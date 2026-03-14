@@ -2224,3 +2224,553 @@ mod native_metric_conversion_tests {
         assert!(scope.attributes.is_empty());
     }
 }
+
+#[cfg(test)]
+mod edge_case_tests {
+    use super::*;
+    use chrono::Utc;
+
+    use super::super::proto::metrics::v1::exponential_histogram_data_point::Buckets as ExpBuckets;
+
+    fn make_counter(name: &str, value: f64, kind: MetricKind) -> MetricEvent {
+        MetricEvent::new(name.to_string(), kind, MetricValue::Counter { value })
+    }
+
+    fn make_gauge(name: &str, value: f64) -> MetricEvent {
+        MetricEvent::new(
+            name.to_string(),
+            MetricKind::Absolute,
+            MetricValue::Gauge { value },
+        )
+    }
+
+    #[test]
+    fn test_exponential_histogram_decode() {
+        let exp_hist = ExponentialHistogram {
+            data_points: vec![ExponentialHistogramDataPoint {
+                attributes: Vec::new(),
+                start_time_unix_nano: 0,
+                time_unix_nano: 1_000_000_000,
+                count: 11,
+                sum: Some(15.0),
+                scale: 0,
+                zero_count: 1,
+                positive: Some(ExpBuckets {
+                    offset: 0,
+                    bucket_counts: vec![5, 3],
+                }),
+                negative: Some(ExpBuckets {
+                    offset: 1,
+                    bucket_counts: vec![2],
+                }),
+                flags: 0,
+                exemplars: Vec::new(),
+                min: None,
+                max: None,
+                zero_threshold: 0.0,
+            }],
+            aggregation_temporality: AggregationTemporality::Cumulative as i32,
+        };
+
+        let metric_msg = super::super::proto::metrics::v1::Metric {
+            name: "exp.hist.test".to_string(),
+            description: String::new(),
+            unit: String::new(),
+            data: Some(Data::ExponentialHistogram(exp_hist)),
+        };
+
+        let resource_metrics = ResourceMetrics {
+            resource: None,
+            scope_metrics: vec![ScopeMetrics {
+                scope: None,
+                metrics: vec![metric_msg],
+                schema_url: String::new(),
+            }],
+            schema_url: String::new(),
+        };
+
+        let events: Vec<Event> = resource_metrics.into_event_iter().collect();
+        assert_eq!(events.len(), 1);
+
+        let decoded = events[0].as_metric();
+        assert_eq!(decoded.name(), "exp.hist.test");
+        assert_eq!(decoded.kind(), MetricKind::Absolute);
+
+        match decoded.value() {
+            MetricValue::AggregatedHistogram {
+                buckets,
+                count,
+                sum,
+            } => {
+                assert_eq!(*count, 11);
+                assert_eq!(*sum, 15.0);
+                assert_eq!(buckets.len(), 4);
+                assert_eq!(buckets[0].upper_limit, -2.0);
+                assert_eq!(buckets[0].count, 2);
+                assert_eq!(buckets[1].upper_limit, 0.0);
+                assert_eq!(buckets[1].count, 1);
+                assert_eq!(buckets[2].upper_limit, 2.0);
+                assert_eq!(buckets[2].count, 5);
+                assert_eq!(buckets[3].upper_limit, 4.0);
+                assert_eq!(buckets[3].count, 3);
+            }
+            other => panic!("Expected AggregatedHistogram, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_counter_negative_value() {
+        let metric =
+            make_counter("negative.counter", -100.0, MetricKind::Incremental)
+                .with_timestamp(Some(Utc::now()));
+        let request = native_metric_to_otlp_request(&metric).unwrap();
+
+        let events: Vec<Event> = request
+            .resource_metrics
+            .into_iter()
+            .flat_map(|rm| rm.into_event_iter())
+            .collect();
+
+        assert_eq!(events.len(), 1);
+        let decoded = events[0].as_metric();
+        assert_eq!(decoded.name(), "negative.counter");
+        assert_eq!(decoded.kind(), MetricKind::Incremental);
+        match decoded.value() {
+            MetricValue::Counter { value } => assert_eq!(*value, -100.0),
+            other => panic!("Expected Counter, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_histogram_empty_explicit_bounds() {
+        let metric = MetricEvent::new(
+            "hist.empty_bounds".to_string(),
+            MetricKind::Absolute,
+            MetricValue::AggregatedHistogram {
+                buckets: vec![Bucket {
+                    upper_limit: f64::INFINITY,
+                    count: 100,
+                }],
+                count: 100,
+                sum: 5000.0,
+            },
+        )
+        .with_timestamp(Some(Utc::now()));
+
+        let request = native_metric_to_otlp_request(&metric).unwrap();
+
+        let otlp_metric = &request.resource_metrics[0].scope_metrics[0].metrics[0];
+        match &otlp_metric.data {
+            Some(Data::Histogram(hist)) => {
+                let dp = &hist.data_points[0];
+                assert!(
+                    dp.explicit_bounds.is_empty(),
+                    "Only +inf bucket should produce empty explicit_bounds"
+                );
+                assert_eq!(dp.bucket_counts, vec![100]);
+                assert_eq!(dp.count, 100);
+                assert_eq!(dp.sum, Some(5000.0));
+            }
+            other => panic!("Expected Histogram, got {other:?}"),
+        }
+
+        let events: Vec<Event> = request
+            .resource_metrics
+            .into_iter()
+            .flat_map(|rm| rm.into_event_iter())
+            .collect();
+
+        assert_eq!(events.len(), 1);
+        let decoded = events[0].as_metric();
+        match decoded.value() {
+            MetricValue::AggregatedHistogram {
+                buckets,
+                count,
+                sum,
+            } => {
+                assert_eq!(*count, 100);
+                assert_eq!(*sum, 5000.0);
+                assert_eq!(buckets.len(), 1);
+                assert!(buckets[0].upper_limit.is_infinite());
+                assert_eq!(buckets[0].count, 100);
+            }
+            other => panic!("Expected AggregatedHistogram, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_summary_no_quantiles() {
+        let metric = MetricEvent::new(
+            "summary.no_quantiles".to_string(),
+            MetricKind::Absolute,
+            MetricValue::AggregatedSummary {
+                quantiles: Vec::new(),
+                count: 100,
+                sum: 5000.0,
+            },
+        )
+        .with_timestamp(Some(Utc::now()));
+
+        let request = native_metric_to_otlp_request(&metric).unwrap();
+
+        let otlp_metric = &request.resource_metrics[0].scope_metrics[0].metrics[0];
+        match &otlp_metric.data {
+            Some(Data::Summary(summary)) => {
+                let dp = &summary.data_points[0];
+                assert!(dp.quantile_values.is_empty());
+                assert_eq!(dp.count, 100);
+                assert_eq!(dp.sum, 5000.0);
+            }
+            other => panic!("Expected Summary, got {other:?}"),
+        }
+
+        let events: Vec<Event> = request
+            .resource_metrics
+            .into_iter()
+            .flat_map(|rm| rm.into_event_iter())
+            .collect();
+
+        assert_eq!(events.len(), 1);
+        let decoded = events[0].as_metric();
+        match decoded.value() {
+            MetricValue::AggregatedSummary {
+                quantiles,
+                count,
+                sum,
+            } => {
+                assert!(quantiles.is_empty());
+                assert_eq!(*count, 100);
+                assert_eq!(*sum, 5000.0);
+            }
+            other => panic!("Expected AggregatedSummary, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_gauge_special_float_values() {
+        // NaN
+        let metric = make_gauge("gauge.nan", f64::NAN);
+        let request = native_metric_to_otlp_request(&metric).unwrap();
+        let events: Vec<Event> = request
+            .resource_metrics
+            .into_iter()
+            .flat_map(|rm| rm.into_event_iter())
+            .collect();
+        assert_eq!(events.len(), 1);
+        match events[0].as_metric().value() {
+            MetricValue::Gauge { value } => assert!(value.is_nan(), "NaN should roundtrip"),
+            other => panic!("Expected Gauge, got {other:?}"),
+        }
+
+        // Positive infinity
+        let metric = make_gauge("gauge.inf", f64::INFINITY);
+        let request = native_metric_to_otlp_request(&metric).unwrap();
+        let events: Vec<Event> = request
+            .resource_metrics
+            .into_iter()
+            .flat_map(|rm| rm.into_event_iter())
+            .collect();
+        assert_eq!(events.len(), 1);
+        match events[0].as_metric().value() {
+            MetricValue::Gauge { value } => {
+                assert!(value.is_infinite() && value.is_sign_positive())
+            }
+            other => panic!("Expected Gauge, got {other:?}"),
+        }
+
+        // Negative infinity
+        let metric = make_gauge("gauge.neg_inf", f64::NEG_INFINITY);
+        let request = native_metric_to_otlp_request(&metric).unwrap();
+        let events: Vec<Event> = request
+            .resource_metrics
+            .into_iter()
+            .flat_map(|rm| rm.into_event_iter())
+            .collect();
+        assert_eq!(events.len(), 1);
+        match events[0].as_metric().value() {
+            MetricValue::Gauge { value } => {
+                assert!(value.is_infinite() && value.is_sign_negative())
+            }
+            other => panic!("Expected Gauge, got {other:?}"),
+        }
+
+        // Subnormal float
+        let subnormal = f64::MIN_POSITIVE / 2.0;
+        assert!(subnormal.is_subnormal(), "test value should be subnormal");
+        let metric = make_gauge("gauge.subnormal", subnormal);
+        let request = native_metric_to_otlp_request(&metric).unwrap();
+        let events: Vec<Event> = request
+            .resource_metrics
+            .into_iter()
+            .flat_map(|rm| rm.into_event_iter())
+            .collect();
+        assert_eq!(events.len(), 1);
+        match events[0].as_metric().value() {
+            MetricValue::Gauge { value } => assert_eq!(*value, subnormal),
+            other => panic!("Expected Gauge, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_multiple_data_points_per_metric() {
+        let sum = Sum {
+            data_points: vec![
+                NumberDataPoint {
+                    attributes: Vec::new(),
+                    start_time_unix_nano: 0,
+                    time_unix_nano: 1_000_000_000,
+                    value: Some(NumberDataPointValue::AsDouble(10.0)),
+                    exemplars: Vec::new(),
+                    flags: 0,
+                },
+                NumberDataPoint {
+                    attributes: Vec::new(),
+                    start_time_unix_nano: 0,
+                    time_unix_nano: 2_000_000_000,
+                    value: Some(NumberDataPointValue::AsDouble(20.0)),
+                    exemplars: Vec::new(),
+                    flags: 0,
+                },
+            ],
+            aggregation_temporality: AggregationTemporality::Delta as i32,
+            is_monotonic: true,
+        };
+
+        let metric_msg = super::super::proto::metrics::v1::Metric {
+            name: "multi.dp".to_string(),
+            description: String::new(),
+            unit: String::new(),
+            data: Some(Data::Sum(sum)),
+        };
+
+        let resource_metrics = ResourceMetrics {
+            resource: None,
+            scope_metrics: vec![ScopeMetrics {
+                scope: None,
+                metrics: vec![metric_msg],
+                schema_url: String::new(),
+            }],
+            schema_url: String::new(),
+        };
+
+        let events: Vec<Event> = resource_metrics.into_event_iter().collect();
+        assert_eq!(events.len(), 2, "Each data point should produce a separate Vector metric");
+
+        for event in &events {
+            let m = event.as_metric();
+            assert_eq!(m.name(), "multi.dp");
+            assert_eq!(m.kind(), MetricKind::Incremental);
+        }
+
+        let values: Vec<f64> = events
+            .iter()
+            .map(|e| match e.as_metric().value() {
+                MetricValue::Counter { value } => *value,
+                other => panic!("Expected Counter, got {other:?}"),
+            })
+            .collect();
+        assert!(values.contains(&10.0));
+        assert!(values.contains(&20.0));
+    }
+
+    #[test]
+    fn test_metric_with_empty_name() {
+        let metric = make_counter("", 1.0, MetricKind::Incremental);
+        let request = native_metric_to_otlp_request(&metric).unwrap();
+
+        let otlp_metric = &request.resource_metrics[0].scope_metrics[0].metrics[0];
+        assert_eq!(otlp_metric.name, "");
+
+        let events: Vec<Event> = request
+            .resource_metrics
+            .into_iter()
+            .flat_map(|rm| rm.into_event_iter())
+            .collect();
+
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].as_metric().name(), "");
+    }
+
+    #[test]
+    fn test_metric_all_temporalities() {
+        // DELTA → MetricKind::Incremental → re-encoded as DELTA
+        let metric = make_counter("temp.delta", 10.0, MetricKind::Incremental)
+            .with_timestamp(Some(Utc::now()));
+        let request = native_metric_to_otlp_request(&metric).unwrap();
+        let otlp_metric = &request.resource_metrics[0].scope_metrics[0].metrics[0];
+        match &otlp_metric.data {
+            Some(Data::Sum(sum)) => {
+                assert_eq!(
+                    sum.aggregation_temporality,
+                    AggregationTemporality::Delta as i32
+                );
+            }
+            other => panic!("Expected Sum, got {other:?}"),
+        }
+        let events: Vec<Event> = request
+            .resource_metrics
+            .into_iter()
+            .flat_map(|rm| rm.into_event_iter())
+            .collect();
+        assert_eq!(events[0].as_metric().kind(), MetricKind::Incremental);
+
+        // CUMULATIVE → MetricKind::Absolute → re-encoded as CUMULATIVE
+        let metric = make_counter("temp.cumulative", 10.0, MetricKind::Absolute)
+            .with_timestamp(Some(Utc::now()));
+        let request = native_metric_to_otlp_request(&metric).unwrap();
+        let otlp_metric = &request.resource_metrics[0].scope_metrics[0].metrics[0];
+        match &otlp_metric.data {
+            Some(Data::Sum(sum)) => {
+                assert_eq!(
+                    sum.aggregation_temporality,
+                    AggregationTemporality::Cumulative as i32
+                );
+            }
+            other => panic!("Expected Sum, got {other:?}"),
+        }
+        let events: Vec<Event> = request
+            .resource_metrics
+            .into_iter()
+            .flat_map(|rm| rm.into_event_iter())
+            .collect();
+        assert_eq!(events[0].as_metric().kind(), MetricKind::Absolute);
+
+        // UNSPECIFIED — decode only: should map to Absolute
+        let sum = Sum {
+            data_points: vec![NumberDataPoint {
+                attributes: Vec::new(),
+                start_time_unix_nano: 0,
+                time_unix_nano: 1_000_000_000,
+                value: Some(NumberDataPointValue::AsDouble(99.0)),
+                exemplars: Vec::new(),
+                flags: 0,
+            }],
+            aggregation_temporality: AggregationTemporality::Unspecified as i32,
+            is_monotonic: true,
+        };
+        let metric_msg = super::super::proto::metrics::v1::Metric {
+            name: "temp.unspecified".to_string(),
+            description: String::new(),
+            unit: String::new(),
+            data: Some(Data::Sum(sum)),
+        };
+        let resource_metrics = ResourceMetrics {
+            resource: None,
+            scope_metrics: vec![ScopeMetrics {
+                scope: None,
+                metrics: vec![metric_msg],
+                schema_url: String::new(),
+            }],
+            schema_url: String::new(),
+        };
+        let events: Vec<Event> = resource_metrics.into_event_iter().collect();
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].as_metric().kind(), MetricKind::Absolute);
+    }
+
+    #[test]
+    fn test_start_time_unix_nano_independence() {
+        let sum = Sum {
+            data_points: vec![NumberDataPoint {
+                attributes: Vec::new(),
+                start_time_unix_nano: 1_000_000_000,
+                time_unix_nano: 2_000_000_000,
+                value: Some(NumberDataPointValue::AsDouble(42.0)),
+                exemplars: Vec::new(),
+                flags: 0,
+            }],
+            aggregation_temporality: AggregationTemporality::Delta as i32,
+            is_monotonic: true,
+        };
+
+        let metric_msg = super::super::proto::metrics::v1::Metric {
+            name: "start_time.test".to_string(),
+            description: String::new(),
+            unit: String::new(),
+            data: Some(Data::Sum(sum)),
+        };
+
+        let resource_metrics = ResourceMetrics {
+            resource: None,
+            scope_metrics: vec![ScopeMetrics {
+                scope: None,
+                metrics: vec![metric_msg],
+                schema_url: String::new(),
+            }],
+            schema_url: String::new(),
+        };
+
+        let events: Vec<Event> = resource_metrics.into_event_iter().collect();
+        assert_eq!(events.len(), 1);
+        let decoded = events[0].as_metric();
+
+        let ts = decoded.timestamp().expect("timestamp should be present");
+        let expected_ts = chrono::TimeZone::timestamp_nanos(&Utc, 2_000_000_000);
+        assert_eq!(ts, expected_ts);
+
+        let request = native_metric_to_otlp_request(decoded).unwrap();
+        let otlp_metric = &request.resource_metrics[0].scope_metrics[0].metrics[0];
+        match &otlp_metric.data {
+            Some(Data::Sum(sum)) => {
+                assert_eq!(
+                    sum.data_points[0].start_time_unix_nano, 0,
+                    "start_time_unix_nano is not preserved through Vector's metric model"
+                );
+                assert_eq!(sum.data_points[0].time_unix_nano, 2_000_000_000);
+            }
+            other => panic!("Expected Sum, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_metric_u64_max_timestamp_overflow() {
+        let gauge = Gauge {
+            data_points: vec![NumberDataPoint {
+                attributes: Vec::new(),
+                start_time_unix_nano: 0,
+                time_unix_nano: u64::MAX,
+                value: Some(NumberDataPointValue::AsDouble(1.0)),
+                exemplars: Vec::new(),
+                flags: 0,
+            }],
+        };
+
+        let metric_msg = super::super::proto::metrics::v1::Metric {
+            name: "overflow.ts".to_string(),
+            description: String::new(),
+            unit: String::new(),
+            data: Some(Data::Gauge(gauge)),
+        };
+
+        let resource_metrics = ResourceMetrics {
+            resource: None,
+            scope_metrics: vec![ScopeMetrics {
+                scope: None,
+                metrics: vec![metric_msg],
+                schema_url: String::new(),
+            }],
+            schema_url: String::new(),
+        };
+
+        let events: Vec<Event> = resource_metrics.into_event_iter().collect();
+        assert_eq!(events.len(), 1);
+
+        let decoded = events[0].as_metric();
+        assert_eq!(decoded.name(), "overflow.ts");
+
+        let ts = decoded.timestamp();
+        assert!(ts.is_some(), "u64::MAX timestamp should decode to Some, not None (it is non-zero)");
+
+        let request = native_metric_to_otlp_request(decoded).unwrap();
+        let otlp_metric = &request.resource_metrics[0].scope_metrics[0].metrics[0];
+        match &otlp_metric.data {
+            Some(Data::Gauge(gauge)) => {
+                assert_eq!(
+                    gauge.data_points[0].time_unix_nano, 0,
+                    "Overflowed timestamp should safely fall back to 0 on re-encode"
+                );
+            }
+            other => panic!("Expected Gauge, got {other:?}"),
+        }
+    }
+}
