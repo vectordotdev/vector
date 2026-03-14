@@ -314,10 +314,10 @@ fn build_scope_logs_from_native(log: &LogEvent, log_record: LogRecord) -> ScopeL
 
 fn build_resource_logs_from_native(log: &LogEvent, scope_logs: ScopeLogs) -> ResourceLogs {
     // Resource-level schema_url: decode path stores at root "schema_url" (Legacy)
-    // or "%metadata.opentelemetry.resources.schema_url" (Vector).
+    // or "%metadata.opentelemetry.resource_schema_url" (Vector).
     let resource_schema_url = log
         .get("schema_url")
-        .or_else(|| get_metadata_otel(log, &["resources", "schema_url"]))
+        .or_else(|| get_metadata_otel(log, &["resource_schema_url"]))
         .and_then(|v| v.as_bytes())
         .map(|b| String::from_utf8_lossy(b).into_owned())
         .unwrap_or_default();
@@ -908,11 +908,11 @@ fn extract_resource_safe(log: &LogEvent) -> Option<Resource> {
             if !attrs.is_empty() {
                 // Extract resource_dropped_attributes_count: decode path stores at
                 // root "resource_dropped_attributes_count" (Legacy) or
-                // "%metadata.opentelemetry.resources.dropped_attributes_count" (Vector).
+                // "%metadata.opentelemetry.resource_dropped_attributes_count" (Vector).
                 let dropped = log
                     .get("resource_dropped_attributes_count")
                     .or_else(|| {
-                        get_metadata_otel(log, &["resources", "dropped_attributes_count"])
+                        get_metadata_otel(log, &["resource_dropped_attributes_count"])
                     })
                     .and_then(|v| match v {
                         Value::Integer(i) => {
