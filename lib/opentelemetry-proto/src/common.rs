@@ -273,10 +273,10 @@ mod tests {
 
     #[test]
     fn test_value_to_pb_float() {
-        let v = Value::Float(NotNan::new(3.14).unwrap());
+        let v = Value::Float(NotNan::new(1.23).unwrap());
         let pb: PBValue = v.into();
         match pb {
-            PBValue::DoubleValue(f) => assert!((f - 3.14).abs() < 0.001),
+            PBValue::DoubleValue(f) => assert!((f - 1.23).abs() < 0.001),
             _ => panic!("Expected DoubleValue"),
         }
     }
@@ -460,7 +460,7 @@ mod tests {
 
     #[test]
     fn test_roundtrip_float() {
-        let original = Value::Float(NotNan::new(3.14159).unwrap());
+        let original = Value::Float(NotNan::new(1.23456).unwrap());
         let pb: PBValue = original.clone().into();
         let roundtrip: Value = pb.into();
         assert_eq!(original, roundtrip);

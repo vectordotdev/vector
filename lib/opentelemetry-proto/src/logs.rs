@@ -1745,7 +1745,7 @@ mod native_conversion_tests {
         attrs.insert("int_val".into(), Value::Integer(42));
         attrs.insert(
             "float_val".into(),
-            Value::Float(NotNan::new(3.14).unwrap()),
+            Value::Float(NotNan::new(1.23).unwrap()),
         );
         attrs.insert("bool_val".into(), Value::Boolean(true));
         attrs.insert(
@@ -1777,7 +1777,7 @@ mod native_conversion_tests {
 
         assert!(matches!(find_attr("str_val"), PBValue::StringValue(s) if s == "hello"));
         assert!(matches!(find_attr("int_val"), PBValue::IntValue(42)));
-        assert!(matches!(find_attr("float_val"), PBValue::DoubleValue(f) if (*f - 3.14).abs() < 0.001));
+        assert!(matches!(find_attr("float_val"), PBValue::DoubleValue(f) if (*f - 1.23).abs() < 0.001));
         assert!(matches!(find_attr("bool_val"), PBValue::BoolValue(true)));
         assert!(matches!(find_attr("array_val"), PBValue::ArrayValue(arr) if arr.values.len() == 2));
         assert!(matches!(
@@ -2209,6 +2209,505 @@ mod native_conversion_tests {
         assert!(
             lr.attributes.is_empty(),
             "Vector namespace should have no remaining-field attributes"
+        );
+    }
+}
+
+#[cfg(test)]
+mod edge_case_tests {
+    use super::*;
+    use crate::proto::{
+        collector::logs::v1::ExportLogsServiceRequest,
+        common::v1::{
+            AnyValue, ArrayValue, KeyValue, KeyValueList,
+            any_value::Value as PBValue,
+        },
+        logs::v1::{LogRecord, ResourceLogs, ScopeLogs, SeverityNumber},
+        resource::v1::Resource,
+    };
+
+    /// Build a minimal ExportLogsServiceRequest with a single ResourceLogs containing
+    /// the given ScopeLogs entries (mirrors existing test patterns).
+    fn make_request(scope_logs: Vec<ScopeLogs>) -> ExportLogsServiceRequest {
+        ExportLogsServiceRequest {
+            resource_logs: vec![ResourceLogs {
+                resource: Some(Resource {
+                    attributes: vec![],
+                    dropped_attributes_count: 0,
+                }),
+                scope_logs,
+                schema_url: String::new(),
+            }],
+        }
+    }
+
+    /// Build a ScopeLogs with a single LogRecord.
+    fn make_scope_logs(log_record: LogRecord) -> ScopeLogs {
+        ScopeLogs {
+            scope: None,
+            log_records: vec![log_record],
+            schema_url: String::new(),
+        }
+    }
+
+    /// Build a ScopeLogs with multiple LogRecords.
+    fn make_scope_logs_multi(log_records: Vec<LogRecord>) -> ScopeLogs {
+        ScopeLogs {
+            scope: None,
+            log_records,
+            schema_url: String::new(),
+        }
+    }
+
+    /// Build a minimal LogRecord with the given body.
+    fn make_log_record(body: Option<AnyValue>) -> LogRecord {
+        LogRecord {
+            time_unix_nano: 1704067200_000_000_000u64,
+            observed_time_unix_nano: 1704067200_000_000_000u64,
+            severity_number: SeverityNumber::Info as i32,
+            severity_text: "INFO".to_string(),
+            body,
+            attributes: vec![],
+            dropped_attributes_count: 0,
+            flags: 0,
+            trace_id: vec![],
+            span_id: vec![],
+        }
+    }
+
+    /// Decode a single-record request into a LogEvent (Legacy namespace).
+    fn decode_single(request: &ExportLogsServiceRequest) -> LogEvent {
+        let rl = request.resource_logs[0].clone();
+        let events: Vec<Event> = rl.into_event_iter(LogNamespace::Legacy).collect();
+        assert_eq!(events.len(), 1, "Expected exactly one event");
+        events.into_iter().next().unwrap().into_log()
+    }
+
+    /// Decode all records from a single-ResourceLogs request (Legacy namespace).
+    fn decode_all(request: &ExportLogsServiceRequest) -> Vec<LogEvent> {
+        let rl = request.resource_logs[0].clone();
+        rl.into_event_iter(LogNamespace::Legacy)
+            .map(|e| e.into_log())
+            .collect()
+    }
+
+    #[test]
+    fn test_array_body_decode_roundtrip() {
+        let body = AnyValue {
+            value: Some(PBValue::ArrayValue(ArrayValue {
+                values: vec![
+                    AnyValue {
+                        value: Some(PBValue::IntValue(1)),
+                    },
+                    AnyValue {
+                        value: Some(PBValue::StringValue("two".to_string())),
+                    },
+                    AnyValue {
+                        value: Some(PBValue::BoolValue(true)),
+                    },
+                    AnyValue {
+                        value: Some(PBValue::DoubleValue(1.23)),
+                    },
+                ],
+            })),
+        };
+
+        let request = make_request(vec![make_scope_logs(make_log_record(Some(body)))]);
+        let log = decode_single(&request);
+
+        // The body should have decoded into the event
+        let roundtrip = native_log_to_otlp_request(&log);
+        let lr = &roundtrip.resource_logs[0].scope_logs[0].log_records[0];
+
+        // Body should be an ArrayValue with 4 elements
+        match lr.body.as_ref().unwrap().value.as_ref().unwrap() {
+            PBValue::ArrayValue(arr) => {
+                assert_eq!(arr.values.len(), 4, "Array body should have 4 elements");
+                assert!(matches!(
+                    arr.values[0].value.as_ref().unwrap(),
+                    PBValue::IntValue(1)
+                ));
+                assert!(matches!(
+                    arr.values[1].value.as_ref().unwrap(),
+                    PBValue::StringValue(s) if s == "two"
+                ));
+                assert!(matches!(
+                    arr.values[2].value.as_ref().unwrap(),
+                    PBValue::BoolValue(true)
+                ));
+                match arr.values[3].value.as_ref().unwrap() {
+                    PBValue::DoubleValue(f) => assert!((f - 1.23).abs() < 0.001),
+                    other => panic!("Expected DoubleValue(1.23), got {other:?}"),
+                }
+            }
+            other => panic!("Expected ArrayValue body after roundtrip, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_nested_kvlist_body() {
+        // Build: {"outer_key": "outer_val", "nested": {"inner_key": "inner_val", "count": 42}}
+        let inner_kvlist = KeyValueList {
+            values: vec![
+                KeyValue {
+                    key: "inner_key".to_string(),
+                    value: Some(AnyValue {
+                        value: Some(PBValue::StringValue("inner_val".to_string())),
+                    }),
+                },
+                KeyValue {
+                    key: "count".to_string(),
+                    value: Some(AnyValue {
+                        value: Some(PBValue::IntValue(42)),
+                    }),
+                },
+            ],
+        };
+
+        let body = AnyValue {
+            value: Some(PBValue::KvlistValue(KeyValueList {
+                values: vec![
+                    KeyValue {
+                        key: "outer_key".to_string(),
+                        value: Some(AnyValue {
+                            value: Some(PBValue::StringValue("outer_val".to_string())),
+                        }),
+                    },
+                    KeyValue {
+                        key: "nested".to_string(),
+                        value: Some(AnyValue {
+                            value: Some(PBValue::KvlistValue(inner_kvlist)),
+                        }),
+                    },
+                ],
+            })),
+        };
+
+        let request = make_request(vec![make_scope_logs(make_log_record(Some(body)))]);
+        let log = decode_single(&request);
+
+        let roundtrip = native_log_to_otlp_request(&log);
+        let lr = &roundtrip.resource_logs[0].scope_logs[0].log_records[0];
+
+        match lr.body.as_ref().unwrap().value.as_ref().unwrap() {
+            PBValue::KvlistValue(kv) => {
+                assert_eq!(kv.values.len(), 2, "Outer kvlist should have 2 entries");
+                // Find the nested entry
+                let nested_kv = kv.values.iter().find(|kv| kv.key == "nested").unwrap();
+                match nested_kv.value.as_ref().unwrap().value.as_ref().unwrap() {
+                    PBValue::KvlistValue(inner) => {
+                        assert_eq!(
+                            inner.values.len(),
+                            2,
+                            "Inner kvlist should have 2 entries"
+                        );
+                        let inner_keys: Vec<&str> =
+                            inner.values.iter().map(|kv| kv.key.as_str()).collect();
+                        assert!(inner_keys.contains(&"inner_key"));
+                        assert!(inner_keys.contains(&"count"));
+                    }
+                    other => panic!("Expected nested KvlistValue, got {other:?}"),
+                }
+            }
+            other => panic!("Expected KvlistValue body, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_bool_int_double_body_types() {
+        // Sub-test: bool body
+        {
+            let body = AnyValue {
+                value: Some(PBValue::BoolValue(true)),
+            };
+            let request = make_request(vec![make_scope_logs(make_log_record(Some(body)))]);
+            let log = decode_single(&request);
+
+            let roundtrip = native_log_to_otlp_request(&log);
+            let lr = &roundtrip.resource_logs[0].scope_logs[0].log_records[0];
+
+            match lr.body.as_ref().unwrap().value.as_ref().unwrap() {
+                PBValue::BoolValue(true) => {}
+                other => panic!("Expected BoolValue(true) body, got {other:?}"),
+            }
+        }
+
+        // Sub-test: int body
+        {
+            let body = AnyValue {
+                value: Some(PBValue::IntValue(999)),
+            };
+            let request = make_request(vec![make_scope_logs(make_log_record(Some(body)))]);
+            let log = decode_single(&request);
+
+            let roundtrip = native_log_to_otlp_request(&log);
+            let lr = &roundtrip.resource_logs[0].scope_logs[0].log_records[0];
+
+            match lr.body.as_ref().unwrap().value.as_ref().unwrap() {
+                PBValue::IntValue(999) => {}
+                other => panic!("Expected IntValue(999) body, got {other:?}"),
+            }
+        }
+
+        // Sub-test: double body
+        {
+            let body = AnyValue {
+                value: Some(PBValue::DoubleValue(9.81)),
+            };
+            let request = make_request(vec![make_scope_logs(make_log_record(Some(body)))]);
+            let log = decode_single(&request);
+
+            let roundtrip = native_log_to_otlp_request(&log);
+            let lr = &roundtrip.resource_logs[0].scope_logs[0].log_records[0];
+
+            match lr.body.as_ref().unwrap().value.as_ref().unwrap() {
+                PBValue::DoubleValue(f) => {
+                    assert!(
+                        (f - 9.81).abs() < 0.001,
+                        "Expected ~9.81, got {f}"
+                    );
+                }
+                other => panic!("Expected DoubleValue body, got {other:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn test_empty_body() {
+        let request = make_request(vec![make_scope_logs(make_log_record(None))]);
+        let log = decode_single(&request);
+
+        // Should not crash and should produce a valid event
+        let roundtrip = native_log_to_otlp_request(&log);
+        assert_eq!(roundtrip.resource_logs.len(), 1);
+        assert_eq!(roundtrip.resource_logs[0].scope_logs.len(), 1);
+        assert_eq!(
+            roundtrip.resource_logs[0].scope_logs[0].log_records.len(),
+            1
+        );
+
+        // Body may or may not be present, but should not panic
+        let lr = &roundtrip.resource_logs[0].scope_logs[0].log_records[0];
+        // The severity and other fields should still be preserved
+        assert_eq!(lr.severity_text, "INFO");
+        assert_eq!(lr.severity_number, SeverityNumber::Info as i32);
+    }
+
+    #[test]
+    fn test_severity_number_zero() {
+        let mut lr = make_log_record(Some(AnyValue {
+            value: Some(PBValue::StringValue("test".to_string())),
+        }));
+        lr.severity_number = SeverityNumber::Unspecified as i32; // 0
+        lr.severity_text = String::new(); // No severity text
+
+        let request = make_request(vec![make_scope_logs(lr)]);
+        let log = decode_single(&request);
+
+        let roundtrip = native_log_to_otlp_request(&log);
+        let out_lr = &roundtrip.resource_logs[0].scope_logs[0].log_records[0];
+
+        // UNSPECIFIED (0) should remain as 0
+        assert_eq!(
+            out_lr.severity_number,
+            SeverityNumber::Unspecified as i32,
+            "Severity number should be UNSPECIFIED (0)"
+        );
+        assert!(
+            out_lr.severity_text.is_empty(),
+            "Severity text should be empty"
+        );
+    }
+
+    #[test]
+    fn test_observed_timestamp_without_timestamp() {
+        let mut lr = make_log_record(Some(AnyValue {
+            value: Some(PBValue::StringValue("observed only".to_string())),
+        }));
+        lr.time_unix_nano = 0; // No timestamp
+        lr.observed_time_unix_nano = 1704067200_000_000_000u64; // Has observed
+
+        let request = make_request(vec![make_scope_logs(lr)]);
+        let log = decode_single(&request);
+
+        let roundtrip = native_log_to_otlp_request(&log);
+        let out_lr = &roundtrip.resource_logs[0].scope_logs[0].log_records[0];
+
+        // Observed timestamp should be preserved
+        assert_eq!(
+            out_lr.observed_time_unix_nano, 1704067200_000_000_000u64,
+            "Observed timestamp should be preserved"
+        );
+
+        // When time_unix_nano is 0, the decode path sets timestamp = observed_timestamp.
+        // So the roundtrip should produce a non-zero time_unix_nano.
+        assert!(
+            out_lr.time_unix_nano > 0,
+            "timestamp should be non-zero (filled from observed_timestamp or current time)"
+        );
+    }
+
+    #[test]
+    fn test_unicode_and_emoji_in_body() {
+        let unicode_body = "Hello 世界 🌍 مرحبا";
+        let body = AnyValue {
+            value: Some(PBValue::StringValue(unicode_body.to_string())),
+        };
+
+        let request = make_request(vec![make_scope_logs(make_log_record(Some(body)))]);
+        let log = decode_single(&request);
+
+        let roundtrip = native_log_to_otlp_request(&log);
+        let lr = &roundtrip.resource_logs[0].scope_logs[0].log_records[0];
+
+        match lr.body.as_ref().unwrap().value.as_ref().unwrap() {
+            PBValue::StringValue(s) => {
+                assert_eq!(s, unicode_body, "Unicode body should roundtrip exactly");
+            }
+            other => panic!("Expected StringValue body, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_unicode_in_attribute_keys_and_values() {
+        let attributes = vec![
+            KeyValue {
+                key: "名前".to_string(), // Japanese: "name"
+                value: Some(AnyValue {
+                    value: Some(PBValue::StringValue("太郎".to_string())), // "Taro"
+                }),
+            },
+            KeyValue {
+                key: "город".to_string(), // Russian: "city"
+                value: Some(AnyValue {
+                    value: Some(PBValue::StringValue("Москва".to_string())), // "Moscow"
+                }),
+            },
+            KeyValue {
+                key: "emoji_key_🔑".to_string(),
+                value: Some(AnyValue {
+                    value: Some(PBValue::StringValue("value_🎉".to_string())),
+                }),
+            },
+        ];
+
+        let mut lr = make_log_record(Some(AnyValue {
+            value: Some(PBValue::StringValue("test".to_string())),
+        }));
+        lr.attributes = attributes;
+
+        let request = make_request(vec![make_scope_logs(lr)]);
+        let log = decode_single(&request);
+
+        let roundtrip = native_log_to_otlp_request(&log);
+        let out_lr = &roundtrip.resource_logs[0].scope_logs[0].log_records[0];
+
+        let attr_keys: Vec<&str> = out_lr
+            .attributes
+            .iter()
+            .map(|kv| kv.key.as_str())
+            .collect();
+
+        assert!(
+            attr_keys.contains(&"名前"),
+            "Japanese key should be preserved, got {attr_keys:?}"
+        );
+        assert!(
+            attr_keys.contains(&"город"),
+            "Russian key should be preserved, got {attr_keys:?}"
+        );
+        assert!(
+            attr_keys.contains(&"emoji_key_🔑"),
+            "Emoji key should be preserved, got {attr_keys:?}"
+        );
+
+        // Check values
+        let find_attr_value = |key: &str| -> &PBValue {
+            out_lr
+                .attributes
+                .iter()
+                .find(|kv| kv.key == key)
+                .unwrap()
+                .value
+                .as_ref()
+                .unwrap()
+                .value
+                .as_ref()
+                .unwrap()
+        };
+
+        match find_attr_value("名前") {
+            PBValue::StringValue(s) => assert_eq!(s, "太郎"),
+            other => panic!("Expected '太郎', got {other:?}"),
+        }
+        match find_attr_value("город") {
+            PBValue::StringValue(s) => assert_eq!(s, "Москва"),
+            other => panic!("Expected 'Москва', got {other:?}"),
+        }
+        match find_attr_value("emoji_key_🔑") {
+            PBValue::StringValue(s) => assert_eq!(s, "value_🎉"),
+            other => panic!("Expected 'value_🎉', got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_multiple_log_records_per_scope() {
+        let records = vec![
+            make_log_record(Some(AnyValue {
+                value: Some(PBValue::StringValue("first".to_string())),
+            })),
+            make_log_record(Some(AnyValue {
+                value: Some(PBValue::StringValue("second".to_string())),
+            })),
+            make_log_record(Some(AnyValue {
+                value: Some(PBValue::StringValue("third".to_string())),
+            })),
+        ];
+
+        let request = make_request(vec![make_scope_logs_multi(records)]);
+
+        // Decode all records
+        let logs = decode_all(&request);
+        assert_eq!(logs.len(), 3, "All 3 log records should be decoded");
+
+        // Roundtrip each and verify bodies
+        let expected_bodies = ["first", "second", "third"];
+        for (i, log) in logs.iter().enumerate() {
+            let roundtrip = native_log_to_otlp_request(log);
+            let lr = &roundtrip.resource_logs[0].scope_logs[0].log_records[0];
+
+            match lr.body.as_ref().unwrap().value.as_ref().unwrap() {
+                PBValue::StringValue(s) => {
+                    assert_eq!(
+                        s, expected_bodies[i],
+                        "Log record {i} body mismatch"
+                    );
+                }
+                other => panic!("Expected StringValue for record {i}, got {other:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn test_u64_max_timestamp_overflow() {
+        let mut lr = make_log_record(Some(AnyValue {
+            value: Some(PBValue::StringValue("overflow test".to_string())),
+        }));
+        lr.time_unix_nano = u64::MAX;
+        lr.observed_time_unix_nano = u64::MAX;
+
+        let request = make_request(vec![make_scope_logs(lr)]);
+
+        // Should not panic — the safe cast in nanos_to_timestamp should handle overflow
+        let log = decode_single(&request);
+
+        // Verify the event was produced and can be roundtripped without panic
+        let roundtrip = native_log_to_otlp_request(&log);
+        assert_eq!(roundtrip.resource_logs.len(), 1);
+        assert_eq!(roundtrip.resource_logs[0].scope_logs.len(), 1);
+        assert_eq!(
+            roundtrip.resource_logs[0].scope_logs[0].log_records.len(),
+            1
         );
     }
 }
