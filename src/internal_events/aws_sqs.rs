@@ -75,14 +75,18 @@ mod s3 {
     #[derive(Debug, NamedInternalEvent)]
     pub struct S3ObjectProcessingFailed<'a> {
         pub bucket: &'a str,
+        pub key: &'a str,
+        pub error: &'a str,
         pub duration: Duration,
     }
 
     impl InternalEvent for S3ObjectProcessingFailed<'_> {
         fn emit(self) {
-            debug!(
+            warn!(
                 message = "S3 object processing failed.",
                 bucket = %self.bucket,
+                key = %self.key,
+                error = %self.error,
                 duration_ms = %self.duration.as_millis(),
             );
             histogram!(
@@ -90,6 +94,41 @@ mod s3 {
                 "bucket" => self.bucket.to_owned(),
             )
             .record(self.duration);
+        }
+    }
+
+    #[derive(Debug, NamedInternalEvent)]
+    pub struct S3ObjectGetFailed<'a> {
+        pub bucket: &'a str,
+        pub key: &'a str,
+        pub error_kind: &'a str,
+        pub actionable_message: &'a str,
+    }
+
+    impl InternalEvent for S3ObjectGetFailed<'_> {
+        fn emit(self) {
+            error!(
+                message = %self.actionable_message,
+                bucket = %self.bucket,
+                key = %self.key,
+                error_kind = %self.error_kind,
+                error_code = "failed_getting_s3_object",
+                error_type = error_type::REQUEST_FAILED,
+                stage = error_stage::RECEIVING,
+            );
+            counter!(
+                "component_errors_total",
+                "error_code" => "failed_getting_s3_object",
+                "error_type" => error_type::REQUEST_FAILED,
+                "stage" => error_stage::RECEIVING,
+            )
+            .increment(1);
+            counter!(
+                "s3_object_get_failed_total",
+                "bucket" => self.bucket.to_owned(),
+                "error_kind" => self.error_kind.to_owned(),
+            )
+            .increment(1);
         }
     }
 

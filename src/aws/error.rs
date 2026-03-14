@@ -95,6 +95,20 @@ pub enum AwsErrorClass {
     Unknown,
 }
 
+impl AwsErrorClass {
+    /// Whether this error class represents a transient/retryable failure.
+    ///
+    /// Returns `true` for connectivity issues, throttling, and server errors.
+    /// Returns `false` for auth, not-found, configuration, and other client errors
+    /// that require human intervention.
+    pub const fn is_retryable(&self) -> bool {
+        matches!(
+            self,
+            AwsErrorClass::Connectivity | AwsErrorClass::Throttling | AwsErrorClass::ServiceError
+        )
+    }
+}
+
 /// Structured error context extracted from an SdkError. All fields are borrowed.
 #[derive(Debug)]
 pub struct AwsErrorContext<'a> {

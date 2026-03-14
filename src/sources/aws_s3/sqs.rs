@@ -49,11 +49,12 @@ use crate::{
     config::{SourceAcknowledgementsConfig, SourceContext},
     event::{BatchNotifier, BatchStatus, EstimatedJsonEncodedSizeOf, Event, LogEvent},
     internal_events::{
-        EventsReceived, S3ObjectProcessingFailed, S3ObjectProcessingSucceeded,
-        SqsMessageDeleteBatchError, SqsMessageDeletePartialError, SqsMessageDeleteSucceeded,
-        SqsMessageProcessingError, SqsMessageProcessingSucceeded, SqsMessageReceiveError,
-        SqsMessageReceiveSucceeded, SqsMessageSendBatchError, SqsMessageSentPartialError,
-        SqsMessageSentSucceeded, SqsS3EventRecordInvalidEventIgnored, StreamClosedError,
+        EventsReceived, S3ObjectGetFailed, S3ObjectProcessingFailed,
+        S3ObjectProcessingSucceeded, SqsMessageDeleteBatchError, SqsMessageDeletePartialError,
+        SqsMessageDeleteSucceeded, SqsMessageProcessingError, SqsMessageProcessingSucceeded,
+        SqsMessageReceiveError, SqsMessageReceiveSucceeded, SqsMessageSendBatchError,
+        SqsMessageSentPartialError, SqsMessageSentSucceeded,
+        SqsS3EventRecordInvalidEventIgnored, StreamClosedError,
     },
     line_agg::{self, LineAgg},
     shutdown::ShutdownSignal,
@@ -548,6 +549,56 @@ impl IngestorProcess {
                                 message_id: &message_id,
                                 error: &err,
                             });
+
+                            let should_delete = match &err {
+                                ProcessingError::GetObject { source, bucket, key } => {
+                                    let ctx = crate::aws::error::extract_error_context(source);
+                                    let class = crate::aws::error::classify_error(&ctx);
+                                    let error_kind = match class {
+                                        crate::aws::error::AwsErrorClass::NotFound => {
+                                            if ctx.aws_error_code == Some("NoSuchBucket") {
+                                                "NoSuchBucket"
+                                            } else {
+                                                "NoSuchKey"
+                                            }
+                                        }
+                                        crate::aws::error::AwsErrorClass::Auth => "AccessDenied",
+                                        crate::aws::error::AwsErrorClass::Throttling => "Throttling",
+                                        crate::aws::error::AwsErrorClass::Connectivity => "Transient",
+                                        crate::aws::error::AwsErrorClass::ServiceError => "ServiceError",
+                                        _ => "Other",
+                                    };
+                                    let actionable_message =
+                                        s3_get_object_actionable_message(error_kind, bucket, key);
+                                    emit!(S3ObjectGetFailed {
+                                        bucket,
+                                        key,
+                                        error_kind,
+                                        actionable_message: &actionable_message,
+                                    });
+                                    self.state.delete_failed_message && !class.is_retryable()
+                                }
+                                ProcessingError::UnsupportedS3EventVersion { .. }
+                                | ProcessingError::WrongRegion { .. } => {
+                                    self.state.delete_failed_message
+                                }
+                                _ => false,
+                            };
+
+                            if should_delete {
+                                warn!(
+                                    message = "Deleting SQS message for non-retryable error.",
+                                    message_id = %message_id,
+                                    error = %err,
+                                );
+                                delete_entries.push(
+                                    DeleteMessageBatchRequestEntry::builder()
+                                        .id(message_id.clone())
+                                        .receipt_handle(receipt_handle.clone())
+                                        .build()
+                                        .expect("all required builder params specified"),
+                                );
+                            }
                         }
                     }
                 }
@@ -824,8 +875,13 @@ impl IngestorProcess {
         let bucket = &s3_event.s3.bucket.name;
         let duration = download_start.elapsed();
 
-        if read_error.is_some() {
-            emit!(S3ObjectProcessingFailed { bucket, duration });
+        if let Some(ref error) = read_error {
+            emit!(S3ObjectProcessingFailed {
+                bucket,
+                key: &s3_event.s3.object.key,
+                error: &error.to_string(),
+                duration,
+            });
         } else {
             emit!(S3ObjectProcessingSucceeded { bucket, duration });
         }
@@ -928,6 +984,44 @@ impl IngestorProcess {
             .set_entries(Some(entries))
             .send()
             .await
+    }
+}
+
+fn s3_get_object_actionable_message(error_kind: &str, bucket: &str, key: &str) -> String {
+    match error_kind {
+        "NoSuchKey" => format!(
+            "S3 object s3://{bucket}/{key} does not exist. \
+             The object may have been deleted before Vector could fetch it. \
+             If this is expected (e.g., short-lived objects), consider enabling \
+             a dead-letter queue on your SQS queue to prevent infinite retries."
+        ),
+        "NoSuchBucket" => format!(
+            "S3 bucket '{bucket}' does not exist. \
+             Verify the bucket name in your S3 event notifications and ensure \
+             the bucket has not been deleted."
+        ),
+        "AccessDenied" => format!(
+            "Access denied to s3://{bucket}/{key}. \
+             Ensure the IAM role/user used by Vector has s3:GetObject permission \
+             on this bucket and key prefix. Check bucket policies, ACLs, and \
+             any KMS key policies if the object is encrypted."
+        ),
+        "Throttling" => format!(
+            "AWS is throttling requests to s3://{bucket}/{key}. \
+             The request will be retried automatically."
+        ),
+        "Transient" => format!(
+            "Transient error fetching s3://{bucket}/{key}. \
+             The request will be retried automatically."
+        ),
+        "ServiceError" => format!(
+            "AWS returned a server error for s3://{bucket}/{key}. \
+             This is usually transient and will be retried automatically."
+        ),
+        _ => format!(
+            "Failed to fetch s3://{bucket}/{key}. \
+             Check AWS documentation for this error."
+        ),
     }
 }
 
