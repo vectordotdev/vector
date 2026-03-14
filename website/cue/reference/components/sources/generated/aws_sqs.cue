@@ -19,7 +19,7 @@ generated: components: sources: aws_sqs: configuration: {
 		type: object: options: enabled: {
 			description: "Whether or not end-to-end acknowledgements are enabled for this source."
 			required:    false
-			type: bool: {}
+			type: bool: default: null
 		}
 	}
 	auth: {
@@ -57,26 +57,33 @@ generated: components: sources: aws_sqs: configuration: {
 			imds: {
 				description: "Configuration for authenticating with AWS through IMDS."
 				required:    false
-				type: object: options: {
-					connect_timeout_seconds: {
-						description: "Connect timeout for IMDS."
-						required:    false
-						type: uint: {
-							default: 1
-							unit:    "seconds"
+				type: object: {
+					default: {
+						connect_timeout_seconds: 1
+						max_attempts:            4
+						read_timeout_seconds:    1
+					}
+					options: {
+						connect_timeout_seconds: {
+							description: "Connect timeout for IMDS."
+							required:    false
+							type: uint: {
+								default: 1
+								unit:    "seconds"
+							}
 						}
-					}
-					max_attempts: {
-						description: "Number of IMDS retries for fetching tokens and metadata."
-						required:    false
-						type: uint: default: 4
-					}
-					read_timeout_seconds: {
-						description: "Read timeout for IMDS."
-						required:    false
-						type: uint: {
-							default: 1
-							unit:    "seconds"
+						max_attempts: {
+							description: "Number of IMDS retries for fetching tokens and metadata."
+							required:    false
+							type: uint: default: 4
+						}
+						read_timeout_seconds: {
+							description: "Read timeout for IMDS."
+							required:    false
+							type: uint: {
+								default: 1
+								unit:    "seconds"
+							}
 						}
 					}
 				}
@@ -89,6 +96,7 @@ generated: components: sources: aws_sqs: configuration: {
 					"""
 				required: false
 				type: uint: {
+					default: null
 					examples: [30]
 					unit: "seconds"
 				}
@@ -115,7 +123,10 @@ generated: components: sources: aws_sqs: configuration: {
 					[aws_region]: https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints
 					"""
 				required: false
-				type: string: examples: ["us-west-2"]
+				type: string: {
+					default: null
+					examples: ["us-west-2"]
+				}
 			}
 			secret_access_key: {
 				description: "The AWS secret access key."
@@ -470,7 +481,10 @@ generated: components: sources: aws_sqs: configuration: {
 																[tz_database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 																"""
 						required: false
-						type: string: examples: ["local", "America/New_York", "EST5EDT"]
+						type: string: {
+							default: null
+							examples: ["local", "America/New_York", "EST5EDT"]
+						}
 					}
 				}
 			}
@@ -488,7 +502,10 @@ generated: components: sources: aws_sqs: configuration: {
 	endpoint: {
 		description: "Custom endpoint for use with AWS-compatible services."
 		required:    false
-		type: string: examples: ["http://127.0.0.0:5000/path/to/service"]
+		type: string: {
+			default: null
+			examples: ["http://127.0.0.0:5000/path/to/service"]
+		}
 	}
 	framing: {
 		description: """
@@ -560,7 +577,7 @@ generated: components: sources: aws_sqs: configuration: {
 																The message's payload is the concatenation of all the chunks' payloads.
 																"""
 						required: false
-						type: uint: {}
+						type: uint: default: null
 					}
 					pending_messages_limit: {
 						description: """
@@ -570,7 +587,7 @@ generated: components: sources: aws_sqs: configuration: {
 																of its messages buffer can grow unbounded. This matches Graylog Server's behavior.
 																"""
 						required: false
-						type: uint: {}
+						type: uint: default: null
 					}
 					timeout_secs: {
 						description: """
@@ -701,7 +718,10 @@ generated: components: sources: aws_sqs: configuration: {
 			[aws_region]: https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints
 			"""
 		required: false
-		type: string: examples: ["us-east-1"]
+		type: string: {
+			default: null
+			examples: ["us-east-1"]
+		}
 	}
 	tls: {
 		description: "TLS configuration."

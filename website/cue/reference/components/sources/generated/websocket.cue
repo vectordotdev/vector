@@ -499,7 +499,10 @@ generated: components: sources: websocket: configuration: {
 																[tz_database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 																"""
 						required: false
-						type: string: examples: ["local", "America/New_York", "EST5EDT"]
+						type: string: {
+							default: null
+							examples: ["local", "America/New_York", "EST5EDT"]
+						}
 					}
 				}
 			}
@@ -569,7 +572,7 @@ generated: components: sources: websocket: configuration: {
 																The message's payload is the concatenation of all the chunks' payloads.
 																"""
 						required: false
-						type: uint: {}
+						type: uint: default: null
 					}
 					pending_messages_limit: {
 						description: """
@@ -579,7 +582,7 @@ generated: components: sources: websocket: configuration: {
 																of its messages buffer can grow unbounded. This matches Graylog Server's behavior.
 																"""
 						required: false
-						type: uint: {}
+						type: uint: default: null
 					}
 					timeout_secs: {
 						description: """
@@ -688,7 +691,10 @@ generated: components: sources: websocket: configuration: {
 	initial_message: {
 		description: "An optional message to send to the server upon connection."
 		required:    false
-		type: string: examples: ["SUBSCRIBE logs"]
+		type: string: {
+			default: null
+			examples: ["SUBSCRIBE logs"]
+		}
 	}
 	initial_message_timeout_secs: {
 		description: """
@@ -729,7 +735,7 @@ generated: components: sources: websocket: configuration: {
 			If not set, a standard WebSocket ping control frame is sent instead.
 			"""
 		required: false
-		type: string: {}
+		type: string: default: null
 	}
 	ping_timeout: {
 		description: """
@@ -755,22 +761,25 @@ generated: components: sources: websocket: configuration: {
 			"""
 		required: false
 		type: {
-			object: options: {
-				type: {
-					description: "The matching strategy to use for the pong message."
-					required:    true
-					type: string: enum: {
-						contains: "The message must contain the value as a substring."
-						exact:    "The entire message must be an exact match."
+			object: {
+				default: null
+				options: {
+					type: {
+						description: "The matching strategy to use for the pong message."
+						required:    true
+						type: string: enum: {
+							contains: "The message must contain the value as a substring."
+							exact:    "The entire message must be an exact match."
+						}
+					}
+					value: {
+						description: "The string value to match against."
+						required:    true
+						type: string: {}
 					}
 				}
-				value: {
-					description: "The string value to match against."
-					required:    true
-					type: string: {}
-				}
 			}
-			string: {}
+			string: default: null
 		}
 	}
 	tls: {

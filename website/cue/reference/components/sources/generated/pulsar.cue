@@ -19,7 +19,7 @@ generated: components: sources: pulsar: configuration: {
 		type: object: options: enabled: {
 			description: "Whether or not end-to-end acknowledgements are enabled for this source."
 			required:    false
-			type: bool: {}
+			type: bool: default: null
 		}
 	}
 	auth: {
@@ -415,7 +415,10 @@ generated: components: sources: pulsar: configuration: {
 																[tz_database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 																"""
 						required: false
-						type: string: examples: ["local", "America/New_York", "EST5EDT"]
+						type: string: {
+							default: null
+							examples: ["local", "America/New_York", "EST5EDT"]
+						}
 					}
 				}
 			}
@@ -496,7 +499,7 @@ generated: components: sources: pulsar: configuration: {
 																The message's payload is the concatenation of all the chunks' payloads.
 																"""
 						required: false
-						type: uint: {}
+						type: uint: default: null
 					}
 					pending_messages_limit: {
 						description: """
@@ -506,7 +509,7 @@ generated: components: sources: pulsar: configuration: {
 																of its messages buffer can grow unbounded. This matches Graylog Server's behavior.
 																"""
 						required: false
-						type: uint: {}
+						type: uint: default: null
 					}
 					timeout_secs: {
 						description: """
@@ -631,29 +634,32 @@ generated: components: sources: pulsar: configuration: {
 	tls: {
 		description: "TLS options configuration for the Pulsar client."
 		required:    false
-		type: object: options: {
-			ca_file: {
-				description: "File path containing a list of PEM encoded certificates"
-				required:    true
-				type: string: examples: ["/etc/certs/chain.pem"]
-			}
-			verify_certificate: {
-				description: """
-					Enables certificate verification.
+		type: object: {
+			default: null
+			options: {
+				ca_file: {
+					description: "File path containing a list of PEM encoded certificates"
+					required:    true
+					type: string: examples: ["/etc/certs/chain.pem"]
+				}
+				verify_certificate: {
+					description: """
+						Enables certificate verification.
 
-					Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
-					"""
-				required: false
-				type: bool: {}
-			}
-			verify_hostname: {
-				description: """
-					Whether hostname verification is enabled when verify_certificate is false
+						Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
+						"""
+					required: false
+					type: bool: {}
+				}
+				verify_hostname: {
+					description: """
+						Whether hostname verification is enabled when verify_certificate is false
 
-					Set to true if not specified.
-					"""
-				required: false
-				type: bool: {}
+						Set to true if not specified.
+						"""
+					required: false
+					type: bool: {}
+				}
 			}
 		}
 	}

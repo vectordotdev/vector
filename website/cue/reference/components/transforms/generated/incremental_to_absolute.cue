@@ -13,18 +13,24 @@ generated: components: transforms: incremental_to_absolute: configuration: cache
 		max_bytes: {
 			description: "The maximum size in bytes of the events in the metrics normalizer cache, excluding cache overhead."
 			required:    false
-			type: uint: unit: "bytes"
+			type: uint: {
+				default: null
+				unit:    "bytes"
+			}
 		}
 		max_events: {
 			description: "The maximum number of events of the metrics normalizer cache"
 			required:    false
-			type: uint: unit: "events"
+			type: uint: {
+				default: null
+				unit:    "events"
+			}
 		}
 		time_to_live: {
 			description: "The maximum age of a metric not being updated before it is evicted from the metrics normalizer cache."
 			required:    false
 			type: uint: {
-				default: 300
+				default: null
 				unit:    "seconds"
 			}
 		}
