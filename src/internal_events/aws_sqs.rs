@@ -17,8 +17,39 @@ mod s3 {
     };
     use metrics::histogram;
 
+    use aws_smithy_types::error::display::DisplayErrorContext;
+
     use super::*;
+    use crate::aws::error::{AwsErrorClass, classify_error};
     use crate::sources::aws_s3::sqs::ProcessingError;
+
+    /// Returns an actionable hint for S3 source errors based on classification.
+    fn s3_error_hint(class: AwsErrorClass, error_code: Option<&str>) -> Option<&'static str> {
+        match (class, error_code) {
+            (AwsErrorClass::Auth, Some("ExpiredToken" | "ExpiredTokenException")) => Some(
+                "The security token has expired. Check credential refresh configuration.",
+            ),
+            (AwsErrorClass::Auth, _) => Some(
+                "Check that the IAM role/user has s3:GetObject permission on this bucket/key.",
+            ),
+            (AwsErrorClass::NotFound, Some("NoSuchBucket")) => {
+                Some("The S3 bucket does not exist. Check the bucket name in your configuration.")
+            }
+            (AwsErrorClass::NotFound, _) => Some(
+                "The S3 object does not exist. It may have been deleted before Vector could fetch it.",
+            ),
+            (AwsErrorClass::Throttling, _) => Some(
+                "AWS is throttling requests. Consider reducing poll frequency or request rate.",
+            ),
+            (AwsErrorClass::Connectivity, _) => Some(
+                "Network connectivity issue. Check DNS, proxy, and TLS configuration.",
+            ),
+            (AwsErrorClass::Configuration, _) => Some(
+                "Configuration error. Check credentials, region, and endpoint settings.",
+            ),
+            _ => None,
+        }
+    }
 
     #[derive(Debug, NamedInternalEvent)]
     pub struct S3ObjectProcessingSucceeded<'a> {
@@ -68,20 +99,77 @@ mod s3 {
         pub error: &'a ProcessingError,
     }
 
+    impl SqsMessageProcessingError<'_> {
+        /// Returns the `(error_type, error_code)` pair for this processing error.
+        const fn classify(error: &ProcessingError) -> (&'static str, &'static str) {
+            match error {
+                ProcessingError::GetObject { .. } => {
+                    (error_type::REQUEST_FAILED, "failed_s3_get_object")
+                }
+                ProcessingError::InvalidSqsMessage { .. } => {
+                    (error_type::PARSER_FAILED, "invalid_sqs_message")
+                }
+                ProcessingError::ReadObject { .. } => {
+                    (error_type::READER_FAILED, "failed_reading_s3_object")
+                }
+                ProcessingError::PipelineSend { .. } => {
+                    (error_type::WRITER_FAILED, "failed_sending_to_pipeline")
+                }
+                ProcessingError::WrongRegion { .. } => {
+                    (error_type::CONDITION_FAILED, "wrong_region")
+                }
+                ProcessingError::UnsupportedS3EventVersion { .. } => {
+                    (error_type::PARSER_FAILED, "unsupported_s3_event_version")
+                }
+                ProcessingError::ErrorAcknowledgement { .. } => {
+                    (error_type::ACKNOWLEDGMENT_FAILED, "error_acknowledgement")
+                }
+                ProcessingError::FileTooOld { .. } => {
+                    (error_type::CONDITION_FAILED, "file_too_old")
+                }
+            }
+        }
+    }
+
     impl InternalEvent for SqsMessageProcessingError<'_> {
         fn emit(self) {
-            error!(
-                message = "Failed to process SQS message.",
-                message_id = %self.message_id,
-                error = %self.error,
-                error_code = "failed_processing_sqs_message",
-                error_type = error_type::PARSER_FAILED,
-                stage = error_stage::PROCESSING,
-            );
+            let (error_type_val, error_code_val) = Self::classify(self.error);
+
+            if let ProcessingError::GetObject { source, bucket, key } = self.error {
+                let ctx = crate::aws::error::extract_error_context(source);
+                let class = classify_error(&ctx);
+                error!(
+                    message = "Failed to process SQS message.",
+                    message_id = %self.message_id,
+                    error = %DisplayErrorContext(source),
+                    error_code = error_code_val,
+                    error_type = error_type_val,
+                    stage = error_stage::PROCESSING,
+                    bucket = %bucket,
+                    key = %key,
+                    aws_error_code = ctx.aws_error_code.unwrap_or(""),
+                    aws_http_status = ctx.http_status.unwrap_or(0),
+                    aws_request_id = ctx.aws_request_id.unwrap_or(""),
+                    aws_error_class = ?class,
+                );
+                if let Some(hint) = s3_error_hint(class, ctx.aws_error_code) {
+                    warn!(message = %hint);
+                }
+            } else {
+                error!(
+                    message = "Failed to process SQS message.",
+                    message_id = %self.message_id,
+                    error = %self.error,
+                    error_code = error_code_val,
+                    error_type = error_type_val,
+                    stage = error_stage::PROCESSING,
+                );
+            }
+
             counter!(
                 "component_errors_total",
-                "error_code" => "failed_processing_sqs_message",
-                "error_type" => error_type::PARSER_FAILED,
+                "error_code" => error_code_val,
+                "error_type" => error_type_val,
                 "stage" => error_stage::PROCESSING,
             )
             .increment(1);
@@ -132,24 +220,44 @@ mod s3 {
     }
 
     #[derive(Debug, NamedInternalEvent)]
-    pub struct SqsMessageDeleteBatchError<E> {
+    pub struct SqsMessageDeleteBatchError<'a, E> {
         pub entries: Vec<DeleteMessageBatchRequestEntry>,
         pub error: E,
+        pub aws_ctx: Option<crate::aws::error::AwsErrorContext<'a>>,
     }
 
-    impl<E: std::fmt::Display> InternalEvent for SqsMessageDeleteBatchError<E> {
+    impl<E: std::fmt::Display> InternalEvent for SqsMessageDeleteBatchError<'_, E> {
         fn emit(self) {
-            error!(
-                message = "Deletion of SQS message(s) failed.",
-                message_ids = %self.entries.iter()
-                    .map(|x| x.id.as_str())
-                    .collect::<Vec<_>>()
-                    .join(", "),
-                error = %self.error,
-                error_code = "failed_deleting_all_sqs_messages",
-                error_type = error_type::ACKNOWLEDGMENT_FAILED,
-                stage = error_stage::PROCESSING,
-            );
+            let message_ids = self
+                .entries
+                .iter()
+                .map(|x| x.id.as_str())
+                .collect::<Vec<_>>()
+                .join(", ");
+            if let Some(ref ctx) = self.aws_ctx {
+                let class = crate::aws::error::classify_error(ctx);
+                error!(
+                    message = "Deletion of SQS message(s) failed.",
+                    message_ids = %message_ids,
+                    error = %self.error,
+                    error_code = "failed_deleting_all_sqs_messages",
+                    error_type = error_type::ACKNOWLEDGMENT_FAILED,
+                    stage = error_stage::PROCESSING,
+                    aws_error_code = ctx.aws_error_code.unwrap_or(""),
+                    aws_http_status = ctx.http_status.unwrap_or(0),
+                    aws_request_id = ctx.aws_request_id.unwrap_or(""),
+                    aws_error_class = ?class,
+                );
+            } else {
+                error!(
+                    message = "Deletion of SQS message(s) failed.",
+                    message_ids = %message_ids,
+                    error = %self.error,
+                    error_code = "failed_deleting_all_sqs_messages",
+                    error_type = error_type::ACKNOWLEDGMENT_FAILED,
+                    stage = error_stage::PROCESSING,
+                );
+            }
             counter!(
                 "component_errors_total",
                 "error_code" => "failed_deleting_all_sqs_messages",
@@ -204,24 +312,44 @@ mod s3 {
     }
 
     #[derive(Debug, NamedInternalEvent)]
-    pub struct SqsMessageSendBatchError<E> {
+    pub struct SqsMessageSendBatchError<'a, E> {
         pub entries: Vec<SendMessageBatchRequestEntry>,
         pub error: E,
+        pub aws_ctx: Option<crate::aws::error::AwsErrorContext<'a>>,
     }
 
-    impl<E: std::fmt::Display> InternalEvent for SqsMessageSendBatchError<E> {
+    impl<E: std::fmt::Display> InternalEvent for SqsMessageSendBatchError<'_, E> {
         fn emit(self) {
-            error!(
-                message = "Sending of deferred SQS message(s) failed.",
-                message_ids = %self.entries.iter()
-                    .map(|x| x.id.as_str())
-                    .collect::<Vec<_>>()
-                    .join(", "),
-                error = %self.error,
-                error_code = "failed_deferring_all_sqs_messages",
-                error_type = error_type::ACKNOWLEDGMENT_FAILED,
-                stage = error_stage::PROCESSING,
-            );
+            let message_ids = self
+                .entries
+                .iter()
+                .map(|x| x.id.as_str())
+                .collect::<Vec<_>>()
+                .join(", ");
+            if let Some(ref ctx) = self.aws_ctx {
+                let class = crate::aws::error::classify_error(ctx);
+                error!(
+                    message = "Sending of deferred SQS message(s) failed.",
+                    message_ids = %message_ids,
+                    error = %self.error,
+                    error_code = "failed_deferring_all_sqs_messages",
+                    error_type = error_type::ACKNOWLEDGMENT_FAILED,
+                    stage = error_stage::PROCESSING,
+                    aws_error_code = ctx.aws_error_code.unwrap_or(""),
+                    aws_http_status = ctx.http_status.unwrap_or(0),
+                    aws_request_id = ctx.aws_request_id.unwrap_or(""),
+                    aws_error_class = ?class,
+                );
+            } else {
+                error!(
+                    message = "Sending of deferred SQS message(s) failed.",
+                    message_ids = %message_ids,
+                    error = %self.error,
+                    error_code = "failed_deferring_all_sqs_messages",
+                    error_type = error_type::ACKNOWLEDGMENT_FAILED,
+                    stage = error_stage::PROCESSING,
+                );
+            }
             counter!(
                 "component_errors_total",
                 "error_code" => "failed_deferring_all_sqs_messages",
@@ -233,20 +361,96 @@ mod s3 {
     }
 }
 
+/// Returns an actionable hint for SQS operation errors based on classification.
+#[cfg(any(feature = "sources-aws_s3", feature = "sources-aws_sqs"))]
+fn sqs_receive_error_hint(
+    class: crate::aws::error::AwsErrorClass,
+    error_code: Option<&str>,
+) -> Option<&'static str> {
+    use crate::aws::error::AwsErrorClass;
+    match (class, error_code) {
+        (AwsErrorClass::Auth, Some("ExpiredToken" | "ExpiredTokenException")) => Some(
+            "The security token has expired. Check credential refresh configuration.",
+        ),
+        (AwsErrorClass::Auth, _) => Some(
+            "Check that the IAM role/user has sqs:ReceiveMessage permission on this queue.",
+        ),
+        (AwsErrorClass::NotFound, _) => Some(
+            "The SQS queue does not exist. Check the queue URL, region, and account in your configuration.",
+        ),
+        (AwsErrorClass::Throttling, _) => Some(
+            "AWS is throttling SQS requests. Consider reducing poll frequency or concurrency.",
+        ),
+        (AwsErrorClass::Connectivity, _) => {
+            Some("Network connectivity issue. Check DNS, proxy, and TLS configuration.")
+        }
+        (AwsErrorClass::Configuration, _) => {
+            Some("Configuration error. Check credentials, region, and endpoint settings.")
+        }
+        (AwsErrorClass::ServiceError, _) => {
+            Some("AWS SQS returned a server error. This is usually transient; retries should resolve it.")
+        }
+        _ => None,
+    }
+}
+
+/// Returns an actionable hint for SQS delete errors based on classification.
+#[cfg(feature = "sources-aws_sqs")]
+fn sqs_delete_error_hint(
+    class: crate::aws::error::AwsErrorClass,
+    error_code: Option<&str>,
+) -> Option<&'static str> {
+    use crate::aws::error::AwsErrorClass;
+    match (class, error_code) {
+        (AwsErrorClass::Auth, Some("ExpiredToken" | "ExpiredTokenException")) => Some(
+            "The security token has expired. Check credential refresh configuration.",
+        ),
+        (AwsErrorClass::Auth, _) => Some(
+            "Check that the IAM role/user has sqs:DeleteMessage permission on this queue.",
+        ),
+        (AwsErrorClass::NotFound, _) => Some(
+            "The SQS queue does not exist. Check the queue URL, region, and account in your configuration.",
+        ),
+        (AwsErrorClass::Throttling, _) => Some(
+            "AWS is throttling SQS requests. Consider reducing request rate.",
+        ),
+        _ => None,
+    }
+}
+
 #[derive(Debug, NamedInternalEvent)]
 pub struct SqsMessageReceiveError<'a, E> {
     pub error: &'a E,
+    pub aws_ctx: Option<crate::aws::error::AwsErrorContext<'a>>,
 }
 
 impl<E: std::fmt::Display> InternalEvent for SqsMessageReceiveError<'_, E> {
     fn emit(self) {
-        error!(
-            message = "Failed to fetch SQS events.",
-            error = %self.error,
-            error_code = "failed_fetching_sqs_events",
-            error_type = error_type::REQUEST_FAILED,
-            stage = error_stage::RECEIVING,
-        );
+        if let Some(ref ctx) = self.aws_ctx {
+            let class = crate::aws::error::classify_error(ctx);
+            error!(
+                message = "Failed to fetch SQS events.",
+                error = %self.error,
+                error_code = "failed_fetching_sqs_events",
+                error_type = error_type::REQUEST_FAILED,
+                stage = error_stage::RECEIVING,
+                aws_error_code = ctx.aws_error_code.unwrap_or(""),
+                aws_http_status = ctx.http_status.unwrap_or(0),
+                aws_request_id = ctx.aws_request_id.unwrap_or(""),
+                aws_error_class = ?class,
+            );
+            if let Some(hint) = sqs_receive_error_hint(class, ctx.aws_error_code) {
+                warn!(message = %hint);
+            }
+        } else {
+            error!(
+                message = "Failed to fetch SQS events.",
+                error = %self.error,
+                error_code = "failed_fetching_sqs_events",
+                error_type = error_type::REQUEST_FAILED,
+                stage = error_stage::RECEIVING,
+            );
+        }
         counter!(
             "component_errors_total",
             "error_code" => "failed_fetching_sqs_events",
@@ -288,17 +492,35 @@ impl InternalEvent for SqsMessageProcessingSucceeded<'_> {
 #[derive(Debug, NamedInternalEvent)]
 pub struct SqsMessageDeleteError<'a, E> {
     pub error: &'a E,
+    pub aws_ctx: Option<crate::aws::error::AwsErrorContext<'a>>,
 }
 
 #[cfg(feature = "sources-aws_sqs")]
 impl<E: std::fmt::Display> InternalEvent for SqsMessageDeleteError<'_, E> {
     fn emit(self) {
-        error!(
-            message = "Failed to delete SQS events.",
-            error = %self.error,
-            error_type = error_type::WRITER_FAILED,
-            stage = error_stage::PROCESSING,
-        );
+        if let Some(ref ctx) = self.aws_ctx {
+            let class = crate::aws::error::classify_error(ctx);
+            error!(
+                message = "Failed to delete SQS events.",
+                error = %self.error,
+                error_type = error_type::WRITER_FAILED,
+                stage = error_stage::PROCESSING,
+                aws_error_code = ctx.aws_error_code.unwrap_or(""),
+                aws_http_status = ctx.http_status.unwrap_or(0),
+                aws_request_id = ctx.aws_request_id.unwrap_or(""),
+                aws_error_class = ?class,
+            );
+            if let Some(hint) = sqs_delete_error_hint(class, ctx.aws_error_code) {
+                warn!(message = %hint);
+            }
+        } else {
+            error!(
+                message = "Failed to delete SQS events.",
+                error = %self.error,
+                error_type = error_type::WRITER_FAILED,
+                stage = error_stage::PROCESSING,
+            );
+        }
         counter!(
             "component_errors_total",
             "error_type" => error_type::WRITER_FAILED,

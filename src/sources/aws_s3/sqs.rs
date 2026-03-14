@@ -274,6 +274,20 @@ pub enum ProcessingError {
     },
 }
 
+impl ProcessingError {
+    /// Returns AWS error context if this error wraps an SdkError.
+    ///
+    /// Only `GetObject` wraps an `SdkError`, so all other variants return `None`.
+    pub fn aws_error_context(&self) -> Option<crate::aws::error::AwsErrorContext<'_>> {
+        match self {
+            ProcessingError::GetObject { source, .. } => {
+                Some(crate::aws::error::extract_error_context(source))
+            }
+            _ => None,
+        }
+    }
+}
+
 pub struct State {
     region: Region,
 
@@ -443,7 +457,12 @@ impl IngestorProcess {
                 messages
             }
             Err(err) => {
-                emit!(SqsMessageReceiveError { error: &err });
+                let aws_ctx =
+                    Some(crate::aws::error::extract_error_context(&err));
+                emit!(SqsMessageReceiveError {
+                    error: &err,
+                    aws_ctx,
+                });
                 return Err(());
             }
         };
@@ -559,10 +578,13 @@ impl IngestorProcess {
                         })
                     }
                 }
-                Err(err) => {
+                Err(ref err) => {
+                    let aws_ctx =
+                        Some(crate::aws::error::extract_error_context(err));
                     emit!(SqsMessageSendBatchError {
                         entries: cloned_entries,
                         error: err,
+                        aws_ctx,
                     });
                 }
             }
@@ -586,10 +608,13 @@ impl IngestorProcess {
                         });
                     }
                 }
-                Err(err) => {
+                Err(ref err) => {
+                    let aws_ctx =
+                        Some(crate::aws::error::extract_error_context(err));
                     emit!(SqsMessageDeleteBatchError {
                         entries: cloned_entries,
                         error: err,
+                        aws_ctx,
                     });
                 }
             }

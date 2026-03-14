@@ -275,7 +275,7 @@ impl AwsS3Config {
                 .await?;
 
                 let ingestor = sqs::Ingestor::new(
-                    region,
+                    region.clone(),
                     sqs_client,
                     s3_client,
                     sqs.clone(),
@@ -284,6 +284,18 @@ impl AwsS3Config {
                     decoder,
                 )
                 .await?;
+
+                info!(
+                    message = "S3 source started.",
+                    queue_url = %sqs.queue_url,
+                    region = %region,
+                    endpoint = self.region.endpoint().as_deref().unwrap_or("default"),
+                    poll_secs = sqs.poll_secs,
+                    visibility_timeout_secs = sqs.visibility_timeout_secs,
+                    max_number_of_messages = sqs.max_number_of_messages,
+                    delete_message = sqs.delete_message,
+                    force_path_style = self.force_path_style,
+                );
 
                 Ok(ingestor)
             }
