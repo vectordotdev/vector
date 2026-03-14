@@ -138,7 +138,7 @@ where
             .transpose()?;
 
         // Compile VRL tokens expression if configured. The tokens expression provides
-        // a custom per-event cost function. Its budget is taken from `json_bytes`.
+        // a custom per-event cost function with its own independent budget.
         let (tokens_program, quota_tokens) =
             if let Some(expr) = config.threshold.tokens_expression() {
                 let functions = vector_vrl_functions::all();
@@ -153,10 +153,10 @@ where
 
                 let program = compilation_result.program;
 
-                let tokens_budget = config.threshold.json_bytes_threshold().unwrap_or(0);
+                let tokens_budget = config.threshold.tokens_budget().unwrap_or(0);
                 if tokens_budget == 0 {
                     return Err(
-                        "`threshold.json_bytes` must be set when `threshold.tokens` is configured \
+                        "`threshold.tokens_budget` must be set when `threshold.tokens` is configured \
                          (it provides the budget for the token limiter)"
                             .into(),
                     );
@@ -179,13 +179,7 @@ where
 
         let events_threshold = config.threshold.events_threshold().unwrap_or(0) as u64;
         let bytes_threshold = config.threshold.json_bytes_threshold().unwrap_or(0) as u64;
-        // Token limiter reuses json_bytes as its budget — they share the same numerical capacity.
-        // This is intentional: the token cost from VRL is measured against the json_bytes budget.
-        let tokens_threshold = config
-            .threshold
-            .tokens_expression()
-            .and(config.threshold.json_bytes_threshold())
-            .unwrap_or(0) as u64;
+        let tokens_threshold = config.threshold.tokens_budget().unwrap_or(0) as u64;
 
         Ok(Self {
             quota_events,
@@ -234,7 +228,9 @@ where
     fn evaluate_tokens(&mut self, event: &Event) -> Option<NonZeroU32> {
         let program = self.tokens_program.as_ref()?;
 
-        let mut target = VrlTarget::new(event.clone(), program.info(), false);
+        // Use read-only evaluation to avoid cloning the event. The VRL program
+        // is compiled read-only, so VrlTarget won't modify the underlying event.
+        let mut target = VrlTarget::new(event.clone(), program.info(), true);
         let timezone = TimeZone::default();
         let result = self.vrl_runtime.resolve(&mut target, program, &timezone);
         self.vrl_runtime.clear();
@@ -286,7 +282,7 @@ where
         key: &Option<String>,
         json_bytes: usize,
         token_cost: Option<NonZeroU32>,
-        exceeded: &Option<ThresholdType>,
+        exceeded: Option<ThresholdType>,
     ) {
         self.events_processed += 1;
 
@@ -336,32 +332,36 @@ where
 
         // Gauges overwrite previous values, so emitting every N events is equivalent
         // to per-event emission for monitoring while reducing metric overhead.
-        if self.events_processed % UTILIZATION_EMIT_INTERVAL != 0 {
+        // Emit ALL tracked keys when the interval fires, not just the current key,
+        // to ensure fair representation across keys regardless of traffic distribution.
+        if !self.events_processed.is_multiple_of(UTILIZATION_EMIT_INTERVAL) {
             return;
         }
 
-        let key_str = key.as_deref().unwrap_or("").to_owned();
+        for (k, u) in &self.utilization {
+            let key_str = k.as_deref().unwrap_or("").to_owned();
 
-        if self.events_threshold > 0 {
-            emit!(ThrottleUtilizationUpdate {
-                key: key_str.clone(),
-                threshold_type: "events",
-                ratio: util.ratio(ThresholdType::Events),
-            });
-        }
-        if self.bytes_threshold > 0 {
-            emit!(ThrottleUtilizationUpdate {
-                key: key_str.clone(),
-                threshold_type: "json_bytes",
-                ratio: util.ratio(ThresholdType::JsonBytes),
-            });
-        }
-        if self.tokens_threshold > 0 {
-            emit!(ThrottleUtilizationUpdate {
-                key: key_str,
-                threshold_type: "tokens",
-                ratio: util.ratio(ThresholdType::Tokens),
-            });
+            if self.events_threshold > 0 {
+                emit!(ThrottleUtilizationUpdate {
+                    key: key_str.clone(),
+                    threshold_type: "events",
+                    ratio: u.ratio(ThresholdType::Events),
+                });
+            }
+            if self.bytes_threshold > 0 {
+                emit!(ThrottleUtilizationUpdate {
+                    key: key_str.clone(),
+                    threshold_type: "json_bytes",
+                    ratio: u.ratio(ThresholdType::JsonBytes),
+                });
+            }
+            if self.tokens_threshold > 0 {
+                emit!(ThrottleUtilizationUpdate {
+                    key: key_str,
+                    threshold_type: "tokens",
+                    ratio: u.ratio(ThresholdType::Tokens),
+                });
+            }
         }
     }
 }
@@ -459,7 +459,7 @@ where
         }
 
         if self.internal_metrics.emit_detailed_metrics {
-            self.update_utilization(&key, json_bytes, token_cost, &exceeded);
+            self.update_utilization(&key, json_bytes, token_cost, exceeded);
         }
 
         match exceeded {
@@ -471,6 +471,7 @@ where
                         .internal_metrics
                         .emit_events_discarded_per_key,
                     emit_detailed_metrics: self.internal_metrics.emit_detailed_metrics,
+                    reroute_dropped: self.reroute_dropped,
                 });
 
                 if self.reroute_dropped {
@@ -496,15 +497,25 @@ where
     I: clock::Reference + Send + 'static,
 {
     fn into_state(self) -> ThrottleState<C> {
-        let events_limiter = self.quota_events.map(|quota| {
-            RateLimiterRunner::start(quota, self.clock.clone(), self.flush_keys_interval)
-        });
-        let json_bytes_limiter = self.quota_json_bytes.map(|quota| {
-            RateLimiterRunner::start(quota, self.clock.clone(), self.flush_keys_interval)
-        });
-        let tokens_limiter = self.quota_tokens.map(|quota| {
-            RateLimiterRunner::start(quota, self.clock.clone(), self.flush_keys_interval)
-        });
+        let has_key_field = self.key_field.is_some();
+
+        let make_limiter = |quota: Quota, clock: C| -> RateLimiterRunner<Option<String>, C> {
+            if has_key_field {
+                RateLimiterRunner::start_keyed(quota, clock, self.flush_keys_interval)
+            } else {
+                RateLimiterRunner::start_direct(quota, clock)
+            }
+        };
+
+        let events_limiter = self
+            .quota_events
+            .map(|quota| make_limiter(quota, self.clock.clone()));
+        let json_bytes_limiter = self
+            .quota_json_bytes
+            .map(|quota| make_limiter(quota, self.clock.clone()));
+        let tokens_limiter = self
+            .quota_tokens
+            .map(|quota| make_limiter(quota, self.clock.clone()));
 
         ThrottleState {
             events_limiter,
@@ -987,7 +998,7 @@ reroute_dropped = true
                         .to_string()
                 }
                 ThresholdVariant::Triple => {
-                    "window_secs = 60\nkey_field = \"{{ service }}\"\n\n[threshold]\nevents = 100000\njson_bytes = 10000000\ntokens = 'strlen(string!(.message))'\n"
+                    "window_secs = 60\nkey_field = \"{{ service }}\"\n\n[threshold]\nevents = 100000\njson_bytes = 10000000\ntokens = 'strlen(string!(.message))'\ntokens_budget = 10000000\n"
                         .to_string()
                 }
             };
@@ -1171,6 +1182,7 @@ reroute_dropped = true
 events = 100
 json_bytes = 200
 tokens = 'strlen(string!(.message))'
+tokens_budget = 200
 ",
         )
         .unwrap();
@@ -1256,5 +1268,527 @@ json_bytes = 10000
                 "at least 5 events per key should pass at {num_keys} keys (got {passed})"
             );
         }
+    }
+
+    // -- Edge-case tests for findings --
+
+    /// Finding 1 (High): Oversized events must be throttled, not bypassed.
+    /// An event whose json_bytes cost exceeds the burst capacity must be
+    /// dropped (or rerouted), never allowed through.
+    #[tokio::test]
+    async fn oversized_event_is_throttled_not_bypassed() {
+        let clock = clock::FakeRelativeClock::default();
+        let config = toml::from_str::<ThrottleConfig>(
+            r"
+window_secs = 60
+reroute_dropped = true
+
+[threshold]
+json_bytes = 50
+",
+        )
+        .unwrap();
+
+        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone()).unwrap();
+        let mut transform = throttle.into_sync_transform();
+        let mut buf = make_buf(&config);
+
+        // Create an event whose estimated JSON size far exceeds the 50-byte budget.
+        let mut log = LogEvent::default();
+        log.insert("message", "x".repeat(500));
+        transform.transform(log.into(), &mut buf);
+
+        let passed = buf.drain().count();
+        let dropped = buf.drain_named(DROPPED).count();
+        assert_eq!(passed, 0, "oversized event must NOT pass through");
+        assert_eq!(dropped, 1, "oversized event must be rerouted to dropped port");
+    }
+
+    /// Finding 1 variant: Oversized token cost also throttled.
+    #[tokio::test]
+    async fn oversized_token_cost_is_throttled() {
+        let clock = clock::FakeRelativeClock::default();
+        let config = toml::from_str::<ThrottleConfig>(
+            r"
+window_secs = 60
+reroute_dropped = true
+
+[threshold]
+tokens = 'strlen(string!(.message))'
+tokens_budget = 10
+",
+        )
+        .unwrap();
+
+        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone()).unwrap();
+        let mut transform = throttle.into_sync_transform();
+        let mut buf = make_buf(&config);
+
+        // Token cost of 200 chars far exceeds the 10-token budget.
+        let mut log = LogEvent::default();
+        log.insert("message", "x".repeat(200));
+        transform.transform(log.into(), &mut buf);
+
+        let passed = buf.drain().count();
+        let dropped = buf.drain_named(DROPPED).count();
+        assert_eq!(passed, 0, "oversized token cost must not pass through");
+        assert_eq!(dropped, 1, "oversized token cost must be rerouted");
+    }
+
+    /// Finding 2 (Medium): tokens is independent of json_bytes.
+    /// A standalone tokens config (without json_bytes) should work when
+    /// tokens_budget is provided.
+    #[tokio::test]
+    async fn tokens_standalone_without_json_bytes() {
+        let clock = clock::FakeRelativeClock::default();
+        let config = toml::from_str::<ThrottleConfig>(
+            r"
+window_secs = 60
+reroute_dropped = true
+
+[threshold]
+tokens = 'strlen(string!(.message))'
+tokens_budget = 100
+",
+        )
+        .unwrap();
+
+        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone()).unwrap();
+        let mut transform = throttle.into_sync_transform();
+        let mut buf = make_buf(&config);
+
+        // Each event costs ~10 tokens. With budget=100, we get ~10 events through.
+        for i in 0..20 {
+            let mut log = LogEvent::default();
+            log.insert("message", format!("{i:0>10}"));
+            transform.transform(log.into(), &mut buf);
+        }
+
+        let passed = buf.drain().count();
+        let dropped = buf.drain_named(DROPPED).count();
+        assert!(passed > 0, "some events should pass");
+        assert!(dropped > 0, "some events should be dropped");
+        assert_eq!(passed + dropped, 20, "all events accounted for");
+    }
+
+    /// Finding 2 variant: tokens without tokens_budget should error at build time.
+    #[tokio::test]
+    async fn tokens_without_budget_errors() {
+        let clock = clock::FakeRelativeClock::default();
+        let config = toml::from_str::<ThrottleConfig>(
+            r"
+window_secs = 60
+
+[threshold]
+tokens = 'strlen(string!(.message))'
+",
+        )
+        .unwrap();
+
+        let result = Throttle::new(&config, &TransformContext::default(), clock);
+        assert!(result.is_err(), "tokens without tokens_budget must error");
+        let err = result.err().unwrap().to_string();
+        assert!(
+            err.contains("tokens_budget"),
+            "error should mention tokens_budget, got: {err}"
+        );
+    }
+
+    /// Finding 2 variant: tokens with json_bytes but no tokens_budget errors.
+    /// json_bytes should NOT serve as the tokens budget anymore.
+    #[tokio::test]
+    async fn tokens_with_json_bytes_but_no_budget_errors() {
+        let clock = clock::FakeRelativeClock::default();
+        let config = toml::from_str::<ThrottleConfig>(
+            r"
+window_secs = 60
+
+[threshold]
+json_bytes = 500000
+tokens = 'strlen(string!(.message))'
+",
+        )
+        .unwrap();
+
+        let result = Throttle::new(&config, &TransformContext::default(), clock.clone());
+        assert!(
+            result.is_err(),
+            "tokens with json_bytes but no tokens_budget must error"
+        );
+    }
+
+    /// Finding 3 (Medium): reroute_dropped should not inflate component_discarded_events_total.
+    /// This test checks behavior correctness: rerouted events must appear on
+    /// the dropped port, and the event itself is preserved.
+    #[tokio::test]
+    async fn rerouted_events_are_not_lost() {
+        let clock = clock::FakeRelativeClock::default();
+        let config = toml::from_str::<ThrottleConfig>(
+            r"
+threshold = 1
+window_secs = 60
+reroute_dropped = true
+",
+        )
+        .unwrap();
+
+        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone()).unwrap();
+        let mut transform = throttle.into_sync_transform();
+        let mut buf = make_buf(&config);
+
+        // First event passes
+        let mut log1 = LogEvent::default();
+        log1.insert("message", "first");
+        transform.transform(log1.into(), &mut buf);
+        assert_eq!(buf.drain().count(), 1);
+
+        // Second event is throttled but rerouted
+        let mut log2 = LogEvent::default();
+        log2.insert("message", "second");
+        log2.insert("important", "data");
+        let log2_clone = log2.clone();
+        transform.transform(log2.into(), &mut buf);
+
+        assert_eq!(buf.drain().count(), 0, "should not pass to primary");
+        let dropped: Vec<Event> = buf.drain_named(DROPPED).collect();
+        assert_eq!(dropped.len(), 1, "should appear on dropped port");
+        assert_eq!(
+            dropped[0].as_log(),
+            &log2_clone,
+            "rerouted event must be unmodified"
+        );
+    }
+
+    /// Verify that without reroute_dropped, throttled events truly disappear.
+    #[tokio::test]
+    async fn throttled_without_reroute_events_vanish() {
+        let clock = clock::FakeRelativeClock::default();
+        let config = toml::from_str::<ThrottleConfig>(
+            r"
+threshold = 1
+window_secs = 60
+reroute_dropped = false
+",
+        )
+        .unwrap();
+
+        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone()).unwrap();
+        let mut transform = throttle.into_sync_transform();
+        let mut buf = make_buf(&config);
+
+        transform.transform(LogEvent::default().into(), &mut buf);
+        assert_eq!(buf.drain().count(), 1);
+
+        transform.transform(LogEvent::default().into(), &mut buf);
+        assert_eq!(buf.drain().count(), 0, "excess event should be discarded");
+    }
+
+    /// Unkeyed path optimization: when key_field is not set,
+    /// the direct rate limiter should work identically to keyed.
+    #[tokio::test]
+    async fn unkeyed_rate_limiter_works() {
+        let clock = clock::FakeRelativeClock::default();
+        let config = toml::from_str::<ThrottleConfig>(
+            r"
+threshold = 3
+window_secs = 60
+reroute_dropped = true
+",
+        )
+        .unwrap();
+
+        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone()).unwrap();
+        let mut transform = throttle.into_sync_transform();
+        let mut buf = make_buf(&config);
+
+        for _ in 0..10 {
+            transform.transform(LogEvent::default().into(), &mut buf);
+        }
+
+        let passed = buf.drain().count();
+        let dropped = buf.drain_named(DROPPED).count();
+        assert_eq!(passed, 3, "unkeyed: 3 should pass");
+        assert_eq!(dropped, 7, "unkeyed: 7 should be dropped");
+    }
+
+    /// Unkeyed json_bytes limiter (direct path).
+    #[tokio::test]
+    async fn unkeyed_json_bytes_limiter() {
+        let clock = clock::FakeRelativeClock::default();
+        let config = toml::from_str::<ThrottleConfig>(
+            r"
+window_secs = 60
+reroute_dropped = true
+
+[threshold]
+json_bytes = 200
+",
+        )
+        .unwrap();
+
+        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone()).unwrap();
+        let mut transform = throttle.into_sync_transform();
+        let mut buf = make_buf(&config);
+
+        let mut total_passed = 0;
+        let mut total_dropped = 0;
+        for i in 0..20 {
+            let mut log = LogEvent::default();
+            log.insert("message", format!("msg-{i:0>30}"));
+            transform.transform(log.into(), &mut buf);
+            total_passed += buf.drain().count();
+            total_dropped += buf.drain_named(DROPPED).count();
+        }
+
+        assert!(total_passed > 0, "some events should pass");
+        assert!(total_dropped > 0, "some events should be throttled by bytes");
+        assert_eq!(total_passed + total_dropped, 20);
+    }
+
+    /// Window replenishment: after the window passes, budget is restored.
+    #[tokio::test]
+    async fn window_replenishment_restores_budget() {
+        let clock = clock::FakeRelativeClock::default();
+        let config = toml::from_str::<ThrottleConfig>(
+            r"
+window_secs = 5
+reroute_dropped = true
+
+[threshold]
+json_bytes = 100
+",
+        )
+        .unwrap();
+
+        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone()).unwrap();
+        let mut transform = throttle.into_sync_transform();
+        let mut buf = make_buf(&config);
+
+        // Exhaust the budget
+        for _ in 0..10 {
+            let mut log = LogEvent::default();
+            log.insert("message", "x".repeat(50));
+            transform.transform(log.into(), &mut buf);
+        }
+        buf.drain().count();
+        let dropped_before = buf.drain_named(DROPPED).count();
+        assert!(dropped_before > 0, "should have drops within window");
+
+        // Advance past the window
+        clock.advance(Duration::from_secs(6));
+
+        // Budget should be replenished
+        let mut log = LogEvent::default();
+        log.insert("message", "fresh");
+        transform.transform(log.into(), &mut buf);
+        assert_eq!(
+            buf.drain().count(),
+            1,
+            "event after window should pass"
+        );
+    }
+
+    /// Combined events + json_bytes: events limit hit first.
+    #[tokio::test]
+    async fn events_limit_triggers_before_bytes() {
+        let clock = clock::FakeRelativeClock::default();
+        let config = toml::from_str::<ThrottleConfig>(
+            r"
+window_secs = 60
+reroute_dropped = true
+
+[threshold]
+events = 2
+json_bytes = 1000000
+",
+        )
+        .unwrap();
+
+        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone()).unwrap();
+        let mut transform = throttle.into_sync_transform();
+        let mut buf = make_buf(&config);
+
+        for _ in 0..5 {
+            let mut log = LogEvent::default();
+            log.insert("message", "tiny");
+            transform.transform(log.into(), &mut buf);
+        }
+
+        let passed = buf.drain().count();
+        let dropped = buf.drain_named(DROPPED).count();
+        assert_eq!(passed, 2, "events limit should trigger at 2");
+        assert_eq!(dropped, 3, "3 events should be dropped by events limit");
+    }
+
+    /// Combined events + json_bytes: bytes limit hit first.
+    #[tokio::test]
+    async fn bytes_limit_triggers_before_events() {
+        let clock = clock::FakeRelativeClock::default();
+        let config = toml::from_str::<ThrottleConfig>(
+            r"
+window_secs = 60
+reroute_dropped = true
+
+[threshold]
+events = 1000
+json_bytes = 100
+",
+        )
+        .unwrap();
+
+        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone()).unwrap();
+        let mut transform = throttle.into_sync_transform();
+        let mut buf = make_buf(&config);
+
+        let mut total_passed = 0;
+        let mut total_dropped = 0;
+        for i in 0..20 {
+            let mut log = LogEvent::default();
+            log.insert("message", format!("{i:0>40}"));
+            transform.transform(log.into(), &mut buf);
+            total_passed += buf.drain().count();
+            total_dropped += buf.drain_named(DROPPED).count();
+        }
+
+        assert!(total_passed < 20, "bytes limit should trigger before events limit of 1000");
+        assert!(total_dropped > 0, "some should be dropped by bytes");
+        assert!(total_passed < 1000, "events limit did not trigger");
+    }
+
+    /// Zero-cost VRL expression (returns 0 or negative) defaults to cost 1.
+    #[tokio::test]
+    async fn vrl_zero_cost_defaults_to_one() {
+        let clock = clock::FakeRelativeClock::default();
+        let config = toml::from_str::<ThrottleConfig>(
+            r"
+window_secs = 60
+reroute_dropped = true
+
+[threshold]
+tokens = '0'
+tokens_budget = 3
+",
+        )
+        .unwrap();
+
+        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone()).unwrap();
+        let mut transform = throttle.into_sync_transform();
+        let mut buf = make_buf(&config);
+
+        // VRL returns 0, which should default to cost 1.
+        // With budget of 3, expect 3 events to pass.
+        for _ in 0..5 {
+            transform.transform(LogEvent::default().into(), &mut buf);
+        }
+
+        let passed = buf.drain().count();
+        let dropped = buf.drain_named(DROPPED).count();
+        assert_eq!(passed, 3, "zero-cost VRL should default to 1 token each");
+        assert_eq!(dropped, 2);
+    }
+
+    /// VRL expression that errors defaults to cost 1.
+    #[tokio::test]
+    async fn vrl_error_defaults_to_cost_one() {
+        let clock = clock::FakeRelativeClock::default();
+        let config = toml::from_str::<ThrottleConfig>(
+            r#"
+window_secs = 60
+reroute_dropped = true
+
+[threshold]
+tokens = 'to_int!(.nonexistent)'
+tokens_budget = 2
+"#,
+        )
+        .unwrap();
+
+        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone()).unwrap();
+        let mut transform = throttle.into_sync_transform();
+        let mut buf = make_buf(&config);
+
+        for _ in 0..5 {
+            transform.transform(LogEvent::default().into(), &mut buf);
+        }
+
+        let passed = buf.drain().count();
+        let dropped = buf.drain_named(DROPPED).count();
+        assert_eq!(passed, 2, "VRL error should default to cost 1");
+        assert_eq!(dropped, 3);
+    }
+
+    /// Exclude condition with multi-threshold: excluded events bypass ALL limiters.
+    #[tokio::test]
+    async fn exclude_bypasses_all_limiters() {
+        let clock = clock::FakeRelativeClock::default();
+        let config = toml::from_str::<ThrottleConfig>(
+            r#"
+window_secs = 60
+exclude = """
+exists(.critical)
+"""
+
+[threshold]
+events = 1
+json_bytes = 50
+"#,
+        )
+        .unwrap();
+
+        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone()).unwrap();
+        let mut transform = throttle.into_sync_transform();
+        let mut buf = make_buf(&config);
+
+        // First normal event passes
+        transform.transform(LogEvent::default().into(), &mut buf);
+        assert_eq!(buf.drain().count(), 1);
+
+        // Second normal event is throttled
+        transform.transform(LogEvent::default().into(), &mut buf);
+        assert_eq!(buf.drain().count(), 0);
+
+        // Excluded event bypasses even after budget exhausted
+        let mut critical = LogEvent::default();
+        critical.insert("critical", true);
+        critical.insert("message", "x".repeat(1000));
+        transform.transform(critical.into(), &mut buf);
+        assert_eq!(buf.drain().count(), 1, "excluded event must always pass");
+    }
+
+    /// Completeness: with reroute_dropped, every input event exits on
+    /// exactly one port across multiple threshold types.
+    #[tokio::test]
+    async fn completeness_with_multi_threshold_reroute() {
+        let clock = clock::FakeRelativeClock::default();
+        let config = toml::from_str::<ThrottleConfig>(
+            r"
+window_secs = 60
+reroute_dropped = true
+
+[threshold]
+events = 5
+json_bytes = 500
+",
+        )
+        .unwrap();
+
+        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone()).unwrap();
+        let mut transform = throttle.into_sync_transform();
+        let mut buf = make_buf(&config);
+
+        let n = 50;
+        for i in 0..n {
+            let mut log = LogEvent::default();
+            log.insert("message", format!("event-{i:0>30}"));
+            transform.transform(log.into(), &mut buf);
+        }
+
+        let passed = buf.drain().count();
+        let dropped = buf.drain_named(DROPPED).count();
+        assert_eq!(
+            passed + dropped,
+            n,
+            "all events must be accounted for: passed={passed}, dropped={dropped}"
+        );
     }
 }

@@ -104,7 +104,7 @@ fn setup_json_bytes(total_events: usize, byte_threshold: u32) -> Payload {
 fn setup_vrl_tokens(total_events: usize) -> Payload {
     let rt = make_runtime();
     let config = toml::from_str::<ThrottleConfig>(
-        "window_secs = 60\n\n[threshold]\njson_bytes = 1000000\ntokens = 'strlen(string!(.message))'\n",
+        "window_secs = 60\n\n[threshold]\njson_bytes = 1000000\ntokens = 'strlen(string!(.message))'\ntokens_budget = 1000000\n",
     )
     .unwrap();
     let transform = build_throttle(&rt, &config);
@@ -136,7 +136,7 @@ fn setup_events_and_bytes(total_events: usize) -> Payload {
 fn setup_all_three(total_events: usize) -> Payload {
     let rt = make_runtime();
     let config = toml::from_str::<ThrottleConfig>(
-        "window_secs = 60\n\n[threshold]\nevents = 10000\njson_bytes = 1000000\ntokens = 'strlen(string!(.message))'\n",
+        "window_secs = 60\n\n[threshold]\nevents = 10000\njson_bytes = 1000000\ntokens = 'strlen(string!(.message))'\ntokens_budget = 1000000\n",
     )
     .unwrap();
     let transform = build_throttle(&rt, &config);
@@ -411,7 +411,7 @@ fn throttle(c: &mut Criterion) {
                 || {
                     let rt = make_runtime();
                     let config = toml::from_str::<ThrottleConfig>(
-                        "window_secs = 60\nkey_field = \"{{ service }}\"\n\n[threshold]\nevents = 10000\njson_bytes = 1000000\ntokens = 'strlen(string!(.message))'\n",
+                        "window_secs = 60\nkey_field = \"{{ service }}\"\n\n[threshold]\nevents = 10000\njson_bytes = 1000000\ntokens = 'strlen(string!(.message))'\ntokens_budget = 1000000\n",
                     )
                     .unwrap();
                     let transform = build_throttle(&rt, &config);

@@ -195,9 +195,11 @@ components: transforms: throttle: {
 				to determine a custom cost. The result must be a positive number (integer or float). Non-numeric
 				results or errors default to a cost of 1.
 
-				The token cost is consumed from its own rate limiter whose budget is set by the same `threshold.tokens`
-				value. This allows flexible cost functions like `strlen(string!(.message))` to throttle by message length,
+				The token cost is consumed from its own independent rate limiter whose budget is set by `threshold.tokens_budget`.
+				This allows flexible cost functions like `strlen(string!(.message))` to throttle by message length,
 				or `to_int(.cost) ?? 1` to use a cost field from the event itself.
+
+				`threshold.tokens_budget` must be set when `threshold.tokens` is configured.
 				"""
 		}
 		dropped_output: {

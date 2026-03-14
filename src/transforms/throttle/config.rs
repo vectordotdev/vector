@@ -62,12 +62,21 @@ pub struct MultiThresholdConfig {
     ///
     /// The result is used as the number of tokens to consume from the rate limiter bucket.
     /// For example, `strlen(string!(.message))` throttles by message length.
+    ///
+    /// Requires `tokens_budget` to set the total token budget per key per window.
     #[configurable(metadata(
         docs::examples = "strlen(string!(.message))",
         docs::examples = "to_int(.cost) ?? 1",
     ))]
     #[serde(default)]
     pub tokens: Option<String>,
+
+    /// Maximum number of tokens allowed per key per window.
+    ///
+    /// Required when `tokens` is set. This is the independent budget for the token limiter,
+    /// separate from `json_bytes`.
+    #[serde(default)]
+    pub tokens_budget: Option<u32>,
 }
 
 /// Threshold configuration supporting both simple (backward-compatible) and multi-dimensional forms.
@@ -111,6 +120,14 @@ impl ThresholdConfig {
         match self {
             ThresholdConfig::Simple(_) => None,
             ThresholdConfig::Multi(m) => m.tokens.as_deref(),
+        }
+    }
+
+    /// Returns the tokens budget, if configured.
+    pub const fn tokens_budget(&self) -> Option<u32> {
+        match self {
+            ThresholdConfig::Simple(_) => None,
+            ThresholdConfig::Multi(m) => m.tokens_budget,
         }
     }
 
@@ -258,12 +275,14 @@ window_secs = 60
 events = 1000
 json_bytes = 500000
 tokens = "strlen(string!(.message))"
+tokens_budget = 100000
 "#,
         )
         .unwrap();
         assert_eq!(config.threshold.events_threshold(), Some(1000));
         assert_eq!(config.threshold.json_bytes_threshold(), Some(500000));
         assert_eq!(config.threshold.tokens_expression(), Some("strlen(string!(.message))"));
+        assert_eq!(config.threshold.tokens_budget(), Some(100000));
     }
 
     #[test]
