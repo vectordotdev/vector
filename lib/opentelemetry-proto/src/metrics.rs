@@ -505,12 +505,12 @@ struct DecomposedMetricTags {
 ///
 /// This reverses the flattening done by `build_metric_tags` during decode:
 /// - Tags with "resource." prefix → Resource attributes (prefix removed)
-/// - "resource.dropped_attributes_count" → Resource.dropped_attributes_count (not an attribute)
-/// - "resource.schema_url" → ResourceMetrics.schema_url (not an attribute)
+/// - "resource_dropped_attributes_count" → Resource.dropped_attributes_count (not an attribute)
+/// - "resource_schema_url" → ResourceMetrics.schema_url (not an attribute)
 /// - "scope.name" → InstrumentationScope.name
 /// - "scope.version" → InstrumentationScope.version
-/// - "scope.dropped_attributes_count" → InstrumentationScope.dropped_attributes_count (not an attribute)
-/// - "scope.schema_url" → ScopeMetrics.schema_url (not an attribute)
+/// - "scope_dropped_attributes_count" → InstrumentationScope.dropped_attributes_count (not an attribute)
+/// - "scope_schema_url" → ScopeMetrics.schema_url (not an attribute)
 /// - Tags with "scope." prefix (other than above) → scope attributes (prefix stripped)
 /// - All other tags → data point KeyValue attributes
 ///
@@ -518,6 +518,8 @@ struct DecomposedMetricTags {
 /// structural mapping under OTLP encoding. Native metrics that happen to use these
 /// prefixes (e.g. `resource.host`) will have those tags routed into the corresponding
 /// OTLP proto fields rather than remaining as flat data point attributes.
+/// Metadata tags use underscores (resource_schema_url, scope_dropped_attributes_count)
+/// to avoid colliding with user-supplied attributes that use dot-separated format.
 fn decompose_metric_tags(tags: Option<&MetricTags>) -> DecomposedMetricTags {
     let tags = match tags {
         Some(t) => t,
@@ -543,9 +545,10 @@ fn decompose_metric_tags(tags: Option<&MetricTags>) -> DecomposedMetricTags {
     let mut data_point_attrs = Vec::new();
 
     for (key, value) in tags.iter_single() {
-        if key == "resource.dropped_attributes_count" {
+        // Metadata tags use underscores to avoid colliding with user resource/scope attributes.
+        if key == "resource_dropped_attributes_count" {
             resource_dropped = value.parse::<u32>().unwrap_or(0);
-        } else if key == "resource.schema_url" {
+        } else if key == "resource_schema_url" {
             resource_schema_url = value.to_string();
         } else if let Some(resource_key) = key.strip_prefix("resource.") {
             let pb_value = PBValue::StringValue(value.to_string());
@@ -559,9 +562,9 @@ fn decompose_metric_tags(tags: Option<&MetricTags>) -> DecomposedMetricTags {
             scope_name = Some(value.to_string());
         } else if key == "scope.version" {
             scope_version = Some(value.to_string());
-        } else if key == "scope.dropped_attributes_count" {
+        } else if key == "scope_dropped_attributes_count" {
             scope_dropped = value.parse::<u32>().unwrap_or(0);
-        } else if key == "scope.schema_url" {
+        } else if key == "scope_schema_url" {
             scope_schema_url = value.to_string();
         } else if let Some(scope_key) = key.strip_prefix("scope.") {
             let pb_value = PBValue::StringValue(value.to_string());
@@ -2083,7 +2086,7 @@ mod native_metric_conversion_tests {
             "svc".to_string(),
         );
         tags.replace(
-            "resource.dropped_attributes_count".to_string(),
+            "resource_dropped_attributes_count".to_string(),
             "5".to_string(),
         );
         let metric = metric.with_tags(Some(tags));
@@ -2114,7 +2117,7 @@ mod native_metric_conversion_tests {
             "svc".to_string(),
         );
         tags.replace(
-            "resource.schema_url".to_string(),
+            "resource_schema_url".to_string(),
             "https://opentelemetry.io/schemas/1.21.0".to_string(),
         );
         let metric = metric.with_tags(Some(tags));
@@ -2137,7 +2140,7 @@ mod native_metric_conversion_tests {
         let mut tags = MetricTags::default();
         tags.replace("scope.name".to_string(), "my-meter".to_string());
         tags.replace(
-            "scope.dropped_attributes_count".to_string(),
+            "scope_dropped_attributes_count".to_string(),
             "3".to_string(),
         );
         let metric = metric.with_tags(Some(tags));
@@ -2163,7 +2166,7 @@ mod native_metric_conversion_tests {
         let mut tags = MetricTags::default();
         tags.replace("scope.name".to_string(), "my-meter".to_string());
         tags.replace(
-            "scope.schema_url".to_string(),
+            "scope_schema_url".to_string(),
             "https://opentelemetry.io/schemas/1.22.0".to_string(),
         );
         let metric = metric.with_tags(Some(tags));
@@ -2187,7 +2190,7 @@ mod native_metric_conversion_tests {
         let metric = make_gauge("test", 1.0);
         let mut tags = MetricTags::default();
         tags.replace(
-            "resource.dropped_attributes_count".to_string(),
+            "resource_dropped_attributes_count".to_string(),
             "2".to_string(),
         );
         let metric = metric.with_tags(Some(tags));
@@ -2207,7 +2210,7 @@ mod native_metric_conversion_tests {
         let metric = make_gauge("test", 1.0);
         let mut tags = MetricTags::default();
         tags.replace(
-            "scope.dropped_attributes_count".to_string(),
+            "scope_dropped_attributes_count".to_string(),
             "1".to_string(),
         );
         let metric = metric.with_tags(Some(tags));
