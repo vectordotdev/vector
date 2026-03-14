@@ -281,7 +281,7 @@ jobs:
       - resolve-inputs
     steps:
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 # v5.1.1
+        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
@@ -315,7 +315,7 @@ jobs:
           docker load --input baseline-image.tar
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 # v5.1.1
+        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
@@ -355,7 +355,7 @@ jobs:
           docker load --input comparison-image.tar
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 # v5.1.1
+        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
@@ -394,7 +394,7 @@ jobs:
           ref: ${{ needs.resolve-inputs.outputs.comparison-sha }}
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 # v5.1.1
+        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
@@ -467,7 +467,7 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 # v5.1.1
+        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
@@ -510,7 +510,7 @@ jobs:
           ref: ${{ needs.resolve-inputs.outputs.comparison-sha }}
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 # v5.1.1
+        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
