@@ -65,7 +65,6 @@ generated: components: sources: aws_kinesis_firehose: configuration: {
 						description: """
 																The Avro schema definition.
 																**Note**: The following [`apache_avro::types::Value`] variants are *not* supported:
-																* `Date`
 																* `Decimal`
 																* `Duration`
 																* `Fixed`

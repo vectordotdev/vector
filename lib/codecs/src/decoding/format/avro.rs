@@ -91,7 +91,6 @@ impl From<&AvroDeserializerOptions> for AvroSerializerOptions {
 pub struct AvroDeserializerOptions {
     /// The Avro schema definition.
     /// **Note**: The following [`apache_avro::types::Value`] variants are *not* supported:
-    /// * `Date`
     /// * `Decimal`
     /// * `Duration`
     /// * `Fixed`
@@ -191,9 +190,7 @@ pub fn try_from(value: AvroValue) -> vector_common::Result<VrlValue> {
         }
         AvroValue::Boolean(boolean) => Ok(VrlValue::from(boolean)),
         AvroValue::Bytes(bytes) => Ok(VrlValue::from(bytes)),
-        AvroValue::Date(_) => Err(vector_common::Error::from(
-            "AvroValue::Date is not supported",
-        )),
+        AvroValue::Date(days) => Ok(VrlValue::from(days)),
         AvroValue::Decimal(_) => Err(vector_common::Error::from(
             "AvroValue::Decimal is not supported",
         )),
