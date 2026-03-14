@@ -7,6 +7,7 @@ use ordered_float::OrderedFloat;
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de::Error};
 use serde_with::{DeserializeAs, SerializeAs, serde_as};
 use snafu::Snafu;
+use tracing::warn;
 use vector_common::byte_size_of::ByteSizeOf;
 use vector_config::configurable_component;
 
@@ -788,10 +789,31 @@ impl AgentDDSketch {
                 }
                 Some(sketch)
             }
-            MetricValue::AggregatedHistogram { buckets, .. } => {
+            MetricValue::AggregatedHistogram {
+                buckets,
+                sum,
+                count,
+            } => {
                 let delta_buckets = mem::take(buckets);
                 let mut sketch = AgentDDSketch::with_agent_defaults();
                 sketch.insert_interpolate_buckets(delta_buckets)?;
+
+                match u32::try_from(*count) {
+                    Ok(c) => {
+                        if c > 0 {
+                            sketch.count = c;
+                            sketch.sum = *sum;
+                            sketch.avg = *sum / f64::from(c);
+                        }
+                    }
+                    Err(_) => {
+                        warn!(
+                            message = "Aggregated histogram count too large to convert to u32; \
+                            falling back to interpolated average"
+                        );
+                    }
+                }
+
                 Some(sketch)
             }
             // We can't convert from any other metric value.
@@ -1097,7 +1119,8 @@ fn round_to_even(v: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::{AGENT_DEFAULT_EPS, AgentDDSketch, Config, MAX_KEY, round_to_even};
-    use crate::event::metric::Bucket;
+    use crate::event::metric::{Bucket, MetricSketch};
+    use crate::event::{Metric, MetricKind, MetricValue};
 
     const FLOATING_POINT_ACCEPTABLE_ERROR: f64 = 1.0e-10;
 
@@ -1204,6 +1227,40 @@ mod tests {
         assert_eq!(start, min);
         assert!(median.abs() < FLOATING_POINT_ACCEPTABLE_ERROR);
         assert!((end - max).abs() < FLOATING_POINT_ACCEPTABLE_ERROR);
+    }
+
+    #[test]
+    fn test_transform_to_sketch_uses_histogram_sum_count() {
+        let buckets = vec![
+            Bucket {
+                upper_limit: 1.0,
+                count: 1,
+            },
+            Bucket {
+                upper_limit: 2.0,
+                count: 1,
+            },
+        ];
+        let histogram = Metric::new(
+            "histogram",
+            MetricKind::Absolute,
+            MetricValue::AggregatedHistogram {
+                count: 2,
+                sum: 3.0,
+                buckets,
+            },
+        );
+        let metric = AgentDDSketch::transform_to_sketch(histogram).unwrap();
+        match metric.data().value() {
+            MetricValue::Sketch {
+                sketch: MetricSketch::AgentDDSketch(dd),
+            } => {
+                assert_eq!(dd.count, 2);
+                assert_eq!(dd.sum, 3.0);
+                assert_eq!(dd.avg, 1.5);
+            }
+            other => panic!("expected AgentDDSketch, got: {other:?}"),
+        }
     }
 
     #[test]

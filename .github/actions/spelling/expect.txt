@@ -519,6 +519,7 @@ SIGHUPs
 sinkbuilder
 sinknetworkbytessent
 slideover
+SLOs
 smartphone
 Smol
 smtracking
