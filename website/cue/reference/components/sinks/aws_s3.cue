@@ -237,8 +237,10 @@ components: sinks: aws_s3: components._aws & {
 				#### Option 1: Inline Field List
 
 				Schemas using Vector type names. Scalar types: `utf8`, `int32`, `int64`,
-				`float32`, `float64`, `boolean`, `binary`, `timestamp_millisecond`,
+				`float32`, `float64`, `boolean`, `timestamp_millisecond`,
 				`timestamp_microsecond`, `timestamp_nanosecond`, `date32`.
+				Note: `binary` is not supported because the Arrow JSON encoder
+				cannot materialize binary columns; use `utf8` with base64/hex encoding.
 				Compound types (one level of nesting): `struct` (with `fields`),
 				`list` (with `items`), `map` (with `key_type` and `value_type`).
 
@@ -380,6 +382,15 @@ components: sinks: aws_s3: components._aws & {
 				| `proto_message_type` | string | Protobuf message type (required with `proto_desc_file`) |
 				| `compression` | string | `snappy` (default), `zstd`, `gzip`, `lz4`, `none` |
 				| `schema_mode` | string | `strict` (default) or `relaxed` |
+
+				#### Unsupported Types
+
+				Binary fields (`binary`, `bytes`, `fixed`) are rejected at config
+				time because the internal Arrow JSON encoder cannot materialize them.
+				This applies across all schema sources: inline `binary` type, Avro
+				`bytes`/`fixed`, Protobuf `bytes`, and native Parquet `BYTE_ARRAY`
+				without a `(STRING)` annotation. Use `utf8` (or Avro/Protobuf
+				`string`) with base64 or hex encoding for binary data instead.
 				"""
 		}
 	}

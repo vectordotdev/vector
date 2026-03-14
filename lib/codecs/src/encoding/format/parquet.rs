@@ -690,6 +690,67 @@ fn proto_kind_to_arrow(
     }
 }
 
+/// Check the resolved Arrow schema for data types unsupported by the JSON-based
+/// encode path (`arrow::json::reader::ReaderBuilder`). Binary variants are
+/// accepted by Parquet/Arrow at the schema level but the JSON decoder rejects
+/// them at runtime, so we fail fast here at config time.
+///
+/// This walks the full field tree (including nested structs, lists, and map
+/// values) so it catches binary fields regardless of schema source (inline,
+/// Avro `bytes`/`fixed`, Protobuf `bytes`, or native Parquet `BYTE_ARRAY`
+/// without a STRING annotation).
+fn reject_unsupported_arrow_types(
+    schema: &Schema,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    fn check_field(
+        field: &Field,
+        path: &str,
+        bad: &mut Vec<String>,
+    ) {
+        let name = if path.is_empty() {
+            field.name().to_string()
+        } else {
+            format!("{path}.{}", field.name())
+        };
+        match field.data_type() {
+            DataType::Binary | DataType::LargeBinary | DataType::FixedSizeBinary(_) => {
+                bad.push(format!("'{name}' ({:?})", field.data_type()));
+            }
+            DataType::Struct(fields) => {
+                for f in fields {
+                    check_field(f, &name, bad);
+                }
+            }
+            DataType::List(inner) | DataType::LargeList(inner) => {
+                check_field(inner, &name, bad);
+            }
+            DataType::Map(entries_field, _) => {
+                // Map entries is a struct with key + value; check value field
+                if let DataType::Struct(kv) = entries_field.data_type() {
+                    for f in kv {
+                        check_field(f, &name, bad);
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    let mut bad = Vec::new();
+    for field in schema.fields() {
+        check_field(field, "", &mut bad);
+    }
+    if !bad.is_empty() {
+        return Err(format!(
+            "Schema contains binary field(s) unsupported by the JSON-based Arrow encoder: {}. \
+             Use Utf8 for base64/hex-encoded data instead.",
+            bad.join(", ")
+        )
+        .into());
+    }
+    Ok(())
+}
+
 /// Parquet batch serializer.
 #[derive(Clone, Debug)]
 pub struct ParquetSerializer {
@@ -706,6 +767,7 @@ impl ParquetSerializer {
         config: ParquetSerializerConfig,
     ) -> Result<Self, Box<dyn std::error::Error + Send + Sync + 'static>> {
         let schema = config.resolve_schema()?;
+        reject_unsupported_arrow_types(&schema)?;
         let schema_ref = SchemaRef::new(schema);
 
         let schema_field_names = schema_ref
@@ -1579,7 +1641,10 @@ mod tests {
 
     #[test]
     fn test_avro_to_arrow_type_mapping() {
-        // Test all Avro primitive types map correctly
+        // Test supported Avro primitive types map correctly.
+        // Note: Avro "bytes" maps to Arrow Binary which is rejected by
+        // reject_unsupported_arrow_types — tested separately in
+        // test_avro_bytes_rejected_at_config_time.
         let config: ParquetSerializerConfig = serde_json::from_value(serde_json::json!({
             "avro_schema": r#"{
                 "type": "record",
@@ -1590,25 +1655,23 @@ mod tests {
                     {"name": "f_long", "type": "long"},
                     {"name": "f_float", "type": "float"},
                     {"name": "f_double", "type": "double"},
-                    {"name": "f_string", "type": "string"},
-                    {"name": "f_bytes", "type": "bytes"}
+                    {"name": "f_string", "type": "string"}
                 ]
             }"#
         }))
         .expect("Config should deserialize");
 
         let serializer =
-            ParquetSerializer::new(config).expect("Should create serializer with all Avro types");
+            ParquetSerializer::new(config).expect("Should create serializer with Avro types");
 
         let fields = serializer.schema.fields();
-        assert_eq!(fields.len(), 7);
+        assert_eq!(fields.len(), 6);
         assert_eq!(*fields[0].data_type(), DataType::Boolean);
         assert_eq!(*fields[1].data_type(), DataType::Int32);
         assert_eq!(*fields[2].data_type(), DataType::Int64);
         assert_eq!(*fields[3].data_type(), DataType::Float32);
         assert_eq!(*fields[4].data_type(), DataType::Float64);
         assert_eq!(*fields[5].data_type(), DataType::Utf8);
-        assert_eq!(*fields[6].data_type(), DataType::Binary);
     }
 
     // ========================================================================
@@ -1640,11 +1703,11 @@ mod tests {
         log.insert("f_i64", Value::Integer(123456789));
         log.insert(
             "f_f32",
-            Value::Float(ordered_float::NotNan::new(3.14).unwrap()),
+            Value::Float(ordered_float::NotNan::new(1.23).unwrap()),
         );
         log.insert(
             "f_f64",
-            Value::Float(ordered_float::NotNan::new(2.718).unwrap()),
+            Value::Float(ordered_float::NotNan::new(9.81).unwrap()),
         );
         log.insert("f_utf8", "hello");
         // Timestamp/date fields left null — Arrow builder doesn't support "UTC"
@@ -2368,5 +2431,346 @@ mod tests {
             serializer.schema.field(4).data_type(),
             DataType::Map(_, _)
         ));
+    }
+
+    #[test]
+    fn test_all_non_log_events_error() {
+        use vector_core::event::{Metric, MetricKind, MetricValue};
+
+        let mut serializer = make_serializer(vec![("msg", "utf8")]);
+
+        let metric = Metric::new(
+            "cpu.usage",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 42.0 },
+        );
+        let events = vec![Event::Metric(metric)];
+
+        let mut buffer = BytesMut::new();
+        let result = serializer.encode(events, &mut buffer);
+        assert!(
+            result.is_err(),
+            "Batch of only non-log events should error"
+        );
+    }
+
+    #[test]
+    fn test_mixed_log_and_non_log_events() {
+        use vector_core::event::{Metric, MetricKind, MetricValue};
+
+        let mut serializer = make_serializer(vec![("msg", "utf8")]);
+
+        let metric = Metric::new(
+            "cpu.usage",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 42.0 },
+        );
+        let events = vec![
+            create_event(vec![("msg", "hello")]),
+            Event::Metric(metric),
+            create_event(vec![("msg", "world")]),
+        ];
+
+        let mut buffer = BytesMut::new();
+        serializer
+            .encode(events, &mut buffer)
+            .expect("Mixed batch should succeed (non-log events dropped)");
+
+        assert_parquet_magic(&buffer);
+        // Only the 2 log events should be in the Parquet output
+        assert_eq!(parquet_row_count(&buffer), 2);
+    }
+
+    #[test]
+    fn test_inline_struct_encode_data() {
+        use vector_core::event::Value;
+        use vrl::value::ObjectMap;
+
+        let config: ParquetSerializerConfig = serde_json::from_value(serde_json::json!({
+            "schema": [
+                {"name": "name", "type": "utf8"},
+                {
+                    "name": "metadata",
+                    "type": "struct",
+                    "fields": [
+                        {"name": "source", "type": "utf8"},
+                        {"name": "priority", "type": "int64"}
+                    ]
+                }
+            ]
+        }))
+        .expect("Config should deserialize");
+
+        let mut serializer = ParquetSerializer::new(config).expect("Should create serializer");
+
+        let mut meta = ObjectMap::new();
+        meta.insert("source".into(), Value::Bytes("syslog".into()));
+        meta.insert("priority".into(), Value::Integer(5));
+
+        let mut log = LogEvent::default();
+        log.insert("name", "test_event");
+        log.insert("metadata", Value::Object(meta));
+
+        let mut buffer = BytesMut::new();
+        serializer
+            .encode(vec![Event::Log(log)], &mut buffer)
+            .expect("Struct data encoding should succeed");
+
+        assert_parquet_magic(&buffer);
+        assert_eq!(parquet_row_count(&buffer), 1);
+    }
+
+    #[test]
+    fn test_inline_list_encode_data() {
+        use vector_core::event::Value;
+
+        let config: ParquetSerializerConfig = serde_json::from_value(serde_json::json!({
+            "schema": [
+                {"name": "name", "type": "utf8"},
+                {"name": "tags", "type": "list", "items": "utf8"}
+            ]
+        }))
+        .expect("Config should deserialize");
+
+        let mut serializer = ParquetSerializer::new(config).expect("Should create serializer");
+
+        let mut log = LogEvent::default();
+        log.insert("name", "test_event");
+        log.insert(
+            "tags",
+            Value::Array(vec![
+                Value::Bytes("prod".into()),
+                Value::Bytes("us-east".into()),
+            ]),
+        );
+
+        let mut buffer = BytesMut::new();
+        serializer
+            .encode(vec![Event::Log(log)], &mut buffer)
+            .expect("List data encoding should succeed");
+
+        assert_parquet_magic(&buffer);
+        assert_eq!(parquet_row_count(&buffer), 1);
+    }
+
+    #[test]
+    fn test_inline_map_encode_data() {
+        use vector_core::event::Value;
+        use vrl::value::ObjectMap;
+
+        let config: ParquetSerializerConfig = serde_json::from_value(serde_json::json!({
+            "schema": [
+                {"name": "name", "type": "utf8"},
+                {
+                    "name": "labels",
+                    "type": "map",
+                    "key_type": "utf8",
+                    "value_type": "utf8"
+                }
+            ]
+        }))
+        .expect("Config should deserialize");
+
+        let mut serializer = ParquetSerializer::new(config).expect("Should create serializer");
+
+        let mut labels = ObjectMap::new();
+        labels.insert("env".into(), Value::Bytes("prod".into()));
+        labels.insert("region".into(), Value::Bytes("us-east-1".into()));
+
+        let mut log = LogEvent::default();
+        log.insert("name", "test_event");
+        log.insert("labels", Value::Object(labels));
+
+        let mut buffer = BytesMut::new();
+        serializer
+            .encode(vec![Event::Log(log)], &mut buffer)
+            .expect("Map data encoding should succeed");
+
+        assert_parquet_magic(&buffer);
+        assert_eq!(parquet_row_count(&buffer), 1);
+    }
+
+    #[test]
+    fn test_strict_mode_ignores_nested_extra_fields() {
+        use vector_core::event::Value;
+        use vrl::value::ObjectMap;
+
+        let config: ParquetSerializerConfig = serde_json::from_value(serde_json::json!({
+            "schema": [
+                {
+                    "name": "metadata",
+                    "type": "struct",
+                    "fields": [
+                        {"name": "source", "type": "utf8"}
+                    ]
+                }
+            ],
+            "schema_mode": "strict"
+        }))
+        .expect("Config should deserialize");
+
+        let mut serializer = ParquetSerializer::new(config).expect("Should create serializer");
+
+        // Event has metadata.source (in schema) plus metadata.unknown (not in schema sub-fields)
+        // Strict mode only checks top-level field names, so this should pass
+        let mut meta = ObjectMap::new();
+        meta.insert("source".into(), Value::Bytes("syslog".into()));
+        meta.insert("unknown".into(), Value::Bytes("extra_nested".into()));
+
+        let mut log = LogEvent::default();
+        log.insert("metadata", Value::Object(meta));
+
+        let mut buffer = BytesMut::new();
+        serializer
+            .encode(vec![Event::Log(log)], &mut buffer)
+            .expect("Strict mode should not reject nested extra fields");
+
+        assert_parquet_magic(&buffer);
+        assert_eq!(parquet_row_count(&buffer), 1);
+    }
+
+    #[test]
+    fn test_inline_binary_rejected_at_config_time() {
+        let config = ParquetSerializerConfig {
+            schema: schema_fields(vec![("payload", "binary")]),
+            ..Default::default()
+        };
+        let result = ParquetSerializer::new(config);
+        assert!(result.is_err(), "Binary should be rejected at config time");
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("payload") && err.contains("binary"),
+            "Error should name the field and type, got: {err}"
+        );
+    }
+
+    #[test]
+    fn test_avro_bytes_rejected_at_config_time() {
+        // Avro "bytes" resolves to Arrow DataType::Binary, which is unsupported
+        let config: ParquetSerializerConfig = serde_json::from_value(serde_json::json!({
+            "avro_schema": r#"{
+                "type": "record",
+                "name": "test",
+                "fields": [
+                    {"name": "id", "type": "string"},
+                    {"name": "blob", "type": "bytes"}
+                ]
+            }"#
+        }))
+        .expect("Config should deserialize");
+
+        let result = ParquetSerializer::new(config);
+        assert!(
+            result.is_err(),
+            "Avro bytes should be rejected at config time"
+        );
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("blob") && err.contains("Binary"),
+            "Error should name the field, got: {err}"
+        );
+    }
+
+    #[test]
+    fn test_parquet_schema_binary_without_string_annotation_rejected() {
+        // Native Parquet "binary" without (STRING) annotation resolves to Arrow Binary
+        let config: ParquetSerializerConfig = serde_json::from_value(serde_json::json!({
+            "parquet_schema": "message logs {\n  required binary name (STRING);\n  optional binary raw_data;\n}"
+        }))
+        .expect("Config should deserialize");
+
+        let result = ParquetSerializer::new(config);
+        assert!(
+            result.is_err(),
+            "Parquet binary without STRING annotation should be rejected"
+        );
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("raw_data"),
+            "Error should name the field, got: {err}"
+        );
+    }
+
+    #[test]
+    fn test_nested_binary_in_struct_rejected() {
+        // Binary inside a struct should also be caught
+        let config: ParquetSerializerConfig = serde_json::from_value(serde_json::json!({
+            "avro_schema": r#"{
+                "type": "record",
+                "name": "test",
+                "fields": [
+                    {"name": "wrapper", "type": {
+                        "type": "record",
+                        "name": "inner",
+                        "fields": [
+                            {"name": "data", "type": "bytes"}
+                        ]
+                    }}
+                ]
+            }"#
+        }))
+        .expect("Config should deserialize");
+
+        let result = ParquetSerializer::new(config);
+        assert!(
+            result.is_err(),
+            "Nested binary in struct should be rejected"
+        );
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("wrapper.data"),
+            "Error should show the full dotted path, got: {err}"
+        );
+    }
+
+    #[test]
+    fn test_avro_nullable_union_null_value_encoding() {
+        let config: ParquetSerializerConfig = serde_json::from_value(serde_json::json!({
+            "avro_schema": r#"{
+                "type": "record",
+                "name": "test",
+                "fields": [
+                    {"name": "id", "type": "string"},
+                    {"name": "optional_count", "type": ["null", "long"]}
+                ]
+            }"#
+        }))
+        .expect("Config should deserialize");
+
+        let mut serializer = ParquetSerializer::new(config).expect("Should create serializer");
+
+        // First event has both fields, second has only id (optional_count is null)
+        let mut log1 = LogEvent::default();
+        log1.insert("id", "event_1");
+        log1.insert("optional_count", vector_core::event::Value::Integer(42));
+
+        let mut log2 = LogEvent::default();
+        log2.insert("id", "event_2");
+        // optional_count deliberately missing
+
+        let mut buffer = BytesMut::new();
+        serializer
+            .encode(vec![Event::Log(log1), Event::Log(log2)], &mut buffer)
+            .expect("Nullable union with null value should encode");
+
+        assert_parquet_magic(&buffer);
+        assert_eq!(parquet_row_count(&buffer), 2);
+    }
+
+    #[test]
+    fn test_very_long_field_values() {
+        let mut serializer = make_serializer(vec![("msg", "utf8")]);
+
+        // 1 MB string value
+        let long_value = "x".repeat(1_000_000);
+        let events = vec![create_event(vec![("msg", long_value.as_str())])];
+
+        let mut buffer = BytesMut::new();
+        serializer
+            .encode(events, &mut buffer)
+            .expect("Very long string value should encode");
+
+        assert_parquet_magic(&buffer);
+        assert_eq!(parquet_row_count(&buffer), 1);
     }
 }
