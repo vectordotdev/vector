@@ -322,7 +322,10 @@ generated: components: sources: exec: configuration: {
 																[tz_database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 																"""
 						required: false
-						type: string: examples: ["local", "America/New_York", "EST5EDT"]
+						type: string: {
+							default: null
+							examples: ["local", "America/New_York", "EST5EDT"]
+						}
 					}
 				}
 			}
@@ -335,6 +338,7 @@ generated: components: sources: exec: configuration: {
 			"""
 		required: false
 		type: object: {
+			default: null
 			examples: [{
 				LANG: "es_ES.UTF-8"
 				PATH: "/bin:/usr/bin:/usr/local/bin"
@@ -417,7 +421,7 @@ generated: components: sources: exec: configuration: {
 																The message's payload is the concatenation of all the chunks' payloads.
 																"""
 						required: false
-						type: uint: {}
+						type: uint: default: null
 					}
 					pending_messages_limit: {
 						description: """
@@ -427,7 +431,7 @@ generated: components: sources: exec: configuration: {
 																of its messages buffer can grow unbounded. This matches Graylog Server's behavior.
 																"""
 						required: false
-						type: uint: {}
+						type: uint: default: null
 					}
 					timeout_secs: {
 						description: """

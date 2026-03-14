@@ -24,7 +24,7 @@ generated: components: sinks: console: configuration: {
 				[global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
 				"""
 			required: false
-			type: bool: {}
+			type: bool: default: null
 		}
 	}
 	encoding: {
@@ -312,7 +312,10 @@ generated: components: sinks: console: configuration: {
 			except_fields: {
 				description: "List of fields that are excluded from the encoded event."
 				required:    false
-				type: array: items: type: string: {}
+				type: array: {
+					default: null
+					items: type: string: {}
+				}
 			}
 			gelf: {
 				description:   "The GELF Serializer Options."
@@ -362,7 +365,10 @@ generated: components: sinks: console: configuration: {
 			only_fields: {
 				description: "List of fields that are included in the encoded event."
 				required:    false
-				type: array: items: type: string: {}
+				type: array: {
+					default: null
+					items: type: string: {}
+				}
 			}
 			protobuf: {
 				description:   "Options for the Protobuf serializer."
@@ -404,60 +410,73 @@ generated: components: sinks: console: configuration: {
 				description:   "Options for the Syslog serializer."
 				relevant_when: "codec = \"syslog\""
 				required:      false
-				type: object: options: {
-					app_name: {
-						description: """
+				type: object: {
+					default: {
+						app_name: null
+						facility: null
+						msg_id:   null
+						proc_id:  null
+						rfc:      "rfc5424"
+						severity: null
+					}
+					options: {
+						app_name: {
+							description: """
 																Path to a field in the event to use for the app name.
 
 																If not provided, the encoder checks for a semantic "service" field.
 																If that is also missing, it defaults to "vector".
 																"""
-						required: false
-						type: string: {}
-					}
-					facility: {
-						description: "Path to a field in the event to use for the facility. Defaults to \"user\"."
-						required:    false
-						type: string: {}
-					}
-					msg_id: {
-						description: "Path to a field in the event to use for the msg ID."
-						required:    false
-						type: string: {}
-					}
-					proc_id: {
-						description: "Path to a field in the event to use for the proc ID."
-						required:    false
-						type: string: {}
-					}
-					rfc: {
-						description: "RFC to use for formatting."
-						required:    false
-						type: string: {
-							default: "rfc5424"
-							enum: {
-								rfc3164: "The legacy RFC3164 syslog format."
-								rfc5424: "The modern RFC5424 syslog format."
+							required: false
+							type: string: default: null
+						}
+						facility: {
+							description: "Path to a field in the event to use for the facility. Defaults to \"user\"."
+							required:    false
+							type: string: default: null
+						}
+						msg_id: {
+							description: "Path to a field in the event to use for the msg ID."
+							required:    false
+							type: string: default: null
+						}
+						proc_id: {
+							description: "Path to a field in the event to use for the proc ID."
+							required:    false
+							type: string: default: null
+						}
+						rfc: {
+							description: "RFC to use for formatting."
+							required:    false
+							type: string: {
+								default: "rfc5424"
+								enum: {
+									rfc3164: "The legacy RFC3164 syslog format."
+									rfc5424: "The modern RFC5424 syslog format."
+								}
 							}
 						}
-					}
-					severity: {
-						description: "Path to a field in the event to use for the severity. Defaults to \"informational\"."
-						required:    false
-						type: string: {}
+						severity: {
+							description: "Path to a field in the event to use for the severity. Defaults to \"informational\"."
+							required:    false
+							type: string: default: null
+						}
 					}
 				}
 			}
 			timestamp_format: {
 				description: "Format used for timestamp fields."
 				required:    false
-				type: string: enum: {
-					rfc3339:    "Represent the timestamp as a RFC 3339 timestamp."
-					unix:       "Represent the timestamp as a Unix timestamp."
-					unix_float: "Represent the timestamp as a Unix timestamp in floating point."
-					unix_ms:    "Represent the timestamp as a Unix timestamp in milliseconds."
-					unix_ns:    "Represent the timestamp as a Unix timestamp in nanoseconds."
-					unix_us:    "Represent the timestamp as a Unix timestamp in microseconds."
+				type: string: {
+					default: null
+					enum: {
+						rfc3339:    "Represent the timestamp as a RFC 3339 timestamp."
+						unix:       "Represent the timestamp as a Unix timestamp."
+						unix_float: "Represent the timestamp as a Unix timestamp in floating point."
+						unix_ms:    "Represent the timestamp as a Unix timestamp in milliseconds."
+						unix_ns:    "Represent the timestamp as a Unix timestamp in nanoseconds."
+						unix_us:    "Represent the timestamp as a Unix timestamp in microseconds."
+					}
 				}
 			}
 		}

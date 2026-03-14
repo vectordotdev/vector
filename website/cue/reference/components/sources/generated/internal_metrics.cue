@@ -17,30 +17,39 @@ generated: components: sources: internal_metrics: configuration: {
 	tags: {
 		description: "Tag configuration for the `internal_metrics` source."
 		required:    false
-		type: object: options: {
-			host_key: {
-				description: """
-					Overrides the name of the tag used to add the peer host to each metric.
-
-					The value is the peer host's address, including the port. For example, `1.2.3.4:9000`.
-
-					By default, the [global `log_schema.host_key` option][global_host_key] is used.
-
-					Set to `""` to suppress this key.
-
-					[global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
-					"""
-				required: false
-				type: string: {}
+		type: object: {
+			default: {
+				host_key: null
+				pid_key:  null
 			}
-			pid_key: {
-				description: """
-					Sets the name of the tag to use to add the current process ID to each metric.
+			options: {
+				host_key: {
+					description: """
+						Overrides the name of the tag used to add the peer host to each metric.
 
-					By default, this is not set and the tag is not automatically added.
-					"""
-				required: false
-				type: string: examples: ["pid"]
+						The value is the peer host's address, including the port. For example, `1.2.3.4:9000`.
+
+						By default, the [global `log_schema.host_key` option][global_host_key] is used.
+
+						Set to `""` to suppress this key.
+
+						[global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
+						"""
+					required: false
+					type: string: default: null
+				}
+				pid_key: {
+					description: """
+						Sets the name of the tag to use to add the current process ID to each metric.
+
+						By default, this is not set and the tag is not automatically added.
+						"""
+					required: false
+					type: string: {
+						default: null
+						examples: ["pid"]
+					}
+				}
 			}
 		}
 	}
