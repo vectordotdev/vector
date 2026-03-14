@@ -368,6 +368,7 @@ chrono.workspace = true
 chrono-tz.workspace = true
 colored.workspace = true
 csv = { version = "1.3", default-features = false }
+dashmap.workspace = true
 databend-client = { version = "0.28.0", default-features = false, features = ["rustls"], optional = true }
 derivative.workspace = true
 dirs-next = { version = "2.0.0", default-features = false, optional = true }

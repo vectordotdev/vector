@@ -49,7 +49,7 @@ components: sources: docker_logs: {
 		acknowledgements: false
 		auto_generated:   true
 		collect: {
-			checkpoint: enabled: false
+			checkpoint: enabled: true
 			from: {
 				service: services.docker
 
