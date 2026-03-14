@@ -15,7 +15,7 @@ use chrono::{DateTime, TimeZone, Utc};
 use futures::{Stream, StreamExt};
 use futures_util::future::OptionFuture;
 use rdkafka::{
-    ClientConfig, ClientContext, Statistics, TopicPartitionList,
+    ClientConfig, ClientContext, Offset, Statistics, TopicPartitionList,
     consumer::{
         BaseConsumer, CommitMode, Consumer, ConsumerContext, Rebalance, StreamConsumer,
         stream_consumer::StreamPartitionQueue,
@@ -59,7 +59,7 @@ use crate::{
     event::{BatchNotifier, BatchStatus, Event, Value},
     internal_events::{
         KafkaBytesReceived, KafkaEventsReceived, KafkaOffsetUpdateError, KafkaReadError,
-        StreamClosedError,
+        KafkaSeekError, StreamClosedError,
     },
     kafka,
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
@@ -592,6 +592,8 @@ impl ConsumerStateInner<Consuming> {
         let decoder = self.decoder.clone();
         let log_namespace = self.log_namespace;
         let mut out = self.out.clone();
+        let socket_timeout = self.config.socket_timeout_ms;
+        let fetch_wait_max_ms = self.config.fetch_wait_max_ms;
 
         let (end_tx, mut end_signal) = oneshot::channel::<()>();
 
@@ -605,6 +607,8 @@ impl ConsumerStateInner<Consuming> {
             let mut finalizer = Some(finalizer);
 
             let mut status = PartitionConsumerStatus::NormalExit;
+
+            let mut failed_msg_offset = None;
 
             loop {
                 tokio::select!(
@@ -620,10 +624,18 @@ impl ConsumerStateInner<Consuming> {
 
                     ack = ack_stream.next() => match ack {
                         Some((status, entry)) => {
-                            if status == BatchStatus::Delivered
-                                && let Err(error) =  consumer.store_offset(&entry.topic, entry.partition, entry.offset) {
-                                    emit!(KafkaOffsetUpdateError { error });
+                            match status {
+                                BatchStatus::Delivered => {
+                                    if let Err(error) = consumer.store_offset(&entry.topic, entry.partition, entry.offset) {
+                                        emit!(KafkaOffsetUpdateError { error });
+                                    }
                                 }
+                                BatchStatus::Errored | BatchStatus::Rejected => {
+                                    if acknowledgements && failed_msg_offset.is_none() {
+                                        failed_msg_offset = Some(entry.offset);
+                                    }
+                                }
+                            }
                         }
                         None if finalizer.is_none() => {
                             debug!("Acknowledgement stream complete for partition {}:{}.", &tp.0, tp.1);
@@ -632,6 +644,19 @@ impl ConsumerStateInner<Consuming> {
                         None => {
                             debug!("Acknowledgement stream empty for {}:{}", &tp.0, tp.1);
                         }
+                    },
+
+                    _ = tokio::time::sleep(fetch_wait_max_ms), if failed_msg_offset.is_some() => {
+                        let offset = failed_msg_offset.unwrap();
+                        match consumer.seek(&tp.0, tp.1, Offset::Offset(offset), socket_timeout) {
+                            Ok(_) => {
+                                debug!("Seeked back to offset {} for {}:{}", offset, &tp.0, tp.1);
+                            }
+                            Err(error) => {
+                                emit!(KafkaSeekError { error });
+                            }
+                        }
+                        failed_msg_offset = None;
                     },
 
                     message = messages.next(), if finalizer.is_some() => match message {
@@ -1557,7 +1582,7 @@ mod integration_test {
     use super::{test::*, *};
     use crate::{
         SourceSender,
-        event::{EventArray, EventContainer},
+        event::{EventArray, EventContainer, into_event_stream},
         shutdown::ShutdownSignal,
         test_util::{collect_n, components::assert_source_compliance, random_string},
     };
@@ -1666,6 +1691,122 @@ mod integration_test {
     #[tokio::test]
     async fn handles_permanent_negative_acknowledgement_vector_namespace() {
         send_receive(true, |n| n >= 2, 2, LogNamespace::Vector).await;
+    }
+
+    /// Test that the Kafka source properly seeks back and retries messages when they are rejected.
+    /// This test verifies the fix for the issue where rejected messages would cause offset commits
+    /// to be skipped, but the consumer wouldn't seek back to retry them.
+    ///
+    /// The test simulates a real-world scenario where a sink temporarily fails (e.g., auth error):
+    /// 1. Sends message A to Kafka - sink accepts it (offset committed)
+    /// 2. Sends messages B and C to Kafka - sink rejects them (offset NOT committed)
+    /// 3. Sends message D to Kafka - sink accepts it again
+    /// 4. Verifies that Kafka source seeks back and retries B and C
+    /// 5. Confirms all messages (A, B, C, D) are eventually received and committed
+    #[tokio::test]
+    async fn seeks_back_on_rejected_message() {
+        const SEND_COUNT: usize = 4;
+        // We expect to receive 6 events total: 0, 1, 2, 3, then 1 and 2 again after retry
+        const EXPECTED_EVENT_COUNT: usize = 6;
+
+        let topic = format!("test-topic-{}", random_string(10));
+        let group_id = format!("test-group-{}", random_string(10));
+        let config = make_config(&topic, &group_id, LogNamespace::Legacy, None);
+
+        // Send 4 messages to Kafka (A, B, C, D)
+        send_events(topic.clone(), 1, SEND_COUNT).await;
+
+        // Track which messages we've received
+        let received_messages = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let received_clone = received_messages.clone();
+
+        // Create a controllable pipeline that:
+        // - Accepts message 0 (A) - EventStatus::Delivered
+        // - Rejects messages 1 and 2 (B, C) on first attempt - EventStatus::Rejected
+        // - Accepts message 3 (D) - EventStatus::Delivered
+        // - Accepts messages 1 and 2 (B, C) on retry - EventStatus::Delivered
+        let (pipe, recv) = SourceSender::new_test_sender_with_options(100, None);
+        let recv = recv.into_stream();
+        let recv = recv.then(move |mut item| {
+            let received_clone = received_clone.clone();
+            async move {
+                // Extract message index from the event
+                let message_text = item.events.iter_logs_mut().next().unwrap()
+                    [log_schema().message_key().unwrap().to_string()]
+                    .to_string_lossy();
+
+                // Parse index from "my message XXX"
+                let index: usize = message_text.split_whitespace().last().unwrap().parse().unwrap();
+
+                let mut received = received_clone.lock().unwrap();
+                let attempt_count = received.iter().filter(|&&i| i == index).count();
+                received.push(index);
+
+                eprintln!("TEST: Received message {} (attempt {})", index, attempt_count + 1);
+
+                // Determine status based on message index and attempt count
+                let status = match (index, attempt_count) {
+                    (0, _) => EventStatus::Delivered,  // A: always accept
+                    (1, 0) => EventStatus::Rejected,   // B: reject on first attempt
+                    (1, _) => EventStatus::Delivered,  // B: accept on retry
+                    (2, 0) => EventStatus::Rejected,   // C: reject on first attempt
+                    (2, _) => EventStatus::Delivered,  // C: accept on retry
+                    (3, _) => EventStatus::Delivered,  // D: always accept
+                    _ => EventStatus::Delivered,
+                };
+
+                eprintln!("TEST: Message {} status: {:?}", index, status);
+
+                item.events.iter_events_mut().for_each(|mut event| {
+                    let metadata = event.metadata_mut();
+                    metadata.update_status(status);
+                    metadata.update_sources();
+                });
+                item
+            }
+        });
+
+        let (trigger_shutdown, shutdown_done) =
+            spawn_kafka(pipe, config, true, false, LogNamespace::Legacy);
+
+        // Collect all messages - should get 6 total (4 original + 2 retries)
+        // Use a timeout to prevent hanging if the fix is not present
+        let events = tokio::time::timeout(
+            Duration::from_secs(5),
+            collect_n(Box::pin(recv.flat_map(into_event_stream)), EXPECTED_EVENT_COUNT)
+        )
+        .await
+        .expect("Test timed out waiting for events - messages were not retried!");
+
+        // Wait for acknowledgements to be processed and offsets to be committed
+        // The auto.commit.interval.ms is 5000ms by default, so we need to wait for that
+        tokio::time::sleep(Duration::from_millis(6000)).await;
+
+        tokio::task::yield_now().await;
+        drop(trigger_shutdown);
+        shutdown_done.await;
+
+        // Verify we received all 6 events (4 original + 2 retries)
+        assert_eq!(
+            events.len(),
+            EXPECTED_EVENT_COUNT,
+            "Should receive all messages including retries"
+        );
+
+        // Verify the messages were retried (B and C should appear twice in received_messages)
+        let received = received_messages.lock().unwrap();
+        eprintln!("TEST: All received message indices: {:?}", *received);
+
+        // Count how many times each message was received
+        let count_0 = received.iter().filter(|&&i| i == 0).count();
+        let count_1 = received.iter().filter(|&&i| i == 1).count();
+        let count_2 = received.iter().filter(|&&i| i == 2).count();
+        let count_3 = received.iter().filter(|&&i| i == 3).count();
+
+        assert_eq!(count_0, 1, "Message A should be received once");
+        assert_eq!(count_1, 2, "Message B should be received twice (rejected then retried)");
+        assert_eq!(count_2, 2, "Message C should be received twice (rejected then retried)");
+        assert_eq!(count_3, 1, "Message D should be received once");
     }
 
     async fn send_receive(
