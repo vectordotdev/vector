@@ -47,7 +47,9 @@ impl MqttSource {
                 client
                     .subscribe(topic, QoS::AtLeastOnce)
                     .await
-                    .map_err(|_| ())?;
+                    .map_err(|e| {
+                        tracing::error!(error = ?e, "Failed to send MQTT subscribe command");
+                    })?;
             }
             OneOrMany::Many(topics) => {
                 client
@@ -58,7 +60,9 @@ impl MqttSource {
                             .map(|topic| SubscribeFilter::new(topic, QoS::AtLeastOnce)),
                     )
                     .await
-                    .map_err(|_| ())?;
+                    .map_err(|e| {
+                        tracing::error!(error = ?e, "Failed to send MQTT subscribe command");
+                    })?;
             }
         }
 
@@ -79,6 +83,10 @@ impl MqttSource {
                             Incoming::PubAck(_) | Incoming::PubRec(_) | Incoming::PubComp(_),
                         )) => {
                             // TODO Handle acknowledgement - https://github.com/vectordotdev/vector/issues/21967
+                        }
+                        Err(e) => {
+                            tracing::error!("Error = {e:?}");
+                            return Ok(());
                         }
                         _ => {}
                     }
