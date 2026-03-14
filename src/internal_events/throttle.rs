@@ -8,6 +8,7 @@ pub(crate) struct ThrottleEventDiscarded {
     pub threshold_type: &'static str,
     pub emit_events_discarded_per_key: bool,
     pub emit_detailed_metrics: bool,
+    pub reroute_dropped: bool,
 }
 
 impl InternalEvent for ThrottleEventDiscarded {
@@ -38,11 +39,15 @@ impl InternalEvent for ThrottleEventDiscarded {
         )
         .increment(1);
 
-        // Always: standard component metric
-        emit!(ComponentEventsDropped::<INTENTIONAL> {
-            count: 1,
-            reason: message
-        })
+        // Only emit the standard dropped metric when events are truly discarded,
+        // not when they are rerouted to the dropped output port. This matches
+        // the convention used by the remap transform.
+        if !self.reroute_dropped {
+            emit!(ComponentEventsDropped::<INTENTIONAL> {
+                count: 1,
+                reason: message
+            })
+        }
     }
 }
 

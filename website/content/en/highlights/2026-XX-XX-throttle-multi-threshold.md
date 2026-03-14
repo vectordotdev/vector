@@ -31,7 +31,8 @@ You can now configure up to three independent thresholds:
   computed via Vector's fast `EstimatedJsonEncodedSizeOf` trait (no
   serialization overhead)
 - **`threshold.tokens`** — a VRL expression evaluated per event to produce a
-  custom cost (e.g., `strlen(string!(.message))` or `to_int(.cost) ?? 1`)
+  custom cost (e.g., `strlen(string!(.message))` or `to_int(.cost) ?? 1`),
+  with its own independent budget set by **`threshold.tokens_budget`**
 
 Each threshold type runs its own GCRA rate limiter. An event is dropped the
 moment *any* limiter is exceeded.
@@ -77,6 +78,7 @@ transforms:
       events: 1000
       json_bytes: 500000
       tokens: 'strlen(string!(.message))'
+      tokens_budget: 500000
     exclude: '.level == "error"'
 ```
 

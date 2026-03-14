@@ -17,6 +17,7 @@ transforms:
       events: 1000
       json_bytes: 500000
       tokens: 'strlen(string!(.message))'
+      tokens_budget: 500000
     exclude: '.level == "error"'
     reroute_dropped: true
     internal_metrics:
