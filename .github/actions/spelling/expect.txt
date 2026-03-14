@@ -244,6 +244,7 @@ gzip'ed
 hashring
 hbb
 hec
+heim
 heka
 hfs
 highlighters
@@ -559,6 +560,7 @@ sustainability
 Swich
 syscalls
 sysfs
+sysinfo
 sysinit
 syslogng
 sysv

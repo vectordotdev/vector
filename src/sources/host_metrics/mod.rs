@@ -6,9 +6,7 @@ use std::{
 use chrono::{DateTime, Utc};
 use futures::StreamExt;
 use glob::{Pattern, PatternError};
-#[cfg(not(windows))]
-use heim::units::ratio::ratio;
-use heim::units::time::second;
+
 use serde_with::serde_as;
 use sysinfo::System;
 use tokio::time;
@@ -432,54 +430,22 @@ impl HostMetrics {
     pub async fn loadavg_metrics(&self, output: &mut MetricsBuffer) {
         output.name = "load";
         #[cfg(unix)]
-        match heim::cpu::os::unix::loadavg().await {
-            Ok(loadavg) => {
-                output.gauge(
-                    "load1",
-                    loadavg.0.get::<ratio>() as f64,
-                    MetricTags::default(),
-                );
-                output.gauge(
-                    "load5",
-                    loadavg.1.get::<ratio>() as f64,
-                    MetricTags::default(),
-                );
-                output.gauge(
-                    "load15",
-                    loadavg.2.get::<ratio>() as f64,
-                    MetricTags::default(),
-                );
-            }
-            Err(error) => {
-                emit!(HostMetricsScrapeDetailError {
-                    message: "Failed to load average info",
-                    error,
-                });
-            }
+        {
+            let loadavg = System::load_average();
+            output.gauge("load1", loadavg.one, MetricTags::default());
+            output.gauge("load5", loadavg.five, MetricTags::default());
+            output.gauge("load15", loadavg.fifteen, MetricTags::default());
         }
     }
 
     pub async fn host_metrics(&self, output: &mut MetricsBuffer) {
         output.name = "host";
-        match heim::host::uptime().await {
-            Ok(time) => output.gauge("uptime", time.get::<second>(), MetricTags::default()),
-            Err(error) => {
-                emit!(HostMetricsScrapeDetailError {
-                    message: "Failed to load host uptime info",
-                    error,
-                });
-            }
-        }
-
-        match heim::host::boot_time().await {
-            Ok(time) => output.gauge("boot_time", time.get::<second>(), MetricTags::default()),
-            Err(error) => {
-                emit!(HostMetricsScrapeDetailError {
-                    message: "Failed to load host boot time info",
-                    error,
-                });
-            }
-        }
+        output.gauge("uptime", System::uptime() as f64, MetricTags::default());
+        output.gauge(
+            "boot_time",
+            System::boot_time() as f64,
+            MetricTags::default(),
+        );
     }
 }
 
