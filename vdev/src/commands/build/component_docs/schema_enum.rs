@@ -1,7 +1,8 @@
 use super::{SchemaContext, get_schema_metadata, schema_aware_nested_merge};
 use anyhow::Result;
+use indexmap::IndexMap;
 use serde_json::{Map, Value, json};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 impl SchemaContext {
     #[allow(clippy::too_many_lines)]
@@ -109,7 +110,7 @@ impl SchemaContext {
             if resolved_subschemas.len() == subschema_count {
                 debug!("Detected likely 'internally-tagged with named fields' enum schema...");
                 let mut unique_resolved_properties = Map::new();
-                let mut unique_tag_values: HashMap<String, Value> = HashMap::new();
+                let mut unique_tag_values: IndexMap<String, Value> = IndexMap::new();
                 let tag_field = enum_tag_field.unwrap();
 
                 for resolved_subschema in &mut resolved_subschemas {
@@ -143,11 +144,10 @@ impl SchemaContext {
                         {
                             if let Some(s) = const_val.as_str() {
                                 tag_value = Some(s.to_string());
-                                break;
                             } else {
                                 tag_value = Some(const_val.to_string());
-                                break;
                             }
+                            break;
                         }
                         if let Some(enum_vals) = tag_subschema
                             .pointer(&format!("/type/{allowed}/enum"))
@@ -261,9 +261,136 @@ impl SchemaContext {
             }
         }
 
-        // ... remaining modes (external tagged unit variants, untagged narrowed, general fallback) ...
+        // Schema pattern: simple externally tagged enum with only unit variants.
+        if enum_tagging == "external" {
+            let mut tag_values: IndexMap<String, Value> = IndexMap::new();
+            let mut all_const_strings = true;
 
-        // Return dummy for now, to be filled out.
-        Ok(json!({ "_resolved": { "type": { "*": {} } } }))
+            for subschema in &subschemas {
+                if let Some(const_val) = subschema.get("const") {
+                    if let Some(s) = const_val.as_str() {
+                        tag_values.insert(s.to_string(), subschema.clone());
+                    } else {
+                        all_const_strings = false;
+                        break;
+                    }
+                } else {
+                    all_const_strings = false;
+                    break;
+                }
+            }
+
+            if all_const_strings && !tag_values.is_empty() {
+                debug!("Resolved as 'externally-tagged with only unit variants' enum schema.");
+                let mut enum_vals = Map::new();
+                for (k, v) in tag_values {
+                    let desc = self.get_rendered_description_from_schema(&v);
+                    enum_vals.insert(k, Value::String(desc));
+                }
+                return Ok(json!({ "_resolved": { "type": { "string": { "enum": enum_vals } } } }));
+            }
+        }
+
+        // Schema pattern: untagged enum with narrowing constant variants and catch-all free-form variant.
+        if enum_tagging == "untagged" {
+            let mut type_def_kinds: Vec<String> = Vec::new();
+            let mut fixed_subschemas = 0;
+            let mut freeform_subschemas = 0;
+
+            for subschema in &subschemas {
+                let schema_type = self.get_json_schema_type(subschema);
+                match schema_type {
+                    None | Some("all-of" | "one-of") => {
+                        // We don't handle these cases.
+                    }
+                    Some("const") => {
+                        if let Some(const_val) = subschema.get("const") {
+                            type_def_kinds.push(super::docs_type_str(const_val).to_string());
+                        }
+                        fixed_subschemas += 1;
+                    }
+                    Some("enum") => {
+                        if let Some(Value::Array(enum_vals)) = subschema.get("enum") {
+                            for val in enum_vals {
+                                type_def_kinds.push(super::docs_type_str(val).to_string());
+                            }
+                        }
+                        fixed_subschemas += 1;
+                    }
+                    Some(t) => {
+                        type_def_kinds.push(t.to_string());
+                        freeform_subschemas += 1;
+                    }
+                }
+            }
+
+            let unique_kinds: HashSet<_> = type_def_kinds.iter().collect();
+            if unique_kinds.len() == 1 && fixed_subschemas >= 1 && freeform_subschemas == 1 {
+                debug!("Resolved as 'untagged with narrowed free-form' enum schema.");
+                let type_def_kind = type_def_kinds.first().unwrap();
+                return Ok(json!({ "_resolved": { "type": { type_def_kind: {} } }, "annotations": "narrowed_free_form" }));
+            }
+        }
+
+        // Schema pattern: simple externally tagged enum with only non-unit variants.
+        if enum_tagging == "external" {
+            let all_objects = subschemas
+                .iter()
+                .all(|s| self.get_json_schema_type(s) == Some("object"));
+
+            if all_objects {
+                let mut aggregated_properties = Map::new();
+
+                for subschema in &subschemas {
+                    let resolved_subschema = self.resolve_schema(subschema)?;
+                    if let Some(Value::Object(resolved_properties)) =
+                        resolved_subschema.pointer("/type/object/options")
+                        && resolved_properties.len() == 1
+                    {
+                        let description = self.get_rendered_description_from_schema(subschema);
+                        for (property_name, property_schema) in resolved_properties {
+                            let mut prop = property_schema.clone();
+                            if !description.is_empty() {
+                                prop.as_object_mut()
+                                    .unwrap()
+                                    .insert("description".to_string(), Value::String(description.clone()));
+                            }
+                            aggregated_properties.insert(property_name.clone(), prop);
+                        }
+                    }
+                }
+
+                if !aggregated_properties.is_empty() {
+                    debug!("Resolved as 'externally-tagged with only non-unit variants' enum schema.");
+                    return Ok(json!({ "_resolved": { "type": { "object": { "options": aggregated_properties } } } }));
+                }
+            }
+        }
+
+        // Fallback schema pattern: mixed-mode enums.
+        debug!("Resolved as 'fallback mixed-mode' enum schema.");
+        debug!("Tagging mode: {}", enum_tagging);
+
+        let resolved_subschemas: Vec<Value> = subschemas
+            .iter()
+            .filter_map(|subschema| self.resolve_schema(subschema).ok())
+            .filter(|v| !v.is_null())
+            .collect();
+
+        if resolved_subschemas.is_empty() {
+            return Ok(json!({ "_resolved": { "type": { "*": {} } } }));
+        }
+
+        let mut type_defs = resolved_subschemas[0].clone();
+        for item in resolved_subschemas.iter().skip(1) {
+            schema_aware_nested_merge(&mut type_defs, item);
+        }
+
+        let merged_type = type_defs
+            .get("type")
+            .cloned()
+            .unwrap_or_else(|| json!({ "*": {} }));
+
+        Ok(json!({ "_resolved": { "type": merged_type }, "annotations": "mixed_mode" }))
     }
 }
