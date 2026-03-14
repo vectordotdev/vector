@@ -62,10 +62,11 @@ unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tokio_unstable)'] }
 name = "vector"
 section = "admin"
 maintainer-scripts = "distribution/debian/scripts/"
-conf-files = ["/etc/vector/vector.yaml", "/etc/default/vector"]
+conf-files = ["/etc/vector/vector.yaml", "/etc/vector/vector-provider.yaml", "/etc/default/vector"]
 assets = [
   ["target/release/vector", "/usr/bin/", "755"],
   ["config/vector.yaml", "/etc/vector/vector.yaml", "644"],
+  ["config/vector-provider.yaml", "/etc/vector/vector-provider.yaml", "644"],
   ["config/examples/*", "/etc/vector/examples/", "644"],
   ["distribution/systemd/vector.service", "/lib/systemd/system/vector.service", "644"],
   ["distribution/systemd/vector.default", "/etc/default/vector", "600"],
