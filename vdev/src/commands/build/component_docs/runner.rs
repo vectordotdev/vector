@@ -1,5 +1,6 @@
 use super::schema::SchemaContext;
 use anyhow::{Context, Result};
+use indexmap::IndexMap;
 use serde_json::Value;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -16,8 +17,8 @@ pub fn run(schema_path: &Path) -> Result<()> {
 
     let component_types = ["source", "transform", "sink"];
 
-    // 1. Process Component Bases
-    let mut component_bases = serde_json::Map::new();
+    // 1. Process Component Bases (sorted by component type for deterministic output)
+    let mut component_bases: IndexMap<String, String> = IndexMap::new();
     if let Some(definitions) = root_schema.get("definitions").and_then(|d| d.as_object()) {
         for (key, definition) in definitions {
             if let Some(base_type) =
@@ -25,22 +26,18 @@ pub fn run(schema_path: &Path) -> Result<()> {
                     .and_then(|v| v.as_str())
                 && component_types.contains(&base_type)
             {
-                component_bases.insert(base_type.to_string(), Value::String(key.clone()));
+                component_bases.insert(base_type.to_string(), key.clone());
             }
         }
     }
+    component_bases.sort_keys();
 
-    for (comp_type, schema_name) in component_bases {
-        render_and_import_generated_component_schema(
-            &mut context,
-            schema_name.as_str().unwrap(),
-            &comp_type,
-        )?;
+    for (comp_type, schema_name) in &component_bases {
+        render_and_import_generated_component_schema(&mut context, schema_name, comp_type)?;
     }
 
-    // 2. Process All Components
-    let mut all_components: indexmap::IndexMap<String, serde_json::Map<String, Value>> =
-        indexmap::IndexMap::new();
+    // 2. Process All Components (sorted by component type and name for deterministic output)
+    let mut all_components: IndexMap<String, IndexMap<String, String>> = IndexMap::new();
     if let Some(definitions) = root_schema.get("definitions").and_then(|d| d.as_object()) {
         for (key, definition) in definitions {
             let comp_type = super::schema::get_schema_metadata(definition, "docs::component_type")
@@ -54,24 +51,23 @@ pub fn run(schema_path: &Path) -> Result<()> {
                 all_components
                     .entry(t.to_string())
                     .or_default()
-                    .insert(n.to_string(), Value::String(key.clone()));
+                    .insert(n.to_string(), key.clone());
             }
         }
     }
+    all_components.sort_keys();
+    for (_, components) in &mut all_components {
+        components.sort_keys();
+    }
 
-    for (comp_type, components) in all_components {
+    for (comp_type, components) in &all_components {
         for (comp_name, schema_name) in components {
-            render_and_import_component_schema(
-                &mut context,
-                schema_name.as_str().unwrap(),
-                &comp_type,
-                &comp_name,
-            )?;
+            render_and_import_component_schema(&mut context, schema_name, comp_type, comp_name)?;
         }
     }
 
-    // 3. Process APIs
-    let mut apis = serde_json::Map::new();
+    // 3. Process APIs (sorted by name for deterministic output)
+    let mut apis: IndexMap<String, String> = IndexMap::new();
     if let Some(definitions) = root_schema.get("definitions").and_then(|d| d.as_object()) {
         for (key, definition) in definitions {
             let comp_type = super::schema::get_schema_metadata(definition, "docs::component_type")
@@ -82,14 +78,15 @@ pub fn run(schema_path: &Path) -> Result<()> {
             if comp_type == Some("api")
                 && let Some(n) = comp_name
             {
-                apis.insert(n.to_string(), Value::String(key.clone()));
+                apis.insert(n.to_string(), key.clone());
             }
         }
     }
-    render_and_import_generated_api_schema(&mut context, apis)?;
+    apis.sort_keys();
+    render_and_import_generated_api_schema(&mut context, &apis)?;
 
-    // 4. Process Global Options
-    let mut global_options = serde_json::Map::new();
+    // 4. Process Global Options (sorted by name for deterministic output)
+    let mut global_options: IndexMap<String, String> = IndexMap::new();
     if let Some(definitions) = root_schema.get("definitions").and_then(|d| d.as_object()) {
         for (key, definition) in definitions {
             let comp_type = super::schema::get_schema_metadata(definition, "docs::component_type")
@@ -100,11 +97,12 @@ pub fn run(schema_path: &Path) -> Result<()> {
             if comp_type == Some("global_option")
                 && let Some(n) = comp_name
             {
-                global_options.insert(n.to_string(), Value::String(key.clone()));
+                global_options.insert(n.to_string(), key.clone());
             }
         }
     }
-    render_and_import_generated_global_option_schema(&mut context, global_options)?;
+    global_options.sort_keys();
+    render_and_import_generated_global_option_schema(&mut context, &global_options)?;
 
     Ok(())
 }
@@ -238,15 +236,13 @@ fn render_and_import_component_schema(
 
 fn render_and_import_generated_api_schema(
     context: &mut SchemaContext,
-    apis: serde_json::Map<String, Value>,
+    apis: &IndexMap<String, String>,
 ) -> Result<()> {
     let mut api_schema = serde_json::Map::new();
     for (component_name, schema_name) in apis {
-        if let Some(name_str) = schema_name.as_str() {
-            let friendly_name = format!("'{component_name}' api configuration");
-            let resolved = context.unwrap_resolved_schema(name_str, &friendly_name)?;
-            api_schema.insert(component_name, Value::Object(resolved));
-        }
+        let friendly_name = format!("'{component_name}' api configuration");
+        let resolved = context.unwrap_resolved_schema(schema_name, &friendly_name)?;
+        api_schema.insert(component_name.clone(), Value::Object(resolved));
     }
 
     render_and_import_schema(
@@ -260,23 +256,21 @@ fn render_and_import_generated_api_schema(
 
 fn render_and_import_generated_global_option_schema(
     context: &mut SchemaContext,
-    global_options: serde_json::Map<String, Value>,
+    global_options: &IndexMap<String, String>,
 ) -> Result<()> {
     let mut global_option_schema = serde_json::Map::new();
 
     for (component_name, schema_name) in global_options {
-        if let Some(name_str) = schema_name.as_str() {
-            let friendly_name = format!("'{component_name}' global options configuration");
+        let friendly_name = format!("'{component_name}' global options configuration");
 
-            if component_name == "global_option" {
-                let flattened = context.unwrap_resolved_schema(name_str, &friendly_name)?;
-                for (k, v) in flattened {
-                    global_option_schema.insert(k, v);
-                }
-            } else {
-                let resolved = context.resolve_schema_by_name(name_str)?;
-                global_option_schema.insert(component_name, resolved);
+        if component_name == "global_option" {
+            let flattened = context.unwrap_resolved_schema(schema_name, &friendly_name)?;
+            for (k, v) in flattened {
+                global_option_schema.insert(k, v);
             }
+        } else {
+            let resolved = context.resolve_schema_by_name(schema_name)?;
+            global_option_schema.insert(component_name.clone(), resolved);
         }
     }
 

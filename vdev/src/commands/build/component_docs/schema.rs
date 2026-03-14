@@ -8,14 +8,15 @@ pub mod resolve;
 pub mod utils;
 
 use anyhow::{Result, anyhow};
+use indexmap::IndexMap;
 use serde_json::Value;
-use std::{collections::HashMap, env};
+use std::env;
 
 pub struct SchemaContext {
     pub root_schema: Value,
     pub cue_binary_path: String,
-    pub resolved_schema_cache: HashMap<String, Value>,
-    pub expanded_schema_cache: HashMap<String, Value>,
+    pub resolved_schema_cache: IndexMap<String, Value>,
+    pub expanded_schema_cache: IndexMap<String, Value>,
 }
 
 impl SchemaContext {
@@ -25,8 +26,8 @@ impl SchemaContext {
         Ok(Self {
             root_schema,
             cue_binary_path,
-            resolved_schema_cache: HashMap::new(),
-            expanded_schema_cache: HashMap::new(),
+            resolved_schema_cache: IndexMap::new(),
+            expanded_schema_cache: IndexMap::new(),
         })
     }
 }
@@ -144,7 +145,7 @@ pub fn schema_aware_nested_merge(base: &mut Value, override_val: &Value) {
                 if let Value::Array(arr) = v {
                     for i in arr {
                         if !result.contains(i) {
-                            result.push(i.clone())
+                            result.push(i.clone());
                         }
                     }
                 } else if !result.contains(v) {

@@ -35,16 +35,8 @@ impl SchemaContext {
 
         let unwrapped_obj = unwrapped.unwrap().as_object().unwrap().clone();
 
-        // Sorting the object properties to match Ruby's `sort_hash_nested` logic
-        let mut sorted_keys: Vec<_> = unwrapped_obj.keys().collect();
-        sorted_keys.sort();
-
-        let mut sorted_map = Map::new();
-        for k in sorted_keys {
-            sorted_map.insert(k.clone(), unwrapped_obj.get(k).unwrap().clone());
-        }
-
-        Ok(sorted_map)
+        // Recursively sort the entire schema to match Ruby's `sort_hash_nested` logic
+        Ok(Self::sort_hash_nested(&unwrapped_obj))
     }
 
     pub fn fix_grouped_enums_if_numeric(
@@ -222,12 +214,11 @@ impl SchemaContext {
             .and_then(Value::as_bool)
             .unwrap_or(false);
 
-        if let Some(Value::Object(types)) = resolved_schema.get_mut("type") {
-            if let Some(Value::Object(string_def)) = types.get_mut("string") {
-                if is_templateable {
-                    string_def.insert("syntax".to_string(), Value::String("template".to_string()));
-                }
-            }
+        if let Some(Value::Object(types)) = resolved_schema.get_mut("type")
+            && let Some(Value::Object(string_def)) = types.get_mut("string")
+            && is_templateable
+        {
+            string_def.insert("syntax".to_string(), Value::String("template".to_string()));
         }
 
         if let Some(examples) = get_schema_metadata(source_schema, "docs::examples") {
@@ -247,17 +238,17 @@ impl SchemaContext {
                 for (type_name, def) in type_obj.iter_mut() {
                     if let Value::Object(def_map) = def {
                         if type_name == "array" {
-                            if let Some(Value::Object(items_obj)) = def_map.get_mut("items") {
-                                if let Some(Value::Object(subtypes)) = items_obj.get_mut("type") {
-                                    for (subtype_name, subtype_def) in subtypes.iter_mut() {
-                                        if subtype_name != "array" {
-                                            if let Value::Object(s_def) = subtype_def {
-                                                s_def.insert(
-                                                    "examples".to_string(),
-                                                    Value::Array(flattened_examples.clone()),
-                                                );
-                                            }
-                                        }
+                            if let Some(Value::Object(items_obj)) = def_map.get_mut("items")
+                                && let Some(Value::Object(subtypes)) = items_obj.get_mut("type")
+                            {
+                                for (subtype_name, subtype_def) in subtypes.iter_mut() {
+                                    if subtype_name != "array"
+                                        && let Value::Object(s_def) = subtype_def
+                                    {
+                                        s_def.insert(
+                                            "examples".to_string(),
+                                            Value::Array(flattened_examples.clone()),
+                                        );
                                     }
                                 }
                             }
@@ -277,12 +268,11 @@ impl SchemaContext {
                 Value::String(s) => s.clone(),
                 v => v.to_string(),
             };
-            if let Some(schema_type) = self.numeric_schema_type(resolved_schema) {
-                if let Some(Value::Object(types)) = resolved_schema.get_mut("type") {
-                    if let Some(Value::Object(def)) = types.get_mut(schema_type) {
-                        def.insert("unit".to_string(), Value::String(unit_str));
-                    }
-                }
+            if let Some(schema_type) = self.numeric_schema_type(resolved_schema)
+                && let Some(Value::Object(types)) = resolved_schema.get_mut("type")
+                && let Some(Value::Object(def)) = types.get_mut(schema_type)
+            {
+                def.insert("unit".to_string(), Value::String(unit_str));
             }
         }
 
@@ -291,12 +281,11 @@ impl SchemaContext {
                 Value::String(s) => s.clone(),
                 v => v.to_string(),
             };
-            if self.resolved_schema_type(resolved_schema) == Some("string") {
-                if let Some(Value::Object(types)) = resolved_schema.get_mut("type") {
-                    if let Some(Value::Object(string_def)) = types.get_mut("string") {
-                        string_def.insert("syntax".to_string(), Value::String(syntax_str));
-                    }
-                }
+            if self.resolved_schema_type(resolved_schema) == Some("string")
+                && let Some(Value::Object(types)) = resolved_schema.get_mut("type")
+                && let Some(Value::Object(string_def)) = types.get_mut("string")
+            {
+                string_def.insert("syntax".to_string(), Value::String(syntax_str));
             }
         }
     }
@@ -370,10 +359,21 @@ impl SchemaContext {
         if let Some(Value::Object(types)) = resolved_schema.get("type")
             && types.len() == 1
         {
-            // Should return string statically initialized
-            return Some(Box::leak(
-                types.keys().next().unwrap().clone().into_boxed_str(),
-            ));
+            let type_name = types.keys().next().unwrap();
+            return match type_name.as_str() {
+                "object" => Some("object"),
+                "array" => Some("array"),
+                "string" => Some("string"),
+                "bool" => Some("bool"),
+                "uint" => Some("uint"),
+                "int" => Some("int"),
+                "float" => Some("float"),
+                "condition" => Some("condition"),
+                "enum" => Some("enum"),
+                "const" => Some("const"),
+                "*" => Some("*"),
+                _ => None,
+            };
         }
         None
     }
