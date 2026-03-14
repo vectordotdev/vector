@@ -2,6 +2,7 @@ use std::{collections::HashMap, convert::TryFrom};
 
 use aws_config::Region;
 use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
+use aws_sdk_cloudwatchlogs::types::LogGroupClass;
 use aws_sdk_kms::Client as KMSClient;
 use chrono::Duration;
 use futures::{StreamExt, stream};
@@ -65,6 +66,7 @@ async fn cloudwatch_insert_log_event() {
         acknowledgements: Default::default(),
         kms_key: None,
         tags: None,
+        log_group_class: None,
     };
 
     let (sink, _) = config.build(SinkContext::default()).await.unwrap();
@@ -118,6 +120,7 @@ async fn cloudwatch_insert_log_events_sorted() {
         acknowledgements: Default::default(),
         kms_key: None,
         tags: None,
+        log_group_class: None,
     };
 
     let (sink, _) = config.build(SinkContext::default()).await.unwrap();
@@ -196,6 +199,7 @@ async fn cloudwatch_insert_out_of_range_timestamp() {
         acknowledgements: Default::default(),
         kms_key: None,
         tags: None,
+        log_group_class: None,
     };
 
     let (sink, _) = config.build(SinkContext::default()).await.unwrap();
@@ -275,6 +279,7 @@ async fn cloudwatch_dynamic_group_and_stream_creation() {
         acknowledgements: Default::default(),
         kms_key: None,
         tags: None,
+        log_group_class: None,
     };
 
     let (sink, _) = config.build(SinkContext::default()).await.unwrap();
@@ -343,6 +348,7 @@ async fn cloudwatch_dynamic_group_and_stream_creation_with_kms_key_and_tags() {
             "key".to_string(),
             "value".to_string(),
         )])),
+        log_group_class: None,
     };
 
     let (sink, _) = config.build(SinkContext::default()).await.unwrap();
@@ -389,6 +395,102 @@ async fn cloudwatch_dynamic_group_and_stream_creation_with_kms_key_and_tags() {
 }
 
 #[tokio::test]
+async fn cloudwatch_dynamic_group_with_log_group_class_default() {
+    trace_init();
+
+    let stream_name = gen_name();
+    let group_name = gen_name();
+
+    let config = CloudwatchLogsSinkConfig {
+        stream_name: Template::try_from(stream_name.as_str()).unwrap(),
+        group_name: Template::try_from(group_name.as_str()).unwrap(),
+        region: RegionOrEndpoint::with_both("us-east-1", cloudwatch_address().as_str()),
+        encoding: TextSerializerConfig::default().into(),
+        create_missing_group: true,
+        create_missing_stream: true,
+        retention: Default::default(),
+        compression: Default::default(),
+        batch: Default::default(),
+        request: Default::default(),
+        tls: Default::default(),
+        assume_role: None,
+        auth: Default::default(),
+        acknowledgements: Default::default(),
+        kms_key: None,
+        tags: None,
+        log_group_class: None,
+    };
+
+    let (sink, _) = config.build(SinkContext::default()).await.unwrap();
+    let (_, events) = random_lines_with_stream(1, 1, None);
+    run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
+
+    let log_group = create_client_test()
+        .await
+        .describe_log_groups()
+        .log_group_name_pattern(group_name.clone())
+        .limit(1)
+        .send()
+        .await
+        .unwrap()
+        .log_groups()
+        .first()
+        .unwrap()
+        .clone();
+
+    let log_class = log_group.log_group_class().unwrap();
+    assert_eq!(log_class, &LogGroupClass::Standard);
+}
+
+#[tokio::test]
+async fn cloudwatch_dynamic_group_with_log_group_class_set() {
+    trace_init();
+
+    let stream_name = gen_name();
+    let group_name = gen_name();
+
+    let config = CloudwatchLogsSinkConfig {
+        stream_name: Template::try_from(stream_name.as_str()).unwrap(),
+        group_name: Template::try_from(group_name.as_str()).unwrap(),
+        region: RegionOrEndpoint::with_both("us-east-1", cloudwatch_address().as_str()),
+        encoding: TextSerializerConfig::default().into(),
+        create_missing_group: true,
+        create_missing_stream: true,
+        retention: Default::default(),
+        compression: Default::default(),
+        batch: Default::default(),
+        request: Default::default(),
+        tls: Default::default(),
+        assume_role: None,
+        auth: Default::default(),
+        acknowledgements: Default::default(),
+        kms_key: None,
+        tags: None,
+        log_group_class: Some("infrequent_access".to_string()),
+    };
+
+    let (sink, _) = config.build(SinkContext::default()).await.unwrap();
+    let (_, events) = random_lines_with_stream(1, 1, None);
+    run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
+
+    let log_group = create_client_test()
+        .await
+        .describe_log_groups()
+        .log_group_name_pattern(group_name.clone())
+        .limit(1)
+        .send()
+        .await
+        .unwrap()
+        .log_groups()
+        .first()
+        .unwrap()
+        .clone();
+
+    let log_class = log_group.log_group_class().unwrap();
+    assert_eq!(log_class, &LogGroupClass::InfrequentAccess);
+}
+
+#[tokio::test]
 async fn cloudwatch_insert_log_event_batched() {
     trace_init();
 
@@ -417,6 +519,7 @@ async fn cloudwatch_insert_log_event_batched() {
         acknowledgements: Default::default(),
         kms_key: None,
         tags: None,
+        log_group_class: None,
     };
 
     let (sink, _) = config.build(SinkContext::default()).await.unwrap();
@@ -470,6 +573,7 @@ async fn cloudwatch_insert_log_event_partitioned() {
         acknowledgements: Default::default(),
         kms_key: None,
         tags: None,
+        log_group_class: None,
     };
 
     let (sink, _) = config.build(SinkContext::default()).await.unwrap();
@@ -565,6 +669,7 @@ async fn cloudwatch_healthcheck() {
         acknowledgements: Default::default(),
         kms_key: None,
         tags: None,
+        log_group_class: None,
     };
 
     let client = config.create_client(&ProxyConfig::default()).await.unwrap();
