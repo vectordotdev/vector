@@ -16,7 +16,8 @@ use crate::{
     sinks::{
         Healthcheck, VectorSink,
         azure_common::{
-            self, config::AzureBlobRetryLogic, service::AzureBlobService, sink::AzureBlobSink,
+            self, config::AzureAuthentication, config::AzureBlobRetryLogic,
+            config::AzureBlobTlsConfig, service::AzureBlobService, sink::AzureBlobSink,
         },
         util::{
             BatchConfig, BulkSizeBasedDefaultBatchSettings, Compression, ServiceBuilderExt,
@@ -41,6 +42,10 @@ impl TowerRequestConfigDefaults for AzureBlobTowerRequestConfigDefaults {
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct AzureBlobSinkConfig {
+    #[configurable(derived)]
+    #[serde(default)]
+    pub auth: Option<AzureAuthentication>,
+
     /// The Azure Blob Storage Account connection string.
     ///
     /// Authentication with an access key or shared access signature (SAS)
@@ -56,12 +61,32 @@ pub struct AzureBlobSinkConfig {
     /// | Allowed resource types | Container & Object |
     /// | Allowed permissions    | Read & Create      |
     #[configurable(metadata(
+        docs::warnings = "Access keys and SAS tokens can be used to gain unauthorized access to Azure Blob Storage \
+        resources. Numerous security breaches have occurred due to leaked connection strings. It is important to keep \
+        connection strings secure and not expose them in logs, error messages, or version control systems."
+    ))]
+    #[configurable(metadata(
         docs::examples = "DefaultEndpointsProtocol=https;AccountName=mylogstorage;AccountKey=storageaccountkeybase64encoded;EndpointSuffix=core.windows.net"
     ))]
     #[configurable(metadata(
         docs::examples = "BlobEndpoint=https://mylogstorage.blob.core.windows.net/;SharedAccessSignature=generatedsastoken"
     ))]
-    pub connection_string: SensitiveString,
+    #[configurable(metadata(docs::examples = "AccountName=mylogstorage"))]
+    pub connection_string: Option<SensitiveString>,
+
+    /// The Azure Blob Storage Account name.
+    ///
+    /// If provided, this will be used instead of the `connection_string`.
+    /// This is useful for authenticating with an Azure credential.
+    #[configurable(metadata(docs::examples = "mylogstorage"))]
+    pub(super) account_name: Option<String>,
+
+    /// The Azure Blob Storage endpoint.
+    ///
+    /// If provided, this will be used instead of the `connection_string`.
+    /// This is useful for authenticating with an Azure credential.
+    #[configurable(metadata(docs::examples = "https://mylogstorage.blob.core.windows.net/"))]
+    pub(super) blob_endpoint: Option<String>,
 
     /// The Azure Blob Storage Account container name.
     #[configurable(metadata(docs::examples = "my-logs"))]
@@ -138,6 +163,10 @@ pub struct AzureBlobSinkConfig {
         skip_serializing_if = "crate::serde::is_default"
     )]
     pub(super) acknowledgements: AcknowledgementsConfig,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    pub tls: Option<AzureBlobTlsConfig>,
 }
 
 pub fn default_blob_prefix() -> Template {
@@ -147,7 +176,10 @@ pub fn default_blob_prefix() -> Template {
 impl GenerateConfig for AzureBlobSinkConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            connection_string: String::from("DefaultEndpointsProtocol=https;AccountName=some-account-name;AccountKey=some-account-key;").into(),
+            auth: None,
+            connection_string: Some(String::from("DefaultEndpointsProtocol=https;AccountName=some-account-name;AccountKey=some-account-key;").into()),
+            account_name: None,
+            blob_endpoint: None,
             container_name: String::from("logs"),
             blob_prefix: default_blob_prefix(),
             blob_time_format: Some(String::from("%s")),
@@ -157,6 +189,7 @@ impl GenerateConfig for AzureBlobSinkConfig {
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
             acknowledgements: Default::default(),
+            tls: None,
         })
         .unwrap()
     }
@@ -166,11 +199,46 @@ impl GenerateConfig for AzureBlobSinkConfig {
 #[typetag::serde(name = "azure_blob")]
 impl SinkConfig for AzureBlobSinkConfig {
     async fn build(&self, cx: SinkContext) -> Result<(VectorSink, Healthcheck)> {
+        let connection_string: String = match (
+            &self.connection_string,
+            &self.account_name,
+            &self.blob_endpoint,
+        ) {
+            (Some(connstr), None, None) => connstr.inner().into(),
+            (None, Some(account_name), None) => {
+                format!("AccountName={}", account_name)
+            }
+            (None, None, Some(blob_endpoint)) => {
+                // BlobEndpoint must always end in a trailing slash
+                let blob_endpoint = if blob_endpoint.ends_with('/') {
+                    blob_endpoint.clone()
+                } else {
+                    format!("{}/", blob_endpoint)
+                };
+                format!("BlobEndpoint={}", blob_endpoint)
+            }
+            (None, None, None) => {
+                return Err("One of `connection_string`, `account_name`, or `blob_endpoint` must be provided".into());
+            }
+            (Some(_), Some(_), _) => {
+                return Err("Cannot provide both `connection_string` and `account_name`".into());
+            }
+            (Some(_), _, Some(_)) => {
+                return Err("Cannot provide both `connection_string` and `blob_endpoint`".into());
+            }
+            (_, Some(_), Some(_)) => {
+                return Err("Cannot provide both `account_name` and `blob_endpoint`".into());
+            }
+        };
+
         let client = azure_common::config::build_client(
-            self.connection_string.clone().into(),
+            self.auth.clone(),
+            connection_string.clone(),
             self.container_name.clone(),
             cx.proxy(),
-        )?;
+            self.tls.clone(),
+        )
+        .await?;
 
         let healthcheck = azure_common::config::build_healthcheck(
             self.container_name.clone(),
