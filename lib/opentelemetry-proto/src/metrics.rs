@@ -1,10 +1,15 @@
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
+
 use chrono::{TimeZone, Utc};
 use lookup::path;
 use vector_core::event::{
     Event, Metric as MetricEvent, MetricKind, MetricTags, MetricValue,
     metric::{Bucket, Quantile, TagValue},
 };
-use vrl::value::Value;
+use vrl::value::{ObjectMap, Value};
+
+use crate::common::kv_list_into_value;
 
 use super::proto::{
     common::v1::{InstrumentationScope, KeyValue},
@@ -289,6 +294,103 @@ fn stash_start_time(metric: &mut MetricEvent, start_time_unix_nano: u64) {
     }
 }
 
+/// Compute a fingerprint of the metric's tags for sidecar staleness detection.
+///
+/// The fingerprint is a hash of the sorted (key, value) pairs from `MetricTags`.
+/// On the encode side, the same fingerprint is recomputed and compared to the
+/// sidecar's stored value. If they match, the sidecar's typed attributes are
+/// still valid and can be used instead of the stringified tag decomposition.
+fn compute_tags_fingerprint(tags: &MetricTags) -> i64 {
+    let mut hasher = DefaultHasher::new();
+    for (key, value) in tags.iter_single() {
+        key.hash(&mut hasher);
+        value.hash(&mut hasher);
+    }
+    hasher.finish() as i64
+}
+
+/// Build a sidecar VRL object containing the original typed OTLP attributes.
+///
+/// This preserves attribute types (IntValue, BoolValue, DoubleValue, etc.) that
+/// would otherwise be lost when `build_metric_tags()` stringifies everything.
+/// The sidecar is stored in `EventMetadata` and read back by the OTLP encoder.
+///
+/// Takes references to avoid consuming the resource/scope before `build_metric_tags()`.
+fn build_otlp_sidecar_data(
+    resource: Option<&Resource>,
+    scope: Option<&InstrumentationScope>,
+    data_point_attributes: &[KeyValue],
+) -> ObjectMap {
+    let mut sidecar = ObjectMap::new();
+
+    if let Some(res) = resource {
+        if !res.attributes.is_empty() {
+            sidecar.insert(
+                "resource_attributes".into(),
+                kv_list_into_value(res.attributes.clone()),
+            );
+        }
+        if res.dropped_attributes_count > 0 {
+            sidecar.insert(
+                "resource_dropped_attributes_count".into(),
+                Value::Integer(i64::from(res.dropped_attributes_count)),
+            );
+        }
+    }
+
+    if let Some(scope) = scope {
+        if !scope.attributes.is_empty() {
+            sidecar.insert(
+                "scope_attributes".into(),
+                kv_list_into_value(scope.attributes.clone()),
+            );
+        }
+        if !scope.name.is_empty() {
+            sidecar.insert("scope_name".into(), Value::from(scope.name.clone()));
+        }
+        if !scope.version.is_empty() {
+            sidecar.insert("scope_version".into(), Value::from(scope.version.clone()));
+        }
+        if scope.dropped_attributes_count > 0 {
+            sidecar.insert(
+                "scope_dropped_attributes_count".into(),
+                Value::Integer(i64::from(scope.dropped_attributes_count)),
+            );
+        }
+    }
+
+    if !data_point_attributes.is_empty() {
+        sidecar.insert(
+            "data_point_attributes".into(),
+            kv_list_into_value(data_point_attributes.to_vec()),
+        );
+    }
+
+    sidecar
+}
+
+/// Stash the typed OTLP sidecar in metric metadata at `%vector.otlp.metric_sidecar`.
+///
+/// Computes a fingerprint from the metric's current tags and embeds it in the
+/// sidecar for staleness detection on the encode side.
+fn stash_otlp_sidecar(metric: &mut MetricEvent, mut sidecar: ObjectMap) {
+    if sidecar.is_empty() {
+        return;
+    }
+
+    if let Some(tags) = metric.tags() {
+        sidecar.insert(
+            "tags_fingerprint".into(),
+            Value::Integer(compute_tags_fingerprint(tags)),
+        );
+    }
+
+    metric.metadata_mut().value_mut().insert(
+        path!("vector", "otlp", "metric_sidecar"),
+        Value::Object(sidecar),
+    );
+}
+
 impl SumMetric {
     fn into_metric(
         self,
@@ -302,6 +404,11 @@ impl SumMetric {
             Some(Utc.timestamp_nanos(self.point.time_unix_nano as i64))
         };
         let value = self.point.value.to_f64().unwrap_or(0.0);
+        let sidecar = build_otlp_sidecar_data(
+            self.resource.as_ref(),
+            self.scope.as_ref(),
+            &self.point.attributes,
+        );
         let attributes = build_metric_tags(
             self.resource,
             self.scope,
@@ -326,6 +433,7 @@ impl SumMetric {
             .with_tags(Some(attributes))
             .with_timestamp(timestamp);
         stash_start_time(&mut metric, self.point.start_time_unix_nano);
+        stash_otlp_sidecar(&mut metric, sidecar);
         metric.into()
     }
 }
@@ -343,6 +451,11 @@ impl GaugeMetric {
             Some(Utc.timestamp_nanos(self.point.time_unix_nano as i64))
         };
         let value = self.point.value.to_f64().unwrap_or(0.0);
+        let sidecar = build_otlp_sidecar_data(
+            self.resource.as_ref(),
+            self.scope.as_ref(),
+            &self.point.attributes,
+        );
         let attributes = build_metric_tags(
             self.resource,
             self.scope,
@@ -359,6 +472,7 @@ impl GaugeMetric {
         .with_timestamp(timestamp)
         .with_tags(Some(attributes));
         stash_start_time(&mut metric, self.point.start_time_unix_nano);
+        stash_otlp_sidecar(&mut metric, sidecar);
         metric.into()
     }
 }
@@ -375,6 +489,11 @@ impl HistogramMetric {
         } else {
             Some(Utc.timestamp_nanos(self.point.time_unix_nano as i64))
         };
+        let sidecar = build_otlp_sidecar_data(
+            self.resource.as_ref(),
+            self.scope.as_ref(),
+            &self.point.attributes,
+        );
         let attributes = build_metric_tags(
             self.resource,
             self.scope,
@@ -420,6 +539,7 @@ impl HistogramMetric {
         .with_timestamp(timestamp)
         .with_tags(Some(attributes));
         stash_start_time(&mut metric, self.point.start_time_unix_nano);
+        stash_otlp_sidecar(&mut metric, sidecar);
         metric.into()
     }
 }
@@ -437,6 +557,11 @@ impl ExpHistogramMetric {
         } else {
             Some(Utc.timestamp_nanos(self.point.time_unix_nano as i64))
         };
+        let sidecar = build_otlp_sidecar_data(
+            self.resource.as_ref(),
+            self.scope.as_ref(),
+            &self.point.attributes,
+        );
         let attributes = build_metric_tags(
             self.resource,
             self.scope,
@@ -492,6 +617,7 @@ impl ExpHistogramMetric {
         .with_timestamp(timestamp)
         .with_tags(Some(attributes));
         stash_start_time(&mut metric, self.point.start_time_unix_nano);
+        stash_otlp_sidecar(&mut metric, sidecar);
         metric.into()
     }
 }
@@ -508,6 +634,11 @@ impl SummaryMetric {
         } else {
             Some(Utc.timestamp_nanos(self.point.time_unix_nano as i64))
         };
+        let sidecar = build_otlp_sidecar_data(
+            self.resource.as_ref(),
+            self.scope.as_ref(),
+            &self.point.attributes,
+        );
         let attributes = build_metric_tags(
             self.resource,
             self.scope,
@@ -538,6 +669,7 @@ impl SummaryMetric {
         .with_timestamp(timestamp)
         .with_tags(Some(attributes));
         stash_start_time(&mut metric, self.point.start_time_unix_nano);
+        stash_otlp_sidecar(&mut metric, sidecar);
         metric.into()
     }
 }
@@ -913,5 +1045,234 @@ mod tests {
         );
         assert_eq!(tags.get("scope_dropped_attributes_count").unwrap(), "1");
         assert_eq!(tags.get("resource_dropped_attributes_count").unwrap(), "2");
+    }
+
+    //
+    // Tests for typed metric sidecar
+    //
+
+    fn make_int_kv(key: &str, val: i64) -> KeyValue {
+        KeyValue {
+            key: key.to_string(),
+            value: Some(AnyValue {
+                value: Some(PBValue::IntValue(val)),
+            }),
+        }
+    }
+
+    fn make_bool_kv(key: &str, val: bool) -> KeyValue {
+        KeyValue {
+            key: key.to_string(),
+            value: Some(AnyValue {
+                value: Some(PBValue::BoolValue(val)),
+            }),
+        }
+    }
+
+    fn make_double_kv(key: &str, val: f64) -> KeyValue {
+        KeyValue {
+            key: key.to_string(),
+            value: Some(AnyValue {
+                value: Some(PBValue::DoubleValue(val)),
+            }),
+        }
+    }
+
+    fn get_sidecar(event: &Event) -> Option<&ObjectMap> {
+        event
+            .as_metric()
+            .metadata()
+            .value()
+            .get("vector")
+            .and_then(|v| v.get("otlp"))
+            .and_then(|v| v.get("metric_sidecar"))
+            .and_then(|v| v.as_object())
+    }
+
+    #[test]
+    fn test_sidecar_preserves_typed_resource_attributes() {
+        let rm = ResourceMetrics {
+            resource: Some(Resource {
+                attributes: vec![
+                    make_int_kv("http.status_code", 200),
+                    make_bool_kv("http.ok", true),
+                    make_double_kv("load.avg", 0.75),
+                    make_kv("service.name", "web"),
+                ],
+                dropped_attributes_count: 0,
+            }),
+            scope_metrics: vec![ScopeMetrics {
+                scope: None,
+                metrics: vec![Metric {
+                    name: "test_gauge".to_string(),
+                    description: String::new(),
+                    unit: String::new(),
+                    data: Some(Data::Gauge(Gauge {
+                        data_points: vec![NumberDataPoint {
+                            attributes: vec![],
+                            start_time_unix_nano: 0,
+                            time_unix_nano: 1_000_000_000,
+                            exemplars: vec![],
+                            flags: 0,
+                            value: Some(NumberDataPointValue::AsDouble(1.0)),
+                        }],
+                    })),
+                }],
+                schema_url: String::new(),
+            }],
+            schema_url: String::new(),
+        };
+        let events: Vec<Event> = rm.into_event_iter().collect();
+        let sidecar = get_sidecar(&events[0]).expect("sidecar should be present");
+
+        let res_attrs = sidecar
+            .get("resource_attributes")
+            .and_then(|v| v.as_object())
+            .expect("resource_attributes should be an object");
+
+        // Types are preserved via From<PBValue> for Value
+        assert_eq!(
+            res_attrs.get("http.status_code").unwrap(),
+            &Value::Integer(200)
+        );
+        assert_eq!(res_attrs.get("http.ok").unwrap(), &Value::Boolean(true));
+        match res_attrs.get("load.avg").unwrap() {
+            Value::Float(f) => assert!((f.into_inner() - 0.75).abs() < f64::EPSILON),
+            other => panic!("Expected Float, got {other:?}"),
+        }
+        assert_eq!(
+            res_attrs.get("service.name").unwrap(),
+            &Value::from("web".to_string())
+        );
+    }
+
+    #[test]
+    fn test_sidecar_preserves_typed_data_point_attributes() {
+        let rm = ResourceMetrics {
+            resource: Some(Resource {
+                attributes: vec![],
+                dropped_attributes_count: 0,
+            }),
+            scope_metrics: vec![ScopeMetrics {
+                scope: None,
+                metrics: vec![Metric {
+                    name: "test_gauge".to_string(),
+                    description: String::new(),
+                    unit: String::new(),
+                    data: Some(Data::Gauge(Gauge {
+                        data_points: vec![NumberDataPoint {
+                            attributes: vec![
+                                make_int_kv("count", 42),
+                                make_bool_kv("is_error", false),
+                            ],
+                            start_time_unix_nano: 0,
+                            time_unix_nano: 1_000_000_000,
+                            exemplars: vec![],
+                            flags: 0,
+                            value: Some(NumberDataPointValue::AsDouble(1.0)),
+                        }],
+                    })),
+                }],
+                schema_url: String::new(),
+            }],
+            schema_url: String::new(),
+        };
+        let events: Vec<Event> = rm.into_event_iter().collect();
+        let sidecar = get_sidecar(&events[0]).expect("sidecar should be present");
+
+        let dp_attrs = sidecar
+            .get("data_point_attributes")
+            .and_then(|v| v.as_object())
+            .expect("data_point_attributes should be an object");
+
+        assert_eq!(dp_attrs.get("count").unwrap(), &Value::Integer(42));
+        assert_eq!(dp_attrs.get("is_error").unwrap(), &Value::Boolean(false));
+    }
+
+    #[test]
+    fn test_sidecar_includes_scope_metadata() {
+        let scope = InstrumentationScope {
+            name: "my-meter".to_string(),
+            version: "1.2.3".to_string(),
+            attributes: vec![make_bool_kv("lib.debug", true)],
+            dropped_attributes_count: 7,
+        };
+        let rm = make_resource_metrics(vec![], 0, Some(scope), "", "");
+        let events: Vec<Event> = rm.into_event_iter().collect();
+        let sidecar = get_sidecar(&events[0]).expect("sidecar should be present");
+
+        assert_eq!(
+            sidecar.get("scope_name").unwrap(),
+            &Value::from("my-meter".to_string())
+        );
+        assert_eq!(
+            sidecar.get("scope_version").unwrap(),
+            &Value::from("1.2.3".to_string())
+        );
+        assert_eq!(
+            sidecar.get("scope_dropped_attributes_count").unwrap(),
+            &Value::Integer(7)
+        );
+
+        let scope_attrs = sidecar
+            .get("scope_attributes")
+            .and_then(|v| v.as_object())
+            .expect("scope_attributes should be an object");
+        assert_eq!(scope_attrs.get("lib.debug").unwrap(), &Value::Boolean(true));
+    }
+
+    #[test]
+    fn test_sidecar_contains_tags_fingerprint() {
+        let rm = make_resource_metrics(
+            vec![make_kv("service.name", "api")],
+            0,
+            None,
+            "",
+            "",
+        );
+        let events: Vec<Event> = rm.into_event_iter().collect();
+        let sidecar = get_sidecar(&events[0]).expect("sidecar should be present");
+
+        // Fingerprint is present
+        assert!(sidecar.get("tags_fingerprint").is_some());
+
+        // Fingerprint matches recomputed value from tags
+        let stored_fp = match sidecar.get("tags_fingerprint").unwrap() {
+            Value::Integer(i) => *i,
+            other => panic!("Expected Integer fingerprint, got {other:?}"),
+        };
+        let tags = get_tags(&events[0]);
+        let recomputed_fp = compute_tags_fingerprint(tags);
+        assert_eq!(stored_fp, recomputed_fp);
+    }
+
+    #[test]
+    fn test_sidecar_not_present_when_no_attributes() {
+        // No resource attrs, no scope, no data point attrs → empty sidecar → not stored
+        let rm = ResourceMetrics {
+            resource: None,
+            scope_metrics: vec![ScopeMetrics {
+                scope: None,
+                metrics: vec![Metric {
+                    name: "test_gauge".to_string(),
+                    description: String::new(),
+                    unit: String::new(),
+                    data: Some(Data::Gauge(Gauge {
+                        data_points: vec![NumberDataPoint {
+                            attributes: vec![],
+                            start_time_unix_nano: 0,
+                            time_unix_nano: 1_000_000_000,
+                            exemplars: vec![],
+                            flags: 0,
+                            value: Some(NumberDataPointValue::AsDouble(1.0)),
+                        }],
+                    })),
+                }],
+                schema_url: String::new(),
+            }],
+            schema_url: String::new(),
+        };
+        let events: Vec<Event> = rm.into_event_iter().collect();
+        assert!(get_sidecar(&events[0]).is_none());
     }
 }
