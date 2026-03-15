@@ -620,12 +620,12 @@ components: sources: internal_metrics: {
 			type:              "gauge"
 			default_namespace: "vector"
 			tags: _component_tags & {
-				topic_id: {
-					description: "The Kafka topic id."
+				topic: {
+					description: "The Kafka topic."
 					required:    true
 				}
-				partition_id: {
-					description: "The Kafka partition id."
+				partition: {
+					description: "The Kafka partition."
 					required:    true
 				}
 			}
