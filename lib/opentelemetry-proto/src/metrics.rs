@@ -743,7 +743,10 @@ impl ToF64 for Option<NumberDataPointValue> {
 mod tests {
     use super::*;
     use crate::proto::{
-        common::v1::{AnyValue, KeyValue, any_value::Value as PBValue},
+        common::v1::{
+            AnyValue, ArrayValue, KeyValue, KeyValueList,
+            any_value::Value as PBValue,
+        },
         metrics::v1::{Gauge, Metric, ScopeMetrics},
     };
 
@@ -1346,5 +1349,182 @@ mod tests {
         };
         let events: Vec<Event> = rm.into_event_iter().collect();
         assert!(get_sidecar(&events[0]).is_none());
+    }
+
+    fn make_bytes_kv(key: &str, val: &[u8]) -> KeyValue {
+        KeyValue {
+            key: key.to_string(),
+            value: Some(AnyValue {
+                value: Some(PBValue::BytesValue(val.to_vec())),
+            }),
+        }
+    }
+
+    fn make_array_kv(key: &str, values: Vec<AnyValue>) -> KeyValue {
+        KeyValue {
+            key: key.to_string(),
+            value: Some(AnyValue {
+                value: Some(PBValue::ArrayValue(ArrayValue { values })),
+            }),
+        }
+    }
+
+    fn make_kvlist_kv(key: &str, values: Vec<KeyValue>) -> KeyValue {
+        KeyValue {
+            key: key.to_string(),
+            value: Some(AnyValue {
+                value: Some(PBValue::KvlistValue(KeyValueList { values })),
+            }),
+        }
+    }
+
+    #[test]
+    fn test_sidecar_preserves_bytes_value() {
+        let rm = ResourceMetrics {
+            resource: Some(Resource {
+                attributes: vec![make_bytes_kv("raw_data", b"hello\x00\xff")],
+                dropped_attributes_count: 0,
+            }),
+            scope_metrics: vec![ScopeMetrics {
+                scope: None,
+                metrics: vec![Metric {
+                    name: "test_gauge".to_string(),
+                    description: String::new(),
+                    unit: String::new(),
+                    data: Some(Data::Gauge(Gauge {
+                        data_points: vec![NumberDataPoint {
+                            attributes: vec![],
+                            start_time_unix_nano: 0,
+                            time_unix_nano: 1_000_000_000,
+                            exemplars: vec![],
+                            flags: 0,
+                            value: Some(NumberDataPointValue::AsDouble(1.0)),
+                        }],
+                    })),
+                }],
+                schema_url: String::new(),
+            }],
+            schema_url: String::new(),
+        };
+        let events: Vec<Event> = rm.into_event_iter().collect();
+        let sidecar = get_sidecar(&events[0]).expect("sidecar should be present");
+        let res_attrs = sidecar
+            .get("resource_attributes")
+            .and_then(|v| v.as_object())
+            .expect("resource_attributes should be an object");
+
+        let (kind, _val) = unwrap_typed(res_attrs.get("raw_data").unwrap());
+        assert_eq!(kind, "bytes_value", "BytesValue should be wrapped as bytes_value, not string_value");
+    }
+
+    #[test]
+    fn test_sidecar_preserves_array_value() {
+        let arr_elements = vec![
+            AnyValue { value: Some(PBValue::IntValue(1)) },
+            AnyValue { value: Some(PBValue::StringValue("two".to_string())) },
+            AnyValue { value: Some(PBValue::BoolValue(true)) },
+        ];
+        let rm = ResourceMetrics {
+            resource: Some(Resource {
+                attributes: vec![make_array_kv("tags_list", arr_elements)],
+                dropped_attributes_count: 0,
+            }),
+            scope_metrics: vec![ScopeMetrics {
+                scope: None,
+                metrics: vec![Metric {
+                    name: "test_gauge".to_string(),
+                    description: String::new(),
+                    unit: String::new(),
+                    data: Some(Data::Gauge(Gauge {
+                        data_points: vec![NumberDataPoint {
+                            attributes: vec![],
+                            start_time_unix_nano: 0,
+                            time_unix_nano: 1_000_000_000,
+                            exemplars: vec![],
+                            flags: 0,
+                            value: Some(NumberDataPointValue::AsDouble(1.0)),
+                        }],
+                    })),
+                }],
+                schema_url: String::new(),
+            }],
+            schema_url: String::new(),
+        };
+        let events: Vec<Event> = rm.into_event_iter().collect();
+        let sidecar = get_sidecar(&events[0]).expect("sidecar should be present");
+        let res_attrs = sidecar
+            .get("resource_attributes")
+            .and_then(|v| v.as_object())
+            .expect("resource_attributes should be an object");
+
+        let (kind, val) = unwrap_typed(res_attrs.get("tags_list").unwrap());
+        assert_eq!(kind, "array_value");
+        let arr = val.as_array().expect("inner value should be an array");
+        assert_eq!(arr.len(), 3);
+
+        // Each element is recursively wrapped
+        let (k0, v0) = unwrap_typed(&arr[0]);
+        assert_eq!(k0, "int_value");
+        assert_eq!(v0, &Value::Integer(1));
+
+        let (k1, v1) = unwrap_typed(&arr[1]);
+        assert_eq!(k1, "string_value");
+        assert_eq!(v1, &Value::from("two".to_string()));
+
+        let (k2, v2) = unwrap_typed(&arr[2]);
+        assert_eq!(k2, "bool_value");
+        assert_eq!(v2, &Value::Boolean(true));
+    }
+
+    #[test]
+    fn test_sidecar_preserves_kvlist_value() {
+        let inner_kvs = vec![
+            make_int_kv("alpha", 100),
+            make_bool_kv("beta", false),
+        ];
+        let rm = ResourceMetrics {
+            resource: Some(Resource {
+                attributes: vec![make_kvlist_kv("nested", inner_kvs)],
+                dropped_attributes_count: 0,
+            }),
+            scope_metrics: vec![ScopeMetrics {
+                scope: None,
+                metrics: vec![Metric {
+                    name: "test_gauge".to_string(),
+                    description: String::new(),
+                    unit: String::new(),
+                    data: Some(Data::Gauge(Gauge {
+                        data_points: vec![NumberDataPoint {
+                            attributes: vec![],
+                            start_time_unix_nano: 0,
+                            time_unix_nano: 1_000_000_000,
+                            exemplars: vec![],
+                            flags: 0,
+                            value: Some(NumberDataPointValue::AsDouble(1.0)),
+                        }],
+                    })),
+                }],
+                schema_url: String::new(),
+            }],
+            schema_url: String::new(),
+        };
+        let events: Vec<Event> = rm.into_event_iter().collect();
+        let sidecar = get_sidecar(&events[0]).expect("sidecar should be present");
+        let res_attrs = sidecar
+            .get("resource_attributes")
+            .and_then(|v| v.as_object())
+            .expect("resource_attributes should be an object");
+
+        let (kind, val) = unwrap_typed(res_attrs.get("nested").unwrap());
+        assert_eq!(kind, "kvlist_value");
+        let inner = val.as_object().expect("inner value should be an object");
+
+        let (k_alpha, v_alpha) = unwrap_typed(inner.get("alpha").unwrap());
+        assert_eq!(k_alpha, "int_value");
+        assert_eq!(v_alpha, &Value::Integer(100));
+
+        let (k_beta, v_beta) = unwrap_typed(inner.get("beta").unwrap());
+        assert_eq!(k_beta, "bool_value");
+        assert_eq!(v_beta, &Value::Boolean(false));
     }
 }
