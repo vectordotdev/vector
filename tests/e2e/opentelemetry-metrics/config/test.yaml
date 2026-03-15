@@ -14,7 +14,7 @@ runner:
 
 matrix:
   # Determines which `otel/opentelemetry-collector-contrib` version to use
-  collector_version: [ 'latest' ]
+  collector_version: [ 'latest@sha256:e7c92c715f28ff142f3bcaccd4fc5603cf4c71276ef09954a38eb4038500a5a5' ]
 
 # Only trigger this integration test if relevant OTEL source/sink files change
 paths:
