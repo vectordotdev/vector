@@ -63,9 +63,12 @@ for entry in "${CONFIGS[@]}"; do
 
     START_TIME=$(date +%s%N)
 
-    "$VECTOR_BIN" -c "$config_path" \
+    if ! "$VECTOR_BIN" -c "$config_path" \
         --quiet \
-        2>/dev/null || true
+        2>/dev/null; then
+        echo "ERROR: Vector exited with non-zero status for $label"
+        exit 1
+    fi
 
     END_TIME=$(date +%s%N)
     ELAPSED_NS=$((END_TIME - START_TIME))
