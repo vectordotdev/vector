@@ -145,7 +145,7 @@ jobs:
       fail-fast: false
       matrix:
         service: [
-          "datadog-logs", "datadog-metrics", "opentelemetry-logs", "opentelemetry-metrics"
+          "datadog-logs", "datadog-metrics", "opentelemetry-logs", "opentelemetry-metrics", "throttle-transform"
         ]
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2

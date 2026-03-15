@@ -5,10 +5,12 @@ mod dedupe;
 mod filter;
 mod reduce;
 mod route;
+mod throttle;
 
 criterion_main!(
     dedupe::benches,
     filter::benches,
     reduce::benches,
     route::benches,
+    throttle::benches,
 );
