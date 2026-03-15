@@ -1819,4 +1819,471 @@ json_bytes = 500
             "all events must be accounted for: passed={passed}, dropped={dropped}"
         );
     }
+
+    // -- Edge-case tests: utilization, cardinality, template failures, VRL edge values, conservation --
+
+    /// Edge case 1: Utilization counters reset when the rate limiter window rolls over.
+    /// After advancing the clock past window_secs, the utilization map counters
+    /// should be reset to reflect current-window usage, not lifetime accumulation.
+    #[tokio::test]
+    async fn utilization_resets_across_windows() {
+        let clock = clock::FakeRelativeClock::default();
+        let config = toml::from_str::<ThrottleConfig>(
+            r#"
+window_secs = 5
+key_field = "{{ service }}"
+
+[threshold]
+events = 100
+
+[internal_metrics]
+emit_detailed_metrics = true
+"#,
+        )
+        .unwrap();
+
+        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone()).unwrap();
+        let mut state = throttle.into_state();
+        let mut buf = make_buf(&config);
+
+        // Window 1: send 50 events
+        for i in 0..50 {
+            let mut log = LogEvent::default();
+            log.insert("message", format!("event-{i}"));
+            log.insert("service", "svc-a");
+            state.process(log.into(), &mut buf);
+        }
+        buf.drain().count();
+
+        // Verify utilization accumulated
+        let util = state.utilization.get(&Some("svc-a".to_string())).unwrap();
+        assert_eq!(util.events_consumed, 50, "should have 50 events consumed");
+
+        // Advance past the window
+        clock.advance(Duration::from_secs(6));
+
+        // Send one more event to trigger the window reset in update_utilization
+        let mut log = LogEvent::default();
+        log.insert("message", "after-window");
+        log.insert("service", "svc-a");
+        state.process(log.into(), &mut buf);
+        buf.drain().count();
+
+        // After window rollover, counters should have been reset then incremented by 1
+        let util = state.utilization.get(&Some("svc-a".to_string())).unwrap();
+        assert_eq!(
+            util.events_consumed, 1,
+            "utilization should reset after window rollover (got {})",
+            util.events_consumed
+        );
+    }
+
+    /// Edge case 1 variant: After idle period (no events for multiple windows),
+    /// utilization should still reset correctly on next event.
+    #[tokio::test]
+    async fn utilization_resets_after_idle_period() {
+        let clock = clock::FakeRelativeClock::default();
+        let config = toml::from_str::<ThrottleConfig>(
+            r"
+window_secs = 5
+
+[threshold]
+events = 100
+
+[internal_metrics]
+emit_detailed_metrics = true
+",
+        )
+        .unwrap();
+
+        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone()).unwrap();
+        let mut state = throttle.into_state();
+        let mut buf = make_buf(&config);
+
+        // Fill up some utilization
+        for i in 0..30 {
+            let mut log = LogEvent::default();
+            log.insert("message", format!("event-{i}"));
+            state.process(log.into(), &mut buf);
+        }
+        buf.drain().count();
+
+        let util = state.utilization.get(&None).unwrap();
+        assert_eq!(util.events_consumed, 30);
+
+        // Simulate long idle: advance clock by 5 full windows
+        clock.advance(Duration::from_secs(25));
+
+        // Next event should trigger reset
+        let mut log = LogEvent::default();
+        log.insert("message", "after-idle");
+        state.process(log.into(), &mut buf);
+        buf.drain().count();
+
+        let util = state.utilization.get(&None).unwrap();
+        assert_eq!(
+            util.events_consumed, 1,
+            "utilization should reset even after long idle (got {})",
+            util.events_consumed
+        );
+    }
+
+    /// Edge case 2: MAX_UTILIZATION_KEYS eviction — when unique keys exceed the
+    /// limit, new keys are silently skipped. After traffic returns to a small
+    /// stable set, existing tracked keys continue to function correctly.
+    #[tokio::test]
+    async fn max_utilization_keys_boundary() {
+        let clock = clock::FakeRelativeClock::default();
+        let config = toml::from_str::<ThrottleConfig>(
+            r#"
+window_secs = 60
+key_field = "{{ service }}"
+
+[threshold]
+events = 100000
+
+[internal_metrics]
+emit_detailed_metrics = true
+"#,
+        )
+        .unwrap();
+
+        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone()).unwrap();
+        let mut state = throttle.into_state();
+        let mut buf = make_buf(&config);
+
+        // Send events with MAX_UTILIZATION_KEYS + 100 unique keys
+        let overflow_count = MAX_UTILIZATION_KEYS + 100;
+        for i in 0..overflow_count {
+            let mut log = LogEvent::default();
+            log.insert("message", format!("event-{i}"));
+            log.insert("service", format!("svc-{i}"));
+            state.process(log.into(), &mut buf);
+        }
+        buf.drain().count();
+
+        // Utilization map should be bounded at MAX_UTILIZATION_KEYS
+        assert_eq!(
+            state.utilization.len(),
+            MAX_UTILIZATION_KEYS,
+            "utilization map must be bounded at MAX_UTILIZATION_KEYS"
+        );
+
+        // The first MAX_UTILIZATION_KEYS keys should be tracked
+        let tracked = state
+            .utilization
+            .get(&Some("svc-0".to_string()))
+            .map(|u| u.events_consumed);
+        assert_eq!(tracked, Some(1), "early key should be tracked");
+
+        // A key beyond the limit should not be tracked
+        let untracked_key = format!("svc-{}", MAX_UTILIZATION_KEYS + 50);
+        assert!(
+            state.utilization.get(&Some(untracked_key)).is_none(),
+            "overflow keys should not be tracked"
+        );
+
+        // Now send events for a stable subset — existing tracked keys still update
+        for _ in 0..10 {
+            let mut log = LogEvent::default();
+            log.insert("message", "recovery");
+            log.insert("service", "svc-0");
+            state.process(log.into(), &mut buf);
+        }
+        buf.drain().count();
+
+        let recovered = state
+            .utilization
+            .get(&Some("svc-0".to_string()))
+            .unwrap();
+        assert_eq!(
+            recovered.events_consumed, 11,
+            "existing key should continue accumulating (1 original + 10 new)"
+        );
+    }
+
+    /// Edge case 3: key_field template render failure — when the template
+    /// references a field that doesn't exist, the key resolves to None and
+    /// events share a single "unkeyed" rate limiter bucket.
+    #[tokio::test]
+    async fn key_field_render_failure_uses_shared_bucket() {
+        let clock = clock::FakeRelativeClock::default();
+        let config = toml::from_str::<ThrottleConfig>(
+            r#"
+threshold = 2
+window_secs = 60
+key_field = "{{ nonexistent_field }}"
+reroute_dropped = true
+"#,
+        )
+        .unwrap();
+
+        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone()).unwrap();
+        let mut transform = throttle.into_sync_transform();
+        let mut buf = make_buf(&config);
+
+        // All events lack "nonexistent_field", so key renders as None.
+        // They should all share a single bucket with threshold=2.
+        for i in 0..5 {
+            let mut log = LogEvent::default();
+            log.insert("message", format!("event-{i}"));
+            transform.transform(log.into(), &mut buf);
+        }
+
+        let passed = buf.drain().count();
+        let dropped = buf.drain_named(DROPPED).count();
+        assert_eq!(passed, 2, "all events share one bucket, threshold=2");
+        assert_eq!(dropped, 3, "remaining events dropped from shared bucket");
+    }
+
+    /// Edge case 3 variant: Mix of events with and without the key field.
+    /// Events with the key get their own bucket; events without share the None bucket.
+    #[tokio::test]
+    async fn key_field_partial_render_mixed_buckets() {
+        let clock = clock::FakeRelativeClock::default();
+        let config = toml::from_str::<ThrottleConfig>(
+            r#"
+threshold = 1
+window_secs = 60
+key_field = "{{ service }}"
+reroute_dropped = true
+"#,
+        )
+        .unwrap();
+
+        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone()).unwrap();
+        let mut transform = throttle.into_sync_transform();
+        let mut buf = make_buf(&config);
+
+        // Event with key "svc-a" → gets its own bucket
+        let mut log1 = LogEvent::default();
+        log1.insert("message", "has-key");
+        log1.insert("service", "svc-a");
+        transform.transform(log1.into(), &mut buf);
+        assert_eq!(buf.drain().count(), 1, "keyed event passes");
+
+        // Event without key → goes to None bucket
+        let mut log2 = LogEvent::default();
+        log2.insert("message", "no-key");
+        transform.transform(log2.into(), &mut buf);
+        assert_eq!(buf.drain().count(), 1, "unkeyed event gets its own bucket");
+
+        // Second event with key "svc-a" → throttled (threshold=1)
+        let mut log3 = LogEvent::default();
+        log3.insert("message", "has-key-again");
+        log3.insert("service", "svc-a");
+        transform.transform(log3.into(), &mut buf);
+        assert_eq!(buf.drain().count(), 0, "second svc-a event throttled");
+        assert_eq!(buf.drain_named(DROPPED).count(), 1);
+
+        // Second event without key → throttled (threshold=1 for None bucket)
+        let mut log4 = LogEvent::default();
+        log4.insert("message", "no-key-again");
+        transform.transform(log4.into(), &mut buf);
+        assert_eq!(buf.drain().count(), 0, "second unkeyed event throttled");
+        assert_eq!(buf.drain_named(DROPPED).count(), 1);
+    }
+
+    /// Edge case 4: VRL tokens returning negative integer defaults to cost 1.
+    #[tokio::test]
+    async fn vrl_negative_integer_defaults_to_one() {
+        let clock = clock::FakeRelativeClock::default();
+        let config = toml::from_str::<ThrottleConfig>(
+            r"
+window_secs = 60
+reroute_dropped = true
+
+[threshold]
+tokens = '-5'
+tokens_budget = 3
+",
+        )
+        .unwrap();
+
+        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone()).unwrap();
+        let mut transform = throttle.into_sync_transform();
+        let mut buf = make_buf(&config);
+
+        for _ in 0..5 {
+            transform.transform(LogEvent::default().into(), &mut buf);
+        }
+
+        let passed = buf.drain().count();
+        let dropped = buf.drain_named(DROPPED).count();
+        assert_eq!(passed, 3, "negative VRL result should default to cost 1");
+        assert_eq!(dropped, 2);
+    }
+
+    /// Edge case 4: VRL tokens returning a huge integer (> u32::MAX) is clamped.
+    #[tokio::test]
+    async fn vrl_huge_integer_clamped_to_u32_max() {
+        let clock = clock::FakeRelativeClock::default();
+        let config = toml::from_str::<ThrottleConfig>(
+            r"
+window_secs = 60
+reroute_dropped = true
+
+[threshold]
+tokens = '9999999999'
+tokens_budget = 100
+",
+        )
+        .unwrap();
+
+        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone()).unwrap();
+        let mut transform = throttle.into_sync_transform();
+        let mut buf = make_buf(&config);
+
+        // Cost = u32::MAX (clamped), far exceeds budget of 100
+        transform.transform(LogEvent::default().into(), &mut buf);
+
+        let passed = buf.drain().count();
+        let dropped = buf.drain_named(DROPPED).count();
+        assert_eq!(passed, 0, "huge cost event should be throttled");
+        assert_eq!(dropped, 1);
+    }
+
+    /// Edge case 4: VRL tokens returning a float is ceiled to integer cost.
+    #[tokio::test]
+    async fn vrl_float_cost_ceiled() {
+        let clock = clock::FakeRelativeClock::default();
+        let config = toml::from_str::<ThrottleConfig>(
+            r"
+window_secs = 60
+reroute_dropped = true
+
+[threshold]
+tokens = '2.7'
+tokens_budget = 5
+",
+        )
+        .unwrap();
+
+        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone()).unwrap();
+        let mut transform = throttle.into_sync_transform();
+        let mut buf = make_buf(&config);
+
+        // ceil(2.7) = 3. With budget 5, first event costs 3, second costs 3 (total 6 > 5).
+        transform.transform(LogEvent::default().into(), &mut buf);
+        assert_eq!(buf.drain().count(), 1, "first event (cost=3) should pass");
+
+        transform.transform(LogEvent::default().into(), &mut buf);
+        let passed = buf.drain().count();
+        let dropped = buf.drain_named(DROPPED).count();
+        assert_eq!(passed, 0, "second event should exceed budget");
+        assert_eq!(dropped, 1);
+    }
+
+    /// Edge case 4: VRL tokens returning a string defaults to cost 1.
+    #[tokio::test]
+    async fn vrl_string_result_defaults_to_one() {
+        let clock = clock::FakeRelativeClock::default();
+        let config = toml::from_str::<ThrottleConfig>(
+            r#"
+window_secs = 60
+reroute_dropped = true
+
+[threshold]
+tokens = '"not_a_number"'
+tokens_budget = 2
+"#,
+        )
+        .unwrap();
+
+        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone()).unwrap();
+        let mut transform = throttle.into_sync_transform();
+        let mut buf = make_buf(&config);
+
+        for _ in 0..4 {
+            transform.transform(LogEvent::default().into(), &mut buf);
+        }
+
+        let passed = buf.drain().count();
+        let dropped = buf.drain_named(DROPPED).count();
+        assert_eq!(passed, 2, "string VRL result should default to cost 1");
+        assert_eq!(dropped, 2);
+    }
+
+    /// Edge case 4: VRL tokens returning null defaults to cost 1.
+    #[tokio::test]
+    async fn vrl_null_result_defaults_to_one() {
+        let clock = clock::FakeRelativeClock::default();
+        let config = toml::from_str::<ThrottleConfig>(
+            r"
+window_secs = 60
+reroute_dropped = true
+
+[threshold]
+tokens = 'null'
+tokens_budget = 2
+",
+        )
+        .unwrap();
+
+        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone()).unwrap();
+        let mut transform = throttle.into_sync_transform();
+        let mut buf = make_buf(&config);
+
+        for _ in 0..4 {
+            transform.transform(LogEvent::default().into(), &mut buf);
+        }
+
+        let passed = buf.drain().count();
+        let dropped = buf.drain_named(DROPPED).count();
+        assert_eq!(passed, 2, "null VRL result should default to cost 1");
+        assert_eq!(dropped, 2);
+    }
+
+    /// Edge case 5: Exact conservation with reroute_dropped across mixed keys
+    /// and all three threshold types. Every input event must appear exactly
+    /// once on either the primary or dropped port.
+    #[tokio::test]
+    async fn exact_conservation_mixed_keys_all_thresholds() {
+        let clock = clock::FakeRelativeClock::default();
+        let config = toml::from_str::<ThrottleConfig>(
+            r#"
+window_secs = 60
+key_field = "{{ service }}"
+reroute_dropped = true
+
+[threshold]
+events = 5
+json_bytes = 500
+tokens = 'strlen(string!(.message))'
+tokens_budget = 500
+"#,
+        )
+        .unwrap();
+
+        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone()).unwrap();
+        let mut transform = throttle.into_sync_transform();
+        let mut buf = make_buf(&config);
+
+        let num_keys = 10;
+        let events_per_key = 20;
+        let total = num_keys * events_per_key;
+
+        for key_idx in 0..num_keys {
+            for evt_idx in 0..events_per_key {
+                let mut log = LogEvent::default();
+                log.insert(
+                    "message",
+                    format!("key{key_idx}-evt{evt_idx:0>20}"),
+                );
+                log.insert("service", format!("svc-{key_idx}"));
+                transform.transform(log.into(), &mut buf);
+            }
+        }
+
+        let passed = buf.drain().count();
+        let dropped = buf.drain_named(DROPPED).count();
+
+        assert_eq!(
+            passed + dropped,
+            total,
+            "exact conservation violated: passed={passed} + dropped={dropped} != {total}"
+        );
+        assert!(passed > 0, "some events must pass");
+        assert!(dropped > 0, "some events must be dropped with tight limits");
+    }
 }
