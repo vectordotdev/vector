@@ -3463,4 +3463,145 @@ mod edge_case_tests {
             "Sidecar should emit BoolValue for scope attribute"
         );
     }
+
+    #[test]
+    fn test_sidecar_bytes_value_roundtrip() {
+        let mut tags = MetricTags::default();
+        tags.insert("raw_data".to_string(), "binary".to_string());
+
+        let mut dp_attrs = ObjectMap::new();
+        dp_attrs.insert(
+            "raw_data".into(),
+            wrap("bytes_value", Value::Bytes(bytes::Bytes::from_static(b"binary"))),
+        );
+
+        let metric = make_gauge_with_sidecar(
+            tags,
+            ObjectMap::new(),
+            ObjectMap::new(),
+            dp_attrs,
+            "",
+            "",
+        );
+
+        let request = native_metric_to_otlp_request(&metric).unwrap();
+        let otlp_metric = &request.resource_metrics[0].scope_metrics[0].metrics[0];
+        match &otlp_metric.data {
+            Some(Data::Gauge(g)) => {
+                let attr = g.data_points[0]
+                    .attributes
+                    .iter()
+                    .find(|kv| kv.key == "raw_data")
+                    .expect("raw_data should be present");
+                assert_eq!(
+                    attr.value.as_ref().unwrap().value,
+                    Some(PBValue::BytesValue(b"binary".to_vec())),
+                    "Sidecar should reconstruct BytesValue, not StringValue"
+                );
+            }
+            other => panic!("Expected Gauge, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_sidecar_array_value_roundtrip() {
+        let mut tags = MetricTags::default();
+        tags.insert("tags_list".to_string(), "[1,2,3]".to_string());
+
+        let mut dp_attrs = ObjectMap::new();
+        dp_attrs.insert(
+            "tags_list".into(),
+            wrap(
+                "array_value",
+                Value::Array(vec![
+                    wrap("int_value", Value::Integer(1)),
+                    wrap("string_value", Value::from("two".to_string())),
+                    wrap("bool_value", Value::Boolean(true)),
+                ]),
+            ),
+        );
+
+        let metric = make_gauge_with_sidecar(
+            tags,
+            ObjectMap::new(),
+            ObjectMap::new(),
+            dp_attrs,
+            "",
+            "",
+        );
+
+        let request = native_metric_to_otlp_request(&metric).unwrap();
+        let otlp_metric = &request.resource_metrics[0].scope_metrics[0].metrics[0];
+        match &otlp_metric.data {
+            Some(Data::Gauge(g)) => {
+                let attr = g.data_points[0]
+                    .attributes
+                    .iter()
+                    .find(|kv| kv.key == "tags_list")
+                    .expect("tags_list should be present");
+                let expected = PBValue::ArrayValue(ArrayValue {
+                    values: vec![
+                        AnyValue { value: Some(PBValue::IntValue(1)) },
+                        AnyValue { value: Some(PBValue::StringValue("two".to_string())) },
+                        AnyValue { value: Some(PBValue::BoolValue(true)) },
+                    ],
+                });
+                assert_eq!(
+                    attr.value.as_ref().unwrap().value,
+                    Some(expected),
+                    "Sidecar should reconstruct ArrayValue with typed elements"
+                );
+            }
+            other => panic!("Expected Gauge, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_sidecar_kvlist_value_roundtrip() {
+        let mut tags = MetricTags::default();
+        tags.insert("nested".to_string(), "{a:1}".to_string());
+
+        let mut dp_attrs = ObjectMap::new();
+        let mut inner_obj = ObjectMap::new();
+        inner_obj.insert("alpha".into(), wrap("int_value", Value::Integer(100)));
+        inner_obj.insert("beta".into(), wrap("double_value", Value::Float(ordered_float::NotNan::new(2.5).unwrap())));
+        dp_attrs.insert("nested".into(), wrap("kvlist_value", Value::Object(inner_obj)));
+
+        let metric = make_gauge_with_sidecar(
+            tags,
+            ObjectMap::new(),
+            ObjectMap::new(),
+            dp_attrs,
+            "",
+            "",
+        );
+
+        let request = native_metric_to_otlp_request(&metric).unwrap();
+        let otlp_metric = &request.resource_metrics[0].scope_metrics[0].metrics[0];
+        match &otlp_metric.data {
+            Some(Data::Gauge(g)) => {
+                let attr = g.data_points[0]
+                    .attributes
+                    .iter()
+                    .find(|kv| kv.key == "nested")
+                    .expect("nested should be present");
+                match &attr.value.as_ref().unwrap().value {
+                    Some(PBValue::KvlistValue(kvl)) => {
+                        let alpha = kvl.values.iter().find(|kv| kv.key == "alpha").unwrap();
+                        assert_eq!(
+                            alpha.value.as_ref().unwrap().value,
+                            Some(PBValue::IntValue(100)),
+                        );
+                        let beta = kvl.values.iter().find(|kv| kv.key == "beta").unwrap();
+                        assert_eq!(
+                            beta.value.as_ref().unwrap().value,
+                            Some(PBValue::DoubleValue(2.5)),
+                        );
+                    }
+                    other => panic!("Expected KvlistValue, got {other:?}"),
+                }
+            }
+            other => panic!("Expected Gauge, got {other:?}"),
+        }
+    }
 }

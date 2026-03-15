@@ -62,9 +62,9 @@ components: sinks: opentelemetry: {
 
 				**Known limitations:**
 
-				- Metric attribute scalar types (`IntValue`, `BoolValue`, `DoubleValue`, `StringValue`) are preserved during
-				  OTLP→Vector→OTLP roundtrip via a typed metadata sidecar. `BytesValue` is narrowed to `StringValue` because both
-				  map to VRL's `Bytes` type. `ArrayValue` and `KvlistValue` are preserved recursively. If a VRL transform mutates
+				- Metric attribute types are preserved during OTLP→Vector→OTLP roundtrip via a typed metadata sidecar.
+				  All OTLP value kinds (`StringValue`, `BytesValue`, `IntValue`, `BoolValue`, `DoubleValue`, `ArrayValue`,
+				  `KvlistValue`) are stored with their kind wrapper and reconstructed on encode. If a VRL transform mutates
 				  metric tags, the sidecar is invalidated and all attributes fall back to `StringValue`.
 				- `start_time_unix_nano` is preserved for OTLP-sourced metrics via metadata stash. For native Vector
 				  incremental metrics, it is synthesized from `timestamp - interval_ms` when available, otherwise set to `0`.
