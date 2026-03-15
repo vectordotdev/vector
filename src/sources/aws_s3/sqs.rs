@@ -204,7 +204,10 @@ const fn default_true() -> bool {
 
 #[derive(Debug, Snafu)]
 pub(super) enum IngestorNewError {
-    #[snafu(display("Invalid value for max_number_of_messages {}", messages))]
+    #[snafu(display(
+        "Invalid value for `sqs.max_number_of_messages`: {} (must be between 1 and 10, per AWS SQS ReceiveMessage API limit)",
+        messages
+    ))]
     InvalidNumberOfMessages { messages: u32 },
 }
 

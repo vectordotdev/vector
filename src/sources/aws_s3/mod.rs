@@ -293,7 +293,12 @@ impl AwsS3Config {
                     poll_secs = sqs.poll_secs,
                     visibility_timeout_secs = sqs.visibility_timeout_secs,
                     max_number_of_messages = sqs.max_number_of_messages,
+                    client_concurrency = sqs.client_concurrency.map(|n| n.get()).unwrap_or_else(crate::num_threads),
+                    compression = ?self.compression,
+                    multiline = self.multiline.is_some(),
                     delete_message = sqs.delete_message,
+                    delete_failed_message = sqs.delete_failed_message,
+                    acknowledgements = ?self.acknowledgements,
                     force_path_style = self.force_path_style,
                 );
 
@@ -306,7 +311,9 @@ impl AwsS3Config {
 
 #[derive(Debug, Snafu)]
 enum CreateSqsIngestorError {
-    #[snafu(display("Configuration for `sqs` required when strategy=sqs"))]
+    #[snafu(display(
+        "Configuration for `sqs` is required when strategy is \"sqs\". Add an [sources.<name>.sqs] section with at least `queue_url`."
+    ))]
     ConfigMissing,
 }
 
