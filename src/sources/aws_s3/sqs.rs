@@ -242,13 +242,16 @@ pub enum ProcessingError {
         key: String,
     },
     #[snafu(display(
-        "Object notification for s3://{}/{} is a bucket in another region: {}",
+        "Received S3 notification for s3://{}/{} in region {}, but this source is configured for region {}. \
+         Ensure the SQS queue and S3 bucket are in the same region, or deploy a separate Vector source for each region.",
         bucket,
         key,
-        region
+        event_region,
+        configured_region,
     ))]
     WrongRegion {
-        region: String,
+        event_region: String,
+        configured_region: String,
         bucket: String,
         key: String,
     },
@@ -734,7 +737,8 @@ impl IngestorProcess {
             return Err(ProcessingError::WrongRegion {
                 bucket: s3_event.s3.bucket.name.clone(),
                 key: s3_event.s3.object.key.clone(),
-                region: s3_event.aws_region,
+                event_region: s3_event.aws_region,
+                configured_region: self.state.region.as_ref().to_string(),
             });
         }
 
