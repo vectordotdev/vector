@@ -6,7 +6,7 @@ use serde::Serialize;
 use serde_with::serde_as;
 use vector_lib::{
     buffers::{BufferConfig, BufferType},
-    config::{AcknowledgementsConfig, GlobalOptions, Input},
+    config::{AcknowledgementsConfig, GlobalOptions, Input, LogNamespace, SinkOutput},
     configurable::{
         Configurable, GenerateError, Metadata, NamedComponent,
         attributes::CustomAttribute,
@@ -15,6 +15,7 @@ use vector_lib::{
     },
     id::Inputs,
     sink::VectorSink,
+    source_sender::SourceSender,
 };
 use vector_vrl_metrics::MetricsStorage;
 
@@ -250,6 +251,11 @@ pub trait SinkConfig: DynClone + NamedComponent + core::fmt::Debug + Send + Sync
     /// Gets the input configuration for this sink.
     fn input(&self) -> Input;
 
+    /// Gets the list of outputs exposed by this sink.
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SinkOutput> {
+        Vec::new()
+    }
+
     /// Gets the files to watch to trigger reload
     fn files_to_watch(&self) -> Vec<&PathBuf> {
         Vec::new()
@@ -274,6 +280,7 @@ dyn_clone::clone_trait_object!(SinkConfig);
 
 #[derive(Clone, Debug)]
 pub struct SinkContext {
+    pub key: Option<ComponentKey>,
     pub healthcheck: SinkHealthcheckOptions,
     pub globals: GlobalOptions,
     pub enrichment_tables: vector_lib::enrichment::TableRegistry,
@@ -282,6 +289,7 @@ pub struct SinkContext {
     pub schema: schema::Options,
     pub app_name: String,
     pub app_name_slug: String,
+    pub outputs: Option<SourceSender>,
 
     /// Extra context data provided by the running app and shared across all components. This can be
     /// used to pass shared settings or other data from outside the components.
@@ -291,6 +299,7 @@ pub struct SinkContext {
 impl Default for SinkContext {
     fn default() -> Self {
         Self {
+            key: Default::default(),
             healthcheck: Default::default(),
             globals: Default::default(),
             enrichment_tables: Default::default(),
@@ -299,6 +308,7 @@ impl Default for SinkContext {
             schema: Default::default(),
             app_name: crate::get_app_name().to_string(),
             app_name_slug: crate::get_slugified_app_name(),
+            outputs: Default::default(),
             extra_context: Default::default(),
         }
     }
@@ -311,5 +321,9 @@ impl SinkContext {
 
     pub const fn proxy(&self) -> &ProxyConfig {
         &self.proxy
+    }
+
+    pub const fn outputs(&self) -> Option<&SourceSender> {
+        self.outputs.as_ref()
     }
 }

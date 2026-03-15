@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use http::StatusCode;
 use serde::Deserialize;
 use vector_lib::{EstimatedJsonEncodedSizeOf, json_size::JsonSize};
@@ -19,19 +21,21 @@ use crate::{
 };
 
 #[derive(Deserialize, Debug)]
-struct EsResultResponse {
+pub(super) struct EsResultResponse {
     items: Vec<EsResultItem>,
 }
 
 impl EsResultResponse {
-    fn parse(body: &str) -> Result<Self, String> {
+    pub(super) fn parse(body: &str) -> Result<Self, String> {
         serde_json::from_str::<EsResultResponse>(body).map_err(|json_error| {
             format!("some messages failed, could not parse response, error: {json_error}")
         })
     }
 
     /// Returns iterator over status codes for items and optional error details.
-    fn iter_status(&self) -> impl Iterator<Item = (StatusCode, Option<&EsErrorDetails>)> {
+    pub(super) fn iter_status(
+        &self,
+    ) -> impl Iterator<Item = (StatusCode, Option<&EsErrorDetails>)> {
         self.items.iter().filter_map(|item| {
             item.result()
                 .status
@@ -51,7 +55,10 @@ impl EsResultResponse {
             .find_map(|item| item.result().error.as_ref())
         {
             Some(error) => format!("error type: {}, reason: {}", error.err_type, error.reason),
-            None => format!("error response: {body}"),
+            None => format!(
+                "error response without item details (body bytes: {})",
+                body.len()
+            ),
         }
     }
 }
@@ -83,11 +90,11 @@ struct EsIndexResult {
     error: Option<EsErrorDetails>,
 }
 
-#[derive(Deserialize, Debug)]
-struct EsErrorDetails {
-    reason: String,
+#[derive(Clone, Deserialize, Debug)]
+pub(super) struct EsErrorDetails {
+    pub(super) reason: String,
     #[serde(rename = "type")]
-    err_type: String,
+    pub(super) err_type: String,
 }
 
 #[derive(Clone)]
@@ -154,8 +161,8 @@ impl RetryLogic for ElasticsearchRetryLogic {
                                         move |req: ElasticsearchRequest| {
                                             let mut failed_events: Vec<ProcessedEvent> = req
                                                 .original_events
-                                                .clone()
-                                                .into_iter()
+                                                .iter()
+                                                .cloned()
                                                 .zip(status_codes.iter())
                                                 .filter(|&(_, &flag)| flag)
                                                 .map(|(item, _)| item)
@@ -182,7 +189,7 @@ impl RetryLogic for ElasticsearchRetryLogic {
                                                 batch_size,
                                                 events_byte_size,
                                                 metadata,
-                                                original_events: failed_events,
+                                                original_events: Arc::new(failed_events),
                                                 elasticsearch_request_builder: req
                                                     .elasticsearch_request_builder,
                                             }
