@@ -11,7 +11,10 @@ use vrl::value::{ObjectMap, Value};
 
 use super::proto::{
     collector::metrics::v1::ExportMetricsServiceRequest,
-    common::v1::{AnyValue, InstrumentationScope, KeyValue, any_value::Value as PBValue},
+    common::v1::{
+        AnyValue, ArrayValue, InstrumentationScope, KeyValue, KeyValueList,
+        any_value::Value as PBValue,
+    },
     metrics::v1::{
         AggregationTemporality, ExponentialHistogram, ExponentialHistogramDataPoint, Gauge,
         Histogram, HistogramDataPoint, NumberDataPoint, ResourceMetrics, ScopeMetrics, Sum,
@@ -680,15 +683,102 @@ fn compute_tags_fingerprint(tags: Option<&MetricTags>) -> i64 {
 
 /// Convert a VRL Value back to a protobuf AnyValue::Value.
 ///
-/// Handles the four common scalar OTLP attribute types (String, Bool, Int, Double).
-/// After rebase on #24621, this is replaced by the full `From<Value> for PBValue` impl
-/// in common.rs.
+/// If the value is a single-key Object whose key matches an OTLP kind
+/// (e.g. {"int_value": 42}, {"bytes_value": <bytes>}), reconstruct the
+/// exact PBValue variant — preserving StringValue/BytesValue distinction
+/// and handling ArrayValue/KvlistValue recursively.
+///
+/// Falls back to scalar-based inference for unwrapped values (e.g. from
+/// stale sidecars or pre-wrapper code paths).
 fn value_to_pb_value(v: &Value) -> PBValue {
+    // Try to unwrap OTLP kind wrapper: {"string_value": "x"} → PBValue::StringValue("x")
+    if let Some(obj) = v.as_object()
+        && obj.len() == 1 {
+            let (key, inner) = obj.iter().next().unwrap();
+            match key.as_str() {
+                "string_value" => {
+                    if let Some(b) = inner.as_bytes() {
+                        return PBValue::StringValue(
+                            String::from_utf8_lossy(b).into_owned(),
+                        );
+                    }
+                }
+                "bytes_value" => {
+                    if let Some(b) = inner.as_bytes() {
+                        return PBValue::BytesValue(b.to_vec());
+                    }
+                }
+                "bool_value" => {
+                    if let Some(b) = inner.as_boolean() {
+                        return PBValue::BoolValue(b);
+                    }
+                }
+                "int_value" => {
+                    if let Some(i) = inner.as_integer() {
+                        return PBValue::IntValue(i);
+                    }
+                }
+                "double_value" => {
+                    if let Some(f) = inner.as_float() {
+                        return PBValue::DoubleValue(f.into_inner());
+                    }
+                }
+                "array_value" => {
+                    if let Some(arr) = inner.as_array() {
+                        return PBValue::ArrayValue(ArrayValue {
+                            values: arr
+                                .iter()
+                                .map(|elem| AnyValue {
+                                    value: Some(value_to_pb_value(elem)),
+                                })
+                                .collect(),
+                        });
+                    }
+                }
+                "kvlist_value" => {
+                    if let Some(obj) = inner.as_object() {
+                        return PBValue::KvlistValue(KeyValueList {
+                            values: obj
+                                .iter()
+                                .map(|(k, val)| KeyValue {
+                                    key: k.to_string(),
+                                    value: Some(AnyValue {
+                                        value: Some(value_to_pb_value(val)),
+                                    }),
+                                })
+                                .collect(),
+                        });
+                    }
+                }
+                _ => {}
+            }
+        }
+
+    // Fallback: infer PBValue from VRL type (unwrapped values or unknown wrappers)
     match v {
         Value::Bytes(b) => PBValue::StringValue(String::from_utf8_lossy(b).into_owned()),
         Value::Boolean(b) => PBValue::BoolValue(*b),
         Value::Integer(i) => PBValue::IntValue(*i),
         Value::Float(f) => PBValue::DoubleValue(f.into_inner()),
+        Value::Array(arr) => PBValue::ArrayValue(ArrayValue {
+            values: arr
+                .iter()
+                .map(|elem| AnyValue {
+                    value: Some(value_to_pb_value(elem)),
+                })
+                .collect(),
+        }),
+        Value::Object(obj) => PBValue::KvlistValue(KeyValueList {
+            values: obj
+                .iter()
+                .map(|(k, val)| KeyValue {
+                    key: k.to_string(),
+                    value: Some(AnyValue {
+                        value: Some(value_to_pb_value(val)),
+                    }),
+                })
+                .collect(),
+        }),
         _ => PBValue::StringValue(format!("{v}")),
     }
 }
@@ -3118,6 +3208,11 @@ mod edge_case_tests {
     // Tests for typed metric sidecar (encode side)
     //
 
+    /// Wrap a VRL value with its OTLP kind, mirroring decode-side pb_value_to_typed_value.
+    fn wrap(kind: &str, val: Value) -> Value {
+        Value::Object(ObjectMap::from([(kind.into(), val)]))
+    }
+
     /// Build a metric with a sidecar stashed in metadata, simulating what the
     /// decode side does on PR #24905.
     fn make_gauge_with_sidecar(
@@ -3176,10 +3271,13 @@ mod edge_case_tests {
         tags.insert("resource.service.name".to_string(), "web".to_string());
 
         let mut resource_attrs = ObjectMap::new();
-        resource_attrs.insert("http.status_code".into(), Value::Integer(200));
+        resource_attrs.insert(
+            "http.status_code".into(),
+            wrap("int_value", Value::Integer(200)),
+        );
         resource_attrs.insert(
             "service.name".into(),
-            Value::from("web".to_string()),
+            wrap("string_value", Value::from("web".to_string())),
         );
 
         let metric = make_gauge_with_sidecar(
@@ -3217,8 +3315,8 @@ mod edge_case_tests {
         tags.insert("is_error".to_string(), "false".to_string());
 
         let mut dp_attrs = ObjectMap::new();
-        dp_attrs.insert("count".into(), Value::Integer(42));
-        dp_attrs.insert("is_error".into(), Value::Boolean(false));
+        dp_attrs.insert("count".into(), wrap("int_value", Value::Integer(42)));
+        dp_attrs.insert("is_error".into(), wrap("bool_value", Value::Boolean(false)));
 
         let metric = make_gauge_with_sidecar(
             tags,
@@ -3262,7 +3360,7 @@ mod edge_case_tests {
         tags.insert("count".to_string(), "42".to_string());
 
         let mut dp_attrs = ObjectMap::new();
-        dp_attrs.insert("count".into(), Value::Integer(42));
+        dp_attrs.insert("count".into(), wrap("int_value", Value::Integer(42)));
 
         let mut metric = make_gauge_with_sidecar(
             tags,
@@ -3333,7 +3431,7 @@ mod edge_case_tests {
         tags.insert("scope.lib.lang".to_string(), "go".to_string());
 
         let mut scope_attrs = ObjectMap::new();
-        scope_attrs.insert("lib.lang".into(), Value::Boolean(true));
+        scope_attrs.insert("lib.lang".into(), wrap("bool_value", Value::Boolean(true)));
 
         let metric = make_gauge_with_sidecar(
             tags,
