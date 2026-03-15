@@ -1,10 +1,13 @@
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
+
 use chrono::{TimeZone, Utc};
 use tracing::warn;
 use vector_core::event::{
     Event, Metric as MetricEvent, MetricKind, MetricTags, MetricValue,
     metric::{Bucket, Quantile, TagValue},
 };
-use vrl::value::Value;
+use vrl::value::{ObjectMap, Value};
 
 use super::proto::{
     collector::metrics::v1::ExportMetricsServiceRequest,
@@ -472,7 +475,7 @@ impl ToF64 for Option<NumberDataPointValue> {
 pub fn native_metric_to_otlp_request(
     metric: &MetricEvent,
 ) -> Option<ExportMetricsServiceRequest> {
-    let decomposed = decompose_metric_tags(metric.tags());
+    let decomposed = try_sidecar(metric).unwrap_or_else(|| decompose_metric_tags(metric.tags()));
     let timestamp_nanos = extract_metric_timestamp_nanos(metric);
     let start_time_nanos = resolve_start_time(metric, timestamp_nanos);
     let otlp_metric =
@@ -657,6 +660,164 @@ fn resolve_start_time(metric: &MetricEvent, timestamp_nanos: u64) -> u64 {
     }
 
     0
+}
+
+/// Compute a fingerprint of the metric's tags for sidecar staleness detection.
+///
+/// Must produce the same hash as the decode-side `compute_tags_fingerprint` in
+/// PR #24905. After rebase, the duplicate is removed and one shared function
+/// is used by both decode and encode paths.
+fn compute_tags_fingerprint(tags: Option<&MetricTags>) -> i64 {
+    let mut hasher = DefaultHasher::new();
+    if let Some(tags) = tags {
+        for (key, value) in tags.iter_single() {
+            key.hash(&mut hasher);
+            value.hash(&mut hasher);
+        }
+    }
+    hasher.finish() as i64
+}
+
+/// Convert a VRL Value back to a protobuf AnyValue::Value.
+///
+/// Handles the four common scalar OTLP attribute types (String, Bool, Int, Double).
+/// After rebase on #24621, this is replaced by the full `From<Value> for PBValue` impl
+/// in common.rs.
+fn value_to_pb_value(v: &Value) -> PBValue {
+    match v {
+        Value::Bytes(b) => PBValue::StringValue(String::from_utf8_lossy(b).into_owned()),
+        Value::Boolean(b) => PBValue::BoolValue(*b),
+        Value::Integer(i) => PBValue::IntValue(*i),
+        Value::Float(f) => PBValue::DoubleValue(f.into_inner()),
+        _ => PBValue::StringValue(format!("{v}")),
+    }
+}
+
+/// Convert a VRL ObjectMap back to a Vec<KeyValue> for protobuf encoding.
+fn value_object_to_kv_list(obj: &ObjectMap) -> Vec<KeyValue> {
+    obj.iter()
+        .map(|(key, value)| KeyValue {
+            key: key.to_string(),
+            value: Some(AnyValue {
+                value: Some(value_to_pb_value(value)),
+            }),
+        })
+        .collect()
+}
+
+/// Try to extract typed OTLP attributes from the metric sidecar.
+///
+/// Returns `Some(DecomposedMetricTags)` with original typed PBValues if:
+/// 1. The sidecar exists in metadata at `%vector.otlp.metric_sidecar`
+/// 2. The stored tags fingerprint matches the current tags (no transform mutations)
+///
+/// Returns `None` if the sidecar is absent or stale, causing the caller to
+/// fall back to string-based `decompose_metric_tags()`.
+fn try_sidecar(metric: &MetricEvent) -> Option<DecomposedMetricTags> {
+    let sidecar = metric
+        .metadata()
+        .value()
+        .get("vector")
+        .and_then(|v| v.get("otlp"))
+        .and_then(|v| v.get("metric_sidecar"))
+        .and_then(|v| v.as_object())?;
+
+    // Check fingerprint for staleness
+    let stored_fp = match sidecar.get("tags_fingerprint")? {
+        Value::Integer(i) => *i,
+        _ => return None,
+    };
+    if stored_fp != compute_tags_fingerprint(metric.tags()) {
+        return None;
+    }
+
+    // Reconstruct Resource from sidecar
+    let resource = {
+        let attrs = sidecar
+            .get("resource_attributes")
+            .and_then(|v| v.as_object())
+            .map(value_object_to_kv_list)
+            .unwrap_or_default();
+        let dropped = sidecar
+            .get("resource_dropped_attributes_count")
+            .and_then(|v| match v {
+                Value::Integer(i) => u32::try_from(*i).ok(),
+                _ => None,
+            })
+            .unwrap_or(0);
+        if !attrs.is_empty() || dropped > 0 {
+            Some(Resource {
+                attributes: attrs,
+                dropped_attributes_count: dropped,
+            })
+        } else {
+            None
+        }
+    };
+
+    // Reconstruct InstrumentationScope from sidecar
+    let scope = {
+        let attrs = sidecar
+            .get("scope_attributes")
+            .and_then(|v| v.as_object())
+            .map(value_object_to_kv_list)
+            .unwrap_or_default();
+        let name = sidecar
+            .get("scope_name")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
+            .unwrap_or_default();
+        let version = sidecar
+            .get("scope_version")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
+            .unwrap_or_default();
+        let dropped = sidecar
+            .get("scope_dropped_attributes_count")
+            .and_then(|v| match v {
+                Value::Integer(i) => u32::try_from(*i).ok(),
+                _ => None,
+            })
+            .unwrap_or(0);
+        if !name.is_empty() || !version.is_empty() || !attrs.is_empty() || dropped > 0 {
+            Some(InstrumentationScope {
+                name,
+                version,
+                attributes: attrs,
+                dropped_attributes_count: dropped,
+            })
+        } else {
+            None
+        }
+    };
+
+    // Data point attributes from sidecar
+    let attributes = sidecar
+        .get("data_point_attributes")
+        .and_then(|v| v.as_object())
+        .map(value_object_to_kv_list)
+        .unwrap_or_default();
+
+    // Schema URLs are simple strings — extract from tags (no type preservation needed)
+    let mut resource_schema_url = String::new();
+    let mut scope_schema_url = String::new();
+    if let Some(tags) = metric.tags() {
+        for (key, value) in tags.iter_single() {
+            if key == "resource_schema_url" {
+                resource_schema_url = value.to_string();
+            } else if key == "scope_schema_url" {
+                scope_schema_url = value.to_string();
+            }
+        }
+    }
+
+    Some(DecomposedMetricTags {
+        resource,
+        scope,
+        attributes,
+        scope_schema_url,
+        resource_schema_url,
+    })
 }
 
 /// Build the OTLP Metric protobuf message from a Vector MetricEvent.
@@ -2951,5 +3112,257 @@ mod edge_case_tests {
             }
             other => panic!("Expected Sum, got {other:?}"),
         }
+    }
+
+    //
+    // Tests for typed metric sidecar (encode side)
+    //
+
+    /// Build a metric with a sidecar stashed in metadata, simulating what the
+    /// decode side does on PR #24905.
+    fn make_gauge_with_sidecar(
+        tags: MetricTags,
+        resource_attrs: ObjectMap,
+        scope_attrs: ObjectMap,
+        dp_attrs: ObjectMap,
+        scope_name: &str,
+        scope_version: &str,
+    ) -> MetricEvent {
+        let mut metric = make_gauge("test.gauge", 1.0).with_tags(Some(tags));
+
+        let mut sidecar = ObjectMap::new();
+        if !resource_attrs.is_empty() {
+            sidecar.insert(
+                "resource_attributes".into(),
+                Value::Object(resource_attrs),
+            );
+        }
+        if !scope_attrs.is_empty() {
+            sidecar.insert("scope_attributes".into(), Value::Object(scope_attrs));
+        }
+        if !dp_attrs.is_empty() {
+            sidecar.insert(
+                "data_point_attributes".into(),
+                Value::Object(dp_attrs),
+            );
+        }
+        if !scope_name.is_empty() {
+            sidecar.insert("scope_name".into(), Value::from(scope_name.to_string()));
+        }
+        if !scope_version.is_empty() {
+            sidecar.insert(
+                "scope_version".into(),
+                Value::from(scope_version.to_string()),
+            );
+        }
+
+        // Compute and store fingerprint
+        let fp = compute_tags_fingerprint(metric.tags());
+        sidecar.insert("tags_fingerprint".into(), Value::Integer(fp));
+
+        use lookup::path;
+        metric.metadata_mut().value_mut().insert(
+            path!("vector", "otlp", "metric_sidecar"),
+            Value::Object(sidecar),
+        );
+
+        metric
+    }
+
+    #[test]
+    fn test_sidecar_emits_typed_resource_attributes() {
+        let mut tags = MetricTags::default();
+        tags.insert("resource.http.status_code".to_string(), "200".to_string());
+        tags.insert("resource.service.name".to_string(), "web".to_string());
+
+        let mut resource_attrs = ObjectMap::new();
+        resource_attrs.insert("http.status_code".into(), Value::Integer(200));
+        resource_attrs.insert(
+            "service.name".into(),
+            Value::from("web".to_string()),
+        );
+
+        let metric = make_gauge_with_sidecar(
+            tags,
+            resource_attrs,
+            ObjectMap::new(),
+            ObjectMap::new(),
+            "",
+            "",
+        );
+
+        let request = native_metric_to_otlp_request(&metric).unwrap();
+        let resource = request.resource_metrics[0]
+            .resource
+            .as_ref()
+            .expect("resource should be present");
+
+        // Find the http.status_code attribute and verify it's IntValue (not StringValue)
+        let status_attr = resource
+            .attributes
+            .iter()
+            .find(|kv| kv.key == "http.status_code")
+            .expect("http.status_code should be present");
+        assert_eq!(
+            status_attr.value.as_ref().unwrap().value,
+            Some(PBValue::IntValue(200)),
+            "Sidecar should emit IntValue, not StringValue"
+        );
+    }
+
+    #[test]
+    fn test_sidecar_emits_typed_data_point_attributes() {
+        let mut tags = MetricTags::default();
+        tags.insert("count".to_string(), "42".to_string());
+        tags.insert("is_error".to_string(), "false".to_string());
+
+        let mut dp_attrs = ObjectMap::new();
+        dp_attrs.insert("count".into(), Value::Integer(42));
+        dp_attrs.insert("is_error".into(), Value::Boolean(false));
+
+        let metric = make_gauge_with_sidecar(
+            tags,
+            ObjectMap::new(),
+            ObjectMap::new(),
+            dp_attrs,
+            "",
+            "",
+        );
+
+        let request = native_metric_to_otlp_request(&metric).unwrap();
+        let otlp_metric = &request.resource_metrics[0].scope_metrics[0].metrics[0];
+        match &otlp_metric.data {
+            Some(Data::Gauge(g)) => {
+                let attrs = &g.data_points[0].attributes;
+                let count_attr = attrs
+                    .iter()
+                    .find(|kv| kv.key == "count")
+                    .expect("count attr should be present");
+                assert_eq!(
+                    count_attr.value.as_ref().unwrap().value,
+                    Some(PBValue::IntValue(42)),
+                );
+
+                let error_attr = attrs
+                    .iter()
+                    .find(|kv| kv.key == "is_error")
+                    .expect("is_error attr should be present");
+                assert_eq!(
+                    error_attr.value.as_ref().unwrap().value,
+                    Some(PBValue::BoolValue(false)),
+                );
+            }
+            other => panic!("Expected Gauge, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_sidecar_staleness_falls_back_to_string() {
+        let mut tags = MetricTags::default();
+        tags.insert("count".to_string(), "42".to_string());
+
+        let mut dp_attrs = ObjectMap::new();
+        dp_attrs.insert("count".into(), Value::Integer(42));
+
+        let mut metric = make_gauge_with_sidecar(
+            tags,
+            ObjectMap::new(),
+            ObjectMap::new(),
+            dp_attrs,
+            "",
+            "",
+        );
+
+        // Mutate tags to make fingerprint stale
+        metric
+            .tags_mut()
+            .unwrap()
+            .insert("new_tag".to_string(), "new_value".to_string());
+
+        let request = native_metric_to_otlp_request(&metric).unwrap();
+        let otlp_metric = &request.resource_metrics[0].scope_metrics[0].metrics[0];
+        match &otlp_metric.data {
+            Some(Data::Gauge(g)) => {
+                let attrs = &g.data_points[0].attributes;
+                let count_attr = attrs
+                    .iter()
+                    .find(|kv| kv.key == "count")
+                    .expect("count attr should be present");
+                // Stale sidecar → falls back to string decomposition
+                assert_eq!(
+                    count_attr.value.as_ref().unwrap().value,
+                    Some(PBValue::StringValue("42".to_string())),
+                    "Stale sidecar should fall back to StringValue"
+                );
+            }
+            other => panic!("Expected Gauge, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_no_sidecar_uses_string_decomposition() {
+        // Native metric without sidecar — should use decompose_metric_tags (all StringValue)
+        let mut metric = make_gauge("test.gauge", 1.0);
+        let mut tags = MetricTags::default();
+        tags.insert("resource.http.status_code".to_string(), "200".to_string());
+        metric = metric.with_tags(Some(tags));
+
+        let request = native_metric_to_otlp_request(&metric).unwrap();
+        let resource = request.resource_metrics[0]
+            .resource
+            .as_ref()
+            .expect("resource should be present");
+
+        let attr = resource
+            .attributes
+            .iter()
+            .find(|kv| kv.key == "http.status_code")
+            .expect("should be present");
+        assert_eq!(
+            attr.value.as_ref().unwrap().value,
+            Some(PBValue::StringValue("200".to_string())),
+            "Without sidecar, should use StringValue"
+        );
+    }
+
+    #[test]
+    fn test_sidecar_scope_metadata_preserved() {
+        let mut tags = MetricTags::default();
+        tags.insert("scope.name".to_string(), "my-meter".to_string());
+        tags.insert("scope.version".to_string(), "2.0".to_string());
+        tags.insert("scope.lib.lang".to_string(), "go".to_string());
+
+        let mut scope_attrs = ObjectMap::new();
+        scope_attrs.insert("lib.lang".into(), Value::Boolean(true));
+
+        let metric = make_gauge_with_sidecar(
+            tags,
+            ObjectMap::new(),
+            scope_attrs,
+            ObjectMap::new(),
+            "my-meter",
+            "2.0",
+        );
+
+        let request = native_metric_to_otlp_request(&metric).unwrap();
+        let scope = request.resource_metrics[0].scope_metrics[0]
+            .scope
+            .as_ref()
+            .expect("scope should be present");
+
+        assert_eq!(scope.name, "my-meter");
+        assert_eq!(scope.version, "2.0");
+
+        // Scope attribute should be typed (BoolValue, not StringValue)
+        let lang_attr = scope
+            .attributes
+            .iter()
+            .find(|kv| kv.key == "lib.lang")
+            .expect("lib.lang should be present");
+        assert_eq!(
+            lang_attr.value.as_ref().unwrap().value,
+            Some(PBValue::BoolValue(true)),
+            "Sidecar should emit BoolValue for scope attribute"
+        );
     }
 }
