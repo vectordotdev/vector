@@ -1,8 +1,10 @@
 use chrono::{TimeZone, Utc};
+use lookup::path;
 use vector_core::event::{
     Event, Metric as MetricEvent, MetricKind, MetricTags, MetricValue,
     metric::{Bucket, Quantile, TagValue},
 };
+use vrl::value::Value;
 
 use super::proto::{
     common::v1::{InstrumentationScope, KeyValue},
@@ -273,6 +275,20 @@ pub fn build_metric_tags(
     tags
 }
 
+/// Stash `start_time_unix_nano` in metric metadata for OTLP roundtrip preservation.
+///
+/// Stored at `%vector.otlp.start_time_unix_nano` in EventMetadata.
+/// Only stored when non-zero (zero means "not set" in OTLP).
+/// The OTLP encoder reads this back to avoid losing start_time on roundtrip.
+fn stash_start_time(metric: &mut MetricEvent, start_time_unix_nano: u64) {
+    if start_time_unix_nano > 0 {
+        metric.metadata_mut().value_mut().insert(
+            path!("vector", "otlp", "start_time_unix_nano"),
+            Value::Integer(start_time_unix_nano as i64),
+        );
+    }
+}
+
 impl SumMetric {
     fn into_metric(
         self,
@@ -306,10 +322,11 @@ impl SumMetric {
             MetricValue::Gauge { value }
         };
 
-        MetricEvent::new(metric_name, kind, metric_value)
+        let mut metric = MetricEvent::new(metric_name, kind, metric_value)
             .with_tags(Some(attributes))
-            .with_timestamp(timestamp)
-            .into()
+            .with_timestamp(timestamp);
+        stash_start_time(&mut metric, self.point.start_time_unix_nano);
+        metric.into()
     }
 }
 
@@ -334,14 +351,15 @@ impl GaugeMetric {
             resource_schema_url,
         );
 
-        MetricEvent::new(
+        let mut metric = MetricEvent::new(
             metric_name,
             MetricKind::Absolute,
             MetricValue::Gauge { value },
         )
         .with_timestamp(timestamp)
-        .with_tags(Some(attributes))
-        .into()
+        .with_tags(Some(attributes));
+        stash_start_time(&mut metric, self.point.start_time_unix_nano);
+        metric.into()
     }
 }
 
@@ -390,7 +408,7 @@ impl HistogramMetric {
             MetricKind::Absolute
         };
 
-        MetricEvent::new(
+        let mut metric = MetricEvent::new(
             metric_name,
             kind,
             MetricValue::AggregatedHistogram {
@@ -400,8 +418,9 @@ impl HistogramMetric {
             },
         )
         .with_timestamp(timestamp)
-        .with_tags(Some(attributes))
-        .into()
+        .with_tags(Some(attributes));
+        stash_start_time(&mut metric, self.point.start_time_unix_nano);
+        metric.into()
     }
 }
 
@@ -461,7 +480,7 @@ impl ExpHistogramMetric {
             MetricKind::Absolute
         };
 
-        MetricEvent::new(
+        let mut metric = MetricEvent::new(
             metric_name,
             kind,
             MetricValue::AggregatedHistogram {
@@ -471,8 +490,9 @@ impl ExpHistogramMetric {
             },
         )
         .with_timestamp(timestamp)
-        .with_tags(Some(attributes))
-        .into()
+        .with_tags(Some(attributes));
+        stash_start_time(&mut metric, self.point.start_time_unix_nano);
+        metric.into()
     }
 }
 
@@ -506,7 +526,7 @@ impl SummaryMetric {
             })
             .collect();
 
-        MetricEvent::new(
+        let mut metric = MetricEvent::new(
             metric_name,
             MetricKind::Absolute,
             MetricValue::AggregatedSummary {
@@ -516,8 +536,9 @@ impl SummaryMetric {
             },
         )
         .with_timestamp(timestamp)
-        .with_tags(Some(attributes))
-        .into()
+        .with_tags(Some(attributes));
+        stash_start_time(&mut metric, self.point.start_time_unix_nano);
+        metric.into()
     }
 }
 
@@ -673,6 +694,184 @@ mod tests {
         let events: Vec<Event> = rm.into_event_iter().collect();
         let tags = get_tags(&events[0]);
         assert!(tags.get("resource_dropped_attributes_count").is_none());
+    }
+
+    //
+    // Combined: all new tags
+    //
+
+    //
+    // Tests for start_time_unix_nano preservation
+    //
+
+    fn get_start_time(event: &Event) -> Option<i64> {
+        event
+            .as_metric()
+            .metadata()
+            .value()
+            .get("vector")
+            .and_then(|v| v.get("otlp"))
+            .and_then(|v| v.get("start_time_unix_nano"))
+            .and_then(|v| match v {
+                Value::Integer(i) => Some(*i),
+                _ => None,
+            })
+    }
+
+    #[test]
+    fn test_start_time_preserved_for_gauge() {
+        let rm = ResourceMetrics {
+            resource: Some(Resource {
+                attributes: vec![],
+                dropped_attributes_count: 0,
+            }),
+            scope_metrics: vec![ScopeMetrics {
+                scope: None,
+                metrics: vec![Metric {
+                    name: "test_gauge".to_string(),
+                    description: String::new(),
+                    unit: String::new(),
+                    data: Some(Data::Gauge(Gauge {
+                        data_points: vec![NumberDataPoint {
+                            attributes: vec![],
+                            start_time_unix_nano: 1_000_000_000,
+                            time_unix_nano: 2_000_000_000,
+                            exemplars: vec![],
+                            flags: 0,
+                            value: Some(NumberDataPointValue::AsDouble(1.0)),
+                        }],
+                    })),
+                }],
+                schema_url: String::new(),
+            }],
+            schema_url: String::new(),
+        };
+        let events: Vec<Event> = rm.into_event_iter().collect();
+        assert_eq!(events.len(), 1);
+        assert_eq!(get_start_time(&events[0]), Some(1_000_000_000));
+    }
+
+    #[test]
+    fn test_start_time_zero_not_stored() {
+        // start_time_unix_nano=0 means "not set" in OTLP, should not be stored
+        let rm = make_resource_metrics(vec![], 0, None, "", "");
+        let events: Vec<Event> = rm.into_event_iter().collect();
+        assert_eq!(events.len(), 1);
+        assert_eq!(get_start_time(&events[0]), None);
+    }
+
+    #[test]
+    fn test_start_time_preserved_for_sum() {
+        use crate::proto::metrics::v1::Sum;
+
+        let rm = ResourceMetrics {
+            resource: Some(Resource {
+                attributes: vec![],
+                dropped_attributes_count: 0,
+            }),
+            scope_metrics: vec![ScopeMetrics {
+                scope: None,
+                metrics: vec![Metric {
+                    name: "test_sum".to_string(),
+                    description: String::new(),
+                    unit: String::new(),
+                    data: Some(Data::Sum(Sum {
+                        aggregation_temporality: AggregationTemporality::Cumulative as i32,
+                        is_monotonic: true,
+                        data_points: vec![NumberDataPoint {
+                            attributes: vec![],
+                            start_time_unix_nano: 5_000_000_000,
+                            time_unix_nano: 10_000_000_000,
+                            exemplars: vec![],
+                            flags: 0,
+                            value: Some(NumberDataPointValue::AsInt(100)),
+                        }],
+                    })),
+                }],
+                schema_url: String::new(),
+            }],
+            schema_url: String::new(),
+        };
+        let events: Vec<Event> = rm.into_event_iter().collect();
+        assert_eq!(events.len(), 1);
+        assert_eq!(get_start_time(&events[0]), Some(5_000_000_000));
+    }
+
+    #[test]
+    fn test_start_time_preserved_for_histogram() {
+        use crate::proto::metrics::v1::Histogram;
+
+        let rm = ResourceMetrics {
+            resource: Some(Resource {
+                attributes: vec![],
+                dropped_attributes_count: 0,
+            }),
+            scope_metrics: vec![ScopeMetrics {
+                scope: None,
+                metrics: vec![Metric {
+                    name: "test_histogram".to_string(),
+                    description: String::new(),
+                    unit: String::new(),
+                    data: Some(Data::Histogram(Histogram {
+                        aggregation_temporality: AggregationTemporality::Delta as i32,
+                        data_points: vec![HistogramDataPoint {
+                            attributes: vec![],
+                            start_time_unix_nano: 3_000_000_000,
+                            time_unix_nano: 4_000_000_000,
+                            count: 10,
+                            sum: Some(100.0),
+                            bucket_counts: vec![2, 5, 3],
+                            explicit_bounds: vec![10.0, 50.0],
+                            exemplars: vec![],
+                            flags: 0,
+                            min: None,
+                            max: None,
+                        }],
+                    })),
+                }],
+                schema_url: String::new(),
+            }],
+            schema_url: String::new(),
+        };
+        let events: Vec<Event> = rm.into_event_iter().collect();
+        assert_eq!(events.len(), 1);
+        assert_eq!(get_start_time(&events[0]), Some(3_000_000_000));
+    }
+
+    #[test]
+    fn test_start_time_preserved_for_summary() {
+        use crate::proto::metrics::v1::Summary;
+
+        let rm = ResourceMetrics {
+            resource: Some(Resource {
+                attributes: vec![],
+                dropped_attributes_count: 0,
+            }),
+            scope_metrics: vec![ScopeMetrics {
+                scope: None,
+                metrics: vec![Metric {
+                    name: "test_summary".to_string(),
+                    description: String::new(),
+                    unit: String::new(),
+                    data: Some(Data::Summary(Summary {
+                        data_points: vec![SummaryDataPoint {
+                            attributes: vec![],
+                            start_time_unix_nano: 7_000_000_000,
+                            time_unix_nano: 8_000_000_000,
+                            count: 5,
+                            sum: 50.0,
+                            quantile_values: vec![],
+                            flags: 0,
+                        }],
+                    })),
+                }],
+                schema_url: String::new(),
+            }],
+            schema_url: String::new(),
+        };
+        let events: Vec<Event> = rm.into_event_iter().collect();
+        assert_eq!(events.len(), 1);
+        assert_eq!(get_start_time(&events[0]), Some(7_000_000_000));
     }
 
     //
