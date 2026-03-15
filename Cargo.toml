@@ -374,8 +374,7 @@ dirs-next = { version = "2.0.0", default-features = false, optional = true }
 dyn-clone = { version = "1.0.20", default-features = false }
 encoding_rs = { version = "0.8.35", default-features = false, features = ["serde"] }
 enum_dispatch = { version = "0.3.13", default-features = false }
-evmap = { version = "10.0.2", default-features = false, optional = true }
-evmap-derive = { version = "0.2.0", default-features = false, optional = true }
+evmap = { version = "11.0.0", default-features = false, optional = true }
 exitcode.workspace = true
 flate2.workspace = true
 futures-util.workspace = true
@@ -601,7 +600,7 @@ gcp = ["dep:base64", "dep:goauth", "dep:smpl_jwt"]
 enrichment-tables = ["enrichment-tables-geoip", "enrichment-tables-mmdb", "enrichment-tables-memory"]
 enrichment-tables-geoip = ["dep:maxminddb"]
 enrichment-tables-mmdb = ["dep:maxminddb"]
-enrichment-tables-memory = ["dep:evmap", "dep:evmap-derive", "dep:thread_local"]
+enrichment-tables-memory = ["dep:evmap", "dep:thread_local"]
 
 # Codecs
 codecs-arrow = ["dep:arrow", "dep:arrow-schema", "vector-lib/arrow"]
