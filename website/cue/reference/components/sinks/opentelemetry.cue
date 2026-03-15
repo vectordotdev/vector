@@ -64,8 +64,8 @@ components: sinks: opentelemetry: {
 
 				- Metric attribute types are not preserved during roundtrip. Vector's metric tag model stores all values as strings,
 				  so OTLP `IntValue`, `BoolValue`, `DoubleValue`, etc. are stringified on decode and rebuilt as `StringValue` on encode.
-				- `start_time_unix_nano` is not preserved. Vector's metric model carries only one timestamp (`time_unix_nano`).
-				  The encode path sets `start_time_unix_nano` to `0` for all data points.
+				- `start_time_unix_nano` is preserved for OTLP-sourced metrics via metadata stash. For native Vector
+				  incremental metrics, it is synthesized from `timestamp - interval_ms` when available, otherwise set to `0`.
 				"""
 		}
 		quickstart: {

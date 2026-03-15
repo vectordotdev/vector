@@ -2702,7 +2702,11 @@ mod edge_case_tests {
     }
 
     #[test]
-    fn test_start_time_unix_nano_independence() {
+    fn test_start_time_unix_nano_roundtrip() {
+        // After rebase on #24905, the decode path stashes start_time_unix_nano
+        // in metric metadata. resolve_start_time() reads it back on encode,
+        // giving us a full roundtrip. Before rebase, decode doesn't stash
+        // so encode falls back to synthesis or 0.
         let sum = Sum {
             data_points: vec![NumberDataPoint {
                 attributes: Vec::new(),
@@ -2745,10 +2749,27 @@ mod edge_case_tests {
         let otlp_metric = &request.resource_metrics[0].scope_metrics[0].metrics[0];
         match &otlp_metric.data {
             Some(Data::Sum(sum)) => {
-                assert_eq!(
-                    sum.data_points[0].start_time_unix_nano, 0,
-                    "start_time_unix_nano is not preserved through Vector's metric model"
-                );
+                // Check whether decode stashed start_time (post-rebase on #24905)
+                let has_sidecar = decoded
+                    .metadata()
+                    .value()
+                    .get("vector")
+                    .and_then(|v| v.get("otlp"))
+                    .and_then(|v| v.get("start_time_unix_nano"))
+                    .is_some();
+
+                if has_sidecar {
+                    assert_eq!(
+                        sum.data_points[0].start_time_unix_nano, 1_000_000_000,
+                        "start_time_unix_nano should be preserved via metadata roundtrip"
+                    );
+                } else {
+                    // Pre-rebase: decode doesn't stash, encode can't recover it
+                    assert_eq!(
+                        sum.data_points[0].start_time_unix_nano, 0,
+                        "Without decode-side stash, start_time_unix_nano falls back to 0"
+                    );
+                }
                 assert_eq!(sum.data_points[0].time_unix_nano, 2_000_000_000);
             }
             other => panic!("Expected Sum, got {other:?}"),
