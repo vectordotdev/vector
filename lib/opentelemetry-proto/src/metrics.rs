@@ -4,6 +4,7 @@ use vector_core::event::{
     Event, Metric as MetricEvent, MetricKind, MetricTags, MetricValue,
     metric::{Bucket, Quantile, TagValue},
 };
+use vrl::value::Value;
 
 use super::proto::{
     collector::metrics::v1::ExportMetricsServiceRequest,
@@ -473,7 +474,9 @@ pub fn native_metric_to_otlp_request(
 ) -> Option<ExportMetricsServiceRequest> {
     let decomposed = decompose_metric_tags(metric.tags());
     let timestamp_nanos = extract_metric_timestamp_nanos(metric);
-    let otlp_metric = build_otlp_metric(metric, &decomposed.attributes, timestamp_nanos)?;
+    let start_time_nanos = resolve_start_time(metric, timestamp_nanos);
+    let otlp_metric =
+        build_otlp_metric(metric, &decomposed.attributes, timestamp_nanos, start_time_nanos)?;
 
     let scope_metrics = ScopeMetrics {
         scope: decomposed.scope,
@@ -627,6 +630,35 @@ fn extract_metric_timestamp_nanos(metric: &MetricEvent) -> u64 {
         .unwrap_or(0)
 }
 
+/// Extract `start_time_unix_nano` for the OTLP encode path.
+///
+/// Priority:
+/// 1. Metadata sidecar (stashed during OTLP decode) at `%vector.otlp.start_time_unix_nano`
+/// 2. Synthesis from `timestamp - interval_ms` for incremental metrics
+/// 3. 0 (OTLP default meaning "not set")
+fn resolve_start_time(metric: &MetricEvent, timestamp_nanos: u64) -> u64 {
+    // Try metadata first (OTLP roundtrip case)
+    if let Some(Value::Integer(ns)) = metric
+        .metadata()
+        .value()
+        .get("vector")
+        .and_then(|v| v.get("otlp"))
+        .and_then(|v| v.get("start_time_unix_nano"))
+    {
+        return u64::try_from(*ns).unwrap_or(0);
+    }
+
+    // Synthesize for native incremental metrics with interval_ms
+    if metric.kind() == MetricKind::Incremental
+        && let Some(interval) = metric.interval_ms()
+    {
+        let interval_nanos = u64::from(interval.get()) * 1_000_000;
+        return timestamp_nanos.saturating_sub(interval_nanos);
+    }
+
+    0
+}
+
 /// Build the OTLP Metric protobuf message from a Vector MetricEvent.
 ///
 /// Returns `None` for unsupported metric types (e.g. Sketch), which causes the
@@ -636,6 +668,7 @@ fn build_otlp_metric(
     metric: &MetricEvent,
     attributes: &[KeyValue],
     timestamp_nanos: u64,
+    start_time_nanos: u64,
 ) -> Option<super::proto::metrics::v1::Metric> {
     let data = match metric.value() {
         MetricValue::Counter { value } => {
@@ -646,7 +679,7 @@ fn build_otlp_metric(
             Some(Data::Sum(Sum {
                 data_points: vec![NumberDataPoint {
                     attributes: attributes.to_vec(),
-                    start_time_unix_nano: 0,
+                    start_time_unix_nano: start_time_nanos,
                     time_unix_nano: timestamp_nanos,
                     value: Some(NumberDataPointValue::AsDouble(*value)),
                     exemplars: Vec::new(),
@@ -660,7 +693,7 @@ fn build_otlp_metric(
         MetricValue::Gauge { value } => Some(Data::Gauge(Gauge {
             data_points: vec![NumberDataPoint {
                 attributes: attributes.to_vec(),
-                start_time_unix_nano: 0,
+                start_time_unix_nano: start_time_nanos,
                 time_unix_nano: timestamp_nanos,
                 value: Some(NumberDataPointValue::AsDouble(*value)),
                 exemplars: Vec::new(),
@@ -697,7 +730,7 @@ fn build_otlp_metric(
             Some(Data::Histogram(Histogram {
                 data_points: vec![HistogramDataPoint {
                     attributes: attributes.to_vec(),
-                    start_time_unix_nano: 0,
+                    start_time_unix_nano: start_time_nanos,
                     time_unix_nano: timestamp_nanos,
                     count: *count,
                     sum: Some(*sum),
@@ -728,7 +761,7 @@ fn build_otlp_metric(
             Some(Data::Summary(Summary {
                 data_points: vec![SummaryDataPoint {
                     attributes: attributes.to_vec(),
-                    start_time_unix_nano: 0,
+                    start_time_unix_nano: start_time_nanos,
                     time_unix_nano: timestamp_nanos,
                     count: *count,
                     sum: *sum,
@@ -792,7 +825,7 @@ fn build_otlp_metric(
             Some(Data::Histogram(Histogram {
                 data_points: vec![HistogramDataPoint {
                     attributes: attributes.to_vec(),
-                    start_time_unix_nano: 0,
+                    start_time_unix_nano: start_time_nanos,
                     time_unix_nano: timestamp_nanos,
                     count: total_count,
                     sum: Some(total_sum),
@@ -812,7 +845,7 @@ fn build_otlp_metric(
             Some(Data::Gauge(Gauge {
                 data_points: vec![NumberDataPoint {
                     attributes: attributes.to_vec(),
-                    start_time_unix_nano: 0,
+                    start_time_unix_nano: start_time_nanos,
                     time_unix_nano: timestamp_nanos,
                     #[allow(clippy::cast_precision_loss)]
                     value: Some(NumberDataPointValue::AsDouble(values.len() as f64)),
@@ -2771,6 +2804,131 @@ mod edge_case_tests {
                 );
             }
             other => panic!("Expected Gauge, got {other:?}"),
+        }
+    }
+
+    //
+    // Tests for start_time_unix_nano on encode
+    //
+
+    #[test]
+    fn test_start_time_from_metadata_sidecar() {
+        use lookup::path;
+
+        let mut metric = make_gauge("test", 1.0);
+        let ts = Utc::now();
+        metric = metric.with_timestamp(Some(ts));
+
+        // Stash start_time in metadata (simulates what OTLP decode does)
+        metric.metadata_mut().value_mut().insert(
+            path!("vector", "otlp", "start_time_unix_nano"),
+            Value::Integer(5_000_000_000),
+        );
+
+        let request = native_metric_to_otlp_request(&metric).unwrap();
+        let dp = &request.resource_metrics[0].scope_metrics[0].metrics[0];
+        match &dp.data {
+            Some(Data::Gauge(gauge)) => {
+                assert_eq!(
+                    gauge.data_points[0].start_time_unix_nano, 5_000_000_000,
+                    "start_time should be read from metadata sidecar"
+                );
+            }
+            other => panic!("Expected Gauge, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_start_time_synthesized_for_incremental() {
+        let mut metric =
+            make_counter("requests_total", 42.0, MetricKind::Incremental);
+        let ts = Utc.timestamp_nanos(10_000_000_000);
+        metric = metric
+            .with_timestamp(Some(ts))
+            .with_interval_ms(std::num::NonZeroU32::new(5000)); // 5 seconds
+
+        let request = native_metric_to_otlp_request(&metric).unwrap();
+        let dp = &request.resource_metrics[0].scope_metrics[0].metrics[0];
+        match &dp.data {
+            Some(Data::Sum(sum)) => {
+                // 10s timestamp - 5s interval = 5s start_time
+                assert_eq!(
+                    sum.data_points[0].start_time_unix_nano, 5_000_000_000,
+                    "start_time should be timestamp - interval_ms"
+                );
+            }
+            other => panic!("Expected Sum, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_start_time_zero_for_absolute_metric() {
+        let mut metric = make_gauge("temperature", 23.5);
+        let ts = Utc.timestamp_nanos(10_000_000_000);
+        metric = metric.with_timestamp(Some(ts));
+
+        let request = native_metric_to_otlp_request(&metric).unwrap();
+        let dp = &request.resource_metrics[0].scope_metrics[0].metrics[0];
+        match &dp.data {
+            Some(Data::Gauge(gauge)) => {
+                assert_eq!(
+                    gauge.data_points[0].start_time_unix_nano, 0,
+                    "Absolute metrics without sidecar should have start_time=0"
+                );
+            }
+            other => panic!("Expected Gauge, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_start_time_zero_for_incremental_without_interval() {
+        let mut metric =
+            make_counter("events_total", 10.0, MetricKind::Incremental);
+        let ts = Utc.timestamp_nanos(10_000_000_000);
+        metric = metric.with_timestamp(Some(ts));
+        // No interval_ms set
+
+        let request = native_metric_to_otlp_request(&metric).unwrap();
+        let dp = &request.resource_metrics[0].scope_metrics[0].metrics[0];
+        match &dp.data {
+            Some(Data::Sum(sum)) => {
+                assert_eq!(
+                    sum.data_points[0].start_time_unix_nano, 0,
+                    "Incremental without interval_ms should have start_time=0"
+                );
+            }
+            other => panic!("Expected Sum, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_metadata_sidecar_takes_priority_over_synthesis() {
+        use lookup::path;
+
+        // Incremental metric with both interval_ms AND sidecar — sidecar wins
+        let mut metric =
+            make_counter("requests_total", 42.0, MetricKind::Incremental);
+        let ts = Utc.timestamp_nanos(10_000_000_000);
+        metric = metric
+            .with_timestamp(Some(ts))
+            .with_interval_ms(std::num::NonZeroU32::new(5000));
+
+        // Stash a different start_time in metadata
+        metric.metadata_mut().value_mut().insert(
+            path!("vector", "otlp", "start_time_unix_nano"),
+            Value::Integer(1_000_000_000),
+        );
+
+        let request = native_metric_to_otlp_request(&metric).unwrap();
+        let dp = &request.resource_metrics[0].scope_metrics[0].metrics[0];
+        match &dp.data {
+            Some(Data::Sum(sum)) => {
+                assert_eq!(
+                    sum.data_points[0].start_time_unix_nano, 1_000_000_000,
+                    "Sidecar start_time should take priority over synthesis"
+                );
+            }
+            other => panic!("Expected Sum, got {other:?}"),
         }
     }
 }
