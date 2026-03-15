@@ -59,6 +59,7 @@ BADVERS
 Bedove
 Benss
 bigendian
+bigquery
 bindir
 binfmt
 bitcast

@@ -1,6 +1,14 @@
 version: '3'
 
 services:
+  bigquery-emulator:
+    image: ghcr.io/goccy/bigquery-emulator:latest
+    command:
+    - --project=testproject
+    - --data-from-yaml=/data.yaml
+    volumes:
+    - ./bigquery-emulator-schema.yaml:/data.yaml:ro
+
   gcloud-pubsub:
     image: docker.io/messagebird/gcloud-pubsub-emulator:${CONFIG_VERSION}
     environment:

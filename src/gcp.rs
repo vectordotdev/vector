@@ -32,6 +32,7 @@ const METADATA_TOKEN_EXPIRY_MARGIN_SECS: u64 = 200;
 
 const METADATA_TOKEN_ERROR_RETRY_SECS: u64 = 2;
 
+pub const BIGQUERY_STORAGE_URL: &str = "https://bigquerystorage.googleapis.com:443";
 pub const PUBSUB_URL: &str = "https://pubsub.googleapis.com";
 
 pub static PUBSUB_ADDRESS: LazyLock<String> = LazyLock::new(|| {
