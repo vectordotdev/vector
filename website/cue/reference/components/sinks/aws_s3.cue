@@ -252,30 +252,31 @@ components: sinks: aws_s3: components._aws & {
 				compression = "none"
 
 				[sinks.s3_parquet.batch_encoding]
-				parquet.compression = "snappy"
-				parquet.schema_mode = "relaxed"
+				codec = "parquet"
+				compression = "snappy"
+				schema_mode = "relaxed"
 
-				[[sinks.s3_parquet.batch_encoding.parquet.schema]]
+				[[sinks.s3_parquet.batch_encoding.schema]]
 				name = "message"
 				type = "utf8"
 
-				[[sinks.s3_parquet.batch_encoding.parquet.schema]]
+				[[sinks.s3_parquet.batch_encoding.schema]]
 				name = "timestamp"
 				type = "timestamp_millisecond"
 
-				[[sinks.s3_parquet.batch_encoding.parquet.schema]]
+				[[sinks.s3_parquet.batch_encoding.schema]]
 				name = "metadata"
 				type = "struct"
 
-				  [[sinks.s3_parquet.batch_encoding.parquet.schema.fields]]
+				  [[sinks.s3_parquet.batch_encoding.schema.fields]]
 				  name = "source"
 				  type = "utf8"
 
-				  [[sinks.s3_parquet.batch_encoding.parquet.schema.fields]]
+				  [[sinks.s3_parquet.batch_encoding.schema.fields]]
 				  name = "region"
 				  type = "utf8"
 
-				[[sinks.s3_parquet.batch_encoding.parquet.schema]]
+				[[sinks.s3_parquet.batch_encoding.schema]]
 				name = "tags"
 				type = "list"
 				items = "utf8"
@@ -288,8 +289,9 @@ components: sinks: aws_s3: components._aws & {
 
 				```toml
 				[sinks.s3_parquet.batch_encoding]
-				parquet.compression = "snappy"
-				parquet.parquet_schema = "message logs { required binary message (STRING); required binary host (STRING); optional int64 timestamp (TIMESTAMP_MILLIS); }"
+				codec = "parquet"
+				compression = "snappy"
+				parquet_schema = "message logs { required binary message (STRING); required binary host (STRING); optional int64 timestamp (TIMESTAMP_MILLIS); }"
 				```
 
 				#### Option 3: Native Parquet Schema (File)
@@ -298,8 +300,9 @@ components: sinks: aws_s3: components._aws & {
 
 				```toml
 				[sinks.s3_parquet.batch_encoding]
-				parquet.compression = "snappy"
-				parquet.schema_file = "/etc/vector/schemas/logs.schema"
+				codec = "parquet"
+				compression = "snappy"
+				schema_file = "/etc/vector/schemas/logs.schema"
 				```
 
 				#### Option 4: Avro Schema (Inline)
@@ -309,8 +312,9 @@ components: sinks: aws_s3: components._aws & {
 
 				```toml
 				[sinks.s3_parquet.batch_encoding]
-				parquet.compression = "snappy"
-				parquet.avro_schema = '{"type":"record","name":"logs","fields":[{"name":"message","type":"string"},{"name":"host","type":"string"},{"name":"level","type":"string"}]}'
+				codec = "parquet"
+				compression = "snappy"
+				avro_schema = '{"type":"record","name":"logs","fields":[{"name":"message","type":"string"},{"name":"host","type":"string"},{"name":"level","type":"string"}]}'
 				```
 
 				#### Option 5: Avro Schema (File)
@@ -319,8 +323,9 @@ components: sinks: aws_s3: components._aws & {
 
 				```toml
 				[sinks.s3_parquet.batch_encoding]
-				parquet.compression = "snappy"
-				parquet.avro_schema_file = "/etc/vector/schemas/logs.avsc"
+				codec = "parquet"
+				compression = "snappy"
+				avro_schema_file = "/etc/vector/schemas/logs.avsc"
 				```
 
 				#### Option 6: Protobuf Descriptor (File)
@@ -330,9 +335,10 @@ components: sinks: aws_s3: components._aws & {
 
 				```toml
 				[sinks.s3_parquet.batch_encoding]
-				parquet.compression = "snappy"
-				parquet.proto_desc_file = "/etc/vector/schemas/logs.desc"
-				parquet.proto_message_type = "logs.LogRecord"
+				codec = "parquet"
+				compression = "snappy"
+				proto_desc_file = "/etc/vector/schemas/logs.desc"
+				proto_message_type = "logs.LogRecord"
 				```
 
 				#### YAML Example (Inline with Nested Types)
@@ -345,10 +351,10 @@ components: sinks: aws_s3: components._aws & {
 				    key_prefix: "logs/date=%F"
 				    compression: none
 				    batch_encoding:
-				      parquet:
-				        compression: snappy
-				        schema_mode: relaxed
-				        schema:
+				      codec: parquet
+				      compression: snappy
+				      schema_mode: relaxed
+				      schema:
 				          - name: message
 				            type: utf8
 				          - name: timestamp
@@ -381,7 +387,7 @@ components: sinks: aws_s3: components._aws & {
 				| `proto_desc_file` | path | Path to `.desc` file |
 				| `proto_message_type` | string | Protobuf message type (required with `proto_desc_file`) |
 				| `compression` | string | `snappy` (default), `zstd`, `gzip`, `lz4`, `none` |
-				| `schema_mode` | string | `strict` (default) or `relaxed` |
+				| `schema_mode` | string | `relaxed` (default) or `strict` |
 
 				#### Unsupported Types
 
