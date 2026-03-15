@@ -476,7 +476,7 @@ pub fn native_metric_to_otlp_request(
     let timestamp_nanos = extract_metric_timestamp_nanos(metric);
     let start_time_nanos = resolve_start_time(metric, timestamp_nanos);
     let otlp_metric =
-        build_otlp_metric(metric, &decomposed.attributes, timestamp_nanos, start_time_nanos)?;
+        build_otlp_metric(metric, decomposed.attributes, timestamp_nanos, start_time_nanos)?;
 
     let scope_metrics = ScopeMetrics {
         scope: decomposed.scope,
@@ -537,15 +537,15 @@ fn decompose_metric_tags(tags: Option<&MetricTags>) -> DecomposedMetricTags {
         }
     };
 
-    let mut resource_attrs = Vec::new();
+    let mut resource_attrs = Vec::with_capacity(4);
     let mut resource_dropped: u32 = 0;
     let mut resource_schema_url = String::new();
     let mut scope_name: Option<String> = None;
     let mut scope_version: Option<String> = None;
     let mut scope_dropped: u32 = 0;
     let mut scope_schema_url = String::new();
-    let mut scope_attrs = Vec::new();
-    let mut data_point_attrs = Vec::new();
+    let mut scope_attrs = Vec::with_capacity(2);
+    let mut data_point_attrs = Vec::with_capacity(8);
 
     for (key, value) in tags.iter_single() {
         // Metadata tags use underscores to avoid colliding with user resource/scope attributes.
@@ -666,7 +666,7 @@ fn resolve_start_time(metric: &MetricEvent, timestamp_nanos: u64) -> u64 {
 /// empty data.
 fn build_otlp_metric(
     metric: &MetricEvent,
-    attributes: &[KeyValue],
+    attributes: Vec<KeyValue>,
     timestamp_nanos: u64,
     start_time_nanos: u64,
 ) -> Option<super::proto::metrics::v1::Metric> {
@@ -678,7 +678,7 @@ fn build_otlp_metric(
             };
             Some(Data::Sum(Sum {
                 data_points: vec![NumberDataPoint {
-                    attributes: attributes.to_vec(),
+                    attributes,
                     start_time_unix_nano: start_time_nanos,
                     time_unix_nano: timestamp_nanos,
                     value: Some(NumberDataPointValue::AsDouble(*value)),
@@ -692,7 +692,7 @@ fn build_otlp_metric(
 
         MetricValue::Gauge { value } => Some(Data::Gauge(Gauge {
             data_points: vec![NumberDataPoint {
-                attributes: attributes.to_vec(),
+                attributes,
                 start_time_unix_nano: start_time_nanos,
                 time_unix_nano: timestamp_nanos,
                 value: Some(NumberDataPointValue::AsDouble(*value)),
@@ -729,7 +729,7 @@ fn build_otlp_metric(
 
             Some(Data::Histogram(Histogram {
                 data_points: vec![HistogramDataPoint {
-                    attributes: attributes.to_vec(),
+                    attributes,
                     start_time_unix_nano: start_time_nanos,
                     time_unix_nano: timestamp_nanos,
                     count: *count,
@@ -760,7 +760,7 @@ fn build_otlp_metric(
 
             Some(Data::Summary(Summary {
                 data_points: vec![SummaryDataPoint {
-                    attributes: attributes.to_vec(),
+                    attributes,
                     start_time_unix_nano: start_time_nanos,
                     time_unix_nano: timestamp_nanos,
                     count: *count,
@@ -824,7 +824,7 @@ fn build_otlp_metric(
 
             Some(Data::Histogram(Histogram {
                 data_points: vec![HistogramDataPoint {
-                    attributes: attributes.to_vec(),
+                    attributes,
                     start_time_unix_nano: start_time_nanos,
                     time_unix_nano: timestamp_nanos,
                     count: total_count,
@@ -844,7 +844,7 @@ fn build_otlp_metric(
             // Encode set cardinality as a gauge (count of unique values)
             Some(Data::Gauge(Gauge {
                 data_points: vec![NumberDataPoint {
-                    attributes: attributes.to_vec(),
+                    attributes,
                     start_time_unix_nano: start_time_nanos,
                     time_unix_nano: timestamp_nanos,
                     #[allow(clippy::cast_precision_loss)]
