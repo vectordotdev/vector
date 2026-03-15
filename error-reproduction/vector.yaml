@@ -1,0 +1,93 @@
+Vector source/sink example:
+test_recursion_sender.yaml:
+data_dir: /tmp
+api:
+  enabled: true
+  address: 0.0.0.0:8686
+  playground: false
+sources:
+  stdin:
+    type: stdin
+transforms:
+  parse_json:
+    type: remap
+    inputs:
+      - stdin
+    source: |-
+      .message = parse_json!(string!(.message), 128)
+sinks:
+  sender:
+    type: vector
+    inputs:
+      - parse_json
+    address: 127.0.0.1:6000
+
+test_recursion_receiver.yaml:
+data_dir: /tmp
+api:
+  enabled: true
+  address: 0.0.0.0:8687
+  playground: false
+sources:
+  receiver:
+    type: vector
+    address: 0.0.0.0:6000
+sinks:
+  console_out:
+    type: console
+    target: stdout
+    inputs:
+      - receiver
+    encoding:
+      codec: json
+
+Disk buffering example:
+--
+test_recursion_sender.yaml:
+data_dir: /tmp
+api:
+  enabled: true
+  address: 0.0.0.0:8686
+  playground: false
+sources:
+  stdin:
+    type: stdin
+transforms:
+  parse_json:
+    type: remap
+    inputs:
+      - stdin
+    source: |-
+      .message = parse_json!(string!(.message), 128)
+sinks:
+  sender:
+    type: http
+    inputs:
+      - parse_json
+    uri: http://127.0.0.1:80
+    encoding:
+      codec: json
+    buffer:
+      type: disk
+      max_size: 268435488
+
+test_recursion_receiver.yaml:
+data_dir: /tmp
+api:
+  enabled: true
+  address: 0.0.0.0:8687
+  playground: false
+sources:
+  receiver:
+    type: http_server
+    address: 0.0.0.0:80
+    decoding:
+      codec: json
+sinks:
+  console_out:
+    type: console
+    target: stdout
+    inputs:
+      - receiver
+    encoding:
+      codec: json

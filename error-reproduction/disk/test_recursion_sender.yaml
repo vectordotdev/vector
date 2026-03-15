@@ -1,0 +1,28 @@
+data_dir: /tmp/vector
+api:
+  enabled: true
+  address: 0.0.0.0:8686
+  playground: false
+sources:
+  stdin:
+    type: stdin
+transforms:
+  parse_json:
+    type: remap
+    inputs:
+      - stdin
+    source: |
+      m, e = parse_json(.message)
+      if e == null {
+        .message = m
+      }
+sinks:
+  blackhole:
+    type: blackhole
+    inputs:
+      - parse_json
+    print_interval_secs: 10
+    buffer:
+      type: disk
+      max_size: 268435488
+      when_full: block
