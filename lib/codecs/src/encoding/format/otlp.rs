@@ -30,7 +30,7 @@ impl OtlpSerializerConfig {
 
     /// The data type of events that are accepted by `OtlpSerializer`.
     pub fn input_type(&self) -> DataType {
-        DataType::Log | DataType::Trace
+        DataType::all_bits()
     }
 
     /// The schema required by the serializer.
@@ -58,8 +58,8 @@ impl OtlpSerializerConfig {
 /// The implementation is the inverse of what the `opentelemetry` source does when decoding,
 /// ensuring round-trip compatibility.
 ///
-/// **Note:** Native metrics are not yet supported. Metrics require `use_otlp_decoding: true`
-/// on the source for passthrough encoding.
+/// Native metric conversion (Counter, Gauge, Histogram, Summary, Distribution, Set) is
+/// provided by companion PR #24897.
 ///
 /// # Native Log Conversion
 ///
@@ -201,7 +201,13 @@ impl Encoder<Event> for OtlpSerializer {
                 }
             }
             Event::Metric(_) => {
-                Err("OTLP serializer does not support native Vector metrics yet.".into())
+                // Native metric → OTLP conversion is provided by #24897.
+                // Until that PR is merged, metrics require use_otlp_decoding: true
+                // on the source for passthrough encoding.
+                Err("OTLP serializer does not support native Vector metrics yet. \
+                     Use `use_otlp_decoding: true` on the source for metrics passthrough, \
+                     or see PR #24897 for native metric conversion."
+                    .into())
             }
         }
     }

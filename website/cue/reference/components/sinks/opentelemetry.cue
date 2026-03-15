@@ -31,7 +31,7 @@ components: sinks: opentelemetry: {
 	}
 
 	support: {
-		requirements: ["With `codec: otlp`, native Vector logs and traces are automatically converted to OTLP protobuf format. Pre-formatted OTLP events (from `use_otlp_decoding: true`) are passed through unchanged. Native metrics are not yet supported and require passthrough mode (`use_otlp_decoding: true` on the source)."]
+		requirements: ["With `codec: otlp`, native Vector logs, traces, and metrics are automatically converted to OTLP protobuf format. Pre-formatted OTLP events (from `use_otlp_decoding: true`) are passed through unchanged. Native metric conversion is provided by #24897."]
 		warnings: []
 		notices: []
 	}

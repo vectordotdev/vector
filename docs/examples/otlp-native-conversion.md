@@ -2,9 +2,8 @@
 
 This document explains the automatic native-to-OTLP conversion feature.
 
-> **Scope:** Auto-conversion currently supports **logs** and **traces**. Metrics continue to
-> work via the existing passthrough path (`use_otlp_decoding: true` on the source).
-> Native metric conversion is planned for a future release.
+> **Scope:** Auto-conversion supports **logs**, **traces**, and **metrics**.
+> Native metric conversion is provided by [#24897](https://github.com/vectordotdev/vector/pull/24897).
 
 ## Architecture overview
 
@@ -575,7 +574,23 @@ sinks:
       codec: otlp  # Native traces auto-converted to OTLP protobuf
 ```
 
-### Metrics passthrough (no native conversion)
+### Native metrics auto-conversion
+
+```yaml
+sources:
+  host_metrics:
+    type: host_metrics
+
+sinks:
+  otel_out:
+    type: opentelemetry
+    inputs: ["host_metrics"]
+    endpoint: http://destination:4317
+    encoding:
+      codec: otlp  # Native metrics auto-converted to OTLP protobuf (see #24897)
+```
+
+### Metrics passthrough (pre-formatted OTLP)
 
 ```yaml
 sources:
@@ -583,7 +598,7 @@ sources:
     type: opentelemetry
     grpc:
       address: 0.0.0.0:4317
-    use_otlp_decoding: true  # Required for metrics passthrough
+    use_otlp_decoding: true  # Preserves original OTLP structure
 
 sinks:
   otel_out:
@@ -591,7 +606,7 @@ sinks:
     inputs: ["otel_in.metrics"]
     endpoint: http://destination:4317
     encoding:
-      codec: otlp  # Passthrough only - native metric conversion not yet supported
+      codec: otlp  # Passthrough of pre-formatted OTLP metrics
 ```
 
 ## Error handling
