@@ -9,10 +9,8 @@ use vector_core::event::{
 };
 use vrl::value::{ObjectMap, Value};
 
-use crate::common::kv_list_into_value;
-
 use super::proto::{
-    common::v1::{InstrumentationScope, KeyValue},
+    common::v1::{InstrumentationScope, KeyValue, any_value::Value as PBValue},
     metrics::v1::{
         AggregationTemporality, ExponentialHistogram, ExponentialHistogramDataPoint, Gauge,
         Histogram, HistogramDataPoint, NumberDataPoint, ResourceMetrics, Sum, Summary,
@@ -309,11 +307,64 @@ fn compute_tags_fingerprint(tags: &MetricTags) -> i64 {
     hasher.finish() as i64
 }
 
+/// Convert a protobuf AnyValue variant to a VRL Value wrapped in a single-key
+/// Object named after the OTLP kind. This preserves the distinction between
+/// StringValue/BytesValue (both map to Value::Bytes) and between ArrayValue/
+/// KvlistValue (both map to Value::Array/Object), so the encoder can reconstruct
+/// the exact PBValue variant on output.
+///
+/// Examples:
+///   StringValue("x")  → {"string_value": "x"}
+///   BytesValue([1,2]) → {"bytes_value": [1,2]}
+///   IntValue(42)      → {"int_value": 42}
+///   ArrayValue([...]) → {"array_value": [...wrapped values...]}
+fn pb_value_to_typed_value(pb: PBValue) -> Value {
+    let (key, val) = match pb {
+        PBValue::StringValue(s) => ("string_value", Value::from(s)),
+        PBValue::BoolValue(b) => ("bool_value", Value::Boolean(b)),
+        PBValue::IntValue(i) => ("int_value", Value::Integer(i)),
+        PBValue::DoubleValue(f) => (
+            "double_value",
+            ordered_float::NotNan::new(f)
+                .map(Value::Float)
+                .unwrap_or(Value::Null),
+        ),
+        PBValue::BytesValue(b) => ("bytes_value", Value::Bytes(bytes::Bytes::from(b))),
+        PBValue::ArrayValue(arr) => (
+            "array_value",
+            Value::Array(
+                arr.values
+                    .into_iter()
+                    .map(|av| av.value.map(pb_value_to_typed_value).unwrap_or(Value::Null))
+                    .collect(),
+            ),
+        ),
+        PBValue::KvlistValue(kvl) => ("kvlist_value", kv_list_into_typed_value(kvl.values)),
+    };
+    Value::Object(ObjectMap::from([(key.into(), val)]))
+}
+
+/// Convert a Vec<KeyValue> into a VRL Object where each value is wrapped
+/// by its OTLP kind via `pb_value_to_typed_value`.
+fn kv_list_into_typed_value(attrs: Vec<KeyValue>) -> Value {
+    Value::Object(
+        attrs
+            .into_iter()
+            .filter_map(|kv| {
+                kv.value.and_then(|av| {
+                    av.value
+                        .map(|v| (kv.key.into(), pb_value_to_typed_value(v)))
+                })
+            })
+            .collect::<ObjectMap>(),
+    )
+}
+
 /// Build a sidecar VRL object containing the original typed OTLP attributes.
 ///
-/// This preserves attribute types (IntValue, BoolValue, DoubleValue, etc.) that
-/// would otherwise be lost when `build_metric_tags()` stringifies everything.
-/// The sidecar is stored in `EventMetadata` and read back by the OTLP encoder.
+/// Each attribute value is wrapped by its OTLP kind (e.g. IntValue(42) becomes
+/// {"int_value": 42}) so the encoder can reconstruct the exact protobuf variant.
+/// This preserves StringValue/BytesValue distinction and handles ArrayValue/KvlistValue.
 ///
 /// Takes references to avoid consuming the resource/scope before `build_metric_tags()`.
 fn build_otlp_sidecar_data(
@@ -327,7 +378,7 @@ fn build_otlp_sidecar_data(
         if !res.attributes.is_empty() {
             sidecar.insert(
                 "resource_attributes".into(),
-                kv_list_into_value(res.attributes.clone()),
+                kv_list_into_typed_value(res.attributes.clone()),
             );
         }
         if res.dropped_attributes_count > 0 {
@@ -342,7 +393,7 @@ fn build_otlp_sidecar_data(
         if !scope.attributes.is_empty() {
             sidecar.insert(
                 "scope_attributes".into(),
-                kv_list_into_value(scope.attributes.clone()),
+                kv_list_into_typed_value(scope.attributes.clone()),
             );
         }
         if !scope.name.is_empty() {
@@ -362,7 +413,7 @@ fn build_otlp_sidecar_data(
     if !data_point_attributes.is_empty() {
         sidecar.insert(
             "data_point_attributes".into(),
-            kv_list_into_value(data_point_attributes.to_vec()),
+            kv_list_into_typed_value(data_point_attributes.to_vec()),
         );
     }
 
@@ -1089,6 +1140,15 @@ mod tests {
             .and_then(|v| v.as_object())
     }
 
+    /// Extract the inner value from a typed-wrapper sidecar value.
+    /// e.g. {"int_value": 42} → ("int_value", &Value::Integer(42))
+    fn unwrap_typed(v: &Value) -> (&str, &Value) {
+        let obj = v.as_object().expect("typed value should be an Object");
+        assert_eq!(obj.len(), 1, "typed wrapper should have exactly one key");
+        let (k, v) = obj.iter().next().unwrap();
+        (k.as_str(), v)
+    }
+
     #[test]
     fn test_sidecar_preserves_typed_resource_attributes() {
         let rm = ResourceMetrics {
@@ -1130,20 +1190,25 @@ mod tests {
             .and_then(|v| v.as_object())
             .expect("resource_attributes should be an object");
 
-        // Types are preserved via From<PBValue> for Value
-        assert_eq!(
-            res_attrs.get("http.status_code").unwrap(),
-            &Value::Integer(200)
-        );
-        assert_eq!(res_attrs.get("http.ok").unwrap(), &Value::Boolean(true));
-        match res_attrs.get("load.avg").unwrap() {
+        // Each value is wrapped by its OTLP kind
+        let (kind, val) = unwrap_typed(res_attrs.get("http.status_code").unwrap());
+        assert_eq!(kind, "int_value");
+        assert_eq!(val, &Value::Integer(200));
+
+        let (kind, val) = unwrap_typed(res_attrs.get("http.ok").unwrap());
+        assert_eq!(kind, "bool_value");
+        assert_eq!(val, &Value::Boolean(true));
+
+        let (kind, val) = unwrap_typed(res_attrs.get("load.avg").unwrap());
+        assert_eq!(kind, "double_value");
+        match val {
             Value::Float(f) => assert!((f.into_inner() - 0.75).abs() < f64::EPSILON),
             other => panic!("Expected Float, got {other:?}"),
         }
-        assert_eq!(
-            res_attrs.get("service.name").unwrap(),
-            &Value::from("web".to_string())
-        );
+
+        let (kind, val) = unwrap_typed(res_attrs.get("service.name").unwrap());
+        assert_eq!(kind, "string_value");
+        assert_eq!(val, &Value::from("web".to_string()));
     }
 
     #[test]
@@ -1185,8 +1250,13 @@ mod tests {
             .and_then(|v| v.as_object())
             .expect("data_point_attributes should be an object");
 
-        assert_eq!(dp_attrs.get("count").unwrap(), &Value::Integer(42));
-        assert_eq!(dp_attrs.get("is_error").unwrap(), &Value::Boolean(false));
+        let (kind, val) = unwrap_typed(dp_attrs.get("count").unwrap());
+        assert_eq!(kind, "int_value");
+        assert_eq!(val, &Value::Integer(42));
+
+        let (kind, val) = unwrap_typed(dp_attrs.get("is_error").unwrap());
+        assert_eq!(kind, "bool_value");
+        assert_eq!(val, &Value::Boolean(false));
     }
 
     #[test]
@@ -1218,7 +1288,9 @@ mod tests {
             .get("scope_attributes")
             .and_then(|v| v.as_object())
             .expect("scope_attributes should be an object");
-        assert_eq!(scope_attrs.get("lib.debug").unwrap(), &Value::Boolean(true));
+        let (kind, val) = unwrap_typed(scope_attrs.get("lib.debug").unwrap());
+        assert_eq!(kind, "bool_value");
+        assert_eq!(val, &Value::Boolean(true));
     }
 
     #[test]
