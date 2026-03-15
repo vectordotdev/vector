@@ -1,6 +1,6 @@
 use std::{num::NonZeroU32, time::Duration};
 
-use governor::{Quota, clock};
+use governor::{Quota, clock, clock::Reference};
 use snafu::Snafu;
 use vector_lib::{EstimatedJsonEncodedSizeOf, TimeZone, compile_vrl};
 use vrl::compiler::{CompileConfig, Program, TypeState, runtime::Runtime};
@@ -68,6 +68,12 @@ impl KeyUtilization {
             tokens_consumed: 0,
             tokens_threshold,
         }
+    }
+
+    const fn reset(&mut self) {
+        self.events_consumed = 0;
+        self.bytes_consumed = 0;
+        self.tokens_consumed = 0;
     }
 
     fn ratio(&self, threshold_type: ThresholdType) -> f64 {
@@ -215,6 +221,9 @@ pub struct ThrottleState<C: clock::Clock> {
     events_threshold: u64,
     bytes_threshold: u64,
     tokens_threshold: u64,
+    clock: C,
+    flush_keys_interval: Duration,
+    utilization_window_start: Option<C::Instant>,
 }
 
 impl<C> ThrottleState<C>
@@ -285,6 +294,22 @@ where
         exceeded: Option<ThresholdType>,
     ) {
         self.events_processed += 1;
+
+        // Reset utilization counters when the rate limiter window rolls over.
+        // Without this reset, the ratio grows monotonically over the process
+        // lifetime, making alerting on `throttle_utilization_ratio > 0.8`
+        // meaningless after the first window is exhausted.
+        let now = self.clock.now();
+        let window_rolled = match self.utilization_window_start {
+            Some(start) => now.duration_since(start) >= self.flush_keys_interval.into(),
+            None => true,
+        };
+        if window_rolled {
+            self.utilization_window_start = Some(now);
+            for u in self.utilization.values_mut() {
+                u.reset();
+            }
+        }
 
         // Bound utilization map to prevent unbounded memory growth from
         // high-cardinality key fields. Skip tracking new keys once at capacity.
@@ -532,6 +557,9 @@ where
             events_threshold: self.events_threshold,
             bytes_threshold: self.bytes_threshold,
             tokens_threshold: self.tokens_threshold,
+            clock: self.clock,
+            flush_keys_interval: self.flush_keys_interval,
+            utilization_window_start: None,
         }
     }
 }
