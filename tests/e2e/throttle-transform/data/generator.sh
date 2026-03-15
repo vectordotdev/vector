@@ -7,9 +7,11 @@ VECTOR_URL="${VECTOR_URL:-http://vector:9090}"
 TOTAL="${TOTAL_EVENTS:-200}"
 DELAY="${EVENT_DELAY_MS:-10}"
 
-# Wait for Vector to be ready
+# Wait for Vector to be ready.
+# The http_server source accepts POST on /, so use a POST with an empty JSON
+# body for the readiness probe rather than GET (which may return 405).
 echo "Waiting for Vector at $VECTOR_URL ..."
-until wget -qO /dev/null "$VECTOR_URL" 2>/dev/null; do
+until wget -qO /dev/null --post-data='{}' --header='Content-Type: application/json' "$VECTOR_URL" 2>/dev/null; do
   sleep 0.5
 done
 echo "Vector is ready."
