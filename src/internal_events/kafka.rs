@@ -157,12 +157,8 @@ impl InternalEvent for KafkaStatisticsReceived<'_> {
                     "partition" => partition_id.to_string(),
                 )
                 .absolute(partition.rxbytes);
-            }
-        }
 
-        if self.expose_lag_metrics {
-            for (topic_id, topic) in &self.statistics.topics {
-                for (partition_id, partition) in &topic.partitions {
+                if self.expose_lag_metrics {
                     gauge!(
                         "kafka_consumer_lag",
                         "topic_id" => topic_id.clone(),
