@@ -10,10 +10,7 @@
 use std::time::Duration;
 
 use bytes::BytesMut;
-use criterion::{
-    BatchSize, BenchmarkGroup, Criterion, SamplingMode, Throughput, criterion_group,
-    measurement::WallTime,
-};
+use criterion::{Criterion, Throughput, criterion_group};
 use tokio_util::codec::Encoder;
 use vector::event::{Event, LogEvent};
 use vector_lib::{
@@ -190,8 +187,7 @@ fn build_otlp_serializer() -> Serializer {
 // ============================================================================
 
 fn otlp(c: &mut Criterion) {
-    let mut group: BenchmarkGroup<WallTime> = c.benchmark_group("otlp_encoding");
-    group.sampling_mode(SamplingMode::Auto);
+    let mut group = c.benchmark_group("otlp_encoding");
 
     let native_log = create_native_log();
     let preformatted_log = create_preformatted_otlp_log();
@@ -199,48 +195,50 @@ fn otlp(c: &mut Criterion) {
 
     // ========================================================================
     // SINGLE EVENT COMPARISON
+    // Serializer and BytesMut are reused across iterations to avoid measuring
+    // one-time setup and allocation costs.
     // ========================================================================
     group.throughput(Throughput::Bytes(event_size));
 
     // NEW: Native → auto-convert → encode
     let native_event = Event::Log(native_log.clone());
-    group.bench_with_input("1_NEW_auto_convert", &(), |b, ()| {
-        b.iter_batched(
-            || build_otlp_serializer(),
-            |mut encoder| {
-                let mut bytes = BytesMut::new();
+    {
+        let mut encoder = build_otlp_serializer();
+        let mut bytes = BytesMut::with_capacity(4096);
+        group.bench_function("1_NEW_auto_convert", |b| {
+            b.iter(|| {
+                bytes.clear();
                 encoder.encode(native_event.clone(), &mut bytes).unwrap();
-            },
-            BatchSize::SmallInput,
-        )
-    });
+            })
+        });
+    }
 
     // OLD: VRL transform + encode (full pipeline)
     let native_for_vrl = native_log.clone();
-    group.bench_with_input("2_OLD_vrl_transform_encode", &(), |b, ()| {
-        b.iter_batched(
-            || build_otlp_serializer(),
-            |mut encoder| {
+    {
+        let mut encoder = build_otlp_serializer();
+        let mut bytes = BytesMut::with_capacity(4096);
+        group.bench_function("2_OLD_vrl_transform_encode", |b| {
+            b.iter(|| {
+                bytes.clear();
                 let transformed = simulate_vrl_transform(&native_for_vrl);
-                let mut bytes = BytesMut::new();
                 encoder.encode(Event::Log(transformed), &mut bytes).unwrap();
-            },
-            BatchSize::SmallInput,
-        )
-    });
+            })
+        });
+    }
 
     // OLD: Passthrough only (encode only, no transform)
     let preformatted = Event::Log(preformatted_log.clone());
-    group.bench_with_input("3_OLD_passthrough_only", &(), |b, ()| {
-        b.iter_batched(
-            || build_otlp_serializer(),
-            |mut encoder| {
-                let mut bytes = BytesMut::new();
+    {
+        let mut encoder = build_otlp_serializer();
+        let mut bytes = BytesMut::with_capacity(4096);
+        group.bench_function("3_OLD_passthrough_only", |b| {
+            b.iter(|| {
+                bytes.clear();
                 encoder.encode(preformatted.clone(), &mut bytes).unwrap();
-            },
-            BatchSize::SmallInput,
-        )
-    });
+            })
+        });
+    }
 
     // ========================================================================
     // BATCH COMPARISON (Production Scenario)
@@ -249,32 +247,32 @@ fn otlp(c: &mut Criterion) {
     let batch_size: u64 = batch.iter().map(|e| e.size_of() as u64).sum();
     group.throughput(Throughput::Bytes(batch_size));
 
-    group.bench_with_input("4_NEW_batch_100", &batch, |b, batch| {
-        b.iter_batched(
-            || build_otlp_serializer(),
-            |mut encoder| {
+    {
+        let mut encoder = build_otlp_serializer();
+        let mut bytes = BytesMut::with_capacity(4096);
+        group.bench_function("4_NEW_batch_100", |b| {
+            b.iter(|| {
                 for log in batch.iter() {
-                    let mut bytes = BytesMut::new();
+                    bytes.clear();
                     encoder.encode(Event::Log(log.clone()), &mut bytes).unwrap();
                 }
-            },
-            BatchSize::SmallInput,
-        )
-    });
+            })
+        });
+    }
 
-    group.bench_with_input("5_OLD_batch_100_vrl", &batch, |b, batch| {
-        b.iter_batched(
-            || build_otlp_serializer(),
-            |mut encoder| {
+    {
+        let mut encoder = build_otlp_serializer();
+        let mut bytes = BytesMut::with_capacity(4096);
+        group.bench_function("5_OLD_batch_100_vrl", |b| {
+            b.iter(|| {
                 for log in batch.iter() {
+                    bytes.clear();
                     let transformed = simulate_vrl_transform(log);
-                    let mut bytes = BytesMut::new();
                     encoder.encode(Event::Log(transformed), &mut bytes).unwrap();
                 }
-            },
-            BatchSize::SmallInput,
-        )
-    });
+            })
+        });
+    }
 
     // ========================================================================
     // LARGE EVENT (Stress Test)
@@ -282,16 +280,16 @@ fn otlp(c: &mut Criterion) {
     let large_log = Event::Log(create_large_native_log());
     group.throughput(Throughput::Bytes(large_log.size_of() as u64));
 
-    group.bench_with_input("6_NEW_large_70_attrs", &(), |b, ()| {
-        b.iter_batched(
-            || build_otlp_serializer(),
-            |mut encoder| {
-                let mut bytes = BytesMut::new();
+    {
+        let mut encoder = build_otlp_serializer();
+        let mut bytes = BytesMut::with_capacity(4096);
+        group.bench_function("6_NEW_large_70_attrs", |b| {
+            b.iter(|| {
+                bytes.clear();
                 encoder.encode(large_log.clone(), &mut bytes).unwrap();
-            },
-            BatchSize::SmallInput,
-        )
-    });
+            })
+        });
+    }
 
     group.finish();
 }
