@@ -90,6 +90,15 @@ pub fn init(color: bool, json: bool, levels: &str, internal_log_rate_limit: u64)
         subscriber.with(allocation_layer)
     };
 
+    #[cfg(all(target_os = "linux", feature = "component-probes"))]
+    let subscriber = {
+        let probes_layer =
+            crate::internal_telemetry::component_probes::ComponentProbesLayer::new()
+                .with_filter(LevelFilter::ERROR);
+
+        subscriber.with(probes_layer)
+    };
+
     if json {
         let formatter = tracing_subscriber::fmt::layer().json().flatten_event(true);
 
