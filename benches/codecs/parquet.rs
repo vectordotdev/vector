@@ -1,0 +1,266 @@
+#![cfg(feature = "codecs-parquet")]
+
+use std::time::Duration;
+
+use bytes::BytesMut;
+use criterion::{
+    BatchSize, BenchmarkGroup, Criterion, SamplingMode, Throughput, criterion_group,
+    measurement::WallTime,
+};
+use tokio_util::codec::Encoder;
+use vector::event::{Event, LogEvent};
+use vector_lib::{
+    btreemap,
+    codecs::{
+        JsonSerializerConfig, NewlineDelimitedEncoder,
+        encoding::{
+            Framer,
+            format::{
+                ParquetCompression, ParquetFieldType, ParquetSchemaField, ParquetSerializerConfig,
+                SchemaMode,
+            },
+        },
+    },
+};
+
+fn make_events(count: usize) -> Vec<Event> {
+    (0..count)
+        .map(|i| {
+            Event::Log(LogEvent::from(btreemap! {
+                "message" => format!("log message number {} with some realistic content for benchmarking", i),
+                "host" => format!("host-{}", i % 10),
+                "level" => if i % 3 == 0 { "error" } else if i % 3 == 1 { "warn" } else { "info" },
+                "status_code" => (200 + (i % 5) * 100) as i64,
+            }))
+        })
+        .collect()
+}
+
+fn make_parquet_serializer(
+    compression: ParquetCompression,
+) -> vector_lib::codecs::encoding::format::ParquetSerializer {
+    let config = ParquetSerializerConfig {
+        schema: vec![
+            ParquetSchemaField {
+                name: "message".into(),
+                data_type: ParquetFieldType::Utf8,
+                fields: Vec::new(), items: None, key_type: None, value_type: None,
+            },
+            ParquetSchemaField {
+                name: "host".into(),
+                data_type: ParquetFieldType::Utf8,
+                fields: Vec::new(), items: None, key_type: None, value_type: None,
+            },
+            ParquetSchemaField {
+                name: "level".into(),
+                data_type: ParquetFieldType::Utf8,
+                fields: Vec::new(), items: None, key_type: None, value_type: None,
+            },
+            ParquetSchemaField {
+                name: "status_code".into(),
+                data_type: ParquetFieldType::Int64,
+                fields: Vec::new(), items: None, key_type: None, value_type: None,
+            },
+        ],
+        compression,
+        schema_mode: SchemaMode::Relaxed,
+        ..Default::default()
+    };
+    vector_lib::codecs::encoding::format::ParquetSerializer::new(config).unwrap()
+}
+
+fn make_parquet_serializer_native(
+    compression: ParquetCompression,
+) -> vector_lib::codecs::encoding::format::ParquetSerializer {
+    let config = ParquetSerializerConfig {
+        parquet_schema: Some(
+            "message logs {\n  required binary message (STRING);\n  required binary host (STRING);\n  required binary level (STRING);\n  optional int64 status_code;\n}".to_string(),
+        ),
+        compression,
+        schema_mode: SchemaMode::Relaxed,
+        ..Default::default()
+    };
+    vector_lib::codecs::encoding::format::ParquetSerializer::new(config).unwrap()
+}
+
+fn make_parquet_serializer_avro(
+    compression: ParquetCompression,
+) -> vector_lib::codecs::encoding::format::ParquetSerializer {
+    let config = ParquetSerializerConfig {
+        avro_schema: Some(
+            r#"{"type":"record","name":"logs","fields":[{"name":"message","type":"string"},{"name":"host","type":"string"},{"name":"level","type":"string"},{"name":"status_code","type":["null","long"]}]}"#.to_string(),
+        ),
+        compression,
+        schema_mode: SchemaMode::Relaxed,
+        ..Default::default()
+    };
+    vector_lib::codecs::encoding::format::ParquetSerializer::new(config).unwrap()
+}
+
+fn parquet_encoder(c: &mut Criterion) {
+    let mut group: BenchmarkGroup<WallTime> = c.benchmark_group("parquet_encoder");
+    group.sampling_mode(SamplingMode::Auto);
+
+    let batch_sizes = [10, 100, 1000];
+
+    for batch_size in batch_sizes {
+        let events = make_events(batch_size);
+
+        // Parquet Snappy (default)
+        group.throughput(Throughput::Elements(batch_size as u64));
+        group.bench_function(format!("parquet_snappy_{}_events", batch_size), |b| {
+            b.iter_batched(
+                || {
+                    (
+                        make_parquet_serializer(ParquetCompression::Snappy),
+                        events.clone(),
+                    )
+                },
+                |(mut encoder, events)| {
+                    let mut bytes = BytesMut::new();
+                    encoder.encode(events, &mut bytes).unwrap();
+                    bytes
+                },
+                BatchSize::SmallInput,
+            )
+        });
+
+        // Parquet Zstd
+        group.throughput(Throughput::Elements(batch_size as u64));
+        group.bench_function(format!("parquet_zstd_{}_events", batch_size), |b| {
+            b.iter_batched(
+                || {
+                    (
+                        make_parquet_serializer(ParquetCompression::Zstd),
+                        events.clone(),
+                    )
+                },
+                |(mut encoder, events)| {
+                    let mut bytes = BytesMut::new();
+                    encoder.encode(events, &mut bytes).unwrap();
+                    bytes
+                },
+                BatchSize::SmallInput,
+            )
+        });
+
+        // Parquet None (uncompressed)
+        group.throughput(Throughput::Elements(batch_size as u64));
+        group.bench_function(format!("parquet_none_{}_events", batch_size), |b| {
+            b.iter_batched(
+                || {
+                    (
+                        make_parquet_serializer(ParquetCompression::None),
+                        events.clone(),
+                    )
+                },
+                |(mut encoder, events)| {
+                    let mut bytes = BytesMut::new();
+                    encoder.encode(events, &mut bytes).unwrap();
+                    bytes
+                },
+                BatchSize::SmallInput,
+            )
+        });
+
+        // NDJSON baseline (uncompressed)
+        group.throughput(Throughput::Elements(batch_size as u64));
+        group.bench_function(format!("ndjson_raw_{}_events", batch_size), |b| {
+            b.iter_batched(
+                || {
+                    let encoder = vector::codecs::Encoder::<Framer>::new(
+                        NewlineDelimitedEncoder::default().into(),
+                        JsonSerializerConfig::default().build().into(),
+                    );
+                    (encoder, events.clone())
+                },
+                |(mut encoder, events)| {
+                    let mut bytes = BytesMut::new();
+                    for event in events {
+                        encoder.encode(event, &mut bytes).unwrap();
+                    }
+                    bytes
+                },
+                BatchSize::SmallInput,
+            )
+        });
+
+        // Parquet Snappy via native Parquet schema
+        group.throughput(Throughput::Elements(batch_size as u64));
+        group.bench_function(
+            format!("parquet_native_schema_snappy_{}_events", batch_size),
+            |b| {
+                b.iter_batched(
+                    || {
+                        (
+                            make_parquet_serializer_native(ParquetCompression::Snappy),
+                            events.clone(),
+                        )
+                    },
+                    |(mut encoder, events)| {
+                        let mut bytes = BytesMut::new();
+                        encoder.encode(events, &mut bytes).unwrap();
+                        bytes
+                    },
+                    BatchSize::SmallInput,
+                )
+            },
+        );
+
+        // Parquet Snappy via Avro schema
+        group.throughput(Throughput::Elements(batch_size as u64));
+        group.bench_function(
+            format!("parquet_avro_schema_snappy_{}_events", batch_size),
+            |b| {
+                b.iter_batched(
+                    || {
+                        (
+                            make_parquet_serializer_avro(ParquetCompression::Snappy),
+                            events.clone(),
+                        )
+                    },
+                    |(mut encoder, events)| {
+                        let mut bytes = BytesMut::new();
+                        encoder.encode(events, &mut bytes).unwrap();
+                        bytes
+                    },
+                    BatchSize::SmallInput,
+                )
+            },
+        );
+
+        // NDJSON + Snappy (encode then compress, matching S3 sink pipeline)
+        group.throughput(Throughput::Elements(batch_size as u64));
+        group.bench_function(format!("ndjson_snappy_{}_events", batch_size), |b| {
+            b.iter_batched(
+                || {
+                    let encoder = vector::codecs::Encoder::<Framer>::new(
+                        NewlineDelimitedEncoder::default().into(),
+                        JsonSerializerConfig::default().build().into(),
+                    );
+                    (encoder, events.clone())
+                },
+                |(mut encoder, events)| {
+                    let mut bytes = BytesMut::new();
+                    for event in events {
+                        encoder.encode(event, &mut bytes).unwrap();
+                    }
+                    let compressed = snap::raw::Encoder::new().compress_vec(&bytes).unwrap();
+                    compressed
+                },
+                BatchSize::SmallInput,
+            )
+        });
+    }
+
+    group.finish();
+}
+
+criterion_group!(
+    name = benches;
+    config = Criterion::default()
+        .warm_up_time(Duration::from_secs(3))
+        .measurement_time(Duration::from_secs(10))
+        .sample_size(50);
+    targets = parquet_encoder
+);
