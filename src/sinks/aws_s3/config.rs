@@ -272,7 +272,16 @@ impl S3SinkConfig {
         #[cfg(feature = "codecs-parquet")]
         if let Some(batch_config) = &self.batch_encoding {
             let batch_serializer = batch_config.build_batch_serializer()?;
-            let encoder = EncoderKind::Batch(Box::new(BatchEncoder::new(batch_serializer)));
+            let batch_encoder = BatchEncoder::new(batch_serializer);
+
+            // Auto-detect Content-Type from batch format. Users can still
+            // override via `options.content_type`; we only set it when unset.
+            let mut api_options = self.options.clone();
+            if api_options.content_type.is_none() {
+                api_options.content_type = Some(batch_encoder.content_type().to_string());
+            }
+
+            let encoder = EncoderKind::Batch(Box::new(batch_encoder));
 
             // Auto-detect file extension from batch format
             let filename_extension =
@@ -287,7 +296,7 @@ impl S3SinkConfig {
 
             let request_options = S3RequestOptions {
                 bucket: self.bucket.clone(),
-                api_options: self.options.clone(),
+                api_options,
                 filename_extension,
                 filename_time_format: self.filename_time_format.clone(),
                 filename_append_uuid: self.filename_append_uuid,
@@ -344,4 +353,5 @@ mod tests {
     fn generate_config() {
         crate::test_util::test_generate_config::<S3SinkConfig>();
     }
+
 }
