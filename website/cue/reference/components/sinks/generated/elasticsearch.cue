@@ -24,7 +24,7 @@ generated: components: sinks: elasticsearch: configuration: {
 				[global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
 				"""
 			required: false
-			type: bool: {}
+			type: bool: default: null
 		}
 	}
 	api_version: {
@@ -214,20 +214,29 @@ generated: components: sinks: elasticsearch: configuration: {
 	aws: {
 		description: "Configuration of the region/endpoint to use when interacting with an AWS service."
 		required:    false
-		type: object: options: {
-			endpoint: {
-				description: "Custom endpoint for use with AWS-compatible services."
-				required:    false
-				type: string: examples: ["http://127.0.0.0:5000/path/to/service"]
-			}
-			region: {
-				description: """
-					The [AWS region][aws_region] of the target service.
+		type: object: {
+			default: null
+			options: {
+				endpoint: {
+					description: "Custom endpoint for use with AWS-compatible services."
+					required:    false
+					type: string: {
+						default: null
+						examples: ["http://127.0.0.0:5000/path/to/service"]
+					}
+				}
+				region: {
+					description: """
+						The [AWS region][aws_region] of the target service.
 
-					[aws_region]: https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints
-					"""
-				required: false
-				type: string: examples: ["us-east-1"]
+						[aws_region]: https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints
+						"""
+					required: false
+					type: string: {
+						default: null
+						examples: ["us-east-1"]
+					}
+				}
 			}
 		}
 	}
@@ -244,20 +253,23 @@ generated: components: sinks: elasticsearch: configuration: {
 					"""
 				required: false
 				type: uint: {
-					default: 10000000
+					default: null
 					unit:    "bytes"
 				}
 			}
 			max_events: {
 				description: "The maximum size of a batch before it is flushed."
 				required:    false
-				type: uint: unit: "events"
+				type: uint: {
+					default: null
+					unit:    "events"
+				}
 			}
 			timeout_secs: {
 				description: "The maximum age of a batch before it is flushed."
 				required:    false
 				type: float: {
-					default: 1.0
+					default: null
 					unit:    "seconds"
 				}
 			}
@@ -294,12 +306,16 @@ generated: components: sinks: elasticsearch: configuration: {
 			template_fallback_index: {
 				description: "The default index to write events to if the template in `bulk.index` cannot be resolved"
 				required:    false
-				type: string: examples: ["test-index"]
+				type: string: {
+					default: null
+					examples: ["test-index"]
+				}
 			}
 			version: {
 				description: "Version field value."
 				required:    false
 				type: string: {
+					default: null
 					examples: ["{{ obj_version }}-%Y-%m-%d", "123"]
 					syntax: "template"
 				}
@@ -362,55 +378,58 @@ generated: components: sinks: elasticsearch: configuration: {
 	data_stream: {
 		description: "Elasticsearch data stream mode configuration."
 		required:    false
-		type: object: options: {
-			auto_routing: {
-				description: """
-					Automatically routes events by deriving the data stream name using specific event fields.
+		type: object: {
+			default: null
+			options: {
+				auto_routing: {
+					description: """
+						Automatically routes events by deriving the data stream name using specific event fields.
 
-					The format of the data stream name is `<type>-<dataset>-<namespace>`, where each value comes
-					from the `data_stream` configuration field of the same name.
+						The format of the data stream name is `<type>-<dataset>-<namespace>`, where each value comes
+						from the `data_stream` configuration field of the same name.
 
-					If enabled, the value of the `data_stream.type`, `data_stream.dataset`, and
-					`data_stream.namespace` event fields are used if they are present. Otherwise, the values
-					set in this configuration are used.
-					"""
-				required: false
-				type: bool: default: true
-			}
-			dataset: {
-				description: "The data stream dataset used to construct the data stream at index time."
-				required:    false
-				type: string: {
-					default: "generic"
-					examples: ["generic", "nginx", "{{ service }}"]
-					syntax: "template"
+						If enabled, the value of the `data_stream.type`, `data_stream.dataset`, and
+						`data_stream.namespace` event fields are used if they are present. Otherwise, the values
+						set in this configuration are used.
+						"""
+					required: false
+					type: bool: default: true
 				}
-			}
-			namespace: {
-				description: "The data stream namespace used to construct the data stream at index time."
-				required:    false
-				type: string: {
-					default: "default"
-					examples: ["{{ environment }}"]
-					syntax: "template"
+				dataset: {
+					description: "The data stream dataset used to construct the data stream at index time."
+					required:    false
+					type: string: {
+						default: "generic"
+						examples: ["generic", "nginx", "{{ service }}"]
+						syntax: "template"
+					}
 				}
-			}
-			sync_fields: {
-				description: """
-					Automatically adds and syncs the `data_stream.*` event fields if they are missing from the event.
+				namespace: {
+					description: "The data stream namespace used to construct the data stream at index time."
+					required:    false
+					type: string: {
+						default: "default"
+						examples: ["{{ environment }}"]
+						syntax: "template"
+					}
+				}
+				sync_fields: {
+					description: """
+						Automatically adds and syncs the `data_stream.*` event fields if they are missing from the event.
 
-					This ensures that fields match the name of the data stream that is receiving events.
-					"""
-				required: false
-				type: bool: default: true
-			}
-			type: {
-				description: "The data stream type used to construct the data stream at index time."
-				required:    false
-				type: string: {
-					default: "logs"
-					examples: ["metrics", "synthetics", "{{ type }}"]
-					syntax: "template"
+						This ensures that fields match the name of the data stream that is receiving events.
+						"""
+					required: false
+					type: bool: default: true
+				}
+				type: {
+					description: "The data stream type used to construct the data stream at index time."
+					required:    false
+					type: string: {
+						default: "logs"
+						examples: ["metrics", "synthetics", "{{ type }}"]
+						syntax: "template"
+					}
 				}
 			}
 		}
@@ -418,21 +437,24 @@ generated: components: sinks: elasticsearch: configuration: {
 	distribution: {
 		description: "Options for determining the health of an endpoint."
 		required:    false
-		type: object: options: {
-			retry_initial_backoff_secs: {
-				description: "Initial delay between attempts to reactivate endpoints once they become unhealthy."
-				required:    false
-				type: uint: {
-					default: 1
-					unit:    "seconds"
+		type: object: {
+			default: null
+			options: {
+				retry_initial_backoff_secs: {
+					description: "Initial delay between attempts to reactivate endpoints once they become unhealthy."
+					required:    false
+					type: uint: {
+						default: 1
+						unit:    "seconds"
+					}
 				}
-			}
-			retry_max_duration_secs: {
-				description: "Maximum delay between attempts to reactivate endpoints once they become unhealthy."
-				required:    false
-				type: uint: {
-					default: 3600
-					unit:    "seconds"
+				retry_max_duration_secs: {
+					description: "Maximum delay between attempts to reactivate endpoints once they become unhealthy."
+					required:    false
+					type: uint: {
+						default: 3600
+						unit:    "seconds"
+					}
 				}
 			}
 		}
@@ -456,23 +478,32 @@ generated: components: sinks: elasticsearch: configuration: {
 			except_fields: {
 				description: "List of fields that are excluded from the encoded event."
 				required:    false
-				type: array: items: type: string: {}
+				type: array: {
+					default: null
+					items: type: string: {}
+				}
 			}
 			only_fields: {
 				description: "List of fields that are included in the encoded event."
 				required:    false
-				type: array: items: type: string: {}
+				type: array: {
+					default: null
+					items: type: string: {}
+				}
 			}
 			timestamp_format: {
 				description: "Format used for timestamp fields."
 				required:    false
-				type: string: enum: {
-					rfc3339:    "Represent the timestamp as a RFC 3339 timestamp."
-					unix:       "Represent the timestamp as a Unix timestamp."
-					unix_float: "Represent the timestamp as a Unix timestamp in floating point."
-					unix_ms:    "Represent the timestamp as a Unix timestamp in milliseconds."
-					unix_ns:    "Represent the timestamp as a Unix timestamp in nanoseconds."
-					unix_us:    "Represent the timestamp as a Unix timestamp in microseconds."
+				type: string: {
+					default: null
+					enum: {
+						rfc3339:    "Represent the timestamp as a RFC 3339 timestamp."
+						unix:       "Represent the timestamp as a Unix timestamp."
+						unix_float: "Represent the timestamp as a Unix timestamp in floating point."
+						unix_ms:    "Represent the timestamp as a Unix timestamp in milliseconds."
+						unix_ns:    "Represent the timestamp as a Unix timestamp in nanoseconds."
+						unix_us:    "Represent the timestamp as a Unix timestamp in microseconds."
+					}
 				}
 			}
 		}
@@ -487,7 +518,7 @@ generated: components: sinks: elasticsearch: configuration: {
 			hostname or IP address and port.
 			"""
 		required: false
-		type: string: {}
+		type: string: default: null
 	}
 	endpoints: {
 		description: """
@@ -519,60 +550,66 @@ generated: components: sinks: elasticsearch: configuration: {
 			[perf_doc]: https://www.elastic.co/guide/en/elasticsearch/reference/master/tune-for-indexing-speed.html#_use_auto_generated_ids
 			"""
 		required: false
-		type: string: examples: ["id", "_id"]
+		type: string: {
+			default: null
+			examples: ["id", "_id"]
+		}
 	}
 	metrics: {
 		description: "Configuration for the `metric_to_log` transform."
 		required:    false
-		type: object: options: {
-			host_tag: {
-				description: """
-					Name of the tag in the metric to use for the source host.
+		type: object: {
+			default: null
+			options: {
+				host_tag: {
+					description: """
+						Name of the tag in the metric to use for the source host.
 
-					If present, the value of the tag is set on the generated log event in the `host` field,
-					where the field key uses the [global `host_key` option][global_log_schema_host_key].
+						If present, the value of the tag is set on the generated log event in the `host` field,
+						where the field key uses the [global `host_key` option][global_log_schema_host_key].
 
-					[global_log_schema_host_key]: https://vector.dev/docs/reference/configuration//global-options#log_schema.host_key
-					"""
-				required: false
-				type: string: examples: ["host", "hostname"]
-			}
-			metric_tag_values: {
-				description: """
-					Controls how metric tag values are encoded.
+						[global_log_schema_host_key]: https://vector.dev/docs/reference/configuration//global-options#log_schema.host_key
+						"""
+					required: false
+					type: string: examples: ["host", "hostname"]
+				}
+				metric_tag_values: {
+					description: """
+						Controls how metric tag values are encoded.
 
-					When set to `single`, only the last non-bare value of tags is displayed with the
-					metric.  When set to `full`, all metric tags are exposed as separate assignments as
-					described by [the `native_json` codec][vector_native_json].
+						When set to `single`, only the last non-bare value of tags is displayed with the
+						metric.  When set to `full`, all metric tags are exposed as separate assignments as
+						described by [the `native_json` codec][vector_native_json].
 
-					[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
-					"""
-				required: false
-				type: string: {
-					default: "single"
-					enum: {
-						full: "All tags are exposed as arrays of either string or null values."
-						single: """
+						[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
+						"""
+					required: false
+					type: string: {
+						default: "single"
+						enum: {
+							full: "All tags are exposed as arrays of either string or null values."
+							single: """
 															Tag values are exposed as single strings, the same as they were before this config
 															option. Tags with multiple values show the last assigned value, and null values
 															are ignored.
 															"""
+						}
 					}
 				}
-			}
-			timezone: {
-				description: """
-					The name of the time zone to apply to timestamp conversions that do not contain an explicit
-					time zone.
+				timezone: {
+					description: """
+						The name of the time zone to apply to timestamp conversions that do not contain an explicit
+						time zone.
 
-					This overrides the [global `timezone`][global_timezone] option. The time zone name may be
-					any name in the [TZ database][tz_database] or `local` to indicate system local time.
+						This overrides the [global `timezone`][global_timezone] option. The time zone name may be
+						any name in the [TZ database][tz_database] or `local` to indicate system local time.
 
-					[global_timezone]: https://vector.dev/docs/reference/configuration//global-options#timezone
-					[tz_database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
-					"""
-				required: false
-				type: string: examples: ["local", "America/New_York", "EST5EDT"]
+						[global_timezone]: https://vector.dev/docs/reference/configuration//global-options#timezone
+						[tz_database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+						"""
+					required: false
+					type: string: examples: ["local", "America/New_York", "EST5EDT"]
+				}
 			}
 		}
 	}
@@ -608,12 +645,16 @@ generated: components: sinks: elasticsearch: configuration: {
 	pipeline: {
 		description: "The name of the pipeline to apply."
 		required:    false
-		type: string: examples: ["pipeline-name"]
+		type: string: {
+			default: null
+			examples: ["pipeline-name"]
+		}
 	}
 	query: {
 		description: "Custom parameters to add to the query string for each HTTP request sent to Elasticsearch."
 		required:    false
 		type: object: {
+			default: null
 			examples: [{
 				"X-Powered-By": "Vector"
 			}]
@@ -656,9 +697,17 @@ generated: components: sinks: elasticsearch: configuration: {
 					unstable performance and sink behavior. Proceed with caution.
 					"""
 				required: false
-				type: object: options: {
-					decrease_ratio: {
-						description: """
+				type: object: {
+					default: {
+						decrease_ratio:        0.9
+						ewma_alpha:            0.4
+						initial_concurrency:   1
+						max_concurrency_limit: 200
+						rtt_deviation_scale:   2.5
+					}
+					options: {
+						decrease_ratio: {
+							description: """
 																The fraction of the current value to set the new concurrency limit when decreasing the limit.
 
 																Valid values are greater than `0` and less than `1`. Smaller values cause the algorithm to scale back rapidly
@@ -666,11 +715,11 @@ generated: components: sinks: elasticsearch: configuration: {
 
 																**Note**: The new limit is rounded down after applying this ratio.
 																"""
-						required: false
-						type: float: default: 0.9
-					}
-					ewma_alpha: {
-						description: """
+							required: false
+							type: float: default: 0.9
+						}
+						ewma_alpha: {
+							description: """
 																The weighting of new measurements compared to older measurements.
 
 																Valid values are greater than `0` and less than `1`.
@@ -679,31 +728,31 @@ generated: components: sinks: elasticsearch: configuration: {
 																the current RTT. Smaller values cause this reference to adjust more slowly, which may be useful if a service has
 																unusually high response variability.
 																"""
-						required: false
-						type: float: default: 0.4
-					}
-					initial_concurrency: {
-						description: """
+							required: false
+							type: float: default: 0.4
+						}
+						initial_concurrency: {
+							description: """
 																The initial concurrency limit to use. If not specified, the initial limit is 1 (no concurrency).
 
 																Datadog recommends setting this value to your service's average limit if you're seeing that it takes a
 																long time to ramp up adaptive concurrency after a restart. You can find this value by looking at the
 																`adaptive_concurrency_limit` metric.
 																"""
-						required: false
-						type: uint: default: 1
-					}
-					max_concurrency_limit: {
-						description: """
+							required: false
+							type: uint: default: 1
+						}
+						max_concurrency_limit: {
+							description: """
 																The maximum concurrency limit.
 
 																The adaptive request concurrency limit does not go above this bound. This is put in place as a safeguard.
 																"""
-						required: false
-						type: uint: default: 200
-					}
-					rtt_deviation_scale: {
-						description: """
+							required: false
+							type: uint: default: 200
+						}
+						rtt_deviation_scale: {
+							description: """
 																Scale of RTT deviations which are not considered anomalous.
 
 																Valid values are greater than or equal to `0`, and reasonable values range from `1.0` to `3.0`.
@@ -713,8 +762,9 @@ generated: components: sinks: elasticsearch: configuration: {
 																can ignore increases in RTT that are within an expected range. This factor is used to scale up the deviation to
 																an appropriate range. Larger values cause the algorithm to ignore larger increases in the RTT.
 																"""
-						required: false
-						type: float: default: 2.5
+							required: false
+							type: float: default: 2.5
+						}
 					}
 				}
 			}
@@ -728,27 +778,24 @@ generated: components: sinks: elasticsearch: configuration: {
 				required: false
 				type: {
 					string: {
-						default: "adaptive"
-						enum: {
-							adaptive: """
+						const: {
+							description: """
 															Concurrency is managed by Vector's [Adaptive Request Concurrency][arc] feature.
 
 															[arc]: https://vector.dev/docs/architecture/arc/
 															"""
-							none: """
-															A fixed concurrency of 1.
-
-															Only one request can be outstanding at any given time.
-															"""
+							value: "adaptive"
 						}
+						default: "adaptive"
 					}
-					uint: {}
+					uint: default: "adaptive"
 				}
 			}
 			headers: {
 				description: "Additional HTTP headers to add to every HTTP request."
 				required:    false
 				type: object: {
+					default: {}
 					examples: [{
 						Accept:               "text/plain"
 						"X-Event-Level":      "{{level}}"
@@ -866,94 +913,97 @@ generated: components: sinks: elasticsearch: configuration: {
 	tls: {
 		description: "TLS configuration."
 		required:    false
-		type: object: options: {
-			alpn_protocols: {
-				description: """
-					Sets the list of supported ALPN protocols.
+		type: object: {
+			default: null
+			options: {
+				alpn_protocols: {
+					description: """
+						Sets the list of supported ALPN protocols.
 
-					Declare the supported ALPN protocols, which are used during negotiation with a peer. They are prioritized in the order
-					that they are defined.
-					"""
-				required: false
-				type: array: items: type: string: examples: ["h2"]
-			}
-			ca_file: {
-				description: """
-					Absolute path to an additional CA certificate file.
+						Declare the supported ALPN protocols, which are used during negotiation with a peer. They are prioritized in the order
+						that they are defined.
+						"""
+					required: false
+					type: array: items: type: string: examples: ["h2"]
+				}
+				ca_file: {
+					description: """
+						Absolute path to an additional CA certificate file.
 
-					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
-					"""
-				required: false
-				type: string: examples: ["/path/to/certificate_authority.crt"]
-			}
-			crt_file: {
-				description: """
-					Absolute path to a certificate file used to identify this server.
+						The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
+						"""
+					required: false
+					type: string: examples: ["/path/to/certificate_authority.crt"]
+				}
+				crt_file: {
+					description: """
+						Absolute path to a certificate file used to identify this server.
 
-					The certificate must be in DER, PEM (X.509), or PKCS#12 format. Additionally, the certificate can be provided as
-					an inline string in PEM format.
+						The certificate must be in DER, PEM (X.509), or PKCS#12 format. Additionally, the certificate can be provided as
+						an inline string in PEM format.
 
-					If this is set _and_ is not a PKCS#12 archive, `key_file` must also be set.
-					"""
-				required: false
-				type: string: examples: ["/path/to/host_certificate.crt"]
-			}
-			key_file: {
-				description: """
-					Absolute path to a private key file used to identify this server.
+						If this is set _and_ is not a PKCS#12 archive, `key_file` must also be set.
+						"""
+					required: false
+					type: string: examples: ["/path/to/host_certificate.crt"]
+				}
+				key_file: {
+					description: """
+						Absolute path to a private key file used to identify this server.
 
-					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
-					"""
-				required: false
-				type: string: examples: ["/path/to/host_certificate.key"]
-			}
-			key_pass: {
-				description: """
-					Passphrase used to unlock the encrypted key file.
+						The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
+						"""
+					required: false
+					type: string: examples: ["/path/to/host_certificate.key"]
+				}
+				key_pass: {
+					description: """
+						Passphrase used to unlock the encrypted key file.
 
-					This has no effect unless `key_file` is set.
-					"""
-				required: false
-				type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
-			}
-			server_name: {
-				description: """
-					Server name to use when using Server Name Indication (SNI).
+						This has no effect unless `key_file` is set.
+						"""
+					required: false
+					type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
+				}
+				server_name: {
+					description: """
+						Server name to use when using Server Name Indication (SNI).
 
-					Only relevant for outgoing connections.
-					"""
-				required: false
-				type: string: examples: ["www.example.com"]
-			}
-			verify_certificate: {
-				description: """
-					Enables certificate verification. For components that create a server, this requires that the
-					client connections have a valid client certificate. For components that initiate requests,
-					this validates that the upstream has a valid certificate.
+						Only relevant for outgoing connections.
+						"""
+					required: false
+					type: string: examples: ["www.example.com"]
+				}
+				verify_certificate: {
+					description: """
+						Enables certificate verification. For components that create a server, this requires that the
+						client connections have a valid client certificate. For components that initiate requests,
+						this validates that the upstream has a valid certificate.
 
-					If enabled, certificates must not be expired and must be issued by a trusted
-					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
-					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
-					so on, until the verification process reaches a root certificate.
+						If enabled, certificates must not be expired and must be issued by a trusted
+						issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
+						certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
+						so on, until the verification process reaches a root certificate.
 
-					Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
-					"""
-				required: false
-				type: bool: {}
-			}
-			verify_hostname: {
-				description: """
-					Enables hostname verification.
+						Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
+						"""
+					required: false
+					type: bool: {}
+				}
+				verify_hostname: {
+					description: """
+						Enables hostname verification.
 
-					If enabled, the hostname used to connect to the remote host must be present in the TLS certificate presented by
-					the remote host, either as the Common Name or as an entry in the Subject Alternative Name extension.
+						If enabled, the hostname used to connect to the remote host must be present in the TLS certificate presented by
+						the remote host, either as the Common Name or as an entry in the Subject Alternative Name extension.
 
-					Only relevant for outgoing connections.
+						Only relevant for outgoing connections.
 
-					Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
-					"""
-				required: false
-				type: bool: {}
+						Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
+						"""
+					required: false
+					type: bool: {}
+				}
 			}
 		}
 	}

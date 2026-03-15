@@ -24,7 +24,7 @@ generated: components: sinks: statsd: configuration: {
 				[global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
 				"""
 			required: false
-			type: bool: {}
+			type: bool: default: null
 		}
 	}
 	address: {
@@ -52,7 +52,7 @@ generated: components: sinks: statsd: configuration: {
 					"""
 				required: false
 				type: uint: {
-					default: 1300
+					default: null
 					unit:    "bytes"
 				}
 			}
@@ -60,7 +60,7 @@ generated: components: sinks: statsd: configuration: {
 				description: "The maximum size of a batch before it is flushed."
 				required:    false
 				type: uint: {
-					default: 1000
+					default: null
 					unit:    "events"
 				}
 			}
@@ -68,7 +68,7 @@ generated: components: sinks: statsd: configuration: {
 				description: "The maximum age of a batch before it is flushed."
 				required:    false
 				type: float: {
-					default: 1.0
+					default: null
 					unit:    "seconds"
 				}
 			}

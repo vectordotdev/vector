@@ -16,6 +16,7 @@ generated: components: transforms: configuration: {
 				"""
 			required: false
 			type: object: {
+				default: {}
 				examples: [{
 					color: "red"
 					name:  "Example Node"

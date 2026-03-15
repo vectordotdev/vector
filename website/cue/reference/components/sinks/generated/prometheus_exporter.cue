@@ -24,7 +24,7 @@ generated: components: sinks: prometheus_exporter: configuration: {
 				[global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
 				"""
 			required: false
-			type: bool: {}
+			type: bool: default: null
 		}
 	}
 	address: {
