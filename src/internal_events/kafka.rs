@@ -129,16 +129,36 @@ impl InternalEvent for KafkaStatisticsReceived<'_> {
         counter!("kafka_requests_bytes_total").absolute(self.statistics.tx_bytes as u64);
         counter!("kafka_responses_total").absolute(self.statistics.rx as u64);
         counter!("kafka_responses_bytes_total").absolute(self.statistics.rx_bytes as u64);
-        counter!("kafka_produced_messages_total").absolute(self.statistics.txmsgs as u64);
-        counter!("kafka_produced_messages_bytes_total")
-            .absolute(self.statistics.txmsg_bytes as u64);
-        counter!("kafka_consumed_messages_total").absolute(self.statistics.rxmsgs as u64);
-        counter!("kafka_consumed_messages_bytes_total")
-            .absolute(self.statistics.rxmsg_bytes as u64);
 
-        if self.expose_lag_metrics {
-            for (topic_id, topic) in &self.statistics.topics {
-                for (partition_id, partition) in &topic.partitions {
+        // Emit per-topic, per-partition message metrics
+        for (topic_id, topic) in &self.statistics.topics {
+            for (partition_id, partition) in &topic.partitions {
+                counter!(
+                    "kafka_produced_messages_total",
+                    "topic" => topic_id.clone(),
+                    "partition" => partition_id.to_string(),
+                )
+                .absolute(partition.txmsgs);
+                counter!(
+                    "kafka_produced_messages_bytes_total",
+                    "topic" => topic_id.clone(),
+                    "partition" => partition_id.to_string(),
+                )
+                .absolute(partition.txbytes);
+                counter!(
+                    "kafka_consumed_messages_total",
+                    "topic" => topic_id.clone(),
+                    "partition" => partition_id.to_string(),
+                )
+                .absolute(partition.rxmsgs);
+                counter!(
+                    "kafka_consumed_messages_bytes_total",
+                    "topic" => topic_id.clone(),
+                    "partition" => partition_id.to_string(),
+                )
+                .absolute(partition.rxbytes);
+
+                if self.expose_lag_metrics {
                     gauge!(
                         "kafka_consumer_lag",
                         "topic_id" => topic_id.clone(),
