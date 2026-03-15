@@ -1,0 +1,26 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+exporters:
+  otlp/vector-grpc:
+    endpoint: vector-otel-native-e2e:4317
+    tls:
+      insecure: true
+  otlphttp/vector-http:
+    endpoint: http://vector-otel-native-e2e:4318
+    tls:
+      insecure: true
+
+service:
+  pipelines:
+    logs/grpc:
+      receivers: [otlp]
+      exporters: [otlp/vector-grpc]
+    logs/http:
+      receivers: [otlp]
+      exporters: [otlphttp/vector-http]

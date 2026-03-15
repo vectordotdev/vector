@@ -1,0 +1,28 @@
+features:
+  - e2e-tests-opentelemetry
+
+test: "e2e"
+
+test_filter: "opentelemetry::native::"
+
+runner:
+  needs_docker_socket: true
+  env:
+    OTEL_COLLECTOR_SOURCE_GRPC_PORT: '4317'
+    OTEL_COLLECTOR_SOURCE_HTTP_PORT: '4318'
+    OTEL_COLLECTOR_SINK_HTTP_PORT: '5318'
+
+matrix:
+  # Determines which `otel/opentelemetry-collector-contrib` version to use
+  collector_version: [ 'latest' ]
+  # Test both native conversion and native with modifications
+  vector_config: [ 'vector_native.yaml', 'vector_native_modified.yaml' ]
+
+# Trigger this test when OTEL source/sink or codec files change
+paths:
+  - "src/sources/opentelemetry/**"
+  - "src/sinks/opentelemetry/**"
+  - "src/internal_events/opentelemetry_*"
+  - "tests/e2e/opentelemetry-native/**"
+  - "lib/codecs/src/**/otlp.rs"
+  - "lib/opentelemetry-proto/src/**"
