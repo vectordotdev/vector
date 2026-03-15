@@ -609,6 +609,7 @@ impl RunningTopology {
         for key in &removed_sinks {
             debug!(component_id = %key, "Removing sink.");
             self.remove_inputs(key, diff, new_config).await;
+            self.remove_outputs(key);
 
             if let Some(registry) = self.utilization_registry.as_ref() {
                 registry.remove_component(key);
@@ -633,6 +634,7 @@ impl RunningTopology {
 
         for key in &sinks_to_change {
             debug!(component_id = %key, "Changing sink.");
+            self.remove_outputs(key);
             if reuse_buffers.contains(key) {
                 self.detach_triggers
                     .remove(key)
@@ -722,7 +724,8 @@ impl RunningTopology {
             }
 
             for key in &diff.sinks.to_remove {
-                // Sinks only have inputs
+                // Sinks can have both inputs and outputs.
+                self.outputs_tap_metadata.remove(key);
                 self.inputs_tap_metadata.remove(key);
             }
 
@@ -776,6 +779,15 @@ impl RunningTopology {
                 }
             }
 
+            for key in diff.sinks.changed_and_added() {
+                if let Some(task) = new_pieces.tasks.get(key)
+                    && new_pieces.outputs.contains_key(key)
+                {
+                    self.outputs_tap_metadata
+                        .insert(key.clone(), ("sink", task.typetag().to_string()));
+                }
+            }
+
             for (key, input) in &new_pieces.inputs {
                 self.inputs_tap_metadata
                     .insert(key.clone(), input.1.clone());
@@ -803,6 +815,18 @@ impl RunningTopology {
         // need them to be available to any transforms and sinks that come afterwards.
         for key in diff.transforms.changed_and_added() {
             debug!(component_id = %key, "Configuring outputs for transform.");
+            self.setup_outputs(key, new_pieces).await;
+        }
+
+        let sink_keys_with_outputs = diff
+            .sinks
+            .changed_and_added()
+            .filter(|key| new_pieces.outputs.contains_key(*key))
+            .cloned()
+            .collect::<Vec<_>>();
+
+        for key in &sink_keys_with_outputs {
+            debug!(component_id = %key, "Configuring outputs for sink.");
             self.setup_outputs(key, new_pieces).await;
         }
 
@@ -885,8 +909,7 @@ impl RunningTopology {
                         .map(|key| key.to_string())
                         .chain(added_changed_tables.iter().map(|key| key.to_string()))
                         .collect(),
-                    // Note, only sources and transforms are relevant. Sinks do
-                    // not have outputs to tap.
+                    // Sources, transforms, and some sinks can expose outputs to tap.
                     removals,
                 })
                 .expect("Couldn't broadcast config changes.");

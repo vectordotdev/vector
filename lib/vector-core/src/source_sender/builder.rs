@@ -5,7 +5,7 @@ use vector_buffers::topology::channel::LimitedReceiver;
 use vector_common::internal_event::DEFAULT_OUTPUT;
 
 use super::{CHUNK_SIZE, LAG_TIME_NAME, Output, SourceSender, SourceSenderItem};
-use crate::config::{ComponentKey, OutputId, SourceOutput};
+use crate::config::{ComponentKey, OutputId, SinkOutput, SourceOutput};
 
 pub struct Builder {
     buf_size: usize,
@@ -51,6 +51,47 @@ impl Builder {
     pub fn add_source_output(
         &mut self,
         output: SourceOutput,
+        component_key: ComponentKey,
+    ) -> LimitedReceiver<SourceSenderItem> {
+        let lag_time = self.lag_time.clone();
+        let log_definition = output.schema_definition.clone();
+        let output_id = OutputId {
+            component: component_key,
+            port: output.port.clone(),
+        };
+        match output.port {
+            None => {
+                let (output, rx) = Output::new_with_buffer(
+                    self.buf_size,
+                    DEFAULT_OUTPUT.to_owned(),
+                    lag_time,
+                    log_definition,
+                    output_id,
+                    self.timeout,
+                    self.ewma_half_life_seconds,
+                );
+                self.default_output = Some(output);
+                rx
+            }
+            Some(name) => {
+                let (output, rx) = Output::new_with_buffer(
+                    self.buf_size,
+                    name.clone(),
+                    lag_time,
+                    log_definition,
+                    output_id,
+                    self.timeout,
+                    self.ewma_half_life_seconds,
+                );
+                self.named_outputs.insert(name, output);
+                rx
+            }
+        }
+    }
+
+    pub fn add_sink_output(
+        &mut self,
+        output: SinkOutput,
         component_key: ComponentKey,
     ) -> LimitedReceiver<SourceSenderItem> {
         let lag_time = self.lag_time.clone();

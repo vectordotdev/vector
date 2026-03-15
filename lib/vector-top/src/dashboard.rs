@@ -373,7 +373,7 @@ impl<'a> Widgets<'a> {
                         .map(Cell::from)
                         .collect::<Vec<_>>();
                     data[1] = Cell::from(id.as_str());
-                    data[5] = Cell::from(sent_events_metric);
+                    data[6] = Cell::from(sent_events_metric);
                     items.push(Row::new(data).style(Style::default()));
                 }
             }

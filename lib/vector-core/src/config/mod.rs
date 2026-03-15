@@ -191,6 +191,72 @@ impl SourceOutput {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct SinkOutput {
+    pub port: Option<String>,
+    pub ty: DataType,
+
+    // NOTE: schema definitions are only implemented/supported for log-type events. There is no
+    // inherent blocker to support other types as well, but it'll require additional work to add
+    // the relevant schemas, and store them separately in this type.
+    pub schema_definition: Option<Arc<schema::Definition>>,
+}
+
+impl SinkOutput {
+    #[must_use]
+    pub fn new_maybe_logs(ty: DataType, schema_definition: schema::Definition) -> Self {
+        let schema_definition = ty
+            .contains(DataType::Log)
+            .then(|| Arc::new(schema_definition));
+
+        Self {
+            port: None,
+            ty,
+            schema_definition,
+        }
+    }
+
+    #[must_use]
+    pub fn new_metrics() -> Self {
+        Self {
+            port: None,
+            ty: DataType::Metric,
+            schema_definition: None,
+        }
+    }
+
+    #[must_use]
+    pub fn new_traces() -> Self {
+        Self {
+            port: None,
+            ty: DataType::Trace,
+            schema_definition: None,
+        }
+    }
+
+    #[must_use]
+    pub fn schema_definition(&self, schema_enabled: bool) -> Option<schema::Definition> {
+        use std::ops::Deref;
+
+        self.schema_definition.as_ref().map(|definition| {
+            if schema_enabled {
+                definition.deref().clone()
+            } else {
+                let mut new_definition =
+                    schema::Definition::default_for_namespace(definition.log_namespaces());
+                new_definition.add_meanings(definition.meanings());
+                new_definition
+            }
+        })
+    }
+
+    #[must_use]
+    pub fn with_port(mut self, name: impl Into<String>) -> Self {
+        self.port = Some(name.into());
+        self
+    }
+}
+
 fn fmt_helper(
     f: &mut fmt::Formatter<'_>,
     maybe_port: Option<&String>,
@@ -204,6 +270,12 @@ fn fmt_helper(
 }
 
 impl fmt::Display for SourceOutput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt_helper(f, self.port.as_ref(), self.ty)
+    }
+}
+
+impl fmt::Display for SinkOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt_helper(f, self.port.as_ref(), self.ty)
     }

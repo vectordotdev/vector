@@ -254,6 +254,20 @@ pub fn check_outputs(config: &ConfigBuilder) -> Result<(), Vec<String>> {
         }
     }
 
+    for (key, sink) in config.sinks.iter() {
+        if sink
+            .inner
+            .outputs(config.schema.log_namespace())
+            .iter()
+            .map(|output| output.port.as_deref().unwrap_or(""))
+            .any(|name| name == DEFAULT_OUTPUT)
+        {
+            errors.push(format!(
+                "Sink {key} cannot have a named output with reserved name: `{DEFAULT_OUTPUT}`"
+            ));
+        }
+    }
+
     if errors.is_empty() {
         Ok(())
     } else {

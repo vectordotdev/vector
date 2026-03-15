@@ -13,7 +13,7 @@ use vrl::value::Kind;
 
 use crate::{
     codecs::Transformer,
-    config::{AcknowledgementsConfig, DataType, Input, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, DataType, Input, SinkConfig, SinkContext, SinkOutput},
     event::{EventRef, LogEvent, Value},
     http::{HttpClient, QueryParameters},
     internal_events::TemplateRenderingError,
@@ -28,8 +28,8 @@ use crate::{
             sink::ElasticsearchSink,
         },
         util::{
-            BatchConfig, Compression, RealtimeSizeBasedDefaultBatchSettings, http::RequestConfig,
-            service::HealthConfig,
+            BatchConfig, Compression, RealtimeSizeBasedDefaultBatchSettings, SinkDlq,
+            http::RequestConfig, service::HealthConfig,
         },
     },
     template::Template,
@@ -550,13 +550,20 @@ impl SinkConfig for ElasticsearchConfig {
 
         let health_config = self.endpoint_health.clone().unwrap_or_default();
 
+        let dlq = SinkDlq::from_context(&cx, "elasticsearch");
+
         let services = commons
             .iter()
             .map(|common| {
                 let endpoint = common.base_url.clone();
 
                 let http_request_builder = HttpRequestBuilder::new(common, self);
-                let service = ElasticsearchService::new(client.clone(), http_request_builder);
+                let service = ElasticsearchService::new(
+                    client.clone(),
+                    http_request_builder,
+                    self.request_retry_partial,
+                    dlq.clone(),
+                );
 
                 (endpoint, service)
             })
@@ -590,6 +597,10 @@ impl SinkConfig for ElasticsearchConfig {
         let requirements = Requirement::empty().optional_meaning("timestamp", Kind::timestamp());
 
         Input::new(DataType::Metric | DataType::Log).with_schema_requirement(requirements)
+    }
+
+    fn outputs(&self, _global_log_namespace: vector_lib::config::LogNamespace) -> Vec<SinkOutput> {
+        vec![SinkDlq::log_output()]
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
