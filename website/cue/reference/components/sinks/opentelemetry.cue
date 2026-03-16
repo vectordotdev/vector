@@ -53,7 +53,7 @@ components: sinks: opentelemetry: {
 				- `scope_schema_url` — Mapped to `ScopeMetrics.schema_url` (not an attribute)
 				- `scope.*` (other) — Stripped of prefix and placed into `InstrumentationScope.attributes[]`
 
-				All other tags are placed into the data point `attributes[]` array unchanged.
+				All other tags are added to the data point `attributes[]` array unchanged.
 
 				This means native metrics that happen to use `resource.*` or `scope.*` tag names for non-OTLP purposes will have
 				those tags routed into the OTLP resource/scope structures rather than remaining as flat data point attributes.
