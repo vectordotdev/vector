@@ -802,7 +802,7 @@ impl observability::Service for ObservabilityService {
             let mut rng = SmallRng::seed_from_u64(seed);
             let mut batch = 0;
 
-            loop {
+            'tap: loop {
                 select! {
                     Some(tap_payload) = tokio_stream::StreamExt::next(&mut tap_rx) => {
                         // Convert TapPayload to OutputEvent(s)
@@ -813,7 +813,7 @@ impl observability::Service for ObservabilityService {
                             if matches!(event.event, Some(output_event::Event::Notification(_))) {
                                 if let Err(err) = event_tx.send(vec![event]).await {
                                     debug!(message = "Couldn't send notification.", error = ?err);
-                                    break;
+                                    break 'tap;
                                 }
                             } else {
                                 // Reservoir sampling (Algorithm R).
