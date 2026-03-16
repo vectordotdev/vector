@@ -137,6 +137,7 @@ dsmith
 DVB
 ede
 emoji
+emojis
 emqx
 enableable
 Enot
@@ -145,7 +146,9 @@ EPC
 esbuild
 esensar
 etld
+eventcreate
 eventloop
+Evt
 Evercoss
 exactlyonce
 Explay
@@ -276,6 +279,7 @@ KDL
 keepappkey
 keephq
 kenton
+keybinds
 Kingcom
 Kolkata
 konqueror
@@ -496,6 +500,7 @@ Telstra
 Tencent
 Texet
 Thl
+timediff
 timeframe
 timeseries
 timespan
@@ -556,3 +561,6 @@ zstandard
 ZTE
 Zync
 sighup
+CLAUDE
+linting
+lexers

@@ -31,11 +31,11 @@ jobs:
           - arm-unknown-linux-musleabi
     steps:
       - name: Checkout branch
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ inputs.ref }}
 
-      - uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
+      - uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
         name: Cache Cargo registry + index
         with:
           path: |
@@ -55,7 +55,7 @@ jobs:
       # aarch64 and musl in particular are notoriously hard to link.
       # While it may be tempting to slot a `check` in here for quickness, please don't.
       - run: make cross-build-${{ matrix.target }}
-      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+      - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: "vector-debug-${{ matrix.target }}"
           path: "./target/${{ matrix.target }}/debug/vector"
