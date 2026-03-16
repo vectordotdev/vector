@@ -15,7 +15,7 @@ vector top --url http://localhost:8686
 ```
 
 * The GraphQL API (HTTP endpoint `/graphql`, WebSocket subscriptions, and the GraphQL Playground at `/playground`) has been removed.
-You can interact with the new gRPC API using tools like [grpcurl](https://github.com/fullstorydev/grpcurl).
+You can interact with the new gRPC API using tools like [grpcurl](https://github.com/fullstorydev/grpcurl):
 
 ```bash
 # Check health
