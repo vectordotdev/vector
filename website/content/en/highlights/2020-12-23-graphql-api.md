@@ -11,7 +11,7 @@ badges:
   domains: ["api"]
 ---
 
-{{< warning >}} Since Vector version X we migrated the API from GraphQL to gRPC.
+{{< warning >}} Since Vector version 0.55.0 we migrated the API from GraphQL to gRPC.
 {{< /warning >}}
 
 Vector now has a [GraphQL] API that you can use for a variety of purposes:

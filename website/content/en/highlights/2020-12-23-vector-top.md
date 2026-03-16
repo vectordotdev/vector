@@ -12,7 +12,7 @@ badges:
   domains: ["cli", "observability"]
 ---
 
-{{< warning >}} Since Vector version X we migrated the API from GraphQL to gRPC.
+{{< warning >}} Since Vector version 0.55.0 we migrated the API from GraphQL to gRPC.
 `vector top` continues to work as before. {{< /warning >}}
 
 [`vector top`][top] is a command for the Vector [CLI] that displays both metrics

@@ -11,7 +11,7 @@ badges:
   domains: ["graphql", "cli", "observability"]
 ---
 
-{{< warning >}} Since Vector version X we migrated the API from GraphQL to gRPC.
+{{< warning >}} Since Vector version 0.55.0 we migrated the API from GraphQL to gRPC.
 `vector tap` continues to work as before. {{< /warning >}}
 
 Vector 0.13 introduces a new [`vector tap`][tap] subcommand that allows for
