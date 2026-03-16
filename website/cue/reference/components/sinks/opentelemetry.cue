@@ -55,8 +55,7 @@ components: sinks: opentelemetry: {
 
 				All other tags are added to the data point `attributes[]` array unchanged.
 
-				This means native metrics that happen to use `resource.*` or `scope.*` tag names for non-OTLP purposes will have
-				those tags routed into the OTLP resource/scope structures rather than remaining as flat data point attributes.
+				This means native metrics that use `resource.*` or `scope.*` tag names for non-OTLP purposes are routed to the OTLP resource and scope structures rather than remaining as flat data point attributes.
 				This is the expected behavior when round-tripping OTLP metrics through Vector, but may be surprising for metrics
 				from non-OTLP sources that coincidentally use these prefixes.
 
