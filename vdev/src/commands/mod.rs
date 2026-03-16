@@ -72,7 +72,6 @@ mod check;
 mod complete;
 mod crate_versions;
 mod e2e;
-mod exec;
 mod features;
 mod fmt;
 mod info;
@@ -92,7 +91,6 @@ cli_commands! {
     complete,
     crate_versions,
     e2e,
-    exec,
     features,
     fmt,
     info,
