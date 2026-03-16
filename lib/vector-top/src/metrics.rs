@@ -7,7 +7,7 @@ use std::{
 use glob::Pattern;
 use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
-use vector_api_client::{Client, proto::Component};
+use vector_api_client::{Client, proto::{Component, ComponentType}};
 
 use crate::state::{self, OutputMetrics, SentEventsMetric};
 use vector_common::config::ComponentKey;
@@ -33,7 +33,10 @@ async fn poll_components(
     components_patterns: Arc<Vec<Pattern>>,
 ) {
     let mut known_components: std::collections::HashSet<String> = std::collections::HashSet::new();
-    let poll_interval = Duration::from_millis(interval_ms as u64);
+    // Always poll at least once per second regardless of the metrics update interval,
+    // to avoid excessive GetComponents calls when the interval is very short (e.g. 100ms).
+    const MIN_POLL_INTERVAL_MS: u64 = 1000;
+    let poll_interval = Duration::from_millis((interval_ms as u64).max(MIN_POLL_INTERVAL_MS));
     let mut consecutive_errors = 0;
     const MAX_CONSECUTIVE_ERRORS: u32 = 3;
 
@@ -88,8 +91,13 @@ fn component_to_row(component: &Component) -> state::ComponentRow {
 
     state::ComponentRow {
         key: key.clone(),
-        kind: component.on_type.clone(),
-        component_type: format!("{:?}", component.component_type()),
+        kind: match component.component_type() {
+            ComponentType::Source => "source",
+            ComponentType::Transform => "transform",
+            ComponentType::Sink => "sink",
+        }
+        .to_string(),
+        component_type: component.on_type.clone(), // actual plugin type e.g. "demo_logs", "kafka"
         outputs: component
             .outputs
             .iter()
@@ -452,7 +460,7 @@ pub async fn subscribe(
 
     // Helper to create and connect a new client
     let create_client = || async {
-        let mut client = Client::new(url.as_str()).await?;
+        let mut client = Client::new(url.as_str());
         client.connect().await?;
         Ok::<Client, vector_api_client::Error>(client)
     };
@@ -539,7 +547,7 @@ pub async fn init_components(
     url: &str,
     components_patterns: &[Pattern],
 ) -> Result<state::State, vector_api_client::Error> {
-    let mut client = Client::new(url).await?;
+    let mut client = Client::new(url);
     client.connect().await?;
 
     // Get all components

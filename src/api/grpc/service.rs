@@ -154,6 +154,17 @@ impl observability::Service for ObservabilityService {
         let metrics = controller.capture_metrics();
         let component_metrics_map = extract_component_metrics(&metrics);
 
+        // Build a lookup from component_id -> actual plugin type name (e.g. "demo_logs", "kafka").
+        // TapOutput carries component_type for every component that has at least one output,
+        // which covers all sources and transforms. Sinks have no outputs so they won't appear here.
+        let mut type_map: HashMap<String, String> = HashMap::new();
+        for tap_output in tap_resource.outputs.keys() {
+            type_map.insert(
+                tap_output.output_id.component.to_string(),
+                tap_output.component_type.clone(),
+            );
+        }
+
         // Collect all component keys and their types
         let mut components = Vec::new();
         let mut seen_keys = HashSet::new();
@@ -162,10 +173,14 @@ impl observability::Service for ObservabilityService {
         for source_key in &tap_resource.source_keys {
             if seen_keys.insert(source_key.clone()) {
                 let metrics = component_metrics_map.get(source_key.as_str()).cloned();
+                let on_type = type_map
+                    .get(source_key.as_str())
+                    .cloned()
+                    .unwrap_or_else(|| "unknown".to_string());
                 components.push(ProtoComponent {
                     component_id: source_key.clone(),
                     component_type: ComponentType::Source as i32,
-                    on_type: "source".to_string(), // Generic type, actual type not available from TapResource
+                    on_type,
                     outputs: vec![],
                     metrics,
                 });
@@ -188,11 +203,15 @@ impl observability::Service for ObservabilityService {
                     ComponentType::Sink
                 };
 
+                let on_type = type_map
+                    .get(&key_str)
+                    .cloned()
+                    .unwrap_or_else(|| "unknown".to_string());
                 let metrics = component_metrics_map.get(&key_str).cloned();
                 components.push(ProtoComponent {
                     component_id: key_str,
                     component_type: component_type as i32,
-                    on_type: if has_outputs { "transform" } else { "sink" }.to_string(),
+                    on_type,
                     outputs: vec![],
                     metrics,
                 });
@@ -202,11 +221,15 @@ impl observability::Service for ObservabilityService {
         // Also explicitly add sinks from sink_keys if they weren't in inputs
         for sink_key in &tap_resource.sink_keys {
             if seen_keys.insert(sink_key.clone()) {
+                let on_type = type_map
+                    .get(sink_key.as_str())
+                    .cloned()
+                    .unwrap_or_else(|| "unknown".to_string());
                 let metrics = component_metrics_map.get(sink_key.as_str()).cloned();
                 components.push(ProtoComponent {
                     component_id: sink_key.clone(),
                     component_type: ComponentType::Sink as i32,
-                    on_type: "sink".to_string(),
+                    on_type,
                     outputs: vec![],
                     metrics,
                 });

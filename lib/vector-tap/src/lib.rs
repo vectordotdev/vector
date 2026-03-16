@@ -160,9 +160,22 @@ impl<'a> TapRunner<'a> {
         duration_ms: Option<u64>,
         quiet: bool,
     ) -> Result<(), TapExecutorError> {
-        let mut client = Client::new(self.url.as_str()).await?;
+        let mut client = Client::new(self.url.as_str());
         client.connect().await?;
+        self.run_tap_with_client(client, interval, limit, duration_ms, quiet)
+            .await
+    }
 
+    /// Run tap using a pre-connected client (avoids an extra connection round-trip when the
+    /// caller has already connected and health-checked the client).
+    pub async fn run_tap_with_client(
+        &self,
+        mut client: Client,
+        interval: i64,
+        limit: i64,
+        duration_ms: Option<u64>,
+        quiet: bool,
+    ) -> Result<(), TapExecutorError> {
         let request = OutputEventsRequest {
             outputs_patterns: self.output_patterns.clone(),
             inputs_patterns: self.input_patterns.clone(),
@@ -231,10 +244,13 @@ impl<'a> TapRunner<'a> {
         event_wrapper: &vector_api_client::proto::event::EventWrapper,
         format: TapEncodingFormat,
     ) -> Result<String, String> {
-        // Encode the vector-api-client EventWrapper to protobuf bytes
+        // INTENTIONAL round-trip through protobuf bytes: `vector_api_client` compiles
+        // `event.proto` independently to avoid taking a dependency on `vector_core` (a large
+        // crate with many features). Both types share the same proto schema, so encoding one
+        // and decoding the other is always safe. If the schemas ever diverge this will surface
+        // as a runtime decode error.
         let bytes = event_wrapper.encode_to_vec();
 
-        // Decode as vector-core EventWrapper
         let core_event_wrapper =
             vector_core::event::proto::EventWrapper::decode(Bytes::from(bytes))
                 .map_err(|e| format!("Failed to decode event: {}", e))?;

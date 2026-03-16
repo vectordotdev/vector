@@ -14,29 +14,7 @@ const RECONNECT_DELAY: u64 = 5000;
 /// Vector API server via HTTP/WebSockets.
 pub(crate) async fn cmd(opts: &super::Opts, signal_rx: SignalRx) -> exitcode::ExitCode {
     let url = opts.url();
-    // Return early with instructions for enabling the API if the endpoint isn't reachable
-    // via a healthcheck.
-    let mut client = match Client::new(url.as_str()).await {
-        Ok(c) => c,
-        Err(_) => {
-            #[allow(clippy::print_stderr)]
-            {
-                eprintln!(
-                    indoc::indoc! {"
-                    Vector API server isn't reachable ({}).
-
-                    Have you enabled the API?
-
-                    To enable the API, add the following to your Vector config file:
-
-                    [api]
-                        enabled = true"},
-                    url
-                );
-            }
-            return exitcode::UNAVAILABLE;
-        }
-    };
+    let mut client = Client::new(url.as_str());
 
     #[allow(clippy::print_stderr)]
     if client.connect().await.is_err() || client.health().await.is_err() {
@@ -55,11 +33,19 @@ pub(crate) async fn cmd(opts: &super::Opts, signal_rx: SignalRx) -> exitcode::Ex
         return exitcode::UNAVAILABLE;
     }
 
-    tap(opts, signal_rx).await
+    tap_internal(opts, signal_rx, Some(client)).await
 }
 
 /// Observe event flow from specified components
-pub async fn tap(opts: &super::Opts, mut signal_rx: SignalRx) -> exitcode::ExitCode {
+pub async fn tap(opts: &super::Opts, signal_rx: SignalRx) -> exitcode::ExitCode {
+    tap_internal(opts, signal_rx, None).await
+}
+
+async fn tap_internal(
+    opts: &super::Opts,
+    mut signal_rx: SignalRx,
+    initial_client: Option<Client>,
+) -> exitcode::ExitCode {
     let url = opts.url();
     let output_channel = OutputChannel::Stdout(EventFormatter::new(opts.meta, opts.format));
     let tap_runner = TapRunner::new(
@@ -69,16 +55,30 @@ pub async fn tap(opts: &super::Opts, mut signal_rx: SignalRx) -> exitcode::ExitC
         &output_channel,
     );
 
+    let mut client_opt = initial_client;
+
     loop {
         tokio::select! {
             biased;
             Ok(SignalTo::Shutdown(_) | SignalTo::Quit) = signal_rx.recv() => break,
-            exec_result = tap_runner.run_tap(
-                opts.interval as i64,
-                opts.limit as i64,
-                opts.duration_ms,
-                opts.quiet,
-            ) => {
+            exec_result = async {
+                if let Some(client) = client_opt.take() {
+                    tap_runner.run_tap_with_client(
+                        client,
+                        opts.interval as i64,
+                        opts.limit as i64,
+                        opts.duration_ms,
+                        opts.quiet,
+                    ).await
+                } else {
+                    tap_runner.run_tap(
+                        opts.interval as i64,
+                        opts.limit as i64,
+                        opts.duration_ms,
+                        opts.quiet,
+                    ).await
+                }
+            } => {
                 match exec_result {
                     Ok(_) => {
                         break;
@@ -93,8 +93,7 @@ pub async fn tap(opts: &super::Opts, mut signal_rx: SignalRx) -> exitcode::ExitC
                                     RECONNECT_DELAY / 1000);
                             }
                             tokio::time::sleep(Duration::from_millis(RECONNECT_DELAY)).await;
-                        }
-                        else {
+                        } else {
                             break;
                         }
                     }
