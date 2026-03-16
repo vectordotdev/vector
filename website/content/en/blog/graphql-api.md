@@ -9,22 +9,21 @@ badges:
 tags: ["graphql", "api", "metrics"]
 ---
 
-{{< warning >}}
-Since Vector version X we migrated the API from GraphQL to gRPC.
+{{< warning >}} Since Vector version X we migrated the API from GraphQL to gRPC.
 {{< /warning >}}
 
 Although Vector is an observability tool, it's nonetheless important to be able
 to observe Vector itself, especially in production environments where it serves
-as critical infrastructure. That's why we're excited to announce the new [Vector
-GraphQL API](https://vector.dev/docs/reference/api/), available in
+as critical infrastructure. That's why we're excited to announce the new
+[Vector GraphQL API](https://vector.dev/docs/reference/api/), available in
 [v0.11.0](https://vector.dev/releases/0.11.0/).
 
 The API enables ad-hoc querying of:
 
 - Your Vector topology, including
   [`sources`](https://vector.dev/docs/reference/configuration/sources/),
-  [`transforms`](https://vector.dev/docs/reference/configuration/transforms/) and
-  [`sinks`](https://vector.dev/docs/reference/configuration/sinks/).
+  [`transforms`](https://vector.dev/docs/reference/configuration/transforms/)
+  and [`sinks`](https://vector.dev/docs/reference/configuration/sinks/).
 - Uptime and health information.
 - Event processing, byte processing, and error metrics, both per component and
   in aggregate across the Vector instance.
@@ -54,8 +53,8 @@ encoding.codec = "text"
 ```
 
 You can then access
-[http://localhost:8686/playground](http://localhost:8686/playground) to get
-a live GraphQL playground to experiment with.
+[http://localhost:8686/playground](http://localhost:8686/playground) to get a
+live GraphQL playground to experiment with.
 
 Here are a few queries you can try:
 
@@ -216,9 +215,9 @@ We chose GraphQL over REST or gRPC for a few reasons:
 - Data can be streamed via subscriptions over WebSockets, making it ideal for
   high-frequency metrics and a pub/sub pattern for observing topology changes.
 - Data is returned in pure JSON, making it simple, readable, and easy to parse.
-- There's [great language/library
-  tooling](https://github.com/chentsulin/awesome-graphql), making it trivial to
-  interop with existing applications.
+- There's
+  [great language/library tooling](https://github.com/chentsulin/awesome-graphql),
+  making it trivial to interop with existing applications.
 - Compile-time type safety in Rust, via
   [async-graphql](https://github.com/async-graphql/async-graphql) (server) and
   [graphql-client](https://github.com/graphql-rust/graphql-client).
@@ -242,9 +241,9 @@ On Linux, Windows and macOS, you'll get an interface like this:
 ![Vector top](/img/blog/vector-top.png)
 
 This will display your configured components and metrics, updating every second
-(pass a millisecond `--interval` to adjust). If you run Vector in [watch
-mode](https://vector.dev/docs/reference/cli/#vector_watch_config), it'll even
-pick up topology changes automatically.
+(pass a millisecond `--interval` to adjust). If you run Vector in
+[watch mode](https://vector.dev/docs/reference/cli/#vector_watch_config), it'll
+even pick up topology changes automatically.
 
 I'll be telling you more about `vector top` soon in a dedicated blog post.
 
@@ -272,9 +271,9 @@ updates.
 GraphQL is an API protocol introduced by Facebook. You can learn more at
 [https://graphql.org](https://graphql.org)
 
-For clients and language support, check out [Awesome
-GraphQL](https://github.com/chentsulin/awesome-graphql), a curated list of
-libraries and other helpers.
+For clients and language support, check out
+[Awesome GraphQL](https://github.com/chentsulin/awesome-graphql), a curated list
+of libraries and other helpers.
 
 For a deeper dive into the currently supported fields in the Vector API, your
 best source of information is the "Docs" sidebar in the API playground. As a

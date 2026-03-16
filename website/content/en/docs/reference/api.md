@@ -5,7 +5,8 @@ weight: 6
 tags: ["api", "grpc"]
 ---
 
-Vector ships with a gRPC API that allows you to interact with a running Vector instance. This page covers how to configure and enable Vector's API.
+Vector ships with a gRPC API that allows you to interact with a running Vector
+instance. This page covers how to configure and enable Vector's API.
 
 ## Configuration
 
@@ -17,7 +18,8 @@ Vector ships with a gRPC API that allows you to interact with a running Vector i
 
 ## How it works
 
-The API exposes a gRPC service defined in `proto/vector/observability.proto`. You can interact with it using any standard gRPC tooling.
+The API exposes a gRPC service defined in `proto/vector/observability.proto`.
+You can interact with it using any standard gRPC tooling.
 
 ### Example using grpcurl
 
