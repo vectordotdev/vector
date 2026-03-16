@@ -130,7 +130,10 @@ pub fn schema_aware_nested_merge(base: &mut Value, override_val: &Value) {
 
         for (k, v) in over_obj {
             if k == "const"
-                && base_obj.contains_key("value")
+                && base_obj
+                    .get("const")
+                    .and_then(|c| c.as_object())
+                    .is_some_and(|c| c.contains_key("value"))
                 && v.as_object().is_some_and(|o| o.contains_key("value"))
             {
                 let base_vals = std::mem::take(base_obj.get_mut("const").unwrap());

@@ -19,7 +19,7 @@ generated: components: sources: journald: configuration: {
 		type: object: options: enabled: {
 			description: "Whether or not end-to-end acknowledgements are enabled for this source."
 			required:    false
-			type: bool: default: null
+			type: bool: {}
 		}
 	}
 	batch_size: {
@@ -51,10 +51,7 @@ generated: components: sources: journald: configuration: {
 			[global_data_dir]: https://vector.dev/docs/reference/configuration/global-options/#data_dir
 			"""
 		required: false
-		type: string: {
-			default: null
-			examples: ["/var/lib/vector"]
-		}
+		type: string: examples: ["/var/lib/vector"]
 	}
 	emit_cursor: {
 		description: """
@@ -157,7 +154,7 @@ generated: components: sources: journald: configuration: {
 			If not set, `journalctl` uses the default system journal path.
 			"""
 		required: false
-		type: string: default: null
+		type: string: {}
 	}
 	journal_namespace: {
 		description: """
@@ -170,7 +167,7 @@ generated: components: sources: journald: configuration: {
 			[journalctl-namespace-option]: https://www.freedesktop.org/software/systemd/man/journalctl.html#--namespace=NAMESPACE
 			"""
 		required: false
-		type: string: default: null
+		type: string: {}
 	}
 	journalctl_path: {
 		description: """
@@ -179,7 +176,7 @@ generated: components: sources: journald: configuration: {
 			If not set, a search is done for the `journalctl` path.
 			"""
 		required: false
-		type: string: default: null
+		type: string: {}
 	}
 	remap_priority: {
 		deprecated:         true

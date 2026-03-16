@@ -12,10 +12,7 @@ generated: components: sources: host_metrics: configuration: {
 			base: {
 				description: "The base cgroup name to provide metrics for."
 				required:    false
-				type: string: {
-					default: null
-					examples: ["/", "system.slice/snapd.service"]
-				}
+				type: string: examples: ["/", "system.slice/snapd.service"]
 			}
 			groups: {
 				description: """
@@ -24,10 +21,6 @@ generated: components: sources: host_metrics: configuration: {
 					"""
 				required: false
 				type: object: {
-					default: {
-						excludes: null
-						includes: null
-					}
 					examples: [{
 						excludes: ["*.service"]
 						includes: ["user.slice/*"]
@@ -40,10 +33,7 @@ generated: components: sources: host_metrics: configuration: {
 																The patterns are matched using globbing.
 																"""
 							required: false
-							type: array: {
-								default: null
-								items: type: string: {}
-							}
+							type: array: items: type: string: {}
 						}
 						includes: {
 							description: """
@@ -114,10 +104,6 @@ generated: components: sources: host_metrics: configuration: {
 				"""
 			required: false
 			type: object: {
-				default: {
-					excludes: null
-					includes: null
-				}
 				examples: [{
 					excludes: ["dm-*"]
 					includes: ["sda"]
@@ -130,10 +116,7 @@ generated: components: sources: host_metrics: configuration: {
 																The patterns are matched using globbing.
 																"""
 						required: false
-						type: array: {
-							default: null
-							items: type: string: {}
-						}
+						type: array: items: type: string: {}
 					}
 					includes: {
 						description: """
@@ -162,10 +145,6 @@ generated: components: sources: host_metrics: configuration: {
 					"""
 				required: false
 				type: object: {
-					default: {
-						excludes: null
-						includes: null
-					}
 					examples: [{
 						excludes: ["dm-*"]
 						includes: ["sda"]
@@ -178,10 +157,7 @@ generated: components: sources: host_metrics: configuration: {
 																The patterns are matched using globbing.
 																"""
 							required: false
-							type: array: {
-								default: null
-								items: type: string: {}
-							}
+							type: array: items: type: string: {}
 						}
 						includes: {
 							description: """
@@ -205,10 +181,6 @@ generated: components: sources: host_metrics: configuration: {
 					"""
 				required: false
 				type: object: {
-					default: {
-						excludes: null
-						includes: null
-					}
 					examples: [{
 						excludes: ["ext*"]
 						includes: ["ntfs"]
@@ -221,10 +193,7 @@ generated: components: sources: host_metrics: configuration: {
 																The patterns are matched using globbing.
 																"""
 							required: false
-							type: array: {
-								default: null
-								items: type: string: {}
-							}
+							type: array: items: type: string: {}
 						}
 						includes: {
 							description: """
@@ -248,10 +217,6 @@ generated: components: sources: host_metrics: configuration: {
 					"""
 				required: false
 				type: object: {
-					default: {
-						excludes: null
-						includes: null
-					}
 					examples: [{
 						excludes: ["/raid*"]
 						includes: ["/home"]
@@ -264,10 +229,7 @@ generated: components: sources: host_metrics: configuration: {
 																The patterns are matched using globbing.
 																"""
 							required: false
-							type: array: {
-								default: null
-								items: type: string: {}
-							}
+							type: array: items: type: string: {}
 						}
 						includes: {
 							description: """
@@ -301,10 +263,6 @@ generated: components: sources: host_metrics: configuration: {
 				"""
 			required: false
 			type: object: {
-				default: {
-					excludes: null
-					includes: null
-				}
 				examples: [{
 					excludes: ["dm-*"]
 					includes: ["sda"]
@@ -317,10 +275,7 @@ generated: components: sources: host_metrics: configuration: {
 																The patterns are matched using globbing.
 																"""
 						required: false
-						type: array: {
-							default: null
-							items: type: string: {}
-						}
+						type: array: items: type: string: {}
 					}
 					includes: {
 						description: """
@@ -345,10 +300,6 @@ generated: components: sources: host_metrics: configuration: {
 			description: "Lists of process name patterns to include or exclude."
 			required:    false
 			type: object: {
-				default: {
-					excludes: null
-					includes: null
-				}
 				examples: [{
 					excludes: null
 					includes: ["docker"]
@@ -361,10 +312,7 @@ generated: components: sources: host_metrics: configuration: {
 																The patterns are matched using globbing.
 																"""
 						required: false
-						type: array: {
-							default: null
-							items: type: string: {}
-						}
+						type: array: items: type: string: {}
 					}
 					includes: {
 						description: """

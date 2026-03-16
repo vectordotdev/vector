@@ -191,28 +191,25 @@ generated: components: sources: http_client: configuration: {
 			"""
 		required: false
 		type: {
-			object: {
-				default: null
-				options: {
-					type: {
-						description: "The parameter type, indicating how the `value` should be treated."
-						required:    false
-						type: string: {
-							default: "string"
-							enum: {
-								string: "The parameter value is a plain string."
-								vrl:    "The parameter value is a VRL expression that is evaluated before each request."
-							}
+			object: options: {
+				type: {
+					description: "The parameter type, indicating how the `value` should be treated."
+					required:    false
+					type: string: {
+						default: "string"
+						enum: {
+							string: "The parameter value is a plain string."
+							vrl:    "The parameter value is a VRL expression that is evaluated before each request."
 						}
 					}
-					value: {
-						description: "The raw value of the parameter."
-						required:    true
-						type: string: {}
-					}
+				}
+				value: {
+					description: "The raw value of the parameter."
+					required:    true
+					type: string: {}
 				}
 			}
-			string: default: null
+			string: {}
 		}
 	}
 	decoding: {
@@ -526,10 +523,7 @@ generated: components: sources: http_client: configuration: {
 																[tz_database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 																"""
 						required: false
-						type: string: {
-							default: null
-							examples: ["local", "America/New_York", "EST5EDT"]
-						}
+						type: string: examples: ["local", "America/New_York", "EST5EDT"]
 					}
 				}
 			}
@@ -608,7 +602,7 @@ generated: components: sources: http_client: configuration: {
 																The message's payload is the concatenation of all the chunks' payloads.
 																"""
 						required: false
-						type: uint: default: null
+						type: uint: {}
 					}
 					pending_messages_limit: {
 						description: """
@@ -618,7 +612,7 @@ generated: components: sources: http_client: configuration: {
 																of its messages buffer can grow unbounded. This matches Graylog Server's behavior.
 																"""
 						required: false
-						type: uint: default: null
+						type: uint: {}
 					}
 					timeout_secs: {
 						description: """

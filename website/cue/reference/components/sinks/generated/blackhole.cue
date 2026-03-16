@@ -24,7 +24,7 @@ generated: components: sinks: blackhole: configuration: {
 				[global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
 				"""
 			required: false
-			type: bool: default: null
+			type: bool: {}
 		}
 	}
 	print_interval_secs: {
@@ -49,11 +49,8 @@ generated: components: sinks: blackhole: configuration: {
 			By default, there is no limit.
 			"""
 		required: false
-		type: uint: {
-			default: null
-			examples: [
-				1000,
-			]
-		}
+		type: uint: examples: [
+			1000,
+		]
 	}
 }

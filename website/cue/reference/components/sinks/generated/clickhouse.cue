@@ -24,7 +24,7 @@ generated: components: sinks: clickhouse: configuration: {
 				[global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
 				"""
 			required: false
-			type: bool: default: null
+			type: bool: {}
 		}
 	}
 	auth: {
@@ -224,23 +224,20 @@ generated: components: sinks: clickhouse: configuration: {
 					"""
 				required: false
 				type: uint: {
-					default: null
+					default: 10000000
 					unit:    "bytes"
 				}
 			}
 			max_events: {
 				description: "The maximum size of a batch before it is flushed."
 				required:    false
-				type: uint: {
-					default: null
-					unit:    "events"
-				}
+				type: uint: unit: "events"
 			}
 			timeout_secs: {
 				description: "The maximum age of a batch before it is flushed."
 				required:    false
 				type: float: {
-					default: null
+					default: 1.0
 					unit:    "seconds"
 				}
 			}
@@ -254,24 +251,32 @@ generated: components: sinks: clickhouse: configuration: {
 			This is mutually exclusive with per-event encoding based on the `format` field.
 			"""
 		required: false
-		type: object: {
-			default: null
-			options: {
-				allow_nullable_fields: {
-					description: """
-						Allow null values for non-nullable fields in the schema.
+		type: object: options: {
+			allow_nullable_fields: {
+				description: """
+					Allow null values for non-nullable fields in the schema.
 
-						When enabled, missing or incompatible values will be encoded as null even for fields
-						marked as non-nullable in the Arrow schema. This is useful when working with downstream
-						systems that can handle null values through defaults, computed columns, or other mechanisms.
+					When enabled, missing or incompatible values will be encoded as null even for fields
+					marked as non-nullable in the Arrow schema. This is useful when working with downstream
+					systems that can handle null values through defaults, computed columns, or other mechanisms.
 
-						When disabled (default), missing values for non-nullable fields will cause encoding errors,
-						ensuring all required data is present before sending to the sink.
-						"""
-					required: false
-					type: bool: default: false
-				}
-				codec: {
+					When disabled (default), missing values for non-nullable fields will cause encoding errors,
+					ensuring all required data is present before sending to the sink.
+					"""
+				required: false
+				type: bool: default: false
+			}
+			codec: {
+				description: """
+					Encodes events in [Apache Arrow][apache_arrow] IPC streaming format.
+
+					This is the streaming variant of the Arrow IPC format, which writes
+					a continuous stream of record batches.
+
+					[apache_arrow]: https://arrow.apache.org/
+					"""
+				required: true
+				type: string: const: {
 					description: """
 						Encodes events in [Apache Arrow][apache_arrow] IPC streaming format.
 
@@ -280,18 +285,7 @@ generated: components: sinks: clickhouse: configuration: {
 
 						[apache_arrow]: https://arrow.apache.org/
 						"""
-					required: true
-					type: string: const: {
-						description: """
-															Encodes events in [Apache Arrow][apache_arrow] IPC streaming format.
-
-															This is the streaming variant of the Arrow IPC format, which writes
-															a continuous stream of record batches.
-
-															[apache_arrow]: https://arrow.apache.org/
-															"""
-						value: "arrow_stream"
-					}
+					value: "arrow_stream"
 				}
 			}
 		}
@@ -350,32 +344,23 @@ generated: components: sinks: clickhouse: configuration: {
 			except_fields: {
 				description: "List of fields that are excluded from the encoded event."
 				required:    false
-				type: array: {
-					default: null
-					items: type: string: {}
-				}
+				type: array: items: type: string: {}
 			}
 			only_fields: {
 				description: "List of fields that are included in the encoded event."
 				required:    false
-				type: array: {
-					default: null
-					items: type: string: {}
-				}
+				type: array: items: type: string: {}
 			}
 			timestamp_format: {
 				description: "Format used for timestamp fields."
 				required:    false
-				type: string: {
-					default: null
-					enum: {
-						rfc3339:    "Represent the timestamp as a RFC 3339 timestamp."
-						unix:       "Represent the timestamp as a Unix timestamp."
-						unix_float: "Represent the timestamp as a Unix timestamp in floating point."
-						unix_ms:    "Represent the timestamp as a Unix timestamp in milliseconds."
-						unix_ns:    "Represent the timestamp as a Unix timestamp in nanoseconds."
-						unix_us:    "Represent the timestamp as a Unix timestamp in microseconds."
-					}
+				type: string: enum: {
+					rfc3339:    "Represent the timestamp as a RFC 3339 timestamp."
+					unix:       "Represent the timestamp as a Unix timestamp."
+					unix_float: "Represent the timestamp as a Unix timestamp in floating point."
+					unix_ms:    "Represent the timestamp as a Unix timestamp in milliseconds."
+					unix_ns:    "Represent the timestamp as a Unix timestamp in nanoseconds."
+					unix_us:    "Represent the timestamp as a Unix timestamp in microseconds."
 				}
 			}
 		}
@@ -413,70 +398,60 @@ generated: components: sinks: clickhouse: configuration: {
 		type: object: options: async_insert_settings: {
 			description: "Async insert-related settings."
 			required:    false
-			type: object: {
-				default: {
-					deduplicate:                 null
-					enabled:                     null
-					max_data_size:               null
-					max_query_number:            null
-					wait_for_processing:         null
-					wait_for_processing_timeout: null
+			type: object: options: {
+				deduplicate: {
+					description: """
+						Sets `async_insert_deduplicate`, allowing ClickHouse to perform deduplication when inserting blocks in the replicated table.
+
+						If left unspecified, use the default provided by the `ClickHouse` server.
+						"""
+					required: false
+					type: bool: {}
 				}
-				options: {
-					deduplicate: {
-						description: """
-																Sets `async_insert_deduplicate`, allowing ClickHouse to perform deduplication when inserting blocks in the replicated table.
+				enabled: {
+					description: """
+						Sets `async_insert`, allowing ClickHouse to queue the inserted data and later flush to table in the background.
 
-																If left unspecified, use the default provided by the `ClickHouse` server.
-																"""
-						required: false
-						type: bool: default: null
-					}
-					enabled: {
-						description: """
-																Sets `async_insert`, allowing ClickHouse to queue the inserted data and later flush to table in the background.
+						If left unspecified, use the default provided by the `ClickHouse` server.
+						"""
+					required: false
+					type: bool: {}
+				}
+				max_data_size: {
+					description: """
+						Sets `async_insert_max_data_size`, the maximum size in bytes of unparsed data collected per query before being inserted.
 
-																If left unspecified, use the default provided by the `ClickHouse` server.
-																"""
-						required: false
-						type: bool: default: null
-					}
-					max_data_size: {
-						description: """
-																Sets `async_insert_max_data_size`, the maximum size in bytes of unparsed data collected per query before being inserted.
+						If left unspecified, use the default provided by the `ClickHouse` server.
+						"""
+					required: false
+					type: uint: {}
+				}
+				max_query_number: {
+					description: """
+						Sets `async_insert_max_query_number`, the maximum number of insert queries before being inserted
 
-																If left unspecified, use the default provided by the `ClickHouse` server.
-																"""
-						required: false
-						type: uint: default: null
-					}
-					max_query_number: {
-						description: """
-																Sets `async_insert_max_query_number`, the maximum number of insert queries before being inserted
+						If left unspecified, use the default provided by the `ClickHouse` server.
+						"""
+					required: false
+					type: uint: {}
+				}
+				wait_for_processing: {
+					description: """
+						Sets `wait_for`, allowing ClickHouse to wait for processing of asynchronous insertion.
 
-																If left unspecified, use the default provided by the `ClickHouse` server.
-																"""
-						required: false
-						type: uint: default: null
-					}
-					wait_for_processing: {
-						description: """
-																Sets `wait_for`, allowing ClickHouse to wait for processing of asynchronous insertion.
+						If left unspecified, use the default provided by the `ClickHouse` server.
+						"""
+					required: false
+					type: bool: {}
+				}
+				wait_for_processing_timeout: {
+					description: """
+						Sets 'wait_for_processing_timeout`, to control the timeout for waiting for processing asynchronous insertion.
 
-																If left unspecified, use the default provided by the `ClickHouse` server.
-																"""
-						required: false
-						type: bool: default: null
-					}
-					wait_for_processing_timeout: {
-						description: """
-																Sets 'wait_for_processing_timeout`, to control the timeout for waiting for processing asynchronous insertion.
-
-																If left unspecified, use the default provided by the `ClickHouse` server.
-																"""
-						required: false
-						type: uint: default: null
-					}
+						If left unspecified, use the default provided by the `ClickHouse` server.
+						"""
+					required: false
+					type: uint: {}
 				}
 			}
 		}
@@ -499,17 +474,9 @@ generated: components: sinks: clickhouse: configuration: {
 					unstable performance and sink behavior. Proceed with caution.
 					"""
 				required: false
-				type: object: {
-					default: {
-						decrease_ratio:        0.9
-						ewma_alpha:            0.4
-						initial_concurrency:   1
-						max_concurrency_limit: 200
-						rtt_deviation_scale:   2.5
-					}
-					options: {
-						decrease_ratio: {
-							description: """
+				type: object: options: {
+					decrease_ratio: {
+						description: """
 																The fraction of the current value to set the new concurrency limit when decreasing the limit.
 
 																Valid values are greater than `0` and less than `1`. Smaller values cause the algorithm to scale back rapidly
@@ -517,11 +484,11 @@ generated: components: sinks: clickhouse: configuration: {
 
 																**Note**: The new limit is rounded down after applying this ratio.
 																"""
-							required: false
-							type: float: default: 0.9
-						}
-						ewma_alpha: {
-							description: """
+						required: false
+						type: float: default: 0.9
+					}
+					ewma_alpha: {
+						description: """
 																The weighting of new measurements compared to older measurements.
 
 																Valid values are greater than `0` and less than `1`.
@@ -530,31 +497,31 @@ generated: components: sinks: clickhouse: configuration: {
 																the current RTT. Smaller values cause this reference to adjust more slowly, which may be useful if a service has
 																unusually high response variability.
 																"""
-							required: false
-							type: float: default: 0.4
-						}
-						initial_concurrency: {
-							description: """
+						required: false
+						type: float: default: 0.4
+					}
+					initial_concurrency: {
+						description: """
 																The initial concurrency limit to use. If not specified, the initial limit is 1 (no concurrency).
 
 																Datadog recommends setting this value to your service's average limit if you're seeing that it takes a
 																long time to ramp up adaptive concurrency after a restart. You can find this value by looking at the
 																`adaptive_concurrency_limit` metric.
 																"""
-							required: false
-							type: uint: default: 1
-						}
-						max_concurrency_limit: {
-							description: """
+						required: false
+						type: uint: default: 1
+					}
+					max_concurrency_limit: {
+						description: """
 																The maximum concurrency limit.
 
 																The adaptive request concurrency limit does not go above this bound. This is put in place as a safeguard.
 																"""
-							required: false
-							type: uint: default: 200
-						}
-						rtt_deviation_scale: {
-							description: """
+						required: false
+						type: uint: default: 200
+					}
+					rtt_deviation_scale: {
+						description: """
 																Scale of RTT deviations which are not considered anomalous.
 
 																Valid values are greater than or equal to `0`, and reasonable values range from `1.0` to `3.0`.
@@ -564,9 +531,8 @@ generated: components: sinks: clickhouse: configuration: {
 																can ignore increases in RTT that are within an expected range. This factor is used to scale up the deviation to
 																an appropriate range. Larger values cause the algorithm to ignore larger increases in the RTT.
 																"""
-							required: false
-							type: float: default: 2.5
-						}
+						required: false
+						type: float: default: 2.5
 					}
 				}
 			}
@@ -580,17 +546,21 @@ generated: components: sinks: clickhouse: configuration: {
 				required: false
 				type: {
 					string: {
-						const: {
-							description: """
+						default: "adaptive"
+						enum: {
+							adaptive: """
 															Concurrency is managed by Vector's [Adaptive Request Concurrency][arc] feature.
 
 															[arc]: https://vector.dev/docs/architecture/arc/
 															"""
-							value: "adaptive"
+							none: """
+															A fixed concurrency of 1.
+
+															Only one request can be outstanding at any given time.
+															"""
 						}
-						default: "adaptive"
 					}
-					uint: default: "adaptive"
+					uint: {}
 				}
 			}
 			rate_limit_duration_secs: {
@@ -679,7 +649,7 @@ generated: components: sinks: clickhouse: configuration: {
 			If left unspecified, use the default provided by the `ClickHouse` server.
 			"""
 		required: false
-		type: bool: default: null
+		type: bool: {}
 	}
 	table: {
 		description: "The table that data is inserted into."

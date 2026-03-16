@@ -24,7 +24,7 @@ generated: components: sinks: datadog_metrics: configuration: {
 				[global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
 				"""
 			required: false
-			type: bool: default: null
+			type: bool: {}
 		}
 	}
 	batch: {
@@ -39,16 +39,13 @@ generated: components: sinks: datadog_metrics: configuration: {
 					serialized or compressed.
 					"""
 				required: false
-				type: uint: {
-					default: null
-					unit:    "bytes"
-				}
+				type: uint: unit: "bytes"
 			}
 			max_events: {
 				description: "The maximum size of a batch before it is flushed."
 				required:    false
 				type: uint: {
-					default: null
+					default: 100000
 					unit:    "events"
 				}
 			}
@@ -56,7 +53,7 @@ generated: components: sinks: datadog_metrics: configuration: {
 				description: "The maximum age of a batch before it is flushed."
 				required:    false
 				type: float: {
-					default: null
+					default: 2.0
 					unit:    "seconds"
 				}
 			}
@@ -86,10 +83,7 @@ generated: components: sinks: datadog_metrics: configuration: {
 			present, it is used as a prefix to the metric name, and separated with a period (`.`).
 			"""
 		required: false
-		type: string: {
-			default: null
-			examples: ["myservice"]
-		}
+		type: string: examples: ["myservice"]
 	}
 	endpoint: {
 		description: """
@@ -102,10 +96,7 @@ generated: components: sinks: datadog_metrics: configuration: {
 			If set, overrides the `site` option.
 			"""
 		required: false
-		type: string: {
-			default: null
-			examples: ["http://127.0.0.1:8080", "http://example.com:12345"]
-		}
+		type: string: examples: ["http://127.0.0.1:8080", "http://example.com:12345"]
 	}
 	request: {
 		description: """
@@ -125,17 +116,9 @@ generated: components: sinks: datadog_metrics: configuration: {
 					unstable performance and sink behavior. Proceed with caution.
 					"""
 				required: false
-				type: object: {
-					default: {
-						decrease_ratio:        0.9
-						ewma_alpha:            0.4
-						initial_concurrency:   1
-						max_concurrency_limit: 200
-						rtt_deviation_scale:   2.5
-					}
-					options: {
-						decrease_ratio: {
-							description: """
+				type: object: options: {
+					decrease_ratio: {
+						description: """
 																The fraction of the current value to set the new concurrency limit when decreasing the limit.
 
 																Valid values are greater than `0` and less than `1`. Smaller values cause the algorithm to scale back rapidly
@@ -143,11 +126,11 @@ generated: components: sinks: datadog_metrics: configuration: {
 
 																**Note**: The new limit is rounded down after applying this ratio.
 																"""
-							required: false
-							type: float: default: 0.9
-						}
-						ewma_alpha: {
-							description: """
+						required: false
+						type: float: default: 0.9
+					}
+					ewma_alpha: {
+						description: """
 																The weighting of new measurements compared to older measurements.
 
 																Valid values are greater than `0` and less than `1`.
@@ -156,31 +139,31 @@ generated: components: sinks: datadog_metrics: configuration: {
 																the current RTT. Smaller values cause this reference to adjust more slowly, which may be useful if a service has
 																unusually high response variability.
 																"""
-							required: false
-							type: float: default: 0.4
-						}
-						initial_concurrency: {
-							description: """
+						required: false
+						type: float: default: 0.4
+					}
+					initial_concurrency: {
+						description: """
 																The initial concurrency limit to use. If not specified, the initial limit is 1 (no concurrency).
 
 																Datadog recommends setting this value to your service's average limit if you're seeing that it takes a
 																long time to ramp up adaptive concurrency after a restart. You can find this value by looking at the
 																`adaptive_concurrency_limit` metric.
 																"""
-							required: false
-							type: uint: default: 1
-						}
-						max_concurrency_limit: {
-							description: """
+						required: false
+						type: uint: default: 1
+					}
+					max_concurrency_limit: {
+						description: """
 																The maximum concurrency limit.
 
 																The adaptive request concurrency limit does not go above this bound. This is put in place as a safeguard.
 																"""
-							required: false
-							type: uint: default: 200
-						}
-						rtt_deviation_scale: {
-							description: """
+						required: false
+						type: uint: default: 200
+					}
+					rtt_deviation_scale: {
+						description: """
 																Scale of RTT deviations which are not considered anomalous.
 
 																Valid values are greater than or equal to `0`, and reasonable values range from `1.0` to `3.0`.
@@ -190,9 +173,8 @@ generated: components: sinks: datadog_metrics: configuration: {
 																can ignore increases in RTT that are within an expected range. This factor is used to scale up the deviation to
 																an appropriate range. Larger values cause the algorithm to ignore larger increases in the RTT.
 																"""
-							required: false
-							type: float: default: 2.5
-						}
+						required: false
+						type: float: default: 2.5
 					}
 				}
 			}
@@ -206,17 +188,21 @@ generated: components: sinks: datadog_metrics: configuration: {
 				required: false
 				type: {
 					string: {
-						const: {
-							description: """
+						default: "adaptive"
+						enum: {
+							adaptive: """
 															Concurrency is managed by Vector's [Adaptive Request Concurrency][arc] feature.
 
 															[arc]: https://vector.dev/docs/architecture/arc/
 															"""
-							value: "adaptive"
+							none: """
+															A fixed concurrency of 1.
+
+															Only one request can be outstanding at any given time.
+															"""
 						}
-						default: "adaptive"
 					}
-					uint: default: "adaptive"
+					uint: {}
 				}
 			}
 			rate_limit_duration_secs: {
@@ -316,107 +302,104 @@ generated: components: sinks: datadog_metrics: configuration: {
 	tls: {
 		description: "Configures the TLS options for incoming/outgoing connections."
 		required:    false
-		type: object: {
-			default: null
-			options: {
-				alpn_protocols: {
-					description: """
-						Sets the list of supported ALPN protocols.
+		type: object: options: {
+			alpn_protocols: {
+				description: """
+					Sets the list of supported ALPN protocols.
 
-						Declare the supported ALPN protocols, which are used during negotiation with a peer. They are prioritized in the order
-						that they are defined.
-						"""
-					required: false
-					type: array: items: type: string: examples: ["h2"]
-				}
-				ca_file: {
-					description: """
-						Absolute path to an additional CA certificate file.
+					Declare the supported ALPN protocols, which are used during negotiation with a peer. They are prioritized in the order
+					that they are defined.
+					"""
+				required: false
+				type: array: items: type: string: examples: ["h2"]
+			}
+			ca_file: {
+				description: """
+					Absolute path to an additional CA certificate file.
 
-						The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
-						"""
-					required: false
-					type: string: examples: ["/path/to/certificate_authority.crt"]
-				}
-				crt_file: {
-					description: """
-						Absolute path to a certificate file used to identify this server.
+					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
+					"""
+				required: false
+				type: string: examples: ["/path/to/certificate_authority.crt"]
+			}
+			crt_file: {
+				description: """
+					Absolute path to a certificate file used to identify this server.
 
-						The certificate must be in DER, PEM (X.509), or PKCS#12 format. Additionally, the certificate can be provided as
-						an inline string in PEM format.
+					The certificate must be in DER, PEM (X.509), or PKCS#12 format. Additionally, the certificate can be provided as
+					an inline string in PEM format.
 
-						If this is set _and_ is not a PKCS#12 archive, `key_file` must also be set.
-						"""
-					required: false
-					type: string: examples: ["/path/to/host_certificate.crt"]
-				}
-				enabled: {
-					description: """
-						Whether to require TLS for incoming or outgoing connections.
+					If this is set _and_ is not a PKCS#12 archive, `key_file` must also be set.
+					"""
+				required: false
+				type: string: examples: ["/path/to/host_certificate.crt"]
+			}
+			enabled: {
+				description: """
+					Whether to require TLS for incoming or outgoing connections.
 
-						When enabled and used for incoming connections, an identity certificate is also required. See `tls.crt_file` for
-						more information.
-						"""
-					required: false
-					type: bool: {}
-				}
-				key_file: {
-					description: """
-						Absolute path to a private key file used to identify this server.
+					When enabled and used for incoming connections, an identity certificate is also required. See `tls.crt_file` for
+					more information.
+					"""
+				required: false
+				type: bool: {}
+			}
+			key_file: {
+				description: """
+					Absolute path to a private key file used to identify this server.
 
-						The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
-						"""
-					required: false
-					type: string: examples: ["/path/to/host_certificate.key"]
-				}
-				key_pass: {
-					description: """
-						Passphrase used to unlock the encrypted key file.
+					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
+					"""
+				required: false
+				type: string: examples: ["/path/to/host_certificate.key"]
+			}
+			key_pass: {
+				description: """
+					Passphrase used to unlock the encrypted key file.
 
-						This has no effect unless `key_file` is set.
-						"""
-					required: false
-					type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
-				}
-				server_name: {
-					description: """
-						Server name to use when using Server Name Indication (SNI).
+					This has no effect unless `key_file` is set.
+					"""
+				required: false
+				type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
+			}
+			server_name: {
+				description: """
+					Server name to use when using Server Name Indication (SNI).
 
-						Only relevant for outgoing connections.
-						"""
-					required: false
-					type: string: examples: ["www.example.com"]
-				}
-				verify_certificate: {
-					description: """
-						Enables certificate verification. For components that create a server, this requires that the
-						client connections have a valid client certificate. For components that initiate requests,
-						this validates that the upstream has a valid certificate.
+					Only relevant for outgoing connections.
+					"""
+				required: false
+				type: string: examples: ["www.example.com"]
+			}
+			verify_certificate: {
+				description: """
+					Enables certificate verification. For components that create a server, this requires that the
+					client connections have a valid client certificate. For components that initiate requests,
+					this validates that the upstream has a valid certificate.
 
-						If enabled, certificates must not be expired and must be issued by a trusted
-						issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
-						certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
-						so on, until the verification process reaches a root certificate.
+					If enabled, certificates must not be expired and must be issued by a trusted
+					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
+					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
+					so on, until the verification process reaches a root certificate.
 
-						Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
-						"""
-					required: false
-					type: bool: {}
-				}
-				verify_hostname: {
-					description: """
-						Enables hostname verification.
+					Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
+					"""
+				required: false
+				type: bool: {}
+			}
+			verify_hostname: {
+				description: """
+					Enables hostname verification.
 
-						If enabled, the hostname used to connect to the remote host must be present in the TLS certificate presented by
-						the remote host, either as the Common Name or as an entry in the Subject Alternative Name extension.
+					If enabled, the hostname used to connect to the remote host must be present in the TLS certificate presented by
+					the remote host, either as the Common Name or as an entry in the Subject Alternative Name extension.
 
-						Only relevant for outgoing connections.
+					Only relevant for outgoing connections.
 
-						Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
-						"""
-					required: false
-					type: bool: {}
-				}
+					Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
+					"""
+				required: false
+				type: bool: {}
 			}
 		}
 	}

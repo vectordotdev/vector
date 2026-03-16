@@ -19,7 +19,7 @@ generated: components: sources: http: configuration: {
 		type: object: options: enabled: {
 			description: "Whether or not end-to-end acknowledgements are enabled for this source."
 			required:    false
-			type: bool: default: null
+			type: bool: {}
 		}
 	}
 	address: {
@@ -386,10 +386,7 @@ generated: components: sources: http: configuration: {
 																[tz_database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 																"""
 						required: false
-						type: string: {
-							default: null
-							examples: ["local", "America/New_York", "EST5EDT"]
-						}
+						type: string: examples: ["local", "America/New_York", "EST5EDT"]
 					}
 				}
 			}
@@ -403,14 +400,11 @@ generated: components: sources: http: configuration: {
 			For `json` and `ndjson` encodings, the fields of the JSON objects are output as separate fields.
 			"""
 		required: false
-		type: string: {
-			default: null
-			enum: {
-				binary: "Binary."
-				json:   "JSON."
-				ndjson: "Newline-delimited JSON."
-				text:   "Plaintext."
-			}
+		type: string: enum: {
+			binary: "Binary."
+			json:   "JSON."
+			ndjson: "Newline-delimited JSON."
+			text:   "Plaintext."
 		}
 	}
 	framing: {
@@ -483,7 +477,7 @@ generated: components: sources: http: configuration: {
 																The message's payload is the concatenation of all the chunks' payloads.
 																"""
 						required: false
-						type: uint: default: null
+						type: uint: {}
 					}
 					pending_messages_limit: {
 						description: """
@@ -493,7 +487,7 @@ generated: components: sources: http: configuration: {
 																of its messages buffer can grow unbounded. This matches Graylog Server's behavior.
 																"""
 						required: false
-						type: uint: default: null
+						type: uint: {}
 					}
 					timeout_secs: {
 						description: """

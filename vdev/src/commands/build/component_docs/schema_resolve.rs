@@ -198,7 +198,9 @@ impl SchemaContext {
             Some("string") => {
                 debug!("Resolving string schema.");
                 let mut def = json!({});
-                if let Some(d) = schema.get("default") {
+                if let Some(d) = schema.get("default")
+                    && !d.is_null()
+                {
                     def.as_object_mut()
                         .unwrap()
                         .insert("default".to_string(), d.clone());
@@ -212,7 +214,9 @@ impl SchemaContext {
                     .unwrap_or("number");
 
                 let mut def = json!({});
-                if let Some(d) = schema.get("default") {
+                if let Some(d) = schema.get("default")
+                    && !d.is_null()
+                {
                     def.as_object_mut()
                         .unwrap()
                         .insert("default".to_string(), d.clone());
@@ -222,7 +226,9 @@ impl SchemaContext {
             Some("boolean") => {
                 debug!("Resolving boolean schema.");
                 let mut def = json!({});
-                if let Some(d) = schema.get("default") {
+                if let Some(d) = schema.get("default")
+                    && !d.is_null()
+                {
                     def.as_object_mut()
                         .unwrap()
                         .insert("default".to_string(), d.clone());
@@ -232,7 +238,7 @@ impl SchemaContext {
             Some("const") => {
                 debug!("Resolving const schema.");
                 let const_val = schema.get("const").unwrap();
-                let type_str = self.get_docs_type_for_value(schema, const_val);
+                let type_str = self.get_docs_type_for_value(Some(schema), const_val);
 
                 let mut def = json!({ "value": const_val.clone() });
                 let desc = self.get_rendered_description_from_schema(schema);

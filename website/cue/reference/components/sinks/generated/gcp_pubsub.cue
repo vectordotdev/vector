@@ -24,7 +24,7 @@ generated: components: sinks: gcp_pubsub: configuration: {
 				[global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
 				"""
 			required: false
-			type: bool: default: null
+			type: bool: {}
 		}
 	}
 	api_key: {
@@ -41,7 +41,7 @@ generated: components: sinks: gcp_pubsub: configuration: {
 			[gcp_api_key]: https://cloud.google.com/docs/authentication/api-keys
 			"""
 		required: false
-		type: string: default: null
+		type: string: {}
 	}
 	batch: {
 		description: "Event batching behavior."
@@ -56,7 +56,7 @@ generated: components: sinks: gcp_pubsub: configuration: {
 					"""
 				required: false
 				type: uint: {
-					default: null
+					default: 10000000
 					unit:    "bytes"
 				}
 			}
@@ -64,7 +64,7 @@ generated: components: sinks: gcp_pubsub: configuration: {
 				description: "The maximum size of a batch before it is flushed."
 				required:    false
 				type: uint: {
-					default: null
+					default: 1000
 					unit:    "events"
 				}
 			}
@@ -72,7 +72,7 @@ generated: components: sinks: gcp_pubsub: configuration: {
 				description: "The maximum age of a batch before it is flushed."
 				required:    false
 				type: float: {
-					default: null
+					default: 1.0
 					unit:    "seconds"
 				}
 			}
@@ -92,7 +92,7 @@ generated: components: sinks: gcp_pubsub: configuration: {
 			[gcp_service_account_credentials]: https://cloud.google.com/docs/authentication/production#manually
 			"""
 		required: false
-		type: string: default: null
+		type: string: {}
 	}
 	encoding: {
 		description: """
@@ -379,10 +379,7 @@ generated: components: sinks: gcp_pubsub: configuration: {
 			except_fields: {
 				description: "List of fields that are excluded from the encoded event."
 				required:    false
-				type: array: {
-					default: null
-					items: type: string: {}
-				}
+				type: array: items: type: string: {}
 			}
 			gelf: {
 				description:   "The GELF Serializer Options."
@@ -432,10 +429,7 @@ generated: components: sinks: gcp_pubsub: configuration: {
 			only_fields: {
 				description: "List of fields that are included in the encoded event."
 				required:    false
-				type: array: {
-					default: null
-					items: type: string: {}
-				}
+				type: array: items: type: string: {}
 			}
 			protobuf: {
 				description:   "Options for the Protobuf serializer."
@@ -477,73 +471,60 @@ generated: components: sinks: gcp_pubsub: configuration: {
 				description:   "Options for the Syslog serializer."
 				relevant_when: "codec = \"syslog\""
 				required:      false
-				type: object: {
-					default: {
-						app_name: null
-						facility: null
-						msg_id:   null
-						proc_id:  null
-						rfc:      "rfc5424"
-						severity: null
-					}
-					options: {
-						app_name: {
-							description: """
+				type: object: options: {
+					app_name: {
+						description: """
 																Path to a field in the event to use for the app name.
 
 																If not provided, the encoder checks for a semantic "service" field.
 																If that is also missing, it defaults to "vector".
 																"""
-							required: false
-							type: string: default: null
-						}
-						facility: {
-							description: "Path to a field in the event to use for the facility. Defaults to \"user\"."
-							required:    false
-							type: string: default: null
-						}
-						msg_id: {
-							description: "Path to a field in the event to use for the msg ID."
-							required:    false
-							type: string: default: null
-						}
-						proc_id: {
-							description: "Path to a field in the event to use for the proc ID."
-							required:    false
-							type: string: default: null
-						}
-						rfc: {
-							description: "RFC to use for formatting."
-							required:    false
-							type: string: {
-								default: "rfc5424"
-								enum: {
-									rfc3164: "The legacy RFC3164 syslog format."
-									rfc5424: "The modern RFC5424 syslog format."
-								}
+						required: false
+						type: string: {}
+					}
+					facility: {
+						description: "Path to a field in the event to use for the facility. Defaults to \"user\"."
+						required:    false
+						type: string: {}
+					}
+					msg_id: {
+						description: "Path to a field in the event to use for the msg ID."
+						required:    false
+						type: string: {}
+					}
+					proc_id: {
+						description: "Path to a field in the event to use for the proc ID."
+						required:    false
+						type: string: {}
+					}
+					rfc: {
+						description: "RFC to use for formatting."
+						required:    false
+						type: string: {
+							default: "rfc5424"
+							enum: {
+								rfc3164: "The legacy RFC3164 syslog format."
+								rfc5424: "The modern RFC5424 syslog format."
 							}
 						}
-						severity: {
-							description: "Path to a field in the event to use for the severity. Defaults to \"informational\"."
-							required:    false
-							type: string: default: null
-						}
+					}
+					severity: {
+						description: "Path to a field in the event to use for the severity. Defaults to \"informational\"."
+						required:    false
+						type: string: {}
 					}
 				}
 			}
 			timestamp_format: {
 				description: "Format used for timestamp fields."
 				required:    false
-				type: string: {
-					default: null
-					enum: {
-						rfc3339:    "Represent the timestamp as a RFC 3339 timestamp."
-						unix:       "Represent the timestamp as a Unix timestamp."
-						unix_float: "Represent the timestamp as a Unix timestamp in floating point."
-						unix_ms:    "Represent the timestamp as a Unix timestamp in milliseconds."
-						unix_ns:    "Represent the timestamp as a Unix timestamp in nanoseconds."
-						unix_us:    "Represent the timestamp as a Unix timestamp in microseconds."
-					}
+				type: string: enum: {
+					rfc3339:    "Represent the timestamp as a RFC 3339 timestamp."
+					unix:       "Represent the timestamp as a Unix timestamp."
+					unix_float: "Represent the timestamp as a Unix timestamp in floating point."
+					unix_ms:    "Represent the timestamp as a Unix timestamp in milliseconds."
+					unix_ns:    "Represent the timestamp as a Unix timestamp in nanoseconds."
+					unix_us:    "Represent the timestamp as a Unix timestamp in microseconds."
 				}
 			}
 		}
@@ -588,17 +569,9 @@ generated: components: sinks: gcp_pubsub: configuration: {
 					unstable performance and sink behavior. Proceed with caution.
 					"""
 				required: false
-				type: object: {
-					default: {
-						decrease_ratio:        0.9
-						ewma_alpha:            0.4
-						initial_concurrency:   1
-						max_concurrency_limit: 200
-						rtt_deviation_scale:   2.5
-					}
-					options: {
-						decrease_ratio: {
-							description: """
+				type: object: options: {
+					decrease_ratio: {
+						description: """
 																The fraction of the current value to set the new concurrency limit when decreasing the limit.
 
 																Valid values are greater than `0` and less than `1`. Smaller values cause the algorithm to scale back rapidly
@@ -606,11 +579,11 @@ generated: components: sinks: gcp_pubsub: configuration: {
 
 																**Note**: The new limit is rounded down after applying this ratio.
 																"""
-							required: false
-							type: float: default: 0.9
-						}
-						ewma_alpha: {
-							description: """
+						required: false
+						type: float: default: 0.9
+					}
+					ewma_alpha: {
+						description: """
 																The weighting of new measurements compared to older measurements.
 
 																Valid values are greater than `0` and less than `1`.
@@ -619,31 +592,31 @@ generated: components: sinks: gcp_pubsub: configuration: {
 																the current RTT. Smaller values cause this reference to adjust more slowly, which may be useful if a service has
 																unusually high response variability.
 																"""
-							required: false
-							type: float: default: 0.4
-						}
-						initial_concurrency: {
-							description: """
+						required: false
+						type: float: default: 0.4
+					}
+					initial_concurrency: {
+						description: """
 																The initial concurrency limit to use. If not specified, the initial limit is 1 (no concurrency).
 
 																Datadog recommends setting this value to your service's average limit if you're seeing that it takes a
 																long time to ramp up adaptive concurrency after a restart. You can find this value by looking at the
 																`adaptive_concurrency_limit` metric.
 																"""
-							required: false
-							type: uint: default: 1
-						}
-						max_concurrency_limit: {
-							description: """
+						required: false
+						type: uint: default: 1
+					}
+					max_concurrency_limit: {
+						description: """
 																The maximum concurrency limit.
 
 																The adaptive request concurrency limit does not go above this bound. This is put in place as a safeguard.
 																"""
-							required: false
-							type: uint: default: 200
-						}
-						rtt_deviation_scale: {
-							description: """
+						required: false
+						type: uint: default: 200
+					}
+					rtt_deviation_scale: {
+						description: """
 																Scale of RTT deviations which are not considered anomalous.
 
 																Valid values are greater than or equal to `0`, and reasonable values range from `1.0` to `3.0`.
@@ -653,9 +626,8 @@ generated: components: sinks: gcp_pubsub: configuration: {
 																can ignore increases in RTT that are within an expected range. This factor is used to scale up the deviation to
 																an appropriate range. Larger values cause the algorithm to ignore larger increases in the RTT.
 																"""
-							required: false
-							type: float: default: 2.5
-						}
+						required: false
+						type: float: default: 2.5
 					}
 				}
 			}
@@ -669,17 +641,21 @@ generated: components: sinks: gcp_pubsub: configuration: {
 				required: false
 				type: {
 					string: {
-						const: {
-							description: """
+						default: "adaptive"
+						enum: {
+							adaptive: """
 															Concurrency is managed by Vector's [Adaptive Request Concurrency][arc] feature.
 
 															[arc]: https://vector.dev/docs/architecture/arc/
 															"""
-							value: "adaptive"
+							none: """
+															A fixed concurrency of 1.
+
+															Only one request can be outstanding at any given time.
+															"""
 						}
-						default: "adaptive"
 					}
-					uint: default: "adaptive"
+					uint: {}
 				}
 			}
 			rate_limit_duration_secs: {
@@ -764,97 +740,94 @@ generated: components: sinks: gcp_pubsub: configuration: {
 	tls: {
 		description: "TLS configuration."
 		required:    false
-		type: object: {
-			default: null
-			options: {
-				alpn_protocols: {
-					description: """
-						Sets the list of supported ALPN protocols.
+		type: object: options: {
+			alpn_protocols: {
+				description: """
+					Sets the list of supported ALPN protocols.
 
-						Declare the supported ALPN protocols, which are used during negotiation with a peer. They are prioritized in the order
-						that they are defined.
-						"""
-					required: false
-					type: array: items: type: string: examples: ["h2"]
-				}
-				ca_file: {
-					description: """
-						Absolute path to an additional CA certificate file.
+					Declare the supported ALPN protocols, which are used during negotiation with a peer. They are prioritized in the order
+					that they are defined.
+					"""
+				required: false
+				type: array: items: type: string: examples: ["h2"]
+			}
+			ca_file: {
+				description: """
+					Absolute path to an additional CA certificate file.
 
-						The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
-						"""
-					required: false
-					type: string: examples: ["/path/to/certificate_authority.crt"]
-				}
-				crt_file: {
-					description: """
-						Absolute path to a certificate file used to identify this server.
+					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
+					"""
+				required: false
+				type: string: examples: ["/path/to/certificate_authority.crt"]
+			}
+			crt_file: {
+				description: """
+					Absolute path to a certificate file used to identify this server.
 
-						The certificate must be in DER, PEM (X.509), or PKCS#12 format. Additionally, the certificate can be provided as
-						an inline string in PEM format.
+					The certificate must be in DER, PEM (X.509), or PKCS#12 format. Additionally, the certificate can be provided as
+					an inline string in PEM format.
 
-						If this is set _and_ is not a PKCS#12 archive, `key_file` must also be set.
-						"""
-					required: false
-					type: string: examples: ["/path/to/host_certificate.crt"]
-				}
-				key_file: {
-					description: """
-						Absolute path to a private key file used to identify this server.
+					If this is set _and_ is not a PKCS#12 archive, `key_file` must also be set.
+					"""
+				required: false
+				type: string: examples: ["/path/to/host_certificate.crt"]
+			}
+			key_file: {
+				description: """
+					Absolute path to a private key file used to identify this server.
 
-						The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
-						"""
-					required: false
-					type: string: examples: ["/path/to/host_certificate.key"]
-				}
-				key_pass: {
-					description: """
-						Passphrase used to unlock the encrypted key file.
+					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
+					"""
+				required: false
+				type: string: examples: ["/path/to/host_certificate.key"]
+			}
+			key_pass: {
+				description: """
+					Passphrase used to unlock the encrypted key file.
 
-						This has no effect unless `key_file` is set.
-						"""
-					required: false
-					type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
-				}
-				server_name: {
-					description: """
-						Server name to use when using Server Name Indication (SNI).
+					This has no effect unless `key_file` is set.
+					"""
+				required: false
+				type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
+			}
+			server_name: {
+				description: """
+					Server name to use when using Server Name Indication (SNI).
 
-						Only relevant for outgoing connections.
-						"""
-					required: false
-					type: string: examples: ["www.example.com"]
-				}
-				verify_certificate: {
-					description: """
-						Enables certificate verification. For components that create a server, this requires that the
-						client connections have a valid client certificate. For components that initiate requests,
-						this validates that the upstream has a valid certificate.
+					Only relevant for outgoing connections.
+					"""
+				required: false
+				type: string: examples: ["www.example.com"]
+			}
+			verify_certificate: {
+				description: """
+					Enables certificate verification. For components that create a server, this requires that the
+					client connections have a valid client certificate. For components that initiate requests,
+					this validates that the upstream has a valid certificate.
 
-						If enabled, certificates must not be expired and must be issued by a trusted
-						issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
-						certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
-						so on, until the verification process reaches a root certificate.
+					If enabled, certificates must not be expired and must be issued by a trusted
+					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
+					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
+					so on, until the verification process reaches a root certificate.
 
-						Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
-						"""
-					required: false
-					type: bool: {}
-				}
-				verify_hostname: {
-					description: """
-						Enables hostname verification.
+					Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
+					"""
+				required: false
+				type: bool: {}
+			}
+			verify_hostname: {
+				description: """
+					Enables hostname verification.
 
-						If enabled, the hostname used to connect to the remote host must be present in the TLS certificate presented by
-						the remote host, either as the Common Name or as an entry in the Subject Alternative Name extension.
+					If enabled, the hostname used to connect to the remote host must be present in the TLS certificate presented by
+					the remote host, either as the Common Name or as an entry in the Subject Alternative Name extension.
 
-						Only relevant for outgoing connections.
+					Only relevant for outgoing connections.
 
-						Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
-						"""
-					required: false
-					type: bool: {}
-				}
+					Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
+					"""
+				required: false
+				type: bool: {}
 			}
 		}
 	}

@@ -21,38 +21,32 @@ generated: components: transforms: dedupe: configuration: {
 			[global_log_schema]: https://vector.dev/docs/reference/configuration/global-options/#log_schema
 			"""
 		required: false
-		type: object: {
-			default: null
-			options: {
-				ignore: {
-					description: "Matches events using all fields except for the ignored ones."
-					required:    true
-					type: array: items: type: string: examples: ["field1", "parent.child_field", "host", "hostname"]
-				}
-				match: {
-					description: "Matches events using only the specified fields."
-					required:    true
-					type: array: items: type: string: examples: ["field1", "parent.child_field"]
-				}
+		type: object: options: {
+			ignore: {
+				description: "Matches events using all fields except for the ignored ones."
+				required:    true
+				type: array: items: type: string: examples: ["field1", "parent.child_field", "host", "hostname"]
+			}
+			match: {
+				description: "Matches events using only the specified fields."
+				required:    true
+				type: array: items: type: string: examples: ["field1", "parent.child_field"]
 			}
 		}
 	}
 	time_settings: {
 		description: "Configuration for time based cache."
 		required:    false
-		type: object: {
-			default: null
-			options: {
-				max_age_ms: {
-					description: "Maximum age of items in deduplication cache, before duplicates are allowed again."
-					required:    true
-					type: uint: unit: "milliseconds"
-				}
-				refresh_on_drop: {
-					description: "Set to true if dropped duplicates should refresh the age timer."
-					required:    false
-					type: bool: default: false
-				}
+		type: object: options: {
+			max_age_ms: {
+				description: "Maximum age of items in deduplication cache, before duplicates are allowed again."
+				required:    true
+				type: uint: unit: "milliseconds"
+			}
+			refresh_on_drop: {
+				description: "Set to true if dropped duplicates should refresh the age timer."
+				required:    false
+				type: bool: default: false
 			}
 		}
 	}

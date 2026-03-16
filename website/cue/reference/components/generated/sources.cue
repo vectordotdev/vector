@@ -16,7 +16,6 @@ generated: components: sources: configuration: {
 				"""
 			required: false
 			type: object: {
-				default: {}
 				examples: [{
 					color: "red"
 					name:  "Example Node"
@@ -54,10 +53,7 @@ generated: components: sources: configuration: {
 					Must be a valid URI string.
 					"""
 				required: false
-				type: string: {
-					default: null
-					examples: ["http://foo.bar:3128"]
-				}
+				type: string: examples: ["http://foo.bar:3128"]
 			}
 			https: {
 				description: """
@@ -66,10 +62,7 @@ generated: components: sources: configuration: {
 					Must be a valid URI string.
 					"""
 				required: false
-				type: string: {
-					default: null
-					examples: ["http://foo.bar:3128"]
-				}
+				type: string: examples: ["http://foo.bar:3128"]
 			}
 			no_proxy: {
 				description: """

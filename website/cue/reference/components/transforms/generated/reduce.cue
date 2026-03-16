@@ -7,7 +7,7 @@ generated: components: transforms: reduce: configuration: {
 			for that grouping is flushed. Checked every flush_period_ms.
 			"""
 		required: false
-		type: uint: default: null
+		type: uint: {}
 	}
 	ends_when: {
 		description: """

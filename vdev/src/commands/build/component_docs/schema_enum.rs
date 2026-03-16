@@ -386,10 +386,29 @@ impl SchemaContext {
             schema_aware_nested_merge(&mut type_defs, item);
         }
 
-        let merged_type = type_defs
+        let mut merged_type = type_defs
             .get("type")
             .cloned()
             .unwrap_or_else(|| json!({ "*": {} }));
+
+        if let Value::Object(type_map) = &mut merged_type {
+            for (_, type_def) in type_map.iter_mut() {
+                if let Value::Object(def) = type_def
+                    && let Some(Value::Array(const_arr)) = def.remove("const")
+                {
+                    let mut enum_map = Map::new();
+                    for const_obj in &const_arr {
+                        if let Some(value) = const_obj.get("value").and_then(|v| v.as_str()) {
+                            let desc = self.get_rendered_description_from_schema(const_obj);
+                            enum_map.insert(value.to_string(), Value::String(desc));
+                        }
+                    }
+                    if !enum_map.is_empty() {
+                        def.insert("enum".to_string(), Value::Object(enum_map));
+                    }
+                }
+            }
+        }
 
         Ok(json!({ "_resolved": { "type": merged_type }, "annotations": "mixed_mode" }))
     }

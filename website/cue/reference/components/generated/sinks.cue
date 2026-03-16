@@ -90,7 +90,6 @@ generated: components: sinks: configuration: {
 				"""
 			required: false
 			type: object: {
-				default: {}
 				examples: [{
 					color: "red"
 					name:  "Example Node"
@@ -129,7 +128,7 @@ generated: components: sinks: configuration: {
 					components -- port, path, etc -- are allowed as well.
 					"""
 				required: false
-				type: string: default: null
+				type: string: {}
 			}
 		}
 	}
@@ -172,10 +171,7 @@ generated: components: sinks: configuration: {
 					Must be a valid URI string.
 					"""
 				required: false
-				type: string: {
-					default: null
-					examples: ["http://foo.bar:3128"]
-				}
+				type: string: examples: ["http://foo.bar:3128"]
 			}
 			https: {
 				description: """
@@ -184,10 +180,7 @@ generated: components: sinks: configuration: {
 					Must be a valid URI string.
 					"""
 				required: false
-				type: string: {
-					default: null
-					examples: ["http://foo.bar:3128"]
-				}
+				type: string: examples: ["http://foo.bar:3128"]
 			}
 			no_proxy: {
 				description: """

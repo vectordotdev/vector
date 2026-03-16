@@ -129,7 +129,7 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 				namespace: {
 					description: "Namespace of the metric this configuration refers to."
 					required:    false
-					type: string: default: null
+					type: string: {}
 				}
 				value_limit: {
 					description: "How many distinct values to accept for any given key."

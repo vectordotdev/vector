@@ -409,10 +409,7 @@ generated: components: sources: nats: configuration: {
 																[tz_database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 																"""
 						required: false
-						type: string: {
-							default: null
-							examples: ["local", "America/New_York", "EST5EDT"]
-						}
+						type: string: examples: ["local", "America/New_York", "EST5EDT"]
 					}
 				}
 			}
@@ -488,7 +485,7 @@ generated: components: sources: nats: configuration: {
 																The message's payload is the concatenation of all the chunks' payloads.
 																"""
 						required: false
-						type: uint: default: null
+						type: uint: {}
 					}
 					pending_messages_limit: {
 						description: """
@@ -498,7 +495,7 @@ generated: components: sources: nats: configuration: {
 																of its messages buffer can grow unbounded. This matches Graylog Server's behavior.
 																"""
 						required: false
-						type: uint: default: null
+						type: uint: {}
 					}
 					timeout_secs: {
 						description: """
@@ -607,46 +604,43 @@ generated: components: sources: nats: configuration: {
 	jetstream: {
 		description: "Configuration for NATS JetStream."
 		required:    false
-		type: object: {
-			default: null
-			options: {
-				batch_config: {
-					description: """
-						Batch settings for a JetStream pull consumer.
+		type: object: options: {
+			batch_config: {
+				description: """
+					Batch settings for a JetStream pull consumer.
 
-						By default, messages are pulled in batches of up to 200.
-						Each pull request expires after 30 seconds if not fulfilled.
-						There is no explicit maximum byte size per batch unless specified.
+					By default, messages are pulled in batches of up to 200.
+					Each pull request expires after 30 seconds if not fulfilled.
+					There is no explicit maximum byte size per batch unless specified.
 
-						**Note:** These defaults follow the `async-nats` crate’s `StreamBuilder`.
-						"""
-					required: false
-					type: object: options: {
-						batch: {
-							description: "The maximum number of messages to pull in a single batch."
-							required:    false
-							type: uint: default: 200
-						}
-						max_bytes: {
-							description: """
+					**Note:** These defaults follow the `async-nats` crate’s `StreamBuilder`.
+					"""
+				required: false
+				type: object: options: {
+					batch: {
+						description: "The maximum number of messages to pull in a single batch."
+						required:    false
+						type: uint: default: 200
+					}
+					max_bytes: {
+						description: """
 																The maximum total byte size for a batch. The pull request will be
 																fulfilled when either `size` or `max_bytes` is reached.
 																"""
-							required: false
-							type: uint: default: 0
-						}
+						required: false
+						type: uint: default: 0
 					}
 				}
-				consumer: {
-					description: "The name of the durable consumer to pull from."
-					required:    true
-					type: string: {}
-				}
-				stream: {
-					description: "The name of the stream to bind to."
-					required:    true
-					type: string: {}
-				}
+			}
+			consumer: {
+				description: "The name of the durable consumer to pull from."
+				required:    true
+				type: string: {}
+			}
+			stream: {
+				description: "The name of the stream to bind to."
+				required:    true
+				type: string: {}
 			}
 		}
 	}

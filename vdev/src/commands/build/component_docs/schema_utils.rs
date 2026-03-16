@@ -157,6 +157,39 @@ impl SchemaContext {
         reduced
     }
 
+    pub fn find_nested_object_property_schema<'a>(
+        &self,
+        schema: &'a Value,
+        property_name: &str,
+    ) -> Option<&'a Value> {
+        if let Some(prop) = schema
+            .get("properties")
+            .and_then(|p| p.get(property_name))
+        {
+            return Some(prop);
+        }
+
+        let mut unvisited: Vec<&'a Value> = Vec::new();
+        for key in &["oneOf", "anyOf", "allOf"] {
+            if let Some(Value::Array(arr)) = schema.get(*key) {
+                unvisited.extend(arr.iter());
+            }
+        }
+
+        while let Some(sub) = unvisited.pop() {
+            if let Some(prop) = sub.get("properties").and_then(|p| p.get(property_name)) {
+                return Some(prop);
+            }
+            for key in &["oneOf", "anyOf", "allOf"] {
+                if let Some(Value::Array(arr)) = sub.get(*key) {
+                    unvisited.extend(arr.iter());
+                }
+            }
+        }
+
+        None
+    }
+
     pub fn apply_schema_default_value(
         &self,
         source_schema: &Value,
@@ -164,46 +197,62 @@ impl SchemaContext {
     ) -> Result<()> {
         debug!("Applying schema default values.");
 
-        if let Some(default_value) = source_schema.get("default") {
-            let default_value_type = docs_type_str(default_value);
-            // Skipping type checking for now, simply merging default value into resolved
+        let default_value = match source_schema.get("default") {
+            Some(v) if !v.is_null() => v,
+            _ => return Ok(()),
+        };
 
-            if default_value_type == "object" {
-                if let Some(resolved_properties) =
-                    resolved_schema.pointer_mut("/type/object/options")
-                    && let Value::Object(props) = resolved_properties
-                    && let Value::Object(def_obj) = default_value
-                {
-                    for (prop_name, prop_default_value) in def_obj {
-                        if let Some(resolved_prop) = props.get_mut(prop_name) {
-                            // Let's add the default down to the types recursively
-                            let mut should_set_required_false = false;
-                            if let Some(Value::Object(type_obj)) = resolved_prop.get_mut("type") {
-                                for (_, nested_type_def) in type_obj.iter_mut() {
-                                    if let Value::Object(t_def) = nested_type_def {
-                                        t_def.insert(
-                                            "default".to_string(),
-                                            prop_default_value.clone(),
-                                        );
-                                        should_set_required_false = true;
-                                    }
-                                }
-                            }
-                            if should_set_required_false {
-                                resolved_prop
-                                    .as_object_mut()
-                                    .unwrap()
-                                    .insert("required".to_string(), Value::Bool(false));
+        let default_value_type = docs_type_str(default_value);
+
+        if default_value_type == "object" {
+            if let Some(resolved_type_field) = resolved_schema.pointer_mut("/type/object")
+                && let Value::Object(type_field) = resolved_type_field
+                && let Some(Value::Object(props)) = type_field.get_mut("options")
+                && let Value::Object(def_obj) = default_value
+            {
+                for (prop_name, prop_default_value) in def_obj {
+                    if prop_default_value.is_null() {
+                        continue;
+                    }
+                    if let Some(resolved_prop) = props.get_mut(prop_name) {
+                        let source_property =
+                            self.find_nested_object_property_schema(source_schema, prop_name);
+                        if let Some(source_prop) = source_property {
+                            let mut source_with_default = source_prop.clone();
+                            source_with_default
+                                .as_object_mut()
+                                .unwrap()
+                                .insert("default".to_string(), prop_default_value.clone());
+                            self.apply_schema_default_value(
+                                &source_with_default,
+                                resolved_prop,
+                            )?;
+                        } else {
+                            let value_type =
+                                self.get_docs_type_for_value(None, prop_default_value);
+                            if let Some(Value::Object(type_obj)) = resolved_prop.get_mut("type")
+                                && let Some(Value::Object(type_def)) =
+                                    type_obj.get_mut(value_type)
+                            {
+                                type_def.insert(
+                                    "default".to_string(),
+                                    prop_default_value.clone(),
+                                );
                             }
                         }
+                        resolved_prop
+                            .as_object_mut()
+                            .unwrap()
+                            .insert("required".to_string(), Value::Bool(false));
                     }
                 }
-            } else if let Some(Value::Object(type_obj)) = resolved_schema.get_mut("type") {
-                for (_, def) in type_obj.iter_mut() {
-                    if let Value::Object(def_map) = def {
-                        def_map.insert("default".to_string(), default_value.clone());
-                    }
-                }
+            }
+        } else {
+            let value_type = self.get_docs_type_for_value(Some(source_schema), default_value);
+            if let Some(Value::Object(type_obj)) = resolved_schema.get_mut("type")
+                && let Some(Value::Object(type_def)) = type_obj.get_mut(value_type)
+            {
+                type_def.insert("default".to_string(), default_value.clone());
             }
         }
         Ok(())
@@ -317,11 +366,13 @@ impl SchemaContext {
     ) {
         let required_properties = parent_schema.get("required").and_then(|r| r.as_array());
 
-        let has_self_default_value = property_schema.get("default").is_some();
+        let has_self_default_value = property_schema
+            .get("default")
+            .is_some_and(|v| !v.is_null());
         let has_parent_default_value = parent_schema
             .get("default")
             .and_then(|d| d.get(property_name))
-            .is_some();
+            .is_some_and(|v| !v.is_null());
         let has_default_value = has_self_default_value || has_parent_default_value;
 
         let is_required = required_properties
@@ -378,7 +429,24 @@ impl SchemaContext {
         None
     }
 
-    pub fn get_docs_type_for_value(&self, _schema: &Value, value: &Value) -> &'static str {
+    pub fn get_docs_type_for_value(
+        &self,
+        schema: Option<&Value>,
+        value: &Value,
+    ) -> &'static str {
+        let value_type = super::json_type_str(value);
+        if matches!(value_type, "number" | "integer")
+            && let Some(s) = schema
+            && let Some(numeric_type) =
+                get_schema_metadata(s, "docs::numeric_type").and_then(|n| n.as_str())
+        {
+            return match numeric_type {
+                "uint" => "uint",
+                "int" => "int",
+                "float" => "float",
+                _ => super::docs_type_str(value),
+            };
+        }
         super::docs_type_str(value)
     }
 }

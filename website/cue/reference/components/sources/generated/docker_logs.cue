@@ -17,10 +17,7 @@ generated: components: sources: docker_logs: configuration: {
 			`//./pipe/docker_engine` on Windows) is used.
 			"""
 		required: false
-		type: string: {
-			default: null
-			examples: ["http://localhost:2375", "https://localhost:2376", "unix:///var/run/docker.sock", "npipe:////./pipe/docker_engine", "/var/run/docker.sock", "//./pipe/docker_engine"]
-		}
+		type: string: examples: ["http://localhost:2375", "https://localhost:2376", "unix:///var/run/docker.sock", "npipe:////./pipe/docker_engine", "/var/run/docker.sock", "//./pipe/docker_engine"]
 	}
 	exclude_containers: {
 		description: """
@@ -37,10 +34,7 @@ generated: components: sources: docker_logs: configuration: {
 			This can be used in conjunction with `include_containers`.
 			"""
 		required: false
-		type: array: {
-			default: null
-			items: type: string: examples: ["exclude_", "exclude_me_0", "ad08cc418cf9"]
-		}
+		type: array: items: type: string: examples: ["exclude_", "exclude_me_0", "ad08cc418cf9"]
 	}
 	host_key: {
 		description: """
@@ -51,7 +45,7 @@ generated: components: sources: docker_logs: configuration: {
 			[global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
 			"""
 		required: false
-		type: string: default: null
+		type: string: {}
 	}
 	include_containers: {
 		description: """
@@ -66,10 +60,7 @@ generated: components: sources: docker_logs: configuration: {
 			This can be used in conjunction with `exclude_containers`.
 			"""
 		required: false
-		type: array: {
-			default: null
-			items: type: string: examples: ["include_", "include_me_0", "ad08cc418cf9"]
-		}
+		type: array: items: type: string: examples: ["include_", "include_me_0", "ad08cc418cf9"]
 	}
 	include_images: {
 		description: """
@@ -78,10 +69,7 @@ generated: components: sources: docker_logs: configuration: {
 			If not provided, all images are included.
 			"""
 		required: false
-		type: array: {
-			default: null
-			items: type: string: examples: ["httpd", "redis"]
-		}
+		type: array: items: type: string: examples: ["httpd", "redis"]
 	}
 	include_labels: {
 		description: """
@@ -90,10 +78,7 @@ generated: components: sources: docker_logs: configuration: {
 			Labels should follow the syntax described in the [Docker object labels](https://docs.docker.com/config/labels-custom-metadata/) documentation.
 			"""
 		required: false
-		type: array: {
-			default: null
-			items: type: string: examples: ["org.opencontainers.image.vendor=Vector", "com.mycorp.internal.animal=fish"]
-		}
+		type: array: items: type: string: examples: ["org.opencontainers.image.vendor=Vector", "com.mycorp.internal.animal=fish"]
 	}
 	multiline: {
 		description: """
@@ -102,68 +87,65 @@ generated: components: sources: docker_logs: configuration: {
 			If not specified, multiline aggregation is disabled.
 			"""
 		required: false
-		type: object: {
-			default: null
-			options: {
-				condition_pattern: {
-					description: """
-						Regular expression pattern that is used to determine whether or not more lines should be read.
+		type: object: options: {
+			condition_pattern: {
+				description: """
+					Regular expression pattern that is used to determine whether or not more lines should be read.
 
-						This setting must be configured in conjunction with `mode`.
+					This setting must be configured in conjunction with `mode`.
+					"""
+				required: true
+				type: string: examples: ["^[\\s]+", "\\\\$", "^(INFO|ERROR) ", ";$"]
+			}
+			mode: {
+				description: """
+					Aggregation mode.
+
+					This setting must be configured in conjunction with `condition_pattern`.
+					"""
+				required: true
+				type: string: enum: {
+					continue_past: """
+						All consecutive lines matching this pattern, plus one additional line, are included in the group.
+
+						This is useful in cases where a log message ends with a continuation marker, such as a backslash, indicating
+						that the following line is part of the same message.
 						"""
-					required: true
-					type: string: examples: ["^[\\s]+", "\\\\$", "^(INFO|ERROR) ", ";$"]
-				}
-				mode: {
-					description: """
-						Aggregation mode.
+					continue_through: """
+						All consecutive lines matching this pattern are included in the group.
 
-						This setting must be configured in conjunction with `condition_pattern`.
+						The first line (the line that matched the start pattern) does not need to match the `ContinueThrough` pattern.
+
+						This is useful in cases such as a Java stack trace, where some indicator in the line (such as a leading
+						whitespace) indicates that it is an extension of the proceeding line.
 						"""
-					required: true
-					type: string: enum: {
-						continue_past: """
-															All consecutive lines matching this pattern, plus one additional line, are included in the group.
+					halt_before: """
+						All consecutive lines not matching this pattern are included in the group.
 
-															This is useful in cases where a log message ends with a continuation marker, such as a backslash, indicating
-															that the following line is part of the same message.
-															"""
-						continue_through: """
-															All consecutive lines matching this pattern are included in the group.
-
-															The first line (the line that matched the start pattern) does not need to match the `ContinueThrough` pattern.
-
-															This is useful in cases such as a Java stack trace, where some indicator in the line (such as a leading
-															whitespace) indicates that it is an extension of the proceeding line.
-															"""
-						halt_before: """
-															All consecutive lines not matching this pattern are included in the group.
-
-															This is useful where a log line contains a marker indicating that it begins a new message.
-															"""
-						halt_with: """
-															All consecutive lines, up to and including the first line matching this pattern, are included in the group.
-
-															This is useful where a log line ends with a termination marker, such as a semicolon.
-															"""
-					}
-				}
-				start_pattern: {
-					description: "Regular expression pattern that is used to match the start of a new message."
-					required:    true
-					type: string: examples: ["^[\\s]+", "\\\\$", "^(INFO|ERROR) ", ";$"]
-				}
-				timeout_ms: {
-					description: """
-						The maximum amount of time to wait for the next additional line, in milliseconds.
-
-						Once this timeout is reached, the buffered message is guaranteed to be flushed, even if incomplete.
+						This is useful where a log line contains a marker indicating that it begins a new message.
 						"""
-					required: true
-					type: uint: {
-						examples: [1000, 600000]
-						unit: "milliseconds"
-					}
+					halt_with: """
+						All consecutive lines, up to and including the first line matching this pattern, are included in the group.
+
+						This is useful where a log line ends with a termination marker, such as a semicolon.
+						"""
+				}
+			}
+			start_pattern: {
+				description: "Regular expression pattern that is used to match the start of a new message."
+				required:    true
+				type: string: examples: ["^[\\s]+", "\\\\$", "^(INFO|ERROR) ", ";$"]
+			}
+			timeout_ms: {
+				description: """
+					The maximum amount of time to wait for the next additional line, in milliseconds.
+
+					Once this timeout is reached, the buffered message is guaranteed to be flushed, even if incomplete.
+					"""
+				required: true
+				type: uint: {
+					examples: [1000, 600000]
+					unit: "milliseconds"
 				}
 			}
 		}
@@ -195,24 +177,21 @@ generated: components: sources: docker_logs: configuration: {
 			If not configured, the environment variable `DOCKER_CERT_PATH` is used. If `DOCKER_CERT_PATH` is absent, then` DOCKER_CONFIG` is used. If both environment variables are absent, the certificates in `~/.docker/` are read.
 			"""
 		required: false
-		type: object: {
-			default: null
-			options: {
-				ca_file: {
-					description: "Path to the CA certificate file."
-					required:    true
-					type: string: {}
-				}
-				crt_file: {
-					description: "Path to the TLS certificate file."
-					required:    true
-					type: string: {}
-				}
-				key_file: {
-					description: "Path to the TLS key file."
-					required:    true
-					type: string: {}
-				}
+		type: object: options: {
+			ca_file: {
+				description: "Path to the CA certificate file."
+				required:    true
+				type: string: {}
+			}
+			crt_file: {
+				description: "Path to the TLS certificate file."
+				required:    true
+				type: string: {}
+			}
+			key_file: {
+				description: "Path to the TLS key file."
+				required:    true
+				type: string: {}
 			}
 		}
 	}

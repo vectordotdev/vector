@@ -19,7 +19,7 @@ generated: components: sources: file: configuration: {
 		type: object: options: enabled: {
 			description: "Whether or not end-to-end acknowledgements are enabled for this source."
 			required:    false
-			type: bool: default: null
+			type: bool: {}
 		}
 	}
 	data_dir: {
@@ -34,33 +34,27 @@ generated: components: sources: file: configuration: {
 			[global_data_dir]: https://vector.dev/docs/reference/configuration/global-options/#data_dir
 			"""
 		required: false
-		type: string: {
-			default: null
-			examples: ["/var/local/lib/vector/"]
-		}
+		type: string: examples: ["/var/local/lib/vector/"]
 	}
 	encoding: {
 		description: "Character set encoding."
 		required:    false
-		type: object: {
-			default: null
-			options: charset: {
-				description: """
-					Encoding of the source messages.
+		type: object: options: charset: {
+			description: """
+				Encoding of the source messages.
 
-					Takes one of the encoding [label strings](https://encoding.spec.whatwg.org/#concept-encoding-get) defined as
-					part of the [Encoding Standard](https://encoding.spec.whatwg.org/).
+				Takes one of the encoding [label strings](https://encoding.spec.whatwg.org/#concept-encoding-get) defined as
+				part of the [Encoding Standard](https://encoding.spec.whatwg.org/).
 
-					When set, the messages are transcoded from the specified encoding to UTF-8, which is the encoding that is
-					assumed internally for string-like data. Enable this transcoding operation if you need your data to
-					be in UTF-8 for further processing. At the time of transcoding, any malformed sequences (that can't be mapped to
-					UTF-8) is replaced with the Unicode [REPLACEMENT
-					CHARACTER](https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character) and warnings are
-					logged.
-					"""
-				required: true
-				type: string: examples: ["utf-16le", "utf-16be"]
-			}
+				When set, the messages are transcoded from the specified encoding to UTF-8, which is the encoding that is
+				assumed internally for string-like data. Enable this transcoding operation if you need your data to
+				be in UTF-8 for further processing. At the time of transcoding, any malformed sequences (that can't be mapped to
+				UTF-8) is replaced with the Unicode [REPLACEMENT
+				CHARACTER](https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character) and warnings are
+				logged.
+				"""
+			required: true
+			type: string: examples: ["utf-16le", "utf-16be"]
 		}
 	}
 	exclude: {
@@ -187,7 +181,7 @@ generated: components: sources: file: configuration: {
 			Checkpoints are still written normally.
 			"""
 		required: false
-		type: bool: default: null
+		type: bool: {}
 	}
 	ignore_not_found: {
 		description: """
@@ -202,7 +196,6 @@ generated: components: sources: file: configuration: {
 		description: "Ignore files with a data modification date older than the specified number of seconds."
 		required:    false
 		type: uint: {
-			default: null
 			examples: [
 				600,
 			]
@@ -271,68 +264,65 @@ generated: components: sources: file: configuration: {
 			If not specified, multiline aggregation is disabled.
 			"""
 		required: false
-		type: object: {
-			default: null
-			options: {
-				condition_pattern: {
-					description: """
-						Regular expression pattern that is used to determine whether or not more lines should be read.
+		type: object: options: {
+			condition_pattern: {
+				description: """
+					Regular expression pattern that is used to determine whether or not more lines should be read.
 
-						This setting must be configured in conjunction with `mode`.
+					This setting must be configured in conjunction with `mode`.
+					"""
+				required: true
+				type: string: examples: ["^[\\s]+", "\\\\$", "^(INFO|ERROR) ", ";$"]
+			}
+			mode: {
+				description: """
+					Aggregation mode.
+
+					This setting must be configured in conjunction with `condition_pattern`.
+					"""
+				required: true
+				type: string: enum: {
+					continue_past: """
+						All consecutive lines matching this pattern, plus one additional line, are included in the group.
+
+						This is useful in cases where a log message ends with a continuation marker, such as a backslash, indicating
+						that the following line is part of the same message.
 						"""
-					required: true
-					type: string: examples: ["^[\\s]+", "\\\\$", "^(INFO|ERROR) ", ";$"]
-				}
-				mode: {
-					description: """
-						Aggregation mode.
+					continue_through: """
+						All consecutive lines matching this pattern are included in the group.
 
-						This setting must be configured in conjunction with `condition_pattern`.
+						The first line (the line that matched the start pattern) does not need to match the `ContinueThrough` pattern.
+
+						This is useful in cases such as a Java stack trace, where some indicator in the line (such as a leading
+						whitespace) indicates that it is an extension of the proceeding line.
 						"""
-					required: true
-					type: string: enum: {
-						continue_past: """
-															All consecutive lines matching this pattern, plus one additional line, are included in the group.
+					halt_before: """
+						All consecutive lines not matching this pattern are included in the group.
 
-															This is useful in cases where a log message ends with a continuation marker, such as a backslash, indicating
-															that the following line is part of the same message.
-															"""
-						continue_through: """
-															All consecutive lines matching this pattern are included in the group.
-
-															The first line (the line that matched the start pattern) does not need to match the `ContinueThrough` pattern.
-
-															This is useful in cases such as a Java stack trace, where some indicator in the line (such as a leading
-															whitespace) indicates that it is an extension of the proceeding line.
-															"""
-						halt_before: """
-															All consecutive lines not matching this pattern are included in the group.
-
-															This is useful where a log line contains a marker indicating that it begins a new message.
-															"""
-						halt_with: """
-															All consecutive lines, up to and including the first line matching this pattern, are included in the group.
-
-															This is useful where a log line ends with a termination marker, such as a semicolon.
-															"""
-					}
-				}
-				start_pattern: {
-					description: "Regular expression pattern that is used to match the start of a new message."
-					required:    true
-					type: string: examples: ["^[\\s]+", "\\\\$", "^(INFO|ERROR) ", ";$"]
-				}
-				timeout_ms: {
-					description: """
-						The maximum amount of time to wait for the next additional line, in milliseconds.
-
-						Once this timeout is reached, the buffered message is guaranteed to be flushed, even if incomplete.
+						This is useful where a log line contains a marker indicating that it begins a new message.
 						"""
-					required: true
-					type: uint: {
-						examples: [1000, 600000]
-						unit: "milliseconds"
-					}
+					halt_with: """
+						All consecutive lines, up to and including the first line matching this pattern, are included in the group.
+
+						This is useful where a log line ends with a termination marker, such as a semicolon.
+						"""
+				}
+			}
+			start_pattern: {
+				description: "Regular expression pattern that is used to match the start of a new message."
+				required:    true
+				type: string: examples: ["^[\\s]+", "\\\\$", "^(INFO|ERROR) ", ";$"]
+			}
+			timeout_ms: {
+				description: """
+					The maximum amount of time to wait for the next additional line, in milliseconds.
+
+					Once this timeout is reached, the buffered message is guaranteed to be flushed, even if incomplete.
+					"""
+				required: true
+				type: uint: {
+					examples: [1000, 600000]
+					unit: "milliseconds"
 				}
 			}
 		}
@@ -346,12 +336,9 @@ generated: components: sources: file: configuration: {
 			Off by default, the offset is only added to the event if this is set.
 			"""
 		required: false
-		type: string: {
-			default: null
-			examples: [
-				"offset",
-			]
-		}
+		type: string: examples: [
+			"offset",
+		]
 	}
 	oldest_first: {
 		description: "Instead of balancing read capacity fairly across all watched files, prioritize draining the oldest files before moving on to read data from more recent files."
@@ -377,7 +364,6 @@ generated: components: sources: file: configuration: {
 			"""
 		required: false
 		type: uint: {
-			default: null
 			examples: [0, 5, 60]
 			unit: "seconds"
 		}
