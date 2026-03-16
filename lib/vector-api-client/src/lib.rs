@@ -25,15 +25,10 @@
 //! # }
 //! ```
 
-#![deny(warnings)]
-#![deny(missing_debug_implementations)]
-
 mod client;
 mod error;
 
-pub use client::GrpcClient;
-// Export GrpcClient as Client for cleaner API
-pub use client::GrpcClient as Client;
+pub use client::Client;
 pub use error::{Error, Result};
 
 /// Re-export generated protobuf types

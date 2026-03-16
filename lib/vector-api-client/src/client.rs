@@ -14,12 +14,12 @@ use crate::{
 
 /// gRPC client for the Vector observability API
 #[derive(Debug, Clone)]
-pub struct GrpcClient {
+pub struct Client {
     url: String,
     client: Option<ObservabilityClient<Channel>>,
 }
 
-impl GrpcClient {
+impl Client {
     /// Create a new gRPC client
     ///
     /// The client is not connected until `connect()` is called.
@@ -289,19 +289,19 @@ mod tests {
     #[test]
     fn test_client_creation() {
         // Construction is infallible; URL is validated lazily on connect()
-        let _client = GrpcClient::new("http://localhost:9999");
+        let _client = Client::new("http://localhost:9999");
     }
 
     #[test]
     fn test_invalid_url() {
         // URL validation happens on connect(), not at construction
-        let _client = GrpcClient::new("not a url");
+        let _client = Client::new("not a url");
     }
 
     #[tokio::test]
     async fn test_connection_failure() {
         // Port 65535 is unlikely to be in use on loopback
-        let mut client = GrpcClient::new("http://localhost:65535");
+        let mut client = Client::new("http://localhost:65535");
         let result = client.connect().await;
         assert!(
             result.is_err(),
@@ -311,14 +311,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_not_connected_error() {
-        let mut client = GrpcClient::new("http://localhost:9999");
+        let mut client = Client::new("http://localhost:9999");
         let result = client.health().await;
         assert!(matches!(result, Err(Error::NotConnected)));
     }
 
     #[test]
     fn test_ensure_connected() {
-        let mut client = GrpcClient::new("http://localhost:9999");
+        let mut client = Client::new("http://localhost:9999");
         let result = client.ensure_connected();
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), Error::NotConnected));
