@@ -1,5 +1,9 @@
 use std::collections::{HashMap, HashSet};
 use std::pin::Pin;
+// std::sync::Mutex is intentional: the lock is never held across an .await point
+// (only used in synchronous map updates inside IntervalStream closures), so the
+// cheaper std mutex is correct here. tokio::sync::Mutex is only needed when the
+// critical section itself contains .await.
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
