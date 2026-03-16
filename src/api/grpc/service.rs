@@ -824,13 +824,17 @@ impl observability::Service for ObservabilityService {
                                     break;
                                 }
                             } else {
-                                // Reservoir sampling (Algorithm R)
+                                // Reservoir sampling (Algorithm R).
+                                // Draw from 0..=batch (inclusive) so that event i has
+                                // exactly limit/(i+1) probability of entering the reservoir.
+                                // Using 0..batch (exclusive) would guarantee replacement on
+                                // the first post-fill event (100% instead of limit/(limit+1)).
                                 let sortable_event = SortableEvent { batch, event };
 
                                 if limit > results.len() {
                                     results.push(sortable_event);
                                 } else {
-                                    let random_number = rng.random_range(0..batch);
+                                    let random_number = rng.random_range(0..=batch);
                                     if random_number < results.len() {
                                         results[random_number] = sortable_event;
                                     }
