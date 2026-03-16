@@ -156,7 +156,10 @@ message OutputEventsRequest {
   // Glob patterns for input component IDs to match (optional)
   repeated string inputs_patterns = 2;
 
-  // Maximum number of events to buffer
+  // Maximum number of events to sample per interval. Must be >= 1.
+  // Unlike GetComponents, 0 is not valid here: limit controls both the
+  // reservoir size and the internal channel capacity, which require a
+  // positive value.
   int32 limit = 3;
 
   // Sampling interval in milliseconds

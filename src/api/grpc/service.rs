@@ -763,7 +763,9 @@ impl observability::Service for ObservabilityService {
         }
 
         if req.limit <= 0 {
-            return Err(Status::invalid_argument("limit must be positive"));
+            return Err(Status::invalid_argument(
+                "limit must be >= 1 (controls reservoir size and channel capacity)",
+            ));
         }
 
         let interval_ms = req.interval_ms as u64;

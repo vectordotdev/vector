@@ -21,8 +21,8 @@ pub struct Opts {
     #[arg(short, long)]
     url: Option<Url>,
 
-    /// Maximum number of events to sample each interval
-    #[arg(default_value = "100", short = 'l', long)]
+    /// Maximum number of events to sample each interval (must be >= 1)
+    #[arg(default_value = "100", short = 'l', long, value_parser = clap::value_parser!(u32).range(1..))]
     limit: u32,
 
     /// Encoding format for events printed to screen
