@@ -646,6 +646,7 @@ wayfor
 wday
 webgraphviz
 websites
+websockets
 wensite
 whostheboss
 willreturn
