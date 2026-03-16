@@ -26,6 +26,8 @@ pub struct TapResource {
     pub sink_keys: Vec<String>,
     // Components removed on a reload (used to drop TapSinks)
     pub removals: HashSet<ComponentKey>,
+    // Plugin type name for every component (e.g. "demo_logs", "remap", "console")
+    pub type_names: HashMap<String, String>,
 }
 
 // Watcher types for topology changes.
