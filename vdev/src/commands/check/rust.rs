@@ -70,6 +70,13 @@ impl Cli {
 
         app::exec("cargo", self.build_args(tool), true)?;
 
+        let lock_after = fs::read(&lock_file)?;
+        if lock_before != lock_after {
+            bail!(
+                "Cargo.lock was modified by `cargo {tool}`. Please commit the updated Cargo.lock."
+            );
+        }
+
         // If --fix was used, check for changes and commit them.
         if self.fix {
             let has_changes = !git::get_modified_files()?.is_empty();
@@ -77,13 +84,6 @@ impl Cli {
                 app::exec("cargo", ["fmt", "--all"], true)?;
                 git::commit("chore(vdev): apply vdev rust check fixes")?;
             }
-        }
-
-        let lock_after = fs::read(&lock_file)?;
-        if lock_before != lock_after {
-            bail!(
-                "Cargo.lock was modified by `cargo {tool}`. Please commit the updated Cargo.lock."
-            );
         }
 
         Ok(())
