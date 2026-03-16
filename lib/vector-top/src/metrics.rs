@@ -7,7 +7,10 @@ use std::{
 use glob::Pattern;
 use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
-use vector_api_client::{Client, proto::{Component, ComponentType}};
+use vector_api_client::{
+    Client,
+    proto::{Component, ComponentType},
+};
 
 use crate::state::{self, OutputMetrics, SentEventsMetric};
 use vector_common::config::ComponentKey;

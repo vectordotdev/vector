@@ -10,7 +10,7 @@ tags: ["graphql", "api", "metrics"]
 ---
 
 {{< warning >}}
-Since Vector version X we migrated the API from GraphQL to gRPC. 
+Since Vector version X we migrated the API from GraphQL to gRPC.
 {{< /warning >}}
 
 Although Vector is an observability tool, it's nonetheless important to be able

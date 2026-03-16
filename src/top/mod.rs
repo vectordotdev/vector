@@ -18,7 +18,7 @@ pub struct Opts {
     #[arg(default_value = "1000", short = 'i', long)]
     interval: u32,
 
-    /// gRPC API server endpoint
+    /// gRPC API server endpoint (e.g. http://localhost:8686)
     #[arg(short, long)]
     url: Option<Url>,
 
