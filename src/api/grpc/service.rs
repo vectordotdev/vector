@@ -779,74 +779,19 @@ impl observability::Service for ObservabilityService {
         tokio::spawn(async move {
             let _tap_controller = TapController::new(watch_rx, tap_tx, patterns);
             let mut tap_rx = ReceiverStream::new(tap_rx);
-
-            // Tick interval for batching
             let mut interval = time::interval(time::Duration::from_millis(interval_ms));
+            let mut reservoir = Reservoir::new(limit);
 
-            // Structure to hold sortable events
-            struct SortableEvent {
-                batch: usize,
-                event: OutputEvent,
-            }
-
-            let mut results = Vec::<SortableEvent>::with_capacity(limit);
-
-            // Random number generator for reservoir sampling
-            let seed = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap_or_else(|_| {
-                    warn!("System clock is before Unix epoch, using fallback seed.");
-                    Duration::from_secs(0)
-                })
-                .as_nanos() as u64;
-            let mut rng = SmallRng::seed_from_u64(seed);
-            let mut batch = 0;
-
-            'tap: loop {
+            loop {
                 select! {
                     Some(tap_payload) = tokio_stream::StreamExt::next(&mut tap_rx) => {
-                        // Convert TapPayload to OutputEvent(s)
-                        let events = tap_payload_to_output_events(tap_payload);
-
-                        for event in events {
-                            // Handle notifications immediately
-                            if matches!(event.event, Some(output_event::Event::Notification(_))) {
-                                if let Err(err) = event_tx.send(vec![event]).await {
-                                    debug!(message = "Couldn't send notification.", error = ?err);
-                                    break 'tap;
-                                }
-                            } else {
-                                // Reservoir sampling (Algorithm R).
-                                // Draw from 0..=batch (inclusive) so that event i has
-                                // exactly limit/(i+1) probability of entering the reservoir.
-                                // Using 0..batch (exclusive) would guarantee replacement on
-                                // the first post-fill event (100% instead of limit/(limit+1)).
-                                let sortable_event = SortableEvent { batch, event };
-
-                                if limit > results.len() {
-                                    results.push(sortable_event);
-                                } else {
-                                    let random_number = rng.random_range(0..=batch);
-                                    if random_number < results.len() {
-                                        results[random_number] = sortable_event;
-                                    }
-                                }
-                                batch += 1;
-                            }
+                        if reservoir.handle_payload(tap_payload, &event_tx).await.is_err() {
+                            break;
                         }
                     }
                     _ = interval.tick() => {
-                        if !results.is_empty() {
-                            batch = 0;
-
-                            // Sort by batch order and drain
-                            results.sort_by_key(|r| r.batch);
-                            let events = results.drain(..).map(|r| r.event).collect();
-
-                            if let Err(err) = event_tx.send(events).await {
-                                debug!(message = "Couldn't send events.", error = ?err);
-                                break;
-                            }
+                        if reservoir.flush(&event_tx).await.is_err() {
+                            break;
                         }
                     }
                 }
@@ -858,6 +803,78 @@ impl observability::Service for ObservabilityService {
         });
 
         Ok(Response::new(Box::pin(stream)))
+    }
+}
+
+/// Reservoir sampler for tap events, batched and flushed on an interval.
+struct Reservoir {
+    events: Vec<(usize, OutputEvent)>,
+    rng: SmallRng,
+    batch: usize,
+    limit: usize,
+}
+
+impl Reservoir {
+    fn new(limit: usize) -> Self {
+        let seed = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_else(|_| {
+                warn!("System clock is before Unix epoch, using fallback seed.");
+                Duration::from_secs(0)
+            })
+            .as_nanos() as u64;
+
+        Self {
+            events: Vec::with_capacity(limit),
+            rng: SmallRng::seed_from_u64(seed),
+            batch: 0,
+            limit,
+        }
+    }
+
+    /// Process a tap payload: notifications are forwarded immediately; data events
+    /// are reservoir-sampled (Algorithm R) for the next flush.
+    async fn handle_payload(
+        &mut self,
+        payload: TapPayload,
+        tx: &mpsc::Sender<Vec<OutputEvent>>,
+    ) -> Result<(), ()> {
+        for event in tap_payload_to_output_events(payload) {
+            if matches!(event.event, Some(output_event::Event::Notification(_))) {
+                tx.send(vec![event]).await.map_err(|err| {
+                    debug!(message = "Couldn't send notification.", error = ?err);
+                })?;
+            } else {
+                // Reservoir sampling (Algorithm R).
+                // Draw from 0..=batch (inclusive) so that event i has
+                // exactly limit/(i+1) probability of entering the reservoir.
+                // Using 0..batch (exclusive) would guarantee replacement on
+                // the first post-fill event (100% instead of limit/(limit+1)).
+                if self.limit > self.events.len() {
+                    self.events.push((self.batch, event));
+                } else {
+                    let idx = self.rng.random_range(0..=self.batch);
+                    if idx < self.events.len() {
+                        self.events[idx] = (self.batch, event);
+                    }
+                }
+                self.batch += 1;
+            }
+        }
+        Ok(())
+    }
+
+    /// Flush sampled events to the client, sorted by arrival order.
+    async fn flush(&mut self, tx: &mpsc::Sender<Vec<OutputEvent>>) -> Result<(), ()> {
+        if self.events.is_empty() {
+            return Ok(());
+        }
+        self.batch = 0;
+        self.events.sort_by_key(|(batch, _)| *batch);
+        let events = self.events.drain(..).map(|(_, e)| e).collect();
+        tx.send(events).await.map_err(|err| {
+            debug!(message = "Couldn't send events.", error = ?err);
+        })
     }
 }
 
