@@ -451,8 +451,9 @@ async fn uptime_changed(mut client: Client, tx: state::EventTx, interval: i64) {
     }
 }
 
-/// Subscribe to each metrics stream through separate gRPC client connections.
-/// Each subscription gets its own client to allow concurrent streaming.
+/// Subscribe to each metrics stream, all sharing a single underlying gRPC connection.
+/// HTTP/2 multiplexes the concurrent streams — cloning a connected `Client` is cheap
+/// (the tonic `Channel` is Arc-backed) and avoids redundant TCP/HTTP2 handshakes.
 pub async fn subscribe(
     url: String,
     tx: state::EventTx,
@@ -461,81 +462,77 @@ pub async fn subscribe(
 ) -> Result<Vec<JoinHandle<()>>, vector_api_client::Error> {
     let components_patterns = Arc::new(components_patterns);
 
-    // Helper to create and connect a new client
-    let create_client = || async {
-        let mut client = Client::new(url.as_str());
-        client.connect().await?;
-        Ok::<Client, vector_api_client::Error>(client)
-    };
+    let mut client = Client::new(url.as_str());
+    client.connect().await?;
 
     #[cfg_attr(not(feature = "allocation-tracing"), allow(unused_mut))]
     let mut handles = vec![
         tokio::spawn(poll_components(
-            create_client().await?,
+            client.clone(),
             tx.clone(),
             interval,
             Arc::clone(&components_patterns),
         )),
         tokio::spawn(received_bytes_totals(
-            create_client().await?,
+            client.clone(),
             tx.clone(),
             interval,
             Arc::clone(&components_patterns),
         )),
         tokio::spawn(received_bytes_throughputs(
-            create_client().await?,
+            client.clone(),
             tx.clone(),
             interval,
             Arc::clone(&components_patterns),
         )),
         tokio::spawn(received_events_totals(
-            create_client().await?,
+            client.clone(),
             tx.clone(),
             interval,
             Arc::clone(&components_patterns),
         )),
         tokio::spawn(received_events_throughputs(
-            create_client().await?,
+            client.clone(),
             tx.clone(),
             interval,
             Arc::clone(&components_patterns),
         )),
         tokio::spawn(sent_bytes_totals(
-            create_client().await?,
+            client.clone(),
             tx.clone(),
             interval,
             Arc::clone(&components_patterns),
         )),
         tokio::spawn(sent_bytes_throughputs(
-            create_client().await?,
+            client.clone(),
             tx.clone(),
             interval,
             Arc::clone(&components_patterns),
         )),
         tokio::spawn(sent_events_totals(
-            create_client().await?,
+            client.clone(),
             tx.clone(),
             interval,
             Arc::clone(&components_patterns),
         )),
         tokio::spawn(sent_events_throughputs(
-            create_client().await?,
+            client.clone(),
             tx.clone(),
             interval,
             Arc::clone(&components_patterns),
         )),
         tokio::spawn(errors_totals(
-            create_client().await?,
+            client.clone(),
             tx.clone(),
             interval,
             Arc::clone(&components_patterns),
         )),
-        tokio::spawn(uptime_changed(create_client().await?, tx.clone(), interval)),
+        tokio::spawn(uptime_changed(client.clone(), tx.clone(), interval)),
     ];
 
     #[cfg(feature = "allocation-tracing")]
     handles.push(tokio::spawn(allocated_bytes(
-        create_client().await?,
+        client,
         tx,
         interval,
         Arc::clone(&components_patterns),
