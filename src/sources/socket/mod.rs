@@ -1041,6 +1041,7 @@ mod test {
                 schema: Default::default(),
                 schema_definitions: HashMap::default(),
                 extra_context: Default::default(),
+                metrics_storage: Default::default(),
             })
             .await
             .unwrap();

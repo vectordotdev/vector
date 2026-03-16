@@ -1,5 +1,7 @@
 use std::{collections::HashMap, io::Read, net::SocketAddr, sync::Arc};
 
+use http_body::Body as _;
+
 use axum::{
     Router,
     body::Body,
@@ -122,9 +124,11 @@ async fn process_stats(Extension(state): Extension<Arc<AppState>>, mut request: 
         debug!("`{}` server got stats payload.", state.name);
 
         let body = request.body_mut();
-        let compressed_body_bytes = hyper::body::to_bytes(body)
+        let compressed_body_bytes = body
+            .collect()
             .await
-            .expect("could not decode body into bytes");
+            .expect("could not decode body into bytes")
+            .to_bytes();
 
         let mut gz = GzDecoder::new(compressed_body_bytes.as_ref());
         let mut decompressed_body_bytes = vec![];

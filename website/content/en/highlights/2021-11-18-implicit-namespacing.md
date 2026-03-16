@@ -86,7 +86,7 @@ This can similarly be applied to the newly added [`enrichment_tables`][enrichmen
 
 If you any feedback for us, let us know on our [Discord chat] or on [Twitter].
 
-[enrichment_tables]: /docs/reference/configuration/global-options/#enrichment_tables
+[enrichment_tables]: /docs/reference/configuration/pipeline-components/#enrichment_tables
 [tests]: /docs/reference/configuration/unit-tests
 [Discord chat]: https://discord.com/invite/dX3bdkF
 [Twitter]: https://twitter.com/vectordotdev

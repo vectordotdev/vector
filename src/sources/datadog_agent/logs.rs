@@ -183,7 +183,7 @@ pub(crate) fn decode_log_body(
                 }
                 Ok(None) => break,
                 Err(error) => {
-                    // Error is logged by `crate::codecs::Decoder`, no further
+                    // Error is logged by `vector_lib::codecs::Decoder`, no further
                     // handling is needed here.
                     if !error.can_continue() {
                         break;

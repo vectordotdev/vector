@@ -583,7 +583,7 @@ impl ChronicleRequestBuilder {
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.config().build()?;
         let compression = Compression::from(config.compression);
-        let encoder = crate::codecs::Encoder::<()>::new(serializer);
+        let encoder = vector_lib::codecs::Encoder::<()>::new(serializer);
         let encoder = ChronicleEncoder {
             customer_id: config.customer_id.clone(),
             labels: config.labels.as_ref().map(|labs| {

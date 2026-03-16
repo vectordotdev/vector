@@ -2126,6 +2126,9 @@ mod tests {
         let mut older = File::create(&older_path).unwrap();
         older.sync_all().unwrap();
 
+        // Sleep to ensure the creation timestamps are different
+        sleep_500_millis().await;
+
         let newer_path = dir.path().join("a_newer_file");
         let mut newer = File::create(&newer_path).unwrap();
         newer.sync_all().unwrap();
@@ -2310,6 +2313,95 @@ mod tests {
                 "please treat us well".into()
             ]
         );
+    }
+
+    // Regression test for https://github.com/vectordotdev/vector/issues/24027
+    // Tests that multi-character delimiters (like \r\n) are correctly handled when
+    // split across buffer boundaries. Without the fix, events would be merged together.
+    #[tokio::test]
+    async fn test_multi_char_delimiter_split_across_buffer_boundary() {
+        let dir = tempdir().unwrap();
+        let config = file::FileConfig {
+            include: vec![dir.path().join("*")],
+            line_delimiter: "\r\n".to_string(),
+            ..test_default_file_config(&dir)
+        };
+
+        let path = dir.path().join("file");
+        let received = run_file_source(&config, false, NoAcks, LogNamespace::Legacy, async {
+            let mut file = File::create(&path).unwrap();
+
+            sleep_500_millis().await;
+
+            // Create data where \r\n is split at 8KB buffer boundary
+            // This reproduces the exact scenario that caused data corruption:
+            // - Event 1 ends with \r at byte 8191
+            // - The \n appears at byte 8192 (right at the buffer boundary)
+            // - Without the fix, Event 1 and Event 2 would be merged
+
+            let buffer_size = 8192;
+
+            // Event 1: Position \r\n to split at first boundary
+            let event1_prefix = "Event 1: ";
+            let padding1_len = buffer_size - event1_prefix.len() - 1; // -1 for the \r
+            write!(&mut file, "{}", event1_prefix).unwrap();
+            file.write_all(&vec![b'X'; padding1_len]).unwrap();
+            write!(&mut file, "\r\n").unwrap(); // \r at byte 8191, \n at byte 8192
+
+            // Event 2: Position \r\n to split at second boundary
+            let event2_prefix = "Event 2: ";
+            let padding2_len = buffer_size - event2_prefix.len() - 1;
+            write!(&mut file, "{}", event2_prefix).unwrap();
+            file.write_all(&vec![b'Y'; padding2_len]).unwrap();
+            write!(&mut file, "\r\n").unwrap(); // \r at byte 16383, \n at byte 16384
+
+            // Event 3: Normal line without boundary split
+            write!(&mut file, "Event 3: Final\r\n").unwrap();
+
+            sleep_500_millis().await;
+        })
+        .await;
+
+        let messages = extract_messages_value(received);
+
+        // The bug would cause Events 1 and 2 to be merged into a single message
+        assert_eq!(
+            messages.len(),
+            3,
+            "Should receive exactly 3 separate events (bug would merge them)"
+        );
+
+        // Verify each event is correctly separated and starts with expected prefix
+        let msg0 = messages[0].to_string_lossy();
+        let msg1 = messages[1].to_string_lossy();
+        let msg2 = messages[2].to_string_lossy();
+
+        assert!(
+            msg0.starts_with("Event 1: "),
+            "First event should start with 'Event 1: ', got: {}",
+            msg0
+        );
+        assert!(
+            msg1.starts_with("Event 2: "),
+            "Second event should start with 'Event 2: ', got: {}",
+            msg1
+        );
+        assert_eq!(msg2, "Event 3: Final");
+
+        // Ensure no event contains embedded CR/LF (sign of incorrect merging)
+        for (i, msg) in messages.iter().enumerate() {
+            let msg_str = msg.to_string_lossy();
+            assert!(
+                !msg_str.contains('\r'),
+                "Event {} should not contain embedded \\r",
+                i
+            );
+            assert!(
+                !msg_str.contains('\n'),
+                "Event {} should not contain embedded \\n",
+                i
+            );
+        }
     }
 
     #[tokio::test]

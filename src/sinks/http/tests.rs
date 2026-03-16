@@ -843,7 +843,7 @@ async fn http_uri_auth_conflict() {
 
     tokio::spawn(server);
 
-    let expected_emitted_error_events = ["ServiceCallError", "SinkRequestBuildError"];
+    let expected_emitted_error_events = ["CallError", "SinkRequestBuildError"];
     run_and_assert_sink_error_with_events(
         sink,
         stream::once(ready(event)),

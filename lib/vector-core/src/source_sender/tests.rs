@@ -238,3 +238,69 @@ fn assert_counter_metric(metrics: &[Metric], name: &str, expected: f64) {
         "Only one {name} metric should be present"
     );
 }
+
+#[tokio::test]
+async fn emits_buffer_utilization_histogram_on_send_and_receive() {
+    const BUFFER_SIZE: usize = 2;
+
+    metrics::init_test();
+    let (mut sender, mut recv) = SourceSender::new_test_sender_with_options(BUFFER_SIZE, None);
+
+    let event = Event::Log(LogEvent::from("test event"));
+    sender
+        .send_event(event.clone())
+        .await
+        .expect("first send succeeds");
+    sender
+        .send_event(event)
+        .await
+        .expect("second send succeeds");
+
+    assert_buffer_metrics(BUFFER_SIZE, 2);
+
+    // Drain the channel so both the send and receive paths are exercised.
+    assert!(recv.next().await.is_some());
+    assert!(recv.next().await.is_some());
+
+    assert_buffer_metrics(BUFFER_SIZE, 0);
+}
+
+#[expect(clippy::cast_precision_loss)]
+fn assert_buffer_metrics(buffer_size: usize, level: usize) {
+    let metrics: Vec<_> = Controller::get()
+        .expect("metrics controller available")
+        .capture_metrics()
+        .into_iter()
+        .filter(|metric| metric.name().starts_with("source_buffer_"))
+        .collect();
+    assert_eq!(metrics.len(), 5, "expected 5 utilization metrics");
+
+    let find_metric = |name: &str| {
+        metrics
+            .iter()
+            .find(|m| m.name() == name)
+            .unwrap_or_else(|| panic!("missing metric: {name}"))
+    };
+
+    let metric = find_metric("source_buffer_utilization");
+    let tags = metric.tags().expect("utilization histogram has tags");
+    assert_eq!(tags.get("output"), Some("_default"));
+
+    let metric = find_metric("source_buffer_utilization_level");
+    let MetricValue::Gauge { value } = metric.value() else {
+        panic!("source_buffer_utilization_level should be a gauge");
+    };
+    assert_eq!(*value, level as f64);
+
+    let metric = find_metric("source_buffer_max_event_size");
+    let MetricValue::Gauge { value } = metric.value() else {
+        panic!("source_buffer_max_event_size should be a gauge");
+    };
+    assert_eq!(*value, buffer_size as f64);
+
+    let metric = find_metric("source_buffer_max_size_events");
+    let MetricValue::Gauge { value } = metric.value() else {
+        panic!("source_buffer_max_size_events should be a gauge");
+    };
+    assert_eq!(*value, buffer_size as f64);
+}

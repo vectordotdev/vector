@@ -37,23 +37,23 @@ cargo vdev release prepare --version "${NEW_VECTOR_VERSION}" --vrl-version "${NE
 ```
 
 Automated steps include:
-- [ ] Create a new release branch from master to freeze commits
+- Create a new release branch from master to freeze commits
   - `git fetch && git checkout origin/master && git checkout -b "${RELEASE_BRANCH}" && git push -u`
-- [ ] Create a new release preparation branch from `master`
+- Create a new release preparation branch from `master`
   - `git checkout -b "${PREP_BRANCH}" && git push -u`
-- [ ] Pin VRL to latest released version rather than `main`
-- [ ] Check if there is a newer version of [Alpine](https://alpinelinux.org/releases/) or [Debian](https://www.debian.org/releases/) available to update the release images in
+- Pin VRL to latest released version rather than `main`
+- Check if there is a newer version of [Alpine](https://alpinelinux.org/releases/) or [Debian](https://www.debian.org/releases/) available to update the release images in
       `distribution/docker/`. Update if so.
-- [ ] Run `cargo vdev build release-cue` to generate a new cue file for the release
-  - [ ] Copy VRL changelogs from the VRL version in the last Vector release as a new changelog entry
+- Run `cargo vdev build release-cue` to generate a new cue file for the release
+  - Copy VRL changelogs from the VRL version in the last Vector release as a new changelog entry
         ([example](https://github.com/vectordotdev/vector/blob/9c67bba358195f5018febca2f228dfcb2be794b5/website/cue/reference/releases/0.41.0.cue#L33-L64))
-- [ ] Update version number in `website/cue/reference/administration/interfaces/kubectl.cue`
-- [ ] Update version number in `distribution/install.sh`
-- [ ] Add new version to `website/cue/reference/versions.cue`
-- [ ] Create new release md file by copying an existing one in `./website/content/en/releases/` and
+- Update version number in `website/cue/reference/administration/interfaces/kubectl.cue`
+- Update version number in `distribution/install.sh`
+- Add new version to `website/cue/reference/versions.cue`
+- Create new release md file by copying an existing one in `./website/content/en/releases/` and
       updating version number
-- [ ] Commit these changes
-- [ ] Open PR against the release branch (`"${RELEASE_BRANCH}"`) for review
+- Commit these changes
+- Open PR against the release branch (`"${RELEASE_BRANCH}"`) for review
 
 ## 3. Manual Steps
 
@@ -92,11 +92,12 @@ Automated steps include:
     - Refer to the internal releasing doc to monitor the deployment.
 - [ ] Release Linux packages. Refer to the internal releasing doc.
 - [ ] Release updated Helm chart. See [releasing Helm chart](https://github.com/vectordotdev/helm-charts/blob/develop/RELEASING.md).
+- [ ] Release Homebrew. Refer to the internal releasing doc.
 - [ ] Create internal Docker images. Refer to the internal releasing doc.
+- [ ] Update the latest [release tag](https://github.com/vectordotdev/vector/releases) description with the release announcement.
 - [ ] Create a new PR with title starting as `chore(releasing):`
   - [ ] Cherry-pick any release commits from the release branch that are not on `master`, to `master`.
   - [ ] Run `cargo vdev build manifests` and commit changes.
   - [ ] Bump the release number in the `Cargo.toml` on master to the next minor release.
   - [ ] Also, update `Cargo.lock` with: `cargo update -p vector`.
   - [ ] If there is a VRL version update, revert it and make it track the git `main` branch and then run `cargo update -p vrl`.
-- [ ] Kick-off post-mortems for any regressions resolved by the release.

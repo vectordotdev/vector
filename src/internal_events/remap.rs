@@ -1,9 +1,10 @@
 use metrics::counter;
+use vector_lib::NamedInternalEvent;
 use vector_lib::internal_event::{
     ComponentEventsDropped, INTENTIONAL, InternalEvent, UNINTENTIONAL, error_stage, error_type,
 };
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct RemapMappingError {
     /// If set to true, the remap transform has dropped the event after a failed
     /// mapping. This internal event reflects that in its messaging.
@@ -34,7 +35,7 @@ impl InternalEvent for RemapMappingError {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct RemapMappingAbort {
     /// If set to true, the remap transform has dropped the event after an abort
     /// during mapping. This internal event reflects that in its messaging.

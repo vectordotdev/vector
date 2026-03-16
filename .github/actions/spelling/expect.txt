@@ -16,6 +16,7 @@ appname
 aqf
 architecting
 archs
+ASIM
 assertverify
 atag
 aton
@@ -129,6 +130,7 @@ datasources
 datid
 datname
 DBserver
+dcr
 ddagent
 ddev
 ddmetrics
@@ -430,6 +432,7 @@ pgo
 PIDs
 PII
 plainify
+plds
 ple
 podspec
 Ponge

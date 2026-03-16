@@ -1,6 +1,8 @@
 //! A collection of support structures that are used in the process of decoding
 //! bytes into events.
 
+mod config;
+mod decoder;
 mod error;
 pub mod format;
 pub mod framing;
@@ -8,6 +10,8 @@ pub mod framing;
 use std::fmt::Debug;
 
 use bytes::{Bytes, BytesMut};
+pub use config::DecodingConfig;
+pub use decoder::Decoder;
 pub use error::StreamDecodingError;
 pub use format::{
     BoxedDeserializer, BytesDeserializer, BytesDeserializerConfig, GelfDeserializer,

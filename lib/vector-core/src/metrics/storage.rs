@@ -3,8 +3,9 @@ use std::sync::{
     atomic::{AtomicU32, Ordering},
 };
 
-use metrics::{GaugeFn, HistogramFn, atomics::AtomicU64};
+use metrics::{HistogramFn, atomics::AtomicU64};
 use metrics_util::registry::Storage;
+use vector_common::atomic::AtomicF64;
 
 use crate::event::{MetricValue, metric::Bucket};
 
@@ -29,60 +30,16 @@ impl<K> Storage<K> for VectorStorage {
 }
 
 #[derive(Debug)]
-pub(super) struct AtomicF64 {
-    inner: AtomicU64,
-}
-
-impl AtomicF64 {
-    fn new(init: f64) -> Self {
-        Self {
-            inner: AtomicU64::new(init.to_bits()),
-        }
-    }
-
-    fn fetch_update(
-        &self,
-        set_order: Ordering,
-        fetch_order: Ordering,
-        mut f: impl FnMut(f64) -> f64,
-    ) {
-        self.inner
-            .fetch_update(set_order, fetch_order, |x| {
-                Some(f(f64::from_bits(x)).to_bits())
-            })
-            .expect("Cannot fail");
-    }
-
-    pub(super) fn load(&self, order: Ordering) -> f64 {
-        f64::from_bits(self.inner.load(order))
-    }
-}
-
-impl GaugeFn for AtomicF64 {
-    fn increment(&self, amount: f64) {
-        self.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |value| value + amount);
-    }
-
-    fn decrement(&self, amount: f64) {
-        self.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |value| value - amount);
-    }
-
-    fn set(&self, value: f64) {
-        self.inner.store(f64::to_bits(value), Ordering::Relaxed);
-    }
-}
-
-#[derive(Debug)]
 pub(super) struct Histogram {
-    buckets: Box<[(f64, AtomicU32); 20]>,
+    buckets: Box<[(f64, AtomicU32); 26]>,
     count: AtomicU64,
     sum: AtomicF64,
 }
 
 impl Histogram {
-    const MIN_BUCKET: f64 = 0.015_625; // (-6_f64).exp2() is not const yet
-    const MIN_BUCKET_EXP: f64 = -6.0;
-    const BUCKETS: usize = 20;
+    const MIN_BUCKET: f64 = 1.0 / (1 << 12) as f64; // f64::powi() is not const yet
+    const MIN_BUCKET_EXP: f64 = -12.0;
+    const BUCKETS: usize = 26;
 
     pub(crate) fn new() -> Self {
         // Box to avoid having this large array inline to the structure, blowing
@@ -95,25 +52,31 @@ impl Histogram {
         // long-tail. This also lets us find the right bucket to record into using simple
         // constant-time math operations instead of a loop-and-compare construct.
         let buckets = Box::new([
-            ((-6_f64).exp2(), AtomicU32::new(0)),
-            ((-5_f64).exp2(), AtomicU32::new(0)),
-            ((-4_f64).exp2(), AtomicU32::new(0)),
-            ((-3_f64).exp2(), AtomicU32::new(0)),
-            ((-2_f64).exp2(), AtomicU32::new(0)),
-            ((-1_f64).exp2(), AtomicU32::new(0)),
-            (0_f64.exp2(), AtomicU32::new(0)),
-            (1_f64.exp2(), AtomicU32::new(0)),
-            (2_f64.exp2(), AtomicU32::new(0)),
-            (3_f64.exp2(), AtomicU32::new(0)),
-            (4_f64.exp2(), AtomicU32::new(0)),
-            (5_f64.exp2(), AtomicU32::new(0)),
-            (6_f64.exp2(), AtomicU32::new(0)),
-            (7_f64.exp2(), AtomicU32::new(0)),
-            (8_f64.exp2(), AtomicU32::new(0)),
-            (9_f64.exp2(), AtomicU32::new(0)),
-            (10_f64.exp2(), AtomicU32::new(0)),
-            (11_f64.exp2(), AtomicU32::new(0)),
-            (12_f64.exp2(), AtomicU32::new(0)),
+            (2.0f64.powi(-12), AtomicU32::new(0)),
+            (2.0f64.powi(-11), AtomicU32::new(0)),
+            (2.0f64.powi(-10), AtomicU32::new(0)),
+            (2.0f64.powi(-9), AtomicU32::new(0)),
+            (2.0f64.powi(-8), AtomicU32::new(0)),
+            (2.0f64.powi(-7), AtomicU32::new(0)),
+            (2.0f64.powi(-6), AtomicU32::new(0)),
+            (2.0f64.powi(-5), AtomicU32::new(0)),
+            (2.0f64.powi(-4), AtomicU32::new(0)),
+            (2.0f64.powi(-3), AtomicU32::new(0)),
+            (2.0f64.powi(-2), AtomicU32::new(0)),
+            (2.0f64.powi(-1), AtomicU32::new(0)),
+            (2.0f64.powi(0), AtomicU32::new(0)),
+            (2.0f64.powi(1), AtomicU32::new(0)),
+            (2.0f64.powi(2), AtomicU32::new(0)),
+            (2.0f64.powi(3), AtomicU32::new(0)),
+            (2.0f64.powi(4), AtomicU32::new(0)),
+            (2.0f64.powi(5), AtomicU32::new(0)),
+            (2.0f64.powi(6), AtomicU32::new(0)),
+            (2.0f64.powi(7), AtomicU32::new(0)),
+            (2.0f64.powi(8), AtomicU32::new(0)),
+            (2.0f64.powi(9), AtomicU32::new(0)),
+            (2.0f64.powi(10), AtomicU32::new(0)),
+            (2.0f64.powi(11), AtomicU32::new(0)),
+            (2.0f64.powi(12), AtomicU32::new(0)),
             (f64::INFINITY, AtomicU32::new(0)),
         ]);
         Self {

@@ -1,9 +1,10 @@
 use vector_lib::{
-    codecs::{CsvSerializerConfig, JsonSerializerConfig, encoding::SerializerConfig},
+    codecs::{
+        CsvSerializerConfig, EncodingConfig, JsonSerializerConfig, Transformer,
+        encoding::SerializerConfig,
+    },
     configurable::configurable_component,
 };
-
-use crate::codecs::{EncodingConfig, Transformer};
 
 /// Serializer configuration for Databend.
 #[configurable_component]

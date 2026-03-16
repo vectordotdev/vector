@@ -5,6 +5,7 @@ use vector_lib::{
     configurable::configurable_component,
     event::{Event, EventRef, LogEvent, Value},
 };
+use vector_vrl_metrics::MetricsStorage;
 use vrl::{
     datadog_filter::{
         Filter, Matcher, Resolver, Run, build_matcher,
@@ -86,6 +87,7 @@ impl ConditionalConfig for DatadogSearchConfig {
     fn build(
         &self,
         _enrichment_tables: &vector_lib::enrichment::TableRegistry,
+        _: &MetricsStorage,
     ) -> crate::Result<Condition> {
         Ok(Condition::DatadogSearch(self.try_into()?))
     }
@@ -1268,9 +1270,9 @@ mod test {
             ),
             // negate OR of two values
             (
-                "-@field:value1 OR -@field:value2",
-                log_event!["field" => "value"],
-                log_event!["field" => "value2"],
+                "-@field1:value1 OR -@field2:value2",
+                log_event!["field1" => "value1"],
+                log_event!["field1" => "value1", "field2" => "value2"],
             ),
             // default AND of two values
             (
@@ -1639,7 +1641,7 @@ mod test {
 
             // Every query should build successfully.
             let cond = config
-                .build(&Default::default())
+                .build(&Default::default(), &Default::default())
                 .unwrap_or_else(|_| panic!("build failed: {source}"));
 
             assert!(
