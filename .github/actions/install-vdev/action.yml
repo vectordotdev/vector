@@ -20,7 +20,8 @@ runs:
       uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
       with:
         path: ~/.cargo/bin/vdev
-        key: ${{ runner.os }}-vdev-${{ hashFiles('vdev/**', 'Cargo.toml', 'Cargo.lock') }}
+        # WARNING: this key need to be in sync with the key in .github/actions/setup/action.yml
+        key: ${{ runner.os }}-vdev-${{ hashFiles('vdev/**', 'lib/vector-vrl/**', 'Cargo.toml', 'Cargo.lock') }}
         restore-keys: |
           ${{ runner.os }}-vdev-
 
@@ -36,7 +37,8 @@ runs:
       uses: actions/cache/save@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
       with:
         path: ~/.cargo/bin/vdev
-        key: ${{ runner.os }}-vdev-${{ hashFiles('vdev/**', 'Cargo.toml', 'Cargo.lock') }}
+        # WARNING: this key need to be in sync with the key in .github/actions/setup/action.yml
+        key: ${{ runner.os }}-vdev-${{ hashFiles('vdev/**', 'lib/vector-vrl/**', 'Cargo.toml', 'Cargo.lock') }}
 
     - name: Set VDEV environment variable
       shell: bash

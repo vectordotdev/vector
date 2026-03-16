@@ -5,7 +5,8 @@ use std::{
     pin::Pin,
     task::{Context, Poll},
 };
-use tokio_util::codec::{Decoder, FramedRead};
+use tokio_util::codec::Decoder;
+use vector_lib::codecs::DecoderFramedRead;
 
 use pin_project::pin_project;
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
@@ -142,7 +143,7 @@ where
 #[pin_project]
 pub struct LenientFramedRead<T, D> {
     #[pin]
-    inner: FramedRead<T, LenientFramedReadDecoder<D>>,
+    inner: DecoderFramedRead<T, LenientFramedReadDecoder<D>>,
 }
 
 impl<T, D> LenientFramedRead<T, D>
@@ -153,7 +154,7 @@ where
     /// Creates a new `LenientFramedRead` with the given `decoder`.
     pub fn new(inner: T, decoder: D) -> Self {
         Self {
-            inner: FramedRead::new(inner, LenientFramedReadDecoder::new(decoder)),
+            inner: DecoderFramedRead::new(inner, LenientFramedReadDecoder::new(decoder)),
         }
     }
 
