@@ -118,6 +118,11 @@ async fn subscription(
                 continue;
             }
         };
+        let initial_components = state
+            .components
+            .keys()
+            .map(|k| k.id().to_string())
+            .collect();
         _ = tx.send(EventType::InitializeState(state)).await;
 
         // Subscribe to updated metrics via gRPC streaming
@@ -126,6 +131,7 @@ async fn subscription(
             tx.clone(),
             opts.interval as i64,
             opts.components.clone(),
+            initial_components,
         )
         .await
         {

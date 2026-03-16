@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, HashMap, HashSet},
     sync::Arc,
     time::Duration,
 };
@@ -34,8 +34,9 @@ async fn poll_components(
     tx: state::EventTx,
     interval_ms: i64,
     components_patterns: Arc<Vec<Pattern>>,
+    initial_components: HashSet<String>,
 ) {
-    let mut known_components: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut known_components = initial_components;
     // Always poll at least once per second regardless of the metrics update interval,
     // to avoid excessive GetComponents calls when the interval is very short (e.g. 100ms).
     const MIN_POLL_INTERVAL_MS: u64 = 1000;
@@ -459,6 +460,7 @@ pub async fn subscribe(
     tx: state::EventTx,
     interval: i64,
     components_patterns: Vec<Pattern>,
+    initial_components: HashSet<String>,
 ) -> Result<Vec<JoinHandle<()>>, vector_api_client::Error> {
     let components_patterns = Arc::new(components_patterns);
 
@@ -472,6 +474,7 @@ pub async fn subscribe(
             tx.clone(),
             interval,
             Arc::clone(&components_patterns),
+            initial_components,
         )),
         tokio::spawn(received_bytes_totals(
             client.clone(),
