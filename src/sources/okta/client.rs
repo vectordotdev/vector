@@ -14,7 +14,7 @@ use tokio_util::codec::Decoder as _;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::{
-        JsonDeserializerConfig, StreamDecodingError,
+        Decoder, DecodingConfig, JsonDeserializerConfig, StreamDecodingError,
         decoding::{DeserializerConfig, FramingConfig},
     },
     config::{LogNamespace, SourceOutput, proxy::ProxyConfig},
@@ -27,17 +27,17 @@ use vector_lib::{
 
 use crate::{
     SourceSender,
-    codecs::{Decoder, DecodingConfig},
     config::{SourceConfig, SourceContext},
     http::{HttpClient, HttpError},
     internal_events::{
-        DecoderDeserializeError, EndpointBytesReceived, HttpClientEventsReceived,
-        HttpClientHttpError, HttpClientHttpResponseError, StreamClosedError,
+        EndpointBytesReceived, HttpClientEventsReceived, HttpClientHttpError,
+        HttpClientHttpResponseError, StreamClosedError,
     },
     sources,
     sources::util::http_client::{default_interval, default_timeout, warn_if_interval_too_low},
     tls::TlsSettings,
 };
+use vector_lib::codecs::internal_events::DecoderDeserializeError;
 
 /// Configuration for the `okta` source.
 #[serde_as]
@@ -408,7 +408,7 @@ fn decode_events(buf: &mut BytesMut, mut decoder: Decoder) -> Vec<Event> {
             }
             Ok(None) => break,
             Err(error) => {
-                // Error is logged by `crate::codecs::Decoder`, no further
+                // Error is logged by `vector_lib::codecs::Decoder`, no further
                 // handling is needed here.
                 if !error.can_continue() {
                     break;

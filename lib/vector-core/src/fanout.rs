@@ -490,6 +490,7 @@ mod tests {
             WhenFull::Block,
             &Span::current(),
             None,
+            None,
         )
     }
 

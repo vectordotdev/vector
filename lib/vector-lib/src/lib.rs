@@ -10,10 +10,10 @@ pub use vector_buffers as buffers;
 #[cfg(feature = "test")]
 pub use vector_common::event_test_util;
 pub use vector_common::{
-    Error, NamedInternalEvent, Result, TimeZone, assert_event_data_eq, btreemap, byte_size_of,
-    byte_size_of::ByteSizeOf, conversion, encode_logfmt, finalization, finalizer, id,
+    Error, NamedInternalEvent, Result, TimeZone, assert_event_data_eq, atomic, btreemap,
+    byte_size_of, byte_size_of::ByteSizeOf, conversion, encode_logfmt, finalization, finalizer, id,
     impl_event_data_eq, internal_event, json_size, registered_event, request_metadata,
-    sensitive_string, shutdown, trigger,
+    sensitive_string, shutdown, stats, trigger,
 };
 pub use vector_config as configurable;
 pub use vector_config::impl_generate_config_from_default;
@@ -21,8 +21,8 @@ pub use vector_config::impl_generate_config_from_default;
 pub use vector_core::compile_vrl;
 pub use vector_core::{
     EstimatedJsonEncodedSizeOf, buckets, default_data_dir, emit, event, fanout, ipallowlist,
-    metric_tags, metrics, partition, quantiles, register, samples, schema, serde, sink, source,
-    source_sender, tcp, tls, transform,
+    latency, metric_tags, metrics, partition, quantiles, register, samples, schema, serde, sink,
+    source, source_sender, tcp, tls, transform,
 };
 pub use vector_lookup as lookup;
 pub use vector_stream as stream;

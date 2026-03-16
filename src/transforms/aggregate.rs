@@ -7,7 +7,6 @@ use std::{
 use async_stream::stream;
 use futures::{Stream, StreamExt};
 use vector_lib::{
-    config::LogNamespace,
     configurable::configurable_component,
     event::{
         MetricValue,
@@ -25,7 +24,7 @@ use crate::{
 
 /// Configuration for the `aggregate` transform.
 #[configurable_component(transform("aggregate", "Aggregate metrics passing through a topology."))]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct AggregateConfig {
     /// The interval between flushes, in milliseconds.
@@ -43,7 +42,7 @@ pub struct AggregateConfig {
 }
 
 #[configurable_component]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 #[configurable(description = "The aggregation mode to use.")]
 pub enum AggregationMode {
     /// Default mode. Sums incremental metrics and uses the latest value for absolute metrics.
@@ -98,9 +97,8 @@ impl TransformConfig for AggregateConfig {
 
     fn outputs(
         &self,
-        _: vector_lib::enrichment::TableRegistry,
+        _: &TransformContext,
         _: &[(OutputId, schema::Definition)],
-        _: LogNamespace,
     ) -> Vec<TransformOutput> {
         vec![TransformOutput::new(DataType::Metric, HashMap::new())]
     }
@@ -124,7 +122,7 @@ impl Aggregate {
             map: Default::default(),
             prev_map: Default::default(),
             multi_map: Default::default(),
-            mode: config.mode.clone(),
+            mode: config.mode,
         })
     }
 
@@ -365,7 +363,7 @@ mod tests {
     use futures::stream;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
-    use vector_lib::config::ComponentKey;
+    use vector_lib::config::{ComponentKey, LogNamespace};
     use vrl::value::Kind;
 
     use super::*;

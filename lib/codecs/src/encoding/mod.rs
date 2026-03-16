@@ -2,12 +2,20 @@
 //! events into bytes.
 
 pub mod chunking;
+mod config;
+mod encoder;
 pub mod format;
 pub mod framing;
 pub mod serializer;
+mod transformer;
 pub use chunking::{Chunker, Chunking, GelfChunker};
+pub use config::{EncodingConfig, EncodingConfigWithFraming, SinkType};
+pub use encoder::{BatchEncoder, BatchSerializer, Encoder, EncoderKind};
 #[cfg(feature = "arrow")]
-pub use format::{ArrowEncodingError, ArrowStreamSerializer, ArrowStreamSerializerConfig};
+pub use format::{
+    ArrowEncodingError, ArrowStreamSerializer, ArrowStreamSerializerConfig, SchemaProvider,
+    find_null_non_nullable_fields,
+};
 pub use format::{
     AvroSerializer, AvroSerializerConfig, AvroSerializerOptions, CefSerializer,
     CefSerializerConfig, CsvSerializer, CsvSerializerConfig, GelfSerializer, GelfSerializerConfig,
@@ -19,6 +27,8 @@ pub use format::{
 };
 #[cfg(feature = "opentelemetry")]
 pub use format::{OtlpSerializer, OtlpSerializerConfig};
+#[cfg(feature = "syslog")]
+pub use format::{SyslogSerializer, SyslogSerializerConfig};
 pub use framing::{
     BoxedFramer, BoxedFramingError, BytesEncoder, BytesEncoderConfig, CharacterDelimitedEncoder,
     CharacterDelimitedEncoderConfig, CharacterDelimitedEncoderOptions, Framer, FramingConfig,
@@ -29,6 +39,7 @@ pub use framing::{
 #[cfg(feature = "arrow")]
 pub use serializer::BatchSerializerConfig;
 pub use serializer::{Serializer, SerializerConfig};
+pub use transformer::{TimestampFormat, Transformer};
 
 /// An error that occurred while building an encoder.
 pub type BuildError = Box<dyn std::error::Error + Send + Sync + 'static>;

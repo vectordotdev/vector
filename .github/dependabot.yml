@@ -25,6 +25,10 @@ updates:
       aws:
         patterns:
         - "aws-*"
+      aws-security:
+        applies-to: security-updates
+        patterns:
+        - "aws-*"
       azure:
         patterns:
         - "azure_*"
@@ -102,6 +106,36 @@ updates:
           - "*"
   - package-ecosystem: "docker"
     directory: "/distribution/docker/debian"
+    schedule:
+      interval: "monthly"
+      time: "04:00" # UTC
+    labels:
+      - "domain: releasing"
+      - "no-changelog"
+    commit-message:
+      prefix: "chore(deps)"
+    open-pull-requests-limit: 100
+    groups:
+      docker-images:
+        patterns:
+          - "*"
+  - package-ecosystem: "docker"
+    directory: "/distribution/docker/distroless-static"
+    schedule:
+      interval: "monthly"
+      time: "04:00" # UTC
+    labels:
+      - "domain: releasing"
+      - "no-changelog"
+    commit-message:
+      prefix: "chore(deps)"
+    open-pull-requests-limit: 100
+    groups:
+      docker-images:
+        patterns:
+          - "*"
+  - package-ecosystem: "docker"
+    directory: "/distribution/docker/distroless-libc"
     schedule:
       interval: "monthly"
       time: "04:00" # UTC

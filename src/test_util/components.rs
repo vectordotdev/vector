@@ -66,11 +66,12 @@ pub const HTTP_SINK_TAGS: [&str; 2] = ["endpoint", "protocol"];
 pub const AWS_SINK_TAGS: [&str; 2] = ["protocol", "region"];
 
 /// The set of suffixes that define the source/transform buffer metric family.
-const BUFFER_METRIC_SUFFIXES: [&str; 3] = [
-    // While hypothetically possible, the `max_byte_size` metric is never actually emitted, because
-    // both sources and transforms limit their buffers by event count. If we ever allow
-    // configuration by byte size, we will need to account for this in these tests.
+const BUFFER_METRIC_SUFFIXES: [&str; 4] = [
+    // While hypothetically possible, the `max_byte_size`/`max_size_bytes` metrics are never
+    // actually emitted, because both sources and transforms limit their buffers by event count. If
+    // we ever allow configuration by byte size, we will need to account for this in these tests.
     "max_event_size",
+    "max_size_events",
     "utilization",
     "utilization_level",
 ];

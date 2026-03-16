@@ -11,11 +11,10 @@ use tokio::{
     time::{self, Duration, Instant, sleep},
 };
 use tokio_stream::wrappers::IntervalStream;
-use tokio_util::codec::FramedRead;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::{
-        StreamDecodingError,
+        Decoder, DecoderFramedRead, DecodingConfig, StreamDecodingError,
         decoding::{DeserializerConfig, FramingConfig},
     },
     config::{LegacyKey, LogNamespace, log_schema},
@@ -27,7 +26,6 @@ use vrl::{path::OwnedValuePath, value::Kind};
 
 use crate::{
     SourceSender,
-    codecs::{Decoder, DecodingConfig},
     config::{SourceConfig, SourceContext, SourceOutput},
     event::Event,
     internal_events::{
@@ -729,7 +727,7 @@ fn spawn_reader_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
     drop(tokio::spawn(async move {
         debug!("Start capturing {} command output.", origin);
 
-        let mut stream = FramedRead::new(reader, decoder);
+        let mut stream = DecoderFramedRead::new(reader, decoder);
         while let Some(result) = stream.next().await {
             match result {
                 Ok(next) => {
@@ -741,7 +739,7 @@ fn spawn_reader_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
                     }
                 }
                 Err(error) => {
-                    // Error is logged by `crate::codecs::Decoder`, no further
+                    // Error is logged by `vector_lib::codecs::Decoder`, no further
                     // handling is needed here.
                     if !error.can_continue() {
                         break;

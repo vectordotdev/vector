@@ -421,6 +421,12 @@ impl From<bool> for LogNamespace {
     }
 }
 
+impl From<LogNamespace> for bool {
+    fn from(x: LogNamespace) -> Self {
+        x == LogNamespace::Vector
+    }
+}
+
 /// A shortcut to specify no `LegacyKey` should be used (since otherwise a turbofish would be required)
 pub const NO_LEGACY_KEY: Option<LegacyKey<&'static str>> = None;
 

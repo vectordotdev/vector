@@ -12,7 +12,7 @@ use vector_lib::{
     event::{Event, LogEvent},
 };
 
-use crate::codecs::Encoder;
+use vector_lib::codecs::Encoder;
 
 /// A test case event for deserialization from yaml file.
 /// This is an intermediary step to TestEvent.
