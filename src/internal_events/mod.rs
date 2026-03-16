@@ -28,7 +28,6 @@ mod aws_kinesis_firehose;
 #[cfg(any(feature = "sources-aws_s3", feature = "sources-aws_sqs",))]
 mod aws_sqs;
 mod batch;
-mod codecs;
 mod common;
 mod conditions;
 #[cfg(feature = "sources-datadog_agent")]
@@ -52,6 +51,12 @@ mod encoding_transcode;
 mod eventstoredb_metrics;
 #[cfg(feature = "sources-exec")]
 mod exec;
+#[cfg(any(
+    feature = "sources-file",
+    feature = "sources-kubernetes_logs",
+    feature = "sinks-file",
+))]
+mod file;
 #[cfg(any(feature = "sources-file_descriptor", feature = "sources-stdin"))]
 mod file_descriptor;
 #[cfg(feature = "transforms-filter")]
@@ -143,13 +148,8 @@ mod websocket;
 mod websocket_server;
 #[cfg(feature = "transforms-window")]
 mod window;
-
-#[cfg(any(
-    feature = "sources-file",
-    feature = "sources-kubernetes_logs",
-    feature = "sinks-file",
-))]
-mod file;
+#[cfg(all(windows, feature = "sources-windows_event_log"))]
+mod windows_event_log;
 
 #[cfg(windows)]
 mod windows;
@@ -187,7 +187,6 @@ pub(crate) use self::aws_kinesis::*;
 pub(crate) use self::aws_kinesis_firehose::*;
 #[cfg(any(feature = "sources-aws_s3", feature = "sources-aws_sqs",))]
 pub(crate) use self::aws_sqs::*;
-pub(crate) use self::codecs::*;
 #[cfg(feature = "sources-datadog_agent")]
 pub(crate) use self::datadog_agent::*;
 #[cfg(feature = "sinks-datadog_metrics")]
@@ -300,6 +299,8 @@ pub(crate) use self::websocket_server::*;
 pub(crate) use self::window::*;
 #[cfg(windows)]
 pub(crate) use self::windows::*;
+#[cfg(all(windows, feature = "sources-windows_event_log"))]
+pub(crate) use self::windows_event_log::*;
 pub use self::{
     adaptive_concurrency::*, batch::*, common::*, conditions::*, encoding_transcode::*,
     heartbeat::*, http::*, open::*, process::*, socket::*, tcp::*, template::*, udp::*,

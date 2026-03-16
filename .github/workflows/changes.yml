@@ -52,8 +52,6 @@ on:
         value: ${{ jobs.source.outputs.test-yml }}
       integration-yml:
         value: ${{ jobs.source.outputs.integration-yml }}
-      cli-yml:
-        value: ${{ jobs.source.outputs.cli-yml }}
       test-make-command-yml:
         value: ${{ jobs.source.outputs.test-make-command-yml }}
       msrv-yml:
@@ -155,6 +153,11 @@ on:
         value: ${{ jobs.int_tests.outputs.any }}
       e2e-tests-any:
         value: ${{ jobs.e2e_tests.outputs.any }}
+
+# Workflow-level permissions - read access to repository contents
+permissions:
+  contents: read  # Required to checkout code
+
 env:
   BASE_SHA: ${{ inputs.base_ref || (github.event_name == 'merge_group' && github.event.merge_group.base_sha) || github.event.pull_request.base.sha }}
   HEAD_SHA: ${{ inputs.head_ref || (github.event_name == 'merge_group' && github.event.merge_group.head_sha) || github.event.pull_request.head.sha }}
@@ -179,14 +182,13 @@ jobs:
       website_only: ${{ steps.filter.outputs.website == 'true' && steps.filter.outputs.not_website == 'false' }}
       test-yml: ${{ steps.filter.outputs.test-yml }}
       integration-yml: ${{ steps.filter.outputs.integration-yml }}
-      cli-yml: ${{ steps.filter.outputs.cli-yml }}
       test-make-command-yml: ${{ steps.filter.outputs.test-make-command-yml }}
       msrv-yml: ${{ steps.filter.outputs.msrv-yml }}
       cross-yml: ${{ steps.filter.outputs.cross-yml }}
       unit_mac-yml: ${{ steps.filter.outputs.unit_mac-yml }}
       unit_windows-yml: ${{ steps.filter.outputs.unit_windows-yml }}
     steps:
-    - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
     - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
       id: filter
@@ -229,7 +231,11 @@ jobs:
           component_docs:
             - 'scripts/generate-component-docs.rb'
             - "vdev/**"
-            - 'website/cue/**/base/**.cue'
+            - 'website/cue/**/*.cue'
+            - 'docs/generated/**'
+            # If changes to the VRL sha is made the combined generated cue file will change which
+            # may cause issues
+            - 'Cargo.lock'
             - ".github/workflows/changes.yml"
           markdown:
             - '**/**.md'
@@ -254,6 +260,9 @@ jobs:
             - "src/sources/kubernetes_logs/**"
             - "lib/k8s-e2e-tests/**"
             - "lib/k8s-test-framework/**"
+            - "scripts/test-e2e-kubernetes.sh"
+            - "scripts/build-docker.sh"
+            - "scripts/deploy-chart-test.sh"
             - ".github/workflows/k8s_e2e.yml"
             - ".github/workflows/changes.yml"
           website:
@@ -265,9 +274,6 @@ jobs:
             - ".github/workflows/changes.yml"
           integration-yml:
             - ".github/workflows/integration.yml"
-            - ".github/workflows/changes.yml"
-          cli-yml:
-            - ".github/workflows/cli.yml"
             - ".github/workflows/changes.yml"
           test-make-command-yml:
             - ".github/workflows/test-make-command.yml"
@@ -289,8 +295,10 @@ jobs:
   # Detects changes that are specific to integration tests
   int_tests:
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 15
     if: ${{ inputs.int_tests }}
+    permissions:
+      contents: read
     outputs:
       amqp: ${{ steps.filter.outputs.amqp }}
       appsignal: ${{ steps.filter.outputs.appsignal}}
@@ -332,7 +340,7 @@ jobs:
       webhdfs: ${{ steps.filter.outputs.webhdfs }}
       any: ${{ steps.detect-changes.outputs.any }}
     steps:
-      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - uses: ./.github/actions/setup
         with:
@@ -407,7 +415,7 @@ jobs:
           echo "any=$any_changed" >> $GITHUB_OUTPUT
 
       - name: Upload JSON artifact
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: int_tests_changes
           path: int_tests_changes.json
@@ -415,8 +423,10 @@ jobs:
   # Detects changes that are specific to e2e tests
   e2e_tests:
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 15
     if: ${{ inputs.e2e_tests }}
+    permissions:
+      contents: read
     outputs:
       datadog-logs: ${{ steps.filter.outputs.datadog-logs }}
       datadog-metrics: ${{ steps.filter.outputs.datadog-metrics }}
@@ -424,7 +434,7 @@ jobs:
       opentelemetry-metrics: ${{ steps.filter.outputs.opentelemetry-metrics }}
       any: ${{ steps.detect-changes.outputs.any }}
     steps:
-      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - uses: ./.github/actions/setup
         with:
@@ -467,7 +477,7 @@ jobs:
           echo "any=$any_changed" >> $GITHUB_OUTPUT
 
       - name: Upload JSON artifact
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: e2e_tests_changes
           path: e2e_tests_changes.json

@@ -273,13 +273,51 @@ components: sources: internal_metrics: {
 				reason: _reason
 			}
 		}
+		component_latency_seconds: {
+			description: """
+				The elapsed time, in fractional seconds, that an event spends in a single transform.
+
+				This includes both the time spent queued in the transform’s input buffer and the time spent executing the transform itself.
+				"""
+			type:              "histogram"
+			default_namespace: "vector"
+			tags:              _internal_metrics_tags
+		}
+		component_latency_mean_seconds: {
+			description: """
+				The mean elapsed time, in fractional seconds, that an event spends in a single transform.
+
+				This includes both the time spent queued in the transform’s input buffer and the time spent executing the transform itself.
+
+				This value is smoothed over time using an exponentially weighted moving average (EWMA).
+				"""
+			type:              "gauge"
+			default_namespace: "vector"
+			tags:              _internal_metrics_tags
+		}
 		buffer_byte_size: {
-			description:       "The number of bytes current in the buffer."
+			description:        "The number of bytes currently in the buffer."
+			type:               "gauge"
+			default_namespace:  "vector"
+			tags:               _component_tags
+			deprecated:         true
+			deprecated_message: "This metric has been deprecated in favor of [`buffer_size_bytes`](#buffer_size_bytes)."
+		}
+		buffer_events: {
+			description:        "The number of events currently in the buffer."
+			type:               "gauge"
+			default_namespace:  "vector"
+			tags:               _component_tags
+			deprecated:         true
+			deprecated_message: "This metric has been deprecated in favor of [`buffer_size_events`](#buffer_size_events)."
+		}
+		buffer_size_bytes: {
+			description:       "The number of bytes currently in the buffer."
 			type:              "gauge"
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
-		buffer_events: {
+		buffer_size_events: {
 			description:       "The number of events currently in the buffer."
 			type:              "gauge"
 			default_namespace: "vector"
@@ -743,8 +781,28 @@ components: sources: internal_metrics: {
 			tags: _component_tags & {
 				output: _output
 			}
+			deprecated:         true
+			deprecated_message: "This metric has been deprecated in favor of [`source_buffer_max_size_bytes`](#source_buffer_max_size_bytes)."
 		}
 		source_buffer_max_event_size: {
+			description:       "The maximum number of events the source buffer can hold. The outputs of the source send data to this buffer."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags: _component_tags & {
+				output: _output
+			}
+			deprecated:         true
+			deprecated_message: "This metric has been deprecated in favor of [`source_buffer_max_size_events`](#source_buffer_max_size_events)."
+		}
+		source_buffer_max_size_bytes: {
+			description:       "The maximum number of bytes the source buffer can hold. The outputs of the source send data to this buffer."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags: _component_tags & {
+				output: _output
+			}
+		}
+		source_buffer_max_size_events: {
 			description:       "The maximum number of events the source buffer can hold. The outputs of the source send data to this buffer."
 			type:              "gauge"
 			default_namespace: "vector"
@@ -864,17 +922,45 @@ components: sources: internal_metrics: {
 		tag_value_limit_exceeded_total: {
 			description: """
 				The total number of events discarded because the tag has been rejected after
-				hitting the configured `value_limit`.
+				hitting the configured `value_limit`. When `internal_metrics.include_extended_tags`
+				is enabled in the `tag_cardinality_limit` transform, this metric includes
+				`metric_name` and `tag_key` labels. By default, this metric has no labels to
+				keep cardinality low.
 				"""
 			type:              "counter"
 			default_namespace: "vector"
-			tags:              _component_tags
+			tags: _component_tags & {
+				metric_name: {
+					description: """
+						The name of the metric whose tag value limit was exceeded.
+						Only present when `internal_metrics.include_extended_tags` is enabled.
+						"""
+					required: false
+				}
+				tag_key: {
+					description: """
+						The key of the tag whose value limit was exceeded.
+						Only present when `internal_metrics.include_extended_tags` is enabled.
+						"""
+					required: false
+				}
+			}
 		}
 		timestamp_parse_errors_total: {
 			description:       "The total number of errors encountered parsing [RFC 3339](\(urls.rfc_3339)) timestamps."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags
+		}
+		transform_buffer_max_byte_size: {
+			description:       "The maximum number of bytes the buffer that feeds into a transform can hold."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags: _component_tags & {
+				output: _output
+			}
+			deprecated:         true
+			deprecated_message: "This metric has been deprecated in favor of [`transform_buffer_max_size_bytes`](#transform_buffer_max_size_bytes)."
 		}
 		transform_buffer_max_event_size: {
 			description:       "The maximum number of events the buffer that feeds into a transform can hold."
@@ -883,9 +969,19 @@ components: sources: internal_metrics: {
 			tags: _component_tags & {
 				output: _output
 			}
+			deprecated:         true
+			deprecated_message: "This metric has been deprecated in favor of [`transform_buffer_max_size_events`](#transform_buffer_max_size_events)."
 		}
-		transform_buffer_max_byte_size: {
+		transform_buffer_max_size_bytes: {
 			description:       "The maximum number of bytes the buffer that feeds into a transform can hold."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags: _component_tags & {
+				output: _output
+			}
+		}
+		transform_buffer_max_size_events: {
+			description:       "The maximum number of events the buffer that feeds into a transform can hold."
 			type:              "gauge"
 			default_namespace: "vector"
 			tags: _component_tags & {

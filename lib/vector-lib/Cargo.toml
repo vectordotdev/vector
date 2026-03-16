@@ -7,7 +7,7 @@ publish = false
 
 [dependencies]
 codecs = { path = "../codecs", default-features = false }
-enrichment = { path = "../enrichment" }
+enrichment = { path = "../vector-vrl/enrichment" }
 file-source = { path = "../file-source", optional = true }
 file-source-common = { path = "../file-source-common", optional = true }
 opentelemetry-proto = { path = "../opentelemetry-proto", optional = true }
@@ -34,5 +34,5 @@ opentelemetry = ["dep:opentelemetry-proto", "codecs/opentelemetry"]
 prometheus = ["dep:prometheus-parser"]
 proptest = ["vector-lookup/proptest", "vrl/proptest"]
 syslog = ["codecs/syslog"]
-test = ["vector-core/test"]
+test = ["codecs/test", "vector-core/test"]
 vrl = ["vector-core/vrl", "dep:vrl"]
