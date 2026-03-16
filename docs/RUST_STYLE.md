@@ -90,6 +90,8 @@ Code in Vector should **NOT** panic under normal circumstances.
 
 ## Feature Flags
 
+### Component Feature Flags
+
 New components (sources, sinks, transforms) must be behind feature flags:
 
 ```bash
@@ -98,3 +100,26 @@ cargo test --lib --no-default-features --features sinks-console sinks::console
 ```
 
 See `features` section in `Cargo.toml` for examples.
+
+### Cargo Dependency Feature Placement
+
+Cargo features are additive: once any crate in the dependency graph enables a feature, it is enabled for the entire build. This can be surprising — enabling a feature in one crate silently turns it on everywhere.
+
+Always set `default-features = false` in `[workspace.dependencies]`. For feature declarations, the rule is simple:
+
+- If only one crate needs a feature, declare it in that crate's own `Cargo.toml`.
+- If multiple crates need it, declare it in `[workspace.dependencies]`.
+
+Add a short comment near the dependency when the feature setup is non-obvious.
+
+**Auditing:** when unsure whether a feature is truly needed or only transitively enabled, verify with:
+
+```bash
+# Show the full feature tree for the workspace
+cargo tree -e features
+
+# Narrow down to a specific dependency
+cargo tree -e features -i <crate-name>
+```
+
+The `-i` (invert) flag shows which crates depend on `<crate-name>` and which features they activate, useful for tracing where a feature is coming from. If a feature only appears because another crate enables it, and your crate relies on that feature being present, declare it explicitly — otherwise your crate silently breaks if the other crate ever stops enabling it.
