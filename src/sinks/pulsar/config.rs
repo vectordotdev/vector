@@ -310,7 +310,7 @@ impl PulsarSinkConfig {
                             .map_or(default_retry_options.keep_alive, |secs| {
                                 Duration::from_secs(secs)
                             }),
-                        connection_max_idle: Default::default(), // TODO make this configurable
+                        connection_max_idle: Default::default(),
                     }
                 });
 
