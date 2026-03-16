@@ -60,6 +60,7 @@ Bedove
 Benss
 bigendian
 bindir
+binstall
 binfmt
 bitcast
 bitcode
