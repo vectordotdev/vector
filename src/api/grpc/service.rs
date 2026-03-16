@@ -46,7 +46,7 @@ fn filter_and_group_metrics(metrics: &[Metric], metric_name: &str) -> HashMap<St
             && let Some(component_id) = tags.get("component_id")
             && let Some(value) = get_metric_value(metric)
         {
-            result.insert(component_id.to_string(), value);
+            *result.entry(component_id.to_string()).or_insert(0.0) += value;
         }
     }
 
