@@ -19,30 +19,9 @@ generated: configuration: {
 				}
 				enabled: {
 					type: bool: default: false
-					description: "Whether the GraphQL API is enabled for this Vector instance."
+					description: "Whether the API is enabled for this Vector instance."
 					common:      true
 					required:    false
-				}
-				graphql: {
-					type: bool: default: true
-					description: """
-						Whether the endpoint for receiving and processing GraphQL queries is
-						enabled for the API. The endpoint is accessible via the `/graphql`
-						endpoint of the address set using the `bind` parameter.
-						"""
-					common:   true
-					required: false
-				}
-				playground: {
-					type: bool: default: true
-					description: """
-						Whether the [GraphQL Playground](https://github.com/graphql/graphql-playground) is enabled
-						for the API. The Playground is accessible via the `/playground` endpoint
-						of the address set using the `bind` parameter. Note that the `playground`
-						endpoint will only be enabled if the `graphql` endpoint is also enabled.
-						"""
-					common:   false
-					required: false
 				}
 			}
 			description: "API options."

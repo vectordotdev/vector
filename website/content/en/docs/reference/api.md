@@ -2,10 +2,10 @@
 title: The Vector API
 short: API
 weight: 6
-tags: ["api", "graphql"]
+tags: ["api", "grpc"]
 ---
 
-Vector ships with a [GraphQL] API that allows you to interact with a running Vector instance. This page covers how to configure and enable Vector's API.
+Vector ships with a gRPC API that allows you to interact with a running Vector instance. This page covers how to configure and enable Vector's API.
 
 ## Configuration
 
@@ -17,12 +17,19 @@ Vector ships with a [GraphQL] API that allows you to interact with a running Vec
 
 ## How it works
 
-### GraphQL
+The API exposes a gRPC service defined in `proto/vector/observability.proto`. You can interact with it using any standard gRPC tooling.
 
-Vector chose [GraphQL] for its API because GraphQL is self-documenting and type safe. We believe that this offers a superior client experience and makes Vector richly programmable through its API.
+### Example using grpcurl
 
-### Playground
+```bash
+# Check health
+grpcurl -plaintext localhost:8686 vector.observability.Observability/Health
 
-Vector's GraphQL API ships with a built-in playground that allows you to explore the available commands and manually run queries against the API. This can be accessed at the `/playground` path.
+# List components
+grpcurl -plaintext localhost:8686 vector.observability.Observability/GetComponents
 
-[graphql]: https://graphql.org
+# Stream events (tap)
+grpcurl -plaintext \
+  -d '{"outputs_patterns": ["*"], "limit": 100, "interval_ms": 500}' \
+  localhost:8686 vector.observability.Observability/StreamOutputEvents
+```

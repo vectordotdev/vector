@@ -21,7 +21,7 @@ reduction and improved data quality for observability infrastructure.
   - `sinks/` - Data output destinations
   - `config/` - Configuration system and validation
   - `topology/` - Component graph management
-  - `api/` - GraphQL API for management and monitoring
+  - `api/` - gRPC API for management and monitoring
   - `cli.rs` - Command-line interface
 
 - `/lib/` - Modular library crates
