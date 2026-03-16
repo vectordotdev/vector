@@ -74,6 +74,57 @@ pub enum AggregationMode {
     Stdev,
 }
 
+#[derive(Clone, Debug, Default, PartialEq)]
+enum Mode {
+    /// Default mode. Sums incremental metrics and uses the latest value for absolute metrics.
+    #[default]
+    Auto,
+
+    /// Sums incremental metrics, ignores absolute
+    Sum,
+
+    /// Returns the latest value for absolute metrics, ignores incremental
+    Latest,
+
+    /// Counts metrics for incremental and absolute metrics
+    Count,
+
+    /// Returns difference between latest value for absolute, ignores incremental
+    Diff {
+        prev_map: HashMap<MetricSeries, MetricEntry>,
+    },
+
+    /// Max value of absolute metric, ignores incremental
+    Max,
+
+    /// Min value of absolute metric, ignores incremental
+    Min,
+
+    /// Mean value of absolute metric, ignores incremental
+    Mean,
+
+    /// Stdev value of absolute metric, ignores incremental
+    Stdev,
+}
+
+impl From<AggregationMode> for Mode {
+    fn from(value: AggregationMode) -> Self {
+        match value {
+            AggregationMode::Auto => Mode::Auto,
+            AggregationMode::Sum => Mode::Sum,
+            AggregationMode::Latest => Mode::Latest,
+            AggregationMode::Count => Mode::Count,
+            AggregationMode::Diff => Mode::Diff {
+                prev_map: HashMap::default(),
+            },
+            AggregationMode::Max => Mode::Max,
+            AggregationMode::Min => Mode::Min,
+            AggregationMode::Mean => Mode::Mean,
+            AggregationMode::Stdev => Mode::Stdev,
+        }
+    }
+}
+
 const fn default_mode() -> AggregationMode {
     AggregationMode::Auto
 }
@@ -110,9 +161,8 @@ type MetricEntry = (MetricData, EventMetadata);
 pub struct Aggregate {
     interval: Duration,
     map: HashMap<MetricSeries, MetricEntry>,
-    prev_map: HashMap<MetricSeries, MetricEntry>,
     multi_map: HashMap<MetricSeries, Vec<MetricEntry>>,
-    mode: AggregationMode,
+    mode: Mode,
 }
 
 impl Aggregate {
@@ -120,9 +170,8 @@ impl Aggregate {
         Ok(Self {
             interval: Duration::from_millis(config.interval_ms),
             map: Default::default(),
-            prev_map: Default::default(),
             multi_map: Default::default(),
-            mode: config.mode,
+            mode: config.mode.into(),
         })
     }
 
@@ -130,24 +179,22 @@ impl Aggregate {
         let (series, data, metadata) = event.into_metric().into_parts();
 
         match self.mode {
-            AggregationMode::Auto => match data.kind {
+            Mode::Auto => match data.kind {
                 MetricKind::Incremental => self.record_sum(series, data, metadata),
                 MetricKind::Absolute => {
                     self.map.insert(series, (data, metadata));
                 }
             },
-            AggregationMode::Sum => self.record_sum(series, data, metadata),
-            AggregationMode::Latest | AggregationMode::Diff => match data.kind {
+            Mode::Sum => self.record_sum(series, data, metadata),
+            Mode::Latest | Mode::Diff { .. } => match data.kind {
                 MetricKind::Incremental => (),
                 MetricKind::Absolute => {
                     self.map.insert(series, (data, metadata));
                 }
             },
-            AggregationMode::Count => self.record_count(series, data, metadata),
-            AggregationMode::Max | AggregationMode::Min => {
-                self.record_comparison(series, data, metadata)
-            }
-            AggregationMode::Mean | AggregationMode::Stdev => match data.kind {
+            Mode::Count => self.record_count(series, data, metadata),
+            Mode::Max | Mode::Min => self.record_comparison(series, data, metadata),
+            Mode::Mean | Mode::Stdev => match data.kind {
                 MetricKind::Incremental => (),
                 MetricKind::Absolute => {
                     if matches!(data.value, MetricValue::Gauge { value: _ }) {
@@ -227,8 +274,8 @@ impl Aggregate {
                             && let MetricValue::Gauge { value: new_value } = data.value()
                         {
                             let should_update = match self.mode {
-                                AggregationMode::Max => new_value > existing_value,
-                                AggregationMode::Min => new_value < existing_value,
+                                Mode::Max => new_value > existing_value,
+                                Mode::Min => new_value < existing_value,
                                 _ => false,
                             };
                             if should_update {
@@ -251,8 +298,8 @@ impl Aggregate {
         let map = std::mem::take(&mut self.map);
         for (series, entry) in map.clone().into_iter() {
             let mut metric = Metric::from_parts(series, entry.0, entry.1);
-            if matches!(self.mode, AggregationMode::Diff)
-                && let Some(prev_entry) = self.prev_map.get(metric.series())
+            if let Mode::Diff { prev_map } = &self.mode
+                && let Some(prev_entry) = prev_map.get(metric.series())
                 && metric.data().kind == prev_entry.0.kind
                 && !metric.subtract(&prev_entry.0)
             {
@@ -287,11 +334,11 @@ impl Aggregate {
 
             let final_mean = final_sum.clone();
             match self.mode {
-                AggregationMode::Mean => {
+                Mode::Mean => {
                     let metric = Metric::from_parts(series, final_mean, final_metadata);
                     output.push(Event::Metric(metric));
                 }
-                AggregationMode::Stdev => {
+                Mode::Stdev => {
                     let variance = entries
                         .iter()
                         .filter_map(|(data, _)| {
@@ -315,7 +362,9 @@ impl Aggregate {
             }
         }
 
-        self.prev_map = map;
+        if let Mode::Diff { prev_map } = &mut self.mode {
+            *prev_map = map;
+        }
         emit!(AggregateFlushed);
     }
 }
