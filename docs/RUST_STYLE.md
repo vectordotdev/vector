@@ -103,7 +103,7 @@ See `features` section in `Cargo.toml` for examples.
 
 ### Cargo Dependency Feature Placement
 
-Cargo features are additive: once any crate in the dependency graph enables a feature, it is enabled for the entire build. This can be surprising — enabling a feature in one crate silently turns it on everywhere.
+[Cargo features are additive](https://doc.rust-lang.org/cargo/reference/features.html#feature-unification): once any crate in the dependency graph enables a feature, it is enabled for the entire build. This can be surprising — enabling a feature in one crate silently turns it on everywhere.
 
 Always set `default-features = false` in `[workspace.dependencies]`. For feature declarations, the rule is simple:
 
@@ -122,4 +122,4 @@ cargo tree -e features
 cargo tree -e features -i <crate-name>
 ```
 
-The `-i` (invert) flag shows which crates depend on `<crate-name>` and which features they activate, useful for tracing where a feature is coming from. If a feature only appears because another crate enables it, and your crate relies on that feature being present, declare it explicitly — otherwise your crate silently breaks if the other crate ever stops enabling it.
+The `-i` flag shows which crates depend on `<crate-name>` and which features they activate, useful for tracing where a feature is coming from. If a feature only appears because another crate enables it, and your crate relies on that feature being present, declare it explicitly — otherwise your crate silently breaks if the other crate ever stops enabling it.
