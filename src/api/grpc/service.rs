@@ -37,6 +37,24 @@ fn get_metric_value(metric: &Metric) -> Option<f64> {
     }
 }
 
+/// Build a map of component_id -> component_type name from metric tags.
+/// Metrics carry a `component_type` tag (e.g. "console", "demo_logs") for every component,
+/// including sinks which are absent from TapResource.outputs.
+fn extract_component_type_names(metrics: &[Metric]) -> HashMap<String, String> {
+    let mut result = HashMap::new();
+    for metric in metrics {
+        if let Some(tags) = metric.tags()
+            && let Some(component_id) = tags.get("component_id")
+            && let Some(component_type) = tags.get("component_type")
+        {
+            result
+                .entry(component_id.to_string())
+                .or_insert_with(|| component_type.to_string());
+        }
+    }
+    result
+}
+
 /// Helper function to filter metrics by name and group by component_id tag
 fn filter_and_group_metrics(metrics: &[Metric], metric_name: &str) -> HashMap<String, f64> {
     let mut result = HashMap::new();
@@ -160,7 +178,9 @@ impl observability::Service for ObservabilityService {
 
         // Build a lookup from component_id -> actual plugin type name (e.g. "demo_logs", "kafka").
         // TapOutput carries component_type for every component that has at least one output,
-        // which covers all sources and transforms. Sinks have no outputs so they won't appear here.
+        // which covers all sources and transforms. Sinks have no outputs so they won't appear here;
+        // for those we fall back to the component_type metric tag.
+        let metric_type_names = extract_component_type_names(&metrics);
         let mut type_map: HashMap<String, String> = HashMap::new();
         for tap_output in tap_resource.outputs.keys() {
             type_map.insert(
@@ -179,6 +199,7 @@ impl observability::Service for ObservabilityService {
                 let metrics = component_metrics_map.get(source_key.as_str()).cloned();
                 let on_type = type_map
                     .get(source_key.as_str())
+                    .or_else(|| metric_type_names.get(source_key.as_str()))
                     .cloned()
                     .unwrap_or_else(|| "unknown".to_string());
                 components.push(ProtoComponent {
@@ -209,6 +230,7 @@ impl observability::Service for ObservabilityService {
 
                 let on_type = type_map
                     .get(&key_str)
+                    .or_else(|| metric_type_names.get(&key_str))
                     .cloned()
                     .unwrap_or_else(|| "unknown".to_string());
                 let metrics = component_metrics_map.get(&key_str).cloned();
@@ -227,6 +249,7 @@ impl observability::Service for ObservabilityService {
             if seen_keys.insert(sink_key.clone()) {
                 let on_type = type_map
                     .get(sink_key.as_str())
+                    .or_else(|| metric_type_names.get(sink_key.as_str()))
                     .cloned()
                     .unwrap_or_else(|| "unknown".to_string());
                 let metrics = component_metrics_map.get(sink_key.as_str()).cloned();
