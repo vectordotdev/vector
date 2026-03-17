@@ -105,6 +105,23 @@ fn calculate_throughput(
     result
 }
 
+/// Minimum allowed polling interval for metric streams (100 ms).
+///
+/// Prevents clients from setting `interval_ms=1` and hammering `capture_metrics()`
+/// at 1 kHz, which would cause high CPU load across concurrent subscriptions.
+const MIN_INTERVAL_MS: i32 = 100;
+
+/// Validates `interval_ms` from a streaming request, returning the value as `u64`
+/// or a gRPC error if it is out of range.
+fn validate_interval_ms(interval_ms: i32) -> Result<u64, Status> {
+    if interval_ms < MIN_INTERVAL_MS {
+        return Err(Status::invalid_argument(format!(
+            "interval_ms must be >= {MIN_INTERVAL_MS}"
+        )));
+    }
+    Ok(interval_ms as u64)
+}
+
 /// Converts a component's output port names into proto `Output` messages.
 ///
 /// `None` port means the default output (represented as `"_default"`).
@@ -246,11 +263,7 @@ impl observability::Service for ObservabilityService {
         request: Request<HeartbeatRequest>,
     ) -> Result<Response<Self::StreamHeartbeatStream>, Status> {
         let interval_ms = request.into_inner().interval_ms;
-        if interval_ms <= 0 {
-            return Err(Status::invalid_argument("interval_ms must be positive"));
-        }
-
-        let duration = Duration::from_millis(interval_ms as u64);
+        let duration = Duration::from_millis(validate_interval_ms(interval_ms)?);
         let stream = tokio_stream::StreamExt::map(IntervalStream::new(interval(duration)), |_| {
             let utc = Some(prost_types::Timestamp {
                 seconds: chrono::Utc::now().timestamp(),
@@ -269,14 +282,10 @@ impl observability::Service for ObservabilityService {
         request: Request<UptimeRequest>,
     ) -> Result<Response<Self::StreamUptimeStream>, Status> {
         let interval_ms = request.into_inner().interval_ms;
-        if interval_ms <= 0 {
-            return Err(Status::invalid_argument("interval_ms must be positive"));
-        }
-
         let controller =
             Controller::get().map_err(|_| Status::internal("Metrics system not initialized"))?;
 
-        let duration = Duration::from_millis(interval_ms as u64);
+        let duration = Duration::from_millis(validate_interval_ms(interval_ms)?);
         let stream =
             tokio_stream::StreamExt::map(IntervalStream::new(interval(duration)), move |_| {
                 // Query the actual Vector uptime from the metrics system
@@ -301,14 +310,10 @@ impl observability::Service for ObservabilityService {
         request: Request<MetricStreamRequest>,
     ) -> Result<Response<Self::StreamComponentAllocatedBytesStream>, Status> {
         let interval_ms = request.into_inner().interval_ms;
-        if interval_ms <= 0 {
-            return Err(Status::invalid_argument("interval_ms must be positive"));
-        }
-
         let controller =
             Controller::get().map_err(|_| Status::internal("Metrics system not initialized"))?;
 
-        let duration = Duration::from_millis(interval_ms as u64);
+        let duration = Duration::from_millis(validate_interval_ms(interval_ms)?);
         let stream =
             tokio_stream::StreamExt::map(IntervalStream::new(interval(duration)), move |_| {
                 let metrics = controller.capture_metrics();
@@ -340,14 +345,10 @@ impl observability::Service for ObservabilityService {
         request: Request<MetricStreamRequest>,
     ) -> Result<Response<Self::StreamComponentReceivedEventsThroughputStream>, Status> {
         let interval_ms = request.into_inner().interval_ms;
-        if interval_ms <= 0 {
-            return Err(Status::invalid_argument("interval_ms must be positive"));
-        }
-
         let controller =
             Controller::get().map_err(|_| Status::internal("Metrics system not initialized"))?;
 
-        let duration = Duration::from_millis(interval_ms as u64);
+        let duration = Duration::from_millis(validate_interval_ms(interval_ms)?);
         let interval_secs = interval_ms as f64 / 1000.0;
         let previous_values = Arc::new(Mutex::new(HashMap::new()));
 
@@ -392,14 +393,10 @@ impl observability::Service for ObservabilityService {
         request: Request<MetricStreamRequest>,
     ) -> Result<Response<Self::StreamComponentSentEventsThroughputStream>, Status> {
         let interval_ms = request.into_inner().interval_ms;
-        if interval_ms <= 0 {
-            return Err(Status::invalid_argument("interval_ms must be positive"));
-        }
-
         let controller =
             Controller::get().map_err(|_| Status::internal("Metrics system not initialized"))?;
 
-        let duration = Duration::from_millis(interval_ms as u64);
+        let duration = Duration::from_millis(validate_interval_ms(interval_ms)?);
         let interval_secs = interval_ms as f64 / 1000.0;
         let previous_values = Arc::new(Mutex::new(HashMap::new()));
 
@@ -444,14 +441,10 @@ impl observability::Service for ObservabilityService {
         request: Request<MetricStreamRequest>,
     ) -> Result<Response<Self::StreamComponentReceivedBytesThroughputStream>, Status> {
         let interval_ms = request.into_inner().interval_ms;
-        if interval_ms <= 0 {
-            return Err(Status::invalid_argument("interval_ms must be positive"));
-        }
-
         let controller =
             Controller::get().map_err(|_| Status::internal("Metrics system not initialized"))?;
 
-        let duration = Duration::from_millis(interval_ms as u64);
+        let duration = Duration::from_millis(validate_interval_ms(interval_ms)?);
         let interval_secs = interval_ms as f64 / 1000.0;
         let previous_values = Arc::new(Mutex::new(HashMap::new()));
 
@@ -496,14 +489,10 @@ impl observability::Service for ObservabilityService {
         request: Request<MetricStreamRequest>,
     ) -> Result<Response<Self::StreamComponentSentBytesThroughputStream>, Status> {
         let interval_ms = request.into_inner().interval_ms;
-        if interval_ms <= 0 {
-            return Err(Status::invalid_argument("interval_ms must be positive"));
-        }
-
         let controller =
             Controller::get().map_err(|_| Status::internal("Metrics system not initialized"))?;
 
-        let duration = Duration::from_millis(interval_ms as u64);
+        let duration = Duration::from_millis(validate_interval_ms(interval_ms)?);
         let interval_secs = interval_ms as f64 / 1000.0;
         let previous_values = Arc::new(Mutex::new(HashMap::new()));
 
@@ -548,14 +537,10 @@ impl observability::Service for ObservabilityService {
         request: Request<MetricStreamRequest>,
     ) -> Result<Response<Self::StreamComponentReceivedEventsTotalStream>, Status> {
         let interval_ms = request.into_inner().interval_ms;
-        if interval_ms <= 0 {
-            return Err(Status::invalid_argument("interval_ms must be positive"));
-        }
-
         let controller =
             Controller::get().map_err(|_| Status::internal("Metrics system not initialized"))?;
 
-        let duration = Duration::from_millis(interval_ms as u64);
+        let duration = Duration::from_millis(validate_interval_ms(interval_ms)?);
         let stream =
             tokio_stream::StreamExt::map(IntervalStream::new(interval(duration)), move |_| {
                 let metrics = controller.capture_metrics();
@@ -587,14 +572,10 @@ impl observability::Service for ObservabilityService {
         request: Request<MetricStreamRequest>,
     ) -> Result<Response<Self::StreamComponentSentEventsTotalStream>, Status> {
         let interval_ms = request.into_inner().interval_ms;
-        if interval_ms <= 0 {
-            return Err(Status::invalid_argument("interval_ms must be positive"));
-        }
-
         let controller =
             Controller::get().map_err(|_| Status::internal("Metrics system not initialized"))?;
 
-        let duration = Duration::from_millis(interval_ms as u64);
+        let duration = Duration::from_millis(validate_interval_ms(interval_ms)?);
         let stream =
             tokio_stream::StreamExt::map(IntervalStream::new(interval(duration)), move |_| {
                 let metrics = controller.capture_metrics();
@@ -626,14 +607,10 @@ impl observability::Service for ObservabilityService {
         request: Request<MetricStreamRequest>,
     ) -> Result<Response<Self::StreamComponentReceivedBytesTotalStream>, Status> {
         let interval_ms = request.into_inner().interval_ms;
-        if interval_ms <= 0 {
-            return Err(Status::invalid_argument("interval_ms must be positive"));
-        }
-
         let controller =
             Controller::get().map_err(|_| Status::internal("Metrics system not initialized"))?;
 
-        let duration = Duration::from_millis(interval_ms as u64);
+        let duration = Duration::from_millis(validate_interval_ms(interval_ms)?);
         let stream =
             tokio_stream::StreamExt::map(IntervalStream::new(interval(duration)), move |_| {
                 let metrics = controller.capture_metrics();
@@ -665,14 +642,10 @@ impl observability::Service for ObservabilityService {
         request: Request<MetricStreamRequest>,
     ) -> Result<Response<Self::StreamComponentSentBytesTotalStream>, Status> {
         let interval_ms = request.into_inner().interval_ms;
-        if interval_ms <= 0 {
-            return Err(Status::invalid_argument("interval_ms must be positive"));
-        }
-
         let controller =
             Controller::get().map_err(|_| Status::internal("Metrics system not initialized"))?;
 
-        let duration = Duration::from_millis(interval_ms as u64);
+        let duration = Duration::from_millis(validate_interval_ms(interval_ms)?);
         let stream =
             tokio_stream::StreamExt::map(IntervalStream::new(interval(duration)), move |_| {
                 let metrics = controller.capture_metrics();
@@ -704,14 +677,11 @@ impl observability::Service for ObservabilityService {
         request: Request<MetricStreamRequest>,
     ) -> Result<Response<Self::StreamComponentErrorsTotalStream>, Status> {
         let interval_ms = request.into_inner().interval_ms;
-        if interval_ms <= 0 {
-            return Err(Status::invalid_argument("interval_ms must be positive"));
-        }
+        let duration = Duration::from_millis(validate_interval_ms(interval_ms)?);
 
         let controller =
             Controller::get().map_err(|_| Status::internal("Metrics system not initialized"))?;
 
-        let duration = Duration::from_millis(interval_ms as u64);
         let stream =
             tokio_stream::StreamExt::map(IntervalStream::new(interval(duration)), move |_| {
                 let metrics = controller.capture_metrics();
@@ -746,10 +716,6 @@ impl observability::Service for ObservabilityService {
         let req = request.into_inner();
 
         // Validate before casting to prevent negative values from becoming large positive values
-        if req.interval_ms <= 0 {
-            return Err(Status::invalid_argument("interval_ms must be positive"));
-        }
-
         if req.limit <= 0 {
             return Err(Status::invalid_argument(
                 "limit must be >= 1 (controls reservoir size and channel capacity)",
@@ -763,7 +729,7 @@ impl observability::Service for ObservabilityService {
             )));
         }
 
-        let interval_ms = req.interval_ms as u64;
+        let interval_ms = validate_interval_ms(req.interval_ms)?;
         let limit = req.limit as usize;
 
         let patterns = TapPatterns {
