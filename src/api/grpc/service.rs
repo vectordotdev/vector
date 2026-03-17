@@ -28,6 +28,8 @@ use crate::proto::observability::{
     self, Component as ProtoComponent, ComponentType, EventNotification, TappedEvent, *,
 };
 
+type BoxStream<T> = Pin<Box<dyn Stream<Item = Result<T, Status>> + Send>>;
+
 /// Helper function to extract metric value as f64
 fn get_metric_value(metric: &Metric) -> Option<f64> {
     match metric.value() {
@@ -120,6 +122,73 @@ fn validate_interval_ms(interval_ms: i32) -> Result<u64, Status> {
         )));
     }
     Ok(interval_ms as u64)
+}
+
+fn get_controller() -> Result<&'static Controller, Status> {
+    Controller::get().map_err(|_| Status::internal("Metrics system not initialized"))
+}
+
+/// Builds a stream that emits per-component totals for `metric_name` every `duration`.
+fn metric_totals_stream(
+    duration: Duration,
+    metric_name: &'static str,
+) -> Result<impl Stream<Item = Result<ComponentTotalsResponse, Status>>, Status> {
+    let controller = get_controller()?;
+    Ok(
+        tokio_stream::StreamExt::map(IntervalStream::new(interval(duration)), move |_| {
+            let metrics = controller.capture_metrics();
+            let component_metrics = filter_and_group_metrics(&metrics, metric_name);
+            tokio_stream::iter(
+                component_metrics
+                    .into_iter()
+                    .map(|(component_id, total)| {
+                        Ok(ComponentTotalsResponse {
+                            component_id,
+                            total: total as i64,
+                        })
+                    })
+                    .collect::<Vec<_>>(),
+            )
+        })
+        .flatten(),
+    )
+}
+
+/// Builds a stream that emits per-component throughputs for `metric_name` every `duration`.
+fn metric_throughput_stream(
+    duration: Duration,
+    metric_name: &'static str,
+) -> Result<impl Stream<Item = Result<ComponentThroughputResponse, Status>>, Status> {
+    let controller = get_controller()?;
+    let interval_secs = duration.as_secs_f64();
+    let previous_values = Arc::new(Mutex::new(HashMap::new()));
+    Ok(
+        tokio_stream::StreamExt::map(IntervalStream::new(interval(duration)), move |_| {
+            let metrics = controller.capture_metrics();
+            let current_values = filter_and_group_metrics(&metrics, metric_name);
+            let mut prev = match previous_values.lock() {
+                Ok(guard) => guard,
+                Err(poisoned) => {
+                    error!("Mutex poisoned for metric throughput, recovering.");
+                    poisoned.into_inner()
+                }
+            };
+            let throughputs = calculate_throughput(&current_values, &prev, interval_secs);
+            *prev = current_values;
+            tokio_stream::iter(
+                throughputs
+                    .into_iter()
+                    .map(|(component_id, throughput)| {
+                        Ok(ComponentThroughputResponse {
+                            component_id,
+                            throughput,
+                        })
+                    })
+                    .collect::<Vec<_>>(),
+            )
+        })
+        .flatten(),
+    )
 }
 
 /// Converts a component's output port names into proto `Output` messages.
@@ -255,15 +324,13 @@ impl observability::Service for ObservabilityService {
 
     // ========== Streaming Metrics ==========
 
-    type StreamHeartbeatStream =
-        Pin<Box<dyn Stream<Item = Result<HeartbeatResponse, Status>> + Send>>;
+    type StreamHeartbeatStream = BoxStream<HeartbeatResponse>;
 
     async fn stream_heartbeat(
         &self,
         request: Request<HeartbeatRequest>,
     ) -> Result<Response<Self::StreamHeartbeatStream>, Status> {
-        let interval_ms = request.into_inner().interval_ms;
-        let duration = Duration::from_millis(validate_interval_ms(interval_ms)?);
+        let duration = Duration::from_millis(validate_interval_ms(request.into_inner().interval_ms)?);
         let stream = tokio_stream::StreamExt::map(IntervalStream::new(interval(duration)), |_| {
             let utc = Some(prost_types::Timestamp {
                 seconds: chrono::Utc::now().timestamp(),
@@ -275,20 +342,16 @@ impl observability::Service for ObservabilityService {
         Ok(Response::new(Box::pin(stream)))
     }
 
-    type StreamUptimeStream = Pin<Box<dyn Stream<Item = Result<UptimeResponse, Status>> + Send>>;
+    type StreamUptimeStream = BoxStream<UptimeResponse>;
 
     async fn stream_uptime(
         &self,
         request: Request<UptimeRequest>,
     ) -> Result<Response<Self::StreamUptimeStream>, Status> {
-        let interval_ms = request.into_inner().interval_ms;
-        let controller =
-            Controller::get().map_err(|_| Status::internal("Metrics system not initialized"))?;
-
-        let duration = Duration::from_millis(validate_interval_ms(interval_ms)?);
+        let duration = Duration::from_millis(validate_interval_ms(request.into_inner().interval_ms)?);
+        let controller = get_controller()?;
         let stream =
             tokio_stream::StreamExt::map(IntervalStream::new(interval(duration)), move |_| {
-                // Query the actual Vector uptime from the metrics system
                 let metrics = controller.capture_metrics();
                 let uptime_seconds = metrics
                     .iter()
@@ -302,18 +365,14 @@ impl observability::Service for ObservabilityService {
         Ok(Response::new(Box::pin(stream)))
     }
 
-    type StreamComponentAllocatedBytesStream =
-        Pin<Box<dyn Stream<Item = Result<ComponentAllocatedBytesResponse, Status>> + Send>>;
+    type StreamComponentAllocatedBytesStream = BoxStream<ComponentAllocatedBytesResponse>;
 
     async fn stream_component_allocated_bytes(
         &self,
         request: Request<MetricStreamRequest>,
     ) -> Result<Response<Self::StreamComponentAllocatedBytesStream>, Status> {
-        let interval_ms = request.into_inner().interval_ms;
-        let controller =
-            Controller::get().map_err(|_| Status::internal("Metrics system not initialized"))?;
-
-        let duration = Duration::from_millis(validate_interval_ms(interval_ms)?);
+        let duration = Duration::from_millis(validate_interval_ms(request.into_inner().interval_ms)?);
+        let controller = get_controller()?;
         let stream =
             tokio_stream::StreamExt::map(IntervalStream::new(interval(duration)), move |_| {
                 let metrics = controller.capture_metrics();
@@ -337,377 +396,126 @@ impl observability::Service for ObservabilityService {
         Ok(Response::new(Box::pin(stream)))
     }
 
-    type StreamComponentReceivedEventsThroughputStream =
-        Pin<Box<dyn Stream<Item = Result<ComponentThroughputResponse, Status>> + Send>>;
+    type StreamComponentReceivedEventsThroughputStream = BoxStream<ComponentThroughputResponse>;
 
     async fn stream_component_received_events_throughput(
         &self,
         request: Request<MetricStreamRequest>,
     ) -> Result<Response<Self::StreamComponentReceivedEventsThroughputStream>, Status> {
-        let interval_ms = request.into_inner().interval_ms;
-        let controller =
-            Controller::get().map_err(|_| Status::internal("Metrics system not initialized"))?;
-
-        let duration = Duration::from_millis(validate_interval_ms(interval_ms)?);
-        let interval_secs = interval_ms as f64 / 1000.0;
-        let previous_values = Arc::new(Mutex::new(HashMap::new()));
-
-        let stream =
-            tokio_stream::StreamExt::map(IntervalStream::new(interval(duration)), move |_| {
-                let metrics = controller.capture_metrics();
-                let current_values =
-                    filter_and_group_metrics(&metrics, "component_received_events_total");
-
-                let mut prev = match previous_values.lock() {
-                    Ok(guard) => guard,
-                    Err(poisoned) => {
-                        error!("Mutex poisoned for metric throughput, recovering.");
-                        poisoned.into_inner()
-                    }
-                };
-                let throughputs = calculate_throughput(&current_values, &prev, interval_secs);
-                *prev = current_values;
-
-                tokio_stream::iter(
-                    throughputs
-                        .into_iter()
-                        .map(|(component_id, throughput)| {
-                            Ok(ComponentThroughputResponse {
-                                component_id,
-                                throughput,
-                            })
-                        })
-                        .collect::<Vec<_>>(),
-                )
-            })
-            .flatten();
-
-        Ok(Response::new(Box::pin(stream)))
+        let duration = Duration::from_millis(validate_interval_ms(request.into_inner().interval_ms)?);
+        Ok(Response::new(Box::pin(metric_throughput_stream(
+            duration,
+            "component_received_events_total",
+        )?)))
     }
 
-    type StreamComponentSentEventsThroughputStream =
-        Pin<Box<dyn Stream<Item = Result<ComponentThroughputResponse, Status>> + Send>>;
+    type StreamComponentSentEventsThroughputStream = BoxStream<ComponentThroughputResponse>;
 
     async fn stream_component_sent_events_throughput(
         &self,
         request: Request<MetricStreamRequest>,
     ) -> Result<Response<Self::StreamComponentSentEventsThroughputStream>, Status> {
-        let interval_ms = request.into_inner().interval_ms;
-        let controller =
-            Controller::get().map_err(|_| Status::internal("Metrics system not initialized"))?;
-
-        let duration = Duration::from_millis(validate_interval_ms(interval_ms)?);
-        let interval_secs = interval_ms as f64 / 1000.0;
-        let previous_values = Arc::new(Mutex::new(HashMap::new()));
-
-        let stream =
-            tokio_stream::StreamExt::map(IntervalStream::new(interval(duration)), move |_| {
-                let metrics = controller.capture_metrics();
-                let current_values =
-                    filter_and_group_metrics(&metrics, "component_sent_events_total");
-
-                let mut prev = match previous_values.lock() {
-                    Ok(guard) => guard,
-                    Err(poisoned) => {
-                        error!("Mutex poisoned for metric throughput, recovering.");
-                        poisoned.into_inner()
-                    }
-                };
-                let throughputs = calculate_throughput(&current_values, &prev, interval_secs);
-                *prev = current_values;
-
-                tokio_stream::iter(
-                    throughputs
-                        .into_iter()
-                        .map(|(component_id, throughput)| {
-                            Ok(ComponentThroughputResponse {
-                                component_id,
-                                throughput,
-                            })
-                        })
-                        .collect::<Vec<_>>(),
-                )
-            })
-            .flatten();
-
-        Ok(Response::new(Box::pin(stream)))
+        let duration = Duration::from_millis(validate_interval_ms(request.into_inner().interval_ms)?);
+        Ok(Response::new(Box::pin(metric_throughput_stream(
+            duration,
+            "component_sent_events_total",
+        )?)))
     }
 
-    type StreamComponentReceivedBytesThroughputStream =
-        Pin<Box<dyn Stream<Item = Result<ComponentThroughputResponse, Status>> + Send>>;
+    type StreamComponentReceivedBytesThroughputStream = BoxStream<ComponentThroughputResponse>;
 
     async fn stream_component_received_bytes_throughput(
         &self,
         request: Request<MetricStreamRequest>,
     ) -> Result<Response<Self::StreamComponentReceivedBytesThroughputStream>, Status> {
-        let interval_ms = request.into_inner().interval_ms;
-        let controller =
-            Controller::get().map_err(|_| Status::internal("Metrics system not initialized"))?;
-
-        let duration = Duration::from_millis(validate_interval_ms(interval_ms)?);
-        let interval_secs = interval_ms as f64 / 1000.0;
-        let previous_values = Arc::new(Mutex::new(HashMap::new()));
-
-        let stream =
-            tokio_stream::StreamExt::map(IntervalStream::new(interval(duration)), move |_| {
-                let metrics = controller.capture_metrics();
-                let current_values =
-                    filter_and_group_metrics(&metrics, "component_received_bytes_total");
-
-                let mut prev = match previous_values.lock() {
-                    Ok(guard) => guard,
-                    Err(poisoned) => {
-                        error!("Mutex poisoned for metric throughput, recovering.");
-                        poisoned.into_inner()
-                    }
-                };
-                let throughputs = calculate_throughput(&current_values, &prev, interval_secs);
-                *prev = current_values;
-
-                tokio_stream::iter(
-                    throughputs
-                        .into_iter()
-                        .map(|(component_id, throughput)| {
-                            Ok(ComponentThroughputResponse {
-                                component_id,
-                                throughput,
-                            })
-                        })
-                        .collect::<Vec<_>>(),
-                )
-            })
-            .flatten();
-
-        Ok(Response::new(Box::pin(stream)))
+        let duration = Duration::from_millis(validate_interval_ms(request.into_inner().interval_ms)?);
+        Ok(Response::new(Box::pin(metric_throughput_stream(
+            duration,
+            "component_received_bytes_total",
+        )?)))
     }
 
-    type StreamComponentSentBytesThroughputStream =
-        Pin<Box<dyn Stream<Item = Result<ComponentThroughputResponse, Status>> + Send>>;
+    type StreamComponentSentBytesThroughputStream = BoxStream<ComponentThroughputResponse>;
 
     async fn stream_component_sent_bytes_throughput(
         &self,
         request: Request<MetricStreamRequest>,
     ) -> Result<Response<Self::StreamComponentSentBytesThroughputStream>, Status> {
-        let interval_ms = request.into_inner().interval_ms;
-        let controller =
-            Controller::get().map_err(|_| Status::internal("Metrics system not initialized"))?;
-
-        let duration = Duration::from_millis(validate_interval_ms(interval_ms)?);
-        let interval_secs = interval_ms as f64 / 1000.0;
-        let previous_values = Arc::new(Mutex::new(HashMap::new()));
-
-        let stream =
-            tokio_stream::StreamExt::map(IntervalStream::new(interval(duration)), move |_| {
-                let metrics = controller.capture_metrics();
-                let current_values =
-                    filter_and_group_metrics(&metrics, "component_sent_bytes_total");
-
-                let mut prev = match previous_values.lock() {
-                    Ok(guard) => guard,
-                    Err(poisoned) => {
-                        error!("Mutex poisoned for metric throughput, recovering.");
-                        poisoned.into_inner()
-                    }
-                };
-                let throughputs = calculate_throughput(&current_values, &prev, interval_secs);
-                *prev = current_values;
-
-                tokio_stream::iter(
-                    throughputs
-                        .into_iter()
-                        .map(|(component_id, throughput)| {
-                            Ok(ComponentThroughputResponse {
-                                component_id,
-                                throughput,
-                            })
-                        })
-                        .collect::<Vec<_>>(),
-                )
-            })
-            .flatten();
-
-        Ok(Response::new(Box::pin(stream)))
+        let duration = Duration::from_millis(validate_interval_ms(request.into_inner().interval_ms)?);
+        Ok(Response::new(Box::pin(metric_throughput_stream(
+            duration,
+            "component_sent_bytes_total",
+        )?)))
     }
 
-    type StreamComponentReceivedEventsTotalStream =
-        Pin<Box<dyn Stream<Item = Result<ComponentTotalsResponse, Status>> + Send>>;
+    type StreamComponentReceivedEventsTotalStream = BoxStream<ComponentTotalsResponse>;
 
     async fn stream_component_received_events_total(
         &self,
         request: Request<MetricStreamRequest>,
     ) -> Result<Response<Self::StreamComponentReceivedEventsTotalStream>, Status> {
-        let interval_ms = request.into_inner().interval_ms;
-        let controller =
-            Controller::get().map_err(|_| Status::internal("Metrics system not initialized"))?;
-
-        let duration = Duration::from_millis(validate_interval_ms(interval_ms)?);
-        let stream =
-            tokio_stream::StreamExt::map(IntervalStream::new(interval(duration)), move |_| {
-                let metrics = controller.capture_metrics();
-                let component_metrics =
-                    filter_and_group_metrics(&metrics, "component_received_events_total");
-
-                tokio_stream::iter(
-                    component_metrics
-                        .into_iter()
-                        .map(|(component_id, total)| {
-                            Ok(ComponentTotalsResponse {
-                                component_id,
-                                total: total as i64,
-                            })
-                        })
-                        .collect::<Vec<_>>(),
-                )
-            })
-            .flatten();
-
-        Ok(Response::new(Box::pin(stream)))
+        let duration = Duration::from_millis(validate_interval_ms(request.into_inner().interval_ms)?);
+        Ok(Response::new(Box::pin(metric_totals_stream(
+            duration,
+            "component_received_events_total",
+        )?)))
     }
 
-    type StreamComponentSentEventsTotalStream =
-        Pin<Box<dyn Stream<Item = Result<ComponentTotalsResponse, Status>> + Send>>;
+    type StreamComponentSentEventsTotalStream = BoxStream<ComponentTotalsResponse>;
 
     async fn stream_component_sent_events_total(
         &self,
         request: Request<MetricStreamRequest>,
     ) -> Result<Response<Self::StreamComponentSentEventsTotalStream>, Status> {
-        let interval_ms = request.into_inner().interval_ms;
-        let controller =
-            Controller::get().map_err(|_| Status::internal("Metrics system not initialized"))?;
-
-        let duration = Duration::from_millis(validate_interval_ms(interval_ms)?);
-        let stream =
-            tokio_stream::StreamExt::map(IntervalStream::new(interval(duration)), move |_| {
-                let metrics = controller.capture_metrics();
-                let component_metrics =
-                    filter_and_group_metrics(&metrics, "component_sent_events_total");
-
-                tokio_stream::iter(
-                    component_metrics
-                        .into_iter()
-                        .map(|(component_id, total)| {
-                            Ok(ComponentTotalsResponse {
-                                component_id,
-                                total: total as i64,
-                            })
-                        })
-                        .collect::<Vec<_>>(),
-                )
-            })
-            .flatten();
-
-        Ok(Response::new(Box::pin(stream)))
+        let duration = Duration::from_millis(validate_interval_ms(request.into_inner().interval_ms)?);
+        Ok(Response::new(Box::pin(metric_totals_stream(
+            duration,
+            "component_sent_events_total",
+        )?)))
     }
 
-    type StreamComponentReceivedBytesTotalStream =
-        Pin<Box<dyn Stream<Item = Result<ComponentTotalsResponse, Status>> + Send>>;
+    type StreamComponentReceivedBytesTotalStream = BoxStream<ComponentTotalsResponse>;
 
     async fn stream_component_received_bytes_total(
         &self,
         request: Request<MetricStreamRequest>,
     ) -> Result<Response<Self::StreamComponentReceivedBytesTotalStream>, Status> {
-        let interval_ms = request.into_inner().interval_ms;
-        let controller =
-            Controller::get().map_err(|_| Status::internal("Metrics system not initialized"))?;
-
-        let duration = Duration::from_millis(validate_interval_ms(interval_ms)?);
-        let stream =
-            tokio_stream::StreamExt::map(IntervalStream::new(interval(duration)), move |_| {
-                let metrics = controller.capture_metrics();
-                let component_metrics =
-                    filter_and_group_metrics(&metrics, "component_received_bytes_total");
-
-                tokio_stream::iter(
-                    component_metrics
-                        .into_iter()
-                        .map(|(component_id, total)| {
-                            Ok(ComponentTotalsResponse {
-                                component_id,
-                                total: total as i64,
-                            })
-                        })
-                        .collect::<Vec<_>>(),
-                )
-            })
-            .flatten();
-
-        Ok(Response::new(Box::pin(stream)))
+        let duration = Duration::from_millis(validate_interval_ms(request.into_inner().interval_ms)?);
+        Ok(Response::new(Box::pin(metric_totals_stream(
+            duration,
+            "component_received_bytes_total",
+        )?)))
     }
 
-    type StreamComponentSentBytesTotalStream =
-        Pin<Box<dyn Stream<Item = Result<ComponentTotalsResponse, Status>> + Send>>;
+    type StreamComponentSentBytesTotalStream = BoxStream<ComponentTotalsResponse>;
 
     async fn stream_component_sent_bytes_total(
         &self,
         request: Request<MetricStreamRequest>,
     ) -> Result<Response<Self::StreamComponentSentBytesTotalStream>, Status> {
-        let interval_ms = request.into_inner().interval_ms;
-        let controller =
-            Controller::get().map_err(|_| Status::internal("Metrics system not initialized"))?;
-
-        let duration = Duration::from_millis(validate_interval_ms(interval_ms)?);
-        let stream =
-            tokio_stream::StreamExt::map(IntervalStream::new(interval(duration)), move |_| {
-                let metrics = controller.capture_metrics();
-                let component_metrics =
-                    filter_and_group_metrics(&metrics, "component_sent_bytes_total");
-
-                tokio_stream::iter(
-                    component_metrics
-                        .into_iter()
-                        .map(|(component_id, total)| {
-                            Ok(ComponentTotalsResponse {
-                                component_id,
-                                total: total as i64,
-                            })
-                        })
-                        .collect::<Vec<_>>(),
-                )
-            })
-            .flatten();
-
-        Ok(Response::new(Box::pin(stream)))
+        let duration = Duration::from_millis(validate_interval_ms(request.into_inner().interval_ms)?);
+        Ok(Response::new(Box::pin(metric_totals_stream(
+            duration,
+            "component_sent_bytes_total",
+        )?)))
     }
 
-    type StreamComponentErrorsTotalStream =
-        Pin<Box<dyn Stream<Item = Result<ComponentTotalsResponse, Status>> + Send>>;
+    type StreamComponentErrorsTotalStream = BoxStream<ComponentTotalsResponse>;
 
     async fn stream_component_errors_total(
         &self,
         request: Request<MetricStreamRequest>,
     ) -> Result<Response<Self::StreamComponentErrorsTotalStream>, Status> {
-        let interval_ms = request.into_inner().interval_ms;
-        let duration = Duration::from_millis(validate_interval_ms(interval_ms)?);
-
-        let controller =
-            Controller::get().map_err(|_| Status::internal("Metrics system not initialized"))?;
-
-        let stream =
-            tokio_stream::StreamExt::map(IntervalStream::new(interval(duration)), move |_| {
-                let metrics = controller.capture_metrics();
-                let component_metrics =
-                    filter_and_group_metrics(&metrics, "component_errors_total");
-
-                tokio_stream::iter(
-                    component_metrics
-                        .into_iter()
-                        .map(|(component_id, total)| {
-                            Ok(ComponentTotalsResponse {
-                                component_id,
-                                total: total as i64,
-                            })
-                        })
-                        .collect::<Vec<_>>(),
-                )
-            })
-            .flatten();
-
-        Ok(Response::new(Box::pin(stream)))
+        let duration = Duration::from_millis(validate_interval_ms(request.into_inner().interval_ms)?);
+        Ok(Response::new(Box::pin(metric_totals_stream(
+            duration,
+            "component_errors_total",
+        )?)))
     }
 
     // ========== Event Tapping ==========
 
-    type StreamOutputEventsStream = Pin<Box<dyn Stream<Item = Result<OutputEvent, Status>> + Send>>;
+    type StreamOutputEventsStream = BoxStream<OutputEvent>;
 
     async fn stream_output_events(
         &self,
