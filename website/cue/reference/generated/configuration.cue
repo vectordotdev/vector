@@ -46,7 +46,8 @@ generated: configuration: {
 				}
 			}
 			description: "API options."
-			group:       "api"
+			warnings: ["The API currently does not support authentication. Only enable it in isolated environments or for debugging. It must not be exposed to untrusted clients."]
+			group: "api"
 		}
 		enrichment_tables: {
 			type: object: options: "*": {
