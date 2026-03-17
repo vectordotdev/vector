@@ -1,4 +1,5 @@
 use bytes::Bytes;
+use vrl::path::ValuePath;
 use vector_lib::{
     config::{LegacyKey, LogNamespace},
     event::Event,
@@ -24,14 +25,26 @@ pub fn add_headers(
                 let value = headers.get(header_name).map(HeaderValue::as_bytes);
 
                 for event in events.iter_mut() {
-                    if let Event::Log(log) = event {
-                        log_namespace.insert_source_metadata(
-                            source_name,
-                            log,
-                            Some(LegacyKey::InsertIfEmpty(path!(header_name))),
-                            path!("headers", header_name),
-                            Value::from(value.map(Bytes::copy_from_slice)),
-                        );
+                    match event {
+                        Event::Log(log) => {
+                            log_namespace.insert_source_metadata(
+                                source_name,
+                                log,
+                                Some(LegacyKey::InsertIfEmpty(path!(header_name))),
+                                path!("headers", header_name),
+                                Value::from(value.map(Bytes::copy_from_slice)),
+                            );
+                        },
+                        Event::Metric(metric) => {
+                            metric.metadata_mut()
+                                .value_mut()
+                                .insert(path!(source_name).concat(path!("headers", header_name),), Value::from(value.map(Bytes::copy_from_slice)));
+                        },
+                        Event::Trace(trace) => {
+                            trace.metadata_mut()
+                                .value_mut()
+                                .insert(path!(source_name).concat(path!("headers", header_name),), Value::from(value.map(Bytes::copy_from_slice)));
+                        }
                     }
                 }
             }
@@ -45,14 +58,26 @@ pub fn add_headers(
                         let value = headers.get(header_name).map(HeaderValue::as_bytes);
 
                         for event in events.iter_mut() {
-                            if let Event::Log(log) = event {
-                                log_namespace.insert_source_metadata(
-                                    source_name,
-                                    log,
-                                    Some(LegacyKey::InsertIfEmpty(path!(header_name.as_str()))),
-                                    path!("headers", header_name.as_str()),
-                                    Value::from(value.map(Bytes::copy_from_slice)),
-                                );
+                            match event {
+                                Event::Log(log) => {
+                                    log_namespace.insert_source_metadata(
+                                        source_name,
+                                        log,
+                                        Some(LegacyKey::InsertIfEmpty(path!(header_name.as_str()))),
+                                        path!("headers", header_name.as_str()),
+                                        Value::from(value.map(Bytes::copy_from_slice)),
+                                    );
+                                },
+                                Event::Metric(metric) => {
+                                    metric.metadata_mut()
+                                        .value_mut()
+                                        .insert(path!(source_name).concat(path!("headers", header_name.as_str()),), Value::from(value.map(Bytes::copy_from_slice)));
+                                },
+                                Event::Trace(trace) => {
+                                    trace.metadata_mut()
+                                        .value_mut()
+                                        .insert(path!(source_name).concat(path!("headers", header_name.as_str()),), Value::from(value.map(Bytes::copy_from_slice)));
+                                }
                             }
                         }
                     }
@@ -64,14 +89,17 @@ pub fn add_headers(
 
 #[cfg(test)]
 mod tests {
+    use std::time::SystemTime;
+    use chrono::{DateTime, Utc};
     use vector_lib::config::LogNamespace;
     use vrl::{path, value};
     use warp::http::HeaderMap;
 
     use crate::{
-        event::LogEvent,
+        event::{LogEvent, Metric, TraceEvent},
         sources::{http_server::HttpConfigParamKind, util::add_headers},
     };
+    use crate::event::{Event, MetricKind, MetricTags, MetricValue};
 
     #[test]
     fn multiple_headers() {
@@ -104,6 +132,54 @@ mod tests {
         assert_eq!(
             base_log[0].as_log().value(),
             namespaced_log[0]
+                .metadata()
+                .value()
+                .get(path!("test", "headers"))
+                .unwrap()
+        );
+
+        let mut metric = [Event::from(
+            Metric::new(
+                "some.random.metric",
+                MetricKind::Incremental,
+                MetricValue::Counter {
+                    value: 123.4,
+                },
+            )
+                .with_timestamp(Some(DateTime::<Utc>::from(SystemTime::now())))
+                .with_tags(Some(MetricTags::default())),
+        )];
+
+        add_headers(
+            &mut metric,
+            &header_names,
+            &headers,
+            LogNamespace::default(),
+            "test",
+        );
+
+        let mut trace = [TraceEvent::from(btreemap! {
+            "span_id" => "abc123",
+            "trace_id" => "xyz789",
+            "span_name" => "test-span",
+            "service" => "my-service",
+        }).into()];
+
+        add_headers(
+            &mut trace,
+            &header_names,
+            &headers,
+            LogNamespace::default(),
+            "test",
+        );
+
+        assert_eq!(
+            metric[0]
+                .metadata()
+                .value()
+                .get(path!("test", "headers"))
+                .unwrap(),
+            trace[0]
                 .metadata()
                 .value()
                 .get(path!("test", "headers"))
@@ -161,6 +237,75 @@ mod tests {
             log["content-encoding"],
             "gzip".into(),
             "Checking log contains Content-Encoding header"
+        );
+
+        let mut metric = [Event::from(
+            Metric::new(
+                "some.random.metric",
+                MetricKind::Incremental,
+                MetricValue::Counter {
+                    value: 123.4,
+                },
+            )
+                .with_timestamp(Some(DateTime::<Utc>::from(SystemTime::now())))
+                .with_tags(Some(MetricTags::default())),
+        )];
+
+        add_headers(
+            &mut metric,
+            &header_names,
+            &headers,
+            LogNamespace::default(),
+            "test",
+        );
+
+        let metric_headers = metric[0].metadata().value().get(path!("test", "headers")).unwrap();
+
+        assert_eq!(
+            metric_headers.get("content-type").unwrap(),
+            &value!("application/x-protobuf"),
+            "Checking metric contains Content-Type header"
+        );
+        assert!(
+            !metric_headers.contains("user-agent"),
+            "Checking metric does not contain User-Agent header"
+        );
+        assert_eq!(
+            metric_headers.get("content-encoding").unwrap(),
+            &value!("gzip"),
+            "Checking metric contains Content-Encoding header"
+        );
+
+        let mut trace = [TraceEvent::from(btreemap! {
+            "span_id" => "abc123",
+            "trace_id" => "xyz789",
+            "span_name" => "test-span",
+            "service" => "my-service",
+        }).into()];
+
+        add_headers(
+            &mut trace,
+            &header_names,
+            &headers,
+            LogNamespace::default(),
+            "test",
+        );
+
+        let trace_headers = trace[0].metadata().value().get(path!("test", "headers")).unwrap();
+
+        assert_eq!(
+            trace_headers.get("content-type").unwrap(),
+            &value!("application/x-protobuf"),
+            "Checking metric contains Content-Type header"
+        );
+        assert!(
+            !trace_headers.contains("user-agent"),
+            "Checking metric does not contain User-Agent header"
+        );
+        assert_eq!(
+            trace_headers.get("content-encoding").unwrap(),
+            &value!("gzip"),
+            "Checking metric contains Content-Encoding header"
         );
     }
 }

@@ -7,6 +7,7 @@ use std::{
 use chrono::{DateTime, TimeZone, Utc};
 use futures::Stream;
 use futures_util::StreamExt;
+use itertools::Itertools;
 use prost::Message;
 use similar_asserts::assert_eq;
 use tonic::Request;
@@ -32,7 +33,8 @@ use vector_lib::{
     },
 };
 use vrl::value;
-
+use vector_lib::opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest;
+use vector_lib::opentelemetry::proto::trace::v1::{ResourceSpans, ScopeSpans, Span};
 use crate::{
     SourceSender,
     config::{OutputId, SourceConfig, SourceContext},
@@ -41,7 +43,7 @@ use crate::{
         ObjectMap, Value, into_event_stream,
         metric::{Bucket, Quantile},
     },
-    sources::opentelemetry::config::{GrpcConfig, HttpConfig, LOGS, METRICS, OpentelemetryConfig},
+    sources::opentelemetry::config::{GrpcConfig, HttpConfig, LOGS, METRICS, TRACES, OpentelemetryConfig},
     test_util::{
         self,
         addr::next_addr,
@@ -1235,6 +1237,338 @@ async fn http_headers_logs_use_otlp_decoding_true() {
         assert_eq!(log["User-Agent"], "Test".into());
     })
     .await;
+}
+
+#[tokio::test]
+async fn http_headers_metrics_use_otlp_decoding_false() {
+    assert_source_compliance(&SOURCE_TAGS, async {
+        let (_guard_0, grpc_addr) = next_addr();
+        let (_guard_1, http_addr) = next_addr();
+
+        let source = get_source_config_with_headers(grpc_addr, http_addr, false);
+
+        let (sender, metrics_output, _) = new_source(EventStatus::Delivered, METRICS.to_string());
+        let server = source
+            .build(SourceContext::new_test(sender, None))
+            .await
+            .unwrap();
+        tokio::spawn(server);
+        test_util::wait_for_tcp(http_addr).await;
+
+        let client = reqwest::Client::new();
+        let req = ExportMetricsServiceRequest {
+            resource_metrics: vec![ResourceMetrics {
+                resource: Some(Resource {
+                    attributes: vec![KeyValue {
+                        key: "service.name".to_string(),
+                        value: Some(AnyValue {
+                            value: Some(StringValue("vector-collector".to_string())),
+                        }),
+                    }],
+                    dropped_attributes_count: 0,
+                }),
+                schema_url: "".to_string(),
+                scope_metrics: vec![ScopeMetrics {
+                    scope: Some(InstrumentationScope {
+                        name: "vector-collector-instrumentation".to_string(),
+                        version: "0.111.0".to_string(),
+                        attributes: vec![],
+                        dropped_attributes_count: 0,
+                    }),
+                    schema_url: "".to_string(),
+                    metrics: vec![Metric {
+                        name: "some.random.metric".to_string(),
+                        description: "Some random metric we use for test".to_string(),
+                        unit: "1".to_string(),
+                        data: Some(Data::Summary(Summary {
+                            data_points: vec![SummaryDataPoint {
+                                attributes: vec![
+                                    KeyValue {
+                                        key: "host".to_string(),
+                                        value: Some(AnyValue {
+                                            value: Some(StringValue("localhost".to_string())),
+                                        }),
+                                    },
+                                    KeyValue {
+                                        key: "service".to_string(),
+                                        value: Some(AnyValue {
+                                            value: Some(StringValue(
+                                                "vector-collector".to_string(),
+                                            )),
+                                        }),
+                                    },
+                                ],
+                                start_time_unix_nano: 0,
+                                time_unix_nano: 0,
+                                count: 5,
+                                sum: 122.5,
+                                quantile_values: vec![
+                                    ValueAtQuantile {
+                                        quantile: 0.5,
+                                        value: 24.5,
+                                    },
+                                    ValueAtQuantile {
+                                        quantile: 0.9,
+                                        value: 45.0,
+                                    },
+                                    ValueAtQuantile {
+                                        quantile: 1.0,
+                                        value: 60.0,
+                                    },
+                                ],
+                                flags: 0,
+                            }],
+                        })),
+                    }],
+                }],
+            }],
+        };
+        let _res = client
+            .post(format!("http://{http_addr}/v1/metrics"))
+            .header("Content-Type", "application/x-protobuf")
+            .header("User-Agent", "Test")
+            .body(req.encode_to_vec())
+            .send()
+            .await
+            .expect("Failed to send metrics to Opentelemetry Collector.");
+
+        let mut output = test_util::collect_ready(metrics_output).await;
+        assert_eq!(output.len(), 1);
+        let actual_event = output.pop().unwrap();
+        let metric = actual_event.as_metric();
+        assert_eq!(metric.metadata().value().get(path!("opentelemetry", "headers")).unwrap().get("AbsentHeader").unwrap(), &Value::Null);
+        assert_eq!(metric.metadata().value().get(path!("opentelemetry", "headers")).unwrap().get("User-Agent").unwrap(), &value!("Test"));
+    })
+        .await;
+}
+
+#[tokio::test]
+async fn http_headers_metrics_use_otlp_decoding_true() {
+    assert_source_compliance(&SOURCE_TAGS, async {
+        let (_guard_0, grpc_addr) = next_addr();
+        let (_guard_1, http_addr) = next_addr();
+
+        let source = get_source_config_with_headers(grpc_addr, http_addr, true);
+
+        let (sender, metrics_output, _) = new_source(EventStatus::Delivered, METRICS.to_string());
+        let server = source
+            .build(SourceContext::new_test(sender, None))
+            .await
+            .unwrap();
+        tokio::spawn(server);
+        test_util::wait_for_tcp(http_addr).await;
+
+        let client = reqwest::Client::new();
+        let req = ExportMetricsServiceRequest {
+            resource_metrics: vec![ResourceMetrics {
+                resource: Some(Resource {
+                    attributes: vec![KeyValue {
+                        key: "service.name".to_string(),
+                        value: Some(AnyValue {
+                            value: Some(StringValue("vector-collector".to_string())),
+                        }),
+                    }],
+                    dropped_attributes_count: 0,
+                }),
+                schema_url: "".to_string(),
+                scope_metrics: vec![ScopeMetrics {
+                    scope: Some(InstrumentationScope {
+                        name: "vector-collector-instrumentation".to_string(),
+                        version: "0.111.0".to_string(),
+                        attributes: vec![],
+                        dropped_attributes_count: 0,
+                    }),
+                    schema_url: "".to_string(),
+                    metrics: vec![Metric {
+                        name: "some.random.metric".to_string(),
+                        description: "Some random metric we use for test".to_string(),
+                        unit: "1".to_string(),
+                        data: Some(Data::Summary(Summary {
+                            data_points: vec![SummaryDataPoint {
+                                attributes: vec![
+                                    KeyValue {
+                                        key: "host".to_string(),
+                                        value: Some(AnyValue {
+                                            value: Some(StringValue("localhost".to_string())),
+                                        }),
+                                    },
+                                    KeyValue {
+                                        key: "service".to_string(),
+                                        value: Some(AnyValue {
+                                            value: Some(StringValue(
+                                                "vector-collector".to_string(),
+                                            )),
+                                        }),
+                                    },
+                                ],
+                                start_time_unix_nano: 0,
+                                time_unix_nano: 0,
+                                count: 5,
+                                sum: 122.5,
+                                quantile_values: vec![
+                                    ValueAtQuantile {
+                                        quantile: 0.5,
+                                        value: 24.5,
+                                    },
+                                    ValueAtQuantile {
+                                        quantile: 0.9,
+                                        value: 45.0,
+                                    },
+                                    ValueAtQuantile {
+                                        quantile: 1.0,
+                                        value: 60.0,
+                                    },
+                                ],
+                                flags: 0,
+                            }],
+                        })),
+                    }],
+                }],
+            }],
+        };
+        let _res = client
+            .post(format!("http://{http_addr}/v1/metrics"))
+            .header("Content-Type", "application/x-protobuf")
+            .header("User-Agent", "Test")
+            .body(req.encode_to_vec())
+            .send()
+            .await
+            .expect("Failed to send metrics to Opentelemetry Collector.");
+
+        let mut output = test_util::collect_ready(metrics_output).await;
+        assert_eq!(output.len(), 1);
+        let actual_event = output.pop().unwrap();
+        let log = actual_event.as_log();
+        assert_eq!(log["AbsentHeader"], Value::Null);
+        assert_eq!(log["User-Agent"], "Test".into());
+    })
+        .await;
+}
+
+#[tokio::test]
+async fn http_headers_traces_use_otlp_decoding_false() {
+    assert_source_compliance(&SOURCE_TAGS, async {
+        let (_guard_0, grpc_addr) = next_addr();
+        let (_guard_1, http_addr) = next_addr();
+
+        let source = get_source_config_with_headers(grpc_addr, http_addr, false);
+
+        let (sender, metrics_output, _) = new_source(EventStatus::Delivered, TRACES.to_string());
+        let server = source
+            .build(SourceContext::new_test(sender, None))
+            .await
+            .unwrap();
+        tokio::spawn(server);
+        test_util::wait_for_tcp(http_addr).await;
+
+        let client = reqwest::Client::new();
+        let req = ExportTraceServiceRequest {
+            resource_spans: vec![ResourceSpans {
+                resource: None,
+                scope_spans: vec![ScopeSpans {
+                    scope: None,
+                    spans: vec![Span {
+                        trace_id: (1..17).collect_vec(),      //trace_id [u8;16]
+                        span_id: (1..9).collect_vec(),        // span_id [u8;8]
+                        parent_span_id: (1..9).collect_vec(), // parent_span_id [u8;8]
+                        name: "span".to_string(),
+                        kind: 1,
+                        start_time_unix_nano: 1713525203000000000,
+                        end_time_unix_nano: 1713525205000000000,
+                        attributes: vec![],
+                        dropped_attributes_count: 0,
+                        events: vec![],
+                        dropped_events_count: 0,
+                        links: vec![],
+                        dropped_links_count: 0,
+                        status: None,
+                        trace_state: "".to_string(),
+                    }],
+                    schema_url: "".to_string(),
+                }],
+                schema_url: "".to_string(),
+            }],
+        };
+        let _res = client
+            .post(format!("http://{http_addr}/v1/traces"))
+            .header("Content-Type", "application/x-protobuf")
+            .header("User-Agent", "Test")
+            .body(req.encode_to_vec())
+            .send()
+            .await
+            .expect("Failed to send traces to Opentelemetry Collector.");
+
+        let mut output = test_util::collect_ready(metrics_output).await;
+        assert_eq!(output.len(), 1);
+        let actual_event = output.pop().unwrap();
+        let trace = actual_event.as_trace();
+        assert_eq!(trace.metadata().value().get(path!("opentelemetry", "headers")).unwrap().get("AbsentHeader").unwrap(), &Value::Null);
+        assert_eq!(trace.metadata().value().get(path!("opentelemetry", "headers")).unwrap().get("User-Agent").unwrap(), &value!("Test"));
+    })
+        .await;
+}
+
+#[tokio::test]
+async fn http_headers_traces_use_otlp_decoding_true() {
+    assert_source_compliance(&SOURCE_TAGS, async {
+        let (_guard_0, grpc_addr) = next_addr();
+        let (_guard_1, http_addr) = next_addr();
+
+        let source = get_source_config_with_headers(grpc_addr, http_addr, true);
+
+        let (sender, metrics_output, _) = new_source(EventStatus::Delivered, TRACES.to_string());
+        let server = source
+            .build(SourceContext::new_test(sender, None))
+            .await
+            .unwrap();
+        tokio::spawn(server);
+        test_util::wait_for_tcp(http_addr).await;
+
+        let client = reqwest::Client::new();
+        let req = ExportTraceServiceRequest {
+            resource_spans: vec![ResourceSpans {
+                resource: None,
+                scope_spans: vec![ScopeSpans {
+                    scope: None,
+                    spans: vec![Span {
+                        trace_id: (1..17).collect_vec(),      //trace_id [u8;16]
+                        span_id: (1..9).collect_vec(),        // span_id [u8;8]
+                        parent_span_id: (1..9).collect_vec(), // parent_span_id [u8;8]
+                        name: "span".to_string(),
+                        kind: 1,
+                        start_time_unix_nano: 1713525203000000000,
+                        end_time_unix_nano: 1713525205000000000,
+                        attributes: vec![],
+                        dropped_attributes_count: 0,
+                        events: vec![],
+                        dropped_events_count: 0,
+                        links: vec![],
+                        dropped_links_count: 0,
+                        status: None,
+                        trace_state: "".to_string(),
+                    }],
+                    schema_url: "".to_string(),
+                }],
+                schema_url: "".to_string(),
+            }],
+        };
+        let _res = client
+            .post(format!("http://{http_addr}/v1/traces"))
+            .header("Content-Type", "application/x-protobuf")
+            .header("User-Agent", "Test")
+            .body(req.encode_to_vec())
+            .send()
+            .await
+            .expect("Failed to send traces to Opentelemetry Collector.");
+
+        let mut output = test_util::collect_ready(metrics_output).await;
+        assert_eq!(output.len(), 1);
+        let actual_event = output.pop().unwrap();
+        let trace = actual_event.as_trace();
+        assert_eq!(trace.metadata().value().get(path!("opentelemetry", "headers")).unwrap().get("AbsentHeader").unwrap(), &Value::Null);
+        assert_eq!(trace.metadata().value().get(path!("opentelemetry", "headers")).unwrap().get("User-Agent").unwrap(), &value!("Test"));
+    })
+        .await;
 }
 
 pub struct OTelTestEnv {
