@@ -1087,7 +1087,7 @@ fn get_source_config_with_headers(
         },
         acknowledgements: Default::default(),
         log_namespace: Default::default(),
-        use_otlp_decoding,
+        use_otlp_decoding: use_otlp_decoding.into(),
     }
 }
 
@@ -1263,7 +1263,7 @@ pub async fn build_otlp_test_env(
         },
         acknowledgements: Default::default(),
         log_namespace,
-        use_otlp_decoding: false,
+        use_otlp_decoding: false.into(),
     };
 
     let (sender, output, _) = new_source(EventStatus::Delivered, event_name.to_string());
@@ -1342,7 +1342,7 @@ async fn http_logs_use_otlp_decoding_emits_metric() {
         },
         acknowledgements: Default::default(),
         log_namespace: None,
-        use_otlp_decoding: true,
+        use_otlp_decoding: true.into(),
     };
 
     let (sender, logs_output, _) = new_source(EventStatus::Delivered, LOGS.to_string());
@@ -1407,5 +1407,281 @@ async fn http_logs_use_otlp_decoding_emits_metric() {
             );
         }
         _ => panic!("component_received_events_total should be a counter"),
+    }
+}
+
+#[cfg(test)]
+mod otlp_decoding_config_tests {
+    use crate::config::{DataType, LogNamespace, SourceConfig};
+    use crate::sources::opentelemetry::config::{
+        GrpcConfig, HttpConfig, OpentelemetryConfig, OtlpDecodingConfig,
+    };
+    use vector_lib::codecs::decoding::OtlpSignalType;
+
+    #[test]
+    fn test_otlp_decoding_mixed_configurations() {
+        // Test single signal enabled
+        let config = OtlpDecodingConfig {
+            logs: false,
+            metrics: false,
+            traces: true,
+        };
+        assert!(config.any_enabled());
+        assert!(!config.all_enabled());
+        assert!(config.is_mixed());
+
+        // Test two signals enabled
+        let config = OtlpDecodingConfig {
+            logs: true,
+            metrics: false,
+            traces: true,
+        };
+        assert!(config.any_enabled());
+        assert!(!config.all_enabled());
+        assert!(config.is_mixed());
+
+        // Test different single signal
+        let config = OtlpDecodingConfig {
+            logs: true,
+            metrics: false,
+            traces: false,
+        };
+        assert!(config.any_enabled());
+        assert!(!config.all_enabled());
+        assert!(config.is_mixed());
+    }
+
+    #[test]
+    fn test_otlp_decoding_from_bool() {
+        // Test direct From<bool> trait implementation
+        let config_true = OtlpDecodingConfig::from(true);
+        assert!(config_true.logs);
+        assert!(config_true.metrics);
+        assert!(config_true.traces);
+        assert!(config_true.all_enabled());
+        assert!(!config_true.is_mixed());
+
+        let config_false = OtlpDecodingConfig::from(false);
+        assert!(!config_false.logs);
+        assert!(!config_false.metrics);
+        assert!(!config_false.traces);
+        assert!(!config_false.any_enabled());
+        assert!(!config_false.is_mixed());
+
+        // Test TOML deserialization (which uses From<bool> under the hood)
+        let config: OpentelemetryConfig = toml::from_str(
+            r#"
+            use_otlp_decoding = true
+
+            [grpc]
+            address = "0.0.0.0:4317"
+
+            [http]
+            address = "0.0.0.0:4318"
+            "#,
+        )
+        .unwrap();
+        assert!(config.use_otlp_decoding.logs);
+        assert!(config.use_otlp_decoding.metrics);
+        assert!(config.use_otlp_decoding.traces);
+
+        let config: OpentelemetryConfig = toml::from_str(
+            r#"
+            use_otlp_decoding = false
+
+            [grpc]
+            address = "0.0.0.0:4317"
+
+            [http]
+            address = "0.0.0.0:4318"
+            "#,
+        )
+        .unwrap();
+        assert!(!config.use_otlp_decoding.logs);
+        assert!(!config.use_otlp_decoding.metrics);
+        assert!(!config.use_otlp_decoding.traces);
+    }
+
+    #[test]
+    fn test_otlp_decoding_deserialization_from_struct() {
+        // Test deserializing from a struct with all fields
+        let config: OpentelemetryConfig = toml::from_str(
+            r#"
+            [grpc]
+            address = "0.0.0.0:4317"
+
+            [http]
+            address = "0.0.0.0:4318"
+
+            [use_otlp_decoding]
+            logs = false
+            metrics = false
+            traces = true
+            "#,
+        )
+        .unwrap();
+        assert!(!config.use_otlp_decoding.logs);
+        assert!(!config.use_otlp_decoding.metrics);
+        assert!(config.use_otlp_decoding.traces);
+
+        // Test deserializing from a struct with partial fields (using defaults)
+        let config: OpentelemetryConfig = toml::from_str(
+            r#"
+            [grpc]
+            address = "0.0.0.0:4317"
+
+            [http]
+            address = "0.0.0.0:4318"
+
+            [use_otlp_decoding]
+            traces = true
+            "#,
+        )
+        .unwrap();
+        assert!(!config.use_otlp_decoding.logs); // default false
+        assert!(!config.use_otlp_decoding.metrics); // default false
+        assert!(config.use_otlp_decoding.traces);
+    }
+
+    #[test]
+    fn test_otlp_decoding_default_when_not_specified() {
+        // Test that when use_otlp_decoding is not specified, it uses defaults (all false)
+        let config: OpentelemetryConfig = toml::from_str(
+            r#"
+            [grpc]
+            address = "0.0.0.0:4317"
+
+            [http]
+            address = "0.0.0.0:4318"
+            "#,
+        )
+        .unwrap();
+        assert!(!config.use_otlp_decoding.logs);
+        assert!(!config.use_otlp_decoding.metrics);
+        assert!(!config.use_otlp_decoding.traces);
+    }
+
+    #[tokio::test]
+    async fn test_get_signal_deserializer_per_signal() {
+        let config_all_true = OpentelemetryConfig {
+            grpc: GrpcConfig {
+                address: "0.0.0.0:4317".parse().unwrap(),
+                tls: None,
+            },
+            http: HttpConfig {
+                address: "0.0.0.0:4318".parse().unwrap(),
+                tls: None,
+                keepalive: Default::default(),
+                headers: vec![],
+            },
+            acknowledgements: Default::default(),
+            log_namespace: None,
+            use_otlp_decoding: OtlpDecodingConfig {
+                logs: true,
+                metrics: true,
+                traces: true,
+            },
+        };
+
+        // All should return Some deserializer
+        assert!(
+            config_all_true
+                .get_signal_deserializer(OtlpSignalType::Logs)
+                .unwrap()
+                .is_some()
+        );
+        assert!(
+            config_all_true
+                .get_signal_deserializer(OtlpSignalType::Metrics)
+                .unwrap()
+                .is_some()
+        );
+        assert!(
+            config_all_true
+                .get_signal_deserializer(OtlpSignalType::Traces)
+                .unwrap()
+                .is_some()
+        );
+
+        let config_mixed = OpentelemetryConfig {
+            grpc: GrpcConfig {
+                address: "0.0.0.0:4317".parse().unwrap(),
+                tls: None,
+            },
+            http: HttpConfig {
+                address: "0.0.0.0:4318".parse().unwrap(),
+                tls: None,
+                keepalive: Default::default(),
+                headers: vec![],
+            },
+            acknowledgements: Default::default(),
+            log_namespace: None,
+            use_otlp_decoding: OtlpDecodingConfig {
+                logs: false,
+                metrics: false,
+                traces: true,
+            },
+        };
+
+        // Only traces should return Some deserializer
+        assert!(
+            config_mixed
+                .get_signal_deserializer(OtlpSignalType::Logs)
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            config_mixed
+                .get_signal_deserializer(OtlpSignalType::Metrics)
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            config_mixed
+                .get_signal_deserializer(OtlpSignalType::Traces)
+                .unwrap()
+                .is_some()
+        );
+    }
+
+    #[test]
+    fn test_outputs_configuration_per_signal() {
+        let config_mixed = OpentelemetryConfig {
+            grpc: GrpcConfig {
+                address: "0.0.0.0:4317".parse().unwrap(),
+                tls: None,
+            },
+            http: HttpConfig {
+                address: "0.0.0.0:4318".parse().unwrap(),
+                tls: None,
+                keepalive: Default::default(),
+                headers: vec![],
+            },
+            acknowledgements: Default::default(),
+            log_namespace: None,
+            use_otlp_decoding: OtlpDecodingConfig {
+                logs: false,
+                metrics: true,
+                traces: true,
+            },
+        };
+
+        let outputs = config_mixed.outputs(LogNamespace::Legacy);
+        assert_eq!(outputs.len(), 3);
+
+        // Verify logs output (native format)
+        let logs_output = &outputs[0];
+        assert_eq!(logs_output.port.as_deref(), Some("logs"));
+        assert_eq!(logs_output.ty, DataType::Log);
+
+        // Verify metrics output (OTLP format, logs data type)
+        let metrics_output = &outputs[1];
+        assert_eq!(metrics_output.port.as_deref(), Some("metrics"));
+        assert_eq!(metrics_output.ty, DataType::Log); // Should be Log when OTLP decoding is enabled
+
+        // Verify traces output (OTLP format, traces data type)
+        let traces_output = &outputs[2];
+        assert_eq!(traces_output.port.as_deref(), Some("traces"));
+        assert_eq!(traces_output.ty, DataType::Trace); // Should always be Trace regardless of OTLP decoding
     }
 }

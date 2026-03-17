@@ -171,8 +171,7 @@ impl SinkBatchSettings for LokiDefaultBatchSettings {
 /// any necessary sorting/reordering. If you're using an earlier version, then you must use `Drop`
 /// or `RewriteTimestamp` depending on which option makes the most sense for your use case.
 #[configurable_component]
-#[derive(Copy, Clone, Debug, Derivative)]
-#[derivative(Default)]
+#[derive(Copy, Clone, Debug, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum OutOfOrderAction {
     /// Accept the event.
@@ -180,7 +179,7 @@ pub enum OutOfOrderAction {
     /// The event is not dropped and is sent without modification.
     ///
     /// Requires Loki 2.4.0 or newer.
-    #[derivative(Default)]
+    #[default]
     Accept,
 
     /// Rewrite the timestamp of the event to the timestamp of the latest event seen by the sink.
