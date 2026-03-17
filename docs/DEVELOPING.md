@@ -122,18 +122,19 @@ To build Vector on your own host will require a fairly complete development envi
 
 Loosely, you'll need the following:
 
-- **To build Vector:** Have working Rustup, Protobuf tools, C++/C build tools (LLVM, GCC, or MSVC), Python, and Perl, `make` (the GNU one preferably), `bash`, `cmake`, `GNU coreutils`, `autotools`, and `libsasl2`.
-  - Installing libsasl2 on Ubuntu
-    - Run `sudo apt-get install -y libsasl2-dev`
-  - Installing libsasl2 on MacOS
-    - Run `brew install cyrus-sasl`
-    - You will need to set the following environment variables:
+- **To build Vector:** Have working Rustup, Protobuf tools, C++/C build tools (LLVM, GCC, or MSVC), Python, and Perl, `make` (the GNU one preferably), `bash`, `cmake`, `GNU coreutils`, and `autotools`.
+  - You may also need to install `libsasl2` if you are compiling with default features or with any `kafka`-related features.
+    - Installing libsasl2 on Ubuntu
+      - Run `sudo apt-get install -y libsasl2-dev`
+    - Installing libsasl2 on MacOS
+      - Run `brew install cyrus-sasl`
+      - You will need to set the following environment variables:
 
-      ```bash
-      export LDFLAGS="-L$(brew --prefix cyrus-sasl)/lib $LDFLAGS"
-      export CPPFLAGS="-I$(brew --prefix cyrus-sasl)/include $CPPFLAGS"
-      export PKG_CONFIG_PATH="$(brew --prefix cyrus-sasl)/lib/pkgconfig:$PKG_CONFIG_PATH"
-      ```
+        ```bash
+        export LDFLAGS="-L$(brew --prefix cyrus-sasl)/lib $LDFLAGS"
+        export CPPFLAGS="-I$(brew --prefix cyrus-sasl)/include $CPPFLAGS"
+        export PKG_CONFIG_PATH="$(brew --prefix cyrus-sasl)/lib/pkgconfig:$PKG_CONFIG_PATH"
+        ```
 
 - **To run `make test`:** Install [`cargo-nextest`](https://nexte.st/)
 - **To run integration tests:** Have `docker` available, or a real live version of that service. (Use `AUTOSPAWN=false`)
