@@ -8,8 +8,8 @@ publish = false
 [dependencies]
 chrono-tz.workspace = true
 vector-vrl-functions = { workspace = true, features = ["dnstap", "vrl-metrics"] }
-enrichment = { path = "../../enrichment" }
-vector-vrl-metrics = { path = "../../vector-vrl-metrics" }
+enrichment = { path = "../enrichment" }
+vector-vrl-metrics = { path = "../metrics" }
 vector-core = { path = "../../vector-core", default-features = false, features = ["vrl"] }
 vrl = { workspace = true, features = ["stdlib"] }
 

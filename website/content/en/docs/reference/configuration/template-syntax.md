@@ -59,7 +59,7 @@ option = "year=%Y/month=%m/day=%d/"
 
 {{< info >}}
 The value is derived from the [`timestamp` field](/docs/architecture/data-model/log/#timestamps)
-and the name of this field can be changed via the [global `timestamp_key` option](/docs/reference/configuration/global-options/#log_schema.timestamp_key).
+and the name of this field can be changed via the [global `timestamp_key` option](/docs/reference/configuration/schema/#log_schema.timestamp_key).
 {{< /info >}}
 
 ### Escaping

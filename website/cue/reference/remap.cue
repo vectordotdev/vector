@@ -13,13 +13,11 @@ package metadata
 		name: Name
 	}
 
-	#Example: {
+	#BaseExample: {
 		title:   string
-		input?:  #Event
 		source:  string
 		diff?:   string
 		return?: _
-		output?: #Event | [#Event, ...#Event]
 		raises?: _
 
 		notes?: [string, ...string]
@@ -27,6 +25,17 @@ package metadata
 
 		// whether to skip in doc tests
 		skip_test?: bool
+	}
+
+	#Example: {
+		#BaseExample
+		input?: #Event
+		output?: #Event | [#Event, ...#Event]
+	}
+
+	#FunctionExample: {
+		#BaseExample
+		input?: {...}
 	}
 
 	#Type: "any" | "array" | "boolean" | "float" | "integer" | "object" | "null" | "path" | "string" | "regex" | "timestamp"
