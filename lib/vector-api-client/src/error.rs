@@ -20,6 +20,25 @@ pub enum Error {
     Stream { message: String },
 }
 
+impl Error {
+    /// Returns true if this error is permanent and should not be retried.
+    pub fn is_fatal(&self) -> bool {
+        match self {
+            Error::InvalidUrl { .. } => true,
+            Error::Grpc { source } => matches!(
+                source.code(),
+                tonic::Code::InvalidArgument
+                    | tonic::Code::OutOfRange
+                    | tonic::Code::NotFound
+                    | tonic::Code::PermissionDenied
+                    | tonic::Code::Unauthenticated
+                    | tonic::Code::Unimplemented
+            ),
+            _ => false,
+        }
+    }
+}
+
 impl From<tonic::Status> for Error {
     fn from(source: tonic::Status) -> Self {
         Error::Grpc { source }

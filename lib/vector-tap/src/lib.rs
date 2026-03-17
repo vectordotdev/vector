@@ -122,11 +122,23 @@ pub enum OutputChannel {
 pub enum TapExecutorError {
     ConnectionFailure(String),
     GrpcError(String),
+    /// Permanent error that should not trigger a reconnect (e.g. invalid arguments).
+    Fatal(String),
+}
+
+impl TapExecutorError {
+    pub fn is_fatal(&self) -> bool {
+        matches!(self, TapExecutorError::Fatal(_))
+    }
 }
 
 impl From<vector_api_client::Error> for TapExecutorError {
     fn from(err: vector_api_client::Error) -> Self {
-        TapExecutorError::GrpcError(format!("{}", err))
+        if err.is_fatal() {
+            TapExecutorError::Fatal(format!("{}", err))
+        } else {
+            TapExecutorError::GrpcError(format!("{}", err))
+        }
     }
 }
 

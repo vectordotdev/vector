@@ -84,14 +84,15 @@ async fn tap_internal(
                         break;
                     }
                     Err(tap_executor_error) => {
-                        if !opts.no_reconnect {
-                            #[allow(clippy::print_stderr)]
-                            {
-                                eprintln!(
-                                    "[tap] Connection failed with error {:?}. Reconnecting in {:?} seconds.",
-                                    tap_executor_error,
-                                    RECONNECT_DELAY / 1000);
-                            }
+                        #[allow(clippy::print_stderr)]
+                        if tap_executor_error.is_fatal() {
+                            eprintln!("[tap] Error: {tap_executor_error:?}");
+                            break;
+                        } else if !opts.no_reconnect {
+                            eprintln!(
+                                "[tap] Connection failed with error {:?}. Reconnecting in {:?} seconds.",
+                                tap_executor_error,
+                                RECONNECT_DELAY / 1000);
                             tokio::time::sleep(Duration::from_millis(RECONNECT_DELAY)).await;
                         } else {
                             break;
