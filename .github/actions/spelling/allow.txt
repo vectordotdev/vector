@@ -61,6 +61,7 @@ Benss
 bigendian
 bigquery
 bindir
+binstall
 binfmt
 bitcast
 bitcode
@@ -147,7 +148,9 @@ EPC
 esbuild
 esensar
 etld
+eventcreate
 eventloop
+Evt
 Evercoss
 exactlyonce
 Explay
@@ -499,6 +502,7 @@ Telstra
 Tencent
 Texet
 Thl
+timediff
 timeframe
 timeseries
 timespan

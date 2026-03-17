@@ -26,4 +26,6 @@ apt-get install -y \
       libclang1-9 \
       llvm-9 \
       clang \
-      unzip
+      unzip \
+      libsasl2-dev
+
