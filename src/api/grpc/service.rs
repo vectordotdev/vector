@@ -105,6 +105,21 @@ fn calculate_throughput(
     result
 }
 
+/// Converts a component's output port names into proto `Output` messages.
+///
+/// `None` port means the default output (represented as `"_default"`).
+/// `sent_events_total` is left at 0; per-output event counts are not available
+/// in the snapshot and are tracked via the streaming metrics endpoints.
+fn ports_to_proto_outputs(ports: &[Option<&str>]) -> Vec<Output> {
+    ports
+        .iter()
+        .map(|port| Output {
+            output_id: port.unwrap_or("_default").to_string(),
+            sent_events_total: 0,
+        })
+        .collect()
+}
+
 /// gRPC observability service implementation.
 ///
 /// This service provides real-time monitoring and observability for Vector instances,
@@ -158,78 +173,59 @@ impl observability::Service for ObservabilityService {
         let metrics = controller.capture_metrics();
         let component_metrics_map = extract_component_metrics(&metrics);
 
-        // TapResource.type_names covers all components (sources, transforms, sinks).
         let type_map = &tap_resource.type_names;
 
-        // Collect all component keys and their types
-        let mut components = Vec::new();
-        let mut seen_keys = HashSet::new();
+        // `tap_resource.outputs` and `tap_resource.inputs` are both full topology snapshots,
+        // maintained incrementally on RunningTopology. `source_keys`/`sink_keys` are diff-only
+        // (changed/added in the last reload) and must not be used for enumeration here.
+        //
+        // Component kind is determined by set membership:
+        //   source    = has outputs, no inputs
+        //   transform = has outputs AND inputs
+        //   sink      = has inputs, no outputs
+        let output_ports = tap_resource.output_ports_by_component();
 
-        // Add sources
-        for source_key in &tap_resource.source_keys {
-            if seen_keys.insert(source_key.clone()) {
-                let metrics = component_metrics_map.get(source_key.as_str()).cloned();
-                let on_type = type_map
-                    .get(source_key.as_str())
-                    .cloned()
-                    .unwrap_or_else(|| "unknown".to_string());
-                components.push(ProtoComponent {
-                    component_id: source_key.clone(),
-                    component_type: ComponentType::Source as i32,
-                    on_type,
-                    outputs: vec![],
-                    metrics,
-                });
+        let mut components = Vec::new();
+
+        // Sources: present in `output_ports` but not in `inputs`.
+        // `output_ports` is keyed by component, so no duplicates.
+        for (key, ports) in &output_ports {
+            if tap_resource.inputs.contains_key(*key) {
+                continue; // transform or sink, handled below
             }
+            let key_str = key.to_string();
+            let on_type = type_map
+                .get(&key_str)
+                .cloned()
+                .unwrap_or_else(|| "unknown".to_string());
+            components.push(ProtoComponent {
+                component_id: key_str.clone(),
+                component_type: ComponentType::Source as i32,
+                on_type,
+                outputs: ports_to_proto_outputs(ports),
+                metrics: component_metrics_map.get(&key_str).cloned(),
+            });
         }
 
-        // Add transforms and sinks (components with inputs)
+        // Transforms and sinks: present in `inputs` (full snapshot)
         for component_key in tap_resource.inputs.keys() {
             let key_str = component_key.to_string();
-            if seen_keys.insert(key_str.clone()) {
-                // Check if this component also has outputs (transform) or not (sink)
-                let has_outputs = tap_resource
-                    .outputs
-                    .keys()
-                    .any(|tap_output| tap_output.output_id.component == *component_key);
-
-                let component_type = if has_outputs {
-                    ComponentType::Transform
-                } else {
-                    ComponentType::Sink
-                };
-
-                let on_type = type_map
-                    .get(&key_str)
-                    .cloned()
-                    .unwrap_or_else(|| "unknown".to_string());
-                let metrics = component_metrics_map.get(&key_str).cloned();
-                components.push(ProtoComponent {
-                    component_id: key_str,
-                    component_type: component_type as i32,
-                    on_type,
-                    outputs: vec![],
-                    metrics,
-                });
-            }
-        }
-
-        // Also explicitly add sinks from sink_keys if they weren't in inputs
-        for sink_key in &tap_resource.sink_keys {
-            if seen_keys.insert(sink_key.clone()) {
-                let on_type = type_map
-                    .get(sink_key.as_str())
-                    .cloned()
-                    .unwrap_or_else(|| "unknown".to_string());
-                let metrics = component_metrics_map.get(sink_key.as_str()).cloned();
-                components.push(ProtoComponent {
-                    component_id: sink_key.clone(),
-                    component_type: ComponentType::Sink as i32,
-                    on_type,
-                    outputs: vec![],
-                    metrics,
-                });
-            }
+            let (component_type, outputs) = if let Some(ports) = output_ports.get(component_key) {
+                (ComponentType::Transform, ports_to_proto_outputs(ports))
+            } else {
+                (ComponentType::Sink, vec![])
+            };
+            let on_type = type_map
+                .get(&key_str)
+                .cloned()
+                .unwrap_or_else(|| "unknown".to_string());
+            components.push(ProtoComponent {
+                component_id: key_str.clone(),
+                component_type: component_type as i32,
+                on_type,
+                outputs,
+                metrics: component_metrics_map.get(&key_str).cloned(),
+            });
         }
 
         // Apply limit if specified

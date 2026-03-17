@@ -30,6 +30,22 @@ pub struct TapResource {
     pub type_names: HashMap<String, String>,
 }
 
+impl TapResource {
+    /// Returns each component's output port names, derived from the full `outputs` snapshot.
+    ///
+    /// Keys are all components that have at least one output (sources and transforms).
+    /// The port value is `None` for the default output and `Some(name)` for named ports.
+    pub fn output_ports_by_component(&self) -> HashMap<&ComponentKey, Vec<Option<&str>>> {
+        let mut map: HashMap<&ComponentKey, Vec<Option<&str>>> = HashMap::new();
+        for tap_output in self.outputs.keys() {
+            map.entry(&tap_output.output_id.component)
+                .or_default()
+                .push(tap_output.output_id.port.as_deref());
+        }
+        map
+    }
+}
+
 // Watcher types for topology changes.
 pub type WatchTx = watch::Sender<TapResource>;
 pub type WatchRx = watch::Receiver<TapResource>;
