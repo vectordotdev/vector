@@ -289,7 +289,7 @@ fn build_warp_metrics_filter(
                     decode_metrics_body(decoded_body, &events_received)
                 }
                 .map(|mut events| {
-                    enrich_events(&mut events, &headers_cfg, &headers, LogNamespace::default(),);
+                    enrich_events(&mut events, &headers_cfg, &headers, LogNamespace::default());
                     events
                 })
             })
@@ -335,7 +335,7 @@ fn build_warp_trace_filter(
                     decode_trace_body(decoded_body, &events_received)
                 }
                 .map(|mut events| {
-                    enrich_events(&mut events, &headers_cfg, &headers, LogNamespace::default(),);
+                    enrich_events(&mut events, &headers_cfg, &headers, LogNamespace::default());
                     events
                 })
             })

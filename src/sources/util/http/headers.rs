@@ -1,10 +1,10 @@
 use bytes::Bytes;
-use vrl::path::ValuePath;
 use vector_lib::{
     config::{LegacyKey, LogNamespace},
     event::Event,
     lookup::path,
 };
+use vrl::path::ValuePath;
 use warp::http::{HeaderMap, HeaderValue};
 
 use crate::{event::Value, sources::http_server::HttpConfigParamKind};
@@ -34,16 +34,18 @@ pub fn add_headers(
                                 path!("headers", header_name),
                                 Value::from(value.map(Bytes::copy_from_slice)),
                             );
-                        },
+                        }
                         Event::Metric(metric) => {
-                            metric.metadata_mut()
-                                .value_mut()
-                                .insert(path!(source_name).concat(path!("headers", header_name),), Value::from(value.map(Bytes::copy_from_slice)));
-                        },
+                            metric.metadata_mut().value_mut().insert(
+                                path!(source_name).concat(path!("headers", header_name)),
+                                Value::from(value.map(Bytes::copy_from_slice)),
+                            );
+                        }
                         Event::Trace(trace) => {
-                            trace.metadata_mut()
-                                .value_mut()
-                                .insert(path!(source_name).concat(path!("headers", header_name),), Value::from(value.map(Bytes::copy_from_slice)));
+                            trace.metadata_mut().value_mut().insert(
+                                path!(source_name).concat(path!("headers", header_name)),
+                                Value::from(value.map(Bytes::copy_from_slice)),
+                            );
                         }
                     }
                 }
@@ -67,16 +69,20 @@ pub fn add_headers(
                                         path!("headers", header_name.as_str()),
                                         Value::from(value.map(Bytes::copy_from_slice)),
                                     );
-                                },
+                                }
                                 Event::Metric(metric) => {
-                                    metric.metadata_mut()
-                                        .value_mut()
-                                        .insert(path!(source_name).concat(path!("headers", header_name.as_str()),), Value::from(value.map(Bytes::copy_from_slice)));
-                                },
+                                    metric.metadata_mut().value_mut().insert(
+                                        path!(source_name)
+                                            .concat(path!("headers", header_name.as_str())),
+                                        Value::from(value.map(Bytes::copy_from_slice)),
+                                    );
+                                }
                                 Event::Trace(trace) => {
-                                    trace.metadata_mut()
-                                        .value_mut()
-                                        .insert(path!(source_name).concat(path!("headers", header_name.as_str()),), Value::from(value.map(Bytes::copy_from_slice)));
+                                    trace.metadata_mut().value_mut().insert(
+                                        path!(source_name)
+                                            .concat(path!("headers", header_name.as_str())),
+                                        Value::from(value.map(Bytes::copy_from_slice)),
+                                    );
                                 }
                             }
                         }
@@ -89,17 +95,17 @@ pub fn add_headers(
 
 #[cfg(test)]
 mod tests {
-    use std::time::SystemTime;
     use chrono::{DateTime, Utc};
+    use std::time::SystemTime;
     use vector_lib::config::LogNamespace;
     use vrl::{path, value};
     use warp::http::HeaderMap;
 
+    use crate::event::{Event, MetricKind, MetricTags, MetricValue};
     use crate::{
         event::{LogEvent, Metric, TraceEvent},
         sources::{http_server::HttpConfigParamKind, util::add_headers},
     };
-    use crate::event::{Event, MetricKind, MetricTags, MetricValue};
 
     #[test]
     fn multiple_headers() {
@@ -142,12 +148,10 @@ mod tests {
             Metric::new(
                 "some.random.metric",
                 MetricKind::Incremental,
-                MetricValue::Counter {
-                    value: 123.4,
-                },
+                MetricValue::Counter { value: 123.4 },
             )
-                .with_timestamp(Some(DateTime::<Utc>::from(SystemTime::now())))
-                .with_tags(Some(MetricTags::default())),
+            .with_timestamp(Some(DateTime::<Utc>::from(SystemTime::now())))
+            .with_tags(Some(MetricTags::default())),
         )];
 
         add_headers(
@@ -163,7 +167,8 @@ mod tests {
             "trace_id" => "xyz789",
             "span_name" => "test-span",
             "service" => "my-service",
-        }).into()];
+        })
+        .into()];
 
         add_headers(
             &mut trace,
@@ -243,12 +248,10 @@ mod tests {
             Metric::new(
                 "some.random.metric",
                 MetricKind::Incremental,
-                MetricValue::Counter {
-                    value: 123.4,
-                },
+                MetricValue::Counter { value: 123.4 },
             )
-                .with_timestamp(Some(DateTime::<Utc>::from(SystemTime::now())))
-                .with_tags(Some(MetricTags::default())),
+            .with_timestamp(Some(DateTime::<Utc>::from(SystemTime::now())))
+            .with_tags(Some(MetricTags::default())),
         )];
 
         add_headers(
@@ -259,7 +262,11 @@ mod tests {
             "test",
         );
 
-        let metric_headers = metric[0].metadata().value().get(path!("test", "headers")).unwrap();
+        let metric_headers = metric[0]
+            .metadata()
+            .value()
+            .get(path!("test", "headers"))
+            .unwrap();
 
         assert_eq!(
             metric_headers.get("content-type").unwrap(),
@@ -281,7 +288,8 @@ mod tests {
             "trace_id" => "xyz789",
             "span_name" => "test-span",
             "service" => "my-service",
-        }).into()];
+        })
+        .into()];
 
         add_headers(
             &mut trace,
@@ -291,7 +299,11 @@ mod tests {
             "test",
         );
 
-        let trace_headers = trace[0].metadata().value().get(path!("test", "headers")).unwrap();
+        let trace_headers = trace[0]
+            .metadata()
+            .value()
+            .get(path!("test", "headers"))
+            .unwrap();
 
         assert_eq!(
             trace_headers.get("content-type").unwrap(),

@@ -4,6 +4,23 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
+use crate::{
+    SourceSender,
+    config::{OutputId, SourceConfig, SourceContext},
+    event::{
+        Event, EventStatus, LogEvent, Metric as MetricEvent, MetricKind, MetricTags, MetricValue,
+        ObjectMap, Value, into_event_stream,
+        metric::{Bucket, Quantile},
+    },
+    sources::opentelemetry::config::{
+        GrpcConfig, HttpConfig, LOGS, METRICS, OpentelemetryConfig, TRACES,
+    },
+    test_util::{
+        self,
+        addr::next_addr,
+        components::{SOURCE_TAGS, assert_source_compliance},
+    },
+};
 use chrono::{DateTime, TimeZone, Utc};
 use futures::Stream;
 use futures_util::StreamExt;
@@ -11,6 +28,8 @@ use itertools::Itertools;
 use prost::Message;
 use similar_asserts::assert_eq;
 use tonic::Request;
+use vector_lib::opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest;
+use vector_lib::opentelemetry::proto::trace::v1::{ResourceSpans, ScopeSpans, Span};
 use vector_lib::{
     config::LogNamespace,
     lookup::path,
@@ -33,23 +52,6 @@ use vector_lib::{
     },
 };
 use vrl::value;
-use vector_lib::opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest;
-use vector_lib::opentelemetry::proto::trace::v1::{ResourceSpans, ScopeSpans, Span};
-use crate::{
-    SourceSender,
-    config::{OutputId, SourceConfig, SourceContext},
-    event::{
-        Event, EventStatus, LogEvent, Metric as MetricEvent, MetricKind, MetricTags, MetricValue,
-        ObjectMap, Value, into_event_stream,
-        metric::{Bucket, Quantile},
-    },
-    sources::opentelemetry::config::{GrpcConfig, HttpConfig, LOGS, METRICS, TRACES, OpentelemetryConfig},
-    test_util::{
-        self,
-        addr::next_addr,
-        components::{SOURCE_TAGS, assert_source_compliance},
-    },
-};
 
 fn create_test_logs_request() -> Request<ExportLogsServiceRequest> {
     Request::new(ExportLogsServiceRequest {
@@ -1336,10 +1338,28 @@ async fn http_headers_metrics_use_otlp_decoding_false() {
         assert_eq!(output.len(), 1);
         let actual_event = output.pop().unwrap();
         let metric = actual_event.as_metric();
-        assert_eq!(metric.metadata().value().get(path!("opentelemetry", "headers")).unwrap().get("AbsentHeader").unwrap(), &Value::Null);
-        assert_eq!(metric.metadata().value().get(path!("opentelemetry", "headers")).unwrap().get("User-Agent").unwrap(), &value!("Test"));
+        assert_eq!(
+            metric
+                .metadata()
+                .value()
+                .get(path!("opentelemetry", "headers"))
+                .unwrap()
+                .get("AbsentHeader")
+                .unwrap(),
+            &Value::Null
+        );
+        assert_eq!(
+            metric
+                .metadata()
+                .value()
+                .get(path!("opentelemetry", "headers"))
+                .unwrap()
+                .get("User-Agent")
+                .unwrap(),
+            &value!("Test")
+        );
     })
-        .await;
+    .await;
 }
 
 #[tokio::test]
@@ -1442,7 +1462,7 @@ async fn http_headers_metrics_use_otlp_decoding_true() {
         assert_eq!(log["AbsentHeader"], Value::Null);
         assert_eq!(log["User-Agent"], "Test".into());
     })
-        .await;
+    .await;
 }
 
 #[tokio::test]
@@ -1502,10 +1522,28 @@ async fn http_headers_traces_use_otlp_decoding_false() {
         assert_eq!(output.len(), 1);
         let actual_event = output.pop().unwrap();
         let trace = actual_event.as_trace();
-        assert_eq!(trace.metadata().value().get(path!("opentelemetry", "headers")).unwrap().get("AbsentHeader").unwrap(), &Value::Null);
-        assert_eq!(trace.metadata().value().get(path!("opentelemetry", "headers")).unwrap().get("User-Agent").unwrap(), &value!("Test"));
+        assert_eq!(
+            trace
+                .metadata()
+                .value()
+                .get(path!("opentelemetry", "headers"))
+                .unwrap()
+                .get("AbsentHeader")
+                .unwrap(),
+            &Value::Null
+        );
+        assert_eq!(
+            trace
+                .metadata()
+                .value()
+                .get(path!("opentelemetry", "headers"))
+                .unwrap()
+                .get("User-Agent")
+                .unwrap(),
+            &value!("Test")
+        );
     })
-        .await;
+    .await;
 }
 
 #[tokio::test]
@@ -1565,10 +1603,28 @@ async fn http_headers_traces_use_otlp_decoding_true() {
         assert_eq!(output.len(), 1);
         let actual_event = output.pop().unwrap();
         let trace = actual_event.as_trace();
-        assert_eq!(trace.metadata().value().get(path!("opentelemetry", "headers")).unwrap().get("AbsentHeader").unwrap(), &Value::Null);
-        assert_eq!(trace.metadata().value().get(path!("opentelemetry", "headers")).unwrap().get("User-Agent").unwrap(), &value!("Test"));
+        assert_eq!(
+            trace
+                .metadata()
+                .value()
+                .get(path!("opentelemetry", "headers"))
+                .unwrap()
+                .get("AbsentHeader")
+                .unwrap(),
+            &Value::Null
+        );
+        assert_eq!(
+            trace
+                .metadata()
+                .value()
+                .get(path!("opentelemetry", "headers"))
+                .unwrap()
+                .get("User-Agent")
+                .unwrap(),
+            &value!("Test")
+        );
     })
-        .await;
+    .await;
 }
 
 pub struct OTelTestEnv {
