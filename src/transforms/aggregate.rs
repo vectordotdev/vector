@@ -101,10 +101,14 @@ enum Mode {
     Min,
 
     /// Mean value of absolute metric, ignores incremental
-    Mean,
+    Mean {
+        multi_map: HashMap<MetricSeries, Vec<MetricEntry>>,
+    },
 
     /// Stdev value of absolute metric, ignores incremental
-    Stdev,
+    Stdev {
+        multi_map: HashMap<MetricSeries, Vec<MetricEntry>>,
+    },
 }
 
 impl From<AggregationMode> for Mode {
@@ -119,8 +123,12 @@ impl From<AggregationMode> for Mode {
             },
             AggregationMode::Max => Mode::Max,
             AggregationMode::Min => Mode::Min,
-            AggregationMode::Mean => Mode::Mean,
-            AggregationMode::Stdev => Mode::Stdev,
+            AggregationMode::Mean => Mode::Mean {
+                multi_map: HashMap::default(),
+            },
+            AggregationMode::Stdev => Mode::Stdev {
+                multi_map: HashMap::default(),
+            },
         }
     }
 }
@@ -161,7 +169,6 @@ type MetricEntry = (MetricData, EventMetadata);
 pub struct Aggregate {
     interval: Duration,
     map: HashMap<MetricSeries, MetricEntry>,
-    multi_map: HashMap<MetricSeries, Vec<MetricEntry>>,
     mode: Mode,
 }
 
@@ -170,7 +177,6 @@ impl Aggregate {
         Ok(Self {
             interval: Duration::from_millis(config.interval_ms),
             map: Default::default(),
-            multi_map: Default::default(),
             mode: config.mode.into(),
         })
     }
@@ -178,7 +184,7 @@ impl Aggregate {
     fn record(&mut self, event: Event) {
         let (series, data, metadata) = event.into_metric().into_parts();
 
-        match self.mode {
+        match &mut self.mode {
             Mode::Auto => match data.kind {
                 MetricKind::Incremental => self.record_sum(series, data, metadata),
                 MetricKind::Absolute => {
@@ -194,11 +200,11 @@ impl Aggregate {
             },
             Mode::Count => self.record_count(series, data, metadata),
             Mode::Max | Mode::Min => self.record_comparison(series, data, metadata),
-            Mode::Mean | Mode::Stdev => match data.kind {
+            Mode::Mean { multi_map } | Mode::Stdev { multi_map } => match data.kind {
                 MetricKind::Incremental => (),
                 MetricKind::Absolute => {
                     if matches!(data.value, MetricValue::Gauge { value: _ }) {
-                        match self.multi_map.entry(series) {
+                        match multi_map.entry(series) {
                             Entry::Occupied(mut entry) => {
                                 let existing = entry.get_mut();
                                 existing.push((data, metadata));
@@ -308,7 +314,11 @@ impl Aggregate {
             output.push(Event::Metric(metric));
         }
 
-        let multi_map = std::mem::take(&mut self.multi_map);
+        let multi_map = match &mut self.mode {
+            Mode::Mean { multi_map } | Mode::Stdev { multi_map } => std::mem::take(multi_map),
+            _ => HashMap::default(),
+        };
+
         'outer: for (series, entries) in multi_map.into_iter() {
             if entries.is_empty() {
                 continue;
@@ -334,11 +344,11 @@ impl Aggregate {
 
             let final_mean = final_sum.clone();
             match self.mode {
-                Mode::Mean => {
+                Mode::Mean { .. } => {
                     let metric = Metric::from_parts(series, final_mean, final_metadata);
                     output.push(Event::Metric(metric));
                 }
-                Mode::Stdev => {
+                Mode::Stdev { .. } => {
                     let variance = entries
                         .iter()
                         .filter_map(|(data, _)| {
