@@ -2432,11 +2432,6 @@ fs.realpath@^1.0.0:
   resolved "https://registry.npmjs.org/fs.realpath/-/fs.realpath-1.0.0.tgz"
   integrity sha1-FQStJSMVjKpA20onh8sBQRmU6k8=
 
-fs@^0.0.1-security:
-  version "0.0.1-security"
-  resolved "https://registry.npmjs.org/fs/-/fs-0.0.1-security.tgz"
-  integrity sha1-invTcYa23d84E/I4WLV+yq9eQdQ=
-
 fsevents@~2.3.2:
   version "2.3.2"
   resolved "https://registry.npmjs.org/fsevents/-/fsevents-2.3.2.tgz"
