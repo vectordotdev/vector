@@ -452,6 +452,17 @@ async fn uptime_changed(mut client: Client, tx: state::EventTx, interval: i64) {
     }
 }
 
+/// Handles returned by [`subscribe`], split by lifecycle.
+pub struct SubscribeHandles {
+    /// Metric stream tasks — exit when a gRPC stream closes or errors.
+    /// `cmd.rs` joins these to detect connection loss and trigger reconnection.
+    pub metric_handles: Vec<JoinHandle<()>>,
+    /// Polls `get_components` for topology changes. Designed to run indefinitely
+    /// while the server is healthy, so it must be aborted separately rather than
+    /// joined alongside the metric handles.
+    pub poll_handle: JoinHandle<()>,
+}
+
 /// Subscribe to each metrics stream, all sharing a single underlying gRPC connection.
 /// HTTP/2 multiplexes the concurrent streams — cloning a connected `Client` is cheap
 /// (the tonic `Channel` is Arc-backed) and avoids redundant TCP/HTTP2 handshakes.
@@ -461,21 +472,22 @@ pub async fn subscribe(
     interval: i64,
     components_patterns: Vec<Pattern>,
     initial_components: HashSet<String>,
-) -> Result<Vec<JoinHandle<()>>, vector_api_client::Error> {
+) -> Result<SubscribeHandles, vector_api_client::Error> {
     let components_patterns = Arc::new(components_patterns);
 
     let mut client = Client::new(url.as_str());
     client.connect().await?;
 
+    let poll_handle = tokio::spawn(poll_components(
+        client.clone(),
+        tx.clone(),
+        interval,
+        Arc::clone(&components_patterns),
+        initial_components,
+    ));
+
     #[cfg_attr(not(feature = "allocation-tracing"), allow(unused_mut))]
-    let mut handles = vec![
-        tokio::spawn(poll_components(
-            client.clone(),
-            tx.clone(),
-            interval,
-            Arc::clone(&components_patterns),
-            initial_components,
-        )),
+    let mut metric_handles = vec![
         tokio::spawn(received_bytes_totals(
             client.clone(),
             tx.clone(),
@@ -534,14 +546,17 @@ pub async fn subscribe(
     ];
 
     #[cfg(feature = "allocation-tracing")]
-    handles.push(tokio::spawn(allocated_bytes(
+    metric_handles.push(tokio::spawn(allocated_bytes(
         client,
         tx,
         interval,
         Arc::clone(&components_patterns),
     )));
 
-    Ok(handles)
+    Ok(SubscribeHandles {
+        metric_handles,
+        poll_handle,
+    })
 }
 
 /// Retrieve the initial components/metrics for first paint. Further updating the metrics

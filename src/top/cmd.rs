@@ -148,9 +148,11 @@ async fn subscription(
             )))
             .await;
 
-        // Tasks spawned in metrics::subscribe finish when the gRPC
-        // streams complete or encounter errors
-        _ = join_all(handles).await;
+        // Wait for metric stream tasks to finish. poll_components is intentionally
+        // excluded: it runs indefinitely while get_components succeeds, so joining
+        // it here would prevent reconnection when metric streams fail first.
+        _ = join_all(handles.metric_handles).await;
+        handles.poll_handle.abort();
 
         _ = tx
             .send(EventType::ConnectionUpdated(
