@@ -756,6 +756,13 @@ impl observability::Service for ObservabilityService {
             ));
         }
 
+        const MAX_TAP_LIMIT: i32 = 100_000;
+        if req.limit > MAX_TAP_LIMIT {
+            return Err(Status::invalid_argument(format!(
+                "limit must be <= {MAX_TAP_LIMIT}"
+            )));
+        }
+
         let interval_ms = req.interval_ms as u64;
         let limit = req.limit as usize;
 
