@@ -14,14 +14,13 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: read  # Restrictive default
 
 jobs:
   cleanup:
     runs-on: ubuntu-latest
     permissions:
-      packages: write
-      contents: read
+      packages: write   # Required to delete package versions from GHCR
     steps:
       - name: Delete untagged vector images
         uses: actions/delete-package-versions@e5bc658cc4c965c472efe991f8beea3981499c55 # v5.0.0

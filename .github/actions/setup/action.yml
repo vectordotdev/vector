@@ -54,6 +54,10 @@ inputs:
     required: false
     default: false
     description: "Install cargo-msrv for minimum supported Rust version checks."
+  cargo-hack:
+    required: false
+    default: false
+    description: "Install cargo-hack for feature compilation checks."
   dd-rust-license-tool:
     required: false
     default: false
@@ -86,7 +90,8 @@ runs:
       uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
       with:
         path: ~/.cargo/bin/vdev
-        key: ${{ runner.os }}-vdev-${{ hashFiles('vdev/**', 'Cargo.toml', 'Cargo.lock') }}
+        # WARNING: this key need to be in sync with the key in .github/actions/install-vdev/action.yml
+        key: ${{ runner.os }}-vdev-${{ hashFiles('vdev/**', 'lib/vector-vrl/**', 'Cargo.toml', 'Cargo.lock') }}
         restore-keys: |
           ${{ runner.os }}-vdev-
         lookup-only: true
@@ -105,6 +110,7 @@ runs:
                    "${{ inputs.cargo-nextest }}" \
                    "${{ inputs.cargo-deny }}" \
                    "${{ inputs.cargo-msrv }}" \
+                   "${{ inputs.cargo-hack }}" \
                    "${{ inputs.dd-rust-license-tool }}" \
                    "${{ inputs.wasm-pack }}"; do
           if [[ "$val" == "true" ]]; then
@@ -176,7 +182,7 @@ runs:
         # We explicitly put `mold-wrapper.so` right beside `mold` itself because it's hard-coded to look in the same directory
         # first when trying to load the shared object, so we can dodge having to care about the "right" lib folder to put it in.
         TEMP=$(mktemp -d)
-        MOLD_VERSION=1.2.1
+        MOLD_VERSION=2.40.4
         MOLD_TARGET=mold-${MOLD_VERSION}-$(uname -m)-linux
         curl -fsSL "https://github.com/rui314/mold/releases/download/v${MOLD_VERSION}/${MOLD_TARGET}.tar.gz" \
         --output "$TEMP/${MOLD_TARGET}.tar.gz"
@@ -206,7 +212,7 @@ runs:
         EOF
 
     - name: Install protoc
-      if: ${{ inputs.protoc == 'true' }}
+      if: ${{ inputs.protoc == 'true' || env.VDEV_NEEDS_COMPILE == 'true' }}
       shell: bash
       run: |
         echo "Installing protoc"
@@ -252,6 +258,7 @@ runs:
           ~/.cargo/bin/cargo-nextest
           ~/.cargo/bin/cargo-deny
           ~/.cargo/bin/cargo-msrv
+          ~/.cargo/bin/cargo-hack
           ~/.cargo/bin/dd-rust-license-tool
           ~/.cargo/bin/wasm-pack
           /usr/local/bin/markdownlint
@@ -270,6 +277,7 @@ runs:
         [[ "${{ inputs.cargo-nextest }}" == "true" ]] && mods+=("cargo-nextest")
         [[ "${{ inputs.cargo-deny }}" == "true" ]] && mods+=("cargo-deny")
         [[ "${{ inputs.cargo-msrv }}" == "true" ]] && mods+=("cargo-msrv")
+        [[ "${{ inputs.cargo-hack }}" == "true" ]] && mods+=("cargo-hack")
         [[ "${{ inputs.dd-rust-license-tool }}" == "true" ]] && mods+=("dd-rust-license-tool")
         [[ "${{ inputs.wasm-pack }}" == "true" ]] && mods+=("wasm-pack")
         [[ "${{ inputs.markdownlint }}" == "true" ]] && mods+=("markdownlint")

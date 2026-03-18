@@ -8,7 +8,7 @@ use vector_lib::{
 };
 
 use super::{
-    config::{DatadogMetricsEndpoint, DatadogMetricsEndpointConfiguration},
+    config::{DatadogMetricsEndpoint, DatadogMetricsEndpointConfiguration, SeriesApiVersion},
     encoder::{CreateError, DatadogMetricsEncoder, EncoderError, FinishError},
     service::DatadogMetricsRequest,
 };
@@ -80,11 +80,12 @@ impl DatadogMetricsRequestBuilder {
     pub fn new(
         endpoint_configuration: DatadogMetricsEndpointConfiguration,
         default_namespace: Option<String>,
+        series_api_version: SeriesApiVersion,
     ) -> Result<Self, RequestBuilderError> {
         Ok(Self {
             endpoint_configuration,
             series_encoder: DatadogMetricsEncoder::new(
-                DatadogMetricsEndpoint::series(),
+                DatadogMetricsEndpoint::Series(series_api_version),
                 default_namespace.clone(),
             )?,
             sketches_encoder: DatadogMetricsEncoder::new(

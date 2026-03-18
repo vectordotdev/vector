@@ -25,6 +25,10 @@ updates:
       aws:
         patterns:
         - "aws-*"
+      aws-security:
+        applies-to: security-updates
+        patterns:
+        - "aws-*"
       azure:
         patterns:
         - "azure_*"
