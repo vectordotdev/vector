@@ -4,7 +4,6 @@ use vector_lib::{
     event::Event,
     lookup::path,
 };
-use vrl::path::ValuePath;
 use warp::http::{HeaderMap, HeaderValue};
 
 use crate::{event::Value, sources::http_server::HttpConfigParamKind};
@@ -35,15 +34,9 @@ pub fn add_headers(
                                 Value::from(value.map(Bytes::copy_from_slice)),
                             );
                         }
-                        Event::Metric(metric) => {
-                            metric.metadata_mut().value_mut().insert(
-                                path!(source_name).concat(path!("headers", header_name)),
-                                Value::from(value.map(Bytes::copy_from_slice)),
-                            );
-                        }
-                        Event::Trace(trace) => {
-                            trace.metadata_mut().value_mut().insert(
-                                path!(source_name).concat(path!("headers", header_name)),
+                        Event::Metric(_) | Event::Trace(_) => {
+                            event.metadata_mut().value_mut().insert(
+                                path!(source_name, "headers", header_name),
                                 Value::from(value.map(Bytes::copy_from_slice)),
                             );
                         }
@@ -70,17 +63,9 @@ pub fn add_headers(
                                         Value::from(value.map(Bytes::copy_from_slice)),
                                     );
                                 }
-                                Event::Metric(metric) => {
-                                    metric.metadata_mut().value_mut().insert(
-                                        path!(source_name)
-                                            .concat(path!("headers", header_name.as_str())),
-                                        Value::from(value.map(Bytes::copy_from_slice)),
-                                    );
-                                }
-                                Event::Trace(trace) => {
-                                    trace.metadata_mut().value_mut().insert(
-                                        path!(source_name)
-                                            .concat(path!("headers", header_name.as_str())),
+                                Event::Metric(_) | Event::Trace(_) => {
+                                    event.metadata_mut().value_mut().insert(
+                                        path!(source_name, "headers", header_name.as_str()),
                                         Value::from(value.map(Bytes::copy_from_slice)),
                                     );
                                 }
@@ -308,16 +293,16 @@ mod tests {
         assert_eq!(
             trace_headers.get("content-type").unwrap(),
             &value!("application/x-protobuf"),
-            "Checking metric contains Content-Type header"
+            "Checking trace contains Content-Type header"
         );
         assert!(
             !trace_headers.contains("user-agent"),
-            "Checking metric does not contain User-Agent header"
+            "Checking trace does not contain User-Agent header"
         );
         assert_eq!(
             trace_headers.get("content-encoding").unwrap(),
             &value!("gzip"),
-            "Checking metric contains Content-Encoding header"
+            "Checking trace contains Content-Encoding header"
         );
     }
 }

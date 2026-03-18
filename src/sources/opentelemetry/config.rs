@@ -122,6 +122,7 @@ pub struct OpentelemetryConfig {
     pub acknowledgements: SourceAcknowledgementsConfig,
 
     /// The namespace to use for logs. This overrides the global setting.
+    /// Is ignored for header enrichment of metrics and traces.
     #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     pub log_namespace: Option<bool>,
@@ -202,11 +203,11 @@ pub struct HttpConfig {
     #[serde(default)]
     pub keepalive: KeepaliveConfig,
 
-    /// A list of HTTP headers to include in the log event.
+    /// A list of HTTP headers to include in the event.
     ///
     /// Accepts the wildcard (`*`) character for headers matching a specified pattern.
     ///
-    /// Specifying "*" results in all headers included in the log event.
+    /// Specifying "*" results in all headers included in the event.
     ///
     /// These headers are not included in the JSON payload if a field with a conflicting name exists.
     #[serde(default)]
