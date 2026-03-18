@@ -443,9 +443,10 @@ impl IngestorProcess {
                         }
                         Err(_) => {
                             let delay = self.backoff.next().expect("backoff never ends");
-                            trace!(
+                            warn!(
+                                message = "SQS receive failed, will retry after delay.",
                                 delay_ms = delay.as_millis(),
-                                "`run_once` failed, will retry after delay.",
+                                queue_url = %self.state.queue_url,
                             );
                             tokio::time::sleep(delay).await;
                         }
@@ -492,6 +493,22 @@ impl IngestorProcess {
                 .message_id
                 .clone()
                 .unwrap_or_else(|| "<unknown>".to_owned());
+
+            if let Some(ref attrs) = message.attributes
+                && let Some(count_str) = attrs.get(
+                    &aws_sdk_sqs::types::MessageSystemAttributeName::ApproximateReceiveCount,
+                )
+                && let Ok(count) = count_str.parse::<u32>()
+                && count > 5
+            {
+                warn!(
+                    message = "SQS message has been received multiple times, possibly a poison message.",
+                    message_id = %message_id,
+                    approximate_receive_count = count,
+                    queue_url = %self.state.queue_url,
+                );
+            }
+
             match self.handle_sqs_message(message.clone()).await {
                 Ok(()) => {
                     emit!(SqsMessageProcessingSucceeded {
@@ -681,9 +698,13 @@ impl IngestorProcess {
 
     async fn handle_sqs_message(&mut self, message: Message) -> Result<(), ProcessingError> {
         let sqs_body = message.body.unwrap_or_default();
-        let sqs_body = serde_json::from_str::<SnsNotification>(sqs_body.as_ref())
-            .map(|notification| notification.message)
-            .unwrap_or(sqs_body);
+        let sqs_body = match serde_json::from_str::<SnsNotification>(sqs_body.as_ref()) {
+            Ok(notification) => {
+                debug!(message = "Unwrapped SNS envelope from SQS message.", ?message.message_id);
+                notification.message
+            }
+            Err(_) => sqs_body,
+        };
         let s3_event: SqsEvent =
             serde_json::from_str(sqs_body.as_ref()).context(InvalidSqsMessageSnafu {
                 message_id: message
@@ -694,7 +715,7 @@ impl IngestorProcess {
 
         match s3_event {
             SqsEvent::TestEvent(_s3_test_event) => {
-                debug!(?message.message_id, message = "Found S3 Test Event.");
+                info!(?message.message_id, message = "Received S3 test event, SQS notifications are configured correctly.");
                 Ok(())
             }
             SqsEvent::Event(s3_event) => self.handle_s3_event(s3_event).await,
@@ -986,6 +1007,9 @@ impl IngestorProcess {
             .max_number_of_messages(self.state.max_number_of_messages)
             .visibility_timeout(self.state.visibility_timeout_secs)
             .wait_time_seconds(self.state.poll_secs)
+            .message_system_attribute_names(
+                aws_sdk_sqs::types::MessageSystemAttributeName::ApproximateReceiveCount,
+            )
             .send()
             .map_ok(|res| res.messages.unwrap_or_default())
             .await
