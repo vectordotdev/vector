@@ -80,7 +80,7 @@ impl MemorySource {
             let mut events = Vec::new();
             {
                 let mut writer = self.memory.write_handle.lock().unwrap();
-                if let Some(reader) = self.memory.get_read_handle().read() {
+                if let Some(reader) = self.memory.get_read_handle().enter() {
                     let now = Instant::now();
                     let utc_now = Utc::now();
                     events = reader
@@ -97,7 +97,7 @@ impl MemorySource {
                         })
                         .filter_map(|(k, v)| {
                             if source_config.remove_after_export {
-                                writer.write_handle.empty(k.clone());
+                                writer.write_handle.remove_entry(k.clone());
                             }
                             v.get_one().map(|v| (k, v))
                         })
@@ -117,7 +117,7 @@ impl MemorySource {
                         })
                         .collect::<Vec<_>>();
                     if source_config.remove_after_export {
-                        writer.write_handle.refresh();
+                        writer.write_handle.publish();
                     }
                 }
             }

@@ -1,5 +1,3 @@
-#![allow(unsafe_op_in_unsafe_fn)] // TODO review ShallowCopy usage code and fix properly.
-
 use std::{
     sync::{Arc, Mutex, MutexGuard},
     time::{Duration, Instant},
@@ -7,11 +5,7 @@ use std::{
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use evmap::{
-    shallow_copy::CopyValue,
-    {self},
-};
-use evmap_derive::ShallowCopy;
+use evmap::handles::{ReadHandle, WriteHandle};
 use futures::{StreamExt, stream::BoxStream};
 use thread_local::ThreadLocal;
 use tokio::{
@@ -46,10 +40,10 @@ use crate::{
 };
 
 /// Single memory entry containing the value and TTL
-#[derive(Clone, Eq, PartialEq, Hash, ShallowCopy)]
+#[derive(Clone, Eq, PartialEq, Hash)]
 pub struct MemoryEntry {
     value: String,
-    update_time: CopyValue<Instant>,
+    update_time: Instant,
     ttl: u64,
 }
 
@@ -63,7 +57,7 @@ impl MemoryEntry {
     pub(super) fn as_object_map(&self, now: Instant, key: &str) -> Result<ObjectMap, Error> {
         let ttl = self
             .ttl
-            .saturating_sub(now.duration_since(*self.update_time).as_secs());
+            .saturating_sub(now.duration_since(self.update_time).as_secs());
         Ok(ObjectMap::from([
             (
                 KeyString::from("key"),
@@ -86,7 +80,7 @@ impl MemoryEntry {
     }
 
     fn expired(&self, now: Instant) -> bool {
-        now.duration_since(*self.update_time).as_secs() > self.ttl
+        now.duration_since(self.update_time).as_secs() > self.ttl
     }
 }
 
@@ -106,14 +100,18 @@ pub(super) struct MemoryEntryPair {
 
 // Used to ensure that these 2 are locked together
 pub(super) struct MemoryWriter {
-    pub(super) write_handle: evmap::WriteHandle<String, MemoryEntry>,
+    pub(super) write_handle: WriteHandle<String, MemoryEntry>,
     metadata: MemoryMetadata,
+    /// Keys pending removal, collected between remove_entry calls and the next publish
+    pending_removals: Vec<String>,
 }
 
 /// A struct that implements [vector_lib::enrichment::Table] to handle loading enrichment data from a memory structure.
 pub struct Memory {
-    read_handle_factory: evmap::ReadHandleFactory<String, MemoryEntry>,
-    read_handle: ThreadLocal<evmap::ReadHandle<String, MemoryEntry>>,
+    read_handle: ThreadLocal<ReadHandle<String, MemoryEntry>>,
+    // ReadHandle is !Sync so we wrap in Mutex; only accessed when
+    // initialising a new per-thread handle via ThreadLocal
+    read_handle_template: Mutex<ReadHandle<String, MemoryEntry>>,
     pub(super) write_handle: Arc<Mutex<MemoryWriter>>,
     pub(super) config: MemoryConfig,
     #[allow(dead_code)]
@@ -124,27 +122,34 @@ pub struct Memory {
 impl Memory {
     /// Creates a new [Memory] based on the provided config.
     pub fn new(config: MemoryConfig) -> Self {
-        let (read_handle, write_handle) = evmap::new();
+        // safety: MemoryEntry's Hash and Eq are derived from String, Instant,
+        // and u64, all of which are deterministic
+        let (write_handle, read_handle) = unsafe { evmap::new_assert_stable() };
         // Buffer could only be used if source is stuck exporting available items, but in that case,
         // publishing will not happen either, because the lock would be held, so this buffer is not
         // that important
         let (expired_tx, expired_rx) = tokio::sync::broadcast::channel(5);
         Self {
             config,
-            read_handle_factory: read_handle.factory(),
+            read_handle_template: Mutex::new(read_handle),
             read_handle: ThreadLocal::new(),
             write_handle: Arc::new(Mutex::new(MemoryWriter {
                 write_handle,
                 metadata: MemoryMetadata::default(),
+                pending_removals: Vec::new(),
             })),
             expired_items_sender: expired_tx,
             expired_items_receiver: expired_rx,
         }
     }
 
-    pub(super) fn get_read_handle(&self) -> &evmap::ReadHandle<String, MemoryEntry> {
-        self.read_handle
-            .get_or(|| self.read_handle_factory.handle())
+    pub(super) fn get_read_handle(&self) -> &ReadHandle<String, MemoryEntry> {
+        self.read_handle.get_or(|| {
+            self.read_handle_template
+                .lock()
+                .expect("mutex poisoned")
+                .clone()
+        })
     }
 
     pub(super) fn subscribe_to_expired_items(&self) -> Receiver<Vec<MemoryEntryPair>> {
@@ -166,7 +171,7 @@ impl Memory {
             };
             let new_entry = MemoryEntry {
                 value: v,
-                update_time: now.into(),
+                update_time: now,
                 ttl: self
                     .config
                     .ttl_field
@@ -214,15 +219,16 @@ impl Memory {
         let mut needs_flush = false;
         // Since evmap holds 2 separate maps for the data, we are free to directly remove
         // elements via the writer, while we are iterating the reader
-        // Refresh will happen only after we manually invoke it after iteration
-        if let Some(reader) = self.get_read_handle().read() {
+        // Publish will happen only after we manually invoke it after iteration
+        if let Some(reader) = self.get_read_handle().enter() {
             for (k, v) in reader.iter() {
                 if let Some(entry) = v.get_one()
                     && entry.expired(now)
                 {
                     // Byte size is not reduced at this point, because the actual deletion
-                    // will only happen at refresh time
-                    writer.write_handle.empty(k.clone());
+                    // will only happen at publish time
+                    writer.pending_removals.push(k.clone());
+                    writer.write_handle.remove_entry(k.clone());
                     emit!(MemoryEnrichmentTableTtlExpired {
                         key: k,
                         include_key_metric_tag: self.config.internal_metrics.include_key_tag
@@ -252,14 +258,8 @@ impl Memory {
             .unwrap_or_default()
         {
             let pending_removal = writer
-                .write_handle
-                .pending()
+                .pending_removals
                 .iter()
-                // We only use empty operation to remove keys
-                .filter_map(|o| match o {
-                    evmap::Operation::Empty(k) => Some(k),
-                    _ => None,
-                })
                 .filter_map(|key| {
                     writer.write_handle.get_one(key).map(|v| MemoryEntryPair {
                         key: key.to_string(),
@@ -274,9 +274,10 @@ impl Memory {
                 );
             }
         }
+        writer.pending_removals.clear();
 
-        writer.write_handle.refresh();
-        if let Some(reader) = self.get_read_handle().read() {
+        writer.write_handle.publish();
+        if let Some(reader) = self.get_read_handle().enter() {
             let mut byte_size = 0;
             for (k, v) in reader.iter() {
                 byte_size += k.size_of() + v.get_one().size_of();
@@ -307,7 +308,12 @@ impl Memory {
 impl Clone for Memory {
     fn clone(&self) -> Self {
         Self {
-            read_handle_factory: self.read_handle_factory.clone(),
+            read_handle_template: Mutex::new(
+                self.read_handle_template
+                    .lock()
+                    .expect("mutex poisoned")
+                    .clone(),
+            ),
             read_handle: ThreadLocal::new(),
             write_handle: Arc::clone(&self.write_handle),
             config: self.config.clone(),
@@ -512,11 +518,11 @@ mod tests {
                 "test_key".to_string(),
                 MemoryEntry {
                     value: "5".to_string(),
-                    update_time: (Instant::now() - Duration::from_secs(secs_to_subtract)).into(),
+                    update_time: Instant::now() - Duration::from_secs(secs_to_subtract),
                     ttl,
                 },
             );
-            handle.write_handle.refresh();
+            handle.write_handle.publish();
         }
 
         let condition = Condition::Equals {
@@ -604,11 +610,11 @@ mod tests {
                 "test_key".to_string(),
                 MemoryEntry {
                     value: "5".to_string(),
-                    update_time: (Instant::now() - Duration::from_secs(ttl + 10)).into(),
+                    update_time: Instant::now() - Duration::from_secs(ttl + 10),
                     ttl,
                 },
             );
-            handle.write_handle.refresh();
+            handle.write_handle.publish();
         }
 
         // Finds the value before scan
@@ -672,11 +678,11 @@ mod tests {
                 "test_key".to_string(),
                 MemoryEntry {
                     value: "5".to_string(),
-                    update_time: (Instant::now() - Duration::from_secs(ttl / 2)).into(),
+                    update_time: Instant::now() - Duration::from_secs(ttl / 2),
                     ttl,
                 },
             );
-            handle.write_handle.refresh();
+            handle.write_handle.publish();
         }
         let condition = Condition::Equals {
             field: "key",
