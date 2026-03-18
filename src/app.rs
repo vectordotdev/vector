@@ -7,7 +7,7 @@ use std::{
     num::{NonZeroU64, NonZeroUsize},
     path::PathBuf,
     process::ExitStatus,
-    sync::atomic::{AtomicUsize, Ordering},
+    sync::{Arc, atomic::{AtomicUsize, Ordering}},
     time::Duration,
 };
 
@@ -138,6 +138,7 @@ impl ApplicationConfig {
             let api_server = handle.block_on(api::GrpcServer::start(
                 self.topology.config(),
                 self.topology.watch(),
+                Arc::clone(&self.topology.running),
             ));
             match api_server {
                 Ok(server) => {

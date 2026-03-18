@@ -76,7 +76,7 @@ impl TopologyController {
         } else if self.api_server.is_none() {
             debug!("Starting gRPC API server.");
 
-            match api::GrpcServer::start(self.topology.config(), self.topology.watch()).await {
+            match api::GrpcServer::start(self.topology.config(), self.topology.watch(), Arc::clone(&self.topology.running)).await {
                 Ok(api_server) => {
                     let addr = api_server.addr();
                     info!(
