@@ -80,7 +80,7 @@ pub enum ElasticsearchMode {
 
 /// Bulk API actions.
 #[configurable_component]
-#[derive(Clone, Copy, Debug, Derivative, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub enum BulkAction {
     /// The `index` action.
@@ -127,7 +127,7 @@ impl TryFrom<&str> for BulkAction {
 
 /// Elasticsearch version types.
 #[configurable_component]
-#[derive(Clone, Copy, Debug, Derivative, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub enum VersionType {
     /// The `internal` type.
