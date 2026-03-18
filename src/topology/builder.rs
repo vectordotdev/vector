@@ -6,7 +6,7 @@ use std::{
     time::Instant,
 };
 
-use futures::{FutureExt, StreamExt, TryStreamExt, stream::FuturesOrdered};
+use futures::{FutureExt, StreamExt, TryStreamExt};
 use futures_util::stream::FuturesUnordered;
 use metrics::gauge;
 use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
@@ -1199,7 +1199,7 @@ impl Runner {
         let mut input_rx =
             super::ready_arrays::ReadyArrays::with_capacity(input_rx, READY_ARRAY_CAPACITY);
 
-        let mut in_flight = FuturesOrdered::new();
+        let mut in_flight = FuturesUnordered::new();
         let mut shutting_down = false;
 
         self.timer_tx.try_send_start_wait();
@@ -1234,7 +1234,7 @@ impl Runner {
                                 }
                                 outputs_buf
                             }.in_current_span());
-                            in_flight.push_back(task);
+                            in_flight.push(task);
                         }
                         None => {
                             shutting_down = true;
