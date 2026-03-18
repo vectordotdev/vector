@@ -226,7 +226,7 @@ fn render_dot(config: config::Config) -> exitcode::ExitCode {
 }
 
 fn render_dot_edge(into: &mut String, id: &ComponentKey, input: &OutputId, graph: &GraphConfig) {
-    let edge_attributes = graph.edge_attributes.get(&input.component.to_string());
+    let edge_attributes = graph.edge_attributes.get(&input.to_string());
     if let Some(port) = &input.port {
         writeln!(
             into,
