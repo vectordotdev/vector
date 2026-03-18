@@ -450,6 +450,7 @@ lockfree-object-pool,https://github.com/EVaillant/lockfree-object-pool,BSL-1.0,E
 log,https://github.com/rust-lang/log,MIT OR Apache-2.0,The Rust Project Developers
 lru,https://github.com/jeromefroe/lru-rs,MIT,Jerome Froelich <jeromefroelic@hotmail.com>
 lru-cache,https://github.com/contain-rs/lru-cache,MIT OR Apache-2.0,Stepan Koltsov <stepan.koltsov@gmail.com>
+lru-slab,https://github.com/Ralith/lru-slab,MIT OR Apache-2.0 OR Zlib,Benjamin Saunders <ben.e.saunders@gmail.com>
 lz4,https://github.com/10xGenomics/lz4-rs,MIT,"Jens Heyens <jens.heyens@ewetel.net>, Artem V. Navrotskiy <bozaro@buzzsoft.ru>, Patrick Marks <pmarks@gmail.com>"
 lz4-sys,https://github.com/10xGenomics/lz4-rs,MIT,"Jens Heyens <jens.heyens@ewetel.net>, Artem V. Navrotskiy <bozaro@buzzsoft.ru>, Patrick Marks <pmarks@gmail.com>"
 lz4_flex,https://github.com/pseitz/lz4_flex,MIT,"Pascal Seitz <pascal.seitz@gmail.com>, Arthur Silva <arthurprs@gmail.com>, ticki <Ticki@users.noreply.github.com>"
@@ -887,7 +888,9 @@ windows-collections,https://github.com/microsoft/windows-rs,MIT OR Apache-2.0,Th
 windows-core,https://github.com/microsoft/windows-rs,MIT OR Apache-2.0,Microsoft
 windows-future,https://github.com/microsoft/windows-rs,MIT OR Apache-2.0,The windows-future Authors
 windows-implement,https://github.com/microsoft/windows-rs,MIT OR Apache-2.0,Microsoft
+windows-implement,https://github.com/microsoft/windows-rs,MIT OR Apache-2.0,The windows-implement Authors
 windows-interface,https://github.com/microsoft/windows-rs,MIT OR Apache-2.0,Microsoft
+windows-interface,https://github.com/microsoft/windows-rs,MIT OR Apache-2.0,The windows-interface Authors
 windows-link,https://github.com/microsoft/windows-rs,MIT OR Apache-2.0,Microsoft
 windows-link,https://github.com/microsoft/windows-rs,MIT OR Apache-2.0,The windows-link Authors
 windows-numerics,https://github.com/microsoft/windows-rs,MIT OR Apache-2.0,The windows-numerics Authors
@@ -898,6 +901,7 @@ windows-strings,https://github.com/microsoft/windows-rs,MIT OR Apache-2.0,Micros
 windows-sys,https://github.com/microsoft/windows-rs,MIT OR Apache-2.0,Microsoft
 windows-sys,https://github.com/microsoft/windows-rs,MIT OR Apache-2.0,The windows-sys Authors
 windows-targets,https://github.com/microsoft/windows-rs,MIT OR Apache-2.0,Microsoft
+windows-threading,https://github.com/microsoft/windows-rs,MIT OR Apache-2.0,Microsoft
 windows_aarch64_gnullvm,https://github.com/microsoft/windows-rs,MIT OR Apache-2.0,Microsoft
 windows_aarch64_msvc,https://github.com/microsoft/windows-rs,MIT OR Apache-2.0,Microsoft
 windows_i686_gnu,https://github.com/microsoft/windows-rs,MIT OR Apache-2.0,Microsoft

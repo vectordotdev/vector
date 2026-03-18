@@ -162,12 +162,11 @@ pub struct OAuth2Config {
 
 /// Supported compression types for Pulsar.
 #[configurable_component]
-#[derive(Clone, Copy, Debug, Derivative)]
-#[derivative(Default)]
+#[derive(Clone, Copy, Debug, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum PulsarCompression {
     /// No compression.
-    #[derivative(Default)]
+    #[default]
     None,
 
     /// LZ4.
