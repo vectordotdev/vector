@@ -149,20 +149,45 @@ async fn tap_specific_component() {
 
 #[tokio::test]
 async fn tap_survives_config_reload() {
-    let config = single_source_config("demo", 0.05, None); // No count limit - run continuously
+    use vector_lib::api_client::proto::output_event::Event;
+
+    let config = single_source_config("demo", 0.05, None); // No count limit - runs continuously
     let mut harness = TestHarness::new(&config)
         .await
         .expect("Failed to start Vector");
 
-    // Start tap with wildcard and collect initial events
-    let initial_events = harness
-        .tap_and_collect(&["*"], 5)
+    // Open the stream ONCE and keep it alive across the reload.
+    // tonic channels are Arc-based so the returned stream is owned and does not
+    // borrow `harness`, allowing us to call reload_with_config below.
+    let request = OutputEventsRequest {
+        outputs_patterns: vec!["*".to_string()],
+        inputs_patterns: vec![],
+        limit: 1000,
+        interval_ms: 100,
+    };
+    let mut stream = harness
+        .api_client()
+        .stream_output_events(request)
         .await
-        .expect("Should receive initial events");
+        .expect("Failed to open tap stream");
 
-    assert!(!initial_events.is_empty(), "Should receive initial events");
+    // Collect a few pre-reload events to confirm the stream is working
+    let mut pre_reload_count = 0;
+    let start = Instant::now();
+    while pre_reload_count < 5 {
+        assert!(
+            start.elapsed() < TAP_TIMEOUT,
+            "Timeout waiting for pre-reload events"
+        );
+        match tokio::time::timeout(TAP_TIMEOUT - start.elapsed(), stream.next()).await {
+            Ok(Some(Ok(_))) => pre_reload_count += 1,
+            Ok(Some(Err(e))) => panic!("Stream error before reload: {e}"),
+            Ok(None) => panic!("Stream ended unexpectedly before reload"),
+            Err(_) => panic!("Timeout before reload"),
+        }
+    }
 
-    // Reload config with completely new components (avoid keeping same names)
+    // Reload with completely new components
     harness
         .reload_with_config(
             indoc! {"
@@ -187,30 +212,27 @@ async fn tap_survives_config_reload() {
         .await
         .expect("Failed to reload config");
 
-    // Tap should still work and see events from both sources after reload
-    let after_reload = harness
-        .tap_and_collect(&["*"], 5)
-        .await
-        .expect("Should receive events after reload");
-
-    assert!(
-        !after_reload.is_empty(),
-        "Should receive events after reload"
-    );
-
-    use vector_lib::api_client::proto::output_event::Event;
-    let tapped_events: Vec<_> = after_reload
-        .iter()
-        .filter_map(|e| match &e.event {
-            Some(Event::TappedEvent(tapped)) => Some(tapped),
-            _ => None,
-        })
-        .collect();
-
-    assert!(
-        !tapped_events.is_empty(),
-        "Should receive tapped events after reload"
-    );
+    // Continue reading from the SAME stream. If the tap implementation drops active
+    // streams on reload, stream.next() will return None and the test will fail.
+    let mut post_reload_count = 0;
+    let start = Instant::now();
+    while post_reload_count < 5 {
+        assert!(
+            start.elapsed() < TAP_TIMEOUT,
+            "Stream did not survive reload: only received {post_reload_count} tapped events after reload"
+        );
+        match tokio::time::timeout(TAP_TIMEOUT - start.elapsed(), stream.next()).await {
+            Ok(Some(Ok(event))) => {
+                if matches!(&event.event, Some(Event::TappedEvent(_))) {
+                    post_reload_count += 1;
+                }
+                // Notifications (component added/removed) are expected during reload - skip them
+            }
+            Ok(Some(Err(e))) => panic!("Stream error after reload: {e}"),
+            Ok(None) => panic!("Stream was closed on reload - tap subscription was dropped"),
+            Err(_) => panic!("Timeout waiting for post-reload tapped events"),
+        }
+    }
 }
 
 #[tokio::test]

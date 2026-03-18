@@ -275,7 +275,7 @@ impl Client {
     pub async fn stream_output_events(
         &mut self,
         request: OutputEventsRequest,
-    ) -> Result<impl Stream<Item = Result<OutputEvent>>> {
+    ) -> Result<impl Stream<Item = Result<OutputEvent>> + use<>> {
         let client = self.ensure_connected()?;
         let response = client.stream_output_events(request).await?;
         Ok(response.into_inner().map(|r| r.map_err(Error::from)))

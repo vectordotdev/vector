@@ -140,11 +140,15 @@ message ComponentAllocatedBytesResponse {
 message ComponentThroughputResponse {
   string component_id = 1;
   double throughput = 2;  // events/sec or bytes/sec depending on the stream
+  // Per-output throughput breakdown (only populated for sent_events streams)
+  map<string, double> output_throughputs = 3;
 }
 
 message ComponentTotalsResponse {
   string component_id = 1;
   int64 total = 2;
+  // Per-output totals breakdown (only populated for sent_events streams)
+  map<string, int64> output_totals = 3;
 }
 
 // ========== Event Tapping Messages ==========

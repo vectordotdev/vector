@@ -133,6 +133,30 @@ fn calculate_throughput(
     result
 }
 
+/// Helper function to calculate throughput for per-output metrics by comparing
+/// current and previous values keyed by `(component_id, output)`.
+fn calculate_throughput_by_output(
+    current: &HashMap<(String, String), f64>,
+    previous: &HashMap<(String, String), f64>,
+    interval_secs: f64,
+) -> HashMap<(String, String), f64> {
+    let mut result = HashMap::new();
+
+    for (key, current_value) in current {
+        if let Some(previous_value) = previous.get(key) {
+            let delta = current_value - previous_value;
+            let throughput = if interval_secs > 0.0 {
+                delta / interval_secs
+            } else {
+                0.0
+            };
+            result.insert(key.clone(), throughput.max(0.0));
+        }
+    }
+
+    result
+}
+
 /// Minimum allowed polling interval for metric streams (100 ms).
 ///
 /// Prevents clients from setting `interval_ms=1` and hammering `capture_metrics()`
@@ -171,6 +195,7 @@ fn metric_totals_stream(
                         Ok(ComponentTotalsResponse {
                             component_id,
                             total: total as i64,
+                            output_totals: Default::default(),
                         })
                     })
                     .collect::<Vec<_>>(),
@@ -208,6 +233,120 @@ fn metric_throughput_stream(
                         Ok(ComponentThroughputResponse {
                             component_id,
                             throughput,
+                            output_throughputs: Default::default(),
+                        })
+                    })
+                    .collect::<Vec<_>>(),
+            )
+        })
+        .flatten(),
+    )
+}
+
+/// Builds a stream that emits per-component sent_events totals with per-output breakdown.
+fn sent_events_totals_stream(
+    duration: Duration,
+) -> Result<impl Stream<Item = Result<ComponentTotalsResponse, Status>>, Status> {
+    let controller = get_controller()?;
+    Ok(
+        tokio_stream::StreamExt::map(IntervalStream::new(interval(duration)), move |_| {
+            let metrics = controller.capture_metrics();
+            let component_totals =
+                filter_and_group_metrics(&metrics, "component_sent_events_total");
+            let by_output =
+                filter_and_group_metrics_by_output(&metrics, "component_sent_events_total");
+
+            // Group per-output values by component_id
+            let mut output_by_component: HashMap<String, HashMap<String, i64>> = HashMap::new();
+            for ((component_id, output), value) in by_output {
+                output_by_component
+                    .entry(component_id)
+                    .or_default()
+                    .insert(output, value as i64);
+            }
+
+            tokio_stream::iter(
+                component_totals
+                    .into_iter()
+                    .map(|(component_id, total)| {
+                        let output_totals = output_by_component
+                            .remove(&component_id)
+                            .unwrap_or_default()
+                            .into_iter()
+                            .collect();
+                        Ok(ComponentTotalsResponse {
+                            component_id,
+                            total: total as i64,
+                            output_totals,
+                        })
+                    })
+                    .collect::<Vec<_>>(),
+            )
+        })
+        .flatten(),
+    )
+}
+
+/// Builds a stream that emits per-component sent_events throughputs with per-output breakdown.
+fn sent_events_throughput_stream(
+    duration: Duration,
+) -> Result<impl Stream<Item = Result<ComponentThroughputResponse, Status>>, Status> {
+    let controller = get_controller()?;
+    let interval_secs = duration.as_secs_f64();
+    let previous_totals = Arc::new(Mutex::new(HashMap::<String, f64>::new()));
+    let previous_outputs = Arc::new(Mutex::new(HashMap::<(String, String), f64>::new()));
+    Ok(
+        tokio_stream::StreamExt::map(IntervalStream::new(interval(duration)), move |_| {
+            let metrics = controller.capture_metrics();
+            let current_totals =
+                filter_and_group_metrics(&metrics, "component_sent_events_total");
+            let current_outputs =
+                filter_and_group_metrics_by_output(&metrics, "component_sent_events_total");
+
+            let mut prev_t = match previous_totals.lock() {
+                Ok(guard) => guard,
+                Err(poisoned) => {
+                    error!("Mutex poisoned for sent_events throughput totals, recovering.");
+                    poisoned.into_inner()
+                }
+            };
+            let mut prev_o = match previous_outputs.lock() {
+                Ok(guard) => guard,
+                Err(poisoned) => {
+                    error!("Mutex poisoned for sent_events throughput outputs, recovering.");
+                    poisoned.into_inner()
+                }
+            };
+
+            let throughputs = calculate_throughput(&current_totals, &prev_t, interval_secs);
+            let output_throughputs_flat =
+                calculate_throughput_by_output(&current_outputs, &prev_o, interval_secs);
+
+            *prev_t = current_totals;
+            *prev_o = current_outputs;
+
+            // Group per-output throughputs by component_id
+            let mut output_by_component: HashMap<String, HashMap<String, f64>> = HashMap::new();
+            for ((component_id, output), tp) in output_throughputs_flat {
+                output_by_component
+                    .entry(component_id)
+                    .or_default()
+                    .insert(output, tp);
+            }
+
+            tokio_stream::iter(
+                throughputs
+                    .into_iter()
+                    .map(|(component_id, throughput)| {
+                        let output_throughputs = output_by_component
+                            .remove(&component_id)
+                            .unwrap_or_default()
+                            .into_iter()
+                            .collect();
+                        Ok(ComponentThroughputResponse {
+                            component_id,
+                            throughput,
+                            output_throughputs,
                         })
                     })
                     .collect::<Vec<_>>(),
@@ -352,7 +491,8 @@ impl observability::Service for ObservabilityService {
             });
         }
 
-        // Apply limit if specified
+        // Sort alphabetically for stable, deterministic ordering before applying limit
+        components.sort_unstable_by(|a, b| a.component_id.cmp(&b.component_id));
         if limit > 0 {
             components.truncate(limit as usize);
         }
@@ -454,9 +594,8 @@ impl observability::Service for ObservabilityService {
         request: Request<MetricStreamRequest>,
     ) -> Result<Response<Self::StreamComponentSentEventsThroughputStream>, Status> {
         let duration = Duration::from_millis(validate_interval_ms(request.into_inner().interval_ms)?);
-        Ok(Response::new(Box::pin(metric_throughput_stream(
+        Ok(Response::new(Box::pin(sent_events_throughput_stream(
             duration,
-            "component_sent_events_total",
         )?)))
     }
 
@@ -506,10 +645,7 @@ impl observability::Service for ObservabilityService {
         request: Request<MetricStreamRequest>,
     ) -> Result<Response<Self::StreamComponentSentEventsTotalStream>, Status> {
         let duration = Duration::from_millis(validate_interval_ms(request.into_inner().interval_ms)?);
-        Ok(Response::new(Box::pin(metric_totals_stream(
-            duration,
-            "component_sent_events_total",
-        )?)))
+        Ok(Response::new(Box::pin(sent_events_totals_stream(duration)?)))
     }
 
     type StreamComponentReceivedBytesTotalStream = BoxStream<ComponentTotalsResponse>;
