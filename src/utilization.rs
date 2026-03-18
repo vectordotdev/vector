@@ -33,6 +33,26 @@ pub(crate) struct Utilization<S> {
 }
 
 impl<S> Utilization<S> {
+    /// Wrap a stream to emit stats about utilization. This is designed for use with
+    /// the input channels of transform and sinks components, and measures the
+    /// amount of time that the stream is waiting for input from upstream. We make
+    /// the simplifying assumption that this wait time is when the component is idle
+    /// and the rest of the time it is doing useful work. This is more true for
+    /// sinks than transforms, which can be blocked by downstream components, but
+    /// with knowledge of the config the data is still useful.
+    pub(crate) fn new(
+        timer_tx: UtilizationComponentSender,
+        component_key: ComponentKey,
+        inner: S,
+    ) -> Self {
+        Self {
+            intervals: IntervalStream::new(interval(Duration::from_secs(5))),
+            timer_tx,
+            component_key,
+            inner,
+        }
+    }
+
     /// Consumes this wrapper and returns the inner stream.
     ///
     /// This can't be constant because destructors can't be run in a const context, and we're
@@ -278,26 +298,6 @@ impl UtilizationEmitter {
     }
 }
 
-/// Wrap a stream to emit stats about utilization. This is designed for use with
-/// the input channels of transform and sinks components, and measures the
-/// amount of time that the stream is waiting for input from upstream. We make
-/// the simplifying assumption that this wait time is when the component is idle
-/// and the rest of the time it is doing useful work. This is more true for
-/// sinks than transforms, which can be blocked by downstream components, but
-/// with knowledge of the config the data is still useful.
-pub(crate) fn wrap<S>(
-    timer_tx: UtilizationComponentSender,
-    component_key: ComponentKey,
-    inner: S,
-) -> Utilization<S> {
-    Utilization {
-        intervals: IntervalStream::new(interval(Duration::from_secs(5))),
-        timer_tx,
-        component_key,
-        inner,
-    }
-}
-
 /// Output-side counterpart of [`Utilization`]. Wraps the output stream of a
 /// task transform to track time spent waiting for downstream to accept items.
 ///
@@ -328,15 +328,14 @@ where
     }
 }
 
-/// Wrap a task transform stream to track time spent waiting for downstream to consume items.
-/// This is the output-side counterpart to [`wrap`], designed for use with task
-/// transforms where the framework cannot otherwise detect downstream
-/// backpressure.
-pub(crate) const fn wrap_task_stream<S>(
-    timer_tx: UtilizationComponentSender,
-    inner: S,
-) -> OutputUtilization<S> {
-    OutputUtilization { timer_tx, inner }
+impl<S> OutputUtilization<S> {
+    /// Wrap a task transform stream to track time spent waiting for downstream
+    /// to consume items. This is the output-side counterpart to
+    /// [`Utilization::new`], designed for use with task transforms where the
+    /// framework cannot otherwise detect downstream backpressure.
+    pub(crate) const fn new(timer_tx: UtilizationComponentSender, inner: S) -> Self {
+        Self { timer_tx, inner }
+    }
 }
 
 #[cfg(test)]
@@ -499,7 +498,7 @@ mod tests {
     /// OutputUtilization (output) stream wrappers with a mock TaskTransform,
     /// wired up the same way `build_task_transform` does in the builder.
     ///
-    /// Pipeline: channel → wrap(input) → TaskTransform → wrap_task_stream(output)
+    /// Pipeline: channel → Utilization(input) → TaskTransform → OutputUtilization(output)
     ///
     /// Timeline (10s):
     ///   T=100..103  waiting for input       (3s wait)
@@ -528,13 +527,13 @@ mod tests {
         let (mut input_tx, input_rx) = futures_mpsc::channel::<EventArray>(10);
 
         // Wire up the pipeline exactly like build_task_transform:
-        //   wrap(input) → transform.transform() → wrap_task_stream(output)
-        let input_wrapped = wrap(sender, key.clone(), input_rx);
+        //   Utilization(input) → transform.transform() → OutputUtilization(output)
+        let input_wrapped = Utilization::new(sender, key.clone(), input_rx);
         let transform = Box::new(MockTaskTransform {
             processing_time: Duration::from_secs(2),
         });
         let transform_output = transform.transform(Box::pin(input_wrapped));
-        let mut pipeline = wrap_task_stream(output_sender, transform_output);
+        let mut pipeline = OutputUtilization::new(output_sender, transform_output);
 
         let waker = futures::task::noop_waker();
         let mut cx = std::task::Context::from_waker(&waker);

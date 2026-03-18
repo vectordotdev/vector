@@ -53,7 +53,8 @@ use crate::{
     topology::task::TaskError,
     transforms::{SyncTransform, TaskTransform, Transform, TransformOutputs, TransformOutputsBuf},
     utilization::{
-        UtilizationComponentSender, UtilizationEmitter, UtilizationRegistry, wrap, wrap_task_stream,
+        OutputUtilization, Utilization, UtilizationComponentSender, UtilizationEmitter,
+        UtilizationRegistry,
     },
 };
 
@@ -643,7 +644,7 @@ impl<'a> Builder<'a> {
                     .take()
                     .expect("Task started but input has been taken.");
 
-                let mut rx = wrap(utilization_sender, component_key.clone(), rx);
+                let mut rx = Utilization::new(utilization_sender, component_key.clone(), rx);
 
                 let events_received = register!(EventsReceived);
                 sink.run(
@@ -804,7 +805,7 @@ impl<'a> Builder<'a> {
             .utilization_registry
             .add_component(key.clone(), gauge!("utilization"));
         let output_sender = sender.clone();
-        let input_rx = wrap(sender, key.clone(), input_rx.into_stream());
+        let input_rx = Utilization::new(sender, key.clone(), input_rx.into_stream());
 
         let events_received = register!(EventsReceived);
         let filtered = input_rx
@@ -849,7 +850,7 @@ impl<'a> Builder<'a> {
                     events.estimated_json_encoded_size_of(),
                 ));
             });
-        let stream = wrap_task_stream(output_sender, stream);
+        let stream = OutputUtilization::new(output_sender, stream);
         let transform = async move {
             debug!("Task transform starting.");
 
