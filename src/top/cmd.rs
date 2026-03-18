@@ -13,7 +13,6 @@ use vector_lib::top::{
     state::{self, ConnectionStatus, EventType, State},
 };
 
-
 /// CLI command func for displaying Vector components, and communicating with a local/remote
 /// Vector API server via gRPC
 pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {

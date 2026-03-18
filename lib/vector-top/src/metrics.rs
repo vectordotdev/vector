@@ -83,7 +83,6 @@ async fn poll_components(
         }
 
         known_components = current_components;
-
     }
 }
 

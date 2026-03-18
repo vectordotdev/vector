@@ -1,4 +1,8 @@
-use std::{error::Error as StdError, net::SocketAddr, sync::{Arc, atomic::AtomicBool}};
+use std::{
+    error::Error as StdError,
+    net::SocketAddr,
+    sync::{Arc, atomic::AtomicBool},
+};
 use tokio::sync::oneshot;
 use tokio_stream::wrappers::TcpListenerStream;
 use tonic::transport::Server as TonicServer;
@@ -24,7 +28,11 @@ impl GrpcServer {
     /// is dropped.
     ///
     /// Returns an error if the server fails to bind to the configured address.
-    pub async fn start(config: &Config, watch_rx: WatchRx, running: Arc<AtomicBool>) -> crate::Result<Self> {
+    pub async fn start(
+        config: &Config,
+        watch_rx: WatchRx,
+        running: Arc<AtomicBool>,
+    ) -> crate::Result<Self> {
         let addr = config.api.address.ok_or_else(|| {
             crate::Error::from("API address not configured in config.api.address")
         })?;

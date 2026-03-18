@@ -337,7 +337,11 @@ async fn multi_output_transform_reports_per_output_sent_events() {
         splitter.outputs.len()
     );
 
-    let output_ids: Vec<&str> = splitter.outputs.iter().map(|o| o.output_id.as_str()).collect();
+    let output_ids: Vec<&str> = splitter
+        .outputs
+        .iter()
+        .map(|o| o.output_id.as_str())
+        .collect();
     assert!(
         output_ids.contains(&"all"),
         "Missing 'all' output, got: {:?}",
@@ -361,12 +365,7 @@ async fn multi_output_transform_reports_per_output_sent_events() {
     let mut splitter_totals_found = false;
 
     while tokio::time::Instant::now() < deadline {
-        match tokio::time::timeout(
-            std::time::Duration::from_millis(600),
-            stream.next(),
-        )
-        .await
-        {
+        match tokio::time::timeout(std::time::Duration::from_millis(600), stream.next()).await {
             Ok(Some(Ok(msg))) => {
                 if msg.component_id == "splitter" && !msg.output_totals.is_empty() {
                     // Both named outputs must be present with positive counts

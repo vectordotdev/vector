@@ -4,7 +4,10 @@ use std::pin::Pin;
 // (only used in synchronous map updates inside IntervalStream closures), so the
 // cheaper std mutex is correct here. tokio::sync::Mutex is only needed when the
 // critical section itself contains .await.
-use std::sync::{Arc, Mutex, atomic::{AtomicBool, Ordering}};
+use std::sync::{
+    Arc, Mutex,
+    atomic::{AtomicBool, Ordering},
+};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use futures::{StreamExt as FuturesStreamExt, stream};
@@ -68,10 +71,7 @@ fn filter_and_group_metrics_by_output(
             && let Some(component_id) = tags.get("component_id")
             && let Some(value) = get_metric_value(metric)
         {
-            let output = tags
-                .get("output")
-                .unwrap_or("_default")
-                .to_string();
+            let output = tags.get("output").unwrap_or("_default").to_string();
             *result
                 .entry((component_id.to_string(), output))
                 .or_insert(0.0) += value;
@@ -298,8 +298,7 @@ fn sent_events_throughput_stream(
     Ok(
         tokio_stream::StreamExt::map(IntervalStream::new(interval(duration)), move |_| {
             let metrics = controller.capture_metrics();
-            let current_totals =
-                filter_and_group_metrics(&metrics, "component_sent_events_total");
+            let current_totals = filter_and_group_metrics(&metrics, "component_sent_events_total");
             let current_outputs =
                 filter_and_group_metrics_by_output(&metrics, "component_sent_events_total");
 
@@ -479,7 +478,10 @@ impl observability::Service for ObservabilityService {
         for component_key in tap_resource.inputs.keys() {
             let key_str = component_key.to_string();
             let (component_type, outputs) = if let Some(ports) = output_ports.get(component_key) {
-                (ComponentType::Transform, ports_to_proto_outputs(ports, &key_str, &sent_events_by_output))
+                (
+                    ComponentType::Transform,
+                    ports_to_proto_outputs(ports, &key_str, &sent_events_by_output),
+                )
             } else {
                 (ComponentType::Sink, vec![])
             };
@@ -513,7 +515,8 @@ impl observability::Service for ObservabilityService {
         &self,
         request: Request<HeartbeatRequest>,
     ) -> Result<Response<Self::StreamHeartbeatStream>, Status> {
-        let duration = Duration::from_millis(validate_interval_ms(request.into_inner().interval_ms)?);
+        let duration =
+            Duration::from_millis(validate_interval_ms(request.into_inner().interval_ms)?);
         let stream = tokio_stream::StreamExt::map(IntervalStream::new(interval(duration)), |_| {
             let utc = Some(prost_types::Timestamp {
                 seconds: chrono::Utc::now().timestamp(),
@@ -531,7 +534,8 @@ impl observability::Service for ObservabilityService {
         &self,
         request: Request<UptimeRequest>,
     ) -> Result<Response<Self::StreamUptimeStream>, Status> {
-        let duration = Duration::from_millis(validate_interval_ms(request.into_inner().interval_ms)?);
+        let duration =
+            Duration::from_millis(validate_interval_ms(request.into_inner().interval_ms)?);
         let controller = get_controller()?;
         let stream =
             tokio_stream::StreamExt::map(IntervalStream::new(interval(duration)), move |_| {
@@ -554,7 +558,8 @@ impl observability::Service for ObservabilityService {
         &self,
         request: Request<MetricStreamRequest>,
     ) -> Result<Response<Self::StreamComponentAllocatedBytesStream>, Status> {
-        let duration = Duration::from_millis(validate_interval_ms(request.into_inner().interval_ms)?);
+        let duration =
+            Duration::from_millis(validate_interval_ms(request.into_inner().interval_ms)?);
         let controller = get_controller()?;
         let stream =
             tokio_stream::StreamExt::map(IntervalStream::new(interval(duration)), move |_| {
@@ -585,7 +590,8 @@ impl observability::Service for ObservabilityService {
         &self,
         request: Request<MetricStreamRequest>,
     ) -> Result<Response<Self::StreamComponentReceivedEventsThroughputStream>, Status> {
-        let duration = Duration::from_millis(validate_interval_ms(request.into_inner().interval_ms)?);
+        let duration =
+            Duration::from_millis(validate_interval_ms(request.into_inner().interval_ms)?);
         Ok(Response::new(Box::pin(metric_throughput_stream(
             duration,
             "component_received_events_total",
@@ -598,7 +604,8 @@ impl observability::Service for ObservabilityService {
         &self,
         request: Request<MetricStreamRequest>,
     ) -> Result<Response<Self::StreamComponentSentEventsThroughputStream>, Status> {
-        let duration = Duration::from_millis(validate_interval_ms(request.into_inner().interval_ms)?);
+        let duration =
+            Duration::from_millis(validate_interval_ms(request.into_inner().interval_ms)?);
         Ok(Response::new(Box::pin(sent_events_throughput_stream(
             duration,
         )?)))
@@ -610,7 +617,8 @@ impl observability::Service for ObservabilityService {
         &self,
         request: Request<MetricStreamRequest>,
     ) -> Result<Response<Self::StreamComponentReceivedBytesThroughputStream>, Status> {
-        let duration = Duration::from_millis(validate_interval_ms(request.into_inner().interval_ms)?);
+        let duration =
+            Duration::from_millis(validate_interval_ms(request.into_inner().interval_ms)?);
         Ok(Response::new(Box::pin(metric_throughput_stream(
             duration,
             "component_received_bytes_total",
@@ -623,7 +631,8 @@ impl observability::Service for ObservabilityService {
         &self,
         request: Request<MetricStreamRequest>,
     ) -> Result<Response<Self::StreamComponentSentBytesThroughputStream>, Status> {
-        let duration = Duration::from_millis(validate_interval_ms(request.into_inner().interval_ms)?);
+        let duration =
+            Duration::from_millis(validate_interval_ms(request.into_inner().interval_ms)?);
         Ok(Response::new(Box::pin(metric_throughput_stream(
             duration,
             "component_sent_bytes_total",
@@ -636,7 +645,8 @@ impl observability::Service for ObservabilityService {
         &self,
         request: Request<MetricStreamRequest>,
     ) -> Result<Response<Self::StreamComponentReceivedEventsTotalStream>, Status> {
-        let duration = Duration::from_millis(validate_interval_ms(request.into_inner().interval_ms)?);
+        let duration =
+            Duration::from_millis(validate_interval_ms(request.into_inner().interval_ms)?);
         Ok(Response::new(Box::pin(metric_totals_stream(
             duration,
             "component_received_events_total",
@@ -649,8 +659,11 @@ impl observability::Service for ObservabilityService {
         &self,
         request: Request<MetricStreamRequest>,
     ) -> Result<Response<Self::StreamComponentSentEventsTotalStream>, Status> {
-        let duration = Duration::from_millis(validate_interval_ms(request.into_inner().interval_ms)?);
-        Ok(Response::new(Box::pin(sent_events_totals_stream(duration)?)))
+        let duration =
+            Duration::from_millis(validate_interval_ms(request.into_inner().interval_ms)?);
+        Ok(Response::new(Box::pin(sent_events_totals_stream(
+            duration,
+        )?)))
     }
 
     type StreamComponentReceivedBytesTotalStream = BoxStream<ComponentTotalsResponse>;
@@ -659,7 +672,8 @@ impl observability::Service for ObservabilityService {
         &self,
         request: Request<MetricStreamRequest>,
     ) -> Result<Response<Self::StreamComponentReceivedBytesTotalStream>, Status> {
-        let duration = Duration::from_millis(validate_interval_ms(request.into_inner().interval_ms)?);
+        let duration =
+            Duration::from_millis(validate_interval_ms(request.into_inner().interval_ms)?);
         Ok(Response::new(Box::pin(metric_totals_stream(
             duration,
             "component_received_bytes_total",
@@ -672,7 +686,8 @@ impl observability::Service for ObservabilityService {
         &self,
         request: Request<MetricStreamRequest>,
     ) -> Result<Response<Self::StreamComponentSentBytesTotalStream>, Status> {
-        let duration = Duration::from_millis(validate_interval_ms(request.into_inner().interval_ms)?);
+        let duration =
+            Duration::from_millis(validate_interval_ms(request.into_inner().interval_ms)?);
         Ok(Response::new(Box::pin(metric_totals_stream(
             duration,
             "component_sent_bytes_total",
@@ -685,7 +700,8 @@ impl observability::Service for ObservabilityService {
         &self,
         request: Request<MetricStreamRequest>,
     ) -> Result<Response<Self::StreamComponentErrorsTotalStream>, Status> {
-        let duration = Duration::from_millis(validate_interval_ms(request.into_inner().interval_ms)?);
+        let duration =
+            Duration::from_millis(validate_interval_ms(request.into_inner().interval_ms)?);
         Ok(Response::new(Box::pin(metric_totals_stream(
             duration,
             "component_errors_total",

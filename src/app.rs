@@ -7,7 +7,10 @@ use std::{
     num::{NonZeroU64, NonZeroUsize},
     path::PathBuf,
     process::ExitStatus,
-    sync::{Arc, atomic::{AtomicUsize, Ordering}},
+    sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    },
     time::Duration,
 };
 
