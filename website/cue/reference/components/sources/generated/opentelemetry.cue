@@ -170,11 +170,11 @@ generated: components: sources: opentelemetry: configuration: {
 				}
 				headers: {
 					description: """
-						A list of HTTP headers to include in the log event.
+						A list of HTTP headers to include in the event.
 
 						Accepts the wildcard (`*`) character for headers matching a specified pattern.
 
-						Specifying "*" results in all headers included in the log event.
+						Specifying "*" results in all headers included in the event.
 
 						These headers are not included in the JSON payload if a field with a conflicting name exists.
 						"""
