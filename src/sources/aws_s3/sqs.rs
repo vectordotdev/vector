@@ -835,16 +835,27 @@ impl IngestorProcess {
             None => lines,
         };
 
+        let mut deserialize_errors: usize = 0;
+        let mut events_produced: usize = 0;
         let mut stream = lines.flat_map(|line| {
             let events = match self.state.decoder.deserializer_parse(line) {
                 Ok((events, _events_size)) => events,
-                Err(_error) => {
-                    // Error is handled by `codecs::Decoder`, no further handling
-                    // is needed here.
+                Err(error) => {
+                    // DecoderDeserializeError is already emitted by the codec layer.
+                    // Add S3 object context since the generic codec error has none.
+                    warn!(
+                        message = "Failed deserializing frame from S3 object.",
+                        bucket = %s3_event.s3.bucket.name,
+                        key = %s3_event.s3.object.key,
+                        error = %error,
+                        internal_log_rate_limit = true,
+                    );
+                    deserialize_errors += 1;
                     SmallVec::new()
                 }
             };
 
+            events_produced += events.len();
             let events = events
                 .into_iter()
                 .map(|mut event: Event| {
@@ -887,6 +898,20 @@ impl IngestorProcess {
                 bucket,
                 key: &s3_event.s3.object.key,
                 error: &error.to_string(),
+                duration,
+            });
+        } else if deserialize_errors > 0 && events_produced == 0 {
+            warn!(
+                message = "S3 object produced no events due to deserialization errors.",
+                bucket = %bucket,
+                key = %s3_event.s3.object.key,
+                deserialize_errors = %deserialize_errors,
+                duration_ms = %duration.as_millis(),
+            );
+            emit!(S3ObjectProcessingFailed {
+                bucket,
+                key: &s3_event.s3.object.key,
+                error: &format!("{} deserialization errors", deserialize_errors),
                 duration,
             });
         } else {
