@@ -51,11 +51,7 @@ pub extern "C" fn vector_register_thread(tid: u64, label_ptr: *const u8) {
 #[unsafe(no_mangle)]
 #[inline(never)]
 #[allow(clippy::missing_const_for_fn)]
-pub extern "C" fn vector_register_component(
-    id: u32,
-    name_ptr: *const u8,
-    name_len: usize,
-) {
+pub extern "C" fn vector_register_component(id: u32, name_ptr: *const u8, name_len: usize) {
     std::hint::black_box((id, name_ptr, name_len));
 }
 

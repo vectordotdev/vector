@@ -92,9 +92,8 @@ pub fn init(color: bool, json: bool, levels: &str, internal_log_rate_limit: u64)
 
     #[cfg(all(target_os = "linux", feature = "component-probes"))]
     let subscriber = {
-        let probes_layer =
-            crate::internal_telemetry::component_probes::ComponentProbesLayer::new()
-                .with_filter(LevelFilter::ERROR);
+        let probes_layer = crate::internal_telemetry::component_probes::ComponentProbesLayer::new()
+            .with_filter(LevelFilter::ERROR);
 
         subscriber.with(probes_layer)
     };
