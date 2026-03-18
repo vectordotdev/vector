@@ -11,14 +11,13 @@ badges:
   domains: ["api"]
 ---
 
-{{< warning >}} Since Vector version 0.55.0 we migrated the API from GraphQL to gRPC.
-{{< /warning >}}
+{{< warning >}} Since Vector version 0.55.0 we migrated the API from GraphQL to gRPC. {{< /warning >}}
 
 Vector now has a [GraphQL] API that you can use for a variety of purposes:
 
-- To view Vector's internal metrics
-- To view metadata about the Vector instance
-- To explore configured Vector topologies
+* To view Vector's internal metrics
+* To view metadata about the Vector instance
+* To explore configured Vector topologies
 
 We have plans to enhance the API in the coming releases by enabling you to, for
 example, re-configure Vector via the API.
@@ -39,10 +38,9 @@ address = "127.0.0.1:8686" # optional. Change IP/port if required
 
 For a more in-depth look at the API, check out:
 
-- The recent [announcement post][post] for the API from esteemed Vector engineer
-  [Lee Benson][lee].
-- Our [official documentation]
-- The [Rust code][code] behind the API
+* The recent [announcement post][post] for the API from esteemed Vector engineer [Lee Benson][lee].
+* Our [official documentation]
+* The [Rust code][code] behind the API
 
 [code]: https://github.com/vectordotdev/vector/tree/master/src/api
 [docs]: https://vector.dev/docs/reference/api

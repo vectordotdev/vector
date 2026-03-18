@@ -11,14 +11,13 @@ badges:
   domains: ["graphql", "cli", "observability"]
 ---
 
-{{< warning >}} Since Vector version 0.55.0 we migrated the API from GraphQL to gRPC.
-`vector tap` continues to work as before. {{< /warning >}}
+{{< warning >}} Since Vector version 0.55.0 we migrated the API from GraphQL to gRPC. {{< /warning >}}
 
 Vector 0.13 introduces a new [`vector tap`][tap] subcommand that allows for
 tapping into the events flowing through Vector. This can be used to "live tail"
 events while troubleshooting incidents events or simply to debug your Vector
-config, replacing the current common approach of sending the events to a
-[`console`][console] sink.
+config, replacing the current common approach of sending the events to
+a [`console`][console] sink.
 
 ## Get Started
 

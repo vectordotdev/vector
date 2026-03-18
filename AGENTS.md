@@ -1,19 +1,15 @@
 # Quick Reference for Vector Development
 
-This guide provides quick commands and coding conventions for Vector
-development. It's designed to help both AI assistants and human contributors get
-started quickly.
+This guide provides quick commands and coding conventions for Vector development. It's designed to help both AI assistants and human
+contributors get started quickly.
 
-**For comprehensive information, see [CONTRIBUTING.md](CONTRIBUTING.md) and
-[docs/DEVELOPING.md](docs/DEVELOPING.md).**
+**For comprehensive information, see [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/DEVELOPING.md](docs/DEVELOPING.md).**
 
 ## Project Summary
 
-Vector is a high-performance, end-to-end observability data pipeline written in
-Rust. It collects, transforms, and routes logs, metrics, and traces from various
-sources to any destination. Vector is designed to be reliable, fast, and
-vendor-neutral, enabling dramatic cost reduction and improved data quality for
-observability infrastructure.
+Vector is a high-performance, end-to-end observability data pipeline written in Rust. It collects, transforms, and routes logs, metrics, and
+traces from various sources to any destination. Vector is designed to be reliable, fast, and vendor-neutral, enabling dramatic cost
+reduction and improved data quality for observability infrastructure.
 
 ## Project Structure
 
@@ -62,14 +58,13 @@ When working on Vector's Rust codebase, follow this iterative development cycle:
 
 Run this cycle after any code modification.
 
-When editing markdown files (\*.md), run `make check-markdown` after changes.
+When editing markdown files (*.md), run `make check-markdown` after changes.
 
 ## Two Different Workflows
 
 ### Rust Development (Most Common)
 
-If you're working on Vector's Rust codebase (sources, sinks, transforms, core
-functionality):
+If you're working on Vector's Rust codebase (sources, sinks, transforms, core functionality):
 
 **Format your code:**
 
@@ -150,15 +145,13 @@ cd website
 make cue-build
 ```
 
-**Note:** Website changes use Hugo, CUE, Tailwind CSS, and TypeScript. See
-[website/README.md](website/README.md) for details.
+**Note:** Website changes use Hugo, CUE, Tailwind CSS, and TypeScript. See [website/README.md](website/README.md) for details.
 
 ## Common Patterns
 
 ### Development Tools
 
-Vector uses `cargo vdev` for most development tasks. This is a custom CLI tool
-that wraps common operations:
+Vector uses `cargo vdev` for most development tasks. This is a custom CLI tool that wraps common operations:
 
 ```bash
 cargo vdev check rust         # Clippy
@@ -195,8 +188,8 @@ Then: `chmod +x .git/hooks/pre-push`
 
 ## Detailed Documentation
 
-| Topic               | Document                                 |
-| ------------------- | ---------------------------------------- |
+| Topic | Document |
+|-------|----------|
 | Rust style patterns | [docs/RUST_STYLE.md](docs/RUST_STYLE.md) |
 
 ## Architecture Notes
@@ -207,13 +200,11 @@ Then: `chmod +x .git/hooks/pre-push`
 - **Transforms**: Modify, filter, or enrich event data
 - **Sinks**: Send data to external systems
 
-Component docs are auto-generated from code annotations. Run
-`make check-generated-docs` after changes.
+Component docs are auto-generated from code annotations. Run `make check-generated-docs` after changes.
 
 ### Integration Tests
 
-Integration tests verify Vector works with real external services. Require
-Docker or Podman.
+Integration tests verify Vector works with real external services. Require Docker or Podman.
 
 **Run integration tests:**
 
@@ -226,8 +217,7 @@ cargo vdev int start aws # need to initiate dev environment first
 cargo vdev int test aws
 ```
 
-See [docs/DEVELOPING.md](docs/DEVELOPING.md#integration-tests) for adding new
-integration tests.
+See [docs/DEVELOPING.md](docs/DEVELOPING.md#integration-tests) for adding new integration tests.
 
 ### Key Files
 
@@ -266,26 +256,19 @@ make build-licenses
 
 ## Reference Documentation
 
-These documents provide context that AI agents and developers need when working
-on Vector code.
+These documents provide context that AI agents and developers need when working on Vector code.
 
 ### Essential for Code Changes
 
-- **[STYLE.md](STYLE.md)** - Code style rules (formatting, const strings, code
-  organization)
-- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** - System architecture
-  (sources, transforms, sinks, topology)
-- **[docs/DEVELOPING.md](docs/DEVELOPING.md)** - Development workflow and
-  testing
+- **[STYLE.md](STYLE.md)** - Code style rules (formatting, const strings, code organization)
+- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** - System architecture (sources, transforms, sinks, topology)
+- **[docs/DEVELOPING.md](docs/DEVELOPING.md)** - Development workflow and testing
 
 ### Component Development
 
-- **[docs/specs/component.md](docs/specs/component.md)** - Component
-  specification (naming, configuration, health checks)
-- **[docs/specs/instrumentation.md](docs/specs/instrumentation.md)** -
-  Instrumentation requirements (event/metric naming)
-- **[src/internal_events](src/internal_events)** - Internal event examples for
-  telemetry
+- **[docs/specs/component.md](docs/specs/component.md)** - Component specification (naming, configuration, health checks)
+- **[docs/specs/instrumentation.md](docs/specs/instrumentation.md)** - Instrumentation requirements (event/metric naming)
+- **[src/internal_events](src/internal_events)** - Internal event examples for telemetry
 
 ### Adding Documentation
 
@@ -295,5 +278,4 @@ on Vector code.
 ### Full Guides
 
 - **[CONTRIBUTING.md](CONTRIBUTING.md)** - Complete contributing guide
-- **[website/README.md](website/README.md)** - Website development only
-  (separate from Rust code)
+- **[website/README.md](website/README.md)** - Website development only (separate from Rust code)
