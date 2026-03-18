@@ -55,6 +55,32 @@ fn filter_and_group_metrics(metrics: &[Metric], metric_name: &str) -> HashMap<St
     result
 }
 
+/// Filter metrics by name and group by (component_id, output) tag pair.
+/// Used to populate per-output metrics in GetComponents responses.
+fn filter_and_group_metrics_by_output(
+    metrics: &[Metric],
+    metric_name: &str,
+) -> HashMap<(String, String), f64> {
+    let mut result = HashMap::new();
+
+    for metric in metrics.iter().filter(|m| m.name() == metric_name) {
+        if let Some(tags) = metric.tags()
+            && let Some(component_id) = tags.get("component_id")
+            && let Some(value) = get_metric_value(metric)
+        {
+            let output = tags
+                .get("output")
+                .unwrap_or("_default")
+                .to_string();
+            *result
+                .entry((component_id.to_string(), output))
+                .or_insert(0.0) += value;
+        }
+    }
+
+    result
+}
+
 /// Extract all component metrics and group by component_id
 fn extract_component_metrics(metrics: &[Metric]) -> HashMap<String, ComponentMetrics> {
     let received_bytes = filter_and_group_metrics(metrics, "component_received_bytes_total");
@@ -191,17 +217,27 @@ fn metric_throughput_stream(
     )
 }
 
-/// Converts a component's output port names into proto `Output` messages.
+/// Converts a component's output port names into proto `Output` messages,
+/// populating `sent_events_total` from the per-output metric snapshot.
 ///
 /// `None` port means the default output (represented as `"_default"`).
-/// `sent_events_total` is left at 0; per-output event counts are not available
-/// in the snapshot and are tracked via the streaming metrics endpoints.
-fn ports_to_proto_outputs(ports: &[Option<&str>]) -> Vec<Output> {
+fn ports_to_proto_outputs(
+    ports: &[Option<&str>],
+    component_id: &str,
+    sent_events_by_output: &HashMap<(String, String), f64>,
+) -> Vec<Output> {
     ports
         .iter()
-        .map(|port| Output {
-            output_id: port.unwrap_or("_default").to_string(),
-            sent_events_total: 0,
+        .map(|port| {
+            let output_id = port.unwrap_or("_default").to_string();
+            let sent_events_total = sent_events_by_output
+                .get(&(component_id.to_string(), output_id.clone()))
+                .copied()
+                .unwrap_or(0.0) as i64;
+            Output {
+                output_id,
+                sent_events_total,
+            }
         })
         .collect()
 }
@@ -258,6 +294,8 @@ impl observability::Service for ObservabilityService {
             Controller::get().map_err(|_| Status::internal("Metrics system not initialized"))?;
         let metrics = controller.capture_metrics();
         let component_metrics_map = extract_component_metrics(&metrics);
+        let sent_events_by_output =
+            filter_and_group_metrics_by_output(&metrics, "component_sent_events_total");
 
         let type_map = &tap_resource.type_names;
 
@@ -288,7 +326,7 @@ impl observability::Service for ObservabilityService {
                 component_id: key_str.clone(),
                 component_type: ComponentType::Source as i32,
                 on_type,
-                outputs: ports_to_proto_outputs(ports),
+                outputs: ports_to_proto_outputs(ports, &key_str, &sent_events_by_output),
                 metrics: component_metrics_map.get(&key_str).cloned(),
             });
         }
@@ -297,7 +335,7 @@ impl observability::Service for ObservabilityService {
         for component_key in tap_resource.inputs.keys() {
             let key_str = component_key.to_string();
             let (component_type, outputs) = if let Some(ports) = output_ports.get(component_key) {
-                (ComponentType::Transform, ports_to_proto_outputs(ports))
+                (ComponentType::Transform, ports_to_proto_outputs(ports, &key_str, &sent_events_by_output))
             } else {
                 (ComponentType::Sink, vec![])
             };

@@ -1,14 +1,11 @@
 use std::time::Duration;
 
 use vector_lib::{
-    api_client::Client,
+    api_client::{Client, RECONNECT_DELAY_MS},
     tap::{EventFormatter, OutputChannel, TapRunner},
 };
 
 use crate::signal::{SignalRx, SignalTo};
-
-/// Delay (in milliseconds) before attempting to reconnect to the Vector API
-const RECONNECT_DELAY: u64 = 5000;
 
 /// CLI command func for issuing 'tap' queries, and communicating with a local/remote
 /// Vector API server via HTTP/WebSockets.
@@ -92,8 +89,8 @@ async fn tap_internal(
                             eprintln!(
                                 "[tap] Connection failed with error {:?}. Reconnecting in {:?} seconds.",
                                 tap_executor_error,
-                                RECONNECT_DELAY / 1000);
-                            tokio::time::sleep(Duration::from_millis(RECONNECT_DELAY)).await;
+                                RECONNECT_DELAY_MS / 1000);
+                            tokio::time::sleep(Duration::from_millis(RECONNECT_DELAY_MS)).await;
                         } else {
                             break;
                         }

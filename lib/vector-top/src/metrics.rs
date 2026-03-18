@@ -37,10 +37,7 @@ async fn poll_components(
     initial_components: HashSet<String>,
 ) {
     let mut known_components = initial_components;
-    // Always poll at least once per second regardless of the metrics update interval,
-    // to avoid excessive GetComponents calls when the interval is very short (e.g. 100ms).
-    const MIN_POLL_INTERVAL_MS: u64 = 1000;
-    let poll_interval = Duration::from_millis((interval_ms as u64).max(MIN_POLL_INTERVAL_MS));
+    let poll_interval = Duration::from_millis(interval_ms as u64);
     let mut consecutive_errors = 0;
     const MAX_CONSECUTIVE_ERRORS: u32 = 3;
 

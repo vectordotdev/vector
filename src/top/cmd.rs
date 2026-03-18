@@ -5,7 +5,7 @@ use chrono::Local;
 use futures_util::future::join_all;
 use regex::Regex;
 use tokio::sync::{mpsc, oneshot};
-use vector_lib::api_client::Client;
+use vector_lib::api_client::{Client, RECONNECT_DELAY_MS};
 
 use vector_lib::top::{
     dashboard::{init_dashboard, is_tty},
@@ -13,8 +13,6 @@ use vector_lib::top::{
     state::{self, ConnectionStatus, EventType, State},
 };
 
-/// Delay (in milliseconds) before attempting to reconnect to the Vector API
-const RECONNECT_DELAY: u64 = 5000;
 
 /// CLI command func for displaying Vector components, and communicating with a local/remote
 /// Vector API server via gRPC
@@ -114,7 +112,7 @@ async fn subscription(
         let state = match metrics::init_components(&url, &opts.components).await {
             Ok(state) => state,
             Err(_) => {
-                tokio::time::sleep(Duration::from_millis(RECONNECT_DELAY)).await;
+                tokio::time::sleep(Duration::from_millis(RECONNECT_DELAY_MS)).await;
                 continue;
             }
         };
@@ -137,7 +135,7 @@ async fn subscription(
         {
             Ok(handles) => handles,
             Err(_) => {
-                tokio::time::sleep(Duration::from_millis(RECONNECT_DELAY)).await;
+                tokio::time::sleep(Duration::from_millis(RECONNECT_DELAY_MS)).await;
                 continue;
             }
         };
@@ -156,7 +154,7 @@ async fn subscription(
 
         _ = tx
             .send(EventType::ConnectionUpdated(
-                ConnectionStatus::Disconnected(RECONNECT_DELAY),
+                ConnectionStatus::Disconnected(RECONNECT_DELAY_MS),
             ))
             .await;
 
