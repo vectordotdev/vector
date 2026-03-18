@@ -230,9 +230,8 @@ fn render_dot_edge(into: &mut String, id: &ComponentKey, input: &OutputId, graph
     if let Some(port) = &input.port {
         writeln!(
             into,
-            "  \"{}\" -> \"{}\" [{}]",
+            "  \"{}\" -> \"{id}\" [{}]",
             input.component,
-            id,
             edge_attributes_to_string(
                 edge_attributes.unwrap_or(&EdgeAttributes::default()),
                 Some(port)
