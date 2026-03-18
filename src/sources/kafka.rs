@@ -782,7 +782,7 @@ impl ConsumerStateInner<Consuming> {
         active_tasks: &Arc<AtomicUsize>,
     ) {
         while max_message_handling_tasks > 0
-            && max_message_handling_tasks < active_tasks.load(Ordering::Acquire)
+            && max_message_handling_tasks <= active_tasks.load(Ordering::Acquire)
         {
             tokio::time::sleep(Duration::from_millis(3)).await;
         }
