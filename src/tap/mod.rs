@@ -13,8 +13,8 @@ use crate::config::api::default_grpc_url;
 #[derive(Parser, Debug, Clone)]
 #[command(rename_all = "kebab-case")]
 pub struct Opts {
-    /// Interval to sample events at, in milliseconds
-    #[arg(default_value = "500", short = 'i', long)]
+    /// Interval to sample events at, in milliseconds (must be >= 100)
+    #[arg(default_value = "500", short = 'i', long, value_parser = clap::value_parser!(u32).range(100..))]
     interval: u32,
 
     /// gRPC API server endpoint (e.g. http://localhost:8686)

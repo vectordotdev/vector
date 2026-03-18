@@ -291,14 +291,10 @@ impl<'a> TapRunner<'a> {
                             .map_err(|e| format!("UTF-8 conversion failed: {}", e))
                     }
                     Event::Metric(_) => {
-                        // Metrics don't serialize well to logfmt, use JSON as fallback
-                        serde_json::to_string(&event)
-                            .map_err(|e| format!("JSON serialization failed: {}", e))
+                        Err("logfmt format is only supported for log events".to_string())
                     }
                     Event::Trace(_) => {
-                        // Traces don't serialize well to logfmt, use JSON as fallback
-                        serde_json::to_string(&event)
-                            .map_err(|e| format!("JSON serialization failed: {}", e))
+                        Err("logfmt format is only supported for log events".to_string())
                     }
                 }
             }

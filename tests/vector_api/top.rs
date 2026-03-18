@@ -5,6 +5,7 @@
 
 use super::{common::*, harness::*};
 use indoc::indoc;
+use tokio_stream::StreamExt;
 use vector_lib::api_client::proto::ComponentsResponse;
 
 impl TestHarness {
@@ -273,4 +274,135 @@ async fn watch_mode_auto_reloads() {
     assert_eq!(component_ids.len(), 3);
 
     // Cleanup happens automatically via Drop
+}
+
+#[tokio::test]
+async fn multi_output_transform_reports_per_output_sent_events() {
+    // Pipeline: demo_logs -> route (two named outputs) -> two blackhole sinks
+    // The route transform splits events into "all" (everything) and "has_host" (subset).
+    // We verify that:
+    //   1. GetComponents reports two Output entries for the route transform
+    //   2. StreamComponentSentEventsTotal populates output_totals for the route transform
+    const EXPECTED_EVENTS: i64 = 50;
+
+    let mut runner = TestHarness::new(indoc! {"
+        sources:
+          demo:
+            type: demo_logs
+            format: json
+            interval: 0.01
+
+        transforms:
+          splitter:
+            type: route
+            inputs: ['demo']
+            route:
+              all: 'true'
+              has_host: 'exists(.host)'
+
+        sinks:
+          sink_all:
+            type: blackhole
+            inputs: ['splitter.all']
+
+          sink_has_host:
+            type: blackhole
+            inputs: ['splitter.has_host']
+    "})
+    .await
+    .expect("Failed to start Vector");
+
+    // Wait for events to reach the sinks
+    runner
+        .wait_for_events("demo", EXPECTED_EVENTS)
+        .await
+        .expect("Source never sent expected events");
+
+    // --- Assert 1: GetComponents reports per-output entries for the route transform ---
+    let response = runner
+        .query_components()
+        .await
+        .expect("Failed to query components");
+
+    let splitter = response
+        .components
+        .iter()
+        .find(|c| c.component_id == "splitter")
+        .expect("splitter transform not found");
+
+    // Route transform must report at least 2 named outputs
+    assert!(
+        splitter.outputs.len() >= 2,
+        "Expected >= 2 outputs for route transform, got {}",
+        splitter.outputs.len()
+    );
+
+    let output_ids: Vec<&str> = splitter.outputs.iter().map(|o| o.output_id.as_str()).collect();
+    assert!(
+        output_ids.contains(&"all"),
+        "Missing 'all' output, got: {:?}",
+        output_ids
+    );
+    assert!(
+        output_ids.contains(&"has_host"),
+        "Missing 'has_host' output, got: {:?}",
+        output_ids
+    );
+
+    // --- Assert 2: StreamComponentSentEventsTotal populates output_totals ---
+    let mut stream = runner
+        .api_client()
+        .stream_component_sent_events_total(500)
+        .await
+        .expect("Failed to open sent_events_total stream");
+
+    // Drain stream updates until we get output_totals for the splitter, or timeout
+    let deadline = tokio::time::Instant::now() + EVENT_PROCESSING_TIMEOUT;
+    let mut splitter_totals_found = false;
+
+    while tokio::time::Instant::now() < deadline {
+        match tokio::time::timeout(
+            std::time::Duration::from_millis(600),
+            stream.next(),
+        )
+        .await
+        {
+            Ok(Some(Ok(msg))) => {
+                if msg.component_id == "splitter" && !msg.output_totals.is_empty() {
+                    // Both named outputs must be present with positive counts
+                    let all_total = msg.output_totals.get("all").copied().unwrap_or(0);
+                    let has_host_total = msg.output_totals.get("has_host").copied().unwrap_or(0);
+
+                    assert!(
+                        all_total > 0,
+                        "Expected positive total for 'all' output, got {}",
+                        all_total
+                    );
+                    assert!(
+                        has_host_total > 0,
+                        "Expected positive total for 'has_host' output, got {}",
+                        has_host_total
+                    );
+                    // "all" must be >= "has_host" since it matches every event
+                    assert!(
+                        all_total >= has_host_total,
+                        "'all' ({}) should be >= 'has_host' ({})",
+                        all_total,
+                        has_host_total
+                    );
+
+                    splitter_totals_found = true;
+                    break;
+                }
+            }
+            Ok(Some(Err(e))) => panic!("Stream error: {e}"),
+            Ok(None) => panic!("Stream ended unexpectedly"),
+            Err(_) => continue, // timeout on this tick, keep looping
+        }
+    }
+
+    assert!(
+        splitter_totals_found,
+        "Never received non-empty output_totals for splitter transform within timeout"
+    );
 }
