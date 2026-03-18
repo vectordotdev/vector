@@ -86,6 +86,36 @@ async fn poll_components(
         }
 
         known_components = current_components;
+
+        // Emit per-output sent events for components that have named output ports.
+        // The streaming endpoints only emit component-level totals; per-output data is
+        // available here from the GetComponents snapshot and updated at poll frequency.
+        let output_metrics: Vec<SentEventsMetric> = response
+            .components
+            .iter()
+            .filter(|c| {
+                component_matches_patterns(&c.component_id, &components_patterns)
+                    && !c.outputs.is_empty()
+            })
+            .map(|c| SentEventsMetric {
+                key: ComponentKey::from(c.component_id.as_str()),
+                total: c
+                    .metrics
+                    .as_ref()
+                    .and_then(|m| m.sent_events_total)
+                    .unwrap_or(0),
+                outputs: c
+                    .outputs
+                    .iter()
+                    .map(|o| (o.output_id.clone(), o.sent_events_total))
+                    .collect(),
+            })
+            .collect();
+        if !output_metrics.is_empty() {
+            _ = tx
+                .send(state::EventType::SentEventsTotals(output_metrics))
+                .await;
+        }
     }
 }
 

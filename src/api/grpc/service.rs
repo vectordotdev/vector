@@ -567,7 +567,7 @@ impl observability::Service for ObservabilityService {
                         }
                     }
                     _ = interval.tick() => {
-                        if reservoir.flush(&event_tx).await.is_err() {
+                        if event_tx.is_closed() || reservoir.flush(&event_tx).await.is_err() {
                             break;
                         }
                     }
