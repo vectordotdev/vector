@@ -35,9 +35,13 @@ jobs:
     timeout-minutes: 180 # Usually takes 2h but this prevents it from hanging for an indefinite time
     steps:
       - name: Checkout branch
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ inputs.ref }}
+
+      - name: Free disk space
+        shell: bash
+        run: sudo -E bash scripts/ci-free-disk-space.sh
 
       - uses: ./.github/actions/setup
         with:
@@ -45,5 +49,6 @@ jobs:
           cargo-nextest: true
           protoc: true
           libsasl2: true
+          cargo-hack: true
 
       - run: make check-component-features

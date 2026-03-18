@@ -12,12 +12,11 @@ use crate::{http::HttpClient, sinks::prelude::*};
 
 /// New Relic region.
 #[configurable_component]
-#[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
-#[derivative(Default)]
 pub enum NewRelicRegion {
     /// US region.
-    #[derivative(Default)]
+    #[default]
     Us,
 
     /// EU region.
@@ -26,12 +25,11 @@ pub enum NewRelicRegion {
 
 /// New Relic API endpoint.
 #[configurable_component]
-#[derive(Clone, Copy, Derivative, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Default, Debug, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
-#[derivative(Default)]
 pub enum NewRelicApi {
     /// Events API.
-    #[derivative(Default)]
+    #[default]
     Events,
 
     /// Metrics API.

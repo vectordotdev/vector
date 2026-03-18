@@ -503,7 +503,6 @@ impl LogNamespace {
             path!("source_type"),
             Bytes::from_static(source_name.as_bytes()),
         );
-        log.metadata_mut().set_ingest_timestamp(now);
         self.insert_vector_metadata(
             log,
             log_schema().timestamp_key(),

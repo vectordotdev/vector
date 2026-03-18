@@ -444,6 +444,7 @@ fn enrich_syslog_event(
             parsed_host,
         );
     }
+
     log_namespace.insert_standard_vector_source_metadata(log, SyslogConfig::NAME, Utc::now());
 
     if log_namespace == LogNamespace::Legacy {
@@ -1207,7 +1208,7 @@ mod test {
             // Create and spawn the source.
             let config = SyslogConfig::from_mode(Mode::Udp {
                 address: in_addr.into(),
-                receive_buffer_bytes: None,
+                receive_buffer_bytes: Some(4 * 1024 * 1024),
             });
 
             let key = ComponentKey::from("in");
