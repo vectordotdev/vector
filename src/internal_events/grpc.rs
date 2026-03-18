@@ -1,3 +1,4 @@
+use std::net::SocketAddr;
 use std::time::Duration;
 
 use http::response::Response;
@@ -7,6 +8,21 @@ use vector_lib::NamedInternalEvent;
 use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
 
 const GRPC_STATUS_LABEL: &str = "grpc_status";
+
+#[derive(Debug, NamedInternalEvent)]
+pub struct ApiStarted {
+    pub addr: SocketAddr,
+}
+
+impl InternalEvent for ApiStarted {
+    fn emit(self) {
+        info!(
+            message = "API server running.",
+            address = %self.addr,
+        );
+        counter!("api_started_total").increment(1);
+    }
+}
 
 #[derive(Debug, NamedInternalEvent)]
 pub struct GrpcServerRequestReceived;

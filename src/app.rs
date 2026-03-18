@@ -24,13 +24,12 @@ use tokio_stream::wrappers::UnboundedReceiverStream;
 
 #[cfg(feature = "api")]
 use crate::api;
-// use crate::internal_events::ApiStarted; // Temporarily disabled with GraphQL
 use crate::{
     cli::{LogFormat, Opts, RootOpts, WatchConfigMethod, handle_config_errors},
     config::{self, ComponentConfig, ComponentType, Config, ConfigPath},
     extra_context::ExtraContext,
     heartbeat,
-    internal_events::{VectorConfigLoadError, VectorQuit, VectorStarted, VectorStopped},
+    internal_events::{ApiStarted, VectorConfigLoadError, VectorQuit, VectorStarted, VectorStopped},
     signal::{SignalHandler, SignalPair, SignalRx, SignalTo},
     topology::{
         ReloadOutcome, RunningTopology, SharedTopologyController, ShutdownErrorReceiver,
@@ -145,7 +144,7 @@ impl ApplicationConfig {
             ));
             match api_server {
                 Ok(server) => {
-                    info!("GRPC API server started successfully.");
+                    emit!(ApiStarted { addr: server.addr() });
                     Some(server)
                 }
                 Err(error) => {
