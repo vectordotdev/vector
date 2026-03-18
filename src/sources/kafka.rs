@@ -688,38 +688,43 @@ impl ConsumerStateInner<Consuming> {
 
                     message = messages.next(), if finalizer.is_some() => match message {
                         None => unreachable!("MessageStream never calls Ready(None)"),
-                        Some(msgs) => match msgs.into_iter().collect::<Result<Vec<_>, _>>() {
-                            Err(error) => match error {
-                                rdkafka::error::KafkaError::PartitionEOF(partition) if exit_eof => {
-                                    debug!("EOF for partition {}.", partition);
-                                    status = PartitionConsumerStatus::PartitionEOF;
-                                    finalizer.take();
-                                },
-                                _ => emit!(KafkaReadError { error }),
-                            },
-                            Ok(msgs) => {
-                                // Detach messages from rdkafka early - this duplicates some memory,
-                                // but is needed for multithreading. Parsing has to copy data
-                                // anyways, so it just takes data from the detached message.
-                                let msgs = msgs.into_iter().filter_map(|b|
-                                    // The only case TryInto will fail if the message is empty
-                                    // And we want to ignore empty messages
-                                    b.try_into().ok()
-                                ).collect();
-                                if let Some(max_message_handling_tasks) = max_message_handling_tasks {
-                                    let decoder = decoder.clone();
-                                    let keys = keys.clone();
-                                    let mut out = out.clone();
-                                    let active_message_handling_tasks = Arc::clone(&active_message_handling_tasks);
-                                    Self::wait_for_task_quota(max_message_handling_tasks, &active_message_handling_tasks).await;
-                                    processing_futures.push_back(tokio::spawn(async move {
-                                        let result = parse_message(msgs, &decoder, &keys, &mut out, acknowledgements, log_namespace).await;
-                                        active_message_handling_tasks.fetch_sub(1, Ordering::AcqRel);
-                                        result
-                                    }.instrument(span.clone())));
-                                } else {
-                                    let batch_result = parse_message(msgs, &decoder, &keys, &mut out, acknowledgements, log_namespace).await;
-                                    Self::finalize_batch(batch_result, finalizer.as_ref());
+                        Some(msgs) => {
+                            let (oks, errors): (Vec<_>, Vec<_>) = msgs.into_iter().partition(Result::is_ok);
+                            let oks: Vec<_> = oks.into_iter().map(Result::unwrap).collect();
+                            let errors: Vec<_> = errors.into_iter().map(Result::unwrap_err).collect();
+
+                            // Detach messages from rdkafka early - this duplicates some memory,
+                            // but is needed for multithreading. Parsing has to copy data
+                            // anyways, so it just takes data from the detached message.
+                            let msgs = oks.into_iter().filter_map(|b|
+                                // The only case TryInto will fail if the message is empty
+                                // And we want to ignore empty messages
+                                b.try_into().ok()
+                            ).collect();
+                            if let Some(max_message_handling_tasks) = max_message_handling_tasks {
+                                let decoder = decoder.clone();
+                                let keys = keys.clone();
+                                let mut out = out.clone();
+                                let active_message_handling_tasks = Arc::clone(&active_message_handling_tasks);
+                                Self::wait_for_task_quota(max_message_handling_tasks, &active_message_handling_tasks).await;
+                                processing_futures.push_back(tokio::spawn(async move {
+                                    let result = parse_message(msgs, &decoder, &keys, &mut out, acknowledgements, log_namespace).await;
+                                    active_message_handling_tasks.fetch_sub(1, Ordering::AcqRel);
+                                    result
+                                }.instrument(span.clone())));
+                            } else {
+                                let batch_result = parse_message(msgs, &decoder, &keys, &mut out, acknowledgements, log_namespace).await;
+                                Self::finalize_batch(batch_result, finalizer.as_ref());
+                            }
+
+                            for error in errors  {
+                                match error {
+                                    rdkafka::error::KafkaError::PartitionEOF(partition) if exit_eof => {
+                                        debug!("EOF for partition {}.", partition);
+                                        status = PartitionConsumerStatus::PartitionEOF;
+                                        finalizer.take();
+                                    },
+                                    _ => emit!(KafkaReadError { error }),
                                 }
                             }
                         }
