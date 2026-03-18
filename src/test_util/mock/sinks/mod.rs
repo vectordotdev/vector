@@ -4,6 +4,9 @@ pub use self::backpressure::BackpressureSinkConfig;
 mod basic;
 pub use self::basic::BasicSinkConfig;
 
+mod completion;
+pub use self::completion::CompletionSinkConfig;
+
 mod error;
 pub use self::error::ErrorSinkConfig;
 

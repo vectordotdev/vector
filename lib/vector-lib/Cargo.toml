@@ -7,7 +7,7 @@ publish = false
 
 [dependencies]
 codecs = { path = "../codecs", default-features = false }
-enrichment = { path = "../enrichment" }
+enrichment = { path = "../vector-vrl/enrichment" }
 file-source = { path = "../file-source", optional = true }
 file-source-common = { path = "../file-source-common", optional = true }
 opentelemetry-proto = { path = "../opentelemetry-proto", optional = true }
