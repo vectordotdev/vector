@@ -385,7 +385,7 @@ where
                 .collect();
 
             for file_id in dead_file_ids {
-                if let Some(watcher) = fp_map.swap_remove(&file_id) {
+                if let Some(watcher) = fp_map.shift_remove(&file_id) {
                     let unwatch_info = watcher.get_unwatch_info().await;
                     self.emitter.emit_file_unwatched(
                         &unwatch_info.path,
