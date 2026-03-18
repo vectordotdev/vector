@@ -60,6 +60,7 @@ Bedove
 Benss
 bigendian
 bindir
+binstall
 binfmt
 bitcast
 bitcode
@@ -137,6 +138,7 @@ dsmith
 DVB
 ede
 emoji
+emojis
 emqx
 enableable
 Enot
@@ -145,7 +147,9 @@ EPC
 esbuild
 esensar
 etld
+eventcreate
 eventloop
+Evt
 Evercoss
 exactlyonce
 Explay
@@ -276,6 +280,7 @@ KDL
 keepappkey
 keephq
 kenton
+keybinds
 Kingcom
 Kolkata
 konqueror
@@ -355,6 +360,7 @@ netcat
 netdata
 Netflix
 netlify
+netlink
 Neue
 neuronull
 Nextbook
@@ -495,6 +501,7 @@ Telstra
 Tencent
 Texet
 Thl
+timediff
 timeframe
 timeseries
 timespan
@@ -555,3 +562,10 @@ zstandard
 ZTE
 Zync
 sighup
+CPPFLAGS
+LDFLAGS
+libsasl
+pkgconfig
+CLAUDE
+linting
+lexers

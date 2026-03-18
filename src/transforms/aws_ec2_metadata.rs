@@ -17,7 +17,6 @@ use snafu::ResultExt as _;
 use tokio::time::{Duration, Instant, sleep};
 use tracing::Instrument;
 use vector_lib::{
-    config::LogNamespace,
     configurable::configurable_component,
     lookup::{
         OwnedTargetPath,
@@ -255,9 +254,8 @@ impl TransformConfig for Ec2Metadata {
 
     fn outputs(
         &self,
-        _: vector_lib::enrichment::TableRegistry,
+        _: &TransformContext,
         input_definitions: &[(OutputId, schema::Definition)],
-        _: LogNamespace,
     ) -> Vec<TransformOutput> {
         let added_keys = Keys::new(self.namespace.clone());
 
@@ -714,7 +712,7 @@ enum Ec2MetadataError {
 
 #[cfg(test)]
 mod test {
-    use vector_lib::{enrichment::TableRegistry, lookup::OwnedTargetPath};
+    use vector_lib::lookup::OwnedTargetPath;
     use vrl::{owned_value_path, value::Kind};
 
     use crate::{
@@ -733,9 +731,8 @@ mod test {
             Definition::new(Kind::bytes(), Kind::any_object(), [LogNamespace::Vector]);
 
         let mut outputs = transform_config.outputs(
-            TableRegistry::default(),
+            &Default::default(),
             &[(OutputId::dummy(), input_definition)],
-            LogNamespace::Vector,
         );
         assert_eq!(outputs.len(), 1);
         let output = outputs.pop().unwrap();

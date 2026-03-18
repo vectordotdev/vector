@@ -16,6 +16,7 @@ appname
 aqf
 architecting
 archs
+ASIM
 assertverify
 atag
 aton
@@ -129,6 +130,7 @@ datasources
 datid
 datname
 DBserver
+dcr
 ddagent
 ddev
 ddmetrics
@@ -168,11 +170,13 @@ duser
 dynamicwireless
 dyno
 ebfcee
+ector
 edenhill
 edns
 eeyun
 efgh
 Elhage
+elopment
 emerg
 endianess
 endler
@@ -644,6 +648,7 @@ wayfor
 wday
 webgraphviz
 websites
+websockets
 wensite
 whostheboss
 willreturn

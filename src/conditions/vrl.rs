@@ -1,4 +1,5 @@
 use vector_lib::{TimeZone, compile_vrl, configurable::configurable_component, emit};
+use vector_vrl_metrics::MetricsStorage;
 use vrl::{
     compiler::{
         CompilationResult, CompileConfig, Program, TypeState, VrlRuntime,
@@ -33,6 +34,7 @@ impl ConditionalConfig for VrlConfig {
     fn build(
         &self,
         enrichment_tables: &vector_lib::enrichment::TableRegistry,
+        metrics_storage: &MetricsStorage,
     ) -> crate::Result<Condition> {
         // TODO(jean): re-add this to VRL
         // let constraint = TypeConstraint {
@@ -50,6 +52,7 @@ impl ConditionalConfig for VrlConfig {
 
         let mut config = CompileConfig::default();
         config.set_custom(enrichment_tables.clone());
+        config.set_custom(metrics_storage.clone());
         config.set_read_only();
 
         let CompilationResult {
@@ -246,13 +249,13 @@ mod test {
 
             assert_eq!(
                 config
-                    .build(&Default::default())
+                    .build(&Default::default(), &Default::default())
                     .map(|_| ())
                     .map_err(|e| e.to_string()),
                 build
             );
 
-            if let Ok(cond) = config.build(&Default::default()) {
+            if let Ok(cond) = config.build(&Default::default(), &Default::default()) {
                 assert_eq!(
                     cond.check_with_context(event.clone()).0,
                     check.map_err(|e| e.to_string())

@@ -1,5 +1,4 @@
 use bytes::Bytes;
-use derivative::Derivative;
 use smallvec::{SmallVec, smallvec};
 use vector_config_macros::configurable_component;
 use vector_core::{
@@ -26,8 +25,7 @@ pub struct VrlDeserializerConfig {
 
 /// VRL-specific decoding options.
 #[configurable_component]
-#[derive(Debug, Clone, PartialEq, Eq, Derivative)]
-#[derivative(Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct VrlDeserializerOptions {
     /// The [Vector Remap Language][vrl] (VRL) program to execute for each event.
     /// Note that the final contents of the `.` target will be used as the decoding result.

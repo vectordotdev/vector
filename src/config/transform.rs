@@ -19,6 +19,7 @@ use vector_lib::{
     schema,
     transform::Transform,
 };
+use vector_vrl_metrics::MetricsStorage;
 
 use super::{ComponentKey, OutputId, dot_graph::GraphConfig, schema::Options as SchemaOptions};
 use crate::extra_context::ExtraContext;
@@ -120,6 +121,8 @@ pub struct TransformContext {
 
     pub enrichment_tables: vector_lib::enrichment::TableRegistry,
 
+    pub metrics_storage: MetricsStorage,
+
     /// Tracks the schema IDs assigned to schemas exposed by the transform.
     ///
     /// Given a transform can expose multiple [`TransformOutput`] channels, the ID is tied to the identifier of
@@ -146,6 +149,7 @@ impl Default for TransformContext {
             key: Default::default(),
             globals: Default::default(),
             enrichment_tables: Default::default(),
+            metrics_storage: Default::default(),
             schema_definitions: HashMap::from([(None, HashMap::new())]),
             merged_schema_definition: schema::Definition::any(),
             schema: SchemaOptions::default(),
@@ -211,12 +215,8 @@ pub trait TransformConfig: DynClone + NamedComponent + core::fmt::Debug + Send +
     /// of events flowing through the transform.
     fn outputs(
         &self,
-        enrichment_tables: vector_lib::enrichment::TableRegistry,
+        globals: &TransformContext,
         input_definitions: &[(OutputId, schema::Definition)],
-
-        // This only exists for transforms that create logs from non-logs, to know which namespace
-        // to use, such as `metric_to_log`
-        global_log_namespace: LogNamespace,
     ) -> Vec<TransformOutput>;
 
     /// Validates that the configuration of the transform is valid.
@@ -273,9 +273,14 @@ pub fn get_transform_output_ids<T: TransformConfig + ?Sized>(
 ) -> impl Iterator<Item = OutputId> + '_ {
     transform
         .outputs(
-            vector_lib::enrichment::TableRegistry::default(),
+            &TransformContext {
+                schema: SchemaOptions {
+                    log_namespace: Some(global_log_namespace.into()),
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
             &[(key.clone().into(), schema::Definition::any())],
-            global_log_namespace,
         )
         .into_iter()
         .map(move |output| OutputId {

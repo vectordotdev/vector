@@ -2,11 +2,10 @@ use bytes::Bytes;
 use chrono::Utc;
 use futures::StreamExt;
 use snafu::{ResultExt, Snafu};
-use tokio_util::codec::FramedRead;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::{
-        StreamDecodingError,
+        Decoder, DecoderFramedRead, DecodingConfig, StreamDecodingError,
         decoding::{DeserializerConfig, FramingConfig},
     },
     config::{LegacyKey, LogNamespace},
@@ -19,7 +18,6 @@ use vector_lib::{
 use vrl::value::Kind;
 
 use crate::{
-    codecs::{Decoder, DecodingConfig},
     config::{GenerateConfig, SourceConfig, SourceContext, SourceOutput, log_schema},
     event::Event,
     internal_events::{EventsReceived, StreamClosedError},
@@ -37,12 +35,11 @@ enum BuildError {
 
 /// Data type to use for reading messages from Redis.
 #[configurable_component]
-#[derive(Copy, Clone, Debug, Derivative)]
-#[derivative(Default)]
+#[derive(Copy, Clone, Debug, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum DataTypeConfig {
     /// The `list` data type.
-    #[derivative(Default)]
+    #[default]
     List,
 
     /// The `channel` data type.
@@ -53,7 +50,7 @@ pub enum DataTypeConfig {
 
 /// Options for the Redis `list` data type.
 #[configurable_component]
-#[derive(Copy, Clone, Debug, Default, Derivative, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "lowercase")]
 pub struct ListOption {
     #[configurable(derived)]
@@ -62,12 +59,11 @@ pub struct ListOption {
 
 /// Method for getting events from the `list` data type.
 #[configurable_component]
-#[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
-#[derivative(Default)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum Method {
     /// Pop messages from the head of the list.
-    #[derivative(Default)]
+    #[default]
     Lpop,
 
     /// Pop messages from the tail of the list.
@@ -243,7 +239,7 @@ impl InputHandler {
 
         self.bytes_received.emit(ByteSize(line.len()));
 
-        let mut stream = FramedRead::new(line.as_ref(), self.decoder.clone());
+        let mut stream = DecoderFramedRead::new(line.as_ref(), self.decoder.clone());
         while let Some(next) = stream.next().await {
             match next {
                 Ok((events, _byte_size)) => {
@@ -284,7 +280,7 @@ impl InputHandler {
                     }
                 }
                 Err(error) => {
-                    // Error is logged by `crate::codecs::Decoder`, no further
+                    // Error is logged by `vector_lib::codecs::Decoder`, no further
                     // handling is needed here.
                     if !error.can_continue() {
                         break;

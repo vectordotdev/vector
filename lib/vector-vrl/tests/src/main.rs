@@ -3,6 +3,7 @@
 
 mod docs;
 mod test_enrichment;
+mod test_vrl_metrics;
 
 use std::{collections::HashSet, env, path::PathBuf};
 
@@ -94,6 +95,7 @@ fn main() {
         timings: cmd.timings,
         runtime: cmd.runtime,
         timezone: cmd.timezone(),
+        run_skipped: false,
     };
 
     run_tests(
@@ -104,6 +106,7 @@ fn main() {
             let mut config = CompileConfig::default();
             let enrichment_table = test_enrichment::test_enrichment_table();
             config.set_custom(enrichment_table.clone());
+            config.set_custom(test_vrl_metrics::test_vrl_metrics_storage());
             (config, enrichment_table)
         },
         |registry| registry.finish_load(),

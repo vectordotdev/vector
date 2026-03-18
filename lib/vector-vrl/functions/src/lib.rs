@@ -38,13 +38,26 @@ pub fn secret_functions() -> Vec<Box<dyn Function>> {
 /// Returns all VRL functions available in Vector.
 #[allow(clippy::disallowed_methods)]
 pub fn all() -> Vec<Box<dyn Function>> {
-    let functions = vrl::stdlib::all()
+    let functions = iter_all_without_vrl_stdlib().chain(vrl::stdlib::all());
+    functions.collect()
+}
+
+/// Returns all VRL functions available only in Vector.
+pub fn all_without_vrl_stdlib() -> Vec<Box<dyn Function>> {
+    let functions = iter_all_without_vrl_stdlib();
+    functions.collect()
+}
+
+fn iter_all_without_vrl_stdlib() -> impl Iterator<Item = Box<dyn Function>> {
+    let functions = secret_functions()
         .into_iter()
-        .chain(secret_functions())
         .chain(enrichment::vrl_functions());
 
     #[cfg(feature = "dnstap")]
     let functions = functions.chain(dnstap_parser::vrl_functions());
 
-    functions.collect()
+    #[cfg(feature = "vrl-metrics")]
+    let functions = functions.chain(vector_vrl_metrics::all());
+
+    functions
 }

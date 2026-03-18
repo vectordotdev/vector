@@ -26,12 +26,11 @@ use crate::{
 ///
 /// [formats]: https://clickhouse.com/docs/en/interfaces/formats
 #[configurable_component]
-#[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq, Hash)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Hash)]
 #[serde(rename_all = "snake_case")]
-#[derivative(Default)]
 #[allow(clippy::enum_variant_names)]
 pub enum Format {
-    #[derivative(Default)]
+    #[default]
     /// JSONEachRow.
     JsonEachRow,
 
@@ -273,14 +272,14 @@ impl ClickhouseConfig {
         endpoint: &Uri,
         database: &Template,
         auth: Option<&Auth>,
-    ) -> crate::Result<(Format, crate::codecs::EncoderKind)> {
-        use crate::codecs::EncoderKind;
+    ) -> crate::Result<(Format, vector_lib::codecs::EncoderKind)> {
+        use vector_lib::codecs::EncoderKind;
         use vector_lib::codecs::{
             JsonSerializerConfig, NewlineDelimitedEncoderConfig, encoding::Framer,
         };
 
         if let Some(batch_encoding) = &self.batch_encoding {
-            use crate::codecs::{BatchEncoder, BatchSerializer};
+            use vector_lib::codecs::{BatchEncoder, BatchSerializer};
 
             // Validate that batch_encoding is only compatible with ArrowStream format
             if self.format != Format::ArrowStream {

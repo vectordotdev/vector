@@ -10,7 +10,7 @@ license = "MIT"
 unwrap-used = "forbid"
 
 [dependencies]
-data-encoding = "2.9"
+data-encoding = "2.10"
 hickory-proto.workspace = true
 snafu.workspace = true
 

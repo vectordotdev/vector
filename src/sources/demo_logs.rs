@@ -7,11 +7,10 @@ use rand::prelude::IndexedRandom;
 use serde_with::serde_as;
 use snafu::Snafu;
 use tokio::time::{self, Duration};
-use tokio_util::codec::FramedRead;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::{
-        StreamDecodingError,
+        DecoderFramedRead, StreamDecodingError,
         decoding::{DeserializerConfig, FramingConfig},
     },
     config::{DataType, LegacyKey, LogNamespace},
@@ -95,8 +94,7 @@ pub enum DemoLogsConfigError {
 
 /// Output format configuration.
 #[configurable_component]
-#[derive(Clone, Debug, Derivative)]
-#[derivative(Default)]
+#[derive(Clone, Debug, Default)]
 #[serde(tag = "format", rename_all = "snake_case")]
 #[configurable(metadata(
     docs::enum_tag_description = "The format of the randomly generated output."
@@ -137,7 +135,7 @@ pub enum OutputFormat {
     /// Randomly generated HTTP server logs in [JSON][json] format.
     ///
     /// [json]: https://en.wikipedia.org/wiki/JSON
-    #[derivative(Default)]
+    #[default]
     Json,
 }
 
@@ -234,7 +232,7 @@ async fn demo_logs_source(
 
         let line = format.generate_line(n);
 
-        let mut stream = FramedRead::new(line.as_bytes(), decoder.clone());
+        let mut stream = DecoderFramedRead::new(line.as_bytes(), decoder.clone());
         while let Some(next) = stream.next().await {
             match next {
                 Ok((events, _byte_size)) => {
@@ -272,7 +270,7 @@ async fn demo_logs_source(
                     })?;
                 }
                 Err(error) => {
-                    // Error is logged by `crate::codecs::Decoder`, no further
+                    // Error is logged by `vector_lib::codecs::Decoder`, no further
                     // handling is needed here.
                     if !error.can_continue() {
                         break;

@@ -45,7 +45,7 @@ where
 
         usage_handle.set_buffer_limits(max_bytes, max_size);
 
-        let (tx, rx) = limited(self.capacity, None);
+        let (tx, rx) = limited(self.capacity, None, None);
         Ok((tx.into(), rx.into()))
     }
 }

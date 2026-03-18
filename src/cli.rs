@@ -12,8 +12,8 @@ use crate::tap;
 use crate::top;
 
 use crate::{
-    config, convert_config, generate, generate_schema, get_version, graph, list, signal, unit_test,
-    validate,
+    completion, config, convert_config, generate, generate_schema, get_version, graph, list,
+    signal, unit_test, validate,
 };
 
 #[derive(Parser, Debug)]
@@ -318,6 +318,10 @@ pub enum SubCommand {
     /// By default all output is writen to stdout. The `output_path` option can be used to redirect to a file.
     GenerateSchema(generate_schema::Opts),
 
+    /// Generate shell completion, then exit.
+    #[command(hide = true)]
+    Completion(completion::Opts),
+
     /// Output a provided Vector configuration file/dir as a single JSON object, useful for checking in to version control.
     #[command(hide = true)]
     Config(config::Opts),
@@ -355,6 +359,7 @@ impl SubCommand {
         color: bool,
     ) -> exitcode::ExitCode {
         match self {
+            Self::Completion(s) => completion::cmd(s),
             Self::Config(c) => config::cmd(c),
             Self::ConvertConfig(opts) => convert_config::cmd(opts),
             Self::Generate(g) => generate::cmd(g),

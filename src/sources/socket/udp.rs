@@ -4,11 +4,10 @@ use bytes::BytesMut;
 use chrono::Utc;
 use futures::StreamExt;
 use listenfd::ListenFd;
-use tokio_util::codec::FramedRead;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::{
-        StreamDecodingError,
+        DecoderFramedRead, StreamDecodingError,
         decoding::{DeserializerConfig, FramingConfig},
     },
     config::{LegacyKey, LogNamespace},
@@ -246,7 +245,8 @@ pub(super) fn udp(
                     bytes_received.emit(ByteSize(byte_size));
                     let payload = buf.split_to(byte_size);
                     let truncated = byte_size == max_length + 1;
-                    let mut stream = FramedRead::new(payload.as_ref(), decoder.clone()).peekable();
+                    let mut stream =
+                        DecoderFramedRead::new(payload.as_ref(), decoder.clone()).peekable();
 
                     while let Some(result) = stream.next().await {
                         let last = Pin::new(&mut stream).peek().await.is_none();
@@ -319,7 +319,7 @@ pub(super) fn udp(
                                 }
                             }
                             Err(error) => {
-                                // Error is logged by `crate::codecs::Decoder`, no
+                                // Error is logged by `vector_lib::codecs::Decoder`, no
                                 // further handling is needed here.
                                 if !error.can_continue() {
                                     break;
