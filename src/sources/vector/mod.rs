@@ -357,6 +357,17 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn receive_zstd_compressed_message() {
+        let (_guard, addr) = test_util::addr::next_addr();
+
+        let config = format!(
+            r#"address = "{addr}"
+            compression = "zstd""#
+        );
+        run_test(&config, addr).await;
+    }
+
+    #[tokio::test]
     async fn custom_health_check_works() {
         use tonic::transport::Channel;
 
