@@ -19,34 +19,6 @@ use crate::{
 /// always used a "relaxed" ordering when updating them.
 const ORDERING: Ordering = Ordering::Relaxed;
 
-fn increment_counter(counter: &AtomicU64, delta: u64) {
-    counter
-        .fetch_update(ORDERING, ORDERING, |current| {
-            Some(current.checked_add(delta).unwrap_or_else(|| {
-                warn!(
-                    current,
-                    delta, "Buffer counter overflowed. Clamping value to `u64::MAX`."
-                );
-                u64::MAX
-            }))
-        })
-        .ok();
-}
-
-fn decrement_counter(counter: &AtomicU64, delta: u64) {
-    counter
-        .fetch_update(ORDERING, ORDERING, |current| {
-            Some(current.checked_sub(delta).unwrap_or_else(|| {
-                warn!(
-                    current,
-                    delta, "Buffer counter underflowed. Clamping value to `0`."
-                );
-                0
-            }))
-        })
-        .ok();
-}
-
 /// Snapshot of category metrics.
 struct CategorySnapshot {
     event_count: u64,
@@ -62,10 +34,15 @@ impl CategorySnapshot {
 
 /// Per-category metrics.
 ///
-/// This tracks the number of events, and their size in the buffer, that a given category has interacted with. A
-/// category in this case could be something like the receive or send categories i.e. being written into the buffer, and
-/// then read out of the buffer. Overall, it's a simple grouping mechanism because we often want to track the change in
-/// both number of events, and their size as measured by the buffer.
+/// This tracks the number of events, and their size in the buffer, that a given category has
+/// interacted with. A category in this case could be something like the receive or send categories
+/// i.e. being written into the buffer, and then read out of the buffer. Overall, it's a simple
+/// grouping mechanism because we often want to track the change in both number of events, and their
+/// size as measured by the buffer.
+///
+///  At a sustained 1 GiB/sec, which is still faster than Vector can currently achieve, a `u64` byte
+///  counter would take over 500 years to overflow. As such, we don't handle failures due to
+///  overflow as it is effectively impossible.
 #[derive(Debug, Default)]
 struct CategoryMetrics {
     event_count: AtomicU64,
@@ -75,14 +52,8 @@ struct CategoryMetrics {
 impl CategoryMetrics {
     /// Increments the event count and byte size by the given amounts.
     fn increment(&self, event_count: u64, event_byte_size: u64) {
-        increment_counter(&self.event_count, event_count);
-        increment_counter(&self.event_byte_size, event_byte_size);
-    }
-
-    /// Decrements the event count and byte size by the given amounts.
-    fn decrement(&self, event_count: u64, event_byte_size: u64) {
-        decrement_counter(&self.event_count, event_count);
-        decrement_counter(&self.event_byte_size, event_byte_size);
+        self.event_count.fetch_add(event_count, ORDERING);
+        self.event_byte_size.fetch_add(event_byte_size, ORDERING);
     }
 
     /// Sets the event count and event byte size to the given amount.
@@ -111,6 +82,41 @@ impl CategoryMetrics {
         CategorySnapshot {
             event_count: self.event_count.swap(0, ORDERING),
             event_byte_size: self.event_byte_size.swap(0, ORDERING),
+        }
+    }
+}
+
+/// `CurrentMetrics` is a wrapper around a pair of `CategoryMetrics` that are used to track a
+/// "current" value that may increment or decrement. The challenge this solves is that the
+/// increments and decrements may race and result in underflows that are hard to handle using only
+/// efficient atomic operations. By tracking the increments and decrements separately, we can ensure
+/// that the current value is always accurate even if the increments and decrements race.
+#[derive(Debug, Default)]
+struct CurrentMetrics {
+    increments: CategoryMetrics,
+    decrements: CategoryMetrics,
+}
+
+impl CurrentMetrics {
+    fn increment(&self, event_count: u64, event_byte_size: u64) {
+        self.increments.increment(event_count, event_byte_size);
+    }
+
+    fn decrement(&self, event_count: u64, event_byte_size: u64) {
+        self.decrements.increment(event_count, event_byte_size);
+    }
+
+    fn get(&self) -> CategorySnapshot {
+        let entered_total = self.increments.get();
+        let left_total = self.decrements.get();
+
+        CategorySnapshot {
+            event_count: entered_total
+                .event_count
+                .saturating_sub(left_total.event_count),
+            event_byte_size: entered_total
+                .event_byte_size
+                .saturating_sub(left_total.event_byte_size),
         }
     }
 }
@@ -195,7 +201,7 @@ struct BufferUsageData {
     dropped: CategoryMetrics,
     dropped_intentional: CategoryMetrics,
     max_size: CategoryMetrics,
-    current: CategoryMetrics,
+    current: CurrentMetrics,
 }
 
 impl BufferUsageData {
@@ -372,68 +378,30 @@ impl BufferUsage {
 
 #[cfg(test)]
 mod tests {
-    use std::thread;
-
     use super::*;
 
     #[test]
-    fn test_multithreaded_updates_are_correct() {
-        const NUM_THREADS: u64 = 16;
-        const INCREMENTS_PER_THREAD: u64 = 10_000;
+    fn current_usage_is_derived_from_entered_and_left_totals() {
+        let handle = BufferUsageHandle {
+            state: Arc::new(BufferUsageData::new(0)),
+        };
 
-        let counter = Arc::new(AtomicU64::new(0));
+        handle.increment_received_event_count_and_byte_size(10, 1000);
+        handle.increment_sent_event_count_and_byte_size(3, 300);
+        handle.increment_dropped_event_count_and_byte_size(2, 200, false);
 
-        let mut handles = vec![];
-
-        for _ in 0..NUM_THREADS {
-            let counter = Arc::clone(&counter);
-            let handle = thread::spawn(move || {
-                for _ in 0..INCREMENTS_PER_THREAD {
-                    increment_counter(&counter, 1);
-                    decrement_counter(&counter, 1);
-                }
-            });
-            handles.push(handle);
-        }
-
-        for handle in handles {
-            handle.join().unwrap();
-        }
-
-        assert_eq!(counter.load(ORDERING), 0);
+        let current = handle.state.current.get();
+        assert_eq!(current.event_count, 5);
+        assert_eq!(current.event_byte_size, 500);
     }
 
     #[test]
-    fn test_decrement_counter_prevents_negatives() {
-        let counter = AtomicU64::new(100);
+    fn current_usage_saturates_at_zero() {
+        let data = BufferUsageData::new(0);
+        data.current.decrement(10, 1000);
 
-        decrement_counter(&counter, 50);
-        assert_eq!(counter.load(ORDERING), 50);
-
-        decrement_counter(&counter, 100);
-        assert_eq!(counter.load(ORDERING), 0);
-
-        decrement_counter(&counter, 50);
-        assert_eq!(counter.load(ORDERING), 0);
-
-        decrement_counter(&counter, u64::MAX);
-        assert_eq!(counter.load(ORDERING), 0);
-    }
-
-    #[test]
-    fn test_increment_counter_prevents_overflow() {
-        let counter = AtomicU64::new(u64::MAX - 2);
-
-        increment_counter(&counter, 1);
-        assert_eq!(counter.load(ORDERING), u64::MAX - 1);
-
-        increment_counter(&counter, 1);
-        assert_eq!(counter.load(ORDERING), u64::MAX);
-
-        increment_counter(&counter, 1);
-        assert_eq!(counter.load(ORDERING), u64::MAX);
-
-        increment_counter(&counter, u64::MAX);
-        assert_eq!(counter.load(ORDERING), u64::MAX);
+        let current = data.current.get();
+        assert_eq!(current.event_count, 0);
+        assert_eq!(current.event_byte_size, 0);
     }
 }
