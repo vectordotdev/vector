@@ -141,9 +141,7 @@ fn create_test_metrics_request() -> ExportMetricsServiceRequest {
                                 KeyValue {
                                     key: "service".to_string(),
                                     value: Some(AnyValue {
-                                        value: Some(StringValue(
-                                            "vector-collector".to_string(),
-                                        )),
+                                        value: Some(StringValue("vector-collector".to_string())),
                                     }),
                                 },
                             ],
