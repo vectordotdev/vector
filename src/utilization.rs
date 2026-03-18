@@ -306,10 +306,8 @@ pub(crate) fn wrap<S>(
 /// time until the consumer polls again is counted as downstream wait (idle).
 /// Both wrappers share a single [`Timer`] per component, and the idempotent
 /// `start_wait`/`stop_wait` transitions ensure no double-counting.
-#[pin_project]
 pub(crate) struct OutputUtilization<S> {
     timer_tx: UtilizationComponentSender,
-    #[pin]
     inner: S,
 }
 
@@ -320,7 +318,7 @@ where
     type Item = S::Item;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let mut this = self.project();
+        let this = self.get_mut();
         this.timer_tx.try_send_stop_wait();
         let result = ready!(this.inner.poll_next_unpin(cx));
         if result.is_some() {
