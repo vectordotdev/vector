@@ -29,7 +29,9 @@ use crate::{
     config::{self, ComponentConfig, ComponentType, Config, ConfigPath},
     extra_context::ExtraContext,
     heartbeat,
-    internal_events::{ApiStarted, VectorConfigLoadError, VectorQuit, VectorStarted, VectorStopped},
+    internal_events::{
+        ApiStarted, VectorConfigLoadError, VectorQuit, VectorStarted, VectorStopped,
+    },
     signal::{SignalHandler, SignalPair, SignalRx, SignalTo},
     topology::{
         ReloadOutcome, RunningTopology, SharedTopologyController, ShutdownErrorReceiver,
@@ -144,7 +146,9 @@ impl ApplicationConfig {
             ));
             match api_server {
                 Ok(server) => {
-                    emit!(ApiStarted { addr: server.addr() });
+                    emit!(ApiStarted {
+                        addr: server.addr()
+                    });
                     Some(server)
                 }
                 Err(error) => {

@@ -3,16 +3,6 @@
 version = 4
 
 [[package]]
-name = "Inflector"
-version = "0.11.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fe438c63458706e03479442743baae6c88256498e6431708f6dfc520a26515d3"
-dependencies = [
- "lazy_static",
- "regex",
-]
-
-[[package]]
 name = "adler2"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -651,77 +641,6 @@ dependencies = [
  "blocking",
  "futures-lite",
  "tokio",
-]
-
-[[package]]
-name = "async-graphql"
-version = "7.0.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "036618f842229ba0b89652ffe425f96c7c16a49f7e3cb23b56fca7f61fd74980"
-dependencies = [
- "async-graphql-derive",
- "async-graphql-parser",
- "async-graphql-value",
- "async-stream",
- "async-trait",
- "base64 0.22.1",
- "bytes 1.11.1",
- "fnv",
- "futures-timer",
- "futures-util",
- "http 1.3.1",
- "indexmap 2.12.0",
- "mime",
- "multer",
- "num-traits",
- "pin-project-lite",
- "regex",
- "serde",
- "serde_json",
- "serde_urlencoded",
- "static_assertions_next",
- "thiserror 1.0.68",
-]
-
-[[package]]
-name = "async-graphql-derive"
-version = "7.0.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fd45deb3dbe5da5cdb8d6a670a7736d735ba65b455328440f236dfb113727a3d"
-dependencies = [
- "Inflector",
- "async-graphql-parser",
- "darling 0.20.11",
- "proc-macro-crate 3.2.0",
- "proc-macro2 1.0.106",
- "quote 1.0.44",
- "strum 0.26.3",
- "syn 2.0.117",
- "thiserror 1.0.68",
-]
-
-[[package]]
-name = "async-graphql-parser"
-version = "7.0.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "60b7607e59424a35dadbc085b0d513aa54ec28160ee640cf79ec3b634eba66d3"
-dependencies = [
- "async-graphql-value",
- "pest",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "async-graphql-value"
-version = "7.0.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "34ecdaff7c9cffa3614a9f9999bf9ee4c3078fe3ce4d6a6e161736b56febf2de"
-dependencies = [
- "bytes 1.11.1",
- "indexmap 2.12.0",
- "serde",
- "serde_json",
 ]
 
 [[package]]
@@ -6813,24 +6732,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "multer"
-version = "3.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a15d522be0a9c3e46fd2632e272d178f56387bdb5c9fbb3a36c649062e9b5219"
-dependencies = [
- "bytes 1.11.1",
- "encoding_rs",
- "futures-util",
- "http 1.3.1",
- "httparse",
- "log",
- "memchr",
- "mime",
- "spin 0.9.8",
- "version_check",
-]
-
-[[package]]
 name = "multimap"
 version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10574,12 +10475,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
-name = "static_assertions_next"
-version = "1.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d7beae5182595e9a8b683fa98c4317f956c9a2dec3b9716990d20023cc60c766"
-
-[[package]]
 name = "stream-cancel"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10640,9 +10535,6 @@ name = "strum"
 version = "0.26.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8fec0f0aef304996cf250b31b5a10dee7980c85da9d759361292b8bca5a18f06"
-dependencies = [
- "strum_macros 0.26.4",
-]
 
 [[package]]
 name = "strum"
@@ -12779,7 +12671,6 @@ dependencies = [
 name = "vector-tap"
 version = "0.1.0"
 dependencies = [
- "async-graphql",
  "bytes 1.11.1",
  "clap",
  "codecs",

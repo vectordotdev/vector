@@ -1,5 +1,4 @@
 Component,Origin,License,Copyright
-Inflector,https://github.com/whatisinternet/inflector,BSD-2-Clause,Josh Teeter<joshteeter@gmail.com>
 adler2,https://github.com/oyvindln/adler2,0BSD OR MIT OR Apache-2.0,"Jonas Schievink <jonasschievink@gmail.com>, oyvindln <oyvindln@users.noreply.github.com>"
 adler32,https://github.com/remram44/adler32-rs,Zlib,Remi Rampin <remirampin@gmail.com>
 aead,https://github.com/RustCrypto/traits,MIT OR Apache-2.0,RustCrypto Developers
@@ -48,10 +47,6 @@ async-compression,https://github.com/Nullus157/async-compression,MIT OR Apache-2
 async-executor,https://github.com/smol-rs/async-executor,Apache-2.0 OR MIT,"Stjepan Glavina <stjepang@gmail.com>, John Nunley <dev@notgull.net>"
 async-fs,https://github.com/smol-rs/async-fs,Apache-2.0 OR MIT,Stjepan Glavina <stjepang@gmail.com>
 async-global-executor,https://github.com/Keruspe/async-global-executor,Apache-2.0 OR MIT,Marc-Antoine Perennou <Marc-Antoine@Perennou.com>
-async-graphql,https://github.com/async-graphql/async-graphql,MIT OR Apache-2.0,"sunli <scott_s829@163.com>, Koxiaet"
-async-graphql-derive,https://github.com/async-graphql/async-graphql,MIT OR Apache-2.0,"sunli <scott_s829@163.com>, Koxiaet"
-async-graphql-parser,https://github.com/async-graphql/async-graphql,MIT OR Apache-2.0,"sunli <scott_s829@163.com>, Koxiaet"
-async-graphql-value,https://github.com/async-graphql/async-graphql,MIT OR Apache-2.0,"sunli <scott_s829@163.com>, Koxiaet"
 async-io,https://github.com/smol-rs/async-io,Apache-2.0 OR MIT,Stjepan Glavina <stjepang@gmail.com>
 async-lock,https://github.com/smol-rs/async-lock,Apache-2.0 OR MIT,Stjepan Glavina <stjepang@gmail.com>
 async-native-tls,https://github.com/async-email/async-native-tls,MIT OR Apache-2.0,dignifiedquire <me@dignifiedquire.com>
@@ -480,7 +475,6 @@ mongocrypt,https://github.com/mongodb/libmongocrypt-rust,Apache-2.0,"Abraham Egn
 mongocrypt-sys,https://github.com/mongodb/libmongocrypt-rust,Apache-2.0,"Abraham Egnor <abraham.egnor@mongodb.com>, Isabel Atkinson <isabel.atkinson@mongodb.com>"
 mongodb,https://github.com/mongodb/mongo-rust-driver,Apache-2.0,"Saghm Rossi <saghmrossi@gmail.com>, Patrick Freed <patrick.freed@mongodb.com>, Isabel Atkinson <isabel.atkinson@mongodb.com>, Abraham Egnor <abraham.egnor@mongodb.com>, Kaitlin Mahar <kaitlin.mahar@mongodb.com>, Patrick Meredith <pmeredit@protonmail.com>"
 mongodb-internal-macros,https://github.com/mongodb/mongo-rust-driver,Apache-2.0,The mongodb-internal-macros Authors
-multer,https://github.com/rousan/multer-rs,MIT,Rousan Ali <hello@rousan.io>
 murmur3,https://github.com/stusmall/murmur3,MIT OR Apache-2.0,Stu Small <stuart.alan.small@gmail.com>
 native-tls,https://github.com/sfackler/rust-native-tls,MIT OR Apache-2.0,Steven Fackler <sfackler@gmail.com>
 ndk-context,https://github.com/rust-windowing/android-ndk-rs,MIT OR Apache-2.0,The Rust Windowing contributors
@@ -734,7 +728,6 @@ sqlx-postgres,https://github.com/launchbadge/sqlx,MIT OR Apache-2.0,"Ryan Leckey
 sqlx-sqlite,https://github.com/launchbadge/sqlx,MIT OR Apache-2.0,"Ryan Leckey <leckey.ryan@gmail.com>, Austin Bonander <austin.bonander@gmail.com>, Chloe Ross <orangesnowfox@gmail.com>, Daniel Akhterov <akhterovd@gmail.com>"
 stable_deref_trait,https://github.com/storyyeller/stable_deref_trait,MIT OR Apache-2.0,Robert Grosse <n210241048576@gmail.com>
 static_assertions,https://github.com/nvzqz/static-assertions-rs,MIT OR Apache-2.0,Nikolai Vazquez
-static_assertions_next,https://github.com/scuffletv/static-assertions,MIT OR Apache-2.0,Nikolai Vazquez
 stream-cancel,https://github.com/jonhoo/stream-cancel,MIT OR Apache-2.0,Jon Gjengset <jon@thesquareplanet.com>
 stringprep,https://github.com/sfackler/rust-stringprep,MIT OR Apache-2.0,Steven Fackler <sfackler@gmail.com>
 strip-ansi-escapes,https://github.com/luser/strip-ansi-escapes,Apache-2.0 OR MIT,Ted Mielczarek <ted@mielczarek.org>
