@@ -27,8 +27,7 @@ fn component_matches_patterns(component_id: &str, components_patterns: &[Pattern
 
 /// Component polling task
 ///
-/// Polls for component changes every interval. gRPC doesn't have real-time component
-/// add/remove subscriptions like GraphQL did, so we poll and diff.
+/// Polls for component changes every interval and diffs to detect adds/removes.
 async fn poll_components(
     mut client: Client,
     tx: state::EventTx,

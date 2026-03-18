@@ -12,9 +12,6 @@ use super::grpc::ObservabilityService;
 use crate::{config::Config, proto::observability::Server as ObservabilityServer};
 
 /// gRPC API server for Vector observability.
-///
-/// This server provides real-time metrics and component information via gRPC,
-/// replacing the GraphQL API with a more efficient binary protocol.
 pub struct GrpcServer {
     _shutdown: oneshot::Sender<()>,
     addr: SocketAddr,

@@ -381,9 +381,6 @@ fn ports_to_proto_outputs(
 }
 
 /// gRPC observability service implementation.
-///
-/// This service provides real-time monitoring and observability for Vector instances,
-/// replacing the previous GraphQL API with a more efficient gRPC interface.
 pub struct ObservabilityService {
     watch_rx: WatchRx,
     running: Arc<AtomicBool>,

@@ -5,7 +5,6 @@ import "google/protobuf/timestamp.proto";
 import "event.proto";
 
 // Observability service for monitoring Vector instances.
-// This replaces the GraphQL API with a more efficient gRPC interface.
 service Observability {
   // ========== Simple Queries ==========
 

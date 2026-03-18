@@ -1,7 +1,6 @@
 //! Vector gRPC API client library
 //!
 //! This library provides a Rust client for the Vector gRPC observability API.
-//! It replaces the previous GraphQL-based client with a more efficient gRPC implementation.
 //!
 //! # Example
 //!
