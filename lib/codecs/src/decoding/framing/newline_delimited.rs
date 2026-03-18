@@ -1,5 +1,4 @@
 use bytes::{Bytes, BytesMut};
-use derivative::Derivative;
 use tokio_util::codec::Decoder;
 use vector_config::configurable_component;
 
@@ -16,8 +15,7 @@ pub struct NewlineDelimitedDecoderConfig {
 
 /// Options for building a `NewlineDelimitedDecoder`.
 #[configurable_component]
-#[derive(Clone, Debug, Derivative, PartialEq, Eq)]
-#[derivative(Default)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct NewlineDelimitedDecoderOptions {
     /// The maximum length of the byte buffer.
     ///

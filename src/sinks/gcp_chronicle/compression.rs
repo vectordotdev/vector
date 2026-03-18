@@ -20,11 +20,10 @@ use crate::sinks::util::{
 };
 
 /// Compression configuration.
-#[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
-#[derivative(Default)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum ChronicleCompression {
     /// No compression.
-    #[derivative(Default)]
+    #[default]
     None,
 
     /// [Gzip][gzip] compression.
