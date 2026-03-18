@@ -135,9 +135,15 @@ pub(super) struct Config {
     #[derivative(Default(value = "default_true()"))]
     pub(super) delete_message: bool,
 
-    /// Whether to delete non-retryable messages.
+    /// Whether to delete messages that are rejected by the sink.
     ///
-    /// If a message is rejected by the sink and not retryable, it is deleted from the queue.
+    /// When enabled, if the downstream sink explicitly rejects a batch
+    /// (e.g., due to a schema mismatch or permanent sink error), the
+    /// corresponding SQS message is deleted from the queue.
+    ///
+    /// This does NOT affect S3 fetch errors (e.g., NoSuchKey, AccessDenied,
+    /// network failures). Those errors always leave the message in SQS for
+    /// retry via visibility timeout or dead-letter queue processing.
     #[serde(default = "default_true")]
     #[derivative(Default(value = "default_true()"))]
     pub(super) delete_failed_message: bool,
@@ -573,54 +579,36 @@ impl IngestorProcess {
                                 error: &err,
                             });
 
-                            let should_delete = match &err {
-                                ProcessingError::GetObject { source, bucket, key } => {
-                                    let ctx = crate::aws::error::extract_error_context(source);
-                                    let class = crate::aws::error::classify_error(&ctx);
-                                    let error_kind = match class {
-                                        crate::aws::error::AwsErrorClass::NotFound => {
-                                            if ctx.aws_error_code == Some("NoSuchBucket") {
-                                                "NoSuchBucket"
-                                            } else {
-                                                "NoSuchKey"
-                                            }
+                            // Emit structured S3 GetObject failure diagnostics.
+                            // The message is NOT deleted here — it remains in SQS
+                            // for retry via visibility timeout or dead-letter queue.
+                            // Only sink rejections (BatchStatus::Rejected) can trigger
+                            // message deletion, controlled by `delete_failed_message`.
+                            if let ProcessingError::GetObject { source, bucket, key } = &err {
+                                let ctx = crate::aws::error::extract_error_context(source);
+                                let class = crate::aws::error::classify_error(&ctx);
+                                let error_kind = match class {
+                                    crate::aws::error::AwsErrorClass::NotFound => {
+                                        if ctx.aws_error_code == Some("NoSuchBucket") {
+                                            "NoSuchBucket"
+                                        } else {
+                                            "NoSuchKey"
                                         }
-                                        crate::aws::error::AwsErrorClass::Auth => "AccessDenied",
-                                        crate::aws::error::AwsErrorClass::Throttling => "Throttling",
-                                        crate::aws::error::AwsErrorClass::Connectivity => "Transient",
-                                        crate::aws::error::AwsErrorClass::ServiceError => "ServiceError",
-                                        _ => "Other",
-                                    };
-                                    let actionable_message =
-                                        s3_get_object_actionable_message(error_kind, bucket, key);
-                                    emit!(S3ObjectGetFailed {
-                                        bucket,
-                                        key,
-                                        error_kind,
-                                        actionable_message: &actionable_message,
-                                    });
-                                    self.state.delete_failed_message && !class.is_retryable()
-                                }
-                                ProcessingError::UnsupportedS3EventVersion { .. }
-                                | ProcessingError::WrongRegion { .. } => {
-                                    self.state.delete_failed_message
-                                }
-                                _ => false,
-                            };
-
-                            if should_delete {
-                                warn!(
-                                    message = "Deleting SQS message for non-retryable error.",
-                                    message_id = %message_id,
-                                    error = %err,
-                                );
-                                delete_entries.push(
-                                    DeleteMessageBatchRequestEntry::builder()
-                                        .id(message_id.clone())
-                                        .receipt_handle(receipt_handle.clone())
-                                        .build()
-                                        .expect("all required builder params specified"),
-                                );
+                                    }
+                                    crate::aws::error::AwsErrorClass::Auth => "AccessDenied",
+                                    crate::aws::error::AwsErrorClass::Throttling => "Throttling",
+                                    crate::aws::error::AwsErrorClass::Connectivity => "Transient",
+                                    crate::aws::error::AwsErrorClass::ServiceError => "ServiceError",
+                                    _ => "Other",
+                                };
+                                let actionable_message =
+                                    s3_get_object_actionable_message(error_kind, bucket, key);
+                                emit!(S3ObjectGetFailed {
+                                    bucket,
+                                    key,
+                                    error_kind,
+                                    actionable_message: &actionable_message,
+                                });
                             }
                         }
                     }
