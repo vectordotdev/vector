@@ -9,9 +9,7 @@ badges:
 tags: ["graphql", "api", "metrics"]
 ---
 
-{{< warning >}}
-The Vector observability API migrated from GraphQL to gRPC in version 0.55.0.
-{{< /warning >}}
+{{< grpc-migration-warning >}}
 
 Although Vector is an observability tool, it's nonetheless important to be able
 to observe Vector itself, especially in production environments where it serves
