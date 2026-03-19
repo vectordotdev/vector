@@ -11,7 +11,9 @@ badges:
   domains: ["api"]
 ---
 
-{{< warning >}} The Vector observability API migrated from GraphQL to gRPC in version 0.55.0. {{< /warning >}}
+{{< warning >}}
+The Vector observability API migrated from GraphQL to gRPC in version 0.55.0.
+{{< /warning >}}
 
 Vector now has a [GraphQL] API that you can use for a variety of purposes:
 
