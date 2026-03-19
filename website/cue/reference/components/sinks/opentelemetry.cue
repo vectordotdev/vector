@@ -44,14 +44,14 @@ components: sinks: opentelemetry: {
 				When encoding native Vector metrics with `codec: otlp`, the following tag prefixes are reserved and control
 				how tags are mapped into the OTLP protobuf structure:
 
-				- `resource.*` — Stripped of prefix and placed into `Resource.attributes[]` (e.g. `resource.service.name` becomes attribute `service.name`)
-				- `resource_dropped_attributes_count` — Mapped to `Resource.dropped_attributes_count` (not an attribute)
-				- `resource_schema_url` — Mapped to `ResourceMetrics.schema_url` (not an attribute)
-				- `scope.name` — Mapped to `InstrumentationScope.name`
-				- `scope.version` — Mapped to `InstrumentationScope.version`
-				- `scope_dropped_attributes_count` — Mapped to `InstrumentationScope.dropped_attributes_count` (not an attribute)
-				- `scope_schema_url` — Mapped to `ScopeMetrics.schema_url` (not an attribute)
-				- `scope.*` (other) — Stripped of prefix and placed into `InstrumentationScope.attributes[]`
+				- `resource.*` — Strips the prefix from the tag and adds the tag to `Resource.attributes[]` (for example, `resource.service.name` becomes attribute `service.name`)
+				- `resource_dropped_attributes_count` — Maps the tag to `Resource.dropped_attributes_count` (not an attribute)
+				- `resource_schema_url` — Maps the tag to `ResourceMetrics.schema_url` (not an attribute)
+				- `scope.name` — Maps the tag to `InstrumentationScope.name`
+				- `scope.version` — Maps the tag to `InstrumentationScope.version`
+				- `scope_dropped_attributes_count` — Maps the tag to `InstrumentationScope.dropped_attributes_count` (not an attribute)
+				- `scope_schema_url` — Maps the tag to to `ScopeMetrics.schema_url` (not an attribute)
+				- `scope.*` (other) — Strips the prefix from the tag and adds the tag to `InstrumentationScope.attributes[]`
 
 				All other tags are added to the data point `attributes[]` array unchanged.
 
