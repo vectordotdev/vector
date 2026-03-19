@@ -55,9 +55,7 @@ impl ResourceMetrics {
                         Some(Data::Gauge(g)) => Self::convert_gauge(g, ctx),
                         Some(Data::Sum(s)) => Self::convert_sum(s, ctx),
                         Some(Data::Histogram(h)) => Self::convert_histogram(h, ctx),
-                        Some(Data::ExponentialHistogram(e)) => {
-                            Self::convert_exp_histogram(e, ctx)
-                        }
+                        Some(Data::ExponentialHistogram(e)) => Self::convert_exp_histogram(e, ctx),
                         Some(Data::Summary(su)) => Self::convert_summary(su, ctx),
                         _ => Vec::new(),
                     }
@@ -255,10 +253,7 @@ pub fn build_metric_tags(
     // with user-supplied resource/scope attributes that use dot-separated
     // "resource.{key}" / "scope.{key}" format.
     if !scope_schema_url.is_empty() {
-        tags.insert(
-            "scope_schema_url".to_string(),
-            scope_schema_url.to_string(),
-        );
+        tags.insert("scope_schema_url".to_string(), scope_schema_url.to_string());
     }
     if !resource_schema_url.is_empty() {
         tags.insert(
@@ -743,10 +738,7 @@ impl ToF64 for Option<NumberDataPointValue> {
 mod tests {
     use super::*;
     use crate::proto::{
-        common::v1::{
-            AnyValue, ArrayValue, KeyValue, KeyValueList,
-            any_value::Value as PBValue,
-        },
+        common::v1::{AnyValue, ArrayValue, KeyValue, KeyValueList, any_value::Value as PBValue},
         metrics::v1::{Gauge, Metric, ScopeMetrics},
     };
 
@@ -798,9 +790,9 @@ mod tests {
         event.as_metric().tags().unwrap()
     }
 
-    //
+    // ========================================================================
     // Tests for schema_url tags
-    //
+    // ========================================================================
 
     #[test]
     fn test_scope_schema_url_as_tag() {
@@ -834,9 +826,9 @@ mod tests {
         assert!(tags.get("resource_schema_url").is_none());
     }
 
-    //
+    // ========================================================================
     // Tests for dropped_attributes_count tags
-    //
+    // ========================================================================
 
     #[test]
     fn test_scope_dropped_attributes_count_tag() {
@@ -882,13 +874,13 @@ mod tests {
         assert!(tags.get("resource_dropped_attributes_count").is_none());
     }
 
-    //
+    // ========================================================================
     // Combined: all new tags
-    //
+    // ========================================================================
 
-    //
+    // ========================================================================
     // Tests for start_time_unix_nano preservation
-    //
+    // ========================================================================
 
     fn get_start_time(event: &Event) -> Option<i64> {
         event
@@ -1060,9 +1052,9 @@ mod tests {
         assert_eq!(get_start_time(&events[0]), Some(7_000_000_000));
     }
 
-    //
+    // ========================================================================
     // Combined: all new tags
-    //
+    // ========================================================================
 
     #[test]
     fn test_all_new_tags_together() {
@@ -1101,9 +1093,9 @@ mod tests {
         assert_eq!(tags.get("resource_dropped_attributes_count").unwrap(), "2");
     }
 
-    //
+    // ========================================================================
     // Tests for typed metric sidecar
-    //
+    // ========================================================================
 
     fn make_int_kv(key: &str, val: i64) -> KeyValue {
         KeyValue {
@@ -1298,13 +1290,7 @@ mod tests {
 
     #[test]
     fn test_sidecar_contains_tags_fingerprint() {
-        let rm = make_resource_metrics(
-            vec![make_kv("service.name", "api")],
-            0,
-            None,
-            "",
-            "",
-        );
+        let rm = make_resource_metrics(vec![make_kv("service.name", "api")], 0, None, "", "");
         let events: Vec<Event> = rm.into_event_iter().collect();
         let sidecar = get_sidecar(&events[0]).expect("sidecar should be present");
 
@@ -1414,15 +1400,24 @@ mod tests {
             .expect("resource_attributes should be an object");
 
         let (kind, _val) = unwrap_typed(res_attrs.get("raw_data").unwrap());
-        assert_eq!(kind, "bytes_value", "BytesValue should be wrapped as bytes_value, not string_value");
+        assert_eq!(
+            kind, "bytes_value",
+            "BytesValue should be wrapped as bytes_value, not string_value"
+        );
     }
 
     #[test]
     fn test_sidecar_preserves_array_value() {
         let arr_elements = vec![
-            AnyValue { value: Some(PBValue::IntValue(1)) },
-            AnyValue { value: Some(PBValue::StringValue("two".to_string())) },
-            AnyValue { value: Some(PBValue::BoolValue(true)) },
+            AnyValue {
+                value: Some(PBValue::IntValue(1)),
+            },
+            AnyValue {
+                value: Some(PBValue::StringValue("two".to_string())),
+            },
+            AnyValue {
+                value: Some(PBValue::BoolValue(true)),
+            },
         ];
         let rm = ResourceMetrics {
             resource: Some(Resource {
@@ -1478,10 +1473,7 @@ mod tests {
 
     #[test]
     fn test_sidecar_preserves_kvlist_value() {
-        let inner_kvs = vec![
-            make_int_kv("alpha", 100),
-            make_bool_kv("beta", false),
-        ];
+        let inner_kvs = vec![make_int_kv("alpha", 100), make_bool_kv("beta", false)];
         let rm = ResourceMetrics {
             resource: Some(Resource {
                 attributes: vec![make_kvlist_kv("nested", inner_kvs)],

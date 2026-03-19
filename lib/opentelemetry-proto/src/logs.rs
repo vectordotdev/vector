@@ -351,9 +351,9 @@ mod tests {
         }
     }
 
-    //
+    // ========================================================================
     // Tests for schema_url decode (Legacy namespace)
-    //
+    // ========================================================================
 
     #[test]
     fn test_scope_schema_url_decoded_legacy() {
@@ -424,9 +424,9 @@ mod tests {
         assert!(log.get("schema_url").is_none());
     }
 
-    //
+    // ========================================================================
     // Tests for schema_url decode (Vector namespace)
-    //
+    // ========================================================================
 
     #[test]
     fn test_scope_schema_url_decoded_vector() {
@@ -475,9 +475,9 @@ mod tests {
         );
     }
 
-    //
+    // ========================================================================
     // Tests for resource.dropped_attributes_count
-    //
+    // ========================================================================
 
     #[test]
     fn test_resource_dropped_attributes_count_legacy() {
@@ -532,9 +532,9 @@ mod tests {
         assert_eq!(*dropped.unwrap(), Value::Integer(3));
     }
 
-    //
+    // ========================================================================
     // Tests for scope fields (verify existing behavior still works)
-    //
+    // ========================================================================
 
     #[test]
     fn test_scope_name_version_decoded() {
@@ -615,11 +615,16 @@ mod tests {
         let events: Vec<Event> = rl.into_event_iter(LogNamespace::Vector).collect();
         let log = events[0].as_log();
         let metadata = log.metadata().value();
-        let otel = metadata.get("opentelemetry").expect("opentelemetry metadata");
+        let otel = metadata
+            .get("opentelemetry")
+            .expect("opentelemetry metadata");
 
         // Scope fields
         let scope_meta = otel.get("scope").expect("scope metadata");
-        assert_eq!(scope_meta.get("name").unwrap().to_string_lossy(), "otel-sdk");
+        assert_eq!(
+            scope_meta.get("name").unwrap().to_string_lossy(),
+            "otel-sdk"
+        );
         assert_eq!(
             scope_meta.get("schema_url").unwrap().to_string_lossy(),
             "https://scope.schema/1.0"
@@ -628,9 +633,7 @@ mod tests {
         // Resource schema_url is stored as a flat key (not nested under "resources")
         // to avoid colliding with user-supplied resource attributes.
         assert_eq!(
-            otel.get("resource_schema_url")
-                .unwrap()
-                .to_string_lossy(),
+            otel.get("resource_schema_url").unwrap().to_string_lossy(),
             "https://resource.schema/1.0"
         );
 

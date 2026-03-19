@@ -281,9 +281,9 @@ mod tests {
         }
     }
 
-    //
+    // ========================================================================
     // Tests for InstrumentationScope decode
-    //
+    // ========================================================================
 
     #[test]
     fn test_scope_name_version_decoded() {
@@ -354,9 +354,9 @@ mod tests {
         assert!(trace.get(event_path!("scope", "version")).is_none());
     }
 
-    //
+    // ========================================================================
     // Tests for schema_url decode
-    //
+    // ========================================================================
 
     #[test]
     fn test_scope_schema_url_decoded() {
@@ -409,9 +409,9 @@ mod tests {
         assert!(trace.get(event_path!("schema_url")).is_none());
     }
 
-    //
+    // ========================================================================
     // Tests for resource.dropped_attributes_count
-    //
+    // ========================================================================
 
     #[test]
     fn test_resource_dropped_attributes_count() {
@@ -592,11 +592,17 @@ mod decode_tests {
         let trace = events[0].as_trace();
 
         assert!(
-            matches!(trace.get(event_path!("start_time_unix_nano")), Some(Value::Timestamp(_))),
+            matches!(
+                trace.get(event_path!("start_time_unix_nano")),
+                Some(Value::Timestamp(_))
+            ),
             "non-zero start_time should decode as Timestamp"
         );
         assert!(
-            matches!(trace.get(event_path!("end_time_unix_nano")), Some(Value::Timestamp(_))),
+            matches!(
+                trace.get(event_path!("end_time_unix_nano")),
+                Some(Value::Timestamp(_))
+            ),
             "non-zero end_time should decode as Timestamp"
         );
     }
@@ -840,7 +846,11 @@ mod edge_case_tests {
         }]);
 
         let events: Vec<Event> = rs.into_event_iter().collect();
-        assert_eq!(events.len(), 3, "should decode all 3 spans from single scope");
+        assert_eq!(
+            events.len(),
+            3,
+            "should decode all 3 spans from single scope"
+        );
 
         let names: Vec<String> = events
             .iter()
@@ -958,11 +968,17 @@ mod edge_case_tests {
         let trace = events[0].as_trace();
 
         assert!(
-            matches!(trace.get(event_path!("start_time_unix_nano")), Some(Value::Timestamp(_))),
+            matches!(
+                trace.get(event_path!("start_time_unix_nano")),
+                Some(Value::Timestamp(_))
+            ),
             "start_time should decode even when > end_time"
         );
         assert!(
-            matches!(trace.get(event_path!("end_time_unix_nano")), Some(Value::Timestamp(_))),
+            matches!(
+                trace.get(event_path!("end_time_unix_nano")),
+                Some(Value::Timestamp(_))
+            ),
             "end_time should decode even when < start_time"
         );
     }

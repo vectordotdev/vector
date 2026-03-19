@@ -8,3 +8,5 @@ metrics: `scope.dropped_attributes_count`, both `schema_url` fields,
 and `resource.dropped_attributes_count` are now included as metric
 tags. This fixes round-trip data loss when events pass through Vector
 between OTLP endpoints.
+
+authors: szibis
