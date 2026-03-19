@@ -11203,7 +11203,6 @@ checksum = "212d5dcb2a1ce06d81107c3d0ffa3121fe974b73f068c8282cb1c32328113b6c"
 dependencies = [
  "futures-util",
  "log",
- "rustls 0.21.12",
  "tokio",
  "tungstenite",
 ]
@@ -12392,11 +12391,9 @@ dependencies = [
  "prost 0.12.6",
  "prost-build 0.12.6",
  "prost-types 0.12.6",
- "reqwest 0.11.26",
  "snafu 0.8.9",
  "tokio",
  "tokio-stream",
- "tokio-tungstenite",
  "tonic 0.11.0",
  "tonic-build 0.11.0",
  "url",

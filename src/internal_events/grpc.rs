@@ -1,3 +1,4 @@
+#[cfg(feature = "api")]
 use std::net::SocketAddr;
 use std::time::Duration;
 
@@ -9,11 +10,13 @@ use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
 
 const GRPC_STATUS_LABEL: &str = "grpc_status";
 
+#[cfg(feature = "api")]
 #[derive(Debug, NamedInternalEvent)]
 pub struct ApiStarted {
     pub addr: SocketAddr,
 }
 
+#[cfg(feature = "api")]
 impl InternalEvent for ApiStarted {
     fn emit(self) {
         info!(

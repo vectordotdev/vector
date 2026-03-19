@@ -7,10 +7,7 @@ use std::{
     num::{NonZeroU64, NonZeroUsize},
     path::PathBuf,
     process::ExitStatus,
-    sync::{
-        Arc,
-        atomic::{AtomicUsize, Ordering},
-    },
+    sync::atomic::{AtomicUsize, Ordering},
     time::Duration,
 };
 
@@ -23,15 +20,17 @@ use tokio::{
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
 #[cfg(feature = "api")]
+use std::sync::Arc;
+#[cfg(feature = "api")]
 use crate::api;
+#[cfg(feature = "api")]
+use crate::internal_events::ApiStarted;
 use crate::{
     cli::{LogFormat, Opts, RootOpts, WatchConfigMethod, handle_config_errors},
     config::{self, ComponentConfig, ComponentType, Config, ConfigPath},
     extra_context::ExtraContext,
     heartbeat,
-    internal_events::{
-        ApiStarted, VectorConfigLoadError, VectorQuit, VectorStarted, VectorStopped,
-    },
+    internal_events::{VectorConfigLoadError, VectorQuit, VectorStarted, VectorStopped},
     signal::{SignalHandler, SignalPair, SignalRx, SignalTo},
     topology::{
         ReloadOutcome, RunningTopology, SharedTopologyController, ShutdownErrorReceiver,
