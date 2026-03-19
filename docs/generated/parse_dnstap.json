@@ -41,6 +41,8 @@
         "extraInfo": "",
         "messageType": "ResolverQuery",
         "messageTypeId": 3,
+        "requestMessageSize": 54,
+        "responseMessageSize": 100,
         "queryZone": "com.",
         "requestData": {
           "fullRcode": 0,
