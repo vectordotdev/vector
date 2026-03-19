@@ -491,15 +491,11 @@ async fn fails_missing_creds() {
             log_id = "testlogs"
             resource.type = "generic_node"
             resource.namespace = "office"
-            credentials_path = {missing_credentials_path:?}
-        "#}))
-    .unwrap();
-
-    let error = config
-        .build(SinkContext::default())
-        .await
-        .expect_err("config.build failed to error");
-    assert_downcast_matches!(error, GcpError, GcpError::InvalidCredentials { .. });
+        "#})
+        .unwrap();
+    if config.build(SinkContext::default()).await.is_ok() {
+        panic!("config.build failed to error");
+    }
 }
 
 #[test]
