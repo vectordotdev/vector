@@ -131,7 +131,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: cargo vdev integration run ${{ matrix.service }}
+          command: cargo vdev integration run ${{ matrix.service }} ${{ runner.debug == '1' && '--show-logs' || '' }}
 
   e2e-tests:
     needs:
@@ -169,7 +169,7 @@ jobs:
         with:
           timeout_minutes: 35
           max_attempts: 3
-          command: cargo vdev e2e run ${{ matrix.service }}
+          command: cargo vdev e2e run ${{ matrix.service }} ${{ runner.debug == '1' && '--show-logs' || '' }}
 
   update-pr-status:
     name: Signal result to PR

@@ -28,7 +28,7 @@ pub struct Cli {
     #[arg(short = 'r', long, default_value = "2")]
     retries: u8,
 
-    /// Print docker compose logs on failure or when in debug mode
+    /// Print docker compose logs on success (logs are always printed on failure)
     #[arg(long)]
     show_logs: bool,
 }

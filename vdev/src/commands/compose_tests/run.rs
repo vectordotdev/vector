@@ -43,9 +43,7 @@ pub fn exec(
 
         if let Err(ref e) = start_result {
             error!("Failed to start environment: {e}");
-            if show_logs || is_ci_debug_mode() {
-                print_compose_logs(test_name);
-            }
+            print_compose_logs(local_config.directory, test_name, environment);
         }
 
         let test_result = if start_result.is_ok() {
@@ -54,9 +52,9 @@ pub fn exec(
 
             if let Err(ref e) = result {
                 error!("Tests failed: {e}");
-                if show_logs || is_ci_debug_mode() {
-                    print_compose_logs(test_name);
-                }
+                print_compose_logs(local_config.directory, test_name, environment);
+            } else if show_logs {
+                print_compose_logs(local_config.directory, test_name, environment);
             }
 
             upload_test_results();
@@ -79,19 +77,21 @@ pub fn exec(
     Ok(())
 }
 
-/// Check if we're running in GitHub Actions debug mode
-fn is_ci_debug_mode() -> bool {
-    std::env::var("ACTIONS_RUNNER_DEBUG")
-        .map(|v| v == "true")
-        .unwrap_or(false)
-}
-
-/// Print docker compose logs for debugging
-fn print_compose_logs(project_name: &str) {
+/// Print docker compose logs for the given test environment.
+///
+/// The project name must match the format used by `ComposeTest::project_name()`:
+/// `vector-<directory>-<test_name>-<environment>` (with dots replaced by hyphens).
+fn print_compose_logs(directory: &str, test_name: &str, environment: &str) {
+    let project_name = format!(
+        "vector-{}-{}-{}",
+        directory,
+        test_name,
+        environment.replace('.', "-")
+    );
     info!("Collecting compose logs for project '{project_name}'...");
 
     let status = Command::new(CONTAINER_TOOL.clone())
-        .args(["compose", "--project-name", project_name, "logs"])
+        .args(["compose", "--project-name", &project_name, "logs"])
         .status();
 
     if let Err(e) = status {
