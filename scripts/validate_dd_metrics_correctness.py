@@ -90,6 +90,7 @@ type = "datadog_metrics"
 inputs = ["statsd", "prom"]
 default_api_key = "{api_key}"
 site = "{site}"
+series_api_version = "{series_api_version}"
 
 [sinks.dd.batch]
 timeout_secs = 2
@@ -662,13 +663,10 @@ def run_test_for_version(
             api_key=args.api_key,
             site=args.site,
             metrics_port=args.metrics_port,
+            series_api_version=api_version,
         ))
 
-    # Set env for API version selection
     extra_env = {}
-    if api_version == "v2":
-        extra_env["VECTOR_TEMP_USE_DD_METRICS_SERIES_V2_API"] = "true"
-
     vector = VectorProcess(vector_bin, config_path, extra_env, args.verbose)
     vector.start()
     print(f"Vector started (pid={vector._proc.pid}), waiting 5s for startup...")
