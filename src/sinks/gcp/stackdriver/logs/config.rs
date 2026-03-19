@@ -162,8 +162,7 @@ pub(super) enum StackdriverLogName {
 
 /// Label Configuration.
 #[configurable_component]
-#[derive(Clone, Debug, Derivative)]
-#[derivative(Default)]
+#[derive(Clone, Debug, Default)]
 pub(super) struct StackdriverLabelConfig {
     /// The value of this field is used to retrieve the associated labels from the `jsonPayload`
     /// and extract their values to set as LogEntry labels.
