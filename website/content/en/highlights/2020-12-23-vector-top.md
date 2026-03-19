@@ -12,7 +12,7 @@ badges:
   domains: ["cli", "observability"]
 ---
 
-{{< warning >}} Since Vector version 0.55.0, Datadog migrated the API from GraphQL to gRPC. {{< /warning >}}
+{{< warning >}} The Vector observability API migrated from GraphQL to gRPC in version 0.55.0. {{< /warning >}}
 
 [`vector top`][top] is a command for the Vector [CLI] that displays both metrics emitted by your Vector instance as well
 as information about your Vector [topology] through a beautiful dashboard-style interface reminiscent of tools like

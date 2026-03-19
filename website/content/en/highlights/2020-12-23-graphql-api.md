@@ -11,7 +11,7 @@ badges:
   domains: ["api"]
 ---
 
-{{< warning >}} Since Vector version 0.55.0, Datadog migrated the API from GraphQL to gRPC. {{< /warning >}}
+{{< warning >}} The Vector observability API migrated from GraphQL to gRPC in version 0.55.0. {{< /warning >}}
 
 Vector now has a [GraphQL] API that you can use for a variety of purposes:
 
