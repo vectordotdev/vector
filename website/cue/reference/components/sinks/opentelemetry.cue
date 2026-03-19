@@ -50,14 +50,16 @@ components: sinks: opentelemetry: {
 				- `scope.name` — Maps the tag to `InstrumentationScope.name`
 				- `scope.version` — Maps the tag to `InstrumentationScope.version`
 				- `scope_dropped_attributes_count` — Maps the tag to `InstrumentationScope.dropped_attributes_count` (not an attribute)
-				- `scope_schema_url` — Maps the tag to to `ScopeMetrics.schema_url` (not an attribute)
+				- `scope_schema_url` — Maps the tag to `ScopeMetrics.schema_url` (not an attribute)
 				- `scope.*` (other) — Strips the prefix from the tag and adds the tag to `InstrumentationScope.attributes[]`
 
 				All other tags are added to the data point `attributes[]` array unchanged.
 
-				This means native metrics that use `resource.*` or `scope.*` tag names for non-OTLP purposes are routed to the OTLP resource and scope structures rather than remaining as flat data point attributes.
-				This is the expected behavior when round-tripping OTLP metrics through Vector, but may be surprising for metrics
-				from non-OTLP sources that coincidentally use these prefixes.
+				Native metrics from non-OTLP sources (e.g., `host_metrics`, `internal_metrics`) that happen to use
+				`resource.*` or `scope.*` tag names will have those tags placed into the OTLP `Resource.attributes[]` or
+				`InstrumentationScope.attributes[]` structures instead of the data point `attributes[]` array. This is
+				expected for OTLP round-trips but may cause unexpected attribute placement for non-OTLP metrics that
+				coincidentally use these prefixes. If this is not desired, rename the tags before sending to the OTLP sink.
 
 				**Known limitations:**
 
