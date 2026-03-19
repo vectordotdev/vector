@@ -254,6 +254,21 @@ cargo install dd-rust-license-tool --locked
 make build-licenses
 ```
 
+## Creating Pull Requests
+
+Before opening a PR, read [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md) and use it as the body structure. The template requires:
+
+- **Summary** - brief description of what the PR does
+- **Vector configuration** - config used to test/debug the changes
+- **How did you test this PR?** - testing approach and setup
+- **Change Type** - one of: Bug fix, New feature, Dependencies, Non-functional, Performance
+- **Is this a breaking change?**
+- **Does this PR include user facing changes?** - if yes, a changelog fragment is required
+- **References** - related issues or PRs
+
+The PR title must follow conventional commits: `<type>(<scope>): <description>`
+Valid types: `chore`, `enhancement`, `feat`, `fix`, `docs`, `revert`
+
 ## Reference Documentation
 
 These documents provide context that AI agents and developers need when working on Vector code.
