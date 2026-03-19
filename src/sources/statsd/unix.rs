@@ -3,12 +3,15 @@ use vector_lib::codecs::{
     decoding::{Deserializer, Framer},
 };
 
-use super::{StatsdDeserializer, UnixConfig};
+use super::{StatsdDeserializer, UnixConfig, UnixMode};
 use crate::{
     SourceSender,
     codecs::Decoder,
     shutdown::ShutdownSignal,
-    sources::{Source, util::build_unix_stream_source},
+    sources::{
+        Source,
+        util::{build_unix_datagram_source, build_unix_stream_source},
+    },
 };
 
 pub fn statsd_unix(
@@ -24,12 +27,23 @@ pub fn statsd_unix(
         ))),
     );
 
-    build_unix_stream_source(
-        config.path,
-        None,
-        decoder,
-        |_events, _host| {},
-        shutdown,
-        out,
-    )
+    match config.unix_mode {
+        UnixMode::Stream => build_unix_stream_source(
+            config.path,
+            config.socket_file_mode,
+            decoder,
+            |_events, _host| {},
+            shutdown,
+            out,
+        ),
+        UnixMode::Datagram => build_unix_datagram_source(
+            config.path,
+            config.socket_file_mode,
+            crate::serde::default_max_length(),
+            decoder,
+            |_events, _host| {},
+            shutdown,
+            out,
+        ),
+    }
 }
