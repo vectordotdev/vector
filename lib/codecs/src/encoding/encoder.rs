@@ -5,6 +5,8 @@ use vector_core::event::Event;
 
 #[cfg(feature = "arrow")]
 use crate::encoding::ArrowStreamSerializer;
+#[cfg(feature = "parquet")]
+use crate::encoding::ParquetSerializer;
 use crate::{
     encoding::{Error, Framer, Serializer},
     internal_events::{EncoderFramingError, EncoderSerializeError},
@@ -39,10 +41,12 @@ impl BatchEncoder {
     }
 
     /// Get the HTTP content type.
-    #[cfg(feature = "arrow")]
+    #[cfg(any(feature = "arrow", feature = "parquet"))]
     pub const fn content_type(&self) -> &'static str {
         match &self.serializer {
             BatchSerializer::Arrow(_) => "application/vnd.apache.arrow.stream",
+            #[cfg(feature = "parquet")]
+            BatchSerializer::Parquet(_) => "application/vnd.apache.parquet",
         }
     }
 }
