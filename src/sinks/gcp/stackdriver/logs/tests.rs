@@ -492,7 +492,7 @@ async fn fails_missing_creds() {
             resource.type = "generic_node"
             resource.namespace = "office"
         "#})
-        .unwrap();
+    .unwrap();
     if config.build(SinkContext::default()).await.is_ok() {
         panic!("config.build failed to error");
     }
