@@ -101,6 +101,7 @@ fn encode_valid() {
             ]),
         },
         Some(ConfigValuePath::try_from("anumber".to_owned()).unwrap()),
+        None,
     );
 
     let mut log = [
@@ -159,6 +160,7 @@ fn encode_inserts_timestamp() {
             )]),
         },
         Some(ConfigValuePath::try_from("anumber".to_owned()).unwrap()),
+        None,
     );
 
     let mut log = LogEvent::default();
@@ -187,6 +189,167 @@ fn encode_inserts_timestamp() {
             "timestamp":"2020-01-01T12:30:00Z"
         })
     );
+}
+
+#[test]
+fn encode_with_insert_id_key() {
+    let transformer = Transformer::default();
+
+    let encoder = StackdriverLogsEncoder::new(
+        transformer,
+        Template::try_from("testlogs").unwrap(),
+        StackdriverLogName::Project("project".to_owned()),
+        StackdriverLabelConfig {
+            labels_key: None,
+            labels: HashMap::new(),
+        },
+        StackdriverResource {
+            type_: "generic_node".to_owned(),
+            labels: HashMap::from([(
+                "namespace".to_owned(),
+                Template::try_from("office").unwrap(),
+            )]),
+        },
+        None,
+        Some(ConfigValuePath::try_from("insert_id".to_owned()).unwrap()),
+    );
+
+    let log = [
+        ("message", "hello world"),
+        ("insert_id", "topic.access.log-0-12345"),
+    ]
+    .iter()
+    .copied()
+    .collect::<LogEvent>();
+
+    let json = encoder.encode_event(Event::from(log)).unwrap();
+
+    assert_eq!(
+        json,
+        serde_json::json!({
+            "logName": "projects/project/logs/testlogs",
+            "jsonPayload": {"message": "hello world"},
+            "severity": 0,
+            "labels": {},
+            "resource": {
+                "type": "generic_node",
+                "labels": {"namespace": "office"}
+            },
+            "insertId": "topic.access.log-0-12345"
+        })
+    );
+
+    // Verify insert_id field was removed from jsonPayload
+    assert!(!json["jsonPayload"].as_object().unwrap().contains_key("insert_id"));
+}
+
+#[test]
+fn encode_without_insert_id_key() {
+    let transformer = Transformer::default();
+
+    let encoder = StackdriverLogsEncoder::new(
+        transformer,
+        Template::try_from("testlogs").unwrap(),
+        StackdriverLogName::Project("project".to_owned()),
+        StackdriverLabelConfig {
+            labels_key: None,
+            labels: HashMap::new(),
+        },
+        StackdriverResource {
+            type_: "generic_node".to_owned(),
+            labels: HashMap::from([(
+                "namespace".to_owned(),
+                Template::try_from("office").unwrap(),
+            )]),
+        },
+        None,
+        None,
+    );
+
+    let log = [
+        ("message", "hello world"),
+        ("insert_id", "should-remain-in-payload"),
+    ]
+    .iter()
+    .copied()
+    .collect::<LogEvent>();
+
+    let json = encoder.encode_event(Event::from(log)).unwrap();
+
+    // insertId should NOT be in the LogEntry json
+    assert!(!json.as_object().unwrap().contains_key("insertId"));
+
+    // insert_id should remain in jsonPayload since we didn't configure insert_id_key
+    assert_eq!(
+        json["jsonPayload"]["insert_id"],
+        serde_json::json!("should-remain-in-payload")
+    );
+}
+
+#[test]
+fn encode_insert_id_type_coercion() {
+    let transformer = Transformer::default();
+
+    let encoder = StackdriverLogsEncoder::new(
+        transformer,
+        Template::try_from("testlogs").unwrap(),
+        StackdriverLogName::Project("project".to_owned()),
+        StackdriverLabelConfig {
+            labels_key: None,
+            labels: HashMap::new(),
+        },
+        StackdriverResource {
+            type_: "generic_node".to_owned(),
+            labels: HashMap::from([(
+                "namespace".to_owned(),
+                Template::try_from("office").unwrap(),
+            )]),
+        },
+        None,
+        Some(ConfigValuePath::try_from("insert_id".to_owned()).unwrap()),
+    );
+
+    let mut log = LogEvent::default();
+    log.insert("message", Value::Bytes("hello".into()));
+    log.insert("insert_id", Value::Integer(12345));
+
+    let json = encoder.encode_event(Event::from(log)).unwrap();
+
+    assert_eq!(json["insertId"], serde_json::json!("12345"));
+}
+
+#[test]
+fn encode_insert_id_field_missing() {
+    let transformer = Transformer::default();
+
+    let encoder = StackdriverLogsEncoder::new(
+        transformer,
+        Template::try_from("testlogs").unwrap(),
+        StackdriverLogName::Project("project".to_owned()),
+        StackdriverLabelConfig {
+            labels_key: None,
+            labels: HashMap::new(),
+        },
+        StackdriverResource {
+            type_: "generic_node".to_owned(),
+            labels: HashMap::from([(
+                "namespace".to_owned(),
+                Template::try_from("office").unwrap(),
+            )]),
+        },
+        None,
+        Some(ConfigValuePath::try_from("insert_id".to_owned()).unwrap()),
+    );
+
+    let log = [("message", "hello world")]
+        .iter()
+        .copied()
+        .collect::<LogEvent>();
+
+    let json = encoder.encode_event(Event::from(log)).unwrap();
+
+    // insertId should NOT be in LogEntry if key was supplied but field was missing
+    assert!(!json.as_object().unwrap().contains_key("insertId"));
 }
 
 #[test]
@@ -238,6 +401,7 @@ async fn correct_request() {
                 Template::try_from("office").unwrap(),
             )]),
         },
+        None,
         None,
     );
 
@@ -322,11 +486,15 @@ async fn fails_missing_creds() {
             log_id = "testlogs"
             resource.type = "generic_node"
             resource.namespace = "office"
-        "#})
+            credentials_path = {missing_credentials_path:?}
+        "#}))
     .unwrap();
-    if config.build(SinkContext::default()).await.is_ok() {
-        panic!("config.build failed to error");
-    }
+
+    let error = config
+        .build(SinkContext::default())
+        .await
+        .expect_err("config.build failed to error");
+    assert_downcast_matches!(error, GcpError, GcpError::InvalidCredentials { .. });
 }
 
 #[test]
