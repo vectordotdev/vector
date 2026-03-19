@@ -256,7 +256,7 @@ make build-licenses
 
 ## Creating Pull Requests
 
-Before opening a PR, read [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md) and use it as the body structure.
+Before opening a PR, read [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md) and use it as the reference for the PR body structure and title.
 
 ## Reference Documentation
 
