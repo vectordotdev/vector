@@ -321,7 +321,9 @@ fn validate_protobuf_set_gauge_rate(request: &(Parts, Bytes)) {
             ddmetric_proto::metric_payload::MetricType::Gauge
         );
         assert_eq!(gauge.points[0].value, 5678.0);
-        assert_eq!(gauge.interval, 10);
+        // interval_ms is dropped during normalization (incremental → absolute conversion
+        // via into_absolute() sets interval_ms: None), so interval is always 0 for gauges.
+        assert_eq!(gauge.interval, 0);
     }
 
     // validate counter w interval = rate

@@ -115,9 +115,8 @@ pub struct HttpSinkConfig {
 ///
 /// [rfc9110]: https://datatracker.ietf.org/doc/html/rfc9110#section-9.1
 #[configurable_component]
-#[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
-#[derivative(Default)]
 pub enum HttpMethod {
     /// GET.
     Get,
@@ -126,7 +125,7 @@ pub enum HttpMethod {
     Head,
 
     /// POST.
-    #[derivative(Default)]
+    #[default]
     Post,
 
     /// PUT.
