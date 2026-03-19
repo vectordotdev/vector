@@ -16,13 +16,9 @@ prost-types.workspace = true
 futures.workspace = true
 tokio = { workspace = true, features = ["macros", "rt", "sync"] }
 tokio-stream = { workspace = true, features = ["sync"] }
-tokio-tungstenite = { workspace = true, features = ["connect", "rustls"] }
 
 # Error handling
 snafu.workspace = true
-
-# HTTP / WebSockets
-reqwest = { version = "0.11.26", default-features = false, features = ["json"] }
 
 # Utils
 url.workspace = true
