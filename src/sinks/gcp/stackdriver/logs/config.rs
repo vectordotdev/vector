@@ -90,6 +90,21 @@ pub(super) struct StackdriverConfig {
     #[configurable(metadata(docs::examples = "severity"))]
     pub(super) severity_key: Option<ConfigValuePath>,
 
+    /// The field of the log event from which to take the outgoing log's `insertId` field.
+    ///
+    /// The named field is removed from the log event if present, and its value is used as the
+    /// unique identifier for the log entry. The insertId is used by GCP to de-duplicate log
+    /// entries and to order entries with the same logName and timestamp.
+    ///
+    /// If no insertId key is specified, the insertId field is omitted from the LogEntry and the
+    /// GCP Logging API assigns its own unique identifier in this field.
+    ///
+    /// See the [GCP LogEntry insertId documentation][insertid_docs] for more details.
+    ///
+    /// [insertid_docs]: https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry#FIELDS.insert_id
+    #[configurable(metadata(docs::examples = "insert_id"))]
+    pub(super) insert_id_key: Option<ConfigValuePath>,
+
     #[serde(flatten)]
     pub(super) auth: GcpAuthConfig,
 
@@ -250,6 +265,57 @@ impl_generate_config_from_default!(StackdriverConfig);
 impl SinkConfig for StackdriverConfig {
     fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
         Some(&self.confinement)
+    }
+
+    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        let auth = self.auth.build(Scope::LoggingWrite).await?;
+
+        let request_builder = StackdriverLogsRequestBuilder {
+            encoder: StackdriverLogsEncoder::new(
+                self.encoding.clone(),
+                self.log_id.clone(),
+                self.log_name.clone(),
+                self.label_config.clone(),
+                self.resource.clone(),
+                self.severity_key.clone(),
+                self.insert_id_key.clone(),
+            ),
+        };
+
+        let batch_settings = self
+            .batch
+            .validate()?
+            .limit_max_bytes(MAX_BATCH_PAYLOAD_SIZE)?
+            .into_batcher_settings()?;
+
+        let request_limits = self.request.into_settings();
+
+        let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
+        let client = HttpClient::new(tls_settings, cx.proxy())?;
+
+        let uri: Uri = self.endpoint.parse()?;
+
+        let stackdriver_logs_service_request_builder = StackdriverLogsServiceRequestBuilder {
+            uri: uri.clone(),
+            auth: auth.clone(),
+        };
+
+        let service = HttpService::new(client.clone(), stackdriver_logs_service_request_builder);
+
+        let service = ServiceBuilder::new()
+            .settings(
+                request_limits,
+                http_response_retry_logic(self.retry_strategy.clone()),
+            )
+            .service(service);
+
+        let sink = StackdriverLogsSink::new(service, batch_settings, request_builder);
+
+        let healthcheck = healthcheck(client, auth.clone(), uri).boxed();
+
+        auth.spawn_regenerate_token();
+
+        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 
     fn input(&self) -> Input {
