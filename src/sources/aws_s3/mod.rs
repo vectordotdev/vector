@@ -261,11 +261,20 @@ impl AwsS3Config {
 
         match self.sqs {
             Some(ref sqs) => {
+                // Use SQS-specific region/endpoint if provided, otherwise fall back to S3's
+                let (sqs_region, sqs_endpoint) = match &sqs.region {
+                    Some(sqs_region_or_endpoint) => (
+                        sqs_region_or_endpoint.region(),
+                        sqs_region_or_endpoint.endpoint(),
+                    ),
+                    None => (region.clone(), endpoint),
+                };
+
                 let (sqs_client, region) = create_client_and_region::<SqsClientBuilder>(
                     &SqsClientBuilder {},
                     &self.auth,
-                    region.clone(),
-                    endpoint,
+                    sqs_region,
+                    sqs_endpoint,
                     proxy,
                     sqs.tls_options.as_ref(),
                     sqs.timeout.as_ref(),

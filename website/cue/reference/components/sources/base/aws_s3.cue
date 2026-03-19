@@ -935,6 +935,30 @@ base: components: sources: aws_s3: configuration: {
 					unit:    "seconds"
 				}
 			}
+			region: {
+				description: """
+					Optional AWS region and/or endpoint override for SQS.
+
+					If not set, the S3 region/endpoint configuration is used.
+					"""
+				required: false
+				type: object: options: {
+					endpoint: {
+						description: "Custom endpoint for use with AWS-compatible services."
+						required:    false
+						type: string: examples: ["http://127.0.0.0:5000/path/to/service"]
+					}
+					region: {
+						description: """
+																The [AWS region][aws_region] of the target service.
+
+																[aws_region]: https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints
+																"""
+						required: false
+						type: string: examples: ["us-east-1"]
+					}
+				}
+			}
 		}
 	}
 	tls_options: {

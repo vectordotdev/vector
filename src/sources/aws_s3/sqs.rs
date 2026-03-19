@@ -35,7 +35,7 @@ use crate::internal_events::{
     SqsMessageSendBatchError, SqsMessageSentPartialError, SqsMessageSentSucceeded,
 };
 use crate::{
-    aws::AwsTimeout,
+    aws::{AwsTimeout, RegionOrEndpoint},
     config::{SourceAcknowledgementsConfig, SourceContext},
     event::{BatchNotifier, BatchStatus, EstimatedJsonEncodedSizeOf},
     internal_events::{
@@ -176,6 +176,13 @@ pub(super) struct Config {
     /// Configuration for deferring events to another queue based on their age.
     #[configurable(derived)]
     pub(super) deferred: Option<DeferredConfig>,
+
+    /// Optional AWS region and/or endpoint override for SQS.
+    ///
+    /// If not set, the S3 region/endpoint configuration is used.
+    #[configurable(derived)]
+    #[serde(default)]
+    pub(super) region: Option<RegionOrEndpoint>,
 }
 
 const fn default_poll_secs() -> u32 {
@@ -1264,4 +1271,90 @@ fn parse_sqs_config() {
         "#,
     );
     assert!(test.is_err());
+}
+
+#[test]
+fn parse_sqs_config_region_defaults_to_none() {
+    let config: Config = toml::from_str(
+        r#"
+            queue_url = "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
+        "#,
+    )
+    .unwrap();
+    assert!(config.region.is_none());
+}
+
+#[test]
+fn parse_sqs_config_with_region_only() {
+    let config: Config = toml::from_str(
+        r#"
+            queue_url = "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
+            [region]
+            region = "us-west-2"
+        "#,
+    )
+    .unwrap();
+    let region_or_endpoint = config.region.unwrap();
+    assert_eq!(region_or_endpoint.region, Some("us-west-2".to_string()));
+    assert!(region_or_endpoint.endpoint.is_none());
+}
+
+#[test]
+fn parse_sqs_config_with_endpoint_only() {
+    let config: Config = toml::from_str(
+        r#"
+            queue_url = "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
+            [region]
+            endpoint = "http://localhost:4566"
+        "#,
+    )
+    .unwrap();
+    let region_or_endpoint = config.region.unwrap();
+    assert!(region_or_endpoint.region.is_none());
+    assert_eq!(
+        region_or_endpoint.endpoint,
+        Some("http://localhost:4566".to_string())
+    );
+}
+
+#[test]
+fn parse_sqs_config_with_region_and_endpoint() {
+    let config: Config = toml::from_str(
+        r#"
+            queue_url = "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
+            [region]
+            region = "us-west-2"
+            endpoint = "http://sqs.custom.endpoint:4566"
+        "#,
+    )
+    .unwrap();
+    let region_or_endpoint = config.region.unwrap();
+    assert_eq!(region_or_endpoint.region, Some("us-west-2".to_string()));
+    assert_eq!(
+        region_or_endpoint.endpoint,
+        Some("http://sqs.custom.endpoint:4566".to_string())
+    );
+}
+
+#[test]
+fn parse_sqs_config_with_region_and_deferred() {
+    let config: Config = toml::from_str(
+        r#"
+            queue_url = "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
+            [region]
+            region = "us-west-2"
+            [deferred]
+            queue_url = "https://sqs.us-west-2.amazonaws.com/123456789012/MyDeferredQueue"
+            max_age_secs = 3600
+        "#,
+    )
+    .unwrap();
+    let region_or_endpoint = config.region.unwrap();
+    assert_eq!(region_or_endpoint.region, Some("us-west-2".to_string()));
+    let deferred = config.deferred.unwrap();
+    assert_eq!(
+        deferred.queue_url,
+        "https://sqs.us-west-2.amazonaws.com/123456789012/MyDeferredQueue"
+    );
+    assert_eq!(deferred.max_age_secs, 3600);
 }
