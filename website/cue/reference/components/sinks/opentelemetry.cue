@@ -61,7 +61,7 @@ components: sinks: opentelemetry: {
 
 				**Known limitations:**
 
-				- Metric attribute types are preserved during OTLP→Vector→OTLP roundtrip via a typed metadata sidecar.
+				- Metric attribute types are preserved during a OTLP→Vector→OTLP round-trip with a typed metadata sidecar.
 				  All OTLP value kinds (`StringValue`, `BytesValue`, `IntValue`, `BoolValue`, `DoubleValue`, `ArrayValue`,
 				  `KvlistValue`) are stored with the kind's wrapper and reconstructed on encode. If a VRL transform changes the
 				  metric tags, the sidecar is invalidated and all attributes fall back to `StringValue`.
