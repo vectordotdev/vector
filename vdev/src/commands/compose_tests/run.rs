@@ -3,7 +3,9 @@ use std::process::Command;
 
 use crate::{
     app::CommandExt as _,
-    testing::{config::ComposeTestConfig, docker::CONTAINER_TOOL, integration::ComposeTestLocalConfig},
+    testing::{
+        config::ComposeTestConfig, docker::CONTAINER_TOOL, integration::ComposeTestLocalConfig,
+    },
 };
 
 /// Run a complete test workflow orchestrating start, test, and stop phases
