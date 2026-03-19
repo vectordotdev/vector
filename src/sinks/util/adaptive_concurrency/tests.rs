@@ -50,11 +50,10 @@ use crate::{
 
 /// Request handling action when the request limit has been exceeded.
 #[configurable_component]
-#[derive(Clone, Copy, Debug, Derivative)]
-#[derivative(Default)]
+#[derive(Clone, Copy, Debug, Default)]
 #[serde(rename_all = "lowercase")]
 enum Action {
-    #[derivative(Default)]
+    #[default]
     /// Additional requests will return with an error.
     Defer,
 

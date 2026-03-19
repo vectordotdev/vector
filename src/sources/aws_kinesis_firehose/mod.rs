@@ -113,9 +113,8 @@ const fn access_keys_example() -> [&'static str; 2] {
 /// Compression scheme for records in a Firehose message.
 #[configurable_component]
 #[configurable(metadata(docs::advanced))]
-#[derive(Clone, Copy, Debug, Derivative, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
-#[derivative(Default)]
 pub enum Compression {
     /// Automatically attempt to determine the compression scheme.
     ///
@@ -127,7 +126,7 @@ pub enum Compression {
     /// set `gzip` in this field so that any records that are not-gzipped are rejected.
     ///
     /// [magic_bytes]: https://en.wikipedia.org/wiki/List_of_file_signatures
-    #[derivative(Default)]
+    #[default]
     Auto,
 
     /// Uncompressed.
