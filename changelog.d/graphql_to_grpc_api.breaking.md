@@ -5,7 +5,7 @@ gRPC API internally. The gRPC service definition is available in
 `proto/vector/observability.proto`.
 
 - Remove the `api.graphql` and `api.playground` fields from your config. Vector
-  will now reject configs that contain them.
+  now rejects configs that contain them.
 
 - If you use `vector top` or `vector tap` with an explicit `--url`, remove the
   `/graphql` path suffix:
