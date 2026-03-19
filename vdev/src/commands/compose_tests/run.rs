@@ -21,7 +21,7 @@ pub fn exec(
     test_name: &str,
     environments: &[String],
     retries: u8,
-    show_logs: bool,
+    always_show_logs: bool,
 ) -> Result<()> {
     let resolved_envs: Vec<String> = if environments.is_empty() {
         let (_test_dir, config) = ComposeTestConfig::load(local_config.directory, test_name)?;
@@ -53,7 +53,7 @@ pub fn exec(
             if let Err(ref e) = result {
                 error!("Tests failed: {e}");
                 print_compose_logs(local_config.directory, test_name, environment);
-            } else if show_logs {
+            } else if always_show_logs {
                 print_compose_logs(local_config.directory, test_name, environment);
             }
 

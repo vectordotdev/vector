@@ -28,9 +28,9 @@ pub struct Cli {
     #[arg(short = 'r', long, default_value = "2")]
     retries: u8,
 
-    /// Print docker compose logs on success (logs are always printed on failure)
+    /// Always print docker compose logs, even on success (logs are always printed on failure regardless)
     #[arg(long)]
-    show_logs: bool,
+    always_show_logs: bool,
 }
 
 impl Cli {
@@ -40,7 +40,7 @@ impl Cli {
             &self.test_name,
             &self.environments,
             self.retries,
-            self.show_logs,
+            self.always_show_logs,
         )
     }
 }
