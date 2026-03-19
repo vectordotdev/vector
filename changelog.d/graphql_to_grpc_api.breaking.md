@@ -4,6 +4,9 @@ commands continue to work as before, as they have been updated to use the new
 gRPC API internally. The gRPC service definition is available in
 `proto/vector/observability.proto`.
 
+Note: `vector top` and `vector tap` from version 0.55.0 or later are not
+compatible with Vector instances running earlier versions.
+
 - Remove the `api.graphql` and `api.playground` fields from your config. Vector
   now rejects configs that contain them.
 
