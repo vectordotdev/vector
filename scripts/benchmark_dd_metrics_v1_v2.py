@@ -188,7 +188,7 @@ def require_file(path: str, name: str) -> None:
         raise FileNotFoundError(f"{name} not found at {path}")
 
 
-def write_vector_config(path: Path, args: argparse.Namespace, max_bytes: Optional[int]) -> None:
+def write_vector_config(path: Path, args: argparse.Namespace, max_bytes: Optional[int], mode: str = "v2") -> None:
     max_bytes_line = f"\n              max_bytes: {max_bytes}" if max_bytes else ""
     config = textwrap.dedent(
         f"""
@@ -212,6 +212,7 @@ def write_vector_config(path: Path, args: argparse.Namespace, max_bytes: Optiona
             inputs: ["statsd_in"]
             default_api_key: "${{DD_API_KEY}}"
             site: "${{DD_SITE}}"
+            series_api_version: "{mode}"
             batch:
               timeout_secs: {DEFAULT_BATCH_TIMEOUT_SECONDS}{max_bytes_line}
         """
@@ -431,11 +432,6 @@ def run_single_benchmark(
     env["DD_SITE"] = dd_site
     env["VECTOR_LOG"] = args.vector_log
 
-    if mode == "v2":
-        env["VECTOR_TEMP_USE_DD_METRICS_SERIES_V2_API"] = "1"
-    else:
-        env.pop("VECTOR_TEMP_USE_DD_METRICS_SERIES_V2_API", None)
-
     vector_cmd = [args.vector_bin, "--config", str(config_path)]
     vector_log_fp = None
     try:
@@ -587,8 +583,8 @@ def main() -> int:
             "v1": tmpdir_path / "vector-bench-v1.yaml",
             "v2": tmpdir_path / "vector-bench-v2.yaml",
         }
-        write_vector_config(config_paths["v1"], args, args.batch_max_bytes_v1)
-        write_vector_config(config_paths["v2"], args, args.batch_max_bytes_v2)
+        write_vector_config(config_paths["v1"], args, args.batch_max_bytes_v1, mode="v1")
+        write_vector_config(config_paths["v2"], args, args.batch_max_bytes_v2, mode="v2")
 
         for repeat in range(1, args.repeats + 1):
             for mode in DEFAULT_RUN_ORDER:
