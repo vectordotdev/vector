@@ -240,7 +240,12 @@ fn encode_with_insert_id_key() {
     );
 
     // Verify insert_id field was removed from jsonPayload
-    assert!(!json["jsonPayload"].as_object().unwrap().contains_key("insert_id"));
+    assert!(
+        !json["jsonPayload"]
+            .as_object()
+            .unwrap()
+            .contains_key("insert_id")
+    );
 }
 
 #[test]
