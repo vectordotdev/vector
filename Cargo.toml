@@ -157,7 +157,8 @@ chrono-tz = { version = "0.10.4", default-features = false, features = ["serde"]
 clap = { version = "4.5.60", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
 clap_complete = "4.5.66"
 colored = { version = "3.1.1", default-features = false }
-const-str = { version = "1.0.0", default-features = false }
+const-str = { version = "1.1.0", default-features = false }
+criterion = "0.8"
 crossbeam-utils = { version = "0.8.21", default-features = false }
 darling = { version = "0.20.11", default-features = false, features = ["suggestions"] }
 dashmap = { version = "6.1.0", default-features = false }
@@ -187,9 +188,10 @@ prost = { version = "0.12", default-features = false, features = ["std"] }
 prost-build = { version = "0.12", default-features = false }
 prost-reflect = { version = "0.14", features = ["serde"], default-features = false }
 prost-types = { version = "0.12", default-features = false }
+quickcheck = { version = "1.1.0" }
 rand = { version = "0.9.2", default-features = false, features = ["small_rng", "thread_rng"] }
 rand_distr = { version = "0.5.1", default-features = false }
-regex = { version = "1.11.2", default-features = false, features = ["std", "perf"] }
+regex = { version = "1.12.3", default-features = false, features = ["std", "perf"] }
 reqwest = { version = "0.11", features = ["json"] }
 rust_decimal = { version = "1.37.0", default-features = false, features = ["std"] }
 semver = { version = "1.0.27", default-features = false, features = ["serde", "std"] }
@@ -221,6 +223,7 @@ vector-vrl-functions = { path = "lib/vector-vrl/functions", default-features = f
 vrl = { git = "https://github.com/vectordotdev/vrl.git", branch = "main", default-features = false, features = ["arbitrary", "cli", "test", "test_framework", "stdlib-base"] }
 mock_instant = { version = "0.6" }
 serial_test = { version = "3.2" }
+strum = { version = "0.28", features = ["derive"] }
 
 [dependencies]
 cfg-if.workspace = true
@@ -407,7 +410,7 @@ lru = { version = "0.16.3", default-features = false }
 maxminddb = { version = "0.27.0", default-features = false, optional = true, features = ["simdutf8"] }
 md-5 = { version = "0.10", default-features = false, optional = true }
 mongodb = { version = "3.3.0", default-features = false, optional = true, features = ["compat-3-0-0", "dns-resolver", "rustls-tls"] }
-async-nats = { version = "0.42.0", default-features = false, optional = true, features = ["ring"] }
+async-nats = { version = "0.42.0", default-features = false, optional = true, features = ["ring", "websockets"] }
 nkeys = { version = "0.4.5", default-features = false, optional = true }
 nom = { workspace = true, optional = true }
 notify = { version = "8.1.0", default-features = false, features = ["macos_fsevent"] }
@@ -416,11 +419,11 @@ openssl-probe = { version = "0.1.6", default-features = false }
 ordered-float.workspace = true
 percent-encoding = { version = "2.3.1", default-features = false }
 postgres-openssl = { version = "0.5.1", default-features = false, features = ["runtime"], optional = true }
-pulsar = { version = "6.3.1", default-features = false, features = ["tokio-runtime", "auth-oauth2", "flate2", "lz4", "snap", "zstd"], optional = true }
+pulsar = { version = "6.7.0", default-features = false, features = ["tokio-runtime", "auth-oauth2", "flate2", "lz4", "snap", "zstd"], optional = true }
 quick-junit = { version = "0.5.1" }
 rand.workspace = true
 rand_distr.workspace = true
-rdkafka = { version = "0.38.0", default-features = false, features = ["curl-static", "tokio", "libz", "ssl", "zstd"], optional = true }
+rdkafka = { version = "0.39.0", default-features = false, features = ["curl-static", "tokio", "libz", "ssl", "zstd"], optional = true }
 redis = { version = "0.32.4", default-features = false, features = ["connection-manager", "sentinel", "tokio-comp", "tokio-native-tls-comp"], optional = true }
 regex.workspace = true
 roaring = { version = "0.11.2", default-features = false, features = ["std"], optional = true }
@@ -450,7 +453,7 @@ arr_macro = { version = "0.2.1" }
 
 # depending on fork for bumped nix dependency
 # https://github.com/heim-rs/heim/pull/360
-heim = { git = "https://github.com/vectordotdev/heim.git", branch = "update-nix", default-features = false, features = ["disk"] }
+heim = { git = "https://github.com/vectordotdev/heim.git", branch = "update-deps", default-features = false, features = ["disk"] }
 
 # make sure to update the external docs when the Lua version changes
 mlua = { version = "0.10.5", default-features = false, features = ["lua54", "send", "vendored", "macros"], optional = true }
@@ -479,12 +482,12 @@ approx = "0.5.1"
 assert_cmd = { version = "2.0.17", default-features = false }
 aws-smithy-runtime = { version = "1.8.3", default-features = false, features = ["tls-rustls"] }
 base64 = "0.22.1"
-criterion = { version = "0.7.0", features = ["html_reports", "async_tokio"] }
+criterion = { workspace = true, features = ["html_reports", "async_tokio"] }
 itertools.workspace = true
 libc.workspace = true
 mock_instant.workspace = true
 proptest.workspace = true
-quickcheck = "1.0.3"
+quickcheck.workspace = true
 reqwest.workspace = true
 rstest = { version = "0.26.1" }
 serial_test.workspace = true
@@ -507,11 +510,14 @@ ntapi = { git = "https://github.com/MSxDOS/ntapi.git", rev = "24fc1e47677fc9f6e3
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
-default = ["enable-unix", "rdkafka?/gssapi-vendored"]
-# Default features for `cargo docs`. The same as `default` but without `rdkafka?/gssapi-vendored` which would require installing libsasl in our doc build environment.
+default = ["enable-unix", "rdkafka?/gssapi"]
+# Default features for `cargo docs`. We're not using `gssapi` which would require installing libsasl2 in our doc environment.
 docs = ["enable-unix"]
 # Default features for *-unknown-linux-* which make use of `cmake` for dependencies
-default-cmake = ["enable-unix", "rdkafka?/gssapi-vendored", "rdkafka?/cmake_build"]
+default-cmake = ["enable-unix", "vendored", "rdkafka?/cmake_build"]
+
+vendored = ["rdkafka?/gssapi-vendored"]
+
 # Default features for *-pc-windows-msvc
 # TODO: Enable SASL https://github.com/vectordotdev/vector/pull/3081#issuecomment-659298042
 base = ["api", "enrichment-tables", "sinks", "sources", "transforms", "secrets", "vrl/stdlib"]
@@ -519,8 +525,8 @@ enable-api-client = ["base", "api-client"]
 enable-unix = ["enable-api-client", "sources-dnstap", "unix"]
 
 default-msvc = ["enable-api-client", "rdkafka?/cmake_build"]
-default-musl = ["enable-unix", "rdkafka?/gssapi-vendored", "rdkafka?/cmake_build"]
-default-no-api-client = ["base", "sources-dnstap", "unix", "rdkafka?/gssapi-vendored"]
+default-musl = ["enable-unix", "vendored", "rdkafka?/cmake_build"]
+default-no-api-client = ["base", "sources-dnstap", "unix", "vendored"]
 
 tokio-console = ["dep:console-subscriber", "tokio/tracing"]
 
@@ -546,7 +552,7 @@ target-armv7-unknown-linux-gnueabihf =  ["target-unix"]
 target-armv7-unknown-linux-musleabihf = ["target-base"]
 target-arm-unknown-linux-gnueabi =      ["target-unix"]
 target-arm-unknown-linux-musleabi =     ["target-base"]
-target-x86_64-unknown-linux-gnu =       ["target-unix", "rdkafka?/gssapi-vendored"]
+target-x86_64-unknown-linux-gnu =       ["target-unix", "vendored"]
 target-x86_64-unknown-linux-musl =      ["target-unix"]
 
 # Enables features that work only on systems providing `cfg(unix)`
