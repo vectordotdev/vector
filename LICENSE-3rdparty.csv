@@ -508,7 +508,6 @@ notify,https://github.com/notify-rs/notify,CC0-1.0,"Félix Saparelli <me@passcod
 notify-types,https://github.com/notify-rs/notify,MIT OR Apache-2.0,Daniel Faust <hessijames@gmail.com>
 ntapi,https://github.com/MSxDOS/ntapi,Apache-2.0 OR MIT,MSxDOS <melcodos@gmail.com>
 nu-ansi-term,https://github.com/nushell/nu-ansi-term,MIT,"ogham@bsago.me, Ryan Scheel (Havvy) <ryan.havvy@gmail.com>, Josh Triplett <josh@joshtriplett.org>, The Nushell Project Developers"
-nuid,https://github.com/casualjim/rs-nuid,Apache-2.0,Ivan Porto Carrero <ivan@oflanders.co.nz>
 num,https://github.com/rust-num/num,MIT OR Apache-2.0,The Rust Project Developers
 num-bigint,https://github.com/rust-num/num-bigint,MIT OR Apache-2.0,The Rust Project Developers
 num-bigint-dig,https://github.com/dignifiedquire/num-bigint,MIT OR Apache-2.0,"dignifiedquire <dignifiedquire@gmail.com>, The Rust Project Developers"
