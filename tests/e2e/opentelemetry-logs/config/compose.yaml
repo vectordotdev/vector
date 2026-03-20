@@ -60,6 +60,7 @@ services:
         target: /output
     ports:
       - "${OTEL_COLLECTOR_SINK_HTTP_PORT:-5318}:5318"
+      - "${OTEL_COLLECTOR_SINK_GRPC_PORT:-14317}:4317"
 
   vector:
     container_name: vector-otel-logs-e2e

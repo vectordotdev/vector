@@ -7,6 +7,7 @@ runner:
   env:
     OTEL_HEALTH_URL: http://opentelemetry-collector:13133
     OTEL_OTLPHTTP_URL: http://opentelemetry-collector:9876
+    OTEL_GRPC_SINK_ADDRESS: opentelemetry-collector:4317
 
 matrix:
   version: [0.56.0]
@@ -15,5 +16,6 @@ matrix:
 # expressions are evaluated using https://github.com/micromatch/picomatch
 paths:
 - "src/sources/opentelemetry/**"
+- "src/sinks/opentelemetry/**"
 - "src/sources/util/**"
 - "tests/integration/opentelemetry/**"

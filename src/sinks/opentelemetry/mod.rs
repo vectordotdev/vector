@@ -1,5 +1,8 @@
 mod grpc;
 
+#[cfg(all(test, feature = "opentelemetry-integration-tests"))]
+mod integration_tests;
+
 use indoc::indoc;
 use vector_config::component::GenerateConfig;
 use vector_lib::{

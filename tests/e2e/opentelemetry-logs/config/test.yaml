@@ -11,11 +11,12 @@ runner:
     OTEL_COLLECTOR_SOURCE_GRPC_PORT: '4317'
     OTEL_COLLECTOR_SOURCE_HTTP_PORT: '4318'
     OTEL_COLLECTOR_SINK_HTTP_PORT: '5318'
+    OTEL_COLLECTOR_SINK_GRPC_PORT: '14317'
 
 matrix:
   # Determines which `otel/opentelemetry-collector-contrib` version to use
   collector_version: [ 'latest' ]
-  vector_config: [ 'vector_default.yaml', 'vector_otlp.yaml' ]
+  vector_config: [ 'vector_default.yaml', 'vector_otlp.yaml', 'vector_grpc.yaml' ]
 
 # Only trigger this integration test if relevant OTEL source/sink files change
 paths:
