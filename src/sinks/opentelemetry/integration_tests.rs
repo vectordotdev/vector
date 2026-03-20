@@ -64,7 +64,7 @@ async fn delivers_logs_via_grpc() {
 
     let config: GrpcSinkConfig = toml::from_str(&format!(
         r#"
-            endpoint = "http://{address}"
+            uri = "http://{address}"
         "#
     ))
     .unwrap();
