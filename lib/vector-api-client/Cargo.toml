@@ -21,7 +21,7 @@ tokio-stream = { workspace = true, features = ["sync"] }
 snafu.workspace = true
 
 # Utils
-url.workspace = true
+http = { version = "0.2", default-features = false }
 
 [build-dependencies]
 tonic-build.workspace = true

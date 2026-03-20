@@ -113,7 +113,7 @@ impl TestHarness {
             .map_err(|e| format!("Failed to spawn vector: {e}"))?;
 
         let url = format!("http://127.0.0.1:{api_port}");
-        let mut api_client = Client::new(&url);
+        let mut api_client = Client::new(url.parse().expect("valid URL"));
 
         // Wait for Vector startup with crash detection
         // This will repeatedly try to connect until Vector is ready

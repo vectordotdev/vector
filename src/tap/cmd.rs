@@ -11,7 +11,15 @@ use crate::signal::{SignalRx, SignalTo};
 /// Vector API server via HTTP/WebSockets.
 pub(crate) async fn cmd(opts: &super::Opts, signal_rx: SignalRx) -> exitcode::ExitCode {
     let url = opts.url();
-    let mut client = Client::new(url.as_str());
+    #[allow(clippy::print_stderr)]
+    let Ok(uri) = url.as_str().parse() else {
+        eprintln!(
+            "Invalid API URL: {}",
+            url
+        );
+        return exitcode::UNAVAILABLE;
+    };
+    let mut client = Client::new(uri);
 
     #[allow(clippy::print_stderr)]
     if client.connect().await.is_err() || client.health().await.is_err() {

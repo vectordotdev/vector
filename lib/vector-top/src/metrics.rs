@@ -461,7 +461,10 @@ pub async fn subscribe(
 ) -> Result<SubscribeHandles, vector_api_client::Error> {
     let components_patterns = Arc::new(components_patterns);
 
-    let mut client = Client::new(url.as_str());
+    let mut client = Client::new(
+        url.parse()
+            .map_err(|e| vector_api_client::Error::InvalidUrl { message: format!("{e}") })?,
+    );
     client.connect().await?;
 
     let poll_handle = tokio::spawn(poll_components(
@@ -551,7 +554,10 @@ pub async fn init_components(
     url: &str,
     components_patterns: &[Pattern],
 ) -> Result<state::State, vector_api_client::Error> {
-    let mut client = Client::new(url);
+    let mut client = Client::new(
+        url.parse()
+            .map_err(|e| vector_api_client::Error::InvalidUrl { message: format!("{e}") })?,
+    );
     client.connect().await?;
 
     // Get all components

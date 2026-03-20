@@ -28,7 +28,15 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
     let url = opts.url();
 
     // Create a new API client for connecting to the local/remote Vector instance.
-    let mut client = Client::new(url.as_str());
+    #[allow(clippy::print_stderr)]
+    let Ok(uri) = url.as_str().parse() else {
+        eprintln!(
+            "Invalid API URL: {}",
+            url
+        );
+        return exitcode::UNAVAILABLE;
+    };
+    let mut client = Client::new(uri);
 
     #[allow(clippy::print_stderr)]
     if client.connect().await.is_err() || client.health().await.is_err() {

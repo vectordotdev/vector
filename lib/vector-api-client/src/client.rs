@@ -1,3 +1,4 @@
+use http::Uri;
 use tokio_stream::{Stream, StreamExt};
 use tonic::transport::{Channel, Endpoint};
 
@@ -9,15 +10,14 @@ use crate::{
         StreamComponentAllocatedBytesResponse, StreamComponentMetricsRequest,
         StreamComponentMetricsResponse, StreamHeartbeatRequest, StreamHeartbeatResponse,
         StreamOutputEventsRequest, StreamOutputEventsResponse, StreamUptimeRequest,
-        StreamUptimeResponse,
-        observability_service_client::ObservabilityServiceClient,
+        StreamUptimeResponse, observability_service_client::ObservabilityServiceClient,
     },
 };
 
 /// gRPC client for the Vector observability API
 #[derive(Debug, Clone)]
 pub struct Client {
-    url: String,
+    endpoint: Endpoint,
     client: Option<ObservabilityServiceClient<Channel>>,
 }
 
@@ -28,21 +28,17 @@ impl Client {
     ///
     /// # Arguments
     ///
-    /// * `url` - The gRPC server URL (e.g., "http://localhost:9999")
-    pub fn new(url: impl Into<String>) -> Self {
+    /// * `uri` - The gRPC server URI (e.g., `"http://localhost:9999".parse().unwrap()`)
+    pub fn new(uri: Uri) -> Self {
         Self {
-            url: url.into(),
+            endpoint: Endpoint::from(uri),
             client: None,
         }
     }
 
     /// Connect to the gRPC server
     pub async fn connect(&mut self) -> Result<()> {
-        let endpoint = Endpoint::from_shared(self.url.clone()).map_err(|e| Error::InvalidUrl {
-            message: e.to_string(),
-        })?;
-
-        let channel = endpoint.connect().await?;
+        let channel = self.endpoint.connect().await?;
         self.client = Some(ObservabilityServiceClient::new(channel));
         Ok(())
     }
@@ -169,39 +165,16 @@ impl Client {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_client_creation() {
-        // Construction is infallible; URL is validated lazily on connect()
-        let _client = Client::new("http://localhost:9999");
-    }
-
-    #[test]
-    fn test_invalid_url() {
-        // URL validation happens on connect(), not at construction
-        let _client = Client::new("not a url");
-    }
-
-    #[tokio::test]
-    async fn test_connection_failure() {
-        // Port 65535 is unlikely to be in use on loopback
-        let mut client = Client::new("http://localhost:65535");
-        let result = client.connect().await;
-        assert!(
-            result.is_err(),
-            "Should fail to connect to non-existent server"
-        );
-    }
-
     #[tokio::test]
     async fn test_not_connected_error() {
-        let mut client = Client::new("http://localhost:9999");
+        let mut client = Client::new("http://localhost:9999".parse().unwrap());
         let result = client.health().await;
         assert!(matches!(result, Err(Error::NotConnected)));
     }
 
     #[test]
     fn test_ensure_connected() {
-        let mut client = Client::new("http://localhost:9999");
+        let mut client = Client::new("http://localhost:9999".parse().unwrap());
         let result = client.ensure_connected();
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), Error::NotConnected));

@@ -172,7 +172,12 @@ impl<'a> TapRunner<'a> {
         duration_ms: Option<u64>,
         quiet: bool,
     ) -> Result<(), TapExecutorError> {
-        let mut client = Client::new(self.url.as_str());
+        let uri = self
+            .url
+            .as_str()
+            .parse()
+            .map_err(|e| TapExecutorError::Fatal(format!("Invalid URL: {e}")))?;
+        let mut client = Client::new(uri);
         client.connect().await?;
         self.run_tap_with_client(client, interval, limit, duration_ms, quiet)
             .await

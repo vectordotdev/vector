@@ -8,7 +8,7 @@
 //! use vector_api_client::Client;
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-//! let mut client = Client::new("http://localhost:9999");
+//! let mut client = Client::new("http://localhost:9999".parse().unwrap());
 //! client.connect().await?;
 //!
 //! // Check health

@@ -1,5 +1,5 @@
 ---
-title: The Vector API
+title: The Vector Observability API
 short: API
 weight: 6
 tags: ["api", "grpc"]
@@ -25,13 +25,13 @@ You can interact with it using any standard gRPC tooling.
 
 ```bash
 # Check health
-grpcurl -plaintext localhost:8686 vector.observability.Observability/Health
+grpcurl -plaintext localhost:8686 vector.observability.v1.ObservabilityService/Health
 
 # List components
-grpcurl -plaintext localhost:8686 vector.observability.Observability/GetComponents
+grpcurl -plaintext localhost:8686 vector.observability.v1.ObservabilityService/GetComponents
 
 # Stream events (tap)
 grpcurl -plaintext \
   -d '{"outputs_patterns": ["*"], "limit": 100, "interval_ms": 500}' \
-  localhost:8686 vector.observability.Observability/StreamOutputEvents
+  localhost:8686 vector.observability.v1.ObservabilityService/StreamOutputEvents
 ```
