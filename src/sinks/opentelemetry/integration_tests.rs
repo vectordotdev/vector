@@ -60,7 +60,7 @@ fn otlp_log_event() -> vector_lib::event::Event {
 #[tokio::test]
 async fn delivers_logs_via_grpc() {
     let address = sink_grpc_address();
-    wait_for_tcp(&address).await;
+    wait_for_tcp(address.clone()).await;
 
     let config: GrpcSinkConfig = toml::from_str(&format!(
         r#"
