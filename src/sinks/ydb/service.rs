@@ -3,21 +3,20 @@ use std::{
     task::{Context, Poll},
 };
 
-use chrono::{DateTime, Utc};
 use futures::future::BoxFuture;
 use snafu::{ResultExt, Snafu};
 use tower::Service;
-use uuid::Uuid;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
-    codecs::JsonSerializerConfig,
     event::{Event, EventFinalizers, EventStatus, Finalizable},
     request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
     stream::DriverResponse,
 };
-use ydb::{TableClient, Value, YdbError, ydb_struct};
+use ydb::{TableClient, TableDescription, YdbError};
 
 use crate::{internal_events::EndpointBytesSent, sinks::prelude::RequestMetadataBuilder};
+
+use super::request::{YdbRequestError, YdbRequestHandler};
 
 const YDB_PROTOCOL: &str = "ydb";
 
@@ -31,15 +30,17 @@ impl crate::sinks::util::retries::RetryLogic for YdbRetryLogic {
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         match error {
-            YdbServiceError::Ydb { source } => {
-                matches!(
-                    source,
-                    YdbError::TransportDial(_)
-                        | YdbError::Transport(_)
-                        | YdbError::TransportGRPCStatus(_)
-                )
-            }
-            YdbServiceError::VectorCommon { .. } | YdbServiceError::Serialization { .. } => false,
+            YdbServiceError::Request { source } => match source {
+                YdbRequestError::Ydb { source } => {
+                    matches!(
+                        source,
+                        YdbError::TransportDial(_)
+                            | YdbError::Transport(_)
+                            | YdbError::TransportGRPCStatus(_)
+                    )
+                }
+                YdbRequestError::Mapping { .. } => false,
+            },
         }
     }
 }
@@ -49,14 +50,21 @@ pub struct YdbService {
     table_client: TableClient,
     table_path: String,
     endpoint: String,
+    table_schema: TableDescription,
 }
 
 impl YdbService {
-    pub const fn new(table_client: TableClient, table_path: String, endpoint: String) -> Self {
+    pub const fn new(
+        table_client: TableClient,
+        table_path: String,
+        endpoint: String,
+        table_schema: TableDescription,
+    ) -> Self {
         Self {
             table_client,
             table_path,
             endpoint,
+            table_schema,
         }
     }
 }
@@ -121,14 +129,8 @@ impl DriverResponse for YdbResponse {
 
 #[derive(Debug, Snafu)]
 pub enum YdbServiceError {
-    #[snafu(display("YDB error: {source}"))]
-    Ydb { source: YdbError },
-
-    #[snafu(display("Event conversion error: {source}"))]
-    VectorCommon { source: vector_common::Error },
-
-    #[snafu(display("Event serialization error: {source}"))]
-    Serialization { source: serde_json::Error },
+    #[snafu(display("Request error: {source}"))]
+    Request { source: YdbRequestError },
 }
 
 impl Service<YdbRequest> for YdbService {
@@ -143,22 +145,19 @@ impl Service<YdbRequest> for YdbService {
     fn call(&mut self, request: YdbRequest) -> Self::Future {
         let service = self.clone();
         let future = async move {
-            let table_path = service.table_path;
             let metadata = request.metadata;
 
-            let rows: Result<Vec<Value>, YdbServiceError> = request
-                .events
-                .into_iter()
-                .map(|event| event_to_ydb_value(event))
-                .collect();
+            let handler = YdbRequestHandler::prepare(
+                request.events,
+                &service.table_schema,
+                service.table_path,
+            )
+            .context(RequestSnafu)?;
 
-            let rows = rows?;
-
-            service
-                .table_client
-                .retry_execute_bulk_upsert(table_path, rows)
+            handler
+                .execute(&service.table_client)
                 .await
-                .context(YdbSnafu)?;
+                .context(RequestSnafu)?;
 
             emit!(EndpointBytesSent {
                 byte_size: metadata.request_encoded_size(),
@@ -171,51 +170,4 @@ impl Service<YdbRequest> for YdbService {
 
         Box::pin(future)
     }
-}
-
-/// Convert Vector Event to YDB Value
-fn event_to_ydb_value(event: Event) -> Result<Value, YdbServiceError> {
-    let id = Uuid::now_v7().to_string();
-    let id_hash = xxhash_rust::xxh32::xxh32(id.as_bytes(), 0);
-
-    let timestamp: DateTime<Utc> = match &event {
-        Event::Log(log) => log
-            .get_timestamp()
-            .and_then(|v| v.as_timestamp())
-            .map(|ts| *ts),
-        Event::Metric(metric) => metric.timestamp(),
-        Event::Trace(_) => None,
-    }
-    .unwrap_or_else(Utc::now);
-
-    let (host, message) = match &event {
-        Event::Log(log) => {
-            let host = log
-                .get("host")
-                .map(|v| v.to_string_lossy().into_owned())
-                .unwrap_or_else(|| String::from("unknown"));
-            let message = log
-                .get_message()
-                .map(|v| v.to_string_lossy().into_owned())
-                .unwrap_or_else(String::new);
-            (host, message)
-        }
-        _ => (String::new(), String::new()),
-    };
-
-    let json_serializer = JsonSerializerConfig::default().build();
-    let payload_value = json_serializer
-        .to_json_value(event)
-        .context(VectorCommonSnafu)?;
-
-    let payload_json = serde_json::to_string(&payload_value).context(SerializationSnafu)?;
-
-    Ok(ydb_struct!(
-        "id" => Value::Text(id),
-        "id_hash" => Value::Uint32(id_hash),
-        "timestamp" => Value::Timestamp(timestamp.into()),
-        "host" => Value::Text(host),
-        "message" => Value::Text(message),
-        "payload" => Value::JsonDocument(payload_json),
-    ))
 }

@@ -1,9 +1,6 @@
 use chrono::{DateTime, Utc};
 use futures::stream;
-use vector_lib::event::{
-    BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent, Metric, MetricKind,
-    MetricValue,
-};
+use vector_lib::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent};
 use ydb::{ClientBuilder, Query, TableClient};
 
 use crate::{
@@ -46,17 +43,6 @@ fn create_events(count: usize) -> (Vec<Event>, BatchStatusReceiver) {
     (events, receiver)
 }
 
-fn create_metric(name: &str) -> Metric {
-    Metric::new(
-        name,
-        MetricKind::Absolute,
-        MetricValue::Counter { value: 42.0 },
-    )
-    .with_namespace(Some("vector"))
-    .with_tags(Some(metric_tags!("host" => "metric-host", "env" => "test")))
-    .with_timestamp(Some(timestamp()))
-}
-
 struct YdbTestClient {
     table_client: TableClient,
 }
@@ -78,13 +64,11 @@ impl YdbTestClient {
     async fn create_table(&self, table_path: &str) {
         let create_table_sql = format!(
             r#"CREATE TABLE `{}` (
-                id Utf8 NOT NULL,
-                id_hash Uint32 NOT NULL,
-                timestamp Timestamp,
-                host Utf8,
-                message Utf8,
-                payload JsonDocument,
-                PRIMARY KEY(id_hash, id)
+                id Int64 NOT NULL,
+                host Utf8 NOT NULL,
+                timestamp Timestamp NOT NULL,
+                message Utf8 NOT NULL,
+                PRIMARY KEY(id)
             )"#,
             table_path
         );
@@ -194,18 +178,109 @@ async fn insert_multiple_events() {
 
     let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
 
-    // Create 100 logs + 50 metrics
-    let (mut input_events, mut receiver) = create_events(100);
-    for i in 0..50 {
-        input_events.push(create_metric(&format!("metric_{}", i)).into());
-    }
+    let (input_events, mut receiver) = create_events(150);
 
     run_and_assert_sink_compliance(sink, stream::iter(input_events), &YDB_SINK_TAGS).await;
 
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
     let count = client.count_rows(&table).await;
-    assert_eq!(count, 150, "Expected 150 events (100 logs + 50 metrics)");
+    assert_eq!(count, 150, "Expected 150 events");
+
+    client.drop_table(&table).await;
+}
+
+#[tokio::test]
+async fn dynamic_mapping_with_various_types() {
+    trace_init();
+
+    let (config, table, client) = prepare_config().await;
+
+    let create_table_sql = format!(
+        r#"CREATE TABLE `{}` (
+            id Int64 NOT NULL,
+            name Utf8,
+            score Double,
+            active Bool,
+            created_at Timestamp,
+            metadata JsonDocument,
+            PRIMARY KEY(id)
+        )"#,
+        table
+    );
+
+    client
+        .table_client
+        .retry_execute_scheme_query(create_table_sql)
+        .await
+        .expect("Failed to create table");
+
+    let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
+
+    let mut event = LogEvent::from("dynamic mapping test");
+    event.insert("id", 42_i64);
+    event.insert("name", "test-user");
+    event.insert("score", 99.5_f64);
+    event.insert("active", true);
+    event.insert("created_at", timestamp());
+    event.insert("metadata", serde_json::json!({"key": "value", "count": 10}));
+
+    let (input_event, mut receiver) = {
+        let (batch, receiver) = BatchNotifier::new_with_receiver();
+        (Event::from(event).with_batch_notifier(&batch), receiver)
+    };
+
+    run_and_assert_sink_compliance(sink, stream::iter(vec![input_event]), &YDB_SINK_TAGS).await;
+
+    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+    let count = client.count_rows(&table).await;
+    assert_eq!(count, 1, "Expected 1 row with all mapped fields");
+
+    client.drop_table(&table).await;
+}
+
+#[tokio::test]
+async fn upsert_with_sync_index() {
+    trace_init();
+
+    let (config, table, client) = prepare_config().await;
+
+    let create_table_sql = format!(
+        r#"CREATE TABLE `{}` (
+            id Int64 NOT NULL,
+            name Utf8 NOT NULL,
+            value Int64 NOT NULL,
+            PRIMARY KEY(id),
+            INDEX idx_name GLOBAL ON (name)
+        )"#,
+        table
+    );
+
+    client
+        .table_client
+        .retry_execute_scheme_query(create_table_sql)
+        .await
+        .expect("Failed to create table with index");
+
+    let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
+
+    let mut event = LogEvent::from("index test");
+    event.insert("id", 100_i64);
+    event.insert("name", "indexed-user");
+    event.insert("value", 42_i64);
+
+    let (input_event, mut receiver) = {
+        let (batch, receiver) = BatchNotifier::new_with_receiver();
+        (Event::from(event).with_batch_notifier(&batch), receiver)
+    };
+
+    run_and_assert_sink_compliance(sink, stream::iter(vec![input_event]), &YDB_SINK_TAGS).await;
+
+    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+    let count = client.count_rows(&table).await;
+    assert_eq!(count, 1, "Expected 1 row inserted via transactional UPSERT");
 
     client.drop_table(&table).await;
 }
