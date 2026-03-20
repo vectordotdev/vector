@@ -185,6 +185,7 @@ prost = { version = "0.12", default-features = false, features = ["std"] }
 prost-build = { version = "0.12", default-features = false }
 prost-reflect = { version = "0.14", features = ["serde"], default-features = false }
 prost-types = { version = "0.12", default-features = false }
+quickcheck = { version = "1.1.0" }
 rand = { version = "0.9.2", default-features = false, features = ["small_rng", "thread_rng"] }
 rand_distr = { version = "0.5.1", default-features = false }
 regex = { version = "1.12.3", default-features = false, features = ["std", "perf"] }
@@ -483,7 +484,7 @@ itertools.workspace = true
 libc.workspace = true
 mock_instant.workspace = true
 proptest.workspace = true
-quickcheck = "1.0.3"
+quickcheck.workspace = true
 reqwest.workspace = true
 rstest = { version = "0.26.1" }
 serial_test.workspace = true
