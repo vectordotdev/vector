@@ -1,10 +1,10 @@
+use super::*;
+use crate::config::log_schema;
 use bytes::{Buf, BufMut, BytesMut};
 use quickcheck::{QuickCheck, TestResult};
 use regex::Regex;
 use similar_asserts::assert_eq;
 use vector_buffers::encoding::Encodable;
-use super::*;
-use crate::config::log_schema;
 
 fn encode_value<T: Encodable, B: BufMut>(value: T, buffer: &mut B) {
     value.encode(buffer).expect("encoding should not fail");

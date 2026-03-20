@@ -9,8 +9,8 @@ const SEED: u64 = 0;
 const GEN_SIZE: usize = 128;
 
 fn main() {
-    let fixture_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../codecs/tests/data/native_encoding");
+    let fixture_dir =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../codecs/tests/data/native_encoding");
     let json_dir = fixture_dir.join("json");
     let proto_dir = fixture_dir.join("proto");
     std::fs::create_dir_all(&json_dir).unwrap();
