@@ -609,7 +609,7 @@ mod test_support {
 
     use quickcheck::{Arbitrary, Gen};
 
-    use super::{TagValue, TagValueSet, MetricTags, BTreeMap};
+    use super::{BTreeMap, MetricTags, TagValue, TagValueSet};
 
     impl Arbitrary for TagValue {
         fn arbitrary(g: &mut Gen) -> Self {
