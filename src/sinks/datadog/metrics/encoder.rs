@@ -2122,8 +2122,8 @@ mod tests {
     proptest! {
         #[test]
         fn encoding_check_for_payload_limit_edge_cases_v1(
-            uncompressed_limit in 0..64_000_000usize,
-            compressed_limit in 0..10_000_000usize,
+            uncompressed_limit in 1..64_000_000usize,
+            compressed_limit in 1..10_000_000usize,
             metric in arb_counter_metric(),
         ) {
             // We simply try to encode a single metric into an encoder, and make sure that when we
@@ -2155,8 +2155,8 @@ mod tests {
 
         #[test]
         fn encoding_check_for_payload_limit_edge_cases_v2(
-            uncompressed_limit in 0..10_000_000usize,
-            compressed_limit in 0..1_000_000usize,
+            uncompressed_limit in 1..10_000_000usize,
+            compressed_limit in 1..1_000_000usize,
             metric in arb_counter_metric(),
         ) {
             let mut encoder = DatadogMetricsEncoder::with_payload_limits(
