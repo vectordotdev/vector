@@ -4,11 +4,13 @@ use tonic::transport::{Channel, Endpoint};
 use crate::{
     error::{Error, Result},
     proto::{
-        ComponentAllocatedBytesResponse, ComponentMetricResponse, ComponentMetricStreamRequest,
-        ComponentsRequest, ComponentsResponse, HealthRequest, HealthResponse, HeartbeatRequest,
-        HeartbeatResponse, MetaRequest, MetaResponse, MetricName, MetricStreamRequest, OutputEvent,
-        OutputEventsRequest, UptimeRequest, UptimeResponse,
-        observability_client::ObservabilityClient,
+        GetComponentsRequest, GetComponentsResponse, GetMetaRequest, GetMetaResponse,
+        HealthRequest, HealthResponse, MetricName, StreamComponentAllocatedBytesRequest,
+        StreamComponentAllocatedBytesResponse, StreamComponentMetricsRequest,
+        StreamComponentMetricsResponse, StreamHeartbeatRequest, StreamHeartbeatResponse,
+        StreamOutputEventsRequest, StreamOutputEventsResponse, StreamUptimeRequest,
+        StreamUptimeResponse,
+        observability_service_client::ObservabilityServiceClient,
     },
 };
 
@@ -16,7 +18,7 @@ use crate::{
 #[derive(Debug, Clone)]
 pub struct Client {
     url: String,
-    client: Option<ObservabilityClient<Channel>>,
+    client: Option<ObservabilityServiceClient<Channel>>,
 }
 
 impl Client {
@@ -41,12 +43,12 @@ impl Client {
         })?;
 
         let channel = endpoint.connect().await?;
-        self.client = Some(ObservabilityClient::new(channel));
+        self.client = Some(ObservabilityServiceClient::new(channel));
         Ok(())
     }
 
     /// Ensure the client is connected
-    fn ensure_connected(&mut self) -> Result<&mut ObservabilityClient<Channel>> {
+    fn ensure_connected(&mut self) -> Result<&mut ObservabilityServiceClient<Channel>> {
         self.client.as_mut().ok_or(Error::NotConnected)
     }
 
@@ -60,9 +62,9 @@ impl Client {
     }
 
     /// Get metadata about the Vector instance
-    pub async fn get_meta(&mut self) -> Result<MetaResponse> {
+    pub async fn get_meta(&mut self) -> Result<GetMetaResponse> {
         let client = self.ensure_connected()?;
-        let response = client.get_meta(MetaRequest {}).await?;
+        let response = client.get_meta(GetMetaRequest {}).await?;
         Ok(response.into_inner())
     }
 
@@ -71,9 +73,11 @@ impl Client {
     /// # Arguments
     ///
     /// * `limit` - Maximum number of components to return (0 = no limit)
-    pub async fn get_components(&mut self, limit: i32) -> Result<ComponentsResponse> {
+    pub async fn get_components(&mut self, limit: i32) -> Result<GetComponentsResponse> {
         let client = self.ensure_connected()?;
-        let response = client.get_components(ComponentsRequest { limit }).await?;
+        let response = client
+            .get_components(GetComponentsRequest { limit })
+            .await?;
         Ok(response.into_inner())
     }
 
@@ -87,10 +91,10 @@ impl Client {
     pub async fn stream_heartbeat(
         &mut self,
         interval_ms: i32,
-    ) -> Result<impl Stream<Item = Result<HeartbeatResponse>>> {
+    ) -> Result<impl Stream<Item = Result<StreamHeartbeatResponse>>> {
         let client = self.ensure_connected()?;
         let response = client
-            .stream_heartbeat(HeartbeatRequest { interval_ms })
+            .stream_heartbeat(StreamHeartbeatRequest { interval_ms })
             .await?;
         Ok(response.into_inner().map(|r| r.map_err(Error::from)))
     }
@@ -103,9 +107,11 @@ impl Client {
     pub async fn stream_uptime(
         &mut self,
         interval_ms: i32,
-    ) -> Result<impl Stream<Item = Result<UptimeResponse>>> {
+    ) -> Result<impl Stream<Item = Result<StreamUptimeResponse>>> {
         let client = self.ensure_connected()?;
-        let response = client.stream_uptime(UptimeRequest { interval_ms }).await?;
+        let response = client
+            .stream_uptime(StreamUptimeRequest { interval_ms })
+            .await?;
         Ok(response.into_inner().map(|r| r.map_err(Error::from)))
     }
 
@@ -117,10 +123,10 @@ impl Client {
     pub async fn stream_component_allocated_bytes(
         &mut self,
         interval_ms: i32,
-    ) -> Result<impl Stream<Item = Result<ComponentAllocatedBytesResponse>>> {
+    ) -> Result<impl Stream<Item = Result<StreamComponentAllocatedBytesResponse>>> {
         let client = self.ensure_connected()?;
         let response = client
-            .stream_component_allocated_bytes(MetricStreamRequest { interval_ms })
+            .stream_component_allocated_bytes(StreamComponentAllocatedBytesRequest { interval_ms })
             .await?;
         Ok(response.into_inner().map(|r| r.map_err(Error::from)))
     }
@@ -135,10 +141,10 @@ impl Client {
         &mut self,
         metric: MetricName,
         interval_ms: i32,
-    ) -> Result<impl Stream<Item = Result<ComponentMetricResponse>>> {
+    ) -> Result<impl Stream<Item = Result<StreamComponentMetricsResponse>>> {
         let client = self.ensure_connected()?;
         let response = client
-            .stream_component_metrics(ComponentMetricStreamRequest {
+            .stream_component_metrics(StreamComponentMetricsRequest {
                 interval_ms,
                 metric: metric as i32,
             })
@@ -151,8 +157,8 @@ impl Client {
     /// This is used by `vector tap` to capture events.
     pub async fn stream_output_events(
         &mut self,
-        request: OutputEventsRequest,
-    ) -> Result<impl Stream<Item = Result<OutputEvent>> + use<>> {
+        request: StreamOutputEventsRequest,
+    ) -> Result<impl Stream<Item = Result<StreamOutputEventsResponse>> + use<>> {
         let client = self.ensure_connected()?;
         let response = client.stream_output_events(request).await?;
         Ok(response.into_inner().map(|r| r.map_err(Error::from)))

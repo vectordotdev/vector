@@ -21,7 +21,7 @@ use tokio_util::codec::Encoder;
 use url::Url;
 use vector_api_client::{
     Client,
-    proto::{OutputEvent, OutputEventsRequest},
+    proto::{StreamOutputEventsRequest, StreamOutputEventsResponse},
 };
 use vector_core::event::Event;
 
@@ -114,7 +114,7 @@ impl EventFormatter {
 #[derive(Clone, Debug)]
 pub enum OutputChannel {
     Stdout(EventFormatter),
-    AsyncChannel(tokio_mpsc::Sender<Vec<OutputEvent>>),
+    AsyncChannel(tokio_mpsc::Sender<Vec<StreamOutputEventsResponse>>),
 }
 
 /// Error type for tap execution
@@ -188,7 +188,7 @@ impl<'a> TapRunner<'a> {
         duration_ms: Option<u64>,
         quiet: bool,
     ) -> Result<(), TapExecutorError> {
-        let request = OutputEventsRequest {
+        let request = StreamOutputEventsRequest {
             outputs_patterns: self.output_patterns.clone(),
             inputs_patterns: self.input_patterns.clone(),
             limit: limit as i32,
@@ -216,9 +216,11 @@ impl<'a> TapRunner<'a> {
                     if quiet
                         && matches!(
                             output_event.event,
-                            Some(vector_api_client::proto::output_event::Event::Notification(
-                                _
-                            ))
+                            Some(
+                                vector_api_client::proto::stream_output_events_response::Event::Notification(
+                                    _
+                                )
+                            )
                         )
                     {
                         continue;
@@ -302,8 +304,12 @@ impl<'a> TapRunner<'a> {
     }
 
     #[allow(clippy::print_stdout)]
-    fn output_event_stdout(&self, output_event: &OutputEvent, formatter: &EventFormatter) {
-        use vector_api_client::proto::output_event::Event as OutputEventType;
+    fn output_event_stdout(
+        &self,
+        output_event: &StreamOutputEventsResponse,
+        formatter: &EventFormatter,
+    ) {
+        use vector_api_client::proto::stream_output_events_response::Event as OutputEventType;
 
         match &output_event.event {
             Some(OutputEventType::TappedEvent(ev)) => {
@@ -335,7 +341,7 @@ impl<'a> TapRunner<'a> {
                 eprintln!("{}", ev.message);
             }
             None => {
-                error!("Received OutputEvent with no event data");
+                error!("Received StreamOutputEventsResponse with no event data");
             }
         }
     }

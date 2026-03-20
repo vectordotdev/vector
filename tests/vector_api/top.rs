@@ -6,11 +6,11 @@
 use super::{common::*, harness::*};
 use indoc::indoc;
 use tokio_stream::StreamExt;
-use vector_lib::api_client::proto::{ComponentsResponse, MetricName, component_metric_response::Value};
+use vector_lib::api_client::proto::{GetComponentsResponse, MetricName, stream_component_metrics_response::Value};
 
 impl TestHarness {
     /// Queries all components from the gRPC API
-    pub async fn query_components(&mut self) -> Result<ComponentsResponse, String> {
+    pub async fn query_components(&mut self) -> Result<GetComponentsResponse, String> {
         self.api_client()
             .get_components(100)
             .await

@@ -28,15 +28,15 @@ vector top --url http://localhost:8686
 
 ```bash
 # Check health
-grpcurl -plaintext localhost:8686 vector.observability.Observability/Health
+grpcurl -plaintext localhost:8686 vector.observability.v1.ObservabilityService/Health
 
 # List components
-grpcurl -plaintext localhost:8686 vector.observability.Observability/GetComponents
+grpcurl -plaintext localhost:8686 vector.observability.v1.ObservabilityService/GetComponents
 
 # Stream events (tap) — limit and interval_ms are required and must be >= 1
 grpcurl -plaintext \
   -d '{"outputs_patterns": ["*"], "limit": 100, "interval_ms": 500}' \
-  localhost:8686 vector.observability.Observability/StreamOutputEvents
+  localhost:8686 vector.observability.v1.ObservabilityService/StreamOutputEvents
 ```
 
 authors: pront

@@ -9,7 +9,7 @@ use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
 use vector_api_client::{
     Client,
-    proto::{Component, ComponentType, MetricName, component_metric_response::Value},
+    proto::{Component, ComponentType, MetricName, stream_component_metrics_response::Value},
 };
 
 use crate::state::{self, OutputMetrics, SentEventsMetric};
@@ -92,6 +92,7 @@ fn component_to_row(component: &Component) -> state::ComponentRow {
     state::ComponentRow {
         key: key.clone(),
         kind: match component.component_type() {
+            ComponentType::Unspecified => "unknown",
             ComponentType::Source => "source",
             ComponentType::Transform => "transform",
             ComponentType::Sink => "sink",

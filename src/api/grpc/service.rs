@@ -182,7 +182,7 @@ fn get_controller() -> Result<&'static Controller, Status> {
 fn metric_totals_stream(
     duration: Duration,
     metric_name: &'static str,
-) -> Result<BoxStream<ComponentMetricResponse>, Status> {
+) -> Result<BoxStream<StreamComponentMetricsResponse>, Status> {
     let controller = get_controller()?;
     Ok(Box::pin(
         tokio_stream::StreamExt::map(IntervalStream::new(interval(duration)), move |_| {
@@ -192,9 +192,9 @@ fn metric_totals_stream(
                 component_metrics
                     .into_iter()
                     .map(|(component_id, total)| {
-                        Ok(ComponentMetricResponse {
+                        Ok(StreamComponentMetricsResponse {
                             component_id,
-                            value: Some(component_metric_response::Value::Total(TotalMetric {
+                            value: Some(stream_component_metrics_response::Value::Total(TotalMetric {
                                 value: total as i64,
                                 output_totals: Default::default(),
                             })),
@@ -211,7 +211,7 @@ fn metric_totals_stream(
 fn metric_throughput_stream(
     duration: Duration,
     metric_name: &'static str,
-) -> Result<BoxStream<ComponentMetricResponse>, Status> {
+) -> Result<BoxStream<StreamComponentMetricsResponse>, Status> {
     let controller = get_controller()?;
     let interval_secs = duration.as_secs_f64();
     let previous_values = Arc::new(Mutex::new(HashMap::new()));
@@ -232,9 +232,9 @@ fn metric_throughput_stream(
                 throughputs
                     .into_iter()
                     .map(|(component_id, throughput)| {
-                        Ok(ComponentMetricResponse {
+                        Ok(StreamComponentMetricsResponse {
                             component_id,
-                            value: Some(component_metric_response::Value::Throughput(
+                            value: Some(stream_component_metrics_response::Value::Throughput(
                                 ThroughputMetric {
                                     value: throughput,
                                     output_throughputs: Default::default(),
@@ -250,7 +250,7 @@ fn metric_throughput_stream(
 }
 
 /// Builds a stream that emits per-component sent_events totals with per-output breakdown.
-fn sent_events_totals_stream(duration: Duration) -> Result<BoxStream<ComponentMetricResponse>, Status> {
+fn sent_events_totals_stream(duration: Duration) -> Result<BoxStream<StreamComponentMetricsResponse>, Status> {
     let controller = get_controller()?;
     Ok(Box::pin(
         tokio_stream::StreamExt::map(IntervalStream::new(interval(duration)), move |_| {
@@ -278,9 +278,9 @@ fn sent_events_totals_stream(duration: Duration) -> Result<BoxStream<ComponentMe
                             .unwrap_or_default()
                             .into_iter()
                             .collect();
-                        Ok(ComponentMetricResponse {
+                        Ok(StreamComponentMetricsResponse {
                             component_id,
-                            value: Some(component_metric_response::Value::Total(TotalMetric {
+                            value: Some(stream_component_metrics_response::Value::Total(TotalMetric {
                                 value: total as i64,
                                 output_totals,
                             })),
@@ -296,7 +296,7 @@ fn sent_events_totals_stream(duration: Duration) -> Result<BoxStream<ComponentMe
 /// Builds a stream that emits per-component sent_events throughputs with per-output breakdown.
 fn sent_events_throughput_stream(
     duration: Duration,
-) -> Result<BoxStream<ComponentMetricResponse>, Status> {
+) -> Result<BoxStream<StreamComponentMetricsResponse>, Status> {
     let controller = get_controller()?;
     let interval_secs = duration.as_secs_f64();
     let previous_totals = Arc::new(Mutex::new(HashMap::<String, f64>::new()));
@@ -348,9 +348,9 @@ fn sent_events_throughput_stream(
                             .unwrap_or_default()
                             .into_iter()
                             .collect();
-                        Ok(ComponentMetricResponse {
+                        Ok(StreamComponentMetricsResponse {
                             component_id,
-                            value: Some(component_metric_response::Value::Throughput(
+                            value: Some(stream_component_metrics_response::Value::Throughput(
                                 ThroughputMetric {
                                     value: throughput,
                                     output_throughputs,
@@ -419,21 +419,21 @@ impl observability::Service for ObservabilityService {
 
     async fn get_meta(
         &self,
-        _request: Request<MetaRequest>,
-    ) -> Result<Response<MetaResponse>, Status> {
+        _request: Request<GetMetaRequest>,
+    ) -> Result<Response<GetMetaResponse>, Status> {
         let version = crate::get_version().to_string();
         let hostname = hostname::get()
             .ok()
             .and_then(|h| h.into_string().ok())
             .unwrap_or_else(|| "unknown".to_string());
 
-        Ok(Response::new(MetaResponse { version, hostname }))
+        Ok(Response::new(GetMetaResponse { version, hostname }))
     }
 
     async fn get_components(
         &self,
-        request: Request<ComponentsRequest>,
-    ) -> Result<Response<ComponentsResponse>, Status> {
+        request: Request<GetComponentsRequest>,
+    ) -> Result<Response<GetComponentsResponse>, Status> {
         let limit = request.into_inner().limit;
 
         // Get the current topology snapshot
@@ -511,16 +511,16 @@ impl observability::Service for ObservabilityService {
             components.truncate(limit as usize);
         }
 
-        Ok(Response::new(ComponentsResponse { components }))
+        Ok(Response::new(GetComponentsResponse { components }))
     }
 
     // ========== Streaming Metrics ==========
 
-    type StreamHeartbeatStream = BoxStream<HeartbeatResponse>;
+    type StreamHeartbeatStream = BoxStream<StreamHeartbeatResponse>;
 
     async fn stream_heartbeat(
         &self,
-        request: Request<HeartbeatRequest>,
+        request: Request<StreamHeartbeatRequest>,
     ) -> Result<Response<Self::StreamHeartbeatStream>, Status> {
         let duration =
             Duration::from_millis(validate_interval_ms(request.into_inner().interval_ms)?);
@@ -529,17 +529,17 @@ impl observability::Service for ObservabilityService {
                 seconds: chrono::Utc::now().timestamp(),
                 nanos: 0,
             });
-            Ok(HeartbeatResponse { utc })
+            Ok(StreamHeartbeatResponse { utc })
         });
 
         Ok(Response::new(Box::pin(stream)))
     }
 
-    type StreamUptimeStream = BoxStream<UptimeResponse>;
+    type StreamUptimeStream = BoxStream<StreamUptimeResponse>;
 
     async fn stream_uptime(
         &self,
-        request: Request<UptimeRequest>,
+        request: Request<StreamUptimeRequest>,
     ) -> Result<Response<Self::StreamUptimeStream>, Status> {
         let duration =
             Duration::from_millis(validate_interval_ms(request.into_inner().interval_ms)?);
@@ -553,17 +553,17 @@ impl observability::Service for ObservabilityService {
                     .and_then(get_metric_value)
                     .unwrap_or(0.0) as i64;
 
-                Ok(UptimeResponse { uptime_seconds })
+                Ok(StreamUptimeResponse { uptime_seconds })
             });
 
         Ok(Response::new(Box::pin(stream)))
     }
 
-    type StreamComponentAllocatedBytesStream = BoxStream<ComponentAllocatedBytesResponse>;
+    type StreamComponentAllocatedBytesStream = BoxStream<StreamComponentAllocatedBytesResponse>;
 
     async fn stream_component_allocated_bytes(
         &self,
-        request: Request<MetricStreamRequest>,
+        request: Request<StreamComponentAllocatedBytesRequest>,
     ) -> Result<Response<Self::StreamComponentAllocatedBytesStream>, Status> {
         let duration =
             Duration::from_millis(validate_interval_ms(request.into_inner().interval_ms)?);
@@ -578,7 +578,7 @@ impl observability::Service for ObservabilityService {
                     component_metrics
                         .into_iter()
                         .map(|(component_id, allocated_bytes)| {
-                            Ok(ComponentAllocatedBytesResponse {
+                            Ok(StreamComponentAllocatedBytesResponse {
                                 component_id,
                                 allocated_bytes: allocated_bytes as i64,
                             })
@@ -591,18 +591,18 @@ impl observability::Service for ObservabilityService {
         Ok(Response::new(Box::pin(stream)))
     }
 
-    type StreamComponentMetricsStream = BoxStream<ComponentMetricResponse>;
+    type StreamComponentMetricsStream = BoxStream<StreamComponentMetricsResponse>;
 
     async fn stream_component_metrics(
         &self,
-        request: Request<ComponentMetricStreamRequest>,
+        request: Request<StreamComponentMetricsRequest>,
     ) -> Result<Response<Self::StreamComponentMetricsStream>, Status> {
         let req = request.into_inner();
         let duration = Duration::from_millis(validate_interval_ms(req.interval_ms)?);
         let metric = MetricName::try_from(req.metric)
             .map_err(|_| Status::invalid_argument("Unknown metric value"))?;
 
-        let stream: BoxStream<ComponentMetricResponse> = match metric {
+        let stream: BoxStream<StreamComponentMetricsResponse> = match metric {
             MetricName::Unspecified => {
                 return Err(Status::invalid_argument("metric must be specified"));
             }
@@ -634,11 +634,11 @@ impl observability::Service for ObservabilityService {
 
     // ========== Event Tapping ==========
 
-    type StreamOutputEventsStream = BoxStream<OutputEvent>;
+    type StreamOutputEventsStream = BoxStream<StreamOutputEventsResponse>;
 
     async fn stream_output_events(
         &self,
-        request: Request<OutputEventsRequest>,
+        request: Request<StreamOutputEventsRequest>,
     ) -> Result<Response<Self::StreamOutputEventsStream>, Status> {
         let req = request.into_inner();
 
@@ -668,7 +668,7 @@ impl observability::Service for ObservabilityService {
         let (tap_tx, tap_rx) = mpsc::channel(limit);
 
         // Channel for sending events to the client
-        let (event_tx, event_rx) = mpsc::channel::<Vec<OutputEvent>>(10);
+        let (event_tx, event_rx) = mpsc::channel::<Vec<StreamOutputEventsResponse>>(10);
 
         let watch_rx = self.watch_rx.clone();
 
@@ -704,7 +704,7 @@ impl observability::Service for ObservabilityService {
 
 /// Reservoir sampler for tap events, batched and flushed on an interval.
 struct Reservoir {
-    events: Vec<(usize, OutputEvent)>,
+    events: Vec<(usize, StreamOutputEventsResponse)>,
     rng: SmallRng,
     batch: usize,
     limit: usize,
@@ -733,10 +733,13 @@ impl Reservoir {
     async fn handle_payload(
         &mut self,
         payload: TapPayload,
-        tx: &mpsc::Sender<Vec<OutputEvent>>,
+        tx: &mpsc::Sender<Vec<StreamOutputEventsResponse>>,
     ) -> Result<(), ()> {
         for event in tap_payload_to_output_events(payload) {
-            if matches!(event.event, Some(output_event::Event::Notification(_))) {
+            if matches!(
+                event.event,
+                Some(stream_output_events_response::Event::Notification(_))
+            ) {
                 tx.send(vec![event]).await.map_err(|err| {
                     debug!(message = "Couldn't send notification.", error = ?err);
                 })?;
@@ -761,7 +764,7 @@ impl Reservoir {
     }
 
     /// Flush sampled events to the client, sorted by arrival order.
-    async fn flush(&mut self, tx: &mpsc::Sender<Vec<OutputEvent>>) -> Result<(), ()> {
+    async fn flush(&mut self, tx: &mpsc::Sender<Vec<StreamOutputEventsResponse>>) -> Result<(), ()> {
         if self.events.is_empty() {
             return Ok(());
         }
@@ -774,8 +777,8 @@ impl Reservoir {
     }
 }
 
-/// Convert TapPayload to gRPC OutputEvent(s)
-fn tap_payload_to_output_events(payload: TapPayload) -> Vec<OutputEvent> {
+/// Convert TapPayload to gRPC StreamOutputEventsResponse(s)
+fn tap_payload_to_output_events(payload: TapPayload) -> Vec<StreamOutputEventsResponse> {
     use crate::event::proto::{Event, EventWrapper};
 
     match payload {
@@ -788,8 +791,8 @@ fn tap_payload_to_output_events(payload: TapPayload) -> Vec<OutputEvent> {
                     event: Some(Event::Log(proto_log)),
                 });
 
-                OutputEvent {
-                    event: Some(output_event::Event::TappedEvent(TappedEvent {
+                StreamOutputEventsResponse {
+                    event: Some(stream_output_events_response::Event::TappedEvent(TappedEvent {
                         component_id: output.output_id.component.id().to_string(),
                         component_type: output.component_type.to_string(),
                         component_kind: output.component_kind.to_string(),
@@ -807,8 +810,8 @@ fn tap_payload_to_output_events(payload: TapPayload) -> Vec<OutputEvent> {
                     event: Some(Event::Metric(proto_metric)),
                 });
 
-                OutputEvent {
-                    event: Some(output_event::Event::TappedEvent(TappedEvent {
+                StreamOutputEventsResponse {
+                    event: Some(stream_output_events_response::Event::TappedEvent(TappedEvent {
                         component_id: output.output_id.component.id().to_string(),
                         component_type: output.component_type.to_string(),
                         component_kind: output.component_kind.to_string(),
@@ -826,8 +829,8 @@ fn tap_payload_to_output_events(payload: TapPayload) -> Vec<OutputEvent> {
                     event: Some(Event::Trace(proto_trace)),
                 });
 
-                OutputEvent {
-                    event: Some(output_event::Event::TappedEvent(TappedEvent {
+                StreamOutputEventsResponse {
+                    event: Some(stream_output_events_response::Event::TappedEvent(TappedEvent {
                         component_id: output.output_id.component.id().to_string(),
                         component_type: output.component_type.to_string(),
                         component_kind: output.component_kind.to_string(),
@@ -842,10 +845,12 @@ fn tap_payload_to_output_events(payload: TapPayload) -> Vec<OutputEvent> {
     }
 }
 
-fn create_notification_event(message: &str) -> OutputEvent {
-    OutputEvent {
-        event: Some(output_event::Event::Notification(EventNotification {
-            message: message.to_string(),
-        })),
+fn create_notification_event(message: &str) -> StreamOutputEventsResponse {
+    StreamOutputEventsResponse {
+        event: Some(stream_output_events_response::Event::Notification(
+            EventNotification {
+                message: message.to_string(),
+            },
+        )),
     }
 }

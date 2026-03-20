@@ -39,5 +39,5 @@ pub mod proto {
         tonic::include_proto!("event");
     }
 
-    tonic::include_proto!("vector.observability");
+    tonic::include_proto!("vector.observability.v1");
 }

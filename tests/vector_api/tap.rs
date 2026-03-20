@@ -6,7 +6,7 @@ use super::{common::*, harness::*};
 use indoc::indoc;
 use std::time::{Duration, Instant};
 use tokio_stream::StreamExt;
-use vector_lib::api_client::proto::{OutputEvent, OutputEventsRequest};
+use vector_lib::api_client::proto::{StreamOutputEventsRequest, StreamOutputEventsResponse};
 
 pub const TAP_TIMEOUT: Duration = Duration::from_secs(10);
 
@@ -18,11 +18,11 @@ impl TestHarness {
         &mut self,
         outputs_patterns: &[&str],
         count: usize,
-    ) -> Result<Vec<OutputEvent>, String> {
+    ) -> Result<Vec<StreamOutputEventsResponse>, String> {
         const DEFAULT_LIMIT: i32 = 1000;
         const DEFAULT_INTERVAL_MS: i32 = 100;
 
-        let request = OutputEventsRequest {
+        let request = StreamOutputEventsRequest {
             outputs_patterns: outputs_patterns.iter().map(|s| s.to_string()).collect(),
             inputs_patterns: vec![],
             limit: DEFAULT_LIMIT,
@@ -91,7 +91,7 @@ async fn tap_receives_events() {
     assert!(!events.is_empty(), "Should receive at least one event");
 
     // Verify we got at least one tapped event (not just notifications)
-    use vector_lib::api_client::proto::output_event::Event;
+    use vector_lib::api_client::proto::stream_output_events_response::Event;
     let tapped_events: Vec<_> = events
         .iter()
         .filter_map(|e| match &e.event {
@@ -127,7 +127,7 @@ async fn tap_specific_component() {
         .expect("Should receive events");
 
     // Verify we only got events from demo1
-    use vector_lib::api_client::proto::output_event::Event;
+    use vector_lib::api_client::proto::stream_output_events_response::Event;
     let tapped_events: Vec<_> = events
         .iter()
         .filter_map(|e| match &e.event {
@@ -149,7 +149,7 @@ async fn tap_specific_component() {
 
 #[tokio::test]
 async fn tap_survives_config_reload() {
-    use vector_lib::api_client::proto::output_event::Event;
+    use vector_lib::api_client::proto::stream_output_events_response::Event;
 
     let config = single_source_config("demo", 0.05, None); // No count limit - runs continuously
     let mut harness = TestHarness::new(&config)
@@ -159,7 +159,7 @@ async fn tap_survives_config_reload() {
     // Open the stream ONCE and keep it alive across the reload.
     // tonic channels are Arc-based so the returned stream is owned and does not
     // borrow `harness`, allowing us to call reload_with_config below.
-    let request = OutputEventsRequest {
+    let request = StreamOutputEventsRequest {
         outputs_patterns: vec!["*".to_string()],
         inputs_patterns: vec![],
         limit: 1000,
@@ -269,7 +269,7 @@ async fn multiple_concurrent_subscriptions() {
     );
 
     // Verify tap1 only sees demo1
-    use vector_lib::api_client::proto::output_event::Event;
+    use vector_lib::api_client::proto::stream_output_events_response::Event;
     let tapped_events1: Vec<_> = events1
         .iter()
         .filter_map(|e| match &e.event {

@@ -1,42 +1,42 @@
 syntax = "proto3";
-package vector.observability;
+package vector.observability.v1;
 
 import "google/protobuf/timestamp.proto";
 import "event.proto";
 
 // Observability service for monitoring Vector instances.
-service Observability {
+service ObservabilityService {
   // ========== Simple Queries ==========
 
   // Check if the API server is healthy and responding
   rpc Health(HealthRequest) returns (HealthResponse);
 
   // Get metadata about the Vector instance (version, hostname)
-  rpc GetMeta(MetaRequest) returns (MetaResponse);
+  rpc GetMeta(GetMetaRequest) returns (GetMetaResponse);
 
   // Get information about configured components (sources, transforms, sinks)
-  rpc GetComponents(ComponentsRequest) returns (ComponentsResponse);
+  rpc GetComponents(GetComponentsRequest) returns (GetComponentsResponse);
 
   // ========== Real-time Metric Streams ==========
   // All streaming RPCs send periodic updates at the specified interval
 
   // Stream periodic heartbeat timestamps
-  rpc StreamHeartbeat(HeartbeatRequest) returns (stream HeartbeatResponse);
+  rpc StreamHeartbeat(StreamHeartbeatRequest) returns (stream StreamHeartbeatResponse);
 
   // Stream uptime in seconds
-  rpc StreamUptime(UptimeRequest) returns (stream UptimeResponse);
+  rpc StreamUptime(StreamUptimeRequest) returns (stream StreamUptimeResponse);
 
   // Stream memory allocated per component
-  rpc StreamComponentAllocatedBytes(MetricStreamRequest) returns (stream ComponentAllocatedBytesResponse);
+  rpc StreamComponentAllocatedBytes(StreamComponentAllocatedBytesRequest) returns (stream StreamComponentAllocatedBytesResponse);
 
   // Stream per-component metrics (throughput or totals) for a chosen metric.
   // Replaces the former 9 per-metric streaming RPCs with a single unified endpoint.
-  rpc StreamComponentMetrics(ComponentMetricStreamRequest) returns (stream ComponentMetricResponse);
+  rpc StreamComponentMetrics(StreamComponentMetricsRequest) returns (stream StreamComponentMetricsResponse);
 
   // ========== Event Tapping ==========
 
   // Stream events from components matching the specified patterns (replaces vector tap)
-  rpc StreamOutputEvents(OutputEventsRequest) returns (stream OutputEvent);
+  rpc StreamOutputEvents(StreamOutputEventsRequest) returns (stream StreamOutputEventsResponse);
 }
 
 // ========== Health & Meta Messages ==========
@@ -47,21 +47,21 @@ message HealthResponse {
   bool healthy = 1;
 }
 
-message MetaRequest {}
+message GetMetaRequest {}
 
-message MetaResponse {
+message GetMetaResponse {
   string version = 1;
   string hostname = 2;
 }
 
 // ========== Component Messages ==========
 
-message ComponentsRequest {
+message GetComponentsRequest {
   // Maximum number of components to return (0 = no limit)
   int32 limit = 1;
 }
 
-message ComponentsResponse {
+message GetComponentsResponse {
   repeated Component components = 1;
 }
 
@@ -74,9 +74,10 @@ message Component {
 }
 
 enum ComponentType {
-  SOURCE = 0;
-  TRANSFORM = 1;
-  SINK = 2;
+  COMPONENT_TYPE_UNSPECIFIED = 0;
+  COMPONENT_TYPE_SOURCE = 1;
+  COMPONENT_TYPE_TRANSFORM = 2;
+  COMPONENT_TYPE_SINK = 3;
 }
 
 message Output {
@@ -93,7 +94,7 @@ message ComponentMetrics {
 
 // ========== Streaming Metrics Messages ==========
 
-message MetricStreamRequest {
+message StreamComponentAllocatedBytesRequest {
   // Update interval in milliseconds
   int32 interval_ms = 1;
 }
@@ -101,38 +102,38 @@ message MetricStreamRequest {
 // Identifies which per-component metric to stream via StreamComponentMetrics.
 enum MetricName {
   METRIC_NAME_UNSPECIFIED = 0;
-  RECEIVED_EVENTS_THROUGHPUT = 1;
-  SENT_EVENTS_THROUGHPUT = 2;
-  RECEIVED_BYTES_THROUGHPUT = 3;
-  SENT_BYTES_THROUGHPUT = 4;
-  RECEIVED_EVENTS_TOTAL = 5;
-  SENT_EVENTS_TOTAL = 6;
-  RECEIVED_BYTES_TOTAL = 7;
-  SENT_BYTES_TOTAL = 8;
-  ERRORS_TOTAL = 9;
+  METRIC_NAME_RECEIVED_EVENTS_THROUGHPUT = 1;
+  METRIC_NAME_SENT_EVENTS_THROUGHPUT = 2;
+  METRIC_NAME_RECEIVED_BYTES_THROUGHPUT = 3;
+  METRIC_NAME_SENT_BYTES_THROUGHPUT = 4;
+  METRIC_NAME_RECEIVED_EVENTS_TOTAL = 5;
+  METRIC_NAME_SENT_EVENTS_TOTAL = 6;
+  METRIC_NAME_RECEIVED_BYTES_TOTAL = 7;
+  METRIC_NAME_SENT_BYTES_TOTAL = 8;
+  METRIC_NAME_ERRORS_TOTAL = 9;
 }
 
-message ComponentMetricStreamRequest {
+message StreamComponentMetricsRequest {
   // Update interval in milliseconds
   int32 interval_ms = 1;
   MetricName metric = 2;
 }
 
 // Cumulative total value for a component metric.
-// output_totals is only populated for SENT_EVENTS_TOTAL.
+// output_totals is only populated for METRIC_NAME_SENT_EVENTS_TOTAL.
 message TotalMetric {
   int64 value = 1;
   map<string, int64> output_totals = 2;
 }
 
 // Throughput value (per-second rate) for a component metric.
-// output_throughputs is only populated for SENT_EVENTS_THROUGHPUT.
+// output_throughputs is only populated for METRIC_NAME_SENT_EVENTS_THROUGHPUT.
 message ThroughputMetric {
   double value = 1;
   map<string, double> output_throughputs = 2;
 }
 
-message ComponentMetricResponse {
+message StreamComponentMetricsResponse {
   string component_id = 1;
   oneof value {
     TotalMetric total = 2;
@@ -140,32 +141,32 @@ message ComponentMetricResponse {
   }
 }
 
-message HeartbeatRequest {
+message StreamHeartbeatRequest {
   // Update interval in milliseconds
   int32 interval_ms = 1;
 }
 
-message HeartbeatResponse {
+message StreamHeartbeatResponse {
   google.protobuf.Timestamp utc = 1;
 }
 
-message UptimeRequest {
+message StreamUptimeRequest {
   // Update interval in milliseconds
   int32 interval_ms = 1;
 }
 
-message UptimeResponse {
+message StreamUptimeResponse {
   int64 uptime_seconds = 1;
 }
 
-message ComponentAllocatedBytesResponse {
+message StreamComponentAllocatedBytesResponse {
   string component_id = 1;
   int64 allocated_bytes = 2;
 }
 
 // ========== Event Tapping Messages ==========
 
-message OutputEventsRequest {
+message StreamOutputEventsRequest {
   // Glob patterns for output component IDs to match
   repeated string outputs_patterns = 1;
 
@@ -182,7 +183,7 @@ message OutputEventsRequest {
   int32 interval_ms = 4;
 }
 
-message OutputEvent {
+message StreamOutputEventsResponse {
   oneof event {
     TappedEvent tapped_event = 1;
     EventNotification notification = 2;

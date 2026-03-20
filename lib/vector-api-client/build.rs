@@ -15,7 +15,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Allow clippy warning for large enum variant in generated code
     // TappedEvent contains a large EventWrapper while EventNotification is small
     prost_config.type_attribute(
-        ".vector.observability.OutputEvent",
+        ".vector.observability.v1.StreamOutputEventsResponse",
         "#[allow(clippy::large_enum_variant)]",
     );
 
