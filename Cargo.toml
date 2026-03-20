@@ -156,6 +156,7 @@ clap = { version = "4.5.60", default-features = false, features = ["derive", "er
 clap_complete = "4.5.66"
 colored = { version = "3.1.1", default-features = false }
 const-str = { version = "1.1.0", default-features = false }
+criterion = "0.8"
 crossbeam-utils = { version = "0.8.21", default-features = false }
 darling = { version = "0.20.11", default-features = false, features = ["suggestions"] }
 dashmap = { version = "6.1.0", default-features = false }
@@ -479,7 +480,7 @@ approx = "0.5.1"
 assert_cmd = { version = "2.0.17", default-features = false }
 aws-smithy-runtime = { version = "1.8.3", default-features = false, features = ["tls-rustls"] }
 base64 = "0.22.1"
-criterion = { version = "0.7.0", features = ["html_reports", "async_tokio"] }
+criterion = { workspace = true, features = ["html_reports", "async_tokio"] }
 itertools.workspace = true
 libc.workspace = true
 mock_instant.workspace = true
