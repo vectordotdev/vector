@@ -782,11 +782,21 @@ impl ConsumerStateInner<Consuming> {
         active_tasks: &Arc<AtomicUsize>,
     ) {
         while max_message_handling_tasks > 0
-            && max_message_handling_tasks <= active_tasks.load(Ordering::Acquire)
+            && active_tasks
+                .fetch_update(Ordering::AcqRel, Ordering::Acquire, |active_tasks| {
+                    if active_tasks >= max_message_handling_tasks {
+                        // Too many active tasks, return None to keep sleeping in loop
+                        None
+                    } else {
+                        // Immediately add the new task to the active_tasks count and stop waiting
+                        // in loop
+                        Some(active_tasks + 1)
+                    }
+                })
+                .is_ok()
         {
             tokio::time::sleep(Duration::from_millis(3)).await;
         }
-        active_tasks.fetch_add(1, Ordering::AcqRel);
     }
 }
 
