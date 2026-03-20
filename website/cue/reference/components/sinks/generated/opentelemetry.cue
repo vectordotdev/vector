@@ -721,22 +721,6 @@ generated: components: sinks: opentelemetry: configuration: protocol: {
 				}
 			}
 		}
-		endpoint: {
-			description: """
-				The endpoint to send gRPC requests to.
-
-				The endpoint _must_ include a port. If scheme is omitted, `http` or `https` is
-				inferred from the TLS configuration.
-
-				# Examples
-
-				- `http://localhost:4317`
-				- `https://otelcol.example.com:4317`
-				"""
-			relevant_when: "type = \"grpc\""
-			required:      true
-			type: string: examples: ["http://localhost:4317"]
-		}
 		framing: {
 			description:   "Framing configuration."
 			relevant_when: "type = \"http\""
@@ -1171,8 +1155,7 @@ generated: components: sinks: opentelemetry: configuration: protocol: {
 
 				This should include the protocol and host, but can also include the port, path, and any other valid part of a URI.
 				"""
-			relevant_when: "type = \"http\""
-			required:      true
+			required: true
 			type: string: {
 				examples: ["https://10.22.212.22:9000/endpoint"]
 				syntax: "template"

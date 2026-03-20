@@ -44,15 +44,14 @@ use crate::{
         Healthcheck, VectorSink,
         util::{
             BatchConfig, Compression, RealtimeEventBasedDefaultBatchSettings, ServiceBuilderExt,
-            SinkBuilderExt, StreamSink, http::RequestConfig, metadata::RequestMetadataBuilder,
-            retries::RetryLogic,
+            SinkBuilderExt, StreamSink, UriSerde, http::RequestConfig,
+            metadata::RequestMetadataBuilder, retries::RetryLogic,
         },
     },
     tls::{MaybeTlsSettings, TlsConfig},
 };
 
-pub(super) fn with_default_scheme(address: &str, tls: bool) -> crate::Result<Uri> {
-    let uri: Uri = address.parse()?;
+pub(super) fn with_default_scheme(uri: Uri, tls: bool) -> crate::Result<Uri> {
     if uri.scheme().is_none() {
         let mut parts = uri.into_parts();
         parts.scheme = if tls {
@@ -84,18 +83,17 @@ pub(super) fn with_default_scheme(address: &str, tls: bool) -> crate::Result<Uri
 #[configurable_component]
 #[derive(Clone, Debug)]
 pub struct GrpcSinkConfig {
-    /// The endpoint to send gRPC requests to.
+    /// The URI to send gRPC requests to.
     ///
-    /// The endpoint _must_ include a port. If scheme is omitted, `http` or `https` is
-    /// inferred from the TLS configuration.
+    /// The URI _must_ include a port. If the scheme is omitted, `http` is used unless
+    /// TLS options are configured, in which case `https` is used.
     ///
     /// # Examples
     ///
     /// - `http://localhost:4317`
     /// - `https://otelcol.example.com:4317`
-    #[configurable(validation(format = "uri"))]
     #[configurable(metadata(docs::examples = "http://localhost:4317"))]
-    pub endpoint: String,
+    pub uri: UriSerde,
 
     /// Compression codec for outgoing gRPC requests.
     ///
@@ -127,8 +125,8 @@ pub struct GrpcSinkConfig {
 
 impl GrpcSinkConfig {
     pub async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        // Determine TLS from the endpoint scheme; fall back to https when tls config is present.
-        let uri = with_default_scheme(&self.endpoint, self.tls.is_some())?;
+        // Determine TLS from the URI scheme; fall back to https when tls options are present.
+        let uri = with_default_scheme(self.uri.uri.clone(), self.tls.is_some())?;
         let tls = if uri.scheme_str() == Some("https") {
             MaybeTlsSettings::tls_client(self.tls.as_ref())?
         } else {
@@ -642,11 +640,11 @@ mod tests {
     fn generate_grpc_config() {
         let config: GrpcSinkConfig = toml::from_str(
             r#"
-            endpoint = "http://localhost:4317"
+            uri = "http://localhost:4317"
         "#,
         )
         .unwrap();
-        assert_eq!(config.endpoint, "http://localhost:4317");
+        assert_eq!(config.uri.uri.to_string(), "http://localhost:4317");
         assert_eq!(config.compression, Compression::default());
     }
 
@@ -654,30 +652,33 @@ mod tests {
     fn grpc_config_with_gzip() {
         let config: GrpcSinkConfig = toml::from_str(
             r#"
-            endpoint = "https://otelcol.example.com:4317"
+            uri = "https://otelcol.example.com:4317"
             compression = "gzip"
         "#,
         )
         .unwrap();
-        assert_eq!(config.endpoint, "https://otelcol.example.com:4317");
+        assert_eq!(
+            config.uri.uri.to_string(),
+            "https://otelcol.example.com:4317"
+        );
         assert!(matches!(config.compression, Compression::Gzip(_)));
     }
 
     #[test]
     fn with_default_scheme_adds_http() {
-        let uri = with_default_scheme("localhost:4317", false).unwrap();
+        let uri = with_default_scheme("localhost:4317".parse().unwrap(), false).unwrap();
         assert_eq!(uri.scheme_str(), Some("http"));
     }
 
     #[test]
     fn with_default_scheme_adds_https() {
-        let uri = with_default_scheme("localhost:4317", true).unwrap();
+        let uri = with_default_scheme("localhost:4317".parse().unwrap(), true).unwrap();
         assert_eq!(uri.scheme_str(), Some("https"));
     }
 
     #[test]
     fn with_default_scheme_preserves_existing() {
-        let uri = with_default_scheme("http://localhost:4317", true).unwrap();
+        let uri = with_default_scheme("http://localhost:4317".parse().unwrap(), true).unwrap();
         assert_eq!(uri.scheme_str(), Some("http"));
     }
 }

@@ -21,7 +21,7 @@ sinks:
     type: opentelemetry
     protocol:
       type: grpc
-      endpoint: http://otel-collector-sink:4317
+      uri: http://otel-collector-sink:4317
 
   otel_file_sink:
     type: file
