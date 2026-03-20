@@ -99,6 +99,9 @@ impl Arbitrary for Event {
 
 impl Arbitrary for LogEvent {
     fn arbitrary(g: &mut Gen) -> Self {
+        #[cfg(feature = "generate-fixtures")]
+        let mut generator = Gen::from_size_and_seed(MAX_MAP_SIZE, u64::arbitrary(g));
+        #[cfg(not(feature = "generate-fixtures"))]
         let mut generator = Gen::new(MAX_MAP_SIZE);
         let map: ObjectMap = ObjectMap::arbitrary(&mut generator);
         let metadata: EventMetadata = EventMetadata::arbitrary(g);
