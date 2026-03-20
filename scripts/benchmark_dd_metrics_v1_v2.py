@@ -118,6 +118,8 @@ class RunResult:
     generated_total: float
     sent_eps: float
     sent_total: float
+    compressed_bytes_sent: float
+    compressed_bytes_per_sec: float
     avg_cpu_percent: float
     avg_rss_mb: float
     peak_rss_mb: float
@@ -283,6 +285,7 @@ def fetch_metrics_snapshot(metrics_url: str, sink_id: str) -> Dict[str, float]:
     return {
         "sent": extract_component_sum(rows, "component_sent_events_total", sink_id),
         "http_requests": extract_component_sum(rows, "http_client_requests_sent_total", sink_id),
+        "compressed_bytes": extract_component_sum(rows, "component_sent_bytes_total", sink_id),
     }
 
 
@@ -483,6 +486,7 @@ def run_single_benchmark(
 
             duration = float(args.measure_seconds)
             sent_delta = after["sent"] - before["sent"]
+            compressed_bytes_delta = after["compressed_bytes"] - before["compressed_bytes"]
 
             return RunResult(
                 mode=mode,
@@ -491,6 +495,8 @@ def run_single_benchmark(
                 generated_total=gen_rate * duration,
                 sent_eps=sent_delta / duration,
                 sent_total=sent_delta,
+                compressed_bytes_sent=compressed_bytes_delta,
+                compressed_bytes_per_sec=compressed_bytes_delta / duration,
                 avg_cpu_percent=statistics.mean(cpu_samples) if cpu_samples else 0.0,
                 avg_rss_mb=statistics.mean(rss_samples) if rss_samples else 0.0,
                 peak_rss_mb=max(rss_samples) if rss_samples else 0.0,
@@ -514,6 +520,8 @@ def summarize_mode(results: List[RunResult]) -> Dict[str, float]:
         "generated_total": median([r.generated_total for r in results]),
         "sent_eps": median([r.sent_eps for r in results]),
         "sent_total": median([r.sent_total for r in results]),
+        "compressed_bytes_sent": median([r.compressed_bytes_sent for r in results]),
+        "compressed_bytes_per_sec": median([r.compressed_bytes_per_sec for r in results]),
         "avg_cpu_percent": median([r.avg_cpu_percent for r in results]),
         "avg_rss_mb": median([r.avg_rss_mb for r in results]),
         "peak_rss_mb": median([r.peak_rss_mb for r in results]),
@@ -525,12 +533,13 @@ def summarize_mode(results: List[RunResult]) -> Dict[str, float]:
 def print_results_table(results: List[RunResult]) -> None:
     print("\nPer-run results")
     print(
-        "mode repeat gen_rate generated sent_eps sent_total delivery avg_cpu avg_rss_mb peak_rss_mb"
+        "mode repeat gen_rate generated sent_eps sent_total comp_MB comp_MB/s delivery avg_cpu avg_rss_mb peak_rss_mb"
     )
     for r in results:
         print(
             f"{r.mode:>3} {r.repeat:>6} {r.generator_actual_rate:>8.1f} "
             f"{r.generated_total:>9.0f} {r.sent_eps:>8.1f} {r.sent_total:>10.0f} "
+            f"{r.compressed_bytes_sent / 1e6:>7.1f} {r.compressed_bytes_per_sec / 1e6:>8.2f} "
             f"{r.delivery_ratio:>8.3f} "
             f"{r.avg_cpu_percent:>7.1f} {r.avg_rss_mb:>10.1f} {r.peak_rss_mb:>11.1f}"
         )
@@ -544,6 +553,8 @@ def print_median_comparison(v1: Dict[str, float], v2: Dict[str, float]) -> None:
         "generated_total",
         "sent_eps",
         "sent_total",
+        "compressed_bytes_sent",
+        "compressed_bytes_per_sec",
         "avg_cpu_percent",
         "avg_rss_mb",
         "peak_rss_mb",
