@@ -18,7 +18,7 @@ Both this repo and the VRL repo have a `generate-fixtures` feature flag that
 activates fixture-stable `Arbitrary` implementations. The vector-core
 `generate-fixtures` feature automatically enables `vrl/generate-fixtures`.
 
-**Run the generator**
+### Run the generator
 
 ```bash
 cargo run -p vector-core --features generate-fixtures --bin generate-fixtures
