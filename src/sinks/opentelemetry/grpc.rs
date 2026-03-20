@@ -43,11 +43,12 @@ use crate::{
     sinks::{
         Healthcheck, VectorSink,
         util::{
-            BatchConfig, RealtimeEventBasedDefaultBatchSettings, ServiceBuilderExt, SinkBuilderExt,
-            StreamSink, TowerRequestConfig, metadata::RequestMetadataBuilder, retries::RetryLogic,
+            BatchConfig, Compression, RealtimeEventBasedDefaultBatchSettings, ServiceBuilderExt,
+            SinkBuilderExt, StreamSink, http::RequestConfig, metadata::RequestMetadataBuilder,
+            retries::RetryLogic,
         },
     },
-    tls::{MaybeTlsSettings, TlsEnableableConfig},
+    tls::{MaybeTlsSettings, TlsConfig},
 };
 
 pub(super) fn with_default_scheme(address: &str, tls: bool) -> crate::Result<Uri> {
@@ -96,12 +97,12 @@ pub struct GrpcSinkConfig {
     #[configurable(metadata(docs::examples = "http://localhost:4317"))]
     pub endpoint: String,
 
-    /// Whether to compress outgoing requests with gzip.
+    /// Compression codec for outgoing gRPC requests.
     ///
-    /// Defaults to `false`.
+    /// Only `none` and `gzip` are supported for gRPC transport.
+    #[configurable(derived)]
     #[serde(default)]
-    #[configurable(metadata(docs::advanced))]
-    pub compression: bool,
+    pub compression: Compression,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -109,11 +110,11 @@ pub struct GrpcSinkConfig {
 
     #[configurable(derived)]
     #[serde(default)]
-    pub request: TowerRequestConfig,
+    pub request: RequestConfig,
 
     #[configurable(derived)]
     #[serde(default)]
-    pub tls: Option<TlsEnableableConfig>,
+    pub tls: Option<TlsConfig>,
 
     #[configurable(derived)]
     #[serde(
@@ -126,15 +127,30 @@ pub struct GrpcSinkConfig {
 
 impl GrpcSinkConfig {
     pub async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let tls = MaybeTlsSettings::from_config(self.tls.as_ref(), false)?;
-        let uri = with_default_scheme(&self.endpoint, tls.is_tls())?;
+        // Determine TLS from the endpoint scheme; fall back to https when tls config is present.
+        let uri = with_default_scheme(&self.endpoint, self.tls.is_some())?;
+        let tls = if uri.scheme_str() == Some("https") {
+            MaybeTlsSettings::tls_client(self.tls.as_ref())?
+        } else {
+            MaybeTlsSettings::Raw(())
+        };
 
+        let use_gzip = match self.compression {
+            Compression::None => false,
+            Compression::Gzip(_) => true,
+            other => {
+                return Err(format!(
+                    "gRPC transport only supports 'none' or 'gzip' compression, got '{other}'"
+                )
+                .into())
+            }
+        };
         let client = new_grpc_client(&tls, cx.proxy())?;
-        let service = OtlpGrpcService::new(client, uri, self.compression);
+        let service = OtlpGrpcService::new(client, uri, use_gzip);
 
         let healthcheck = Box::pin(async move { Ok(()) });
 
-        let request_settings = self.request.into_settings();
+        let request_settings = self.request.tower.into_settings();
         let batch_settings = self.batch.into_batcher_settings()?;
 
         let service = ServiceBuilder::new()
@@ -631,20 +647,20 @@ mod tests {
         )
         .unwrap();
         assert_eq!(config.endpoint, "http://localhost:4317");
-        assert!(!config.compression);
+        assert_eq!(config.compression, Compression::default());
     }
 
     #[test]
-    fn grpc_config_with_tls() {
+    fn grpc_config_with_gzip() {
         let config: GrpcSinkConfig = toml::from_str(
             r#"
             endpoint = "https://otelcol.example.com:4317"
-            compression = true
+            compression = "gzip"
         "#,
         )
         .unwrap();
         assert_eq!(config.endpoint, "https://otelcol.example.com:4317");
-        assert!(config.compression);
+        assert!(matches!(config.compression, Compression::Gzip(_)));
     }
 
     #[test]
