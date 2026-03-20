@@ -31,5 +31,8 @@ fn main() {
         proto_out.write_all(&buf).unwrap();
     }
 
-    println!("Written 1024 fixtures to {}", fixture_dir.display());
+    #[allow(clippy::print_stdout)]
+    {
+        println!("Written 1024 fixtures to {}", fixture_dir.display());
+    }
 }
