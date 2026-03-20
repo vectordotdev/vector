@@ -1070,7 +1070,7 @@ mod tests {
     }
 
     fn get_compressed_empty_sketches_payload() -> Bytes {
-        Compressor::from(Compression::zlib_default())
+        Compressor::from(Compression::zstd_default())
             .finish()
             .expect("should not fail")
             .freeze()

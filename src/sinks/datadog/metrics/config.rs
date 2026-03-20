@@ -111,8 +111,8 @@ impl DatadogMetricsEndpoint {
     /// Returns the compression scheme used for this endpoint.
     pub(super) const fn compression(self) -> DatadogMetricsCompression {
         match self {
-            Self::Series(SeriesApiVersion::V2) => DatadogMetricsCompression::Zstd,
-            _ => DatadogMetricsCompression::Zlib,
+            Self::Series(SeriesApiVersion::V1) => DatadogMetricsCompression::Zlib,
+            _ => DatadogMetricsCompression::Zstd,
         }
     }
 }
@@ -120,9 +120,9 @@ impl DatadogMetricsEndpoint {
 /// Selects the compressor for a given Datadog metrics endpoint.
 #[derive(Clone, Copy, Debug)]
 pub(super) enum DatadogMetricsCompression {
-    /// zlib (deflate) — used by Series v1 and Sketches.
+    /// zlib (deflate) — used by Series v1.
     Zlib,
-    /// zstd — used by Series v2.
+    /// zstd — used by Series v2 and Sketches.
     Zstd,
 }
 
