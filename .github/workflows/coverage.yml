@@ -29,7 +29,7 @@ jobs:
           datadog-ci: true
 
       - name: "Generate code coverage"
-        run: cargo llvm-cov nextest --all-features --workspace --lcov --output-path lcov.info
+        run: cargo llvm-cov nextest --workspace --lcov --output-path lcov.info
 
       - name: "Upload coverage to Datadog"
         env:
