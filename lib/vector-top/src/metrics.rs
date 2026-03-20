@@ -203,10 +203,10 @@ async fn received_bytes_throughputs(
         }
         if let Some(Value::Throughput(tp)) = response.value {
             _ = tx
-                .send(state::EventType::ReceivedBytesThroughputs(
-                    interval,
-                    vec![(ComponentKey::from(component_id.as_str()), tp.value as i64)],
-                ))
+                .send(state::EventType::ReceivedBytesThroughputs(vec![(
+                    ComponentKey::from(component_id.as_str()),
+                    tp.value as i64,
+                )]))
                 .await;
         }
     }
@@ -261,10 +261,10 @@ async fn received_events_throughputs(
         }
         if let Some(Value::Throughput(tp)) = response.value {
             _ = tx
-                .send(state::EventType::ReceivedEventsThroughputs(
-                    interval,
-                    vec![(ComponentKey::from(component_id.as_str()), tp.value as i64)],
-                ))
+                .send(state::EventType::ReceivedEventsThroughputs(vec![(
+                    ComponentKey::from(component_id.as_str()),
+                    tp.value as i64,
+                )]))
                 .await;
         }
     }
@@ -319,10 +319,10 @@ async fn sent_bytes_throughputs(
         }
         if let Some(Value::Throughput(tp)) = response.value {
             _ = tx
-                .send(state::EventType::SentBytesThroughputs(
-                    interval,
-                    vec![(ComponentKey::from(component_id.as_str()), tp.value as i64)],
-                ))
+                .send(state::EventType::SentBytesThroughputs(vec![(
+                    ComponentKey::from(component_id.as_str()),
+                    tp.value as i64,
+                )]))
                 .await;
         }
     }
@@ -378,9 +378,8 @@ async fn sent_events_throughputs(
         }
         if let Some(Value::Throughput(tp)) = response.value {
             _ = tx
-                .send(state::EventType::SentEventsThroughputs(
-                    interval,
-                    vec![SentEventsMetric {
+                .send(state::EventType::SentEventsThroughputs(vec![
+                    SentEventsMetric {
                         key: ComponentKey::from(component_id.as_str()),
                         total: tp.value as i64,
                         outputs: tp
@@ -388,8 +387,8 @@ async fn sent_events_throughputs(
                             .into_iter()
                             .map(|(k, v)| (k, v as i64))
                             .collect(),
-                    }],
-                ))
+                    },
+                ]))
                 .await;
         }
     }
@@ -461,10 +460,13 @@ pub async fn subscribe(
 ) -> Result<SubscribeHandles, vector_api_client::Error> {
     let components_patterns = Arc::new(components_patterns);
 
-    let mut client = Client::new(
-        url.parse()
-            .map_err(|e| vector_api_client::Error::InvalidUrl { message: format!("{e}") })?,
-    );
+    let mut client =
+        Client::new(
+            url.parse()
+                .map_err(|e| vector_api_client::Error::InvalidUrl {
+                    message: format!("{e}"),
+                })?,
+        );
     client.connect().await?;
 
     let poll_handle = tokio::spawn(poll_components(
@@ -554,10 +556,13 @@ pub async fn init_components(
     url: &str,
     components_patterns: &[Pattern],
 ) -> Result<state::State, vector_api_client::Error> {
-    let mut client = Client::new(
-        url.parse()
-            .map_err(|e| vector_api_client::Error::InvalidUrl { message: format!("{e}") })?,
-    );
+    let mut client =
+        Client::new(
+            url.parse()
+                .map_err(|e| vector_api_client::Error::InvalidUrl {
+                    message: format!("{e}"),
+                })?,
+        );
     client.connect().await?;
 
     // Get all components
