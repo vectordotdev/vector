@@ -9,7 +9,7 @@ use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
 use vector_api_client::{
     Client,
-    proto::{Component, ComponentType},
+    proto::{Component, ComponentType, MetricName, component_metric_response::Value},
 };
 
 use crate::state::{self, OutputMetrics, SentEventsMetric};
@@ -160,10 +160,9 @@ async fn received_bytes_totals(
     components_patterns: Arc<Vec<Pattern>>,
 ) {
     let Ok(mut stream) = client
-        .stream_component_received_bytes_total(interval as i32)
+        .stream_component_metrics(MetricName::ReceivedBytesTotal, interval as i32)
         .await
     else {
-        // Failed to establish stream, will retry on reconnection
         return;
     };
 
@@ -172,14 +171,14 @@ async fn received_bytes_totals(
         if !component_matches_patterns(component_id, &components_patterns) {
             continue;
         }
-
-        // Send immediately to ensure live updates for systems with <10 components
-        _ = tx
-            .send(state::EventType::ReceivedBytesTotals(vec![(
-                ComponentKey::from(component_id.as_str()),
-                response.total,
-            )]))
-            .await;
+        if let Some(Value::Total(total)) = response.value {
+            _ = tx
+                .send(state::EventType::ReceivedBytesTotals(vec![(
+                    ComponentKey::from(component_id.as_str()),
+                    total.value,
+                )]))
+                .await;
+        }
     }
 }
 
@@ -190,10 +189,9 @@ async fn received_bytes_throughputs(
     components_patterns: Arc<Vec<Pattern>>,
 ) {
     let Ok(mut stream) = client
-        .stream_component_received_bytes_throughput(interval as i32)
+        .stream_component_metrics(MetricName::ReceivedBytesThroughput, interval as i32)
         .await
     else {
-        // Failed to establish stream, will retry on reconnection
         return;
     };
 
@@ -202,17 +200,14 @@ async fn received_bytes_throughputs(
         if !component_matches_patterns(component_id, &components_patterns) {
             continue;
         }
-
-        // Send immediately to ensure live updates for systems with <10 components
-        _ = tx
-            .send(state::EventType::ReceivedBytesThroughputs(
-                interval,
-                vec![(
-                    ComponentKey::from(component_id.as_str()),
-                    response.throughput as i64,
-                )],
-            ))
-            .await;
+        if let Some(Value::Throughput(tp)) = response.value {
+            _ = tx
+                .send(state::EventType::ReceivedBytesThroughputs(
+                    interval,
+                    vec![(ComponentKey::from(component_id.as_str()), tp.value as i64)],
+                ))
+                .await;
+        }
     }
 }
 
@@ -223,10 +218,9 @@ async fn received_events_totals(
     components_patterns: Arc<Vec<Pattern>>,
 ) {
     let Ok(mut stream) = client
-        .stream_component_received_events_total(interval as i32)
+        .stream_component_metrics(MetricName::ReceivedEventsTotal, interval as i32)
         .await
     else {
-        // Failed to establish stream, will retry on reconnection
         return;
     };
 
@@ -235,14 +229,14 @@ async fn received_events_totals(
         if !component_matches_patterns(component_id, &components_patterns) {
             continue;
         }
-
-        // Send immediately to ensure live updates for systems with <10 components
-        _ = tx
-            .send(state::EventType::ReceivedEventsTotals(vec![(
-                ComponentKey::from(component_id.as_str()),
-                response.total,
-            )]))
-            .await;
+        if let Some(Value::Total(total)) = response.value {
+            _ = tx
+                .send(state::EventType::ReceivedEventsTotals(vec![(
+                    ComponentKey::from(component_id.as_str()),
+                    total.value,
+                )]))
+                .await;
+        }
     }
 }
 
@@ -253,10 +247,9 @@ async fn received_events_throughputs(
     components_patterns: Arc<Vec<Pattern>>,
 ) {
     let Ok(mut stream) = client
-        .stream_component_received_events_throughput(interval as i32)
+        .stream_component_metrics(MetricName::ReceivedEventsThroughput, interval as i32)
         .await
     else {
-        // Failed to establish stream, will retry on reconnection
         return;
     };
 
@@ -265,17 +258,14 @@ async fn received_events_throughputs(
         if !component_matches_patterns(component_id, &components_patterns) {
             continue;
         }
-
-        // Send immediately to ensure live updates for systems with <10 components
-        _ = tx
-            .send(state::EventType::ReceivedEventsThroughputs(
-                interval,
-                vec![(
-                    ComponentKey::from(component_id.as_str()),
-                    response.throughput as i64,
-                )],
-            ))
-            .await;
+        if let Some(Value::Throughput(tp)) = response.value {
+            _ = tx
+                .send(state::EventType::ReceivedEventsThroughputs(
+                    interval,
+                    vec![(ComponentKey::from(component_id.as_str()), tp.value as i64)],
+                ))
+                .await;
+        }
     }
 }
 
@@ -286,10 +276,9 @@ async fn sent_bytes_totals(
     components_patterns: Arc<Vec<Pattern>>,
 ) {
     let Ok(mut stream) = client
-        .stream_component_sent_bytes_total(interval as i32)
+        .stream_component_metrics(MetricName::SentBytesTotal, interval as i32)
         .await
     else {
-        // Failed to establish stream, will retry on reconnection
         return;
     };
 
@@ -298,14 +287,14 @@ async fn sent_bytes_totals(
         if !component_matches_patterns(component_id, &components_patterns) {
             continue;
         }
-
-        // Send immediately to ensure live updates for systems with <10 components
-        _ = tx
-            .send(state::EventType::SentBytesTotals(vec![(
-                ComponentKey::from(component_id.as_str()),
-                response.total,
-            )]))
-            .await;
+        if let Some(Value::Total(total)) = response.value {
+            _ = tx
+                .send(state::EventType::SentBytesTotals(vec![(
+                    ComponentKey::from(component_id.as_str()),
+                    total.value,
+                )]))
+                .await;
+        }
     }
 }
 
@@ -316,10 +305,9 @@ async fn sent_bytes_throughputs(
     components_patterns: Arc<Vec<Pattern>>,
 ) {
     let Ok(mut stream) = client
-        .stream_component_sent_bytes_throughput(interval as i32)
+        .stream_component_metrics(MetricName::SentBytesThroughput, interval as i32)
         .await
     else {
-        // Failed to establish stream, will retry on reconnection
         return;
     };
 
@@ -328,17 +316,14 @@ async fn sent_bytes_throughputs(
         if !component_matches_patterns(component_id, &components_patterns) {
             continue;
         }
-
-        // Send immediately to ensure live updates for systems with <10 components
-        _ = tx
-            .send(state::EventType::SentBytesThroughputs(
-                interval,
-                vec![(
-                    ComponentKey::from(component_id.as_str()),
-                    response.throughput as i64,
-                )],
-            ))
-            .await;
+        if let Some(Value::Throughput(tp)) = response.value {
+            _ = tx
+                .send(state::EventType::SentBytesThroughputs(
+                    interval,
+                    vec![(ComponentKey::from(component_id.as_str()), tp.value as i64)],
+                ))
+                .await;
+        }
     }
 }
 
@@ -349,10 +334,9 @@ async fn sent_events_totals(
     components_patterns: Arc<Vec<Pattern>>,
 ) {
     let Ok(mut stream) = client
-        .stream_component_sent_events_total(interval as i32)
+        .stream_component_metrics(MetricName::SentEventsTotal, interval as i32)
         .await
     else {
-        // Failed to establish stream, will retry on reconnection
         return;
     };
 
@@ -361,14 +345,15 @@ async fn sent_events_totals(
         if !component_matches_patterns(component_id, &components_patterns) {
             continue;
         }
-
-        _ = tx
-            .send(state::EventType::SentEventsTotals(vec![SentEventsMetric {
-                key: ComponentKey::from(component_id.as_str()),
-                total: response.total,
-                outputs: response.output_totals.into_iter().collect(),
-            }]))
-            .await;
+        if let Some(Value::Total(total)) = response.value {
+            _ = tx
+                .send(state::EventType::SentEventsTotals(vec![SentEventsMetric {
+                    key: ComponentKey::from(component_id.as_str()),
+                    total: total.value,
+                    outputs: total.output_totals.into_iter().collect(),
+                }]))
+                .await;
+        }
     }
 }
 
@@ -379,10 +364,9 @@ async fn sent_events_throughputs(
     components_patterns: Arc<Vec<Pattern>>,
 ) {
     let Ok(mut stream) = client
-        .stream_component_sent_events_throughput(interval as i32)
+        .stream_component_metrics(MetricName::SentEventsThroughput, interval as i32)
         .await
     else {
-        // Failed to establish stream, will retry on reconnection
         return;
     };
 
@@ -391,21 +375,22 @@ async fn sent_events_throughputs(
         if !component_matches_patterns(component_id, &components_patterns) {
             continue;
         }
-
-        _ = tx
-            .send(state::EventType::SentEventsThroughputs(
-                interval,
-                vec![SentEventsMetric {
-                    key: ComponentKey::from(component_id.as_str()),
-                    total: response.throughput as i64,
-                    outputs: response
-                        .output_throughputs
-                        .into_iter()
-                        .map(|(k, v)| (k, v as i64))
-                        .collect(),
-                }],
-            ))
-            .await;
+        if let Some(Value::Throughput(tp)) = response.value {
+            _ = tx
+                .send(state::EventType::SentEventsThroughputs(
+                    interval,
+                    vec![SentEventsMetric {
+                        key: ComponentKey::from(component_id.as_str()),
+                        total: tp.value as i64,
+                        outputs: tp
+                            .output_throughputs
+                            .into_iter()
+                            .map(|(k, v)| (k, v as i64))
+                            .collect(),
+                    }],
+                ))
+                .await;
+        }
     }
 }
 
@@ -415,7 +400,10 @@ async fn errors_totals(
     interval: i64,
     components_patterns: Arc<Vec<Pattern>>,
 ) {
-    let Ok(mut stream) = client.stream_component_errors_total(interval as i32).await else {
+    let Ok(mut stream) = client
+        .stream_component_metrics(MetricName::ErrorsTotal, interval as i32)
+        .await
+    else {
         return;
     };
 
@@ -424,14 +412,14 @@ async fn errors_totals(
         if !component_matches_patterns(component_id, &components_patterns) {
             continue;
         }
-
-        // Send immediately to ensure live updates for systems with <10 components
-        _ = tx
-            .send(state::EventType::ErrorsTotals(vec![(
-                ComponentKey::from(component_id.as_str()),
-                response.total,
-            )]))
-            .await;
+        if let Some(Value::Total(total)) = response.value {
+            _ = tx
+                .send(state::EventType::ErrorsTotals(vec![(
+                    ComponentKey::from(component_id.as_str()),
+                    total.value,
+                )]))
+                .await;
+        }
     }
 }
 

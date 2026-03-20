@@ -182,9 +182,9 @@ fn get_controller() -> Result<&'static Controller, Status> {
 fn metric_totals_stream(
     duration: Duration,
     metric_name: &'static str,
-) -> Result<impl Stream<Item = Result<ComponentTotalsResponse, Status>>, Status> {
+) -> Result<BoxStream<ComponentMetricResponse>, Status> {
     let controller = get_controller()?;
-    Ok(
+    Ok(Box::pin(
         tokio_stream::StreamExt::map(IntervalStream::new(interval(duration)), move |_| {
             let metrics = controller.capture_metrics();
             let component_metrics = filter_and_group_metrics(&metrics, metric_name);
@@ -192,28 +192,30 @@ fn metric_totals_stream(
                 component_metrics
                     .into_iter()
                     .map(|(component_id, total)| {
-                        Ok(ComponentTotalsResponse {
+                        Ok(ComponentMetricResponse {
                             component_id,
-                            total: total as i64,
-                            output_totals: Default::default(),
+                            value: Some(component_metric_response::Value::Total(TotalMetric {
+                                value: total as i64,
+                                output_totals: Default::default(),
+                            })),
                         })
                     })
                     .collect::<Vec<_>>(),
             )
         })
         .flatten(),
-    )
+    ))
 }
 
 /// Builds a stream that emits per-component throughputs for `metric_name` every `duration`.
 fn metric_throughput_stream(
     duration: Duration,
     metric_name: &'static str,
-) -> Result<impl Stream<Item = Result<ComponentThroughputResponse, Status>>, Status> {
+) -> Result<BoxStream<ComponentMetricResponse>, Status> {
     let controller = get_controller()?;
     let interval_secs = duration.as_secs_f64();
     let previous_values = Arc::new(Mutex::new(HashMap::new()));
-    Ok(
+    Ok(Box::pin(
         tokio_stream::StreamExt::map(IntervalStream::new(interval(duration)), move |_| {
             let metrics = controller.capture_metrics();
             let current_values = filter_and_group_metrics(&metrics, metric_name);
@@ -230,25 +232,27 @@ fn metric_throughput_stream(
                 throughputs
                     .into_iter()
                     .map(|(component_id, throughput)| {
-                        Ok(ComponentThroughputResponse {
+                        Ok(ComponentMetricResponse {
                             component_id,
-                            throughput,
-                            output_throughputs: Default::default(),
+                            value: Some(component_metric_response::Value::Throughput(
+                                ThroughputMetric {
+                                    value: throughput,
+                                    output_throughputs: Default::default(),
+                                },
+                            )),
                         })
                     })
                     .collect::<Vec<_>>(),
             )
         })
         .flatten(),
-    )
+    ))
 }
 
 /// Builds a stream that emits per-component sent_events totals with per-output breakdown.
-fn sent_events_totals_stream(
-    duration: Duration,
-) -> Result<impl Stream<Item = Result<ComponentTotalsResponse, Status>>, Status> {
+fn sent_events_totals_stream(duration: Duration) -> Result<BoxStream<ComponentMetricResponse>, Status> {
     let controller = get_controller()?;
-    Ok(
+    Ok(Box::pin(
         tokio_stream::StreamExt::map(IntervalStream::new(interval(duration)), move |_| {
             let metrics = controller.capture_metrics();
             let component_totals =
@@ -274,28 +278,30 @@ fn sent_events_totals_stream(
                             .unwrap_or_default()
                             .into_iter()
                             .collect();
-                        Ok(ComponentTotalsResponse {
+                        Ok(ComponentMetricResponse {
                             component_id,
-                            total: total as i64,
-                            output_totals,
+                            value: Some(component_metric_response::Value::Total(TotalMetric {
+                                value: total as i64,
+                                output_totals,
+                            })),
                         })
                     })
                     .collect::<Vec<_>>(),
             )
         })
         .flatten(),
-    )
+    ))
 }
 
 /// Builds a stream that emits per-component sent_events throughputs with per-output breakdown.
 fn sent_events_throughput_stream(
     duration: Duration,
-) -> Result<impl Stream<Item = Result<ComponentThroughputResponse, Status>>, Status> {
+) -> Result<BoxStream<ComponentMetricResponse>, Status> {
     let controller = get_controller()?;
     let interval_secs = duration.as_secs_f64();
     let previous_totals = Arc::new(Mutex::new(HashMap::<String, f64>::new()));
     let previous_outputs = Arc::new(Mutex::new(HashMap::<(String, String), f64>::new()));
-    Ok(
+    Ok(Box::pin(
         tokio_stream::StreamExt::map(IntervalStream::new(interval(duration)), move |_| {
             let metrics = controller.capture_metrics();
             let current_totals = filter_and_group_metrics(&metrics, "component_sent_events_total");
@@ -342,17 +348,21 @@ fn sent_events_throughput_stream(
                             .unwrap_or_default()
                             .into_iter()
                             .collect();
-                        Ok(ComponentThroughputResponse {
+                        Ok(ComponentMetricResponse {
                             component_id,
-                            throughput,
-                            output_throughputs,
+                            value: Some(component_metric_response::Value::Throughput(
+                                ThroughputMetric {
+                                    value: throughput,
+                                    output_throughputs,
+                                },
+                            )),
                         })
                     })
                     .collect::<Vec<_>>(),
             )
         })
         .flatten(),
-    )
+    ))
 }
 
 /// Converts a component's output port names into proto `Output` messages,
@@ -581,128 +591,45 @@ impl observability::Service for ObservabilityService {
         Ok(Response::new(Box::pin(stream)))
     }
 
-    type StreamComponentReceivedEventsThroughputStream = BoxStream<ComponentThroughputResponse>;
+    type StreamComponentMetricsStream = BoxStream<ComponentMetricResponse>;
 
-    async fn stream_component_received_events_throughput(
+    async fn stream_component_metrics(
         &self,
-        request: Request<MetricStreamRequest>,
-    ) -> Result<Response<Self::StreamComponentReceivedEventsThroughputStream>, Status> {
-        let duration =
-            Duration::from_millis(validate_interval_ms(request.into_inner().interval_ms)?);
-        Ok(Response::new(Box::pin(metric_throughput_stream(
-            duration,
-            "component_received_events_total",
-        )?)))
-    }
+        request: Request<ComponentMetricStreamRequest>,
+    ) -> Result<Response<Self::StreamComponentMetricsStream>, Status> {
+        let req = request.into_inner();
+        let duration = Duration::from_millis(validate_interval_ms(req.interval_ms)?);
+        let metric = MetricName::try_from(req.metric)
+            .map_err(|_| Status::invalid_argument("Unknown metric value"))?;
 
-    type StreamComponentSentEventsThroughputStream = BoxStream<ComponentThroughputResponse>;
+        let stream: BoxStream<ComponentMetricResponse> = match metric {
+            MetricName::Unspecified => {
+                return Err(Status::invalid_argument("metric must be specified"));
+            }
+            MetricName::ReceivedEventsTotal => {
+                metric_totals_stream(duration, "component_received_events_total")?
+            }
+            MetricName::SentEventsTotal => sent_events_totals_stream(duration)?,
+            MetricName::ReceivedBytesTotal => {
+                metric_totals_stream(duration, "component_received_bytes_total")?
+            }
+            MetricName::SentBytesTotal => {
+                metric_totals_stream(duration, "component_sent_bytes_total")?
+            }
+            MetricName::ErrorsTotal => metric_totals_stream(duration, "component_errors_total")?,
+            MetricName::ReceivedEventsThroughput => {
+                metric_throughput_stream(duration, "component_received_events_total")?
+            }
+            MetricName::SentEventsThroughput => sent_events_throughput_stream(duration)?,
+            MetricName::ReceivedBytesThroughput => {
+                metric_throughput_stream(duration, "component_received_bytes_total")?
+            }
+            MetricName::SentBytesThroughput => {
+                metric_throughput_stream(duration, "component_sent_bytes_total")?
+            }
+        };
 
-    async fn stream_component_sent_events_throughput(
-        &self,
-        request: Request<MetricStreamRequest>,
-    ) -> Result<Response<Self::StreamComponentSentEventsThroughputStream>, Status> {
-        let duration =
-            Duration::from_millis(validate_interval_ms(request.into_inner().interval_ms)?);
-        Ok(Response::new(Box::pin(sent_events_throughput_stream(
-            duration,
-        )?)))
-    }
-
-    type StreamComponentReceivedBytesThroughputStream = BoxStream<ComponentThroughputResponse>;
-
-    async fn stream_component_received_bytes_throughput(
-        &self,
-        request: Request<MetricStreamRequest>,
-    ) -> Result<Response<Self::StreamComponentReceivedBytesThroughputStream>, Status> {
-        let duration =
-            Duration::from_millis(validate_interval_ms(request.into_inner().interval_ms)?);
-        Ok(Response::new(Box::pin(metric_throughput_stream(
-            duration,
-            "component_received_bytes_total",
-        )?)))
-    }
-
-    type StreamComponentSentBytesThroughputStream = BoxStream<ComponentThroughputResponse>;
-
-    async fn stream_component_sent_bytes_throughput(
-        &self,
-        request: Request<MetricStreamRequest>,
-    ) -> Result<Response<Self::StreamComponentSentBytesThroughputStream>, Status> {
-        let duration =
-            Duration::from_millis(validate_interval_ms(request.into_inner().interval_ms)?);
-        Ok(Response::new(Box::pin(metric_throughput_stream(
-            duration,
-            "component_sent_bytes_total",
-        )?)))
-    }
-
-    type StreamComponentReceivedEventsTotalStream = BoxStream<ComponentTotalsResponse>;
-
-    async fn stream_component_received_events_total(
-        &self,
-        request: Request<MetricStreamRequest>,
-    ) -> Result<Response<Self::StreamComponentReceivedEventsTotalStream>, Status> {
-        let duration =
-            Duration::from_millis(validate_interval_ms(request.into_inner().interval_ms)?);
-        Ok(Response::new(Box::pin(metric_totals_stream(
-            duration,
-            "component_received_events_total",
-        )?)))
-    }
-
-    type StreamComponentSentEventsTotalStream = BoxStream<ComponentTotalsResponse>;
-
-    async fn stream_component_sent_events_total(
-        &self,
-        request: Request<MetricStreamRequest>,
-    ) -> Result<Response<Self::StreamComponentSentEventsTotalStream>, Status> {
-        let duration =
-            Duration::from_millis(validate_interval_ms(request.into_inner().interval_ms)?);
-        Ok(Response::new(Box::pin(sent_events_totals_stream(
-            duration,
-        )?)))
-    }
-
-    type StreamComponentReceivedBytesTotalStream = BoxStream<ComponentTotalsResponse>;
-
-    async fn stream_component_received_bytes_total(
-        &self,
-        request: Request<MetricStreamRequest>,
-    ) -> Result<Response<Self::StreamComponentReceivedBytesTotalStream>, Status> {
-        let duration =
-            Duration::from_millis(validate_interval_ms(request.into_inner().interval_ms)?);
-        Ok(Response::new(Box::pin(metric_totals_stream(
-            duration,
-            "component_received_bytes_total",
-        )?)))
-    }
-
-    type StreamComponentSentBytesTotalStream = BoxStream<ComponentTotalsResponse>;
-
-    async fn stream_component_sent_bytes_total(
-        &self,
-        request: Request<MetricStreamRequest>,
-    ) -> Result<Response<Self::StreamComponentSentBytesTotalStream>, Status> {
-        let duration =
-            Duration::from_millis(validate_interval_ms(request.into_inner().interval_ms)?);
-        Ok(Response::new(Box::pin(metric_totals_stream(
-            duration,
-            "component_sent_bytes_total",
-        )?)))
-    }
-
-    type StreamComponentErrorsTotalStream = BoxStream<ComponentTotalsResponse>;
-
-    async fn stream_component_errors_total(
-        &self,
-        request: Request<MetricStreamRequest>,
-    ) -> Result<Response<Self::StreamComponentErrorsTotalStream>, Status> {
-        let duration =
-            Duration::from_millis(validate_interval_ms(request.into_inner().interval_ms)?);
-        Ok(Response::new(Box::pin(metric_totals_stream(
-            duration,
-            "component_errors_total",
-        )?)))
+        Ok(Response::new(stream))
     }
 
     // ========== Event Tapping ==========

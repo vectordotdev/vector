@@ -29,24 +29,9 @@ service Observability {
   // Stream memory allocated per component
   rpc StreamComponentAllocatedBytes(MetricStreamRequest) returns (stream ComponentAllocatedBytesResponse);
 
-  // Stream throughput metrics (events/sec)
-  rpc StreamComponentReceivedEventsThroughput(MetricStreamRequest) returns (stream ComponentThroughputResponse);
-  rpc StreamComponentSentEventsThroughput(MetricStreamRequest) returns (stream ComponentThroughputResponse);
-
-  // Stream throughput metrics (bytes/sec)
-  rpc StreamComponentReceivedBytesThroughput(MetricStreamRequest) returns (stream ComponentThroughputResponse);
-  rpc StreamComponentSentBytesThroughput(MetricStreamRequest) returns (stream ComponentThroughputResponse);
-
-  // Stream cumulative total metrics (events)
-  rpc StreamComponentReceivedEventsTotal(MetricStreamRequest) returns (stream ComponentTotalsResponse);
-  rpc StreamComponentSentEventsTotal(MetricStreamRequest) returns (stream ComponentTotalsResponse);
-
-  // Stream cumulative total metrics (bytes)
-  rpc StreamComponentReceivedBytesTotal(MetricStreamRequest) returns (stream ComponentTotalsResponse);
-  rpc StreamComponentSentBytesTotal(MetricStreamRequest) returns (stream ComponentTotalsResponse);
-
-  // Stream error counts per component
-  rpc StreamComponentErrorsTotal(MetricStreamRequest) returns (stream ComponentTotalsResponse);
+  // Stream per-component metrics (throughput or totals) for a chosen metric.
+  // Replaces the former 9 per-metric streaming RPCs with a single unified endpoint.
+  rpc StreamComponentMetrics(ComponentMetricStreamRequest) returns (stream ComponentMetricResponse);
 
   // ========== Event Tapping ==========
 
@@ -113,6 +98,48 @@ message MetricStreamRequest {
   int32 interval_ms = 1;
 }
 
+// Identifies which per-component metric to stream via StreamComponentMetrics.
+enum MetricName {
+  METRIC_NAME_UNSPECIFIED = 0;
+  RECEIVED_EVENTS_THROUGHPUT = 1;
+  SENT_EVENTS_THROUGHPUT = 2;
+  RECEIVED_BYTES_THROUGHPUT = 3;
+  SENT_BYTES_THROUGHPUT = 4;
+  RECEIVED_EVENTS_TOTAL = 5;
+  SENT_EVENTS_TOTAL = 6;
+  RECEIVED_BYTES_TOTAL = 7;
+  SENT_BYTES_TOTAL = 8;
+  ERRORS_TOTAL = 9;
+}
+
+message ComponentMetricStreamRequest {
+  // Update interval in milliseconds
+  int32 interval_ms = 1;
+  MetricName metric = 2;
+}
+
+// Cumulative total value for a component metric.
+// output_totals is only populated for SENT_EVENTS_TOTAL.
+message TotalMetric {
+  int64 value = 1;
+  map<string, int64> output_totals = 2;
+}
+
+// Throughput value (per-second rate) for a component metric.
+// output_throughputs is only populated for SENT_EVENTS_THROUGHPUT.
+message ThroughputMetric {
+  double value = 1;
+  map<string, double> output_throughputs = 2;
+}
+
+message ComponentMetricResponse {
+  string component_id = 1;
+  oneof value {
+    TotalMetric total = 2;
+    ThroughputMetric throughput = 3;
+  }
+}
+
 message HeartbeatRequest {
   // Update interval in milliseconds
   int32 interval_ms = 1;
@@ -134,20 +161,6 @@ message UptimeResponse {
 message ComponentAllocatedBytesResponse {
   string component_id = 1;
   int64 allocated_bytes = 2;
-}
-
-message ComponentThroughputResponse {
-  string component_id = 1;
-  double throughput = 2;  // events/sec or bytes/sec depending on the stream
-  // Per-output throughput breakdown (only populated for sent_events streams)
-  map<string, double> output_throughputs = 3;
-}
-
-message ComponentTotalsResponse {
-  string component_id = 1;
-  int64 total = 2;
-  // Per-output totals breakdown (only populated for sent_events streams)
-  map<string, int64> output_totals = 3;
 }
 
 // ========== Event Tapping Messages ==========

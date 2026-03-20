@@ -4,9 +4,9 @@ use tonic::transport::{Channel, Endpoint};
 use crate::{
     error::{Error, Result},
     proto::{
-        ComponentAllocatedBytesResponse, ComponentThroughputResponse, ComponentTotalsResponse,
+        ComponentAllocatedBytesResponse, ComponentMetricResponse, ComponentMetricStreamRequest,
         ComponentsRequest, ComponentsResponse, HealthRequest, HealthResponse, HeartbeatRequest,
-        HeartbeatResponse, MetaRequest, MetaResponse, MetricStreamRequest, OutputEvent,
+        HeartbeatResponse, MetaRequest, MetaResponse, MetricName, MetricStreamRequest, OutputEvent,
         OutputEventsRequest, UptimeRequest, UptimeResponse,
         observability_client::ObservabilityClient,
     },
@@ -125,146 +125,23 @@ impl Client {
         Ok(response.into_inner().map(|r| r.map_err(Error::from)))
     }
 
-    /// Stream received events throughput (events/sec)
+    /// Stream per-component metrics for a chosen metric name.
     ///
     /// # Arguments
     ///
+    /// * `metric` - Which metric to stream
     /// * `interval_ms` - Update interval in milliseconds
-    pub async fn stream_component_received_events_throughput(
+    pub async fn stream_component_metrics(
         &mut self,
+        metric: MetricName,
         interval_ms: i32,
-    ) -> Result<impl Stream<Item = Result<ComponentThroughputResponse>>> {
+    ) -> Result<impl Stream<Item = Result<ComponentMetricResponse>>> {
         let client = self.ensure_connected()?;
         let response = client
-            .stream_component_received_events_throughput(MetricStreamRequest { interval_ms })
-            .await?;
-        Ok(response.into_inner().map(|r| r.map_err(Error::from)))
-    }
-
-    /// Stream sent events throughput (events/sec)
-    ///
-    /// # Arguments
-    ///
-    /// * `interval_ms` - Update interval in milliseconds
-    pub async fn stream_component_sent_events_throughput(
-        &mut self,
-        interval_ms: i32,
-    ) -> Result<impl Stream<Item = Result<ComponentThroughputResponse>>> {
-        let client = self.ensure_connected()?;
-        let response = client
-            .stream_component_sent_events_throughput(MetricStreamRequest { interval_ms })
-            .await?;
-        Ok(response.into_inner().map(|r| r.map_err(Error::from)))
-    }
-
-    /// Stream received bytes throughput (bytes/sec)
-    ///
-    /// # Arguments
-    ///
-    /// * `interval_ms` - Update interval in milliseconds
-    pub async fn stream_component_received_bytes_throughput(
-        &mut self,
-        interval_ms: i32,
-    ) -> Result<impl Stream<Item = Result<ComponentThroughputResponse>>> {
-        let client = self.ensure_connected()?;
-        let response = client
-            .stream_component_received_bytes_throughput(MetricStreamRequest { interval_ms })
-            .await?;
-        Ok(response.into_inner().map(|r| r.map_err(Error::from)))
-    }
-
-    /// Stream sent bytes throughput (bytes/sec)
-    ///
-    /// # Arguments
-    ///
-    /// * `interval_ms` - Update interval in milliseconds
-    pub async fn stream_component_sent_bytes_throughput(
-        &mut self,
-        interval_ms: i32,
-    ) -> Result<impl Stream<Item = Result<ComponentThroughputResponse>>> {
-        let client = self.ensure_connected()?;
-        let response = client
-            .stream_component_sent_bytes_throughput(MetricStreamRequest { interval_ms })
-            .await?;
-        Ok(response.into_inner().map(|r| r.map_err(Error::from)))
-    }
-
-    /// Stream total received events
-    ///
-    /// # Arguments
-    ///
-    /// * `interval_ms` - Update interval in milliseconds
-    pub async fn stream_component_received_events_total(
-        &mut self,
-        interval_ms: i32,
-    ) -> Result<impl Stream<Item = Result<ComponentTotalsResponse>>> {
-        let client = self.ensure_connected()?;
-        let response = client
-            .stream_component_received_events_total(MetricStreamRequest { interval_ms })
-            .await?;
-        Ok(response.into_inner().map(|r| r.map_err(Error::from)))
-    }
-
-    /// Stream total sent events
-    ///
-    /// # Arguments
-    ///
-    /// * `interval_ms` - Update interval in milliseconds
-    pub async fn stream_component_sent_events_total(
-        &mut self,
-        interval_ms: i32,
-    ) -> Result<impl Stream<Item = Result<ComponentTotalsResponse>>> {
-        let client = self.ensure_connected()?;
-        let response = client
-            .stream_component_sent_events_total(MetricStreamRequest { interval_ms })
-            .await?;
-        Ok(response.into_inner().map(|r| r.map_err(Error::from)))
-    }
-
-    /// Stream total received bytes
-    ///
-    /// # Arguments
-    ///
-    /// * `interval_ms` - Update interval in milliseconds
-    pub async fn stream_component_received_bytes_total(
-        &mut self,
-        interval_ms: i32,
-    ) -> Result<impl Stream<Item = Result<ComponentTotalsResponse>>> {
-        let client = self.ensure_connected()?;
-        let response = client
-            .stream_component_received_bytes_total(MetricStreamRequest { interval_ms })
-            .await?;
-        Ok(response.into_inner().map(|r| r.map_err(Error::from)))
-    }
-
-    /// Stream total sent bytes
-    ///
-    /// # Arguments
-    ///
-    /// * `interval_ms` - Update interval in milliseconds
-    pub async fn stream_component_sent_bytes_total(
-        &mut self,
-        interval_ms: i32,
-    ) -> Result<impl Stream<Item = Result<ComponentTotalsResponse>>> {
-        let client = self.ensure_connected()?;
-        let response = client
-            .stream_component_sent_bytes_total(MetricStreamRequest { interval_ms })
-            .await?;
-        Ok(response.into_inner().map(|r| r.map_err(Error::from)))
-    }
-
-    /// Stream error counts per component
-    ///
-    /// # Arguments
-    ///
-    /// * `interval_ms` - Update interval in milliseconds
-    pub async fn stream_component_errors_total(
-        &mut self,
-        interval_ms: i32,
-    ) -> Result<impl Stream<Item = Result<ComponentTotalsResponse>>> {
-        let client = self.ensure_connected()?;
-        let response = client
-            .stream_component_errors_total(MetricStreamRequest { interval_ms })
+            .stream_component_metrics(ComponentMetricStreamRequest {
+                interval_ms,
+                metric: metric as i32,
+            })
             .await?;
         Ok(response.into_inner().map(|r| r.map_err(Error::from)))
     }
