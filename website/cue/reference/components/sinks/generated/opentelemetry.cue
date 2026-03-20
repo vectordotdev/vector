@@ -1,8 +1,12 @@
 package metadata
 
 generated: components: sinks: opentelemetry: configuration: protocol: {
-	description: "Protocol configuration"
-	required:    true
+	description: """
+		The protocol used to send data to an OpenTelemetry-compatible endpoint.
+
+		Protocol configuration
+		"""
+	required: true
 	type: object: options: {
 		acknowledgements: {
 			description: """
@@ -37,7 +41,8 @@ generated: components: sinks: opentelemetry: configuration: protocol: {
 				HTTP authentication should be used with HTTPS only, as the authentication credentials are passed as an
 				HTTP header without any additional encryption beyond what is provided by the transport itself.
 				"""
-			required: false
+			relevant_when: "type = \"http\""
+			required:      false
 			type: object: options: {
 				auth: {
 					description:   "The AWS authentication configuration."
@@ -286,7 +291,8 @@ generated: components: sinks: opentelemetry: configuration: protocol: {
 				Configures how events are encoded into raw bytes.
 				The selected encoding also determines which input types (logs, metrics, traces) are supported.
 				"""
-			required: true
+			relevant_when: "type = \"http\""
+			required:      true
 			type: object: options: {
 				avro: {
 					description:   "Apache Avro-specific encoder options."
@@ -715,9 +721,26 @@ generated: components: sinks: opentelemetry: configuration: protocol: {
 				}
 			}
 		}
+		endpoint: {
+			description: """
+				The endpoint to send gRPC requests to.
+
+				The endpoint _must_ include a port. If scheme is omitted, `http` or `https` is
+				inferred from the TLS configuration.
+
+				# Examples
+
+				- `http://localhost:4317`
+				- `https://otelcol.example.com:4317`
+				"""
+			relevant_when: "type = \"grpc\""
+			required:      true
+			type: string: examples: ["http://localhost:4317"]
+		}
 		framing: {
-			description: "Framing configuration."
-			required:    false
+			description:   "Framing configuration."
+			relevant_when: "type = \"http\""
+			required:      false
 			type: object: options: {
 				character_delimited: {
 					description:   "Options for the character delimited encoder."
@@ -787,6 +810,7 @@ generated: components: sinks: opentelemetry: configuration: protocol: {
 			deprecated:         true
 			deprecated_message: "This option has been deprecated, use `request.headers` instead."
 			description:        "A list of custom headers to add to each request."
+			relevant_when:      "type = \"http\""
 			required:           false
 			type: object: options: "*": {
 				description: "An HTTP request header and it's value."
@@ -795,8 +819,9 @@ generated: components: sinks: opentelemetry: configuration: protocol: {
 			}
 		}
 		method: {
-			description: "The HTTP method to use when making the request."
-			required:    false
+			description:   "The HTTP method to use when making the request."
+			relevant_when: "type = \"http\""
+			required:      false
 			type: string: {
 				default: "post"
 				enum: {
@@ -819,7 +844,8 @@ generated: components: sinks: opentelemetry: configuration: protocol: {
 
 				If specified, the `payload_suffix` must also be specified and together they must produce a valid JSON object.
 				"""
-			required: false
+			relevant_when: "type = \"http\""
+			required:      false
 			type: string: {
 				default: ""
 				examples: ["{\"data\":"]
@@ -833,7 +859,8 @@ generated: components: sinks: opentelemetry: configuration: protocol: {
 
 				If specified, the `payload_prefix` must also be specified and together they must produce a valid JSON object.
 				"""
-			required: false
+			relevant_when: "type = \"http\""
+			required:      false
 			type: string: {
 				default: ""
 				examples: ["}"]
@@ -1133,7 +1160,10 @@ generated: components: sinks: opentelemetry: configuration: protocol: {
 		type: {
 			description: "The communication protocol."
 			required:    true
-			type: string: enum: http: "Send data over HTTP."
+			type: string: enum: {
+				grpc: "Send data over gRPC."
+				http: "Send data over HTTP."
+			}
 		}
 		uri: {
 			description: """
@@ -1141,7 +1171,8 @@ generated: components: sinks: opentelemetry: configuration: protocol: {
 
 				This should include the protocol and host, but can also include the port, path, and any other valid part of a URI.
 				"""
-			required: true
+			relevant_when: "type = \"http\""
+			required:      true
 			type: string: {
 				examples: ["https://10.22.212.22:9000/endpoint"]
 				syntax: "template"
