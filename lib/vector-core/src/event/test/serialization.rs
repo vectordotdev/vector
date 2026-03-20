@@ -3,13 +3,6 @@ use quickcheck::{QuickCheck, TestResult};
 use regex::Regex;
 use similar_asserts::assert_eq;
 use vector_buffers::encoding::Encodable;
-#[cfg(feature = "generate-fixtures")]
-use {
-    prost::Message,
-    quickcheck::{Arbitrary as _, Gen},
-    std::{fs::File, io::Write},
-};
-
 use super::*;
 use crate::config::log_schema;
 
@@ -84,40 +77,6 @@ fn serialization() {
 
     let rfc3339_re = Regex::new(r"\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z\z").unwrap();
     assert!(rfc3339_re.is_match(actual_all.pointer("/timestamp").unwrap().as_str().unwrap()));
-}
-
-/// Generates fixture files used by the native encoding codec tests.
-///
-/// Run with:
-///   cargo test -p vector-core --features generate-fixtures \
-///       event::test::serialization::generate_fixtures -- --nocapture
-///
-/// The files are written directly to the fixture directory under
-/// `lib/codecs/tests/data/native_encoding/{json,proto}/`.
-#[cfg(feature = "generate-fixtures")]
-#[test]
-fn generate_fixtures() {
-    let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let fixture_dir = manifest_dir
-        .join("../codecs/tests/data/native_encoding");
-    let json_dir = fixture_dir.join("json");
-    let proto_dir = fixture_dir.join("proto");
-    std::fs::create_dir_all(&json_dir).unwrap();
-    std::fs::create_dir_all(&proto_dir).unwrap();
-
-    let mut generator = Gen::new(128);
-    for n in 0..1024_usize {
-        let mut json_out = File::create(json_dir.join(format!("{n:04}.json"))).unwrap();
-        let mut proto_out = File::create(proto_dir.join(format!("{n:04}.pb"))).unwrap();
-        let event = Event::arbitrary(&mut generator);
-        serde_json::to_writer(&mut json_out, &event).unwrap();
-
-        let array = EventArray::from(event);
-        let proto = proto::EventArray::from(array);
-        let mut buf = BytesMut::new();
-        proto.encode(&mut buf).unwrap();
-        proto_out.write_all(&buf).unwrap();
-    }
 }
 
 #[test]

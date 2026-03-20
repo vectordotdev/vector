@@ -4,7 +4,7 @@ use chrono::{DateTime, Utc};
 use quickcheck::{Arbitrary, Gen, empty_shrinker};
 use vrl::value::{ObjectMap, Value};
 
-use super::super::{
+use super::{
     Event, EventMetadata, LogEvent, Metric, MetricKind, MetricValue, StatisticKind, TraceEvent,
     metric::{
         Bucket, MetricData, MetricName, MetricSeries, MetricSketch, MetricTags, MetricTime,

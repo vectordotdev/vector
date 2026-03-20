@@ -35,6 +35,9 @@ pub mod metric;
 pub mod proto;
 mod r#ref;
 mod ser;
+#[cfg(any(test, feature = "generate-fixtures"))]
+pub(crate) mod arbitrary_impl;
+
 #[cfg(test)]
 mod test;
 mod trace;

@@ -21,9 +21,8 @@ activates fixture-stable `Arbitrary` implementations. The vector-core
 **Run the generator**
 
 ```bash
-cargo test -p vector-core --features generate-fixtures \
-    event::test::serialization::generate_fixtures
+cargo run -p vector-core --features generate-fixtures --bin generate-fixtures
 ```
 
-The test writes files directly into this directory's `json/` and `proto/`
+The binary writes files directly into this directory's `json/` and `proto/`
 subdirectories, replacing the existing fixtures.
