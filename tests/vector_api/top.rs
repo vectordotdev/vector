@@ -6,7 +6,9 @@
 use super::{common::*, harness::*};
 use indoc::indoc;
 use tokio_stream::StreamExt;
-use vector_lib::api_client::proto::{GetComponentsResponse, MetricName, stream_component_metrics_response::Value};
+use vector_lib::api_client::proto::{
+    GetComponentsResponse, MetricName, stream_component_metrics_response::Value,
+};
 
 impl TestHarness {
     /// Queries all components from the gRPC API
@@ -371,31 +373,30 @@ async fn multi_output_transform_reports_per_output_sent_events() {
                     && let Some(Value::Total(total)) = msg.value
                     && !total.output_totals.is_empty()
                 {
-                        // Both named outputs must be present with positive counts
-                        let all_total = total.output_totals.get("all").copied().unwrap_or(0);
-                        let has_host_total =
-                            total.output_totals.get("has_host").copied().unwrap_or(0);
+                    // Both named outputs must be present with positive counts
+                    let all_total = total.output_totals.get("all").copied().unwrap_or(0);
+                    let has_host_total = total.output_totals.get("has_host").copied().unwrap_or(0);
 
-                        assert!(
-                            all_total > 0,
-                            "Expected positive total for 'all' output, got {}",
-                            all_total
-                        );
-                        assert!(
-                            has_host_total > 0,
-                            "Expected positive total for 'has_host' output, got {}",
-                            has_host_total
-                        );
-                        // "all" must be >= "has_host" since it matches every event
-                        assert!(
-                            all_total >= has_host_total,
-                            "'all' ({}) should be >= 'has_host' ({})",
-                            all_total,
-                            has_host_total
-                        );
+                    assert!(
+                        all_total > 0,
+                        "Expected positive total for 'all' output, got {}",
+                        all_total
+                    );
+                    assert!(
+                        has_host_total > 0,
+                        "Expected positive total for 'has_host' output, got {}",
+                        has_host_total
+                    );
+                    // "all" must be >= "has_host" since it matches every event
+                    assert!(
+                        all_total >= has_host_total,
+                        "'all' ({}) should be >= 'has_host' ({})",
+                        all_total,
+                        has_host_total
+                    );
 
-                        splitter_totals_found = true;
-                        break;
+                    splitter_totals_found = true;
+                    break;
                 }
             }
             Ok(Some(Err(e))) => panic!("Stream error: {e}"),

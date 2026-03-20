@@ -9,19 +9,15 @@ use crate::signal::{SignalRx, SignalTo};
 
 /// CLI command func for issuing 'tap' queries, and communicating with a local/remote
 /// Vector API server via HTTP/WebSockets.
+#[allow(clippy::print_stderr)]
 pub(crate) async fn cmd(opts: &super::Opts, signal_rx: SignalRx) -> exitcode::ExitCode {
     let url = opts.url();
-    #[allow(clippy::print_stderr)]
     let Ok(uri) = url.as_str().parse() else {
-        eprintln!(
-            "Invalid API URL: {}",
-            url
-        );
+        eprintln!("Invalid API URL: {url}");
         return exitcode::UNAVAILABLE;
     };
     let mut client = Client::new(uri);
 
-    #[allow(clippy::print_stderr)]
     if client.connect().await.is_err() || client.health().await.is_err() {
         eprintln!(
             indoc::indoc! {"

@@ -2,14 +2,14 @@
 pub mod prelude;
 
 mod adaptive_concurrency;
-#[cfg(feature = "api")]
-mod api;
 #[cfg(feature = "transforms-aggregate")]
 mod aggregate;
 #[cfg(any(feature = "sources-amqp", feature = "sinks-amqp"))]
 mod amqp;
 #[cfg(feature = "sources-apache_metrics")]
 mod apache_metrics;
+#[cfg(feature = "api")]
+mod api;
 #[cfg(feature = "aws-core")]
 mod aws;
 #[cfg(feature = "sinks-aws_cloudwatch_logs")]
@@ -159,14 +159,14 @@ mod expansion;
 #[cfg(feature = "sources-mongodb_metrics")]
 pub(crate) use mongodb_metrics::*;
 
-#[cfg(feature = "api")]
-pub(crate) use self::api::*;
 #[cfg(feature = "transforms-aggregate")]
 pub(crate) use self::aggregate::*;
 #[cfg(feature = "sources-amqp")]
 pub(crate) use self::amqp::*;
 #[cfg(feature = "sources-apache_metrics")]
 pub(crate) use self::apache_metrics::*;
+#[cfg(feature = "api")]
+pub(crate) use self::api::*;
 #[cfg(feature = "aws-core")]
 pub(crate) use self::aws::*;
 #[cfg(feature = "sinks-aws_cloudwatch_logs")]

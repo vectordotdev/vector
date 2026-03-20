@@ -20,8 +20,6 @@ use tokio::{
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
 #[cfg(feature = "api")]
-use std::sync::Arc;
-#[cfg(feature = "api")]
 use crate::api;
 #[cfg(feature = "api")]
 use crate::internal_events::ApiStarted;
@@ -38,6 +36,8 @@ use crate::{
     },
     trace,
 };
+#[cfg(feature = "api")]
+use std::sync::Arc;
 
 static WORKER_THREADS: AtomicUsize = AtomicUsize::new(0);
 

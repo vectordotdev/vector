@@ -194,10 +194,12 @@ fn metric_totals_stream(
                     .map(|(component_id, total)| {
                         Ok(StreamComponentMetricsResponse {
                             component_id,
-                            value: Some(stream_component_metrics_response::Value::Total(TotalMetric {
-                                value: total as i64,
-                                output_totals: Default::default(),
-                            })),
+                            value: Some(stream_component_metrics_response::Value::Total(
+                                TotalMetric {
+                                    value: total as i64,
+                                    output_totals: Default::default(),
+                                },
+                            )),
                         })
                     })
                     .collect::<Vec<_>>(),
@@ -250,7 +252,9 @@ fn metric_throughput_stream(
 }
 
 /// Builds a stream that emits per-component sent_events totals with per-output breakdown.
-fn sent_events_totals_stream(duration: Duration) -> Result<BoxStream<StreamComponentMetricsResponse>, Status> {
+fn sent_events_totals_stream(
+    duration: Duration,
+) -> Result<BoxStream<StreamComponentMetricsResponse>, Status> {
     let controller = get_controller()?;
     Ok(Box::pin(
         tokio_stream::StreamExt::map(IntervalStream::new(interval(duration)), move |_| {
@@ -280,10 +284,12 @@ fn sent_events_totals_stream(duration: Duration) -> Result<BoxStream<StreamCompo
                             .collect();
                         Ok(StreamComponentMetricsResponse {
                             component_id,
-                            value: Some(stream_component_metrics_response::Value::Total(TotalMetric {
-                                value: total as i64,
-                                output_totals,
-                            })),
+                            value: Some(stream_component_metrics_response::Value::Total(
+                                TotalMetric {
+                                    value: total as i64,
+                                    output_totals,
+                                },
+                            )),
                         })
                     })
                     .collect::<Vec<_>>(),
@@ -764,7 +770,10 @@ impl Reservoir {
     }
 
     /// Flush sampled events to the client, sorted by arrival order.
-    async fn flush(&mut self, tx: &mpsc::Sender<Vec<StreamOutputEventsResponse>>) -> Result<(), ()> {
+    async fn flush(
+        &mut self,
+        tx: &mpsc::Sender<Vec<StreamOutputEventsResponse>>,
+    ) -> Result<(), ()> {
         if self.events.is_empty() {
             return Ok(());
         }
@@ -792,12 +801,14 @@ fn tap_payload_to_output_events(payload: TapPayload) -> Vec<StreamOutputEventsRe
                 });
 
                 StreamOutputEventsResponse {
-                    event: Some(stream_output_events_response::Event::TappedEvent(TappedEvent {
-                        component_id: output.output_id.component.id().to_string(),
-                        component_type: output.component_type.to_string(),
-                        component_kind: output.component_kind.to_string(),
-                        event: event_wrapper,
-                    })),
+                    event: Some(stream_output_events_response::Event::TappedEvent(
+                        TappedEvent {
+                            component_id: output.output_id.component.id().to_string(),
+                            component_type: output.component_type.to_string(),
+                            component_kind: output.component_kind.to_string(),
+                            event: event_wrapper,
+                        },
+                    )),
                 }
             })
             .collect(),
@@ -811,12 +822,14 @@ fn tap_payload_to_output_events(payload: TapPayload) -> Vec<StreamOutputEventsRe
                 });
 
                 StreamOutputEventsResponse {
-                    event: Some(stream_output_events_response::Event::TappedEvent(TappedEvent {
-                        component_id: output.output_id.component.id().to_string(),
-                        component_type: output.component_type.to_string(),
-                        component_kind: output.component_kind.to_string(),
-                        event: event_wrapper,
-                    })),
+                    event: Some(stream_output_events_response::Event::TappedEvent(
+                        TappedEvent {
+                            component_id: output.output_id.component.id().to_string(),
+                            component_type: output.component_type.to_string(),
+                            component_kind: output.component_kind.to_string(),
+                            event: event_wrapper,
+                        },
+                    )),
                 }
             })
             .collect(),
@@ -830,12 +843,14 @@ fn tap_payload_to_output_events(payload: TapPayload) -> Vec<StreamOutputEventsRe
                 });
 
                 StreamOutputEventsResponse {
-                    event: Some(stream_output_events_response::Event::TappedEvent(TappedEvent {
-                        component_id: output.output_id.component.id().to_string(),
-                        component_type: output.component_type.to_string(),
-                        component_kind: output.component_kind.to_string(),
-                        event: event_wrapper,
-                    })),
+                    event: Some(stream_output_events_response::Event::TappedEvent(
+                        TappedEvent {
+                            component_id: output.output_id.component.id().to_string(),
+                            component_type: output.component_type.to_string(),
+                            component_kind: output.component_kind.to_string(),
+                            event: event_wrapper,
+                        },
+                    )),
                 }
             })
             .collect(),

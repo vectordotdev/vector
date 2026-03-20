@@ -15,30 +15,23 @@ use vector_lib::top::{
 
 /// CLI command func for displaying Vector components, and communicating with a local/remote
 /// Vector API server via gRPC
+#[allow(clippy::print_stderr)]
 pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
     // Exit early if the terminal is not a teletype
     if !is_tty() {
-        #[allow(clippy::print_stderr)]
-        {
-            eprintln!("Terminal must be a teletype (TTY) to display a Vector dashboard.");
-        }
+        eprintln!("Terminal must be a teletype (TTY) to display a Vector dashboard.");
         return exitcode::IOERR;
     }
 
     let url = opts.url();
 
     // Create a new API client for connecting to the local/remote Vector instance.
-    #[allow(clippy::print_stderr)]
     let Ok(uri) = url.as_str().parse() else {
-        eprintln!(
-            "Invalid API URL: {}",
-            url
-        );
+        eprintln!("Invalid API URL: {url}");
         return exitcode::UNAVAILABLE;
     };
     let mut client = Client::new(uri);
 
-    #[allow(clippy::print_stderr)]
     if client.connect().await.is_err() || client.health().await.is_err() {
         eprintln!(
             indoc::indoc! {"
