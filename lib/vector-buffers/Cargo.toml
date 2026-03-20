@@ -43,7 +43,7 @@ hdrhistogram = "7.5.4"
 metrics-tracing-context.workspace = true
 metrics-util = { workspace = true, features = ["debugging"] }
 proptest = "1.10"
-quickcheck = "1.0"
+quickcheck.workspace = true
 rand.workspace = true
 serde_yaml.workspace = true
 temp-dir = "0.1.16"
