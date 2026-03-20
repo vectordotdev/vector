@@ -1,0 +1,24 @@
+data_dir: /tmp/vector-sender
+api:
+  enabled: true
+  address: 0.0.0.0:8686
+  playground: false
+sources:
+  stdin:
+    type: stdin
+transforms:
+  parse_json:
+    type: remap
+    inputs:
+      - stdin
+    source: |
+      m, e = parse_json(.message)
+      if e == null {
+        .message = m
+      }
+sinks:
+  sender:
+    type: vector
+    inputs:
+      - parse_json
+    address: 127.0.0.1:6001

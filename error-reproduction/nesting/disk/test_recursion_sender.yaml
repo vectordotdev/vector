@@ -1,4 +1,4 @@
-data_dir: /tmp/vector-sender
+data_dir: /tmp/vector
 api:
   enabled: true
   address: 0.0.0.0:8686
@@ -17,8 +17,12 @@ transforms:
         .message = m
       }
 sinks:
-  sender:
-    type: vector
+  blackhole:
+    type: blackhole
     inputs:
       - parse_json
-    address: 127.0.0.1:6001
+    print_interval_secs: 10
+    buffer:
+      type: disk
+      max_size: 268435488
+      when_full: block

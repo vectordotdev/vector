@@ -1,4 +1,4 @@
-data_dir: /tmp/vector
+data_dir: /tmp/vector-max-depth
 api:
   enabled: true
   address: 0.0.0.0:8686
@@ -12,7 +12,7 @@ transforms:
     inputs:
       - stdin
     source: |
-      m, e = parse_json(.message)
+      m, e = parse_json(.message, max_depth: 3)
       if e == null {
         .message = m
       }

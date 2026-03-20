@@ -1,0 +1,17 @@
+data_dir: /tmp/vector-receiver
+api:
+  enabled: true
+  address: 0.0.0.0:8687
+  playground: false
+sources:
+  receiver:
+    type: vector
+    address: 0.0.0.0:6001
+sinks:
+  console_out:
+    type: console
+    target: stdout
+    inputs:
+      - receiver
+    encoding:
+      codec: json
