@@ -403,8 +403,10 @@ mod integration_test {
                 match consumer.poll(Duration::from_secs(3)) {
                     Some(Ok(msg)) => {
                         let payload: &str = msg.payload_view().unwrap().unwrap();
-                        let payload_json: serde_json::Value = serde_json::from_str(payload).unwrap();
-                        observed_messages.push(payload_json["message"].as_str().unwrap().to_owned());
+                        let payload_json: serde_json::Value =
+                            serde_json::from_str(payload).unwrap();
+                        observed_messages
+                            .push(payload_json["message"].as_str().unwrap().to_owned());
 
                         let key = msg.key().unwrap();
                         assert_eq!(key, trace_key.as_bytes());
