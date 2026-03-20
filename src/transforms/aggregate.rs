@@ -247,12 +247,12 @@ impl Aggregate {
             interval: Duration::from_millis(config.interval_ms),
             map: Default::default(),
             mode: config.mode.into(),
-            time_source: config.time_source.clone(),
+            time_source: config.time_source,
             event_time_buckets: Default::default(),
             event_time_prev_buckets: Default::default(),
             event_time_multi_buckets: Default::default(),
             watermark: None,
-            config: config.clone(),
+            config: *config,
         })
     }
 
@@ -262,7 +262,7 @@ impl Aggregate {
         (timestamp_ms / interval_ms) * interval_ms
     }
 
-    fn is_too_late(&self, bucket_key: BucketKey) -> bool {
+    const fn is_too_late(&self, bucket_key: BucketKey) -> bool {
         if let Some(watermark) = self.watermark {
             // Allow events within the grace period (allowed_lateness)
             let grace_period_ms = self.config.allowed_lateness_ms as i64;
