@@ -353,7 +353,7 @@ async-graphql-warp = { version = "7.0.17", default-features = false, optional = 
 hex = { version = "0.4.3", default-features = false, optional = true }
 
 # GreptimeDB
-greptimedb-ingester = { git = "https://github.com/GreptimeTeam/greptimedb-ingester-rust", rev = "f7243393808640f5123b0d5b7b798da591a4df6e", optional = true }
+greptimedb-ingester = { version = "0.15.3", optional = true }
 
 # External libs
 arc-swap = { workspace = true, default-features = false, optional = true }
