@@ -433,31 +433,6 @@ fn dynamic_rate_field_falls_back_to_static_ratio_when_missing() {
     assert_eq!(output.as_log()["sample_rate"], "1".into());
 }
 
-#[test]
-fn ratio_field_takes_precedence_over_rate_field() {
-    let mut sampler = Sample::new_with_dynamic(
-        "sample".to_string(),
-        SampleMode::new_ratio(0.0),
-        DynamicSampleFields {
-            ratio_field: Some("dynamic_ratio".to_string()),
-            rate_field: Some("dynamic_rate".to_string()),
-        },
-        Some("other_field".into()),
-        None,
-        None,
-        default_sample_rate_key(),
-    );
-
-    let mut event = Event::Log(LogEvent::from("hello"));
-    let log = event.as_mut_log();
-    log.insert("other_field", "foo");
-    log.insert("dynamic_ratio", 1.0);
-    log.insert("dynamic_rate", 1000);
-
-    let output = transform_one(&mut sampler, event).expect("event should be sampled");
-    assert_eq!(output.as_log()["sample_rate"], "1".into());
-}
-
 fn condition_contains(key: &str, needle: &str) -> Condition {
     let vrl_config = VrlConfig {
         source: format!(r#"contains!(."{key}", "{needle}")"#),

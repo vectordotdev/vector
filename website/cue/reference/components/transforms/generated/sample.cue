@@ -67,8 +67,9 @@ generated: components: transforms: sample: configuration: {
 		description: """
 			The event field whose numeric value is used as the sampling ratio on a per-event basis.
 
-			The value must be in `(0, 1]` to be considered valid. If the field is missing or invalid, `rate_field`
-			is checked next (if configured), and static sampling settings (`rate` or `ratio`) are used as a fallback.
+			The value must be in `(0, 1]` to be considered valid. If the field is missing or invalid,
+			static sampling settings (`rate` or `ratio`) are used as a fallback.
+			This option cannot be used together with `rate_field`.
 			"""
 		required: false
 		type: string: examples: ["sample_rate"]
@@ -79,6 +80,7 @@ generated: components: transforms: sample: configuration: {
 
 			The value must be a positive integer to be considered valid. If the field is missing or invalid,
 			static sampling settings (`rate` or `ratio`) are used as a fallback.
+			This option cannot be used together with `ratio_field`.
 			"""
 		required: false
 		type: string: examples: ["sample_rate_n"]
