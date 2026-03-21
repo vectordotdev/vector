@@ -1,0 +1,25 @@
+data_dir: "/var/lib/vector"
+
+sources:
+  internal_metrics:
+    type: "internal_metrics"
+
+  statsd:
+    type: "statsd"
+    address: "0.0.0.0:8125"
+    mode: "tcp"
+
+sinks:
+  prometheus:
+    type: "prometheus_exporter"
+    inputs: ["internal_metrics"]
+    address: "0.0.0.0:9090"
+
+  datadog_metrics:
+    type: "datadog_metrics"
+    inputs: ["statsd"]
+    endpoint: "http://0.0.0.0:8080"
+    default_api_key: "DEADBEEF"
+    default_namespace: "vector"
+    healthcheck:
+      enabled: false

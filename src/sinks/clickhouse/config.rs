@@ -26,12 +26,11 @@ use crate::{
 ///
 /// [formats]: https://clickhouse.com/docs/en/interfaces/formats
 #[configurable_component]
-#[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq, Hash)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Hash)]
 #[serde(rename_all = "snake_case")]
-#[derivative(Default)]
 #[allow(clippy::enum_variant_names)]
 pub enum Format {
-    #[derivative(Default)]
+    #[default]
     /// JSONEachRow.
     JsonEachRow,
 
