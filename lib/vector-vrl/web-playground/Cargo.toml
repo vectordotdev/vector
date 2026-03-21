@@ -21,6 +21,7 @@ vector-vrl-functions.workspace = true
 enrichment = { path = "../enrichment" }
 # Required per https://docs.rs/getrandom/latest/getrandom/#webassembly-support
 getrandom = { version = "0.2.15", features = ["js"] }
+getrandom_v04 = { package = "getrandom", version = "0.4", features = ["wasm_js"] }
 
 [build-dependencies]
 cargo-lock = "11.0.1"
