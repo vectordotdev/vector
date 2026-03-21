@@ -33,6 +33,11 @@ pub enum SampleError {
     InvalidStaticConfiguration,
 
     #[snafu(display(
+        "Only one value can be provided for either 'ratio_field' or 'rate_field', but not both"
+    ))]
+    InvalidDynamicConfiguration,
+
+    #[snafu(display(
         "Exactly one value must be provided for either 'rate' or 'ratio' to configure static sampling"
     ))]
     MissingStaticConfiguration,
@@ -66,8 +71,9 @@ pub struct SampleConfig {
 
     /// The event field whose numeric value is used as the sampling ratio on a per-event basis.
     ///
-    /// The value must be in `(0, 1]` to be considered valid. If the field is missing or invalid, `rate_field`
-    /// is checked next (if configured), and static sampling settings (`rate` or `ratio`) are used as a fallback.
+    /// The value must be in `(0, 1]` to be considered valid. If the field is missing or invalid,
+    /// static sampling settings (`rate` or `ratio`) are used as a fallback.
+    /// This option cannot be used together with `rate_field`.
     #[configurable(metadata(docs::examples = "sample_rate"))]
     pub ratio_field: Option<String>,
 
@@ -75,6 +81,7 @@ pub struct SampleConfig {
     ///
     /// The value must be a positive integer to be considered valid. If the field is missing or invalid,
     /// static sampling settings (`rate` or `ratio`) are used as a fallback.
+    /// This option cannot be used together with `ratio_field`.
     #[configurable(metadata(docs::examples = "sample_rate_n"))]
     pub rate_field: Option<String>,
 
@@ -113,6 +120,10 @@ pub struct SampleConfig {
 
 impl SampleConfig {
     fn sample_rate(&self) -> Result<SampleMode, SampleError> {
+        if self.ratio_field.is_some() && self.rate_field.is_some() {
+            return Err(SampleError::InvalidDynamicConfiguration);
+        }
+
         if self.rate.is_some() && self.ratio.is_some() {
             return Err(SampleError::InvalidStaticConfiguration);
         }
@@ -272,5 +283,21 @@ mod tests {
         };
 
         assert!(config.validate(&crate::schema::Definition::any()).is_ok());
+    }
+
+    #[test]
+    fn rejects_both_dynamic_fields_configuration() {
+        let config = SampleConfig {
+            rate: Some(10),
+            ratio: None,
+            ratio_field: Some("sample_rate".to_string()),
+            rate_field: Some("sample_rate_n".to_string()),
+            key_field: None,
+            sample_rate_key: super::default_sample_rate_key(),
+            group_by: None,
+            exclude: None,
+        };
+
+        assert!(config.validate(&crate::schema::Definition::any()).is_err());
     }
 }
