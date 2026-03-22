@@ -105,7 +105,7 @@ pub struct OdbcConfig {
     /// Maximum string length for ODBC driver operations.
     /// The default is 4096.
     #[configurable(metadata(docs::examples = 4096))]
-    #[serde(default = "default_odbc_batch_size")]
+    #[serde(default = "default_odbc_max_str_limit")]
     pub odbc_max_str_limit: usize,
 
     /// Timezone applied to database date/time columns that lack timezone information.
