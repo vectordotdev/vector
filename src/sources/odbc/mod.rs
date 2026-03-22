@@ -1,6 +1,6 @@
 //! ODBC Data Source
 //!
-//! This data source runs a database query through the ODBC interface on the configured schedule.
+//! This data source runs a database query through the ODBC interface on the required `schedule` (cron expression).
 //! Query results are sent to Vector as an array of key-value maps.
 //! The final row of the result set is saved to disk and used as a parameter for the next scheduled SQL query.
 //!

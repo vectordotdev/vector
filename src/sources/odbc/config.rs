@@ -79,8 +79,7 @@ pub struct OdbcConfig {
     ))]
     pub statement_init_params: Option<ObjectMap>,
 
-    /// Cron expression used to schedule database queries.
-    /// When omitted, the statement runs only once by default.
+    /// Cron expression used to schedule database queries. This field is required.
     #[configurable(derived)]
     pub schedule: Option<OdbcSchedule>,
 

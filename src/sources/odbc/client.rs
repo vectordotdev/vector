@@ -79,7 +79,9 @@ impl Context {
         let shutdown = self.cx.shutdown.clone();
 
         let Some(ref schedule) = self.cfg.schedule else {
-            warn!(message = "No next schedule found. Retry in 10 seconds.");
+            error!(
+                message = "Missing required `schedule` for ODBC source; the source is shutting down without running SQL."
+            );
             return Err(());
         };
 

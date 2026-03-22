@@ -373,7 +373,6 @@ generated: components: sources: odbc: configuration: {
 	schedule: {
 		description: """
 			Cron expression used to schedule database queries.
-			When omitted, the statement runs only once by default.
 			"""
 		required: false
 		type: string: {}
