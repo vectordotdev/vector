@@ -443,7 +443,8 @@ fn map_value(data_type: &odbc_api::DataType, value: Option<&[u8]>, tz: Tz) -> Va
             let datetime = TIMESTAMP_FORMATS
                 .iter()
                 .find_map(|fmt| NaiveDateTime::parse_from_str(str, fmt).ok())
-                .map(|ndt| ndt.and_utc());
+                .and_then(|ndt| ndt.and_local_timezone(tz).single())
+                .map(|dt| dt.with_timezone(&Utc));
 
             datetime.map(Value::Timestamp).unwrap_or(Value::Null)
         }
