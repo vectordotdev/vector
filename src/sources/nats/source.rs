@@ -171,12 +171,9 @@ pub async fn run_nats_jetstream(
                                 error!(message = "Failed to acknowledge JetStream message.", %err);
                             }
                         }
-                        ProcessingStatus::Failed => {
-                            // Do not acknowledge on failure; the message will be redelivered.
-                        }
-                        ProcessingStatus::ChannelClosed => {
-                            return Err(());
-                        }
+                        ProcessingStatus::ChannelClosed => return Err(()),
+                        // Do not acknowledge on failure; the message will be redelivered.
+                        ProcessingStatus::Failed => {}
                     }
                 }
                 Err(err) => {
