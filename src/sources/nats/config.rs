@@ -1,6 +1,5 @@
 use async_nats::jetstream::{
-    consumer::{PullConsumer, StreamError as ConsumerStreamError},
-    context::GetStreamError,
+    consumer::StreamError as ConsumerStreamError, context::GetStreamError,
 };
 use snafu::{ResultExt, Snafu};
 use vector_lib::{
@@ -18,7 +17,9 @@ use crate::{
     serde::{default_decoding, default_framing_message_based},
     sources::{
         Source,
-        nats::source::{create_subscription, run_nats_core, run_nats_jetstream},
+        nats::source::{
+            create_consumer_stream, create_subscription, run_nats_core, run_nats_jetstream,
+        },
     },
     tls::TlsEnableableConfig,
 };
@@ -49,15 +50,15 @@ pub enum BuildError {
 /// **Note:** These defaults follow the `async-nats` crate’s `StreamBuilder`.
 #[configurable_component]
 #[derive(Clone, Debug)]
-pub struct BatchConfig {
+pub(super) struct BatchConfig {
     /// The maximum number of messages to pull in a single batch.
     #[serde(default = "default_batch")]
-    batch: usize,
+    pub(super) batch: usize,
 
     /// The maximum total byte size for a batch. The pull request will be
     /// fulfilled when either `size` or `max_bytes` is reached.
     #[serde(default = "default_max_bytes")]
-    max_bytes: usize,
+    pub(super) max_bytes: usize,
 }
 
 const fn default_batch() -> usize {
@@ -205,25 +206,8 @@ impl SourceConfig for NatsSourceConfig {
         match self.mode() {
             NatsMode::JetStream(js_config) => {
                 let connection = self.connect().await?;
-                let js = async_nats::jetstream::new(connection.clone());
-                let stream = js
-                    .get_stream(&js_config.stream)
-                    .await
-                    .context(StreamSnafu)?;
-                let consumer: PullConsumer = stream
-                    .get_consumer(&js_config.consumer)
-                    .await
-                    .context(ConsumerSnafu)?;
-
-                let batch_config = js_config.batch_config.clone();
-
-                let messages = consumer
-                    .stream()
-                    .max_messages_per_batch(batch_config.batch)
-                    .max_bytes_per_batch(batch_config.max_bytes)
-                    .messages()
-                    .await
-                    .context(MessagesSnafu)?;
+                let messages =
+                    create_consumer_stream(&connection, js_config).await?;
 
                 Ok(Box::pin(run_nats_jetstream(
                     self.clone(),
