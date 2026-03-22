@@ -96,7 +96,7 @@ Want to run from outside of the environment? _Clever. Good thinking._ You can ru
 make check ENVIRONMENT=true
 # Validate your code actually does compile (in dev mode)
 make build-dev ENVIRONMENT=true
-# Validate your test pass
+# Validate your tests pass
 make test SCOPE="sources::example" ENVIRONMENT=true
 # Validate tests (that do not require other services) pass
 make test ENVIRONMENT=true
@@ -155,7 +155,7 @@ make check
 # Validate your code actually does compile (in dev mode)
 cargo build
 make build-dev
-# Validate your test pass
+# Validate your tests pass
 cargo test sources::example
 make test SCOPE="sources::example"
 # Validate tests (that do not require other services) pass
