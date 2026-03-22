@@ -177,8 +177,8 @@ impl OdbcConfig {
     pub fn statement_or_file(&self) -> Option<String> {
         self.statement_filepath
             .as_ref()
-            .map(|path| fs::read_to_string(path).ok())
-            .unwrap_or(self.statement.clone())
+            .and_then(|path| fs::read_to_string(path).ok())
+            .or_else(|| self.statement.clone())
     }
 }
 
