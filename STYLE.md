@@ -87,7 +87,7 @@ debug!("User connected: {}", username);
 
 // Adding structured fields to the event, mixing and matching the message format:
 trace!(bytes_sent = 22, "Sent heartbeat packet to client.");
-error!(client_addr = %conn.get_ref().peer_addr, "Client actor received malformed packet: {}", parse_err.to_string())
+error!(client_addr = ?conn.get_ref().peer_addr(), "Client actor received malformed packet: {}", parse_err.to_string())
 ```
 
 While this does not cover all the permutations of what the macros in `tracing` support, these
