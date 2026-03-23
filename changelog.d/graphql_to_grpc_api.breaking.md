@@ -2,7 +2,7 @@ The Vector observability API has been migrated from GraphQL to gRPC for improved
 performance, efficiency and maintainability. The `vector top` and `vector tap`
 commands continue to work as before, as they have been updated to use the new
 gRPC API internally. The gRPC service definition is available in
-`proto/vector/observability.proto`.
+[`proto/vector/observability.proto`](https://github.com/vectordotdev/vector/blob/master/proto/vector/observability.proto).
 
 Note: `vector top` and `vector tap` from version 0.55.0 or later are not
 compatible with Vector instances running earlier versions.
