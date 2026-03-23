@@ -980,9 +980,11 @@ fn write_payload_footer(
 
 #[cfg(test)]
 mod tests {
-    use std::{io, num::NonZeroU32, sync::Arc};
+    use std::io::{self, Write as _};
+    use std::{num::NonZeroU32, sync::Arc};
 
-    use bytes::{BufMut, Bytes};
+    use bytes::{BufMut, BytesMut, Bytes};
+    use flate2::read::ZlibDecoder;
     use chrono::{DateTime, TimeZone, Timelike, Utc};
     use proptest::{
         arbitrary::any, collection::btree_map, num::f64::POSITIVE as ARB_POSITIVE_F64, prop_assert,
@@ -1083,12 +1085,9 @@ mod tests {
     }
 
     fn decompress_zlib_payload(payload: Bytes) -> io::Result<Bytes> {
-        use bytes::BytesMut;
-        use flate2::read::ZlibDecoder;
-        use std::io::copy;
         let mut decompressor = ZlibDecoder::new(&payload[..]);
         let mut decompressed = BytesMut::new().writer();
-        copy(&mut decompressor, &mut decompressed)?;
+        io::copy(&mut decompressor, &mut decompressed)?;
         Ok(decompressed.into_inner().freeze())
     }
 
@@ -1106,7 +1105,6 @@ mod tests {
     /// Compresses `n` bytes of high-entropy (worst-case for compression) data and returns the
     /// total output size after `finish()`.
     fn total_compressed_len(compression: DatadogMetricsCompression, n: usize) -> usize {
-        use std::io::Write as _;
         // Xorshift64 — period 2^64-1, passes BigCrush, produces statistically random bytes
         // that neither zlib nor zstd can compress significantly.
         let mut state = 0xdeadbeef_cafebabe_u64;
