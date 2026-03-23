@@ -6,7 +6,7 @@ use std::{
     time::Instant,
 };
 
-use futures::{FutureExt, StreamExt, TryStreamExt, stream::FuturesOrdered};
+use futures::{FutureExt, StreamExt, TryStreamExt};
 use futures_util::stream::FuturesUnordered;
 use metrics::gauge;
 use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
@@ -748,6 +748,11 @@ impl<'a> Builder<'a> {
         let sender = self
             .utilization_registry
             .add_component(node.key.clone(), gauge!("utilization"));
+        let preserve_ordering = self
+            .config
+            .global
+            .preserve_ordering_stateless_transforms
+            .unwrap_or(true);
         let runner = Runner::new(
             t,
             input_rx,
@@ -755,6 +760,7 @@ impl<'a> Builder<'a> {
             node.input_details.data_type(),
             outputs,
             LatencyRecorder::new(self.config.global.latency_ewma_alpha),
+            preserve_ordering,
         );
         let transform = if node.enable_concurrency {
             runner.run_concurrently().boxed()
@@ -1130,6 +1136,7 @@ struct Runner {
     timer_tx: UtilizationComponentSender,
     latency_recorder: LatencyRecorder,
     events_received: Registered<EventsReceived>,
+    preserve_ordering: bool,
 }
 
 impl Runner {
@@ -1140,6 +1147,7 @@ impl Runner {
         input_type: DataType,
         outputs: TransformOutputs,
         latency_recorder: LatencyRecorder,
+        preserve_ordering: bool,
     ) -> Self {
         Self {
             transform,
@@ -1149,6 +1157,7 @@ impl Runner {
             timer_tx,
             latency_recorder,
             events_received: register!(EventsReceived),
+            preserve_ordering,
         }
     }
 
@@ -1204,7 +1213,8 @@ impl Runner {
         let mut input_rx =
             super::ready_arrays::ReadyArrays::with_capacity(input_rx, READY_ARRAY_CAPACITY);
 
-        let mut in_flight = FuturesOrdered::new();
+        let mut in_flight =
+            super::in_flight_queue::InFlightQueue::new(self.preserve_ordering);
         let mut shutting_down = false;
 
         self.timer_tx.try_send_start_wait();
@@ -1239,7 +1249,7 @@ impl Runner {
                                 }
                                 outputs_buf
                             }.in_current_span());
-                            in_flight.push_back(task);
+                            in_flight.push(task);
                         }
                         None => {
                             shutting_down = true;
