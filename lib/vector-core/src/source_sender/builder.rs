@@ -1,6 +1,6 @@
 use std::{collections::HashMap, time::Duration};
 
-use metrics::{Histogram, histogram};
+use metrics::histogram;
 use vector_buffers::topology::channel::LimitedReceiver;
 use vector_common::internal_event::DEFAULT_OUTPUT;
 
@@ -14,9 +14,7 @@ pub struct Builder {
     buf_size: usize,
     default_output: Option<Output>,
     named_outputs: HashMap<String, Output>,
-    lag_time: Option<Histogram>,
-    send_latency: Option<Histogram>,
-    send_batch_latency: Option<Histogram>,
+    output_metrics: OutputMetrics,
     timeout: Option<Duration>,
     ewma_half_life_seconds: Option<f64>,
 }
@@ -27,9 +25,11 @@ impl Default for Builder {
             buf_size: CHUNK_SIZE,
             default_output: None,
             named_outputs: Default::default(),
-            lag_time: Some(histogram!(LAG_TIME_NAME)),
-            send_latency: Some(histogram!(SEND_LATENCY_NAME)),
-            send_batch_latency: Some(histogram!(SEND_BATCH_LATENCY_NAME)),
+            output_metrics: OutputMetrics::new(
+                Some(histogram!(LAG_TIME_NAME)),
+                Some(histogram!(SEND_LATENCY_NAME)),
+                Some(histogram!(SEND_BATCH_LATENCY_NAME)),
+            ),
             timeout: None,
             ewma_half_life_seconds: None,
         }
@@ -60,9 +60,6 @@ impl Builder {
         output: SourceOutput,
         component_key: ComponentKey,
     ) -> LimitedReceiver<SourceSenderItem> {
-        let lag_time = self.lag_time.clone();
-        let send_latency = self.send_latency.clone();
-        let send_batch_latency = self.send_batch_latency.clone();
         let log_definition = output.schema_definition.clone();
         let output_id = OutputId {
             component: component_key,
@@ -73,7 +70,7 @@ impl Builder {
                 let (output, rx) = Output::new_with_buffer(
                     self.buf_size,
                     DEFAULT_OUTPUT.to_owned(),
-                    OutputMetrics::new(lag_time, send_latency, send_batch_latency),
+                    self.output_metrics.clone(),
                     log_definition,
                     output_id,
                     self.timeout,
@@ -86,7 +83,7 @@ impl Builder {
                 let (output, rx) = Output::new_with_buffer(
                     self.buf_size,
                     name.clone(),
-                    OutputMetrics::new(lag_time, send_latency, send_batch_latency),
+                    self.output_metrics.clone(),
                     log_definition,
                     output_id,
                     self.timeout,
