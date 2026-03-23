@@ -16,6 +16,11 @@ use vector_lib::{
     request_metadata::GroupedCountByteSize,
 };
 
+use vector_common::constants::{
+    ZLIB_FRAME_OVERHEAD, ZLIB_STORED_BLOCK_OVERHEAD, ZLIB_STORED_BLOCK_SIZE,
+    ZSTD_SMALL_INPUT_THRESHOLD,
+};
+
 use super::config::{DatadogMetricsCompression, DatadogMetricsEndpoint, SeriesApiVersion};
 use crate::{
     common::datadog::{
@@ -917,24 +922,18 @@ impl DatadogMetricsCompression {
     const fn max_compressed_size(self, n: usize) -> usize {
         match self {
             Self::Zlib => {
-                // Deflate stores incompressible data in uncompressed blocks of up to 16 KB,
-                // each with 5 bytes of overhead (1 byte header + 2 byte length + 2 byte ~length).
-                // We subtract the zlib frame (2-byte header + 4-byte CRC trailer) from the block
-                // count since those bytes are not stored-block data.
-                // See: https://www.zlib.net/zlib_tech.html
-                const STORED_BLOCK_SIZE: usize = 16384;
-                const STORED_BLOCK_OVERHEAD: usize = 5;
-                const ZLIB_FRAME: usize = 6;
-                n + (1 + n.saturating_sub(ZLIB_FRAME) / STORED_BLOCK_SIZE) * STORED_BLOCK_OVERHEAD
+                // Deflate stores incompressible data in uncompressed blocks, each with fixed
+                // overhead. We subtract the zlib frame from the block count since those bytes
+                // are not stored-block data.
+                n + (1 + n.saturating_sub(ZLIB_FRAME_OVERHEAD) / ZLIB_STORED_BLOCK_SIZE)
+                    * ZLIB_STORED_BLOCK_OVERHEAD
             }
             Self::Zstd => {
                 // zstd_safe::compress_bound is not const, so we use the same formula it uses
                 // internally: srcSize + (srcSize >> 8) + small correction for inputs < 128 KB.
-                // See: https://github.com/facebook/zstd/blob/dev/lib/zstd.h (ZSTD_compressBound)
-                const ZSTD_128KB: usize = 128 << 10;
                 n + (n >> 8)
-                    + if n < ZSTD_128KB {
-                        (ZSTD_128KB - n) >> 11
+                    + if n < ZSTD_SMALL_INPUT_THRESHOLD {
+                        (ZSTD_SMALL_INPUT_THRESHOLD - n) >> 11
                     } else {
                         0
                     }
