@@ -383,23 +383,20 @@ pub fn udp(
                     }
                 }
             }
-        });
+        })
+        .boxed();
 
-        while let Some(events) = stream.next().await {
-            let handler_start = Instant::now();
-            let count = events.len();
-
-            if (out.send_batch(events).await).is_err() {
-                emit!(StreamClosedError { count });
+        match out.send_event_stream(&mut stream).await {
+            Ok(()) => {
+                debug!("Finished sending.");
+                Ok(())
             }
-
-            emit!(SocketRequestHandled {
-                mode: SocketMode::Udp,
-                latency: handler_start.elapsed(),
-            });
+            Err(_) => {
+                let (count, _) = stream.size_hint();
+                emit!(StreamClosedError { count });
+                Err(())
+            }
         }
-
-        Ok(())
     })
 }
 
