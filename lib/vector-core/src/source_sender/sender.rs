@@ -22,7 +22,9 @@ use vector_common::{
 
 use super::{Builder, Output, SendError};
 #[cfg(any(test, feature = "test"))]
-use super::{LAG_TIME_NAME, SEND_BATCH_LATENCY_NAME, SEND_LATENCY_NAME, TEST_BUFFER_SIZE};
+use super::{
+    LAG_TIME_NAME, OutputMetrics, SEND_BATCH_LATENCY_NAME, SEND_LATENCY_NAME, TEST_BUFFER_SIZE,
+};
 use crate::{
     EstimatedJsonEncodedSizeOf,
     event::{Event, EventArray, EventContainer, array::EventArrayIntoIter},
