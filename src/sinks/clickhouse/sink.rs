@@ -43,7 +43,8 @@ where
         input
             .batched_partitioned(
                 KeyPartitioner::new(self.database, self.table, self.format),
-                || batch_settings.as_byte_size_config(),
+                batch_settings.timeout,
+                |_| batch_settings.as_byte_size_config(),
             )
             .filter_map(|(key, batch)| async move { key.map(move |k| (k, batch)) })
             .request_builder(
