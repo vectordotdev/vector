@@ -1,4 +1,8 @@
-use std::{fs::remove_file, path::PathBuf, time::Duration};
+use std::{
+    fs::remove_file,
+    path::PathBuf,
+    time::{Duration, Instant},
+};
 
 use bytes::Bytes;
 use futures::{FutureExt, StreamExt};
@@ -22,8 +26,8 @@ use crate::{
     async_read::VecAsyncReadExt,
     event::Event,
     internal_events::{
-        ConnectionOpen, OpenGauge, SocketEventsReceived, SocketMode, StreamClosedError,
-        UnixSocketError, UnixSocketFileDeleteError,
+        ConnectionOpen, OpenGauge, SocketEventsReceived, SocketMode, SocketRequestHandled,
+        StreamClosedError, UnixSocketError, UnixSocketFileDeleteError,
     },
     shutdown::ShutdownSignal,
     sources::{
@@ -116,6 +120,7 @@ where
                     while let Some(result) = stream.next().await {
                         match result {
                             Ok((frame, _byte_size)) => {
+                                let handler_start = Instant::now();
                                 let mut events = frame.into();
 
                                 emit!(SocketEventsReceived {
@@ -130,6 +135,10 @@ where
                                 if (out.send_batch(events).await).is_err() {
                                     emit!(StreamClosedError { count });
                                 }
+                                emit!(SocketRequestHandled {
+                                    mode: SocketMode::Unix,
+                                    latency: handler_start.elapsed(),
+                                });
                             }
                             Err(error) => {
                                 emit!(UnixSocketError {

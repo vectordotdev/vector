@@ -1,4 +1,4 @@
-use std::{fs::remove_file, path::PathBuf};
+use std::{fs::remove_file, path::PathBuf, time::Instant};
 
 use bytes::{Bytes, BytesMut};
 use futures::StreamExt;
@@ -15,8 +15,8 @@ use crate::{
     codecs::Decoder,
     event::Event,
     internal_events::{
-        SocketEventsReceived, SocketMode, SocketReceiveError, StreamClosedError,
-        UnixSocketFileDeleteError,
+        SocketEventsReceived, SocketMode, SocketReceiveError, SocketRequestHandled,
+        StreamClosedError, UnixSocketFileDeleteError,
     },
     shutdown::ShutdownSignal,
     sources::{
@@ -73,6 +73,8 @@ async fn listen(
         buf.resize(max_length, 0);
         tokio::select! {
             recv = socket.recv_from(&mut buf) => {
+                let handler_start = Instant::now();
+
                 let (byte_size, address) = recv.map_err(|error| {
                     let error = vector_lib::codecs::decoding::Error::FramingError(error.into());
                     emit!(SocketReceiveError {
@@ -131,6 +133,11 @@ async fn listen(
                         None => break,
                     }
                 }
+
+                emit!(SocketRequestHandled {
+                    mode: SocketMode::Unix,
+                    latency: handler_start.elapsed(),
+                });
             }
             _ = &mut shutdown => return Ok(()),
         }

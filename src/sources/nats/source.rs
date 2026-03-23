@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use async_nats::jetstream::consumer::pull::Stream as PullConsumerStream;
 use chrono::Utc;
 use futures::StreamExt;
@@ -17,7 +19,7 @@ use crate::{
     SourceSender,
     codecs::Decoder,
     event::Event,
-    internal_events::StreamClosedError,
+    internal_events::{SocketMode, SocketRequestHandled, StreamClosedError},
     shutdown::ShutdownSignal,
     sources::nats::config::{BuildError, NatsSourceConfig, SubscribeSnafu},
 };
@@ -117,6 +119,8 @@ pub async fn run_nats_jetstream(
     let mut message_stream = stream.take_until(shutdown);
 
     while let Some(Ok(msg)) = message_stream.next().await {
+        let handler_start = Instant::now();
+
         bytes_received.emit(ByteSize(msg.payload.len()));
 
         let status = process_message(
@@ -128,6 +132,11 @@ pub async fn run_nats_jetstream(
             &events_received,
         )
         .await;
+
+        emit!(SocketRequestHandled {
+            mode: SocketMode::Tcp,
+            latency: handler_start.elapsed(),
+        });
 
         match status {
             ProcessingStatus::Success => {

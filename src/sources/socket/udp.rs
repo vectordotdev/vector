@@ -1,4 +1,7 @@
-use std::net::{Ipv4Addr, SocketAddr};
+use std::{
+    net::{Ipv4Addr, SocketAddr},
+    time::Instant,
+};
 
 use bytes::BytesMut;
 use chrono::Utc;
@@ -23,7 +26,7 @@ use crate::{
     event::Event,
     internal_events::{
         SocketBindError, SocketEventsReceived, SocketMode, SocketMulticastGroupJoinError,
-        SocketReceiveError, StreamClosedError,
+        SocketReceiveError, SocketRequestHandled, StreamClosedError,
     },
     net,
     serde::default_decoding,
@@ -242,6 +245,8 @@ pub(super) fn udp(
                        }
                     };
 
+                    let handler_start = Instant::now();
+
                     bytes_received.emit(ByteSize(byte_size));
                     let payload = buf.split_to(byte_size);
                     let truncated = byte_size == max_length + 1;
@@ -326,6 +331,11 @@ pub(super) fn udp(
                                 }
                             }
                         }
+
+                        emit!(SocketRequestHandled {
+                            mode: SocketMode::Udp,
+                            latency: handler_start.elapsed(),
+                        });
                     }
                 }
                 _ = &mut shutdown => return Ok(()),

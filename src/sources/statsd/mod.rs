@@ -1,6 +1,6 @@
 use std::{
     net::{Ipv4Addr, SocketAddr, SocketAddrV4},
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use bytes::Bytes;
@@ -29,7 +29,7 @@ use crate::{
     event::Event,
     internal_events::{
         EventsReceived, SocketBindError, SocketBytesReceived, SocketMode, SocketReceiveError,
-        StreamClosedError,
+        SocketRequestHandled, StreamClosedError,
     },
     net,
     shutdown::ShutdownSignal,
@@ -357,12 +357,19 @@ async fn statsd_udp(
     );
     let mut stream = UdpFramed::new(socket, codec).take_until(shutdown);
     while let Some(frame) = stream.next().await {
+        let handler_start = Instant::now();
         match frame {
             Ok(((events, _byte_size), _sock)) => {
                 let count = events.len();
                 if (out.send_batch(events).await).is_err() {
-                    emit!(StreamClosedError { count });
+                    emit!(StreamClosedError {
+                        count: events.len()
+                    });
                 }
+                emit!(SocketRequestHandled {
+                    mode: SocketMode::Udp,
+                    latency: handler_start.elapsed(),
+                });
             }
             Err(error) => {
                 emit!(SocketReceiveError {

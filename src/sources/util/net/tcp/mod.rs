@@ -1,6 +1,6 @@
 pub mod request_limiter;
 
-use std::{io, mem::drop, net::SocketAddr, time::Duration};
+use std::{io, mem::drop, net::SocketAddr, time::{Duration, Instant}};
 
 use bytes::Bytes;
 use futures::{FutureExt, StreamExt, future::BoxFuture};
@@ -36,8 +36,8 @@ use crate::{
     config::SourceContext,
     internal_events::{
         ConnectionOpen, OpenGauge, SocketBindError, SocketEventsReceived, SocketMode,
-        SocketReceiveError, StreamClosedError, TcpBytesReceived, TcpSendAckError,
-        TcpSocketTlsConnectionError,
+        SocketReceiveError, SocketRequestHandled, StreamClosedError, TcpBytesReceived,
+        TcpSendAckError, TcpSocketTlsConnectionError,
     },
     sources::util::{AfterReadExt, LenientFramedRead},
 };
@@ -340,6 +340,7 @@ async fn handle_stream<T>(
             res = reader.next() => {
                 match res {
                     Some(Ok((frames, _byte_size))) => {
+                        let handler_start = Instant::now();
                         let _num_frames = frames.len();
                         let acker = source.build_acker(&frames);
                         let (batch, receiver) = BatchNotifier::maybe_new_with_receiver(acknowledgements);
@@ -398,6 +399,10 @@ async fn handle_stream<T>(
                                             }
                                         }
                                 };
+                                emit!(SocketRequestHandled {
+                                    mode: SocketMode::Tcp,
+                                    latency: handler_start.elapsed(),
+                                });
                                 if let Some(ack_bytes) = acker.build_ack(ack){
                                     let stream = reader.get_mut().get_mut();
                                     if let Err(error) = stream.write_all(&ack_bytes).await {
