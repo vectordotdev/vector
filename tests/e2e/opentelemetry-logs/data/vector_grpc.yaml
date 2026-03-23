@@ -19,9 +19,8 @@ sinks:
     inputs:
       - source0.logs
     type: opentelemetry
-    protocol:
-      type: grpc
-      uri: http://otel-collector-sink:4317
+    protocol: grpc
+    uri: http://otel-collector-sink:4317
 
   otel_file_sink:
     type: file
