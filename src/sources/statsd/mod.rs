@@ -362,9 +362,7 @@ async fn statsd_udp(
             Ok(((events, _byte_size), _sock)) => {
                 let count = events.len();
                 if (out.send_batch(events).await).is_err() {
-                    emit!(StreamClosedError {
-                        count: events.len()
-                    });
+                    emit!(StreamClosedError { count });
                 }
                 emit!(SocketRequestHandled {
                     mode: SocketMode::Udp,

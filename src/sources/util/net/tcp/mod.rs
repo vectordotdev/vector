@@ -1,6 +1,11 @@
 pub mod request_limiter;
 
-use std::{io, mem::drop, net::SocketAddr, time::{Duration, Instant}};
+use std::{
+    io,
+    mem::drop,
+    net::SocketAddr,
+    time::{Duration, Instant},
+};
 
 use bytes::Bytes;
 use futures::{FutureExt, StreamExt, future::BoxFuture};
