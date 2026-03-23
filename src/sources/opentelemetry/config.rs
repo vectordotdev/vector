@@ -122,7 +122,8 @@ pub struct OpentelemetryConfig {
     pub acknowledgements: SourceAcknowledgementsConfig,
 
     /// The namespace to use for logs. This overrides the global setting.
-    /// Is ignored for header enrichment of metrics and traces.
+    /// Is ignored for header enrichment of metrics (unless use_otlp_decoding.metrics = true,
+    /// when Event::Log messages are emitted) and traces.
     #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     pub log_namespace: Option<bool>,
