@@ -52,6 +52,4 @@ ignore = [
   # rustls-webpki 0.101.7 vulnerability. Fix requires upgrading rustls from 0.21 to 0.23+,
   # which is a significant chain upgrade through aws-smithy-http-client, hyper-rustls, tokio-rustls, etc.
   { id = "RUSTSEC-2026-0049", reason = "Fix requires major rustls upgrade (0.21 -> 0.23+); tracked for future upgrade" },
-  # tokio-io 0.1.13 is unmaintained; no safe upgrade available (superseded by tokio crate itself).
-  { id = "RUSTSEC-2026-0058", reason = "tokio-io is unmaintained with no safe upgrade available" },
 ]
