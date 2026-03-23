@@ -5,7 +5,8 @@ use chrono::Local;
 use futures_util::future::join_all;
 use regex::Regex;
 use tokio::sync::{mpsc, oneshot};
-use vector_lib::api_client::{Client, RECONNECT_DELAY_MS, Uri};
+use http::Uri;
+use vector_lib::api_client::{Client, RECONNECT_DELAY_MS};
 
 use vector_lib::top::{
     dashboard::{init_dashboard, is_tty},

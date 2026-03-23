@@ -7,6 +7,7 @@ use std::{
 use glob::Pattern;
 use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
+use http::Uri;
 use vector_api_client::{
     Client,
     proto::{Component, ComponentType, MetricName, stream_component_metrics_response::Value},
@@ -452,7 +453,7 @@ pub struct SubscribeHandles {
 /// HTTP/2 multiplexes the concurrent streams — cloning a connected `Client` is cheap
 /// (the tonic `Channel` is Arc-backed) and avoids redundant TCP/HTTP2 handshakes.
 pub async fn subscribe(
-    uri: vector_api_client::Uri,
+    uri: Uri,
     tx: state::EventTx,
     interval: i64,
     components_patterns: Vec<Pattern>,
@@ -547,7 +548,7 @@ pub async fn subscribe(
 /// Retrieve the initial components/metrics for first paint. Further updating the metrics
 /// will be handled by subscriptions.
 pub async fn init_components(
-    uri: vector_api_client::Uri,
+    uri: Uri,
     components_patterns: &[Pattern],
 ) -> Result<state::State, vector_api_client::Error> {
     let mut client = Client::new(uri);

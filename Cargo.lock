@@ -12688,6 +12688,7 @@ dependencies = [
  "futures",
  "futures-util",
  "glob",
+ "http 0.2.12",
  "humantime",
  "indoc",
  "num-format",
