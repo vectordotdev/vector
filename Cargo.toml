@@ -435,7 +435,6 @@ sqlx = { version = "0.8.6", default-features = false, features = ["derive", "pos
 stream-cancel = { version = "0.8.2", default-features = false }
 strip-ansi-escapes = { version = "0.2.1", default-features = false }
 syslog = { version = "6.1.1", default-features = false, optional = true }
-tikv-jemallocator = { version = "0.6.0", default-features = false, features = ["unprefixed_malloc_on_supported_platforms"], optional = true }
 tokio-postgres = { version = "0.7.13", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
 tokio-tungstenite = { workspace = true, features = ["connect"], optional = true }
 toml.workspace = true
@@ -462,9 +461,11 @@ byteorder = "1.5.0"
 windows-service = "0.8.0"
 windows = { version = "0.58", features = ["Win32_System_EventLog", "Win32_Foundation", "Win32_System_Com", "Win32_Security", "Win32_Security_Authorization", "Win32_System_Threading", "Win32_Storage_FileSystem"], optional = true }
 quick-xml = { version = "0.31", default-features = false, features = ["serialize"], optional = true }
+rdkafka = { version = "0.39.0", default-features = false, features = ["cmake_build"], optional = true }
 
 [target.'cfg(unix)'.dependencies]
 nix = { version = "0.31", default-features = false, features = ["socket", "signal", "fs"] }
+tikv-jemallocator = { version = "0.6.0", default-features = false, features = ["unprefixed_malloc_on_supported_platforms"], optional = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 procfs = { version = "0.18.0", default-features = false }
