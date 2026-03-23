@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use bytes::Bytes;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf, json_size::JsonSize, request_metadata::RequestMetadata,
@@ -27,7 +29,7 @@ pub struct Metadata {
     finalizers: EventFinalizers,
     batch_size: usize,
     events_byte_size: JsonSize,
-    original_events: Vec<ProcessedEvent>,
+    original_events: Arc<Vec<ProcessedEvent>>,
 }
 
 impl RequestBuilder<Vec<ProcessedEvent>> for ElasticsearchRequestBuilder {
@@ -62,7 +64,7 @@ impl RequestBuilder<Vec<ProcessedEvent>> for ElasticsearchRequestBuilder {
             finalizers: events.take_finalizers(),
             batch_size: events.len(),
             events_byte_size,
-            original_events: events.clone(),
+            original_events: Arc::new(events.clone()),
         };
         (es_metadata, metadata_builder, events)
     }

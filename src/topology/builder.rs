@@ -168,6 +168,25 @@ impl<'a> Builder<'a> {
         finalized_outputs
     }
 
+    fn is_sink_output_connected(&self, sink_key: &ComponentKey, port: Option<&str>) -> bool {
+        let output_id = OutputId {
+            component: sink_key.clone(),
+            port: port.map(str::to_owned),
+        };
+
+        self.config
+            .transforms()
+            .any(|(_, transform)| transform.inputs.contains(&output_id))
+            || self
+                .config
+                .sinks()
+                .any(|(_, sink)| sink.inputs.contains(&output_id))
+            || self
+                .config
+                .enrichment_tables()
+                .any(|(_, table)| table.inputs.contains(&output_id))
+    }
+
     /// Loads, or reloads the enrichment tables.
     /// The tables are stored in the `ENRICHMENT_TABLES` global variable.
     async fn load_enrichment_tables(&mut self) -> &'static vector_lib::enrichment::TableRegistry {
@@ -546,6 +565,12 @@ impl<'a> Builder<'a> {
             debug!(component_id = %key, "Building new sink.");
 
             let sink_inputs = &sink.inputs;
+            let sink_outputs = sink
+                .inner
+                .outputs(self.config.schema.log_namespace())
+                .into_iter()
+                .filter(|output| self.is_sink_output_connected(key, output.port.as_deref()))
+                .collect::<Vec<_>>();
             let healthcheck = sink.healthcheck();
             let enable_healthcheck = healthcheck.enabled && self.config.healthchecks.enabled;
             let healthcheck_timeout = healthcheck.timeout;
@@ -560,6 +585,33 @@ impl<'a> Builder<'a> {
                 component_type = %sink.inner.get_component_name(),
             );
             let _entered_span = span.enter();
+
+            let mut sink_output_pumps = Vec::new();
+            let sink_output = if sink_outputs.is_empty() {
+                None
+            } else {
+                let mut builder = SourceSender::builder()
+                    .with_buffer(*SOURCE_SENDER_BUFFER_SIZE)
+                    .with_ewma_half_life_seconds(
+                        self.config.global.buffer_utilization_ewma_half_life_seconds,
+                    );
+
+                for output in sink_outputs.into_iter() {
+                    let rx = builder.add_sink_output(output.clone(), key.clone());
+                    let (fanout, control) = Fanout::new();
+                    let pump = run_sink_output_pump(rx, fanout);
+                    sink_output_pumps.push(pump.boxed());
+                    self.outputs.insert(
+                        OutputId {
+                            component: key.clone(),
+                            port: output.port.clone(),
+                        },
+                        control,
+                    );
+                }
+
+                Some(builder.build())
+            };
 
             // At this point, we've validated that all transforms are valid, including any
             // transform that mutates the schema provided by their sources. We can now validate the
@@ -601,6 +653,7 @@ impl<'a> Builder<'a> {
             };
 
             let cx = SinkContext {
+                key: Some(key.clone()),
                 healthcheck,
                 globals: self.config.global.clone(),
                 enrichment_tables: enrichment_tables.clone(),
@@ -609,6 +662,7 @@ impl<'a> Builder<'a> {
                 schema: self.config.schema,
                 app_name: crate::get_app_name().to_string(),
                 app_name_slug: crate::get_slugified_app_name(),
+                outputs: sink_output,
                 extra_context: self.extra_context.clone(),
             };
 
@@ -626,8 +680,15 @@ impl<'a> Builder<'a> {
                 .utilization_registry
                 .add_component(key.clone(), gauge!("utilization"));
             let component_key = key.clone();
+            let sink_output_pumps = sink_output_pumps;
             let sink = async move {
                 debug!("Sink starting.");
+
+                for pump in sink_output_pumps {
+                    let task_name =
+                        format!(">> {} ({}, output pump) >>", typetag, component_key.id());
+                    _ = spawn_named(pump, task_name.as_ref());
+                }
 
                 // Why is this Arc<Mutex<Option<_>>> needed you ask.
                 // In case when this function build_pieces errors
@@ -906,6 +967,30 @@ async fn run_source_output_pump(
     }
 
     debug!("Source pump finished normally.");
+    Ok(TaskOutput::Source)
+}
+
+async fn run_sink_output_pump(
+    mut rx: LimitedReceiver<SourceSenderItem>,
+    mut fanout: Fanout,
+) -> TaskResult {
+    debug!("Sink output pump starting.");
+
+    while let Some(SourceSenderItem {
+        events: array,
+        send_reference,
+    }) = rx.next().await
+    {
+        fanout
+            .send(array, Some(send_reference))
+            .await
+            .map_err(|e| {
+                debug!("Sink output pump finished with an error.");
+                TaskError::wrapped(e)
+            })?;
+    }
+
+    debug!("Sink output pump finished normally.");
     Ok(TaskOutput::Source)
 }
 

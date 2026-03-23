@@ -6,8 +6,8 @@ use std::{
 use indexmap::{IndexMap, set::IndexSet};
 
 use super::{
-    ComponentKey, DataType, OutputId, SinkOuter, SourceOuter, SourceOutput, TransformContext,
-    TransformOuter, TransformOutput, WildcardMatching, schema,
+    ComponentKey, DataType, OutputId, SinkOuter, SinkOutput, SourceOuter, SourceOutput,
+    TransformContext, TransformOuter, TransformOutput, WildcardMatching, schema,
 };
 
 #[derive(Debug, Clone)]
@@ -21,6 +21,7 @@ pub enum Node {
     },
     Sink {
         ty: DataType,
+        outputs: Vec<SinkOutput>,
     },
 }
 
@@ -44,8 +45,12 @@ impl fmt::Display for Node {
                 }
                 Ok(())
             }
-            Node::Sink { ty } => {
-                write!(f, "component_kind: sink\n  types: {ty}")
+            Node::Sink { ty, outputs } => {
+                write!(f, "component_kind: sink\n  types: {ty}\n  outputs:")?;
+                for output in outputs {
+                    write!(f, "\n    {output}")?;
+                }
+                Ok(())
             }
         }
     }
@@ -127,6 +132,7 @@ impl Graph {
                 id.clone(),
                 Node::Sink {
                     ty: config.inner.input().data_type(),
+                    outputs: config.inner.outputs(schema.log_namespace()),
                 },
             );
         }
@@ -215,7 +221,7 @@ impl Graph {
         match self.nodes[key] {
             Node::Source { .. } => panic!("no inputs on sources"),
             Node::Transform { in_ty, .. } => in_ty,
-            Node::Sink { ty } => ty,
+            Node::Sink { ty, .. } => ty,
         }
     }
 
@@ -237,7 +243,11 @@ impl Graph {
                 .find(|output| output.port == id.port)
                 .map(|output| output.ty)
                 .expect("output didn't exist"),
-            Node::Sink { .. } => panic!("no outputs on sinks"),
+            Node::Sink { outputs, .. } => outputs
+                .iter()
+                .find(|output| output.port == id.port)
+                .map(|output| output.ty)
+                .expect("output didn't exist"),
         }
     }
 
@@ -322,7 +332,13 @@ impl Graph {
         self.nodes
             .iter()
             .flat_map(|(key, node)| match node {
-                Node::Sink { .. } => vec![],
+                Node::Sink { outputs, .. } => outputs
+                    .iter()
+                    .map(|output| OutputId {
+                        component: key.clone(),
+                        port: output.port.clone(),
+                    })
+                    .collect::<Vec<_>>(),
                 Node::Source { outputs } => outputs
                     .iter()
                     .map(|output| OutputId {
@@ -414,7 +430,7 @@ impl Graph {
             .into_iter()
             .filter(|path| {
                 if let Some(key) = path.last() {
-                    matches!(self.nodes.get(key), Some(Node::Sink { ty: _ }))
+                    matches!(self.nodes.get(key), Some(Node::Sink { .. }))
                 } else {
                     false
                 }
@@ -488,7 +504,13 @@ mod test {
         fn add_sink(&mut self, id: &str, ty: DataType, inputs: Vec<&str>) {
             let id = ComponentKey::from(id);
             let inputs = clean_inputs(inputs);
-            self.nodes.insert(id.clone(), Node::Sink { ty });
+            self.nodes.insert(
+                id.clone(),
+                Node::Sink {
+                    ty,
+                    outputs: vec![],
+                },
+            );
             for from in inputs {
                 self.edges.push(Edge {
                     from,
@@ -505,6 +527,17 @@ mod test {
         ) -> Result<(), String> {
             let available_inputs = self.input_map().unwrap();
             self.add_input(input, &node.into(), &available_inputs, wildcard_matching)
+        }
+
+        fn add_sink_output(&mut self, id: &str, port: &str, ty: DataType) {
+            match self.nodes.get_mut(&ComponentKey::from(id)) {
+                Some(Node::Sink { outputs, .. }) => outputs.push(SinkOutput {
+                    port: Some(port.to_string()),
+                    ty,
+                    schema_definition: None,
+                }),
+                _ => panic!("output added to non-sink"),
+            }
         }
     }
 
@@ -701,6 +734,20 @@ mod test {
                 "log_to_log.not_errors",
                 WildcardMatching::Strict
             )
+        );
+    }
+
+    #[test]
+    fn allows_sink_outputs() {
+        let mut graph = Graph::default();
+        graph.add_source("log_source", DataType::Log);
+        graph.add_sink("elastic", DataType::Log, vec!["log_source"]);
+        graph.add_sink_output("elastic", "dlq", DataType::Log);
+        graph.add_sink("dlq_sink", DataType::Log, vec![]);
+
+        assert_eq!(
+            Ok(()),
+            graph.test_add_input("dlq_sink", "elastic.dlq", WildcardMatching::Strict)
         );
     }
 

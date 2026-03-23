@@ -7,6 +7,7 @@ pub mod buffer;
 pub mod builder;
 pub mod compressor;
 pub mod datagram;
+pub mod dlq;
 pub mod encoding;
 pub mod http;
 pub mod metadata;
@@ -45,6 +46,7 @@ pub use buffer::{
 pub use builder::SinkBuilderExt;
 use chrono::{FixedOffset, Offset, Utc};
 pub use compressor::Compressor;
+pub use dlq::{DLQ_OUTPUT, SinkDlq};
 pub use normalizer::Normalizer;
 pub use request_builder::{IncrementalRequestBuilder, RequestBuilder};
 pub use service::{

@@ -41,6 +41,20 @@ fn sum_metrics_owned<I: IntoIterator<Item = Metric>>(metrics: I) -> Option<Metri
     Some(iter.fold(m, |mut m1, m2| if m1.update(&m2) { m1 } else { m2 }))
 }
 
+fn component_total_sent_events_metric(metrics: Vec<Metric>) -> Option<Metric> {
+    let output_agnostic: Vec<Metric> = metrics
+        .iter()
+        .filter(|m| m.tag_value("output").is_none())
+        .cloned()
+        .collect();
+
+    if output_agnostic.is_empty() {
+        sum_metrics_owned(metrics)
+    } else {
+        sum_metrics_owned(output_agnostic)
+    }
+}
+
 pub trait MetricsFilter<'a> {
     fn received_bytes_total(&self) -> Option<ReceivedBytesTotal>;
     fn received_events_total(&self) -> Option<ReceivedEventsTotal>;
@@ -310,7 +324,7 @@ pub fn component_sent_events_totals_metrics_with_outputs(
                         })
                         .collect();
 
-                    let sum = sum_metrics_owned(metrics)?;
+                    let sum = component_total_sent_events_metric(metrics)?;
                     match sum.value() {
                         MetricValue::Counter { value }
                             if cache.insert(id, *value).unwrap_or(0.00) < *value =>
@@ -350,7 +364,7 @@ pub fn component_sent_events_total_throughputs_with_outputs(
                         })
                         .collect::<Vec<_>>();
 
-                    let sum = sum_metrics_owned(metrics)?;
+                    let sum = component_total_sent_events_metric(metrics)?;
                     let total_throughput = throughput(&sum, id.clone(), &mut cache)?;
                     Some((
                         ComponentKey::from(id),
