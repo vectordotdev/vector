@@ -58,6 +58,10 @@ inputs:
     required: false
     default: false
     description: "Install cargo-hack for feature compilation checks."
+  cargo-llvm-cov:
+    required: false
+    default: false
+    description: "Install cargo-llvm-cov for code coverage."
   dd-rust-license-tool:
     required: false
     default: false
@@ -111,6 +115,7 @@ runs:
                    "${{ inputs.cargo-deny }}" \
                    "${{ inputs.cargo-msrv }}" \
                    "${{ inputs.cargo-hack }}" \
+                   "${{ inputs.cargo-llvm-cov }}" \
                    "${{ inputs.dd-rust-license-tool }}" \
                    "${{ inputs.wasm-pack }}"; do
           if [[ "$val" == "true" ]]; then
@@ -259,6 +264,7 @@ runs:
           ~/.cargo/bin/cargo-deny
           ~/.cargo/bin/cargo-msrv
           ~/.cargo/bin/cargo-hack
+          ~/.cargo/bin/cargo-llvm-cov
           ~/.cargo/bin/dd-rust-license-tool
           ~/.cargo/bin/wasm-pack
           /usr/local/bin/markdownlint
@@ -278,6 +284,7 @@ runs:
         [[ "${{ inputs.cargo-deny }}" == "true" ]] && mods+=("cargo-deny")
         [[ "${{ inputs.cargo-msrv }}" == "true" ]] && mods+=("cargo-msrv")
         [[ "${{ inputs.cargo-hack }}" == "true" ]] && mods+=("cargo-hack")
+        [[ "${{ inputs.cargo-llvm-cov }}" == "true" ]] && mods+=("cargo-llvm-cov")
         [[ "${{ inputs.dd-rust-license-tool }}" == "true" ]] && mods+=("dd-rust-license-tool")
         [[ "${{ inputs.wasm-pack }}" == "true" ]] && mods+=("wasm-pack")
         [[ "${{ inputs.markdownlint }}" == "true" ]] && mods+=("markdownlint")

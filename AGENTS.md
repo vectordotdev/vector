@@ -254,6 +254,10 @@ cargo install dd-rust-license-tool --locked
 make build-licenses
 ```
 
+## Creating Pull Requests
+
+Before opening a PR, read [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md) and use it as the reference for the PR body structure and title.
+
 ## Reference Documentation
 
 These documents provide context that AI agents and developers need when working on Vector code.
