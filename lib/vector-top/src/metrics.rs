@@ -452,7 +452,7 @@ pub struct SubscribeHandles {
 /// HTTP/2 multiplexes the concurrent streams — cloning a connected `Client` is cheap
 /// (the tonic `Channel` is Arc-backed) and avoids redundant TCP/HTTP2 handshakes.
 pub async fn subscribe(
-    url: String,
+    uri: vector_api_client::Uri,
     tx: state::EventTx,
     interval: i64,
     components_patterns: Vec<Pattern>,
@@ -460,13 +460,7 @@ pub async fn subscribe(
 ) -> Result<SubscribeHandles, vector_api_client::Error> {
     let components_patterns = Arc::new(components_patterns);
 
-    let mut client =
-        Client::new(
-            url.parse()
-                .map_err(|e| vector_api_client::Error::InvalidUrl {
-                    message: format!("{e}"),
-                })?,
-        );
+    let mut client = Client::new(uri);
     client.connect().await?;
 
     let poll_handle = tokio::spawn(poll_components(
@@ -553,16 +547,10 @@ pub async fn subscribe(
 /// Retrieve the initial components/metrics for first paint. Further updating the metrics
 /// will be handled by subscriptions.
 pub async fn init_components(
-    url: &str,
+    uri: vector_api_client::Uri,
     components_patterns: &[Pattern],
 ) -> Result<state::State, vector_api_client::Error> {
-    let mut client =
-        Client::new(
-            url.parse()
-                .map_err(|e| vector_api_client::Error::InvalidUrl {
-                    message: format!("{e}"),
-                })?,
-        );
+    let mut client = Client::new(uri);
     client.connect().await?;
 
     // Get all components

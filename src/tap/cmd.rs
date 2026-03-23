@@ -14,7 +14,7 @@ pub(crate) async fn cmd(opts: &super::Opts, signal_rx: SignalRx) -> exitcode::Ex
     let url = opts.url();
     let Ok(uri) = url.as_str().parse() else {
         eprintln!("Invalid API URL: {url}");
-        return exitcode::UNAVAILABLE;
+        return exitcode::USAGE;
     };
     let mut client = Client::new(uri);
 
@@ -45,7 +45,7 @@ pub async fn tap(opts: &super::Opts, signal_rx: SignalRx) -> exitcode::ExitCode 
 async fn tap_internal(
     opts: &super::Opts,
     mut signal_rx: SignalRx,
-    initial_client: Option<Client>,
+    mut client_opt: Option<Client>,
 ) -> exitcode::ExitCode {
     let url = opts.url();
     let output_channel = OutputChannel::Stdout(EventFormatter::new(opts.meta, opts.format));
@@ -55,8 +55,6 @@ async fn tap_internal(
         opts.outputs_patterns().clone(),
         &output_channel,
     );
-
-    let mut client_opt = initial_client;
 
     loop {
         tokio::select! {

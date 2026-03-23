@@ -29,6 +29,7 @@ mod error;
 
 pub use client::Client;
 pub use error::{Error, Result};
+pub use http::Uri;
 
 /// How long (ms) to wait before attempting to reconnect to the Vector API after a disconnect.
 pub const RECONNECT_DELAY_MS: u64 = 5000;

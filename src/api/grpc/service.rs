@@ -8,10 +8,10 @@ use std::sync::{
     Arc, Mutex,
     atomic::{AtomicBool, Ordering},
 };
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 
 use futures::{StreamExt as FuturesStreamExt, stream};
-use rand::{Rng, SeedableRng, rngs::SmallRng};
+use rand::{Rng, SeedableRng as _, rngs::SmallRng};
 use tokio::select;
 use tokio::sync::mpsc;
 use tokio::time::{self, interval};
@@ -718,17 +718,9 @@ struct Reservoir {
 
 impl Reservoir {
     fn new(limit: usize) -> Self {
-        let seed = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_else(|_| {
-                warn!("System clock is before Unix epoch, using fallback seed.");
-                Duration::from_secs(0)
-            })
-            .as_nanos() as u64;
-
         Self {
             events: Vec::with_capacity(limit),
-            rng: SmallRng::seed_from_u64(seed),
+            rng: SmallRng::from_rng(&mut rand::rng()),
             batch: 0,
             limit,
         }

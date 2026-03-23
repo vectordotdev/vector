@@ -5,7 +5,7 @@ use chrono::Local;
 use futures_util::future::join_all;
 use regex::Regex;
 use tokio::sync::{mpsc, oneshot};
-use vector_lib::api_client::{Client, RECONNECT_DELAY_MS};
+use vector_lib::api_client::{Client, RECONNECT_DELAY_MS, Uri};
 
 use vector_lib::top::{
     dashboard::{init_dashboard, is_tty},
@@ -26,11 +26,11 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
     let url = opts.url();
 
     // Create a new API client for connecting to the local/remote Vector instance.
-    let Ok(uri) = url.as_str().parse() else {
+    let Ok(uri) = url.as_str().parse::<Uri>() else {
         eprintln!("Invalid API URL: {url}");
-        return exitcode::UNAVAILABLE;
+        return exitcode::USAGE;
     };
-    let mut client = Client::new(uri);
+    let mut client = Client::new(uri.clone());
 
     if client.connect().await.is_err() || client.health().await.is_err() {
         eprintln!(
@@ -48,11 +48,11 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
         return exitcode::UNAVAILABLE;
     }
 
-    top(opts, url.to_string(), "Vector").await
+    top(opts, uri, "Vector").await
 }
 
 /// General monitoring
-pub async fn top(opts: &super::Opts, url: String, dashboard_title: &str) -> exitcode::ExitCode {
+pub async fn top(opts: &super::Opts, uri: Uri, dashboard_title: &str) -> exitcode::ExitCode {
     // Channel for updating state via event messages
     let (tx, rx) = tokio::sync::mpsc::channel(20);
     let mut starting_state = State::new(BTreeMap::new());
@@ -68,7 +68,7 @@ pub async fn top(opts: &super::Opts, url: String, dashboard_title: &str) -> exit
     // Channel for shutdown signal
     let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
 
-    let connection = tokio::spawn(subscription(opts.clone(), url, tx.clone(), shutdown_tx));
+    let connection = tokio::spawn(subscription(opts.clone(), uri, tx.clone(), shutdown_tx));
 
     // Initialize the dashboard
     match init_dashboard(
@@ -101,7 +101,7 @@ pub async fn top(opts: &super::Opts, url: String, dashboard_title: &str) -> exit
 // subscriptions in the case of a connection failure
 async fn subscription(
     opts: super::Opts,
-    url: String,
+    uri: Uri,
     tx: mpsc::Sender<EventType>,
     shutdown_tx: oneshot::Sender<()>,
 ) {
@@ -109,7 +109,7 @@ async fn subscription(
         // Initialize state. On future reconnects, we re-initialize state in
         // order to accurately capture added, removed, and edited
         // components.
-        let state = match metrics::init_components(&url, &opts.components).await {
+        let state = match metrics::init_components(uri.clone(), &opts.components).await {
             Ok(state) => state,
             Err(_) => {
                 tokio::time::sleep(Duration::from_millis(RECONNECT_DELAY_MS)).await;
@@ -125,7 +125,7 @@ async fn subscription(
 
         // Subscribe to updated metrics via gRPC streaming
         let handles = match metrics::subscribe(
-            url.clone(),
+            uri.clone(),
             tx.clone(),
             opts.interval as i64,
             opts.components.clone(),
