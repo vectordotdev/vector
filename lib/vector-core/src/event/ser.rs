@@ -3,13 +3,89 @@ use enumflags2::{BitFlags, FromBitsError, bitflags};
 use prost::Message;
 use snafu::Snafu;
 use vector_buffers::encoding::{AsMetadata, Encodable};
+use vrl::value::Value;
 
 use super::{Event, EventArray, proto};
+
+/// Maximum nesting depth allowed for events before protobuf encoding.
+///
+/// Prost enforces a recursion limit of 100 during protobuf decoding. In Vector's proto schema,
+/// each level of map nesting costs ~3 prost recursion levels (map entry -> key/value -> nested
+/// message). Empirically, prost decode fails at Value tree depth 34 and succeeds at depth 33.
+///
+/// We set the limit to 33 — the highest safe depth — to prevent corruption across all protobuf
+/// encoding paths (disk buffers, gRPC, native codec) while preserving backward compatibility
+/// with JSON payloads up to 32 levels deep (which become depth 33 after parse_json places them
+/// inside a LogEvent field).
+pub const MAX_NESTING_DEPTH: usize = 33;
+
+/// Check the nesting depth of a `Value`, returning `Err(actual_depth)` if it exceeds `max_depth`.
+///
+/// This performs an early-exit traversal: it returns as soon as any branch exceeds the limit,
+/// avoiding unnecessary work on well-formed events.
+pub fn check_value_depth(
+    value: &Value,
+    current_depth: usize,
+    max_depth: usize,
+) -> Result<(), usize> {
+    if current_depth > max_depth {
+        return Err(current_depth);
+    }
+    match value {
+        Value::Object(map) => {
+            for v in map.values() {
+                check_value_depth(v, current_depth + 1, max_depth)?;
+            }
+        }
+        Value::Array(arr) => {
+            for v in arr {
+                check_value_depth(v, current_depth + 1, max_depth)?;
+            }
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+/// Returns `true` if the event's nesting depth exceeds `MAX_NESTING_DEPTH`.
+///
+/// Metrics have a fixed structure and cannot be deeply nested, so they always return `false`.
+pub fn event_exceeds_max_nesting_depth(event: &Event) -> bool {
+    let value = match event {
+        Event::Log(log) => log.value(),
+        Event::Trace(trace) => trace.value(),
+        Event::Metric(_) => return false,
+    };
+    check_value_depth(value, 0, MAX_NESTING_DEPTH).is_err()
+}
+
+/// Checks all events in an `EventArray` for nesting depth violations.
+///
+/// Returns `Err(EncodeError::NestingTooDeep)` if any log or trace event exceeds
+/// `MAX_NESTING_DEPTH`. Metrics are skipped (fixed structure, no deep nesting possible).
+fn check_event_array_nesting_depth(events: &EventArray) -> Result<(), EncodeError> {
+    let values: Box<dyn Iterator<Item = &Value> + '_> = match events {
+        EventArray::Logs(logs) => Box::new(logs.iter().map(|l| l.value())),
+        EventArray::Traces(traces) => Box::new(traces.iter().map(|t| t.value())),
+        EventArray::Metrics(_) => return Ok(()),
+    };
+    for value in values {
+        if let Err(depth) = check_value_depth(value, 0, MAX_NESTING_DEPTH) {
+            return Err(EncodeError::NestingTooDeep {
+                depth,
+                max_depth: MAX_NESTING_DEPTH,
+            });
+        }
+    }
+    Ok(())
+}
 
 #[derive(Debug, Snafu)]
 pub enum EncodeError {
     #[snafu(display("the provided buffer was too small to fully encode this item"))]
     BufferTooSmall,
+    #[snafu(display("event nesting depth {depth} exceeds maximum of {max_depth}"))]
+    NestingTooDeep { depth: usize, max_depth: usize },
 }
 
 #[derive(Debug, Snafu)]
@@ -95,6 +171,11 @@ impl Encodable for EventArray {
     where
         B: BufMut,
     {
+        // Check nesting depth before encoding. Deeply nested events encode
+        // successfully but fail to decode due to prost's recursion limit,
+        // which would corrupt the disk buffer.
+        check_event_array_nesting_depth(&self)?;
+
         proto::EventArray::from(self)
             .encode(buffer)
             .map_err(|_| EncodeError::BufferTooSmall)

@@ -35,6 +35,7 @@ pub mod metric;
 pub mod proto;
 mod r#ref;
 mod ser;
+pub use ser::{MAX_NESTING_DEPTH, check_value_depth, event_exceeds_max_nesting_depth};
 #[cfg(test)]
 mod test;
 mod trace;

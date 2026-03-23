@@ -322,3 +322,68 @@ fn rebuild_fixtures(proto: &str, deserializer: &dyn Deserializer, serializer: &m
         out.flush().expect("Could not write rebuilt data");
     }
 }
+
+// ---------------------------------------------------------------------------
+// Nesting depth guard integration tests for the native codec
+// ---------------------------------------------------------------------------
+
+use tokio_util::codec::Encoder;
+use vector_core::event::{LogEvent, ObjectMap, Value};
+
+fn create_nested_log_event(wrapping_levels: usize) -> LogEvent {
+    let mut value = Value::from("innermost");
+    for _ in 0..wrapping_levels {
+        let mut map = ObjectMap::new();
+        map.insert("nested".into(), value);
+        value = Value::Object(map);
+    }
+    let mut event = LogEvent::default();
+    event.insert("data", value);
+    event
+}
+
+/// The native codec serializer rejects events exceeding MAX_NESTING_DEPTH.
+#[test]
+fn native_codec_rejects_overly_nested_event() {
+    // 33 wrapping levels + "data" key = depth 34 > MAX_NESTING_DEPTH (33)
+    let event = create_nested_log_event(33);
+    let event = Event::Log(event);
+
+    let mut serializer = NativeSerializerConfig.build();
+    let mut buffer = BytesMut::with_capacity(8192);
+
+    let result = serializer.encode(event, &mut buffer);
+    assert!(
+        result.is_err(),
+        "native codec should reject events exceeding MAX_NESTING_DEPTH"
+    );
+}
+
+/// The native codec serializer + deserializer roundtrips events at max depth.
+#[test]
+fn native_codec_roundtrip_max_depth_event() {
+    // 32 wrapping levels + "data" key = depth 33 = MAX_NESTING_DEPTH
+    let event = create_nested_log_event(32);
+    let original_data = event.value().get("data").cloned();
+    let event = Event::Log(event);
+
+    let mut serializer = NativeSerializerConfig.build();
+    let mut buffer = BytesMut::with_capacity(8192);
+
+    serializer
+        .encode(event, &mut buffer)
+        .expect("native codec should accept events at MAX_NESTING_DEPTH");
+
+    let deserializer = NativeDeserializerConfig.build();
+    let decoded_events = deserializer
+        .parse(buffer.freeze(), LogNamespace::Legacy)
+        .expect("native codec should decode events at MAX_NESTING_DEPTH");
+
+    assert_eq!(decoded_events.len(), 1);
+    let decoded_log = decoded_events.into_iter().next().unwrap().into_log();
+    assert_eq!(
+        original_data.as_ref(),
+        decoded_log.value().get("data"),
+        "deeply nested data should survive native codec roundtrip at max depth"
+    );
+}
