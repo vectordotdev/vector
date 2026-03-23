@@ -3,9 +3,9 @@ use std::time::Duration;
 
 use chrono::Local;
 use futures_util::future::join_all;
+use http::Uri;
 use regex::Regex;
 use tokio::sync::{mpsc, oneshot};
-use http::Uri;
 use vector_lib::api_client::{Client, RECONNECT_DELAY_MS};
 
 use vector_lib::top::{

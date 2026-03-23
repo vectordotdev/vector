@@ -5,9 +5,9 @@ use std::{
 };
 
 use glob::Pattern;
+use http::Uri;
 use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
-use http::Uri;
 use vector_api_client::{
     Client,
     proto::{Component, ComponentType, MetricName, stream_component_metrics_response::Value},
