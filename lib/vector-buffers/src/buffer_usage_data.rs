@@ -20,6 +20,7 @@ use crate::{
 const ORDERING: Ordering = Ordering::Relaxed;
 
 /// Snapshot of category metrics.
+#[derive(Clone, Copy, Debug, Default)]
 struct CategorySnapshot {
     event_count: u64,
     event_byte_size: u64,
@@ -86,37 +87,45 @@ impl CategoryMetrics {
     }
 }
 
-/// `CurrentMetrics` is a wrapper around a pair of `CategoryMetrics` that are used to track a
-/// "current" value that may increment or decrement. The challenge this solves is that the
-/// increments and decrements may race and result in underflows that are hard to handle using only
-/// efficient atomic operations. By tracking the increments and decrements separately, we can ensure
-/// that the current value is always accurate even if the increments and decrements race.
-#[derive(Debug, Default)]
-struct CurrentMetrics {
-    increments: CategoryMetrics,
-    decrements: CategoryMetrics,
+#[derive(Clone, Copy, Debug, Default)]
+struct ReporterCurrentMetrics {
+    total_entered: CategorySnapshot,
+    total_left: CategorySnapshot,
 }
 
-impl CurrentMetrics {
-    fn increment(&self, event_count: u64, event_byte_size: u64) {
-        self.increments.increment(event_count, event_byte_size);
+impl ReporterCurrentMetrics {
+    fn add_received(&mut self, snapshot: CategorySnapshot) {
+        self.total_entered.event_count = self
+            .total_entered
+            .event_count
+            .saturating_add(snapshot.event_count);
+        self.total_entered.event_byte_size = self
+            .total_entered
+            .event_byte_size
+            .saturating_add(snapshot.event_byte_size);
     }
 
-    fn decrement(&self, event_count: u64, event_byte_size: u64) {
-        self.decrements.increment(event_count, event_byte_size);
+    fn add_left(&mut self, snapshot: CategorySnapshot) {
+        self.total_left.event_count = self
+            .total_left
+            .event_count
+            .saturating_add(snapshot.event_count);
+        self.total_left.event_byte_size = self
+            .total_left
+            .event_byte_size
+            .saturating_add(snapshot.event_byte_size);
     }
 
-    fn get(&self) -> CategorySnapshot {
-        let entered_total = self.increments.get();
-        let left_total = self.decrements.get();
-
+    fn current(&self) -> CategorySnapshot {
         CategorySnapshot {
-            event_count: entered_total
+            event_count: self
+                .total_entered
                 .event_count
-                .saturating_sub(left_total.event_count),
-            event_byte_size: entered_total
+                .saturating_sub(self.total_left.event_count),
+            event_byte_size: self
+                .total_entered
                 .event_byte_size
-                .saturating_sub(left_total.event_byte_size),
+                .saturating_sub(self.total_left.event_byte_size),
         }
     }
 }
@@ -161,7 +170,6 @@ impl BufferUsageHandle {
     pub fn increment_received_event_count_and_byte_size(&self, count: u64, byte_size: u64) {
         if count > 0 || byte_size > 0 {
             self.state.received.increment(count, byte_size);
-            self.state.current.increment(count, byte_size);
         }
     }
 
@@ -171,7 +179,6 @@ impl BufferUsageHandle {
     pub fn increment_sent_event_count_and_byte_size(&self, count: u64, byte_size: u64) {
         if count > 0 || byte_size > 0 {
             self.state.sent.increment(count, byte_size);
-            self.state.current.decrement(count, byte_size);
         }
     }
 
@@ -188,7 +195,6 @@ impl BufferUsageHandle {
             } else {
                 self.state.dropped.increment(count, byte_size);
             }
-            self.state.current.decrement(count, byte_size);
         }
     }
 }
@@ -201,7 +207,6 @@ struct BufferUsageData {
     dropped: CategoryMetrics,
     dropped_intentional: CategoryMetrics,
     max_size: CategoryMetrics,
-    current: CurrentMetrics,
 }
 
 impl BufferUsageData {
@@ -296,7 +301,11 @@ impl BufferUsage {
     pub fn install(self, buffer_id: &str) {
         let buffer_id = buffer_id.to_string();
         let span = self.span;
-        let stages = self.stages;
+        let mut stages: Vec<_> = self
+            .stages
+            .into_iter()
+            .map(|stage| (stage, ReporterCurrentMetrics::default()))
+            .collect();
         let task_name = format!("buffer usage reporter ({buffer_id})");
 
         let task = async move {
@@ -304,7 +313,7 @@ impl BufferUsage {
             loop {
                 interval.tick().await;
 
-                for stage in &stages {
+                for (stage, current_metrics) in &mut stages {
                     let max_size = stage.max_size.get();
                     emit(BufferCreated {
                         buffer_id: buffer_id.clone(),
@@ -316,8 +325,20 @@ impl BufferUsage {
                             .expect("should never be bigger than `usize`"),
                     });
 
-                    let current = stage.current.get();
                     let received = stage.received.consume();
+                    current_metrics.add_received(received);
+
+                    let sent = stage.sent.consume();
+                    current_metrics.add_left(sent);
+
+                    let dropped = stage.dropped.consume();
+                    current_metrics.add_left(dropped);
+
+                    let dropped_intentional = stage.dropped_intentional.consume();
+                    current_metrics.add_left(dropped_intentional);
+
+                    let current = current_metrics.current();
+
                     if received.has_updates() {
                         emit(BufferEventsReceived {
                             buffer_id: buffer_id.clone(),
@@ -329,7 +350,6 @@ impl BufferUsage {
                         });
                     }
 
-                    let sent = stage.sent.consume();
                     if sent.has_updates() {
                         emit(BufferEventsSent {
                             buffer_id: buffer_id.clone(),
@@ -341,7 +361,6 @@ impl BufferUsage {
                         });
                     }
 
-                    let dropped = stage.dropped.consume();
                     if dropped.has_updates() {
                         emit(BufferEventsDropped {
                             buffer_id: buffer_id.clone(),
@@ -355,7 +374,6 @@ impl BufferUsage {
                         });
                     }
 
-                    let dropped_intentional = stage.dropped_intentional.consume();
                     if dropped_intentional.has_updates() {
                         emit(BufferEventsDropped {
                             buffer_id: buffer_id.clone(),
@@ -381,27 +399,40 @@ mod tests {
     use super::*;
 
     #[test]
-    fn current_usage_is_derived_from_entered_and_left_totals() {
-        let handle = BufferUsageHandle {
-            state: Arc::new(BufferUsageData::new(0)),
-        };
+    fn reporter_current_usage_is_derived_from_entered_and_left_totals() {
+        let mut current = ReporterCurrentMetrics::default();
+        current.add_received(CategorySnapshot {
+            event_count: 10,
+            event_byte_size: 1000,
+        });
+        current.add_left(CategorySnapshot {
+            event_count: 3,
+            event_byte_size: 300,
+        });
+        current.add_left(CategorySnapshot {
+            event_count: 2,
+            event_byte_size: 200,
+        });
 
-        handle.increment_received_event_count_and_byte_size(10, 1000);
-        handle.increment_sent_event_count_and_byte_size(3, 300);
-        handle.increment_dropped_event_count_and_byte_size(2, 200, false);
-
-        let current = handle.state.current.get();
+        let current = current.current();
         assert_eq!(current.event_count, 5);
         assert_eq!(current.event_byte_size, 500);
     }
 
     #[test]
-    fn current_usage_saturates_at_zero() {
-        let data = BufferUsageData::new(0);
-        data.current.decrement(10, 1000);
+    fn reporter_current_usage_preserves_underflow_debt() {
+        let mut current = ReporterCurrentMetrics::default();
+        current.add_left(CategorySnapshot {
+            event_count: 10,
+            event_byte_size: 1000,
+        });
+        current.add_received(CategorySnapshot {
+            event_count: 15,
+            event_byte_size: 1500,
+        });
 
-        let current = data.current.get();
-        assert_eq!(current.event_count, 0);
-        assert_eq!(current.event_byte_size, 0);
+        let current = current.current();
+        assert_eq!(current.event_count, 5);
+        assert_eq!(current.event_byte_size, 500);
     }
 }
