@@ -191,7 +191,7 @@ serde_json = { version = "1.0.143", default-features = false, features = ["prese
 serde_yaml = { version = "0.9.34", default-features = false }
 snafu = { version = "0.8.9", default-features = false, features = ["futures", "std"] }
 socket2 = { version = "0.5.10", default-features = false }
-tempfile = "3.23.0"
+tempfile = "3.27.0"
 tokio = { version = "1.49.0", default-features = false }
 tokio-stream = { version = "0.1.18", default-features = false }
 tokio-test = "0.4.5"
