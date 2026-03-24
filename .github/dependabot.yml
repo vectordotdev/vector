@@ -45,9 +45,6 @@ updates:
         patterns:
         - "futures"
         - "futures-util"
-      graphql:
-        patterns:
-        - "async-graphql*"
       metrics:
         patterns:
         - "metrics"

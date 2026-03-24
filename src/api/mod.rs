@@ -1,9 +1,5 @@
 #![allow(missing_docs)]
-mod handler;
-mod schema;
-mod server;
-#[cfg(all(test, feature = "vector-api-tests"))]
-mod tests;
+mod grpc;
+mod grpc_server;
 
-pub use schema::build_schema;
-pub use server::Server;
+pub use grpc_server::GrpcServer;

@@ -1,14 +1,16 @@
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, HashSet},
     sync::Arc,
+    time::Duration,
 };
 
 use glob::Pattern;
+use http::Uri;
 use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
 use vector_api_client::{
-    Client, SubscriptionClient,
-    gql::{ComponentsQueryExt, ComponentsSubscriptionExt, MetricsSubscriptionExt},
+    Client,
+    proto::{Component, ComponentType, MetricName, stream_component_metrics_response::Value},
 };
 
 use crate::state::{self, OutputMetrics, SentEventsMetric};
@@ -24,526 +26,546 @@ fn component_matches_patterns(component_id: &str, components_patterns: &[Pattern
         .any(|pattern| pattern.matches(component_id))
 }
 
-/// Components that have been added
-async fn component_added(
-    client: Arc<SubscriptionClient>,
+/// Component polling task
+///
+/// Polls for component changes every interval and diffs to detect adds/removes.
+async fn poll_components(
+    mut client: Client,
     tx: state::EventTx,
+    interval_ms: i64,
     components_patterns: Arc<Vec<Pattern>>,
+    initial_components: HashSet<String>,
 ) {
-    tokio::pin! {
-        let stream = client.component_added();
-    };
+    let mut known_components = initial_components;
+    let poll_interval = Duration::from_millis(interval_ms as u64);
+    let mut consecutive_errors = 0;
+    const MAX_CONSECUTIVE_ERRORS: u32 = 3;
 
-    while let Some(Some(res)) = stream.next().await {
-        if let Some(d) = res.data {
-            let c = d.component_added;
-            let component_id = c.component_id;
-            if !component_matches_patterns(&component_id, &components_patterns) {
-                continue;
+    loop {
+        tokio::time::sleep(poll_interval).await;
+
+        // Fetch current components
+        let Ok(response) = client.get_components(0).await else {
+            consecutive_errors += 1;
+            if consecutive_errors >= MAX_CONSECUTIVE_ERRORS {
+                // Exit to trigger reconnection after sustained failures
+                return;
             }
-            let key = ComponentKey::from(component_id);
-            _ = tx
-                .send(state::EventType::ComponentAdded(state::ComponentRow {
-                    key,
-                    kind: c.on.to_string(),
-                    component_type: c.component_type,
-                    outputs: HashMap::new(),
-                    received_bytes_total: 0,
-                    received_bytes_throughput_sec: 0,
-                    received_events_total: 0,
-                    received_events_throughput_sec: 0,
-                    sent_bytes_total: 0,
-                    sent_bytes_throughput_sec: 0,
-                    sent_events_total: 0,
-                    sent_events_throughput_sec: 0,
-                    #[cfg(feature = "allocation-tracing")]
-                    allocated_bytes: 0,
-                    errors: 0,
-                }))
-                .await;
+            continue;
+        };
+        consecutive_errors = 0;
+
+        let current_components: std::collections::HashSet<String> = response
+            .components
+            .iter()
+            .map(|c| c.component_id.clone())
+            .collect();
+
+        // Detect added components
+        for component in &response.components {
+            let component_id = &component.component_id;
+            if !known_components.contains(component_id)
+                && component_matches_patterns(component_id, &components_patterns)
+            {
+                let row = component_to_row(component);
+                _ = tx.send(state::EventType::ComponentAdded(row)).await;
+            }
         }
+
+        // Detect removed components
+        for old_id in &known_components {
+            if !current_components.contains(old_id)
+                && component_matches_patterns(old_id, &components_patterns)
+            {
+                let key = ComponentKey::from(old_id.as_str());
+                _ = tx.send(state::EventType::ComponentRemoved(key)).await;
+            }
+        }
+
+        known_components = current_components;
+    }
+}
+
+fn component_to_row(component: &Component) -> state::ComponentRow {
+    let key = ComponentKey::from(component.component_id.as_str());
+    let metrics = component.metrics.as_ref();
+
+    state::ComponentRow {
+        key: key.clone(),
+        kind: match component.component_type() {
+            ComponentType::Unspecified => "unknown",
+            ComponentType::Source => "source",
+            ComponentType::Transform => "transform",
+            ComponentType::Sink => "sink",
+        }
+        .to_string(),
+        component_type: component.on_type.clone(), // actual plugin type e.g. "demo_logs", "kafka"
+        outputs: component
+            .outputs
+            .iter()
+            .map(|o| {
+                (
+                    o.output_id.clone(),
+                    OutputMetrics::from(o.sent_events_total),
+                )
+            })
+            .collect(),
+        received_bytes_total: metrics.and_then(|m| m.received_bytes_total).unwrap_or(0),
+        received_bytes_throughput_sec: 0,
+        received_events_total: metrics.and_then(|m| m.received_events_total).unwrap_or(0),
+        received_events_throughput_sec: 0,
+        sent_bytes_total: metrics.and_then(|m| m.sent_bytes_total).unwrap_or(0),
+        sent_bytes_throughput_sec: 0,
+        sent_events_total: metrics.and_then(|m| m.sent_events_total).unwrap_or(0),
+        sent_events_throughput_sec: 0,
+        #[cfg(feature = "allocation-tracing")]
+        allocated_bytes: 0,
+        errors: 0,
     }
 }
 
 /// Allocated bytes per component
 #[cfg(feature = "allocation-tracing")]
 async fn allocated_bytes(
-    client: Arc<SubscriptionClient>,
+    mut client: Client,
     tx: state::EventTx,
     interval: i64,
     components_patterns: Arc<Vec<Pattern>>,
 ) {
-    tokio::pin! {
-        let stream = client.component_allocated_bytes_subscription(interval);
+    let Ok(mut stream) = client
+        .stream_component_allocated_bytes(interval as i32)
+        .await
+    else {
+        // Failed to establish stream, will retry on reconnection
+        return;
     };
 
-    while let Some(Some(res)) = stream.next().await {
-        if let Some(d) = res.data {
-            let c = d.component_allocated_bytes;
-            _ = tx
-                .send(state::EventType::AllocatedBytes(
-                    c.into_iter()
-                        .filter(|c| {
-                            component_matches_patterns(&c.component_id, &components_patterns)
-                        })
-                        .map(|c| {
-                            (
-                                ComponentKey::from(c.component_id),
-                                c.metric.allocated_bytes as i64,
-                            )
-                        })
-                        .collect(),
-                ))
-                .await;
+    while let Some(Ok(response)) = stream.next().await {
+        let component_id = &response.component_id;
+        if !component_matches_patterns(component_id, &components_patterns) {
+            continue;
         }
-    }
-}
-/// Components that have been removed
-async fn component_removed(
-    client: Arc<SubscriptionClient>,
-    tx: state::EventTx,
-    components_patterns: Arc<Vec<Pattern>>,
-) {
-    tokio::pin! {
-        let stream = client.component_removed();
-    };
 
-    while let Some(Some(res)) = stream.next().await {
-        if let Some(d) = res.data {
-            let c = d.component_removed;
-            let component_id = c.component_id;
-            if !component_matches_patterns(&component_id, &components_patterns) {
-                continue;
-            }
-            let id = ComponentKey::from(component_id);
-            _ = tx.send(state::EventType::ComponentRemoved(id)).await;
-        }
+        _ = tx
+            .send(state::EventType::AllocatedBytes(vec![(
+                ComponentKey::from(component_id.as_str()),
+                response.allocated_bytes,
+            )]))
+            .await;
     }
 }
 
 async fn received_bytes_totals(
-    client: Arc<SubscriptionClient>,
+    mut client: Client,
     tx: state::EventTx,
     interval: i64,
     components_patterns: Arc<Vec<Pattern>>,
 ) {
-    tokio::pin! {
-        let stream = client.component_received_bytes_totals_subscription(interval);
+    let Ok(mut stream) = client
+        .stream_component_metrics(MetricName::ReceivedBytesTotal, interval as i32)
+        .await
+    else {
+        return;
     };
 
-    while let Some(Some(res)) = stream.next().await {
-        if let Some(d) = res.data {
-            let c = d.component_received_bytes_totals;
-
+    while let Some(Ok(response)) = stream.next().await {
+        let component_id = &response.component_id;
+        if !component_matches_patterns(component_id, &components_patterns) {
+            continue;
+        }
+        if let Some(Value::Total(total)) = response.value {
             _ = tx
-                .send(state::EventType::ReceivedBytesTotals(
-                    c.into_iter()
-                        .filter(|c| {
-                            component_matches_patterns(&c.component_id, &components_patterns)
-                        })
-                        .map(|c| {
-                            (
-                                ComponentKey::from(c.component_id),
-                                c.metric.received_bytes_total as i64,
-                            )
-                        })
-                        .collect(),
-                ))
+                .send(state::EventType::ReceivedBytesTotals(vec![(
+                    ComponentKey::from(component_id.as_str()),
+                    total.value,
+                )]))
                 .await;
         }
     }
 }
 
 async fn received_bytes_throughputs(
-    client: Arc<SubscriptionClient>,
+    mut client: Client,
     tx: state::EventTx,
     interval: i64,
     components_patterns: Arc<Vec<Pattern>>,
 ) {
-    tokio::pin! {
-        let stream = client.component_received_bytes_throughputs_subscription(interval);
+    let Ok(mut stream) = client
+        .stream_component_metrics(MetricName::ReceivedBytesThroughput, interval as i32)
+        .await
+    else {
+        return;
     };
 
-    while let Some(Some(res)) = stream.next().await {
-        if let Some(d) = res.data {
-            let c = d.component_received_bytes_throughputs;
+    while let Some(Ok(response)) = stream.next().await {
+        let component_id = &response.component_id;
+        if !component_matches_patterns(component_id, &components_patterns) {
+            continue;
+        }
+        if let Some(Value::Throughput(tp)) = response.value {
             _ = tx
-                .send(state::EventType::ReceivedBytesThroughputs(
-                    interval,
-                    c.into_iter()
-                        .filter(|c| {
-                            component_matches_patterns(&c.component_id, &components_patterns)
-                        })
-                        .map(|c| (ComponentKey::from(c.component_id), c.throughput))
-                        .collect(),
-                ))
+                .send(state::EventType::ReceivedBytesThroughputs(vec![(
+                    ComponentKey::from(component_id.as_str()),
+                    tp.value as i64,
+                )]))
                 .await;
         }
     }
 }
 
 async fn received_events_totals(
-    client: Arc<SubscriptionClient>,
+    mut client: Client,
     tx: state::EventTx,
     interval: i64,
     components_patterns: Arc<Vec<Pattern>>,
 ) {
-    tokio::pin! {
-        let stream = client.component_received_events_totals_subscription(interval);
+    let Ok(mut stream) = client
+        .stream_component_metrics(MetricName::ReceivedEventsTotal, interval as i32)
+        .await
+    else {
+        return;
     };
 
-    while let Some(Some(res)) = stream.next().await {
-        if let Some(d) = res.data {
-            let c = d.component_received_events_totals;
+    while let Some(Ok(response)) = stream.next().await {
+        let component_id = &response.component_id;
+        if !component_matches_patterns(component_id, &components_patterns) {
+            continue;
+        }
+        if let Some(Value::Total(total)) = response.value {
             _ = tx
-                .send(state::EventType::ReceivedEventsTotals(
-                    c.into_iter()
-                        .filter(|c| {
-                            component_matches_patterns(&c.component_id, &components_patterns)
-                        })
-                        .map(|c| {
-                            (
-                                ComponentKey::from(c.component_id),
-                                c.metric.received_events_total as i64,
-                            )
-                        })
-                        .collect(),
-                ))
+                .send(state::EventType::ReceivedEventsTotals(vec![(
+                    ComponentKey::from(component_id.as_str()),
+                    total.value,
+                )]))
                 .await;
         }
     }
 }
 
 async fn received_events_throughputs(
-    client: Arc<SubscriptionClient>,
+    mut client: Client,
     tx: state::EventTx,
     interval: i64,
     components_patterns: Arc<Vec<Pattern>>,
 ) {
-    tokio::pin! {
-        let stream = client.component_received_events_throughputs_subscription(interval);
+    let Ok(mut stream) = client
+        .stream_component_metrics(MetricName::ReceivedEventsThroughput, interval as i32)
+        .await
+    else {
+        return;
     };
 
-    while let Some(Some(res)) = stream.next().await {
-        if let Some(d) = res.data {
-            let c = d.component_received_events_throughputs;
+    while let Some(Ok(response)) = stream.next().await {
+        let component_id = &response.component_id;
+        if !component_matches_patterns(component_id, &components_patterns) {
+            continue;
+        }
+        if let Some(Value::Throughput(tp)) = response.value {
             _ = tx
-                .send(state::EventType::ReceivedEventsThroughputs(
-                    interval,
-                    c.into_iter()
-                        .filter(|c| {
-                            component_matches_patterns(&c.component_id, &components_patterns)
-                        })
-                        .map(|c| (ComponentKey::from(c.component_id), c.throughput))
-                        .collect(),
-                ))
+                .send(state::EventType::ReceivedEventsThroughputs(vec![(
+                    ComponentKey::from(component_id.as_str()),
+                    tp.value as i64,
+                )]))
                 .await;
         }
     }
 }
 
 async fn sent_bytes_totals(
-    client: Arc<SubscriptionClient>,
+    mut client: Client,
     tx: state::EventTx,
     interval: i64,
     components_patterns: Arc<Vec<Pattern>>,
 ) {
-    tokio::pin! {
-        let stream = client.component_sent_bytes_totals_subscription(interval);
+    let Ok(mut stream) = client
+        .stream_component_metrics(MetricName::SentBytesTotal, interval as i32)
+        .await
+    else {
+        return;
     };
 
-    while let Some(Some(res)) = stream.next().await {
-        if let Some(d) = res.data {
-            let c = d.component_sent_bytes_totals;
+    while let Some(Ok(response)) = stream.next().await {
+        let component_id = &response.component_id;
+        if !component_matches_patterns(component_id, &components_patterns) {
+            continue;
+        }
+        if let Some(Value::Total(total)) = response.value {
             _ = tx
-                .send(state::EventType::SentBytesTotals(
-                    c.into_iter()
-                        .filter(|c| {
-                            component_matches_patterns(&c.component_id, &components_patterns)
-                        })
-                        .map(|c| {
-                            (
-                                ComponentKey::from(c.component_id),
-                                c.metric.sent_bytes_total as i64,
-                            )
-                        })
-                        .collect(),
-                ))
+                .send(state::EventType::SentBytesTotals(vec![(
+                    ComponentKey::from(component_id.as_str()),
+                    total.value,
+                )]))
                 .await;
         }
     }
 }
 
 async fn sent_bytes_throughputs(
-    client: Arc<SubscriptionClient>,
+    mut client: Client,
     tx: state::EventTx,
     interval: i64,
     components_patterns: Arc<Vec<Pattern>>,
 ) {
-    tokio::pin! {
-        let stream = client.component_sent_bytes_throughputs_subscription(interval);
+    let Ok(mut stream) = client
+        .stream_component_metrics(MetricName::SentBytesThroughput, interval as i32)
+        .await
+    else {
+        return;
     };
 
-    while let Some(Some(res)) = stream.next().await {
-        if let Some(d) = res.data {
-            let c = d.component_sent_bytes_throughputs;
+    while let Some(Ok(response)) = stream.next().await {
+        let component_id = &response.component_id;
+        if !component_matches_patterns(component_id, &components_patterns) {
+            continue;
+        }
+        if let Some(Value::Throughput(tp)) = response.value {
             _ = tx
-                .send(state::EventType::SentBytesThroughputs(
-                    interval,
-                    c.into_iter()
-                        .filter(|c| {
-                            component_matches_patterns(&c.component_id, &components_patterns)
-                        })
-                        .map(|c| (ComponentKey::from(c.component_id), c.throughput))
-                        .collect(),
-                ))
+                .send(state::EventType::SentBytesThroughputs(vec![(
+                    ComponentKey::from(component_id.as_str()),
+                    tp.value as i64,
+                )]))
                 .await;
         }
     }
 }
 
 async fn sent_events_totals(
-    client: Arc<SubscriptionClient>,
+    mut client: Client,
     tx: state::EventTx,
     interval: i64,
     components_patterns: Arc<Vec<Pattern>>,
 ) {
-    tokio::pin! {
-        let stream = client.component_sent_events_totals_subscription(interval);
+    let Ok(mut stream) = client
+        .stream_component_metrics(MetricName::SentEventsTotal, interval as i32)
+        .await
+    else {
+        return;
     };
 
-    while let Some(Some(res)) = stream.next().await {
-        if let Some(d) = res.data {
-            let c = d.component_sent_events_totals;
+    while let Some(Ok(response)) = stream.next().await {
+        let component_id = &response.component_id;
+        if !component_matches_patterns(component_id, &components_patterns) {
+            continue;
+        }
+        if let Some(Value::Total(total)) = response.value {
             _ = tx
-                .send(state::EventType::SentEventsTotals(
-                    c.into_iter()
-                        .filter(|c| {
-                            component_matches_patterns(&c.component_id, &components_patterns)
-                        })
-                        .map(|c| SentEventsMetric {
-                            key: ComponentKey::from(c.component_id.as_str()),
-                            total: c.metric.sent_events_total as i64,
-                            outputs: c.outputs().into_iter().collect(),
-                        })
-                        .collect(),
-                ))
+                .send(state::EventType::SentEventsTotals(vec![SentEventsMetric {
+                    key: ComponentKey::from(component_id.as_str()),
+                    total: total.value,
+                    outputs: total.output_totals.into_iter().collect(),
+                }]))
                 .await;
         }
     }
 }
 
 async fn sent_events_throughputs(
-    client: Arc<SubscriptionClient>,
+    mut client: Client,
     tx: state::EventTx,
     interval: i64,
     components_patterns: Arc<Vec<Pattern>>,
 ) {
-    tokio::pin! {
-        let stream = client.component_sent_events_throughputs_subscription(interval);
+    let Ok(mut stream) = client
+        .stream_component_metrics(MetricName::SentEventsThroughput, interval as i32)
+        .await
+    else {
+        return;
     };
 
-    while let Some(Some(res)) = stream.next().await {
-        if let Some(d) = res.data {
-            let c = d.component_sent_events_throughputs;
+    while let Some(Ok(response)) = stream.next().await {
+        let component_id = &response.component_id;
+        if !component_matches_patterns(component_id, &components_patterns) {
+            continue;
+        }
+        if let Some(Value::Throughput(tp)) = response.value {
             _ = tx
-                .send(state::EventType::SentEventsThroughputs(
-                    interval,
-                    c.into_iter()
-                        .filter(|c| {
-                            component_matches_patterns(&c.component_id, &components_patterns)
-                        })
-                        .map(|c| SentEventsMetric {
-                            key: ComponentKey::from(c.component_id.as_str()),
-                            total: c.throughput,
-                            outputs: c.outputs().into_iter().collect(),
-                        })
-                        .collect(),
-                ))
+                .send(state::EventType::SentEventsThroughputs(vec![
+                    SentEventsMetric {
+                        key: ComponentKey::from(component_id.as_str()),
+                        total: tp.value as i64,
+                        outputs: tp
+                            .output_throughputs
+                            .into_iter()
+                            .map(|(k, v)| (k, v as i64))
+                            .collect(),
+                    },
+                ]))
                 .await;
         }
     }
 }
 
 async fn errors_totals(
-    client: Arc<SubscriptionClient>,
+    mut client: Client,
     tx: state::EventTx,
     interval: i64,
     components_patterns: Arc<Vec<Pattern>>,
 ) {
-    tokio::pin! {
-        let stream = client.component_errors_totals_subscription(interval);
+    let Ok(mut stream) = client
+        .stream_component_metrics(MetricName::ErrorsTotal, interval as i32)
+        .await
+    else {
+        return;
     };
 
-    while let Some(Some(res)) = stream.next().await {
-        if let Some(d) = res.data {
-            let c = d.component_errors_totals;
+    while let Some(Ok(response)) = stream.next().await {
+        let component_id = &response.component_id;
+        if !component_matches_patterns(component_id, &components_patterns) {
+            continue;
+        }
+        if let Some(Value::Total(total)) = response.value {
             _ = tx
-                .send(state::EventType::ErrorsTotals(
-                    c.into_iter()
-                        .filter(|c| {
-                            component_matches_patterns(&c.component_id, &components_patterns)
-                        })
-                        .map(|c| {
-                            (
-                                ComponentKey::from(c.component_id.as_str()),
-                                c.metric.errors_total as i64,
-                            )
-                        })
-                        .collect(),
-                ))
+                .send(state::EventType::ErrorsTotals(vec![(
+                    ComponentKey::from(component_id.as_str()),
+                    total.value,
+                )]))
                 .await;
         }
     }
 }
 
-async fn uptime_changed(client: Arc<SubscriptionClient>, tx: state::EventTx) {
-    tokio::pin! {
-        let stream = client.uptime_subscription();
+async fn uptime_changed(mut client: Client, tx: state::EventTx, interval: i64) {
+    let Ok(mut stream) = client.stream_uptime(interval as i32).await else {
+        return;
     };
 
-    while let Some(Some(res)) = stream.next().await {
-        if let Some(d) = res.data {
-            _ = tx
-                .send(state::EventType::UptimeChanged(d.uptime.seconds))
-                .await;
-        }
+    while let Some(Ok(response)) = stream.next().await {
+        _ = tx
+            .send(state::EventType::UptimeChanged(
+                response.uptime_seconds as f64,
+            ))
+            .await;
     }
 }
 
-/// Subscribe to each metrics channel through a separate client. This is a temporary workaround
-/// until client multiplexing is fixed. In future, we should be able to use a single client
-pub fn subscribe(
-    client: SubscriptionClient,
+/// Handles returned by [`subscribe`], split by lifecycle.
+pub struct SubscribeHandles {
+    /// Metric stream tasks — exit when a gRPC stream closes or errors.
+    /// `cmd.rs` joins these to detect connection loss and trigger reconnection.
+    pub metric_handles: Vec<JoinHandle<()>>,
+    /// Polls `get_components` for topology changes. Designed to run indefinitely
+    /// while the server is healthy, so it must be aborted separately rather than
+    /// joined alongside the metric handles.
+    pub poll_handle: JoinHandle<()>,
+}
+
+/// Subscribe to each metrics stream, all sharing a single underlying gRPC connection.
+/// HTTP/2 multiplexes the concurrent streams — cloning a connected `Client` is cheap
+/// (the tonic `Channel` is Arc-backed) and avoids redundant TCP/HTTP2 handshakes.
+pub async fn subscribe(
+    uri: Uri,
     tx: state::EventTx,
     interval: i64,
     components_patterns: Vec<Pattern>,
-) -> Vec<JoinHandle<()>> {
-    let client = Arc::new(client);
+    initial_components: HashSet<String>,
+) -> Result<SubscribeHandles, vector_api_client::Error> {
     let components_patterns = Arc::new(components_patterns);
-    vec![
-        tokio::spawn(component_added(
-            Arc::clone(&client),
-            tx.clone(),
-            Arc::clone(&components_patterns),
-        )),
-        tokio::spawn(component_removed(
-            Arc::clone(&client),
-            tx.clone(),
-            Arc::clone(&components_patterns),
-        )),
+
+    let mut client = Client::new(uri);
+    client.connect().await?;
+
+    let poll_handle = tokio::spawn(poll_components(
+        client.clone(),
+        tx.clone(),
+        interval,
+        Arc::clone(&components_patterns),
+        initial_components,
+    ));
+
+    #[cfg_attr(not(feature = "allocation-tracing"), allow(unused_mut))]
+    let mut metric_handles = vec![
         tokio::spawn(received_bytes_totals(
-            Arc::clone(&client),
+            client.clone(),
             tx.clone(),
             interval,
             Arc::clone(&components_patterns),
         )),
         tokio::spawn(received_bytes_throughputs(
-            Arc::clone(&client),
+            client.clone(),
             tx.clone(),
             interval,
             Arc::clone(&components_patterns),
         )),
         tokio::spawn(received_events_totals(
-            Arc::clone(&client),
+            client.clone(),
             tx.clone(),
             interval,
             Arc::clone(&components_patterns),
         )),
         tokio::spawn(received_events_throughputs(
-            Arc::clone(&client),
+            client.clone(),
             tx.clone(),
             interval,
             Arc::clone(&components_patterns),
         )),
         tokio::spawn(sent_bytes_totals(
-            Arc::clone(&client),
+            client.clone(),
             tx.clone(),
             interval,
             Arc::clone(&components_patterns),
         )),
         tokio::spawn(sent_bytes_throughputs(
-            Arc::clone(&client),
+            client.clone(),
             tx.clone(),
             interval,
             Arc::clone(&components_patterns),
         )),
         tokio::spawn(sent_events_totals(
-            Arc::clone(&client),
+            client.clone(),
             tx.clone(),
             interval,
             Arc::clone(&components_patterns),
         )),
         tokio::spawn(sent_events_throughputs(
-            Arc::clone(&client),
-            tx.clone(),
-            interval,
-            Arc::clone(&components_patterns),
-        )),
-        #[cfg(feature = "allocation-tracing")]
-        tokio::spawn(allocated_bytes(
-            Arc::clone(&client),
+            client.clone(),
             tx.clone(),
             interval,
             Arc::clone(&components_patterns),
         )),
         tokio::spawn(errors_totals(
-            Arc::clone(&client),
+            client.clone(),
             tx.clone(),
             interval,
             Arc::clone(&components_patterns),
         )),
-        tokio::spawn(uptime_changed(Arc::clone(&client), tx)),
-    ]
+        tokio::spawn(uptime_changed(client.clone(), tx.clone(), interval)),
+    ];
+
+    #[cfg(feature = "allocation-tracing")]
+    metric_handles.push(tokio::spawn(allocated_bytes(
+        client,
+        tx,
+        interval,
+        Arc::clone(&components_patterns),
+    )));
+
+    Ok(SubscribeHandles {
+        metric_handles,
+        poll_handle,
+    })
 }
 
 /// Retrieve the initial components/metrics for first paint. Further updating the metrics
 /// will be handled by subscriptions.
 pub async fn init_components(
-    client: &Client,
+    uri: Uri,
     components_patterns: &[Pattern],
-) -> Result<state::State, ()> {
-    // Execute a query to get the latest components, and aggregate metrics for each resource.
-    // Since we don't know currently have a mechanism for scrolling/paging through results,
-    // we're using an artificially high page size to capture all likely component configurations.
-    let rows = client
-        .components_query(i16::MAX as i64)
-        .await
-        .map_err(|_| ())?
-        .data
-        .ok_or(())?
+) -> Result<state::State, vector_api_client::Error> {
+    let mut client = Client::new(uri);
+    client.connect().await?;
+
+    // Get all components
+    let response = client.get_components(0).await?;
+
+    let rows = response
         .components
-        .edges
         .into_iter()
-        .filter(|edge| component_matches_patterns(&edge.node.component_id, components_patterns))
-        .map(|edge| {
-            let d = edge.node;
-            let key = ComponentKey::from(d.component_id);
-            (
-                key.clone(),
-                state::ComponentRow {
-                    key,
-                    kind: d.on.to_string(),
-                    component_type: d.component_type,
-                    outputs: d
-                        .on
-                        .outputs()
-                        .into_iter()
-                        .map(|(id, sent_events_total)| (id, OutputMetrics::from(sent_events_total)))
-                        .collect(),
-                    received_bytes_total: d.on.received_bytes_total(),
-                    received_bytes_throughput_sec: 0,
-                    received_events_total: d.on.received_events_total(),
-                    received_events_throughput_sec: 0,
-                    sent_bytes_total: d.on.sent_bytes_total(),
-                    sent_bytes_throughput_sec: 0,
-                    sent_events_total: d.on.sent_events_total(),
-                    sent_events_throughput_sec: 0,
-                    #[cfg(feature = "allocation-tracing")]
-                    allocated_bytes: 0,
-                    errors: 0,
-                },
-            )
+        .filter(|component| {
+            component_matches_patterns(&component.component_id, components_patterns)
+        })
+        .map(|component| {
+            let row = component_to_row(&component);
+            (row.key.clone(), row)
         })
         .collect::<BTreeMap<_, _>>();
 
