@@ -2444,7 +2444,7 @@ dependencies = [
  "serde_with",
  "similar-asserts",
  "smallvec",
- "snafu 0.8.9",
+ "snafu 0.9.0",
  "strum 0.28.0",
  "syslog_loose 0.23.0",
  "tokio",
@@ -3415,7 +3415,7 @@ dependencies = [
  "criterion",
  "data-encoding",
  "hickory-proto 0.25.2",
- "snafu 0.8.9",
+ "snafu 0.9.0",
 ]
 
 [[package]]
@@ -3432,7 +3432,7 @@ dependencies = [
  "pastey",
  "prost 0.12.6",
  "prost-build 0.12.6",
- "snafu 0.8.9",
+ "snafu 0.9.0",
  "tracing 0.1.44",
  "vector-common",
  "vector-config",
@@ -3454,7 +3454,7 @@ dependencies = [
  "anyhow",
  "serde",
  "serde_json",
- "snafu 0.8.9",
+ "snafu 0.9.0",
  "tracing 0.1.44",
  "vector-config",
  "vector-config-common",
@@ -3661,7 +3661,7 @@ dependencies = [
  "const-str",
  "dyn-clone",
  "indoc",
- "snafu 0.8.9",
+ "snafu 0.9.0",
  "vector-vrl-category",
  "vrl",
 ]
@@ -8076,7 +8076,7 @@ dependencies = [
  "prost 0.12.6",
  "prost-build 0.12.6",
  "prost-types 0.12.6",
- "snafu 0.8.9",
+ "snafu 0.9.0",
  "vector-common",
 ]
 
@@ -10189,9 +10189,18 @@ version = "0.8.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6e84b3f4eacbf3a1ce05eac6763b4d629d60cbc94d632e4092c54ade71f1e1a2"
 dependencies = [
+ "snafu-derive 0.8.9",
+]
+
+[[package]]
+name = "snafu"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d1d4bced6a69f90b2056c03dcff2c4737f98d6fb9e0853493996e1d253ca29c6"
+dependencies = [
  "futures-core",
  "pin-project",
- "snafu-derive 0.8.9",
+ "snafu-derive 0.9.0",
 ]
 
 [[package]]
@@ -10211,6 +10220,18 @@ name = "snafu-derive"
 version = "0.8.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c1c97747dbf44bb1ca44a561ece23508e99cb592e862f22222dcf42f51d1e451"
+dependencies = [
+ "heck 0.5.0",
+ "proc-macro2 1.0.106",
+ "quote 1.0.44",
+ "syn 2.0.117",
+]
+
+[[package]]
+name = "snafu-derive"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "54254b8531cafa275c5e096f62d48c81435d1015405a91198ddb11e967301d40"
 dependencies = [
  "heck 0.5.0",
  "proc-macro2 1.0.106",
@@ -12320,7 +12341,7 @@ dependencies = [
  "similar-asserts",
  "smallvec",
  "smpl_jwt",
- "snafu 0.8.9",
+ "snafu 0.9.0",
  "snap",
  "socket2 0.5.10",
  "sqlx",
@@ -12380,7 +12401,7 @@ dependencies = [
  "prost 0.12.6",
  "prost-build 0.12.6",
  "prost-types 0.12.6",
- "snafu 0.8.9",
+ "snafu 0.9.0",
  "tokio",
  "tokio-stream",
  "tonic 0.11.0",
@@ -12419,7 +12440,7 @@ dependencies = [
  "rkyv",
  "serde",
  "serde_yaml",
- "snafu 0.8.9",
+ "snafu 0.9.0",
  "temp-dir",
  "tokio",
  "tokio-test",
@@ -12482,7 +12503,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with",
- "snafu 0.8.9",
+ "snafu 0.9.0",
  "toml",
  "tracing 0.1.44",
  "url",
@@ -12576,7 +12597,7 @@ dependencies = [
  "serde_yaml",
  "similar-asserts",
  "smallvec",
- "snafu 0.8.9",
+ "snafu 0.9.0",
  "socket2 0.5.10",
  "tokio",
  "tokio-openssl",
