@@ -22,11 +22,11 @@ fn event_iteration() {
         all,
         vec![
             (
-                "Pitbull".into(),
+                "Pitbull".parse().expect("compile time values error"),
                 "The bigger they are, the harder they fall".into()
             ),
             (
-                "\"Ke$ha\"".into(),
+                "\"Ke$ha\"".parse().expect("compile time values error"),
                 "It's going down, I'm yelling timber".into()
             ),
         ]
@@ -46,9 +46,9 @@ fn event_iteration_order() {
     assert_eq!(
         collected,
         vec![
-            ("YRjhxXcg".into(), &Value::from("nw8iM5Jr")),
-            ("lZDfzKIL".into(), &Value::from("tOVrjveM")),
-            ("o9amkaRY".into(), &Value::from("pGsfG7Nr")),
+            ("YRjhxXcg".parse().expect("compile time values error"), &Value::from("nw8iM5Jr")),
+            ("lZDfzKIL".parse().expect("compile time values error"), &Value::from("tOVrjveM")),
+            ("o9amkaRY".parse().expect("compile time values error"), &Value::from("pGsfG7Nr")),
         ]
     );
 }

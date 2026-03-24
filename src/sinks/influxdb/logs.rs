@@ -290,13 +290,18 @@ impl HttpEventEncoder<BytesMut> for InfluxDbLogsEncoder {
         // Tags + Fields
         let mut tags = MetricTags::default();
         let mut fields: HashMap<KeyString, Field> = HashMap::new();
-        log.convert_to_fields().for_each(|(key, value)| {
-            if self.tags.contains(&key[..]) {
-                tags.replace(key.into(), value.to_string_lossy().into_owned());
-            } else {
-                fields.insert(key, to_field(value));
-            }
-        });
+
+        // OwnedTargetPath automatically quotes special chars in to_string() impl
+        // To avoid prepended prefix char let's use OwnedValuePath to_string
+        log.convert_to_fields()
+            .map(|(key, value)| (key.path.to_string(), value))
+            .for_each(|(key, value)| {
+                if self.tags.contains(&key[..]) {
+                    tags.replace(key, value.to_string_lossy().into_owned());
+                } else {
+                    fields.insert(key.into(), to_field(value));
+                }
+            });
 
         let mut output = BytesMut::new();
         if let Err(error_message) = influx_line_protocol(

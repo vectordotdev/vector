@@ -1,30 +1,24 @@
-use std::{collections::btree_map, fmt::Write as _, iter, slice, sync::LazyLock};
+use std::{collections::btree_map, iter, slice};
 
-use regex::Regex;
+use lookup::{OwnedTargetPath, OwnedValuePath};
 use serde::{Serialize, Serializer};
-use vrl::path::PathPrefix;
+use vrl::{
+    owned_value_path,
+    path::{OwnedSegment, PathPrefix},
+};
 
 use crate::event::{KeyString, ObjectMap, Value};
-
-static IS_VALID_PATH_SEGMENT: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"^[a-zA-Z0-9_]+$").unwrap());
 
 /// Iterates over all paths in form `a.b[0].c[1]` in alphabetical order
 /// and their corresponding values.
 pub fn all_fields(fields: &ObjectMap) -> FieldsIter<'_> {
-    FieldsIter::new(None, fields, true)
-}
-
-/// Iterates over all paths in form `a.b[0].c[1]` in alphabetical order and their corresponding
-/// values. Field names containing meta-characters are not quoted.
-pub fn all_fields_unquoted(fields: &ObjectMap) -> FieldsIter<'_> {
-    FieldsIter::new(None, fields, false)
+    FieldsIter::new(PathPrefix::Event, fields)
 }
 
 /// Same functionality as `all_fields` but it prepends a character that denotes the
 /// path type.
 pub fn all_metadata_fields(fields: &ObjectMap) -> FieldsIter<'_> {
-    FieldsIter::new(Some(PathPrefix::Metadata), fields, true)
+    FieldsIter::new(PathPrefix::Metadata, fields)
 }
 
 /// An iterator with a single "message" element
@@ -57,29 +51,22 @@ enum PathComponent<'a> {
 #[derive(Clone)]
 pub struct FieldsIter<'a> {
     /// If specified, this will be prepended to each path.
-    path_prefix: Option<PathPrefix>,
+    path_prefix: PathPrefix,
     /// Stack of iterators used for the depth-first traversal.
     stack: Vec<LeafIter<'a>>,
     /// Path components from the root up to the top of the stack.
     path: Vec<PathComponent<'a>>,
     /// Treat array as a single value and don't traverse each element.
     skip_array_elements: bool,
-    /// Surround invalid fields with quotes to make them parsable.
-    quote_invalid_fields: bool,
 }
 
 impl<'a> FieldsIter<'a> {
-    fn new(
-        path_prefix: Option<PathPrefix>,
-        fields: &'a ObjectMap,
-        quote_invalid_fields: bool,
-    ) -> FieldsIter<'a> {
+    fn new(path_prefix: PathPrefix, fields: &'a ObjectMap) -> FieldsIter<'a> {
         FieldsIter {
             path_prefix,
             stack: vec![LeafIter::Map(fields.iter())],
             path: vec![],
             skip_array_elements: false,
-            quote_invalid_fields,
         }
     }
 
@@ -87,21 +74,19 @@ impl<'a> FieldsIter<'a> {
     /// will be treated as an object with a single "message" key
     fn non_object(value: &'a Value) -> FieldsIter<'a> {
         FieldsIter {
-            path_prefix: None,
+            path_prefix: PathPrefix::Event,
             stack: vec![LeafIter::Root((value, false))],
             path: vec![],
             skip_array_elements: false,
-            quote_invalid_fields: true,
         }
     }
 
     fn new_with_skip_array_elements(fields: &'a ObjectMap) -> FieldsIter<'a> {
         FieldsIter {
-            path_prefix: None,
+            path_prefix: PathPrefix::Event,
             stack: vec![LeafIter::Map(fields.iter())],
             path: vec![],
             skip_array_elements: true,
-            quote_invalid_fields: true,
         }
     }
 
@@ -130,38 +115,26 @@ impl<'a> FieldsIter<'a> {
         self.path.pop();
     }
 
-    fn make_path(&mut self, component: PathComponent<'a>) -> KeyString {
-        let mut res = match self.path_prefix {
-            None => String::new(),
-            Some(prefix) => match prefix {
-                PathPrefix::Event => String::from("."),
-                PathPrefix::Metadata => String::from("%"),
-            },
-        };
-        let mut path_iter = self.path.iter().chain(iter::once(&component)).peekable();
-        loop {
-            match path_iter.next() {
-                None => break res.into(),
-                Some(PathComponent::Key(key)) => {
-                    if self.quote_invalid_fields && !IS_VALID_PATH_SEGMENT.is_match(key) {
-                        write!(res, "\"{key}\"").expect("write to String never fails");
-                    } else {
-                        res.push_str(key);
-                    }
-                }
-                Some(PathComponent::Index(index)) => {
-                    write!(res, "[{index}]").expect("write to String never fails");
-                }
-            }
-            if let Some(PathComponent::Key(_)) = path_iter.peek() {
-                res.push('.');
-            }
+    fn make_path(&mut self, component: PathComponent<'a>) -> OwnedTargetPath {
+        let segments = self
+            .path
+            .iter()
+            .chain(iter::once(&component))
+            .map(|val| match val {
+                PathComponent::Key(key_string) => OwnedSegment::Field((*key_string).to_owned()),
+                PathComponent::Index(idx) => OwnedSegment::Index(*idx as isize),
+            })
+            .collect();
+
+        OwnedTargetPath {
+            prefix: self.path_prefix,
+            path: OwnedValuePath { segments },
         }
     }
 }
 
 impl<'a> Iterator for FieldsIter<'a> {
-    type Item = (KeyString, &'a Value);
+    type Item = (OwnedTargetPath, &'a Value);
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
@@ -187,7 +160,9 @@ impl<'a> Iterator for FieldsIter<'a> {
                     }
                 },
                 Some(LeafIter::Root((value, visited))) => {
-                    let result = (!*visited).then(|| ("message".into(), *value));
+                    let result = (!*visited)
+                        .then(|| (OwnedTargetPath::event(owned_value_path!("message")), *value));
+
                     *visited = true;
                     break result;
                 }
@@ -201,7 +176,14 @@ impl Serialize for FieldsIter<'_> {
     where
         S: Serializer,
     {
-        serializer.collect_map(self.clone())
+        serializer.collect_map(self.clone().map(|(key, val)| {
+            let key_str = match key.prefix {
+                PathPrefix::Event => key.path.to_string(), // -> not .field but just field
+                PathPrefix::Metadata => key.to_string(),   // metadata keeps % prepended (%field)
+            };
+
+            (key_str, val)
+        }))
     }
 }
 
@@ -225,7 +207,7 @@ mod test {
             ("field3", &Value::Integer(5)),
         ]
         .into_iter()
-        .map(|(k, v)| (k.into(), v))
+        .map(|(k, v)| (OwnedTargetPath::event(owned_value_path!(k)), v))
         .collect();
 
         let collected: Vec<_> = all_fields(&fields).collect();
@@ -243,34 +225,12 @@ mod test {
     }
 
     #[test]
-    fn keys_special_quoted() {
+    fn keys_special() {
         let fields = special_fields();
         let mut collected: Vec<_> = all_fields(&fields).collect();
         collected.sort_by(|(a, _), (b, _)| a.cmp(b));
 
-        let mut expected: Vec<(KeyString, &Value)> = vec![
-            ("\"a-b\"", &Value::Integer(1)),
-            ("\"a*b\"", &Value::Integer(2)),
-            ("\"a b\"", &Value::Integer(3)),
-            ("\".a .b*\"", &Value::Integer(4)),
-            ("\"\"a\"\"", &Value::Integer(5)),
-        ]
-        .into_iter()
-        .map(|(k, v)| (k.into(), v))
-        .collect();
-        // Compare without the leading `"` char so that the order is the same as the collected fields.
-        expected.sort_by(|(a, _), (b, _)| a[1..].cmp(&b[1..]));
-
-        assert_eq!(collected, expected);
-    }
-
-    #[test]
-    fn keys_special_unquoted() {
-        let fields = special_fields();
-        let mut collected: Vec<_> = all_fields_unquoted(&fields).collect();
-        collected.sort_by(|(a, _), (b, _)| a.cmp(b));
-
-        let mut expected: Vec<(KeyString, &Value)> = vec![
+        let mut expected: Vec<(OwnedTargetPath, &Value)> = vec![
             ("a-b", &Value::Integer(1)),
             ("a*b", &Value::Integer(2)),
             ("a b", &Value::Integer(3)),
@@ -278,8 +238,9 @@ mod test {
             ("\"a\"", &Value::Integer(5)),
         ]
         .into_iter()
-        .map(|(k, v)| (k.into(), v))
+        .map(|(k, v)| (OwnedTargetPath::event(owned_value_path!(k)), v))
         .collect();
+
         expected.sort_by(|(a, _), (b, _)| a.cmp(b));
 
         assert_eq!(collected, expected);
@@ -293,15 +254,16 @@ mod test {
             "field_2": 2
         }));
         let expected: Vec<_> = vec![
-            ("%field_0", &Value::Integer(0)),
-            ("%field_1", &Value::Integer(1)),
-            ("%field_2", &Value::Integer(2)),
+            ("field_0", &Value::Integer(0)),
+            ("field_1", &Value::Integer(1)),
+            ("field_2", &Value::Integer(2)),
         ]
         .into_iter()
-        .map(|(k, v)| (k.into(), v))
+        .map(|(k, v)| (OwnedTargetPath::metadata(owned_value_path!(k)), v))
         .collect();
 
         let collected: Vec<_> = all_metadata_fields(&fields).collect();
+
         assert_eq!(collected, expected);
     }
 
@@ -323,21 +285,21 @@ mod test {
     }
 
     #[test]
-    fn keys_nested_quoted() {
+    fn keys_nested() {
         let fields = nested_fields();
         let expected: Vec<_> = vec![
-            ("a.a", Value::Integer(4)),
-            ("a.array[0]", Value::Null),
-            ("a.array[1]", Value::Integer(3)),
-            ("a.array[2].x", Value::Integer(1)),
-            ("a.array[3][0]", Value::Integer(2)),
-            ("a.b.c", Value::Integer(5)),
-            ("\"a.b.c\"", Value::Integer(6)),
-            ("d", Value::Object(ObjectMap::new())),
-            ("e", Value::Array(Vec::new())),
+            (owned_value_path!("a", "a"), Value::Integer(4)),
+            (owned_value_path!("a", "array", 0), Value::Null),
+            (owned_value_path!("a", "array", 1), Value::Integer(3)),
+            (owned_value_path!("a", "array", 2, "x"), Value::Integer(1)),
+            (owned_value_path!("a", "array", 3, 0), Value::Integer(2)),
+            (owned_value_path!("a", "b", "c"), Value::Integer(5)),
+            (owned_value_path!("a.b.c"), Value::Integer(6)),
+            (owned_value_path!("d"), Value::Object(ObjectMap::new())),
+            (owned_value_path!("e"), Value::Array(Vec::new())),
         ]
         .into_iter()
-        .map(|(k, v)| (k.into(), v))
+        .map(|(k, v)| (OwnedTargetPath::event(k), v))
         .collect();
 
         let collected: Vec<_> = all_fields(&fields).map(|(k, v)| (k, v.clone())).collect();
@@ -345,35 +307,15 @@ mod test {
     }
 
     #[test]
-    fn keys_nested_unquoted() {
-        let fields = nested_fields();
-        let expected: Vec<_> = vec![
-            ("a.a", Value::Integer(4)),
-            ("a.array[0]", Value::Null),
-            ("a.array[1]", Value::Integer(3)),
-            ("a.array[2].x", Value::Integer(1)),
-            ("a.array[3][0]", Value::Integer(2)),
-            ("a.b.c", Value::Integer(5)),
-            ("a.b.c", Value::Integer(6)),
-            ("d", Value::Object(ObjectMap::new())),
-            ("e", Value::Array(Vec::new())),
-        ]
-        .into_iter()
-        .map(|(k, v)| (k.into(), v))
-        .collect();
-
-        let collected: Vec<_> = all_fields_unquoted(&fields)
-            .map(|(k, v)| (k, v.clone()))
-            .collect();
-        assert_eq!(collected, expected);
-    }
-
-    #[test]
     fn test_non_object_root() {
         let value = Value::Integer(3);
         let collected: Vec<_> = all_fields_non_object_root(&value)
-            .map(|(k, v)| (k.into(), v.clone()))
+            .map(|(k, v)| (k, v.clone()))
             .collect();
-        assert_eq!(collected, vec![("message".to_owned(), value)]);
+
+        assert_eq!(
+            collected,
+            vec![(OwnedTargetPath::event(owned_value_path!("message")), value)]
+        );
     }
 }

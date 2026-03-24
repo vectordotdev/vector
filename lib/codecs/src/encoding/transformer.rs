@@ -186,7 +186,7 @@ impl Transformer {
                 }
             }
             for (k, v) in unix_timestamps {
-                log.parse_path_and_insert(k, v)
+                log.insert(&k, v)
                     .expect("timestamp fields must allow insertion");
             }
         } else {

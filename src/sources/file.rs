@@ -1534,17 +1534,18 @@ mod tests {
 
             assert_eq!(received.len(), 1);
             assert_eq!(
-                received[0].as_log().keys().unwrap().collect::<HashSet<_>>(),
+                received[0]
+                    .as_log()
+                    .keys()
+                    .unwrap()
+                    .map(|target_path| target_path.path)
+                    .collect::<HashSet<_>>(),
                 vec![
-                    default_file_key()
-                        .path
-                        .expect("file key to exist")
-                        .to_string()
-                        .into(),
-                    log_schema().host_key().unwrap().to_string().into(),
-                    log_schema().message_key().unwrap().to_string().into(),
-                    log_schema().timestamp_key().unwrap().to_string().into(),
-                    log_schema().source_type_key().unwrap().to_string().into()
+                    default_file_key().path.expect("file key to exist"),
+                    log_schema().host_key().cloned().unwrap(),
+                    log_schema().message_key().cloned().unwrap(),
+                    log_schema().timestamp_key().cloned().unwrap(),
+                    log_schema().source_type_key().cloned().unwrap(),
                 ]
                 .into_iter()
                 .collect::<HashSet<_>>()

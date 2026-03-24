@@ -5,7 +5,7 @@ use mlua::{ExternalError, FromLua};
 use ordered_float::NotNan;
 use snafu::{ResultExt, Snafu};
 use vector_lib::configurable::configurable_component;
-use vrl::path::parse_target_path;
+use vrl::{path::parse_target_path, value::KeyString};
 
 use crate::{
     config::{DataType, Input, OutputId, TransformOutput},
@@ -281,7 +281,9 @@ impl mlua::UserData for LuaEvent {
             let state = lua.create_table()?;
             {
                 if let Some(keys) = event.inner.as_log().keys() {
-                    let keys = lua.create_table_from(keys.map(|k| (k, true)))?;
+                    let keys = lua.create_table_from(
+                        keys.map(|k| (KeyString::from(k.path.to_string()), true)),
+                    )?;
                     state.raw_set("keys", keys)?;
                 }
                 state.raw_set("event", event)?;

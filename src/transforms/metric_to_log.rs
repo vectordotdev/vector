@@ -355,11 +355,12 @@ mod tests {
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
     use vector_lib::{config::ComponentKey, event::EventMetadata, metric_tags};
+    use vrl::path::OwnedTargetPath;
 
     use super::*;
     use crate::{
         event::{
-            KeyString, Metric, Value,
+            Metric, Value,
             metric::{MetricKind, MetricTags, MetricValue, StatisticKind, TagValue, TagValueSet},
         },
         test_util::{components::assert_transform_compliance, random_string},
@@ -435,12 +436,30 @@ mod tests {
         assert_eq!(
             collected,
             vec![
-                (KeyString::from("counter.value"), &Value::from(1.0)),
-                (KeyString::from("host"), &Value::from("localhost")),
-                (KeyString::from("kind"), &Value::from("absolute")),
-                (KeyString::from("name"), &Value::from("counter")),
-                (KeyString::from("tags.some_tag"), &Value::from("some_value")),
-                (KeyString::from("timestamp"), &Value::from(ts())),
+                (
+                    OwnedTargetPath::event(owned_value_path!("counter", "value")),
+                    &Value::from(1.0)
+                ),
+                (
+                    OwnedTargetPath::event(owned_value_path!("host")),
+                    &Value::from("localhost")
+                ),
+                (
+                    OwnedTargetPath::event(owned_value_path!("kind")),
+                    &Value::from("absolute")
+                ),
+                (
+                    OwnedTargetPath::event(owned_value_path!("name")),
+                    &Value::from("counter")
+                ),
+                (
+                    OwnedTargetPath::event(owned_value_path!("tags", "some_tag")),
+                    &Value::from("some_value")
+                ),
+                (
+                    OwnedTargetPath::event(owned_value_path!("timestamp")),
+                    &Value::from(ts())
+                ),
             ]
         );
         assert_eq!(log.metadata(), &metadata);
@@ -466,10 +485,22 @@ mod tests {
         assert_eq!(
             collected,
             vec![
-                (KeyString::from("gauge.value"), &Value::from(1.0)),
-                (KeyString::from("kind"), &Value::from("absolute")),
-                (KeyString::from("name"), &Value::from("gauge")),
-                (KeyString::from("timestamp"), &Value::from(ts())),
+                (
+                    OwnedTargetPath::event(owned_value_path!("gauge", "value")),
+                    &Value::from(1.0),
+                ),
+                (
+                    OwnedTargetPath::event(owned_value_path!("kind")),
+                    &Value::from("absolute"),
+                ),
+                (
+                    OwnedTargetPath::event(owned_value_path!("name")),
+                    &Value::from("gauge"),
+                ),
+                (
+                    OwnedTargetPath::event(owned_value_path!("timestamp")),
+                    &Value::from(ts()),
+                ),
             ]
         );
         assert_eq!(log.metadata(), &metadata);
@@ -497,11 +528,26 @@ mod tests {
         assert_eq!(
             collected,
             vec![
-                (KeyString::from("kind"), &Value::from("absolute")),
-                (KeyString::from("name"), &Value::from("set")),
-                (KeyString::from("set.values[0]"), &Value::from("one")),
-                (KeyString::from("set.values[1]"), &Value::from("two")),
-                (KeyString::from("timestamp"), &Value::from(ts())),
+                (
+                    OwnedTargetPath::event(owned_value_path!("kind")),
+                    &Value::from("absolute"),
+                ),
+                (
+                    OwnedTargetPath::event(owned_value_path!("name")),
+                    &Value::from("set"),
+                ),
+                (
+                    OwnedTargetPath::event(owned_value_path!("set", "values", 0)),
+                    &Value::from("one"),
+                ),
+                (
+                    OwnedTargetPath::event(owned_value_path!("set", "values", 1)),
+                    &Value::from("two"),
+                ),
+                (
+                    OwnedTargetPath::event(owned_value_path!("timestamp")),
+                    &Value::from(ts()),
+                ),
             ]
         );
         assert_eq!(log.metadata(), &metadata);
@@ -531,28 +577,47 @@ mod tests {
             collected,
             vec![
                 (
-                    KeyString::from("distribution.samples[0].rate"),
-                    &Value::from(10)
+                    OwnedTargetPath::event(owned_value_path!("distribution", "samples", 0, "rate")),
+                    &Value::from(10),
                 ),
                 (
-                    KeyString::from("distribution.samples[0].value"),
-                    &Value::from(1.0)
+                    OwnedTargetPath::event(owned_value_path!(
+                        "distribution",
+                        "samples",
+                        0,
+                        "value"
+                    )),
+                    &Value::from(1.0),
                 ),
                 (
-                    KeyString::from("distribution.samples[1].rate"),
-                    &Value::from(20)
+                    OwnedTargetPath::event(owned_value_path!("distribution", "samples", 1, "rate")),
+                    &Value::from(20),
                 ),
                 (
-                    KeyString::from("distribution.samples[1].value"),
-                    &Value::from(2.0)
+                    OwnedTargetPath::event(owned_value_path!(
+                        "distribution",
+                        "samples",
+                        1,
+                        "value"
+                    )),
+                    &Value::from(2.0),
                 ),
                 (
-                    KeyString::from("distribution.statistic"),
-                    &Value::from("histogram")
+                    OwnedTargetPath::event(owned_value_path!("distribution", "statistic")),
+                    &Value::from("histogram"),
                 ),
-                (KeyString::from("kind"), &Value::from("absolute")),
-                (KeyString::from("name"), &Value::from("distro")),
-                (KeyString::from("timestamp"), &Value::from(ts())),
+                (
+                    OwnedTargetPath::event(owned_value_path!("kind")),
+                    &Value::from("absolute"),
+                ),
+                (
+                    OwnedTargetPath::event(owned_value_path!("name")),
+                    &Value::from("distro"),
+                ),
+                (
+                    OwnedTargetPath::event(owned_value_path!("timestamp")),
+                    &Value::from(ts()),
+                ),
             ]
         );
         assert_eq!(log.metadata(), &metadata);
@@ -583,32 +648,61 @@ mod tests {
             collected,
             vec![
                 (
-                    KeyString::from("aggregated_histogram.buckets[0].count"),
-                    &Value::from(10)
+                    OwnedTargetPath::event(owned_value_path!(
+                        "aggregated_histogram",
+                        "buckets",
+                        0,
+                        "count"
+                    )),
+                    &Value::from(10),
                 ),
                 (
-                    KeyString::from("aggregated_histogram.buckets[0].upper_limit"),
-                    &Value::from(1.0)
+                    OwnedTargetPath::event(owned_value_path!(
+                        "aggregated_histogram",
+                        "buckets",
+                        0,
+                        "upper_limit"
+                    )),
+                    &Value::from(1.0),
                 ),
                 (
-                    KeyString::from("aggregated_histogram.buckets[1].count"),
-                    &Value::from(20)
+                    OwnedTargetPath::event(owned_value_path!(
+                        "aggregated_histogram",
+                        "buckets",
+                        1,
+                        "count"
+                    )),
+                    &Value::from(20),
                 ),
                 (
-                    KeyString::from("aggregated_histogram.buckets[1].upper_limit"),
-                    &Value::from(2.0)
+                    OwnedTargetPath::event(owned_value_path!(
+                        "aggregated_histogram",
+                        "buckets",
+                        1,
+                        "upper_limit"
+                    )),
+                    &Value::from(2.0),
                 ),
                 (
-                    KeyString::from("aggregated_histogram.count"),
-                    &Value::from(30)
+                    OwnedTargetPath::event(owned_value_path!("aggregated_histogram", "count")),
+                    &Value::from(30),
                 ),
                 (
-                    KeyString::from("aggregated_histogram.sum"),
-                    &Value::from(50.0)
+                    OwnedTargetPath::event(owned_value_path!("aggregated_histogram", "sum")),
+                    &Value::from(50.0),
                 ),
-                (KeyString::from("kind"), &Value::from("absolute")),
-                (KeyString::from("name"), &Value::from("histo")),
-                (KeyString::from("timestamp"), &Value::from(ts())),
+                (
+                    OwnedTargetPath::event(owned_value_path!("kind")),
+                    &Value::from("absolute"),
+                ),
+                (
+                    OwnedTargetPath::event(owned_value_path!("name")),
+                    &Value::from("histo"),
+                ),
+                (
+                    OwnedTargetPath::event(owned_value_path!("timestamp")),
+                    &Value::from(ts()),
+                ),
             ]
         );
         assert_eq!(log.metadata(), &metadata);
@@ -639,32 +733,61 @@ mod tests {
             collected,
             vec![
                 (
-                    KeyString::from("aggregated_summary.count"),
-                    &Value::from(30)
+                    OwnedTargetPath::event(owned_value_path!("aggregated_summary", "count")),
+                    &Value::from(30),
                 ),
                 (
-                    KeyString::from("aggregated_summary.quantiles[0].quantile"),
-                    &Value::from(50.0)
+                    OwnedTargetPath::event(owned_value_path!(
+                        "aggregated_summary",
+                        "quantiles",
+                        0,
+                        "quantile"
+                    )),
+                    &Value::from(50.0),
                 ),
                 (
-                    KeyString::from("aggregated_summary.quantiles[0].value"),
-                    &Value::from(10.0)
+                    OwnedTargetPath::event(owned_value_path!(
+                        "aggregated_summary",
+                        "quantiles",
+                        0,
+                        "value"
+                    )),
+                    &Value::from(10.0),
                 ),
                 (
-                    KeyString::from("aggregated_summary.quantiles[1].quantile"),
-                    &Value::from(90.0)
+                    OwnedTargetPath::event(owned_value_path!(
+                        "aggregated_summary",
+                        "quantiles",
+                        1,
+                        "quantile"
+                    )),
+                    &Value::from(90.0),
                 ),
                 (
-                    KeyString::from("aggregated_summary.quantiles[1].value"),
-                    &Value::from(20.0)
+                    OwnedTargetPath::event(owned_value_path!(
+                        "aggregated_summary",
+                        "quantiles",
+                        1,
+                        "value"
+                    )),
+                    &Value::from(20.0),
                 ),
                 (
-                    KeyString::from("aggregated_summary.sum"),
-                    &Value::from(50.0)
+                    OwnedTargetPath::event(owned_value_path!("aggregated_summary", "sum")),
+                    &Value::from(50.0),
                 ),
-                (KeyString::from("kind"), &Value::from("absolute")),
-                (KeyString::from("name"), &Value::from("summary")),
-                (KeyString::from("timestamp"), &Value::from(ts())),
+                (
+                    OwnedTargetPath::event(owned_value_path!("kind")),
+                    &Value::from("absolute"),
+                ),
+                (
+                    OwnedTargetPath::event(owned_value_path!("name")),
+                    &Value::from("summary"),
+                ),
+                (
+                    OwnedTargetPath::event(owned_value_path!("timestamp")),
+                    &Value::from(ts()),
+                ),
             ]
         );
         assert_eq!(log.metadata(), &metadata);
