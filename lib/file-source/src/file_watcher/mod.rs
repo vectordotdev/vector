@@ -146,9 +146,6 @@ pub struct FileWatcher {
     max_line_bytes: usize,
     line_delimiter: Bytes,
     buf: BytesMut,
-    /// The file size when the watcher was created. Used as fallback for
-    /// bytes unread calculation when the reader doesn't support file_size().
-    initial_file_size: u64,
 }
 
 impl FileWatcher {
@@ -246,8 +243,6 @@ impl FileWatcher {
             .and_then(|diff| Instant::now().checked_sub(diff))
             .unwrap_or_else(Instant::now);
 
-        let initial_file_size = metadata.len();
-
         Ok(FileWatcher {
             path,
             findable: true,
@@ -263,7 +258,6 @@ impl FileWatcher {
             max_line_bytes,
             line_delimiter,
             buf: BytesMut::new(),
-            initial_file_size,
         })
     }
 
@@ -297,8 +291,6 @@ impl FileWatcher {
 
                 self.devno = file_info.portable_dev();
                 self.inode = file_info.portable_ino();
-                // Reset initial_file_size for the new file
-                self.initial_file_size = file_info.len();
 
                 Some(old_info)
             } else {
@@ -334,17 +326,16 @@ impl FileWatcher {
 
     /// Returns the number of bytes that were not read.
     /// Uses the current file size from the underlying File (works even after
-    /// file deletion since the fd remains valid), falling back to initial_file_size.
+    /// file deletion since the fd remains valid).
+    /// Returns 0 for gzipped or null readers: file_position tracks decompressed bytes
+    /// while the on-disk size is compressed, so the subtraction would be meaningless.
     /// When the file reaches EOF, this will be 0. When the file is unwatched before EOF,
     /// this represents the bytes that were never read.
     pub async fn get_bytes_unread(&self) -> u64 {
-        let current_size = self
-            .reader
-            .file_size()
-            .await
-            .unwrap_or(self.initial_file_size);
-
-        current_size.saturating_sub(self.file_position)
+        match self.reader.file_size().await {
+            Some(current_size) => current_size.saturating_sub(self.file_position),
+            None => 0,
+        }
     }
 
     /// Returns information about this file for metric emission when unwatching.
