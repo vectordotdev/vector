@@ -16,7 +16,7 @@ impl Cli {
 
         let args: Vec<&str> = vec![
             "--config",
-            "scripts/.markdownlintrc",
+            ".markdownlintrc",
             // We should fix these as well. Previously these files were not linted.
             "--ignore",
             ".github",

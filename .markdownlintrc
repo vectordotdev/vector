@@ -1,7 +1,7 @@
 {
-  "default": false,
+  "default": true,
 
-  "MD001": true,
+  "MD001": false, // Hugo generates the outer heading structure, so heading levels in content files are intentional
   "MD003": { "style": "atx" },
   "MD004": true,
   "MD005": true,
@@ -23,7 +23,6 @@
   "MD026": { "punctuation": ".,;:" },
   "MD027": true,
   "MD028": true,
-  "MD030": false,
   "MD031": true,
   "MD032": true,
   "MD033": false, // we allow HTML
@@ -38,8 +37,11 @@
   "MD042": true,
   "MD043": true,
   "MD044": true,
-  "MD045": false,
   "MD046": true,
   "MD047": true,
-  "MD048": true
+  "MD048": true,
+  "MD049": { "style": "asterisk" },
+  "MD051": false, // Hugo assembles sections from partials/shortcodes; fragments exist at render time but not in raw markdown
+  "MD052": false, // Hugo link definitions use shortcodes in URLs, unresolvable by markdownlint
+  "MD053": false  // Hugo uses reference link definitions extensively in README/website content
 }
