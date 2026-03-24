@@ -16,9 +16,10 @@ use crate::{
         http::config::{HttpMethod, HttpSinkConfig},
         util::{
             BatchConfig, Compression, RealtimeEventBasedDefaultBatchSettings,
-            RealtimeSizeBasedDefaultBatchSettings, UriSerde, http::RequestConfig,
+            RealtimeSizeBasedDefaultBatchSettings, http::RequestConfig,
         },
     },
+    template::Template,
     tls::TlsConfig,
 };
 
@@ -77,6 +78,7 @@ pub struct OpenTelemetryConfig {
 
     /// The URI to send requests to.
     ///
+    /// Supports template syntax (e.g. `http://{{ host }}:4318/v1/logs`).
     /// Must include a scheme (`http://` or `https://`) and a port.
     ///
     /// # Examples
@@ -85,7 +87,7 @@ pub struct OpenTelemetryConfig {
     /// - `http://localhost:4317` (gRPC)
     #[configurable(metadata(docs::examples = "http://localhost:5318/v1/logs"))]
     #[configurable(metadata(docs::examples = "http://localhost:4317"))]
-    pub uri: UriSerde,
+    pub uri: Template,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -132,13 +134,7 @@ impl SinkConfig for OpenTelemetryConfig {
                 batch,
             } => {
                 let config = HttpSinkConfig {
-                    uri: self
-                        .uri
-                        .uri
-                        .to_string()
-                        .as_str()
-                        .try_into()
-                        .map_err(|e| format!("invalid URI for HTTP sink: {e}"))?,
+                    uri: self.uri.clone(),
                     method: *method,
                     auth: auth.clone(),
                     headers: None,
@@ -164,8 +160,13 @@ impl SinkConfig for OpenTelemetryConfig {
                         .into())
                     }
                 };
+                let uri = self
+                    .uri
+                    .get_ref()
+                    .parse()
+                    .map_err(|e| format!("invalid URI for gRPC sink: {e}"))?;
                 let config = GrpcSinkConfig {
-                    uri: self.uri.clone(),
+                    uri,
                     compression: grpc_compression,
                     batch: *batch,
                     request: self.request.clone(),
