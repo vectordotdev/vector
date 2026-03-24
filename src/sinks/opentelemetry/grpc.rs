@@ -36,7 +36,7 @@ use vector_lib::{
 };
 
 use crate::{
-    config::{AcknowledgementsConfig, Input, SinkContext, SinkHealthcheckOptions},
+    config::{AcknowledgementsConfig, DataType, Input, SinkContext, SinkHealthcheckOptions},
     event::{Event, EventFinalizers, EventStatus, Finalizable},
     http::build_proxy_connector,
     internal_events::EndpointBytesSent,
@@ -137,7 +137,14 @@ pub struct GrpcSinkConfig {
 
 impl GrpcSinkConfig {
     pub async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        // Determine TLS from the URI scheme; fall back to https when tls options are present.
+        if self.uri.is_dynamic() {
+            return Err(
+                "template syntax is not supported for `uri` with the gRPC transport; \
+                 use a literal URI (e.g. `http://localhost:4317`)"
+                    .into(),
+            );
+        }
+
         let uri = with_default_scheme(
             self.uri
                 .get_ref()
@@ -145,6 +152,7 @@ impl GrpcSinkConfig {
                 .map_err(|e| format!("invalid URI for gRPC sink: {e}"))?,
             self.tls.is_some(),
         )?;
+
         let tls = if uri.scheme_str() == Some("https") {
             MaybeTlsSettings::tls_client(self.tls.as_ref())?
         } else {
@@ -152,8 +160,27 @@ impl GrpcSinkConfig {
         };
 
         let use_gzip = self.compression == GrpcCompression::Gzip;
+
+        let grpc_headers: Vec<(
+            tonic::metadata::AsciiMetadataKey,
+            tonic::metadata::AsciiMetadataValue,
+        )> = self
+            .request
+            .headers
+            .iter()
+            .filter_map(|(k, v)| {
+                let key = tonic::metadata::AsciiMetadataKey::from_bytes(k.as_bytes())
+                    .map_err(|e| warn!("Skipping invalid gRPC metadata key {k:?}: {e}"))
+                    .ok()?;
+                let value = tonic::metadata::AsciiMetadataValue::try_from(v.as_str())
+                    .map_err(|e| warn!("Skipping invalid gRPC metadata value for {k:?}: {e}"))
+                    .ok()?;
+                Some((key, value))
+            })
+            .collect();
+
         let client = new_grpc_client(&tls, cx.proxy())?;
-        let service = OtlpGrpcService::new(client.clone(), uri.clone(), use_gzip);
+        let service = OtlpGrpcService::new(client.clone(), uri.clone(), use_gzip, grpc_headers);
 
         let healthcheck = Box::pin(grpc_healthcheck(client, uri, cx.healthcheck));
 
@@ -173,7 +200,9 @@ impl GrpcSinkConfig {
     }
 
     pub fn input(&self) -> Input {
-        Input::all()
+        // Native Vector Metric events are not supported; OTLP-encoded metrics arrive as Log
+        // events with a `resourceMetrics` field and are handled correctly.
+        Input::new(DataType::Log | DataType::Trace)
     }
 
     pub const fn acknowledgements(&self) -> &AcknowledgementsConfig {
@@ -322,6 +351,7 @@ pub struct OtlpGrpcService {
     logs_client: LogsServiceClient<HyperSvc>,
     metrics_client: MetricsServiceClient<HyperSvc>,
     traces_client: TraceServiceClient<HyperSvc>,
+    headers: Vec<(tonic::metadata::AsciiMetadataKey, tonic::metadata::AsciiMetadataValue)>,
     protocol: String,
     endpoint: String,
 }
@@ -331,6 +361,7 @@ impl OtlpGrpcService {
         hyper_client: hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>,
         uri: Uri,
         compression: bool,
+        headers: Vec<(tonic::metadata::AsciiMetadataKey, tonic::metadata::AsciiMetadataValue)>,
     ) -> Self {
         let (protocol, endpoint) = crate::sinks::util::uri::protocol_endpoint(uri.clone());
 
@@ -354,6 +385,7 @@ impl OtlpGrpcService {
             logs_client,
             metrics_client,
             traces_client,
+            headers,
             protocol,
             endpoint,
         }
@@ -375,31 +407,25 @@ impl Service<OtlpGrpcRequest> for OtlpGrpcService {
         let events_byte_size = metadata.into_events_estimated_json_encoded_byte_size();
 
         let future = async move {
+            macro_rules! export {
+                ($client:expr, $payload:expr) => {{
+                    let len = $payload.encoded_len();
+                    let mut grpc_req = tonic::Request::new($payload);
+                    for (key, value) in &svc.headers {
+                        grpc_req.metadata_mut().insert(key.clone(), value.clone());
+                    }
+                    $client
+                        .export(grpc_req)
+                        .map_err(|source| OtlpGrpcError::Request { source })
+                        .await?;
+                    len
+                }};
+            }
+
             let byte_size = match req.signal {
-                OtlpSignalRequest::Logs(r) => {
-                    let len = r.encoded_len();
-                    svc.logs_client
-                        .export(r)
-                        .map_err(|source| OtlpGrpcError::Request { source })
-                        .await?;
-                    len
-                }
-                OtlpSignalRequest::Metrics(r) => {
-                    let len = r.encoded_len();
-                    svc.metrics_client
-                        .export(r)
-                        .map_err(|source| OtlpGrpcError::Request { source })
-                        .await?;
-                    len
-                }
-                OtlpSignalRequest::Traces(r) => {
-                    let len = r.encoded_len();
-                    svc.traces_client
-                        .export(r)
-                        .map_err(|source| OtlpGrpcError::Request { source })
-                        .await?;
-                    len
-                }
+                OtlpSignalRequest::Logs(r) => export!(svc.logs_client, r),
+                OtlpSignalRequest::Metrics(r) => export!(svc.metrics_client, r),
+                OtlpSignalRequest::Traces(r) => export!(svc.traces_client, r),
             };
 
             emit!(EndpointBytesSent {
