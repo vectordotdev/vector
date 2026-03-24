@@ -44,10 +44,11 @@ use crate::{
         Healthcheck, VectorSink,
         util::{
             BatchConfig, RealtimeEventBasedDefaultBatchSettings, ServiceBuilderExt,
-            SinkBuilderExt, StreamSink, UriSerde, http::RequestConfig,
+            SinkBuilderExt, StreamSink, http::RequestConfig,
             metadata::RequestMetadataBuilder, retries::RetryLogic,
         },
     },
+    template::Template,
     tls::{MaybeTlsSettings, TlsConfig},
 };
 
@@ -108,7 +109,7 @@ pub struct GrpcSinkConfig {
     /// - `http://localhost:4317`
     /// - `https://otelcol.example.com:4317`
     #[configurable(metadata(docs::examples = "http://localhost:4317"))]
-    pub uri: UriSerde,
+    pub uri: Template,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -138,7 +139,13 @@ pub struct GrpcSinkConfig {
 impl GrpcSinkConfig {
     pub async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         // Determine TLS from the URI scheme; fall back to https when tls options are present.
-        let uri = with_default_scheme(self.uri.uri.clone(), self.tls.is_some())?;
+        let uri = with_default_scheme(
+            self.uri
+                .get_ref()
+                .parse()
+                .map_err(|e| format!("invalid URI for gRPC sink: {e}"))?,
+            self.tls.is_some(),
+        )?;
         let tls = if uri.scheme_str() == Some("https") {
             MaybeTlsSettings::tls_client(self.tls.as_ref())?
         } else {
@@ -706,7 +713,7 @@ mod tests {
         "#,
         )
         .unwrap();
-        assert_eq!(config.uri.uri.to_string(), "http://localhost:4317");
+        assert_eq!(config.uri.get_ref(), "http://localhost:4317");
         assert_eq!(config.compression, GrpcCompression::default());
     }
 
@@ -719,10 +726,7 @@ mod tests {
         "#,
         )
         .unwrap();
-        assert_eq!(
-            config.uri.uri.to_string(),
-            "https://otelcol.example.com:4317"
-        );
+        assert_eq!(config.uri.get_ref(), "https://otelcol.example.com:4317");
         assert_eq!(config.compression, GrpcCompression::Gzip);
     }
 
