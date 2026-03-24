@@ -160,13 +160,8 @@ impl SinkConfig for OpenTelemetryConfig {
                         .into())
                     }
                 };
-                let uri = self
-                    .uri
-                    .get_ref()
-                    .parse()
-                    .map_err(|e| format!("invalid URI for gRPC sink: {e}"))?;
                 let config = GrpcSinkConfig {
-                    uri,
+                    uri: self.uri.clone(),
                     compression: grpc_compression,
                     batch: *batch,
                     request: self.request.clone(),
