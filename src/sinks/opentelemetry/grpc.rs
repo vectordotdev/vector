@@ -225,14 +225,22 @@ pub enum OtlpGrpcError {
 
 // ── Request/Response ─────────────────────────────────────────────────────────
 
-/// A grouped batch of OTLP events, with one proto request per signal type.
-#[derive(Clone, Default)]
+/// A single-signal OTLP export request. One request per signal type ensures
+/// that retries are atomic — a failed metrics export cannot duplicate a
+/// previously-accepted logs export.
+#[derive(Clone)]
 pub struct OtlpGrpcRequest {
-    pub logs: Option<ExportLogsServiceRequest>,
-    pub metrics: Option<ExportMetricsServiceRequest>,
-    pub traces: Option<ExportTraceServiceRequest>,
+    pub signal: OtlpSignalRequest,
     pub finalizers: EventFinalizers,
     pub metadata: RequestMetadata,
+}
+
+/// The OTLP export payload for a single signal type.
+#[derive(Clone)]
+pub enum OtlpSignalRequest {
+    Logs(ExportLogsServiceRequest),
+    Metrics(ExportMetricsServiceRequest),
+    Traces(ExportTraceServiceRequest),
 }
 
 impl Finalizable for OtlpGrpcRequest {
@@ -325,34 +333,35 @@ impl Service<OtlpGrpcRequest> for OtlpGrpcService {
         let events_byte_size = metadata.into_events_estimated_json_encoded_byte_size();
 
         let future = async move {
-            let mut total_bytes: usize = 0;
-
-            if let Some(logs_req) = req.logs {
-                total_bytes += logs_req.encoded_len();
-                svc.logs_client
-                    .export(logs_req)
-                    .map_err(|source| OtlpGrpcError::Request { source })
-                    .await?;
-            }
-
-            if let Some(metrics_req) = req.metrics {
-                total_bytes += metrics_req.encoded_len();
-                svc.metrics_client
-                    .export(metrics_req)
-                    .map_err(|source| OtlpGrpcError::Request { source })
-                    .await?;
-            }
-
-            if let Some(traces_req) = req.traces {
-                total_bytes += traces_req.encoded_len();
-                svc.traces_client
-                    .export(traces_req)
-                    .map_err(|source| OtlpGrpcError::Request { source })
-                    .await?;
-            }
+            let byte_size = match req.signal {
+                OtlpSignalRequest::Logs(r) => {
+                    let len = r.encoded_len();
+                    svc.logs_client
+                        .export(r)
+                        .map_err(|source| OtlpGrpcError::Request { source })
+                        .await?;
+                    len
+                }
+                OtlpSignalRequest::Metrics(r) => {
+                    let len = r.encoded_len();
+                    svc.metrics_client
+                        .export(r)
+                        .map_err(|source| OtlpGrpcError::Request { source })
+                        .await?;
+                    len
+                }
+                OtlpSignalRequest::Traces(r) => {
+                    let len = r.encoded_len();
+                    svc.traces_client
+                        .export(r)
+                        .map_err(|source| OtlpGrpcError::Request { source })
+                        .await?;
+                    len
+                }
+            };
 
             emit!(EndpointBytesSent {
-                byte_size: total_bytes,
+                byte_size,
                 protocol: &svc.protocol,
                 endpoint: &svc.endpoint,
             });
@@ -422,16 +431,23 @@ impl OtlpSignal {
     }
 }
 
-/// Accumulator for a batch of OTLP events, merged per signal type.
-#[derive(Default)]
-struct OtlpBatch {
+/// Per-signal accumulator tracking the merged proto request and its associated
+/// event metadata. Kept separate so each signal can be retried independently.
+struct SignalData<R> {
+    request: R,
     finalizers: EventFinalizers,
     event_count: usize,
-    events_byte_size: usize,
-    events_json_byte_size: GroupedCountByteSize,
-    logs: Option<ExportLogsServiceRequest>,
-    metrics: Option<ExportMetricsServiceRequest>,
-    traces: Option<ExportTraceServiceRequest>,
+    byte_size: usize,
+    json_byte_size: GroupedCountByteSize,
+}
+
+/// Accumulator for a batch of OTLP events, separated by signal type so that
+/// the resulting requests can be retried independently.
+#[derive(Default)]
+struct OtlpBatch {
+    logs: Option<SignalData<ExportLogsServiceRequest>>,
+    metrics: Option<SignalData<ExportMetricsServiceRequest>>,
+    traces: Option<SignalData<ExportTraceServiceRequest>>,
 }
 
 impl Clone for OtlpBatch {
@@ -490,65 +506,69 @@ where
             .batched(self.batch_settings.as_reducer_config(
                 |data: &OtlpEventData| data.signal.encoded_len(),
                 BatchReduce::new(|batch: &mut OtlpBatch, item: OtlpEventData| {
-                    batch.finalizers.merge(item.finalizers);
-                    batch.event_count += 1;
-                    batch.events_byte_size += item.byte_size;
-                    batch.events_json_byte_size += item.json_byte_size;
+                    macro_rules! accumulate {
+                        ($field:ident, $req:expr, $merge:expr) => {
+                            match &mut batch.$field {
+                                Some(existing) => {
+                                    $merge(&mut existing.request, $req);
+                                    existing.finalizers.merge(item.finalizers);
+                                    existing.event_count += 1;
+                                    existing.byte_size += item.byte_size;
+                                    existing.json_byte_size += item.json_byte_size;
+                                }
+                                slot => {
+                                    *slot = Some(SignalData {
+                                        request: $req,
+                                        finalizers: item.finalizers,
+                                        event_count: 1,
+                                        byte_size: item.byte_size,
+                                        json_byte_size: item.json_byte_size,
+                                    });
+                                }
+                            }
+                        };
+                    }
                     match item.signal {
-                        OtlpSignal::Logs(req) => {
-                            if let Some(existing) = &mut batch.logs {
-                                existing.resource_logs.extend(req.resource_logs);
-                            } else {
-                                batch.logs = Some(req);
-                            }
-                        }
-                        OtlpSignal::Metrics(req) => {
-                            if let Some(existing) = &mut batch.metrics {
-                                existing.resource_metrics.extend(req.resource_metrics);
-                            } else {
-                                batch.metrics = Some(req);
-                            }
-                        }
-                        OtlpSignal::Traces(req) => {
-                            if let Some(existing) = &mut batch.traces {
-                                existing.resource_spans.extend(req.resource_spans);
-                            } else {
-                                batch.traces = Some(req);
-                            }
-                        }
+                        OtlpSignal::Logs(req) => accumulate!(logs, req, |e: &mut ExportLogsServiceRequest, r: ExportLogsServiceRequest| {
+                            e.resource_logs.extend(r.resource_logs)
+                        }),
+                        OtlpSignal::Metrics(req) => accumulate!(metrics, req, |e: &mut ExportMetricsServiceRequest, r: ExportMetricsServiceRequest| {
+                            e.resource_metrics.extend(r.resource_metrics)
+                        }),
+                        OtlpSignal::Traces(req) => accumulate!(traces, req, |e: &mut ExportTraceServiceRequest, r: ExportTraceServiceRequest| {
+                            e.resource_spans.extend(r.resource_spans)
+                        }),
                     }
                 }),
             ))
-            .map(|batch| {
-                let builder = RequestMetadataBuilder::new(
-                    batch.event_count,
-                    batch.events_byte_size,
-                    batch.events_json_byte_size,
-                );
+            .flat_map(|batch| {
+                let mut requests = Vec::new();
 
-                let byte_size = batch
-                    .logs
-                    .as_ref()
-                    .map_or(0, |r| r.encoded_len())
-                    + batch
-                        .metrics
-                        .as_ref()
-                        .map_or(0, |r| r.encoded_len())
-                    + batch
-                        .traces
-                        .as_ref()
-                        .map_or(0, |r| r.encoded_len());
-
-                let bytes_len =
-                    NonZeroUsize::new(byte_size.max(1)).expect("should be non-zero");
-
-                OtlpGrpcRequest {
-                    logs: batch.logs,
-                    metrics: batch.metrics,
-                    traces: batch.traces,
-                    finalizers: batch.finalizers,
-                    metadata: builder.with_request_size(bytes_len),
+                macro_rules! push_signal {
+                    ($field:ident, $variant:ident) => {
+                        if let Some(data) = batch.$field {
+                            let byte_size = data.request.encoded_len();
+                            let bytes_len =
+                                NonZeroUsize::new(byte_size.max(1)).expect("should be non-zero");
+                            let builder = RequestMetadataBuilder::new(
+                                data.event_count,
+                                data.byte_size,
+                                data.json_byte_size,
+                            );
+                            requests.push(OtlpGrpcRequest {
+                                signal: OtlpSignalRequest::$variant(data.request),
+                                finalizers: data.finalizers,
+                                metadata: builder.with_request_size(bytes_len),
+                            });
+                        }
+                    };
                 }
+
+                push_signal!(logs, Logs);
+                push_signal!(metrics, Metrics);
+                push_signal!(traces, Traces);
+
+                futures::stream::iter(requests)
             })
             .into_driver(self.service)
             .run()
@@ -648,7 +668,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(config.uri.uri.to_string(), "http://localhost:4317");
-        assert_eq!(config.compression, Compression::default());
+        assert_eq!(config.compression, GrpcCompression::default());
     }
 
     #[test]
@@ -664,7 +684,7 @@ mod tests {
             config.uri.uri.to_string(),
             "https://otelcol.example.com:4317"
         );
-        assert!(matches!(config.compression, Compression::Gzip(_)));
+        assert_eq!(config.compression, GrpcCompression::Gzip);
     }
 
     #[test]
