@@ -20,7 +20,9 @@ use tokio::{
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
 #[cfg(feature = "api")]
-use crate::{api, internal_events::ApiStarted};
+use crate::api;
+#[cfg(feature = "api")]
+use crate::internal_events::ApiStarted;
 use crate::{
     cli::{LogFormat, Opts, RootOpts, WatchConfigMethod, handle_config_errors},
     config::{self, ComponentConfig, ComponentType, Config, ConfigPath},
@@ -34,6 +36,8 @@ use crate::{
     },
     trace,
 };
+#[cfg(feature = "api")]
+use std::sync::Arc;
 
 static WORKER_THREADS: AtomicUsize = AtomicUsize::new(0);
 
@@ -129,28 +133,32 @@ impl ApplicationConfig {
         Ok(())
     }
 
-    /// Configure the API server, if applicable
+    /// Configure the gRPC API server, if applicable
     #[cfg(feature = "api")]
-    pub fn setup_api(&self, handle: &Handle) -> Option<api::Server> {
+    pub fn setup_api(&self, handle: &Handle) -> Option<api::GrpcServer> {
         if self.api.enabled {
-            match api::Server::start(
+            // Start gRPC server
+            let api_server = handle.block_on(api::GrpcServer::start(
                 self.topology.config(),
                 self.topology.watch(),
-                std::sync::Arc::clone(&self.topology.running),
-                handle,
-            ) {
-                Ok(api_server) => {
+                Arc::clone(&self.topology.running),
+            ));
+            match api_server {
+                Ok(server) => {
                     emit!(ApiStarted {
-                        addr: self.api.address.unwrap(),
-                        playground: self.api.playground,
-                        graphql: self.api.graphql
+                        addr: server.addr()
                     });
-
-                    Some(api_server)
+                    Some(server)
                 }
                 Err(error) => {
                     let error = error.to_string();
-                    error!(message = "An error occurred that Vector couldn't handle.", %error, internal_log_rate_limit = false);
+                    error!(
+                        message = "An error occurred that Vector couldn't handle.",
+                        %error,
+                        internal_log_rate_limit = false
+                    );
+                    // Trigger shutdown because the API was explicitly enabled but failed to start
+                    // This ensures users don't run Vector thinking top/tap will work when they won't
                     _ = self
                         .topology
                         .abort_tx
@@ -256,9 +264,12 @@ impl Application {
             signals,
         } = self;
 
+        #[cfg(feature = "api")]
+        let api_server = config.setup_api(handle);
+
         let topology_controller = SharedTopologyController::new(TopologyController {
             #[cfg(feature = "api")]
-            api_server: config.setup_api(handle),
+            api_server,
             topology: config.topology,
             config_paths: config.config_paths.clone(),
             require_healthy: root_opts.require_healthy,
