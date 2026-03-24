@@ -12382,8 +12382,6 @@ dependencies = [
  "tempfile",
  "toml",
  "toml_edit 0.23.9",
- "vector-vrl-functions",
- "vrl",
 ]
 
 [[package]]
@@ -12939,6 +12937,17 @@ name = "vector-vrl-cli"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "vector-vrl-functions",
+ "vrl",
+]
+
+[[package]]
+name = "vector-vrl-doc-builder"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "serde_json",
  "vector-vrl-functions",
  "vrl",
 ]
