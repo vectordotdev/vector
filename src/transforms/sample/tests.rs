@@ -14,7 +14,7 @@ use crate::{
         FunctionTransform, OutputBuffer,
         sample::{
             config::{SampleConfig, default_sample_rate_key},
-            transform::{Sample, SampleMode},
+            transform::{DynamicSampleFields, Sample, SampleMode},
         },
         test::{create_topology, transform_one},
     },
@@ -26,6 +26,8 @@ async fn emits_internal_events() {
         let config = SampleConfig {
             rate: None,
             ratio: Some(1.0),
+            ratio_field: None,
+            rate_field: None,
             key_field: None,
             group_by: None,
             exclude: None,
@@ -322,6 +324,113 @@ fn sample_at_rates_higher_then_half() {
             .count();
         assert_eq!(total_observed as f64, 10000.0 * sampler.ratio());
     }
+}
+
+#[test]
+fn dynamic_ratio_field_overrides_static_ratio() {
+    let mut sampler = Sample::new_with_dynamic(
+        "sample".to_string(),
+        SampleMode::new_ratio(0.1),
+        DynamicSampleFields {
+            ratio_field: Some("dynamic_ratio".to_string()),
+            rate_field: None,
+        },
+        Some("other_field".into()),
+        None,
+        None,
+        default_sample_rate_key(),
+    );
+
+    let mut event = Event::Log(LogEvent::from("hello"));
+    let log = event.as_mut_log();
+    log.insert("other_field", "foo");
+    log.insert("dynamic_ratio", 1.0);
+
+    let output = transform_one(&mut sampler, event).expect("event should be sampled");
+    assert_eq!(output.as_log()["sample_rate"], "1".into());
+}
+
+#[test]
+fn dynamic_ratio_field_falls_back_to_static_ratio_when_missing() {
+    let mut sampler = Sample::new_with_dynamic(
+        "sample".to_string(),
+        SampleMode::new_ratio(1.0),
+        DynamicSampleFields {
+            ratio_field: Some("dynamic_ratio".to_string()),
+            rate_field: None,
+        },
+        None,
+        None,
+        None,
+        default_sample_rate_key(),
+    );
+
+    let event = Event::Log(LogEvent::from("hello"));
+    let output = transform_one(&mut sampler, event).expect("event should be sampled");
+    assert_eq!(output.as_log()["sample_rate"], "1".into());
+}
+
+#[test]
+fn dynamic_ratio_field_falls_back_to_static_rate_when_missing() {
+    let mut sampler = Sample::new_with_dynamic(
+        "sample".to_string(),
+        SampleMode::new_rate(2),
+        DynamicSampleFields {
+            ratio_field: Some("dynamic_ratio".to_string()),
+            rate_field: None,
+        },
+        None,
+        None,
+        None,
+        default_sample_rate_key(),
+    );
+
+    let event = Event::Log(LogEvent::from("hello"));
+    assert!(transform_one(&mut sampler, event).is_some());
+}
+
+#[test]
+fn dynamic_rate_field_overrides_static_ratio() {
+    let mut sampler = Sample::new_with_dynamic(
+        "sample".to_string(),
+        SampleMode::new_ratio(0.0),
+        DynamicSampleFields {
+            ratio_field: None,
+            rate_field: Some("dynamic_rate".to_string()),
+        },
+        Some("other_field".into()),
+        None,
+        None,
+        default_sample_rate_key(),
+    );
+
+    let mut event = Event::Log(LogEvent::from("hello"));
+    let log = event.as_mut_log();
+    log.insert("other_field", "foo");
+    log.insert("dynamic_rate", 1);
+
+    let output = transform_one(&mut sampler, event).expect("event should be sampled");
+    assert_eq!(output.as_log()["sample_rate"], "1".into());
+}
+
+#[test]
+fn dynamic_rate_field_falls_back_to_static_ratio_when_missing() {
+    let mut sampler = Sample::new_with_dynamic(
+        "sample".to_string(),
+        SampleMode::new_ratio(1.0),
+        DynamicSampleFields {
+            ratio_field: None,
+            rate_field: Some("dynamic_rate".to_string()),
+        },
+        None,
+        None,
+        None,
+        default_sample_rate_key(),
+    );
+
+    let event = Event::Log(LogEvent::from("hello"));
+    let output = transform_one(&mut sampler, event).expect("event should be sampled");
+    assert_eq!(output.as_log()["sample_rate"], "1".into());
 }
 
 fn condition_contains(key: &str, needle: &str) -> Condition {
