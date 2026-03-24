@@ -264,3 +264,14 @@ make build-licenses
 
 Before opening a PR, read [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md) and use it as the reference for the PR body structure and title.
 
+### PR Title Format
+
+PR titles must follow the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) spec and are validated by `.github/workflows/semantic.yml`.
+
+Examples:
+```
+feat(kafka source): add consumer group lag metric
+fix(loki sink): handle empty label sets correctly
+docs(internal docs): update contributing guide
+chore(deps): bump tokio to X
+```
