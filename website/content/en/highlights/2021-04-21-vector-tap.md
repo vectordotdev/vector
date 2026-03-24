@@ -11,6 +11,8 @@ badges:
   domains: ["graphql", "cli", "observability"]
 ---
 
+{{< grpc-migration-warning >}}
+
 Vector 0.13 introduces a new [`vector tap`][tap] subcommand that allows for
 tapping into the events flowing through Vector. This can be used to "live tail"
 events while troubleshooting incidents events or simply to debug your Vector
