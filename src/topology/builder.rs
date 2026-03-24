@@ -8,7 +8,7 @@ use std::{
 
 use futures::{FutureExt, StreamExt, TryStreamExt};
 use futures_util::stream::FuturesUnordered;
-use metrics::gauge;
+use metrics::{gauge, histogram};
 use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
 use tokio::{
     select,
@@ -753,7 +753,7 @@ impl<'a> Builder<'a> {
             .global
             .preserve_ordering_stateless_transforms
             .unwrap_or(true);
-        let runner = Runner::new(
+        let mut runner = Runner::new(
             t,
             input_rx,
             sender,
@@ -762,6 +762,7 @@ impl<'a> Builder<'a> {
             LatencyRecorder::new(self.config.global.latency_ewma_alpha),
             preserve_ordering,
         );
+        runner.component_id = node.key.id().to_owned();
         let transform = if node.enable_concurrency {
             runner.run_concurrently().boxed()
         } else {
@@ -1137,6 +1138,7 @@ struct Runner {
     latency_recorder: LatencyRecorder,
     events_received: Registered<EventsReceived>,
     preserve_ordering: bool,
+    component_id: String,
 }
 
 impl Runner {
@@ -1158,6 +1160,7 @@ impl Runner {
             latency_recorder,
             events_received: register!(EventsReceived),
             preserve_ordering,
+            component_id: String::new(),
         }
     }
 
@@ -1216,6 +1219,7 @@ impl Runner {
         let mut in_flight =
             super::in_flight_queue::InFlightQueue::new(self.preserve_ordering);
         let mut shutting_down = false;
+        let mut blocked_completions: u64 = 0;
 
         self.timer_tx.try_send_start_wait();
         loop {
@@ -1223,6 +1227,7 @@ impl Runner {
                 biased;
 
                 result = in_flight.next(), if !in_flight.is_empty() => {
+                    blocked_completions += 1;
                     match result {
                         Some(Ok(mut outputs_buf)) => {
                             self.send_outputs(&mut outputs_buf).await
@@ -1233,6 +1238,12 @@ impl Runner {
                 }
 
                 input_arrays = input_rx.next(), if in_flight.len() < *TRANSFORM_CONCURRENCY_LIMIT && !shutting_down => {
+                    histogram!(
+                        "transform_concurrent_scheduling_pressure",
+                        "component_id" => self.component_id.clone()
+                    )
+                    .record((blocked_completions as f64 / *TRANSFORM_CONCURRENCY_LIMIT as f64).min(1.0));
+                    blocked_completions = 0;
                     match input_arrays {
                         Some(input_arrays) => {
                             let mut len = 0;
@@ -1259,6 +1270,7 @@ impl Runner {
                 }
 
                 else => {
+                    blocked_completions = 0;
                     if shutting_down {
                         break
                     }
