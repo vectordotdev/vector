@@ -1116,6 +1116,7 @@ generated: components: sinks: opentelemetry: configuration: {
 		description: """
 			The URI to send requests to.
 
+			Supports template syntax (e.g. `http://{{ host }}:4318/v1/logs`).
 			Must include a scheme (`http://` or `https://`) and a port.
 
 			# Examples
@@ -1124,6 +1125,9 @@ generated: components: sinks: opentelemetry: configuration: {
 			- `http://localhost:4317` (gRPC)
 			"""
 		required: true
-		type: string: examples: ["http://localhost:5318/v1/logs", "http://localhost:4317"]
+		type: string: {
+			examples: ["http://localhost:5318/v1/logs", "http://localhost:4317"]
+			syntax: "template"
+		}
 	}
 }
