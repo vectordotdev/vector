@@ -983,9 +983,9 @@ mod tests {
     use std::io::{self, Write as _};
     use std::{num::NonZeroU32, sync::Arc};
 
-    use bytes::{BufMut, BytesMut, Bytes};
-    use flate2::read::ZlibDecoder;
+    use bytes::{BufMut, Bytes, BytesMut};
     use chrono::{DateTime, TimeZone, Timelike, Utc};
+    use flate2::read::ZlibDecoder;
     use proptest::{
         arbitrary::any, collection::btree_map, num::f64::POSITIVE as ARB_POSITIVE_F64, prop_assert,
         proptest, strategy::Strategy, string::string_regex,
