@@ -137,7 +137,6 @@ impl SinkConfig for OpenTelemetryConfig {
                     uri: self.uri.clone(),
                     method: *method,
                     auth: auth.clone(),
-                    headers: None,
                     compression: self.compression,
                     encoding: encoding.clone(),
                     payload_prefix: payload_prefix.clone(),
