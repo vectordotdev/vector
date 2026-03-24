@@ -4,7 +4,7 @@ configuration.
 
 Before:
 
-```
+```yaml
 sinks:
   otel_sink:
     inputs:
@@ -26,7 +26,7 @@ sinks:
 
 After:
 
-```
+```yaml
 sinks:
   otel_sink:
     inputs:
