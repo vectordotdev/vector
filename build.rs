@@ -120,6 +120,7 @@ fn main() {
         println!("cargo:rerun-if-changed=proto/vector/dd_trace.proto");
         println!("cargo:rerun-if-changed=proto/vector/ddsketch_full.proto");
         println!("cargo:rerun-if-changed=proto/vector/vector.proto");
+        println!("cargo:rerun-if-changed=proto/vector/observability.proto");
 
         // Create and store the "file descriptor set" from the compiled Protocol Buffers packages.
         //
@@ -133,7 +134,8 @@ fn main() {
         let mut prost_build = prost_build::Config::new();
         prost_build
             .btree_map(["."])
-            .file_descriptor_set_path(protobuf_fds_path);
+            .file_descriptor_set_path(protobuf_fds_path)
+            .extern_path(".event", "crate::event::proto"); // Use existing event types from vector-core
 
         tonic_build::configure()
             .protoc_arg("--experimental_allow_proto3_optional")
@@ -147,6 +149,7 @@ fn main() {
                     "proto/third-party/google/pubsub/v1/pubsub.proto",
                     "proto/third-party/google/rpc/status.proto",
                     "proto/vector/vector.proto",
+                    "proto/vector/observability.proto",
                 ],
                 &[
                     "proto/third-party",
