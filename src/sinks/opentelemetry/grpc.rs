@@ -43,9 +43,8 @@ use crate::{
     sinks::{
         Healthcheck, VectorSink,
         util::{
-            BatchConfig, RealtimeEventBasedDefaultBatchSettings, ServiceBuilderExt,
-            SinkBuilderExt, StreamSink, http::RequestConfig,
-            metadata::RequestMetadataBuilder, retries::RetryLogic,
+            BatchConfig, RealtimeEventBasedDefaultBatchSettings, ServiceBuilderExt, SinkBuilderExt,
+            StreamSink, http::RequestConfig, metadata::RequestMetadataBuilder, retries::RetryLogic,
         },
     },
     template::Template,
@@ -202,10 +201,7 @@ async fn grpc_healthcheck(
     use tonic::Code;
     use tonic_health::pb::{HealthCheckRequest, health_client::HealthClient};
 
-    let svc = HyperSvc {
-        uri,
-        client,
-    };
+    let svc = HyperSvc { uri, client };
     let mut health_client = HealthClient::new(svc);
 
     match health_client

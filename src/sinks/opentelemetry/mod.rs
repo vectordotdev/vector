@@ -153,12 +153,10 @@ impl SinkConfig for OpenTelemetryConfig {
                 let grpc_compression = match self.compression {
                     Compression::None => GrpcCompression::None,
                     Compression::Gzip(_) => GrpcCompression::Gzip,
-                    other => {
-                        return Err(format!(
-                            "gRPC transport only supports 'none' or 'gzip' compression, got '{other}'"
-                        )
-                        .into())
-                    }
+                    other => return Err(format!(
+                        "gRPC transport only supports 'none' or 'gzip' compression, got '{other}'"
+                    )
+                    .into()),
                 };
                 let config = GrpcSinkConfig {
                     uri: self.uri.clone(),
