@@ -80,13 +80,19 @@ impl DriverResponse for BigqueryResponse {
             Some(proto::append_rows_response::Response::AppendResult(_)) => EventStatus::Delivered,
             Some(proto::append_rows_response::Response::Error(status)) => {
                 match super::proto::google::rpc::Code::try_from(status.code) {
-                    // we really shouldn't be able to get here, but just in case
+                    // We really shouldn't be able to get here, but just in case
                     Ok(super::proto::google::rpc::Code::Ok) => EventStatus::Delivered,
-                    // these errors can't be retried because the event payload is almost definitely bad
+                    // Permanent errors - retrying won't help
                     Ok(super::proto::google::rpc::Code::InvalidArgument)
                     | Ok(super::proto::google::rpc::Code::NotFound)
-                    | Ok(super::proto::google::rpc::Code::AlreadyExists) => EventStatus::Rejected,
-                    // everything else can probably be retried
+                    | Ok(super::proto::google::rpc::Code::AlreadyExists)
+                    // PermissionDenied requires human action (IAM changes) to resolve, so fail fast.
+                    | Ok(super::proto::google::rpc::Code::PermissionDenied)
+                    | Ok(super::proto::google::rpc::Code::FailedPrecondition)
+                    | Ok(super::proto::google::rpc::Code::OutOfRange)
+                    | Ok(super::proto::google::rpc::Code::Unimplemented) => EventStatus::Rejected,
+                    // Unauthenticated is intentionally excluded. Our token refresher runs concurrently
+                    // and a token may have just expired, so a retry can succeed.
                     _ => EventStatus::Errored,
                 }
             }
@@ -157,7 +163,11 @@ impl RetryLogic for BigqueryRetryLogic {
 
     fn should_retry_response(&self, response: &Self::Response) -> RetryAction<Self::Request> {
         match response.event_status() {
-            EventStatus::Delivered | EventStatus::Recorded | EventStatus::Dropped => RetryAction::Successful,
+            EventStatus::Delivered | EventStatus::Recorded => RetryAction::Successful,
+            // Dropped means the event was abandoned without finalization.
+            // It is never returned by `BigqueryResponse::event_status()` but treat it as a
+            // no-op rather than a retriable error.
+            EventStatus::Dropped => RetryAction::Successful,
             EventStatus::Errored => {
                 RetryAction::Retry("transient error in BigQuery response".into())
             }

@@ -1,6 +1,6 @@
 use crate::codecs::encoding::ProtobufSerializer;
 use bytes::BytesMut;
-use prost::Message;
+use prost::{Message, encoding::encoded_len_varint};
 use std::num::NonZeroUsize;
 use tokio_util::codec::Encoder;
 use vector_lib::event::Finalizable;
@@ -12,7 +12,7 @@ use crate::event::{Event, EventFinalizers};
 use crate::sinks::util::IncrementalRequestBuilder;
 use crate::sinks::util::metadata::RequestMetadataBuilder;
 
-// 10MB maximum message size:
+// 10MB maximum request size:
 // https://cloud.google.com/bigquery/docs/reference/storage/rpc/google.cloud.bigquery.storage.v1#appendrowsrequest
 pub const MAX_BATCH_PAYLOAD_SIZE: usize = 10_000_000;
 
@@ -41,8 +41,8 @@ pub struct BigqueryRequestBuilder {
     write_stream: String,
     // Cached schema for inclusion in every AppendRowsRequest.
     proto_schema: proto::ProtoSchema,
-    // Encoded size of the ProtoData structure with no rows, used to compute batch size limits.
-    schema_overhead: usize,
+    // Encoded size of a full AppendRowsRequest with no rows, used to compute batch size limits.
+    request_overhead: usize,
 }
 
 impl BigqueryRequestBuilder {
@@ -60,18 +60,27 @@ impl BigqueryRequestBuilder {
         let proto_schema = proto::ProtoSchema {
             proto_descriptor: Some(descriptor_proto),
         };
-        let schema_overhead = proto::append_rows_request::ProtoData {
-            writer_schema: Some(proto_schema.clone()),
-            rows: Some(proto::ProtoRows {
-                serialized_rows: vec![],
-            }),
+        let request_overhead = proto::AppendRowsRequest {
+            write_stream: write_stream.clone(),
+            offset: None,
+            trace_id: Default::default(),
+            missing_value_interpretations: Default::default(),
+            default_missing_value_interpretation: 0,
+            rows: Some(proto::append_rows_request::Rows::ProtoRows(
+                proto::append_rows_request::ProtoData {
+                    writer_schema: Some(proto_schema.clone()),
+                    rows: Some(proto::ProtoRows {
+                        serialized_rows: vec![],
+                    }),
+                },
+            )),
         }
         .encoded_len();
         Ok(Self {
             protobuf_serializer,
             write_stream,
             proto_schema,
-            schema_overhead,
+            request_overhead,
         })
     }
 
@@ -99,7 +108,7 @@ impl IncrementalRequestBuilder<Vec<Event>> for BigqueryRequestBuilder {
         &mut self,
         input: Vec<Event>,
     ) -> Vec<Result<(Self::Metadata, Self::Payload), Self::Error>> {
-        let max_serialized_rows_len = MAX_BATCH_PAYLOAD_SIZE - self.schema_overhead;
+        let max_serialized_rows_len = MAX_BATCH_PAYLOAD_SIZE - self.request_overhead;
         let mut results = vec![];
         let mut event_finalizers = EventFinalizers::DEFAULT;
         let mut chunk_metadata = RequestMetadataBuilder::default();
@@ -112,36 +121,41 @@ impl IncrementalRequestBuilder<Vec<Event>> for BigqueryRequestBuilder {
                 results.push(Err(BigqueryRequestBuilderError::ProtobufEncoding {
                     message: format!("{e}"),
                 }));
-            } else if bytes.len() > max_serialized_rows_len {
-                // A single event that exceeds the limit cannot be sent in any request, reject it immediately.
-                results.push(Err(BigqueryRequestBuilderError::ProtobufEncoding {
-                    message: format!(
-                        "Encoded event ({} bytes) exceeds the maximum allowed serialized rows size ({} bytes).",
-                        bytes.len(),
-                        max_serialized_rows_len
-                    ),
-                }));
             } else {
-                if bytes.len() + serialized_rows_len > max_serialized_rows_len {
-                    // Adding this event would overflow the current chunk so flush it first.
-                    let (size, proto_data) = self.build_proto_data(serialized_rows);
-                    results.push(Ok((
-                        BigqueryRequestMetadata {
-                            finalizers: event_finalizers,
-                            request_metadata: chunk_metadata.with_request_size(size),
-                        },
-                        proto_data,
-                    )));
-                    event_finalizers = EventFinalizers::DEFAULT;
-                    chunk_metadata = RequestMetadataBuilder::default();
-                    serialized_rows_len = 0;
-                    serialized_rows = vec![];
+                // Each row in ProtoRows.serialized_rows (field 1, wire type 2) is encoded as
+                // 1 byte tag + varint(len) bytes + payload bytes.
+                let row_framed_size = bytes.len() + 1 + encoded_len_varint(bytes.len() as u64);
+                if row_framed_size > max_serialized_rows_len {
+                    // A single event that exceeds the limit cannot be sent in any request, reject it immediately.
+                    results.push(Err(BigqueryRequestBuilderError::ProtobufEncoding {
+                        message: format!(
+                            "Encoded event ({} bytes) exceeds the maximum allowed serialized rows size ({} bytes).",
+                            bytes.len(),
+                            max_serialized_rows_len
+                        ),
+                    }));
+                } else {
+                    if row_framed_size + serialized_rows_len > max_serialized_rows_len {
+                        // Adding this event would overflow the current chunk so flush it first.
+                        let (size, proto_data) = self.build_proto_data(serialized_rows);
+                        results.push(Ok((
+                            BigqueryRequestMetadata {
+                                finalizers: event_finalizers,
+                                request_metadata: chunk_metadata.with_request_size(size),
+                            },
+                            proto_data,
+                        )));
+                        event_finalizers = EventFinalizers::DEFAULT;
+                        chunk_metadata = RequestMetadataBuilder::default();
+                        serialized_rows_len = 0;
+                        serialized_rows = vec![];
+                    }
+                    let current_event_finalizers = event.take_finalizers();
+                    chunk_metadata.track_event(event);
+                    event_finalizers.merge(current_event_finalizers);
+                    serialized_rows_len += row_framed_size;
+                    serialized_rows.push(bytes.into());
                 }
-                let current_event_finalizers = event.take_finalizers();
-                chunk_metadata.track_event(event);
-                event_finalizers.merge(current_event_finalizers);
-                serialized_rows_len += bytes.len();
-                serialized_rows.push(bytes.into());
             }
         }
         // flush the final chunk (if there are any events left)

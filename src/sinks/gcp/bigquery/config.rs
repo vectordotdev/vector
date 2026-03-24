@@ -133,6 +133,11 @@ impl SinkConfig for BigqueryConfig {
 
         // Configure auth and make sure it's constantly up-to-date
         let auth = self.auth.build(Scope::BigQueryInsertdata).await?;
+        if matches!(auth, GcpAuthenticator::ApiKey(_)) {
+            return Err(
+                "GCP BigQuery sink does not support API key authentication. Use service account credentials or workload identity instead".into(),
+            );
+        }
         auth.spawn_regenerate_token();
 
         // Create the gRPC channel; tonic channels are cheap to clone and share the underlying connection.
