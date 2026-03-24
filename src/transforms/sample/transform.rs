@@ -89,6 +89,32 @@ impl SampleMode {
             } => hash <= *hash_ratio_threshold,
         }
     }
+
+    fn hash_with_ratio(value: &[u8], ratio: f64) -> bool {
+        let hash = seahash::hash(value);
+        let hash_ratio_threshold = (ratio * (u64::MAX as u128) as f64) as u64;
+        hash <= hash_ratio_threshold
+    }
+}
+
+enum EventSampleMode {
+    Ratio(f64),
+    Rate(u64),
+}
+
+#[derive(Clone, Default)]
+pub struct DynamicSampleFields {
+    pub ratio_field: Option<String>,
+    pub rate_field: Option<String>,
+}
+
+impl fmt::Display for EventSampleMode {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::Ratio(ratio) => write!(f, "{ratio}"),
+            Self::Rate(rate) => write!(f, "{rate}"),
+        }
+    }
 }
 
 impl fmt::Display for SampleMode {
@@ -105,7 +131,11 @@ impl fmt::Display for SampleMode {
 #[derive(Clone)]
 pub struct Sample {
     name: String,
-    rate: SampleMode,
+    static_mode: SampleMode,
+    ratio_field: Option<String>,
+    rate_field: Option<String>,
+    dynamic_values: HashMap<Option<String>, f64>,
+    dynamic_counters: HashMap<Option<String>, u64>,
     key_field: Option<String>,
     group_by: Option<Template>,
     exclude: Option<Condition>,
@@ -116,7 +146,7 @@ impl Sample {
     // This function is dead code when the feature flag `transforms-impl-sample` is specified but not
     // `transforms-sample`.
     #![allow(dead_code)]
-    pub const fn new(
+    pub fn new(
         name: String,
         rate: SampleMode,
         key_field: Option<String>,
@@ -124,9 +154,33 @@ impl Sample {
         exclude: Option<Condition>,
         sample_rate_key: OptionalValuePath,
     ) -> Self {
-        Self {
+        Self::new_with_dynamic(
             name,
             rate,
+            DynamicSampleFields::default(),
+            key_field,
+            group_by,
+            exclude,
+            sample_rate_key,
+        )
+    }
+
+    pub fn new_with_dynamic(
+        name: String,
+        static_mode: SampleMode,
+        dynamic_fields: DynamicSampleFields,
+        key_field: Option<String>,
+        group_by: Option<Template>,
+        exclude: Option<Condition>,
+        sample_rate_key: OptionalValuePath,
+    ) -> Self {
+        Self {
+            name,
+            static_mode,
+            ratio_field: dynamic_fields.ratio_field,
+            rate_field: dynamic_fields.rate_field,
+            dynamic_values: HashMap::default(),
+            dynamic_counters: HashMap::default(),
             key_field,
             group_by,
             exclude,
@@ -136,9 +190,107 @@ impl Sample {
 
     #[cfg(test)]
     pub fn ratio(&self) -> f64 {
-        match self.rate {
-            SampleMode::Rate { rate, .. } => 1.0f64 / rate as f64,
-            SampleMode::Ratio { ratio, .. } => ratio,
+        match &self.static_mode {
+            SampleMode::Rate { rate, .. } => 1.0f64 / *rate as f64,
+            SampleMode::Ratio { ratio, .. } => *ratio,
+        }
+    }
+
+    fn increment_dynamic_ratio(
+        &mut self,
+        ratio: f64,
+        group_by_key: Option<String>,
+        value: Option<&Value>,
+    ) -> bool {
+        let threshold_exceeded = {
+            let current_value = self
+                .dynamic_values
+                .entry(group_by_key)
+                .or_insert(1.0 - ratio);
+            let incremented_value = *current_value + ratio;
+            *current_value = if incremented_value >= 1.0 {
+                incremented_value - 1.0
+            } else {
+                incremented_value
+            };
+            incremented_value >= 1.0
+        };
+
+        if let Some(value) = value {
+            SampleMode::hash_with_ratio(value.to_string_lossy().as_bytes(), ratio)
+        } else {
+            threshold_exceeded
+        }
+    }
+
+    fn event_ratio(&self, event: &Event) -> Option<f64> {
+        let ratio_field = self.ratio_field.as_ref()?;
+        let value = self.get_event_value(event, ratio_field.as_str())?;
+
+        let ratio = match value {
+            Value::Integer(value) => *value as f64,
+            Value::Float(value) => value.into_inner(),
+            Value::Bytes(bytes) => std::str::from_utf8(bytes).ok()?.parse::<f64>().ok()?,
+            _ => return None,
+        };
+
+        (ratio > 0.0 && ratio <= 1.0).then_some(ratio)
+    }
+
+    fn event_rate(&self, event: &Event) -> Option<u64> {
+        let rate_field = self.rate_field.as_ref()?;
+        let value = self.get_event_value(event, rate_field.as_str())?;
+
+        match value {
+            Value::Integer(value) => (*value > 0).then_some(*value as u64),
+            Value::Float(value) => {
+                let value = value.into_inner();
+                (value.is_finite()
+                    && value > 0.0
+                    && value.fract() == 0.0
+                    && value <= u64::MAX as f64)
+                    .then_some(value as u64)
+            }
+            Value::Bytes(bytes) => std::str::from_utf8(bytes)
+                .ok()?
+                .parse::<u64>()
+                .ok()
+                .filter(|value| *value > 0),
+            _ => None,
+        }
+    }
+
+    fn get_event_value<'a>(&self, event: &'a Event, path: &str) -> Option<&'a Value> {
+        match event {
+            Event::Log(event) => event.parse_path_and_get_value(path).ok().flatten(),
+            Event::Trace(event) => event.parse_path_and_get_value(path).ok().flatten(),
+            Event::Metric(_) => panic!("component can never receive metric events"),
+        }
+    }
+
+    fn event_sample_mode(&self, event: &Event) -> Option<EventSampleMode> {
+        self.event_ratio(event)
+            .map(EventSampleMode::Ratio)
+            .or_else(|| self.event_rate(event).map(EventSampleMode::Rate))
+    }
+
+    fn increment_dynamic_rate(
+        &mut self,
+        rate: u64,
+        group_by_key: Option<String>,
+        value: Option<&Value>,
+    ) -> bool {
+        let threshold_exceeded = {
+            let counter_value = self.dynamic_counters.entry(group_by_key).or_default();
+            let old_counter_value = *counter_value;
+            *counter_value += 1;
+            old_counter_value.is_multiple_of(rate)
+        };
+
+        if let Some(value) = value {
+            seahash::hash(value.to_string_lossy().as_bytes()).is_multiple_of(rate)
+        } else {
+            threshold_exceeded
         }
     }
 }
@@ -188,7 +340,23 @@ impl FunctionTransform for Sample {
             .ok()
         });
 
-        if self.rate.increment(group_by_key, value) {
+        let event_sample_mode = self.event_sample_mode(&event);
+        let sample_rate = event_sample_mode
+            .as_ref()
+            .map(ToString::to_string)
+            .unwrap_or_else(|| self.static_mode.to_string());
+
+        let should_sample = match event_sample_mode {
+            Some(EventSampleMode::Ratio(ratio)) => {
+                self.increment_dynamic_ratio(ratio, group_by_key, value)
+            }
+            Some(EventSampleMode::Rate(rate)) => {
+                self.increment_dynamic_rate(rate, group_by_key, value)
+            }
+            None => self.static_mode.increment(group_by_key, value),
+        };
+
+        if should_sample {
             if let Some(path) = &self.sample_rate_key.path {
                 match event {
                     Event::Log(ref mut event) => {
@@ -197,11 +365,11 @@ impl FunctionTransform for Sample {
                             event,
                             Some(LegacyKey::Overwrite(path)),
                             path,
-                            self.rate.to_string(),
+                            sample_rate.clone(),
                         );
                     }
                     Event::Trace(ref mut event) => {
-                        event.insert(&OwnedTargetPath::event(path.clone()), self.rate.to_string());
+                        event.insert(&OwnedTargetPath::event(path.clone()), sample_rate);
                     }
                     Event::Metric(_) => panic!("component can never receive metric events"),
                 };
