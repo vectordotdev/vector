@@ -2,9 +2,8 @@
 #
 # This workflow cleans up old images from GitHub Container Registry
 # to prevent unlimited storage growth. It runs weekly and removes:
-# 1. Untagged images from all packages (intermediate build artifacts)
-# 2. Old dated nightly tags for vector (keeps last 30 days)
-# 3. Old test-runner versions (keeps 5 most recent)
+# 1. Old dated nightly tags for vector (keeps last ~8)
+# 2. Old test-runner versions (keeps 5 most recent)
 
 name: Cleanup GHCR Images
 
@@ -18,31 +17,24 @@ permissions:
   contents: read  # Restrictive default
 
 jobs:
-  cleanup:
+  cleanup-vector-nightlies:
     runs-on: ubuntu-latest
     permissions:
       packages: write   # Required to delete package versions from GHCR
     steps:
-      - name: Delete untagged vector images
+      - name: Delete old dated nightly vector images
         uses: actions/delete-package-versions@e5bc658cc4c965c472efe991f8beea3981499c55 # v5.0.0
         with:
           package-name: vector
           package-type: container
-          min-versions-to-keep: 0
-          delete-only-untagged-versions: true
-        continue-on-error: true
+          min-versions-to-keep: 8
+          ignore-versions: '^(nightly$|\d+\.\d+)'
 
-      - name: Delete old dated nightly vector images
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          CUTOFF=$(date -d '30 days ago' --iso-8601=seconds)
-          gh api --paginate "/orgs/vectordotdev/packages/container/vector/versions" \
-            --jq ".[] | select(.metadata.container.tags | map(test(\"^[0-9]+\\\\.[0-9]+\")) | any | not) | select(.metadata.container.tags | map(test(\"^nightly-[0-9]{4}-[0-9]{2}-[0-9]{2}\")) | any) | select(.created_at < \"$CUTOFF\") | .id" \
-          | while read -r id; do
-              gh api --method DELETE "/orgs/vectordotdev/packages/container/vector/versions/$id" || true
-            done
-
+  cleanup-test-runner:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write   # Required to delete package versions from GHCR
+    steps:
       - name: Delete old test-runner images
         uses: actions/delete-package-versions@e5bc658cc4c965c472efe991f8beea3981499c55 # v5.0.0
         with:
@@ -50,4 +42,3 @@ jobs:
           package-type: container
           min-versions-to-keep: 5
           num-old-versions-to-delete: 100
-        continue-on-error: true
