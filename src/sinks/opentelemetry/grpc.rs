@@ -36,7 +36,7 @@ use vector_lib::{
 };
 
 use crate::{
-    config::{AcknowledgementsConfig, Input, SinkContext},
+    config::{AcknowledgementsConfig, Input, SinkContext, SinkHealthcheckOptions},
     event::{Event, EventFinalizers, EventStatus, Finalizable},
     http::build_proxy_connector,
     internal_events::EndpointBytesSent,
@@ -147,9 +147,9 @@ impl GrpcSinkConfig {
 
         let use_gzip = self.compression == GrpcCompression::Gzip;
         let client = new_grpc_client(&tls, cx.proxy())?;
-        let service = OtlpGrpcService::new(client, uri, use_gzip);
+        let service = OtlpGrpcService::new(client.clone(), uri.clone(), use_gzip);
 
-        let healthcheck = Box::pin(async move { Ok(()) });
+        let healthcheck = Box::pin(grpc_healthcheck(client, uri, cx.healthcheck));
 
         let request_settings = self.request.tower.into_settings();
         let batch_settings = self.batch.into_batcher_settings()?;
@@ -181,6 +181,45 @@ fn new_grpc_client(
 ) -> crate::Result<hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>> {
     let proxy = build_proxy_connector(tls_settings.clone(), proxy_config)?;
     Ok(hyper::Client::builder().http2_only(true).build(proxy))
+}
+
+async fn grpc_healthcheck(
+    client: hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>,
+    uri: Uri,
+    options: SinkHealthcheckOptions,
+) -> crate::Result<()> {
+    if !options.enabled {
+        return Ok(());
+    }
+
+    use tonic::Code;
+    use tonic_health::pb::{HealthCheckRequest, health_client::HealthClient};
+
+    let svc = HyperSvc {
+        uri,
+        client,
+    };
+    let mut health_client = HealthClient::new(svc);
+
+    match health_client
+        .check(HealthCheckRequest {
+            service: String::new(),
+        })
+        .await
+    {
+        Ok(response) => {
+            use tonic_health::pb::health_check_response::ServingStatus;
+            let status = response.into_inner().status;
+            if status == ServingStatus::Serving as i32 {
+                Ok(())
+            } else {
+                Err(format!("gRPC collector reported non-serving status: {status}").into())
+            }
+        }
+        // Server is reachable but does not implement the health protocol — treat as healthy.
+        Err(status) if status.code() == Code::Unimplemented => Ok(()),
+        Err(status) => Err(Box::new(OtlpGrpcError::Request { source: status })),
+    }
 }
 
 // ── Retry logic ──────────────────────────────────────────────────────────────
