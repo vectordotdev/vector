@@ -118,6 +118,7 @@ pub(crate) fn build_warp_filter(
     );
     let trace_filters = build_warp_trace_filter(
         acknowledgements,
+        log_namespace,
         out.clone(),
         bytes_received,
         events_received,
@@ -307,6 +308,7 @@ fn build_warp_metrics_filter(
 
 fn build_warp_trace_filter(
     acknowledgements: bool,
+    log_namespace: LogNamespace,
     source_sender: SourceSender,
     bytes_received: Registered<BytesReceived>,
     events_received: Registered<EventsReceived>,
@@ -330,14 +332,14 @@ fn build_warp_trace_filter(
                     parse_with_deserializer(
                         d,
                         decoded_body,
-                        LogNamespace::default(),
+                        log_namespace,
                         &events_received,
                     )
                 } else {
                     decode_trace_body(decoded_body, &events_received)
                 }
                 .map(|mut events| {
-                    enrich_events(&mut events, &headers_cfg, &headers, LogNamespace::default());
+                    enrich_events(&mut events, &headers_cfg, &headers, log_namespace);
                     events
                 })
             })
