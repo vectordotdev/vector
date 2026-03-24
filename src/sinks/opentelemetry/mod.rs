@@ -22,7 +22,7 @@ use crate::{
     tls::TlsConfig,
 };
 
-pub use grpc::GrpcSinkConfig;
+pub use grpc::{GrpcCompression, GrpcSinkConfig};
 
 /// Transport protocol for the OpenTelemetry sink.
 #[configurable_component]
@@ -154,9 +154,19 @@ impl SinkConfig for OpenTelemetryConfig {
                 config.build(cx).await
             }
             OtlpProtocol::Grpc { batch } => {
+                let grpc_compression = match self.compression {
+                    Compression::None => GrpcCompression::None,
+                    Compression::Gzip(_) => GrpcCompression::Gzip,
+                    other => {
+                        return Err(format!(
+                            "gRPC transport only supports 'none' or 'gzip' compression, got '{other}'"
+                        )
+                        .into())
+                    }
+                };
                 let config = GrpcSinkConfig {
                     uri: self.uri.clone(),
-                    compression: self.compression,
+                    compression: grpc_compression,
                     batch: *batch,
                     request: self.request.clone(),
                     tls: self.tls.clone(),
@@ -169,9 +179,7 @@ impl SinkConfig for OpenTelemetryConfig {
 
     fn input(&self) -> Input {
         match &self.protocol {
-            OtlpProtocol::Http { encoding, .. } => {
-                Input::new(encoding.config().1.input_type())
-            }
+            OtlpProtocol::Http { encoding, .. } => Input::new(encoding.config().1.input_type()),
             OtlpProtocol::Grpc { .. } => Input::all(),
         }
     }

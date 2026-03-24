@@ -43,13 +43,28 @@ use crate::{
     sinks::{
         Healthcheck, VectorSink,
         util::{
-            BatchConfig, Compression, RealtimeEventBasedDefaultBatchSettings, ServiceBuilderExt,
+            BatchConfig, RealtimeEventBasedDefaultBatchSettings, ServiceBuilderExt,
             SinkBuilderExt, StreamSink, UriSerde, http::RequestConfig,
             metadata::RequestMetadataBuilder, retries::RetryLogic,
         },
     },
     tls::{MaybeTlsSettings, TlsConfig},
 };
+
+/// Compression codec for gRPC transport.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum GrpcCompression {
+    /// No compression.
+    #[default]
+    None,
+
+    /// [Gzip][gzip] compression.
+    ///
+    /// [gzip]: https://www.gzip.org/
+    Gzip,
+}
 
 pub(super) fn with_default_scheme(uri: Uri, tls: bool) -> crate::Result<Uri> {
     if uri.scheme().is_none() {
@@ -95,12 +110,9 @@ pub struct GrpcSinkConfig {
     #[configurable(metadata(docs::examples = "http://localhost:4317"))]
     pub uri: UriSerde,
 
-    /// Compression codec for outgoing gRPC requests.
-    ///
-    /// Only `none` and `gzip` are supported for gRPC transport.
     #[configurable(derived)]
     #[serde(default)]
-    pub compression: Compression,
+    pub compression: GrpcCompression,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -133,16 +145,7 @@ impl GrpcSinkConfig {
             MaybeTlsSettings::Raw(())
         };
 
-        let use_gzip = match self.compression {
-            Compression::None => false,
-            Compression::Gzip(_) => true,
-            other => {
-                return Err(format!(
-                    "gRPC transport only supports 'none' or 'gzip' compression, got '{other}'"
-                )
-                .into())
-            }
-        };
+        let use_gzip = self.compression == GrpcCompression::Gzip;
         let client = new_grpc_client(&tls, cx.proxy())?;
         let service = OtlpGrpcService::new(client, uri, use_gzip);
 
