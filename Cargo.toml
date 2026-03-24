@@ -20,13 +20,6 @@ test = false
 bench = false
 
 [[bin]]
-name = "graphql-schema"
-path = "src/api/schema/gen.rs"
-test = false
-bench = false
-required-features = ["default-no-api-client"]
-
-[[bin]]
 name = "secret-backend-example"
 path = "src/config/loading/secret_backend_example.rs"
 test = false
@@ -155,14 +148,15 @@ chrono-tz = { version = "0.10.4", default-features = false, features = ["serde"]
 clap = { version = "4.5.60", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
 clap_complete = "4.5.66"
 colored = { version = "3.1.1", default-features = false }
-const-str = { version = "1.0.0", default-features = false }
+const-str = { version = "1.1.0", default-features = false }
+criterion = "0.8"
 crossbeam-utils = { version = "0.8.21", default-features = false }
 darling = { version = "0.20.11", default-features = false, features = ["suggestions"] }
 dashmap = { version = "6.1.0", default-features = false }
 derivative = { version = "2.2.0", default-features = false }
 exitcode = { version = "1.1.2", default-features = false }
 flate2 = { version = "1.1.2", default-features = false, features = ["zlib-rs"] }
-futures = { version = "0.3.31", default-features = false, features = ["compat", "io-compat", "std"], package = "futures" }
+futures = { version = "0.3.31", default-features = false, features = ["std"] }
 futures-util = { version = "0.3.29", default-features = false }
 glob = { version = "0.3.3", default-features = false }
 hickory-proto = { version = "0.25.2", default-features = false, features = ["dnssec-ring"] }
@@ -185,6 +179,7 @@ prost = { version = "0.12", default-features = false, features = ["std"] }
 prost-build = { version = "0.12", default-features = false }
 prost-reflect = { version = "0.14", features = ["serde"], default-features = false }
 prost-types = { version = "0.12", default-features = false }
+quickcheck = { version = "1.1.0" }
 rand = { version = "0.9.2", default-features = false, features = ["small_rng", "thread_rng"] }
 rand_distr = { version = "0.5.1", default-features = false }
 regex = { version = "1.12.3", default-features = false, features = ["std", "perf"] }
@@ -205,6 +200,7 @@ toml = { version = "0.9.8", default-features = false, features = ["serde", "disp
 tonic = { version = "0.11", default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
 tonic-build = { version = "0.11", default-features = false, features = ["transport", "prost"] }
 tonic-health = { version = "0.11", default-features = false }
+tonic-reflection = { version = "0.11", default-features = false, features = ["server"] }
 tracing = { version = "0.1.44", default-features = false }
 tracing-subscriber = { version = "0.3.22", default-features = false, features = ["fmt"]  }
 url = { version = "2.5.4", default-features = false, features = ["serde"] }
@@ -342,10 +338,6 @@ lapin = { version = "4.3.0", default-features = false, features = ["tokio", "nat
 async-rs = { version = "0.8", default-features = false, features = ["tokio"], optional = true }
 deadpool = { version = "0.12.2", default-features = false, features = ["managed", "rt_tokio_1"], optional = true }
 
-# API
-async-graphql = { version = "7.0.17", default-features = false, optional = true, features = ["chrono", "playground"] }
-async-graphql-warp = { version = "7.0.17", default-features = false, optional = true }
-
 # Opentelemetry
 
 hex = { version = "0.4.3", default-features = false, optional = true }
@@ -406,7 +398,7 @@ lru = { version = "0.16.3", default-features = false }
 maxminddb = { version = "0.27.0", default-features = false, optional = true, features = ["simdutf8"] }
 md-5 = { version = "0.10", default-features = false, optional = true }
 mongodb = { version = "3.3.0", default-features = false, optional = true, features = ["compat-3-0-0", "dns-resolver", "rustls-tls"] }
-async-nats = { version = "0.42.0", default-features = false, optional = true, features = ["ring", "websockets"] }
+async-nats = { version = "0.46.0", default-features = false, optional = true, features = ["ring", "websockets", "jetstream", "nkeys"] }
 nkeys = { version = "0.4.5", default-features = false, optional = true }
 nom = { workspace = true, optional = true }
 notify = { version = "8.1.0", default-features = false, features = ["macos_fsevent"] }
@@ -419,7 +411,7 @@ pulsar = { version = "6.7.0", default-features = false, features = ["tokio-runti
 quick-junit = { version = "0.5.1" }
 rand.workspace = true
 rand_distr.workspace = true
-rdkafka = { version = "0.38.0", default-features = false, features = ["curl-static", "tokio", "libz", "ssl", "zstd"], optional = true }
+rdkafka = { version = "0.39.0", default-features = false, features = ["curl-static", "tokio", "libz", "ssl", "zstd"], optional = true }
 redis = { version = "0.32.4", default-features = false, features = ["connection-manager", "sentinel", "tokio-comp", "tokio-native-tls-comp"], optional = true }
 regex.workspace = true
 roaring = { version = "0.11.2", default-features = false, features = ["std"], optional = true }
@@ -440,6 +432,7 @@ toml.workspace = true
 hickory-proto = { workspace = true, optional = true }
 tonic = { workspace = true, optional = true }
 tonic-health = { workspace = true, optional = true }
+tonic-reflection = { workspace = true, optional = true }
 thread_local = { version = "1.1.9", default-features = false, optional = true }
 typetag = { version = "0.2.20", default-features = false }
 url.workspace = true
@@ -478,12 +471,12 @@ approx = "0.5.1"
 assert_cmd = { version = "2.0.17", default-features = false }
 aws-smithy-runtime = { version = "1.8.3", default-features = false, features = ["tls-rustls"] }
 base64 = "0.22.1"
-criterion = { version = "0.7.0", features = ["html_reports", "async_tokio"] }
+criterion = { workspace = true, features = ["html_reports", "async_tokio"] }
 itertools.workspace = true
 libc.workspace = true
 mock_instant.workspace = true
 proptest.workspace = true
-quickcheck = "1.0.3"
+quickcheck.workspace = true
 reqwest.workspace = true
 rstest = { version = "0.26.1" }
 serial_test.workspace = true
@@ -563,9 +556,12 @@ docker = ["dep:bollard", "dep:dirs-next"]
 
 # API
 api = [
-  "dep:async-graphql",
-  "dep:async-graphql-warp",
   "dep:base64",
+  "dep:tonic",
+  "dep:tonic-reflection",
+  "dep:prost",
+  "dep:prost-types",
+  "protobuf-build",
   "vector-lib/api",
 ]
 
@@ -1076,6 +1072,7 @@ vector-api-tests = [
   "sources-demo_logs",
   "transforms-log_to_metric",
   "transforms-remap",
+  "transforms-route",
   "sinks-blackhole"
 ]
 vector-unit-test-tests = [
