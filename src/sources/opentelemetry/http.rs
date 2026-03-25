@@ -281,12 +281,7 @@ fn build_warp_metrics_filter(
             .and_then(|decoded_body| {
                 bytes_received.emit(ByteSize(decoded_body.len()));
                 if let Some(d) = deserializer.as_ref() {
-                    parse_with_deserializer(
-                        d,
-                        decoded_body,
-                        log_namespace,
-                        &events_received,
-                    )
+                    parse_with_deserializer(d, decoded_body, log_namespace, &events_received)
                 } else {
                     decode_metrics_body(decoded_body, &events_received)
                 }
