@@ -460,6 +460,7 @@ mod tests {
 
     use futures::{StreamExt, future::ready};
     use futures_util::stream;
+    use tokio::sync::broadcast::error::TryRecvError;
     use tokio::time;
 
     use vector_lib::{
@@ -636,6 +637,71 @@ mod tests {
         memory.scan(writer);
 
         // The value is not present anymore
+        assert!(
+            memory
+                .find_table_rows(Case::Sensitive, &[condition], None, None, None)
+                .unwrap()
+                .pop()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn exports_expired_items_via_pending_removals() {
+        let ttl = 100;
+        let memory = Memory::new(build_memory_config(|c| {
+            c.ttl = ttl;
+            c.source_config = Some(MemorySourceConfig {
+                export_interval: None,
+                export_batch_size: None,
+                remove_after_export: false,
+                export_expired_items: true,
+                source_key: "test".to_string(),
+            });
+        }));
+
+        // Insert an already-expired entry directly
+        {
+            let mut handle = memory.write_handle.lock().unwrap();
+            handle.write_handle.update(
+                "expired_key".to_string(),
+                MemoryEntry {
+                    value: "\"42\"".to_string(),
+                    update_time: Instant::now() - Duration::from_secs(ttl + 1),
+                    ttl,
+                },
+            );
+            handle.write_handle.publish();
+        }
+
+        // Subscribe before triggering the scan so we don't miss the send
+        let mut rx = memory.subscribe_to_expired_items();
+
+        // Force scan — this populates pending_removals, then flush() sends them and clears
+        let writer = memory.write_handle.lock().unwrap();
+        memory.scan(writer);
+
+        // The expired item should have been sent exactly once on the channel
+        let batch = rx
+            .try_recv()
+            .expect("expected expired items batch on channel");
+        assert_eq!(batch.len(), 1);
+        assert_eq!(batch[0].key, "expired_key");
+
+        // Channel should be empty now (no double-send)
+        assert!(matches!(rx.try_recv(), Err(TryRecvError::Empty)));
+
+        // pending_removals must have been cleared — a second scan on the now-empty
+        // map should not produce another batch
+        let writer = memory.write_handle.lock().unwrap();
+        memory.scan(writer);
+        assert!(matches!(rx.try_recv(), Err(TryRecvError::Empty)));
+
+        // The entry must be gone from the map after publish
+        let condition = Condition::Equals {
+            field: "key",
+            value: Value::from("expired_key"),
+        };
         assert!(
             memory
                 .find_table_rows(Case::Sensitive, &[condition], None, None, None)
