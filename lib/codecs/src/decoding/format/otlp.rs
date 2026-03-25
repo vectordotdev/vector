@@ -181,7 +181,7 @@ impl Deserializer for OtlpDeserializer {
                     }
                 }
                 OtlpSignalType::Traces => {
-                    // TODO: https://github.com/vectordotdev/vector/issues/25045
+                    // TODO: <https://github.com/vectordotdev/vector/issues/25045>
                     if let Ok(mut events) =
                         self.traces_deserializer.parse(bytes.clone(), log_namespace)
                         && let Some(Event::Log(log)) = events.first()
