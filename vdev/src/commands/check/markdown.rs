@@ -14,7 +14,7 @@ impl Cli {
             return Ok(());
         }
 
-        let args: Vec<&str> = vec!["--config", ".markdownlintrc"]
+        let args: Vec<&str> = vec!["--config", ".markdownlint.jsonc"]
             .into_iter()
             .chain(files.iter().map(String::as_str))
             .collect();

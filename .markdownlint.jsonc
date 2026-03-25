@@ -1,3 +1,7 @@
+// This config is auto-detected by markdownlint-cli2 (used by Zed, VS Code, and most modern editors).
+// The CI check currently uses markdownlint-cli (legacy). Migrate CI to markdownlint-cli2 to unify tooling:
+//   npm install -g markdownlint-cli2
+//   markdownlint-cli2 "**/*.md"
 {
   "default": true,
 
