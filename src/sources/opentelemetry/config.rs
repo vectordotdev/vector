@@ -208,7 +208,8 @@ pub struct HttpConfig {
     ///
     /// Specifying "*" results in all headers included in the event.
     ///
-    /// These headers are not included in the JSON payload if a field with a conflicting name exists.
+    /// For log events in legacy namespace mode, headers are not included if a field with a conflicting name exists.
+    /// For metrics and traces, headers are always added to event metadata.
     #[serde(default)]
     #[configurable(metadata(docs::examples = "User-Agent"))]
     #[configurable(metadata(docs::examples = "X-My-Custom-Header"))]
