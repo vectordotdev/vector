@@ -105,12 +105,12 @@ Vector maintains special tags that are automatically updated whenever Vector is
 
 | Version          | URL                                                      |
 |:-----------------|:---------------------------------------------------------|
-| Latest major     | `timberio/vector:latest-alpine`               |
-| Latest minor     | `timberio/vector:<MAJOR>.X-alpine`            |
-| Latest patch     | `timberio/vector:<MAJOR.MINOR>.X-alpine`      |
-| Specific version | `timberio/vector:<MAJOR.MINOR.PATCH>-alpine`  |
-| Latest nightly   | `timberio/vector:nightly-alpine`              |
-| Specific nightly | `timberio/vector:nightly-<YYYY-MM-DD>-alpine` |
+| Latest major     | `timberio/vector:latest-alpine`                          |
+| Latest minor     | `timberio/vector:<MAJOR>.X-alpine`                       |
+| Latest patch     | `timberio/vector:<MAJOR.MINOR>.X-alpine`                 |
+| Specific version | `timberio/vector:<MAJOR.MINOR.PATCH>-alpine`             |
+| Latest nightly   | `timberio/vector:nightly-alpine`                         |
+| Specific nightly | `timberio/vector:nightly-<YYYY-MM-DD>-alpine`            |
 
 ### Source Files
 
