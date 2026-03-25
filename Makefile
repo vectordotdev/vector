@@ -522,6 +522,10 @@ check-scripts: ## Check that scripts do not have common mistakes
 check-deny: ## Check advisories licenses and sources for crate dependencies
 	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) check deny
 
+.PHONY: check-deny-licenses
+check-deny-licenses: ## Check licenses for crate dependencies
+	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) check deny --licenses-only
+
 .PHONY: check-events
 check-events: ## Check that events satisfy patterns set in https://github.com/vectordotdev/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
 	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) check events
