@@ -41,6 +41,11 @@ pub enum SampleError {
         "Exactly one value must be provided for either 'rate' or 'ratio' to configure static sampling"
     ))]
     MissingStaticConfiguration,
+
+    #[snafu(display(
+        "'key_field' cannot be combined with 'ratio_field' or 'rate_field' because dynamic values can vary per event and break key-based coherence"
+    ))]
+    InvalidKeyFieldDynamicCombination,
 }
 
 /// Configuration for the `sample` transform.
@@ -96,6 +101,8 @@ pub struct SampleConfig {
     ///
     /// This can be useful to, for example, ensure that all logs for a given transaction are
     /// sampled together, but that overall `1/N` transactions are sampled.
+    ///
+    /// This option cannot be combined with `ratio_field` or `rate_field`.
     #[configurable(metadata(docs::examples = "message"))]
     pub key_field: Option<String>,
 
@@ -122,6 +129,10 @@ impl SampleConfig {
     fn sample_rate(&self) -> Result<SampleMode, SampleError> {
         if self.ratio_field.is_some() && self.rate_field.is_some() {
             return Err(SampleError::InvalidDynamicConfiguration);
+        }
+
+        if self.key_field.is_some() && (self.ratio_field.is_some() || self.rate_field.is_some()) {
+            return Err(SampleError::InvalidKeyFieldDynamicCombination);
         }
 
         if self.rate.is_some() && self.ratio.is_some() {
@@ -293,6 +304,22 @@ mod tests {
             ratio_field: Some("sample_rate".to_string()),
             rate_field: Some("sample_rate_n".to_string()),
             key_field: None,
+            sample_rate_key: super::default_sample_rate_key(),
+            group_by: None,
+            exclude: None,
+        };
+
+        assert!(config.validate(&crate::schema::Definition::any()).is_err());
+    }
+
+    #[test]
+    fn rejects_key_field_with_dynamic_configuration() {
+        let config = SampleConfig {
+            rate: Some(10),
+            ratio: None,
+            ratio_field: Some("sample_ratio".to_string()),
+            rate_field: None,
+            key_field: Some("trace_id".to_string()),
             sample_rate_key: super::default_sample_rate_key(),
             group_by: None,
             exclude: None,

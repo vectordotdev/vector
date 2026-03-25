@@ -134,8 +134,6 @@ pub struct Sample {
     static_mode: SampleMode,
     ratio_field: Option<String>,
     rate_field: Option<String>,
-    dynamic_values: HashMap<Option<String>, f64>,
-    dynamic_counters: HashMap<Option<String>, u64>,
     key_field: Option<String>,
     group_by: Option<Template>,
     exclude: Option<Condition>,
@@ -179,8 +177,6 @@ impl Sample {
             static_mode,
             ratio_field: dynamic_fields.ratio_field,
             rate_field: dynamic_fields.rate_field,
-            dynamic_values: HashMap::default(),
-            dynamic_counters: HashMap::default(),
             key_field,
             group_by,
             exclude,
@@ -196,30 +192,11 @@ impl Sample {
         }
     }
 
-    fn increment_dynamic_ratio(
-        &mut self,
-        ratio: f64,
-        group_by_key: Option<String>,
-        value: Option<&Value>,
-    ) -> bool {
-        let threshold_exceeded = {
-            let current_value = self
-                .dynamic_values
-                .entry(group_by_key)
-                .or_insert(1.0 - ratio);
-            let incremented_value = *current_value + ratio;
-            *current_value = if incremented_value >= 1.0 {
-                incremented_value - 1.0
-            } else {
-                incremented_value
-            };
-            incremented_value >= 1.0
-        };
-
+    fn sample_with_dynamic_ratio(ratio: f64, value: Option<&Value>) -> bool {
         if let Some(value) = value {
             SampleMode::hash_with_ratio(value.to_string_lossy().as_bytes(), ratio)
         } else {
-            threshold_exceeded
+            rand::random::<f64>() < ratio
         }
     }
 
@@ -274,23 +251,11 @@ impl Sample {
             .or_else(|| self.event_rate(event).map(EventSampleMode::Rate))
     }
 
-    fn increment_dynamic_rate(
-        &mut self,
-        rate: u64,
-        group_by_key: Option<String>,
-        value: Option<&Value>,
-    ) -> bool {
-        let threshold_exceeded = {
-            let counter_value = self.dynamic_counters.entry(group_by_key).or_default();
-            let old_counter_value = *counter_value;
-            *counter_value += 1;
-            old_counter_value.is_multiple_of(rate)
-        };
-
+    fn sample_with_dynamic_rate(rate: u64, value: Option<&Value>) -> bool {
         if let Some(value) = value {
             seahash::hash(value.to_string_lossy().as_bytes()).is_multiple_of(rate)
         } else {
-            threshold_exceeded
+            rand::random::<f64>() < (1.0 / rate as f64)
         }
     }
 }
@@ -347,12 +312,8 @@ impl FunctionTransform for Sample {
             .unwrap_or_else(|| self.static_mode.to_string());
 
         let should_sample = match event_sample_mode {
-            Some(EventSampleMode::Ratio(ratio)) => {
-                self.increment_dynamic_ratio(ratio, group_by_key, value)
-            }
-            Some(EventSampleMode::Rate(rate)) => {
-                self.increment_dynamic_rate(rate, group_by_key, value)
-            }
+            Some(EventSampleMode::Ratio(ratio)) => Self::sample_with_dynamic_ratio(ratio, value),
+            Some(EventSampleMode::Rate(rate)) => Self::sample_with_dynamic_rate(rate, value),
             None => self.static_mode.increment(group_by_key, value),
         };
 
