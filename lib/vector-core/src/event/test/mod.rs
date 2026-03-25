@@ -52,3 +52,25 @@ fn event_iteration_order() {
         ]
     );
 }
+
+#[test]
+fn special_fields_iterate_and_get_round_trip() {
+    let mut log = LogEvent::default();
+    log.insert("\"Ke$ha\"", "timber");
+    log.insert("normal", "value");
+    log.insert("a.nested.path", 42);
+    log.insert(
+        "arr",
+        Value::Array(vec![Value::Integer(1), Value::Integer(2)]),
+    );
+
+    // Every path returned by the iterator should resolve back to the same value via get().
+    for (path, expected_value) in log.all_event_fields().unwrap() {
+        let actual = log.get(&path);
+        assert_eq!(
+            actual,
+            Some(expected_value),
+            "round-trip failed for path: {path}"
+        );
+    }
+}

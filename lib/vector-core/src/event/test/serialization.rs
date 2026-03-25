@@ -96,3 +96,24 @@ fn type_serialization() {
     assert_eq!(map["bool"], json!(true));
     assert_eq!(map["string"], json!("thisisastring"));
 }
+
+#[test]
+fn serialization_nested_and_special_fields() {
+    use serde_json::json;
+
+    let mut event = LogEvent::default();
+    event.insert("a.b", 1);
+    event.insert("a.c", 2);
+    event.insert("d", Value::Array(vec![Value::Integer(10), Value::Integer(20)]));
+
+    let map = serde_json::to_value(event.all_event_fields().unwrap()).unwrap();
+
+    // The Serialize impl flattens to dot-notation keys (not nested JSON objects).
+    // Nested fields use "parent.child" as a flat key.
+    assert_eq!(map["a.b"], json!(1));
+    assert_eq!(map["a.c"], json!(2));
+
+    // Array elements are serialized with index notation.
+    assert_eq!(map["d[0]"], json!(10));
+    assert_eq!(map["d[1]"], json!(20));
+}
