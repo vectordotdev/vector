@@ -44,5 +44,5 @@ We supported generating a Vector config schema for a while. This guide demonstra
 popular IDEs in order to help with writing configs.
 
 We would love to this to VRL IDE support in the future. In the meantime, we would like to highlight
-this   [tree-sitter](https://github.com/tree-sitter/tree-sitter) plugin that was developed by https://github.com/belltoy. You can read more
-[here](https://github.com/vectordotdev/vrl/issues/964).
+this   [tree-sitter](https://github.com/tree-sitter/tree-sitter) plugin that was developed by https://github.com/belltoy. You can read more about it in the
+[VRL tree-sitter issue](https://github.com/vectordotdev/vrl/issues/964).

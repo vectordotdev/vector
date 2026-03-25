@@ -36,10 +36,10 @@ files, including:
 These checks verify that the configuration file contains a valid topology:
 
 1. At least one [source][sources] is defined
-1. At least one [sink][sinks] is defined
-1. All inputs for each topology component (specified using the `inputs` parameter) contain at least
+2. At least one [sink][sinks] is defined
+3. All inputs for each topology component (specified using the `inputs` parameter) contain at least
   one value.
-1. All inputs refer to valid and upstream [sources] or [transforms].
+4. All inputs refer to valid and upstream [sources] or [transforms].
 
 ### Environment checks
 
@@ -47,7 +47,7 @@ Finally, these checks ensure that Vector is running in an environment that can s
 configured topology:
 
 1. All components have the pre-requisites to run, e.g. data directories exist and are writable.
-1. All sinks can connect to their specified targets.
+2. All sinks can connect to their specified targets.
 
 These environment checks can be disabled using the [`--no-environment`][no_environment] flag:
 
