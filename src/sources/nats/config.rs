@@ -89,7 +89,7 @@ pub struct JetStreamConfig {
 
     #[serde(default)]
     #[configurable(derived)]
-    pub batch_config: BatchConfig,
+    pub(super) batch_config: BatchConfig,
 }
 
 /// Configuration for the `nats` source.
@@ -206,8 +206,7 @@ impl SourceConfig for NatsSourceConfig {
         match self.mode() {
             NatsMode::JetStream(js_config) => {
                 let connection = self.connect().await?;
-                let messages =
-                    create_consumer_stream(&connection, js_config).await?;
+                let messages = create_consumer_stream(&connection, js_config).await?;
 
                 Ok(Box::pin(run_nats_jetstream(
                     self.clone(),

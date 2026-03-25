@@ -758,9 +758,8 @@ impl JetStreamTestHarness {
         while tokio::time::Instant::now() < deadline {
             match timeout(Duration::from_secs(5), self.rx.next()).await {
                 Ok(Some(event)) => {
-                    let msg = event.as_log()
-                        [log_schema().message_key().unwrap().to_string()]
-                    .to_string_lossy();
+                    let msg = event.as_log()[log_schema().message_key().unwrap().to_string()]
+                        .to_string_lossy();
                     if msg == target {
                         return true;
                     }
@@ -878,7 +877,9 @@ async fn nats_jetstream_shutdown_during_recovery() {
 
     let connection = conf.connect().await.unwrap();
     let js_config = conf.jetstream.clone().unwrap();
-    let initial_messages = create_consumer_stream(&connection, &js_config).await.unwrap();
+    let initial_messages = create_consumer_stream(&connection, &js_config)
+        .await
+        .unwrap();
 
     let decoder = DecodingConfig::new(
         conf.framing.clone(),
@@ -973,10 +974,9 @@ async fn nats_jetstream_messages_during_downtime() {
     while found.len() < 5 && tokio::time::Instant::now() < deadline {
         match timeout(Duration::from_secs(5), h.rx.next()).await {
             Ok(Some(event)) => {
-                let msg = event.as_log()
-                    [log_schema().message_key().unwrap().to_string()]
-                .to_string_lossy()
-                .into_owned();
+                let msg = event.as_log()[log_schema().message_key().unwrap().to_string()]
+                    .to_string_lossy()
+                    .into_owned();
                 if msg.starts_with("queued-") {
                     found.insert(msg);
                 }

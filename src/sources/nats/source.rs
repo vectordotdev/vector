@@ -112,7 +112,10 @@ pub(crate) async fn create_consumer_stream(
     js_config: &JetStreamConfig,
 ) -> Result<async_nats::jetstream::consumer::pull::Stream, BuildError> {
     let js = async_nats::jetstream::new(connection.clone());
-    let stream = js.get_stream(&js_config.stream).await.context(StreamSnafu)?;
+    let stream = js
+        .get_stream(&js_config.stream)
+        .await
+        .context(StreamSnafu)?;
     let consumer: PullConsumer = stream
         .get_consumer(&js_config.consumer)
         .await
