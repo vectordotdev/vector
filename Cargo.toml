@@ -214,7 +214,7 @@ vector-vrl-category = { path = "lib/vector-vrl/category" }
 vector-vrl-functions = { path = "lib/vector-vrl/functions", default-features = false }
 vrl = { git = "https://github.com/vectordotdev/vrl.git", branch = "main", default-features = false, features = ["arbitrary", "cli", "test", "test_framework", "stdlib-base"] }
 mock_instant = { version = "0.6" }
-serial_test = { version = "3.2" }
+serial_test = { version = "3.4" }
 strum = { version = "0.28", features = ["derive"] }
 
 [dependencies]
