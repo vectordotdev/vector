@@ -19,10 +19,11 @@
   "MD022": true,
   "MD023": true,
   "MD024": false, // due to the way we generate docs, there are cases where duplicate headings are out of our control
-  "MD025": true,
+  "MD025": false, // release templates and other files intentionally use multiple top-level headings
   "MD026": { "punctuation": ".,;:" },
   "MD027": true,
   "MD028": true,
+  "MD029": { "style": "ordered" },
   "MD031": true,
   "MD032": true,
   "MD033": false, // we allow HTML
@@ -40,7 +41,7 @@
   "MD046": true,
   "MD047": true,
   "MD048": true,
-  "MD049": { "style": "asterisk" },
+  "MD049": false, // both *foo* and _foo_ are used intentionally for different semantic purposes
   "MD051": false, // Hugo assembles sections from partials/shortcodes; fragments exist at render time but not in raw markdown
   "MD052": false, // Hugo link definitions use shortcodes in URLs, unresolvable by markdownlint
   "MD053": false  // Hugo uses reference link definitions extensively in README/website content

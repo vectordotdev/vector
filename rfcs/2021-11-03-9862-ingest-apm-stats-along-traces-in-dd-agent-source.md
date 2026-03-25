@@ -100,7 +100,7 @@ found in the trace support [RFC][trace-support-pr] and may provide relevant cont
 ## Cross cutting concerns
 
 * Ongoing work on transforms to add `named_outputs` that is laying the ground for the same feature but on `sources`,
-  [one PR][named-outputs-pr] has already be merged while scheduled work is tracked [here][named-outputs-improvements].
+  [one PR][named-outputs-pr] has already be merged while scheduled work is tracked in the [named outputs improvements issue][named-outputs-improvements].
 * [Ongoing work on schemas][schema-rfc] will ultimately offer a programatic way of validating required fields and
   express constrains on incoming event for a given sink. Traces & APM stats are a good fit for that because they will be
   represented as standard Vector events, but sinks handling thos will expect some mandatory information.
