@@ -506,6 +506,10 @@ check-licenses: ## Check that the 3rd-party license file is up to date
 check-markdown: ## Check that markdown is styled properly
 	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) check markdown
 
+.PHONY: fix-markdown
+fix-markdown: ## Auto-fix markdown style issues
+	${MAYBE_ENVIRONMENT_EXEC} markdownlint --fix --config .markdownlint.jsonc $(shell git ls-files '*.md')
+
 .PHONY: check-examples
 check-examples: ## Check that the config/examples files are valid
 	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) check examples

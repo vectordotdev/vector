@@ -9,16 +9,16 @@ Please see the [FAQ](#faq) section for more info.**
 <!-- MarkdownTOC autolink="true" style="ordered" indent="   " -->
 
 1. [Convention](#convention)
-1. [Public API](#public-api)
+2. [Public API](#public-api)
    1. [Areas that *are* covered](#areas-that-are-covered)
       1. [Intended for *public* consumption](#intended-for-public-consumption)
-      1. [Intended for *private* consumption](#intended-for-private-consumption)
-   1. [Areas that are *NOT* covered](#areas-that-are-not-covered)
-1. [FAQ](#faq)
+      2. [Intended for *private* consumption](#intended-for-private-consumption)
+   2. [Areas that are *NOT* covered](#areas-that-are-not-covered)
+3. [FAQ](#faq)
    1. [How often is Vector released?](#how-often-is-vector-released)
-   1. [How does Vector treat patch and minor versions?](#how-does-vector-treat-patch-and-minor-versions)
-   1. [How does Vector treat major versions \(breaking changes\)?](#how-does-vector-treat-major-versions-breaking-changes)
-   1. [How does Vector treat pre-1.0 versions?](#how-does-vector-treat-pre-10-versions)
+   2. [How does Vector treat patch and minor versions?](#how-does-vector-treat-patch-and-minor-versions)
+   3. [How does Vector treat major versions \(breaking changes\)?](#how-does-vector-treat-major-versions-breaking-changes)
+   4. [How does Vector treat pre-1.0 versions?](#how-does-vector-treat-pre-10-versions)
 
 <!-- /MarkdownTOC -->
 
