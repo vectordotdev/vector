@@ -687,6 +687,7 @@ mod tests {
             .expect("expected expired items batch on channel");
         assert_eq!(batch.len(), 1);
         assert_eq!(batch[0].key, "expired_key");
+        assert_eq!(batch[0].entry.value, "\"42\"");
 
         // Channel should be empty now (no double-send)
         assert!(matches!(rx.try_recv(), Err(TryRecvError::Empty)));
