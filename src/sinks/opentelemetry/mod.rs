@@ -71,7 +71,7 @@ pub enum OtlpProtocol {
 #[configurable_component(sink("opentelemetry", "Deliver OTLP data over HTTP or gRPC."))]
 #[derive(Clone, Debug)]
 pub struct OpenTelemetryConfig {
-    /// The transport protocol to use. Defaults to `http`.
+    /// The transport protocol to use.
     #[configurable(derived)]
     #[serde(flatten)]
     pub protocol: OtlpProtocol,
