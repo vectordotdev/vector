@@ -32,7 +32,8 @@ use vector_lib::{
         },
     },
     request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
-    stream::{BatcherSettings, DriverResponse, batcher::data::BatchReduce},
+    partition::Partitioner,
+    stream::{BatcherSettings, DriverResponse},
 };
 
 use crate::{
@@ -530,6 +531,37 @@ impl Service<hyper::Request<BoxBody>> for HyperSvc {
 
 // ── Sink ─────────────────────────────────────────────────────────────────────
 
+/// Partition key for gRPC batches. Events that render to different URIs or
+/// dynamic headers must be sent in separate requests, so they are batched
+/// independently. The key stores rendered values as strings so it can derive
+/// `Hash + Eq` without requiring those traits from `Uri` or tonic types.
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+struct BatchPartitionKey {
+    uri: String,
+    /// Dynamic header (key, rendered-value) pairs, sorted for deterministic equality.
+    headers: Vec<(String, String)>,
+}
+
+struct GrpcPartitioner;
+
+impl Partitioner for GrpcPartitioner {
+    type Item = OtlpEventData;
+    type Key = BatchPartitionKey;
+
+    fn partition(&self, item: &OtlpEventData) -> BatchPartitionKey {
+        let mut headers: Vec<(String, String)> = item
+            .dynamic_headers
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_str().unwrap_or("").to_owned()))
+            .collect();
+        headers.sort_unstable();
+        BatchPartitionKey {
+            uri: item.uri.to_string(),
+            headers,
+        }
+    }
+}
+
 /// Intermediate event data extracted before batching.
 struct OtlpEventData {
     byte_size: usize,
@@ -538,6 +570,16 @@ struct OtlpEventData {
     signal: OtlpSignal,
     uri: Uri,
     dynamic_headers: Vec<(tonic::metadata::AsciiMetadataKey, tonic::metadata::AsciiMetadataValue)>,
+}
+
+impl ByteSizeOf for OtlpEventData {
+    fn size_of(&self) -> usize {
+        std::mem::size_of::<Self>() + self.allocated_bytes()
+    }
+
+    fn allocated_bytes(&self) -> usize {
+        self.signal.encoded_len()
+    }
 }
 
 /// Pre-decoded OTLP signal for a single event.
@@ -574,16 +616,65 @@ struct OtlpBatch {
     logs: Option<SignalData<ExportLogsServiceRequest>>,
     metrics: Option<SignalData<ExportMetricsServiceRequest>>,
     traces: Option<SignalData<ExportTraceServiceRequest>>,
-    /// URI and dynamic header values captured from the first event in the batch.
-    uri: Option<Uri>,
-    dynamic_headers: Vec<(tonic::metadata::AsciiMetadataKey, tonic::metadata::AsciiMetadataValue)>,
 }
 
-impl Clone for OtlpBatch {
-    fn clone(&self) -> Self {
-        // OtlpBatch is used only in the batcher accumulator; Clone is required by the
-        // BatchReduce API but the accumulator is always the initial default value.
-        Self::default()
+impl OtlpBatch {
+    fn push(&mut self, item: OtlpEventData) {
+        let OtlpEventData {
+            byte_size,
+            json_byte_size,
+            finalizers,
+            signal,
+            uri: _,
+            dynamic_headers: _,
+        } = item;
+
+        macro_rules! accumulate {
+            ($field:ident, $req:expr, $merge:expr) => {
+                match &mut self.$field {
+                    Some(existing) => {
+                        $merge(&mut existing.request, $req);
+                        existing.finalizers.merge(finalizers);
+                        existing.event_count += 1;
+                        existing.byte_size += byte_size;
+                        existing.json_byte_size += json_byte_size;
+                    }
+                    slot => {
+                        *slot = Some(SignalData {
+                            request: $req,
+                            finalizers,
+                            event_count: 1,
+                            byte_size,
+                            json_byte_size,
+                        });
+                    }
+                }
+            };
+        }
+
+        match signal {
+            OtlpSignal::Logs(req) => accumulate!(
+                logs,
+                req,
+                |e: &mut ExportLogsServiceRequest, r: ExportLogsServiceRequest| {
+                    e.resource_logs.extend(r.resource_logs)
+                }
+            ),
+            OtlpSignal::Metrics(req) => accumulate!(
+                metrics,
+                req,
+                |e: &mut ExportMetricsServiceRequest, r: ExportMetricsServiceRequest| {
+                    e.resource_metrics.extend(r.resource_metrics)
+                }
+            ),
+            OtlpSignal::Traces(req) => accumulate!(
+                traces,
+                req,
+                |e: &mut ExportTraceServiceRequest, r: ExportTraceServiceRequest| {
+                    e.resource_spans.extend(r.resource_spans)
+                }
+            ),
+        }
     }
 }
 
@@ -685,55 +776,46 @@ where
                     }
                 }
             })
-            .batched(self.batch_settings.as_reducer_config(
-                |data: &OtlpEventData| data.signal.encoded_len(),
-                BatchReduce::new(|batch: &mut OtlpBatch, item: OtlpEventData| {
-                    if batch.uri.is_none() {
-                        batch.uri = Some(item.uri);
-                        batch.dynamic_headers = item.dynamic_headers;
+            // Partition by (rendered URI, dynamic headers) so that events destined for
+            // different collectors or with different tenant metadata are never merged into
+            // the same batch. Each partition is independently flushed by size or timeout.
+            .batched_partitioned(
+                GrpcPartitioner,
+                self.batch_settings.timeout,
+                |_| self.batch_settings.as_byte_size_config(),
+            )
+            .flat_map(|(key, items)| {
+                // Re-parse the URI from the partition key (always succeeds: it was validated
+                // in filter_map before being stored in the key).
+                let uri: Uri = match key.uri.parse::<Uri>() {
+                    Ok(u) => u,
+                    Err(e) => {
+                        error!("Failed to re-parse gRPC batch partition URI: {e}");
+                        return futures::stream::iter(Vec::new());
                     }
-
-                    macro_rules! accumulate {
-                        ($field:ident, $req:expr, $merge:expr) => {
-                            match &mut batch.$field {
-                                Some(existing) => {
-                                    $merge(&mut existing.request, $req);
-                                    existing.finalizers.merge(item.finalizers);
-                                    existing.event_count += 1;
-                                    existing.byte_size += item.byte_size;
-                                    existing.json_byte_size += item.json_byte_size;
-                                }
-                                slot => {
-                                    *slot = Some(SignalData {
-                                        request: $req,
-                                        finalizers: item.finalizers,
-                                        event_count: 1,
-                                        byte_size: item.byte_size,
-                                        json_byte_size: item.json_byte_size,
-                                    });
-                                }
-                            }
-                        };
-                    }
-                    match item.signal {
-                        OtlpSignal::Logs(req) => accumulate!(logs, req, |e: &mut ExportLogsServiceRequest, r: ExportLogsServiceRequest| {
-                            e.resource_logs.extend(r.resource_logs)
-                        }),
-                        OtlpSignal::Metrics(req) => accumulate!(metrics, req, |e: &mut ExportMetricsServiceRequest, r: ExportMetricsServiceRequest| {
-                            e.resource_metrics.extend(r.resource_metrics)
-                        }),
-                        OtlpSignal::Traces(req) => accumulate!(traces, req, |e: &mut ExportTraceServiceRequest, r: ExportTraceServiceRequest| {
-                            e.resource_spans.extend(r.resource_spans)
-                        }),
-                    }
-                }),
-            ))
-            .flat_map(|batch| {
-                let Some(uri) = batch.uri else {
-                    return futures::stream::iter(Vec::new());
                 };
+
+                let dynamic_headers: Vec<(
+                    tonic::metadata::AsciiMetadataKey,
+                    tonic::metadata::AsciiMetadataValue,
+                )> = key
+                    .headers
+                    .iter()
+                    .filter_map(|(k, v)| {
+                        Some((
+                            tonic::metadata::AsciiMetadataKey::from_bytes(k.as_bytes()).ok()?,
+                            tonic::metadata::AsciiMetadataValue::try_from(v.as_str()).ok()?,
+                        ))
+                    })
+                    .collect();
+
+                // Reduce the partitioned items into per-signal accumulators.
+                let mut batch = OtlpBatch::default();
+                for item in items {
+                    batch.push(item);
+                }
+
                 let mut requests = Vec::new();
-                let dynamic_headers = batch.dynamic_headers;
 
                 macro_rules! push_signal {
                     ($field:ident, $variant:ident) => {
