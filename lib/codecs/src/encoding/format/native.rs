@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use tokio_util::codec::Encoder;
 use vector_core::{
     config::DataType,
-    event::{Event, EventArray, proto},
+    event::{Event, EventArray, MAX_NESTING_DEPTH, event_exceeds_max_nesting_depth, proto},
     schema,
 };
 
@@ -37,6 +37,12 @@ impl Encoder<Event> for NativeSerializer {
     type Error = vector_common::Error;
 
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
+        if event_exceeds_max_nesting_depth(&event) {
+            return Err(format!(
+                "event nesting depth exceeds maximum of {MAX_NESTING_DEPTH} for protobuf encoding"
+            )
+            .into());
+        }
         let array = EventArray::from(event);
         let proto = proto::EventArray::from(array);
         proto.encode(buffer)?;
