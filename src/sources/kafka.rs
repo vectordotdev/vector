@@ -275,7 +275,7 @@ impl KafkaSourceConfig {
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct MultithreadingConfig {
-    /// Number of messages may be processed in parallel for message processing.
+    /// Number of tasks that may run in parallel for message processing.
     /// Defaults to number of available cores.
     #[serde(default)]
     max_message_handling_tasks: Option<usize>,
