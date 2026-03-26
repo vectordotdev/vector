@@ -336,7 +336,7 @@ smpl_jwt = { version = "0.8.0", default-features = false, optional = true }
 # AMQP
 lapin = { version = "4.3.0", default-features = false, features = ["tokio", "native-tls"], optional = true }
 async-rs = { version = "0.8", default-features = false, features = ["tokio"], optional = true }
-deadpool = { version = "0.12.2", default-features = false, features = ["managed", "rt_tokio_1"], optional = true }
+deadpool = { version = "0.13.0", default-features = false, features = ["managed", "rt_tokio_1"], optional = true }
 
 # Opentelemetry
 
