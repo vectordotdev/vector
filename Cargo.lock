@@ -32,7 +32,7 @@ checksum = "ac1f845298e95f983ff1944b728ae08b8cebab80d684f0a832ed0fc74dfa27e2"
 dependencies = [
  "cfg-if",
  "cipher",
- "cpufeatures",
+ "cpufeatures 0.2.11",
 ]
 
 [[package]]
@@ -2215,7 +2215,18 @@ checksum = "c3613f74bd2eac03dad61bd53dbe620703d4371614fe0bc3b9f04dd36fe4e818"
 dependencies = [
  "cfg-if",
  "cipher",
- "cpufeatures",
+ "cpufeatures 0.2.11",
+]
+
+[[package]]
+name = "chacha20"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6f8d983286843e49675a4b7a2d174efe136dc93a18d69130dd18198a6c167601"
+dependencies = [
+ "cfg-if",
+ "cpufeatures 0.3.0",
+ "rand_core 0.10.0",
 ]
 
 [[package]]
@@ -2225,7 +2236,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "10cd79432192d1c0f4e1a0fef9527696cc039165d729fb41b3f4f4f354c2dc35"
 dependencies = [
  "aead",
- "chacha20",
+ "chacha20 0.9.1",
  "cipher",
  "poly1305",
  "zeroize",
@@ -2444,7 +2455,7 @@ dependencies = [
  "serde_with",
  "similar-asserts",
  "smallvec",
- "snafu 0.8.9",
+ "snafu 0.9.0",
  "strum 0.28.0",
  "syslog_loose 0.23.0",
  "tokio",
@@ -2769,6 +2780,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "cpufeatures"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8b2a41393f66f16b0823bb79094d54ac5fbd34ab292ddafb9a0456ac9f87d201"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "crc"
 version = "3.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3019,7 +3039,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "97fb8b7c4503de7d6ae7b42ab72a5a59857b4c937ec27a3d4539dba95b5ab2be"
 dependencies = [
  "cfg-if",
- "cpufeatures",
+ "cpufeatures 0.2.11",
  "curve25519-dalek-derive",
  "digest",
  "fiat-crypto",
@@ -3415,7 +3435,7 @@ dependencies = [
  "criterion",
  "data-encoding",
  "hickory-proto 0.25.2",
- "snafu 0.8.9",
+ "snafu 0.9.0",
 ]
 
 [[package]]
@@ -3432,7 +3452,7 @@ dependencies = [
  "pastey",
  "prost 0.12.6",
  "prost-build 0.12.6",
- "snafu 0.8.9",
+ "snafu 0.9.0",
  "tracing 0.1.44",
  "vector-common",
  "vector-config",
@@ -3454,7 +3474,7 @@ dependencies = [
  "anyhow",
  "serde",
  "serde_json",
- "snafu 0.8.9",
+ "snafu 0.9.0",
  "tracing 0.1.44",
  "vector-config",
  "vector-config-common",
@@ -3661,7 +3681,7 @@ dependencies = [
  "const-str",
  "dyn-clone",
  "indoc",
- "snafu 0.8.9",
+ "snafu 0.9.0",
  "vector-vrl-category",
  "vrl",
 ]
@@ -5522,9 +5542,9 @@ dependencies = [
 
 [[package]]
 name = "ipnet"
-version = "2.11.0"
+version = "2.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "469fb0b9cefa57e3ef31275ee7cacb78f2fdca44e4765491884a2b119d4eb130"
+checksum = "d98f6fed1fde3f8c21bc40a1abb88dd75e67924f9cffc3ef95607bad8017f8e2"
 dependencies = [
  "serde",
 ]
@@ -5797,7 +5817,7 @@ version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cb26cec98cce3a3d96cbb7bced3c4b16e3d13f27ec56dbd62cbc8f39cfb9d653"
 dependencies = [
- "cpufeatures",
+ "cpufeatures 0.2.11",
 ]
 
 [[package]]
@@ -7815,7 +7835,7 @@ version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8159bd90725d2df49889a078b54f4f79e87f1f8a8444194cdca81d38f5393abf"
 dependencies = [
- "cpufeatures",
+ "cpufeatures 0.2.11",
  "opaque-debug",
  "universal-hash",
 ]
@@ -8076,7 +8096,7 @@ dependencies = [
  "prost 0.12.6",
  "prost-build 0.12.6",
  "prost-types 0.12.6",
- "snafu 0.8.9",
+ "snafu 0.9.0",
  "vector-common",
 ]
 
@@ -8592,6 +8612,7 @@ version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bc266eb313df6c5c09c1c7b1fbe2510961e5bcd3add930c1e31f7ed9da0feff8"
 dependencies = [
+ "chacha20 0.10.0",
  "getrandom 0.4.2",
  "rand_core 0.10.0",
 ]
@@ -9954,7 +9975,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f5058ada175748e33390e40e872bd0fe59a19f265d0158daa551c5a88a76009c"
 dependencies = [
  "cfg-if",
- "cpufeatures",
+ "cpufeatures 0.2.11",
  "digest",
 ]
 
@@ -9965,7 +9986,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e3bf829a2d51ab4a5ddf1352d8470c140cadc8301b2ae1789db023f01cedd6ba"
 dependencies = [
  "cfg-if",
- "cpufeatures",
+ "cpufeatures 0.2.11",
  "digest",
 ]
 
@@ -9976,7 +9997,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a7507d819769d01a365ab707794a4084392c824f54a7a6a7862f8c3d0892b283"
 dependencies = [
  "cfg-if",
- "cpufeatures",
+ "cpufeatures 0.2.11",
  "digest",
 ]
 
@@ -10190,9 +10211,18 @@ version = "0.8.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6e84b3f4eacbf3a1ce05eac6763b4d629d60cbc94d632e4092c54ade71f1e1a2"
 dependencies = [
+ "snafu-derive 0.8.9",
+]
+
+[[package]]
+name = "snafu"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d1d4bced6a69f90b2056c03dcff2c4737f98d6fb9e0853493996e1d253ca29c6"
+dependencies = [
  "futures-core",
  "pin-project",
- "snafu-derive 0.8.9",
+ "snafu-derive 0.9.0",
 ]
 
 [[package]]
@@ -10212,6 +10242,18 @@ name = "snafu-derive"
 version = "0.8.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c1c97747dbf44bb1ca44a561ece23508e99cb592e862f22222dcf42f51d1e451"
+dependencies = [
+ "heck 0.5.0",
+ "proc-macro2 1.0.106",
+ "quote 1.0.44",
+ "syn 2.0.117",
+]
+
+[[package]]
+name = "snafu-derive"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "54254b8531cafa275c5e096f62d48c81435d1015405a91198ddb11e967301d40"
 dependencies = [
  "heck 0.5.0",
  "proc-macro2 1.0.106",
@@ -12092,14 +12134,14 @@ checksum = "711b9620af191e0cdc7468a8d14e709c3dcdb115b36f838e601583af800a370a"
 
 [[package]]
 name = "uuid"
-version = "1.18.1"
+version = "1.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2f87b8aa10b915a06587d0dec516c282ff295b475d94abf425d62b57710070a2"
+checksum = "a68d3c8f01c0cfa54a75291d83601161799e4a89a39e0929f4b0354d88757a37"
 dependencies = [
- "getrandom 0.3.4",
+ "getrandom 0.4.2",
  "js-sys",
- "rand 0.9.2",
- "serde",
+ "rand 0.10.0",
+ "serde_core",
  "wasm-bindgen",
 ]
 
@@ -12321,7 +12363,7 @@ dependencies = [
  "similar-asserts",
  "smallvec",
  "smpl_jwt",
- "snafu 0.8.9",
+ "snafu 0.9.0",
  "snap",
  "socket2 0.5.10",
  "sqlx",
@@ -12381,7 +12423,7 @@ dependencies = [
  "prost 0.12.6",
  "prost-build 0.12.6",
  "prost-types 0.12.6",
- "snafu 0.8.9",
+ "snafu 0.9.0",
  "tokio",
  "tokio-stream",
  "tonic 0.11.0",
@@ -12420,7 +12462,7 @@ dependencies = [
  "rkyv",
  "serde",
  "serde_yaml",
- "snafu 0.8.9",
+ "snafu 0.9.0",
  "temp-dir",
  "tokio",
  "tokio-test",
@@ -12483,7 +12525,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with",
- "snafu 0.8.9",
+ "snafu 0.9.0",
  "toml",
  "tracing 0.1.44",
  "url",
@@ -12577,7 +12619,7 @@ dependencies = [
  "serde_yaml",
  "similar-asserts",
  "smallvec",
- "snafu 0.8.9",
+ "snafu 0.9.0",
  "socket2 0.5.10",
  "tokio",
  "tokio-openssl",

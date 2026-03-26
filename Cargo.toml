@@ -189,7 +189,7 @@ semver = { version = "1.0.27", default-features = false, features = ["serde", "s
 serde = { version = "1.0.219", default-features = false, features = ["alloc", "derive", "rc"] }
 serde_json = { version = "1.0.143", default-features = false, features = ["preserve_order", "raw_value", "std"] }
 serde_yaml = { version = "0.9.34", default-features = false }
-snafu = { version = "0.8.9", default-features = false, features = ["futures", "std"] }
+snafu = { version = "0.9.0", default-features = false, features = ["futures", "std"] }
 socket2 = { version = "0.5.10", default-features = false }
 tempfile = "3.23.0"
 tokio = { version = "1.49.0", default-features = false }
@@ -204,7 +204,7 @@ tonic-reflection = { version = "0.11", default-features = false, features = ["se
 tracing = { version = "0.1.44", default-features = false }
 tracing-subscriber = { version = "0.3.22", default-features = false, features = ["fmt"]  }
 url = { version = "2.5.4", default-features = false, features = ["serde"] }
-uuid = { version = "1.18.1", features = ["v4", "v7", "serde", "fast-rng"] }
+uuid = { version = "1.22.0", features = ["v4", "v7", "serde", "fast-rng"] }
 vector-config = { path = "lib/vector-config" }
 vector-config-common = { path = "lib/vector-config-common" }
 vector-config-macros = { path = "lib/vector-config-macros" }
