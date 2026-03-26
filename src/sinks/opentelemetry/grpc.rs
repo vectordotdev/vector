@@ -152,7 +152,7 @@ impl GrpcSinkConfig {
             || static_uri
                 .as_ref()
                 .is_some_and(|u| u.scheme_str() == Some("https"))
-            || self.uri.get_ref().starts_with("https://");
+            || self.uri.get_ref().to_ascii_lowercase().starts_with("https://");
 
         let tls = if use_https {
             MaybeTlsSettings::tls_client(self.tls.as_ref())?
