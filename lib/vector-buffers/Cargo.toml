@@ -46,7 +46,7 @@ proptest = "1.10"
 quickcheck.workspace = true
 rand.workspace = true
 serde_yaml.workspace = true
-temp-dir = "0.1.16"
+temp-dir = "0.2.0"
 tokio-test.workspace = true
 tracing-fluent-assertions = { version = "0.3" }
 tracing-subscriber = { workspace = true, features = ["env-filter", "fmt", "registry", "std", "ansi"] }
