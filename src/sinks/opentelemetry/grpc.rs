@@ -749,44 +749,39 @@ where
                     }};
                 }
 
-                let uri = match uri_template.render_string(&event) {
-                    Ok(rendered) => match rendered.parse::<Uri>() {
-                        Ok(parsed) => match with_default_scheme(parsed, use_https) {
-                            Ok(u) => {
-                                match u.scheme_str() {
-                                    Some("https") if !use_https => {
-                                        // The Hyper client was built without TLS (use_https=false),
-                                        // so it cannot complete a TLS handshake. Sending data to an
-                                        // https:// endpoint over a plaintext connector would either
-                                        // fail or silently transmit unencrypted. Drop the event and
-                                        // surface a clear error so the operator can add `tls:` or
-                                        // use a static `https://` scheme prefix.
-                                        drop_event!(
-                                            "rendered gRPC URI uses \"https\" but the sink \
-                                             has no TLS connector; add a `tls:` block or use \
-                                             a static \"https://\" URI prefix so TLS is \
-                                             enabled at startup"
-                                        );
-                                    }
-                                    Some("http") | Some("https") => u,
-                                    other => {
-                                        drop_event!(format!(
-                                            "rendered gRPC URI has disallowed scheme {:?}; only \"http\" and \"https\" are permitted",
-                                            other.unwrap_or("<none>")
-                                        ));
-                                    }
-                                }
-                            }
-                            Err(e) => {
-                                drop_event!(format!("invalid gRPC URI after rendering template: {e}"));
-                            }
-                        },
-                        Err(e) => {
-                            drop_event!(format!("failed to parse rendered gRPC URI: {e}"));
-                        }
-                    },
-                    Err(e) => {
-                        drop_event!(format!("failed to render gRPC URI template: {e}"));
+                let rendered = match uri_template.render_string(&event) {
+                    Ok(s) => s,
+                    Err(e) => drop_event!(format!("failed to render gRPC URI template: {e}")),
+                };
+                let parsed = match rendered.parse::<Uri>() {
+                    Ok(u) => u,
+                    Err(e) => drop_event!(format!("failed to parse rendered gRPC URI: {e}")),
+                };
+                let u = match with_default_scheme(parsed, use_https) {
+                    Ok(u) => u,
+                    Err(e) => drop_event!(format!("invalid gRPC URI after rendering template: {e}")),
+                };
+                let uri = match u.scheme_str() {
+                    Some("https") if !use_https => {
+                        // The Hyper client was built without TLS (use_https=false),
+                        // so it cannot complete a TLS handshake. Sending data to an
+                        // https:// endpoint over a plaintext connector would either
+                        // fail or silently transmit unencrypted. Drop the event and
+                        // surface a clear error so the operator can add `tls:` or
+                        // use a static `https://` scheme prefix.
+                        drop_event!(
+                            "rendered gRPC URI uses \"https\" but the sink \
+                             has no TLS connector; add a `tls:` block or use \
+                             a static \"https://\" URI prefix so TLS is \
+                             enabled at startup"
+                        );
+                    }
+                    Some("http") | Some("https") => u,
+                    other => {
+                        drop_event!(format!(
+                            "rendered gRPC URI has disallowed scheme {:?}; only \"http\" and \"https\" are permitted",
+                            other.unwrap_or("<none>")
+                        ));
                     }
                 };
 
