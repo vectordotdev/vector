@@ -52,6 +52,7 @@ services:
     image: ${CONFIG_VECTOR_IMAGE}
     environment:
       - FEATURES=e2e-tests-datadog
+      - CONFIG_SERIES_API_VERSION
     working_dir: /home/vector
     command:
       - "/usr/bin/vector"

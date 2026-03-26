@@ -1,7 +1,6 @@
 use std::io;
 
 use bytes::{Buf, Bytes, BytesMut};
-use derivative::Derivative;
 use tokio_util::codec::{LinesCodec, LinesCodecError};
 use tracing::trace;
 use vector_config::configurable_component;
@@ -30,8 +29,7 @@ impl OctetCountingDecoderConfig {
 
 /// Options for building a `OctetCountingDecoder`.
 #[configurable_component]
-#[derive(Clone, Debug, Derivative, PartialEq, Eq)]
-#[derivative(Default)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct OctetCountingDecoderOptions {
     /// The maximum length of the byte buffer.
     #[serde(skip_serializing_if = "vector_core::serde::is_default")]

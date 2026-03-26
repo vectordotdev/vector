@@ -37,11 +37,11 @@ ordered-float.workspace = true
 openssl = { version = "0.10.75", default-features = false, features = ["vendored"] }
 parking_lot = { version = "0.12.5", default-features = false }
 pin-project.workspace = true
-proptest = { version = "1.8", optional = true }
+proptest = { version = "1.10", optional = true }
 prost-types.workspace = true
 prost.workspace = true
 quanta = { version = "0.12.6", default-features = false }
-regex = { version = "1.11.2", default-features = false, features = ["std", "perf"] }
+regex = { version = "1.12.3", default-features = false, features = ["std", "perf"] }
 ryu = { version = "1", default-features = false }
 serde.workspace = true
 serde_json.workspace = true
@@ -78,11 +78,11 @@ prost-build.workspace = true
 [dev-dependencies]
 base64 = "0.22.1"
 chrono-tz.workspace = true
-criterion = { version = "0.7.0", features = ["html_reports"] }
+criterion = { workspace = true, features = ["html_reports"] }
 env-test-util = "1.0.1"
-quickcheck = "1"
+quickcheck.workspace = true
 quickcheck_macros = "1"
-proptest = "1.8"
+proptest = "1.10"
 similar-asserts = "1.7.0"
 tokio-test.workspace = true
 toml.workspace = true

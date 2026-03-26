@@ -63,4 +63,4 @@ install_protoc() {
   mv -f -v "${TMP_DIR}/bin/protoc" "${install_path}"
 }
 
-install_protoc "3.20.2" "${INSTALL_PATH}/protoc"
+install_protoc "21.12" "${INSTALL_PATH}/protoc"
