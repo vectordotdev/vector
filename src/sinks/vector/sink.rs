@@ -7,6 +7,8 @@ use tower::Service;
 use vector_lib::{
     ByteSizeOf, EstimatedJsonEncodedSizeOf,
     config::telemetry,
+    event::event_exceeds_max_nesting_depth,
+    internal_event::{ComponentEventsDropped, INTENTIONAL},
     request_metadata::GroupedCountByteSize,
     stream::{BatcherSettings, DriverResponse, batcher::data::BatchReduce},
 };
@@ -60,6 +62,17 @@ where
 {
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         input
+            .filter_map(|event| {
+                std::future::ready(if event_exceeds_max_nesting_depth(&event) {
+                    emit!(ComponentEventsDropped::<INTENTIONAL> {
+                        count: 1,
+                        reason: "Event nesting depth exceeds maximum for protobuf encoding.",
+                    });
+                    None
+                } else {
+                    Some(event)
+                })
+            })
             .map(|mut event| {
                 let mut byte_size = telemetry().create_request_count_byte_size();
                 byte_size.add_event(&event, event.estimated_json_encoded_size_of());
