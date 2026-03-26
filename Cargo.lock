@@ -2168,7 +2168,7 @@ checksum = "b99da2f8558ca23c71f4fd15dc57c906239752dd27ff3c00a1d56b685b7cbfec"
 dependencies = [
  "bitflags 2.10.0",
  "log",
- "polling 3.7.4",
+ "polling",
  "rustix 0.38.40",
  "slab",
  "thiserror 1.0.68",
