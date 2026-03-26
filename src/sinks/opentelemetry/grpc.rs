@@ -715,6 +715,21 @@ where
                         Ok(parsed) => match with_default_scheme(parsed, use_https) {
                             Ok(u) => {
                                 match u.scheme_str() {
+                                    Some("https") if !use_https => {
+                                        // The Hyper client was built without TLS (use_https=false),
+                                        // so it cannot complete a TLS handshake. Sending data to an
+                                        // https:// endpoint over a plaintext connector would either
+                                        // fail or silently transmit unencrypted. Drop the event and
+                                        // surface a clear error so the operator can add `tls:` or
+                                        // use a static `https://` scheme prefix.
+                                        emit!(crate::internal_events::SinkRequestBuildError {
+                                            error: "rendered gRPC URI uses \"https\" but the sink \
+                                                    has no TLS connector; add a `tls:` block or use \
+                                                    a static \"https://\" URI prefix so TLS is \
+                                                    enabled at startup",
+                                        });
+                                        return futures::future::ready(None);
+                                    }
                                     Some("http") | Some("https") => u,
                                     other => {
                                         emit!(crate::internal_events::SinkRequestBuildError {
