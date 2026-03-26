@@ -277,6 +277,7 @@ generated: components: sinks: opentelemetry: configuration: {
 					"""
 			}
 		}
+		warnings: ["The `grpc` protocol only supports `none` and `gzip`. Specifying any other algorithm causes Vector to fail at startup."]
 	}
 	encoding: {
 		description: """
