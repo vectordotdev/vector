@@ -10,16 +10,16 @@ use super::{Event, EventArray, proto};
 /// Maximum nesting depth allowed for events before protobuf encoding.
 ///
 /// Prost enforces a decode recursion limit of 100 (no limit on encode). In Vector's proto
-/// schema (`event.proto`), decoding a `LogEvent` consumes 4 prost recursion levels for the
-/// outer wrappers (`EventArray` → `LogArray` → `Log` → fields map), then 3 levels per
-/// `Value` map nesting level (`Value` message → `ValueMap` message → map entry). The formula
-/// is `4 + 3*N <= 100`, giving N <= 32 map nesting levels. Since `check_value_depth` counts
-/// from the `LogEvent` root (depth 0), a leaf at depth 33 uses exactly `4 + 3*32 = 100`
-/// recursion levels — the maximum prost allows. Depth 34 exceeds it.
+/// schema (`event.proto`), each `Value` map nesting level consumes 3 prost recursion levels
+/// (`Value` message → `ValueMap` message → map entry). The outer message wrappers and
+/// metadata paths consume varying numbers of levels (3-5 depending on the path), making
+/// the tightest constraint approximately `5 + 3*N <= 100`, giving N <= 31 map nesting
+/// levels from the `Value` root, or depth 32 as counted by `check_value_depth`.
 ///
-/// Unit tests `deeply_nested_event_encodes_but_fails_prost_decode` and
-/// `event_at_max_depth_roundtrips_via_prost` verify this boundary empirically.
-pub const MAX_NESTING_DEPTH: usize = 33;
+/// We set the limit to 32 to be safe across all encoding paths (event value via `Log.fields`,
+/// event value via `Log.value`, event metadata, and trace events). Unit tests verify that no
+/// encoding path has a gap between our check and prost's actual decode limit.
+pub const MAX_NESTING_DEPTH: usize = 32;
 
 /// Check the nesting depth of a `Value`, returning `Err(actual_depth)` if it exceeds `max_depth`.
 ///

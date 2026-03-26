@@ -124,7 +124,7 @@ fn create_nested_log_event(wrapping_levels: usize) -> LogEvent {
 /// but fails to decode them due to its internal recursion limit of 100.
 #[test]
 fn deeply_nested_event_encodes_but_fails_prost_decode() {
-    // 33 wrapping levels + root "data" key = effective depth 34
+    // 33 wrapping levels exceeds the prost decode limit for the Log.fields path
     let event = create_nested_log_event(33);
     let array = EventArray::Logs(LogArray::from(vec![event]));
 
@@ -139,15 +139,15 @@ fn deeply_nested_event_encodes_but_fails_prost_decode() {
     let result = proto::EventArray::decode(buffer.freeze());
     assert!(
         result.is_err(),
-        "prost decode should fail at effective depth 34"
+        "prost decode should fail for events exceeding the recursion limit"
     );
 }
 
 /// Confirms that events at exactly the max allowed depth encode AND decode via raw prost.
 #[test]
 fn event_at_max_depth_roundtrips_via_prost() {
-    // 32 wrapping levels + "data" key = leaf at depth 33 = MAX_NESTING_DEPTH
-    let event = create_nested_log_event(32);
+    // 31 wrapping levels + "data" key = leaf at depth 32 = MAX_NESTING_DEPTH
+    let event = create_nested_log_event(31);
     let original = event.clone();
     let array = EventArray::Logs(LogArray::from(vec![event]));
 
@@ -155,10 +155,10 @@ fn event_at_max_depth_roundtrips_via_prost() {
     let mut buffer = BytesMut::with_capacity(8192);
     proto_array
         .encode(&mut buffer)
-        .expect("prost encode should succeed at depth 33");
+        .expect("prost encode should succeed at MAX_NESTING_DEPTH");
 
     let decoded_proto = proto::EventArray::decode(buffer.freeze())
-        .expect("prost decode should succeed at depth 33");
+        .expect("prost decode should succeed at MAX_NESTING_DEPTH");
     let decoded_array = EventArray::from(decoded_proto);
 
     let decoded_event = decoded_array.into_events().next().unwrap().into_log();
@@ -181,8 +181,8 @@ fn nesting_gate_accepts_flat_event() {
 
 #[test]
 fn nesting_gate_accepts_event_at_max_depth() {
-    // 32 wrapping levels + "data" key = leaf at depth 33 = MAX_NESTING_DEPTH
-    let event = create_nested_log_event(32);
+    // 31 wrapping levels + "data" key = leaf at depth 32 = MAX_NESTING_DEPTH
+    let event = create_nested_log_event(31);
     let original = event.clone();
     let events = EventArray::Logs(LogArray::from(vec![event]));
     let mut buffer = BytesMut::with_capacity(8192);
@@ -203,8 +203,8 @@ fn nesting_gate_accepts_event_at_max_depth() {
 
 #[test]
 fn nesting_gate_rejects_event_exceeding_max_depth() {
-    // 33 wrapping levels + "data" key = leaf at depth 34, exceeds MAX_NESTING_DEPTH (33)
-    let event = create_nested_log_event(33);
+    // 32 wrapping levels + "data" key = leaf at depth 33, exceeds MAX_NESTING_DEPTH (32)
+    let event = create_nested_log_event(32);
     let events = EventArray::Logs(LogArray::from(vec![event]));
     let mut buffer = BytesMut::with_capacity(8192);
 
@@ -215,8 +215,8 @@ fn nesting_gate_rejects_event_exceeding_max_depth() {
         matches!(
             err,
             super::super::ser::EncodeError::NestingTooDeep {
-                depth: 34,
-                max_depth: 33
+                depth: 33,
+                max_depth: 32
             }
         ),
         "expected NestingTooDeep error, got: {err:?}"
@@ -226,7 +226,7 @@ fn nesting_gate_rejects_event_exceeding_max_depth() {
 #[test]
 fn nesting_gate_rejects_trace_event_exceeding_max_depth() {
     let mut value = Value::from("innermost");
-    for _ in 0..33 {
+    for _ in 0..32 {
         let mut map = ObjectMap::new();
         map.insert("nested".into(), value);
         value = Value::Object(map);
