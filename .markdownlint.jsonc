@@ -1,7 +1,11 @@
+// This config is auto-detected by markdownlint-cli2 (used by Zed, VS Code, and most modern editors).
+// The CI check currently uses markdownlint-cli (legacy). Migrate CI to markdownlint-cli2 to unify tooling:
+//   npm install -g markdownlint-cli2
+//   markdownlint-cli2 "**/*.md"
 {
-  "default": false,
+  "default": true,
 
-  "MD001": true,
+  "MD001": false, // Hugo generates the outer heading structure, so heading levels in content files are intentional
   "MD003": { "style": "atx" },
   "MD004": true,
   "MD005": true,
@@ -19,11 +23,11 @@
   "MD022": true,
   "MD023": true,
   "MD024": false, // due to the way we generate docs, there are cases where duplicate headings are out of our control
-  "MD025": true,
+  "MD025": false, // release templates and other files intentionally use multiple top-level headings
   "MD026": { "punctuation": ".,;:" },
   "MD027": true,
   "MD028": true,
-  "MD030": false,
+  "MD029": { "style": "ordered" },
   "MD031": true,
   "MD032": true,
   "MD033": false, // we allow HTML
@@ -38,8 +42,11 @@
   "MD042": true,
   "MD043": true,
   "MD044": true,
-  "MD045": false,
   "MD046": true,
   "MD047": true,
-  "MD048": true
+  "MD048": true,
+  "MD049": false, // both *foo* and _foo_ are used intentionally for different semantic purposes
+  "MD051": false, // Hugo assembles sections from partials/shortcodes; fragments exist at render time but not in raw markdown
+  "MD052": false, // Hugo link definitions use shortcodes in URLs, unresolvable by markdownlint
+  "MD053": false  // Hugo uses reference link definitions extensively in README/website content
 }
