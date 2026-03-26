@@ -49,8 +49,8 @@ Add a `#[configurable(metadata(docs::warnings = "..."))]` annotation noting that
 ## Acceptance Criteria
 
 - [x] Dynamic URI rendering is either restricted (allowlist) or clearly documented as requiring trusted input
-- [ ] At minimum, scheme is validated to be `http` or `https` only for rendered URIs
-- [ ] Any rendered URI that fails validation emits `SinkRequestBuildError` and drops the event
+- [x] At minimum, scheme is validated to be `http` or `https` only for rendered URIs
+- [x] Any rendered URI that fails validation emits `SinkRequestBuildError` and drops the event
 
 ## Work Log
 

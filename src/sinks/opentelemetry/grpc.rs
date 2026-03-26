@@ -713,7 +713,20 @@ where
                 let uri = match uri_template.render_string(&event) {
                     Ok(rendered) => match rendered.parse::<Uri>() {
                         Ok(parsed) => match with_default_scheme(parsed, use_https) {
-                            Ok(u) => u,
+                            Ok(u) => {
+                                match u.scheme_str() {
+                                    Some("http") | Some("https") => u,
+                                    other => {
+                                        emit!(crate::internal_events::SinkRequestBuildError {
+                                            error: format!(
+                                                "rendered gRPC URI has disallowed scheme {:?}; only \"http\" and \"https\" are permitted",
+                                                other.unwrap_or("<none>")
+                                            ),
+                                        });
+                                        return futures::future::ready(None);
+                                    }
+                                }
+                            }
                             Err(e) => {
                                 emit!(crate::internal_events::SinkRequestBuildError {
                                     error: format!("invalid gRPC URI after rendering template: {e}"),
