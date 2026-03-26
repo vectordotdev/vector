@@ -161,17 +161,26 @@ impl GrpcSinkConfig {
 
         let use_gzip = self.compression == GrpcCompression::Gzip;
 
-        let grpc_headers: Vec<(
+        // Split headers into static (literal values) and dynamic (template values).
+        // Static headers are pre-parsed once and used for the healthcheck and every export.
+        // Dynamic headers are rendered per-event so that templated fields (e.g. tenant IDs)
+        // resolve correctly at export time.
+        let (static_header_strings, dynamic_header_templates_raw) =
+            self.request.split_headers();
+
+        let parse_key = |k: &str| {
+            tonic::metadata::AsciiMetadataKey::from_bytes(k.as_bytes())
+                .map_err(|e| warn!("Skipping invalid gRPC metadata key {k:?}: {e}"))
+                .ok()
+        };
+
+        let static_grpc_headers: Vec<(
             tonic::metadata::AsciiMetadataKey,
             tonic::metadata::AsciiMetadataValue,
-        )> = self
-            .request
-            .headers
+        )> = static_header_strings
             .iter()
             .filter_map(|(k, v)| {
-                let key = tonic::metadata::AsciiMetadataKey::from_bytes(k.as_bytes())
-                    .map_err(|e| warn!("Skipping invalid gRPC metadata key {k:?}: {e}"))
-                    .ok()?;
+                let key = parse_key(k)?;
                 let value = tonic::metadata::AsciiMetadataValue::try_from(v.as_str())
                     .map_err(|e| warn!("Skipping invalid gRPC metadata value for {k:?}: {e}"))
                     .ok()?;
@@ -179,9 +188,20 @@ impl GrpcSinkConfig {
             })
             .collect();
 
+        let dynamic_grpc_header_templates: Vec<(tonic::metadata::AsciiMetadataKey, Template)> =
+            dynamic_header_templates_raw
+                .into_iter()
+                .filter_map(|(k, t)| Some((parse_key(&k)?, t)))
+                .collect();
+
         let client = new_grpc_client(&tls, cx.proxy())?;
-        let healthcheck = Box::pin(grpc_healthcheck(client.clone(), uri.clone(), grpc_headers.clone(), cx.healthcheck));
-        let service = OtlpGrpcService::new(client, uri, use_gzip, grpc_headers);
+        let healthcheck = Box::pin(grpc_healthcheck(
+            client.clone(),
+            uri.clone(),
+            static_grpc_headers.clone(),
+            cx.healthcheck,
+        ));
+        let service = OtlpGrpcService::new(client, uri, use_gzip, static_grpc_headers);
 
         let request_settings = self.request.tower.into_settings();
         let batch_settings = self.batch.into_batcher_settings()?;
@@ -193,6 +213,7 @@ impl GrpcSinkConfig {
         let sink = OtlpGrpcSink {
             batch_settings,
             service,
+            dynamic_header_templates: dynamic_grpc_header_templates,
         };
 
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
@@ -305,6 +326,8 @@ pub enum OtlpGrpcError {
 #[derive(Clone)]
 pub struct OtlpGrpcRequest {
     pub signal: OtlpSignalRequest,
+    /// Per-event rendered values for dynamic (templated) metadata headers.
+    pub dynamic_headers: Vec<(tonic::metadata::AsciiMetadataKey, tonic::metadata::AsciiMetadataValue)>,
     pub finalizers: EventFinalizers,
     pub metadata: RequestMetadata,
 }
@@ -417,6 +440,9 @@ impl Service<OtlpGrpcRequest> for OtlpGrpcService {
                     for (key, value) in &svc.headers {
                         grpc_req.metadata_mut().insert(key.clone(), value.clone());
                     }
+                    for (key, value) in &req.dynamic_headers {
+                        grpc_req.metadata_mut().insert(key.clone(), value.clone());
+                    }
                     $client
                         .export(grpc_req)
                         .map_err(|source| OtlpGrpcError::Request { source })
@@ -483,6 +509,7 @@ struct OtlpEventData {
     json_byte_size: GroupedCountByteSize,
     finalizers: EventFinalizers,
     signal: OtlpSignal,
+    dynamic_headers: Vec<(tonic::metadata::AsciiMetadataKey, tonic::metadata::AsciiMetadataValue)>,
 }
 
 /// Pre-decoded OTLP signal for a single event.
@@ -519,6 +546,8 @@ struct OtlpBatch {
     logs: Option<SignalData<ExportLogsServiceRequest>>,
     metrics: Option<SignalData<ExportMetricsServiceRequest>>,
     traces: Option<SignalData<ExportTraceServiceRequest>>,
+    /// Dynamic header values captured from the first event in the batch.
+    dynamic_headers: Vec<(tonic::metadata::AsciiMetadataKey, tonic::metadata::AsciiMetadataValue)>,
 }
 
 impl Clone for OtlpBatch {
@@ -532,6 +561,7 @@ impl Clone for OtlpBatch {
 pub struct OtlpGrpcSink<S> {
     pub batch_settings: BatcherSettings,
     pub service: S,
+    dynamic_header_templates: Vec<(tonic::metadata::AsciiMetadataKey, Template)>,
 }
 
 impl<S> OtlpGrpcSink<S>
@@ -546,8 +576,28 @@ where
             error!("Failed to create OTLP serializer: {}", e);
         })?;
 
+        let dynamic_header_templates = self.dynamic_header_templates.clone();
+
         input
-            .filter_map(|mut event| {
+            .filter_map(move |mut event| {
+                let dynamic_headers: Vec<_> = dynamic_header_templates
+                    .iter()
+                    .filter_map(|(key, template)| {
+                        let rendered = template
+                            .render_string(&event)
+                            .map_err(|e| {
+                                warn!("Failed to render gRPC metadata template for key {:?}: {e}", key.as_str());
+                            })
+                            .ok()?;
+                        let value = tonic::metadata::AsciiMetadataValue::try_from(rendered.as_str())
+                            .map_err(|e| {
+                                warn!("Rendered gRPC metadata value for key {:?} is not valid ASCII: {e}", key.as_str());
+                            })
+                            .ok()?;
+                        Some((key.clone(), value))
+                    })
+                    .collect();
+
                 let signal = encode_event(&mut serializer, &event);
                 match signal {
                     Ok(Some(signal)) => {
@@ -558,6 +608,7 @@ where
                             json_byte_size,
                             finalizers: event.take_finalizers(),
                             signal,
+                            dynamic_headers,
                         };
                         futures::future::ready(Some(data))
                     }
@@ -577,6 +628,10 @@ where
             .batched(self.batch_settings.as_reducer_config(
                 |data: &OtlpEventData| data.signal.encoded_len(),
                 BatchReduce::new(|batch: &mut OtlpBatch, item: OtlpEventData| {
+                    if batch.dynamic_headers.is_empty() {
+                        batch.dynamic_headers = item.dynamic_headers;
+                    }
+
                     macro_rules! accumulate {
                         ($field:ident, $req:expr, $merge:expr) => {
                             match &mut batch.$field {
@@ -614,6 +669,7 @@ where
             ))
             .flat_map(|batch| {
                 let mut requests = Vec::new();
+                let dynamic_headers = batch.dynamic_headers;
 
                 macro_rules! push_signal {
                     ($field:ident, $variant:ident) => {
@@ -628,6 +684,7 @@ where
                             );
                             requests.push(OtlpGrpcRequest {
                                 signal: OtlpSignalRequest::$variant(data.request),
+                                dynamic_headers: dynamic_headers.clone(),
                                 finalizers: data.finalizers,
                                 metadata: builder.with_request_size(bytes_len),
                             });
