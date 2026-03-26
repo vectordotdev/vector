@@ -137,23 +137,26 @@ pub struct GrpcSinkConfig {
 
 impl GrpcSinkConfig {
     pub async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        if self.uri.is_dynamic() {
-            return Err(
-                "template syntax is not supported for `uri` with the gRPC transport; \
-                 use a literal URI (e.g. `http://localhost:4317`)"
-                    .into(),
-            );
-        }
+        // For static URIs, parse at build time for the healthcheck.
+        // Dynamic URIs are rendered per-event during sink execution.
+        let static_uri = if self.uri.is_dynamic() {
+            None
+        } else {
+            Some(with_default_scheme(
+                self.uri
+                    .get_ref()
+                    .parse()
+                    .map_err(|e| format!("invalid URI for gRPC sink: {e}"))?,
+                self.tls.is_some(),
+            )?)
+        };
 
-        let uri = with_default_scheme(
-            self.uri
-                .get_ref()
-                .parse()
-                .map_err(|e| format!("invalid URI for gRPC sink: {e}"))?,
-            self.tls.is_some(),
-        )?;
+        let use_https = self.tls.is_some()
+            || static_uri
+                .as_ref()
+                .is_some_and(|u| u.scheme_str() == Some("https"));
 
-        let tls = if uri.scheme_str() == Some("https") {
+        let tls = if use_https {
             MaybeTlsSettings::tls_client(self.tls.as_ref())?
         } else {
             MaybeTlsSettings::Raw(())
@@ -197,11 +200,11 @@ impl GrpcSinkConfig {
         let client = new_grpc_client(&tls, cx.proxy())?;
         let healthcheck = Box::pin(grpc_healthcheck(
             client.clone(),
-            uri.clone(),
+            static_uri,
             static_grpc_headers.clone(),
             cx.healthcheck,
         ));
-        let service = OtlpGrpcService::new(client, uri, use_gzip, static_grpc_headers);
+        let service = OtlpGrpcService::new(client, use_gzip, static_grpc_headers);
 
         let request_settings = self.request.tower.into_settings();
         let batch_settings = self.batch.into_batcher_settings()?;
@@ -214,6 +217,8 @@ impl GrpcSinkConfig {
             batch_settings,
             service,
             dynamic_header_templates: dynamic_grpc_header_templates,
+            uri_template: self.uri.clone(),
+            use_https,
         };
 
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
@@ -240,13 +245,18 @@ fn new_grpc_client(
 
 async fn grpc_healthcheck(
     client: hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>,
-    uri: Uri,
+    uri: Option<Uri>,
     headers: Vec<(tonic::metadata::AsciiMetadataKey, tonic::metadata::AsciiMetadataValue)>,
     options: SinkHealthcheckOptions,
 ) -> crate::Result<()> {
     if !options.enabled {
         return Ok(());
     }
+
+    let Some(uri) = uri else {
+        debug!("Skipping gRPC healthcheck: URI is a dynamic template resolved at runtime.");
+        return Ok(());
+    };
 
     use tonic::Code;
     use tonic_health::pb::{HealthCheckRequest, health_client::HealthClient};
@@ -326,6 +336,7 @@ pub enum OtlpGrpcError {
 #[derive(Clone)]
 pub struct OtlpGrpcRequest {
     pub signal: OtlpSignalRequest,
+    pub uri: Uri,
     /// Per-event rendered values for dynamic (templated) metadata headers.
     pub dynamic_headers: Vec<(tonic::metadata::AsciiMetadataKey, tonic::metadata::AsciiMetadataValue)>,
     pub finalizers: EventFinalizers,
@@ -372,49 +383,61 @@ impl DriverResponse for OtlpGrpcResponse {
 
 // ── Service ──────────────────────────────────────────────────────────────────
 
+struct CachedClients {
+    uri: Uri,
+    logs: LogsServiceClient<HyperSvc>,
+    metrics: MetricsServiceClient<HyperSvc>,
+    traces: TraceServiceClient<HyperSvc>,
+}
+
 #[derive(Clone)]
 pub struct OtlpGrpcService {
-    logs_client: LogsServiceClient<HyperSvc>,
-    metrics_client: MetricsServiceClient<HyperSvc>,
-    traces_client: TraceServiceClient<HyperSvc>,
+    /// Tonic clients for the most-recently-seen URI; rebuilt when the rendered URI changes.
+    clients: std::sync::Arc<std::sync::Mutex<Option<CachedClients>>>,
+    hyper_client: hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>,
+    compression: bool,
     headers: Vec<(tonic::metadata::AsciiMetadataKey, tonic::metadata::AsciiMetadataValue)>,
-    protocol: String,
-    endpoint: String,
 }
 
 impl OtlpGrpcService {
     pub fn new(
         hyper_client: hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>,
-        uri: Uri,
         compression: bool,
         headers: Vec<(tonic::metadata::AsciiMetadataKey, tonic::metadata::AsciiMetadataValue)>,
     ) -> Self {
-        let (protocol, endpoint) = crate::sinks::util::uri::protocol_endpoint(uri.clone());
-
-        let svc = HyperSvc {
-            uri,
-            client: hyper_client,
-        };
-
-        let mut logs_client = LogsServiceClient::new(svc.clone());
-        let mut metrics_client = MetricsServiceClient::new(svc.clone());
-        let mut traces_client = TraceServiceClient::new(svc);
-
-        if compression {
-            logs_client = logs_client.send_compressed(tonic::codec::CompressionEncoding::Gzip);
-            metrics_client =
-                metrics_client.send_compressed(tonic::codec::CompressionEncoding::Gzip);
-            traces_client = traces_client.send_compressed(tonic::codec::CompressionEncoding::Gzip);
-        }
-
         Self {
-            logs_client,
-            metrics_client,
-            traces_client,
+            clients: std::sync::Arc::new(std::sync::Mutex::new(None)),
+            hyper_client,
+            compression,
             headers,
-            protocol,
-            endpoint,
         }
+    }
+
+    /// Returns cloned tonic clients for `uri`, rebuilding them if the URI changed.
+    /// The mutex is held only during the synchronous rebuild, never across any `.await`.
+    fn clients_for(
+        &self,
+        uri: &Uri,
+    ) -> (
+        LogsServiceClient<HyperSvc>,
+        MetricsServiceClient<HyperSvc>,
+        TraceServiceClient<HyperSvc>,
+    ) {
+        let mut guard = self.clients.lock().expect("client lock poisoned");
+        if guard.as_ref().is_none_or(|c| &c.uri != uri) {
+            let svc = HyperSvc { uri: uri.clone(), client: self.hyper_client.clone() };
+            let mut logs = LogsServiceClient::new(svc.clone());
+            let mut metrics = MetricsServiceClient::new(svc.clone());
+            let mut traces = TraceServiceClient::new(svc);
+            if self.compression {
+                logs = logs.send_compressed(tonic::codec::CompressionEncoding::Gzip);
+                metrics = metrics.send_compressed(tonic::codec::CompressionEncoding::Gzip);
+                traces = traces.send_compressed(tonic::codec::CompressionEncoding::Gzip);
+            }
+            *guard = Some(CachedClients { uri: uri.clone(), logs, metrics, traces });
+        }
+        let c = guard.as_ref().expect("just populated");
+        (c.logs.clone(), c.metrics.clone(), c.traces.clone())
     }
 }
 
@@ -428,7 +451,11 @@ impl Service<OtlpGrpcRequest> for OtlpGrpcService {
     }
 
     fn call(&mut self, mut req: OtlpGrpcRequest) -> Self::Future {
-        let mut svc = self.clone();
+        let (protocol, endpoint) = crate::sinks::util::uri::protocol_endpoint(req.uri.clone());
+        // Rebuild clients if the URI changed; clone them out before any `.await`.
+        let (mut logs_client, mut metrics_client, mut traces_client) =
+            self.clients_for(&req.uri);
+        let static_headers = self.headers.clone();
         let metadata = std::mem::take(req.metadata_mut());
         let events_byte_size = metadata.into_events_estimated_json_encoded_byte_size();
 
@@ -437,7 +464,7 @@ impl Service<OtlpGrpcRequest> for OtlpGrpcService {
                 ($client:expr, $payload:expr) => {{
                     let len = $payload.encoded_len();
                     let mut grpc_req = tonic::Request::new($payload);
-                    for (key, value) in &svc.headers {
+                    for (key, value) in &static_headers {
                         grpc_req.metadata_mut().insert(key.clone(), value.clone());
                     }
                     for (key, value) in &req.dynamic_headers {
@@ -452,15 +479,15 @@ impl Service<OtlpGrpcRequest> for OtlpGrpcService {
             }
 
             let byte_size = match req.signal {
-                OtlpSignalRequest::Logs(r) => export!(svc.logs_client, r),
-                OtlpSignalRequest::Metrics(r) => export!(svc.metrics_client, r),
-                OtlpSignalRequest::Traces(r) => export!(svc.traces_client, r),
+                OtlpSignalRequest::Logs(r) => export!(logs_client, r),
+                OtlpSignalRequest::Metrics(r) => export!(metrics_client, r),
+                OtlpSignalRequest::Traces(r) => export!(traces_client, r),
             };
 
             emit!(EndpointBytesSent {
                 byte_size,
-                protocol: &svc.protocol,
-                endpoint: &svc.endpoint,
+                protocol: &protocol,
+                endpoint: &endpoint,
             });
 
             Ok(OtlpGrpcResponse { events_byte_size })
@@ -509,6 +536,7 @@ struct OtlpEventData {
     json_byte_size: GroupedCountByteSize,
     finalizers: EventFinalizers,
     signal: OtlpSignal,
+    uri: Uri,
     dynamic_headers: Vec<(tonic::metadata::AsciiMetadataKey, tonic::metadata::AsciiMetadataValue)>,
 }
 
@@ -546,7 +574,8 @@ struct OtlpBatch {
     logs: Option<SignalData<ExportLogsServiceRequest>>,
     metrics: Option<SignalData<ExportMetricsServiceRequest>>,
     traces: Option<SignalData<ExportTraceServiceRequest>>,
-    /// Dynamic header values captured from the first event in the batch.
+    /// URI and dynamic header values captured from the first event in the batch.
+    uri: Option<Uri>,
     dynamic_headers: Vec<(tonic::metadata::AsciiMetadataKey, tonic::metadata::AsciiMetadataValue)>,
 }
 
@@ -561,6 +590,8 @@ impl Clone for OtlpBatch {
 pub struct OtlpGrpcSink<S> {
     pub batch_settings: BatcherSettings,
     pub service: S,
+    uri_template: Template,
+    use_https: bool,
     dynamic_header_templates: Vec<(tonic::metadata::AsciiMetadataKey, Template)>,
 }
 
@@ -576,10 +607,38 @@ where
             error!("Failed to create OTLP serializer: {}", e);
         })?;
 
+        let uri_template = self.uri_template.clone();
+        let use_https = self.use_https;
         let dynamic_header_templates = self.dynamic_header_templates.clone();
 
         input
             .filter_map(move |mut event| {
+                let uri = match uri_template.render_string(&event) {
+                    Ok(rendered) => match rendered.parse::<Uri>() {
+                        Ok(parsed) => match with_default_scheme(parsed, use_https) {
+                            Ok(u) => u,
+                            Err(e) => {
+                                emit!(crate::internal_events::SinkRequestBuildError {
+                                    error: format!("invalid gRPC URI after rendering template: {e}"),
+                                });
+                                return futures::future::ready(None);
+                            }
+                        },
+                        Err(e) => {
+                            emit!(crate::internal_events::SinkRequestBuildError {
+                                error: format!("failed to parse rendered gRPC URI: {e}"),
+                            });
+                            return futures::future::ready(None);
+                        }
+                    },
+                    Err(e) => {
+                        emit!(crate::internal_events::SinkRequestBuildError {
+                            error: format!("failed to render gRPC URI template: {e}"),
+                        });
+                        return futures::future::ready(None);
+                    }
+                };
+
                 let dynamic_headers: Vec<_> = dynamic_header_templates
                     .iter()
                     .filter_map(|(key, template)| {
@@ -608,6 +667,7 @@ where
                             json_byte_size,
                             finalizers: event.take_finalizers(),
                             signal,
+                            uri,
                             dynamic_headers,
                         };
                         futures::future::ready(Some(data))
@@ -628,7 +688,8 @@ where
             .batched(self.batch_settings.as_reducer_config(
                 |data: &OtlpEventData| data.signal.encoded_len(),
                 BatchReduce::new(|batch: &mut OtlpBatch, item: OtlpEventData| {
-                    if batch.dynamic_headers.is_empty() {
+                    if batch.uri.is_none() {
+                        batch.uri = Some(item.uri);
                         batch.dynamic_headers = item.dynamic_headers;
                     }
 
@@ -668,6 +729,9 @@ where
                 }),
             ))
             .flat_map(|batch| {
+                let Some(uri) = batch.uri else {
+                    return futures::stream::iter(Vec::new());
+                };
                 let mut requests = Vec::new();
                 let dynamic_headers = batch.dynamic_headers;
 
@@ -684,6 +748,7 @@ where
                             );
                             requests.push(OtlpGrpcRequest {
                                 signal: OtlpSignalRequest::$variant(data.request),
+                                uri: uri.clone(),
                                 dynamic_headers: dynamic_headers.clone(),
                                 finalizers: data.finalizers,
                                 metadata: builder.with_request_size(bytes_len),
