@@ -397,10 +397,10 @@ pub struct OtlpGrpcService {
     clients: std::sync::Arc<std::sync::Mutex<Option<CachedClients>>>,
     hyper_client: hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>,
     compression: bool,
-    headers: Vec<(
+    headers: std::sync::Arc<Vec<(
         tonic::metadata::AsciiMetadataKey,
         tonic::metadata::AsciiMetadataValue,
-    )>,
+    )>>,
 }
 
 impl OtlpGrpcService {
@@ -416,7 +416,7 @@ impl OtlpGrpcService {
             clients: std::sync::Arc::new(std::sync::Mutex::new(None)),
             hyper_client,
             compression,
-            headers,
+            headers: std::sync::Arc::new(headers),
         }
     }
 
@@ -469,7 +469,7 @@ impl Service<OtlpGrpcRequest> for OtlpGrpcService {
         let (protocol, endpoint) = crate::sinks::util::uri::protocol_endpoint(req.uri.clone());
         // Rebuild clients if the URI changed; clone them out before any `.await`.
         let (mut logs_client, mut metrics_client, mut traces_client) = self.clients_for(&req.uri);
-        let static_headers = self.headers.clone();
+        let static_headers = std::sync::Arc::clone(&self.headers);
         let metadata = std::mem::take(req.metadata_mut());
         let events_byte_size = metadata.into_events_estimated_json_encoded_byte_size();
 
@@ -478,7 +478,7 @@ impl Service<OtlpGrpcRequest> for OtlpGrpcService {
                 ($client:expr, $payload:expr) => {{
                     let len = $payload.encoded_len();
                     let mut grpc_req = tonic::Request::new($payload);
-                    for (key, value) in &static_headers {
+                    for (key, value) in static_headers.iter() {
                         grpc_req.metadata_mut().insert(key.clone(), value.clone());
                     }
                     for (key, value) in &req.dynamic_headers {
