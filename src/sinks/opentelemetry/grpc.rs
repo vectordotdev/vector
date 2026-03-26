@@ -152,10 +152,15 @@ impl GrpcSinkConfig {
             )?)
         };
 
+        // For dynamic templates like `https://{{ host }}:4317` the static_uri is None, so
+        // we also check whether the literal prefix of the template string is "https://".
+        // This covers the common case where the scheme is a fixed literal even though the
+        // host/port are templated.
         let use_https = self.tls.is_some()
             || static_uri
                 .as_ref()
-                .is_some_and(|u| u.scheme_str() == Some("https"));
+                .is_some_and(|u| u.scheme_str() == Some("https"))
+            || self.uri.get_ref().starts_with("https://");
 
         let tls = if use_https {
             MaybeTlsSettings::tls_client(self.tls.as_ref())?
