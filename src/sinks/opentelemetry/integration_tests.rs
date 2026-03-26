@@ -24,6 +24,14 @@ fn sink_grpc_address() -> String {
         .unwrap_or_else(|_| "opentelemetry-collector:4317".to_owned())
 }
 
+fn otlp_log_event_with_host(host: &str) -> vector_lib::event::Event {
+    let mut event = otlp_log_event();
+    if let vector_lib::event::Event::Log(ref mut log) = event {
+        log.insert("host", host.to_owned());
+    }
+    event
+}
+
 fn otlp_log_event() -> vector_lib::event::Event {
     let req = ExportLogsServiceRequest {
         resource_logs: vec![ResourceLogs {
@@ -72,5 +80,22 @@ async fn delivers_logs_via_grpc() {
     let (sink, _healthcheck) = config.build(SinkContext::default()).await.unwrap();
 
     let events = vec![otlp_log_event()];
+    run_and_assert_sink_compliance(sink, stream::iter(events), &HTTP_SINK_TAGS).await;
+}
+
+#[tokio::test]
+async fn delivers_logs_via_grpc_template_uri() {
+    let host = sink_grpc_address();
+    wait_for_tcp(host.clone()).await;
+
+    let config: GrpcSinkConfig = toml::from_str(r#"
+        uri = "http://{{ host }}:4317"
+    "#)
+    .unwrap();
+
+    let (sink, _healthcheck) = config.build(SinkContext::default()).await.unwrap();
+
+    // The event carries `host` so the template renders to the collector address.
+    let events = vec![otlp_log_event_with_host(host.split(':').next().unwrap())];
     run_and_assert_sink_compliance(sink, stream::iter(events), &HTTP_SINK_TAGS).await;
 }
