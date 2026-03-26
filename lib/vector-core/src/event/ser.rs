@@ -11,8 +11,8 @@ use super::{Event, EventArray, proto};
 ///
 /// Prost enforces a decode recursion limit of 100 (no limit on encode). Vector's proto
 /// schema uses multiple prost recursion levels per `Value` nesting level, so the effective
-/// safe depth is much lower than 100. The exact overhead depends on the encoding path
-/// (`Log.fields` vs `Log.value`, event value vs metadata, log vs trace).
+/// safe depth is much lower than 100. The exact overhead varies across encoding paths
+/// (log events, trace events, event metadata each have different proto message wrappers).
 ///
 /// The value 32 was determined empirically by testing all encoding paths and finding the
 /// highest depth that roundtrips successfully across all of them. Unit tests verify that
