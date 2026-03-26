@@ -120,9 +120,8 @@ fn create_nested_log_event(wrapping_levels: usize) -> LogEvent {
     event
 }
 
-/// Verifies that the `EventWrapper` path (used by the vector sink gRPC) is at least as
-/// permissive as our `MAX_NESTING_DEPTH` check. `EventWrapper` has fewer outer wrappers
-/// than `EventArray`, so its prost decode limit is higher — our check is conservative.
+/// The vector sink encodes events as `EventWrapper` (not `EventArray`), which has a
+/// different proto structure. Verify that it can also decode at `MAX_NESTING_DEPTH`.
 #[test]
 fn event_wrapper_path_safe_at_max_depth() {
     let event = create_nested_log_event(super::super::ser::MAX_NESTING_DEPTH - 1);
@@ -141,7 +140,7 @@ fn event_wrapper_path_safe_at_max_depth() {
 /// but fails to decode them due to its internal recursion limit of 100.
 #[test]
 fn deeply_nested_event_encodes_but_fails_prost_decode() {
-    // 33 wrapping levels exceeds the prost decode limit for the Log.fields path
+    // 33 wrapping levels exceeds the prost decode limit
     let event = create_nested_log_event(33);
     let array = EventArray::Logs(LogArray::from(vec![event]));
 
