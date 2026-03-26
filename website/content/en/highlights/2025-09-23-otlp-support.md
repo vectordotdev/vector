@@ -39,12 +39,11 @@ sinks:
     inputs:
       - source0.logs
     type: opentelemetry
-    protocol:
-      type: http
-      uri: http://otel-collector-sink:5318/v1/logs
-      method: post
-      encoding:
-        codec: otlp
+    protocol: http
+    uri: http://otel-collector-sink:5318/v1/logs
+    method: post
+    encoding:
+      codec: otlp
 ```
 
 The above configuration will only work with Vector versions >= `0.51`.
@@ -58,11 +57,10 @@ otel_sink:
   inputs:
     - otel.logs
   type: opentelemetry
-  protocol:
-    type: http
-    uri: http://localhost:5318/v1/logs
-    method: post
-    encoding:
+  protocol: http
+  uri: http://localhost:5318/v1/logs
+  method: post
+  encoding:
       codec: protobuf
       protobuf:
         desc_file: path/to/opentelemetry-proto.desc
