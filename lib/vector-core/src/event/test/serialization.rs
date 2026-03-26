@@ -120,6 +120,23 @@ fn create_nested_log_event(wrapping_levels: usize) -> LogEvent {
     event
 }
 
+/// Verifies that the `EventWrapper` path (used by the vector sink gRPC) is at least as
+/// permissive as our `MAX_NESTING_DEPTH` check. `EventWrapper` has fewer outer wrappers
+/// than `EventArray`, so its prost decode limit is higher — our check is conservative.
+#[test]
+fn event_wrapper_path_safe_at_max_depth() {
+    let event = create_nested_log_event(super::super::ser::MAX_NESTING_DEPTH - 1);
+    let wrapper = proto::EventWrapper::from(Event::Log(event));
+
+    let mut buffer = BytesMut::with_capacity(65536);
+    wrapper.encode(&mut buffer).unwrap();
+    let result = proto::EventWrapper::decode(buffer.freeze());
+    assert!(
+        result.is_ok(),
+        "EventWrapper path should succeed at MAX_NESTING_DEPTH"
+    );
+}
+
 /// Demonstrates the root cause: prost encodes deeply nested events successfully,
 /// but fails to decode them due to its internal recursion limit of 100.
 #[test]
