@@ -4,7 +4,6 @@ use std::{
     pin::Pin,
     sync::{
         Arc, OnceLock, Weak,
-        atomic::{AtomicUsize, Ordering},
         mpsc::{SyncSender, sync_channel},
     },
     time::Duration,
@@ -30,6 +29,7 @@ use snafu::{ResultExt, Snafu};
 use tokio::{
     runtime::Handle,
     sync::{
+        Semaphore,
         mpsc::{self, UnboundedReceiver, UnboundedSender},
         oneshot,
     },
@@ -469,6 +469,11 @@ async fn kafka_source(
         return Err(());
     }
 
+    let max_message_handling_tasks = config.multithreading.as_ref().map(|c| {
+        c.max_message_handling_tasks
+            .unwrap_or_else(crate::num_threads)
+    });
+
     let coordination_task = {
         let span = span.clone();
         let consumer = Arc::clone(&consumer);
@@ -481,7 +486,7 @@ async fn kafka_source(
             out,
             log_namespace,
             span,
-            Arc::new(AtomicUsize::new(0)),
+            max_message_handling_tasks.map(|tasks| Arc::new(Semaphore::new(tasks))),
         );
         tokio::spawn(async move {
             coordinate_kafka_callbacks(
@@ -537,9 +542,9 @@ struct Consuming {
     /// The source's tracing Span used to instrument metrics emitted by consumer tasks
     span: Span,
 
-    /// Number of currently active message parsing tasks.
+    /// Semaphore for active message parsing tasks.
     /// Used in multithreaded mode.
-    active_message_handling_tasks: Arc<AtomicUsize>,
+    message_handling_tasks_semaphore: Option<Arc<Semaphore>>,
 }
 struct Draining {
     /// The rendezvous channel sender from the revoke or shutdown callback. Sending on this channel
@@ -560,10 +565,10 @@ struct Draining {
     /// a Consuming state.
     shutdown: bool,
 
-    /// Number of currently active message parsing tasks.
+    /// Semaphore for active message parsing tasks.
     /// Used in multithreaded mode.
     /// Needed if Consuming state is to be returned.
-    active_message_handling_tasks: Arc<AtomicUsize>,
+    message_handling_tasks_semaphore: Option<Arc<Semaphore>>,
 
     /// The source's tracing Span used to instrument metrics emitted by consumer tasks
     span: Span,
@@ -581,7 +586,7 @@ impl Draining {
             shutdown,
             expect_drain: HashSet::new(),
             span: state.span,
-            active_message_handling_tasks: state.active_message_handling_tasks,
+            message_handling_tasks_semaphore: state.message_handling_tasks_semaphore,
         }
     }
 
@@ -603,7 +608,7 @@ impl ConsumerStateInner<Consuming> {
         out: SourceSender,
         log_namespace: LogNamespace,
         span: Span,
-        active_message_handling_tasks: Arc<AtomicUsize>,
+        message_handling_tasks_semaphore: Option<Arc<Semaphore>>,
     ) -> Self {
         Self {
             config,
@@ -612,7 +617,7 @@ impl ConsumerStateInner<Consuming> {
             log_namespace,
             consumer_state: Consuming {
                 span,
-                active_message_handling_tasks,
+                message_handling_tasks_semaphore,
             },
         }
     }
@@ -636,12 +641,8 @@ impl ConsumerStateInner<Consuming> {
         let mut out = self.out.clone();
 
         let (end_tx, mut end_signal) = oneshot::channel::<()>();
-        let max_message_handling_tasks = self.config.multithreading.as_ref().map(|c| {
-            c.max_message_handling_tasks
-                .unwrap_or_else(crate::num_threads)
-        });
-        let active_message_handling_tasks =
-            Arc::clone(&self.consumer_state.active_message_handling_tasks);
+        let message_handling_tasks_semaphore =
+            self.consumer_state.message_handling_tasks_semaphore.clone();
 
         let span = self.consumer_state.span.clone();
 
@@ -700,15 +701,17 @@ impl ConsumerStateInner<Consuming> {
                                 // And we want to ignore empty messages
                                 b.try_into().ok()
                             ).collect();
-                            if let Some(max_message_handling_tasks) = max_message_handling_tasks {
+                            if let Some(message_handling_tasks_semaphore) = &message_handling_tasks_semaphore {
                                 let decoder = decoder.clone();
                                 let keys = keys.clone();
                                 let mut out = out.clone();
-                                let active_message_handling_tasks = Arc::clone(&active_message_handling_tasks);
-                                Self::wait_for_task_quota(max_message_handling_tasks, &active_message_handling_tasks).await;
+                                let message_handling_tasks_semaphore = Arc::clone(message_handling_tasks_semaphore);
+                                let permit = message_handling_tasks_semaphore.acquire_owned().await.expect("Message handling tasks semaphore closed");
                                 processing_futures.push_back(tokio::spawn(async move {
                                     let result = parse_message(msgs, &decoder, &keys, &mut out, acknowledgements, log_namespace).await;
-                                    active_message_handling_tasks.fetch_sub(1, Ordering::AcqRel);
+                                    // Force moving permit into the task, to release only once done
+                                    // parsing
+                                    drop(permit);
                                     result
                                 }.instrument(span.clone())));
                             } else {
@@ -776,28 +779,6 @@ impl ConsumerStateInner<Consuming> {
             f.add(msg.into(), receiver);
         }
     }
-
-    async fn wait_for_task_quota(
-        max_message_handling_tasks: usize,
-        active_tasks: &Arc<AtomicUsize>,
-    ) {
-        while max_message_handling_tasks > 0
-            && active_tasks
-                .fetch_update(Ordering::AcqRel, Ordering::Acquire, |active_tasks| {
-                    if active_tasks >= max_message_handling_tasks {
-                        // Too many active tasks, return None to keep sleeping in loop
-                        None
-                    } else {
-                        // Immediately add the new task to the active_tasks count and stop waiting
-                        // in loop
-                        Some(active_tasks + 1)
-                    }
-                })
-                .is_ok()
-        {
-            tokio::time::sleep(Duration::from_millis(3)).await;
-        }
-    }
 }
 
 impl ConsumerStateInner<Draining> {
@@ -841,9 +822,9 @@ impl ConsumerStateInner<Draining> {
                     log_namespace: self.log_namespace,
                     consumer_state: Consuming {
                         span: self.consumer_state.span,
-                        active_message_handling_tasks: self
+                        message_handling_tasks_semaphore: self
                             .consumer_state
-                            .active_message_handling_tasks,
+                            .message_handling_tasks_semaphore,
                     },
                 }),
             )
