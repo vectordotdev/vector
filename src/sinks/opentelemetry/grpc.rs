@@ -169,31 +169,30 @@ impl GrpcSinkConfig {
         // resolve correctly at export time.
         let (static_header_strings, dynamic_header_templates_raw) = self.request.split_headers();
 
-        let parse_key = |k: &str| {
-            tonic::metadata::AsciiMetadataKey::from_bytes(k.as_bytes())
-                .map_err(|e| warn!("Skipping invalid gRPC metadata key {k:?}: {e}"))
-                .ok()
-        };
-
-        let static_grpc_headers: Vec<(
+        // Static headers are validated at build time and any invalid key or value is a hard
+        // error. Silently dropping them would cause every request to be sent without the
+        // intended metadata (e.g. auth headers), which is worse than failing fast.
+        let mut static_grpc_headers: Vec<(
             tonic::metadata::AsciiMetadataKey,
             tonic::metadata::AsciiMetadataValue,
-        )> = static_header_strings
-            .iter()
-            .filter_map(|(k, v)| {
-                let key = parse_key(k)?;
-                let value = tonic::metadata::AsciiMetadataValue::try_from(v.as_str())
-                    .map_err(|e| warn!("Skipping invalid gRPC metadata value for {k:?}: {e}"))
-                    .ok()?;
-                Some((key, value))
-            })
-            .collect();
+        )> = Vec::with_capacity(static_header_strings.len());
+        for (k, v) in &static_header_strings {
+            let key = tonic::metadata::AsciiMetadataKey::from_bytes(k.as_bytes())
+                .map_err(|e| format!("invalid gRPC metadata key {k:?}: {e}"))?;
+            let value = tonic::metadata::AsciiMetadataValue::try_from(v.as_str())
+                .map_err(|e| format!("invalid gRPC metadata value for key {k:?}: {e}"))?;
+            static_grpc_headers.push((key, value));
+        }
 
-        let dynamic_grpc_header_templates: Vec<(tonic::metadata::AsciiMetadataKey, Template)> =
-            dynamic_header_templates_raw
-                .into_iter()
-                .filter_map(|(k, t)| Some((parse_key(&k)?, t)))
-                .collect();
+        // Dynamic header key names are known at build time and validated eagerly.
+        // Values are templated and validated per-event at runtime.
+        let mut dynamic_grpc_header_templates: Vec<(tonic::metadata::AsciiMetadataKey, Template)> =
+            Vec::with_capacity(dynamic_header_templates_raw.len());
+        for (k, t) in dynamic_header_templates_raw {
+            let key = tonic::metadata::AsciiMetadataKey::from_bytes(k.as_bytes())
+                .map_err(|e| format!("invalid gRPC metadata key {k:?}: {e}"))?;
+            dynamic_grpc_header_templates.push((key, t));
+        }
 
         let client = new_grpc_client(&tls, cx.proxy())?;
         let healthcheck = Box::pin(grpc_healthcheck(
