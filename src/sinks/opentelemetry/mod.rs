@@ -9,7 +9,7 @@ use vector_lib::configurable::configurable_component;
 
 use crate::{
     codecs::EncodingConfigWithFraming,
-    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, DataType, Input, SinkConfig, SinkContext},
     http::Auth,
     sinks::{
         Healthcheck, VectorSink,
@@ -176,7 +176,7 @@ impl SinkConfig for OpenTelemetryConfig {
     fn input(&self) -> Input {
         match &self.protocol {
             OtlpProtocol::Http { encoding, .. } => Input::new(encoding.config().1.input_type()),
-            OtlpProtocol::Grpc { .. } => Input::all(),
+            OtlpProtocol::Grpc { .. } => Input::new(DataType::Log | DataType::Trace),
         }
     }
 
