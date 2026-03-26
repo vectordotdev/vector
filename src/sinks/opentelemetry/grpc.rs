@@ -972,6 +972,10 @@ fn detect_signal_type(event: &Event) -> Option<SignalType> {
                 Some(SignalType::Logs)
             } else if log.contains(RESOURCE_METRICS_JSON_FIELD) {
                 Some(SignalType::Metrics)
+            } else if log.contains(RESOURCE_SPANS_JSON_FIELD) {
+                // OTLP spans can arrive as Log events when the source does not use
+                // use_otlp_decoding.traces = true.
+                Some(SignalType::Traces)
             } else {
                 None
             }
