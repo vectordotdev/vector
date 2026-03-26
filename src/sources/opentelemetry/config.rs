@@ -357,7 +357,7 @@ impl SourceConfig for OpentelemetryConfig {
             self.http.keepalive.clone(),
         )
         .map_err(|error| {
-            error!(message = "OpenTelemetry HTTP source failed. Terminating", %error);
+            error!(message = "OpenTelemetry HTTP source failed. Terminating.", %error);
         });
 
         Ok(join(grpc_source, http_source).map(|_| Ok(())).boxed())
