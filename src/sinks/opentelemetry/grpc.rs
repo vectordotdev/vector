@@ -109,6 +109,7 @@ pub struct GrpcSinkConfig {
     /// - `http://localhost:4317`
     /// - `https://otelcol.example.com:4317`
     #[configurable(metadata(docs::examples = "http://localhost:4317"))]
+    #[configurable(metadata(docs::warnings = "When using template syntax, the rendered URI is taken from event data. Only use dynamic URIs with trusted event sources to avoid directing Vector to unintended internal network destinations."))]
     pub uri: Template,
 
     #[configurable(derived)]
