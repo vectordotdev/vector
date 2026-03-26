@@ -7,7 +7,10 @@ use std::{
 use async_trait::async_trait;
 use bytes::BytesMut;
 use futures::{StreamExt, TryFutureExt, future::BoxFuture, stream::BoxStream};
-use http::Uri;
+use http::{
+    Uri,
+    uri::{PathAndQuery, Scheme},
+};
 use hyper::client::HttpConnector;
 use hyper_openssl::HttpsConnector;
 use hyper_proxy::ProxyConnector;
@@ -21,6 +24,7 @@ use vector_lib::{
     codecs::encoding::format::OtlpSerializer,
     config::telemetry,
     configurable::configurable_component,
+    internal_event::{ComponentEventsDropped, UNINTENTIONAL},
     opentelemetry::proto::{
         RESOURCE_LOGS_JSON_FIELD, RESOURCE_METRICS_JSON_FIELD, RESOURCE_SPANS_JSON_FIELD,
         collector::{
@@ -31,8 +35,8 @@ use vector_lib::{
             trace::v1::{ExportTraceServiceRequest, trace_service_client::TraceServiceClient},
         },
     },
-    request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
     partition::Partitioner,
+    request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
     stream::{BatcherSettings, DriverResponse},
 };
 
@@ -70,24 +74,9 @@ pub enum GrpcCompression {
 pub(super) fn with_default_scheme(uri: Uri, tls: bool) -> crate::Result<Uri> {
     if uri.scheme().is_none() {
         let mut parts = uri.into_parts();
-        parts.scheme = if tls {
-            Some(
-                "https"
-                    .parse()
-                    .unwrap_or_else(|_| unreachable!("https should be valid")),
-            )
-        } else {
-            Some(
-                "http"
-                    .parse()
-                    .unwrap_or_else(|_| unreachable!("http should be valid")),
-            )
-        };
+        parts.scheme = Some(if tls { Scheme::HTTPS } else { Scheme::HTTP });
         if parts.path_and_query.is_none() {
-            parts.path_and_query = Some(
-                "/".parse()
-                    .unwrap_or_else(|_| unreachable!("root should be valid")),
-            );
+            parts.path_and_query = Some(PathAndQuery::from_static("/"));
         }
         Ok(Uri::from_parts(parts)?)
     } else {
@@ -109,7 +98,9 @@ pub struct GrpcSinkConfig {
     /// - `http://localhost:4317`
     /// - `https://otelcol.example.com:4317`
     #[configurable(metadata(docs::examples = "http://localhost:4317"))]
-    #[configurable(metadata(docs::warnings = "When using template syntax, the rendered URI is taken from event data. Only use dynamic URIs with trusted event sources to avoid directing Vector to unintended internal network destinations."))]
+    #[configurable(metadata(
+        docs::warnings = "When using template syntax, the rendered URI is taken from event data. Only use dynamic URIs with trusted event sources to avoid directing Vector to unintended internal network destinations."
+    ))]
     pub uri: Template,
 
     #[configurable(derived)]
@@ -175,8 +166,7 @@ impl GrpcSinkConfig {
         // Static headers are pre-parsed once and used for the healthcheck and every export.
         // Dynamic headers are rendered per-event so that templated fields (e.g. tenant IDs)
         // resolve correctly at export time.
-        let (static_header_strings, dynamic_header_templates_raw) =
-            self.request.split_headers();
+        let (static_header_strings, dynamic_header_templates_raw) = self.request.split_headers();
 
         let parse_key = |k: &str| {
             tonic::metadata::AsciiMetadataKey::from_bytes(k.as_bytes())
@@ -253,7 +243,10 @@ fn new_grpc_client(
 async fn grpc_healthcheck(
     client: hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>,
     uri: Option<Uri>,
-    headers: Vec<(tonic::metadata::AsciiMetadataKey, tonic::metadata::AsciiMetadataValue)>,
+    headers: Vec<(
+        tonic::metadata::AsciiMetadataKey,
+        tonic::metadata::AsciiMetadataValue,
+    )>,
     options: SinkHealthcheckOptions,
 ) -> crate::Result<()> {
     if !options.enabled {
@@ -278,8 +271,7 @@ async fn grpc_healthcheck(
         req.metadata_mut().insert(key, value);
     }
 
-    match health_client.check(req).await
-    {
+    match health_client.check(req).await {
         Ok(response) => {
             use tonic_health::pb::health_check_response::ServingStatus;
             let status = response.into_inner().status;
@@ -289,7 +281,7 @@ async fn grpc_healthcheck(
                 Err(format!("gRPC collector reported non-serving status: {status}").into())
             }
         }
-        // Server is reachable but does not implement the health protocol — treat as healthy.
+        // Server is reachable but does not implement the health protocol; treat as healthy.
         Err(status) if status.code() == Code::Unimplemented => Ok(()),
         Err(status) => Err(Box::new(OtlpGrpcError::Request { source: status })),
     }
@@ -320,6 +312,10 @@ impl RetryLogic for OtlpGrpcRetryLogic {
                     | OutOfRange
                     | Unimplemented
                     | Unauthenticated
+                    // DataLoss: per gRPC spec this means unrecoverable data corruption, not
+                    // retriable. Note that the OTLP partial-success model can also surface
+                    // DataLoss for a partial write; we treat it as non-retriable (consistent with
+                    // the vector sink) to avoid sending an already-accepted partial batch twice.
                     | DataLoss
             ),
         }
@@ -338,24 +334,19 @@ pub enum OtlpGrpcError {
 // ── Request/Response ─────────────────────────────────────────────────────────
 
 /// A single-signal OTLP export request. One request per signal type ensures
-/// that retries are atomic — a failed metrics export cannot duplicate a
+/// that retries are atomic: a failed metrics export cannot duplicate a
 /// previously-accepted logs export.
 #[derive(Clone)]
 pub struct OtlpGrpcRequest {
-    pub signal: OtlpSignalRequest,
+    pub signal: OtlpSignal,
     pub uri: Uri,
     /// Per-event rendered values for dynamic (templated) metadata headers.
-    pub dynamic_headers: Vec<(tonic::metadata::AsciiMetadataKey, tonic::metadata::AsciiMetadataValue)>,
+    pub dynamic_headers: Vec<(
+        tonic::metadata::AsciiMetadataKey,
+        tonic::metadata::AsciiMetadataValue,
+    )>,
     pub finalizers: EventFinalizers,
     pub metadata: RequestMetadata,
-}
-
-/// The OTLP export payload for a single signal type.
-#[derive(Clone)]
-pub enum OtlpSignalRequest {
-    Logs(ExportLogsServiceRequest),
-    Metrics(ExportMetricsServiceRequest),
-    Traces(ExportTraceServiceRequest),
 }
 
 impl Finalizable for OtlpGrpcRequest {
@@ -403,14 +394,20 @@ pub struct OtlpGrpcService {
     clients: std::sync::Arc<std::sync::Mutex<Option<CachedClients>>>,
     hyper_client: hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>,
     compression: bool,
-    headers: Vec<(tonic::metadata::AsciiMetadataKey, tonic::metadata::AsciiMetadataValue)>,
+    headers: Vec<(
+        tonic::metadata::AsciiMetadataKey,
+        tonic::metadata::AsciiMetadataValue,
+    )>,
 }
 
 impl OtlpGrpcService {
     pub fn new(
         hyper_client: hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>,
         compression: bool,
-        headers: Vec<(tonic::metadata::AsciiMetadataKey, tonic::metadata::AsciiMetadataValue)>,
+        headers: Vec<(
+            tonic::metadata::AsciiMetadataKey,
+            tonic::metadata::AsciiMetadataValue,
+        )>,
     ) -> Self {
         Self {
             clients: std::sync::Arc::new(std::sync::Mutex::new(None)),
@@ -432,7 +429,10 @@ impl OtlpGrpcService {
     ) {
         let mut guard = self.clients.lock().expect("client lock poisoned");
         if guard.as_ref().is_none_or(|c| &c.uri != uri) {
-            let svc = HyperSvc { uri: uri.clone(), client: self.hyper_client.clone() };
+            let svc = HyperSvc {
+                uri: uri.clone(),
+                client: self.hyper_client.clone(),
+            };
             let mut logs = LogsServiceClient::new(svc.clone());
             let mut metrics = MetricsServiceClient::new(svc.clone());
             let mut traces = TraceServiceClient::new(svc);
@@ -441,7 +441,12 @@ impl OtlpGrpcService {
                 metrics = metrics.send_compressed(tonic::codec::CompressionEncoding::Gzip);
                 traces = traces.send_compressed(tonic::codec::CompressionEncoding::Gzip);
             }
-            *guard = Some(CachedClients { uri: uri.clone(), logs, metrics, traces });
+            *guard = Some(CachedClients {
+                uri: uri.clone(),
+                logs,
+                metrics,
+                traces,
+            });
         }
         let c = guard.as_ref().expect("just populated");
         (c.logs.clone(), c.metrics.clone(), c.traces.clone())
@@ -460,8 +465,7 @@ impl Service<OtlpGrpcRequest> for OtlpGrpcService {
     fn call(&mut self, mut req: OtlpGrpcRequest) -> Self::Future {
         let (protocol, endpoint) = crate::sinks::util::uri::protocol_endpoint(req.uri.clone());
         // Rebuild clients if the URI changed; clone them out before any `.await`.
-        let (mut logs_client, mut metrics_client, mut traces_client) =
-            self.clients_for(&req.uri);
+        let (mut logs_client, mut metrics_client, mut traces_client) = self.clients_for(&req.uri);
         let static_headers = self.headers.clone();
         let metadata = std::mem::take(req.metadata_mut());
         let events_byte_size = metadata.into_events_estimated_json_encoded_byte_size();
@@ -486,9 +490,9 @@ impl Service<OtlpGrpcRequest> for OtlpGrpcService {
             }
 
             let byte_size = match req.signal {
-                OtlpSignalRequest::Logs(r) => export!(logs_client, r),
-                OtlpSignalRequest::Metrics(r) => export!(metrics_client, r),
-                OtlpSignalRequest::Traces(r) => export!(traces_client, r),
+                OtlpSignal::Logs(r) => export!(logs_client, r),
+                OtlpSignal::Metrics(r) => export!(metrics_client, r),
+                OtlpSignal::Traces(r) => export!(traces_client, r),
             };
 
             emit!(EndpointBytesSent {
@@ -522,12 +526,24 @@ impl Service<hyper::Request<BoxBody>> for HyperSvc {
     }
 
     fn call(&mut self, mut req: hyper::Request<BoxBody>) -> Self::Future {
+        // SAFETY: `self.uri` is always produced by `with_default_scheme`, which guarantees
+        // a scheme and a path_and_query. Tonic always sets a path on the request URI.
         let uri = Uri::builder()
-            .scheme(self.uri.scheme().unwrap().clone())
-            .authority(self.uri.authority().unwrap().clone())
-            .path_and_query(req.uri().path_and_query().unwrap().clone())
+            .scheme(self.uri.scheme().expect("uri always has a scheme").clone())
+            .authority(
+                self.uri
+                    .authority()
+                    .expect("uri always has an authority")
+                    .clone(),
+            )
+            .path_and_query(
+                req.uri()
+                    .path_and_query()
+                    .expect("tonic request always has a path")
+                    .clone(),
+            )
             .build()
-            .unwrap();
+            .expect("uri components are always valid");
 
         *req.uri_mut() = uri;
 
@@ -575,7 +591,10 @@ struct OtlpEventData {
     finalizers: EventFinalizers,
     signal: OtlpSignal,
     uri: Uri,
-    dynamic_headers: Vec<(tonic::metadata::AsciiMetadataKey, tonic::metadata::AsciiMetadataValue)>,
+    dynamic_headers: Vec<(
+        tonic::metadata::AsciiMetadataKey,
+        tonic::metadata::AsciiMetadataValue,
+    )>,
 }
 
 impl ByteSizeOf for OtlpEventData {
@@ -588,8 +607,11 @@ impl ByteSizeOf for OtlpEventData {
     }
 }
 
-/// Pre-decoded OTLP signal for a single event.
-enum OtlpSignal {
+/// OTLP signal payload. Used as per-event intermediate data before batching and as the
+/// request payload sent via gRPC after batching. Each variant corresponds to one signal
+/// type so that requests can be retried independently.
+#[derive(Clone)]
+pub enum OtlpSignal {
     Logs(ExportLogsServiceRequest),
     Metrics(ExportMetricsServiceRequest),
     Traces(ExportTraceServiceRequest),
@@ -710,6 +732,20 @@ where
 
         input
             .filter_map(move |mut event| {
+                macro_rules! drop_event {
+                    ($reason:expr) => {{
+                        let reason_owned: String = $reason.to_string();
+                        emit!(crate::internal_events::SinkRequestBuildError {
+                            error: reason_owned.as_str()
+                        });
+                        emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+                            count: 1,
+                            reason: reason_owned.as_str(),
+                        });
+                        return futures::future::ready(None);
+                    }};
+                }
+
                 let uri = match uri_template.render_string(&event) {
                     Ok(rendered) => match rendered.parse::<Uri>() {
                         Ok(parsed) => match with_default_scheme(parsed, use_https) {
@@ -722,66 +758,65 @@ where
                                         // fail or silently transmit unencrypted. Drop the event and
                                         // surface a clear error so the operator can add `tls:` or
                                         // use a static `https://` scheme prefix.
-                                        emit!(crate::internal_events::SinkRequestBuildError {
-                                            error: "rendered gRPC URI uses \"https\" but the sink \
-                                                    has no TLS connector; add a `tls:` block or use \
-                                                    a static \"https://\" URI prefix so TLS is \
-                                                    enabled at startup",
-                                        });
-                                        return futures::future::ready(None);
+                                        drop_event!(
+                                            "rendered gRPC URI uses \"https\" but the sink \
+                                             has no TLS connector; add a `tls:` block or use \
+                                             a static \"https://\" URI prefix so TLS is \
+                                             enabled at startup"
+                                        );
                                     }
                                     Some("http") | Some("https") => u,
                                     other => {
-                                        emit!(crate::internal_events::SinkRequestBuildError {
-                                            error: format!(
-                                                "rendered gRPC URI has disallowed scheme {:?}; only \"http\" and \"https\" are permitted",
-                                                other.unwrap_or("<none>")
-                                            ),
-                                        });
-                                        return futures::future::ready(None);
+                                        drop_event!(format!(
+                                            "rendered gRPC URI has disallowed scheme {:?}; only \"http\" and \"https\" are permitted",
+                                            other.unwrap_or("<none>")
+                                        ));
                                     }
                                 }
                             }
                             Err(e) => {
-                                emit!(crate::internal_events::SinkRequestBuildError {
-                                    error: format!("invalid gRPC URI after rendering template: {e}"),
-                                });
-                                return futures::future::ready(None);
+                                drop_event!(format!("invalid gRPC URI after rendering template: {e}"));
                             }
                         },
                         Err(e) => {
-                            emit!(crate::internal_events::SinkRequestBuildError {
-                                error: format!("failed to parse rendered gRPC URI: {e}"),
-                            });
-                            return futures::future::ready(None);
+                            drop_event!(format!("failed to parse rendered gRPC URI: {e}"));
                         }
                     },
                     Err(e) => {
-                        emit!(crate::internal_events::SinkRequestBuildError {
-                            error: format!("failed to render gRPC URI template: {e}"),
-                        });
-                        return futures::future::ready(None);
+                        drop_event!(format!("failed to render gRPC URI template: {e}"));
                     }
                 };
 
-                let dynamic_headers: Vec<_> = dynamic_header_templates
-                    .iter()
-                    .filter_map(|(key, template)| {
-                        let rendered = template
-                            .render_string(&event)
-                            .map_err(|e| {
-                                warn!("Failed to render gRPC metadata template for key {:?}: {e}", key.as_str());
-                            })
-                            .ok()?;
-                        let value = tonic::metadata::AsciiMetadataValue::try_from(rendered.as_str())
-                            .map_err(|e| {
-                                warn!("Rendered gRPC metadata value for key {:?} is not valid ASCII: {e}", key.as_str());
-                            })
-                            .ok()?;
-                        Some((key.clone(), value))
-                    })
-                    .collect();
+                // Render dynamic headers. If any required header fails to render or produces a
+                // non-ASCII value, drop the entire event rather than forwarding without it.
+                // Silently omitting a header (e.g. X-Tenant-ID) could bypass authorization on
+                // the receiving collector.
+                let mut dynamic_headers = Vec::with_capacity(dynamic_header_templates.len());
+                for (key, template) in &dynamic_header_templates {
+                    match template.render_string(&event) {
+                        Ok(rendered) => {
+                            match tonic::metadata::AsciiMetadataValue::try_from(rendered.as_str()) {
+                                Ok(value) => dynamic_headers.push((key.clone(), value)),
+                                Err(e) => {
+                                    drop_event!(format!(
+                                        "gRPC metadata value for key {:?} is not valid ASCII: {e}",
+                                        key.as_str()
+                                    ));
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            drop_event!(format!(
+                                "failed to render gRPC metadata template for key {:?}: {e}",
+                                key.as_str()
+                            ));
+                        }
+                    }
+                }
 
+                // TODO(perf): OtlpSerializer only exposes a byte-level Encoder interface, so
+                // encode_event must encode to bytes and then decode back to a typed proto struct.
+                // Exposing a typed output from OtlpSerializer would eliminate this roundtrip.
                 let signal = encode_event(&mut serializer, &event);
                 match signal {
                     Ok(Some(signal)) => {
@@ -798,15 +833,17 @@ where
                         futures::future::ready(Some(data))
                     }
                     Ok(None) => {
-                        // Event type not supported (e.g. native Vector Metric)
-                        emit!(crate::internal_events::SinkRequestBuildError {
-                            error: "Unsupported event type for OTLP gRPC sink (native Vector Metric events are not supported; use OTLP-decoded metrics)",
-                        });
-                        futures::future::ready(None)
+                        // Event does not contain OTLP structure (missing resourceLogs,
+                        // resourceMetrics, or resourceSpans field). This sink only accepts
+                        // OTLP-structured events; plain log events from non-OTLP sources
+                        // must be encoded with an OTLP codec before reaching this sink.
+                        drop_event!(
+                            "event is not OTLP-encoded (missing resourceLogs, resourceMetrics, \
+                             or resourceSpans field); this sink only accepts OTLP-structured events"
+                        );
                     }
                     Err(e) => {
-                        emit!(crate::internal_events::SinkRequestBuildError { error: e });
-                        futures::future::ready(None)
+                        drop_event!(e);
                     }
                 }
             })
@@ -818,34 +855,17 @@ where
                 self.batch_settings.timeout,
                 |_| self.batch_settings.as_byte_size_config(),
             )
-            .flat_map(|(key, items)| {
-                // Re-parse the URI from the partition key (always succeeds: it was validated
-                // in filter_map before being stored in the key).
-                let uri: Uri = match key.uri.parse::<Uri>() {
-                    Ok(u) => u,
-                    Err(e) => {
-                        error!("Failed to re-parse gRPC batch partition URI: {e}");
-                        return futures::stream::iter(Vec::new());
-                    }
+            .flat_map(|(_, mut items)| {
+                // All items in a partition share the same URI and dynamic headers by construction;
+                // take them from the first item rather than re-parsing from the partition key.
+                let (uri, dynamic_headers) = match items.first() {
+                    Some(first) => (first.uri.clone(), first.dynamic_headers.clone()),
+                    None => return futures::stream::iter(Vec::new()),
                 };
-
-                let dynamic_headers: Vec<(
-                    tonic::metadata::AsciiMetadataKey,
-                    tonic::metadata::AsciiMetadataValue,
-                )> = key
-                    .headers
-                    .iter()
-                    .filter_map(|(k, v)| {
-                        Some((
-                            tonic::metadata::AsciiMetadataKey::from_bytes(k.as_bytes()).ok()?,
-                            tonic::metadata::AsciiMetadataValue::try_from(v.as_str()).ok()?,
-                        ))
-                    })
-                    .collect();
 
                 // Reduce the partitioned items into per-signal accumulators.
                 let mut batch = OtlpBatch::default();
-                for item in items {
+                for item in items.drain(..) {
                     batch.push(item);
                 }
 
@@ -863,7 +883,7 @@ where
                                 data.json_byte_size,
                             );
                             requests.push(OtlpGrpcRequest {
-                                signal: OtlpSignalRequest::$variant(data.request),
+                                signal: OtlpSignal::$variant(data.request),
                                 uri: uri.clone(),
                                 dynamic_headers: dynamic_headers.clone(),
                                 finalizers: data.finalizers,

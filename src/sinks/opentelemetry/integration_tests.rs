@@ -80,6 +80,8 @@ async fn delivers_logs_via_grpc() {
     let (sink, _healthcheck) = config.build(SinkContext::default()).await.unwrap();
 
     let events = vec![otlp_log_event()];
+    // The gRPC sink emits EndpointBytesSent with the same "endpoint" and "protocol" tags as
+    // HTTP sinks, so HTTP_SINK_TAGS is the correct compliance set here.
     run_and_assert_sink_compliance(sink, stream::iter(events), &HTTP_SINK_TAGS).await;
 }
 
@@ -88,9 +90,11 @@ async fn delivers_logs_via_grpc_template_uri() {
     let host = sink_grpc_address();
     wait_for_tcp(host.clone()).await;
 
-    let config: GrpcSinkConfig = toml::from_str(r#"
+    let config: GrpcSinkConfig = toml::from_str(
+        r#"
         uri = "http://{{ host }}:4317"
-    "#)
+    "#,
+    )
     .unwrap();
 
     let (sink, _healthcheck) = config.build(SinkContext::default()).await.unwrap();
