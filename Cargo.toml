@@ -20,13 +20,6 @@ test = false
 bench = false
 
 [[bin]]
-name = "graphql-schema"
-path = "src/api/schema/gen.rs"
-test = false
-bench = false
-required-features = ["default-no-api-client"]
-
-[[bin]]
 name = "secret-backend-example"
 path = "src/config/loading/secret_backend_example.rs"
 test = false
@@ -163,7 +156,7 @@ dashmap = { version = "6.1.0", default-features = false }
 derivative = { version = "2.2.0", default-features = false }
 exitcode = { version = "1.1.2", default-features = false }
 flate2 = { version = "1.1.2", default-features = false, features = ["zlib-rs"] }
-futures = { version = "0.3.31", default-features = false, features = ["compat", "io-compat", "std"], package = "futures" }
+futures = { version = "0.3.31", default-features = false, features = ["std"] }
 futures-util = { version = "0.3.29", default-features = false }
 glob = { version = "0.3.3", default-features = false }
 hickory-proto = { version = "0.25.2", default-features = false, features = ["dnssec-ring"] }
@@ -207,6 +200,7 @@ toml = { version = "0.9.8", default-features = false, features = ["serde", "disp
 tonic = { version = "0.11", default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
 tonic-build = { version = "0.11", default-features = false, features = ["transport", "prost"] }
 tonic-health = { version = "0.11", default-features = false }
+tonic-reflection = { version = "0.11", default-features = false, features = ["server"] }
 tracing = { version = "0.1.44", default-features = false }
 tracing-subscriber = { version = "0.3.22", default-features = false, features = ["fmt"]  }
 url = { version = "2.5.4", default-features = false, features = ["serde"] }
@@ -220,7 +214,7 @@ vector-vrl-category = { path = "lib/vector-vrl/category" }
 vector-vrl-functions = { path = "lib/vector-vrl/functions", default-features = false }
 vrl = { git = "https://github.com/vectordotdev/vrl.git", branch = "main", default-features = false, features = ["arbitrary", "cli", "test", "test_framework", "stdlib-base"] }
 mock_instant = { version = "0.6" }
-serial_test = { version = "3.2" }
+serial_test = { version = "3.4" }
 strum = { version = "0.28", features = ["derive"] }
 
 [dependencies]
@@ -344,10 +338,6 @@ lapin = { version = "4.3.0", default-features = false, features = ["tokio", "nat
 async-rs = { version = "0.8", default-features = false, features = ["tokio"], optional = true }
 deadpool = { version = "0.12.2", default-features = false, features = ["managed", "rt_tokio_1"], optional = true }
 
-# API
-async-graphql = { version = "7.0.17", default-features = false, optional = true, features = ["chrono", "playground"] }
-async-graphql-warp = { version = "7.0.17", default-features = false, optional = true }
-
 # ODBC
 odbc-api = { version = "19.1.0", optional = true }
 cron = { version = "0.15.0", features = ["serde"], optional = true }
@@ -412,7 +402,7 @@ lru = { version = "0.16.3", default-features = false }
 maxminddb = { version = "0.27.0", default-features = false, optional = true, features = ["simdutf8"] }
 md-5 = { version = "0.10", default-features = false, optional = true }
 mongodb = { version = "3.3.0", default-features = false, optional = true, features = ["compat-3-0-0", "dns-resolver", "rustls-tls"] }
-async-nats = { version = "0.42.0", default-features = false, optional = true, features = ["ring", "websockets"] }
+async-nats = { version = "0.46.0", default-features = false, optional = true, features = ["ring", "websockets", "jetstream", "nkeys"] }
 nkeys = { version = "0.4.5", default-features = false, optional = true }
 nom = { workspace = true, optional = true }
 notify = { version = "8.1.0", default-features = false, features = ["macos_fsevent"] }
@@ -422,7 +412,7 @@ ordered-float.workspace = true
 percent-encoding = { version = "2.3.1", default-features = false }
 postgres-openssl = { version = "0.5.1", default-features = false, features = ["runtime"], optional = true }
 pulsar = { version = "6.7.0", default-features = false, features = ["tokio-runtime", "auth-oauth2", "flate2", "lz4", "snap", "zstd"], optional = true }
-quick-junit = { version = "0.5.1" }
+quick-junit = { version = "0.6.0" }
 rand.workspace = true
 rand_distr.workspace = true
 rdkafka = { version = "0.39.0", default-features = false, features = ["curl-static", "tokio", "libz", "ssl", "zstd"], optional = true }
@@ -446,6 +436,7 @@ toml.workspace = true
 hickory-proto = { workspace = true, optional = true }
 tonic = { workspace = true, optional = true }
 tonic-health = { workspace = true, optional = true }
+tonic-reflection = { workspace = true, optional = true }
 thread_local = { version = "1.1.9", default-features = false, optional = true }
 typetag = { version = "0.2.20", default-features = false }
 url.workspace = true
@@ -569,9 +560,12 @@ docker = ["dep:bollard", "dep:dirs-next"]
 
 # API
 api = [
-  "dep:async-graphql",
-  "dep:async-graphql-warp",
   "dep:base64",
+  "dep:tonic",
+  "dep:tonic-reflection",
+  "dep:prost",
+  "dep:prost-types",
+  "protobuf-build",
   "vector-lib/api",
 ]
 
@@ -647,7 +641,6 @@ sources-logs = [
   "sources-logstash",
   "sources-mqtt",
   "sources-nats",
-  "sources-odbc",
   "sources-okta",
   "sources-opentelemetry",
   "sources-pulsar",
@@ -709,7 +702,6 @@ sources-mongodb_metrics = ["dep:mongodb"]
 sources-mqtt = ["dep:rumqttc"]
 sources-nats = ["dep:async-nats", "dep:nkeys"]
 sources-nginx_metrics = ["dep:nom"]
-sources-odbc = ["dep:odbc-api", "dep:cron"]
 sources-okta = ["sources-utils-http-client"]
 sources-opentelemetry = [
   "dep:hex",
@@ -969,7 +961,6 @@ all-integration-tests = [
   "mqtt-integration-tests",
   "nats-integration-tests",
   "nginx-integration-tests",
-  "odbc-integration-tests",
   "opentelemetry-integration-tests",
   "postgresql_metrics-integration-tests",
   "postgres_sink-integration-tests",
@@ -1038,7 +1029,6 @@ mongodb_metrics-integration-tests = ["sources-mongodb_metrics"]
 mqtt-integration-tests = ["sinks-mqtt", "sources-mqtt"]
 nats-integration-tests = ["sinks-nats", "sources-nats"]
 nginx-integration-tests = ["sources-nginx_metrics"]
-odbc-integration-tests = ["sources-odbc"]
 opentelemetry-integration-tests = ["sources-opentelemetry", "dep:prost"]
 postgresql_metrics-integration-tests = ["sources-postgresql_metrics"]
 postgres_sink-integration-tests = ["sinks-postgres"]
@@ -1085,6 +1075,7 @@ vector-api-tests = [
   "sources-demo_logs",
   "transforms-log_to_metric",
   "transforms-remap",
+  "transforms-route",
   "sinks-blackhole"
 ]
 vector-unit-test-tests = [

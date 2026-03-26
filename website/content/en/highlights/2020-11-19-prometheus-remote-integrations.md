@@ -66,7 +66,7 @@ Kubernetes where Prometheus is tightly integrated.
 To get started, setup the new
 [`prometheus_remote_write` source][prometheus_remote_write_source] and send
 your metrics to [Datadog][datadog], [New Relic][new_relic], [Influx][influx],
-[Elasticsearch][elastic], and [more][sinks]:
+[Elasticsearch][elastic], and [many other sinks][sinks]:
 
 ```toml title="vector.toml"
 [sources.prometheus]
