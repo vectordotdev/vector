@@ -254,7 +254,10 @@ async fn grpc_healthcheck(
     }
 
     let Some(uri) = uri else {
-        debug!("Skipping gRPC healthcheck: URI is a dynamic template resolved at runtime.");
+        warn!(
+            "Skipping gRPC healthcheck: `uri` is a dynamic template and cannot be validated \
+             at startup. To enable healthchecking, use a static URI."
+        );
         return Ok(());
     };
 
