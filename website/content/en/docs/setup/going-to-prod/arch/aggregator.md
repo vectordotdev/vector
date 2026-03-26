@@ -111,4 +111,4 @@ This eliminates the need to deploy a single monolith aggregator, creating an unn
 
 ## Support
 
-For easy setup and maintenance of this architecture, consider the Vector’s [discussions](https://discussions.vector.dev) or [chat](https://chat.vector.dev). These are free best effort channels. For enterprise needs, consider Datadog Observability Pipelines, which comes with enterprise-level support. Read more about that product [here](https://www.datadoghq.com/product/observability-pipelines/).
+For easy setup and maintenance of this architecture, consider the Vector’s [discussions](https://discussions.vector.dev) or [chat](https://chat.vector.dev). These are free best effort channels. For enterprise needs, consider Datadog Observability Pipelines, which comes with enterprise-level support. Read more about [Datadog Observability Pipelines](https://www.datadoghq.com/product/observability-pipelines/).
