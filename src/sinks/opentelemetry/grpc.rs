@@ -180,9 +180,8 @@ impl GrpcSinkConfig {
             .collect();
 
         let client = new_grpc_client(&tls, cx.proxy())?;
-        let service = OtlpGrpcService::new(client.clone(), uri.clone(), use_gzip, grpc_headers);
-
-        let healthcheck = Box::pin(grpc_healthcheck(client, uri, cx.healthcheck));
+        let healthcheck = Box::pin(grpc_healthcheck(client.clone(), uri.clone(), grpc_headers.clone(), cx.healthcheck));
+        let service = OtlpGrpcService::new(client, uri, use_gzip, grpc_headers);
 
         let request_settings = self.request.tower.into_settings();
         let batch_settings = self.batch.into_batcher_settings()?;
@@ -221,6 +220,7 @@ fn new_grpc_client(
 async fn grpc_healthcheck(
     client: hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>,
     uri: Uri,
+    headers: Vec<(tonic::metadata::AsciiMetadataKey, tonic::metadata::AsciiMetadataValue)>,
     options: SinkHealthcheckOptions,
 ) -> crate::Result<()> {
     if !options.enabled {
@@ -233,11 +233,14 @@ async fn grpc_healthcheck(
     let svc = HyperSvc { uri, client };
     let mut health_client = HealthClient::new(svc);
 
-    match health_client
-        .check(HealthCheckRequest {
-            service: String::new(),
-        })
-        .await
+    let mut req = tonic::Request::new(HealthCheckRequest {
+        service: String::new(),
+    });
+    for (key, value) in headers {
+        req.metadata_mut().insert(key, value);
+    }
+
+    match health_client.check(req).await
     {
         Ok(response) => {
             use tonic_health::pb::health_check_response::ServingStatus;
