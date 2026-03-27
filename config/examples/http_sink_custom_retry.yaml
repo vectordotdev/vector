@@ -1,0 +1,42 @@
+# HTTP sink example with a custom retry strategy
+# ----------------------------------------------------
+# Sends demo logs to an HTTP endpoint and only retries the response codes
+# that the upstream API documents as transient.
+
+data_dir: "/var/lib/vector"
+
+sources:
+  demo_logs:
+    type: "demo_logs"
+    format: "json"
+    interval: 1
+
+sinks:
+  http_out:
+    type: "http"
+    inputs: [ "demo_logs" ]
+    uri: "https://example.com/ingest"
+    method: "post"
+
+    # Skip the startup probe so the example can be adapted locally.
+    healthcheck:
+      enabled: false
+
+    # Send newline-delimited JSON in the request body.
+    framing:
+      method: "newline_delimited"
+    encoding:
+      codec: "json"
+
+    # Control how many retries are made and how quickly backoff grows.
+    request:
+      timeout_secs: 60
+      retry_attempts: 8
+      retry_initial_backoff_secs: 2
+      retry_max_duration_secs: 30
+
+    # Retry only on the exact HTTP status codes that this destination
+    # treats as temporary failures.
+    retry_strategy:
+      type: "custom"
+      status_codes: [ 408, 425, 429, 503 ]
