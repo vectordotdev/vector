@@ -124,6 +124,8 @@ on:
         value: ${{ jobs.int_tests.outputs.nats }}
       nginx:
         value: ${{ jobs.int_tests.outputs.nginx }}
+      opensearch:
+        value: ${{ jobs.int_tests.outputs.opensearch }}
       opentelemetry:
         value: ${{ jobs.int_tests.outputs.opentelemetry }}
       postgres:
@@ -337,6 +339,7 @@ jobs:
       mqtt: ${{ steps.filter.outputs.mqtt }}
       nats: ${{ steps.filter.outputs.nats }}
       nginx: ${{ steps.filter.outputs.nginx }}
+      opensearch: ${{ steps.filter.outputs.opensearch }}
       opentelemetry: ${{ steps.filter.outputs.opentelemetry }}
       postgres: ${{ steps.filter.outputs.postgres }}
       prometheus: ${{ steps.filter.outputs.prometheus }}
@@ -404,6 +407,7 @@ jobs:
             "nats": ${{ steps.filter.outputs.nats }},
             "nginx": ${{ steps.filter.outputs.nginx }},
             "opentelemetry": ${{ steps.filter.outputs.opentelemetry }},
+            "opensearch": ${{ steps.filter.outputs.opensearch }},
             "postgres": ${{ steps.filter.outputs.postgres }},
             "prometheus": ${{ steps.filter.outputs.prometheus }},
             "pulsar": ${{ steps.filter.outputs.pulsar }},
