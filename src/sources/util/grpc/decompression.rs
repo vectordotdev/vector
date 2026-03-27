@@ -10,13 +10,10 @@ use std::{
 use bytes::{Buf, BufMut, BytesMut};
 use flate2::write::GzDecoder;
 use futures_util::FutureExt;
-use http::{Request, Response};
-use hyper::{
-    Body,
-    body::{HttpBody, Sender},
-};
+use http_1::{Request, Response};
+use http_body_util::{BodyExt, channel::{Channel, Sender}};
 use tokio::{pin, select};
-use tonic::{Status, body::BoxBody, metadata::AsciiMetadataValue};
+use tonic::{Status, body::Body as TonicBody, metadata::AsciiMetadataValue};
 use tower::{Layer, Service};
 use vector_lib::internal_event::{
     ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
@@ -36,7 +33,7 @@ enum CompressionScheme {
 }
 
 impl CompressionScheme {
-    fn from_encoding_header(req: &Request<Body>) -> Result<Option<Self>, Status> {
+    fn from_encoding_header(req: &Request<TonicBody>) -> Result<Option<Self>, Status> {
         req.headers()
             .get(GRPC_ENCODING_HEADER)
             .map(|s| {
@@ -87,17 +84,29 @@ fn new_decompressor() -> GzDecoder<Vec<u8>> {
 }
 
 async fn drive_body_decompression(
-    mut source: Body,
-    mut destination: Sender,
+    mut source: TonicBody,
+    mut destination: Sender<bytes::Bytes, Status>,
 ) -> Result<usize, Status> {
     let mut state = State::default();
     let mut buf = BytesMut::new();
     let mut decompressor = None;
     let mut bytes_received = 0;
 
-    // Drain all message chunks from the body first.
-    while let Some(result) = source.data().await {
-        let chunk = result.map_err(|_| Status::internal("failed to read from underlying body"))?;
+    // Drain all frames from the body.
+    while let Some(result) = source.frame().await {
+        let frame = result.map_err(|_| Status::internal("failed to read from underlying body"))?;
+
+        if frame.is_trailers() {
+            let trailers = frame.into_trailers().unwrap();
+            if destination.send_trailers(trailers).await.is_err() {
+                return Err(Status::internal("destination body abnormally closed"));
+            }
+            break;
+        }
+
+        let Ok(chunk) = frame.into_data() else {
+            return Err(Status::internal("unexpected non-data frame"));
+        };
         buf.put(chunk);
 
         let maybe_message = loop {
@@ -225,27 +234,17 @@ async fn drive_body_decompression(
         }
     }
 
-    // When we've exhausted all the message chunks, we try sending any trailers that came in on the underlying body.
-    let result = source.trailers().await;
-    let maybe_trailers =
-        result.map_err(|_| Status::internal("error reading trailers from underlying body"))?;
-    if let Some(trailers) = maybe_trailers
-        && destination.send_trailers(trailers).await.is_err()
-    {
-        return Err(Status::internal("destination body abnormally closed"));
-    }
-
     Ok(bytes_received)
 }
 
 async fn drive_request<F, E>(
-    source: Body,
-    destination: Sender,
+    source: TonicBody,
+    destination: Sender<bytes::Bytes, Status>,
     inner: F,
     bytes_received: Registered<BytesReceived>,
-) -> Result<Response<BoxBody>, E>
+) -> Result<Response<TonicBody>, E>
 where
-    F: Future<Output = Result<Response<BoxBody>, E>>,
+    F: Future<Output = Result<Response<TonicBody>, E>>,
     E: std::fmt::Display,
 {
     let body_decompression = drive_body_decompression(source, destination);
@@ -266,7 +265,7 @@ where
             // Drive the core decompression loop, reading chunks from the underlying body, decompressing them if needed,
             // and eventually handling trailers at the end, if they're present.
             result = &mut body_decompression, if !body_eof => match result {
-                Err(e) => break Ok(e.to_http()),
+                Err(e) => break Ok(e.into_http::<TonicBody>()),
                 Ok(bytes_received) => {
                     body_bytes_received = bytes_received;
                     body_eof = true;
@@ -300,13 +299,13 @@ pub struct DecompressionAndMetrics<S> {
     bytes_received: Registered<BytesReceived>,
 }
 
-impl<S> Service<Request<Body>> for DecompressionAndMetrics<S>
+impl<S> Service<Request<TonicBody>> for DecompressionAndMetrics<S>
 where
-    S: Service<Request<Body>, Response = Response<BoxBody>> + Clone + Send + 'static,
+    S: Service<Request<TonicBody>, Response = Response<TonicBody>> + Clone + Send + 'static,
     S::Future: Send + 'static,
     S::Error: std::fmt::Display,
 {
-    type Response = Response<BoxBody>;
+    type Response = Response<TonicBody>;
     type Error = S::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
@@ -314,12 +313,12 @@ where
         self.inner.poll_ready(cx)
     }
 
-    fn call(&mut self, req: Request<Body>) -> Self::Future {
+    fn call(&mut self, req: Request<TonicBody>) -> Self::Future {
         match CompressionScheme::from_encoding_header(&req) {
             // There was a header for the encoding, but it was either invalid data or a scheme we don't support.
             Err(status) => {
                 emit!(GrpcInvalidCompressionSchemeError { status: &status });
-                Box::pin(async move { Ok(status.to_http()) })
+                Box::pin(async move { Ok(status.into_http::<TonicBody>()) })
             }
 
             // The request either isn't using compression, or it has indicated compression may be used and we know we
@@ -328,7 +327,8 @@ where
             //
             // TODO: Actually use the scheme given back to us to support other compression schemes.
             Ok(_) => {
-                let (destination, decompressed_body) = Body::channel();
+                let (destination, channel) = Channel::<bytes::Bytes, Status>::new(0);
+                let decompressed_body = TonicBody::new(channel);
                 let (req_parts, req_body) = req.into_parts();
                 let mapped_req = Request::from_parts(req_parts, decompressed_body);
 

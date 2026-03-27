@@ -3,7 +3,7 @@ use std::net::SocketAddr;
 
 use chrono::Utc;
 use futures::TryFutureExt;
-use tonic::{Request, Response, Status, transport::server::RoutesBuilder};
+use tonic::{Request, Response, Status, service::RoutesBuilder};
 use tonic_health::server::health_reporter;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
@@ -188,7 +188,7 @@ impl SourceConfig for VectorConfig {
         .max_decoding_message_size(usize::MAX);
 
         // Create the standard gRPC health service
-        let (mut health_reporter, health_service) = health_reporter();
+        let (health_reporter, health_service) = health_reporter();
 
         // Register the Vector service as serving in the health reporter
         health_reporter

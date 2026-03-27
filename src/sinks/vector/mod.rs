@@ -165,7 +165,7 @@ mod tests {
             hyper::Response::builder()
                 .header("grpc-status", "7") // permission denied
                 .header("content-type", "application/grpc")
-                .body(tonic::body::empty_body())
+                .body(hyper::Body::empty())
                 .unwrap()
         });
 

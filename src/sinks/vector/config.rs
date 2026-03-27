@@ -1,8 +1,11 @@
-use http::Uri;
-use hyper::client::HttpConnector;
-use hyper_openssl::HttpsConnector;
-use hyper_proxy::ProxyConnector;
-use tonic::body::BoxBody;
+use http_1::Uri;
+use hyper_openssl_10::client::legacy::HttpsConnector;
+use hyper_proxy2::ProxyConnector;
+use hyper_util::{
+    client::legacy::{Client, connect::HttpConnector},
+    rt::TokioExecutor,
+};
+use tonic::body::Body as TonicBody;
 use tower::ServiceBuilder;
 use vector_lib::configurable::configurable_component;
 
@@ -13,10 +16,10 @@ use super::{
 };
 use crate::{
     config::{
-        AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext,
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext,
         SinkHealthcheckOptions,
     },
-    http::build_proxy_connector,
+    http::http_1::{IntoHttp1, build_proxy_connector},
     proto::vector as proto,
     sinks::{
         Healthcheck, VectorSink as VectorSinkType,
@@ -112,14 +115,15 @@ impl SinkConfig for VectorConfig {
         let tls = MaybeTlsSettings::from_config(self.tls.as_ref(), false)?;
         let uri = with_default_scheme(&self.address, tls.is_tls())?;
 
-        let client = new_client(&tls, cx.proxy())?;
+        let client = new_client(&tls, cx.http_1_proxy())?;
 
         let healthcheck_uri = cx
             .healthcheck
             .uri
             .clone()
-            .map(|uri| uri.uri)
+            .map(|uri| uri.uri.into_http_1())
             .unwrap_or_else(|| uri.clone());
+
         let healthcheck_client = VectorService::new(client.clone(), healthcheck_uri, false);
         let healthcheck = healthcheck(healthcheck_client, cx.healthcheck);
         let service = VectorService::new(client, uri, self.compression);
@@ -212,11 +216,13 @@ pub fn with_default_scheme(address: &str, tls: bool) -> crate::Result<Uri> {
 
 fn new_client(
     tls_settings: &MaybeTlsSettings,
-    proxy_config: &ProxyConfig,
-) -> crate::Result<hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>> {
+    proxy_config: &crate::config::http_1::ProxyConfig,
+) -> crate::Result<Client<ProxyConnector<HttpsConnector<HttpConnector>>, TonicBody>> {
     let proxy = build_proxy_connector(tls_settings.clone(), proxy_config)?;
 
-    Ok(hyper::Client::builder().http2_only(true).build(proxy))
+    Ok(Client::builder(TokioExecutor::new())
+        .http2_only(true)
+        .build(proxy))
 }
 
 #[derive(Debug, Clone)]

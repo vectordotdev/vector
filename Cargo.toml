@@ -175,10 +175,10 @@ pastey = { version = "0.2", default-features = false }
 pin-project = { version = "1.1.11", default-features = false }
 proptest = { version = "1.11" }
 proptest-derive = { version = "0.6.0" }
-prost = { version = "0.12", default-features = false, features = ["std"] }
-prost-build = { version = "0.12", default-features = false }
+prost = { version = "0.13", default-features = false, features = ["std"] }
+prost-build = { version = "0.13", default-features = false }
 prost-reflect = { version = "0.14", features = ["serde"], default-features = false }
-prost-types = { version = "0.12", default-features = false }
+prost-types = { version = "0.13", default-features = false }
 quickcheck = { version = "1.1.0" }
 rand = { version = "0.9.2", default-features = false, features = ["small_rng", "thread_rng"] }
 rand_distr = { version = "0.5.1", default-features = false }
@@ -198,10 +198,10 @@ tokio-stream = { version = "0.1.18", default-features = false }
 tokio-test = "0.4.5"
 tokio-tungstenite = { version = "0.20.1", default-features = false }
 toml = { version = "0.9.8", default-features = false, features = ["serde", "display", "parse"] }
-tonic = { version = "0.11", default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
-tonic-build = { version = "0.11", default-features = false, features = ["transport", "prost"] }
-tonic-health = { version = "0.11", default-features = false }
-tonic-reflection = { version = "0.11", default-features = false, features = ["server"] }
+tonic = { version = "0.13", default-features = false, features = ["transport", "codegen", "prost", "tls-native-roots", "gzip", "router"] }
+tonic-build = { version = "0.13", default-features = false, features = ["transport", "prost"] }
+tonic-health = { version = "0.13", default-features = false }
+tonic-reflection = { version = "0.13", default-features = false, features = ["server"] }
 tracing = { version = "0.1.44", default-features = false }
 tracing-subscriber = { version = "0.3.22", default-features = false, features = ["fmt"]  }
 url = { version = "2.5.4", default-features = false, features = ["serde"] }
@@ -312,6 +312,7 @@ opendal = { version = "0.54", default-features = false, features = ["services-we
 # Tower
 tower = { version = "0.5.2", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util", "balance", "discover"] }
 tower-http = { version = "0.4.4", default-features = false, features = ["compression-full", "decompression-full", "trace"] }
+tower-http-6 = { package = "tower-http", version = "0.6", default-features = false, features = ["compression-full", "decompression-full", "trace"] }
 # Serde
 serde.workspace = true
 serde-toml-merge = { version = "0.3.11", default-features = false }

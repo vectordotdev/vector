@@ -59,7 +59,7 @@ impl GrpcServer {
                 .register_encoded_file_descriptor_set(
                     crate::proto::observability::FILE_DESCRIPTOR_SET,
                 )
-                .build()
+                .build_v1()
                 .expect("Failed to build reflection service");
 
             let result = TonicServer::builder()

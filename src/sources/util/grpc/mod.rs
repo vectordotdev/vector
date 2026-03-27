@@ -1,15 +1,15 @@
 use std::{convert::Infallible, net::SocketAddr, time::Duration};
 
 use futures::FutureExt;
-use http::{Request, Response};
-use hyper::Body;
+use http_1::{Request, Response};
 use tonic::{
-    body::BoxBody,
+    body::Body as TonicBody,
     server::NamedService,
-    transport::server::{Routes, Server},
+    service::Routes,
+    transport::server::Server,
 };
 use tower::Service;
-use tower_http::{
+use tower_http_6::{
     classify::{GrpcErrorsAsFailures, SharedClassifier},
     trace::TraceLayer,
 };
@@ -31,7 +31,7 @@ pub async fn run_grpc_server<S>(
     shutdown: ShutdownSignal,
 ) -> crate::Result<()>
 where
-    S: Service<Request<Body>, Response = Response<BoxBody>, Error = Infallible>
+    S: Service<Request<TonicBody>, Response = Response<TonicBody>, Error = Infallible>
         + NamedService
         + Clone
         + Send
@@ -57,8 +57,7 @@ where
         // modified or wrapped.. so instead of a cleaner design, we're opting here to bake it all together until the
         // crates are sufficiently flexible for us to craft a better design.
         .layer(DecompressionAndMetricsLayer)
-        .add_service(service)
-        .serve_with_incoming_shutdown(stream, shutdown.map(|token| tx.send(token).unwrap()))
+        .serve_with_incoming_shutdown(service, stream, shutdown.map(|token| tx.send(token).unwrap()))
         .await?;
 
     drop(rx.await);
@@ -100,15 +99,15 @@ pub fn build_grpc_trace_layer(
     span: Span,
 ) -> TraceLayer<
     SharedClassifier<GrpcErrorsAsFailures>,
-    impl Fn(&Request<Body>) -> Span + Clone,
-    impl Fn(&Request<Body>, &Span) + Clone,
-    impl Fn(&Response<BoxBody>, Duration, &Span) + Clone,
+    impl Fn(&Request<TonicBody>) -> Span + Clone,
+    impl Fn(&Request<TonicBody>, &Span) + Clone,
+    impl Fn(&Response<TonicBody>, Duration, &Span) + Clone,
     (),
     (),
     (),
 > {
     TraceLayer::new_for_grpc()
-        .make_span_with(move |request: &Request<Body>| {
+        .make_span_with(move |request: &Request<TonicBody>| {
             // The path is defined as “/” {service name} “/” {method name}.
             let mut path = request.uri().path().split('/');
             let service = path.nth(1).unwrap_or("_unknown");
@@ -122,11 +121,11 @@ pub fn build_grpc_trace_layer(
                grpc_method = method,
             )
         })
-        .on_request(Box::new(|_request: &Request<Body>, _span: &Span| {
+        .on_request(Box::new(|_request: &Request<TonicBody>, _span: &Span| {
             emit!(GrpcServerRequestReceived);
         }))
         .on_response(
-            |response: &Response<BoxBody>, latency: Duration, _span: &Span| {
+            |response: &Response<TonicBody>, latency: Duration, _span: &Span| {
                 emit!(GrpcServerResponseSent { response, latency });
             },
         )

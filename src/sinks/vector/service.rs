@@ -1,12 +1,13 @@
 use std::task::{Context, Poll};
 
 use futures::{TryFutureExt, future::BoxFuture};
-use http::Uri;
-use hyper::client::HttpConnector;
-use hyper_openssl::HttpsConnector;
-use hyper_proxy::ProxyConnector;
+use http_1::Uri;
+use hyper_1::body::Incoming;
+use hyper_openssl_10::client::legacy::HttpsConnector;
+use hyper_proxy2::ProxyConnector;
+use hyper_util::client::legacy::{Client, connect::HttpConnector};
 use prost::Message;
-use tonic::{IntoRequest, body::BoxBody};
+use tonic::{IntoRequest, body::Body as TonicBody};
 use tower::Service;
 use vector_lib::{
     request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
@@ -17,10 +18,13 @@ use super::VectorSinkError;
 use crate::{
     Error,
     event::{EventFinalizers, EventStatus, Finalizable},
+    http::http_1::IntoLegacyHttp,
     internal_events::EndpointBytesSent,
     proto::vector as proto_vector,
     sinks::util::uri,
 };
+
+type HyperClient = Client<ProxyConnector<HttpsConnector<HttpConnector>>, TonicBody>;
 
 #[derive(Clone, Debug)]
 pub struct VectorService {
@@ -67,12 +71,8 @@ impl MetaDescriptive for VectorRequest {
 }
 
 impl VectorService {
-    pub fn new(
-        hyper_client: hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>,
-        uri: Uri,
-        compression: bool,
-    ) -> Self {
-        let (protocol, endpoint) = uri::protocol_endpoint(uri.clone());
+    pub fn new(hyper_client: HyperClient, uri: Uri, compression: bool) -> Self {
+        let (protocol, endpoint) = uri::protocol_endpoint(uri.into_legacy_http());
         let mut proto_client = proto_vector::Client::new(HyperSvc {
             uri,
             client: hyper_client,
@@ -135,12 +135,12 @@ impl Service<VectorRequest> for VectorService {
 #[derive(Clone, Debug)]
 pub struct HyperSvc {
     uri: Uri,
-    client: hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>,
+    client: HyperClient,
 }
 
-impl Service<hyper::Request<BoxBody>> for HyperSvc {
-    type Response = hyper::Response<hyper::Body>;
-    type Error = hyper::Error;
+impl Service<http_1::Request<TonicBody>> for HyperSvc {
+    type Response = http_1::Response<Incoming>;
+    type Error = hyper_util::client::legacy::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     // Emission of an internal event in case of errors is handled upstream by the caller.
@@ -149,7 +149,7 @@ impl Service<hyper::Request<BoxBody>> for HyperSvc {
     }
 
     // Emission of internal events for errors and dropped events is handled upstream by the caller.
-    fn call(&mut self, mut req: hyper::Request<BoxBody>) -> Self::Future {
+    fn call(&mut self, mut req: http_1::Request<TonicBody>) -> Self::Future {
         let uri = Uri::builder()
             .scheme(self.uri.scheme().unwrap().clone())
             .authority(self.uri.authority().unwrap().clone())

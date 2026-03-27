@@ -22,7 +22,7 @@ fn main() -> Result<()> {
         .build_client(true)
         .build_server(true)
         .file_descriptor_set_path(&descriptor_path)
-        .compile(&proto_paths, &[include_path])?;
+        .compile_protos(&proto_paths, &[include_path])?;
 
     write_static_descriptor_reference(&descriptor_path, &out_dir)?;
 
