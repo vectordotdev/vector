@@ -325,8 +325,7 @@ impl RetryLogic for OtlpGrpcRetryLogic {
 // ── Error type ───────────────────────────────────────────────────────────────
 
 #[derive(Debug, Snafu)]
-#[snafu(visibility(pub))]
-pub enum OtlpGrpcError {
+enum OtlpGrpcError {
     #[snafu(display("gRPC request failed: {source}"))]
     Request { source: tonic::Status },
 }
@@ -337,16 +336,16 @@ pub enum OtlpGrpcError {
 /// that retries are atomic: a failed metrics export cannot duplicate a
 /// previously-accepted logs export.
 #[derive(Clone)]
-pub struct OtlpGrpcRequest {
-    pub signal: OtlpSignal,
-    pub uri: Uri,
+struct OtlpGrpcRequest {
+    signal: OtlpSignal,
+    uri: Uri,
     /// Per-event rendered values for dynamic (templated) metadata headers.
-    pub dynamic_headers: Vec<(
+    dynamic_headers: Vec<(
         tonic::metadata::AsciiMetadataKey,
         tonic::metadata::AsciiMetadataValue,
     )>,
-    pub finalizers: EventFinalizers,
-    pub metadata: RequestMetadata,
+    finalizers: EventFinalizers,
+    metadata: RequestMetadata,
 }
 
 impl Finalizable for OtlpGrpcRequest {
@@ -365,7 +364,7 @@ impl MetaDescriptive for OtlpGrpcRequest {
     }
 }
 
-pub struct OtlpGrpcResponse {
+struct OtlpGrpcResponse {
     events_byte_size: GroupedCountByteSize,
 }
 
@@ -399,7 +398,7 @@ enum SignalClient {
 }
 
 #[derive(Clone)]
-pub struct OtlpGrpcService {
+struct OtlpGrpcService {
     /// Tonic clients for the most-recently-seen URI; rebuilt when the rendered URI changes.
     /// Each Tower concurrency-slot clone owns its cache independently — no shared mutex needed.
     clients: Option<CachedClients>,
@@ -412,7 +411,7 @@ pub struct OtlpGrpcService {
 }
 
 impl OtlpGrpcService {
-    pub fn new(
+    fn new(
         hyper_client: hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>,
         compression: bool,
         headers: Vec<(
@@ -592,7 +591,7 @@ impl ByteSizeOf for OtlpEventData {
 /// request payload sent via gRPC after batching. Each variant corresponds to one signal
 /// type so that requests can be retried independently.
 #[derive(Clone)]
-pub enum OtlpSignal {
+enum OtlpSignal {
     Logs(ExportLogsServiceRequest),
     Metrics(ExportMetricsServiceRequest),
     Traces(ExportTraceServiceRequest),
@@ -673,9 +672,9 @@ impl OtlpBatch {
     }
 }
 
-pub struct OtlpGrpcSink<S> {
-    pub batch_settings: BatcherSettings,
-    pub service: S,
+struct OtlpGrpcSink<S> {
+    batch_settings: BatcherSettings,
+    service: S,
     uri_template: Template,
     use_https: bool,
     dynamic_header_templates: Vec<(tonic::metadata::AsciiMetadataKey, Template)>,
