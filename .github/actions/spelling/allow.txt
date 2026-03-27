@@ -60,6 +60,7 @@ Bedove
 Benss
 bigendian
 bindir
+binstall
 binfmt
 bitcast
 bitcode
@@ -148,7 +149,9 @@ EPC
 esbuild
 esensar
 etld
+eventcreate
 eventloop
+Evt
 Evercoss
 exactlyonce
 Explay
@@ -500,6 +503,7 @@ Telstra
 Tencent
 Texet
 Thl
+timediff
 timeframe
 timeseries
 timespan
@@ -563,5 +567,11 @@ zstandard
 ZTE
 Zync
 sighup
+CPPFLAGS
+LDFLAGS
+libsasl
+pkgconfig
 CLAUDE
+grpcurl
 linting
+lexers

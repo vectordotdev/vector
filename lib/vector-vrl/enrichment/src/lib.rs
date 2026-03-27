@@ -185,6 +185,7 @@ pub(crate) const ENRICHMENT_TABLE_EXPLAINER: &str = indoc! {r#"
         * `autonomous_system_organization`
         * `isp`
         * `organization`
+        * `network`
 
     * City databases:
         * `city_name`
@@ -198,9 +199,20 @@ pub(crate) const ENRICHMENT_TABLE_EXPLAINER: &str = indoc! {r#"
         * `longitude`
         * `postal_code`
         * `timezone`
+        * `network`
 
     * Connection-Type databases:
         * `connection_type`
+        * `network`
+
+    * Anonymous-IP databases:
+        * `is_anonymous`
+        * `is_anonymous_vpn`
+        * `is_hosting_provider`
+        * `is_public_proxy`
+        * `is_residential_proxy`
+        * `is_tor_exit_node`
+        * `network`
 
     To use this function, you need to update your configuration to
     include an

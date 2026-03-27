@@ -85,11 +85,10 @@ pub struct ChunkedGelfDecoderOptions {
 
 /// Decompression options for ChunkedGelfDecoder.
 #[configurable_component]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Derivative)]
-#[derivative(Default)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum ChunkedGelfDecompressionConfig {
     /// Automatically detect the decompression method based on the magic bytes of the message.
-    #[derivative(Default)]
+    #[default]
     Auto,
     /// Use Gzip decompression.
     Gzip,
