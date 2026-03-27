@@ -455,7 +455,7 @@ windows = { version = "0.58", features = ["Win32_System_EventLog", "Win32_Founda
 quick-xml = { version = "0.31", default-features = false, features = ["serialize"], optional = true }
 
 [target.'cfg(unix)'.dependencies]
-nix = { version = "0.31", default-features = false, features = ["socket", "signal", "fs", "process"] }
+nix = { version = "0.31", default-features = false, features = ["socket", "signal", "fs"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 procfs = { version = "0.18.0", default-features = false }
@@ -547,7 +547,7 @@ target-x86_64-unknown-linux-musl =      ["target-unix"]
 # Enables features that work only on systems providing `cfg(unix)`
 unix = ["tikv-jemallocator", "allocation-tracing"]
 allocation-tracing = ["vector-lib/allocation-tracing"]
-component-probes = []
+component-probes = ["nix/process"]
 
 # Enables kubernetes dependencies and shared code. Kubernetes-related sources,
 # transforms and sinks should depend on this feature.
