@@ -93,10 +93,6 @@ where
     #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
     pub proxy: ProxyConfig,
 
-    #[configurable(derived)]
-    #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
-    pub http_1_proxy: Http1ProxyConfig,
-
     #[serde(flatten)]
     #[configurable(metadata(docs::hidden))]
     pub inner: BoxedSink,
@@ -142,7 +138,6 @@ where
             healthcheck_uri: None,
             inner: inner.into(),
             proxy: Default::default(),
-            http_1_proxy: Default::default(),
             graph: Default::default(),
             validated: None,
         }
@@ -183,8 +178,8 @@ where
         &self.proxy
     }
 
-    pub const fn http_1_proxy(&self) -> &Http1ProxyConfig {
-        &self.http_1_proxy
+    pub fn http_1_proxy(&self) -> Http1ProxyConfig {
+        Http1ProxyConfig::from(&self.proxy)
     }
 
     pub(super) fn map_inputs<U>(self, f: impl Fn(&T) -> U) -> SinkOuter<U>
@@ -207,7 +202,6 @@ where
             healthcheck: self.healthcheck,
             healthcheck_uri: self.healthcheck_uri,
             proxy: self.proxy,
-            http_1_proxy: self.http_1_proxy,
             graph: self.graph,
             validated: self.validated,
         }

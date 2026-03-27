@@ -716,8 +716,8 @@ impl<'a> Builder<'a> {
             metrics_storage: METRICS_STORAGE.clone(),
             proxy: ProxyConfig::merge_with_env(&self.config.global.proxy, sink.proxy()),
             http_1_proxy: Http1ProxyConfig::merge_with_env(
-                &self.config.global.http_1_proxy,
-                sink.http_1_proxy(),
+                &self.config.global.http_1_proxy(),
+                &sink.http_1_proxy(),
             ),
             schema: self.config.schema,
             app_name: crate::get_app_name().to_string(),
