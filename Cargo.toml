@@ -842,6 +842,7 @@ sinks-logs = [
   "sinks-redis",
   "sinks-sematext",
   "sinks-socket",
+  "sinks-syslog",
   "sinks-splunk_hec",
   "sinks-vector",
   "sinks-webhdfs",
@@ -914,6 +915,7 @@ sinks-pulsar = ["dep:apache-avro", "dep:pulsar"]
 sinks-redis = ["dep:redis"]
 sinks-sematext = ["sinks-elasticsearch", "sinks-influxdb"]
 sinks-socket = ["sinks-utils-udp"]
+sinks-syslog = ["codecs-syslog", "sinks-utils-udp"]
 sinks-splunk_hec = []
 sinks-statsd = ["sinks-utils-udp", "tokio-util/net"]
 sinks-utils-udp = []
