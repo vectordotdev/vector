@@ -261,7 +261,7 @@ async fn grpc_healthcheck(
     use tonic::Code;
     use tonic_health::pb::{HealthCheckRequest, health_client::HealthClient};
 
-    let svc = HyperSvc { uri, client };
+    let svc = HyperSvc::new(uri, client);
     let mut health_client = HealthClient::new(svc);
 
     let mut req = tonic::Request::new(HealthCheckRequest {
@@ -432,10 +432,7 @@ impl OtlpGrpcService {
     /// matching `signal`. Only that one client is cloned.
     fn client_for_signal(&mut self, uri: &Uri, signal: &OtlpSignal) -> SignalClient {
         if self.clients.as_ref().is_none_or(|c| &c.uri != uri) {
-            let svc = HyperSvc {
-                uri: uri.clone(),
-                client: self.hyper_client.clone(),
-            };
+            let svc = HyperSvc::new(uri.clone(), self.hyper_client.clone());
             let mut logs = LogsServiceClient::new(svc.clone());
             let mut metrics = MetricsServiceClient::new(svc.clone());
             let mut traces = TraceServiceClient::new(svc);
