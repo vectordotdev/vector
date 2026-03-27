@@ -45,7 +45,7 @@ use crate::{
     sinks::util::grpc::HyperGrpcService,
     event::{Event, EventFinalizers, EventStatus, Finalizable},
     http::build_proxy_connector,
-    internal_events::EndpointBytesSent,
+    internal_events::{EndpointBytesSent, SinkRequestBuildError},
     sinks::{
         Healthcheck, VectorSink,
         util::{
@@ -611,6 +611,32 @@ struct SignalData<R> {
     json_byte_size: GroupedCountByteSize,
 }
 
+impl<R> SignalData<R> {
+    const fn new(
+        request: R,
+        finalizers: EventFinalizers,
+        byte_size: usize,
+        json_byte_size: GroupedCountByteSize,
+    ) -> Self {
+        SignalData { request, finalizers, event_count: 1, byte_size, json_byte_size }
+    }
+
+    fn merge(
+        &mut self,
+        req: R,
+        finalizers: EventFinalizers,
+        byte_size: usize,
+        json_byte_size: GroupedCountByteSize,
+        merge_req: impl FnOnce(&mut R, R),
+    ) {
+        merge_req(&mut self.request, req);
+        self.finalizers.merge(finalizers);
+        self.event_count += 1;
+        self.byte_size += byte_size;
+        self.json_byte_size += json_byte_size;
+    }
+}
+
 /// Accumulator for a batch of OTLP events, separated by signal type so that
 /// the resulting requests can be retried independently.
 #[derive(Default)]
@@ -622,60 +648,20 @@ struct OtlpBatch {
 
 impl OtlpBatch {
     fn push(&mut self, item: OtlpEventData) {
-        let OtlpEventData {
-            byte_size,
-            json_byte_size,
-            finalizers,
-            signal,
-            uri: _,
-            dynamic_headers: _,
-        } = item;
-
-        macro_rules! accumulate {
-            ($field:ident, $req:expr, $merge:expr) => {
-                match &mut self.$field {
-                    Some(existing) => {
-                        $merge(&mut existing.request, $req);
-                        existing.finalizers.merge(finalizers);
-                        existing.event_count += 1;
-                        existing.byte_size += byte_size;
-                        existing.json_byte_size += json_byte_size;
-                    }
-                    slot => {
-                        *slot = Some(SignalData {
-                            request: $req,
-                            finalizers,
-                            event_count: 1,
-                            byte_size,
-                            json_byte_size,
-                        });
-                    }
-                }
-            };
-        }
-
+        let OtlpEventData { byte_size, json_byte_size, finalizers, signal, uri: _, dynamic_headers: _ } = item;
         match signal {
-            OtlpSignal::Logs(req) => accumulate!(
-                logs,
-                req,
-                |e: &mut ExportLogsServiceRequest, r: ExportLogsServiceRequest| {
-                    e.resource_logs.extend(r.resource_logs)
-                }
-            ),
-            OtlpSignal::Metrics(req) => accumulate!(
-                metrics,
-                req,
-                |e: &mut ExportMetricsServiceRequest, r: ExportMetricsServiceRequest| {
-                    e.resource_metrics.extend(r.resource_metrics)
-                }
-            ),
-            OtlpSignal::Traces(req) => accumulate!(
-                traces,
-                req,
-                |e: &mut ExportTraceServiceRequest, r: ExportTraceServiceRequest| {
-                    e.resource_spans.extend(r.resource_spans)
-                }
-            ),
+            OtlpSignal::Logs(req) => match &mut self.logs {
+                Some(existing) => existing.merge(req, finalizers, byte_size, json_byte_size, |e, r| e.resource_logs.extend(r.resource_logs)),
+                slot => *slot = Some(SignalData::new(req, finalizers, byte_size, json_byte_size)),
+            },
+            OtlpSignal::Metrics(req) => match &mut self.metrics {
+                Some(existing) => existing.merge(req, finalizers, byte_size, json_byte_size, |e, r| e.resource_metrics.extend(r.resource_metrics)),
+                slot => *slot = Some(SignalData::new(req, finalizers, byte_size, json_byte_size)),
+            },
+            OtlpSignal::Traces(req) => match &mut self.traces {
+                Some(existing) => existing.merge(req, finalizers, byte_size, json_byte_size, |e, r| e.resource_spans.extend(r.resource_spans)),
+                slot => *slot = Some(SignalData::new(req, finalizers, byte_size, json_byte_size)),
+            },
         }
     }
 }
@@ -706,31 +692,17 @@ where
 
         input
             .filter_map(move |mut event| {
-                macro_rules! drop_event {
-                    ($reason:expr) => {{
-                        let reason_owned: String = $reason.to_string();
-                        emit!(crate::internal_events::SinkRequestBuildError {
-                            error: reason_owned.as_str()
-                        });
-                        emit!(ComponentEventsDropped::<UNINTENTIONAL> {
-                            count: 1,
-                            reason: reason_owned.as_str(),
-                        });
-                        return futures::future::ready(None);
-                    }};
-                }
-
                 let rendered = match uri_template.render_string(&event) {
                     Ok(s) => s,
-                    Err(e) => drop_event!(format!("failed to render gRPC URI template: {e}")),
+                    Err(e) => return reject_event(format!("failed to render gRPC URI template: {e}")),
                 };
                 let parsed = match rendered.parse::<Uri>() {
                     Ok(u) => u,
-                    Err(e) => drop_event!(format!("failed to parse rendered gRPC URI: {e}")),
+                    Err(e) => return reject_event(format!("failed to parse rendered gRPC URI: {e}")),
                 };
                 let u = match with_default_scheme(parsed, use_https) {
                     Ok(u) => u,
-                    Err(e) => drop_event!(format!("invalid gRPC URI after rendering template: {e}")),
+                    Err(e) => return reject_event(format!("invalid gRPC URI after rendering template: {e}")),
                 };
                 let uri = match u.scheme_str() {
                     Some("https") if !use_https => {
@@ -740,16 +712,16 @@ where
                         // fail or silently transmit unencrypted. Drop the event and
                         // surface a clear error so the operator can add `tls:` or
                         // use a static `https://` scheme prefix.
-                        drop_event!(
+                        return reject_event(
                             "rendered gRPC URI uses \"https\" but the sink \
                              has no TLS connector; add a `tls:` block or use \
                              a static \"https://\" URI prefix so TLS is \
-                             enabled at startup"
+                             enabled at startup",
                         );
                     }
                     Some("http") | Some("https") => u,
                     other => {
-                        drop_event!(format!(
+                        return reject_event(format!(
                             "rendered gRPC URI has disallowed scheme {:?}; only \"http\" and \"https\" are permitted",
                             other.unwrap_or("<none>")
                         ));
@@ -767,7 +739,7 @@ where
                             match tonic::metadata::AsciiMetadataValue::try_from(rendered.as_str()) {
                                 Ok(value) => dynamic_headers.push((key.clone(), value)),
                                 Err(e) => {
-                                    drop_event!(format!(
+                                    return reject_event(format!(
                                         "gRPC metadata value for key {:?} is not valid ASCII: {e}",
                                         key.as_str()
                                     ));
@@ -775,7 +747,7 @@ where
                             }
                         }
                         Err(e) => {
-                            drop_event!(format!(
+                            return reject_event(format!(
                                 "failed to render gRPC metadata template for key {:?}: {e}",
                                 key.as_str()
                             ));
@@ -806,14 +778,12 @@ where
                         // resourceMetrics, or resourceSpans field). This sink only accepts
                         // OTLP-structured events; plain log events from non-OTLP sources
                         // must be encoded with an OTLP codec before reaching this sink.
-                        drop_event!(
+                        reject_event(
                             "event is not OTLP-encoded (missing resourceLogs, resourceMetrics, \
-                             or resourceSpans field); this sink only accepts OTLP-structured events"
-                        );
+                             or resourceSpans field); this sink only accepts OTLP-structured events",
+                        )
                     }
-                    Err(e) => {
-                        drop_event!(e);
-                    }
+                    Err(e) => reject_event(e.to_string()),
                 }
             })
             // Partition by (rendered URI, dynamic headers) so that events destined for
@@ -840,31 +810,15 @@ where
 
                 let mut requests = Vec::new();
 
-                macro_rules! push_signal {
-                    ($field:ident, $variant:ident) => {
-                        if let Some(data) = batch.$field {
-                            let byte_size = data.request.encoded_len();
-                            let bytes_len =
-                                NonZeroUsize::new(byte_size.max(1)).expect("should be non-zero");
-                            let builder = RequestMetadataBuilder::new(
-                                data.event_count,
-                                data.byte_size,
-                                data.json_byte_size,
-                            );
-                            requests.push(OtlpGrpcRequest {
-                                signal: OtlpSignal::$variant(data.request),
-                                uri: uri.clone(),
-                                dynamic_headers: dynamic_headers.clone(),
-                                finalizers: data.finalizers,
-                                metadata: builder.with_request_size(bytes_len),
-                            });
-                        }
-                    };
+                if let Some(data) = batch.logs {
+                    requests.push(signal_into_request(data, OtlpSignal::Logs, &uri, dynamic_headers.clone()));
                 }
-
-                push_signal!(logs, Logs);
-                push_signal!(metrics, Metrics);
-                push_signal!(traces, Traces);
+                if let Some(data) = batch.metrics {
+                    requests.push(signal_into_request(data, OtlpSignal::Metrics, &uri, dynamic_headers.clone()));
+                }
+                if let Some(data) = batch.traces {
+                    requests.push(signal_into_request(data, OtlpSignal::Traces, &uri, dynamic_headers.clone()));
+                }
 
                 futures::stream::iter(requests)
             })
@@ -954,6 +908,44 @@ fn detect_signal_type(event: &Event) -> Option<SignalType> {
             }
         }
         Event::Metric(_) => None, // Native Vector metrics not supported by OtlpSerializer
+    }
+}
+
+/// Drop an event that could not be prepared for export.
+///
+/// Emits [`SinkRequestBuildError`] and [`ComponentEventsDropped`], then returns
+/// a ready future resolving to `None` so the caller can use `return
+/// reject_event(...)` directly inside a `filter_map` closure.
+fn reject_event(reason: impl fmt::Display) -> futures::future::Ready<Option<OtlpEventData>> {
+    let reason = reason.to_string();
+    emit!(SinkRequestBuildError { error: &reason });
+    emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+        count: 1,
+        reason: &reason,
+    });
+    futures::future::ready(None)
+}
+
+/// Build an [`OtlpGrpcRequest`] from a per-signal accumulator.
+fn signal_into_request<R: prost::Message>(
+    data: SignalData<R>,
+    make_signal: fn(R) -> OtlpSignal,
+    uri: &Uri,
+    dynamic_headers: Vec<(
+        tonic::metadata::AsciiMetadataKey,
+        tonic::metadata::AsciiMetadataValue,
+    )>,
+) -> OtlpGrpcRequest {
+    let byte_size = data.request.encoded_len();
+    let bytes_len = NonZeroUsize::new(byte_size.max(1)).expect("should be non-zero");
+    let builder =
+        RequestMetadataBuilder::new(data.event_count, data.byte_size, data.json_byte_size);
+    OtlpGrpcRequest {
+        signal: make_signal(data.request),
+        uri: uri.clone(),
+        dynamic_headers,
+        finalizers: data.finalizers,
+        metadata: builder.with_request_size(bytes_len),
     }
 }
 
