@@ -113,11 +113,6 @@ pub struct GlobalOptions {
     #[configurable(metadata(docs::common = false, docs::required = false))]
     pub proxy: ProxyConfig,
 
-    #[configurable(derived)]
-    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
-    #[configurable(metadata(docs::common = false, docs::required = false))]
-    pub http_1_proxy: Http1ProxyConfig,
-
     /// Controls how acknowledgements are handled for all sinks by default.
     ///
     /// See [End-to-end Acknowledgements][e2e_acks] for more information on how Vector handles event
@@ -341,7 +336,6 @@ impl GlobalOptions {
                 acknowledgements: self.acknowledgements.merge_default(&with.acknowledgements),
                 timezone: self.timezone.or(with.timezone),
                 proxy: self.proxy.merge(&with.proxy),
-                http_1_proxy: self.http_1_proxy.merge(&with.http_1_proxy),
                 expire_metrics: self.expire_metrics.or(with.expire_metrics),
                 expire_metrics_secs: self.expire_metrics_secs.or(with.expire_metrics_secs),
                 expire_metrics_per_metric_set: merged_expire_metrics_per_metric_set,
@@ -356,6 +350,13 @@ impl GlobalOptions {
         } else {
             Err(errors)
         }
+    }
+
+    /// Returns an `Http1ProxyConfig` derived from the `proxy` field.
+    ///
+    /// The HTTP/1 proxy is always kept in sync with the configured `proxy` settings.
+    pub fn http_1_proxy(&self) -> Http1ProxyConfig {
+        Http1ProxyConfig::from(&self.proxy)
     }
 
     /// Get the configured time zone, using "local" time if none is set.
@@ -472,7 +473,7 @@ mod tests {
     fn merges_http_1_proxy() {
         // We use the `.http` settings as a proxy for the other settings, as they are all compared
         // for equality above.
-        let merge = |a, b| merge("proxy.http", a, b, |result| result.http_1_proxy.http);
+        let merge = |a, b| merge("proxy.http", a, b, |result| result.http_1_proxy().http);
 
         assert_eq!(merge(None, None), Ok(None));
         assert_eq!(merge(Some("test1"), None), Ok(Some("test1".into())));

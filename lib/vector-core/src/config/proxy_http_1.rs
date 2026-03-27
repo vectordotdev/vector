@@ -110,6 +110,23 @@ fn is_enabled(e: &bool) -> bool {
     e == &true
 }
 
+impl From<&super::proxy::ProxyConfig> for ProxyConfig {
+    fn from(proxy: &super::proxy::ProxyConfig) -> Self {
+        let super::proxy::ProxyConfig {
+            enabled,
+            http,
+            https,
+            no_proxy,
+        } = proxy.clone();
+        Self {
+            enabled,
+            http,
+            https,
+            no_proxy,
+        }
+    }
+}
+
 impl ProxyConfig {
     fn default_enabled() -> bool {
         true
