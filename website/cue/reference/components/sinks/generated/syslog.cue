@@ -1,0 +1,273 @@
+package metadata
+
+generated: components: sinks: syslog: configuration: {
+	acknowledgements: {
+		description: """
+			Controls how acknowledgements are handled for this sink.
+
+			See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
+
+			[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
+			"""
+		required: false
+		type: object: options: enabled: {
+			description: """
+				Controls whether or not end-to-end acknowledgements are enabled.
+
+				When enabled for a sink, any source that supports end-to-end
+				acknowledgements that is connected to that sink waits for events
+				to be acknowledged by **all connected sinks** before acknowledging them at the source.
+
+				Enabling or disabling acknowledgements at the sink level takes precedence over any global
+				[`acknowledgements`][global_acks] configuration.
+
+				[global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
+				"""
+			required: false
+			type: bool: {}
+		}
+	}
+	address: {
+		description: """
+			The address to connect to.
+
+			Both IP address and hostname are accepted formats.
+
+			The address _must_ include a port.
+			"""
+		relevant_when: "mode = \"tcp\" or mode = \"udp\""
+		required:      true
+		type: string: examples: ["92.12.333.224:5000", "https://somehost:5000"]
+	}
+	framing: {
+		description: """
+			Stream framing configuration.
+
+			Applies only to stream-oriented transports: TCP and Unix stream sockets. UDP
+			sends exactly one syslog message per datagram and does not use framing.
+			"""
+		relevant_when: "mode = \"tcp\" or mode = \"unix_stream\""
+		required:      false
+		type: object: options: method: {
+			description: "The framing method used to separate syslog messages in stream transports."
+			required:    false
+			type: string: {
+				default: "newline_delimited"
+				enum: {
+					newline_delimited: """
+						Terminates each syslog message with a newline (LF) character.
+
+						This is RFC 6587 non-transparent framing. Use octet-counting if
+						messages can contain embedded newlines.
+						"""
+					octet_counting: """
+						Prefixes each syslog message with its byte length and a space.
+
+						This is RFC 6587 octet-counting framing. When used with TCP, TLS, and
+						RFC 5424 messages, this is the framing required by RFC 5425.
+						"""
+				}
+			}
+		}
+	}
+	keepalive: {
+		description:   "TCP keepalive settings for socket-based components."
+		relevant_when: "mode = \"tcp\""
+		required:      false
+		type: object: options: time_secs: {
+			description: "The time to wait before starting to send TCP keepalive probes on an idle connection."
+			required:    false
+			type: uint: unit: "seconds"
+		}
+	}
+	mode: {
+		description: "The type of socket to use."
+		required:    true
+		type: string: enum: {
+			tcp:         "Send over TCP."
+			udp:         "Send over UDP."
+			unix_stream: "Send over a Unix domain socket (UDS), in stream mode."
+		}
+	}
+	path: {
+		description: """
+			The Unix socket path.
+
+			This should be an absolute path.
+			"""
+		relevant_when: "mode = \"unix_stream\""
+		required:      true
+		type: string: examples: ["/path/to/socket"]
+	}
+	send_buffer_bytes: {
+		description: """
+			The size of the socket's send buffer.
+
+			If set, the value of the setting is passed via the `SO_SNDBUF` option.
+			"""
+		relevant_when: "mode = \"tcp\" or mode = \"udp\""
+		required:      false
+		type: uint: {
+			examples: [
+				65536,
+			]
+			unit: "bytes"
+		}
+	}
+	syslog: {
+		description: """
+			Syslog encoding options.
+
+			Controls the RFC format, facility, severity, and field mappings for the syslog output.
+			"""
+		required: false
+		type: object: options: {
+			app_name: {
+				description: """
+					Path to a field in the event to use for the app name.
+
+					If not provided, the encoder checks for a semantic "service" field.
+					If that is also missing, it defaults to "vector".
+					"""
+				required: false
+				type: string: {}
+			}
+			facility: {
+				description: "Path to a field in the event to use for the facility. Defaults to \"user\"."
+				required:    false
+				type: string: {}
+			}
+			msg_id: {
+				description: "Path to a field in the event to use for the msg ID."
+				required:    false
+				type: string: {}
+			}
+			proc_id: {
+				description: "Path to a field in the event to use for the proc ID."
+				required:    false
+				type: string: {}
+			}
+			rfc: {
+				description: "RFC to use for formatting."
+				required:    false
+				type: string: {
+					default: "rfc5424"
+					enum: {
+						rfc3164: "The legacy RFC3164 syslog format."
+						rfc5424: "The modern RFC5424 syslog format."
+					}
+				}
+			}
+			severity: {
+				description: "Path to a field in the event to use for the severity. Defaults to \"informational\"."
+				required:    false
+				type: string: {}
+			}
+		}
+	}
+	tls: {
+		description:   "Configures the TLS options for incoming/outgoing connections."
+		relevant_when: "mode = \"tcp\""
+		required:      false
+		type: object: options: {
+			alpn_protocols: {
+				description: """
+					Sets the list of supported ALPN protocols.
+
+					Declare the supported ALPN protocols, which are used during negotiation with a peer. They are prioritized in the order
+					that they are defined.
+					"""
+				required: false
+				type: array: items: type: string: examples: ["h2"]
+			}
+			ca_file: {
+				description: """
+					Absolute path to an additional CA certificate file.
+
+					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
+					"""
+				required: false
+				type: string: examples: ["/path/to/certificate_authority.crt"]
+			}
+			crt_file: {
+				description: """
+					Absolute path to a certificate file used to identify this server.
+
+					The certificate must be in DER, PEM (X.509), or PKCS#12 format. Additionally, the certificate can be provided as
+					an inline string in PEM format.
+
+					If this is set _and_ is not a PKCS#12 archive, `key_file` must also be set.
+					"""
+				required: false
+				type: string: examples: ["/path/to/host_certificate.crt"]
+			}
+			enabled: {
+				description: """
+					Whether to require TLS for incoming or outgoing connections.
+
+					When enabled and used for incoming connections, an identity certificate is also required. See `tls.crt_file` for
+					more information.
+					"""
+				required: false
+				type: bool: {}
+			}
+			key_file: {
+				description: """
+					Absolute path to a private key file used to identify this server.
+
+					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
+					"""
+				required: false
+				type: string: examples: ["/path/to/host_certificate.key"]
+			}
+			key_pass: {
+				description: """
+					Passphrase used to unlock the encrypted key file.
+
+					This has no effect unless `key_file` is set.
+					"""
+				required: false
+				type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
+			}
+			server_name: {
+				description: """
+					Server name to use when using Server Name Indication (SNI).
+
+					Only relevant for outgoing connections.
+					"""
+				required: false
+				type: string: examples: ["www.example.com"]
+			}
+			verify_certificate: {
+				description: """
+					Enables certificate verification. For components that create a server, this requires that the
+					client connections have a valid client certificate. For components that initiate requests,
+					this validates that the upstream has a valid certificate.
+
+					If enabled, certificates must not be expired and must be issued by a trusted
+					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
+					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
+					so on, until the verification process reaches a root certificate.
+
+					Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
+					"""
+				required: false
+				type: bool: {}
+			}
+			verify_hostname: {
+				description: """
+					Enables hostname verification.
+
+					If enabled, the hostname used to connect to the remote host must be present in the TLS certificate presented by
+					the remote host, either as the Common Name or as an entry in the Subject Alternative Name extension.
+
+					Only relevant for outgoing connections.
+
+					Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
+					"""
+				required: false
+				type: bool: {}
+			}
+		}
+	}
+}

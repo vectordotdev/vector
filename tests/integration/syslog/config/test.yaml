@@ -1,0 +1,24 @@
+features:
+  - syslog-integration-tests
+
+test_filter: "::syslog::integration_tests::"
+
+env:
+  SYSLOG_UDP_ADDRESS: rsyslog:5514
+  SYSLOG_TCP_LINE_ADDRESS: rsyslog:5515
+  SYSLOG_TCP_OCTET_ADDRESS: rsyslog:5516
+  SYSLOG_LOG_DIR: /syslog_logs
+
+runner:
+  volumes:
+    syslog_logs: /syslog_logs
+
+matrix:
+  version: ["2026-02"]
+
+paths:
+  - "lib/codecs/src/encoding/format/syslog.rs"
+  - "src/sinks/syslog.rs"
+  - "src/sinks/syslog/**"
+  - "src/sinks/util/**"
+  - "tests/integration/syslog/**"
