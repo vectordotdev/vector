@@ -562,7 +562,12 @@ pub async fn build_client(
         (Auth::None, Some(AzureAuthentication::Specific(..))) => {
             info!("Using Azure Authentication method");
             let credential_result: Arc<dyn TokenCredential> =
-                auth.unwrap().credential().await.unwrap();
+                auth.unwrap().credential().await.map_err(|e| {
+                    Error::with_message(
+                        ErrorKind::Credential,
+                        format!("Failed to configure Azure Authentication: {e}"),
+                    )
+                })?;
             credential = Some(credential_result);
         }
         (Auth::Sas { .. }, Some(AzureAuthentication::Specific(..))) => {
