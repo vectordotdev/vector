@@ -290,6 +290,56 @@ pub mod http_1 {
                 .finish()
         }
     }
+
+    pub trait IntoHttp1<T> {
+        fn into_http_1(self) -> T;
+    }
+
+    pub trait IntoLegacyHttp<T> {
+        fn into_legacy_http(self) -> T;
+    }
+
+    impl IntoLegacyHttp<http::HeaderMap> for &http_1::HeaderMap {
+        fn into_legacy_http(self) -> http::HeaderMap {
+            let iter = self.into_iter().map(|(name, value)| {
+                (
+                    http::HeaderName::from_bytes(name.as_str().as_bytes())
+                        .expect("conversion from http_1::HeaderName to http::HeaderName failed"),
+                    http::HeaderValue::from_bytes(value.as_bytes())
+                        .expect("conversion from http_1::HeaderValue to http::HeaderValue failed"),
+                )
+            });
+
+            http::HeaderMap::from_iter(iter)
+        }
+    }
+
+    impl IntoLegacyHttp<http::HeaderMap> for http_1::HeaderMap {
+        fn into_legacy_http(self) -> http::HeaderMap {
+            IntoLegacyHttp::into_legacy_http(&self)
+        }
+    }
+
+    impl IntoHttp1<http_1::HeaderMap> for &http::HeaderMap {
+        fn into_http_1(self) -> http_1::HeaderMap {
+            let iter = self.into_iter().map(|(name, value)| {
+                (
+                    http_1::HeaderName::from_bytes(name.as_str().as_bytes())
+                        .expect("conversion from http::HeaderName to http_1::HeaderName failed"),
+                    http_1::HeaderValue::from_bytes(value.as_bytes())
+                        .expect("conversion from http::HeaderValue to http_1::HeaderValue failed"),
+                )
+            });
+
+            http_1::HeaderMap::from_iter(iter)
+        }
+    }
+
+    impl IntoHttp1<http_1::HeaderMap> for http::HeaderMap {
+        fn into_http_1(self) -> http_1::HeaderMap {
+            IntoHttp1::into_http_1(&self)
+        }
+    }
 }
 
 #[derive(Debug, Snafu)]

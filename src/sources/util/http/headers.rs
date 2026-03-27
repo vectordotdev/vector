@@ -1,10 +1,10 @@
 use bytes::Bytes;
+use http_1::{HeaderMap, HeaderValue};
 use vector_lib::{
     config::{LegacyKey, LogNamespace},
     event::Event,
     lookup::path,
 };
-use warp::http::{HeaderMap, HeaderValue};
 
 use crate::{event::Value, sources::http_server::HttpConfigParamKind};
 
@@ -81,10 +81,10 @@ pub fn add_headers(
 #[cfg(test)]
 mod tests {
     use chrono::{DateTime, Utc};
+    use http_1::HeaderMap;
     use std::time::SystemTime;
     use vector_lib::config::LogNamespace;
     use vrl::{path, value};
-    use warp::http::HeaderMap;
 
     use crate::event::{Event, MetricKind, MetricTags, MetricValue};
     use crate::{

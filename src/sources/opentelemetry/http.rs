@@ -33,7 +33,7 @@ use crate::{
     SourceSender,
     common::http::ErrorMessage,
     event::Event,
-    http::{KeepaliveConfig, MaxConnectionAgeLayer, build_http_trace_layer},
+    http::{KeepaliveConfig, MaxConnectionAgeLayer, build_http_trace_layer, http_1::IntoHttp1},
     internal_events::{EventsReceived, HttpBadRequest, StreamClosedError},
     shutdown::ShutdownSignal,
     sources::{
@@ -141,7 +141,7 @@ fn enrich_events(
     add_headers(
         events,
         headers_config,
-        headers,
+        &headers.into_http_1(),
         log_namespace,
         OpentelemetryConfig::NAME,
     );
