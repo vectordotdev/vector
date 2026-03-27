@@ -643,11 +643,14 @@ impl RetryStrategy {
 #[derive(Debug, Clone)]
 pub struct HttpRetryLogic<Req> {
     request: PhantomData<Req>,
+    retry_strategy: RetryStrategy,
 }
+
 impl<Req> Default for HttpRetryLogic<Req> {
     fn default() -> Self {
         Self {
             request: PhantomData,
+            retry_strategy: RetryStrategy::Default,
         }
     }
 }
@@ -662,20 +665,7 @@ impl<Req: Clone + Send + Sync + 'static> RetryLogic for HttpRetryLogic<Req> {
     }
 
     fn should_retry_response(&self, response: &Self::Response) -> RetryAction<Self::Request> {
-        let status = response.status();
-
-        match status {
-            StatusCode::TOO_MANY_REQUESTS => RetryAction::Retry("too many requests".into()),
-            StatusCode::REQUEST_TIMEOUT => RetryAction::Retry("request timeout".into()),
-            StatusCode::NOT_IMPLEMENTED => {
-                RetryAction::DontRetry("endpoint not implemented".into())
-            }
-            _ if status.is_server_error() => RetryAction::Retry(
-                format!("{}: {}", status, String::from_utf8_lossy(response.body())).into(),
-            ),
-            _ if status.is_success() => RetryAction::Successful,
-            _ => RetryAction::DontRetry(format!("response status: {status}").into()),
-        }
+        self.retry_strategy.retry_action(response.status())
     }
 }
 
