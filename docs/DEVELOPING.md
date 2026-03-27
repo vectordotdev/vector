@@ -467,8 +467,8 @@ times:
 
 We use `flog` to build a sample set of log files to test sending logs from a
 file. This can be done with the following commands on Mac with `homebrew`.
-Installation instruction for flog can be found
-[here](https://github.com/mingrammer/flog#installation).
+Installation instruction for flog can be found in the
+[flog README](https://github.com/mingrammer/flog#installation).
 
 ```bash
 flog --bytes $((100 * 1024 * 1024)) > sample.log

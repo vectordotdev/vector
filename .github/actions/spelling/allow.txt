@@ -567,5 +567,6 @@ LDFLAGS
 libsasl
 pkgconfig
 CLAUDE
+grpcurl
 linting
 lexers
