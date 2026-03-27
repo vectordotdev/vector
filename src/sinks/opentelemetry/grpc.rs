@@ -381,6 +381,7 @@ impl DriverResponse for OtlpGrpcResponse {
 
 // ── Service ──────────────────────────────────────────────────────────────────
 
+#[derive(Clone)]
 struct CachedClients {
     uri: Uri,
     logs: LogsServiceClient<HyperSvc>,
@@ -391,7 +392,8 @@ struct CachedClients {
 #[derive(Clone)]
 pub struct OtlpGrpcService {
     /// Tonic clients for the most-recently-seen URI; rebuilt when the rendered URI changes.
-    clients: std::sync::Arc<std::sync::Mutex<Option<CachedClients>>>,
+    /// Each Tower concurrency-slot clone owns its cache independently — no shared mutex needed.
+    clients: Option<CachedClients>,
     hyper_client: hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>,
     compression: bool,
     headers: std::sync::Arc<Vec<(
@@ -410,7 +412,7 @@ impl OtlpGrpcService {
         )>,
     ) -> Self {
         Self {
-            clients: std::sync::Arc::new(std::sync::Mutex::new(None)),
+            clients: None,
             hyper_client,
             compression,
             headers: std::sync::Arc::new(headers),
@@ -418,17 +420,15 @@ impl OtlpGrpcService {
     }
 
     /// Returns cloned tonic clients for `uri`, rebuilding them if the URI changed.
-    /// The mutex is held only during the synchronous rebuild, never across any `.await`.
     fn clients_for(
-        &self,
+        &mut self,
         uri: &Uri,
     ) -> (
         LogsServiceClient<HyperSvc>,
         MetricsServiceClient<HyperSvc>,
         TraceServiceClient<HyperSvc>,
     ) {
-        let mut guard = self.clients.lock().expect("client lock poisoned");
-        if guard.as_ref().is_none_or(|c| &c.uri != uri) {
+        if self.clients.as_ref().is_none_or(|c| &c.uri != uri) {
             let svc = HyperSvc {
                 uri: uri.clone(),
                 client: self.hyper_client.clone(),
@@ -441,14 +441,14 @@ impl OtlpGrpcService {
                 metrics = metrics.send_compressed(tonic::codec::CompressionEncoding::Gzip);
                 traces = traces.send_compressed(tonic::codec::CompressionEncoding::Gzip);
             }
-            *guard = Some(CachedClients {
+            self.clients = Some(CachedClients {
                 uri: uri.clone(),
                 logs,
                 metrics,
                 traces,
             });
         }
-        let c = guard.as_ref().expect("just populated");
+        let c = self.clients.as_ref().expect("just populated");
         (c.logs.clone(), c.metrics.clone(), c.traces.clone())
     }
 }
