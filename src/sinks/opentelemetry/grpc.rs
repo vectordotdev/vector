@@ -389,6 +389,15 @@ struct CachedClients {
     traces: TraceServiceClient<HyperSvc>,
 }
 
+/// Holds whichever tonic client is needed for a single `OtlpGrpcRequest`. Only the
+/// relevant client is cloned out of `CachedClients`, avoiding two unnecessary clones
+/// per `Service::call` invocation.
+enum SignalClient {
+    Logs(LogsServiceClient<HyperSvc>),
+    Metrics(MetricsServiceClient<HyperSvc>),
+    Traces(TraceServiceClient<HyperSvc>),
+}
+
 #[derive(Clone)]
 pub struct OtlpGrpcService {
     /// Tonic clients for the most-recently-seen URI; rebuilt when the rendered URI changes.
@@ -419,15 +428,9 @@ impl OtlpGrpcService {
         }
     }
 
-    /// Returns cloned tonic clients for `uri`, rebuilding them if the URI changed.
-    fn clients_for(
-        &mut self,
-        uri: &Uri,
-    ) -> (
-        LogsServiceClient<HyperSvc>,
-        MetricsServiceClient<HyperSvc>,
-        TraceServiceClient<HyperSvc>,
-    ) {
+    /// Rebuilds cached tonic clients if the URI changed, then returns the single client
+    /// matching `signal`. Only that one client is cloned.
+    fn client_for_signal(&mut self, uri: &Uri, signal: &OtlpSignal) -> SignalClient {
         if self.clients.as_ref().is_none_or(|c| &c.uri != uri) {
             let svc = HyperSvc {
                 uri: uri.clone(),
@@ -449,7 +452,11 @@ impl OtlpGrpcService {
             });
         }
         let c = self.clients.as_ref().expect("just populated");
-        (c.logs.clone(), c.metrics.clone(), c.traces.clone())
+        match signal {
+            OtlpSignal::Logs(_) => SignalClient::Logs(c.logs.clone()),
+            OtlpSignal::Metrics(_) => SignalClient::Metrics(c.metrics.clone()),
+            OtlpSignal::Traces(_) => SignalClient::Traces(c.traces.clone()),
+        }
     }
 }
 
@@ -464,8 +471,8 @@ impl Service<OtlpGrpcRequest> for OtlpGrpcService {
 
     fn call(&mut self, mut req: OtlpGrpcRequest) -> Self::Future {
         let (protocol, endpoint) = crate::sinks::util::uri::protocol_endpoint(req.uri.clone());
-        // Rebuild clients if the URI changed; clone them out before any `.await`.
-        let (mut logs_client, mut metrics_client, mut traces_client) = self.clients_for(&req.uri);
+        // Rebuild clients if the URI changed; clone only the client for this signal type.
+        let client = self.client_for_signal(&req.uri, &req.signal);
         let static_headers = std::sync::Arc::clone(&self.headers);
         let metadata = std::mem::take(req.metadata_mut());
         let events_byte_size = metadata.into_events_estimated_json_encoded_byte_size();
@@ -489,25 +496,28 @@ impl Service<OtlpGrpcRequest> for OtlpGrpcService {
                 }};
             }
 
-            let byte_size = match req.signal {
-                OtlpSignal::Logs(r) => {
-                    let (len, resp) = export!(logs_client, r);
+            // The signal variant and the client type are always aligned — both are derived
+            // from `req.signal` in `client_for_signal` — so the mixed arms are unreachable.
+            let byte_size = match (req.signal, client) {
+                (OtlpSignal::Logs(r), SignalClient::Logs(mut c)) => {
+                    let (len, resp) = export!(c, r);
                     let rejected = resp.partial_success.map(|ps| ps.rejected_log_records).unwrap_or(0);
                     if rejected > 0 { warn!(rejected, "OTLP collector rejected log records"); }
                     len
                 }
-                OtlpSignal::Metrics(r) => {
-                    let (len, resp) = export!(metrics_client, r);
+                (OtlpSignal::Metrics(r), SignalClient::Metrics(mut c)) => {
+                    let (len, resp) = export!(c, r);
                     let rejected = resp.partial_success.map(|ps| ps.rejected_data_points).unwrap_or(0);
                     if rejected > 0 { warn!(rejected, "OTLP collector rejected metric data points"); }
                     len
                 }
-                OtlpSignal::Traces(r) => {
-                    let (len, resp) = export!(traces_client, r);
+                (OtlpSignal::Traces(r), SignalClient::Traces(mut c)) => {
+                    let (len, resp) = export!(c, r);
                     let rejected = resp.partial_success.map(|ps| ps.rejected_spans).unwrap_or(0);
                     if rejected > 0 { warn!(rejected, "OTLP collector rejected trace spans"); }
                     len
                 }
+                _ => unreachable!("signal variant and cached client are always aligned"),
             };
 
             emit!(EndpointBytesSent {
