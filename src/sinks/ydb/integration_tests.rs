@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use futures::stream;
+use tower::Service;
 use vector_lib::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent};
 use ydb::{ClientBuilder, Query, TableClient};
 
@@ -65,9 +66,9 @@ impl YdbTestClient {
         let create_table_sql = format!(
             r#"CREATE TABLE `{}` (
                 id Int64 NOT NULL,
-                host Utf8 NOT NULL,
-                timestamp Timestamp NOT NULL,
-                message Utf8 NOT NULL,
+                host Utf8,
+                timestamp Timestamp,
+                message Utf8,
                 PRIMARY KEY(id)
             )"#,
             table_path
@@ -249,8 +250,8 @@ async fn upsert_with_sync_index() {
     let create_table_sql = format!(
         r#"CREATE TABLE `{}` (
             id Int64 NOT NULL,
-            name Utf8 NOT NULL,
-            value Int64 NOT NULL,
+            name Utf8,
+            value Int64,
             PRIMARY KEY(id),
             INDEX idx_name GLOBAL ON (name)
         )"#,
@@ -281,6 +282,91 @@ async fn upsert_with_sync_index() {
 
     let count = client.count_rows(&table).await;
     assert_eq!(count, 1, "Expected 1 row inserted via transactional UPSERT");
+
+    client.drop_table(&table).await;
+}
+
+#[tokio::test]
+async fn schema_refresh_on_index_addition() {
+    use crate::sinks::ydb::service::{YdbRequest, YdbService};
+    use tower::ServiceExt;
+
+    trace_init();
+
+    let (config, table, client) = prepare_config().await;
+    let table_client = client.table_client.clone();
+
+    let create_table_sql = format!(
+        r#"CREATE TABLE `{}` (
+            id Int64 NOT NULL,
+            name Utf8,
+            value Int64,
+            PRIMARY KEY(id)
+        )"#,
+        table
+    );
+
+    table_client
+        .retry_execute_scheme_query(create_table_sql)
+        .await
+        .expect("Failed to create table");
+
+    let initial_schema = table_client
+        .describe_table(table.clone())
+        .await
+        .expect("Failed to describe table");
+
+    let mut service = YdbService::new(
+        table_client.clone(),
+        table.clone(),
+        config.endpoint.clone(),
+        initial_schema,
+    );
+
+    let mut event1 = LogEvent::from("before index");
+    event1.insert("id", 1_i64);
+    event1.insert("name", "user1");
+    event1.insert("value", 10_i64);
+
+    let request1 = YdbRequest::try_from(vec![Event::from(event1)]).unwrap();
+    service.ready().await.unwrap().call(request1).await.unwrap();
+
+    let add_index_sql = format!(
+        r#"ALTER TABLE `{}` ADD INDEX idx_name GLOBAL ON (name)"#,
+        table
+    );
+
+    table_client
+        .retry_execute_scheme_query(add_index_sql)
+        .await
+        .expect("Failed to add index");
+
+    let mut event2 = LogEvent::from("after index");
+    event2.insert("id", 2_i64);
+    event2.insert("name", "user2");
+    event2.insert("value", 20_i64);
+
+    let request2 = YdbRequest::try_from(vec![Event::from(event2)]).unwrap();
+    service.ready().await.unwrap().call(request2).await.unwrap();
+
+    let count_query = format!("SELECT COUNT(*) as cnt FROM `{}`", table);
+    let count_result = table_client
+        .retry_transaction(|mut t| {
+            let query = count_query.clone();
+            async move {
+                let result_set = t.query(Query::new(&query)).await?;
+                let value = result_set.into_only_row()?.remove_field_by_name("cnt")?;
+                Ok(value)
+            }
+        })
+        .await
+        .unwrap();
+
+    let count: u64 = count_result.try_into().unwrap();
+    assert_eq!(
+        count, 2,
+        "Expected 2 rows: 1 via bulk_upsert, 1 via UPSERT after auto-refresh"
+    );
 
     client.drop_table(&table).await;
 }
