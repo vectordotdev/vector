@@ -9,7 +9,7 @@ use std::{
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use futures::{Stream, StreamExt};
-use http::HeaderMap;
+use http_1::HeaderMap;
 use indoc::indoc;
 use ordered_float::NotNan;
 use prost::Message;
