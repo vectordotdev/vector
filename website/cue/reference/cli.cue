@@ -334,7 +334,7 @@ cli: {
 				}
 				"url": {
 					_short:      "u"
-					description: "Vector GraphQL API server endpoint"
+					description: "Vector gRPC API server endpoint"
 					type:        "string"
 				}
 				"limit": {
@@ -414,7 +414,7 @@ cli: {
 				}
 				"url": {
 					_short:      "u"
-					description: "Vector GraphQL API server endpoint"
+					description: "Vector gRPC API server endpoint"
 					type:        "string"
 				}
 			}

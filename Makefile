@@ -373,7 +373,7 @@ test-behavior-config: ## Runs configuration related behavioral tests
 
 .PHONY: test-behavior-%
 test-behavior-%: ## Runs behavioral test for a given category
-	${MAYBE_ENVIRONMENT_EXEC} cargo run --no-default-features --features transforms -- test tests/behavior/$*/*
+	${MAYBE_ENVIRONMENT_EXEC} cargo run --no-default-features --features transforms,vrl-functions-env,vrl-functions-system,vrl-functions-network -- test tests/behavior/$*/*
 
 .PHONY: test-behavior
 test-behavior: ## Runs all behavioral tests
@@ -388,6 +388,14 @@ test-integration: test-integration-kafka test-integration-logstash test-integrat
 test-integration: test-integration-nginx test-integration-opentelemetry test-integration-postgres test-integration-prometheus test-integration-pulsar
 test-integration: test-integration-redis test-integration-splunk test-integration-dnstap test-integration-datadog-agent test-integration-datadog-logs test-integration-e2e-datadog-logs test-integration-e2e-opentelemetry-logs
 test-integration: test-integration-datadog-traces test-integration-shutdown
+
+.PHONY: test-integration-windows-event-log
+test-integration-windows-event-log: ## Runs Windows Event Log integration tests (Windows only)
+ifeq ($(OS),Windows_NT)
+	${MAYBE_ENVIRONMENT_EXEC} cargo test -p vector --no-default-features --features sources-windows_event_log-integration-tests windows_event_log::integration_tests
+else
+	@echo "Skipping windows-event-log integration tests (Windows only)"
+endif
 
 test-integration-%-cleanup:
 	$(VDEV) --verbose integration stop $*
@@ -472,7 +480,7 @@ check: ## Run prerequisite code checks
 check-all: ## Check everything
 check-all: check-fmt check-clippy check-docs
 check-all: check-examples check-component-features
-check-all: check-scripts check-deny check-component-docs check-licenses
+check-all: check-scripts check-deny check-generated-docs check-licenses
 
 .PHONY: check-component-features
 check-component-features: ## Check that all component features are setup properly
@@ -483,7 +491,7 @@ check-clippy: ## Check code with Clippy
 	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) check rust
 
 .PHONY: check-docs
-check-docs: ## Check that all /docs file are valid
+check-docs: generate-vrl-docs ## Check that all /docs file are valid - vrl docs due to remap.functions.* references
 	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) check docs
 
 .PHONY: check-fmt
@@ -498,6 +506,10 @@ check-licenses: ## Check that the 3rd-party license file is up to date
 check-markdown: ## Check that markdown is styled properly
 	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) check markdown
 
+.PHONY: fix-markdown
+fix-markdown: ## Auto-fix markdown style issues
+	${MAYBE_ENVIRONMENT_EXEC} markdownlint --fix --config .markdownlint.jsonc $(shell git ls-files '*.md')
+
 .PHONY: check-examples
 check-examples: ## Check that the config/examples files are valid
 	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) check examples
@@ -510,13 +522,17 @@ check-scripts: ## Check that scripts do not have common mistakes
 check-deny: ## Check advisories licenses and sources for crate dependencies
 	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) check deny
 
+.PHONY: check-deny-licenses
+check-deny-licenses: ## Check licenses for crate dependencies
+	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) check deny --licenses-only
+
 .PHONY: check-events
 check-events: ## Check that events satisfy patterns set in https://github.com/vectordotdev/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
 	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) check events
 
-.PHONY: check-component-docs
-check-component-docs: generate-component-docs ## Checks that the machine-generated component Cue docs are up-to-date.
-	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) check component-docs
+.PHONY: check-generated-docs
+check-generated-docs: generate-docs ## Checks that the machine-generated component Cue docs are up-to-date.
+	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) check generated-docs
 
 ##@ Rustdoc
 build-rustdoc: ## Build Vector's Rustdocs
@@ -599,41 +615,41 @@ package-arm-unknown-linux-musleabi: target/artifacts/vector-${VERSION}-arm-unkno
 
 .PHONY: package-deb-x86_64-unknown-linux-gnu
 package-deb-x86_64-unknown-linux-gnu: package-x86_64-unknown-linux-gnu ## Build the x86_64 GNU deb package
-	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=x86_64-unknown-linux-gnu -e VECTOR_VERSION $(ENVIRONMENT_UPSTREAM) cargo vdev package deb
+	TARGET=x86_64-unknown-linux-gnu $(VDEV) package deb
 
 .PHONY: package-deb-x86_64-unknown-linux-musl
 package-deb-x86_64-unknown-linux-musl: package-x86_64-unknown-linux-musl ## Build the x86_64 GNU deb package
-	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=x86_64-unknown-linux-musl -e VECTOR_VERSION $(ENVIRONMENT_UPSTREAM) cargo vdev package deb
+	TARGET=x86_64-unknown-linux-musl $(VDEV) package deb
 
 .PHONY: package-deb-aarch64
 package-deb-aarch64: package-aarch64-unknown-linux-gnu ## Build the aarch64 deb package
-	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=aarch64-unknown-linux-gnu -e VECTOR_VERSION $(ENVIRONMENT_UPSTREAM) cargo vdev package deb
+	TARGET=aarch64-unknown-linux-gnu $(VDEV) package deb
 
 .PHONY: package-deb-armv7-gnu
 package-deb-armv7-gnu: package-armv7-unknown-linux-gnueabihf ## Build the armv7-unknown-linux-gnueabihf deb package
-	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=armv7-unknown-linux-gnueabihf -e VECTOR_VERSION $(ENVIRONMENT_UPSTREAM) cargo vdev package deb
+	TARGET=armv7-unknown-linux-gnueabihf $(VDEV) package deb
 
 .PHONY: package-deb-arm-gnu
 package-deb-arm-gnu: package-arm-unknown-linux-gnueabi ## Build the arm-unknown-linux-gnueabi deb package
-	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=arm-unknown-linux-gnueabi -e VECTOR_VERSION $(ENVIRONMENT_UPSTREAM) cargo vdev package deb
+	TARGET=arm-unknown-linux-gnueabi $(VDEV) package deb
 
 # rpms
 
 .PHONY: package-rpm-x86_64-unknown-linux-gnu
 package-rpm-x86_64-unknown-linux-gnu: package-x86_64-unknown-linux-gnu ## Build the x86_64 rpm package
-	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=x86_64-unknown-linux-gnu -e VECTOR_VERSION $(ENVIRONMENT_UPSTREAM) cargo vdev package rpm
+	TARGET=x86_64-unknown-linux-gnu $(VDEV) package rpm
 
 .PHONY: package-rpm-x86_64-unknown-linux-musl
 package-rpm-x86_64-unknown-linux-musl: package-x86_64-unknown-linux-musl ## Build the x86_64 musl rpm package
-	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=x86_64-unknown-linux-musl -e VECTOR_VERSION $(ENVIRONMENT_UPSTREAM) cargo vdev package rpm
+	TARGET=x86_64-unknown-linux-musl $(VDEV) package rpm
 
 .PHONY: package-rpm-aarch64
 package-rpm-aarch64: package-aarch64-unknown-linux-gnu ## Build the aarch64 rpm package
-	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=aarch64-unknown-linux-gnu -e VECTOR_VERSION $(ENVIRONMENT_UPSTREAM) cargo vdev package rpm
+	TARGET=aarch64-unknown-linux-gnu $(VDEV) package rpm
 
 .PHONY: package-rpm-armv7hl-gnu
 package-rpm-armv7hl-gnu: package-armv7-unknown-linux-gnueabihf ## Build the armv7hl-unknown-linux-gnueabihf rpm package
-	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=armv7-unknown-linux-gnueabihf -e ARCH=armv7hl -e VECTOR_VERSION $(ENVIRONMENT_UPSTREAM) cargo vdev package rpm
+	TARGET=armv7-unknown-linux-gnueabihf ARCH=armv7hl $(VDEV) package rpm
 
 ##@ Releasing
 
@@ -699,6 +715,18 @@ generate-component-docs: ## Generate per-component Cue docs from the configurati
 	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) build component-docs /tmp/vector-config-schema.json \
 		$(if $(findstring true,$(CI)),>/dev/null,)
 	./scripts/cue.sh fmt
+
+.PHONY: generate-vector-vrl-docs
+generate-vector-vrl-docs: ## Generate VRL function documentation from Rust source.
+	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) build vector-vrl-docs --output docs/generated/ \
+		$(if $(findstring true,$(CI)),>/dev/null,)
+
+.PHONY: generate-vrl-docs
+generate-vrl-docs: ## Generate combined VRL function documentation for the website.
+	$(MAKE) -C website generate-vrl-docs
+
+.PHONY: generate-docs
+generate-docs: generate-component-docs generate-vector-vrl-docs generate-vrl-docs
 
 .PHONY: signoff
 signoff: ## Signsoff all previous commits since branch creation

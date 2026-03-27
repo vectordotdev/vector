@@ -28,7 +28,7 @@ pub const MEMORY_BUFFER_DEFAULT_MAX_EVENTS: NonZeroUsize =
     vector_buffers::config::memory_buffer_default_max_events();
 
 // This enum should be kept alphabetically sorted as the bitmask value is used when
-// sorting sources by data type in the GraphQL API.
+// sorting sources by data type in the API.
 #[bitmask(u8)]
 #[bitmask_config(flags_iter)]
 pub enum DataType {

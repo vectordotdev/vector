@@ -21,7 +21,7 @@ chrono.workspace = true
 rust_decimal.workspace = true
 csv-core = { version = "0.1.13", default-features = false }
 derivative.workspace = true
-derive_more = { version = "2.0.1", optional = true, features = ["from", "display"] }
+derive_more = { version = "2.1.1", optional = true, features = ["from", "display"] }
 dyn-clone = { version = "1", default-features = false }
 flate2.workspace = true
 futures.workspace = true
@@ -42,7 +42,7 @@ serde_json.workspace = true
 serde-aux = { version = "4.5", optional = true }
 smallvec = { version = "1", default-features = false, features = ["union"] }
 snafu.workspace = true
-strum = { version = "0.26.3", features = ["derive"], optional = true }
+strum = { workspace = true, optional = true }
 syslog_loose = { version = "0.23", default-features = false, optional = true }
 tokio-util = { version = "0.7", default-features = false, features = ["codec"] }
 tokio = { workspace = true, features = ["full"] }
