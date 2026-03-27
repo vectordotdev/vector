@@ -676,6 +676,7 @@ pub struct HttpStatusRetryLogic<F, Req, Res> {
     func: F,
     request: PhantomData<Req>,
     response: PhantomData<Res>,
+    retry_strategy: RetryStrategy,
 }
 
 impl<F, Req, Res> HttpStatusRetryLogic<F, Req, Res>
@@ -684,11 +685,12 @@ where
     Req: Send + Sync + 'static,
     Res: Send + Sync + 'static,
 {
-    pub const fn new(func: F) -> HttpStatusRetryLogic<F, Req, Res> {
+    pub const fn new(func: F, retry_strategy: RetryStrategy) -> HttpStatusRetryLogic<F, Req, Res> {
         HttpStatusRetryLogic {
             func,
             request: PhantomData,
             response: PhantomData,
+            retry_strategy,
         }
     }
 }
@@ -709,19 +711,7 @@ where
 
     fn should_retry_response(&self, response: &Res) -> RetryAction<Req> {
         let status = (self.func)(response);
-
-        match status {
-            StatusCode::TOO_MANY_REQUESTS => RetryAction::Retry("too many requests".into()),
-            StatusCode::REQUEST_TIMEOUT => RetryAction::Retry("request timeout".into()),
-            StatusCode::NOT_IMPLEMENTED => {
-                RetryAction::DontRetry("endpoint not implemented".into())
-            }
-            _ if status.is_server_error() => {
-                RetryAction::Retry(format!("Http Status: {status}").into())
-            }
-            _ if status.is_success() => RetryAction::Successful,
-            _ => RetryAction::DontRetry(format!("Http status: {status}").into()),
-        }
+        self.retry_strategy.retry_action(status)
     }
 }
 
@@ -734,6 +724,7 @@ where
             func: self.func.clone(),
             request: PhantomData,
             response: PhantomData,
+            retry_strategy: self.retry_strategy.clone(),
         }
     }
 }
@@ -900,12 +891,17 @@ impl DriverResponse for HttpResponse {
 }
 
 /// Creates a `RetryLogic` for use with `HttpResponse`.
-pub fn http_response_retry_logic<Request: Clone + Send + Sync + 'static>() -> HttpStatusRetryLogic<
+pub fn http_response_retry_logic<Request: Clone + Send + Sync + 'static>(
+    retry_strategy: RetryStrategy,
+) -> HttpStatusRetryLogic<
     impl Fn(&HttpResponse) -> StatusCode + Clone + Send + Sync + 'static,
     Request,
     HttpResponse,
 > {
-    HttpStatusRetryLogic::new(|req: &HttpResponse| req.http_response.status())
+    HttpStatusRetryLogic::new(
+        |req: &HttpResponse| req.http_response.status(),
+        retry_strategy,
+    )
 }
 
 /// Uses the estimated json encoded size to determine batch sizing.
