@@ -41,7 +41,7 @@ use vector_lib::{
 };
 
 use crate::{
-    config::{AcknowledgementsConfig, DataType, Input, SinkContext, SinkHealthcheckOptions},
+    config::{AcknowledgementsConfig, SinkContext, SinkHealthcheckOptions},
     sinks::util::grpc::HyperGrpcService,
     event::{Event, EventFinalizers, EventStatus, Finalizable},
     http::build_proxy_connector,
@@ -88,7 +88,7 @@ pub(super) fn with_default_scheme(uri: Uri, tls: bool) -> crate::Result<Uri> {
 /// Configuration for the OpenTelemetry sink's gRPC transport.
 #[configurable_component]
 #[derive(Clone, Debug)]
-pub struct GrpcSinkConfig {
+pub(super) struct GrpcSinkConfig {
     /// The URI to send gRPC requests to.
     ///
     /// The URI _must_ include a port. If the scheme is omitted, `http` is used unless
@@ -130,7 +130,7 @@ pub struct GrpcSinkConfig {
 }
 
 impl GrpcSinkConfig {
-    pub async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+    pub(super) async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         // For static URIs, parse at build time for the healthcheck.
         // Dynamic URIs are rendered per-event during sink execution.
         let static_uri = if self.uri.is_dynamic() {
@@ -146,14 +146,20 @@ impl GrpcSinkConfig {
         };
 
         // For dynamic templates like `https://{{ host }}:4317` the static_uri is None, so
-        // we also check whether the literal prefix of the template string is "https://".
-        // This covers the common case where the scheme is a fixed literal even though the
-        // host/port are templated.
+        // we also check whether the static literal prefix of the template string starts with
+        // "https://". Only the part before the first `{{` is inspected so that a template
+        // like `{{ scheme }}://host:4317` does not falsely trigger TLS — in that case the
+        // scheme is not known at build time and events will be dropped at runtime if a
+        // rendered `https://` URI is encountered without a TLS connector.
         let use_https = self.tls.is_some()
             || static_uri
                 .as_ref()
                 .is_some_and(|u| u.scheme_str() == Some("https"))
-            || self.uri.get_ref().to_ascii_lowercase().starts_with("https://");
+            || {
+                let raw = self.uri.get_ref().to_ascii_lowercase();
+                let static_prefix_end = raw.find("{{").unwrap_or(raw.len());
+                raw[..static_prefix_end].contains("https://")
+            };
 
         let tls = if use_https {
             MaybeTlsSettings::tls_client(self.tls.as_ref())?
@@ -221,15 +227,6 @@ impl GrpcSinkConfig {
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 
-    pub fn input(&self) -> Input {
-        // Native Vector Metric events are not supported; OTLP-encoded metrics arrive as Log
-        // events with a `resourceMetrics` field and are handled correctly.
-        Input::new(DataType::Log | DataType::Trace)
-    }
-
-    pub const fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        &self.acknowledgements
-    }
 }
 
 fn new_grpc_client(
@@ -484,18 +481,33 @@ impl Service<OtlpGrpcRequest> for OtlpGrpcService {
                     for (key, value) in &req.dynamic_headers {
                         grpc_req.metadata_mut().insert(key.clone(), value.clone());
                     }
-                    $client
+                    let response = $client
                         .export(grpc_req)
                         .map_err(|source| OtlpGrpcError::Request { source })
                         .await?;
-                    len
+                    (len, response.into_inner())
                 }};
             }
 
             let byte_size = match req.signal {
-                OtlpSignal::Logs(r) => export!(logs_client, r),
-                OtlpSignal::Metrics(r) => export!(metrics_client, r),
-                OtlpSignal::Traces(r) => export!(traces_client, r),
+                OtlpSignal::Logs(r) => {
+                    let (len, resp) = export!(logs_client, r);
+                    let rejected = resp.partial_success.map(|ps| ps.rejected_log_records).unwrap_or(0);
+                    if rejected > 0 { warn!(rejected, "OTLP collector rejected log records"); }
+                    len
+                }
+                OtlpSignal::Metrics(r) => {
+                    let (len, resp) = export!(metrics_client, r);
+                    let rejected = resp.partial_success.map(|ps| ps.rejected_data_points).unwrap_or(0);
+                    if rejected > 0 { warn!(rejected, "OTLP collector rejected metric data points"); }
+                    len
+                }
+                OtlpSignal::Traces(r) => {
+                    let (len, resp) = export!(traces_client, r);
+                    let rejected = resp.partial_success.map(|ps| ps.rejected_spans).unwrap_or(0);
+                    if rejected > 0 { warn!(rejected, "OTLP collector rejected trace spans"); }
+                    len
+                }
             };
 
             emit!(EndpointBytesSent {

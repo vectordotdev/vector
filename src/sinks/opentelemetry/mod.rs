@@ -23,7 +23,8 @@ use crate::{
     tls::TlsConfig,
 };
 
-pub use grpc::{GrpcCompression, GrpcSinkConfig};
+pub use grpc::GrpcCompression;
+use grpc::GrpcSinkConfig;
 
 /// Transport protocol for the OpenTelemetry sink.
 #[configurable_component]
@@ -101,6 +102,10 @@ pub struct OpenTelemetryConfig {
     pub compression: Compression,
 
     #[configurable(derived)]
+    #[configurable(metadata(docs::description = "Outbound request settings for retry, concurrency, timeout, and headers. \
+        For the `grpc` protocol, `request.headers` entries are forwarded as gRPC metadata — use them \
+        for authentication (e.g. `authorization: \"Bearer <token>\"`) since the HTTP-only `auth` field \
+        is not available for gRPC."))]
     #[serde(default)]
     pub request: RequestConfig,
 
