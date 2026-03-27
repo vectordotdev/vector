@@ -340,6 +340,22 @@ pub mod http_1 {
             IntoHttp1::into_http_1(&self)
         }
     }
+
+    impl IntoLegacyHttp<http::Uri> for &http_1::Uri {
+        fn into_legacy_http(self) -> http::Uri {
+            self.to_string()
+                .parse()
+                .expect("conversion from http_1::Uri to http::Uri failed")
+        }
+    }
+
+    impl IntoHttp1<http_1::Uri> for &http::Uri {
+        fn into_http_1(self) -> http_1::Uri {
+            self.to_string()
+                .parse()
+                .expect("conversion from http::Uri to http_1::Uri failed")
+        }
+    }
 }
 
 #[derive(Debug, Snafu)]

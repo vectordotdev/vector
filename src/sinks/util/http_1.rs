@@ -69,7 +69,7 @@ use super::{
 use crate::aws::sign_request_http_1;
 use crate::{
     event::Event,
-    http::http_1::{HttpClient, HttpError},
+    http::http_1::{HttpClient, HttpError, IntoLegacyHttp},
     internal_events::{EndpointBytesSent, SinkRequestBuildError},
     sinks::prelude::*,
     template::Template,
@@ -494,7 +494,7 @@ where
             };
             let byte_size = request.body().len();
             let (protocol, endpoint) =
-                uri::protocol_endpoint(request.uri().to_string().parse().unwrap());
+                uri::protocol_endpoint(request.uri().into_legacy_http());
             let request = request.map(Full::new);
 
             // Any errors raised in `http_client.send` results in a `GotHttpWarning` event being emitted
