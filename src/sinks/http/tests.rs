@@ -447,6 +447,103 @@ async fn retries_on_temporary_error() {
 }
 
 #[tokio::test]
+async fn custom_retry_retries_only_configured_status_code() {
+    components::assert_sink_compliance(&HTTP_SINK_TAGS, async {
+        const NUM_LINES: usize = 1;
+        const NUM_FAILURES: usize = 2;
+        const CUSTOM_RETRY_CONFIG: &str = r#"
+            request.retry_attempts = 2
+            request.retry_initial_backoff_secs = 1
+            request.retry_max_duration_secs = 1
+            retry_strategy.type = "custom"
+            retry_strategy.status_codes = [408, 425, 429, 503]
+        "#;
+
+        let (in_addr, sink) = build_sink(CUSTOM_RETRY_CONFIG).await;
+
+        let counter = Arc::new(atomic::AtomicUsize::new(0));
+        let in_counter = Arc::clone(&counter);
+        let (rx, trigger, server) = build_test_server_generic(in_addr, move || {
+            let count = in_counter.fetch_add(1, atomic::Ordering::Relaxed);
+            if count < NUM_FAILURES {
+                Response::builder()
+                    .status(StatusCode::SERVICE_UNAVAILABLE)
+                    .body(Body::empty())
+                    .unwrap_or_else(|_| unreachable!())
+            } else {
+                Response::new(Body::empty())
+            }
+        });
+
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let (input_lines, events) = random_lines_with_stream(100, NUM_LINES, Some(batch));
+        let pump = sink.run(events);
+
+        tokio::spawn(server);
+
+        pump.await.unwrap();
+        drop(trigger);
+
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+        let output_lines = get_received_gzip(rx, |parts| {
+            assert_eq!(Method::POST, parts.method);
+            assert_eq!("/frames", parts.uri.path());
+        })
+        .await;
+
+        let tries = counter.load(atomic::Ordering::Relaxed);
+        assert_eq!(tries, NUM_FAILURES + 1);
+        assert_eq!(NUM_LINES, output_lines.len());
+        assert_eq!(input_lines, output_lines);
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn custom_retry_does_not_retry_unconfigured_status_code() {
+    components::assert_sink_error(&COMPONENT_ERROR_TAGS, async {
+        const NUM_LINES: usize = 1;
+        const CUSTOM_RETRY_CONFIG: &str = r#"
+            request.retry_attempts = 2
+            request.retry_initial_backoff_secs = 1
+            request.retry_max_duration_secs = 1
+            retry_strategy.type = "custom"
+            retry_strategy.status_codes = [408, 425, 429, 503]
+        "#;
+
+        let (in_addr, sink) = build_sink(CUSTOM_RETRY_CONFIG).await;
+
+        let counter = Arc::new(atomic::AtomicUsize::new(0));
+        let in_counter = Arc::clone(&counter);
+        let (rx, trigger, server) = build_test_server_generic(in_addr, move || {
+            in_counter.fetch_add(1, atomic::Ordering::Relaxed);
+            Response::builder()
+                .status(StatusCode::BAD_REQUEST)
+                .body(Body::empty())
+                .unwrap_or_else(|_| unreachable!())
+        });
+
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let (_input_lines, events) = random_lines_with_stream(100, NUM_LINES, Some(batch));
+        let pump = sink.run(events);
+
+        tokio::spawn(server);
+
+        pump.await.unwrap();
+        drop(trigger);
+
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
+        assert_eq!(counter.load(atomic::Ordering::Relaxed), 1);
+
+        let output_lines =
+            get_received_gzip(rx, |_| unreachable!("There should be no successful requests")).await;
+        assert!(output_lines.is_empty());
+    })
+    .await;
+}
+
+#[tokio::test]
 async fn fails_on_permanent_error() {
     components::assert_sink_error(&COMPONENT_ERROR_TAGS, async {
         let num_lines = 1000;
