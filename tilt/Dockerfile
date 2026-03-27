@@ -20,7 +20,7 @@ RUN git clone https://github.com/rui314/mold.git \
 WORKDIR /vector
 COPY . .
 ARG FEATURES
-RUN scripts/environment/install-protoc.sh
+RUN scripts/environment/prepare.sh --modules=protoc
 RUN --mount=type=cache,target=/vector/target \
     --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/local/cargo/git \

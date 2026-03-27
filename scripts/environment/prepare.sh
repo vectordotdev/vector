@@ -27,6 +27,13 @@ ensure_active_toolchain_is_installed() {
 
 SCRIPT_DIR=$(realpath "$(dirname "${BASH_SOURCE[0]}")")
 
+# Use sudo only when not already running as root (e.g. Docker containers run as root without sudo)
+if [[ "$(id -u)" == "0" ]]; then
+  SUDO=""
+else
+  SUDO="sudo"
+fi
+
 # Tool version definitions - update versions here
 CARGO_DEB_VERSION="2.9.3"
 CROSS_VERSION="0.2.5"
@@ -43,6 +50,7 @@ VDEV_VERSION="0.3.0"
 
 ALL_MODULES=(
   rustup
+  protoc
   cargo-deb
   cross
   cargo-nextest
@@ -83,6 +91,7 @@ Usage: $0 [--modules=mod1,mod2,...]
 
 Modules:
   rustup
+  protoc
   cargo-deb
   cross
   cargo-nextest
@@ -162,7 +171,7 @@ maybe_install_npm_package() {
   fi
 
   if [[ "$("$tool" "$version_cmd" 2>/dev/null)" != "$version_pattern" ]]; then
-    sudo npm install -g "${package}@${version}"
+    $SUDO npm install -g "${package}@${version}"
   fi
 }
 
@@ -206,6 +215,16 @@ if contains_module rustup; then
   fi
 fi
 set -e -o verbose
+
+if contains_module protoc; then
+  if ! command -v protoc &>/dev/null; then
+    if [[ "$(uname)" == "Linux" ]]; then
+      $SUDO apt-get install -y protobuf-compiler
+    else
+      brew install protobuf
+    fi
+  fi
+fi
 
 maybe_install_cargo_tool cargo-deb "${CARGO_DEB_VERSION}" "${CARGO_DEB_VERSION}"
 maybe_install_cargo_tool cross "${CROSS_VERSION}"

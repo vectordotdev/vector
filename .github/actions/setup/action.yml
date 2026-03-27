@@ -19,7 +19,7 @@ inputs:
   protoc:
     required: false
     default: false
-    description: "Install protoc (uses scripts/environment/install-protoc.sh)."
+    description: "Install protoc (uses prepare.sh protoc module)."
   cue:
     required: false
     default: false
@@ -216,16 +216,6 @@ runs:
         rustc-wrapper = "$RUSTC_WRAPPER"
         EOF
 
-    - name: Install protoc
-      if: ${{ inputs.protoc == 'true' || env.VDEV_NEEDS_COMPILE == 'true' }}
-      shell: bash
-      run: |
-        echo "Installing protoc"
-        if [[ "${{ runner.os }}" == "macOS" ]]; then
-          sudo bash ./scripts/environment/install-protoc.sh /usr/local/bin
-        else
-          sudo bash ./scripts/environment/install-protoc.sh
-        fi
 
     - name: Install cue
       if: ${{ inputs.cue == 'true' }}
@@ -278,6 +268,7 @@ runs:
       run: |
         mods=()
         [[ "${{ inputs.rust == 'true' || env.NEEDS_RUST == 'true' }}" == "true" ]] && mods+=("rustup")
+        [[ "${{ inputs.protoc }}" == "true" || "${{ env.VDEV_NEEDS_COMPILE }}" == "true" ]] && mods+=("protoc")
         [[ "${{ inputs.cargo-deb }}" == "true" ]] && mods+=("cargo-deb")
         [[ "${{ inputs.cross }}" == "true" ]] && mods+=("cross")
         [[ "${{ inputs.cargo-nextest }}" == "true" ]] && mods+=("cargo-nextest")

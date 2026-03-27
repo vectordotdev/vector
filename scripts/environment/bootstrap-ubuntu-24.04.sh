@@ -115,7 +115,7 @@ if ! [ -x "$(command -v docker)" ]; then
     usermod --append --groups docker ubuntu || true
 fi
 
-bash scripts/environment/install-protoc.sh
+bash scripts/environment/prepare.sh --modules=protoc
 
 # Install Node.js if needed
 if ! [ -x "$(command -v node)" ]; then

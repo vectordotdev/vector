@@ -25,7 +25,7 @@ Install compilation dependencies for your distribution, if they aren't pre-insta
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
 
 # Install protoc
-./scripts/environment/install-protoc.sh
+./scripts/environment/prepare.sh --modules=protoc
 
 # Install other dependencies, example for Ubuntu/Debian:
 sudo apt-get update
