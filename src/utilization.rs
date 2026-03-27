@@ -29,6 +29,7 @@ const UTILIZATION_EMITTER_DURATION: Duration = Duration::from_secs(5);
 /// Current model:
 ///
 ///
+#[pin_project]
 pub(crate) struct Utilization<S> {
     intervals: IntervalStream,
     timer_tx: UtilizationComponentSender,
