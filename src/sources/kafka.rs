@@ -1,6 +1,7 @@
 use std::{
     collections::{HashMap, HashSet},
     io::Cursor,
+    num::NonZeroUsize,
     pin::Pin,
     sync::{
         Arc, OnceLock, Weak,
@@ -278,7 +279,7 @@ pub struct MultithreadingConfig {
     /// Number of tasks that may run in parallel for message processing.
     /// Defaults to number of available cores.
     #[serde(default)]
-    max_message_handling_tasks: Option<usize>,
+    max_message_handling_tasks: Option<NonZeroUsize>,
 }
 
 const fn default_session_timeout_ms() -> Duration {
@@ -471,6 +472,7 @@ async fn kafka_source(
 
     let max_message_handling_tasks = config.multithreading.as_ref().map(|c| {
         c.max_message_handling_tasks
+            .map(NonZeroUsize::get)
             .unwrap_or_else(crate::num_threads)
     });
 
