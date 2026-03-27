@@ -855,6 +855,7 @@ sinks-logs = [
   "sinks-redis",
   "sinks-sematext",
   "sinks-socket",
+  "sinks-syslog",
   "sinks-splunk_hec",
   "sinks-vector",
   "sinks-webhdfs",
@@ -927,6 +928,7 @@ sinks-pulsar = ["dep:apache-avro", "dep:pulsar"]
 sinks-redis = ["dep:redis"]
 sinks-sematext = ["sinks-elasticsearch", "sinks-influxdb"]
 sinks-socket = ["sinks-utils-udp"]
+sinks-syslog = ["codecs-syslog", "sinks-utils-udp"]
 sinks-splunk_hec = []
 sinks-statsd = ["sinks-utils-udp", "tokio-util/net"]
 sinks-utils-udp = []
@@ -979,6 +981,7 @@ all-integration-tests = [
   "pulsar-integration-tests",
   "redis-integration-tests",
   "splunk-integration-tests",
+  "syslog-integration-tests",
   "vector-api-tests",
   "webhdfs-integration-tests",
   "windows-event-log-integration-tests",
@@ -1049,6 +1052,7 @@ prometheus-integration-tests = ["sinks-prometheus", "sources-prometheus", "sinks
 pulsar-integration-tests = ["sinks-pulsar", "sources-pulsar"]
 redis-integration-tests = ["sinks-redis", "sources-redis"]
 splunk-integration-tests = ["sinks-splunk_hec"]
+syslog-integration-tests = ["sinks-syslog"]
 dnstap-integration-tests = ["sources-dnstap", "dep:bollard"]
 webhdfs-integration-tests = ["sinks-webhdfs"]
 windows-event-log-integration-tests = ["sources-windows_event_log-integration-tests"]

@@ -32,7 +32,7 @@ pub use format::{
     ParquetCompression, ParquetSchemaMode, ParquetSerializer, ParquetSerializerConfig,
 };
 #[cfg(feature = "syslog")]
-pub use format::{SyslogSerializer, SyslogSerializerConfig};
+pub use format::{SyslogSerializer, SyslogSerializerConfig, SyslogSerializerOptions};
 pub use framing::{
     BoxedFramer, BoxedFramingError, BytesEncoder, BytesEncoderConfig, CharacterDelimitedEncoder,
     CharacterDelimitedEncoderConfig, CharacterDelimitedEncoderOptions, Framer, FramingConfig,

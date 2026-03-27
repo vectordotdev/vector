@@ -112,6 +112,7 @@ jobs:
             "prometheus",
             "pulsar",
             "redis",
+            "syslog",
             "webhdfs"
           ]
     timeout-minutes: 90

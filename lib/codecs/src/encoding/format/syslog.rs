@@ -5,7 +5,6 @@ use serde_json;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::fmt::Write;
-use std::str::FromStr;
 use strum::{EnumString, FromRepr, VariantNames};
 use tokio_util::codec::Encoder;
 use tracing::debug;
@@ -84,11 +83,13 @@ impl Encoder<Event> for SyslogSerializer {
     type Error = vector_common::Error;
 
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
-        if let Event::Log(log_event) = event {
-            let syslog_message = ConfigDecanter::new(&log_event).decant_config(&self.config.syslog);
-            let encoded = syslog_message.encode(&self.config.syslog.rfc);
-            buffer.put_slice(encoded.as_bytes());
-        }
+        let Event::Log(log_event) = event else {
+            return Err("Syslog serializer only supports log events.".into());
+        };
+
+        let syslog_message = ConfigDecanter::new(&log_event).decant_config(&self.config.syslog);
+        let encoded = syslog_message.encode(&self.config.syslog.rfc);
+        buffer.put_slice(encoded.as_bytes());
 
         Ok(())
     }
@@ -104,18 +105,15 @@ impl<'a> ConfigDecanter<'a> {
     }
 
     fn decant_config(&self, config: &SyslogSerializerOptions) -> SyslogMessage {
-        let mut app_name = self
-            .get_value(&config.app_name) // P1: Configured path
-            .unwrap_or_else(|| {
-                // P2: Semantic Fallback: Check for the field designated as "service" in the schema
-                self.log
-                    .get_by_meaning("service")
-                    .map(|v| v.to_string_lossy().to_string())
-                    // P3: Hardcoded default
-                    .unwrap_or_else(|| "vector".to_owned())
-            });
+        let mut app_name = self.get_value(&config.app_name).unwrap_or_else(|| {
+            self.log
+                .get_by_meaning("service")
+                .map(|v| v.to_string_lossy().to_string())
+                .unwrap_or_else(|| "vector".to_owned())
+        });
         let mut proc_id = self.get_value(&config.proc_id);
         let mut msg_id = self.get_value(&config.msg_id);
+        let mut hostname = self.log.get_host().map(|v| v.to_string_lossy().to_string());
 
         match config.rfc {
             SyslogRFC::Rfc3164 => {
@@ -124,16 +122,18 @@ impl<'a> ConfigDecanter<'a> {
                 if let Some(pid) = &mut proc_id {
                     *pid = sanitize_to_ascii(pid).into_owned();
                 }
+                hostname = hostname
+                    .and_then(|host| sanitize_printusascii_field(&host, HOSTNAME_MAX_LENGTH));
             }
             SyslogRFC::Rfc5424 => {
-                // Truncate to character limits (not byte limits to avoid UTF-8 panics)
-                truncate_chars(&mut app_name, 48);
-                if let Some(pid) = &mut proc_id {
-                    truncate_chars(pid, 128);
-                }
-                if let Some(mid) = &mut msg_id {
-                    truncate_chars(mid, 32);
-                }
+                app_name = sanitize_printusascii_field(&app_name, APP_NAME_MAX_LENGTH)
+                    .unwrap_or_else(|| NIL_VALUE.to_owned());
+                proc_id =
+                    proc_id.and_then(|pid| sanitize_printusascii_field(&pid, PROC_ID_MAX_LENGTH));
+                msg_id =
+                    msg_id.and_then(|mid| sanitize_printusascii_field(&mid, MSG_ID_MAX_LENGTH));
+                hostname = hostname
+                    .and_then(|host| sanitize_printusascii_field(&host, HOSTNAME_MAX_LENGTH));
             }
         }
 
@@ -143,7 +143,7 @@ impl<'a> ConfigDecanter<'a> {
                 severity: self.get_severity(config),
             },
             timestamp: self.get_timestamp(),
-            hostname: self.log.get_host().map(|v| v.to_string_lossy().to_string()),
+            hostname,
             tag: Tag {
                 app_name,
                 proc_id,
@@ -183,7 +183,10 @@ impl<'a> ConfigDecanter<'a> {
 
     fn get_facility(&self, config: &SyslogSerializerOptions) -> Facility {
         config.facility.as_ref().map_or(Facility::User, |path| {
-            self.get_syslog_code(path, Facility::from_repr, Facility::User)
+            self.log
+                .get(path)
+                .and_then(parse_facility)
+                .unwrap_or(Facility::User)
         })
     }
 
@@ -192,38 +195,22 @@ impl<'a> ConfigDecanter<'a> {
             .severity
             .as_ref()
             .map_or(Severity::Informational, |path| {
-                self.get_syslog_code(path, Severity::from_repr, Severity::Informational)
+                self.log
+                    .get(path)
+                    .and_then(parse_severity)
+                    .unwrap_or(Severity::Informational)
             })
-    }
-
-    fn get_syslog_code<T>(
-        &self,
-        path: &ConfigTargetPath,
-        from_repr_fn: fn(usize) -> Option<T>,
-        default_value: T,
-    ) -> T
-    where
-        T: Copy + FromStr,
-    {
-        if let Some(value) = self.log.get(path).cloned() {
-            let s = value.to_string_lossy();
-            if let Ok(val_from_name) = s.to_ascii_lowercase().parse::<T>() {
-                return val_from_name;
-            }
-            if let Value::Integer(n) = value
-                && let Some(val_from_num) = from_repr_fn(n as usize)
-            {
-                return val_from_num;
-            }
-        }
-        default_value
     }
 }
 
 const NIL_VALUE: &str = "-";
 const SYSLOG_V1: &str = "1";
 const RFC3164_TAG_MAX_LENGTH: usize = 32;
-const SD_ID_MAX_LENGTH: usize = 32;
+const HOSTNAME_MAX_LENGTH: usize = 255;
+const APP_NAME_MAX_LENGTH: usize = 48;
+const PROC_ID_MAX_LENGTH: usize = 128;
+const MSG_ID_MAX_LENGTH: usize = 32;
+const SD_NAME_MAX_LENGTH: usize = 32;
 
 /// Replaces invalid characters with '_'
 #[inline]
@@ -251,6 +238,20 @@ where
 #[inline]
 fn sanitize_to_ascii(s: &str) -> Cow<'_, str> {
     sanitize_with(s, |c| (' '..='~').contains(&c))
+}
+
+/// Sanitize an RFC 5424 PRINTUSASCII field, replacing spaces and control
+/// characters with underscores and treating empty fields as NILVALUE.
+#[inline]
+fn sanitize_printusascii_field(s: &str, max_chars: usize) -> Option<String> {
+    let mut sanitized = sanitize_with(s, |c| c.is_ascii_graphic()).into_owned();
+    truncate_chars(&mut sanitized, max_chars);
+
+    if sanitized.is_empty() {
+        None
+    } else {
+        Some(sanitized)
+    }
 }
 
 /// Sanitize SD-ID or PARAM-NAME according to RFC 5424
@@ -291,6 +292,113 @@ fn escape_sd_value(s: &str) -> Cow<'_, str> {
 fn truncate_chars(s: &mut String, max_chars: usize) {
     if let Some((byte_idx, _)) = s.char_indices().nth(max_chars) {
         s.truncate(byte_idx);
+    }
+}
+
+fn truncate_to_string(s: Cow<'_, str>, max_chars: usize) -> String {
+    let mut s = s.into_owned();
+    truncate_chars(&mut s, max_chars);
+    s
+}
+
+fn sanitize_sd_name(name: &str) -> Option<String> {
+    let sanitized = truncate_to_string(sanitize_name(name), SD_NAME_MAX_LENGTH);
+
+    if sanitized.is_empty() {
+        None
+    } else {
+        Some(sanitized)
+    }
+}
+
+fn deduped_key<V>(map: &BTreeMap<String, V>, base: String) -> String {
+    if !map.contains_key(&base) {
+        return base;
+    }
+
+    for index in 1usize.. {
+        let suffix = format!("_{index}");
+        let mut candidate = base.clone();
+        truncate_chars(
+            &mut candidate,
+            SD_NAME_MAX_LENGTH.saturating_sub(suffix.len()),
+        );
+        candidate.push_str(&suffix);
+
+        if !map.contains_key(&candidate) {
+            return candidate;
+        }
+    }
+
+    unreachable!("usize iteration should produce a unique structured-data name")
+}
+
+fn insert_structured_param(result: &mut BTreeMap<String, String>, key: String, value: String) {
+    let key = deduped_key(result, key);
+    result.insert(key, value);
+}
+
+fn parse_numeric_code<T>(value: &Value, from_repr: fn(usize) -> Option<T>) -> Option<T> {
+    match value {
+        Value::Integer(n) => usize::try_from(*n).ok().and_then(from_repr),
+        other => other
+            .to_string_lossy()
+            .trim()
+            .parse::<usize>()
+            .ok()
+            .and_then(from_repr),
+    }
+}
+
+fn parse_facility(value: &Value) -> Option<Facility> {
+    if let Some(facility) = parse_numeric_code(value, Facility::from_repr) {
+        return Some(facility);
+    }
+
+    match value.to_string_lossy().trim().to_ascii_lowercase().as_str() {
+        "kern" | "kernel" => Some(Facility::Kern),
+        "user" => Some(Facility::User),
+        "mail" => Some(Facility::Mail),
+        "daemon" => Some(Facility::Daemon),
+        "auth" => Some(Facility::Auth),
+        "syslog" => Some(Facility::Syslog),
+        "lpr" => Some(Facility::Lpr),
+        "news" => Some(Facility::News),
+        "uucp" => Some(Facility::Uucp),
+        "cron" => Some(Facility::Cron),
+        "authpriv" | "auth-priv" | "auth_priv" => Some(Facility::Authpriv),
+        "ftp" => Some(Facility::Ftp),
+        "ntp" => Some(Facility::Ntp),
+        "security" | "audit" => Some(Facility::Security),
+        "log-alert" | "log_alert" | "alert" | "console" => Some(Facility::LogAlert),
+        "solaris-cron" | "solaris_cron" | "clockd" => Some(Facility::SolarisCron),
+        "local0" => Some(Facility::Local0),
+        "local1" => Some(Facility::Local1),
+        "local2" => Some(Facility::Local2),
+        "local3" => Some(Facility::Local3),
+        "local4" => Some(Facility::Local4),
+        "local5" => Some(Facility::Local5),
+        "local6" => Some(Facility::Local6),
+        "local7" => Some(Facility::Local7),
+        _ => None,
+    }
+}
+
+fn parse_severity(value: &Value) -> Option<Severity> {
+    if let Some(severity) = parse_numeric_code(value, Severity::from_repr) {
+        return Some(severity);
+    }
+
+    match value.to_string_lossy().trim().to_ascii_lowercase().as_str() {
+        "emergency" | "emerg" => Some(Severity::Emergency),
+        "alert" => Some(Severity::Alert),
+        "critical" | "crit" => Some(Severity::Critical),
+        "error" | "err" => Some(Severity::Error),
+        "warning" | "warn" => Some(Severity::Warning),
+        "notice" => Some(Severity::Notice),
+        "informational" | "info" => Some(Severity::Informational),
+        "debug" => Some(Severity::Debug),
+        _ => None,
     }
 }
 
@@ -353,8 +461,10 @@ impl SyslogMessage {
 
         if *rfc == SyslogRFC::Rfc3164 {
             // RFC 3164 does not support structured data
-            if let Some(sd) = &self.structured_data
-                && !sd.elements.is_empty()
+            if self
+                .structured_data
+                .as_ref()
+                .is_some_and(|sd| !sd.elements.is_empty())
             {
                 debug!(
                     "Structured data present but ignored - RFC 3164 does not support structured data. Consider using RFC 5424 instead."
@@ -449,33 +559,30 @@ impl StructuredData {
 
 impl From<ObjectMap> for StructuredData {
     fn from(fields: ObjectMap) -> Self {
-        let elements = fields
-            .into_iter()
-            .map(|(sd_id, value)| {
-                let sd_id_str: String = sd_id.into();
-                let sanitized_id = sanitize_name(&sd_id_str);
+        let mut elements = BTreeMap::new();
 
-                let final_id = if sanitized_id.chars().count() > SD_ID_MAX_LENGTH {
-                    sanitized_id.chars().take(SD_ID_MAX_LENGTH).collect()
-                } else {
-                    sanitized_id.into_owned()
-                };
+        for (sd_id, value) in fields {
+            let sd_id_str: String = sd_id.into();
+            let Some(final_id) = sanitize_sd_name(&sd_id_str) else {
+                continue;
+            };
+            let final_id = deduped_key(&elements, final_id);
 
-                let sd_params = match value {
-                    Value::Object(obj) => {
-                        let mut map = BTreeMap::new();
-                        flatten_object(obj, String::new(), &mut map);
-                        map
-                    }
-                    scalar => {
-                        let mut map = BTreeMap::new();
-                        map.insert("value".to_string(), scalar.to_string_lossy().to_string());
-                        map
-                    }
-                };
-                (final_id, sd_params)
-            })
-            .collect();
+            let sd_params = match value {
+                Value::Object(obj) => {
+                    let mut map = BTreeMap::new();
+                    flatten_object(obj, String::new(), &mut map);
+                    map
+                }
+                scalar => {
+                    let mut map = BTreeMap::new();
+                    map.insert("value".to_string(), scalar.to_string_lossy().to_string());
+                    map
+                }
+            };
+            elements.insert(final_id, sd_params);
+        }
+
         Self { elements }
     }
 }
@@ -484,14 +591,18 @@ impl From<ObjectMap> for StructuredData {
 fn flatten_object(obj: ObjectMap, prefix: String, result: &mut BTreeMap<String, String>) {
     for (key, value) in obj {
         let key_str: String = key.into();
-
-        let sanitized_key = sanitize_name(&key_str);
+        let Some(sanitized_key) = sanitize_sd_name(&key_str) else {
+            continue;
+        };
 
         let mut full_key = prefix.clone();
         if !full_key.is_empty() {
             full_key.push('.');
         }
         full_key.push_str(&sanitized_key);
+        let Some(full_key) = sanitize_sd_name(&full_key) else {
+            continue;
+        };
 
         match value {
             Value::Object(nested) => {
@@ -499,13 +610,13 @@ fn flatten_object(obj: ObjectMap, prefix: String, result: &mut BTreeMap<String, 
             }
             Value::Array(arr) => {
                 if let Ok(json) = serde_json::to_string(&arr) {
-                    result.insert(full_key, json);
+                    insert_structured_param(result, full_key, json);
                 } else {
-                    result.insert(full_key, format!("{:?}", arr));
+                    insert_structured_param(result, full_key, format!("{:?}", arr));
                 }
             }
             scalar => {
-                result.insert(full_key, scalar.to_string_lossy().to_string());
+                insert_structured_param(result, full_key, scalar.to_string_lossy().to_string());
             }
         }
     }
@@ -560,8 +671,9 @@ pub enum Facility {
     Ntp = 12,
     /// Security
     Security = 13,
-    /// Console
-    Console = 14,
+    /// Log alert
+    #[strum(serialize = "log-alert", serialize = "alert", serialize = "console")]
+    LogAlert = 14,
     /// SolarisCron
     SolarisCron = 15,
     /// Local0
@@ -717,7 +829,7 @@ mod tests {
             toml::from_str::<SyslogSerializerOptions>(r#"facility = ".syslog_facility""#).unwrap();
         let config_sev =
             toml::from_str::<SyslogSerializerOptions>(r#"severity = ".syslog_severity""#).unwrap();
-        //check lowercase and digit
+
         log.insert(event_path!("syslog_facility"), "daemon");
         log.insert(event_path!("syslog_severity"), "critical");
         let decanter = ConfigDecanter::new(&log);
@@ -735,7 +847,6 @@ mod tests {
         assert_eq!(facility, Facility::Daemon);
         assert_eq!(severity, Severity::Critical);
 
-        //check digit
         log.insert(event_path!("syslog_facility"), Value::from(3u8));
         log.insert(event_path!("syslog_severity"), Value::from(2u8));
         let decanter = ConfigDecanter::new(&log);
@@ -744,13 +855,83 @@ mod tests {
         assert_eq!(facility, Facility::Daemon);
         assert_eq!(severity, Severity::Critical);
 
-        //check defaults with empty config
+        log.insert(event_path!("syslog_facility"), "3");
+        log.insert(event_path!("syslog_severity"), "2");
+        let decanter = ConfigDecanter::new(&log);
+        let facility = decanter.get_facility(&config_fac);
+        let severity = decanter.get_severity(&config_sev);
+        assert_eq!(facility, Facility::Daemon);
+        assert_eq!(severity, Severity::Critical);
+
+        for (name, expected) in [
+            ("kern", Facility::Kern),
+            ("kernel", Facility::Kern),
+            ("audit", Facility::Security),
+            ("alert", Facility::LogAlert),
+            ("log-alert", Facility::LogAlert),
+            ("clockd", Facility::SolarisCron),
+            ("local7", Facility::Local7),
+        ] {
+            log.insert(event_path!("syslog_facility"), name);
+            let decanter = ConfigDecanter::new(&log);
+            assert_eq!(decanter.get_facility(&config_fac), expected);
+        }
+
+        for (name, expected) in [
+            ("emerg", Severity::Emergency),
+            ("emergency", Severity::Emergency),
+            ("crit", Severity::Critical),
+            ("critical", Severity::Critical),
+            ("err", Severity::Error),
+            ("error", Severity::Error),
+            ("warn", Severity::Warning),
+            ("warning", Severity::Warning),
+            ("info", Severity::Informational),
+            ("informational", Severity::Informational),
+        ] {
+            log.insert(event_path!("syslog_severity"), name);
+            let decanter = ConfigDecanter::new(&log);
+            assert_eq!(decanter.get_severity(&config_sev), expected);
+        }
+
         let empty_config =
             toml::from_str::<SyslogSerializerOptions>(r#"facility = ".missing_field""#).unwrap();
+        let decanter = ConfigDecanter::new(&log);
         let default_facility = decanter.get_facility(&empty_config);
         let default_severity = decanter.get_severity(&empty_config);
         assert_eq!(default_facility, Facility::User);
         assert_eq!(default_severity, Severity::Informational);
+    }
+
+    #[test]
+    fn test_pri_aliases_from_syslog_decoder_names() {
+        let config = toml::from_str::<SyslogSerializerConfig>(
+            r#"
+        [syslog]
+        rfc = "rfc5424"
+        facility = ".facility"
+        severity = ".severity"
+    "#,
+        )
+        .unwrap();
+
+        let mut log = create_simple_log();
+        log.insert(event_path!("facility"), "audit");
+        log.insert(event_path!("severity"), "info");
+        let output = run_encode(config.clone(), Event::Log(log));
+        assert!(output.starts_with("<110>1"), "unexpected PRI: {output}");
+
+        let mut log = create_simple_log();
+        log.insert(event_path!("facility"), "clockd");
+        log.insert(event_path!("severity"), "err");
+        let output = run_encode(config.clone(), Event::Log(log));
+        assert!(output.starts_with("<123>1"), "unexpected PRI: {output}");
+
+        let mut log = create_simple_log();
+        log.insert(event_path!("facility"), "3");
+        log.insert(event_path!("severity"), "2");
+        let output = run_encode(config, Event::Log(log));
+        assert!(output.starts_with("<26>1"), "unexpected PRI: {output}");
     }
 
     #[test]
@@ -800,6 +981,72 @@ mod tests {
         assert_eq!(message.tag.app_name.len(), 48);
         assert_eq!(message.tag.proc_id.unwrap().len(), 128);
         assert_eq!(message.tag.msg_id.unwrap().len(), 32);
+    }
+
+    #[test]
+    fn test_rfc5424_header_field_sanitization() {
+        let config = toml::from_str::<SyslogSerializerConfig>(
+            r#"
+        [syslog]
+        rfc = "rfc5424"
+        app_name = ".app"
+        proc_id = ".proc"
+        msg_id = ".msg"
+    "#,
+        )
+        .unwrap();
+
+        let mut log = create_simple_log();
+        log.insert(event_path!("host"), "bad host\n😀");
+        log.insert(event_path!("app"), "my app\n");
+        log.insert(event_path!("proc"), "proc\tid");
+        log.insert(event_path!("msg"), "msg id\u{0007}");
+
+        let output = run_encode(config, Event::Log(log));
+        let expected = "<14>1 2025-08-28T18:30:00.123456Z bad_host__ my_app_ proc_id msg_id_ - original message";
+        assert_eq!(output, expected);
+    }
+
+    #[test]
+    fn test_rfc5424_empty_header_fields_use_nilvalue() {
+        let config = toml::from_str::<SyslogSerializerConfig>(
+            r#"
+        [syslog]
+        rfc = "rfc5424"
+        app_name = ".app"
+        proc_id = ".proc"
+        msg_id = ".msg"
+    "#,
+        )
+        .unwrap();
+
+        let mut log = create_simple_log();
+        log.insert(event_path!("host"), "");
+        log.insert(event_path!("app"), "");
+        log.insert(event_path!("proc"), "");
+        log.insert(event_path!("msg"), "");
+
+        let output = run_encode(config, Event::Log(log));
+        let expected = "<14>1 2025-08-28T18:30:00.123456Z - - - - - original message";
+        assert_eq!(output, expected);
+    }
+
+    #[test]
+    fn test_rfc3164_hostname_sanitization() {
+        let config = toml::from_str::<SyslogSerializerConfig>(
+            r#"
+        [syslog]
+        rfc = "rfc3164"
+    "#,
+        )
+        .unwrap();
+
+        let mut log = create_simple_log();
+        log.insert(event_path!("host"), "bad host\n😀");
+
+        let output = run_encode(config, Event::Log(log));
+        let expected = "<14>Aug 28 18:30:00 bad_host__ vector: original message";
+        assert_eq!(output, expected);
     }
 
     #[test]
@@ -898,7 +1145,7 @@ mod tests {
     }
 
     #[test]
-    fn test_non_log_event_filtering() {
+    fn test_non_log_event_rejected() {
         let config = toml::from_str::<SyslogSerializerConfig>(
             r#"
         [syslog]
@@ -921,7 +1168,7 @@ mod tests {
 
         let result = serializer.encode(metric_event, &mut buffer);
 
-        assert!(result.is_ok());
+        assert!(result.is_err());
         assert!(buffer.is_empty());
     }
 
@@ -1134,6 +1381,65 @@ mod tests {
         let expected_id = "a".repeat(32);
         assert!(output.contains(&format!("[{}", expected_id)));
         assert!(!output.contains(&format!("[{}", "a".repeat(50))));
+    }
+
+    #[test]
+    fn test_structured_data_param_name_length_limit_and_collision() {
+        let config = toml::from_str::<SyslogSerializerConfig>(
+            r#"
+            [syslog]
+            rfc = "rfc5424"
+        "#,
+        )
+        .unwrap();
+
+        let mut log = create_simple_log();
+        log.insert(
+            event_path!("structured_data"),
+            value!({
+                "metrics": {
+                    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": "first",
+                    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab": "second",
+                }
+            }),
+        );
+
+        let output = run_encode(config, Event::Log(log));
+        let truncated_key = "a".repeat(32);
+        let deduped_key = format!("{}_1", "a".repeat(30));
+        assert!(output.contains(&format!(r#"{truncated_key}="first""#)));
+        assert!(output.contains(&format!(r#"{deduped_key}="second""#)));
+        assert!(!output.contains(&"a".repeat(50)));
+    }
+
+    #[test]
+    fn test_structured_data_empty_names_are_skipped() {
+        let config = toml::from_str::<SyslogSerializerConfig>(
+            r#"
+            [syslog]
+            rfc = "rfc5424"
+        "#,
+        )
+        .unwrap();
+
+        let mut log = create_simple_log();
+        log.insert(
+            event_path!("structured_data"),
+            value!({
+                "": {
+                    "ignored": "value"
+                },
+                "valid": {
+                    "": "also ignored",
+                    "kept": "yes"
+                }
+            }),
+        );
+
+        let output = run_encode(config, Event::Log(log));
+        assert!(output.contains(r#"[valid kept="yes"]"#));
+        assert!(!output.contains("ignored"));
+        assert!(!output.contains("also ignored"));
     }
 
     #[test]

@@ -139,6 +139,7 @@ jobs:
             "prometheus",
             "pulsar",
             "redis",
+            "syslog",
             "webhdfs"
           ]
     steps:
