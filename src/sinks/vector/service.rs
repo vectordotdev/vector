@@ -73,10 +73,7 @@ impl VectorService {
         compression: bool,
     ) -> Self {
         let (protocol, endpoint) = uri::protocol_endpoint(uri.clone());
-        let mut proto_client = proto_vector::Client::new(HyperSvc {
-            uri,
-            client: hyper_client,
-        });
+        let mut proto_client = proto_vector::Client::new(HyperSvc::new(uri, hyper_client));
 
         if compression {
             proto_client = proto_client.send_compressed(tonic::codec::CompressionEncoding::Gzip);

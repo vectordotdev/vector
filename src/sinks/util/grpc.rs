@@ -1,7 +1,7 @@
 use std::task::{Context, Poll};
 
 use futures::future::BoxFuture;
-use http::Uri;
+use http::{Uri, uri::{Authority, PathAndQuery, Scheme}};
 use hyper::client::HttpConnector;
 use hyper_openssl::HttpsConnector;
 use hyper_proxy::ProxyConnector;
@@ -16,8 +16,34 @@ use tower::Service;
 /// shared Hyper client.
 #[derive(Clone, Debug)]
 pub struct HyperGrpcService {
-    pub uri: Uri,
+    scheme: Scheme,
+    authority: Authority,
     pub client: hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>,
+}
+
+impl HyperGrpcService {
+    /// Creates a new [`HyperGrpcService`].
+    ///
+    /// # Panics
+    ///
+    /// Panics at construction time if `uri` lacks a scheme or authority. Always supply a
+    /// URI produced by `with_default_scheme`, which guarantees both components are present.
+    /// Panicking here (once, at startup) is preferable to panicking inside the hot-path
+    /// `Service::call` implementation on every request.
+    pub fn new(
+        uri: Uri,
+        client: hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>,
+    ) -> Self {
+        let scheme = uri
+            .scheme()
+            .expect("gRPC service URI must have a scheme — supply a URI from `with_default_scheme`")
+            .clone();
+        let authority = uri
+            .authority()
+            .expect("gRPC service URI must have an authority (host:port) — supply a URI from `with_default_scheme`")
+            .clone();
+        Self { scheme, authority, client }
+    }
 }
 
 impl Service<hyper::Request<BoxBody>> for HyperGrpcService {
@@ -30,24 +56,19 @@ impl Service<hyper::Request<BoxBody>> for HyperGrpcService {
     }
 
     fn call(&mut self, mut req: hyper::Request<BoxBody>) -> Self::Future {
-        // SAFETY: `self.uri` is always produced by `with_default_scheme` or equivalent,
-        // which guarantees a scheme and authority. Tonic always sets a path on the request URI.
+        // scheme and authority are pre-validated at construction; path_and_query falls back
+        // to "/" if tonic omits it (it never does, but we avoid a panic either way).
         let uri = Uri::builder()
-            .scheme(self.uri.scheme().expect("uri always has a scheme").clone())
-            .authority(
-                self.uri
-                    .authority()
-                    .expect("uri always has an authority")
-                    .clone(),
-            )
+            .scheme(self.scheme.clone())
+            .authority(self.authority.clone())
             .path_and_query(
                 req.uri()
                     .path_and_query()
-                    .expect("tonic request always has a path")
-                    .clone(),
+                    .cloned()
+                    .unwrap_or_else(|| PathAndQuery::from_static("/")),
             )
             .build()
-            .expect("uri components are always valid");
+            .expect("pre-validated scheme and authority always produce a valid URI");
 
         *req.uri_mut() = uri;
 
