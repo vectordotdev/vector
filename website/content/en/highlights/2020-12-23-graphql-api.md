@@ -11,6 +11,8 @@ badges:
   domains: ["api"]
 ---
 
+{{< grpc-migration-warning >}}
+
 Vector now has a [GraphQL] API that you can use for a variety of purposes:
 
 * To view Vector's internal metrics

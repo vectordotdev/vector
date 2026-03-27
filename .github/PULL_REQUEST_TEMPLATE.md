@@ -9,6 +9,7 @@ This should help the reviewers give feedback faster and with higher quality. -->
 <!-- Please describe how you tested your changes. Also include any information about your setup. -->
 
 ## Change Type
+
 - [ ] Bug fix
 - [ ] New feature
 - [ ] Dependencies
@@ -16,6 +17,7 @@ This should help the reviewers give feedback faster and with higher quality. -->
 - [ ] Performance
 
 ## Is this a breaking change?
+
 - [ ] Yes
 - [ ] No
 
@@ -36,6 +38,7 @@ Changes to CI, website, playground and similar are generally not considered user
 -->
 
 ## Notes
+
 - Please read our [Vector contributor resources](https://github.com/vectordotdev/vector/tree/master/docs#getting-started).
 - Do not hesitate to use `@vectordotdev/vector` to reach out to us regarding this PR.
 - Some CI checks run only after we manually approve them.
@@ -48,7 +51,7 @@ Changes to CI, website, playground and similar are generally not considered user
   - Feel free to push as many commits as you want. They will be squashed into one before merging.
   - For example, you can run `git merge origin master` and `git push`.
 - If this PR introduces changes Vector dependencies (modifies `Cargo.lock`), please
-  run `make build-licenses` to regenerate the [license inventory](https://github.com/vectordotdev/vrl/blob/main/LICENSE-3rdparty.csv) and commit the changes (if any). More details [here](https://crates.io/crates/dd-rust-license-tool).
+  run `make build-licenses` to regenerate the [license inventory](https://github.com/vectordotdev/vrl/blob/main/LICENSE-3rdparty.csv) and commit the changes (if any). More details on the [dd-rust-license-tool](https://crates.io/crates/dd-rust-license-tool).
 
 
 <!--
