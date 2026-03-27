@@ -24,7 +24,11 @@ use vector_lib::{id::ComponentKey, shutdown::ShutdownSignal, stats};
 
 const UTILIZATION_EMITTER_DURATION: Duration = Duration::from_secs(5);
 
-#[pin_project]
+/// Stream wrappers used to approximate component utilization from poll timing.
+///
+/// Current model:
+///
+/// 
 pub(crate) struct Utilization<S> {
     intervals: IntervalStream,
     timer_tx: UtilizationComponentSender,
@@ -33,13 +37,10 @@ pub(crate) struct Utilization<S> {
 }
 
 impl<S> Utilization<S> {
-    /// Wrap a stream to emit stats about utilization. This is designed for use with
-    /// the input channels of transform and sinks components, and measures the
-    /// amount of time that the stream is waiting for input from upstream. We make
-    /// the simplifying assumption that this wait time is when the component is idle
-    /// and the rest of the time it is doing useful work. This is more true for
-    /// sinks than transforms, which can be blocked by downstream components, but
-    /// with knowledge of the config the data is still useful.
+	/// Output-side utilization wrapper for task transforms.
+	///
+	/// Measures the time after the wrapped stream yields an item until downstream
+	/// polls it again.
     pub(crate) fn new(
         timer_tx: UtilizationComponentSender,
         component_key: ComponentKey,
