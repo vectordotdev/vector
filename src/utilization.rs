@@ -28,7 +28,7 @@ const UTILIZATION_EMITTER_DURATION: Duration = Duration::from_secs(5);
 ///
 /// Current model:
 ///
-/// 
+///
 pub(crate) struct Utilization<S> {
     intervals: IntervalStream,
     timer_tx: UtilizationComponentSender,
@@ -37,10 +37,10 @@ pub(crate) struct Utilization<S> {
 }
 
 impl<S> Utilization<S> {
-	/// Output-side utilization wrapper for task transforms.
-	///
-	/// Measures the time after the wrapped stream yields an item until downstream
-	/// polls it again.
+    /// Output-side utilization wrapper for task transforms.
+    ///
+    /// Measures the time after the wrapped stream yields an item until downstream
+    /// polls it again.
     pub(crate) fn new(
         timer_tx: UtilizationComponentSender,
         component_key: ComponentKey,
