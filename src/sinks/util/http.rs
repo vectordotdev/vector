@@ -550,6 +550,96 @@ impl<T: fmt::Debug> sink::Response for http::Response<T> {
     }
 }
 
+/// Configurable retry strategy for `http` based sinks.
+///
+/// For more information about error responses, see [Client Error Responses][error_responses].
+///
+/// [error_responses]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status#client_error_responses
+#[configurable_component]
+#[derive(Debug, Clone, Default, PartialEq)]
+#[serde(tag = "type", rename_all = "snake_case")]
+#[configurable(metadata(docs::enum_tag_description = "The retry strategy enum."))]
+pub enum RetryStrategy {
+    /// Don't retry any errors
+    None,
+
+    /// Default strategy. See [`RetryStrategy::retry_action`] for more details.
+    #[default]
+    Default,
+
+    /// Retry on *all* errorcodes
+    All,
+
+    /// Custom retry strategy
+    Custom {
+        /// Retry on these specific HTTP status codes
+        status_codes: Vec<u16>,
+    },
+}
+
+impl RetryStrategy {
+    /// Returns the name of the retry strategy.
+    #[must_use]
+    const fn name(&self) -> &str {
+        match self {
+            Self::None => "Never retry strategy",
+            Self::Default => "Default retry strategy",
+            Self::All => "Retry all strategy",
+            Self::Custom { .. } => "Custom retry strategy",
+        }
+    }
+
+    /// Determines if the given status code should be retried.
+    ///
+    /// For the `Default` strategy, the following status codes will be retried:
+    /// - 429 (Too Many Requests)
+    /// - 408 (Request Timeout)
+    /// - 5xx (Server Error)
+    ///
+    /// For the `Custom` strategy, the status codes specified in the `status_codes` field will be retried.
+    ///
+    /// For the `All` strategy, all non-success status codes will be retried.
+    #[must_use]
+    pub fn retry_action<Req>(&self, status: http::StatusCode) -> RetryAction<Req> {
+        if status.is_success() {
+            return RetryAction::Successful;
+        }
+
+        let reason = format!(
+            "{}: {}",
+            self.name(),
+            status
+                .canonical_reason()
+                .unwrap_or(status.to_string().as_str())
+        )
+        .into();
+
+        match self {
+            Self::None => RetryAction::DontRetry(reason),
+            Self::Default => match status {
+                StatusCode::TOO_MANY_REQUESTS | StatusCode::REQUEST_TIMEOUT => {
+                    RetryAction::Retry(reason)
+                }
+                _ => {
+                    if status.is_server_error() {
+                        RetryAction::Retry(reason)
+                    } else {
+                        RetryAction::DontRetry(reason)
+                    }
+                }
+            },
+            Self::All => RetryAction::Retry(reason),
+            Self::Custom { status_codes } => {
+                if status_codes.contains(&status.as_u16()) {
+                    RetryAction::Retry(reason)
+                } else {
+                    RetryAction::DontRetry(reason)
+                }
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct HttpRetryLogic<Req> {
     request: PhantomData<Req>,
@@ -965,6 +1055,54 @@ mod test {
         assert!(
             logic
                 .should_retry_response(&response_501)
+                .is_not_retryable()
+        );
+    }
+
+    #[test]
+    fn retry_strategy_none_preserves_success_and_rejects_failures() {
+        let strategy = RetryStrategy::None;
+
+        assert!(strategy.retry_action::<()>(StatusCode::OK).is_successful());
+        assert!(
+            strategy
+                .retry_action::<()>(StatusCode::INTERNAL_SERVER_ERROR)
+                .is_not_retryable()
+        );
+    }
+
+    #[test]
+    fn retry_strategy_all_preserves_success_and_retries_failures() {
+        let strategy = RetryStrategy::All;
+
+        assert!(strategy.retry_action::<()>(StatusCode::OK).is_successful());
+        assert!(
+            strategy
+                .retry_action::<()>(StatusCode::BAD_REQUEST)
+                .is_retryable()
+        );
+        assert!(
+            strategy
+                .retry_action::<()>(StatusCode::INTERNAL_SERVER_ERROR)
+                .is_retryable()
+        );
+    }
+
+    #[test]
+    fn retry_strategy_custom_only_retries_configured_statuses() {
+        let strategy = RetryStrategy::Custom {
+            status_codes: vec![StatusCode::BAD_REQUEST.as_u16()],
+        };
+
+        assert!(strategy.retry_action::<()>(StatusCode::OK).is_successful());
+        assert!(
+            strategy
+                .retry_action::<()>(StatusCode::BAD_REQUEST)
+                .is_retryable()
+        );
+        assert!(
+            strategy
+                .retry_action::<()>(StatusCode::INTERNAL_SERVER_ERROR)
                 .is_not_retryable()
         );
     }
