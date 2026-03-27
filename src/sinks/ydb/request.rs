@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use snafu::{ResultExt, Snafu};
 use tracing::debug;
 use vector_lib::event::Event;
@@ -23,8 +21,6 @@ pub struct YdbRequestHandler {
     strategy: InsertStrategy,
     rows: Vec<Value>,
     table_path: String,
-    // temporal field to store columns names and types for UPSERT query
-    columns: Vec<(String, String)>,
 }
 
 impl YdbRequestHandler {
@@ -42,28 +38,10 @@ impl YdbRequestHandler {
         let rows = rows.context(MappingSnafu)?;
         let strategy = choose_insert_strategy(schema);
 
-        let columns: Vec<(String, String)> = schema
-            .columns
-            .iter()
-            .filter_map(|col| {
-                col.type_value.as_ref().ok().map(|val| {
-                    let debug_str = format!("{:?}", val);
-                    let type_name = debug_str.split('(').next().unwrap_or("");
-                    let yql_type = if type_name == "Bytes" {
-                        "String"
-                    } else {
-                        type_name
-                    };
-                    (col.name.clone(), yql_type.to_string())
-                })
-            })
-            .collect();
-
         Ok(Self {
             strategy,
             rows,
             table_path,
-            columns,
         })
     }
 
@@ -72,14 +50,18 @@ impl YdbRequestHandler {
             strategy,
             rows,
             table_path,
-            columns,
         } = self;
+
+        if rows.is_empty() {
+            return Ok(());
+        }
 
         match strategy {
             InsertStrategy::BulkUpsert => {
                 debug!(
                     message = "Using bulk_upsert",
                     table = %table_path,
+                    rows_count = rows.len(),
                 );
                 table_client
                     .retry_execute_bulk_upsert(table_path, rows)
@@ -90,8 +72,9 @@ impl YdbRequestHandler {
                 debug!(
                     message = "Using UPSERT in transaction",
                     table = %table_path,
+                    rows_count = rows.len(),
                 );
-                execute_upsert_in_transaction(table_client, table_path, rows, columns)
+                execute_upsert_in_transaction(table_client, table_path, rows)
                     .await
                     .context(YdbSnafu)?;
             }
@@ -101,31 +84,10 @@ impl YdbRequestHandler {
     }
 }
 
-fn build_declare_section(row: &Value, columns: &[(String, String)]) -> Result<String, YdbError> {
-    let Value::Struct(s) = row.clone() else {
-        return Err(YdbError::Custom("Expected Struct value".to_string()));
-    };
-
-    let map: HashMap<String, Value> = s.into();
-    let fields: Vec<String> = columns
-        .iter()
-        .filter(|(name, _)| map.contains_key(name))
-        .map(|(name, yql_type)| format!("    {}: {}", name, yql_type))
-        .collect();
-
-    let fields_str = fields.join(",\n");
-
-    Ok(format!(
-        "DECLARE $values AS List<Struct<\n{}\n>>;\n\n",
-        fields_str
-    ))
-}
-
 async fn execute_upsert_in_transaction(
     table_client: &TableClient,
     table_path: String,
     rows: Vec<Value>,
-    columns: Vec<(String, String)>,
 ) -> Result<(), YdbError> {
     if rows.is_empty() {
         return Ok(());
@@ -135,16 +97,13 @@ async fn execute_upsert_in_transaction(
         .retry_transaction(|mut tx| {
             let table_path = table_path.clone();
             let rows = rows.clone();
-            let columns = columns.clone();
 
             async move {
                 let type_example = rows.first().unwrap();
-                let declare = build_declare_section(type_example, &columns)?;
-                let upsert = format!(
+                let yql = format!(
                     "UPSERT INTO `{}`\nSELECT * FROM AS_TABLE($values);",
                     table_path
                 );
-                let yql = format!("{}{}", declare, upsert);
 
                 debug!(
                     message = "Executing UPSERT in transaction",

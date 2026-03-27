@@ -1,11 +1,13 @@
 use std::{
     num::NonZeroUsize,
+    sync::{Arc, RwLock},
     task::{Context, Poll},
 };
 
 use futures::future::BoxFuture;
 use snafu::{ResultExt, Snafu};
 use tower::Service;
+use tracing::warn;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     event::{Event, EventFinalizers, EventStatus, Finalizable},
@@ -50,11 +52,11 @@ pub struct YdbService {
     table_client: TableClient,
     table_path: String,
     endpoint: String,
-    table_schema: TableDescription,
+    table_schema: Arc<RwLock<TableDescription>>,
 }
 
 impl YdbService {
-    pub const fn new(
+    pub fn new(
         table_client: TableClient,
         table_path: String,
         endpoint: String,
@@ -64,8 +66,14 @@ impl YdbService {
             table_client,
             table_path,
             endpoint,
-            table_schema,
+            table_schema: Arc::new(RwLock::new(table_schema)),
         }
+    }
+
+    async fn refresh_schema(&self) -> Result<TableDescription, YdbError> {
+        self.table_client
+            .describe_table(self.table_path.clone())
+            .await
     }
 }
 
@@ -144,30 +152,100 @@ impl Service<YdbRequest> for YdbService {
 
     fn call(&mut self, request: YdbRequest) -> Self::Future {
         let service = self.clone();
-        let future = async move {
-            let metadata = request.metadata;
-
-            let handler = YdbRequestHandler::prepare(
-                request.events,
-                &service.table_schema,
-                service.table_path,
-            )
-            .context(RequestSnafu)?;
-
-            handler
-                .execute(&service.table_client)
-                .await
-                .context(RequestSnafu)?;
-
-            emit!(EndpointBytesSent {
-                byte_size: metadata.request_encoded_size(),
-                protocol: YDB_PROTOCOL,
-                endpoint: &service.endpoint,
-            });
-
-            Ok(YdbResponse { metadata })
-        };
+        let future = async move { service.execute_with_retry(request).await };
 
         Box::pin(future)
+    }
+}
+
+impl YdbService {
+    async fn execute_with_retry(
+        &self,
+        request: YdbRequest,
+    ) -> Result<YdbResponse, YdbServiceError> {
+        let metadata = request.metadata.clone();
+        let events = request.events.clone();
+
+        let schema = self
+            .table_schema
+            .read()
+            .unwrap_or_else(|poisoned| {
+                warn!("Schema lock was poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .clone();
+
+        let result = self.try_execute(events.clone(), &schema).await;
+
+        if let Err(ref e) = result {
+            if should_refresh_schema(e) {
+                warn!(
+                    message = "Operation failed, refreshing schema and retrying",
+                    error = %e,
+                    table = %self.table_path,
+                );
+
+                match self.refresh_schema().await {
+                    Ok(new_schema) => {
+                        *self.table_schema.write().unwrap_or_else(|poisoned| {
+                            warn!("Schema lock was poisoned during refresh, recovering");
+                            poisoned.into_inner()
+                        }) = new_schema.clone();
+
+                        return self
+                            .try_execute(events, &new_schema)
+                            .await
+                            .map(|_| YdbResponse { metadata });
+                    }
+                    Err(refresh_err) => {
+                        warn!(
+                            message = "Schema refresh failed",
+                            refresh_error = %refresh_err,
+                        );
+                        return result.map(|_| YdbResponse { metadata });
+                    }
+                }
+            } else {
+                return result.map(|_| YdbResponse { metadata });
+            }
+        }
+
+        result?;
+
+        emit!(EndpointBytesSent {
+            byte_size: metadata.request_encoded_size(),
+            protocol: YDB_PROTOCOL,
+            endpoint: &self.endpoint,
+        });
+
+        Ok(YdbResponse { metadata })
+    }
+
+    async fn try_execute(
+        &self,
+        events: Vec<Event>,
+        schema: &TableDescription,
+    ) -> Result<(), YdbServiceError> {
+        let handler = YdbRequestHandler::prepare(events, schema, self.table_path.clone())
+            .context(RequestSnafu)?;
+
+        handler
+            .execute(&self.table_client)
+            .await
+            .context(RequestSnafu)
+    }
+}
+
+const fn should_refresh_schema(err: &YdbServiceError) -> bool {
+    match err {
+        YdbServiceError::Request { source } => match source {
+            YdbRequestError::Ydb { source } => !matches!(
+                source,
+                YdbError::TransportDial(_)
+                    | YdbError::Transport(_)
+                    | YdbError::TransportGRPCStatus(_)
+            ),
+            YdbRequestError::Mapping { .. } => false,
+        },
     }
 }

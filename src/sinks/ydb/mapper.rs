@@ -97,30 +97,34 @@ fn type_mismatch(vector_type: &str, ydb_type: &Value) -> MappingError {
 }
 
 fn convert_value(vector_val: &VectorValue, ydb_type_hint: &Value) -> Result<Value, MappingError> {
-    if let Value::Optional(_) = ydb_type_hint {
-        // TODO: need type getter to support Optional type
-        return Err(MappingError::ConversionFailed {
-            message: "Optional type is not supported yet".to_string(),
-        });
-    }
+    let inner_type = if let Value::Optional(_) = ydb_type_hint {
+        ydb_type_hint
+            .clone()
+            .to_option()
+            .ok_or_else(|| MappingError::ConversionFailed {
+                message: "Cannot extract inner type from Optional".to_string(),
+            })?
+    } else {
+        ydb_type_hint.clone()
+    };
 
     match vector_val {
-        VectorValue::Integer(i) => match ydb_type_hint {
+        VectorValue::Integer(i) => match &inner_type {
             Value::Int64(_) => Ok(Value::Int64(*i)),
-            _ => Err(type_mismatch("Integer", ydb_type_hint)),
+            _ => Err(type_mismatch("Integer", &inner_type)),
         },
 
-        VectorValue::Float(f) => match ydb_type_hint {
+        VectorValue::Float(f) => match &inner_type {
             Value::Double(_) => Ok(Value::Double(f.into_inner())),
             Value::Decimal(_) => Ok(Value::Decimal(Decimal::try_from(f.into_inner()).map_err(
                 |e| MappingError::ConversionFailed {
                     message: format!("failed to convert Float to Decimal: {}", e),
                 },
             )?)),
-            _ => Err(type_mismatch("Float", ydb_type_hint)),
+            _ => Err(type_mismatch("Float", &inner_type)),
         },
 
-        VectorValue::Bytes(b) => match ydb_type_hint {
+        VectorValue::Bytes(b) => match &inner_type {
             Value::Bytes(_) => Ok(Value::Bytes(b.to_vec().into())),
             Value::Text(_) => {
                 let text =
@@ -129,15 +133,15 @@ fn convert_value(vector_val: &VectorValue, ydb_type_hint: &Value) -> Result<Valu
                     })?;
                 Ok(Value::Text(text))
             }
-            _ => Err(type_mismatch("Bytes", ydb_type_hint)),
+            _ => Err(type_mismatch("Bytes", &inner_type)),
         },
 
-        VectorValue::Boolean(b) => match ydb_type_hint {
+        VectorValue::Boolean(b) => match &inner_type {
             Value::Bool(_) => Ok(Value::Bool(*b)),
-            _ => Err(type_mismatch("Boolean", ydb_type_hint)),
+            _ => Err(type_mismatch("Boolean", &inner_type)),
         },
 
-        VectorValue::Timestamp(ts) => match ydb_type_hint {
+        VectorValue::Timestamp(ts) => match &inner_type {
             Value::Timestamp(_) => Ok(Value::Timestamp(std::time::SystemTime::from(*ts))),
             Value::Date(_) => {
                 let date = ts.date_naive();
@@ -150,7 +154,7 @@ fn convert_value(vector_val: &VectorValue, ydb_type_hint: &Value) -> Result<Valu
                 Ok(Value::Date(std::time::SystemTime::from(datetime_utc)))
             }
             Value::DateTime(_) => Ok(Value::DateTime(std::time::SystemTime::from(*ts))),
-            _ => Err(type_mismatch("Timestamp", ydb_type_hint)),
+            _ => Err(type_mismatch("Timestamp", &inner_type)),
         },
 
         VectorValue::Array(_) => {
@@ -161,10 +165,10 @@ fn convert_value(vector_val: &VectorValue, ydb_type_hint: &Value) -> Result<Valu
                 }
             })?;
 
-            match ydb_type_hint {
+            match &inner_type {
                 Value::JsonDocument(_) => Ok(Value::JsonDocument(json_str)),
                 Value::Json(_) => Ok(Value::Json(json_str)),
-                _ => Err(type_mismatch("Array", ydb_type_hint)),
+                _ => Err(type_mismatch("Array", &inner_type)),
             }
         }
 
@@ -176,10 +180,10 @@ fn convert_value(vector_val: &VectorValue, ydb_type_hint: &Value) -> Result<Valu
                 }
             })?;
 
-            match ydb_type_hint {
+            match &inner_type {
                 Value::JsonDocument(_) => Ok(Value::JsonDocument(json_str)),
                 Value::Json(_) => Ok(Value::Json(json_str)),
-                _ => Err(type_mismatch("Object", ydb_type_hint)),
+                _ => Err(type_mismatch("Object", &inner_type)),
             }
         }
 
