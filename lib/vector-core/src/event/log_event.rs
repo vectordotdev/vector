@@ -1138,11 +1138,12 @@ mod test {
             .unwrap()
             .map(|(s, v)| (s, v.clone()))
             .collect();
+
         assert_eq!(
             actual,
             vec![
-                ("a.b".parse().expect("compile time values error"), 1.into()),
-                ("c".parse().expect("compile time values error"), 2.into()),
+                (OwnedTargetPath::event(owned_value_path!("a.b")), 1.into()),
+                (OwnedTargetPath::event(owned_value_path!("c")), 2.into()),
             ]
         );
     }
@@ -1153,16 +1154,21 @@ mod test {
         log.insert("%a", 0);
         log.insert("%a.b", 1);
         log.insert("%c", 2);
+
         let actual: Vec<(OwnedTargetPath, Value)> = log
             .all_metadata_fields()
             .unwrap()
             .map(|(s, v)| (s, v.clone()))
             .collect();
+
         assert_eq!(
             actual,
             vec![
-                ("%a.b".parse().expect("compile time values error"), 1.into()),
-                ("%c".parse().expect("compile time values error"), 2.into())
+                (
+                    OwnedTargetPath::metadata(owned_value_path!("a.b")),
+                    1.into()
+                ),
+                (OwnedTargetPath::metadata(owned_value_path!("c")), 2.into()),
             ]
         );
     }
@@ -1181,15 +1187,13 @@ mod test {
             .unwrap()
             .map(|(s, v)| (s, v.clone()))
             .collect();
+
         assert_eq!(
             actual,
             vec![
+                (OwnedTargetPath::event(owned_value_path!("arr")), [1].into()),
                 (
-                    "arr".parse().expect("compile time values error"),
-                    [1].into()
-                ),
-                (
-                    "obj.arr".parse().expect("compile time values error"),
+                    OwnedTargetPath::event(owned_value_path!("obj", "arr")),
                     [1, 2, 3].into()
                 )
             ]

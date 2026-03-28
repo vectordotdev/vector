@@ -248,6 +248,8 @@ impl TryFrom<Vec<Event>> for EventsApiModel {
     }
 }
 
+// TODO: move to vrl package?
+
 fn build_unquoted_value_path(path: &OwnedValuePath) -> String {
     let mut output = String::new();
     for (i, segment) in path.segments.iter().enumerate() {

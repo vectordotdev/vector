@@ -4,6 +4,9 @@ mod size_of;
 
 use std::collections::HashSet;
 
+use lookup::OwnedTargetPath;
+use vrl::owned_value_path;
+
 use super::*;
 
 #[test]
@@ -22,11 +25,11 @@ fn event_iteration() {
         all,
         vec![
             (
-                "Pitbull".parse().expect("compile time values error"),
+                OwnedTargetPath::event(owned_value_path!("Pitbull")),
                 "The bigger they are, the harder they fall".into()
             ),
             (
-                "\"Ke$ha\"".parse().expect("compile time values error"),
+                OwnedTargetPath::event(owned_value_path!("\"Ke$ha\"")),
                 "It's going down, I'm yelling timber".into()
             ),
         ]
@@ -46,9 +49,18 @@ fn event_iteration_order() {
     assert_eq!(
         collected,
         vec![
-            ("YRjhxXcg".parse().expect("compile time values error"), &Value::from("nw8iM5Jr")),
-            ("lZDfzKIL".parse().expect("compile time values error"), &Value::from("tOVrjveM")),
-            ("o9amkaRY".parse().expect("compile time values error"), &Value::from("pGsfG7Nr")),
+            (
+                OwnedTargetPath::event(owned_value_path!("YRjhxXcg")),
+                &Value::from("nw8iM5Jr")
+            ),
+            (
+                OwnedTargetPath::event(owned_value_path!("lZDfzKIL")),
+                &Value::from("tOVrjveM")
+            ),
+            (
+                OwnedTargetPath::event(owned_value_path!("o9amkaRY")),
+                &Value::from("pGsfG7Nr")
+            ),
         ]
     );
 }
