@@ -1142,7 +1142,10 @@ mod test {
         assert_eq!(
             actual,
             vec![
-                (OwnedTargetPath::event(owned_value_path!("a.b")), 1.into()),
+                (
+                    OwnedTargetPath::event(owned_value_path!("a", "b")),
+                    1.into()
+                ),
                 (OwnedTargetPath::event(owned_value_path!("c")), 2.into()),
             ]
         );
@@ -1165,7 +1168,7 @@ mod test {
             actual,
             vec![
                 (
-                    OwnedTargetPath::metadata(owned_value_path!("a.b")),
+                    OwnedTargetPath::metadata(owned_value_path!("a", "b")),
                     1.into()
                 ),
                 (OwnedTargetPath::metadata(owned_value_path!("c")), 2.into()),

@@ -29,7 +29,7 @@ fn event_iteration() {
                 "The bigger they are, the harder they fall".into()
             ),
             (
-                OwnedTargetPath::event(owned_value_path!("\"Ke$ha\"")),
+                OwnedTargetPath::event(owned_value_path!("Ke$ha")), // quotes are removed during the log.insert
                 "It's going down, I'm yelling timber".into()
             ),
         ]
