@@ -104,7 +104,10 @@ fn serialization_nested_and_special_fields() {
     let mut event = LogEvent::default();
     event.insert("a.b", 1);
     event.insert("a.c", 2);
-    event.insert("d", Value::Array(vec![Value::Integer(10), Value::Integer(20)]));
+    event.insert(
+        "d",
+        Value::Array(vec![Value::Integer(10), Value::Integer(20)]),
+    );
 
     let map = serde_json::to_value(event.all_event_fields().unwrap()).unwrap();
 
