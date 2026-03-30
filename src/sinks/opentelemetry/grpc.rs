@@ -7,10 +7,7 @@ use std::{
 use async_trait::async_trait;
 use bytes::BytesMut;
 use futures::{StreamExt, TryFutureExt, future::BoxFuture, stream::BoxStream};
-use http::{
-    Uri,
-    uri::{PathAndQuery, Scheme},
-};
+use http::Uri;
 use hyper::client::HttpConnector;
 use hyper_openssl::HttpsConnector;
 use hyper_proxy::ProxyConnector;
@@ -42,7 +39,7 @@ use vector_lib::{
 
 use crate::{
     config::{AcknowledgementsConfig, SinkContext, SinkHealthcheckOptions},
-    sinks::util::grpc::HyperGrpcService,
+    sinks::util::grpc::{HyperGrpcService, with_default_scheme},
     event::{Event, EventFinalizers, EventStatus, Finalizable},
     http::build_proxy_connector,
     internal_events::{EndpointBytesSent, SinkRequestBuildError},
@@ -72,18 +69,6 @@ pub enum GrpcCompression {
     Gzip,
 }
 
-pub(super) fn with_default_scheme(uri: Uri, tls: bool) -> crate::Result<Uri> {
-    if uri.scheme().is_none() {
-        let mut parts = uri.into_parts();
-        parts.scheme = Some(if tls { Scheme::HTTPS } else { Scheme::HTTP });
-        if parts.path_and_query.is_none() {
-            parts.path_and_query = Some(PathAndQuery::from_static("/"));
-        }
-        Ok(Uri::from_parts(parts)?)
-    } else {
-        Ok(uri)
-    }
-}
 
 /// Configuration for the OpenTelemetry sink's gRPC transport.
 #[configurable_component]
@@ -918,6 +903,7 @@ fn signal_into_request<R: prost::Message>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::sinks::util::grpc::with_default_scheme;
 
     #[test]
     fn generate_grpc_config() {

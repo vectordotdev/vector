@@ -8,6 +8,24 @@ use hyper_proxy::ProxyConnector;
 use tonic::body::BoxBody;
 use tower::Service;
 
+/// Adds a default scheme to a URI that lacks one.
+///
+/// Returns the URI unchanged if a scheme is already present. Otherwise prepends
+/// `https` when `tls` is `true`, or `http` when `false`. Also sets the
+/// path-and-query to `/` if missing.
+pub(crate) fn with_default_scheme(uri: Uri, tls: bool) -> crate::Result<Uri> {
+    if uri.scheme().is_none() {
+        let mut parts = uri.into_parts();
+        parts.scheme = Some(if tls { Scheme::HTTPS } else { Scheme::HTTP });
+        if parts.path_and_query.is_none() {
+            parts.path_and_query = Some(PathAndQuery::from_static("/"));
+        }
+        Ok(Uri::from_parts(parts)?)
+    } else {
+        Ok(uri)
+    }
+}
+
 /// A Tower [`Service`] that routes gRPC requests through a Hyper HTTP/2 client,
 /// substituting the scheme and authority from a fixed base URI while preserving
 /// the path/query set by tonic.
