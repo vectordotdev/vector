@@ -497,28 +497,22 @@ impl Service<OtlpGrpcRequest> for OtlpGrpcService {
             let byte_size = match (req.signal, client) {
                 (OtlpSignal::Logs(r), SignalClient::Logs(mut c)) => {
                     let (len, resp) = export!(c, r);
-                    if let Some(ps) = resp.partial_success {
-                        if ps.rejected_log_records > 0 {
-                            warn!(rejected = ps.rejected_log_records, message = ps.error_message, "OTLP collector rejected log records");
-                        }
+                    if let Some(ps) = resp.partial_success && ps.rejected_log_records > 0 {
+                        warn!(rejected = ps.rejected_log_records, message = ps.error_message, "OTLP collector rejected log records");
                     }
                     len
                 }
                 (OtlpSignal::Metrics(r), SignalClient::Metrics(mut c)) => {
                     let (len, resp) = export!(c, r);
-                    if let Some(ps) = resp.partial_success {
-                        if ps.rejected_data_points > 0 {
-                            warn!(rejected = ps.rejected_data_points, message = ps.error_message, "OTLP collector rejected metric data points");
-                        }
+                    if let Some(ps) = resp.partial_success && ps.rejected_data_points > 0 {
+                        warn!(rejected = ps.rejected_data_points, message = ps.error_message, "OTLP collector rejected metric data points");
                     }
                     len
                 }
                 (OtlpSignal::Traces(r), SignalClient::Traces(mut c)) => {
                     let (len, resp) = export!(c, r);
-                    if let Some(ps) = resp.partial_success {
-                        if ps.rejected_spans > 0 {
-                            warn!(rejected = ps.rejected_spans, message = ps.error_message, "OTLP collector rejected trace spans");
-                        }
+                    if let Some(ps) = resp.partial_success && ps.rejected_spans > 0 {
+                        warn!(rejected = ps.rejected_spans, message = ps.error_message, "OTLP collector rejected trace spans");
                     }
                     len
                 }
@@ -857,63 +851,29 @@ fn encode_event(
     serializer: &mut OtlpSerializer,
     event: &Event,
 ) -> Result<Option<OtlpSignal>, vector_common::Error> {
-    let signal_type = detect_signal_type(event);
-    let signal_type = match signal_type {
-        Some(t) => t,
-        None => return Ok(None),
-    };
-
     let mut buf = BytesMut::new();
     // Clone the event to pass ownership to the encoder while keeping the original
     // for metadata extraction in the caller. The clone is shallow for logs/traces.
-    serializer.encode(event.clone(), &mut buf)?;
-
-    let bytes = buf.freeze();
-    match signal_type {
-        SignalType::Logs => {
-            let req = ExportLogsServiceRequest::decode(bytes)?;
-            Ok(Some(OtlpSignal::Logs(req)))
-        }
-        SignalType::Metrics => {
-            let req = ExportMetricsServiceRequest::decode(bytes)?;
-            Ok(Some(OtlpSignal::Metrics(req)))
-        }
-        SignalType::Traces => {
-            let req = ExportTraceServiceRequest::decode(bytes)?;
-            Ok(Some(OtlpSignal::Traces(req)))
-        }
-    }
-}
-
-enum SignalType {
-    Logs,
-    Metrics,
-    Traces,
-}
-
-fn detect_signal_type(event: &Event) -> Option<SignalType> {
     match event {
-        Event::Log(log) => {
-            if log.contains(RESOURCE_LOGS_JSON_FIELD) {
-                Some(SignalType::Logs)
-            } else if log.contains(RESOURCE_METRICS_JSON_FIELD) {
-                Some(SignalType::Metrics)
-            } else if log.contains(RESOURCE_SPANS_JSON_FIELD) {
-                // OTLP spans can arrive as Log events when the source does not use
-                // use_otlp_decoding.traces = true.
-                Some(SignalType::Traces)
-            } else {
-                None
-            }
+        Event::Log(log) if log.contains(RESOURCE_LOGS_JSON_FIELD) => {
+            serializer.encode(event.clone(), &mut buf)?;
+            Ok(Some(OtlpSignal::Logs(ExportLogsServiceRequest::decode(buf.freeze())?)))
         }
-        Event::Trace(trace) => {
-            if trace.contains(RESOURCE_SPANS_JSON_FIELD) {
-                Some(SignalType::Traces)
-            } else {
-                None
-            }
+        Event::Log(log) if log.contains(RESOURCE_METRICS_JSON_FIELD) => {
+            serializer.encode(event.clone(), &mut buf)?;
+            Ok(Some(OtlpSignal::Metrics(ExportMetricsServiceRequest::decode(buf.freeze())?)))
         }
-        Event::Metric(_) => None, // Native Vector metrics not supported by OtlpSerializer
+        // OTLP spans can arrive as Log events when the source does not use
+        // use_otlp_decoding.traces = true.
+        Event::Log(log) if log.contains(RESOURCE_SPANS_JSON_FIELD) => {
+            serializer.encode(event.clone(), &mut buf)?;
+            Ok(Some(OtlpSignal::Traces(ExportTraceServiceRequest::decode(buf.freeze())?)))
+        }
+        Event::Trace(trace) if trace.contains(RESOURCE_SPANS_JSON_FIELD) => {
+            serializer.encode(event.clone(), &mut buf)?;
+            Ok(Some(OtlpSignal::Traces(ExportTraceServiceRequest::decode(buf.freeze())?)))
+        }
+        _ => Ok(None),
     }
 }
 
