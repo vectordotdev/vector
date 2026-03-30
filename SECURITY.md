@@ -169,11 +169,8 @@ those changes are kept to a minimum.
 
 #### User Privileges
 
-Vector is designed to run under non-`root` privileges, and our documentation
-defaults to non-`root` use. Note that some components, such as `host_metrics`
-and `kubernetes_logs`, might require elevated privileges due to system level
-permissions. Therefore, our Docker image defaults to the `root` user. With
-additional configuration you can configure Vector to run as a non-`root` user.
+Vector is always designed to run under non-`root` privileges, and our
+documentation always defaults to non-`root` use.
 
 ### Dependencies
 
