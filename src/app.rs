@@ -276,6 +276,9 @@ impl Application {
             extra_context: config.extra_context,
         });
 
+        #[cfg(target_os = "linux")]
+        crate::systemd::sd_notify_ready();
+
         Ok(StartedApplication {
             config_paths: config.config_paths,
             internal_topologies: config.internal_topologies,
@@ -493,6 +496,8 @@ impl FinishedApplication {
     }
 
     async fn stop(topology_controller: TopologyController, mut signal_rx: SignalRx) -> ExitStatus {
+        #[cfg(target_os = "linux")]
+        crate::systemd::sd_notify_stopping();
         emit!(VectorStopped);
         tokio::select! {
             _ = topology_controller.stop() => ExitStatus::from_raw({

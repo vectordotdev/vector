@@ -11,6 +11,7 @@ After=network-online.target
 Requires=network-online.target
 
 [Service]
+Type=notify
 EnvironmentFile=-/etc/default/vector
 User=vector
 Group=vector

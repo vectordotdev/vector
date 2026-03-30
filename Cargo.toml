@@ -461,6 +461,7 @@ tikv-jemallocator = { version = "0.6.0", default-features = false, features = ["
 
 [target.'cfg(target_os = "linux")'.dependencies]
 procfs = { version = "0.18.0", default-features = false }
+sd-notify = { version = "0.5.0", default-features = false }
 
 [build-dependencies]
 prost-build = { workspace = true, optional = true }

@@ -5,6 +5,7 @@ After=network-online.target
 Requires=network-online.target
 
 [Service]
+Type=notify
 User=vector
 Group=vector
 ExecStartPre=/usr/bin/vector validate
