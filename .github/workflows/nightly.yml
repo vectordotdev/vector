@@ -1,8 +1,7 @@
 name: Nightly
 
 permissions:
-  contents: write
-  packages: write
+  contents: read  # Restrictive default
 
 on:
   workflow_dispatch:
@@ -11,6 +10,9 @@ on:
 
 jobs:
   Nightly:
+    permissions:
+      contents: write   # Required to create/update releases and tags
+      packages: write   # Required to push container images to GHCR
     uses: ./.github/workflows/publish.yml
     with:
       git_ref: ${{ github.ref }}

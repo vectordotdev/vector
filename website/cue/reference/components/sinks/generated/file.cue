@@ -590,6 +590,7 @@ generated: components: sinks: file: configuration: {
 			examples: ["/tmp/vector-%Y-%m-%d.log", "/tmp/application-{{ application_id }}-%Y-%m-%d.log", "/tmp/vector-%Y-%m-%d.log.zst"]
 			syntax: "template"
 		}
+		warnings: ["The rendered path can resolve to any location on the filesystem. Vector will write to it if the process has permission."]
 	}
 	timezone: {
 		description: """

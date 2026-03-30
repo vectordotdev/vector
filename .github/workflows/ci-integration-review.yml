@@ -51,11 +51,11 @@ env:
 jobs:
   prep-pr:
     name: (PR review) Signal pending to PR
-    permissions:
-      statuses: write
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     if: startsWith(github.event.review.body, '/ci-run-integration') || startsWith(github.event.review.body, '/ci-run-e2e') || contains(github.event.review.body, '/ci-run-all')
+    permissions:
+      statuses: write   # Required to set commit status to pending
     steps:
       - name: Generate authentication token
         id: generate_token
@@ -83,10 +83,10 @@ jobs:
           status: pending
 
   build-test-runner:
+    needs: prep-pr
     permissions:
       contents: read
-      packages: write
-    needs: prep-pr
+      packages: write   # Required to push test runner image to GHCR
     uses: ./.github/workflows/build-test-runner.yml
     with:
       commit_sha: ${{ github.event.review.commit_id }}
@@ -98,6 +98,9 @@ jobs:
       - build-test-runner
     runs-on: ubuntu-24.04
     timeout-minutes: 90
+    permissions:
+      contents: read
+      packages: read    # Required to pull test runner image from GHCR
     strategy:
       fail-fast: false
       matrix:
@@ -138,6 +141,9 @@ jobs:
       - build-test-runner
     runs-on: ubuntu-24.04-8core
     timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: read    # Required to pull test runner image from GHCR
     strategy:
       fail-fast: false
       matrix:
@@ -171,14 +177,14 @@ jobs:
 
   update-pr-status:
     name: Signal result to PR
-    permissions:
-      statuses: write
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     needs:
       - integration-tests
       - e2e-tests
     if: always() && (startsWith(github.event.review.body, '/ci-run-integration') || contains(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-e2e'))
+    permissions:
+      statuses: write   # Required to set final commit status
     env:
       FAILED: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
     steps:

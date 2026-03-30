@@ -21,7 +21,7 @@ reduction and improved data quality for observability infrastructure.
   - `sinks/` - Data output destinations
   - `config/` - Configuration system and validation
   - `topology/` - Component graph management
-  - `api/` - GraphQL API for management and monitoring
+  - `api/` - gRPC API for management and monitoring
   - `cli.rs` - Command-line interface
 
 - `/lib/` - Modular library crates
@@ -115,7 +115,7 @@ make fmt                      # Format code
 make check-fmt                # Verify formatting
 make check-clippy             # Run Clippy linter
 make check-markdown           # Check markdown files
-make check-component-docs     # Check component documentation
+make check-generated-docs     # Check generated documentation
 ./scripts/check_changelog_fragments.sh  # Verify changelog
 ```
 
@@ -179,7 +179,7 @@ make check-licenses
 make check-fmt
 make check-clippy
 make check-markdown
-make check-component-docs
+make check-generated-docs
 
 ./scripts/check_changelog_fragments.sh
 ```
@@ -189,8 +189,14 @@ Then: `chmod +x .git/hooks/pre-push`
 ## Detailed Documentation
 
 | Topic | Document |
-|-------|----------|
+| ----- | -------- |
 | Rust style patterns | [docs/RUST_STYLE.md](docs/RUST_STYLE.md) |
+| Code style rules (formatting, const strings, organization) | [STYLE.md](STYLE.md) |
+| System architecture (sources, transforms, sinks, topology) | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
+| Component specification (naming, configuration, health checks) | [docs/specs/component.md](docs/specs/component.md) |
+| Instrumentation requirements (event/metric naming) | [docs/specs/instrumentation.md](docs/specs/instrumentation.md) |
+| How to document code changes | [docs/DOCUMENTING.md](docs/DOCUMENTING.md) |
+| Adding changelog entries | [changelog.d/README.md](changelog.d/README.md) |
 
 ## Architecture Notes
 
@@ -200,7 +206,7 @@ Then: `chmod +x .git/hooks/pre-push`
 - **Transforms**: Modify, filter, or enrich event data
 - **Sinks**: Send data to external systems
 
-Component docs are auto-generated from code annotations. Run `make check-component-docs` after changes.
+Component docs are auto-generated from code annotations. Run `make check-generated-docs` after changes.
 
 ### Integration Tests
 
@@ -237,12 +243,12 @@ Run `make fmt` before committing. Formatting must be exact.
 
 Run `make clippy-fix` to auto-fix many issues. Manual fixes may be required.
 
-### Component Docs Out of Sync
+### Generated Docs Out of Sync
 
-Component documentation is generated from code. Run:
+Documentation is generated from code. Run:
 
 ```bash
-make check-component-docs
+make check-generated-docs
 ```
 
 ### License Check Fails
@@ -254,28 +260,19 @@ cargo install dd-rust-license-tool --locked
 make build-licenses
 ```
 
-## Reference Documentation
+## Creating Pull Requests
 
-These documents provide context that AI agents and developers need when working on Vector code.
+Before opening a PR, read [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md) and use it as the reference for the PR body structure and title.
 
-### Essential for Code Changes
+### PR Title Format
 
-- **[STYLE.md](STYLE.md)** - Code style rules (formatting, const strings, code organization)
-- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** - System architecture (sources, transforms, sinks, topology)
-- **[docs/DEVELOPING.md](docs/DEVELOPING.md)** - Development workflow and testing
+PR titles must follow the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) spec and are validated by `.github/workflows/semantic.yml`.
 
-### Component Development
+Examples:
 
-- **[docs/specs/component.md](docs/specs/component.md)** - Component specification (naming, configuration, health checks)
-- **[docs/specs/instrumentation.md](docs/specs/instrumentation.md)** - Instrumentation requirements (event/metric naming)
-- **[src/internal_events](src/internal_events)** - Internal event examples for telemetry
-
-### Adding Documentation
-
-- **[docs/DOCUMENTING.md](docs/DOCUMENTING.md)** - How to document code changes
-- **[changelog.d/README.md](changelog.d/README.md)** - Adding changelog entries
-
-### Full Guides
-
-- **[CONTRIBUTING.md](CONTRIBUTING.md)** - Complete contributing guide
-- **[website/README.md](website/README.md)** - Website development only (separate from Rust code)
+```text
+feat(kafka source): add consumer group lag metric
+fix(loki sink): handle empty label sets correctly
+docs(internal docs): update contributing guide
+chore(deps): bump tokio to X
+```
