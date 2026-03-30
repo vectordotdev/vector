@@ -214,7 +214,7 @@ Vector's infrastructure and how we secure them.
 
 All builds run in GitHub Actions runners which are ephemeral and don't maintain
 state after the job is completed. We ensure we are following [OpenSSF best
-practices](https://bestpractices.dev/)
+practices](https://bestpractices.dev/) to minimize CI risk and exposure.
 
 ### Network Security
 
