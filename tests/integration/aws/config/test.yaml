@@ -17,7 +17,7 @@ env:
   SNS_ADDRESS: http://mock-localstack:4566
 
 matrix:
-  localstack_version: [stable, stable@sha256:46302bcb91a7e8008e6394be8afafdbfa40fb77a54d4046a38be35992042d5de]
+  localstack_version: [stable, latest]
 
 # changes to these files/paths will invoke the integration test in CI
 # expressions are evaluated using https://github.com/micromatch/picomatch
