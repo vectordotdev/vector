@@ -47,9 +47,11 @@ possible on our security efforts.
     - [Asset Audit Logging](#asset-audit-logging)
     - [Asset Signatures & Checksums](#asset-signatures--checksums)
 - [Vulnerability Reporting](#vulnerability-reporting)
-  - [Vector CI](#vector-ci)
-  - [Other reports](#other-reports)
-
+- [Meta](#meta)
+  - [Review Schedule](#review-schedule)
+  - [Vulnerability Reporting](#vulnerability-reporting)
+    - [Vector CI](#vector-ci)
+    - [Other reports](#other-reports)
 ## Project Structure
 
 Project structure plays an important role in security. It creates guardrails
@@ -235,11 +237,17 @@ Changes to Vector's assets are logged through S3's audit logging feature.
 All assets are signed with checksums allowing users to verify asset authenticity
 upon download. This verifies that assets have not been modified at rest.
 
-## Vulnerability Reporting
+## Meta
+
+### Review Schedule
+
+Vector reviews this policy and all user access levels on a quarterly basis.
+
+### Vulnerability Reporting
 
 We deeply appreciate any effort to discover and disclose security vulnerabilities responsibly.
 
-### Vector CI
+#### Vector CI
 
 If you would like to report a Vector CI vulnerability or have any security concerns with other Datadog products,
 please e-mail security@datadoghq.com.
@@ -249,7 +257,7 @@ and verify the vulnerability before taking the necessary steps to fix it. After
 our initial reply to your disclosure, which should be directly after receiving
 it, we will periodically update you with the status of the fix.
 
-### Other reports
+#### Other reports
 
 Due to the nature of an open-source project, Vector deployments are fully managed by users. Thus vulnerabilities in Vector deployments could
 potentially be exploited by malicious actors who already have access to the user’s infrastructure. We encourage responsible disclosure
