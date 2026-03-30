@@ -4,7 +4,7 @@ services:
   mock-ec2-metadata:
     image: public.ecr.aws/aws-ec2/amazon-ec2-metadata-mock:v1.13.0
   mock-localstack:
-    image: docker.io/localstack/localstack@sha256:46302bcb91a7e8008e6394be8afafdbfa40fb77a54d4046a38be35992042d5de
+    image: docker.io/localstack/localstack:${CONFIG_LOCALSTACK_VERSION}
     environment:
     - SERVICES=kinesis,s3,cloudwatch,es,firehose,kms,sqs,sns,logs
   mock-ecs:
