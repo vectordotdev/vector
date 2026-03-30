@@ -85,6 +85,7 @@ jobs:
   build-test-runner:
     needs: prep-pr
     permissions:
+      contents: read
       packages: write   # Required to push test runner image to GHCR
     uses: ./.github/workflows/build-test-runner.yml
     with:
@@ -98,6 +99,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     permissions:
+      contents: read
       packages: read    # Required to pull test runner image from GHCR
     strategy:
       fail-fast: false
@@ -146,6 +148,7 @@ jobs:
     runs-on: ubuntu-24.04-8core
     timeout-minutes: 30
     permissions:
+      contents: read
       packages: read    # Required to pull test runner image from GHCR
     strategy:
       fail-fast: false
