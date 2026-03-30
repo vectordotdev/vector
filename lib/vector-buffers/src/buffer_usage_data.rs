@@ -87,6 +87,13 @@ impl CategoryMetrics {
     }
 }
 
+/// Running totals of events that have entered and left a buffer stage.
+///
+/// Each reporting tick consumes the latest deltas from the atomic counters and
+/// folds them into these cumulative totals.  The difference
+/// (`total_entered - total_left`) gives the approximate current buffer
+/// occupancy without requiring a separate "current size" counter that would
+/// itself be subject to cross-thread races.
 #[derive(Clone, Copy, Debug, Default)]
 struct ReporterCurrentMetrics {
     total_entered: CategorySnapshot,
@@ -325,6 +332,10 @@ impl BufferUsage {
                             .expect("should never be bigger than `usize`"),
                     });
 
+                    // Consume received before sent/dropped so that, in the presence of
+                    // a race between producers and consumers, the computed current usage
+                    // will err on the side of overcounting, which is more likely to be an
+                    // accurate representation of the current usage than undercounting.
                     let received = stage.received.consume();
                     current_metrics.add_received(received);
 
