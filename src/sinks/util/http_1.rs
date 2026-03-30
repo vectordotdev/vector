@@ -493,8 +493,7 @@ where
                 }
             };
             let byte_size = request.body().len();
-            let (protocol, endpoint) =
-                uri::protocol_endpoint(request.uri().into_legacy_http());
+            let (protocol, endpoint) = uri::protocol_endpoint(request.uri().into_legacy_http());
             let request = request.map(Full::new);
 
             // Any errors raised in `http_client.send` results in a `GotHttpWarning` event being emitted
