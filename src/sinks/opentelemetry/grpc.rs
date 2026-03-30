@@ -186,9 +186,16 @@ impl GrpcSinkConfig {
         }
 
         let client = new_grpc_client(&tls, cx.proxy())?;
+        let healthcheck_uri = cx
+            .healthcheck
+            .uri
+            .clone()
+            .map(|u| with_default_scheme(u.uri, use_https))
+            .transpose()?
+            .or(static_uri.clone());
         let healthcheck = Box::pin(grpc_healthcheck(
             client.clone(),
-            static_uri,
+            healthcheck_uri,
             static_grpc_headers.clone(),
             cx.healthcheck,
         ));
