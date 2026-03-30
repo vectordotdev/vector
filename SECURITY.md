@@ -52,6 +52,7 @@ possible on our security efforts.
   - [Vulnerability Reporting](#vulnerability-reporting)
     - [Vector CI](#vector-ci)
     - [Other reports](#other-reports)
+
 ## Project Structure
 
 Project structure plays an important role in security. It creates guardrails
