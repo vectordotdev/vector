@@ -59,4 +59,4 @@ Vector will then use the returned values when loading the configuration.
 
 If an `error` is returned, or the command exits non-zero, Vector will log any errors and stop.
 
-See the [documentation](/docs/reference/configuration/global-options/#secret) for additional details.
+See the [documentation](/docs/reference/configuration/secrets/#secret) for additional details.

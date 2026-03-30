@@ -37,11 +37,11 @@ vector generate-schema -o vector-v0.45.0-schema.json
 1. `Settings | Languages & Frameworks | Schemas and DTDs | JSON Schema Mappings`
 2. Import `vector-v0.45.0-schema.json`
 
-You can find more details [here][jetbrains].
+You can find more details in the [JetBrains JSON schema documentation][jetbrains].
 
 ### Visual Studio Code
 
-Follow the guide [here][vscode].
+Follow the [VS Code YAML schema validation guide][vscode].
 
 ## Example
 

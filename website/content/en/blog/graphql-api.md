@@ -9,6 +9,8 @@ badges:
 tags: ["graphql", "api", "metrics"]
 ---
 
+{{< grpc-migration-warning >}}
+
 Although Vector is an observability tool, it's nonetheless important to be able
 to observe Vector itself, especially in production environments where it serves
 as critical infrastructure. That's why we're excited to announce the new [Vector

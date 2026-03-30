@@ -26,8 +26,7 @@ pub fn default_endpoint() -> String {
 ///
 /// [predefined_acls]: https://cloud.google.com/storage/docs/access-control/lists#predefined-acl
 #[configurable_component]
-#[derive(Clone, Copy, Debug, Derivative)]
-#[derivative(Default)]
+#[derive(Clone, Copy, Debug, Default)]
 #[serde(rename_all = "kebab-case")]
 pub enum GcsPredefinedAcl {
     /// Bucket/object can be read by authenticated users.
@@ -65,10 +64,10 @@ pub enum GcsPredefinedAcl {
     /// part of the project team is granted the `READER` permission.
     ///
     /// This is the default.
-    #[derivative(Default)]
+    #[default]
     ProjectPrivate,
 
-    /// Bucket/object can be read publically.
+    /// Bucket/object can be read publicly.
     ///
     /// The bucket/object owner is granted the `OWNER` permission, and all other users, whether
     /// authenticated or anonymous, are granted the `READER` permission.
@@ -81,14 +80,13 @@ pub enum GcsPredefinedAcl {
 ///
 /// [storage_classes]: https://cloud.google.com/storage/docs/storage-classes
 #[configurable_component]
-#[derive(Clone, Copy, Debug, Derivative, PartialEq, Eq)]
-#[derivative(Default)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum GcsStorageClass {
     /// Standard storage.
     ///
     /// This is the default.
-    #[derivative(Default)]
+    #[default]
     Standard,
 
     /// Nearline storage.

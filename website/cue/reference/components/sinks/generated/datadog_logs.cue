@@ -69,35 +69,38 @@ generated: components: sinks: datadog_logs: configuration: {
 			All compression algorithms use the default compression level unless otherwise specified.
 			"""
 		required: false
-		type: string: enum: {
-			gzip: """
-				[Gzip][gzip] compression.
+		type: string: {
+			default: "zstd"
+			enum: {
+				gzip: """
+					[Gzip][gzip] compression.
 
-				[gzip]: https://www.gzip.org/
-				"""
-			none: "No compression."
-			snappy: """
-				[Snappy][snappy] compression.
+					[gzip]: https://www.gzip.org/
+					"""
+				none: "No compression."
+				snappy: """
+					[Snappy][snappy] compression.
 
-				[snappy]: https://github.com/google/snappy/blob/main/docs/README.md
-				"""
-			zlib: """
-				[Zlib][zlib] compression.
+					[snappy]: https://github.com/google/snappy/blob/main/docs/README.md
+					"""
+				zlib: """
+					[Zlib][zlib] compression.
 
-				[zlib]: https://zlib.net/
-				"""
-			zstd: """
-				[Zstandard][zstd] compression.
+					[zlib]: https://zlib.net/
+					"""
+				zstd: """
+					[Zstandard][zstd] compression.
 
-				[zstd]: https://facebook.github.io/zstd/
-				"""
+					[zstd]: https://facebook.github.io/zstd/
+					"""
+			}
 		}
 	}
 	conforms_as_agent: {
 		description: """
 			When enabled this sink will normalize events to conform to the Datadog Agent standard. This
 			also sends requests to the logs backend with the `DD-PROTOCOL: agent-json` header. This bool
-			will be overidden as `true` if this header has already been set in the request.headers
+			will be overridden as `true` if this header has already been set in the request.headers
 			configuration setting.
 			"""
 		required: false
