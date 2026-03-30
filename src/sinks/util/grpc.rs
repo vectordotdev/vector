@@ -1,7 +1,10 @@
 use std::task::{Context, Poll};
 
 use futures::future::BoxFuture;
-use http::{Uri, uri::{Authority, PathAndQuery, Scheme}};
+use http::{
+    Uri,
+    uri::{Authority, PathAndQuery, Scheme},
+};
 use hyper::client::HttpConnector;
 use hyper_openssl::HttpsConnector;
 use hyper_proxy::ProxyConnector;
@@ -60,7 +63,11 @@ impl HyperGrpcService {
             .authority()
             .expect("gRPC service URI must have an authority (host:port) — supply a URI from `with_default_scheme`")
             .clone();
-        Self { scheme, authority, client }
+        Self {
+            scheme,
+            authority,
+            client,
+        }
     }
 }
 
