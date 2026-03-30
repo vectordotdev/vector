@@ -583,7 +583,7 @@ impl ByteSizeOf for OtlpEventData {
     }
 
     fn allocated_bytes(&self) -> usize {
-        self.signal.encoded_len()
+        self.byte_size
     }
 }
 
@@ -597,15 +597,6 @@ enum OtlpSignal {
     Traces(ExportTraceServiceRequest),
 }
 
-impl OtlpSignal {
-    fn encoded_len(&self) -> usize {
-        match self {
-            OtlpSignal::Logs(r) => r.encoded_len(),
-            OtlpSignal::Metrics(r) => r.encoded_len(),
-            OtlpSignal::Traces(r) => r.encoded_len(),
-        }
-    }
-}
 
 /// Per-signal accumulator tracking the merged proto request and its associated
 /// event metadata. Kept separate so each signal can be retried independently.
