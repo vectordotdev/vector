@@ -491,6 +491,10 @@ impl Service<OtlpGrpcRequest> for OtlpGrpcService {
                     let (len, resp) = export!(c, r);
                     if let Some(ps) = resp.partial_success && ps.rejected_log_records > 0 {
                         warn!(rejected = ps.rejected_log_records, message = ps.error_message, "OTLP collector rejected log records");
+                        emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+                            count: ps.rejected_log_records as usize,
+                            reason: if ps.error_message.is_empty() { "OTLP partial success rejection" } else { &ps.error_message },
+                        });
                     }
                     len
                 }
@@ -498,6 +502,10 @@ impl Service<OtlpGrpcRequest> for OtlpGrpcService {
                     let (len, resp) = export!(c, r);
                     if let Some(ps) = resp.partial_success && ps.rejected_data_points > 0 {
                         warn!(rejected = ps.rejected_data_points, message = ps.error_message, "OTLP collector rejected metric data points");
+                        emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+                            count: ps.rejected_data_points as usize,
+                            reason: if ps.error_message.is_empty() { "OTLP partial success rejection" } else { &ps.error_message },
+                        });
                     }
                     len
                 }
@@ -505,6 +513,10 @@ impl Service<OtlpGrpcRequest> for OtlpGrpcService {
                     let (len, resp) = export!(c, r);
                     if let Some(ps) = resp.partial_success && ps.rejected_spans > 0 {
                         warn!(rejected = ps.rejected_spans, message = ps.error_message, "OTLP collector rejected trace spans");
+                        emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+                            count: ps.rejected_spans as usize,
+                            reason: if ps.error_message.is_empty() { "OTLP partial success rejection" } else { &ps.error_message },
+                        });
                     }
                     len
                 }
