@@ -27,7 +27,7 @@ jobs:
         with:
           package-name: vector
           package-type: container
-          min-versions-to-keep: 8
+          min-versions-to-keep: 30
           ignore-versions: '^(nightly$|\d+\.\d+)'
 
   cleanup-test-runner:
