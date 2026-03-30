@@ -49,7 +49,7 @@ use crate::{
     sinks::{
         Healthcheck, VectorSink,
         util::{
-            BatchConfig, RealtimeEventBasedDefaultBatchSettings, ServiceBuilderExt, SinkBuilderExt,
+            BatchConfig, RealtimeSizeBasedDefaultBatchSettings, ServiceBuilderExt, SinkBuilderExt,
             StreamSink, http::RequestConfig, metadata::RequestMetadataBuilder, retries::RetryLogic,
         },
     },
@@ -110,7 +110,7 @@ pub(super) struct GrpcSinkConfig {
 
     #[configurable(derived)]
     #[serde(default)]
-    pub batch: BatchConfig<RealtimeEventBasedDefaultBatchSettings>,
+    pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
 
     #[configurable(derived)]
     #[serde(default)]
