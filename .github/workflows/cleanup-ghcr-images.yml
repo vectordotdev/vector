@@ -10,17 +10,17 @@ name: Cleanup GHCR Images
 on:
   schedule:
     # Run weekly on Sundays at 2 AM UTC
-    - cron: '0 2 * * 0'
+    - cron: "0 2 * * 0"
   workflow_dispatch:
 
 permissions:
-  contents: read  # Restrictive default
+  contents: read # Restrictive default
 
 jobs:
   cleanup-vector-nightlies:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
-      packages: write   # Required to delete package versions from GHCR
+      packages: write # Required to delete package versions from GHCR
     steps:
       - name: Delete old dated nightly vector images
         uses: actions/delete-package-versions@e5bc658cc4c965c472efe991f8beea3981499c55 # v5.0.0
@@ -31,9 +31,9 @@ jobs:
           ignore-versions: '^(nightly$|\d+\.\d+)'
 
   cleanup-test-runner:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
-      packages: write   # Required to delete package versions from GHCR
+      packages: write # Required to delete package versions from GHCR
     steps:
       - name: Delete old test-runner images
         uses: actions/delete-package-versions@e5bc658cc4c965c472efe991f8beea3981499c55 # v5.0.0
