@@ -19,9 +19,11 @@ possible on our security efforts.
     - [Open Source](#open-source)
     - [Workflow](#workflow)
   - [Version Control](#version-control)
-    - [Git](#git)
+    - [Pull Requests](#pull-requests)
+    - [Reviews & Approvals](#reviews--approvals)
     - [Signed Commits](#signed-commits)
     - [Protected Branches](#protected-branches)
+    - [Merge Policies](#merge-policies)
 - [Personnel](#personnel)
   - [Education](#education)
   - [Policies](#policies)
@@ -34,26 +36,19 @@ possible on our security efforts.
     - [Unsafe Code](#unsafe-code)
     - [User Privileges](#user-privileges)
   - [Dependencies](#dependencies)
-  - [Change Control](#change-control)
-    - [Pull Requests](#pull-requests)
-    - [Reviews & Approvals](#reviews--approvals)
-    - [Merge Policies](#merge-policies)
   - [Automated Checks](#automated-checks)
     - [Vulnerability Scans & Security Advisories](#vulnerability-scans--security-advisories)
     - [Vulnerability Remediation](#vulnerability-remediation)
-    - [Fuzz Testing](#fuzz-testing)
 - [Infrastructure](#infrastructure)
   - [CI/CD](#cicd)
-    - [Runtime Isolation](#runtime-isolation)
   - [Network Security](#network-security)
-    - [Penetration Testing](#penetration-testing)
     - [Protocols](#protocols)
   - [Release Artifacts & Channels](#release-artifacts--channels)
     - [Asset Audit Logging](#asset-audit-logging)
     - [Asset Signatures & Checksums](#asset-signatures--checksums)
-- [Meta](#meta)
-  - [Review Schedule](#review-schedule)
-  - [Vulnerability Reporting](#vulnerability-reporting)
+- [Vulnerability Reporting](#vulnerability-reporting)
+  - [Vector CI](#vector-ci)
+  - [Other reports](#other-reports)
 
 ## Project Structure
 
@@ -84,10 +79,19 @@ are all publicly available.
 
 Version control ensures that all code changes are audited and authentic.
 
-#### Git
+Vector uses [Git][urls.git] to ensure that changes are auditable and traceable.
 
-Vector leverages the [Git][urls.git] version-control system. This ensures all
-changes are audited and traceable.
+#### Pull Requests
+
+All changes to Vector must go through a pull request review process.
+
+#### Reviews & Approvals
+
+All pull requests must be reviewed by at least one Vector team member. The
+review process takes into account many factors, all of which are detailed in
+our [Reviewing guide](REVIEWING.md). In exceptional circumstances, this
+approval can be retroactive.
+
 
 #### Signed Commits
 
@@ -107,6 +111,12 @@ are [protected][urls.github_protected_branches]. The exact requirements are:
 - Signed commits are required.
 - Administrators are included in these checks.
 
+#### Merge Policies
+
+Vector requires pull requests to pass all [automated checks](#automated-checks).
+Once passed, the pull request must be squashed and merged. This creates a clean
+linear history with a Vector team member's co-sign.
+
 ## Personnel
 
 ### Education
@@ -116,7 +126,7 @@ the [contributing](CONTRIBUTING.md) and [reviewing](REVIEWING.md) documents.
 
 ### Policies
 
-Vector maintains this security policy. Changed are communicated to all Vector
+Vector maintains this security policy. Changes are communicated to all Vector
 team members.
 
 ### Two-factor Authentication
@@ -150,40 +160,23 @@ catch many common sources of vulnerabilities at compile time.
 
 #### Unsafe Code
 
-Vector does not allow the use of unsafe code except in circumstances where it
-is required, such as dealing with CFFI.
+Vector uses unsafe code sparingly. Unsafe is sometimes required, such as dealing
+with CFFI. We may occasionally also use unsafe code for performance reasons but
+those changes are kept to a minimum.
 
 #### User Privileges
 
-Vector is always designed to run under non-`root` privileges, and our
-documentation always defaults to non-`root` use.
+Vector is designed to run under non-`root` privileges, and our documentation
+defaults to non-`root` use. Note that some components, such as `host_metrics`
+and `kubernetes_logs`, might require elevated privileges due to system level
+permissions. Therefore, our Docker image defaults to the `root` user. With
+additional configuration you can configure Vector to run as a non-`root` user.
 
 ### Dependencies
 
 Vector aims to reduce the number of dependencies it relies on. If a dependency
 is added it goes through a comprehensive review process that is detailed in
 the [Reviewing guide](REVIEWING.md#dependencies).
-
-### Change Control
-
-As noted above Vector uses the Git version control system on GitHub.
-
-#### Pull Requests
-
-All changes to Vector must go through a pull request review process.
-
-#### Reviews & Approvals
-
-All pull requests must be reviewed by at least one Vector team member. The
-review process takes into account many factors, all of which are detailed in
-our [Reviewing guide](REVIEWING.md). In exceptional circumstances, this
-approval can be retroactive.
-
-#### Merge Policies
-
-Vector requires pull requests to pass all [automated checks](#automated-checks).
-Once passed, the pull request must be squashed and merged. This creates a clean
-linear history with a Vector team member's co-sign.
 
 ### Automated Checks
 
@@ -195,25 +188,21 @@ When possible, we'll create automated checks to enforce security policies.
   is part of the [Rust Security advisory database][urls.rust_sec]. The configuration, and a
   list of currently accepted advisories, are maintained in the
   [Cargo Deny configuration][urls.cargo_deny_configuration]. The check is run
-  [on every incoming PR][urls.cargo_deny_schedule] to the Vector project.
+  on every PR to the Vector project.
 - Vector implements [Dependabot][urls.dependabot] which performs automated
   upgrades on dependencies and [alerts][urls.dependabot_alerts] about any
   dependency-related security vulnerabilities.
 
 #### Vulnerability Remediation
 
-If the advisory check fails then the PR will not be merged. We review each advisory to
-determine what action to take. If possible, we update the dependency to a version
-where the vulnerability has been addressed. If this isn't possible we either record
-the acceptance of the vulnerability or replace the dependency. If we accept the
-vulnerability we open a ticket to track its remediation, generally awaiting a fix
-upstream. If the risk is deemed unacceptable we revisit the code and dependency
-to find a more secure alternative.
-
-#### Fuzz Testing
-
-Vector implements automated fuzz testing to probe our code for other sources
-of potential vulnerabilities.
+If the advisory check fails due to changes made in the PR, it will not be
+merged. We review each advisory to determine what action to take. Whenever
+possible, we update the dependency to a version where the vulnerability has been
+addressed. If this isn't possible we either record the acceptance of the
+vulnerability or replace the dependency. If we accept the vulnerability we open
+a ticket to track its remediation, generally awaiting a fix upstream. If the
+risk is deemed unacceptable we revisit the code and dependency to find a more
+secure alternative.
 
 ## Infrastructure
 
@@ -223,15 +212,11 @@ Vector's infrastructure and how we secure them.
 
 ### CI/CD
 
-#### Runtime Isolation
-
-All builds run in an isolated sandbox that is destroyed after each use.
+All builds run in GitHub Actions runners which are ephemeral and don't maintain
+state after the job is completed. We ensure we are following [OpenSSF best
+practices](https://bestpractices.dev/)
 
 ### Network Security
-
-#### Penetration Testing
-
-Vector performs quarterly pen tests on vector.dev.
 
 #### Protocols
 
@@ -250,17 +235,11 @@ Changes to Vector's assets are logged through S3's audit logging feature.
 All assets are signed with checksums allowing users to verify asset authenticity
 upon download. This verifies that assets have not been modified at rest.
 
-## Meta
-
-### Review Schedule
-
-Vector reviews this policy and all user access levels on a quarterly basis.
-
-### Vulnerability Reporting
+## Vulnerability Reporting
 
 We deeply appreciate any effort to discover and disclose security vulnerabilities responsibly.
 
-## Vector CI
+### Vector CI
 
 If you would like to report a Vector CI vulnerability or have any security concerns with other Datadog products,
 please e-mail security@datadoghq.com.
@@ -270,9 +249,9 @@ and verify the vulnerability before taking the necessary steps to fix it. After
 our initial reply to your disclosure, which should be directly after receiving
 it, we will periodically update you with the status of the fix.
 
-## Other reports
+### Other reports
 
-Due to the nature of a open-source project, Vector deployments are fully managed by users. Thus vulnerabilities in Vector deployments could
+Due to the nature of an open-source project, Vector deployments are fully managed by users. Thus vulnerabilities in Vector deployments could
 potentially be exploited by malicious actors who already have access to the user’s infrastructure. We encourage responsible disclosure
 via opening an [open an issue][urls.new_security_report] so that risks can be properly assessed and mitigated.
 
@@ -286,7 +265,6 @@ following when reporting:
 
 [urls.cargo_deny]: https://github.com/EmbarkStudios/cargo-deny
 [urls.cargo_deny_configuration]: https://github.com/vectordotdev/vector/blob/master/deny.toml
-[urls.cargo_deny_schedule]: https://github.com/vectordotdev/vector/blob/master/.github/workflows/test.yml#L267
 [urls.dependabot]: https://github.com/marketplace/dependabot-preview
 [urls.dependabot_alerts]: https://github.com/vectordotdev/vector/network/alerts
 [urls.git]: https://git-scm.com/
