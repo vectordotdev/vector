@@ -257,6 +257,8 @@ impl Application {
 
         emit!(VectorStarted);
         handle.spawn(heartbeat::heartbeat());
+        #[cfg(target_os = "linux")]
+        handle.spawn(crate::systemd::watchdog());
 
         let Self {
             root_opts,

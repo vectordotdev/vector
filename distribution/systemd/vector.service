@@ -19,5 +19,9 @@ EnvironmentFile=-/etc/default/vector
 # it is also supported to have it here.
 StartLimitInterval=10
 StartLimitBurst=5
+
+# Uncomment to enable watchdog. Vector will ping at half this interval.
+#WatchdogSec=30
+
 [Install]
 WantedBy=multi-user.target
