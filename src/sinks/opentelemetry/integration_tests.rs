@@ -10,9 +10,9 @@ use vector_lib::{
     },
 };
 
-use super::grpc::GrpcSinkConfig;
+use super::OpenTelemetryConfig;
 use crate::{
-    config::SinkContext,
+    config::{SinkConfig as _, SinkContext},
     test_util::{
         components::{HTTP_SINK_TAGS, run_and_assert_sink_compliance},
         wait_for_tcp,
@@ -70,8 +70,9 @@ async fn delivers_logs_via_grpc() {
     let address = sink_grpc_address();
     wait_for_tcp(address.clone()).await;
 
-    let config: GrpcSinkConfig = toml::from_str(&format!(
+    let config: OpenTelemetryConfig = toml::from_str(&format!(
         r#"
+            protocol = "grpc"
             uri = "http://{address}"
         "#
     ))
@@ -90,8 +91,9 @@ async fn delivers_logs_via_grpc_template_uri() {
     let host = sink_grpc_address();
     wait_for_tcp(host.clone()).await;
 
-    let config: GrpcSinkConfig = toml::from_str(
+    let config: OpenTelemetryConfig = toml::from_str(
         r#"
+        protocol = "grpc"
         uri = "http://{{ host }}:4317"
     "#,
     )
