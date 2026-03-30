@@ -497,20 +497,29 @@ impl Service<OtlpGrpcRequest> for OtlpGrpcService {
             let byte_size = match (req.signal, client) {
                 (OtlpSignal::Logs(r), SignalClient::Logs(mut c)) => {
                     let (len, resp) = export!(c, r);
-                    let rejected = resp.partial_success.map(|ps| ps.rejected_log_records).unwrap_or(0);
-                    if rejected > 0 { warn!(rejected, "OTLP collector rejected log records"); }
+                    if let Some(ps) = resp.partial_success {
+                        if ps.rejected_log_records > 0 {
+                            warn!(rejected = ps.rejected_log_records, message = ps.error_message, "OTLP collector rejected log records");
+                        }
+                    }
                     len
                 }
                 (OtlpSignal::Metrics(r), SignalClient::Metrics(mut c)) => {
                     let (len, resp) = export!(c, r);
-                    let rejected = resp.partial_success.map(|ps| ps.rejected_data_points).unwrap_or(0);
-                    if rejected > 0 { warn!(rejected, "OTLP collector rejected metric data points"); }
+                    if let Some(ps) = resp.partial_success {
+                        if ps.rejected_data_points > 0 {
+                            warn!(rejected = ps.rejected_data_points, message = ps.error_message, "OTLP collector rejected metric data points");
+                        }
+                    }
                     len
                 }
                 (OtlpSignal::Traces(r), SignalClient::Traces(mut c)) => {
                     let (len, resp) = export!(c, r);
-                    let rejected = resp.partial_success.map(|ps| ps.rejected_spans).unwrap_or(0);
-                    if rejected > 0 { warn!(rejected, "OTLP collector rejected trace spans"); }
+                    if let Some(ps) = resp.partial_success {
+                        if ps.rejected_spans > 0 {
+                            warn!(rejected = ps.rejected_spans, message = ps.error_message, "OTLP collector rejected trace spans");
+                        }
+                    }
                     len
                 }
                 _ => unreachable!("signal variant and cached client are always aligned"),
