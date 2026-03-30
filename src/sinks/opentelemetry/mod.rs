@@ -15,8 +15,8 @@ use crate::{
         Healthcheck, VectorSink,
         http::config::{HttpMethod, HttpSinkConfig},
         util::{
-            BatchConfig, Compression, RealtimeSizeBasedDefaultBatchSettings,
-            http::RequestConfig,
+            BatchConfig, Compression, RealtimeEventBasedDefaultBatchSettings,
+            RealtimeSizeBasedDefaultBatchSettings, http::RequestConfig,
         },
     },
     template::Template,
@@ -64,7 +64,7 @@ pub enum OtlpProtocol {
     Grpc {
         #[configurable(derived)]
         #[serde(default)]
-        batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
+        batch: BatchConfig<RealtimeEventBasedDefaultBatchSettings>,
     },
 }
 
