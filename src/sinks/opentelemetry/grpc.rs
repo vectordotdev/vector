@@ -775,11 +775,12 @@ where
             // different collectors or with different tenant metadata are never merged into
             // the same batch. Each partition is independently flushed by size or timeout.
             //
-            // `as_byte_size_config` is intentional here: gRPC batches are bounded by the
-            // serialized protobuf byte size (via `ByteSizeOf::allocated_bytes`), not by raw
-            // event count. `RealtimeEventBasedDefaultBatchSettings` is kept as the config
-            // type so that the default `max_events = 1000` cap is preserved for throughput;
-            // the byte-size limit is then the primary flush trigger.
+            // `as_byte_size_config` is intentional here: the primary flush triggers are the
+            // event-count limit (default 1000, from `RealtimeEventBasedDefaultBatchSettings`)
+            // and the 1s timeout. The byte limit defaults to `usize::MAX` (effectively
+            // disabled) because `MAX_BYTES = None` for that settings type. `as_byte_size_config`
+            // selects `ByteSizeOf` as the size metric so that an operator-configured
+            // `batch.max_bytes` is measured consistently with the rest of Vector.
             .batched_partitioned(
                 GrpcPartitioner,
                 self.batch_settings.timeout,
