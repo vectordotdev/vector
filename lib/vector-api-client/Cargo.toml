@@ -20,10 +20,6 @@ tokio-stream = { workspace = true, features = ["sync"] }
 # Error handling
 snafu.workspace = true
 
-# HTTP / WebSockets
-reqwest = { version = "0.12.28", default-features = false, features = ["json"] }
-tokio-tungstenite = { workspace = true, features = ["connect", "rustls"] }
-
 # Utils
 http = { version = "0.2", default-features = false }
 
