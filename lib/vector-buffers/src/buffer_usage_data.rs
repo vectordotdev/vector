@@ -247,6 +247,85 @@ impl BufferUsageData {
                 .expect("should never be bigger than `usize`"),
         }
     }
+
+    fn report(&self, current_metrics: &mut ReporterCurrentMetrics, buffer_id: &str) {
+        let max_size = self.max_size.get();
+        emit(BufferCreated {
+            buffer_id: buffer_id.to_string(),
+            idx: self.idx,
+            max_size_bytes: max_size.event_byte_size,
+            max_size_events: max_size
+                .event_count
+                .try_into()
+                .expect("should never be bigger than `usize`"),
+        });
+
+        // Consume received before sent/dropped so that, in the presence of
+        // a race between producers and consumers, the computed current usage
+        // will err on the side of overcounting, which is more likely to be an
+        // accurate representation of the current usage than undercounting.
+        let received = self.received.consume();
+        current_metrics.add_received(received);
+
+        let sent = self.sent.consume();
+        current_metrics.add_left(sent);
+
+        let dropped = self.dropped.consume();
+        current_metrics.add_left(dropped);
+
+        let dropped_intentional = self.dropped_intentional.consume();
+        current_metrics.add_left(dropped_intentional);
+
+        let current = current_metrics.current();
+
+        if received.has_updates() {
+            emit(BufferEventsReceived {
+                buffer_id: buffer_id.to_string(),
+                idx: self.idx,
+                count: received.event_count,
+                byte_size: received.event_byte_size,
+                total_count: current.event_count,
+                total_byte_size: current.event_byte_size,
+            });
+        }
+
+        if sent.has_updates() {
+            emit(BufferEventsSent {
+                buffer_id: buffer_id.to_string(),
+                idx: self.idx,
+                count: sent.event_count,
+                byte_size: sent.event_byte_size,
+                total_count: current.event_count,
+                total_byte_size: current.event_byte_size,
+            });
+        }
+
+        if dropped.has_updates() {
+            emit(BufferEventsDropped {
+                buffer_id: buffer_id.to_string(),
+                idx: self.idx,
+                intentional: false,
+                reason: "corrupted_events",
+                count: dropped.event_count,
+                byte_size: dropped.event_byte_size,
+                total_count: current.event_count,
+                total_byte_size: current.event_byte_size,
+            });
+        }
+
+        if dropped_intentional.has_updates() {
+            emit(BufferEventsDropped {
+                buffer_id: buffer_id.to_string(),
+                idx: self.idx,
+                intentional: true,
+                reason: "drop_newest",
+                count: dropped_intentional.event_count,
+                byte_size: dropped_intentional.event_byte_size,
+                total_count: current.event_count,
+                total_byte_size: current.event_byte_size,
+            });
+        }
+    }
 }
 
 /// Snapshot of buffer usage metrics.
@@ -308,100 +387,29 @@ impl BufferUsage {
     pub fn install(self, buffer_id: &str) {
         let buffer_id = buffer_id.to_string();
         let span = self.span;
-        let mut stages: Vec<_> = self
+        let stages: Vec<_> = self
             .stages
             .into_iter()
             .map(|stage| (stage, ReporterCurrentMetrics::default()))
             .collect();
         let task_name = format!("buffer usage reporter ({buffer_id})");
 
-        let task = async move {
-            let mut interval = interval(Duration::from_secs(2));
-            loop {
-                interval.tick().await;
+        let task = Self::report_buffer_usage(stages, buffer_id).instrument(span.or_current());
+        spawn_named(task, task_name.as_str());
+    }
 
-                for (stage, current_metrics) in &mut stages {
-                    let max_size = stage.max_size.get();
-                    emit(BufferCreated {
-                        buffer_id: buffer_id.clone(),
-                        idx: stage.idx,
-                        max_size_bytes: max_size.event_byte_size,
-                        max_size_events: max_size
-                            .event_count
-                            .try_into()
-                            .expect("should never be bigger than `usize`"),
-                    });
+    async fn report_buffer_usage(
+        mut stages: Vec<(Arc<BufferUsageData>, ReporterCurrentMetrics)>,
+        buffer_id: String,
+    ) {
+        let mut interval = interval(Duration::from_secs(2));
+        loop {
+            interval.tick().await;
 
-                    // Consume received before sent/dropped so that, in the presence of
-                    // a race between producers and consumers, the computed current usage
-                    // will err on the side of overcounting, which is more likely to be an
-                    // accurate representation of the current usage than undercounting.
-                    let received = stage.received.consume();
-                    current_metrics.add_received(received);
-
-                    let sent = stage.sent.consume();
-                    current_metrics.add_left(sent);
-
-                    let dropped = stage.dropped.consume();
-                    current_metrics.add_left(dropped);
-
-                    let dropped_intentional = stage.dropped_intentional.consume();
-                    current_metrics.add_left(dropped_intentional);
-
-                    let current = current_metrics.current();
-
-                    if received.has_updates() {
-                        emit(BufferEventsReceived {
-                            buffer_id: buffer_id.clone(),
-                            idx: stage.idx,
-                            count: received.event_count,
-                            byte_size: received.event_byte_size,
-                            total_count: current.event_count,
-                            total_byte_size: current.event_byte_size,
-                        });
-                    }
-
-                    if sent.has_updates() {
-                        emit(BufferEventsSent {
-                            buffer_id: buffer_id.clone(),
-                            idx: stage.idx,
-                            count: sent.event_count,
-                            byte_size: sent.event_byte_size,
-                            total_count: current.event_count,
-                            total_byte_size: current.event_byte_size,
-                        });
-                    }
-
-                    if dropped.has_updates() {
-                        emit(BufferEventsDropped {
-                            buffer_id: buffer_id.clone(),
-                            idx: stage.idx,
-                            intentional: false,
-                            reason: "corrupted_events",
-                            count: dropped.event_count,
-                            byte_size: dropped.event_byte_size,
-                            total_count: current.event_count,
-                            total_byte_size: current.event_byte_size,
-                        });
-                    }
-
-                    if dropped_intentional.has_updates() {
-                        emit(BufferEventsDropped {
-                            buffer_id: buffer_id.clone(),
-                            idx: stage.idx,
-                            intentional: true,
-                            reason: "drop_newest",
-                            count: dropped_intentional.event_count,
-                            byte_size: dropped_intentional.event_byte_size,
-                            total_count: current.event_count,
-                            total_byte_size: current.event_byte_size,
-                        });
-                    }
-                }
+            for (stage, current_metrics) in &mut stages {
+                stage.report(current_metrics, &buffer_id);
             }
-        };
-
-        spawn_named(task.instrument(span.or_current()), task_name.as_str());
+        }
     }
 }
 
@@ -445,5 +453,56 @@ mod tests {
         let current = current.current();
         assert_eq!(current.event_count, 5);
         assert_eq!(current.event_byte_size, 500);
+    }
+
+    #[test]
+    fn consume_resets_deltas_between_ticks() {
+        let data = BufferUsageData::new(0);
+        let mut metrics = ReporterCurrentMetrics::default();
+
+        data.received.increment(10, 1000);
+        data.sent.increment(3, 300);
+        data.report(&mut metrics, "test");
+        let current = metrics.current();
+        assert_eq!(current.event_count, 7);
+        assert_eq!(current.event_byte_size, 700);
+
+        // Second tick with no new activity should report the same totals.
+        data.report(&mut metrics, "test");
+        let current = metrics.current();
+        assert_eq!(current.event_count, 7);
+        assert_eq!(current.event_byte_size, 700);
+    }
+
+    #[test]
+    fn accumulates_across_multiple_ticks() {
+        let data = BufferUsageData::new(0);
+        let mut metrics = ReporterCurrentMetrics::default();
+
+        data.received.increment(10, 1000);
+        data.report(&mut metrics, "test");
+
+        data.received.increment(5, 500);
+        data.sent.increment(8, 800);
+        data.report(&mut metrics, "test");
+        let current = metrics.current();
+        assert_eq!(current.event_count, 7);
+        assert_eq!(current.event_byte_size, 700);
+    }
+
+    #[test]
+    fn drops_count_as_leaving_the_buffer() {
+        let data = BufferUsageData::new(0);
+        let mut metrics = ReporterCurrentMetrics::default();
+
+        data.received.increment(20, 2000);
+        data.sent.increment(5, 500);
+        data.dropped.increment(3, 300);
+        data.dropped_intentional.increment(2, 200);
+
+        data.report(&mut metrics, "test");
+        let current = metrics.current();
+        assert_eq!(current.event_count, 10);
+        assert_eq!(current.event_byte_size, 1000);
     }
 }
