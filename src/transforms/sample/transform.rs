@@ -102,19 +102,19 @@ enum EventSampleMode {
     Rate(u64),
 }
 
+impl EventSampleMode {
+    fn sample_rate_label(&self) -> String {
+        match self {
+            Self::Ratio(ratio) => ratio.to_string(),
+            Self::Rate(rate) => rate.to_string(),
+        }
+    }
+}
+
 #[derive(Clone, Default)]
 pub struct DynamicSampleFields {
     pub ratio_field: Option<String>,
     pub rate_field: Option<String>,
-}
-
-impl fmt::Display for EventSampleMode {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Self::Ratio(ratio) => write!(f, "{ratio}"),
-            Self::Rate(rate) => write!(f, "{rate}"),
-        }
-    }
 }
 
 impl fmt::Display for SampleMode {
@@ -129,13 +129,22 @@ impl fmt::Display for SampleMode {
 }
 
 #[derive(Clone)]
+pub enum SampleKeySource {
+    Static {
+        key_field: Option<String>,
+        group_by: Option<Template>,
+    },
+    Dynamic {
+        fields: DynamicSampleFields,
+        group_by: Option<Template>,
+    },
+}
+
+#[derive(Clone)]
 pub struct Sample {
     name: String,
     static_mode: SampleMode,
-    ratio_field: Option<String>,
-    rate_field: Option<String>,
-    key_field: Option<String>,
-    group_by: Option<Template>,
+    key_source: SampleKeySource,
     exclude: Option<Condition>,
     sample_rate_key: OptionalValuePath,
 }
@@ -144,41 +153,54 @@ impl Sample {
     // This function is dead code when the feature flag `transforms-impl-sample` is specified but not
     // `transforms-sample`.
     #![allow(dead_code)]
-    pub fn new(
+    pub const fn new(
         name: String,
-        rate: SampleMode,
+        static_mode: SampleMode,
         key_field: Option<String>,
         group_by: Option<Template>,
         exclude: Option<Condition>,
         sample_rate_key: OptionalValuePath,
     ) -> Self {
-        Self::new_with_dynamic(
+        Self::new_with_source(
             name,
-            rate,
-            DynamicSampleFields::default(),
-            key_field,
-            group_by,
+            static_mode,
+            SampleKeySource::Static {
+                key_field,
+                group_by,
+            },
             exclude,
             sample_rate_key,
         )
     }
 
-    pub fn new_with_dynamic(
+    pub const fn new_with_dynamic(
         name: String,
         static_mode: SampleMode,
-        dynamic_fields: DynamicSampleFields,
-        key_field: Option<String>,
+        fields: DynamicSampleFields,
         group_by: Option<Template>,
+        exclude: Option<Condition>,
+        sample_rate_key: OptionalValuePath,
+    ) -> Self {
+        Self::new_with_source(
+            name,
+            static_mode,
+            SampleKeySource::Dynamic { fields, group_by },
+            exclude,
+            sample_rate_key,
+        )
+    }
+
+    const fn new_with_source(
+        name: String,
+        static_mode: SampleMode,
+        key_source: SampleKeySource,
         exclude: Option<Condition>,
         sample_rate_key: OptionalValuePath,
     ) -> Self {
         Self {
             name,
             static_mode,
-            ratio_field: dynamic_fields.ratio_field,
-            rate_field: dynamic_fields.rate_field,
-            key_field,
-            group_by,
+            key_source,
             exclude,
             sample_rate_key,
         }
@@ -192,16 +214,20 @@ impl Sample {
         }
     }
 
-    fn sample_with_dynamic_ratio(ratio: f64, value: Option<&Value>) -> bool {
-        if let Some(value) = value {
-            SampleMode::hash_with_ratio(value.to_string_lossy().as_bytes(), ratio)
+    fn sample_with_dynamic_ratio(ratio: f64, sampling_key: Option<&str>) -> bool {
+        if let Some(sampling_key) = sampling_key {
+            SampleMode::hash_with_ratio(sampling_key.as_bytes(), ratio)
         } else {
             rand::random::<f64>() < ratio
         }
     }
 
     fn event_ratio(&self, event: &Event) -> Option<f64> {
-        let ratio_field = self.ratio_field.as_ref()?;
+        let ratio_field = match &self.key_source {
+            SampleKeySource::Dynamic { fields, .. } => fields.ratio_field.as_ref()?,
+            SampleKeySource::Static { .. } => return None,
+        };
+
         let value = self.get_event_value(event, ratio_field.as_str())?;
 
         let ratio = match value {
@@ -215,7 +241,11 @@ impl Sample {
     }
 
     fn event_rate(&self, event: &Event) -> Option<u64> {
-        let rate_field = self.rate_field.as_ref()?;
+        let rate_field = match &self.key_source {
+            SampleKeySource::Dynamic { fields, .. } => fields.rate_field.as_ref()?,
+            SampleKeySource::Static { .. } => return None,
+        };
+
         let value = self.get_event_value(event, rate_field.as_str())?;
 
         match value {
@@ -251,12 +281,53 @@ impl Sample {
             .or_else(|| self.event_rate(event).map(EventSampleMode::Rate))
     }
 
-    fn sample_with_dynamic_rate(rate: u64, value: Option<&Value>) -> bool {
-        if let Some(value) = value {
-            seahash::hash(value.to_string_lossy().as_bytes()).is_multiple_of(rate)
+    fn sample_with_dynamic_rate(rate: u64, sampling_key: Option<&str>) -> bool {
+        if let Some(sampling_key) = sampling_key {
+            seahash::hash(sampling_key.as_bytes()).is_multiple_of(rate)
         } else {
             rand::random::<f64>() < (1.0 / rate as f64)
         }
+    }
+
+    fn group_by_key(&self, event: &Event) -> Option<String> {
+        let group_by = match &self.key_source {
+            SampleKeySource::Static { group_by, .. } => group_by.as_ref()?,
+            SampleKeySource::Dynamic { group_by, .. } => group_by.as_ref()?,
+        };
+
+        match event {
+            Event::Log(event) => group_by.render_string(event),
+            Event::Trace(event) => group_by.render_string(event),
+            Event::Metric(_) => panic!("component can never receive metric events"),
+        }
+        .map_err(|error| {
+            emit!(TemplateRenderingError {
+                error,
+                field: Some("group_by"),
+                drop_event: false,
+            })
+        })
+        .ok()
+    }
+
+    fn static_key_value<'a>(&self, event: &'a Event) -> Option<&'a Value> {
+        let key_field = match &self.key_source {
+            SampleKeySource::Static { key_field, .. } => key_field.as_ref()?,
+            SampleKeySource::Dynamic { .. } => return None,
+        };
+
+        self.get_event_value(event, key_field)
+    }
+
+    fn dynamic_sampling_key(&self, event: &Event, group_by_key: Option<&str>) -> Option<String> {
+        if let SampleKeySource::Static { key_field, .. } = &self.key_source
+            && let Some(key_field) = key_field.as_ref()
+            && let Some(value) = self.get_event_value(event, key_field)
+        {
+            return Some(value.to_string_lossy().into_owned());
+        }
+
+        group_by_key.map(ToString::to_string)
     }
 }
 
@@ -276,44 +347,24 @@ impl FunctionTransform for Sample {
             }
         };
 
-        let value = self.key_field.as_ref().and_then(|key_field| match &event {
-            Event::Log(event) => event
-                .parse_path_and_get_value(key_field.as_str())
-                .ok()
-                .flatten(),
-            Event::Trace(event) => event
-                .parse_path_and_get_value(key_field.as_str())
-                .ok()
-                .flatten(),
-            Event::Metric(_) => panic!("component can never receive metric events"),
-        });
-
-        // Fetch actual field value if group_by option is set.
-        let group_by_key = self.group_by.as_ref().and_then(|group_by| {
-            match &event {
-                Event::Log(event) => group_by.render_string(event),
-                Event::Trace(event) => group_by.render_string(event),
-                Event::Metric(_) => panic!("component can never receive metric events"),
-            }
-            .map_err(|error| {
-                emit!(TemplateRenderingError {
-                    error,
-                    field: Some("group_by"),
-                    drop_event: false,
-                })
-            })
-            .ok()
-        });
+        let group_by_key = self.group_by_key(&event);
+        let value = self.static_key_value(&event);
 
         let event_sample_mode = self.event_sample_mode(&event);
         let sample_rate = event_sample_mode
             .as_ref()
-            .map(ToString::to_string)
+            .map(EventSampleMode::sample_rate_label)
             .unwrap_or_else(|| self.static_mode.to_string());
 
         let should_sample = match event_sample_mode {
-            Some(EventSampleMode::Ratio(ratio)) => Self::sample_with_dynamic_ratio(ratio, value),
-            Some(EventSampleMode::Rate(rate)) => Self::sample_with_dynamic_rate(rate, value),
+            Some(EventSampleMode::Ratio(ratio)) => {
+                let sampling_key = self.dynamic_sampling_key(&event, group_by_key.as_deref());
+                Self::sample_with_dynamic_ratio(ratio, sampling_key.as_deref())
+            }
+            Some(EventSampleMode::Rate(rate)) => {
+                let sampling_key = self.dynamic_sampling_key(&event, group_by_key.as_deref());
+                Self::sample_with_dynamic_rate(rate, sampling_key.as_deref())
+            }
             None => self.static_mode.increment(group_by_key, value),
         };
 

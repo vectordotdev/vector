@@ -180,23 +180,37 @@ impl GenerateConfig for SampleConfig {
 #[typetag::serde(name = "sample")]
 impl TransformConfig for SampleConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
-        Ok(Transform::function(Sample::new_with_dynamic(
-            Self::NAME.to_string(),
-            self.sample_rate()?,
-            DynamicSampleFields {
-                ratio_field: self.ratio_field.clone(),
-                rate_field: self.rate_field.clone(),
-            },
-            self.key_field.clone(),
-            self.group_by.clone(),
-            self.exclude
-                .as_ref()
-                .map(|condition| {
-                    condition.build(&context.enrichment_tables, &context.metrics_storage)
-                })
-                .transpose()?,
-            self.sample_rate_key.clone(),
-        )))
+        let sample_mode = self.sample_rate()?;
+        let exclude = self
+            .exclude
+            .as_ref()
+            .map(|condition| condition.build(&context.enrichment_tables, &context.metrics_storage))
+            .transpose()?;
+
+        let sample = if self.ratio_field.is_some() || self.rate_field.is_some() {
+            Sample::new_with_dynamic(
+                Self::NAME.to_string(),
+                sample_mode,
+                DynamicSampleFields {
+                    ratio_field: self.ratio_field.clone(),
+                    rate_field: self.rate_field.clone(),
+                },
+                self.group_by.clone(),
+                exclude,
+                self.sample_rate_key.clone(),
+            )
+        } else {
+            Sample::new(
+                Self::NAME.to_string(),
+                sample_mode,
+                self.key_field.clone(),
+                self.group_by.clone(),
+                exclude,
+                self.sample_rate_key.clone(),
+            )
+        };
+
+        Ok(Transform::function(sample))
     }
 
     fn input(&self) -> Input {
@@ -241,7 +255,10 @@ pub fn default_sample_rate_key() -> OptionalValuePath {
 
 #[cfg(test)]
 mod tests {
-    use crate::{config::TransformConfig, transforms::sample::config::SampleConfig};
+    use crate::{
+        config::TransformConfig,
+        transforms::sample::config::{SampleConfig, SampleError},
+    };
 
     #[test]
     fn generate_config() {
@@ -261,7 +278,8 @@ mod tests {
             exclude: None,
         };
 
-        assert!(config.validate(&crate::schema::Definition::any()).is_err());
+        let err = config.sample_rate().unwrap_err();
+        assert!(matches!(err, SampleError::MissingStaticConfiguration));
     }
 
     #[test]
@@ -277,7 +295,8 @@ mod tests {
             exclude: None,
         };
 
-        assert!(config.validate(&crate::schema::Definition::any()).is_err());
+        let err = config.sample_rate().unwrap_err();
+        assert!(matches!(err, SampleError::MissingStaticConfiguration));
     }
 
     #[test]
@@ -309,7 +328,8 @@ mod tests {
             exclude: None,
         };
 
-        assert!(config.validate(&crate::schema::Definition::any()).is_err());
+        let err = config.sample_rate().unwrap_err();
+        assert!(matches!(err, SampleError::InvalidDynamicConfiguration));
     }
 
     #[test]
@@ -325,6 +345,10 @@ mod tests {
             exclude: None,
         };
 
-        assert!(config.validate(&crate::schema::Definition::any()).is_err());
+        let err = config.sample_rate().unwrap_err();
+        assert!(matches!(
+            err,
+            SampleError::InvalidKeyFieldDynamicCombination
+        ));
     }
 }

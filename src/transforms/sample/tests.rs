@@ -335,7 +335,6 @@ fn dynamic_ratio_field_overrides_static_ratio() {
             ratio_field: Some("dynamic_ratio".to_string()),
             rate_field: None,
         },
-        Some("other_field".into()),
         None,
         None,
         default_sample_rate_key(),
@@ -343,7 +342,6 @@ fn dynamic_ratio_field_overrides_static_ratio() {
 
     let mut event = Event::Log(LogEvent::from("hello"));
     let log = event.as_mut_log();
-    log.insert("other_field", "foo");
     log.insert("dynamic_ratio", 1.0);
 
     let output = transform_one(&mut sampler, event).expect("event should be sampled");
@@ -359,7 +357,6 @@ fn dynamic_ratio_field_falls_back_to_static_ratio_when_missing() {
             ratio_field: Some("dynamic_ratio".to_string()),
             rate_field: None,
         },
-        None,
         None,
         None,
         default_sample_rate_key(),
@@ -381,7 +378,6 @@ fn dynamic_ratio_field_falls_back_to_static_rate_when_missing() {
         },
         None,
         None,
-        None,
         default_sample_rate_key(),
     );
 
@@ -398,7 +394,6 @@ fn dynamic_rate_field_overrides_static_ratio() {
             ratio_field: None,
             rate_field: Some("dynamic_rate".to_string()),
         },
-        Some("other_field".into()),
         None,
         None,
         default_sample_rate_key(),
@@ -406,7 +401,6 @@ fn dynamic_rate_field_overrides_static_ratio() {
 
     let mut event = Event::Log(LogEvent::from("hello"));
     let log = event.as_mut_log();
-    log.insert("other_field", "foo");
     log.insert("dynamic_rate", 1);
 
     let output = transform_one(&mut sampler, event).expect("event should be sampled");
@@ -424,13 +418,88 @@ fn dynamic_rate_field_falls_back_to_static_ratio_when_missing() {
         },
         None,
         None,
-        None,
         default_sample_rate_key(),
     );
 
     let event = Event::Log(LogEvent::from("hello"));
     let output = transform_one(&mut sampler, event).expect("event should be sampled");
     assert_eq!(output.as_log()["sample_rate"], "1".into());
+}
+
+#[test]
+fn dynamic_ratio_honors_group_by_key() {
+    let ratio = 0.5;
+    let (sampled_service, dropped_service) =
+        find_group_by_keys_with_opposing_decisions(|service| {
+            dynamic_ratio_should_sample(service, ratio)
+        });
+
+    let mut sampler = Sample::new_with_dynamic(
+        "sample".to_string(),
+        SampleMode::new_ratio(0.0),
+        DynamicSampleFields {
+            ratio_field: Some("dynamic_ratio".to_string()),
+            rate_field: None,
+        },
+        Some(Template::try_from("{{ service }}").unwrap()),
+        None,
+        default_sample_rate_key(),
+    );
+
+    for _ in 0..5 {
+        let mut event = Event::Log(LogEvent::from("hello"));
+        let log = event.as_mut_log();
+        log.insert("service", sampled_service.as_str());
+        log.insert("dynamic_ratio", ratio);
+        let output = transform_one(&mut sampler, event).expect("sampled service should pass");
+        assert_eq!(output.as_log()["sample_rate"], "0.5".into());
+    }
+
+    for _ in 0..5 {
+        let mut event = Event::Log(LogEvent::from("hello"));
+        let log = event.as_mut_log();
+        log.insert("service", dropped_service.as_str());
+        log.insert("dynamic_ratio", ratio);
+        assert!(transform_one(&mut sampler, event).is_none());
+    }
+}
+
+#[test]
+fn dynamic_rate_honors_group_by_key() {
+    let rate = 2;
+    let (sampled_service, dropped_service) =
+        find_group_by_keys_with_opposing_decisions(|service| {
+            dynamic_rate_should_sample(service, rate)
+        });
+
+    let mut sampler = Sample::new_with_dynamic(
+        "sample".to_string(),
+        SampleMode::new_ratio(0.0),
+        DynamicSampleFields {
+            ratio_field: None,
+            rate_field: Some("dynamic_rate".to_string()),
+        },
+        Some(Template::try_from("{{ service }}").unwrap()),
+        None,
+        default_sample_rate_key(),
+    );
+
+    for _ in 0..5 {
+        let mut event = Event::Log(LogEvent::from("hello"));
+        let log = event.as_mut_log();
+        log.insert("service", sampled_service.as_str());
+        log.insert("dynamic_rate", rate as i64);
+        let output = transform_one(&mut sampler, event).expect("sampled service should pass");
+        assert_eq!(output.as_log()["sample_rate"], "2".into());
+    }
+
+    for _ in 0..5 {
+        let mut event = Event::Log(LogEvent::from("hello"));
+        let log = event.as_mut_log();
+        log.insert("service", dropped_service.as_str());
+        log.insert("dynamic_rate", rate as i64);
+        assert!(transform_one(&mut sampler, event).is_none());
+    }
 }
 
 fn condition_contains(key: &str, needle: &str) -> Condition {
@@ -449,4 +518,37 @@ fn random_events(n: usize) -> Vec<Event> {
         .take(n)
         .map(|e| Event::Log(LogEvent::from(e)))
         .collect()
+}
+
+fn dynamic_ratio_should_sample(service: &str, ratio: f64) -> bool {
+    let hash = seahash::hash(service.as_bytes());
+    let threshold = (ratio * (u64::MAX as u128) as f64) as u64;
+    hash <= threshold
+}
+
+fn dynamic_rate_should_sample(service: &str, rate: u64) -> bool {
+    seahash::hash(service.as_bytes()).is_multiple_of(rate)
+}
+
+fn find_group_by_keys_with_opposing_decisions<F>(should_sample: F) -> (String, String)
+where
+    F: Fn(&str) -> bool,
+{
+    let mut sampled = None;
+    let mut dropped = None;
+
+    for i in 0..10_000 {
+        let candidate = format!("service-{i}");
+        if should_sample(&candidate) {
+            sampled = Some(candidate);
+        } else {
+            dropped = Some(candidate);
+        }
+
+        if let (Some(sampled), Some(dropped)) = (sampled.as_ref(), dropped.as_ref()) {
+            return (sampled.clone(), dropped.clone());
+        }
+    }
+
+    panic!("failed to find group_by keys with opposing sample decisions");
 }
