@@ -184,11 +184,15 @@ mod tests {
     #[test]
     fn test_with_default_scheme() {
         assert_eq!(
-            with_default_scheme("0.0.0.0".parse().unwrap(), false).unwrap().to_string(),
+            with_default_scheme("0.0.0.0".parse().unwrap(), false)
+                .unwrap()
+                .to_string(),
             "http://0.0.0.0/"
         );
         assert_eq!(
-            with_default_scheme("0.0.0.0".parse().unwrap(), true).unwrap().to_string(),
+            with_default_scheme("0.0.0.0".parse().unwrap(), true)
+                .unwrap()
+                .to_string(),
             "https://0.0.0.0/"
         );
     }

@@ -110,7 +110,8 @@ fn default_config(address: &str) -> VectorConfig {
 impl SinkConfig for VectorConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSinkType, Healthcheck)> {
         let tls = MaybeTlsSettings::from_config(self.tls.as_ref(), false)?;
-        let uri = crate::sinks::util::grpc::with_default_scheme(self.address.parse()?, tls.is_tls())?;
+        let uri =
+            crate::sinks::util::grpc::with_default_scheme(self.address.parse()?, tls.is_tls())?;
 
         let client = new_client(&tls, cx.proxy())?;
 
@@ -175,7 +176,6 @@ async fn healthcheck(
         Err(source) => Err(Box::new(VectorSinkError::Request { source })),
     }
 }
-
 
 fn new_client(
     tls_settings: &MaybeTlsSettings,

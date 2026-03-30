@@ -39,10 +39,10 @@ use vector_lib::{
 
 use crate::{
     config::{AcknowledgementsConfig, SinkContext, SinkHealthcheckOptions},
-    sinks::util::grpc::{HyperGrpcService, with_default_scheme},
     event::{Event, EventFinalizers, EventStatus, Finalizable},
     http::build_proxy_connector,
     internal_events::{EndpointBytesSent, SinkRequestBuildError},
+    sinks::util::grpc::{HyperGrpcService, with_default_scheme},
     sinks::{
         Healthcheck, VectorSink,
         util::{
@@ -68,7 +68,6 @@ pub enum GrpcCompression {
     /// [gzip]: https://www.gzip.org/
     Gzip,
 }
-
 
 /// Configuration for the OpenTelemetry sink's gRPC transport.
 #[configurable_component]
@@ -218,7 +217,6 @@ impl GrpcSinkConfig {
 
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
-
 }
 
 fn new_grpc_client(
@@ -358,11 +356,20 @@ impl MetaDescriptive for OtlpGrpcRequest {
 
 struct OtlpGrpcResponse {
     events_byte_size: GroupedCountByteSize,
+    /// True when the collector returned a partial-success response with one or more rejected
+    /// records. The entire batch is marked `Rejected` so that upstream sources are notified of
+    /// data loss. This may cause the accepted portion to be re-sent if the source retries, but
+    /// silent data loss is worse than potential duplication.
+    had_partial_success: bool,
 }
 
 impl DriverResponse for OtlpGrpcResponse {
     fn event_status(&self) -> EventStatus {
-        EventStatus::Delivered
+        if self.had_partial_success {
+            EventStatus::Rejected
+        } else {
+            EventStatus::Delivered
+        }
     }
 
     fn events_sent(&self) -> &GroupedCountByteSize {
@@ -396,10 +403,12 @@ struct OtlpGrpcService {
     clients: Option<CachedClients>,
     hyper_client: hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>,
     compression: bool,
-    headers: std::sync::Arc<Vec<(
-        tonic::metadata::AsciiMetadataKey,
-        tonic::metadata::AsciiMetadataValue,
-    )>>,
+    headers: std::sync::Arc<
+        Vec<(
+            tonic::metadata::AsciiMetadataKey,
+            tonic::metadata::AsciiMetadataValue,
+        )>,
+    >,
 }
 
 impl OtlpGrpcService {
@@ -486,39 +495,78 @@ impl Service<OtlpGrpcRequest> for OtlpGrpcService {
 
             // The signal variant and the client type are always aligned — both are derived
             // from `req.signal` in `client_for_signal` — so the mixed arms are unreachable.
-            let byte_size = match (req.signal, client) {
+            let (byte_size, had_partial_success) = match (req.signal, client) {
                 (OtlpSignal::Logs(r), SignalClient::Logs(mut c)) => {
                     let (len, resp) = export!(c, r);
-                    if let Some(ps) = resp.partial_success && ps.rejected_log_records > 0 {
-                        warn!(rejected = ps.rejected_log_records, message = ps.error_message, "OTLP collector rejected log records");
+                    let partial = if let Some(ps) = resp.partial_success
+                        && ps.rejected_log_records > 0
+                    {
+                        warn!(
+                            rejected = ps.rejected_log_records,
+                            message = ps.error_message,
+                            "OTLP collector rejected log records"
+                        );
                         emit!(ComponentEventsDropped::<UNINTENTIONAL> {
                             count: ps.rejected_log_records as usize,
-                            reason: if ps.error_message.is_empty() { "OTLP partial success rejection" } else { &ps.error_message },
+                            reason: if ps.error_message.is_empty() {
+                                "OTLP partial success rejection"
+                            } else {
+                                &ps.error_message
+                            },
                         });
-                    }
-                    len
+                        true
+                    } else {
+                        false
+                    };
+                    (len, partial)
                 }
                 (OtlpSignal::Metrics(r), SignalClient::Metrics(mut c)) => {
                     let (len, resp) = export!(c, r);
-                    if let Some(ps) = resp.partial_success && ps.rejected_data_points > 0 {
-                        warn!(rejected = ps.rejected_data_points, message = ps.error_message, "OTLP collector rejected metric data points");
+                    let partial = if let Some(ps) = resp.partial_success
+                        && ps.rejected_data_points > 0
+                    {
+                        warn!(
+                            rejected = ps.rejected_data_points,
+                            message = ps.error_message,
+                            "OTLP collector rejected metric data points"
+                        );
                         emit!(ComponentEventsDropped::<UNINTENTIONAL> {
                             count: ps.rejected_data_points as usize,
-                            reason: if ps.error_message.is_empty() { "OTLP partial success rejection" } else { &ps.error_message },
+                            reason: if ps.error_message.is_empty() {
+                                "OTLP partial success rejection"
+                            } else {
+                                &ps.error_message
+                            },
                         });
-                    }
-                    len
+                        true
+                    } else {
+                        false
+                    };
+                    (len, partial)
                 }
                 (OtlpSignal::Traces(r), SignalClient::Traces(mut c)) => {
                     let (len, resp) = export!(c, r);
-                    if let Some(ps) = resp.partial_success && ps.rejected_spans > 0 {
-                        warn!(rejected = ps.rejected_spans, message = ps.error_message, "OTLP collector rejected trace spans");
+                    let partial = if let Some(ps) = resp.partial_success
+                        && ps.rejected_spans > 0
+                    {
+                        warn!(
+                            rejected = ps.rejected_spans,
+                            message = ps.error_message,
+                            "OTLP collector rejected trace spans"
+                        );
                         emit!(ComponentEventsDropped::<UNINTENTIONAL> {
                             count: ps.rejected_spans as usize,
-                            reason: if ps.error_message.is_empty() { "OTLP partial success rejection" } else { &ps.error_message },
+                            reason: if ps.error_message.is_empty() {
+                                "OTLP partial success rejection"
+                            } else {
+                                &ps.error_message
+                            },
                         });
-                    }
-                    len
+                        true
+                    } else {
+                        false
+                    };
+                    (len, partial)
                 }
                 _ => unreachable!("signal variant and cached client are always aligned"),
             };
@@ -529,7 +577,10 @@ impl Service<OtlpGrpcRequest> for OtlpGrpcService {
                 endpoint: &endpoint,
             });
 
-            Ok(OtlpGrpcResponse { events_byte_size })
+            Ok(OtlpGrpcResponse {
+                events_byte_size,
+                had_partial_success,
+            })
         };
 
         Box::pin(future.map_err(|err: OtlpGrpcError| -> crate::Error { Box::new(err) }))
@@ -604,7 +655,6 @@ enum OtlpSignal {
     Traces(ExportTraceServiceRequest),
 }
 
-
 /// Per-signal accumulator tracking the merged proto request and its associated
 /// event metadata. Kept separate so each signal can be retried independently.
 struct SignalData<R> {
@@ -622,7 +672,13 @@ impl<R> SignalData<R> {
         byte_size: usize,
         json_byte_size: GroupedCountByteSize,
     ) -> Self {
-        SignalData { request, finalizers, event_count: 1, byte_size, json_byte_size }
+        SignalData {
+            request,
+            finalizers,
+            event_count: 1,
+            byte_size,
+            json_byte_size,
+        }
     }
 
     fn merge(
@@ -652,18 +708,37 @@ struct OtlpBatch {
 
 impl OtlpBatch {
     fn push(&mut self, item: OtlpEventData) {
-        let OtlpEventData { byte_size, json_byte_size, finalizers, signal, uri: _, dynamic_headers: _ } = item;
+        let OtlpEventData {
+            byte_size,
+            json_byte_size,
+            finalizers,
+            signal,
+            uri: _,
+            dynamic_headers: _,
+        } = item;
         match signal {
             OtlpSignal::Logs(req) => match &mut self.logs {
-                Some(existing) => existing.merge(req, finalizers, byte_size, json_byte_size, |e, r| e.resource_logs.extend(r.resource_logs)),
+                Some(existing) => {
+                    existing.merge(req, finalizers, byte_size, json_byte_size, |e, r| {
+                        e.resource_logs.extend(r.resource_logs)
+                    })
+                }
                 slot => *slot = Some(SignalData::new(req, finalizers, byte_size, json_byte_size)),
             },
             OtlpSignal::Metrics(req) => match &mut self.metrics {
-                Some(existing) => existing.merge(req, finalizers, byte_size, json_byte_size, |e, r| e.resource_metrics.extend(r.resource_metrics)),
+                Some(existing) => {
+                    existing.merge(req, finalizers, byte_size, json_byte_size, |e, r| {
+                        e.resource_metrics.extend(r.resource_metrics)
+                    })
+                }
                 slot => *slot = Some(SignalData::new(req, finalizers, byte_size, json_byte_size)),
             },
             OtlpSignal::Traces(req) => match &mut self.traces {
-                Some(existing) => existing.merge(req, finalizers, byte_size, json_byte_size, |e, r| e.resource_spans.extend(r.resource_spans)),
+                Some(existing) => {
+                    existing.merge(req, finalizers, byte_size, json_byte_size, |e, r| {
+                        e.resource_spans.extend(r.resource_spans)
+                    })
+                }
                 slot => *slot = Some(SignalData::new(req, finalizers, byte_size, json_byte_size)),
             },
         }
@@ -698,15 +773,15 @@ where
             .filter_map(move |mut event| {
                 let rendered = match uri_template.render_string(&event) {
                     Ok(s) => s,
-                    Err(e) => return reject_event(format!("failed to render gRPC URI template: {e}")),
+                    Err(e) => return reject_event(event.take_finalizers(), format!("failed to render gRPC URI template: {e}")),
                 };
                 let parsed = match rendered.parse::<Uri>() {
                     Ok(u) => u,
-                    Err(e) => return reject_event(format!("failed to parse rendered gRPC URI: {e}")),
+                    Err(e) => return reject_event(event.take_finalizers(), format!("failed to parse rendered gRPC URI: {e}")),
                 };
                 let u = match with_default_scheme(parsed, use_https) {
                     Ok(u) => u,
-                    Err(e) => return reject_event(format!("invalid gRPC URI after rendering template: {e}")),
+                    Err(e) => return reject_event(event.take_finalizers(), format!("invalid gRPC URI after rendering template: {e}")),
                 };
                 let uri = match u.scheme_str() {
                     Some("https") if !use_https => {
@@ -717,6 +792,7 @@ where
                         // surface a clear error so the operator can add `tls:` or
                         // use a static `https://` scheme prefix.
                         return reject_event(
+                            event.take_finalizers(),
                             "rendered gRPC URI uses \"https\" but the sink \
                              has no TLS connector; add a `tls:` block or use \
                              a static \"https://\" URI prefix so TLS is \
@@ -725,7 +801,7 @@ where
                     }
                     Some("http") | Some("https") => u,
                     other => {
-                        return reject_event(format!(
+                        return reject_event(event.take_finalizers(), format!(
                             "rendered gRPC URI has disallowed scheme {:?}; only \"http\" and \"https\" are permitted",
                             other.unwrap_or("<none>")
                         ));
@@ -743,7 +819,7 @@ where
                             match tonic::metadata::AsciiMetadataValue::try_from(rendered.as_str()) {
                                 Ok(value) => dynamic_headers.push((key.clone(), value)),
                                 Err(e) => {
-                                    return reject_event(format!(
+                                    return reject_event(event.take_finalizers(), format!(
                                         "gRPC metadata value for key {:?} is not valid ASCII: {e}",
                                         key.as_str()
                                     ));
@@ -751,7 +827,7 @@ where
                             }
                         }
                         Err(e) => {
-                            return reject_event(format!(
+                            return reject_event(event.take_finalizers(), format!(
                                 "failed to render gRPC metadata template for key {:?}: {e}",
                                 key.as_str()
                             ));
@@ -783,11 +859,12 @@ where
                         // OTLP-structured events; plain log events from non-OTLP sources
                         // must be encoded with an OTLP codec before reaching this sink.
                         reject_event(
+                            event.take_finalizers(),
                             "event is not OTLP-encoded (missing resourceLogs, resourceMetrics, \
                              or resourceSpans field); this sink only accepts OTLP-structured events",
                         )
                     }
-                    Err(e) => reject_event(e.to_string()),
+                    Err(e) => reject_event(event.take_finalizers(), e.to_string()),
                 }
             })
             // Partition by (rendered URI, dynamic headers) so that events destined for
@@ -868,21 +945,29 @@ fn encode_event(
     match event {
         Event::Log(log) if log.contains(RESOURCE_LOGS_JSON_FIELD) => {
             serializer.encode(event.clone(), &mut buf)?;
-            Ok(Some(OtlpSignal::Logs(ExportLogsServiceRequest::decode(buf.freeze())?)))
+            Ok(Some(OtlpSignal::Logs(ExportLogsServiceRequest::decode(
+                buf.freeze(),
+            )?)))
         }
         Event::Log(log) if log.contains(RESOURCE_METRICS_JSON_FIELD) => {
             serializer.encode(event.clone(), &mut buf)?;
-            Ok(Some(OtlpSignal::Metrics(ExportMetricsServiceRequest::decode(buf.freeze())?)))
+            Ok(Some(OtlpSignal::Metrics(
+                ExportMetricsServiceRequest::decode(buf.freeze())?,
+            )))
         }
         // OTLP spans can arrive as Log events when the source does not use
         // use_otlp_decoding.traces = true.
         Event::Log(log) if log.contains(RESOURCE_SPANS_JSON_FIELD) => {
             serializer.encode(event.clone(), &mut buf)?;
-            Ok(Some(OtlpSignal::Traces(ExportTraceServiceRequest::decode(buf.freeze())?)))
+            Ok(Some(OtlpSignal::Traces(ExportTraceServiceRequest::decode(
+                buf.freeze(),
+            )?)))
         }
         Event::Trace(trace) if trace.contains(RESOURCE_SPANS_JSON_FIELD) => {
             serializer.encode(event.clone(), &mut buf)?;
-            Ok(Some(OtlpSignal::Traces(ExportTraceServiceRequest::decode(buf.freeze())?)))
+            Ok(Some(OtlpSignal::Traces(ExportTraceServiceRequest::decode(
+                buf.freeze(),
+            )?)))
         }
         _ => Ok(None),
     }
@@ -890,11 +975,17 @@ fn encode_event(
 
 /// Drop an event that could not be prepared for export.
 ///
-/// Emits [`SinkRequestBuildError`] and [`ComponentEventsDropped`], then returns
-/// a ready future resolving to `None` so the caller can use `return
-/// reject_event(...)` directly inside a `filter_map` closure.
-fn reject_event(reason: impl fmt::Display) -> futures::future::Ready<Option<OtlpEventData>> {
+/// Marks `finalizers` as [`EventStatus::Rejected`] so that upstream sources are
+/// notified of the failure, then emits [`SinkRequestBuildError`] and
+/// [`ComponentEventsDropped`]. Returns a ready future resolving to `None` so
+/// the caller can use `return reject_event(...)` directly inside a `filter_map`
+/// closure.
+fn reject_event(
+    finalizers: EventFinalizers,
+    reason: impl fmt::Display,
+) -> futures::future::Ready<Option<OtlpEventData>> {
     let reason = reason.to_string();
+    finalizers.update_status(EventStatus::Rejected);
     emit!(SinkRequestBuildError { error: &reason });
     emit!(ComponentEventsDropped::<UNINTENTIONAL> {
         count: 1,
