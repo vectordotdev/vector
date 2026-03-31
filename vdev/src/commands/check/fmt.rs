@@ -1,6 +1,8 @@
 use anyhow::Result;
 
-use crate::app;
+use crate::{app, utils::git::git_ls_files};
+
+const PRETTIER_EXTENSIONS: &[&str] = &["*.yml", "*.yaml", "*.js", "*.ts", "*.tsx", "*.json"];
 
 /// Check that all files are formatted properly
 #[derive(clap::Args, Debug)]
@@ -15,11 +17,19 @@ impl Cli {
         info!("Checking Rust formatting...");
         app::exec("cargo", ["fmt", "--", "--check"], true)?;
 
-        info!("Checking prettier formatting...");
-        app::exec(
-            "prettier",
-            ["--check", "**/*.{yml,yaml,js,ts,tsx,json}"],
-            true,
-        )
+        let files: Vec<String> = PRETTIER_EXTENSIONS
+            .iter()
+            .filter_map(|ext| git_ls_files(Some(ext)).ok())
+            .flatten()
+            .collect();
+        if !files.is_empty() {
+            info!("Checking prettier formatting...");
+            let args: Vec<&str> = std::iter::once("--check")
+                .chain(files.iter().map(String::as_str))
+                .collect();
+            app::exec("prettier", &args, true)?;
+        }
+
+        Ok(())
     }
 }
