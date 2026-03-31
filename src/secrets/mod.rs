@@ -12,10 +12,10 @@ use crate::{
 #[cfg(feature = "secrets-aws-secrets-manager")]
 mod aws_secrets_manager;
 mod directory;
-#[cfg(feature = "secrets-gcp-secret-manager")]
-mod gcp_secret_manager;
 mod exec;
 mod file;
+#[cfg(feature = "secrets-gcp-secret-manager")]
+mod gcp_secret_manager;
 mod test;
 
 ///	Configuration options to retrieve secrets from external backend in order to avoid storing secrets in plaintext
