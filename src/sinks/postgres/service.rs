@@ -54,7 +54,12 @@ pub struct PostgresService {
 }
 
 impl PostgresService {
-     pub const fn new(connection_pool: Pool<Postgres>, table: String, endpoint: String, columns: Vec<String>) -> Self {
+    pub const fn new(
+        connection_pool: Pool<Postgres>,
+        table: String,
+        endpoint: String,
+        columns: Vec<String>,
+    ) -> Self {
         Self {
             connection_pool,
             table,
@@ -167,10 +172,10 @@ impl Service<PostgresRequest> for PostgresService {
             };
 
             sqlx::query(&query)
-            .bind(Json(serialized_values))
-            .execute(&service.connection_pool)
-            .await
-            .context(PostgresSnafu)?;
+                .bind(Json(serialized_values))
+                .execute(&service.connection_pool)
+                .await
+                .context(PostgresSnafu)?;
 
             emit!(EndpointBytesSent {
                 byte_size: metadata.request_encoded_size(),
