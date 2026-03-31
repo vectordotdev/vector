@@ -166,6 +166,36 @@ maybe_install_npm_package() {
   fi
 }
 
+# Helper for standalone binaries from GitHub Releases (no npm dependency chain)
+# Usage: maybe_install_standalone_binary <tool-name> <version>
+maybe_install_standalone_binary() {
+  local tool="$1"
+  local version="$2"
+
+  if ! contains_module "$tool"; then
+    return 0
+  fi
+
+  if [[ "$("$tool" version 2>/dev/null)" == "v${version}" ]]; then
+    return 0
+  fi
+
+  local arch
+  arch="$(uname -m)"
+  local os
+  os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+
+  case "${arch}" in
+    x86_64)  arch="x64" ;;
+    aarch64|arm64) arch="arm64" ;;
+    *) echo "Unsupported architecture: ${arch}"; return 1 ;;
+  esac
+
+  local url="https://github.com/DataDog/datadog-ci/releases/download/v${version}/datadog-ci_${os}-${arch}"
+  sudo curl -fsSL "${url}" -o /usr/local/bin/datadog-ci
+  sudo chmod +x /usr/local/bin/datadog-ci
+}
+
 # Always ensure git safe.directory is set
 git config --global --add safe.directory "$(pwd)"
 
@@ -219,4 +249,4 @@ maybe_install_cargo_tool wasm-pack "${WASM_PACK_VERSION}"
 maybe_install_cargo_tool vdev "${VDEV_VERSION}"
 
 maybe_install_npm_package markdownlint-cli2 markdownlint-cli2 "${MARKDOWNLINT_CLI2_VERSION}"
-maybe_install_npm_package datadog-ci "@datadog/datadog-ci" "${DATADOG_CI_VERSION}" "v${DATADOG_CI_VERSION}" "version"
+maybe_install_standalone_binary datadog-ci "${DATADOG_CI_VERSION}"
