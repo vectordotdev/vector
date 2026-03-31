@@ -102,8 +102,10 @@ cargo nextest run --workspace --no-default-features --features "${FEATURES}"
 
 ```bash
 # See available integration tests:
-# cargo vdev int show
-./scripts/run-integration-test.sh <integration-name>
+cargo vdev int show
+
+# Run a specific integration test
+cargo vdev integration run <integration-name>
 ```
 
 See [Integration Tests](#integration-tests) section below for more details.
