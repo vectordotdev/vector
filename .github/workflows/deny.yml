@@ -26,12 +26,14 @@ on:
         type: string
 
   pull_request:
+  merge_group:
+    types: [checks_requested]
   schedule:
     # Same schedule as nightly.yml
     - cron: "0 5 * * 2-6"  # Runs at 5:00 AM UTC, Tuesday through Saturday
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.number || github.sha }}
   cancel-in-progress: true
 
 permissions:
@@ -48,8 +50,6 @@ jobs:
     timeout-minutes: 30
     if: ${{ always() && (github.event_name != 'pull_request' || needs.changes.outputs.deny == 'true') }}
     needs: [changes]
-    env:
-      CARGO_INCREMENTAL: 0
     steps:
       - name: Checkout branch
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -61,5 +61,24 @@ jobs:
           mold: false
           cargo-deny: true
 
-      - name: Check cargo deny advisories/licenses
+      - name: Check cargo deny (all)
         run: make check-deny
+
+  test-deny-licenses:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    if: ${{ always() && (github.event_name != 'pull_request' || needs.changes.outputs.deny == 'true') }}
+    needs: [changes]
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.ref }}
+
+      - uses: ./.github/actions/setup
+        with:
+          mold: false
+          cargo-deny: true
+
+      - name: Check cargo deny licenses
+        run: make check-deny-licenses
