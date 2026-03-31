@@ -9,6 +9,10 @@ name: Unit and Component Validation Tests
 on:
   workflow_call:
     inputs:
+      ref:
+        description: 'Git ref to checkout'
+        required: false
+        type: string
       coverage:
         description: "Collect code coverage (sets COVERAGE=1 for make targets)"
         required: false
@@ -28,6 +32,8 @@ jobs:
     runs-on: ubuntu-24.04-8core
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.ref }}
 
       - uses: ./.github/actions/setup
         with:

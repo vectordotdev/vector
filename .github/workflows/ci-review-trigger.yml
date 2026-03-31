@@ -9,6 +9,7 @@
 #
 # The available triggers are:
 #
+# /ci-run-coverage            : runs full coverage suite (unit + int + e2e) — NOT included in /ci-run-all (covered by others)
 # /ci-run-all                 : runs all of the below
 # /ci-run-cli                 : runs CLI - Linux
 # /ci-run-test-vector-api     : runs make test-vector-api
@@ -67,6 +68,7 @@ jobs:
         || startsWith(github.event.review.body, '/ci-run-unit-windows')
         || startsWith(github.event.review.body, '/ci-run-environment')
         || startsWith(github.event.review.body, '/ci-run-k8s')
+        || startsWith(github.event.review.body, '/ci-run-coverage')
     steps:
       - name: Generate authentication token
         id: generate_token
@@ -190,6 +192,17 @@ jobs:
     needs: validate
     if: startsWith(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-k8s')
     uses: ./.github/workflows/k8s_e2e.yml
+    with:
+      ref: ${{ github.event.review.commit_id }}
+    secrets: inherit
+
+  coverage:
+    needs: validate
+    if: contains(github.event.review.body, '/ci-run-coverage')
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/coverage.yml
     with:
       ref: ${{ github.event.review.commit_id }}
     secrets: inherit
