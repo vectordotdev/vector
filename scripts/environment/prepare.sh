@@ -191,9 +191,11 @@ maybe_install_standalone_binary() {
     *) echo "Unsupported architecture: ${arch}"; return 1 ;;
   esac
 
-  local url="https://github.com/DataDog/datadog-ci/releases/download/v${version}/datadog-ci_${os}-${arch}"
-  sudo curl -fsSL "${url}" -o /usr/local/bin/datadog-ci
-  sudo chmod +x /usr/local/bin/datadog-ci
+  local dest="/usr/local/bin/${tool}"
+  local url="https://github.com/DataDog/datadog-ci/releases/download/v${version}/${tool}_${os}-${arch}"
+  local run=(); [[ -w "$(dirname "${dest}")" ]] || run=(sudo)
+  "${run[@]}" curl -fsSL "${url}" -o "${dest}"
+  "${run[@]}" chmod +x "${dest}"
 }
 
 # Always ensure git safe.directory is set
