@@ -117,13 +117,16 @@ jobs:
           submodules: "recursive"
           ref: ${{ github.event.review.commit_id }}
 
+      - uses: ./.github/actions/setup
+        with:
+          vdev: true
+          datadog-ci: true
+
       - name: Pull test runner image
         uses: ./.github/actions/pull-test-runner
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           commit_sha: ${{ github.event.review.commit_id }}
-
-      - run: bash scripts/environment/prepare.sh --modules=datadog-ci
 
       - name: Integration Tests - ${{ matrix.service }}
         if: ${{ startsWith(github.event.review.body, '/ci-run-integration-all')
@@ -156,13 +159,16 @@ jobs:
           submodules: "recursive"
           ref: ${{ github.event.review.commit_id }}
 
+      - uses: ./.github/actions/setup
+        with:
+          vdev: true
+          datadog-ci: true
+
       - name: Pull test runner image
         uses: ./.github/actions/pull-test-runner
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           commit_sha: ${{ github.event.review.commit_id }}
-
-      - run: bash scripts/environment/prepare.sh --modules=datadog-ci
 
       - name: E2E Tests - ${{ matrix.service }}
         if: ${{ startsWith(github.event.review.body, '/ci-run-e2e-all')
