@@ -112,27 +112,25 @@ jobs:
           "redis", "webhdfs"
         ]
     steps:
+      - name: Evaluate run condition
+        id: run_condition
+        run: echo "should_run=${{ startsWith(github.event.review.body, '/ci-run-integration-all') || startsWith(github.event.review.body, '/ci-run-all') || startsWith(github.event.review.body, format('/ci-run-integration-{0}', matrix.service)) }}" >> $GITHUB_OUTPUT
+
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        if: ${{ startsWith(github.event.review.body, '/ci-run-integration-all')
-          || startsWith(github.event.review.body, '/ci-run-all')
-          || startsWith(github.event.review.body, format('/ci-run-integration-{0}', matrix.service)) }}
+        if: steps.run_condition.outputs.should_run == 'true'
         with:
           submodules: "recursive"
           ref: ${{ github.event.review.commit_id }}
 
       - name: Pull test runner image
-        if: ${{ startsWith(github.event.review.body, '/ci-run-integration-all')
-          || startsWith(github.event.review.body, '/ci-run-all')
-          || startsWith(github.event.review.body, format('/ci-run-integration-{0}', matrix.service)) }}
+        if: steps.run_condition.outputs.should_run == 'true'
         uses: ./.github/actions/pull-test-runner
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           commit_sha: ${{ github.event.review.commit_id }}
 
       - name: Integration Tests - ${{ matrix.service }}
-        if: ${{ startsWith(github.event.review.body, '/ci-run-integration-all')
-          || startsWith(github.event.review.body, '/ci-run-all')
-          || startsWith(github.event.review.body, format('/ci-run-integration-{0}', matrix.service)) }}
+        if: steps.run_condition.outputs.should_run == 'true'
         uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
         with:
           timeout_minutes: 30
@@ -157,27 +155,25 @@ jobs:
           "datadog-logs", "datadog-metrics", "opentelemetry-logs", "opentelemetry-metrics"
         ]
     steps:
+      - name: Evaluate run condition
+        id: run_condition
+        run: echo "should_run=${{ startsWith(github.event.review.body, '/ci-run-e2e-all') || startsWith(github.event.review.body, '/ci-run-all') || startsWith(github.event.review.body, format('/ci-run-e2e-{0}', matrix.service)) }}" >> $GITHUB_OUTPUT
+
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        if: ${{ startsWith(github.event.review.body, '/ci-run-e2e-all')
-          || startsWith(github.event.review.body, '/ci-run-all')
-          || startsWith(github.event.review.body, format('/ci-run-e2e-{0}', matrix.service)) }}
+        if: steps.run_condition.outputs.should_run == 'true'
         with:
           submodules: "recursive"
           ref: ${{ github.event.review.commit_id }}
 
       - name: Pull test runner image
-        if: ${{ startsWith(github.event.review.body, '/ci-run-e2e-all')
-          || startsWith(github.event.review.body, '/ci-run-all')
-          || startsWith(github.event.review.body, format('/ci-run-e2e-{0}', matrix.service)) }}
+        if: steps.run_condition.outputs.should_run == 'true'
         uses: ./.github/actions/pull-test-runner
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           commit_sha: ${{ github.event.review.commit_id }}
 
       - name: E2E Tests - ${{ matrix.service }}
-        if: ${{ startsWith(github.event.review.body, '/ci-run-e2e-all')
-          || startsWith(github.event.review.body, '/ci-run-all')
-          || startsWith(github.event.review.body, format('/ci-run-e2e-{0}', matrix.service)) }}
+        if: steps.run_condition.outputs.should_run == 'true'
         uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
         with:
           timeout_minutes: 35
