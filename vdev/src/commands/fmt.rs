@@ -17,13 +17,12 @@ impl Cli {
         info!("Formatting Rust code...");
         app::exec("cargo", ["fmt", "--all"], true)?;
 
-        let files: Vec<String> = PRETTIER_EXTENSIONS
-            .iter()
-            .filter_map(|ext| git_ls_files(Some(ext)).ok())
-            .flatten()
-            .collect();
-        if !files.is_empty() {
-            info!("Formatting with prettier...");
+        info!("Formatting with prettier...");
+        for ext in PRETTIER_EXTENSIONS {
+            let files = git_ls_files(Some(ext))?;
+            if files.is_empty() {
+                continue;
+            }
             let args: Vec<&str> = ["--ignore-path", ".prettierignore", "--write"]
                 .into_iter()
                 .chain(files.iter().map(String::as_str))
