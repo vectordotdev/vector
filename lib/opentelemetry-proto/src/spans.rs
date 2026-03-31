@@ -149,7 +149,11 @@ impl ResourceSpan {
             }
         }
 
-        // Scope-level schema_url (from ScopeSpans)
+        // Scope-level schema_url (from ScopeSpans). The schema_url field is defined on
+        // ScopeSpans (and ResourceSpans) in the OTLP proto and identifies the schema that
+        // applies to the instrumentation scope's telemetry:
+        // https://github.com/open-telemetry/opentelemetry-proto/blob/v1.0.0/opentelemetry/proto/trace/v1/trace.proto#L73-L74
+
         if !self.scope_schema_url.is_empty() {
             trace.insert(
                 event_path!("scope", "schema_url"),
@@ -157,7 +161,9 @@ impl ResourceSpan {
             );
         }
 
-        // Resource-level schema_url (from ResourceSpans)
+        // Resource-level schema_url (from ResourceSpans). Identifies the schema for the
+        // Resource's semantic conventions, distinct from the ScopeSpans schema_url:
+        // https://github.com/open-telemetry/opentelemetry-proto/blob/v1.0.0/opentelemetry/proto/trace/v1/trace.proto#L58-L60
         if !self.resource_schema_url.is_empty() {
             trace.insert(
                 event_path!("schema_url"),

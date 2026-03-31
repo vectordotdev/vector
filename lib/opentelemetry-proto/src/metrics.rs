@@ -26,7 +26,9 @@ struct MetricContext {
     resource: Option<Resource>,
     scope: Option<InstrumentationScope>,
     metric_name: String,
+    /// Schema URL from [ScopeMetrics](https://github.com/open-telemetry/opentelemetry-proto/blob/v1.0.0/opentelemetry/proto/metrics/v1/metrics.proto#L73-L74).
     scope_schema_url: String,
+    /// Schema URL from [ResourceMetrics](https://github.com/open-telemetry/opentelemetry-proto/blob/v1.0.0/opentelemetry/proto/metrics/v1/metrics.proto#L58-L60).
     resource_schema_url: String,
 }
 
