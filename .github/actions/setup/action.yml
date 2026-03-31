@@ -83,7 +83,7 @@ inputs:
   datadog-ci:
     required: false
     default: false
-    description: "Install @datadog/datadog-ci (npm)."
+    description: "Install datadog-ci standalone binary."
 
 runs:
   using: "composite"
@@ -267,6 +267,7 @@ runs:
           ~/.cargo/bin/cargo-llvm-cov
           ~/.cargo/bin/dd-rust-license-tool
           ~/.cargo/bin/wasm-pack
+          /opt/markdownlint-cli2
           /usr/local/bin/markdownlint-cli2
           /usr/local/bin/datadog-ci
         key: ${{ runner.os }}-prepare-binaries-${{ hashFiles('scripts/environment/*') }}

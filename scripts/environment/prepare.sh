@@ -148,23 +148,6 @@ maybe_install_cargo_tool() {
   fi
 }
 
-# Helper for NPM packages
-# Usage: maybe_install_npm_package <tool-name> <package-name> <version> <version-check-pattern> <version-command>
-maybe_install_npm_package() {
-  local tool="$1"
-  local package="$2"
-  local version="$3"
-  local version_pattern="${4:-$version}"
-  local version_cmd="${5:---version}"  # Default to --version, can override with "version" etc.
-
-  if ! contains_module "$tool"; then
-    return 0
-  fi
-
-  if [[ "$("$tool" "$version_cmd" 2>/dev/null)" != "$version_pattern" ]]; then
-    sudo npm install -g "${package}@${version}"
-  fi
-}
 
 # Always ensure git safe.directory is set
 git config --global --add safe.directory "$(pwd)"
@@ -218,5 +201,50 @@ maybe_install_cargo_tool dd-rust-license-tool "${DD_RUST_LICENSE_TOOL_VERSION}"
 maybe_install_cargo_tool wasm-pack "${WASM_PACK_VERSION}"
 maybe_install_cargo_tool vdev "${VDEV_VERSION}"
 
-maybe_install_npm_package markdownlint-cli2 markdownlint-cli2 "${MARKDOWNLINT_CLI2_VERSION}"
-maybe_install_npm_package datadog-ci "@datadog/datadog-ci" "${DATADOG_CI_VERSION}" "v${DATADOG_CI_VERSION}" "version"
+maybe_install_markdownlint_cli2() {
+  if ! contains_module "markdownlint-cli2"; then
+    return 0
+  fi
+
+  if markdownlint-cli2 --version 2>/dev/null | grep -q "^${MARKDOWNLINT_CLI2_VERSION}$"; then
+    return 0
+  fi
+
+  if [[ "${CI:-}" == "true" ]]; then
+    local install_dir="/opt/markdownlint-cli2"
+    sudo mkdir -p "$install_dir"
+    # Install into an isolated directory so all deps are co-located and cacheable
+    sudo npm install --prefix "$install_dir" "markdownlint-cli2@${MARKDOWNLINT_CLI2_VERSION}"
+    sudo ln -sf "$install_dir/node_modules/.bin/markdownlint-cli2" /usr/local/bin/markdownlint-cli2
+  else
+    sudo npm install -g "markdownlint-cli2@${MARKDOWNLINT_CLI2_VERSION}"
+  fi
+}
+maybe_install_markdownlint_cli2
+
+maybe_install_datadog_ci() {
+  if ! contains_module "datadog-ci"; then
+    return 0
+  fi
+
+  if datadog-ci version 2>/dev/null | grep -q "^v${DATADOG_CI_VERSION}$"; then
+    return 0
+  fi
+
+  local os arch
+  os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+  arch="$(uname -m)"
+
+  case "$arch" in
+    x86_64)        arch="x64" ;;
+    aarch64|arm64) arch="arm64" ;;
+    *) echo "Unsupported arch for datadog-ci: $arch"; exit 1 ;;
+  esac
+
+  local binary_name="datadog-ci_${os}-${arch}"
+  curl -fsSL "https://github.com/DataDog/datadog-ci/releases/download/v${DATADOG_CI_VERSION}/${binary_name}" \
+    -o /tmp/datadog-ci
+  sudo install -m 755 /tmp/datadog-ci /usr/local/bin/datadog-ci
+  rm -f /tmp/datadog-ci
+}
+maybe_install_datadog_ci
