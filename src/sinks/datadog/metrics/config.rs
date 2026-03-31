@@ -87,11 +87,6 @@ impl DatadogMetricsEndpoint {
         }
     }
 
-    // Gets whether or not this is a series endpoint.
-    pub const fn is_series(self) -> bool {
-        matches!(self, Self::Series { .. })
-    }
-
     pub(super) const fn payload_limits(self) -> DatadogMetricsPayloadLimits {
         // from https://docs.datadoghq.com/api/latest/metrics/#submit-metrics
         let (uncompressed, compressed) = match self {
@@ -110,6 +105,32 @@ impl DatadogMetricsEndpoint {
         DatadogMetricsPayloadLimits {
             uncompressed,
             compressed,
+        }
+    }
+
+    /// Returns the compression scheme used for this endpoint.
+    pub(super) const fn compression(self) -> DatadogMetricsCompression {
+        match self {
+            Self::Series(SeriesApiVersion::V1) => DatadogMetricsCompression::Zlib,
+            _ => DatadogMetricsCompression::Zstd,
+        }
+    }
+}
+
+/// Selects the compressor for a given Datadog metrics endpoint.
+#[derive(Clone, Copy, Debug)]
+pub(super) enum DatadogMetricsCompression {
+    /// zlib (deflate) — used by Series v1.
+    Zlib,
+    /// zstd — used by Series v2 and Sketches.
+    Zstd,
+}
+
+impl DatadogMetricsCompression {
+    pub(super) const fn content_encoding(self) -> &'static str {
+        match self {
+            Self::Zstd => "zstd",
+            Self::Zlib => "deflate",
         }
     }
 }
@@ -270,7 +291,7 @@ impl DatadogMetricsConfig {
             endpoint_configuration,
             self.default_namespace.clone(),
             self.series_api_version,
-        )?;
+        );
 
         let protocol = self.get_protocol(dd_common);
         let sink = DatadogMetricsSink::new(

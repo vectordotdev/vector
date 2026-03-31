@@ -23,6 +23,9 @@ jobs:
             windows:
               - "src/sources/windows_event_log/**"
               - "src/internal_events/windows_event_log.rs"
+              - "src/internal_events/windows.rs"
+              - "src/vector_windows.rs"
+              - "src/service.rs"
               - "tests/integration/windows-event-log/**"
               - ".github/workflows/integration_windows.yml"
 
