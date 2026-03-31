@@ -512,11 +512,11 @@ fix-markdown: ## Auto-fix markdown style issues
 
 .PHONY: check-prettier
 check-prettier: ## Check that JS/TS/YAML/JSON files are formatted with prettier
-	${MAYBE_ENVIRONMENT_EXEC} prettier --ignore-path .prettierignore --check $(shell git ls-files '*.yml' '*.yaml' '*.js' '*.ts' '*.tsx' '*.json')
+	@${MAYBE_ENVIRONMENT_EXEC} prettier --ignore-path .prettierignore --check $(shell git ls-files '*.yml' '*.yaml' '*.js' '*.ts' '*.tsx' '*.json')
 
 .PHONY: fix-prettier
 fix-prettier: ## Auto-fix JS/TS/YAML/JSON formatting with prettier
-	${MAYBE_ENVIRONMENT_EXEC} prettier --ignore-path .prettierignore --write $(shell git ls-files '*.yml' '*.yaml' '*.js' '*.ts' '*.tsx' '*.json')
+	@${MAYBE_ENVIRONMENT_EXEC} prettier --ignore-path .prettierignore --write $(shell git ls-files '*.yml' '*.yaml' '*.js' '*.ts' '*.tsx' '*.json')
 
 .PHONY: check-examples
 check-examples: ## Check that the config/examples files are valid
