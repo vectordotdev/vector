@@ -269,7 +269,11 @@ where
         append_environment_variables(&mut command, config_environment_variables);
 
         command.arg(self.container_name());
-        command.args(if coverage { COVERAGE_COMMAND } else { TEST_COMMAND });
+        command.args(if coverage {
+            COVERAGE_COMMAND
+        } else {
+            TEST_COMMAND
+        });
         command.args(args);
         if coverage {
             command.args([
@@ -431,7 +435,11 @@ impl TestRunner for LocalTestRunner {
         _build: bool,
         coverage: bool,
     ) -> Result<()> {
-        let test_cmd = if coverage { COVERAGE_COMMAND } else { TEST_COMMAND };
+        let test_cmd = if coverage {
+            COVERAGE_COMMAND
+        } else {
+            TEST_COMMAND
+        };
         let mut command = Command::new(test_cmd[0]);
         command.args(&test_cmd[1..]);
         command.args(args);
