@@ -13,6 +13,13 @@ impl Cli {
         app::exec("scripts/check-style.sh", ["--all"], true)?;
 
         info!("Checking Rust formatting...");
-        app::exec("cargo", ["fmt", "--", "--check"], true)
+        app::exec("cargo", ["fmt", "--", "--check"], true)?;
+
+        info!("Checking prettier formatting...");
+        app::exec(
+            "prettier",
+            ["--check", "**/*.{yml,yaml,js,ts,tsx,json}"],
+            true,
+        )
     }
 }

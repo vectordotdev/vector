@@ -510,6 +510,14 @@ check-markdown: ## Check that markdown is styled properly
 fix-markdown: ## Auto-fix markdown style issues
 	${MAYBE_ENVIRONMENT_EXEC} markdownlint-cli2 --fix $(shell git ls-files '*.md')
 
+.PHONY: check-prettier
+check-prettier: ## Check that JS/TS/YAML/JSON files are formatted with prettier
+	${MAYBE_ENVIRONMENT_EXEC} prettier --check "**/*.{yml,yaml,js,ts,tsx,json}"
+
+.PHONY: fix-prettier
+fix-prettier: ## Auto-fix JS/TS/YAML/JSON formatting with prettier
+	${MAYBE_ENVIRONMENT_EXEC} prettier --write "**/*.{yml,yaml,js,ts,tsx,json}"
+
 .PHONY: check-examples
 check-examples: ## Check that the config/examples files are valid
 	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) check examples
