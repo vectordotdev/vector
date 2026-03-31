@@ -15,6 +15,7 @@ pub fn exec(
     environment: Option<&String>,
     retries: u8,
     args: &[String],
+    coverage: bool,
 ) -> Result<()> {
     let (_test_dir, config) = ComposeTestConfig::load(local_config.directory, integration)?;
     let envs = config.environments();
@@ -33,7 +34,7 @@ pub fn exec(
     };
 
     for environment in environments {
-        ComposeTest::generate(local_config, integration, environment, retries)?
+        ComposeTest::generate(local_config, integration, environment, retries, coverage)?
             .test(args.to_owned())?;
     }
     Ok(())

@@ -1,0 +1,67 @@
+# Reusable Workflow: Unit and Component Validation Tests
+#
+# Runs unit tests and component validation tests via the Makefile.
+# With coverage: false (default), plain cargo-nextest; uploads test results to Datadog.
+# With coverage: true, cargo-llvm-cov (COVERAGE=1); uploads an lcov artifact named "coverage-unit".
+
+name: Unit and Component Validation Tests
+
+on:
+  workflow_call:
+    inputs:
+      coverage:
+        description: "Collect code coverage (sets COVERAGE=1 for make targets)"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  CARGO_INCREMENTAL: "0"
+  CI: true
+
+jobs:
+  unit-tests:
+    name: Unit and Component Validation Tests
+    runs-on: ubuntu-24.04-8core
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
+          cargo-nextest: true
+          cargo-llvm-cov: ${{ inputs.coverage }}
+          datadog-ci: ${{ !inputs.coverage }}
+          protoc: true
+          libsasl2: true
+
+      - name: Unit tests
+        run: make test
+        env:
+          COVERAGE: ${{ inputs.coverage }}
+
+      - name: Component validation tests
+        run: make test-component-validation
+        env:
+          COVERAGE: ${{ inputs.coverage }}
+
+      - name: Upload test results to Datadog
+        if: "!inputs.coverage && always()"
+        run: scripts/upload-test-results.sh
+
+      - name: Generate lcov report
+        if: inputs.coverage
+        run: |
+          make coverage-report
+          # Normalize absolute source paths to relative so they merge cleanly with
+          # coverage from the containerized integration tests (which use SF:src/...).
+          sed -i "s|SF:$(pwd)/|SF:|g" lcov.info
+
+      - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        if: inputs.coverage
+        with:
+          name: coverage-unit
+          path: lcov.info

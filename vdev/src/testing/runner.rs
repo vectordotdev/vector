@@ -29,6 +29,17 @@ const TEST_COMMAND: &[&str] = &[
     "--no-fail-fast",
     "--no-default-features",
 ];
+const COVERAGE_COMMAND: &[&str] = &[
+    "cargo",
+    "llvm-cov",
+    "nextest",
+    "--no-fail-fast",
+    "--no-default-features",
+];
+/// Coverage output path inside the test runner container.
+const COVERAGE_OUTPUT_DIR: &str = "/coverage";
+/// Coverage output path on the host (relative to project root).
+const LOCAL_COVERAGE_OUTPUT_DIR: &str = "target/coverage";
 // The upstream container we publish artifacts to on a successful master build.
 const UPSTREAM_IMAGE: &str = "docker.io/timberio/vector-dev:latest";
 
@@ -59,6 +70,7 @@ pub trait TestRunner {
         features: Option<&[String]>,
         args: &[String],
         build: bool,
+        coverage: bool,
     ) -> Result<()>;
 }
 
@@ -237,6 +249,7 @@ where
         features: Option<&[String]>,
         args: &[String],
         build: bool,
+        coverage: bool,
     ) -> Result<()> {
         self.ensure_running(features, config_environment_variables, build)?;
 
@@ -256,8 +269,15 @@ where
         append_environment_variables(&mut command, config_environment_variables);
 
         command.arg(self.container_name());
-        command.args(TEST_COMMAND);
+        command.args(if coverage { COVERAGE_COMMAND } else { TEST_COMMAND });
         command.args(args);
+        if coverage {
+            command.args([
+                "--lcov",
+                "--output-path",
+                &format!("{COVERAGE_OUTPUT_DIR}/lcov.info"),
+            ]);
+        }
 
         command.check_run()
     }
@@ -277,6 +297,7 @@ impl IntegrationTestRunner {
         integration: Option<String>,
         config: &IntegrationRunnerConfig,
         network: Option<String>,
+        coverage: bool,
     ) -> Result<Self> {
         let mut volumes: Vec<String> = config
             .volumes
@@ -285,6 +306,12 @@ impl IntegrationTestRunner {
             .collect();
 
         volumes.push(format!("{VOLUME_TARGET}:/output"));
+
+        if coverage {
+            let coverage_dir = std::path::Path::new(app::path()).join(LOCAL_COVERAGE_OUTPUT_DIR);
+            std::fs::create_dir_all(&coverage_dir)?;
+            volumes.push(format!("{}:{COVERAGE_OUTPUT_DIR}", coverage_dir.display()));
+        }
 
         Ok(Self {
             integration,
@@ -402,10 +429,20 @@ impl TestRunner for LocalTestRunner {
         _features: Option<&[String]>,
         args: &[String],
         _build: bool,
+        coverage: bool,
     ) -> Result<()> {
-        let mut command = Command::new(TEST_COMMAND[0]);
-        command.args(&TEST_COMMAND[1..]);
+        let test_cmd = if coverage { COVERAGE_COMMAND } else { TEST_COMMAND };
+        let mut command = Command::new(test_cmd[0]);
+        command.args(&test_cmd[1..]);
         command.args(args);
+        if coverage {
+            std::fs::create_dir_all(LOCAL_COVERAGE_OUTPUT_DIR)?;
+            command.args([
+                "--lcov",
+                "--output-path",
+                &format!("{LOCAL_COVERAGE_OUTPUT_DIR}/lcov.info"),
+            ]);
+        }
 
         for (key, value) in outer_env {
             if let Some(value) = value {

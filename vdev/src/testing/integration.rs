@@ -76,6 +76,7 @@ pub(crate) struct ComposeTest {
     compose: Option<Compose>,
     env_config: Environment,
     retries: u8,
+    coverage: bool,
 }
 
 impl ComposeTest {
@@ -84,6 +85,7 @@ impl ComposeTest {
         test_name: impl Into<String>,
         environment: impl Into<String>,
         retries: u8,
+        coverage: bool,
     ) -> Result<ComposeTest> {
         let test_name: String = test_name.into();
         let environment = environment.into();
@@ -114,6 +116,7 @@ impl ComposeTest {
             runner_name,
             &config.runner,
             compose.is_some().then_some(network_name),
+            coverage,
         )?;
 
         env_config.insert("VECTOR_IMAGE".to_string(), Some(runner.image_name()));
@@ -127,6 +130,7 @@ impl ComposeTest {
             compose,
             env_config: rename_environment_keys(&env_config),
             retries,
+            coverage,
         };
         trace!("Generated {compose_test:#?}");
         Ok(compose_test)
@@ -230,6 +234,7 @@ impl ComposeTest {
             Some(&self.config.features),
             &args,
             self.local_config.kind == ComposeTestKind::E2E,
+            self.coverage,
         )?;
 
         Ok(())

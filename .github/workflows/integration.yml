@@ -7,14 +7,22 @@
 name: Integration Test Suite
 
 on:
+  workflow_call:
+    inputs:
+      coverage:
+        description: "Collect code coverage (outputs target/coverage/lcov.info per service)"
+        required: false
+        type: boolean
+        default: false
   workflow_dispatch:
   pull_request:
   merge_group:
     types: [ checks_requested ]
 
 concurrency:
-  # `github.event.number` exists for pull requests, otherwise fall back to SHA for merge queue
-  group: ${{ github.workflow }}-${{ github.event.number || github.event.merge_group.head_sha }}
+  # `github.event.number` exists for pull requests, otherwise fall back to SHA for merge queue.
+  # For workflow_call (e.g. weekly coverage), use run_id so each caller gets its own group.
+  group: ${{ github.workflow }}-${{ github.event.number || github.event.merge_group.head_sha || github.run_id }}
   cancel-in-progress: true
 
 permissions:
@@ -52,6 +60,7 @@ jobs:
     if: ${{
       always() &&
       (github.event_name == 'workflow_dispatch' ||
+       github.event_name == 'workflow_call' ||
       (github.event_name == 'merge_group' &&
       needs.changes.result == 'success' &&
       (needs.changes.outputs.dependencies == 'true' ||
@@ -70,8 +79,9 @@ jobs:
       - build-test-runner
 
     if: ${{ always() && !failure() && !cancelled() && needs.build-test-runner.result == 'success' &&
-      (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch') }}
+      (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') }}
     strategy:
+      fail-fast: false
       matrix:
         # TODO: Add "splunk" back once https://github.com/vectordotdev/vector/issues/23474 is fixed.
         # If you modify this list, please also update the `int_tests` job in changes.yml.
@@ -127,16 +137,25 @@ jobs:
 
             # Check if any of the three conditions is true
             if [[ "${{ github.event_name }}" == "workflow_dispatch" || \
+                  "${{ github.event_name }}" == "workflow_call" || \
                   "${{ needs.changes.outputs.dependencies }}" == "true" || \
                   "${{ needs.changes.outputs.integration-yml }}" == "true" || \
                   "$should_run" == "true" ]]; then
               # Only install dep if test runs
               bash scripts/environment/prepare.sh --modules=datadog-ci
               echo "Running test for ${{ matrix.service }}"
-              bash scripts/run-integration-test.sh int ${{ matrix.service }}
+              bash scripts/run-integration-test.sh ${{ inputs.coverage && '-c' || '' }} int ${{ matrix.service }}
             else
               echo "Skipping ${{ matrix.service }} test as the value is false or conditions not met."
             fi
+
+      - name: Upload coverage artifact
+        if: inputs.coverage && always()
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: coverage-int-${{ matrix.service }}
+          path: target/coverage/lcov.info
+          if-no-files-found: ignore
 
 
   e2e-tests:
@@ -145,8 +164,9 @@ jobs:
       - changes
       - build-test-runner
     if: ${{ always() && !failure() && !cancelled() && needs.build-test-runner.result == 'success' &&
-      (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch') }}
+      (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') }}
     strategy:
+      fail-fast: false
       matrix:
         service: [ "datadog-logs", "datadog-metrics", "opentelemetry-logs", "opentelemetry-metrics" ]
     timeout-minutes: 90
@@ -195,16 +215,25 @@ jobs:
 
             # Check if any of the three conditions is true
             if [[ "${{ github.event_name }}" == "workflow_dispatch" || \
+                  "${{ github.event_name }}" == "workflow_call" || \
                   "${{ needs.changes.outputs.dependencies }}" == "true" || \
-                  "${{ needs.changes.outputs.integration-yml }}" == "true" ]] || \
+                  "${{ needs.changes.outputs.integration-yml }}" == "true" || \
                   "$should_run" == "true" ]]; then
               # Only install dep if test runs
               bash scripts/environment/prepare.sh --modules=datadog-ci
               echo "Running test for ${{ matrix.service }}"
-              bash scripts/run-integration-test.sh e2e ${{ matrix.service }}
+              bash scripts/run-integration-test.sh ${{ inputs.coverage && '-c' || '' }} e2e ${{ matrix.service }}
             else
               echo "Skipping ${{ matrix.service }} test as the value is false or conditions not met."
             fi
+
+      - name: Upload coverage artifact
+        if: inputs.coverage && always()
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: coverage-e2e-${{ matrix.service }}
+          path: target/coverage/lcov.info
+          if-no-files-found: ignore
 
   integration-test-suite:
     name: Integration Test Suite
