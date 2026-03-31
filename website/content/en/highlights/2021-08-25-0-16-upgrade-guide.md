@@ -13,10 +13,10 @@ badges:
 Vector's 0.16.0 release includes three **breaking changes**:
 
 1. [Component name field renamed to ID](#name-to-id)
-1. [Datadog Log sink encoding option removed](#encoding)
-1. [Renaming of `memory_use_bytes` internal metric](#memory_use_bytes)
-1. [`datadog_logs` source renamed to `datadog_agent`](#datadog_logs_rename)
-1. [`kubernetes_logs` source's new RBAC](#kubernetes_logs_rbac)
+2. [Datadog Log sink encoding option removed](#encoding)
+3. [Renaming of `memory_use_bytes` internal metric](#memory_use_bytes)
+4. [`datadog_logs` source renamed to `datadog_agent`](#datadog_logs_rename)
+5. [`kubernetes_logs` source's new RBAC](#kubernetes_logs_rbac)
 
 We cover them below to help you upgrade quickly:
 

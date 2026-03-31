@@ -85,6 +85,7 @@ jobs:
   build-test-runner:
     needs: prep-pr
     permissions:
+      contents: read
       packages: write   # Required to push test runner image to GHCR
     uses: ./.github/workflows/build-test-runner.yml
     with:
@@ -98,6 +99,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     permissions:
+      contents: read
       packages: read    # Required to pull test runner image from GHCR
     strategy:
       fail-fast: false
@@ -115,13 +117,16 @@ jobs:
           submodules: "recursive"
           ref: ${{ github.event.review.commit_id }}
 
+      - uses: ./.github/actions/setup
+        with:
+          vdev: true
+          datadog-ci: true
+
       - name: Pull test runner image
         uses: ./.github/actions/pull-test-runner
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           commit_sha: ${{ github.event.review.commit_id }}
-
-      - run: bash scripts/environment/prepare.sh --modules=datadog-ci
 
       - name: Integration Tests - ${{ matrix.service }}
         if: ${{ startsWith(github.event.review.body, '/ci-run-integration-all')
@@ -140,6 +145,7 @@ jobs:
     runs-on: ubuntu-24.04-8core
     timeout-minutes: 30
     permissions:
+      contents: read
       packages: read    # Required to pull test runner image from GHCR
     strategy:
       fail-fast: false
@@ -153,13 +159,16 @@ jobs:
           submodules: "recursive"
           ref: ${{ github.event.review.commit_id }}
 
+      - uses: ./.github/actions/setup
+        with:
+          vdev: true
+          datadog-ci: true
+
       - name: Pull test runner image
         uses: ./.github/actions/pull-test-runner
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           commit_sha: ${{ github.event.review.commit_id }}
-
-      - run: bash scripts/environment/prepare.sh --modules=datadog-ci
 
       - name: E2E Tests - ${{ matrix.service }}
         if: ${{ startsWith(github.event.review.body, '/ci-run-e2e-all')

@@ -14,6 +14,8 @@ runner:
 matrix:
   # validate against the Agent latest nightly and also stable v6 and v7
   agent_version: ['latest', '6', '7']
+  # validate both series API versions
+  series_api_version: ['v1', 'v2']
 
 # changes to these files/paths will invoke the integration test in CI
 # expressions are evaluated using https://github.com/micromatch/picomatch
