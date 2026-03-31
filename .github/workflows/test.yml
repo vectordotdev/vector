@@ -126,7 +126,7 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           rust: true
-          markdownlint: true
+          markdownlint-cli2: true
       - run: make check-markdown
 
   check-generated-docs:

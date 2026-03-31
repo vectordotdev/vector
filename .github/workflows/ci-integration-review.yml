@@ -105,14 +105,19 @@ jobs:
       fail-fast: false
       matrix:
         service: [
-          "amqp", "appsignal", "aws", "axiom", "azure", "clickhouse", "databend", "datadog-agent",
-          "datadog-logs", "datadog-metrics", "datadog-traces", "dnstap", "docker-logs", "elasticsearch",
+          "amqp", "appsignal", "axiom", "aws", "azure", "clickhouse", "databend", "datadog-agent",
+          "datadog-logs", "datadog-metrics", "datadog-traces", "dnstap", "docker-logs", "doris", "elasticsearch",
           "eventstoredb", "fluent", "gcp", "greptimedb", "http-client", "influxdb", "kafka", "logstash",
-          "loki", "mongodb", "nats", "nginx", "opentelemetry", "postgres", "prometheus", "pulsar",
-          "redis", "splunk", "webhdfs"
+          "loki", "mqtt", "mongodb", "nats", "nginx", "opentelemetry", "postgres", "prometheus", "pulsar",
+          "redis", "webhdfs"
         ]
     steps:
+      - name: Evaluate run condition
+        id: run_condition
+        run: echo "should_run=${{ startsWith(github.event.review.body, '/ci-run-integration-all') || startsWith(github.event.review.body, '/ci-run-all') || startsWith(github.event.review.body, format('/ci-run-integration-{0}', matrix.service)) }}" >> $GITHUB_OUTPUT
+
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        if: steps.run_condition.outputs.should_run == 'true'
         with:
           submodules: "recursive"
           ref: ${{ github.event.review.commit_id }}
@@ -123,20 +128,21 @@ jobs:
           datadog-ci: true
 
       - name: Pull test runner image
+        if: steps.run_condition.outputs.should_run == 'true'
         uses: ./.github/actions/pull-test-runner
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           commit_sha: ${{ github.event.review.commit_id }}
 
       - name: Integration Tests - ${{ matrix.service }}
-        if: ${{ startsWith(github.event.review.body, '/ci-run-integration-all')
-          || startsWith(github.event.review.body, '/ci-run-all')
-          || startsWith(github.event.review.body, format('/ci-run-integration-{0}', matrix.service)) }}
+        if: steps.run_condition.outputs.should_run == 'true'
         uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/run-integration-test.sh int ${{ matrix.service }}
+          command: |
+            bash scripts/environment/prepare.sh --modules=datadog-ci
+            bash scripts/run-integration-test.sh int ${{ matrix.service }}
 
   e2e-tests:
     needs:
@@ -154,7 +160,12 @@ jobs:
           "datadog-logs", "datadog-metrics", "opentelemetry-logs", "opentelemetry-metrics"
         ]
     steps:
+      - name: Evaluate run condition
+        id: run_condition
+        run: echo "should_run=${{ startsWith(github.event.review.body, '/ci-run-e2e-all') || startsWith(github.event.review.body, '/ci-run-all') || startsWith(github.event.review.body, format('/ci-run-e2e-{0}', matrix.service)) }}" >> $GITHUB_OUTPUT
+
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        if: steps.run_condition.outputs.should_run == 'true'
         with:
           submodules: "recursive"
           ref: ${{ github.event.review.commit_id }}
@@ -165,20 +176,21 @@ jobs:
           datadog-ci: true
 
       - name: Pull test runner image
+        if: steps.run_condition.outputs.should_run == 'true'
         uses: ./.github/actions/pull-test-runner
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           commit_sha: ${{ github.event.review.commit_id }}
 
       - name: E2E Tests - ${{ matrix.service }}
-        if: ${{ startsWith(github.event.review.body, '/ci-run-e2e-all')
-          || startsWith(github.event.review.body, '/ci-run-all')
-          || startsWith(github.event.review.body, format('/ci-run-e2e-{0}', matrix.service)) }}
+        if: steps.run_condition.outputs.should_run == 'true'
         uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
         with:
           timeout_minutes: 35
           max_attempts: 3
-          command: bash scripts/run-integration-test.sh e2e ${{ matrix.service }}
+          command: |
+            bash scripts/environment/prepare.sh --modules=datadog-ci
+            bash scripts/run-integration-test.sh e2e ${{ matrix.service }}
 
 
   update-pr-status:

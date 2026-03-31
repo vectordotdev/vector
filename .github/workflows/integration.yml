@@ -94,60 +94,57 @@ jobs:
         ]
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          submodules: "recursive"
-
-      - uses: ./.github/actions/setup
-        with:
-          vdev: true
-          mold: false
-          cargo-cache: false
-
       - name: Download JSON artifact from changes.yml
         uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
         if: github.event_name == 'merge_group'
         with:
           name: int_tests_changes
 
+      - name: Determine if test should run
+        id: check
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" || \
+                "${{ github.event_name }}" == "workflow_call" || \
+                "${{ needs.changes.outputs.dependencies }}" == "true" || \
+                "${{ needs.changes.outputs.integration-yml }}" == "true" ]]; then
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+          elif [[ "${{ needs.changes.outputs.website_only }}" == "true" ]]; then
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+          elif [[ -f int_tests_changes.json ]]; then
+            should_run=$(jq -r '."${{ matrix.service }}" // false' int_tests_changes.json)
+            echo "should_run=${should_run}" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        if: steps.check.outputs.should_run == 'true'
+        with:
+          submodules: "recursive"
+
+      - uses: ./.github/actions/setup
+        if: steps.check.outputs.should_run == 'true'
+        with:
+          vdev: true
+          mold: false
+          cargo-cache: false
+          datadog-ci: true
+
       - name: Pull test runner image
+        if: steps.check.outputs.should_run == 'true'
         uses: ./.github/actions/pull-test-runner
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           commit_sha: ${{ github.sha }}
 
       - name: Run Integration Tests for ${{ matrix.service }}
+        if: steps.check.outputs.should_run == 'true'
         uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
         with:
           timeout_minutes: 30
           max_attempts: 3
           command: |
-            if [[ -f int_tests_changes.json ]]; then
-              # Parse the JSON and check if the specific integration test should run.
-              should_run=$(jq -r '."${{ matrix.service }}" // false' int_tests_changes.json)
-            else
-              # The `changes` job did not run (manual run) or the file is missing, default to false.
-              should_run=false
-            fi
-
-            if [[ "${{ needs.changes.outputs.website_only }}" == "true" ]]; then
-              echo "Skipping ${{ matrix.service }} test since only website changes were detected"
-              exit 0
-            fi
-
-            # Check if any of the three conditions is true
-            if [[ "${{ github.event_name }}" == "workflow_dispatch" || \
-                  "${{ github.event_name }}" == "workflow_call" || \
-                  "${{ needs.changes.outputs.dependencies }}" == "true" || \
-                  "${{ needs.changes.outputs.integration-yml }}" == "true" || \
-                  "$should_run" == "true" ]]; then
-              # Only install dep if test runs
-              bash scripts/environment/prepare.sh --modules=datadog-ci
-              echo "Running test for ${{ matrix.service }}"
-              bash scripts/run-integration-test.sh ${{ inputs.coverage && '-c' || '' }} int ${{ matrix.service }}
-            else
-              echo "Skipping ${{ matrix.service }} test as the value is false or conditions not met."
-            fi
+            bash scripts/run-integration-test.sh ${{ inputs.coverage && '-c' || '' }} int ${{ matrix.service }}
 
       - name: Upload coverage artifact
         if: inputs.coverage && always()
@@ -172,60 +169,57 @@ jobs:
     timeout-minutes: 90
 
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          submodules: "recursive"
-
-      - uses: ./.github/actions/setup
-        with:
-          vdev: true
-          mold: false
-          cargo-cache: false
-
       - name: Download JSON artifact from changes.yml
         uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
         if: github.event_name == 'merge_group'
         with:
           name: e2e_tests_changes
 
+      - name: Determine if test should run
+        id: check
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" || \
+                "${{ github.event_name }}" == "workflow_call" || \
+                "${{ needs.changes.outputs.dependencies }}" == "true" || \
+                "${{ needs.changes.outputs.integration-yml }}" == "true" ]]; then
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+          elif [[ "${{ needs.changes.outputs.website_only }}" == "true" ]]; then
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+          elif [[ -f e2e_tests_changes.json ]]; then
+            should_run=$(jq -r '."${{ matrix.service }}" // false' e2e_tests_changes.json)
+            echo "should_run=${should_run}" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        if: steps.check.outputs.should_run == 'true'
+        with:
+          submodules: "recursive"
+
+      - uses: ./.github/actions/setup
+        if: steps.check.outputs.should_run == 'true'
+        with:
+          vdev: true
+          mold: false
+          cargo-cache: false
+          datadog-ci: true
+
       - name: Pull test runner image
+        if: steps.check.outputs.should_run == 'true'
         uses: ./.github/actions/pull-test-runner
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           commit_sha: ${{ github.sha }}
 
       - name: Run E2E Tests for ${{ matrix.service }}
+        if: steps.check.outputs.should_run == 'true'
         uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
         with:
           timeout_minutes: 30
           max_attempts: 3
           command: |
-            if [[ -f e2e_tests_changes.json ]]; then
-              # Parse the JSON and check if the specific e2e test should run.
-              should_run=$(jq -r '."${{ matrix.service }}" // false' e2e_tests_changes.json)
-            else
-              # The `changes` job did not run (manual run) or the file is missing, default to false.
-              should_run=false
-            fi
-
-            if [[ "${{ needs.changes.outputs.website_only }}" == "true" ]]; then
-              echo "Skipping ${{ matrix.service }} test since only website changes were detected"
-              exit 0
-            fi
-
-            # Check if any of the three conditions is true
-            if [[ "${{ github.event_name }}" == "workflow_dispatch" || \
-                  "${{ github.event_name }}" == "workflow_call" || \
-                  "${{ needs.changes.outputs.dependencies }}" == "true" || \
-                  "${{ needs.changes.outputs.integration-yml }}" == "true" || \
-                  "$should_run" == "true" ]]; then
-              # Only install dep if test runs
-              bash scripts/environment/prepare.sh --modules=datadog-ci
-              echo "Running test for ${{ matrix.service }}"
-              bash scripts/run-integration-test.sh ${{ inputs.coverage && '-c' || '' }} e2e ${{ matrix.service }}
-            else
-              echo "Skipping ${{ matrix.service }} test as the value is false or conditions not met."
-            fi
+            bash scripts/run-integration-test.sh ${{ inputs.coverage && '-c' || '' }} e2e ${{ matrix.service }}
 
       - name: Upload coverage artifact
         if: inputs.coverage && always()
