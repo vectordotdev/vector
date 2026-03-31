@@ -493,16 +493,18 @@ impl FinishedApplication {
     }
 
     async fn stop(topology_controller: TopologyController, mut signal_rx: SignalRx) -> ExitStatus {
-        emit!(VectorStopped);
         tokio::select! {
-            _ = topology_controller.stop() => ExitStatus::from_raw({
-                #[cfg(windows)]
-                {
-                    exitcode::OK as u32
-                }
-                #[cfg(unix)]
-                exitcode::OK
-            }), // Graceful shutdown finished
+            _ = topology_controller.stop() => {
+                emit!(VectorStopped);
+                ExitStatus::from_raw({
+                    #[cfg(windows)]
+                    {
+                        exitcode::OK as u32
+                    }
+                    #[cfg(unix)]
+                    exitcode::OK
+                })
+            }, // Graceful shutdown finished
             _ = signal_rx.recv() => Self::quit(),
         }
     }
