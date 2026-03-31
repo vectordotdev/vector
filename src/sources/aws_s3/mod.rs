@@ -34,9 +34,8 @@ pub mod sqs;
 /// Compression scheme for objects retrieved from S3.
 #[configurable_component]
 #[configurable(metadata(docs::advanced))]
-#[derive(Clone, Copy, Debug, Derivative, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
-#[derivative(Default)]
 pub enum Compression {
     /// Automatically attempt to determine the compression scheme.
     ///
@@ -44,7 +43,7 @@ pub enum Compression {
     /// `Content-Type` metadata, as well as the key suffix (for example, `.gz`).
     ///
     /// It is set to `none` if the compression scheme cannot be determined.
-    #[derivative(Default)]
+    #[default]
     Auto,
 
     /// Uncompressed.
@@ -59,14 +58,13 @@ pub enum Compression {
 
 /// Strategies for consuming objects from AWS S3.
 #[configurable_component]
-#[derive(Clone, Copy, Debug, Derivative)]
+#[derive(Clone, Copy, Debug, Default)]
 #[serde(rename_all = "lowercase")]
-#[derivative(Default)]
 enum Strategy {
     /// Consumes objects by processing bucket notification events sent to an [AWS SQS queue][aws_sqs].
     ///
     /// [aws_sqs]: https://aws.amazon.com/sqs/
-    #[derivative(Default)]
+    #[default]
     Sqs,
 }
 

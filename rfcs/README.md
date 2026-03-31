@@ -78,8 +78,8 @@ more info navigating your solution.
 
 1. Search GitHub for [previous issues](https://github.com/vectordotdev/vector/issues) and
    [RFCs](https://github.com/vectordotdev/vector/tree/master/rfcs) on this topic.
-1. If an RFC issue does not exist, [open one](https://github.com/vectordotdev/vector/issues/new/choose).
-1. Use the issue to obtain consensus that an RFC is necessary.
+2. If an RFC issue does not exist, [open one](https://github.com/vectordotdev/vector/issues/new/choose).
+3. Use the issue to obtain consensus that an RFC is necessary.
    - The change might be quickly rejected.
    - The change might be on our long term roadmap and get deferred.
    - The change might be blocked by other work.
@@ -87,22 +87,22 @@ more info navigating your solution.
 ### Creating an RFC
 
 1. Create a new branch
-1. Copy the [`rfcs/_YYYY-MM-DD-issue#-title.md`](rfcs/_YYYY-MM-DD-issue%23-title.md) template with the appropriate
+2. Copy the [`rfcs/_YYYY-MM-DD-issue#-title.md`](rfcs/_YYYY-MM-DD-issue%23-title.md) template with the appropriate
    name. Be sure to use the issue number you created above. (e.g., `rfcs/2020-02-10-445-internal-observability.md`)
-1. Fill in your RFC, pay attention the bullets and guidelines. Do not omit any sections.
-1. Work with the Vector team to land on a confident solution. Allocate time for code-level spikes if necessary.
-1. Submit your RFC as a pull request and tag reviewers for approval.
+3. Fill in your RFC, pay attention the bullets and guidelines. Do not omit any sections.
+4. Work with the Vector team to land on a confident solution. Allocate time for code-level spikes if necessary.
+5. Submit your RFC as a pull request and tag reviewers for approval.
 
 ### Getting an RFC accepted
 
 1. Schedule a "last call" meeting for your RFC. This should be 1 week after opening your pull request. The purpose is to efficiently obtain consensus.
-1. At least 3 Vector team members must approve your RFC in the form of pull request approvals.
-1. Once approved, self-merge your RFC, or ask a Vector team member to do it for you.
+2. At least 3 Vector team members must approve your RFC in the form of pull request approvals.
+3. Once approved, self-merge your RFC, or ask a Vector team member to do it for you.
 
 ### Implementing an RFC
 
 1. Create issues from the "Plan Of Attack" section. Place them in an epic if necessary.
-1. Coordinate with leadership to schedule your work.
+2. Coordinate with leadership to schedule your work.
 
 ## FAQ
 

@@ -94,8 +94,7 @@ pub enum DemoLogsConfigError {
 
 /// Output format configuration.
 #[configurable_component]
-#[derive(Clone, Debug, Derivative)]
-#[derivative(Default)]
+#[derive(Clone, Debug, Default)]
 #[serde(tag = "format", rename_all = "snake_case")]
 #[configurable(metadata(
     docs::enum_tag_description = "The format of the randomly generated output."
@@ -136,7 +135,7 @@ pub enum OutputFormat {
     /// Randomly generated HTTP server logs in [JSON][json] format.
     ///
     /// [json]: https://en.wikipedia.org/wiki/JSON
-    #[derivative(Default)]
+    #[default]
     Json,
 }
 

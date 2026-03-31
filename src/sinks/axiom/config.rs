@@ -166,7 +166,6 @@ impl SinkConfig for AxiomConfig {
             request,
             acknowledgements: self.acknowledgements,
             batch: self.batch,
-            headers: None,
             encoding: EncodingConfigWithFraming::new(
                 Some(FramingConfig::NewlineDelimited),
                 SerializerConfig::Json(JsonSerializerConfig {

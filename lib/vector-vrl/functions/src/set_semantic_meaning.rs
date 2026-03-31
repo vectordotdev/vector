@@ -38,13 +38,16 @@ impl Function for SetSemanticMeaning {
     }
 
     fn usage(&self) -> &'static str {
-        indoc! {"
-            Sets a semantic meaning for an event. **Note**: This function assigns
-            meaning at startup, and has _no_ runtime behavior. It is suggested
+        indoc! {"Sets a semantic meaning for an event."}
+    }
+
+    fn notices(&self) -> &'static [&'static str] {
+        &[indoc! {"
+            This function assigns meaning at startup, and has _no_ runtime behavior. It is suggested
             to put all calls to this function at the beginning of a VRL function. The function
-            cannot be conditionally called. For example, using an if statement cannot stop the meaning
-            from being assigned.
-        "}
+            cannot be conditionally called. For example, using an if statement cannot stop the
+            meaning from being assigned.
+        "}]
     }
 
     fn category(&self) -> &'static str {
