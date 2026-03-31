@@ -173,7 +173,7 @@ nom = { version = "8.0.0", default-features = false }
 ordered-float = { version = "4.6.0", default-features = false }
 pastey = { version = "0.2", default-features = false }
 pin-project = { version = "1.1.11", default-features = false }
-proptest = { version = "1.10" }
+proptest = { version = "1.11" }
 proptest-derive = { version = "0.6.0" }
 prost = { version = "0.12", default-features = false, features = ["std"] }
 prost-build = { version = "0.12", default-features = false }
@@ -185,14 +185,14 @@ rand_distr = { version = "0.5.1", default-features = false }
 rdkafka = { version = "0.39.0", default-features = false }
 regex = { version = "1.12.3", default-features = false, features = ["std", "perf"] }
 reqwest = { version = "0.11", features = ["json"] }
-rust_decimal = { version = "1.37.0", default-features = false, features = ["std"] }
+rust_decimal = { version = "1.40.0", default-features = false, features = ["std"] }
 semver = { version = "1.0.27", default-features = false, features = ["serde", "std"] }
 serde = { version = "1.0.219", default-features = false, features = ["alloc", "derive", "rc"] }
 serde_json = { version = "1.0.143", default-features = false, features = ["preserve_order", "raw_value", "std"] }
 serde_yaml = { version = "0.9.34", default-features = false }
 snafu = { version = "0.9.0", default-features = false, features = ["futures", "std"] }
 socket2 = { version = "0.5.10", default-features = false }
-tempfile = "3.23.0"
+tempfile = "3.27.0"
 tokio = { version = "1.49.0", default-features = false }
 tokio-stream = { version = "0.1.18", default-features = false }
 tokio-test = "0.4.5"
