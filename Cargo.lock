@@ -1667,7 +1667,7 @@ dependencies = [
  "async-lock 3.4.0",
  "async-trait",
  "azure_core",
- "futures 0.3.31",
+ "futures",
  "openssl",
  "pin-project",
  "serde",
