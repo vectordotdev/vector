@@ -38,6 +38,7 @@ jobs:
       packages: write
     uses: ./.github/workflows/integration.yml
     with:
+      run_all: true
       coverage: true
     secrets: inherit
 
