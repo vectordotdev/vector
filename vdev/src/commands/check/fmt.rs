@@ -24,7 +24,8 @@ impl Cli {
             .collect();
         if !files.is_empty() {
             info!("Checking prettier formatting...");
-            let args: Vec<&str> = std::iter::once("--check")
+            let args: Vec<&str> = ["--ignore-path", ".prettierignore", "--check"]
+                .into_iter()
                 .chain(files.iter().map(String::as_str))
                 .collect();
             app::exec("prettier", &args, true)?;
