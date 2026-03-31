@@ -63,9 +63,9 @@ a `timestamp` key like:
 ```
 
 The specific JSON schema here is subject to change, but you can find an initial
-schema [here][cue schema]. The protobuf schema for the `native` codec is the
-same used in the `vector` source and sink, and the definition can be found
-[here][proto schema].
+[CUE schema][cue schema]. The protobuf schema for the `native` codec is the
+same used in the `vector` source and sink, and the definition can be found in the
+[proto schema][proto schema].
 
 We will be providing more thorough guidance for using each as the feature
 matures. One current limitation of the JSON-based native codec is that timestamp

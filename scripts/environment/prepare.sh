@@ -37,7 +37,7 @@ CARGO_HACK_VERSION="0.6.43"
 DD_RUST_LICENSE_TOOL_VERSION="1.0.6"
 CARGO_LLVM_COV_VERSION="0.8.4"
 WASM_PACK_VERSION="0.13.1"
-MARKDOWNLINT_VERSION="0.45.0"
+MARKDOWNLINT_CLI2_VERSION="0.22.0"
 DATADOG_CI_VERSION="5.9.0"
 VDEV_VERSION="0.3.0"
 
@@ -52,7 +52,7 @@ ALL_MODULES=(
   cargo-llvm-cov
   dd-rust-license-tool
   wasm-pack
-  markdownlint
+  markdownlint-cli2
   datadog-ci
   release-flags  # Not a tool - sources release-flags.sh to set CI env vars
   vdev
@@ -92,7 +92,7 @@ Modules:
   cargo-llvm-cov
   dd-rust-license-tool
   wasm-pack
-  markdownlint
+  markdownlint-cli2
   datadog-ci
   vdev
 
@@ -218,5 +218,5 @@ maybe_install_cargo_tool dd-rust-license-tool "${DD_RUST_LICENSE_TOOL_VERSION}"
 maybe_install_cargo_tool wasm-pack "${WASM_PACK_VERSION}"
 maybe_install_cargo_tool vdev "${VDEV_VERSION}"
 
-maybe_install_npm_package markdownlint markdownlint-cli "${MARKDOWNLINT_VERSION}"
+maybe_install_npm_package markdownlint-cli2 markdownlint-cli2 "${MARKDOWNLINT_CLI2_VERSION}"
 maybe_install_npm_package datadog-ci "@datadog/datadog-ci" "${DATADOG_CI_VERSION}" "v${DATADOG_CI_VERSION}" "version"

@@ -189,7 +189,7 @@ Then: `chmod +x .git/hooks/pre-push`
 ## Detailed Documentation
 
 | Topic | Document |
-|-------|----------|
+| ----- | -------- |
 | Rust style patterns | [docs/RUST_STYLE.md](docs/RUST_STYLE.md) |
 | Code style rules (formatting, const strings, organization) | [STYLE.md](STYLE.md) |
 | System architecture (sources, transforms, sinks, topology) | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
