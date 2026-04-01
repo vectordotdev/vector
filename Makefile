@@ -77,9 +77,6 @@ endif
 export AWS_ACCESS_KEY_ID ?= "dummy"
 export AWS_SECRET_ACCESS_KEY ?= "dummy"
 
-# Set version
-export VERSION ?= $(shell command -v cargo >/dev/null && $(VDEV) version || echo unknown)
-
 # Set if you are on the CI and actually want the things to happen. (Non-CI users should never set this.)
 export CI ?= false
 
@@ -539,117 +536,17 @@ build-rustdoc: ## Build Vector's Rustdocs
 	# This command is mostly intended for use by the build process in vectordotdev/vector-rustdoc
 	${MAYBE_ENVIRONMENT_EXEC} cargo doc --no-deps --workspace
 
-##@ Packaging
+##@ Packaging (forwarded to Makefile.packaging)
 
-# archives
-target/artifacts/vector-${VERSION}-%.tar.gz: export TRIPLE :=$(@:target/artifacts/vector-${VERSION}-%.tar.gz=%)
-target/artifacts/vector-${VERSION}-%.tar.gz: override PROFILE =release
-target/artifacts/vector-${VERSION}-%.tar.gz: target/%/release/vector.tar.gz
-	@echo "Built to ${<}, relocating to ${@}"
-	@mkdir -p target/artifacts/
-	@cp -v \
-		${<} \
-		${@}
+# Packaging targets that depend on VERSION live in Makefile.packaging to avoid
+# running `cargo vdev version` when invoking non-packaging targets.
 
 .PHONY: package
 package: build ## Build the Vector archive
 	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) package archive
 
-.PHONY: package-x86_64-unknown-linux-gnu-all
-package-x86_64-unknown-linux-gnu-all: package-x86_64-unknown-linux-gnu package-deb-x86_64-unknown-linux-gnu package-rpm-x86_64-unknown-linux-gnu # .tar.gz, .deb, .rpm
-
-.PHONY: package-x86_64-unknown-linux-musl-all
-package-x86_64-unknown-linux-musl-all: package-x86_64-unknown-linux-musl # .tar.gz
-
-.PHONY: package-aarch64-unknown-linux-musl-all
-package-aarch64-unknown-linux-musl-all: package-aarch64-unknown-linux-musl # .tar.gz
-
-.PHONY: package-aarch64-unknown-linux-gnu-all
-package-aarch64-unknown-linux-gnu-all: package-aarch64-unknown-linux-gnu package-deb-aarch64 package-rpm-aarch64 # .tar.gz, .deb, .rpm
-
-.PHONY: package-armv7-unknown-linux-gnueabihf-all
-package-armv7-unknown-linux-gnueabihf-all: package-armv7-unknown-linux-gnueabihf package-deb-armv7-gnu package-rpm-armv7hl-gnu # .tar.gz, .deb, .rpm
-
-.PHONY: package-armv7-unknown-linux-musleabihf-all
-package-armv7-unknown-linux-musleabihf-all: package-armv7-unknown-linux-musleabihf # .tar.gz
-
-.PHONY: package-arm-unknown-linux-gnueabi-all
-package-arm-unknown-linux-gnueabi-all: package-arm-unknown-linux-gnueabi package-deb-arm-gnu # .tar.gz, .deb
-
-.PHONY: package-arm-unknown-linux-musleabi-all
-package-arm-unknown-linux-musleabi-all: package-arm-unknown-linux-musleabi # .tar.gz
-
-.PHONY: package-x86_64-unknown-linux-gnu
-package-x86_64-unknown-linux-gnu: target/artifacts/vector-${VERSION}-x86_64-unknown-linux-gnu.tar.gz ## Build an archive suitable for the `x86_64-unknown-linux-gnu` triple.
-	@echo "Output to ${<}."
-
-.PHONY: package-x86_64-unknown-linux-musl
-package-x86_64-unknown-linux-musl: target/artifacts/vector-${VERSION}-x86_64-unknown-linux-musl.tar.gz ## Build an archive suitable for the `x86_64-unknown-linux-musl` triple.
-	@echo "Output to ${<}."
-
-.PHONY: package-aarch64-unknown-linux-musl
-package-aarch64-unknown-linux-musl: target/artifacts/vector-${VERSION}-aarch64-unknown-linux-musl.tar.gz ## Build an archive suitable for the `aarch64-unknown-linux-musl` triple.
-	@echo "Output to ${<}."
-
-.PHONY: package-aarch64-unknown-linux-gnu
-package-aarch64-unknown-linux-gnu: target/artifacts/vector-${VERSION}-aarch64-unknown-linux-gnu.tar.gz ## Build an archive suitable for the `aarch64-unknown-linux-gnu` triple.
-	@echo "Output to ${<}."
-
-.PHONY: package-armv7-unknown-linux-gnueabihf
-package-armv7-unknown-linux-gnueabihf: target/artifacts/vector-${VERSION}-armv7-unknown-linux-gnueabihf.tar.gz ## Build an archive suitable for the `armv7-unknown-linux-gnueabihf` triple.
-	@echo "Output to ${<}."
-
-.PHONY: package-armv7-unknown-linux-musleabihf
-package-armv7-unknown-linux-musleabihf: target/artifacts/vector-${VERSION}-armv7-unknown-linux-musleabihf.tar.gz ## Build an archive suitable for the `armv7-unknown-linux-musleabihf triple.
-	@echo "Output to ${<}."
-
-.PHONY: package-arm-unknown-linux-gnueabi
-package-arm-unknown-linux-gnueabi: target/artifacts/vector-${VERSION}-arm-unknown-linux-gnueabi.tar.gz ## Build an archive suitable for the `arm-unknown-linux-gnueabi` triple.
-	@echo "Output to ${<}."
-
-.PHONY: package-arm-unknown-linux-musleabi
-package-arm-unknown-linux-musleabi: target/artifacts/vector-${VERSION}-arm-unknown-linux-musleabi.tar.gz ## Build an archive suitable for the `arm-unknown-linux-musleabi` triple.
-	@echo "Output to ${<}."
-
-# debs
-
-.PHONY: package-deb-x86_64-unknown-linux-gnu
-package-deb-x86_64-unknown-linux-gnu: package-x86_64-unknown-linux-gnu ## Build the x86_64 GNU deb package
-	TARGET=x86_64-unknown-linux-gnu $(VDEV) package deb
-
-.PHONY: package-deb-x86_64-unknown-linux-musl
-package-deb-x86_64-unknown-linux-musl: package-x86_64-unknown-linux-musl ## Build the x86_64 GNU deb package
-	TARGET=x86_64-unknown-linux-musl $(VDEV) package deb
-
-.PHONY: package-deb-aarch64
-package-deb-aarch64: package-aarch64-unknown-linux-gnu ## Build the aarch64 deb package
-	TARGET=aarch64-unknown-linux-gnu $(VDEV) package deb
-
-.PHONY: package-deb-armv7-gnu
-package-deb-armv7-gnu: package-armv7-unknown-linux-gnueabihf ## Build the armv7-unknown-linux-gnueabihf deb package
-	TARGET=armv7-unknown-linux-gnueabihf $(VDEV) package deb
-
-.PHONY: package-deb-arm-gnu
-package-deb-arm-gnu: package-arm-unknown-linux-gnueabi ## Build the arm-unknown-linux-gnueabi deb package
-	TARGET=arm-unknown-linux-gnueabi $(VDEV) package deb
-
-# rpms
-
-.PHONY: package-rpm-x86_64-unknown-linux-gnu
-package-rpm-x86_64-unknown-linux-gnu: package-x86_64-unknown-linux-gnu ## Build the x86_64 rpm package
-	TARGET=x86_64-unknown-linux-gnu $(VDEV) package rpm
-
-.PHONY: package-rpm-x86_64-unknown-linux-musl
-package-rpm-x86_64-unknown-linux-musl: package-x86_64-unknown-linux-musl ## Build the x86_64 musl rpm package
-	TARGET=x86_64-unknown-linux-musl $(VDEV) package rpm
-
-.PHONY: package-rpm-aarch64
-package-rpm-aarch64: package-aarch64-unknown-linux-gnu ## Build the aarch64 rpm package
-	TARGET=aarch64-unknown-linux-gnu $(VDEV) package rpm
-
-.PHONY: package-rpm-armv7hl-gnu
-package-rpm-armv7hl-gnu: package-armv7-unknown-linux-gnueabihf ## Build the armv7hl-unknown-linux-gnueabihf rpm package
-	TARGET=armv7-unknown-linux-gnueabihf ARCH=armv7hl $(VDEV) package rpm
+package-%:
+	$(MAKE) -f Makefile.packaging $@
 
 ##@ Releasing
 
