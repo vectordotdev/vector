@@ -11,22 +11,32 @@ use hyper_proxy::ProxyConnector;
 use tonic::body::BoxBody;
 use tower::Service;
 
-/// Adds a default scheme to a URI that lacks one.
+/// Adds a default scheme to a URI that lacks one, and validates that the URI has an authority.
 ///
 /// Returns the URI unchanged if a scheme is already present. Otherwise prepends
 /// `https` when `tls` is `true`, or `http` when `false`. Also sets the
 /// path-and-query to `/` if missing.
+///
+/// Returns an error if the URI has no authority (host), since `HyperGrpcService`
+/// requires one and would otherwise panic at request time.
 pub(crate) fn with_default_scheme(uri: Uri, tls: bool) -> crate::Result<Uri> {
-    if uri.scheme().is_none() {
+    let uri = if uri.scheme().is_none() {
         let mut parts = uri.into_parts();
         parts.scheme = Some(if tls { Scheme::HTTPS } else { Scheme::HTTP });
         if parts.path_and_query.is_none() {
             parts.path_and_query = Some(PathAndQuery::from_static("/"));
         }
-        Ok(Uri::from_parts(parts)?)
+        Uri::from_parts(parts)?
     } else {
-        Ok(uri)
+        uri
+    };
+    if uri.authority().is_none() {
+        return Err(format!(
+            "gRPC URI {uri:?} has no host; expected \"scheme://host:port\""
+        )
+        .into());
     }
+    Ok(uri)
 }
 
 /// A Tower [`Service`] that routes gRPC requests through a Hyper HTTP/2 client,
