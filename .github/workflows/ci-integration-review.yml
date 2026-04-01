@@ -114,7 +114,15 @@ jobs:
     steps:
       - name: Evaluate run condition
         id: run_condition
-        run: echo "should_run=${{ startsWith(github.event.review.body, '/ci-run-integration-all') || startsWith(github.event.review.body, '/ci-run-all') || startsWith(github.event.review.body, format('/ci-run-integration-{0}', matrix.service)) }}" >> $GITHUB_OUTPUT
+        env:
+          REVIEW_BODY: ${{ github.event.review.body }}
+          SERVICE: ${{ matrix.service }}
+        run: |
+          if [[ "$REVIEW_BODY" == /ci-run-integration-all* ]] || [[ "$REVIEW_BODY" == /ci-run-all* ]] || [[ "$REVIEW_BODY" == "/ci-run-integration-${SERVICE}"* ]]; then
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         if: steps.run_condition.outputs.should_run == 'true'
@@ -162,7 +170,15 @@ jobs:
     steps:
       - name: Evaluate run condition
         id: run_condition
-        run: echo "should_run=${{ startsWith(github.event.review.body, '/ci-run-e2e-all') || startsWith(github.event.review.body, '/ci-run-all') || startsWith(github.event.review.body, format('/ci-run-e2e-{0}', matrix.service)) }}" >> $GITHUB_OUTPUT
+        env:
+          REVIEW_BODY: ${{ github.event.review.body }}
+          SERVICE: ${{ matrix.service }}
+        run: |
+          if [[ "$REVIEW_BODY" == /ci-run-e2e-all* ]] || [[ "$REVIEW_BODY" == /ci-run-all* ]] || [[ "$REVIEW_BODY" == "/ci-run-e2e-${SERVICE}"* ]]; then
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         if: steps.run_condition.outputs.should_run == 'true'
