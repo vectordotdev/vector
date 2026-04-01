@@ -51,20 +51,24 @@ pub(crate) fn check_value_depth(
     Ok(())
 }
 
-/// Returns `true` if the event's nesting depth exceeds `MAX_NESTING_DEPTH`.
+/// Checks whether an event's nesting depth exceeds `MAX_NESTING_DEPTH`.
+///
+/// Returns `Some(depth)` with the violating depth if the event exceeds the limit,
+/// or `None` if the event is within bounds.
 ///
 /// Both the event value and event metadata value are checked, since both are
 /// encoded into the protobuf message.
 ///
-/// Metrics have a fixed structure and cannot be deeply nested, so they always return `false`.
-pub fn event_exceeds_max_nesting_depth(event: &Event) -> bool {
+/// Metrics have a fixed structure and cannot be deeply nested, so they always return `None`.
+pub fn event_exceeds_max_nesting_depth(event: &Event) -> Option<usize> {
     let (value, metadata_value) = match event {
         Event::Log(log) => (log.value(), log.metadata().value()),
         Event::Trace(trace) => (trace.value(), trace.metadata().value()),
-        Event::Metric(_) => return false,
+        Event::Metric(_) => return None,
     };
-    check_value_depth(value, 0, MAX_NESTING_DEPTH).is_err()
-        || check_value_depth(metadata_value, 0, MAX_NESTING_DEPTH).is_err()
+    check_value_depth(value, 0, MAX_NESTING_DEPTH)
+        .or_else(|_| check_value_depth(metadata_value, 0, MAX_NESTING_DEPTH))
+        .err()
 }
 
 /// Checks all events in an `EventArray` for nesting depth violations.

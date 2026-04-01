@@ -37,9 +37,9 @@ impl Encoder<Event> for NativeSerializer {
     type Error = vector_common::Error;
 
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
-        if event_exceeds_max_nesting_depth(&event) {
+        if let Some(depth) = event_exceeds_max_nesting_depth(&event) {
             return Err(format!(
-                "event nesting depth exceeds maximum of {MAX_NESTING_DEPTH} for protobuf encoding"
+                "event nesting depth {depth} exceeds maximum of {MAX_NESTING_DEPTH} for protobuf encoding"
             )
             .into());
         }
