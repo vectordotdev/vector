@@ -31,7 +31,11 @@ pub(crate) fn with_default_scheme(uri: Uri, tls: bool) -> crate::Result<Uri> {
 
 /// A Tower [`Service`] that routes gRPC requests through a Hyper HTTP/2 client,
 /// substituting the scheme and authority from a fixed base URI while preserving
-/// the path/query set by tonic.
+/// the path set by tonic.
+///
+/// If the configured URI includes a path prefix (e.g. `https://gateway/grpc`),
+/// that prefix is prepended to every tonic RPC path so that requests reach the
+/// correct backend through a reverse proxy.
 ///
 /// Used by gRPC sinks that need to send requests to a specific endpoint using a
 /// shared Hyper client.
@@ -39,6 +43,10 @@ pub(crate) fn with_default_scheme(uri: Uri, tls: bool) -> crate::Result<Uri> {
 pub struct HyperGrpcService {
     scheme: Scheme,
     authority: Authority,
+    /// Path prefix extracted from the configured URI (e.g. `"/grpc"`), or empty
+    /// string when the URI has no meaningful path. Never ends with `/` so it can
+    /// be concatenated directly with tonic's `/ServiceName/Method` paths.
+    path_prefix: String,
     pub client: hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>,
 }
 
@@ -63,9 +71,12 @@ impl HyperGrpcService {
             .authority()
             .expect("gRPC service URI must have an authority (host:port) — supply a URI from `with_default_scheme`")
             .clone();
+        // Strip trailing slash so we can concatenate directly with tonic's leading-slash paths.
+        let path_prefix = uri.path().trim_end_matches('/').to_owned();
         Self {
             scheme,
             authority,
+            path_prefix,
             client,
         }
     }
@@ -81,17 +92,27 @@ impl Service<hyper::Request<BoxBody>> for HyperGrpcService {
     }
 
     fn call(&mut self, mut req: hyper::Request<BoxBody>) -> Self::Future {
-        // scheme and authority are pre-validated at construction; path_and_query falls back
-        // to "/" if tonic omits it (it never does, but we avoid a panic either way).
+        // Tonic sets the RPC method path (e.g. `/pkg.Service/Method`). Prepend any
+        // configured path prefix so requests reach the right backend through a proxy.
+        // Falls back to "/" if tonic omits the path (it never does in practice).
+        let rpc_path = req
+            .uri()
+            .path_and_query()
+            .map(|pq| pq.as_str())
+            .unwrap_or("/");
+        let full_path: PathAndQuery = if self.path_prefix.is_empty() {
+            rpc_path
+                .parse()
+                .unwrap_or_else(|_| PathAndQuery::from_static("/"))
+        } else {
+            format!("{}{}", self.path_prefix, rpc_path)
+                .parse()
+                .unwrap_or_else(|_| PathAndQuery::from_static("/"))
+        };
         let uri = Uri::builder()
             .scheme(self.scheme.clone())
             .authority(self.authority.clone())
-            .path_and_query(
-                req.uri()
-                    .path_and_query()
-                    .cloned()
-                    .unwrap_or_else(|| PathAndQuery::from_static("/")),
-            )
+            .path_and_query(full_path)
             .build()
             .expect("pre-validated scheme and authority always produce a valid URI");
 
