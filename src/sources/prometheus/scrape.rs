@@ -427,6 +427,60 @@ mod test {
         assert!(!events.is_empty());
     }
 
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn test_prometheus_unix_socket() {
+        use tempfile::tempdir;
+        use tokio::net::UnixListener;
+        use tokio_stream::wrappers::UnixListenerStream;
+
+        use crate::test_util::wait_for_unix_socket;
+
+        // Cleanup once dropped
+        let dir = tempdir().unwrap();
+        let addr = dir.path().join("prometheus_unix.sock");
+
+        let dummy_endpoint = warp::path!("metrics").and(warp::header::exact("Accept", "text/plain")).map(|| {
+            r#"
+                    promhttp_metric_handler_requests_total{endpoint="http://example.com", instance="localhost:9999", code="200"} 100 1612411516789
+                    "#
+        });
+
+        let listener = UnixListener::bind(&addr).unwrap();
+        let incoming = UnixListenerStream::new(listener);
+
+        tokio::spawn(warp::serve(dummy_endpoint).run_incoming(incoming));
+        wait_for_unix_socket(addr.clone()).await;
+
+        let config = PrometheusScrapeConfig {
+            endpoints: vec![sources::prometheus::scrape::PrometheusEndpoint::Unix(
+                UnixEndpoint {
+                    path: addr.clone().into_os_string().into_string().unwrap(),
+                    endpoint: "/metrics".to_string(),
+                },
+            )],
+            interval: Duration::from_secs(1),
+            timeout: default_timeout(),
+            instance_tag: Some("instance".to_string()),
+            endpoint_tag: Some("endpoint".to_string()),
+            honor_labels: true,
+            query: HashMap::new(),
+            auth: None,
+            tls: None,
+        };
+
+        let events = run_and_assert_source_compliance(
+            config,
+            Duration::from_secs(3),
+            &HTTP_PULL_SOURCE_TAGS,
+        )
+        .await;
+        assert!(!events.is_empty());
+
+        // cleanup unix socket
+        tokio::fs::remove_file(addr).await.unwrap();
+    }
+
     #[tokio::test]
     async fn test_prometheus_honor_labels() {
         let (_guard, in_addr) = next_addr();
