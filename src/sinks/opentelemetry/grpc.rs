@@ -129,43 +129,12 @@ impl GrpcSinkConfig {
             )?)
         };
 
-        // For dynamic templates like `https://{{ host }}:4317` the static_uri is None, so
-        // we inspect the static literal prefix of the template string (everything before the
-        // first `{{`) to determine the scheme at build time.
-        //
-        // If the scheme itself is dynamic (e.g. `{{ scheme }}://host:4317`) and no explicit
-        // `tls:` block is present, we cannot choose the right Hyper connector. Rather than
-        // silently dropping events whose rendered URI uses the wrong scheme at runtime, we
-        // fail fast here.
-        if self.uri.is_dynamic() && self.tls.is_none() {
-            let raw = self.uri.get_ref();
-            let static_prefix_end = raw.find("{{").unwrap_or(raw.len());
-            if !raw[..static_prefix_end].to_ascii_lowercase().contains("://") {
-                return Err(
-                    "gRPC sink URI template must have a static scheme prefix \
-                     (e.g. \"http://{{ host }}:4317\" or \"https://{{ host }}:4317\"); \
-                     a fully dynamic scheme cannot be resolved at startup so the TLS \
-                     connector cannot be configured correctly. \
-                     Alternatively, add a `tls:` block to force HTTPS."
-                        .into(),
-                );
-            }
-        }
-        let use_https = self.tls.is_some()
-            || static_uri
-                .as_ref()
-                .is_some_and(|u| u.scheme_str() == Some("https"))
-            || {
-                let raw = self.uri.get_ref().to_ascii_lowercase();
-                let static_prefix_end = raw.find("{{").unwrap_or(raw.len());
-                raw[..static_prefix_end].contains("https://")
-            };
-
-        let tls = if use_https {
-            MaybeTlsSettings::tls_client(self.tls.as_ref())?
-        } else {
-            MaybeTlsSettings::Raw(())
-        };
+        // The connector is always TLS-capable so it can handle both http:// and https://
+        // URIs per-request, matching the behaviour of the HTTP sink. Whether the scheme
+        // defaults to http or https when the URI has no explicit scheme is controlled by
+        // whether a `tls:` block is configured.
+        let tls_configured = self.tls.is_some();
+        let tls = MaybeTlsSettings::tls_client(self.tls.as_ref())?;
 
         let use_gzip = self.compression == GrpcCompression::Gzip;
 
@@ -216,7 +185,7 @@ impl GrpcSinkConfig {
             cx.healthcheck
                 .uri
                 .clone()
-                .map(|u| with_default_scheme(u.uri, use_https))
+                .map(|u| with_default_scheme(u.uri, tls_configured))
                 .transpose()?
                 .or(static_uri.clone())
         };
@@ -240,7 +209,7 @@ impl GrpcSinkConfig {
             service,
             dynamic_header_templates: dynamic_grpc_header_templates,
             uri_template: self.uri.clone(),
-            use_https,
+            tls_configured,
         };
 
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
@@ -777,7 +746,9 @@ struct OtlpGrpcSink<S> {
     batch_settings: BatcherSettings,
     service: S,
     uri_template: Template,
-    use_https: bool,
+    /// Used only to pick the default scheme (`http` vs `https`) when the rendered URI
+    /// has no explicit scheme. The connector itself handles both schemes.
+    tls_configured: bool,
     dynamic_header_templates: Vec<(tonic::metadata::AsciiMetadataKey, Template)>,
 }
 
@@ -794,7 +765,7 @@ where
         })?;
 
         let uri_template = self.uri_template.clone();
-        let use_https = self.use_https;
+        let tls_configured = self.tls_configured;
         let dynamic_header_templates = self.dynamic_header_templates.clone();
 
         input
@@ -807,33 +778,9 @@ where
                     Ok(u) => u,
                     Err(e) => return reject_event(event.take_finalizers(), format!("failed to parse rendered gRPC URI: {e}")),
                 };
-                let u = match with_default_scheme(parsed, use_https) {
+                let uri = match with_default_scheme(parsed, tls_configured) {
                     Ok(u) => u,
                     Err(e) => return reject_event(event.take_finalizers(), format!("invalid gRPC URI after rendering template: {e}")),
-                };
-                let uri = match u.scheme_str() {
-                    Some("https") if !use_https => {
-                        // The Hyper client was built without TLS (use_https=false),
-                        // so it cannot complete a TLS handshake. Sending data to an
-                        // https:// endpoint over a plaintext connector would either
-                        // fail or silently transmit unencrypted. Drop the event and
-                        // surface a clear error so the operator can add `tls:` or
-                        // use a static `https://` scheme prefix.
-                        return reject_event(
-                            event.take_finalizers(),
-                            "rendered gRPC URI uses \"https\" but the sink \
-                             has no TLS connector; add a `tls:` block or use \
-                             a static \"https://\" URI prefix so TLS is \
-                             enabled at startup",
-                        );
-                    }
-                    Some("http") | Some("https") => u,
-                    other => {
-                        return reject_event(event.take_finalizers(), format!(
-                            "rendered gRPC URI has disallowed scheme {:?}; only \"http\" and \"https\" are permitted",
-                            other.unwrap_or("<none>")
-                        ));
-                    }
                 };
 
                 // Render dynamic headers. If any required header fails to render or produces a
