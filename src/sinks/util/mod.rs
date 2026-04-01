@@ -1,5 +1,6 @@
 pub mod adaptive_concurrency;
 pub mod auth;
+#[cfg(any(feature = "sinks-opentelemetry", feature = "sinks-vector"))]
 pub mod grpc;
 // https://github.com/mcarton/rust-derivative/issues/112
 #[allow(clippy::non_canonical_clone_impl)]
