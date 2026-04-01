@@ -152,7 +152,8 @@ impl GrpcSinkConfig {
             tonic::metadata::AsciiMetadataValue,
         )> = Vec::with_capacity(static_header_strings.len());
         for (k, v) in &static_header_strings {
-            let key = tonic::metadata::AsciiMetadataKey::from_bytes(k.as_bytes())
+            let k_lower = k.to_lowercase();
+            let key = tonic::metadata::AsciiMetadataKey::from_bytes(k_lower.as_bytes())
                 .map_err(|e| format!("invalid gRPC metadata key {k:?}: {e}"))?;
             let value = tonic::metadata::AsciiMetadataValue::try_from(v.as_str())
                 .map_err(|e| format!("invalid gRPC metadata value for key {k:?}: {e}"))?;
@@ -164,7 +165,8 @@ impl GrpcSinkConfig {
         let mut dynamic_grpc_header_templates: Vec<(tonic::metadata::AsciiMetadataKey, Template)> =
             Vec::with_capacity(dynamic_header_templates_raw.len());
         for (k, t) in dynamic_header_templates_raw {
-            let key = tonic::metadata::AsciiMetadataKey::from_bytes(k.as_bytes())
+            let k_lower = k.to_lowercase();
+            let key = tonic::metadata::AsciiMetadataKey::from_bytes(k_lower.as_bytes())
                 .map_err(|e| format!("invalid gRPC metadata key {k:?}: {e}"))?;
             dynamic_grpc_header_templates.push((key, t));
         }
@@ -173,21 +175,26 @@ impl GrpcSinkConfig {
         // Dynamic headers cannot be rendered without a live event, so the healthcheck cannot
         // include them. Rather than running a check that omits required auth metadata (which
         // would cause a false failure against a properly secured collector), skip the
-        // healthcheck entirely when dynamic header templates are present.
-        let healthcheck_uri = if !dynamic_grpc_header_templates.is_empty() {
+        // healthcheck entirely when dynamic header templates are present — unless the operator
+        // has supplied an explicit `healthcheck.uri` override, in which case we honour that URI
+        // with only the static headers (the override endpoint does not require the dynamic auth).
+        let explicit_healthcheck_uri = cx
+            .healthcheck
+            .uri
+            .clone()
+            .map(|u| with_default_scheme(u.uri, tls_configured))
+            .transpose()?;
+        let healthcheck_uri = if !dynamic_grpc_header_templates.is_empty()
+            && explicit_healthcheck_uri.is_none()
+        {
             warn!(
                 "Skipping gRPC healthcheck: dynamic (templated) headers are configured and \
-                 cannot be rendered at startup. Use static header values to re-enable the \
-                 healthcheck."
+                 cannot be rendered at startup. Set a static `healthcheck.uri` override to \
+                 re-enable the healthcheck."
             );
             None
         } else {
-            cx.healthcheck
-                .uri
-                .clone()
-                .map(|u| with_default_scheme(u.uri, tls_configured))
-                .transpose()?
-                .or(static_uri.clone())
+            explicit_healthcheck_uri.or(static_uri.clone())
         };
         let healthcheck = Box::pin(grpc_healthcheck(
             client.clone(),
