@@ -19,6 +19,10 @@ on:
         required: false
         type: boolean
         default: false
+      ref:
+        description: "Git ref to checkout (defaults to github.sha)"
+        required: false
+        type: string
   workflow_dispatch:
   pull_request:
   merge_group:
@@ -76,7 +80,8 @@ jobs:
      }}
     uses: ./.github/workflows/build-test-runner.yml
     with:
-      commit_sha: ${{ github.sha }}
+      commit_sha: ${{ inputs.ref || github.sha }}
+      checkout_ref: ${{ inputs.ref }}
 
   integration-tests:
     runs-on: ubuntu-24.04-8core
@@ -128,6 +133,7 @@ jobs:
         if: steps.check.outputs.should_run == 'true'
         with:
           submodules: "recursive"
+          ref: ${{ inputs.ref || github.sha }}
 
       - uses: ./.github/actions/setup
         if: steps.check.outputs.should_run == 'true'
@@ -142,7 +148,7 @@ jobs:
         uses: ./.github/actions/pull-test-runner
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          commit_sha: ${{ github.sha }}
+          commit_sha: ${{ inputs.ref || github.sha }}
 
       - name: Run Integration Tests for ${{ matrix.service }}
         if: steps.check.outputs.should_run == 'true'
@@ -204,6 +210,7 @@ jobs:
         if: steps.check.outputs.should_run == 'true'
         with:
           submodules: "recursive"
+          ref: ${{ inputs.ref || github.sha }}
 
       - uses: ./.github/actions/setup
         if: steps.check.outputs.should_run == 'true'
@@ -218,7 +225,7 @@ jobs:
         uses: ./.github/actions/pull-test-runner
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          commit_sha: ${{ github.sha }}
+          commit_sha: ${{ inputs.ref || github.sha }}
 
       - name: Run E2E Tests for ${{ matrix.service }}
         if: steps.check.outputs.should_run == 'true'
