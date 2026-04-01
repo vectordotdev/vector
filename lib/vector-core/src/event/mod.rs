@@ -11,6 +11,7 @@ pub use metadata::{DatadogMetricOriginMetadata, EventMetadata, WithMetadata};
 pub use metric::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind};
 pub use r#ref::{EventMutRef, EventRef};
 use serde::{Deserialize, Serialize};
+pub use ser::{MAX_NESTING_DEPTH, event_exceeds_max_nesting_depth};
 pub use trace::TraceEvent;
 use vector_buffers::EventCount;
 use vector_common::{
@@ -35,7 +36,6 @@ pub mod metric;
 pub mod proto;
 mod r#ref;
 mod ser;
-pub use ser::{MAX_NESTING_DEPTH, event_exceeds_max_nesting_depth};
 #[cfg(test)]
 mod test;
 mod trace;

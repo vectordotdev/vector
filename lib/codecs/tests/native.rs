@@ -12,7 +12,8 @@ use codecs::{
     NativeSerializerConfig, decoding::format::Deserializer, encoding::format::Serializer,
 };
 use similar_asserts::assert_eq;
-use vector_core::{config::LogNamespace, event::Event};
+use tokio_util::codec::Encoder;
+use vector_core::{config::LogNamespace, event::{Event, LogEvent, ObjectMap, Value}};
 
 #[test]
 fn pre_v24_fixtures_match() {
@@ -326,9 +327,6 @@ fn rebuild_fixtures(proto: &str, deserializer: &dyn Deserializer, serializer: &m
 // ---------------------------------------------------------------------------
 // Nesting depth guard integration tests for the native codec
 // ---------------------------------------------------------------------------
-
-use tokio_util::codec::Encoder;
-use vector_core::event::{LogEvent, ObjectMap, Value};
 
 fn create_nested_log_event(wrapping_levels: usize) -> LogEvent {
     let mut value = Value::from("innermost");
