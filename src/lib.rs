@@ -126,6 +126,8 @@ pub mod trace;
 pub mod transforms;
 pub mod types;
 pub mod unit_test;
+#[cfg(unix)]
+pub mod unix_http;
 pub(crate) mod utilization;
 pub mod validate;
 #[cfg(windows)]

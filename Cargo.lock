@@ -1900,7 +1900,7 @@ dependencies = [
  "hyper-named-pipe",
  "hyper-rustls 0.27.5",
  "hyper-util",
- "hyperlocal",
+ "hyperlocal 0.9.1",
  "log",
  "pin-project-lite",
  "rustls 0.23.37",
@@ -5234,6 +5234,19 @@ dependencies = [
  "tower-service",
  "tracing 0.1.44",
  "windows-registry",
+]
+
+[[package]]
+name = "hyperlocal"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0fafdf7b2b2de7c9784f76e02c0935e65a8117ec3b768644379983ab333ac98c"
+dependencies = [
+ "futures-util",
+ "hex",
+ "hyper 0.14.32",
+ "pin-project",
+ "tokio",
 ]
 
 [[package]]
@@ -12321,6 +12334,7 @@ dependencies = [
  "hyper 0.14.32",
  "hyper-openssl 0.9.2",
  "hyper-proxy",
+ "hyperlocal 0.8.0",
  "indexmap 2.12.0",
  "indoc",
  "inventory",
