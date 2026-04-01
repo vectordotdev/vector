@@ -127,6 +127,36 @@ jobs:
     needs: changes
     secrets: inherit
 
+  scorecard:
+    name: Scorecard security scan
+    if: ${{ github.event_name == 'merge_group' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Run Scorecard analysis
+        uses: ossf/scorecard-action@4eaacf0543bb3f2c246792bd56e8cdeffafb205a # v2.4.3
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          publish_results: false
+
+      - name: Fail on critical findings
+        run: |
+          critical=$(jq '[.runs[].results[] | select(.level == "error")] | length' results.sarif)
+          if [ "$critical" -gt 0 ]; then
+            echo "::error::Scorecard found $critical critical finding(s):"
+            jq -r '.runs[].results[] | select(.level == "error") | "\(.ruleId): \(.message.text)"' results.sarif
+            exit 1
+          fi
+          echo "No critical findings detected"
+
   master-merge-queue-check:
     permissions:
       statuses: write
@@ -147,6 +177,7 @@ jobs:
       - unit-mac
       - unit-windows
       - install-sh
+      - scorecard
     steps:
       - name: Check all jobs status
         run: |
