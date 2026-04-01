@@ -273,6 +273,32 @@ fn nesting_gate_accepts_metric_events() {
 }
 
 #[test]
+fn nesting_gate_rejects_deeply_nested_metadata() {
+    let mut event = LogEvent::from("normal event data");
+
+    // Build a deeply nested metadata value (32 wrapping levels → depth 33 exceeds limit)
+    let mut value = Value::from("innermost");
+    for _ in 0..32 {
+        let mut map = ObjectMap::new();
+        map.insert("nested".into(), value);
+        value = Value::Object(map);
+    }
+    *event.metadata_mut().value_mut() = value;
+
+    let events = EventArray::Logs(LogArray::from(vec![event]));
+    let mut buffer = BytesMut::with_capacity(8192);
+
+    let result = events.encode(&mut buffer);
+    assert!(
+        matches!(
+            result,
+            Err(super::super::ser::EncodeError::NestingTooDeep { .. })
+        ),
+        "should reject events with deeply nested metadata"
+    );
+}
+
+#[test]
 fn check_value_depth_with_configurable_limit() {
     let mut value = Value::from("leaf");
     for _ in 0..5 {
