@@ -1,6 +1,7 @@
 # Wrapper around the official OpenTelemetry Collector image which lacks all basic utils which we want for debugging.
 ARG CONFIG_COLLECTOR_VERSION=latest
-FROM otel/opentelemetry-collector-contrib:${CONFIG_COLLECTOR_VERSION} AS upstream
+ARG CONFIG_COLLECTOR_DIGEST
+FROM otel/opentelemetry-collector-contrib:${CONFIG_COLLECTOR_VERSION}@${CONFIG_COLLECTOR_DIGEST} AS upstream
 
 FROM alpine:3.20 AS base
 COPY --from=upstream /otelcol-contrib /otelcol-contrib
