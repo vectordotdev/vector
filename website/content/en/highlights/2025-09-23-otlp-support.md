@@ -61,16 +61,16 @@ otel_sink:
   uri: http://localhost:5318/v1/logs
   method: post
   encoding:
-      codec: protobuf
-      protobuf:
-        desc_file: path/to/opentelemetry-proto.desc
-        message_type: opentelemetry.proto.collector.logs.v1.ExportLogsServiceRequest
-        use_json_names: true
-    framing:
-      method: 'bytes'
-    request:
-      headers:
-        content-type: 'application/x-protobuf'
+    codec: protobuf
+    protobuf:
+      desc_file: path/to/opentelemetry-proto.desc
+      message_type: opentelemetry.proto.collector.logs.v1.ExportLogsServiceRequest
+      use_json_names: true
+  framing:
+    method: 'bytes'
+  request:
+    headers:
+      content-type: 'application/x-protobuf'
 ```
 
 The `desc` file was generated with the following command:
