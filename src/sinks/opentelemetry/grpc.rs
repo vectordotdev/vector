@@ -120,23 +120,13 @@ impl GrpcSinkConfig {
         let static_uri = if self.uri.is_dynamic() {
             None
         } else {
-            let uri = with_default_scheme(
+            Some(with_default_scheme(
                 self.uri
                     .get_ref()
                     .parse()
                     .map_err(|e| format!("invalid URI for gRPC sink: {e}"))?,
                 self.tls.is_some(),
-            )?;
-            let path = uri.path();
-            if !path.is_empty() && path != "/" {
-                return Err(format!(
-                    "gRPC sink URI must not include a path prefix (got {path:?}); \
-                     the RPC method path is set automatically. \
-                     Use a URI without a path, e.g. \"http://host:4317\""
-                )
-                .into());
-            }
-            Some(uri)
+            )?)
         };
 
         // For dynamic templates like `https://{{ host }}:4317` the static_uri is None, so
@@ -805,17 +795,6 @@ where
                     Ok(u) => u,
                     Err(e) => return reject_event(event.take_finalizers(), format!("invalid gRPC URI after rendering template: {e}")),
                 };
-                let path = u.path();
-                if !path.is_empty() && path != "/" {
-                    return reject_event(
-                        event.take_finalizers(),
-                        format!(
-                            "rendered gRPC URI has an unsupported path prefix {path:?}; \
-                             the RPC method path is set automatically. \
-                             Use a URI without a path, e.g. \"http://host:4317\""
-                        ),
-                    );
-                }
                 let uri = match u.scheme_str() {
                     Some("https") if !use_https => {
                         // The Hyper client was built without TLS (use_https=false),
