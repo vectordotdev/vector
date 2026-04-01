@@ -35,6 +35,7 @@ pin-project.workspace = true
 prost.workspace = true
 prost-reflect.workspace = true
 rand.workspace = true
+reqwest.workspace = true
 regex.workspace = true
 serde.workspace = true
 serde_with = { version = "3.14.0", default-features = false, features = ["std", "macros", "chrono_0_4"] }
@@ -67,6 +68,7 @@ rstest = "0.26.1"
 tracing-test = "0.2.6"
 uuid.workspace = true
 vrl.workspace = true
+wiremock = "0.6.4"
 
 [features]
 arrow = ["dep:arrow"]
