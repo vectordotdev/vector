@@ -1,4 +1,4 @@
-use std::{collections::HashMap, net::SocketAddr};
+use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
 use bytes::{Bytes, BytesMut};
 use chrono::Utc;
@@ -11,12 +11,16 @@ use vector_lib::{
         NewlineDelimitedDecoderConfig,
         decoding::{DeserializerConfig, FramingConfig},
     },
+    compile_vrl,
     config::{DataType, LegacyKey, LogNamespace},
     configurable::configurable_component,
     lookup::{lookup_v2::OptionalValuePath, owned_value_path, path},
     schema::Definition,
 };
-use vrl::value::{Kind, kind::Collection};
+use vrl::{
+    compiler::{CompilationResult, CompileConfig, Program, TypeState},
+    value::{Kind, kind::Collection},
+};
 use warp::http::HeaderMap;
 
 use crate::{
@@ -27,6 +31,7 @@ use crate::{
         SourceOutput,
     },
     event::Event,
+    format_vrl_diagnostics,
     http::KeepaliveConfig,
     serde::{bool_or_struct, default_decoding},
     sources::util::{
@@ -154,6 +159,65 @@ pub struct SimpleHttpConfig {
     #[serde(default = "default_http_response_code")]
     response_code: StatusCode,
 
+    /// The HTTP status code returned to the client when the `response_source` VRL program calls
+    /// `abort`. Use `abort "message"` in your VRL program to suppress event forwarding and return
+    /// this status code immediately, bypassing sink acknowledgements entirely.
+    ///
+    /// The appropriate code depends on the reason for rejection: for example, `400` for invalid
+    /// input, `403` for an unauthorized source, or `429` for a rate limit. Defaults to `400`.
+    ///
+    /// To vary the status code per `abort` call rather than using a single fixed value, pass a
+    /// JSON-encoded object as the abort message instead of a plain string:
+    /// `abort encode_json({ "status": 403, "body": "forbidden" })`. The object accepts the same
+    /// optional fields as the `response_source` return value: `status`, `body`, and `headers`.
+    /// When `status` is omitted from the object, this `reject_code` is used as the fallback.
+    #[configurable(metadata(docs::examples = 400))]
+    #[configurable(metadata(docs::examples = 403))]
+    #[configurable(metadata(docs::numeric_type = "uint"))]
+    #[serde(with = "http_serde::status_code")]
+    #[serde(default = "default_http_reject_code")]
+    reject_code: StatusCode,
+
+    /// A [VRL] program to generate the HTTP response sent back to the client.
+    ///
+    /// The program receives the decoded, enriched events where `.` is an array of event objects.
+    /// It must return either:
+    /// - A string, used directly as the response body with the configured `response_code`.
+    /// - An object with optional fields: `status` (integer), `body` (string), `headers` (object).
+    ///
+    /// ## Aborting and early rejection
+    ///
+    /// Call `abort` in the program to suppress event forwarding entirely and respond immediately,
+    /// bypassing sink acknowledgements. The abort message becomes the response body and
+    /// [`reject_code`][Self::reject_code] is used as the status code.
+    ///
+    /// To control both the status code and body per `abort` call, pass a JSON-encoded object as
+    /// the message: `abort encode_json({ "status": 403, "body": "forbidden" })`. The object
+    /// accepts the same optional fields as the normal return value: `status`, `body`, and
+    /// `headers`. Any field that is omitted falls back to the same default as the normal path
+    /// (`status` defaults to `reject_code`, `body` defaults to empty, `headers` to none).
+    ///
+    /// ## Acknowledgements and sink failures
+    ///
+    /// When [acknowledgements] are enabled, the response defined by this program is only sent to
+    /// the client if the downstream sink successfully delivers the events (`Delivered`). If the
+    /// sink reports a failure (`Errored` or `Rejected`), the configured response is discarded and
+    /// the client receives a `500 Internal Server Error` or `400 Bad Request` instead.
+    ///
+    /// Responses returned via `abort` are not subject to this — they are sent immediately before
+    /// any events reach the sink, so acknowledgement results can never override them.
+    ///
+    /// [acknowledgements]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
+    /// [VRL]: https://vector.dev/docs/reference/vrl
+    #[configurable(metadata(
+        docs::examples = "encode_json({ \"ids\": map_values(.) -> |e| { e.id } })",
+        docs::examples = "parsed, err = parse_json(.[0].body)\nif err != null {\n  { \"status\": 400, \"body\": \"invalid JSON\" }\n} else {\n  { \"status\": 202, \"body\": encode_json(parsed), \"headers\": { \"x-request-id\": .[0].request_id } }\n}",
+        docs::examples = "row, err = get_enrichment_table_record(\"ip_allowlist\", { \"ip\": .source_ip })\nif err != null {\n  abort encode_json({ \"status\": 403, \"body\": \"source address not permitted\" })\n} else {\n  { \"status\": 202, \"body\": encode_json({ \"accepted\": true }) }\n}",
+        docs::syntax_override = "remap_program"
+    ))]
+    #[serde(default)]
+    response_source: Option<String>,
+
     #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
 
@@ -280,6 +344,8 @@ impl Default for SimpleHttpConfig {
             host_key: default_host_key(),
             method: default_http_method(),
             response_code: default_http_response_code(),
+            reject_code: default_http_reject_code(),
+            response_source: None,
             strict_path: true,
             framing: None,
             decoding: Some(default_decoding()),
@@ -310,6 +376,34 @@ fn default_host_key() -> OptionalValuePath {
 
 const fn default_http_response_code() -> StatusCode {
     StatusCode::OK
+}
+
+const fn default_http_reject_code() -> StatusCode {
+    StatusCode::BAD_REQUEST
+}
+
+fn compile_response_source(
+    source: &str,
+    enrichment_tables: &vector_lib::enrichment::TableRegistry,
+    metrics_storage: &vector_vrl_metrics::MetricsStorage,
+) -> crate::Result<Arc<Program>> {
+    let functions = vector_vrl_functions::all();
+    let state = TypeState::default();
+    let mut config = CompileConfig::default();
+    config.set_custom(enrichment_tables.clone());
+    config.set_custom(metrics_storage.clone());
+    let CompilationResult {
+        program, warnings, ..
+    } = compile_vrl(source, &functions, &state, config)
+        .map_err(|diags| format_vrl_diagnostics(source, diags))?;
+    if !warnings.is_empty() {
+        let warnings_str = format_vrl_diagnostics(source, warnings);
+        warn!(
+            message = "VRL response source compilation warning.",
+            warnings = %warnings_str
+        );
+    }
+    Ok(Arc::new(program))
 }
 
 /// Removes duplicates from the list, and logs a `warn!()` for each duplicate removed.
@@ -363,6 +457,12 @@ impl SourceConfig for SimpleHttpConfig {
             .build()?
             .with_log_namespace(log_namespace);
 
+        let response_source = self
+            .response_source
+            .as_deref()
+            .map(|s| compile_response_source(s, &cx.enrichment_tables, &cx.metrics_storage))
+            .transpose()?;
+
         let source = SimpleHttpSource {
             headers: build_param_matcher(&remove_duplicates(self.headers.clone(), "headers"))?,
             query_parameters: build_param_matcher(&remove_duplicates(
@@ -373,6 +473,8 @@ impl SourceConfig for SimpleHttpConfig {
             host_key: self.host_key.clone(),
             decoder,
             log_namespace,
+            response_source,
+            reject_code: self.reject_code,
         };
         source.run(
             self.address,
@@ -421,9 +523,19 @@ struct SimpleHttpSource {
     host_key: OptionalValuePath,
     decoder: Decoder,
     log_namespace: LogNamespace,
+    response_source: Option<Arc<Program>>,
+    reject_code: StatusCode,
 }
 
 impl HttpSource for SimpleHttpSource {
+    fn response_source(&self) -> Option<Arc<Program>> {
+        self.response_source.clone()
+    }
+
+    fn reject_code(&self) -> StatusCode {
+        self.reject_code
+    }
+
     /// Enriches the log events with metadata for the `request_path` and for each of the headers.
     /// Non-log events are skipped.
     fn enrich_events(
@@ -559,6 +671,7 @@ mod tests {
         sources::http_server::HttpMethod,
         test_util::{
             addr::next_addr,
+            collect_ready,
             components::{self, HTTP_PUSH_SOURCE_TAGS, assert_source_compliance},
             spawn_collect_n, wait_for_tcp,
         },
@@ -604,6 +717,8 @@ mod tests {
                 encoding: None,
                 query_parameters,
                 response_code,
+                reject_code: StatusCode::TOO_MANY_REQUESTS,
+                response_source: None,
                 tls: None,
                 auth,
                 strict_path,
@@ -682,6 +797,358 @@ mod tests {
             .unwrap()
             .status()
             .as_u16()
+    }
+
+    /// Spawn an `http_server` source with a `response_source` and return the bound address.
+    async fn source_with_program(
+        response_source: &str,
+        decoding: Option<DeserializerConfig>,
+    ) -> (impl Stream<Item = Event>, SocketAddr) {
+        let (sender, recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
+        let (_guard, address) = next_addr();
+        let context = SourceContext::new_test(sender, None);
+        let program = response_source.to_owned();
+        tokio::spawn(async move {
+            SimpleHttpConfig {
+                address,
+                response_source: Some(program),
+                decoding,
+                ..SimpleHttpConfig::default()
+            }
+            .build(context)
+            .await
+            .unwrap()
+            .await
+            .unwrap();
+        });
+        wait_for_tcp(address).await;
+        (recv, address)
+    }
+
+    /// Spawn an `http_server` source with a `response_source` and a custom `reject_code`.
+    async fn source_with_program_and_reject_code(
+        response_source: &str,
+        reject_code: StatusCode,
+    ) -> (impl Stream<Item = Event>, SocketAddr) {
+        let (sender, recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
+        let (_guard, address) = next_addr();
+        let context = SourceContext::new_test(sender, None);
+        let program = response_source.to_owned();
+        tokio::spawn(async move {
+            SimpleHttpConfig {
+                address,
+                response_source: Some(program),
+                reject_code,
+                ..SimpleHttpConfig::default()
+            }
+            .build(context)
+            .await
+            .unwrap()
+            .await
+            .unwrap();
+        });
+        wait_for_tcp(address).await;
+        (recv, address)
+    }
+
+    /// POST `body` and return the full reqwest Response (status + headers + body text).
+    async fn post_raw(address: SocketAddr, body: &str) -> reqwest::Response {
+        reqwest::Client::new()
+            .post(format!("http://{address}/"))
+            .body(body.to_owned())
+            .send()
+            .await
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn response_source_string_return() {
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let (rx, addr) = source_with_program(r#" "request received" "#, None).await;
+
+            spawn_collect_n(
+                async move {
+                    let resp = post_raw(addr, "hello\n").await;
+                    assert_eq!(resp.status().as_u16(), 200);
+                    assert_eq!(resp.text().await.unwrap(), "request received");
+                },
+                rx,
+                1,
+            )
+            .await;
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn response_source_object_custom_status_and_body() {
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let program = r#"
+                {
+                    "status": 202,
+                    "body": encode_json({ "count": length(.) })
+                }
+            "#;
+            let (rx, addr) =
+                source_with_program(program, Some(JsonDeserializerConfig::default().into())).await;
+
+            spawn_collect_n(
+                async move {
+                    let resp = post_raw(addr, "{\"id\":1}\n{\"id\":2}\n").await;
+                    assert_eq!(resp.status().as_u16(), 202);
+                    let body: serde_json::Value =
+                        serde_json::from_str(&resp.text().await.unwrap()).unwrap();
+                    assert_eq!(body["count"], 2);
+                },
+                rx,
+                2,
+            )
+            .await;
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn response_source_custom_response_headers() {
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let program = r#"
+                {
+                    "body": encode_json({ "id": .[0].id }),
+                    "headers": { "X-Event-Id": to_string(.[0].id) }
+                }
+            "#;
+            let (rx, addr) =
+                source_with_program(program, Some(JsonDeserializerConfig::default().into())).await;
+
+            spawn_collect_n(
+                async move {
+                    let resp = post_raw(addr, "{\"id\": 42}\n").await;
+                    assert_eq!(resp.status().as_u16(), 200);
+                    assert_eq!(resp.headers()["x-event-id"], "42");
+                },
+                rx,
+                1,
+            )
+            .await;
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn response_source_invalid_vrl_fails_at_build() {
+        let result = SimpleHttpConfig {
+            address: "0.0.0.0:0".parse().unwrap(),
+            response_source: Some("this is not valid vrl !!!".to_owned()),
+            ..SimpleHttpConfig::default()
+        }
+        .build(SourceContext::new_test(
+            SourceSender::new_test_finalize(EventStatus::Delivered).0,
+            None,
+        ))
+        .await;
+
+        assert!(result.is_err(), "invalid VRL should fail at build time");
+    }
+
+    /// Spawn an `http_server` source with a `response_source`, a specific `EventStatus` finalizer,
+    /// and acknowledgements enabled. This lets us simulate sink failure while also having a custom
+    /// VRL response configured.
+    async fn source_with_program_and_status(
+        response_source: &str,
+        status: EventStatus,
+    ) -> (impl Stream<Item = Event>, SocketAddr) {
+        let (sender, recv) = SourceSender::new_test_finalize(status);
+        let (_guard, address) = next_addr();
+        let context = SourceContext::new_test(sender, None);
+        let program = response_source.to_owned();
+        tokio::spawn(async move {
+            SimpleHttpConfig {
+                address,
+                response_source: Some(program),
+                acknowledgements: true.into(),
+                ..SimpleHttpConfig::default()
+            }
+            .build(context)
+            .await
+            .unwrap()
+            .await
+            .unwrap();
+        });
+        wait_for_tcp(address).await;
+        (recv, address)
+    }
+
+    /// When `response_source` calls `abort` with a plain string message, events are dropped
+    /// immediately, the client receives `reject_code` as the status, and the message as the body.
+    #[tokio::test]
+    async fn response_source_abort_suppresses_events_and_returns_reject_code() {
+        // Program that always aborts with a plain string message.
+        let program = r#"abort "request rejected""#;
+
+        let (rx, addr) =
+            source_with_program_and_reject_code(program, StatusCode::BAD_REQUEST).await;
+
+        let resp = post_raw(addr, "hello\n").await;
+
+        // Client receives reject_code (400) with the abort message as the body.
+        assert_eq!(resp.status().as_u16(), 400);
+        assert_eq!(resp.text().await.unwrap(), "request rejected");
+
+        // No events should have been forwarded to the sink.
+        // Give a brief window for any (erroneous) event to arrive, then assert the stream is empty.
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        let events = collect_ready(rx).await;
+        assert!(
+            events.is_empty(),
+            "abort should suppress event forwarding, but {n} event(s) reached the sink",
+            n = events.len()
+        );
+    }
+
+    /// When `response_source` calls `abort` with a JSON-encoded object containing both `status`
+    /// and `body`, the client receives that exact status and body — not `reject_code`.
+    #[tokio::test]
+    async fn response_source_abort_json_object_overrides_status_and_body() {
+        let program = r#"abort encode_json({ "status": 403, "body": "forbidden" })"#;
+
+        let (rx, addr) =
+            source_with_program_and_reject_code(program, StatusCode::BAD_REQUEST).await;
+
+        let resp = post_raw(addr, "hello\n").await;
+
+        // Client receives the status and body from the JSON object, not reject_code.
+        assert_eq!(resp.status().as_u16(), 403);
+        assert_eq!(resp.text().await.unwrap(), "forbidden");
+
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        let events = collect_ready(rx).await;
+        assert!(events.is_empty(), "abort must not forward events to sink");
+    }
+
+    /// When the JSON object in `abort` omits `status`, `reject_code` is used as the fallback.
+    #[tokio::test]
+    async fn response_source_abort_json_object_status_falls_back_to_reject_code() {
+        let program = r#"abort encode_json({ "body": "rejected" })"#;
+
+        let (rx, addr) =
+            source_with_program_and_reject_code(program, StatusCode::UNPROCESSABLE_ENTITY).await;
+
+        let resp = post_raw(addr, "hello\n").await;
+
+        // No status in the object — reject_code (422) is used.
+        assert_eq!(resp.status().as_u16(), 422);
+        assert_eq!(resp.text().await.unwrap(), "rejected");
+
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        let events = collect_ready(rx).await;
+        assert!(events.is_empty(), "abort must not forward events to sink");
+    }
+
+    /// When `abort` is called with a JSON object containing `headers`, those headers are present
+    /// in the response.
+    #[tokio::test]
+    async fn response_source_abort_json_object_includes_headers() {
+        let program = r#"abort encode_json({ "status": 429, "body": "rate limited", "headers": { "Retry-After": "60" } })"#;
+
+        let (rx, addr) =
+            source_with_program_and_reject_code(program, StatusCode::BAD_REQUEST).await;
+
+        let resp = post_raw(addr, "hello\n").await;
+
+        assert_eq!(resp.status().as_u16(), 429);
+        assert_eq!(resp.headers()["retry-after"], "60");
+        assert_eq!(resp.text().await.unwrap(), "rate limited");
+
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        let events = collect_ready(rx).await;
+        assert!(events.is_empty(), "abort must not forward events to sink");
+    }
+
+    /// When `response_source` calls `abort` and acknowledgements are enabled, the response is
+    /// returned immediately without ever touching the sink — so ack results cannot override it.
+    #[tokio::test]
+    async fn response_source_abort_not_overridden_by_ack_failure() {
+        // Program that always aborts.
+        let program = r#"abort "request rejected""#;
+
+        // Use EventStatus::Errored + acknowledgements to prove that even a failing sink
+        // cannot override the abort response, because we never reach handle_batch_status.
+        let (sender, recv) = SourceSender::new_test_finalize(EventStatus::Errored);
+        let (_guard, address) = next_addr();
+        let context = SourceContext::new_test(sender, None);
+        let prog = program.to_owned();
+        tokio::spawn(async move {
+            SimpleHttpConfig {
+                address,
+                response_source: Some(prog),
+                acknowledgements: true.into(),
+                reject_code: StatusCode::BAD_REQUEST,
+                ..SimpleHttpConfig::default()
+            }
+            .build(context)
+            .await
+            .unwrap()
+            .await
+            .unwrap();
+        });
+        wait_for_tcp(address).await;
+
+        let resp = post_raw(address, "hello\n").await;
+
+        // Must be 400 from the abort, not 500 from the ack failure path.
+        assert_eq!(
+            resp.status().as_u16(),
+            400,
+            "abort response must not be overridden by ack failure"
+        );
+        assert_eq!(resp.text().await.unwrap(), "request rejected");
+
+        // No events were forwarded — the stream should be empty.
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        let events = collect_ready(recv).await;
+        assert!(events.is_empty(), "abort must not forward events to sink");
+    }
+
+    /// When a `response_source` is configured to return `{ "status": 200, "body": "ok" }` but the
+    /// sink reports `Errored`, the acknowledgement path overrides the custom VRL response and the
+    /// client receives a `500 Internal Server Error` instead.
+    ///
+    /// This test documents the current behaviour: a user-configured successful response is
+    /// silently discarded whenever the downstream sink fails and acknowledgements are enabled.
+    ///
+    /// The `BatchNotifier` attached to each event only resolves (and thus unblocks
+    /// `handle_batch_status`) once every cloned notifier is dropped — which happens when
+    /// `new_test_finalize` finalizes the event on the consumer side. That means the HTTP response
+    /// cannot complete until the event is actually pulled off the stream, so we must drive the
+    /// stream concurrently with the HTTP request using `spawn_collect_n`.
+    #[tokio::test]
+    async fn response_source_overridden_by_ack_failure_on_sink_error() {
+        // VRL program that unconditionally asks for a 200 OK with body "ok".
+        let program = r#"{ "status": 200, "body": "ok" }"#;
+
+        let (rx, addr) = source_with_program_and_status(program, EventStatus::Errored).await;
+
+        // Drive the stream concurrently: the HTTP request is the "sender" future and we collect
+        // exactly 1 event from the stream. The stream consumer finalizing the event fires the
+        // BatchNotifier (with EventStatus::Errored), which unblocks handle_batch_status and lets
+        // the HTTP response complete.
+        //
+        // The configured response_source returns { "status": 200, "body": "ok" }, but because
+        // acknowledgements are enabled and the sink reports Errored, handle_batch_status discards
+        // the VRL-built response entirely and returns a 500 rejection instead.
+        spawn_collect_n(
+            async move {
+                let status = post_raw(addr, "hello\n").await.status().as_u16();
+                assert_eq!(
+                    status, 500,
+                    "sink error with acks enabled overrides the configured response_source (bug: \
+                     expected 200 from response_source but got 500 from ack failure path)"
+                );
+            },
+            rx,
+            1,
+        )
+        .await;
     }
 
     async fn send_bytes(address: SocketAddr, body: Vec<u8>, headers: HeaderMap) -> u16 {
