@@ -2,7 +2,8 @@ use anyhow::Result;
 
 use crate::{app, utils::git::git_ls_files};
 
-const PRETTIER_EXTENSIONS: &[&str] = &["*.yml", "*.yaml", "*.js", "*.ts", "*.tsx", "*.json"];
+pub(crate) const PRETTIER_EXTENSIONS: &[&str] =
+    &["*.yml", "*.yaml", "*.js", "*.ts", "*.tsx", "*.json"];
 
 /// Apply format changes across the repository
 #[derive(clap::Args, Debug)]

@@ -28,6 +28,3 @@ config/examples/file_to_prometheus.yaml
 # Lock files
 Cargo.lock
 website/yarn.lock
-
-# Vendor
-vendor/

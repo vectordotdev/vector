@@ -1,8 +1,6 @@
 use anyhow::Result;
 
-use crate::{app, utils::git::git_ls_files};
-
-const PRETTIER_EXTENSIONS: &[&str] = &["*.yml", "*.yaml", "*.js", "*.ts", "*.tsx", "*.json"];
+use crate::{app, commands::fmt::PRETTIER_EXTENSIONS, utils::git::git_ls_files};
 
 /// Check that all files are formatted properly
 #[derive(clap::Args, Debug)]
