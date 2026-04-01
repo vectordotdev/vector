@@ -421,11 +421,11 @@ test-e2e-kubernetes: ## Runs Kubernetes E2E tests (Sorry, no `ENVIRONMENT=true` 
 
 .PHONY: test-cli
 test-cli: ## Runs cli tests
-	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --no-fail-fast --no-default-features --features cli-tests --test integration --test-threads 4
+	${MAYBE_ENVIRONMENT_EXEC} ${TEST_RUNNER} --no-fail-fast --no-default-features --features cli-tests --test integration --test-threads 4
 
 .PHONY: test-vector-api
 test-vector-api: ## Runs vector API tests (top and tap)
-	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --no-fail-fast --no-default-features --features vector-api-tests --test vector_api
+	${MAYBE_ENVIRONMENT_EXEC} ${TEST_RUNNER} --no-fail-fast --no-default-features --features vector-api-tests --test vector_api
 
 .PHONY: test-component-validation
 test-component-validation: ## Runs component validation tests

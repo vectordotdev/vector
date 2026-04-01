@@ -1,8 +1,9 @@
 # Coverage
 #
-# Runs all test suites (unit, component validation, integration, e2e) with code coverage
-# instrumentation on a single commit. Results are merged into one lcov report and uploaded
-# to Datadog. Also runs on a weekly schedule to ensure full baseline coverage is always fresh.
+# Runs all test suites (unit, component validation, CLI, API, behavior,
+# integration) with code coverage instrumentation on a single commit. Results
+# are merged into one lcov report and uploaded to Datadog. Also runs on a
+# weekly schedule to ensure full baseline coverage is always fresh.
 
 name: Coverage
 
@@ -26,11 +27,14 @@ env:
   CI: true
 
 jobs:
-  unit-coverage:
+  tests:
     uses: ./.github/workflows/unit-tests.yml
     with:
       ref: ${{ inputs.ref }}
+      default: true
       coverage: true
+      cli: true
+      vector-api: true
 
   integration-tests:
     permissions:
@@ -46,10 +50,9 @@ jobs:
     name: Merge and Upload Coverage
     runs-on: ubuntu-24.04
     needs:
-      - unit-coverage
+      - tests
       - integration-tests
-    # Run even if some integration jobs failed — partial coverage is still valuable.
-    if: always() && needs.unit-coverage.result == 'success'
+    if: ${{ !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:

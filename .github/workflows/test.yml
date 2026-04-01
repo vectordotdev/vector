@@ -58,6 +58,9 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.test-yml == 'true' }}
     uses: ./.github/workflows/unit-tests.yml
+    with:
+      default: true
+      behavior: true
     secrets: inherit
 
   check-scripts:
