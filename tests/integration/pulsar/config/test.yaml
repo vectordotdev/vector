@@ -9,7 +9,7 @@ env:
 matrix:
   # TODO: re-enable `latest` once TLS tests pass with newer Pulsar images.
   # See https://github.com/vectordotdev/vector/issues/25096
-  version: ["4.1.3"]
+  version: latest
 
 # changes to these files/paths will invoke the integration test in CI
 # expressions are evaluated using https://github.com/micromatch/picomatch
