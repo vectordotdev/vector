@@ -78,7 +78,8 @@ async fn delivers_logs_via_grpc() {
     ))
     .unwrap();
 
-    let (sink, _healthcheck) = config.build(SinkContext::default()).await.unwrap();
+    let (sink, healthcheck) = config.build(SinkContext::default()).await.unwrap();
+    healthcheck.await.expect("gRPC healthcheck failed");
 
     let events = vec![otlp_log_event()];
     // The gRPC sink emits EndpointBytesSent with the same "endpoint" and "protocol" tags as
@@ -99,7 +100,10 @@ async fn delivers_logs_via_grpc_template_uri() {
     )
     .unwrap();
 
-    let (sink, _healthcheck) = config.build(SinkContext::default()).await.unwrap();
+    let (sink, healthcheck) = config.build(SinkContext::default()).await.unwrap();
+    // The URI is a dynamic template so there is no static healthcheck URI; the healthcheck
+    // skips gracefully and returns Ok(()) rather than failing.
+    healthcheck.await.expect("gRPC healthcheck failed unexpectedly for dynamic URI");
 
     // The event carries `host` so the template renders to the collector address.
     let events = vec![otlp_log_event_with_host(host.split(':').next().unwrap())];
