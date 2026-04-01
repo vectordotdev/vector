@@ -76,10 +76,10 @@ inputs:
     description: "Install vdev CLI tool (cached by vdev/ directory changes)."
 
   # prepare.sh - npm
-  markdownlint:
+  markdownlint-cli2:
     required: false
     default: false
-    description: "Install markdownlint (npm)."
+    description: "Install markdownlint-cli2 (npm)."
   datadog-ci:
     required: false
     default: false
@@ -267,7 +267,7 @@ runs:
           ~/.cargo/bin/cargo-llvm-cov
           ~/.cargo/bin/dd-rust-license-tool
           ~/.cargo/bin/wasm-pack
-          /usr/local/bin/markdownlint
+          /usr/local/bin/markdownlint-cli2
           /usr/local/bin/datadog-ci
         key: ${{ runner.os }}-prepare-binaries-${{ hashFiles('scripts/environment/*') }}
         restore-keys: |
@@ -287,7 +287,7 @@ runs:
         [[ "${{ inputs.cargo-llvm-cov }}" == "true" ]] && mods+=("cargo-llvm-cov")
         [[ "${{ inputs.dd-rust-license-tool }}" == "true" ]] && mods+=("dd-rust-license-tool")
         [[ "${{ inputs.wasm-pack }}" == "true" ]] && mods+=("wasm-pack")
-        [[ "${{ inputs.markdownlint }}" == "true" ]] && mods+=("markdownlint")
+        [[ "${{ inputs.markdownlint-cli2 }}" == "true" ]] && mods+=("markdownlint-cli2")
         [[ "${{ inputs.datadog-ci }}" == "true" ]] && mods+=("datadog-ci")
         csm=$(IFS=,; echo "${mods[*]}")
 
