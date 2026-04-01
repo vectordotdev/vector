@@ -113,8 +113,9 @@ components: sinks: opentelemetry: {
 							codec: json
 						framing:
 							method: newline_delimited
-						headers:
-							content-type: application/json
+						request:
+							headers:
+								content-type: application/json
 				```
 
 				2. Sample OTEL collector config:
