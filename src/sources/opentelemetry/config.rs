@@ -328,7 +328,7 @@ impl SourceConfig for OpentelemetryConfig {
             cx.shutdown.clone(),
         )
         .map_err(|error| {
-            error!(message = "Source future failed.", %error);
+            error!(message = "OpenTelemetry source gRPC server failed.", %error);
         });
 
         let http_tls_settings = MaybeTlsSettings::from_config(self.http.tls.as_ref(), true)?;
@@ -355,7 +355,10 @@ impl SourceConfig for OpentelemetryConfig {
             filters,
             cx.shutdown,
             self.http.keepalive.clone(),
-        );
+        )
+        .map_err(|error| {
+            error!(message = "OpenTelemetry source HTTP server failed.", %error);
+        });
 
         Ok(join(grpc_source, http_source).map(|_| Ok(())).boxed())
     }
