@@ -178,14 +178,16 @@ impl GrpcSinkConfig {
         // healthcheck entirely when dynamic header templates are present — unless the operator
         // has supplied an explicit `healthcheck.uri` override, in which case we honour that URI
         // with only the static headers (the override endpoint does not require the dynamic auth).
-        let explicit_healthcheck_uri = cx
+        // Prefer an explicit healthcheck.uri override, then fall back to the static sink URI.
+        // with_default_scheme is applied once to the resolved value.
+        let raw_healthcheck_uri = cx
             .healthcheck
             .uri
             .clone()
-            .map(|u| with_default_scheme(u.uri, tls_configured))
-            .transpose()?;
+            .map(|u| u.uri)
+            .or_else(|| static_uri.clone());
         let healthcheck_uri = if !dynamic_grpc_header_templates.is_empty()
-            && explicit_healthcheck_uri.is_none()
+            && raw_healthcheck_uri.is_none()
         {
             warn!(
                 "Skipping gRPC healthcheck: dynamic (templated) headers are configured and \
@@ -193,8 +195,16 @@ impl GrpcSinkConfig {
                  re-enable the healthcheck."
             );
             None
+        } else if raw_healthcheck_uri.is_none() && self.uri.is_dynamic() {
+            warn!(
+                "Skipping gRPC healthcheck: `uri` is a dynamic template and no static \
+                 `healthcheck.uri` override is set. To enable healthchecking, use a static URI."
+            );
+            None
         } else {
-            explicit_healthcheck_uri.or(static_uri.clone())
+            raw_healthcheck_uri
+                .map(|u| with_default_scheme(u, tls_configured))
+                .transpose()?
         };
         let healthcheck = Box::pin(grpc_healthcheck(
             client.clone(),
@@ -245,10 +255,6 @@ async fn grpc_healthcheck(
     }
 
     let Some(uri) = uri else {
-        warn!(
-            "Skipping gRPC healthcheck: `uri` is a dynamic template and cannot be validated \
-             at startup. To enable healthchecking, use a static URI."
-        );
         return Ok(());
     };
 
