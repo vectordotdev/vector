@@ -23,7 +23,6 @@ permissions:
 env:
   CONTAINER_TOOL: "docker"
   DD_ENV: "ci"
-  DD_API_KEY: ${{ secrets.DD_API_KEY }}
   TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}
   TEST_APPSIGNAL_PUSH_API_KEY: ${{ secrets.TEST_APPSIGNAL_PUSH_API_KEY }}
   AXIOM_TOKEN: ${{ secrets.AXIOM_TOKEN }}
@@ -65,6 +64,9 @@ jobs:
 
   integration-tests:
     runs-on: ubuntu-24.04-8core
+    permissions:
+      contents: read
+      id-token: write
     needs:
       - changes
       - build-test-runner
@@ -111,6 +113,17 @@ jobs:
         with:
           submodules: "recursive"
 
+      - name: Get Datadog credentials
+        if: steps.check.outputs.should_run == 'true'
+        id: dd-sts
+        uses: DataDog/dd-sts-action@2e8187910199bd93129520183c093e19aa585c75
+        with:
+          policy: vector-ci
+
+      - name: Set Datadog credentials
+        if: steps.check.outputs.should_run == 'true'
+        run: echo "DD_API_KEY=${{ steps.dd-sts.outputs.api_key }}" >> "$GITHUB_ENV"
+
       - uses: ./.github/actions/setup
         if: steps.check.outputs.should_run == 'true'
         with:
@@ -138,6 +151,9 @@ jobs:
 
   e2e-tests:
     runs-on: ubuntu-24.04-8core
+    permissions:
+      contents: read
+      id-token: write
     needs:
       - changes
       - build-test-runner
@@ -175,6 +191,17 @@ jobs:
         if: steps.check.outputs.should_run == 'true'
         with:
           submodules: "recursive"
+
+      - name: Get Datadog credentials
+        if: steps.check.outputs.should_run == 'true'
+        id: dd-sts
+        uses: DataDog/dd-sts-action@2e8187910199bd93129520183c093e19aa585c75
+        with:
+          policy: vector-ci
+
+      - name: Set Datadog credentials
+        if: steps.check.outputs.should_run == 'true'
+        run: echo "DD_API_KEY=${{ steps.dd-sts.outputs.api_key }}" >> "$GITHUB_ENV"
 
       - uses: ./.github/actions/setup
         if: steps.check.outputs.should_run == 'true'

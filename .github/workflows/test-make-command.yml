@@ -33,16 +33,29 @@ permissions:
 jobs:
   run-make-command:
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
     timeout-minutes: 90
     env:
       CARGO_INCREMENTAL: 0
       DD_ENV: "ci"
-      DD_API_KEY: ${{ secrets.DD_API_KEY }}
     steps:
       - name: Checkout branch
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ inputs.ref }}
+
+      - name: Get Datadog credentials
+        if: ${{ inputs.upload_test_results }}
+        id: dd-sts
+        uses: DataDog/dd-sts-action@2e8187910199bd93129520183c093e19aa585c75
+        with:
+          policy: vector-ci
+
+      - name: Set Datadog credentials
+        if: ${{ inputs.upload_test_results }}
+        run: echo "DD_API_KEY=${{ steps.dd-sts.outputs.api_key }}" >> "$GITHUB_ENV"
 
       - uses: ./.github/actions/setup
         with:

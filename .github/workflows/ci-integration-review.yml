@@ -41,7 +41,6 @@ env:
   TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}
   CONTAINER_TOOL: "docker"
   DD_ENV: "ci"
-  DD_API_KEY: ${{ secrets.DD_API_KEY }}
   RUST_BACKTRACE: full
   VECTOR_LOG: vector=debug
   VERBOSE: true
@@ -101,6 +100,7 @@ jobs:
     permissions:
       contents: read
       packages: read    # Required to pull test runner image from GHCR
+      id-token: write
     strategy:
       fail-fast: false
       matrix:
@@ -121,6 +121,17 @@ jobs:
         with:
           submodules: "recursive"
           ref: ${{ github.event.review.commit_id }}
+
+      - name: Get Datadog credentials
+        if: steps.run_condition.outputs.should_run == 'true'
+        id: dd-sts
+        uses: DataDog/dd-sts-action@2e8187910199bd93129520183c093e19aa585c75
+        with:
+          policy: vector-ci
+
+      - name: Set Datadog credentials
+        if: steps.run_condition.outputs.should_run == 'true'
+        run: echo "DD_API_KEY=${{ steps.dd-sts.outputs.api_key }}" >> "$GITHUB_ENV"
 
       - uses: ./.github/actions/setup
         with:
@@ -153,6 +164,7 @@ jobs:
     permissions:
       contents: read
       packages: read    # Required to pull test runner image from GHCR
+      id-token: write
     strategy:
       fail-fast: false
       matrix:
@@ -169,6 +181,17 @@ jobs:
         with:
           submodules: "recursive"
           ref: ${{ github.event.review.commit_id }}
+
+      - name: Get Datadog credentials
+        if: steps.run_condition.outputs.should_run == 'true'
+        id: dd-sts
+        uses: DataDog/dd-sts-action@2e8187910199bd93129520183c093e19aa585c75
+        with:
+          policy: vector-ci
+
+      - name: Set Datadog credentials
+        if: steps.run_condition.outputs.should_run == 'true'
+        run: echo "DD_API_KEY=${{ steps.dd-sts.outputs.api_key }}" >> "$GITHUB_ENV"
 
       - uses: ./.github/actions/setup
         with:
