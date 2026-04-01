@@ -3,6 +3,8 @@ use std::{collections::HashMap, time::Duration};
 use bytes::Bytes;
 use futures_util::FutureExt;
 use http::{Uri, response::Parts};
+#[cfg(unix)]
+use hyperlocal::Uri as UnixUri;
 use serde_with::serde_as;
 use snafu::ResultExt;
 use vector_lib::{config::LogNamespace, configurable::configurable_component, event::Event};
@@ -34,6 +36,47 @@ static NOT_FOUND_NO_PATH: &str = "No path is set on the endpoint and we got a 40
                                   did you mean to use /metrics?\
                                   This behavior changed in version 0.11.";
 
+/// Unix socket configuration to scrape metrics from
+#[cfg(unix)]
+#[serde_as]
+#[configurable_component]
+#[derive(Clone, Debug)]
+pub struct UnixEndpoint {
+    /// The Path to the unix socket
+    #[configurable(metadata(docs::examples = "/var/run/forgejo/forgejo.sock"))]
+    path: String,
+    /// The Path in the Uri
+    #[serde(default = "default_prometheus_path")]
+    #[configurable(metadata(docs::examples = "/metrics"))]
+    #[configurable(metadata(docs::examples = "/api/v1/metrics"))]
+    endpoint: String,
+}
+
+/// Uri Configuration to scrape metrics from
+#[serde_as]
+#[configurable_component]
+#[serde(untagged)]
+#[derive(Clone, Debug)]
+pub enum PrometheusEndpoint {
+    /// The Url to scrape metrics from
+    #[configurable(metadata(docs::examples = "http://localhost:9090/metrics"))]
+    Url(String),
+    /// The URI to scrape metrics from a unix socket
+    #[cfg(unix)]
+    Unix(UnixEndpoint),
+}
+
+impl From<std::string::String> for PrometheusEndpoint {
+    fn from(str: std::string::String) -> Self {
+        Self::Url(str)
+    }
+}
+
+/// The default path in the Uri for Unix Endpoint
+pub(crate) fn default_prometheus_path() -> String {
+    String::from("/metrics")
+}
+
 /// Configuration for the `prometheus_scrape` source.
 #[serde_as]
 #[configurable_component(source(
@@ -43,9 +86,8 @@ static NOT_FOUND_NO_PATH: &str = "No path is set on the endpoint and we got a 40
 #[derive(Clone, Debug)]
 pub struct PrometheusScrapeConfig {
     /// Endpoints to scrape metrics from.
-    #[configurable(metadata(docs::examples = "http://localhost:9090/metrics"))]
     #[serde(alias = "hosts")]
-    endpoints: Vec<String>,
+    endpoints: Vec<PrometheusEndpoint>,
 
     /// The interval between scrapes. Requests are run concurrently so if a scrape takes longer
     /// than the interval a new scrape will be started. This can take extra resources, set the timeout
@@ -115,7 +157,9 @@ fn query_example() -> serde_json::Value {
 impl GenerateConfig for PrometheusScrapeConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            endpoints: vec!["http://localhost:9090/metrics".to_string()],
+            endpoints: vec![sources::prometheus::scrape::PrometheusEndpoint::Url(
+                "http://localhost:9090/metrics".to_string(),
+            )],
             interval: default_interval(),
             timeout: default_timeout(),
             instance_tag: Some("instance".to_string()),
@@ -136,9 +180,14 @@ impl SourceConfig for PrometheusScrapeConfig {
         let urls = self
             .endpoints
             .iter()
-            .map(|s| s.parse::<Uri>().context(sources::UriParseSnafu))
+            .map(|t| match t {
+                PrometheusEndpoint::Url(s) => s.parse::<Uri>().context(sources::UriParseSnafu),
+                #[cfg(unix)]
+                PrometheusEndpoint::Unix(u) => Ok(UnixUri::new(&u.path, &u.endpoint).into()).into(),
+            })
             .map(|r| r.map(|uri| build_url(&uri, &self.query)))
             .collect::<std::result::Result<Vec<Uri>, sources::BuildError>>()?;
+
         let tls = TlsSettings::from_options(self.tls.as_ref())?;
 
         let builder = PrometheusScrapeBuilder {
@@ -358,7 +407,7 @@ mod test {
         wait_for_tcp(in_addr).await;
 
         let config = PrometheusScrapeConfig {
-            endpoints: vec![format!("http://{}/metrics", in_addr)],
+            endpoints: vec![format!("http://{}/metrics", in_addr).into()],
             interval: Duration::from_secs(1),
             timeout: default_timeout(),
             instance_tag: Some("instance".to_string()),
@@ -392,7 +441,7 @@ mod test {
         wait_for_tcp(in_addr).await;
 
         let config = PrometheusScrapeConfig {
-            endpoints: vec![format!("http://{}/metrics", in_addr)],
+            endpoints: vec![format!("http://{}/metrics", in_addr).into()],
             interval: Duration::from_secs(1),
             timeout: default_timeout(),
             instance_tag: Some("instance".to_string()),
@@ -444,7 +493,7 @@ mod test {
         wait_for_tcp(in_addr).await;
 
         let config = PrometheusScrapeConfig {
-            endpoints: vec![format!("http://{}/metrics", in_addr)],
+            endpoints: vec![format!("http://{}/metrics", in_addr).into()],
             interval: Duration::from_secs(1),
             timeout: default_timeout(),
             instance_tag: Some("instance".to_string()),
@@ -510,7 +559,7 @@ mod test {
         wait_for_tcp(in_addr).await;
 
         let config = PrometheusScrapeConfig {
-            endpoints: vec![format!("http://{}/metrics", in_addr)],
+            endpoints: vec![format!("http://{}/metrics", in_addr).into()],
             interval: Duration::from_secs(1),
             timeout: default_timeout(),
             instance_tag: Some("instance".to_string()),
@@ -565,7 +614,7 @@ mod test {
         wait_for_tcp(in_addr).await;
 
         let config = PrometheusScrapeConfig {
-            endpoints: vec![format!("http://{}/metrics?key1=val1", in_addr)],
+            endpoints: vec![format!("http://{}/metrics?key1=val1", in_addr).into()],
             interval: Duration::from_secs(1),
             timeout: default_timeout(),
             instance_tag: Some("instance".to_string()),
@@ -681,7 +730,7 @@ mod test {
         config.add_source(
             "in",
             PrometheusScrapeConfig {
-                endpoints: vec![format!("http://{}", in_addr)],
+                endpoints: vec![format!("http://{}", in_addr).into()],
                 instance_tag: None,
                 endpoint_tag: None,
                 honor_labels: false,
