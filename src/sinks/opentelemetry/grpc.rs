@@ -130,11 +130,27 @@ impl GrpcSinkConfig {
         };
 
         // For dynamic templates like `https://{{ host }}:4317` the static_uri is None, so
-        // we also check whether the static literal prefix of the template string starts with
-        // "https://". Only the part before the first `{{` is inspected so that a template
-        // like `{{ scheme }}://host:4317` does not falsely trigger TLS — in that case the
-        // scheme is not known at build time and events will be dropped at runtime if a
-        // rendered `https://` URI is encountered without a TLS connector.
+        // we inspect the static literal prefix of the template string (everything before the
+        // first `{{`) to determine the scheme at build time.
+        //
+        // If the scheme itself is dynamic (e.g. `{{ scheme }}://host:4317`) and no explicit
+        // `tls:` block is present, we cannot choose the right Hyper connector. Rather than
+        // silently dropping events whose rendered URI uses the wrong scheme at runtime, we
+        // fail fast here.
+        if self.uri.is_dynamic() && self.tls.is_none() {
+            let raw = self.uri.get_ref();
+            let static_prefix_end = raw.find("{{").unwrap_or(raw.len());
+            if !raw[..static_prefix_end].to_ascii_lowercase().contains("://") {
+                return Err(
+                    "gRPC sink URI template must have a static scheme prefix \
+                     (e.g. \"http://{{ host }}:4317\" or \"https://{{ host }}:4317\"); \
+                     a fully dynamic scheme cannot be resolved at startup so the TLS \
+                     connector cannot be configured correctly. \
+                     Alternatively, add a `tls:` block to force HTTPS."
+                        .into(),
+                );
+            }
+        }
         let use_https = self.tls.is_some()
             || static_uri
                 .as_ref()
