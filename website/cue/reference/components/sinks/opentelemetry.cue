@@ -106,16 +106,15 @@ components: sinks: opentelemetry: {
 					emit_syslog:
 						inputs: ["remap_syslog"]
 						type: opentelemetry
-						protocol:
-							type: http
-							uri: http://localhost:5318/v1/logs
-							method: post
-							encoding:
-								codec: json
-							framing:
-								method: newline_delimited
-							headers:
-								content-type: application/json
+						protocol: http
+						uri: http://localhost:5318/v1/logs
+						method: post
+						encoding:
+							codec: json
+						framing:
+							method: newline_delimited
+						headers:
+							content-type: application/json
 				```
 
 				2. Sample OTEL collector config:

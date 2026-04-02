@@ -110,7 +110,8 @@ fn default_config(address: &str) -> VectorConfig {
 impl SinkConfig for VectorConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSinkType, Healthcheck)> {
         let tls = MaybeTlsSettings::from_config(self.tls.as_ref(), false)?;
-        let uri = with_default_scheme(&self.address, tls.is_tls())?;
+        let uri =
+            crate::sinks::util::grpc::with_default_scheme(self.address.parse()?, tls.is_tls())?;
 
         let client = new_client(&tls, cx.proxy())?;
 
@@ -173,40 +174,6 @@ async fn healthcheck(
             Err(_) => Err(Box::new(VectorSinkError::Health { status: None })),
         },
         Err(source) => Err(Box::new(VectorSinkError::Request { source })),
-    }
-}
-
-/// grpc doesn't like an address without a scheme, so we default to http or https if one isn't
-/// specified in the address.
-pub fn with_default_scheme(address: &str, tls: bool) -> crate::Result<Uri> {
-    let uri: Uri = address.parse()?;
-    if uri.scheme().is_none() {
-        // Default the scheme to http or https.
-        let mut parts = uri.into_parts();
-
-        parts.scheme = if tls {
-            Some(
-                "https"
-                    .parse()
-                    .unwrap_or_else(|_| unreachable!("https should be valid")),
-            )
-        } else {
-            Some(
-                "http"
-                    .parse()
-                    .unwrap_or_else(|_| unreachable!("http should be valid")),
-            )
-        };
-
-        if parts.path_and_query.is_none() {
-            parts.path_and_query = Some(
-                "/".parse()
-                    .unwrap_or_else(|_| unreachable!("root should be valid")),
-            );
-        }
-        Ok(Uri::from_parts(parts)?)
-    } else {
-        Ok(uri)
     }
 }
 

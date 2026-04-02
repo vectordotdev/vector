@@ -3,6 +3,8 @@ receivers:
     protocols:
       http:
         endpoint: "0.0.0.0:5318"
+      grpc:
+        endpoint: "0.0.0.0:4317"
 
 processors:
   batch: { }

@@ -73,10 +73,7 @@ impl VectorService {
         compression: bool,
     ) -> Self {
         let (protocol, endpoint) = uri::protocol_endpoint(uri.clone());
-        let mut proto_client = proto_vector::Client::new(HyperSvc {
-            uri,
-            client: hyper_client,
-        });
+        let mut proto_client = proto_vector::Client::new(HyperSvc::new(uri, hyper_client));
 
         if compression {
             proto_client = proto_client.send_compressed(tonic::codec::CompressionEncoding::Gzip);
@@ -132,33 +129,4 @@ impl Service<VectorRequest> for VectorService {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct HyperSvc {
-    uri: Uri,
-    client: hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>,
-}
-
-impl Service<hyper::Request<BoxBody>> for HyperSvc {
-    type Response = hyper::Response<hyper::Body>;
-    type Error = hyper::Error;
-    type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
-
-    // Emission of an internal event in case of errors is handled upstream by the caller.
-    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
-
-    // Emission of internal events for errors and dropped events is handled upstream by the caller.
-    fn call(&mut self, mut req: hyper::Request<BoxBody>) -> Self::Future {
-        let uri = Uri::builder()
-            .scheme(self.uri.scheme().unwrap().clone())
-            .authority(self.uri.authority().unwrap().clone())
-            .path_and_query(req.uri().path_and_query().unwrap().clone())
-            .build()
-            .unwrap();
-
-        *req.uri_mut() = uri;
-
-        Box::pin(self.client.request(req))
-    }
-}
+pub use crate::sinks::util::grpc::HyperGrpcService as HyperSvc;
