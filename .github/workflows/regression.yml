@@ -287,6 +287,7 @@ jobs:
         with:
           role-to-assume: arn:aws:iam::850406765696:role/smp-regression-oidc
           aws-region: us-west-2
+          role-duration-seconds: 14400 # 4 hours
 
       - name: Download SMP binary
         run: |
@@ -323,6 +324,7 @@ jobs:
         with:
           role-to-assume: arn:aws:iam::850406765696:role/smp-regression-oidc
           aws-region: us-west-2
+          role-duration-seconds: 14400 # 4 hours
 
       - name: Login to Amazon ECR
         id: login-ecr
@@ -365,6 +367,7 @@ jobs:
         with:
           role-to-assume: arn:aws:iam::850406765696:role/smp-regression-oidc
           aws-region: us-west-2
+          role-duration-seconds: 14400 # 4 hours
 
       - name: Login to Amazon ECR
         id: login-ecr
@@ -404,6 +407,7 @@ jobs:
         with:
           role-to-assume: arn:aws:iam::850406765696:role/smp-regression-oidc
           aws-region: us-west-2
+          role-duration-seconds: 14400 # 4 hours
 
       - name: Login to Amazon ECR
         id: login-ecr
@@ -480,6 +484,7 @@ jobs:
         with:
           role-to-assume: arn:aws:iam::850406765696:role/smp-regression-oidc
           aws-region: us-west-2
+          role-duration-seconds: 14400 # 4 hours
 
       - name: Download SMP binary
         run: |
@@ -523,6 +528,7 @@ jobs:
         with:
           role-to-assume: arn:aws:iam::850406765696:role/smp-regression-oidc
           aws-region: us-west-2
+          role-duration-seconds: 14400 # 4 hours
 
       - name: Download SMP binary
         run: |
