@@ -1001,7 +1001,16 @@ where
             // skipped. In particular, not only does this matter for deadlocking during shutdown due
             // to improper writer behavior/flushing, but it also matters during initialization in
             // case where the current data file had a partial write.
-            let is_finalized = (reader_file_id != writer_file_id) || !self.ready_to_read;
+            //
+            // The `is_current_file_abandoned` flag is set when the writer detects corruption during
+            // initialization and marks itself to skip to the next file.  In this case, the ledger's
+            // writer file ID has not yet advanced (the skip is deferred to the next write), so
+            // reader_file_id == writer_file_id even though the writer will never write more data to
+            // this file.  Without this extra condition, the reader would busy-spin at EOF waiting
+            // for data that will never arrive.
+            let is_finalized = (reader_file_id != writer_file_id)
+                || !self.ready_to_read
+                || self.ledger.is_current_file_abandoned();
 
             // Try reading a record, which if successful, gives us a token to actually read/get a
             // reference to the record.  This is a slightly-tricky song-and-dance due to rustc not
