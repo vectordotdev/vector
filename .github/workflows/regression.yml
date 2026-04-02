@@ -474,7 +474,7 @@ jobs:
       - resolve-inputs
     # Job level permissions for downloading SMP results
     permissions:
-      contents: read  # Required to checkout code
+      contents: read # Required to checkout code
       id-token: write # Required for GitHub OIDC token exchange
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
