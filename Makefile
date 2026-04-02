@@ -508,7 +508,25 @@ check-markdown: ## Check that markdown is styled properly
 
 .PHONY: fix-markdown
 fix-markdown: ## Auto-fix markdown style issues
-	${MAYBE_ENVIRONMENT_EXEC} markdownlint --fix --config .markdownlint.jsonc $(shell git ls-files '*.md')
+	${MAYBE_ENVIRONMENT_EXEC} markdownlint-cli2 --fix $(shell git ls-files '*.md')
+
+.PHONY: check-prettier
+check-prettier: ## Check that JS/TS/YAML/JSON files are formatted with prettier
+	@for ext in yml yaml js ts tsx json; do \
+		files=$$(git ls-files "*.$$ext"); \
+		if [ -n "$$files" ]; then \
+			${MAYBE_ENVIRONMENT_EXEC} prettier --ignore-path .prettierignore --check $$files || exit 1; \
+		fi; \
+	done
+
+.PHONY: fix-prettier
+fix-prettier: ## Auto-fix JS/TS/YAML/JSON formatting with prettier
+	@for ext in yml yaml js ts tsx json; do \
+		files=$$(git ls-files "*.$$ext"); \
+		if [ -n "$$files" ]; then \
+			${MAYBE_ENVIRONMENT_EXEC} prettier --ignore-path .prettierignore --write $$files || exit 1; \
+		fi; \
+	done
 
 .PHONY: check-examples
 check-examples: ## Check that the config/examples files are valid

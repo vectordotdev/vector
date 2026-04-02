@@ -4,14 +4,14 @@ on:
   push:
     branches:
       - master
-  workflow_dispatch:  # Allow manual trigger from GitHub UI
+  workflow_dispatch: # Allow manual trigger from GitHub UI
 
 permissions:
   contents: read
 
 env:
   CI: true
-  CARGO_INCREMENTAL: '0'  # Disable incremental compilation for coverage
+  CARGO_INCREMENTAL: "0" # Disable incremental compilation for coverage
 
 jobs:
   coverage:
