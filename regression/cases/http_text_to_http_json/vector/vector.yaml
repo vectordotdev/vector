@@ -9,7 +9,7 @@ sources:
     type: "internal_metrics"
 
   logs:
-    type:    "http"
+    type: "http"
     address: "0.0.0.0:8282"
     decoding:
       codec: "bytes"
@@ -20,13 +20,13 @@ sources:
 
 sinks:
   prometheus:
-    type:    "prometheus_exporter"
-    inputs:  [ "internal_metrics" ]
+    type: "prometheus_exporter"
+    inputs: ["internal_metrics"]
     address: "0.0.0.0:9090"
 
   http_sink:
     type: "http"
-    uri:  "http://localhost:8080"
-    inputs: [ "logs" ]
+    uri: "http://localhost:8080"
+    inputs: ["logs"]
     encoding:
       codec: "json"

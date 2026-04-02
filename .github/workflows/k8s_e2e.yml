@@ -21,20 +21,20 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: 'Git ref to checkout'
+        description: "Git ref to checkout"
         required: false
         type: string
   workflow_call:
     inputs:
       ref:
-        description: 'Git ref to checkout'
+        description: "Git ref to checkout"
         required: false
         type: string
   pull_request:
   merge_group:
     types: [checks_requested]
   schedule:
-    - cron: '0 1 * * 2-6' # 01:00 UTC Tue-Sat
+    - cron: "0 1 * * 2-6" # 01:00 UTC Tue-Sat
 
 concurrency:
   # In flight runs will be canceled through re-trigger in the merge queue, scheduled run, or if

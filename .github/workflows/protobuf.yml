@@ -6,15 +6,15 @@ permissions:
 on:
   pull_request:
     paths:
-        - "proto/**"
-        - "lib/vector-core/proto/**"
+      - "proto/**"
+      - "lib/vector-core/proto/**"
   merge_group:
     types: [checks_requested]
 
 concurrency:
-    # `github.ref` is unique for MQ runs and PRs
-    group: ${{ github.workflow }}-${{ github.ref }}
-    cancel-in-progress: true
+  # `github.ref` is unique for MQ runs and PRs
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   validate-protos:
