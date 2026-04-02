@@ -170,11 +170,13 @@ duser
 dynamicwireless
 dyno
 ebfcee
+ector
 edenhill
 edns
 eeyun
 efgh
 Elhage
+elopment
 emerg
 endianess
 endler
@@ -646,6 +648,7 @@ wayfor
 wday
 webgraphviz
 websites
+websockets
 wensite
 whostheboss
 willreturn

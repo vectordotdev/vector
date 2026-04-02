@@ -34,11 +34,12 @@ CARGO_NEXTEST_VERSION="0.9.95"
 CARGO_DENY_VERSION="0.19.0"
 CARGO_MSRV_VERSION="0.18.4"
 CARGO_HACK_VERSION="0.6.43"
-DD_RUST_LICENSE_TOOL_VERSION="1.0.5"
+DD_RUST_LICENSE_TOOL_VERSION="1.0.6"
+CARGO_LLVM_COV_VERSION="0.8.4"
 WASM_PACK_VERSION="0.13.1"
-MARKDOWNLINT_VERSION="0.45.0"
-DATADOG_CI_VERSION="5.8.0"
-VDEV_VERSION="0.1.0"
+MARKDOWNLINT_CLI2_VERSION="0.22.0"
+DATADOG_CI_VERSION="5.9.0"
+VDEV_VERSION="0.3.0"
 
 ALL_MODULES=(
   rustup
@@ -48,9 +49,10 @@ ALL_MODULES=(
   cargo-deny
   cargo-msrv
   cargo-hack
+  cargo-llvm-cov
   dd-rust-license-tool
   wasm-pack
-  markdownlint
+  markdownlint-cli2
   datadog-ci
   release-flags  # Not a tool - sources release-flags.sh to set CI env vars
   vdev
@@ -87,9 +89,10 @@ Modules:
   cargo-deny
   cargo-msrv
   cargo-hack
+  cargo-llvm-cov
   dd-rust-license-tool
   wasm-pack
-  markdownlint
+  markdownlint-cli2
   datadog-ci
   vdev
 
@@ -138,6 +141,11 @@ maybe_install_cargo_tool() {
   if ! $version_cmd --version 2>/dev/null | grep -q "^${version_pattern}"; then
     cargo "${install[@]}" "$tool" --version "$version" --force --locked
   fi
+
+  # cargo-llvm-cov requires the llvm-tools-preview rustup component
+  if [[ "$tool" == "cargo-llvm-cov" ]]; then
+    rustup component add llvm-tools-preview
+  fi
 }
 
 # Helper for NPM packages
@@ -161,8 +169,8 @@ maybe_install_npm_package() {
 # Always ensure git safe.directory is set
 git config --global --add safe.directory "$(pwd)"
 
-REQUIRES_RUSTUP=(dd-rust-license-tool cargo-deb cross cargo-nextest cargo-deny cargo-msrv cargo-hack wasm-pack vdev)
-REQUIRES_BINSTALL=(cargo-deb cross cargo-nextest cargo-deny cargo-msrv cargo-hack wasm-pack vdev)
+REQUIRES_RUSTUP=(dd-rust-license-tool cargo-deb cross cargo-nextest cargo-deny cargo-msrv cargo-hack cargo-llvm-cov wasm-pack vdev)
+REQUIRES_BINSTALL=(cargo-deb cross cargo-nextest cargo-deny cargo-msrv cargo-hack cargo-llvm-cov wasm-pack vdev)
 require_binstall=false
 
 for tool in "${REQUIRES_BINSTALL[@]}"; do
@@ -205,9 +213,10 @@ maybe_install_cargo_tool cargo-nextest "${CARGO_NEXTEST_VERSION}"
 maybe_install_cargo_tool cargo-deny "${CARGO_DENY_VERSION}"
 maybe_install_cargo_tool cargo-msrv "${CARGO_MSRV_VERSION}"
 maybe_install_cargo_tool cargo-hack "${CARGO_HACK_VERSION}"
+maybe_install_cargo_tool cargo-llvm-cov "${CARGO_LLVM_COV_VERSION}"
 maybe_install_cargo_tool dd-rust-license-tool "${DD_RUST_LICENSE_TOOL_VERSION}"
 maybe_install_cargo_tool wasm-pack "${WASM_PACK_VERSION}"
 maybe_install_cargo_tool vdev "${VDEV_VERSION}"
 
-maybe_install_npm_package markdownlint markdownlint-cli "${MARKDOWNLINT_VERSION}"
+maybe_install_npm_package markdownlint-cli2 markdownlint-cli2 "${MARKDOWNLINT_CLI2_VERSION}"
 maybe_install_npm_package datadog-ci "@datadog/datadog-ci" "${DATADOG_CI_VERSION}" "v${DATADOG_CI_VERSION}" "version"

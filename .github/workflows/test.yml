@@ -5,6 +5,10 @@ on:
   merge_group:
     types: [checks_requested]
 
+# Workflow-level permissions - read access to repository contents
+permissions:
+  contents: read  # Required to checkout code
+
 concurrency:
   # `github.ref` is unique for MQ runs and PRs
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -143,11 +147,11 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           rust: true
-          markdownlint: true
+          markdownlint-cli2: true
       - run: make check-markdown
 
-  check-component-docs:
-    name: Check Component Docs
+  check-generated-docs:
+    name: Check Generated Docs
     runs-on: ubuntu-24.04-8core
     if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.component_docs == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
@@ -159,7 +163,7 @@ jobs:
           protoc: true
           cue: true
           libsasl2: true
-      - run: make check-component-docs
+      - run: make check-generated-docs
 
   check-rust-docs:
     name: Check Rust Docs
@@ -217,7 +221,7 @@ jobs:
       - check-licenses
       - check-docs
       - check-markdown
-      - check-component-docs
+      - check-generated-docs
       - check-rust-docs
       - test-vrl
       - build-vrl-playground
