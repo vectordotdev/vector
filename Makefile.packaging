@@ -17,7 +17,7 @@ export VERSION ?= $(shell command -v cargo >/dev/null && $(VDEV) version || echo
 
 # Delegate cross-compilation prerequisites to the main Makefile
 target/%/release/vector.tar.gz:
-	$(MAKE) $@
+	unset TRIPLE && $(MAKE) $@
 
 ##@ Packaging
 
