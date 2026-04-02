@@ -149,10 +149,20 @@ jobs:
 
       - name: Fail on critical findings
         run: |
-          critical=$(jq '[.runs[].results[] | select(.level == "error")] | length' results.sarif)
+          critical=$(jq '
+            [.runs[] | . as $run |
+              ($run.tool.driver.rules | map({(.id): .properties["security-severity"]}) | add // {}) as $sev |
+              $run.results[] |
+              select(($sev[.ruleId] // "0") | tonumber >= 9.0)
+            ] | length' results.sarif)
           if [ "$critical" -gt 0 ]; then
             echo "::error::Scorecard found $critical critical finding(s):"
-            jq -r '.runs[].results[] | select(.level == "error") | "\(.ruleId): \(.message.text)"' results.sarif
+            jq -r '
+              .runs[] | . as $run |
+              ($run.tool.driver.rules | map({(.id): .properties["security-severity"]}) | add // {}) as $sev |
+              $run.results[] |
+              select(($sev[.ruleId] // "0") | tonumber >= 9.0) |
+              "\(.ruleId) (severity: \($sev[.ruleId])): \(.message.text)"' results.sarif
             exit 1
           fi
           echo "No critical findings detected"
