@@ -13,17 +13,17 @@ on:
   workflow_call:
     inputs:
       ref:
-        description: 'Git ref to checkout'
+        description: "Git ref to checkout"
         required: false
         type: string
   workflow_dispatch:
     inputs:
       ref:
-        description: 'Git ref to checkout'
+        description: "Git ref to checkout"
         required: false
         type: string
   schedule:
-    - cron: '0 10 * * 1' # 10:00 UTC Monday (6 AM EST NYC)
+    - cron: "0 10 * * 1" # 10:00 UTC Monday (6 AM EST NYC)
 
 permissions:
   contents: read
