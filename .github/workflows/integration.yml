@@ -26,7 +26,7 @@ on:
   workflow_dispatch:
   pull_request:
   merge_group:
-    types: [ checks_requested ]
+    types: [checks_requested]
 
 concurrency:
   # `github.event.number` exists for pull requests, otherwise fall back to SHA for merge queue.
@@ -77,7 +77,7 @@ jobs:
       needs.changes.outputs.integration-yml == 'true' ||
       needs.changes.outputs.int-tests-any == 'true' ||
       needs.changes.outputs.e2e-tests-any == 'true')))
-     }}
+      }}
     uses: ./.github/workflows/build-test-runner.yml
     with:
       commit_sha: ${{ inputs.ref || github.sha }}
@@ -96,13 +96,43 @@ jobs:
       matrix:
         # TODO: Add "splunk" back once https://github.com/vectordotdev/vector/issues/23474 is fixed.
         # If you modify this list, please also update the `int_tests` job in changes.yml.
-        service: [
-          "amqp", "appsignal", "axiom", "aws", "azure", "clickhouse", "databend", "datadog-agent",
-          "datadog-logs", "datadog-metrics", "datadog-traces", "dnstap", "docker-logs", "doris", "elasticsearch",
-          "eventstoredb", "fluent", "gcp", "greptimedb", "http-client", "influxdb", "kafka", "logstash",
-          "loki", "mqtt", "mongodb", "nats", "nginx", "opentelemetry", "postgres", "prometheus", "pulsar",
-          "redis", "webhdfs"
-        ]
+        service:
+          [
+            "amqp",
+            "appsignal",
+            "axiom",
+            "aws",
+            "azure",
+            "clickhouse",
+            "databend",
+            "datadog-agent",
+            "datadog-logs",
+            "datadog-metrics",
+            "datadog-traces",
+            "dnstap",
+            "docker-logs",
+            "doris",
+            "elasticsearch",
+            "eventstoredb",
+            "fluent",
+            "gcp",
+            "greptimedb",
+            "http-client",
+            "influxdb",
+            "kafka",
+            "logstash",
+            "loki",
+            "mqtt",
+            "mongodb",
+            "nats",
+            "nginx",
+            "opentelemetry",
+            "postgres",
+            "prometheus",
+            "pulsar",
+            "redis",
+            "webhdfs"
+          ]
     timeout-minutes: 90
     steps:
       - name: Download JSON artifact from changes.yml
@@ -167,7 +197,6 @@ jobs:
           path: target/coverage/lcov.info
           if-no-files-found: ignore
 
-
   e2e-tests:
     runs-on: ubuntu-24.04-8core
     needs:
@@ -178,7 +207,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        service: [ "datadog-logs", "datadog-metrics", "opentelemetry-logs", "opentelemetry-metrics" ]
+        service: ["datadog-logs", "datadog-metrics", "opentelemetry-logs", "opentelemetry-metrics"]
     timeout-minutes: 90
 
     steps:

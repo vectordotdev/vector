@@ -11,7 +11,7 @@ on:
   workflow_call:
     inputs:
       ref:
-        description: 'Git ref to checkout'
+        description: "Git ref to checkout"
         required: false
         type: string
 
@@ -23,7 +23,7 @@ permissions:
   contents: read
 
 env:
-  CARGO_INCREMENTAL: "0"
+  CARGO_INCREMENTAL: "0" # Disable incremental compilation for coverage
   CI: true
 
 jobs:
