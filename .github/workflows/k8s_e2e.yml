@@ -164,7 +164,7 @@ jobs:
   test-e2e-kubernetes:
     name: K8s ${{ matrix.kubernetes_version.version }} / ${{ matrix.container_runtime }} (${{ matrix.kubernetes_version.role }})
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 60
     needs:
       - build-x86_64-unknown-linux-gnu
       - compute-k8s-test-plan
@@ -208,6 +208,37 @@ jobs:
           timeout_minutes: 45
           max_attempts: 3
           command: make test-e2e-kubernetes
+
+      - name: Collect K8s diagnostics on failure
+        if: ${{ !success() }}
+        run: |
+          set +e +o pipefail
+          # Best-effort diagnostics -- never fail the job
+          run_diag() { local label="$1"; shift; echo "--- $label ---"; "$@" 2>&1 || true; echo; }
+          # For commands with pipes that can't be passed as args
+          run_diag_sh() { echo "--- $1 ---"; bash -c "$2" 2>&1 || true; echo; }
+
+          run_diag "Cluster-wide pods" kubectl get pods -A -o wide
+          run_diag "Cluster-wide events" kubectl get events -A --sort-by=.metadata.creationTimestamp
+          run_diag "Nodes" kubectl get nodes -o wide
+
+          for ns in $(kubectl get namespaces -o jsonpath='{.items[*].metadata.name}' 2>/dev/null | tr ' ' '\n' | grep -E '^vector-' || true); do
+            echo "=========================================="
+            echo "=== Namespace: $ns ==="
+            echo "=========================================="
+            run_diag "Pods"             kubectl get pods -n "$ns" -o wide
+            run_diag "Pod descriptions" kubectl describe pods -n "$ns"
+            run_diag "Events"           kubectl get events -n "$ns" --sort-by=.metadata.creationTimestamp
+            run_diag "ConfigMaps"       kubectl get configmaps -n "$ns" -o yaml
+
+            for pod in $(kubectl get pods -n "$ns" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || true); do
+              run_diag "Logs: $pod"          kubectl logs -n "$ns" "$pod" --all-containers=true --tail=100
+              run_diag "Previous logs: $pod" kubectl logs -n "$ns" "$pod" --all-containers=true --previous --tail=50
+            done
+          done
+
+          run_diag_sh "Node resources" "kubectl describe nodes | grep -A20 'Allocated resources'"
+          run_diag "Minikube logs" minikube logs --length=100
 
   final-result:
     name: K8s E2E Suite
