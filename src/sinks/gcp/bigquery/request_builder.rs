@@ -16,6 +16,11 @@ use crate::sinks::util::metadata::RequestMetadataBuilder;
 // https://cloud.google.com/bigquery/docs/reference/storage/rpc/google.cloud.bigquery.storage.v1#appendrowsrequest
 pub const MAX_BATCH_PAYLOAD_SIZE: usize = 10_000_000;
 
+// This buffer is subtracted from the row length budget to account for varint growth in nested message
+// length prefixes. As rows fill up to 10MB, the size of the varint required to encode the length
+// grows to 4 bytes (up from 1). The same growth occurs one level up, in ProtoData.
+const LENGTH_PREFIX_BUFFER: usize = 6;
+
 #[derive(Debug, snafu::Snafu)]
 pub enum BigqueryRequestBuilderError {
     #[snafu(display("Encoding protobuf failed: {}", message))]
@@ -76,6 +81,15 @@ impl BigqueryRequestBuilder {
             )),
         }
         .encoded_len();
+
+        if request_overhead.saturating_add(LENGTH_PREFIX_BUFFER) >= MAX_BATCH_PAYLOAD_SIZE {
+            // This could only really happen if the proto schema is extremely large.
+            // Unlikely to be a problem in the real world but it's better to be defensive.
+            return Err(BigqueryRequestBuilderError::ProtobufEncoding {
+                message: format!("Request overhead ({request_overhead} bytes) is too large"),
+            });
+        }
+
         Ok(Self {
             protobuf_serializer,
             write_stream,
@@ -108,7 +122,8 @@ impl IncrementalRequestBuilder<Vec<Event>> for BigqueryRequestBuilder {
         &mut self,
         input: Vec<Event>,
     ) -> Vec<Result<(Self::Metadata, Self::Payload), Self::Error>> {
-        let max_serialized_rows_len = MAX_BATCH_PAYLOAD_SIZE - self.request_overhead;
+        let max_serialized_rows_len =
+            MAX_BATCH_PAYLOAD_SIZE - self.request_overhead - LENGTH_PREFIX_BUFFER;
         let mut results = vec![];
         let mut event_finalizers = EventFinalizers::DEFAULT;
         let mut chunk_metadata = RequestMetadataBuilder::default();
@@ -129,9 +144,7 @@ impl IncrementalRequestBuilder<Vec<Event>> for BigqueryRequestBuilder {
                     // A single event that exceeds the limit cannot be sent in any request, reject it immediately.
                     results.push(Err(BigqueryRequestBuilderError::ProtobufEncoding {
                         message: format!(
-                            "Encoded event ({} bytes) exceeds the maximum allowed serialized rows size ({} bytes).",
-                            bytes.len(),
-                            max_serialized_rows_len
+                            "Event ({row_framed_size} bytes including proto framing) exceeds the maximum allowed serialized rows size ({max_serialized_rows_len} bytes).",
                         ),
                     }));
                 } else {

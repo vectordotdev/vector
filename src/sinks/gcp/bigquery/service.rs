@@ -91,8 +91,9 @@ impl DriverResponse for BigqueryResponse {
                     | Ok(super::proto::google::rpc::Code::FailedPrecondition)
                     | Ok(super::proto::google::rpc::Code::OutOfRange)
                     | Ok(super::proto::google::rpc::Code::Unimplemented) => EventStatus::Rejected,
-                    // Unauthenticated is intentionally excluded. Our token refresher runs concurrently
-                    // and a token may have just expired, so a retry can succeed.
+                    // Unauthenticated is intentionally excluded since a bearer token may have just expired
+                    // and a retry will pick up the refreshed token.
+                    Ok(super::proto::google::rpc::Code::Unauthenticated) => EventStatus::Errored,
                     _ => EventStatus::Errored,
                 }
             }
@@ -152,11 +153,14 @@ impl RetryLogic for BigqueryRetryLogic {
             BigqueryServiceError::Transport { .. } => true,
             BigqueryServiceError::ResponseStreamClosed => true,
             // Allow transient gRPC status codes to be retried.
+            // Unauthenticated is included because a bearer token may expire between the token
+            // refresher updating it and the request being sent; a retry will pick up the new token.
             BigqueryServiceError::Request { status } => matches!(
                 status.code(),
                 tonic::Code::Unavailable
                     | tonic::Code::ResourceExhausted
                     | tonic::Code::DeadlineExceeded
+                    | tonic::Code::Unauthenticated
             ),
         }
     }
