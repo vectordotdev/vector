@@ -187,7 +187,11 @@ impl BigqueryService {
         let service = proto::big_query_write_client::BigQueryWriteClient::with_interceptor(
             channel,
             AuthInterceptor { auth },
-        );
+        )
+        // AppendRowsResponse.row_errors is a repeated field
+        // that can grow with batch size, so remove the cap to avoid decoding failures on large
+        // error responses.
+        .max_decoding_message_size(usize::MAX);
         Self { service }
     }
 }
@@ -211,10 +215,6 @@ impl Service<BigqueryRequest> for BigqueryService {
         Box::pin(async move {
             // Ideally, we would maintain the gRPC stream, detect when auth expired and re-request with new auth.
             // But issuing a new request every time leads to more comprehensible code with reasonable performance.
-            trace!(
-                message = "Sending request to BigQuery.",
-                ?request.request,
-            );
             let stream = tokio_stream::once(request.request);
             let response = client.append_rows(stream).await?;
             match response.into_inner().message().await? {
