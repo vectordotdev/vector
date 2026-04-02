@@ -3,10 +3,10 @@ description: Login to GHCR and pull the pre-built test runner image for integrat
 
 inputs:
   github_token:
-    description: 'GitHub token for GHCR authentication'
+    description: "GitHub token for GHCR authentication"
     required: true
   commit_sha:
-    description: 'Commit SHA used to tag the test runner image'
+    description: "Commit SHA used to tag the test runner image"
     required: true
 
 runs:
