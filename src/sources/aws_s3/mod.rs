@@ -242,12 +242,12 @@ impl AwsS3Config {
         let region = self.region.region();
         let endpoint = self.region.endpoint();
 
-        let s3_client = create_client::<S3ClientBuilder>(
+        let (s3_client, region) = create_client_and_region::<S3ClientBuilder>(
             &S3ClientBuilder {
                 force_path_style: Some(self.force_path_style),
             },
             &self.auth,
-            region.clone(),
+            region,
             endpoint.clone(),
             proxy,
             self.tls_options.as_ref(),
@@ -261,11 +261,22 @@ impl AwsS3Config {
 
         match self.sqs {
             Some(ref sqs) => {
-                let (sqs_client, region) = create_client_and_region::<SqsClientBuilder>(
+                let sqs_region = sqs
+                    .region
+                    .as_ref()
+                    .and_then(|r| r.region())
+                    .or_else(|| Some(region.clone()));
+                let sqs_endpoint = sqs
+                    .region
+                    .as_ref()
+                    .and_then(|r| r.endpoint())
+                    .or_else(|| endpoint.clone());
+
+                let sqs_client = create_client::<SqsClientBuilder>(
                     &SqsClientBuilder {},
                     &self.auth,
-                    region.clone(),
-                    endpoint,
+                    sqs_region,
+                    sqs_endpoint,
                     proxy,
                     sqs.tls_options.as_ref(),
                     sqs.timeout.as_ref(),
