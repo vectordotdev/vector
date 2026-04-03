@@ -1,16 +1,16 @@
-import tocbot from 'tocbot';
+import tocbot from "tocbot";
 
 // Table of contents for documentation pages
 const tableOfContents = () => {
-  if (document.getElementById('toc')) {
+  if (document.getElementById("toc")) {
     tocbot.init({
-      tocSelector: '#toc',
-      contentSelector: '#page-content',
-      headingSelector: 'h2,h3,h4,h5',
+      tocSelector: "#toc",
+      contentSelector: "#page-content",
+      headingSelector: "h2,h3,h4,h5",
       scrollSmoothDuration: 400
     });
   }
-}
+};
 
 const showCodeFilename = () => {
   var els = document.getElementsByClassName("highlight");
@@ -21,9 +21,9 @@ const showCodeFilename = () => {
       els[i].parentNode.insertBefore(newNode, els[i]);
     }
   }
-}
+};
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener("DOMContentLoaded", () => {
   // search.start();
 
   tableOfContents();

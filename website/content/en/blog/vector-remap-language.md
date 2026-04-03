@@ -330,14 +330,14 @@ maintaining flexibility. This makes VRL ideal for always-up,
 performance-sensitive infrastructure like observability pipelines. To illustrate
 how we achieve this, below is a VRL feature matrix across these two principles:
 
-| Feature                   | Safety | Performance |
-|:--------------------------|:------:|:-----------:|
-| [Progressive type safety] |   ✅    |             |
-| [Fail safety]             |   ✅    |             |
-| [Memory safety]           |   ✅    |             |
-| [Ergonomic safety]        |   ✅    |      ✅      |
-| [Vector/Rust native]      |   ✅    |      ✅      |
-| [Stateless]               |   ✅    |      ✅      |
+| Feature | Safety | Performance |
+| :-- | :----: | :---------: |
+| [Progressive type safety] | ✅ | |
+| [Fail safety] | ✅ | |
+| [Memory safety] | ✅ | |
+| [Ergonomic safety] | ✅ | ✅ |
+| [Vector/Rust native] | ✅ | ✅ |
+| [Stateless] | ✅ | ✅ |
 
 For more info on each click on the feature, but for the purposes of
 demonstrating how VRL is unique, let's touch on the first two: *progressive type
@@ -411,7 +411,7 @@ either specify the type of the `.log` field or handle the error in the event
 that `.log` is not a string. To resolve this error, the user must do one of
 three things:
 
-1.  **Handle the error**
+1. **Handle the error**
 
     ```coffee
     ., err = parse_common_log(.log)
@@ -430,7 +430,7 @@ three things:
     handling this error is a *very* common mistake that would otherwise result
     in data loss and downtime.
 
-2.  **Raise the error and abort**
+2. **Raise the error and abort**
 
     ```coffee
     . = parse_common_log!(.log)
@@ -445,7 +445,7 @@ three things:
     operators. Again, this forces the users to decide how to handle errors
     instead of being surprised by them.
 
-3.  **Specify types**
+3. **Specify types**
 
     ```coffee
     .log = to_string!(.log)
