@@ -1,5 +1,5 @@
 features:
-- azure-integration-tests
+  - azure-integration-tests
 
 test_filter: ::azure_
 
@@ -10,11 +10,11 @@ env:
   LOGSTASH_ADDRESS: 0.0.0.0:8081
 
 matrix:
-  version: [ 3.35.0 ]
+  version: [3.35.0]
 
 # changes to these files/paths will invoke the integration test in CI
 # expressions are evaluated using https://github.com/micromatch/picomatch
 paths:
-- "src/sinks/azure_**"
-- "src/sinks/util/**"
-- "tests/integration/azure/**"
+  - "src/sinks/azure_**"
+  - "src/sinks/util/**"
+  - "tests/integration/azure/**"
