@@ -118,6 +118,10 @@ else
   fi
 fi
 
+# Remove stale combined coverage from a previous (possibly failed) attempt so
+# retries via nick-fields/retry don't append to leftover data.
+rm -f target/coverage/lcov-combined.info
+
 for TEST_ENV in "${TEST_ENVIRONMENTS[@]}"; do
   # Execution flow for each environment:
   # 1. Clean up previous test output

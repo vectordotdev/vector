@@ -432,7 +432,7 @@ test-component-validation: ## Runs component validation tests
 	${MAYBE_ENVIRONMENT_EXEC} ${TEST_RUNNER} --no-fail-fast --no-default-features --features component-validation-tests --status-level pass --test-threads 4 --lib components::validation::tests
 
 .PHONY: coverage-report
-coverage-report: ## Generate lcov report after running tests with COVERAGE=1 (outputs lcov.info)
+coverage-report: ## Generate lcov report after running tests with COVERAGE=true (outputs lcov.info)
 	cargo llvm-cov report --lcov --output-path lcov.info
 
 ##@ Benching (Supports `ENVIRONMENT=true`)
