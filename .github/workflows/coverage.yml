@@ -4,6 +4,11 @@
 # integration) with code coverage instrumentation on a single commit. Results
 # are merged into one lcov report and uploaded to Datadog. Also runs on a
 # weekly schedule to ensure full baseline coverage is always fresh.
+#
+# Limitation: integration and E2E coverage only instruments the test runner
+# (cargo-nextest), not the separately-launched Vector binary inside compose
+# services. Instrumenting the service binary would require building it with
+# cargo-llvm-cov and merging its runtime profdata, which is out of scope here.
 
 name: Coverage
 
