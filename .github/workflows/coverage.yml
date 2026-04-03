@@ -16,7 +16,7 @@ on:
         type: string
 
   schedule:
-    - cron: "0 2 * * 0"  # 2 AM UTC every Sunday
+    - cron: "0 2 * * 0" # 2 AM UTC every Sunday
   workflow_dispatch:
 
 permissions:

@@ -69,8 +69,8 @@ jobs:
     if: ${{
       always() &&
       (github.event_name == 'workflow_dispatch' ||
-       github.event_name == 'workflow_call' ||
-       inputs.run_all == true ||
+      github.event_name == 'workflow_call' ||
+      inputs.run_all == true ||
       (github.event_name == 'merge_group' &&
       needs.changes.result == 'success' &&
       (needs.changes.outputs.dependencies == 'true' ||
