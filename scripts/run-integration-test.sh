@@ -149,8 +149,12 @@ for TEST_ENV in "${TEST_ENVIRONMENTS[@]}"; do
     # Normalize source paths in coverage report so they are relative to the repo root.
     # The test runner container mounts source at /home/vector; strip that prefix so
     # Datadog can resolve files against the repository root (e.g. SF:src/foo.rs).
+    # Append each environment's coverage to a combined file so multi-env services
+    # preserve all coverage data (not just the last environment).
     if [[ "$COVERAGE" == "true" && "$RET" -eq 0 && -f target/coverage/lcov.info ]]; then
       sed -i 's|SF:/home/vector/|SF:|g' target/coverage/lcov.info
+      cat target/coverage/lcov.info >> target/coverage/lcov-combined.info
+      rm target/coverage/lcov.info
     fi
 
     # Upload test results only if the vdev test step ran
@@ -168,5 +172,10 @@ for TEST_ENV in "${TEST_ENVIRONMENTS[@]}"; do
     exit "$RET"
   fi
 done
+
+# Promote combined coverage file to the expected output path
+if [[ "$COVERAGE" == "true" && -f target/coverage/lcov-combined.info ]]; then
+  mv target/coverage/lcov-combined.info target/coverage/lcov.info
+fi
 
 exit 0
