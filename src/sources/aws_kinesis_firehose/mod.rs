@@ -1079,6 +1079,83 @@ mod tests {
         .await;
     }
 
+    // Test there is no regression for existing setups and non-AWS test senders that previously
+    // ignored X-Amz-Firehose-Common-Attributes header after firehose common attributes were introduced
+    // (https://github.com/vectordotdev/vector/pull/24914#discussion_r3024341032)
+    #[tokio::test]
+    async fn aws_kinesis_firehose_ignores_malformed_common_attributes_if_none_configured() {
+        assert_source_compliance(&SOURCE_TAGS, async move {
+            let (rx, addr, _guard) =
+                source(None, None, false, Default::default(), true, true, vec![]).await;
+
+            let timestamp: DateTime<Utc> = Utc::now();
+
+            let res = spawn_send(
+                addr,
+                timestamp,
+                vec![RECORD.as_bytes()],
+                None,
+                true,
+                Compression::None,
+                Some("malformed-common-attributes"),
+            )
+            .await;
+
+            let mut events = collect_ready(rx).await;
+            let res = res.await.unwrap().unwrap();
+            assert_eq!(200, res.status().as_u16());
+
+            let event = events.pop().unwrap();
+            let log = event.as_log();
+            let meta = log.metadata();
+
+            // event data, currently assumes default bytes deserializer
+            assert_eq!(log.value(), &value!(Bytes::from(RECORD.to_owned())));
+
+            // vector metadata
+            assert_eq!(
+                meta.value().get(path!("vector", "source_type")).unwrap(),
+                &value!("aws_kinesis_firehose")
+            );
+            assert!(
+                meta.value()
+                    .get(path!("vector", "ingest_timestamp"))
+                    .unwrap()
+                    .is_timestamp()
+            );
+
+            // source metadata
+            assert_eq!(
+                meta.value()
+                    .get(path!("aws_kinesis_firehose", "request_id"))
+                    .unwrap(),
+                &value!(REQUEST_ID)
+            );
+            assert_eq!(
+                meta.value()
+                    .get(path!("aws_kinesis_firehose", "source_arn"))
+                    .unwrap(),
+                &value!(SOURCE_ARN)
+            );
+            assert_eq!(
+                meta.value()
+                    .get(path!("aws_kinesis_firehose", "timestamp"))
+                    .unwrap(),
+                &value!(timestamp.trunc_subsecs(3))
+            );
+            assert_eq!(
+                meta.value()
+                    .get(path!("aws_kinesis_firehose", "common_attributes"))
+                    .unwrap(),
+                &value!(expected_common_attributes)
+            );
+
+            let response: models::FirehoseResponse = res.json().await.unwrap();
+            assert_eq!(response.request_id, REQUEST_ID);
+        })
+        .await;
+    }
+
     #[tokio::test]
     async fn aws_kinesis_firehose_rejects_bad_access_key() {
         let (_rx, addr, _guard) = source(

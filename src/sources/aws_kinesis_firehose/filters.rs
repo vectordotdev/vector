@@ -62,7 +62,9 @@ pub fn firehose(
                 })
                 .untuple_one(),
         )
-        .and(parse_common_attributes_header())
+        .and(parse_common_attributes_header(
+            !context.common_attributes.is_empty(),
+        ))
         .and(parse_body())
         .and(warp::any().map(move || context.clone()))
         .and_then(handlers::firehose)
@@ -112,13 +114,18 @@ fn parse_body() -> impl Filter<Extract = (FirehoseRequest,), Error = warp::rejec
 }
 
 /// Parse AWS Kinesis Firehose X-Amz-Firehose-Common-Attributes header
-fn parse_common_attributes_header()
--> impl Filter<Extract = (HashMap<String, String>,), Error = warp::reject::Rejection> + Clone {
+fn parse_common_attributes_header(
+    is_common_attributes_configured: bool,
+) -> impl Filter<Extract = (HashMap<String, String>,), Error = warp::reject::Rejection> + Clone {
     warp::any()
         .and(warp::header("X-Amz-Firehose-Request-Id"))
         .and(warp::header::optional("X-Amz-Firehose-Common-Attributes"))
         .and_then(
-            |request_id: String, common_attributes: Option<String>| async move {
+            move |request_id: String, common_attributes: Option<String>| async move {
+                if !is_common_attributes_configured {
+                    return Ok(HashMap::new());
+                }
+
                 match common_attributes {
                     Some(common_attributes) => serde_json::from_str(&common_attributes)
                         .context(ParseSnafu {
