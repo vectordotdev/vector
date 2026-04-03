@@ -233,12 +233,9 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
-        let common_attributes_path =
-            self.common_attributes
-                .is_empty()
-                .then_some(LegacyKey::InsertIfEmpty(owned_value_path!(
-                    "common_attributes"
-                )));
+        let common_attributes_path = (!self.common_attributes.is_empty()).then_some(
+            LegacyKey::InsertIfEmpty(owned_value_path!("common_attributes")),
+        );
         let log_namespace = global_log_namespace.merge(self.log_namespace);
         let schema_definition = self
             .decoding
@@ -263,7 +260,7 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
                 Self::NAME,
                 common_attributes_path,
                 &owned_value_path!("common_attributes"),
-                Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                Kind::object(Collection::from_unknown(Kind::bytes().or_undefined())).or_undefined(),
                 None,
             );
 
