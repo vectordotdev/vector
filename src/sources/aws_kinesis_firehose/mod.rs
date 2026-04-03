@@ -13,7 +13,7 @@ use vector_lib::{
     sensitive_string::SensitiveString,
     tls::MaybeTlsIncomingStream,
 };
-use vrl::value::Kind;
+use vrl::value::{Kind, kind::Collection};
 
 use crate::{
     codecs::DecodingConfig,
@@ -233,9 +233,16 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+        let common_attributes_path =
+            self.common_attributes
+                .is_empty()
+                .then_some(LegacyKey::InsertIfEmpty(owned_value_path!(
+                    "common_attributes"
+                )));
+        let log_namespace = global_log_namespace.merge(self.log_namespace);
         let schema_definition = self
             .decoding
-            .schema_definition(global_log_namespace.merge(self.log_namespace))
+            .schema_definition(log_namespace)
             .with_standard_vector_source_metadata()
             .with_source_metadata(
                 Self::NAME,
@@ -249,6 +256,14 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
                 Some(LegacyKey::InsertIfEmpty(owned_value_path!("source_arn"))),
                 &owned_value_path!("source_arn"),
                 Kind::bytes(),
+                None,
+            )
+            // for common attributes dynamically added from X-Amz-Firehose-Common-Attributes header
+            .with_source_metadata(
+                Self::NAME,
+                common_attributes_path,
+                &owned_value_path!("common_attributes"),
+                Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                 None,
             );
 
