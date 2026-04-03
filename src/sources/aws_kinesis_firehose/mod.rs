@@ -1143,11 +1143,10 @@ mod tests {
                     .unwrap(),
                 &value!(timestamp.trunc_subsecs(3))
             );
-            assert_eq!(
+            assert!(
                 meta.value()
                     .get(path!("aws_kinesis_firehose", "common_attributes"))
-                    .unwrap(),
-                &value!(expected_common_attributes)
+                    .is_none()
             );
 
             let response: models::FirehoseResponse = res.json().await.unwrap();
