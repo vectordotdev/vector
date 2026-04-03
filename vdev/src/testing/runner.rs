@@ -301,7 +301,6 @@ impl IntegrationTestRunner {
         integration: Option<String>,
         config: &IntegrationRunnerConfig,
         network: Option<String>,
-        coverage: bool,
     ) -> Result<Self> {
         let mut volumes: Vec<String> = config
             .volumes
@@ -311,11 +310,11 @@ impl IntegrationTestRunner {
 
         volumes.push(format!("{VOLUME_TARGET}:/output"));
 
-        if coverage {
-            let coverage_dir = std::path::Path::new(app::path()).join(LOCAL_COVERAGE_OUTPUT_DIR);
-            std::fs::create_dir_all(&coverage_dir)?;
-            volumes.push(format!("{}:{COVERAGE_OUTPUT_DIR}", coverage_dir.display()));
-        }
+        // Always mount the coverage directory so the container can be reused
+        // for coverage runs without needing to be recreated.
+        let coverage_dir = std::path::Path::new(app::path()).join(LOCAL_COVERAGE_OUTPUT_DIR);
+        std::fs::create_dir_all(&coverage_dir)?;
+        volumes.push(format!("{}:{COVERAGE_OUTPUT_DIR}", coverage_dir.display()));
 
         Ok(Self {
             integration,
