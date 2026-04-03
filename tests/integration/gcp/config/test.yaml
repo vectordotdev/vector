@@ -1,8 +1,8 @@
 features:
-- gcp-integration-tests
-- chronicle-integration-tests
+  - gcp-integration-tests
+  - chronicle-integration-tests
 
-test_filter: '::gcp'
+test_filter: "::gcp"
 
 env:
   EMULATOR_ADDRESS: http://gcloud-pubsub:8681
@@ -14,10 +14,10 @@ matrix:
 # changes to these files/paths will invoke the integration test in CI
 # expressions are evaluated using https://github.com/micromatch/picomatch
 paths:
-- "src/internal_events/gcp_pubsub.rs"
-- "src/sources/gcp_pubsub.rs"
-- "src/sources/util/**"
-- "src/sinks/gcp/**"
-- "src/sinks/util/**"
-- "src/gcp.rs"
-- "tests/integration/gcp/**"
+  - "src/internal_events/gcp_pubsub.rs"
+  - "src/sources/gcp_pubsub.rs"
+  - "src/sources/util/**"
+  - "src/sinks/gcp/**"
+  - "src/sinks/util/**"
+  - "src/gcp.rs"
+  - "tests/integration/gcp/**"

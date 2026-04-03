@@ -23,18 +23,18 @@ on:
         required: true
 
 permissions:
-  contents: read  # Restrictive default
+  contents: read # Restrictive default
 
 jobs:
   create_preview_site:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
-      contents: read          # Required for repository context
-      actions: read           # Required to download artifacts
-      issues: write           # Required to post preview link comments
-      pull-requests: write    # Required to post preview link comments
-      statuses: write         # Required to update commit status
+      contents: read # Required for repository context
+      actions: read # Required to download artifacts
+      issues: write # Required to post preview link comments
+      pull-requests: write # Required to post preview link comments
+      statuses: write # Required to update commit status
     steps:
       # Get the artifacts with the PR number and branch name
       - name: Download artifact
