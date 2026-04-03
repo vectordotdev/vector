@@ -111,10 +111,10 @@ fn git_path(path: &str) -> std::io::Result<String> {
         .output();
 
     output_result.map(|output| {
-        let mut path = String::from_utf8(output.stdout).expect("valid UTF-8");
-        path.retain(|c| !c.is_ascii_whitespace());
-
-        path
+        String::from_utf8(output.stdout)
+            .expect("valid UTF-8")
+            .trim_end_matches(['\r', '\n'])
+            .to_owned()
     })
 }
 
