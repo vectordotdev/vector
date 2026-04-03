@@ -4,7 +4,7 @@
 #    - manual dispatch in GH UI
 #    - on a PR commit if the kubernetes_logs source was changed
 #    - in the merge queue
-#    - on a schedule at midnight UTC Tue-Sat
+#    - on a weekly schedule (Monday 01:00 UTC)
 #    - on demand by either of the following comments in a PR:
 #        - '/ci-run-k8s'
 #        - '/ci-run-all'
@@ -34,7 +34,7 @@ on:
   merge_group:
     types: [checks_requested]
   schedule:
-    - cron: "0 1 * * 2-6" # 01:00 UTC Tue-Sat
+    - cron: "0 1 * * 1" # 01:00 UTC every Monday
 
 concurrency:
   # In flight runs will be canceled through re-trigger in the merge queue, scheduled run, or if
