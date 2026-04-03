@@ -1710,9 +1710,8 @@ mod tests {
             Value::Float(ordered_float::NotNan::new(9.81).unwrap()),
         );
         log.insert("f_utf8", "hello");
-        // Timestamp/date fields left null — Arrow builder doesn't support "UTC"
-        // timezone string without chrono-tz, so we verify schema creation works
-        // and null handling is correct.
+        // Timestamp/date fields intentionally left null to verify that the
+        // schema handles missing values correctly (nullable columns).
 
         let mut buffer = BytesMut::new();
         serializer
