@@ -11,7 +11,9 @@ function Install-ChocoPackage {
 
     for ($attempt = 1; $attempt -le $MaxRetries; $attempt++) {
         choco install $Package --execution-timeout=7200 -y
-        if ($LASTEXITCODE -eq 0) {
+        # choco can return exit code 0 even on 5xx errors from the feed,
+        # so verify the package is actually installed
+        if ($LASTEXITCODE -eq 0 -and (choco list --local-only --exact $Package | Select-String $Package)) {
             return
         }
 
