@@ -47,7 +47,7 @@ use crate::{
 pub struct AzureBlobTlsConfig {
     /// Absolute path to an additional CA certificate file.
     ///
-    /// The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
+    /// The certificate must be in PEM (X.509) format.
     #[serde(alias = "ca_path")]
     #[configurable(metadata(docs::examples = "/path/to/certificate_authority.crt"))]
     #[configurable(metadata(docs::human_name = "CA File Path"))]
