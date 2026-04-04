@@ -32,11 +32,11 @@ on:
         description: "The SHA to use for comparison (optional). If not provided, it defaults to the current HEAD of the origin/master branch."
         required: false
   schedule:
-    - cron: '0 7 * * 1' # Runs at 7 AM UTC on Mondays
+    - cron: "0 7 * * 1" # Runs at 7 AM UTC on Mondays
 
 # Workflow-level permissions - read access to repository contents
 permissions:
-  contents: read  # Required to checkout code
+  contents: read # Required to checkout code
 
 env:
   SINGLE_MACHINE_PERFORMANCE_API: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_API }}
@@ -44,7 +44,6 @@ env:
   SMP_REPLICAS: 100 # default is 10
 
 jobs:
-
   resolve-inputs:
     runs-on: ubuntu-24.04
     outputs:
@@ -57,7 +56,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          fetch-depth: 0  # need to pull repository history to find merge bases
+          fetch-depth: 0 # need to pull repository history to find merge bases
 
       - name: Set and Validate SHAs
         id: set_and_validate_shas
@@ -195,8 +194,8 @@ jobs:
       - resolve-inputs
     # Job-level permissions for artifact upload
     permissions:
-      contents: read  # Required to checkout code
-      actions: write  # Required to upload artifacts
+      contents: read # Required to checkout code
+      actions: write # Required to upload artifacts
     steps:
       - uses: colpal/actions-clean@36e6ca1abd35efe61cb60f912bd7837f67887c8a # v1.1.1
 
@@ -209,7 +208,7 @@ jobs:
 
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
 
       - name: Build 'vector' target image
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
@@ -238,8 +237,8 @@ jobs:
       - resolve-inputs
     # Job-level permissions for artifact upload
     permissions:
-      contents: read  # Required to checkout code
-      actions: write  # Required to upload artifacts
+      contents: read # Required to checkout code
+      actions: write # Required to upload artifacts
     steps:
       - uses: colpal/actions-clean@36e6ca1abd35efe61cb60f912bd7837f67887c8a # v1.1.1
 
@@ -252,7 +251,7 @@ jobs:
 
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
 
       - name: Build 'vector' target image
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
@@ -305,7 +304,7 @@ jobs:
       - confirm-valid-credentials
       - build-baseline
     steps:
-      - name: 'Download baseline image'
+      - name: "Download baseline image"
         uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
         with:
           name: baseline-image
@@ -326,7 +325,7 @@ jobs:
         uses: aws-actions/amazon-ecr-login@062b18b96a7aff071d4dc91bc00c4c1a7945b076 # v2.0.1
 
       - name: Docker Login to ECR
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
         with:
           registry: ${{ steps.login-ecr.outputs.registry }}
 
@@ -345,7 +344,7 @@ jobs:
       - confirm-valid-credentials
       - build-comparison
     steps:
-      - name: 'Download comparison image'
+      - name: "Download comparison image"
         uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
         with:
           name: comparison-image
@@ -366,7 +365,7 @@ jobs:
         uses: aws-actions/amazon-ecr-login@062b18b96a7aff071d4dc91bc00c4c1a7945b076 # v2.0.1
 
       - name: Docker Login to ECR
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
         with:
           registry: ${{ steps.login-ecr.outputs.registry }}
 
@@ -386,8 +385,8 @@ jobs:
       - upload-comparison-image-to-ecr
     # Job-level permissions for artifact upload
     permissions:
-      contents: read  # Required to checkout code
-      actions: write  # Required to upload artifacts
+      contents: read # Required to checkout code
+      actions: write # Required to upload artifacts
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -502,8 +501,8 @@ jobs:
       - resolve-inputs
     # Job-level permissions for artifact upload
     permissions:
-      contents: read  # Required to checkout code
-      actions: write  # Required to upload artifacts
+      contents: read # Required to checkout code
+      actions: write # Required to upload artifacts
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -538,7 +537,7 @@ jobs:
 
       - name: Read regression report
         id: read-analysis
-        uses: juliangruber/read-file-action@b549046febe0fe86f8cb4f93c24e284433f9ab58 # v1.1.7
+        uses: juliangruber/read-file-action@271ff311a4947af354c6abcd696a306553b9ec18 # v1.1.8
         with:
           path: ${{ runner.temp }}/outputs/report.md
 

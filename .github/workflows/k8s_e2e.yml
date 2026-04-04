@@ -21,20 +21,20 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: 'Git ref to checkout'
+        description: "Git ref to checkout"
         required: false
         type: string
   workflow_call:
     inputs:
       ref:
-        description: 'Git ref to checkout'
+        description: "Git ref to checkout"
         required: false
         type: string
   pull_request:
   merge_group:
     types: [checks_requested]
   schedule:
-    - cron: '0 1 * * 2-6' # 01:00 UTC Tue-Sat
+    - cron: "0 1 * * 2-6" # 01:00 UTC Tue-Sat
 
 concurrency:
   # In flight runs will be canceled through re-trigger in the merge queue, scheduled run, or if
@@ -197,6 +197,13 @@ jobs:
           MINIKUBE_VERSION: ${{ matrix.minikube_version }}
           CONTAINER_RUNTIME: ${{ matrix.container_runtime }}
 
+      - name: Checkout helm-charts
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: vectordotdev/helm-charts
+          ref: develop
+          path: helm-charts
+
       # TODO: This job has been quite flakey. Need to investigate further and then remove the retries.
       - name: Run tests
         uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
@@ -204,6 +211,7 @@ jobs:
           USE_MINIKUBE_CACHE: "true"
           SKIP_PACKAGE_DEB: "true"
           CARGO_INCREMENTAL: 0
+          HELM_CHART_REPO: ${{ github.workspace }}/helm-charts/charts/vector
         with:
           timeout_minutes: 45
           max_attempts: 3

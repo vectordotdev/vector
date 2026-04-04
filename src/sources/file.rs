@@ -2463,12 +2463,23 @@ mod tests {
         inner: impl Future<Output = ()>,
     ) -> Vec<Event> {
         assert_source_compliance(&FILE_SOURCE_TAGS, async move {
-            let (tx, rx) = if acking_mode == Acks {
-                let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
-                (tx, rx.boxed())
-            } else {
-                let (tx, rx) = SourceSender::new_test();
-                (tx, rx.boxed())
+            let (tx, rx) = match acking_mode {
+                Acks => {
+                    let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
+                    (tx, rx.boxed())
+                }
+                Unfinalized => {
+                    // Use Rejected so that events are finalized but checkpoints
+                    // are NOT updated (only Delivered triggers checkpoint updates).
+                    // This avoids a race where the default Delivered status on drop
+                    // could leak checkpoint writes into the next run.
+                    let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Rejected);
+                    (tx, rx.boxed())
+                }
+                NoAcks => {
+                    let (tx, rx) = SourceSender::new_test();
+                    (tx, rx.boxed())
+                }
             };
 
             let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
