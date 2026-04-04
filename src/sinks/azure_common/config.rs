@@ -533,10 +533,10 @@ pub async fn build_client(
     let mut options = BlobContainerClientOptions::default();
     match (parsed.auth(), &auth) {
         (Auth::None, None) => {
-            warn!("No authentication method provided, requests will be anonymous");
+            warn!("No authentication method provided, requests will be anonymous.");
         }
         (Auth::Sas { .. }, None) => {
-            info!("Using SAS token authentication");
+            info!("Using SAS token authentication.");
         }
         (
             Auth::SharedKey {
@@ -545,7 +545,7 @@ pub async fn build_client(
             },
             None,
         ) => {
-            info!("Using Shared Key authentication");
+            info!("Using Shared Key authentication.");
 
             let policy = SharedKeyAuthorizationPolicy::new(
                 account_name,
@@ -560,7 +560,7 @@ pub async fn build_client(
                 .push(Arc::new(policy));
         }
         (Auth::None, Some(AzureAuthentication::Specific(..))) => {
-            info!("Using Azure Authentication method");
+            info!("Using Azure Authentication method.");
             let credential_result: Arc<dyn TokenCredential> =
                 auth.unwrap().credential().await.map_err(|e| {
                     Error::with_message(
@@ -584,7 +584,7 @@ pub async fn build_client(
         }
         #[cfg(test)]
         (Auth::None, Some(AzureAuthentication::MockCredential)) => {
-            warn!("Using mock token credential authentication");
+            warn!("Using mock token credential authentication.");
             credential = Some(auth.unwrap().credential().await.unwrap());
         }
         #[cfg(test)]
