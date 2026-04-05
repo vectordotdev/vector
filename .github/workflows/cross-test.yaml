@@ -1,0 +1,29 @@
+name: Build Vector FreeBSD
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-freebsd:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: x86_64-unknown-freebsd
+          override: true
+
+      - name: Install build tools
+        run: sudo apt-get update && sudo apt-get install -y clang build-essential
+
+      - name: Build FreeBSD binary
+        run: cargo build --release --target x86_64-unknown-freebsd
+
+    #   - name: Upload artifact
+    #     uses: actions/upload-artifact@v3
+    #     with:
+    #       name: vector-freebsd
+    #       path: target/x86_64-unknown-freebsd/release/vector

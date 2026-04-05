@@ -1,0 +1,6 @@
+V	320604222753Z		1000	unknown	/C=US/ST=New York/L=New York/O=Datadog/OU=Vector/CN=localhost
+V	320613192819Z		1001	unknown	/C=US/ST=New York/L=New York/O=Datadog/OU=Vector/CN=elasticsearch-secure
+V	320613194901Z		1003	unknown	/C=US/ST=New York/L=New York/O=Datadog/OU=Vector/CN=influxdb-v1-tls
+V	320613195026Z		1004	unknown	/C=US/ST=New York/L=New York/O=Datadog/OU=Vector/CN=postgres
+V	320613195253Z		1005	unknown	/C=US/ST=New York/L=New York/O=Datadog/OU=Vector/CN=kafka
+V	320731200837Z		1006	unknown	/C=US/ST=New York/L=New York/O=Datadog/OU=Vector/CN=dufs-https
