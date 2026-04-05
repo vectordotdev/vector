@@ -1,88 +1,66 @@
 //! Service implementation for the `azure_data_explorer` sink.
 //!
-//! Implements **queued ingestion** matching the Fluent Bit `out_azure_kusto` plugin:
+//! Implements **streaming ingestion** via the Kusto REST API:
+//! `POST /v1/rest/ingest/{database}/{table}?streamFormat=MultiJSON[&mappingName=...]`
 //!
-//! 1. Ensure ingestion resources (blob + queue SAS URIs) are loaded and fresh.
-//! 2. Upload the JSONL/MultiJSON payload as a blob to Azure Blob Storage (SAS-authenticated PUT).
-//! 3. Enqueue an ingestion notification message to Azure Queue Storage (SAS-authenticated POST).
-//!
-//! The blob and queue endpoints are discovered via the ADX management command
-//! `.get ingestion resources` and cached for 1 hour (matching Fluent Bit defaults).
+//! See: <https://learn.microsoft.com/en-us/azure/data-explorer/kusto/api/rest/streaming-ingest>
 
 use std::{
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
+    sync::Arc,
     task::{Context, Poll},
-    time::{SystemTime, UNIX_EPOCH},
 };
 
-use base64::Engine as _;
 use bytes::Bytes;
 use futures::future::BoxFuture;
 use http::Request;
 use tower::Service;
+use url::Url;
 use uuid::Uuid;
 
-use super::resources::ResourceManager;
+use super::auth::AzureDataExplorerAuth;
 use crate::{
     http::HttpClient,
+    internal_events::EndpointBytesSent,
     sinks::{
         prelude::*,
         util::{
             buffer::compression::Compression,
             http::{HttpRequest, HttpResponse},
+            uri::protocol_endpoint,
         },
     },
 };
 
-// ---------------------------------------------------------------------------
-// Queued ingest configuration (shared across clones)
-// ---------------------------------------------------------------------------
-
-/// Configuration for the queued ingest service, shared across all clones.
+/// Configuration for streaming ingest, shared across all clones of the service.
 #[derive(Clone, Debug)]
-pub(super) struct QueuedIngestConfig {
+pub(super) struct StreamingIngestConfig {
+    pub ingestion_endpoint: String,
     pub database: String,
     pub table: String,
     pub mapping_reference: Option<String>,
     pub compression: Compression,
 }
 
-// ---------------------------------------------------------------------------
-// Service
-// ---------------------------------------------------------------------------
-
-/// A Tower `Service` that performs **queued ingestion** to Azure Data Explorer.
+/// A Tower `Service` that performs **streaming ingestion** to Azure Data Explorer.
 ///
-/// Each `call()` invocation:
-/// 1. Gets/refreshes ingestion resources (blob + queue SAS URIs + identity token)
-/// 2. Uploads the payload to a randomly selected blob endpoint
-/// 3. Enqueues an ingestion notification to a randomly selected queue endpoint
-/// 4. Returns a synthetic `HttpResponse` indicating success or the first failure
+/// Each `call()` issues one authenticated POST with the batch body to
+/// `/v1/rest/ingest/{database}/{table}` on the configured ingestion endpoint.
 pub(super) struct AzureDataExplorerService {
     http_client: HttpClient,
-    resource_manager: ResourceManager,
-    config: Arc<QueuedIngestConfig>,
-    /// Round-robin index for blob endpoint selection.
-    blob_index: Arc<AtomicUsize>,
-    /// Round-robin index for queue endpoint selection.
-    queue_index: Arc<AtomicUsize>,
+    auth: AzureDataExplorerAuth,
+    config: Arc<StreamingIngestConfig>,
 }
 
 impl AzureDataExplorerService {
     pub(super) fn new(
         http_client: HttpClient,
-        resource_manager: ResourceManager,
-        config: QueuedIngestConfig,
+        auth: AzureDataExplorerAuth,
+        config: StreamingIngestConfig,
     ) -> Self {
         Self {
             http_client,
-            resource_manager,
+            auth,
             config: Arc::new(config),
-            blob_index: Arc::new(AtomicUsize::new(0)),
-            queue_index: Arc::new(AtomicUsize::new(0)),
         }
     }
 }
@@ -98,10 +76,8 @@ impl Service<HttpRequest<()>> for AzureDataExplorerService {
 
     fn call(&mut self, mut request: HttpRequest<()>) -> Self::Future {
         let http_client = self.http_client.clone();
-        let resource_manager = self.resource_manager.clone();
+        let auth = self.auth.clone();
         let config = Arc::clone(&self.config);
-        let blob_index = Arc::clone(&self.blob_index);
-        let queue_index = Arc::clone(&self.queue_index);
 
         let metadata = std::mem::take(request.metadata_mut());
         let raw_byte_size = metadata.request_encoded_size();
@@ -109,73 +85,57 @@ impl Service<HttpRequest<()>> for AzureDataExplorerService {
         let payload = request.take_payload();
 
         Box::pin(async move {
-            // 1. Get/refresh ingestion resources
-            let resources = resource_manager.get_resources().await?;
+            let ingest_uri = build_streaming_ingest_url(&config)?;
 
-            // 2. Select blob endpoint (round-robin)
-            let blob_idx =
-                blob_index.fetch_add(1, Ordering::Relaxed) % resources.blob_endpoints.len();
-            let blob_ep = &resources.blob_endpoints[blob_idx];
-
-            // 3. Generate unique blob ID
-            let epoch_ms = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_millis();
-            let blob_id = format!(
-                "vector__{}__{}__{}__{epoch_ms}",
-                config.database,
-                config.table,
-                Uuid::new_v4(),
-            );
-
-            let extension = if config.compression.content_encoding().is_some() {
-                ".multijson.gz"
-            } else {
-                ".multijson"
-            };
-
-            // 4. Upload payload to blob storage
-            let blob_uri = format!(
-                "{}/{blob_id}{extension}?{}",
-                blob_ep.base_url, blob_ep.sas_token
-            );
+            let token = auth.get_token().await?;
 
             debug!(
-                message = "Uploading payload to blob storage.",
-                blob_uri = %blob_ep.base_url,
-                blob_id = %blob_id,
+                message = "Sending streaming ingest request to Azure Data Explorer.",
+                uri = %ingest_uri,
                 payload_bytes = payload.len(),
             );
 
-            let blob_request = Request::put(&blob_uri)
-                .header("Content-Type", "application/json")
-                .header("x-ms-blob-type", "BlockBlob")
-                .header("x-ms-version", "2019-12-12")
+            let (protocol, endpoint) = protocol_endpoint(
+                ingest_uri
+                    .as_str()
+                    .parse()
+                    .unwrap_or_else(|_| http::Uri::from_static("https://unknown")),
+            );
+
+            let mut req_builder = Request::post(ingest_uri.as_str())
+                .header("Authorization", format!("Bearer {}", token))
+                .header("Accept", "application/json")
+                .header("Connection", "Keep-Alive")
                 .header("x-ms-app", "Kusto.Vector")
                 .header("x-ms-user", "Kusto.Vector")
-                .body(hyper::Body::from(payload.clone()))?;
-
-            let blob_response = http_client.send(blob_request).await?;
-            let blob_status = blob_response.status();
-
-            if blob_status != http::StatusCode::CREATED {
-                let body = http_body::Body::collect(blob_response.into_body())
-                    .await?
-                    .to_bytes();
-                let body_str = String::from_utf8_lossy(&body);
-                let err_msg = format!(
-                    "Blob upload failed: HTTP {} - {}",
-                    blob_status,
-                    &body_str[..body_str.len().min(500)]
+                .header(
+                    "x-ms-client-request-id",
+                    format!("Vector.Ingest;{}", Uuid::new_v4()),
                 );
-                error!(message = %err_msg);
 
-                // Return a synthetic response with the blob's error status code
-                // so the retry logic can decide whether to retry.
+            if config.compression.content_encoding().is_some() {
+                req_builder = req_builder.header("Content-Encoding", "gzip");
+            }
+
+            let http_request = req_builder.body(hyper::Body::from(payload))?;
+
+            let response = http_client.send(http_request).await?;
+            let status = response.status();
+
+            let body = http_body::Body::collect(response.into_body())
+                .await?
+                .to_bytes();
+
+            if status.is_success() {
+                debug!(message = "Streaming ingest completed successfully.", status = %status);
+                emit!(EndpointBytesSent {
+                    byte_size: raw_byte_size,
+                    protocol: &protocol,
+                    endpoint: &endpoint,
+                });
                 let synthetic = http::Response::builder()
-                    .status(blob_status)
-                    .body(Bytes::from(err_msg))
+                    .status(http::StatusCode::OK)
+                    .body(body)
                     .unwrap();
                 return Ok(HttpResponse {
                     http_response: synthetic,
@@ -184,76 +144,17 @@ impl Service<HttpRequest<()>> for AzureDataExplorerService {
                 });
             }
 
-            // 5. Build the full blob URI for the ingestion message
-            let full_blob_uri = format!(
-                "{}/{blob_id}{extension}?{}",
-                blob_ep.base_url, blob_ep.sas_token
+            let body_str = String::from_utf8_lossy(&body);
+            let err_msg = format!(
+                "Azure Data Explorer streaming ingest failed: HTTP {} - {}",
+                status,
+                &body_str[..body_str.len().min(500)]
             );
+            error!(message = %err_msg);
 
-            // 6. Create ingestion message (matching Fluent Bit's format)
-            let ingestion_message = create_ingestion_message(
-                &config,
-                &full_blob_uri,
-                payload.len(),
-                &resources.identity_token,
-            );
-
-            // 7. Base64-encode the message and wrap in Azure Queue XML format
-            let message_b64 = base64::engine::general_purpose::STANDARD.encode(&ingestion_message);
-            let queue_payload = format!(
-                "<QueueMessage><MessageText>{message_b64}</MessageText></QueueMessage>"
-            );
-
-            // 8. Enqueue ingestion notification (round-robin)
-            let queue_idx =
-                queue_index.fetch_add(1, Ordering::Relaxed) % resources.queue_endpoints.len();
-            let queue_ep = &resources.queue_endpoints[queue_idx];
-            let queue_uri = format!("{}/messages?{}", queue_ep.base_url, queue_ep.sas_token);
-
-            debug!(
-                message = "Enqueueing ingestion notification.",
-                queue_uri = %queue_ep.base_url,
-            );
-
-            let queue_request = Request::post(&queue_uri)
-                .header("Content-Type", "application/atom+xml")
-                .header("x-ms-version", "2019-12-12")
-                .header("x-ms-app", "Kusto.Vector")
-                .header("x-ms-user", "Kusto.Vector")
-                .body(hyper::Body::from(queue_payload))?;
-
-            let queue_response = http_client.send(queue_request).await?;
-            let queue_status = queue_response.status();
-
-            if queue_status != http::StatusCode::CREATED {
-                let body = http_body::Body::collect(queue_response.into_body())
-                    .await?
-                    .to_bytes();
-                let body_str = String::from_utf8_lossy(&body);
-                let err_msg = format!(
-                    "Queue notification failed: HTTP {} - {}",
-                    queue_status,
-                    &body_str[..body_str.len().min(500)]
-                );
-                error!(message = %err_msg);
-
-                let synthetic = http::Response::builder()
-                    .status(queue_status)
-                    .body(Bytes::from(err_msg))
-                    .unwrap();
-                return Ok(HttpResponse {
-                    http_response: synthetic,
-                    events_byte_size,
-                    raw_byte_size,
-                });
-            }
-
-            debug!(message = "Queued ingestion completed successfully.", blob_id = %blob_id);
-
-            // 9. Return synthetic 200 OK
             let synthetic = http::Response::builder()
-                .status(http::StatusCode::OK)
-                .body(Bytes::from("queued"))
+                .status(status)
+                .body(Bytes::from(err_msg))
                 .unwrap();
 
             Ok(HttpResponse {
@@ -269,117 +170,71 @@ impl Clone for AzureDataExplorerService {
     fn clone(&self) -> Self {
         Self {
             http_client: self.http_client.clone(),
-            resource_manager: self.resource_manager.clone(),
+            auth: self.auth.clone(),
             config: Arc::clone(&self.config),
-            blob_index: Arc::clone(&self.blob_index),
-            queue_index: Arc::clone(&self.queue_index),
         }
     }
 }
 
-// ---------------------------------------------------------------------------
-// Ingestion message helpers
-// ---------------------------------------------------------------------------
+/// Builds `POST {ingestion_endpoint}/v1/rest/ingest/{database}/{table}?streamFormat=MultiJSON...`
+fn build_streaming_ingest_url(config: &StreamingIngestConfig) -> crate::Result<Url> {
+    let base = config.ingestion_endpoint.trim_end_matches('/');
+    let mut url = Url::parse(base).map_err(|e| format!("Invalid ingestion_endpoint URL: {e}"))?;
 
-/// Creates the JSON ingestion message matching Fluent Bit's format:
-///
-/// ```json
-/// {
-///   "Id": "<uuid>",
-///   "BlobPath": "<full_blob_url_with_sas>",
-///   "RawDataSize": <bytes>,
-///   "DatabaseName": "<db>",
-///   "TableName": "<table>",
-///   "AdditionalProperties": {
-///     "format": "multijson",
-///     "authorizationContext": "<identity_token>",
-///     "jsonMappingReference": "<mapping>"
-///   }
-/// }
-/// ```
-fn create_ingestion_message(
-    config: &QueuedIngestConfig,
-    blob_uri: &str,
-    raw_data_size: usize,
-    identity_token: &str,
-) -> String {
-    let uuid = Uuid::new_v4();
-    let mapping = config.mapping_reference.as_deref().unwrap_or("");
+    url.path_segments_mut()
+        .map_err(|_| {
+            "ingestion_endpoint must be a hierarchical HTTP(S) URL (e.g. cannot-be-a-base URLs are not supported)"
+        })?
+        .push("v1")
+        .push("rest")
+        .push("ingest")
+        .push(config.database.as_str())
+        .push(config.table.as_str());
 
-    // Use format! to build compact JSON matching Fluent Bit's output.
-    format!(
-        r#"{{"Id":"{uuid}","BlobPath":"{blob_uri}","RawDataSize":{raw_data_size},"DatabaseName":"{}","TableName":"{}","ClientVersionForTracing":"Kusto.Vector:0.1.0","ApplicationForTracing":"Kusto.Vector","AdditionalProperties":{{"format":"multijson","authorizationContext":"{identity_token}","jsonMappingReference":"{mapping}"}}}}"#,
-        config.database, config.table,
-    )
+    {
+        let mut q = url.query_pairs_mut();
+        q.append_pair("streamFormat", "MultiJSON");
+        if let Some(m) = config.mapping_reference.as_deref() {
+            if !m.is_empty() {
+                q.append_pair("mappingName", m);
+            }
+        }
+    }
+
+    Ok(url)
 }
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn ingestion_message_format() {
-        let config = QueuedIngestConfig {
-            database: "testdb".to_string(),
-            table: "testtable".to_string(),
-            mapping_reference: Some("my_mapping".to_string()),
-            compression: Compression::None,
-        };
-
-        let msg = create_ingestion_message(
-            &config,
-            "https://blob.core.windows.net/c/blob.multijson?sas",
-            1234,
-            "identity_tok",
-        );
-
-        let parsed: serde_json::Value = serde_json::from_str(&msg).unwrap();
-        assert!(parsed.get("Id").is_some());
-        assert_eq!(
-            parsed["BlobPath"].as_str().unwrap(),
-            "https://blob.core.windows.net/c/blob.multijson?sas"
-        );
-        assert_eq!(parsed["RawDataSize"].as_u64().unwrap(), 1234);
-        assert_eq!(parsed["DatabaseName"].as_str().unwrap(), "testdb");
-        assert_eq!(parsed["TableName"].as_str().unwrap(), "testtable");
-        assert_eq!(
-            parsed["AdditionalProperties"]["format"].as_str().unwrap(),
-            "multijson"
-        );
-        assert_eq!(
-            parsed["AdditionalProperties"]["authorizationContext"]
-                .as_str()
-                .unwrap(),
-            "identity_tok"
-        );
-        assert_eq!(
-            parsed["AdditionalProperties"]["jsonMappingReference"]
-                .as_str()
-                .unwrap(),
-            "my_mapping"
-        );
-    }
-
-    #[test]
-    fn ingestion_message_no_mapping() {
-        let config = QueuedIngestConfig {
-            database: "db".to_string(),
-            table: "tbl".to_string(),
+    fn streaming_ingest_url_basic() {
+        let config = StreamingIngestConfig {
+            ingestion_endpoint: "https://ingest-mycluster.eastus.kusto.windows.net".to_string(),
+            database: "MyDb".to_string(),
+            table: "MyTable".to_string(),
             mapping_reference: None,
             compression: Compression::None,
         };
+        let u = build_streaming_ingest_url(&config).unwrap();
+        assert_eq!(u.path(), "/v1/rest/ingest/MyDb/MyTable");
+        let q: std::collections::HashMap<String, String> = u.query_pairs().into_owned().collect();
+        assert_eq!(q.get("streamFormat").map(String::as_str), Some("MultiJSON"));
+        assert!(!q.contains_key("mappingName"));
+    }
 
-        let msg = create_ingestion_message(&config, "https://blob/path?sas", 42, "tok");
-        let parsed: serde_json::Value = serde_json::from_str(&msg).unwrap();
-        assert_eq!(
-            parsed["AdditionalProperties"]["jsonMappingReference"]
-                .as_str()
-                .unwrap(),
-            ""
-        );
+    #[test]
+    fn streaming_ingest_url_with_mapping() {
+        let config = StreamingIngestConfig {
+            ingestion_endpoint: "https://ingest.example.com/".to_string(),
+            database: "db".to_string(),
+            table: "tbl".to_string(),
+            mapping_reference: Some("my_map".to_string()),
+            compression: Compression::None,
+        };
+        let u = build_streaming_ingest_url(&config).unwrap();
+        assert!(u.as_str().contains("mappingName=my_map"));
+        assert!(u.as_str().contains("streamFormat=MultiJSON"));
     }
 }

@@ -2,13 +2,13 @@
 //!
 //! Each event is serialized to JSON exactly as it exists at the sink boundary
 //! (no wrapping, no added/removed fields). Events are joined with newlines
-//! to produce JSON Lines / MultiJSON output.
+//! to produce **MultiJSON** (`streamFormat=MultiJSON`) for streaming ingestion.
 
 use std::io;
 
 use crate::sinks::{
     prelude::*,
-    util::encoding::{write_all, Encoder as SinkEncoder},
+    util::encoding::{Encoder as SinkEncoder, write_all},
 };
 
 pub(super) struct AzureDataExplorerEncoder {
@@ -33,7 +33,7 @@ impl SinkEncoder<Vec<Event>> for AzureDataExplorerEncoder {
             // Convert to LogEvent and serialize the inner value directly to JSON.
             // This preserves the original event structure without Vector's internal metadata.
             let log = event.into_log();
-            
+
             // Serialize to JSON
             serde_json::to_writer(&mut body, log.value())?;
 

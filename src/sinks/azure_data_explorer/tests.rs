@@ -11,84 +11,67 @@ use super::{
     config::AzureDataExplorerConfig,
     encoder::AzureDataExplorerEncoder,
     request_builder::AzureDataExplorerRequestBuilder,
-    resources::ResourceManager,
-    service::{AzureDataExplorerService, QueuedIngestConfig},
+    service::{AzureDataExplorerService, StreamingIngestConfig},
     sink::AzureDataExplorerSink,
 };
 use crate::{
     http::HttpClient,
     sinks::{
         prelude::*,
-        util::{
-            http::http_response_retry_logic,
-            service::GlobalTowerRequestConfigDefaults,
-        },
+        util::{http::http_response_retry_logic, service::GlobalTowerRequestConfigDefaults},
     },
     test_util::{
-        components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
+        components::{HTTP_SINK_TAGS, run_and_assert_sink_compliance},
         http::spawn_blackhole_http_server,
     },
 };
 
 // ---------- helpers ----------------------------------------------------------
 
-/// Mock HTTP handler that returns 200/201 for management commands and blob/queue operations.
-/// - Management commands (.get ingestion resources, .get kusto identity token): 200
-/// - Blob upload (PUT): 201
-/// - Queue enqueue (POST to /messages): 201
+/// Mock HTTP handler for streaming ingest (`POST /v1/rest/ingest/...`) and management (healthcheck).
 async fn mock_adx_response(req: Request<Body>) -> Result<Response<Body>, Infallible> {
     let path = req.uri().path().to_string();
     let method = req.method().clone();
 
+    if path.starts_with("/v1/rest/ingest/") && method == http::Method::POST {
+        let auth = req
+            .headers()
+            .get(http::header::AUTHORIZATION)
+            .and_then(|h| h.to_str().ok());
+        assert!(
+            auth.is_some_and(|a| a.starts_with("Bearer ")),
+            "expected Authorization: Bearer on ingest request"
+        );
+        let q = req.uri().query().unwrap_or("");
+        assert!(
+            q.contains("streamFormat=MultiJSON"),
+            "expected streamFormat=MultiJSON in {q:?}"
+        );
+        return Ok(Response::builder()
+            .status(200)
+            .body(Body::from("{}"))
+            .unwrap());
+    }
+
     if path.contains("/v1/rest/mgmt") {
-        // Check what management command is being sent
         let body = http_body::Body::collect(req.into_body())
             .await
             .map(|c| c.to_bytes())
             .unwrap_or_default();
         let body_str = String::from_utf8_lossy(&body);
-
-        if body_str.contains(".get ingestion resources") {
-            // Return mock ingestion resources
-            let response_body = serde_json::json!({
-                "Tables": [{
-                    "TableName": "Table_0",
-                    "Columns": [],
-                    "Rows": [
-                        ["TempStorage", "https://mockblob.blob.core.windows.net/container?sv=mock&sig=mock"],
-                        ["SecuredReadyForAggregationQueue", "https://mockqueue.queue.core.windows.net/queue?sv=mock&sig=mock"]
-                    ]
-                }]
-            });
-            Ok(Response::new(Body::from(response_body.to_string())))
-        } else if body_str.contains(".get kusto identity token") {
-            let response_body = serde_json::json!({
-                "Tables": [{
-                    "TableName": "Table_0",
-                    "Columns": [{"ColumnName": "AuthorizationContext"}],
-                    "Rows": [["mock_identity_token"]]
-                }]
-            });
-            Ok(Response::new(Body::from(response_body.to_string())))
-        } else {
-            // Other management commands (e.g. .show version for healthcheck)
-            Ok(Response::new(Body::from("{}")))
+        if body_str.contains(".show version") {
+            return Ok(Response::builder()
+                .status(200)
+                .body(Body::from("{}"))
+                .unwrap());
         }
-    } else if method == http::Method::PUT {
-        // Blob upload - return 201 Created
-        Ok(Response::builder()
-            .status(201)
-            .body(Body::empty())
-            .unwrap())
-    } else if path.contains("/messages") {
-        // Queue enqueue - return 201 Created
-        Ok(Response::builder()
-            .status(201)
-            .body(Body::empty())
-            .unwrap())
-    } else {
-        Ok(Response::new(Body::from("{}")))
+        return Ok(Response::new(Body::from("{}")));
     }
+
+    Ok(Response::builder()
+        .status(404)
+        .body(Body::from("unexpected path"))
+        .unwrap())
 }
 
 // ---------- unit tests -------------------------------------------------------
@@ -157,17 +140,13 @@ fn encoder_produces_jsonl_without_mutation() {
     let lines: Vec<&str> = output.split('\n').collect();
     assert_eq!(lines.len(), 2, "Expected 2 JSONL lines, got: {lines:?}");
 
-    // Verify each line is valid JSON and contains expected fields.
     let obj1: BTreeMap<String, serde_json::Value> =
         serde_json::from_str(lines[0]).expect("line 0 is valid JSON");
     assert_eq!(
         obj1.get("message").and_then(|v| v.as_str()),
         Some("hello world")
     );
-    assert_eq!(
-        obj1.get("host").and_then(|v| v.as_str()),
-        Some("server01")
-    );
+    assert_eq!(obj1.get("host").and_then(|v| v.as_str()), Some("server01"));
 
     let obj2: BTreeMap<String, serde_json::Value> =
         serde_json::from_str(lines[1]).expect("line 1 is valid JSON");
@@ -224,10 +203,7 @@ fn encoder_with_transformer_field_filtering() {
     let obj: BTreeMap<String, serde_json::Value> =
         serde_json::from_str(&output).expect("valid JSON");
 
-    assert_eq!(
-        obj.get("message").and_then(|v| v.as_str()),
-        Some("keep me")
-    );
+    assert_eq!(obj.get("message").and_then(|v| v.as_str()), Some("keep me"));
     assert!(
         obj.get("host").is_none(),
         "filtered field 'host' should be absent"
@@ -242,21 +218,17 @@ fn encoder_with_transformer_field_filtering() {
 
 #[tokio::test]
 async fn component_spec_compliance() {
-    // Spawn a mock HTTP server that handles mgmt commands, blob upload, and queue enqueue.
     let mock_endpoint = spawn_blackhole_http_server(mock_adx_response).await;
     let mock_url = mock_endpoint.to_string();
 
     let client = HttpClient::new(None, &Default::default()).unwrap();
 
-    // Use the mock auth provider — no real Entra token acquisition.
     let auth = AzureDataExplorerAuth::mock("mock-token-for-testing");
-
-    // Resource manager pointing at our mock server
-    let resource_manager = ResourceManager::new(auth, client.clone(), mock_url);
 
     let compression = Compression::gzip_default();
 
-    let queued_config = QueuedIngestConfig {
+    let streaming_config = StreamingIngestConfig {
+        ingestion_endpoint: mock_url,
         database: "testdb".to_string(),
         table: "testtable".to_string(),
         mapping_reference: None,
@@ -270,7 +242,7 @@ async fn component_spec_compliance() {
         compression,
     };
 
-    let service = AzureDataExplorerService::new(client, resource_manager, queued_config);
+    let service = AzureDataExplorerService::new(client, auth, streaming_config);
 
     let request_limits =
         TowerRequestConfig::<GlobalTowerRequestConfigDefaults>::default().into_settings();

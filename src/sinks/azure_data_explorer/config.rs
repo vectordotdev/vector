@@ -1,7 +1,9 @@
 //! Configuration for the `azure_data_explorer` sink.
 //!
-//! Uses **queued ingestion** (blob upload + queue notification), matching the
-//! Fluent Bit `out_azure_kusto` plugin.
+//! Uses **streaming ingestion** via the Kusto REST API (`/v1/rest/ingest/...`).
+//! The target table must have a [streaming ingestion policy] enabled on the cluster.
+//!
+//! [streaming ingestion policy]: https://learn.microsoft.com/en-us/kusto/management/streaming-ingestion-policy
 
 use futures::FutureExt;
 use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
@@ -11,8 +13,7 @@ use super::{
     auth::AzureDataExplorerAuth,
     encoder::AzureDataExplorerEncoder,
     request_builder::AzureDataExplorerRequestBuilder,
-    resources::ResourceManager,
-    service::{AzureDataExplorerService, QueuedIngestConfig},
+    service::{AzureDataExplorerService, StreamingIngestConfig},
     sink::AzureDataExplorerSink,
 };
 use crate::{
@@ -26,16 +27,19 @@ use crate::{
 /// Configuration for the `azure_data_explorer` sink.
 #[configurable_component(sink(
     "azure_data_explorer",
-    "Deliver log events to Azure Data Explorer via queued ingestion."
+    "Deliver log events to Azure Data Explorer via streaming ingestion."
 ))]
 #[derive(Clone, Debug)]
 pub struct AzureDataExplorerConfig {
-    /// The Kusto cluster's **ingestion** endpoint URL.
+    /// The Kusto cluster endpoint URL.
     ///
-    /// This is the `ingest-` prefixed URL, e.g.
-    /// `https://ingest-mycluster.eastus.kusto.windows.net`.
+    /// For streaming ingestion this must be the plain cluster URL **without** the `ingest-`
+    /// prefix, e.g. `https://mycluster.eastus.kusto.windows.net`.
+    ///
+    /// The `ingest-` prefixed URL is only used for queued (blob) ingestion, which this
+    /// sink does not support.
     #[configurable(metadata(
-        docs::examples = "https://ingest-mycluster.eastus.kusto.windows.net",
+        docs::examples = "https://mycluster.eastus.kusto.windows.net",
     ))]
     #[configurable(validation(format = "uri"))]
     pub(super) ingestion_endpoint: String,
@@ -60,10 +64,12 @@ pub struct AzureDataExplorerConfig {
     #[configurable(metadata(docs::examples = "${AZURE_CLIENT_SECRET}"))]
     pub(super) client_secret: SensitiveString,
 
-    /// Optional ingestion mapping reference name.
+    /// Optional ingestion mapping name (`mappingName` query parameter).
     ///
-    /// When set, the value is passed in the ingestion message's
-    /// `jsonMappingReference` property.
+    /// For `MultiJSON` streaming ingest, Azure Data Explorer typically requires a
+    /// pre-created [JSON mapping] on the table when the payload needs column mapping.
+    ///
+    /// [JSON mapping]: https://learn.microsoft.com/en-us/kusto/management/mappings?view=azure-data-explorer
     #[serde(default)]
     #[configurable(metadata(docs::examples = "my_mapping"))]
     pub(super) mapping_reference: Option<String>,
@@ -82,8 +88,10 @@ pub struct AzureDataExplorerConfig {
 
     /// The compression algorithm to use.
     ///
-    /// When enabled, the JSONL payload is gzip-compressed before blob upload
-    /// and the blob name ends with `.multijson.gz`.
+    /// When gzip is enabled, the request body is compressed and `Content-Encoding: gzip`
+    /// is set per the [streaming ingest] API.
+    ///
+    /// [streaming ingest]: https://learn.microsoft.com/en-us/azure/data-explorer/kusto/api/rest/streaming-ingest
     #[configurable(derived)]
     #[serde(default = "Compression::gzip_default")]
     pub(super) compression: Compression,
@@ -101,15 +109,16 @@ pub struct AzureDataExplorerConfig {
 pub(super) struct AzureDataExplorerDefaultBatchSettings;
 
 impl SinkBatchSettings for AzureDataExplorerDefaultBatchSettings {
-    const MAX_EVENTS: Option<usize> = Some(1_000);
-    const MAX_BYTES: Option<usize> = Some(4_000_000); // 4 MB
-    const TIMEOUT_SECS: f64 = 30.0;
+    /// Streaming ingestion requests are limited to 4 MiB per Microsoft guidance.
+    const MAX_EVENTS: Option<usize> = Some(500);
+    const MAX_BYTES: Option<usize> = Some(3_900_000);
+    const TIMEOUT_SECS: f64 = 10.0;
 }
 
 impl GenerateConfig for AzureDataExplorerConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(
-            r#"ingestion_endpoint = "https://ingest-mycluster.eastus.kusto.windows.net"
+            r#"ingestion_endpoint = "https://mycluster.eastus.kusto.windows.net"
             database = "my_database"
             table = "my_table"
             tenant_id = "${AZURE_TENANT_ID}"
@@ -141,22 +150,15 @@ impl SinkConfig for AzureDataExplorerConfig {
             self.client_secret.clone(),
         )?;
 
-        // Resource manager handles .get ingestion resources + identity token caching
-        let resource_manager = ResourceManager::new(
-            auth.clone(),
-            client.clone(),
-            self.ingestion_endpoint.clone(),
-        );
-
-        let queued_config = QueuedIngestConfig {
+        let streaming_config = StreamingIngestConfig {
+            ingestion_endpoint: self.ingestion_endpoint.clone(),
             database: self.database.clone(),
             table: self.table.clone(),
             mapping_reference: self.mapping_reference.clone(),
             compression: self.compression,
         };
 
-        let service =
-            AzureDataExplorerService::new(client.clone(), resource_manager.clone(), queued_config);
+        let service = AzureDataExplorerService::new(client.clone(), auth.clone(), streaming_config);
 
         let request_limits = self.request.into_settings();
 
@@ -184,16 +186,10 @@ impl SinkConfig for AzureDataExplorerConfig {
 /// Validates credentials and ingestion endpoint reachability by:
 /// 1. Acquiring an Entra token (validates service-principal credentials)
 /// 2. Executing a lightweight `.show version` management command
-async fn healthcheck(
-    ingestion_endpoint: String,
-    auth: AzureDataExplorerAuth,
-) -> crate::Result<()> {
+async fn healthcheck(ingestion_endpoint: String, auth: AzureDataExplorerAuth) -> crate::Result<()> {
     let token = auth.get_token().await?;
 
-    let mgmt_uri = format!(
-        "{}/v1/rest/mgmt",
-        ingestion_endpoint.trim_end_matches('/')
-    );
+    let mgmt_uri = format!("{}/v1/rest/mgmt", ingestion_endpoint.trim_end_matches('/'));
 
     let body = serde_json::json!({
         "csl": ".show version",
@@ -204,6 +200,7 @@ async fn healthcheck(
     let request = http::Request::post(&mgmt_uri)
         .header("Authorization", format!("Bearer {}", token))
         .header("Content-Type", "application/json")
+        .header("Accept", "application/json")
         .body(hyper::Body::from(body_bytes))?;
 
     let client = HttpClient::new(None, &Default::default())?;
