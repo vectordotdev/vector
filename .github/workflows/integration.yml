@@ -75,13 +75,45 @@ jobs:
       matrix:
         # TODO: Add "splunk" back once https://github.com/vectordotdev/vector/issues/23474 is fixed.
         # If you modify this list, please also update the `int_tests` job in changes.yml.
-        service: [
-          "amqp", "appsignal", "axiom", "aws", "azure", "clickhouse", "databend", "datadog-agent",
-          "datadog-logs", "datadog-metrics", "datadog-traces", "dnstap", "docker-logs", "doris", "elasticsearch",
-          "eventstoredb", "fluent", "gcp", "greptimedb", "http-client", "influxdb", "kafka", "logstash",
-          "loki", "mqtt", "mongodb", "nats", "nginx", "odbc-mariadb", "odbc-postgresql", "opentelemetry",
-          "postgres", "prometheus", "pulsar", "redis", "webhdfs"
-        ]
+        service:
+          [
+            "amqp",
+            "appsignal",
+            "axiom",
+            "aws",
+            "azure",
+            "clickhouse",
+            "databend",
+            "datadog-agent",
+            "datadog-logs",
+            "datadog-metrics",
+            "datadog-traces",
+            "dnstap",
+            "docker-logs",
+            "doris",
+            "elasticsearch",
+            "eventstoredb",
+            "fluent",
+            "gcp",
+            "greptimedb",
+            "http-client",
+            "influxdb",
+            "kafka",
+            "logstash",
+            "loki",
+            "mqtt",
+            "mongodb",
+            "nats",
+            "nginx",
+            "odbc-mariadb",
+            "odbc-postgresql",
+            "opentelemetry",
+            "postgres",
+            "prometheus",
+            "pulsar",
+            "redis",
+            "webhdfs"
+          ]
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2

@@ -48,6 +48,8 @@ on:
         value: ${{ jobs.source.outputs.website_only }}
       install:
         value: ${{ jobs.source.outputs.install }}
+      prettier:
+        value: ${{ jobs.source.outputs.prettier }}
       test-yml:
         value: ${{ jobs.source.outputs.test-yml }}
       integration-yml:
@@ -156,7 +158,7 @@ on:
 
 # Workflow-level permissions - read access to repository contents
 permissions:
-  contents: read  # Required to checkout code
+  contents: read # Required to checkout code
 
 env:
   BASE_SHA: ${{ inputs.base_ref || (github.event_name == 'merge_group' && github.event.merge_group.base_sha) || github.event.pull_request.base.sha }}
@@ -180,6 +182,7 @@ jobs:
       install: ${{ steps.filter.outputs.install }}
       k8s: ${{ steps.filter.outputs.k8s }}
       website_only: ${{ steps.filter.outputs.website == 'true' && steps.filter.outputs.not_website == 'false' }}
+      prettier: ${{ steps.filter.outputs.prettier }}
       test-yml: ${{ steps.filter.outputs.test-yml }}
       integration-yml: ${{ steps.filter.outputs.integration-yml }}
       test-make-command-yml: ${{ steps.filter.outputs.test-make-command-yml }}
@@ -188,109 +191,118 @@ jobs:
       unit_mac-yml: ${{ steps.filter.outputs.unit_mac-yml }}
       unit_windows-yml: ${{ steps.filter.outputs.unit_windows-yml }}
     steps:
-    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-    - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
-      id: filter
-      with:
-        base: ${{ env.BASE_SHA }}
-        ref:  ${{ env.HEAD_SHA }}
-        filters: |
-          source:
-            - ".cargo/**"
-            - "benches/**"
-            - "lib/**"
-            - "proto/**"
-            - "scripts/**"
-            - "src/**"
-            - "tests/**"
-            - "build.rs"
-            - "Cargo.lock"
-            - "Cargo.toml"
-            - "Makefile"
-            - "rust-toolchain.toml"
-            - "vdev/**"
-            - ".github/workflows/changes.yml"
-          dependencies:
-            - ".cargo/**"
-            - 'Cargo.toml'
-            - 'Cargo.lock'
-            - 'rust-toolchain.toml'
-            - 'Makefile'
-            - 'scripts/cross/**'
-            - "vdev/**"
-            - ".github/workflows/changes.yml"
-          deny:
-            - '**/Cargo.toml'
-            - 'Cargo.lock'
-            - ".github/workflows/deny.yml"
-          cue:
-            - 'website/cue/**'
-            - "vdev/**"
-            - ".github/workflows/changes.yml"
-          component_docs:
-            - 'scripts/generate-component-docs.rb'
-            - "vdev/**"
-            - 'website/cue/**/*.cue'
-            - 'docs/generated/**'
-            # If changes to the VRL sha is made the combined generated cue file will change which
-            # may cause issues
-            - 'Cargo.lock'
-            - ".github/workflows/changes.yml"
-          markdown:
-            - '**/**.md'
-            - "vdev/**"
-            - ".github/workflows/changes.yml"
-          scripts:
-            - '**/**.sh'
-            - ".github/workflows/changes.yml"
-          internal_events:
-            - 'src/internal_events/**'
-            - "vdev/**"
-            - ".github/workflows/changes.yml"
-          docker:
-            - 'distribution/docker/**'
-            - "vdev/**"
-            - ".github/workflows/changes.yml"
-          install:
-            - ".github/workflows/install-sh.yml"
-            - "distribution/install.sh"
-            - ".github/workflows/changes.yml"
-          k8s:
-            - "src/sources/kubernetes_logs/**"
-            - "lib/k8s-e2e-tests/**"
-            - "lib/k8s-test-framework/**"
-            - "scripts/test-e2e-kubernetes.sh"
-            - "scripts/build-docker.sh"
-            - "scripts/deploy-chart-test.sh"
-            - ".github/workflows/k8s_e2e.yml"
-            - ".github/workflows/changes.yml"
-          website:
-            - "website/**"
-          not_website:
-            - "!website/**"
-          test-yml:
-            - ".github/workflows/test.yml"
-            - ".github/workflows/changes.yml"
-          integration-yml:
-            - ".github/workflows/integration.yml"
-            - ".github/workflows/changes.yml"
-          test-make-command-yml:
-            - ".github/workflows/test-make-command.yml"
-            - ".github/workflows/changes.yml"
-          msrv-yml:
-            - ".github/workflows/msrv.yml"
-            - ".github/workflows/changes.yml"
-          cross-yml:
-            - ".github/workflows/cross.yml"
-            - ".github/workflows/changes.yml"
-          unit_mac-yml:
-            - ".github/workflows/unit_mac.yml"
-            - ".github/workflows/changes.yml"
-          unit_windows-yml:
-            - ".github/workflows/unit_windows.yml"
-            - ".github/workflows/changes.yml"
-
+      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
+        id: filter
+        with:
+          base: ${{ env.BASE_SHA }}
+          ref: ${{ env.HEAD_SHA }}
+          filters: |
+            source:
+              - ".cargo/**"
+              - "benches/**"
+              - "lib/**"
+              - "proto/**"
+              - "scripts/**"
+              - "src/**"
+              - "tests/**"
+              - "build.rs"
+              - "Cargo.lock"
+              - "Cargo.toml"
+              - "Makefile"
+              - "rust-toolchain.toml"
+              - "vdev/**"
+              - ".github/workflows/changes.yml"
+            dependencies:
+              - ".cargo/**"
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+              - 'rust-toolchain.toml'
+              - 'Makefile'
+              - 'scripts/cross/**'
+              - "vdev/**"
+              - ".github/workflows/changes.yml"
+            deny:
+              - '**/Cargo.toml'
+              - 'Cargo.lock'
+              - ".github/workflows/deny.yml"
+            cue:
+              - 'website/cue/**'
+              - "vdev/**"
+              - ".github/workflows/changes.yml"
+            component_docs:
+              - 'scripts/generate-component-docs.rb'
+              - "vdev/**"
+              - 'website/cue/**/*.cue'
+              - 'docs/generated/**'
+              # If changes to the VRL sha is made the combined generated cue file will change which
+              # may cause issues
+              - 'Cargo.lock'
+              - ".github/workflows/changes.yml"
+            markdown:
+              - '**/**.md'
+              - "vdev/**"
+              - ".github/workflows/changes.yml"
+            scripts:
+              - '**/**.sh'
+              - ".github/workflows/changes.yml"
+            internal_events:
+              - 'src/internal_events/**'
+              - "vdev/**"
+              - ".github/workflows/changes.yml"
+            docker:
+              - 'distribution/docker/**'
+              - "vdev/**"
+              - ".github/workflows/changes.yml"
+            install:
+              - ".github/workflows/install-sh.yml"
+              - "distribution/install.sh"
+              - ".github/workflows/changes.yml"
+            k8s:
+              - "src/sources/kubernetes_logs/**"
+              - "lib/k8s-e2e-tests/**"
+              - "lib/k8s-test-framework/**"
+              - "scripts/test-e2e-kubernetes.sh"
+              - "scripts/build-docker.sh"
+              - "scripts/deploy-chart-test.sh"
+              - ".github/workflows/k8s_e2e.yml"
+              - ".github/workflows/changes.yml"
+            website:
+              - "website/**"
+            not_website:
+              - "!website/**"
+            prettier:
+              - "**/*.yml"
+              - "**/*.yaml"
+              - "**/*.js"
+              - "**/*.ts"
+              - "**/*.tsx"
+              - "**/*.json"
+              - ".prettierrc.json"
+              - ".prettierignore"
+              - ".github/workflows/changes.yml"
+            test-yml:
+              - ".github/workflows/test.yml"
+              - ".github/workflows/changes.yml"
+            integration-yml:
+              - ".github/workflows/integration.yml"
+              - ".github/workflows/changes.yml"
+            test-make-command-yml:
+              - ".github/workflows/test-make-command.yml"
+              - ".github/workflows/changes.yml"
+            msrv-yml:
+              - ".github/workflows/msrv.yml"
+              - ".github/workflows/changes.yml"
+            cross-yml:
+              - ".github/workflows/cross.yml"
+              - ".github/workflows/changes.yml"
+            unit_mac-yml:
+              - ".github/workflows/unit_mac.yml"
+              - ".github/workflows/changes.yml"
+            unit_windows-yml:
+              - ".github/workflows/unit_windows.yml"
+              - ".github/workflows/changes.yml"
 
   # Detects changes that are specific to integration tests
   int_tests:
@@ -358,7 +370,7 @@ jobs:
         id: filter
         with:
           base: ${{ env.BASE_SHA }}
-          ref:  ${{ env.HEAD_SHA }}
+          ref: ${{ env.HEAD_SHA }}
           filters: int_test_filters.yaml
 
       # This JSON hack was introduced because GitHub Actions does not support dynamic expressions in the
@@ -452,7 +464,7 @@ jobs:
         id: filter
         with:
           base: ${{ env.BASE_SHA }}
-          ref:  ${{ env.HEAD_SHA }}
+          ref: ${{ env.HEAD_SHA }}
           filters: int_test_filters.yaml
 
       # This JSON hack was introduced because GitHub Actions does not support dynamic expressions in the

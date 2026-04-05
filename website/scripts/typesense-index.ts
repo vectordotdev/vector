@@ -54,7 +54,7 @@ const tagHierarchy = {
   h5: 2,
   h6: 1,
   li: 1,
-  p: 1,
+  p: 1
 };
 
 function getPageUrl(file: string) {
@@ -75,7 +75,7 @@ function getItemUrl(file: string, { level, domId }: Payload[0]) {
 
 // Hash the file name to create a unique ID for the record using the same hash function as the one used in the synapse stream package.
 function hashString(fileName: string) {
-  return crypto.createHash('md5').update(fileName).digest('hex')
+  return crypto.createHash("md5").update(fileName).digest("hex");
 }
 
 async function indexHTMLFiles(
@@ -92,8 +92,8 @@ async function indexHTMLFiles(
     const $ = cheerio.load(html);
     const containers = $("#page-content");
     const pageTitle = $("meta[name='algolia:title']").attr("content") || "";
-    const pageTagsString = $("meta[name='keywords']").attr('content') || "";
-    const pageTags: string[] = (pageTagsString === "") ? [] : pageTagsString.split(",");
+    const pageTagsString = $("meta[name='keywords']").attr("content") || "";
+    const pageTags: string[] = pageTagsString === "" ? [] : pageTagsString.split(",");
 
     // @ts-ignore
     $(".algolia-no-index").each((_, d) => $(d).remove());
@@ -114,7 +114,7 @@ async function indexHTMLFiles(
           tagName: node.tagName,
           content: $(node)
             .text()
-            .replace(/[\n\t]/g, " "),
+            .replace(/[\n\t]/g, " ")
         });
       }
 
@@ -146,9 +146,10 @@ async function indexHTMLFiles(
           ranking,
           hierarchy: [],
           tags: pageTags,
-          content: "",
+          content: ""
         };
-      } else if (item.level === 1) { // h1 logic
+      } else if (item.level === 1) {
+        // h1 logic
         activeRecord.content += item.content;
       } else if (item.level < activeRecord.level) {
         algoliaRecords.push({ ...activeRecord });
@@ -164,9 +165,10 @@ async function indexHTMLFiles(
           ranking,
           hierarchy: [...activeRecord.hierarchy, activeRecord.title.trim()],
           tags: pageTags,
-          content: "",
+          content: ""
         };
-      } else { // h2-h6 logic
+      } else {
+        // h2-h6 logic
         algoliaRecords.push({ ...activeRecord });
 
         const hierarchySize = activeRecord.hierarchy.length;
@@ -184,12 +186,12 @@ async function indexHTMLFiles(
           ranking,
           hierarchy: [...activeRecord.hierarchy.slice(0, lastIndex)],
           tags: pageTags,
-          content: "",
+          content: ""
         };
       }
 
       if (activeRecord) {
-        algoliaRecords.push({ ...activeRecord })
+        algoliaRecords.push({ ...activeRecord });
       }
 
       for (const rec of algoliaRecords) {
@@ -211,9 +213,7 @@ async function indexHTMLFiles(
     }
   }
 
-  console.log(
-    chalk.green(`Success. Updated records for ${files.length} file(s).`)
-  );
+  console.log(chalk.green(`Success. Updated records for ${files.length} file(s).`));
 
   records.push(...algoliaRecords);
 }
@@ -228,56 +228,56 @@ async function buildIndex() {
       name: "Docs",
       path: `${publicPath}/docs/introduction/**/**.html`,
       displayPath: "docs/introduction",
-      ranking: 50,
+      ranking: 50
     },
     {
       name: "Docs",
       path: `${publicPath}/docs/administration/**/**.html`,
       displayPath: "docs/administration",
-      ranking: 50,
+      ranking: 50
     },
     {
       name: "Docs",
       path: `${publicPath}/docs/reference/**/**.html`,
       displayPath: "docs/reference",
-      ranking: 50,
+      ranking: 50
     },
     {
       name: "Docs",
       path: `${publicPath}/docs/setup/**/**.html`,
       displayPath: "docs/setup",
-      ranking: 50,
+      ranking: 50
     },
     {
       name: "Advanced guides",
       path: `${publicPath}/guides/advanced/**/**.html`,
       displayPath: "guides/advanced",
-      ranking: 40,
+      ranking: 40
     },
     {
       name: "Level up guides",
       path: `${publicPath}/guides/level-up/**/**.html`,
       displayPath: "guides/level-up",
-      ranking: 40,
+      ranking: 40
     },
     {
       name: "Developer guides",
       path: `${publicPath}/guides/developer/**/**.html`,
       displayPath: "guides/developer",
-      ranking: 40,
+      ranking: 40
     },
     {
       name: "Vector highlights",
       path: `${publicPath}/highlights/**/**.html`,
       displayPath: "highlights/",
-      ranking: 40,
+      ranking: 40
     },
     {
       name: "Upgrade guides",
       path: `${publicPath}/highlights/*-upgrade-guide/**.html`,
       displayPath: "highlights/",
-      ranking: 10,
-    },
+      ranking: 10
+    }
   ];
 
   // Recurse through each section and push the resulting records to `allRecords`
@@ -286,7 +286,7 @@ async function buildIndex() {
 
     // We shouldn't index upgrade guides
     if (section.name === "Vector highlights") {
-      files = files.filter((path) => !path.includes("-upgrade-guide"))
+      files = files.filter((path) => !path.includes("-upgrade-guide"));
     }
 
     console.log(chalk.blue(`Indexing ${section.displayPath}...`));
