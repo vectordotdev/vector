@@ -409,6 +409,8 @@ jobs:
             "mqtt": ${{ steps.filter.outputs.mqtt }},
             "nats": ${{ steps.filter.outputs.nats }},
             "nginx": ${{ steps.filter.outputs.nginx }},
+            "odbc-mariadb": ${{ steps.filter.outputs.odbc-mariadb }}
+            "odbc-postgresql": ${{ steps.filter.outputs.odbc-postgresql }}
             "opentelemetry": ${{ steps.filter.outputs.opentelemetry }},
             "postgres": ${{ steps.filter.outputs.postgres }},
             "prometheus": ${{ steps.filter.outputs.prometheus }},
