@@ -183,7 +183,10 @@ impl Context {
         // Example with query results: `{"message":[{ ... }],"timestamp":"2025-10-21T00:00:00.05275Z"}`
         // Example with no query results: `{"message":[],"timestamp":"2025-10-21T00:00:00.05275Z"}`
         let mut event = LogEvent::default();
-        event.maybe_insert(Some("timestamp"), Value::Timestamp(Utc::now()));
+        event.maybe_insert(
+            log_schema.timestamp_key_target_path(),
+            Value::Timestamp(Utc::now()),
+        );
         event.maybe_insert(
             log_schema.message_key_target_path(),
             Value::Array(rows.clone()),
