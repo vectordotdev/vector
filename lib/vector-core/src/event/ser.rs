@@ -67,7 +67,7 @@ pub fn event_exceeds_max_nesting_depth(event: &Event) -> Option<usize> {
         Event::Metric(_) => return None,
     };
     check_value_depth(value, 0, MAX_NESTING_DEPTH)
-        .or_else(|_| check_value_depth(metadata_value, 0, MAX_NESTING_DEPTH))
+        .and_then(|()| check_value_depth(metadata_value, 0, MAX_NESTING_DEPTH))
         .err()
 }
 
