@@ -56,25 +56,29 @@ pub(crate) fn check_value_depth(
 /// Returns `Some(depth)` with the violating depth if the event exceeds the limit,
 /// or `None` if the event is within bounds.
 ///
-/// Both the event value and event metadata value are checked, since both are
-/// encoded into the protobuf message.
-///
-/// Metrics have a fixed structure and cannot be deeply nested, so they always return `None`.
+/// For logs and traces, both the event value and event metadata value are checked.
+/// For metrics, the metric value has a fixed structure that cannot be deeply nested,
+/// but the metadata value is an arbitrary `Value` that is encoded into protobuf,
+/// so it is still checked.
 pub fn event_exceeds_max_nesting_depth(event: &Event) -> Option<usize> {
-    let (value, metadata_value) = match event {
-        Event::Log(log) => (log.value(), log.metadata().value()),
-        Event::Trace(trace) => (trace.value(), trace.metadata().value()),
-        Event::Metric(_) => return None,
-    };
-    check_value_depth(value, 0, MAX_NESTING_DEPTH)
-        .and_then(|()| check_value_depth(metadata_value, 0, MAX_NESTING_DEPTH))
-        .err()
+    match event {
+        Event::Log(log) => check_value_depth(log.value(), 0, MAX_NESTING_DEPTH)
+            .and_then(|()| check_value_depth(log.metadata().value(), 0, MAX_NESTING_DEPTH))
+            .err(),
+        Event::Trace(trace) => check_value_depth(trace.value(), 0, MAX_NESTING_DEPTH)
+            .and_then(|()| check_value_depth(trace.metadata().value(), 0, MAX_NESTING_DEPTH))
+            .err(),
+        Event::Metric(metric) => {
+            check_value_depth(metric.metadata().value(), 0, MAX_NESTING_DEPTH).err()
+        }
+    }
 }
 
 /// Checks all events in an `EventArray` for nesting depth violations.
 ///
-/// Returns `Err(EncodeError::NestingTooDeep)` if any log or trace event exceeds
-/// `MAX_NESTING_DEPTH`. Metrics are skipped (fixed structure, no deep nesting possible).
+/// Returns `Err(EncodeError::NestingTooDeep)` if any event exceeds `MAX_NESTING_DEPTH`.
+/// For metrics, only metadata is checked since metric values have a fixed structure,
+/// but metadata is an arbitrary `Value` encoded into protobuf.
 fn check_event_array_nesting_depth(events: &EventArray) -> Result<(), EncodeError> {
     let check = |value: &Value| {
         check_value_depth(value, 0, MAX_NESTING_DEPTH).map_err(|depth| {
@@ -97,7 +101,11 @@ fn check_event_array_nesting_depth(events: &EventArray) -> Result<(), EncodeErro
                 check(trace.metadata().value())?;
             }
         }
-        EventArray::Metrics(_) => {}
+        EventArray::Metrics(metrics) => {
+            for metric in metrics {
+                check(metric.metadata().value())?;
+            }
+        }
     }
     Ok(())
 }
