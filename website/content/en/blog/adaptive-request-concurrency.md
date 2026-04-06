@@ -25,7 +25,7 @@ TRACE tower_limit::rate::service: rate limit exceeded, disabling service
 Users typically have two questions about this:
 
 1. What does it mean?
-1. How can I fix it?
+2. How can I fix it?
 
 The answer to the first question is simple: Vector has _internally_ rate-limited processing to respect user-configured limits—[`request.rate_limit_duration_secs`][rate_limit_duration_secs] and [`request.rate_limit_num`][rate_limit_num]—for that particular [sink][sinks]. In other words, Vector has intentionally reduced performance to stay within static limits.
 
@@ -66,12 +66,12 @@ We feel strongly that Vector's **Adaptive Request Concurrency** (ARC) feature pr
 
 Here's how that plays out in some example scenarios:
 
-Change |   | Response
-:------|:-:|:--------
-**You deploy more Vector instances** | ➔ |Vector automatically redistributes HTTP throughput across both current and new instances
-**You scale up your Elasticsearch cluster** | ➔ | Vector automatically increases concurrency to take full advantage of the new capacity
-**You scale your Elasticsearch cluster back down** | ➔ | Vector lowers concurrency to avoid any risk of destabilizing the cluster (while still taking full of advantage of the now-decreased bandwidth)
-**Your Elasticsearch cluster experiences a temporary outage** | ➔ |Vector lowers concurrency dramatically and provides backpressure by [buffering][buffer] events
+| Change | | Response |
+| :------- | :-: | :-------- |
+| **You deploy more Vector instances** | ➔ | Vector automatically redistributes HTTP throughput across both current and new instances |
+| **You scale up your Elasticsearch cluster** | ➔ | Vector automatically increases concurrency to take full advantage of the new capacity |
+| **You scale your Elasticsearch cluster back down** | ➔ | Vector lowers concurrency to avoid any risk of destabilizing the cluster (while still taking full of advantage of the now-decreased bandwidth) |
+| **Your Elasticsearch cluster experiences a temporary outage** | ➔ | Vector lowers concurrency dramatically and provides backpressure by [buffering][buffer] events |
 
 With ARC, these scenarios require no human intervention. Vector quietly hums along making these decisions for you with a speed and granularity that rate limits simply cannot provide.
 

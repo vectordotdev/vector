@@ -79,7 +79,7 @@ components: sources: internal_metrics: {
 			tags:              _component_tags
 		}
 		api_started_total: {
-			description:       "The number of times the Vector GraphQL API has been started."
+			description:       "The number of times the Vector API has been started."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags

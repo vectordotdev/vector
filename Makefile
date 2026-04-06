@@ -506,6 +506,28 @@ check-licenses: ## Check that the 3rd-party license file is up to date
 check-markdown: ## Check that markdown is styled properly
 	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) check markdown
 
+.PHONY: fix-markdown
+fix-markdown: ## Auto-fix markdown style issues
+	${MAYBE_ENVIRONMENT_EXEC} markdownlint-cli2 --fix $(shell git ls-files '*.md')
+
+.PHONY: check-prettier
+check-prettier: ## Check that JS/TS/YAML/JSON files are formatted with prettier
+	@for ext in yml yaml js ts tsx json; do \
+		files=$$(git ls-files "*.$$ext"); \
+		if [ -n "$$files" ]; then \
+			${MAYBE_ENVIRONMENT_EXEC} prettier --ignore-path .prettierignore --check $$files || exit 1; \
+		fi; \
+	done
+
+.PHONY: fix-prettier
+fix-prettier: ## Auto-fix JS/TS/YAML/JSON formatting with prettier
+	@for ext in yml yaml js ts tsx json; do \
+		files=$$(git ls-files "*.$$ext"); \
+		if [ -n "$$files" ]; then \
+			${MAYBE_ENVIRONMENT_EXEC} prettier --ignore-path .prettierignore --write $$files || exit 1; \
+		fi; \
+	done
+
 .PHONY: check-examples
 check-examples: ## Check that the config/examples files are valid
 	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) check examples
@@ -517,6 +539,10 @@ check-scripts: ## Check that scripts do not have common mistakes
 .PHONY: check-deny
 check-deny: ## Check advisories licenses and sources for crate dependencies
 	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) check deny
+
+.PHONY: check-deny-licenses
+check-deny-licenses: ## Check licenses for crate dependencies
+	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) check deny --licenses-only
 
 .PHONY: check-events
 check-events: ## Check that events satisfy patterns set in https://github.com/vectordotdev/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
