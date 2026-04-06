@@ -51,6 +51,7 @@ jobs:
 
       - uses: ./.github/actions/setup
         with:
+          rust: true
           vdev: true
           mold: false
           cargo-cache: false

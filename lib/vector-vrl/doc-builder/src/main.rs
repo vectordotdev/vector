@@ -20,6 +20,7 @@ struct Cli {
     extension: String,
 }
 
+#[allow(clippy::print_stdout)]
 fn main() -> Result<()> {
     let cli = <Cli as clap::Parser>::parse();
     let functions = vector_vrl_functions::all_without_vrl_stdlib();
