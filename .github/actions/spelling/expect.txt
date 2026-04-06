@@ -292,7 +292,6 @@ Jolokia
 JSONAs
 jsonify
 jsonlines
-jszwedko
 kebabcase
 kernelmode
 keyclock
@@ -310,6 +309,7 @@ landingpad
 leebenson
 leveldb
 libcrypto
+libmaodbc
 librdkafka
 libvector
 lld
@@ -333,6 +333,7 @@ majorly
 makecache
 Makefiles
 mallocs
+mariadb
 markdownify
 marketo
 maxbin
@@ -406,6 +407,7 @@ nullishness
 NUMA
 numbackends
 NXRR
+odbcinst
 OIDC
 OKD
 oneof
@@ -535,6 +537,9 @@ spencergilbert
 spinlock
 SPOF
 spog
+SQLLEN
+SQLSETPOSIROW
+SQLULEN
 sqlx
 srcaddr
 srcport
@@ -618,6 +623,7 @@ underutilizing
 unevictable
 unflatten
 unioning
+unixodbc
 unnested
 upgradable
 urql
@@ -678,5 +684,4 @@ zieme
 zoog
 zork
 zorp
-zsherman
 zulip
