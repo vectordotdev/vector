@@ -66,43 +66,56 @@ impl TopologyController {
             .healthchecks
             .set_require_healthy(self.require_healthy);
 
-        // Start the api server or disable it, if necessary
+        // Start, stop, or restart the api server as necessary
         #[cfg(feature = "api")]
         if !new_config.api.enabled {
             if let Some(server) = self.api_server.take() {
                 debug!("Stopping gRPC API server.");
                 drop(server);
             }
-        } else if self.api_server.is_none() {
-            debug!("Starting gRPC API server.");
+        } else {
+            // Determine if we need to (re)start the API server
+            let needs_restart = match &self.api_server {
+                None => true,
+                Some(existing) => new_config.api.address != Some(existing.addr()),
+            };
 
-            match api::GrpcServer::start(
-                self.topology.config(),
-                self.topology.watch(),
-                Arc::clone(&self.topology.running),
-            )
-            .await
-            {
-                Ok(api_server) => {
-                    let addr = api_server.addr();
-                    info!(
-                        message = "GRPC API server started.",
-                        addr = %addr,
-                    );
-                    self.api_server = Some(api_server);
+            if needs_restart {
+                if let Some(server) = self.api_server.take() {
+                    debug!("Stopping gRPC API server for restart with new address.");
+                    drop(server);
                 }
-                Err(error) => {
-                    let error_string = error.to_string();
-                    error!(
-                        message = "An error occurred that Vector couldn't handle.",
-                        error = %error_string,
-                        internal_log_rate_limit = false,
-                    );
-                    // Fail fast when API is explicitly enabled but fails to start
-                    // This ensures users don't run with a broken configuration thinking top/tap will work
-                    return ReloadOutcome::FatalError(ShutdownError::ApiFailed {
-                        error: error_string,
-                    });
+
+                debug!("Starting gRPC API server.");
+
+                match api::GrpcServer::start(
+                    &new_config,
+                    self.topology.watch(),
+                    Arc::clone(&self.topology.running),
+                )
+                .await
+                {
+                    Ok(api_server) => {
+                        let addr = api_server.addr();
+                        info!(
+                            message = "GRPC API server started.",
+                            addr = %addr,
+                        );
+                        self.api_server = Some(api_server);
+                    }
+                    Err(error) => {
+                        let error_string = error.to_string();
+                        error!(
+                            message = "An error occurred that Vector couldn't handle.",
+                            error = %error_string,
+                            internal_log_rate_limit = false,
+                        );
+                        // Fail fast when API is explicitly enabled but fails to start
+                        // This ensures users don't run with a broken configuration thinking top/tap will work
+                        return ReloadOutcome::FatalError(ShutdownError::ApiFailed {
+                            error: error_string,
+                        });
+                    }
                 }
             }
         }
