@@ -525,14 +525,18 @@ mod test {
                                 close_rx = None;
                             }
 
-                            let mut buf = [0u8; 11];
+                            // Count newlines per read so coalesced TLS/TCP reads still match one
+                            // increment per text line.
+                            let mut buf = [0u8; 256];
                             let mut buf = ReadBuf::new(&mut buf);
                             return match Pin::new(&mut stream).poll_read(cx, &mut buf) {
                                 Poll::Ready(Ok(())) => {
                                     if buf.filled().is_empty() {
                                         Poll::Ready(())
                                     } else {
-                                        msg_counter1.fetch_add(1, Ordering::SeqCst);
+                                        let lines =
+                                            buf.filled().iter().filter(|&&b| b == b'\n').count();
+                                        msg_counter1.fetch_add(lines, Ordering::SeqCst);
                                         continue;
                                     }
                                 }

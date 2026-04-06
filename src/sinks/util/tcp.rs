@@ -17,7 +17,7 @@ use tokio::{
 use tokio_util::codec::Encoder;
 use vector_lib::{
     ByteSizeOf, EstimatedJsonEncodedSizeOf, configurable::configurable_component,
-    json_size::JsonSize,
+    finalization::EventStatus, json_size::JsonSize,
 };
 
 use crate::{
@@ -29,7 +29,6 @@ use crate::{
         ConnectionOpen, OpenGauge, SocketMode, SocketSendError, TcpSocketConnectionEstablished,
         TcpSocketConnectionShutdown, TcpSocketOutgoingConnectionError,
     },
-    sink_ext::VecSinkExt,
     sinks::{
         Healthcheck, VectorSink,
         util::{
@@ -306,16 +305,35 @@ where
             let mut sink = self.connect().await;
             let _open_token = OpenGauge::new().open(|count| emit!(ConnectionOpen { count }));
 
-            let result = match sink.send_all_peekable(&mut (&mut input).peekable()).await {
-                Ok(()) => sink.close().await,
-                Err(error) => Err(error),
-            };
-
-            // TODO we can consider retrying once in the Error case. This sink is a "best effort"
-            // delivery due to the nature of the underlying protocol.
-            // For now, if an error occurs we cannot assume that the events succeeded in delivery
-            // so we will emit `Error` / `EventsDropped` internal events regardless of if the server
-            // responded with Ok(0).
+            // `BytesSink` only tracks empty finalizers; we mark the real ones delivered only
+            // after a successful `Sink::send` (flush). The stream is not advanced until then, so a
+            // disconnect during `poll_ready` (shutdown check before send) does not drop the event.
+            let result = async {
+                loop {
+                    let (item, byte_size, json_byte_size) = match Pin::new(&mut input).peek().await
+                    {
+                        None => break,
+                        Some(p) => (p.item.clone(), p.byte_size, p.json_byte_size),
+                    };
+                    let wire = EncodedEvent {
+                        item,
+                        finalizers: Default::default(),
+                        byte_size,
+                        json_byte_size,
+                    };
+                    match sink.send(wire).await {
+                        Ok(()) => {
+                            let delivered = Pin::new(&mut input).next().await.ok_or_else(|| {
+                                std::io::Error::other("peekable stream returned no item after peek")
+                            })?;
+                            delivered.finalizers.update_status(EventStatus::Delivered);
+                        }
+                        Err(error) => return Err(error),
+                    }
+                }
+                sink.close().await
+            }
+            .await;
             if let Err(error) = result {
                 if error.kind() == ErrorKind::Other && error.to_string() == "ShutdownCheck::Close" {
                     emit!(TcpSocketConnectionShutdown {});

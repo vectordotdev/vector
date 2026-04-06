@@ -18,6 +18,7 @@ use tokio_util::codec::Encoder;
 use vector_lib::{
     ByteSizeOf, EstimatedJsonEncodedSizeOf,
     configurable::configurable_component,
+    finalization::EventStatus,
     internal_event::{BytesSent, Protocol},
     json_size::JsonSize,
 };
@@ -31,7 +32,6 @@ use crate::{
         ConnectionOpen, OpenGauge, SocketMode, UnixSocketConnectionEstablished,
         UnixSocketOutgoingConnectionError, UnixSocketSendError,
     },
-    sink_ext::VecSinkExt,
     sinks::{
         Healthcheck, VectorSink,
         util::{
@@ -241,10 +241,32 @@ where
             let mut sink = self.connect().await;
             let _open_token = OpenGauge::new().open(|count| emit!(ConnectionOpen { count }));
 
-            let result = match sink.send_all_peekable(&mut (&mut input).peekable()).await {
-                Ok(()) => sink.close().await,
-                Err(error) => Err(error),
-            };
+            let result = async {
+                loop {
+                    let (item, byte_size, json_byte_size) = match Pin::new(&mut input).peek().await
+                    {
+                        None => break,
+                        Some(p) => (p.item.clone(), p.byte_size, p.json_byte_size),
+                    };
+                    let wire = EncodedEvent {
+                        item,
+                        finalizers: Default::default(),
+                        byte_size,
+                        json_byte_size,
+                    };
+                    match sink.send(wire).await {
+                        Ok(()) => {
+                            let delivered = Pin::new(&mut input).next().await.ok_or_else(|| {
+                                io::Error::other("peekable stream returned no item after peek")
+                            })?;
+                            delivered.finalizers.update_status(EventStatus::Delivered);
+                        }
+                        Err(error) => return Err(error),
+                    }
+                }
+                sink.close().await
+            }
+            .await;
 
             if let Err(error) = result {
                 emit!(UnixSocketSendError {

@@ -29,7 +29,8 @@ pub enum ShutdownCheck {
 /// [FramedWrite](https://docs.rs/tokio-util/0.3.1/tokio_util/codec/struct.FramedWrite.html) wrapper.
 /// Wrapper acts like [Sink](https://docs.rs/futures/0.3.7/futures/sink/trait.Sink.html) forwarding all
 /// calls to `FramedWrite`, but in addition:
-/// - Call `shutdown_check` on each `poll_flush`, so we can stop sending data if other side disconnected.
+/// - Call `shutdown_check` on each `poll_ready` (before accepting more data) and on each
+///   `poll_flush`, so we can stop sending if the other side disconnected.
 /// - Flush all data on each `poll_ready` if total number of events in queue more than some limit.
 /// - Count event size on each `start_send`.
 /// - Ack all sent events on successful `poll_flush` and `poll_close` or on `Drop`.
@@ -118,6 +119,30 @@ where
     type Error = <FramedWrite<T, BytesCodec> as Sink<Bytes>>::Error;
 
     fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        // Detect peer shutdown before `start_send` (and before `FramedWrite::poll_ready`) so callers
+        // such as the TCP/Unix stream sinks (peek, then `Sink::send`) fail here without consuming
+        // the next stream item.
+        let close_reason = {
+            let pinned = self.as_mut().project();
+            match (pinned.shutdown_check)(pinned.inner.get_mut().get_mut()) {
+                ShutdownCheck::Error(error) => return Poll::Ready(Err(error)),
+                ShutdownCheck::Close(reason) => Some(reason),
+                ShutdownCheck::Alive => None,
+            }
+        };
+        if let Some(reason) = close_reason {
+            // Close the transport only; do not use `BytesSink::poll_close`, which acks `Dropped`
+            // and would finalize in-flight events while the TCP sink may reconnect and retry.
+            let inner = self.as_mut().project().inner;
+            if let Err(error) = ready!(<FramedWrite<T, BytesCodec> as Sink<Bytes>>::poll_close(
+                inner, cx
+            )) {
+                return Poll::Ready(Err(error));
+            }
+            self.as_mut().get_mut().state.ack(EventStatus::Errored);
+            return Poll::Ready(Err(IoError::other(reason)));
+        }
+
         if self.as_mut().project().state.events_total >= MAX_PENDING_ITEMS
             && let Err(error) = ready!(self.as_mut().poll_flush(cx))
         {
@@ -147,10 +172,13 @@ where
         match (pinned.shutdown_check)(pinned.inner.get_mut().get_mut()) {
             ShutdownCheck::Error(error) => return Poll::Ready(Err(error)),
             ShutdownCheck::Close(reason) => {
-                if let Err(error) = ready!(self.as_mut().poll_close(cx)) {
+                let inner = self.as_mut().project().inner;
+                if let Err(error) = ready!(<FramedWrite<T, BytesCodec> as Sink<Bytes>>::poll_close(
+                    inner, cx
+                )) {
                     return Poll::Ready(Err(error));
                 }
-
+                self.as_mut().get_mut().state.ack(EventStatus::Errored);
                 return Poll::Ready(Err(IoError::other(reason)));
             }
             ShutdownCheck::Alive => {}
