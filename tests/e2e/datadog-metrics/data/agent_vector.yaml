@@ -1,5 +1,5 @@
 api_key: DEADBEEF
-log_level: 'warn'
+log_level: "warn"
 
 # disable bunch of stuff we don't need
 inventories_configuration_enabled: false
