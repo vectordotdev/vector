@@ -13,7 +13,10 @@ use codecs::{
 };
 use similar_asserts::assert_eq;
 use tokio_util::codec::Encoder;
-use vector_core::{config::LogNamespace, event::{Event, LogEvent, ObjectMap, Value}};
+use vector_core::{
+    config::LogNamespace,
+    event::{Event, LogEvent, ObjectMap, Value},
+};
 
 #[test]
 fn pre_v24_fixtures_match() {
