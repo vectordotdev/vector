@@ -278,13 +278,16 @@ jobs:
     needs:
       - should-run-gate
       - resolve-inputs
+    # Job level permissions for downloading SMP binary
+    permissions:
+      id-token: write # Required for GitHub OIDC token exchange
     steps:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
         with:
-          aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
+          role-to-assume: arn:aws:iam::850406765696:role/smp-regression-oidc
           aws-region: us-west-2
+          role-duration-seconds: 14400 # 4 hours
 
       - name: Download SMP binary
         run: |
@@ -303,6 +306,9 @@ jobs:
       - resolve-inputs
       - confirm-valid-credentials
       - build-baseline
+    # Job level permissions for uploading baseline image to SMP ECR
+    permissions:
+      id-token: write # Required for GitHub OIDC token exchange
     steps:
       - name: "Download baseline image"
         uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
@@ -316,9 +322,9 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
         with:
-          aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
+          role-to-assume: arn:aws:iam::850406765696:role/smp-regression-oidc
           aws-region: us-west-2
+          role-duration-seconds: 14400 # 4 hours
 
       - name: Login to Amazon ECR
         id: login-ecr
@@ -343,6 +349,9 @@ jobs:
       - resolve-inputs
       - confirm-valid-credentials
       - build-comparison
+    # Job level permissions for uploading comparison image to SMP ECR
+    permissions:
+      id-token: write # Required for GitHub OIDC token exchange
     steps:
       - name: "Download comparison image"
         uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
@@ -356,9 +365,9 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
         with:
-          aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
+          role-to-assume: arn:aws:iam::850406765696:role/smp-regression-oidc
           aws-region: us-west-2
+          role-duration-seconds: 14400 # 4 hours
 
       - name: Login to Amazon ECR
         id: login-ecr
@@ -387,6 +396,7 @@ jobs:
     permissions:
       contents: read # Required to checkout code
       actions: write # Required to upload artifacts
+      id-token: write # Required for GitHub OIDC token exchange
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -395,9 +405,9 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
         with:
-          aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
+          role-to-assume: arn:aws:iam::850406765696:role/smp-regression-oidc
           aws-region: us-west-2
+          role-duration-seconds: 14400 # 4 hours
 
       - name: Login to Amazon ECR
         id: login-ecr
@@ -462,15 +472,19 @@ jobs:
       - submit-job
       - should-run-gate
       - resolve-inputs
+    # Job level permissions for downloading SMP results
+    permissions:
+      contents: read # Required to checkout code
+      id-token: write # Required for GitHub OIDC token exchange
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
         with:
-          aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
+          role-to-assume: arn:aws:iam::850406765696:role/smp-regression-oidc
           aws-region: us-west-2
+          role-duration-seconds: 14400 # 4 hours
 
       - name: Download SMP binary
         run: |
@@ -503,6 +517,7 @@ jobs:
     permissions:
       contents: read # Required to checkout code
       actions: write # Required to upload artifacts
+      id-token: write # Required for GitHub OIDC token exchange
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -511,9 +526,9 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
         with:
-          aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
+          role-to-assume: arn:aws:iam::850406765696:role/smp-regression-oidc
           aws-region: us-west-2
+          role-duration-seconds: 14400 # 4 hours
 
       - name: Download SMP binary
         run: |
