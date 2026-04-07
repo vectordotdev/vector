@@ -64,3 +64,6 @@ volumes/
 
 # LLM tools
 copilot-instructions.md
+
+# Local CRC (CodeReady Containers) test setup
+CRC/
