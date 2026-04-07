@@ -536,8 +536,10 @@ async fn custom_retry_does_not_retry_unconfigured_status_code() {
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
         assert_eq!(counter.load(atomic::Ordering::Relaxed), 1);
 
-        let output_lines =
-            get_received_gzip(rx, |_| unreachable!("There should be no successful requests")).await;
+        let output_lines = get_received_gzip(rx, |_| {
+            unreachable!("There should be no successful requests")
+        })
+        .await;
         assert!(output_lines.is_empty());
     })
     .await;

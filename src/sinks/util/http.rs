@@ -619,10 +619,8 @@ impl RetryStrategy {
             Self::Default => match status {
                 StatusCode::TOO_MANY_REQUESTS | StatusCode::REQUEST_TIMEOUT => {
                     RetryAction::Retry(reason)
-                },
-                StatusCode::NOT_IMPLEMENTED => {
-                    RetryAction::DontRetry(reason)
-                },
+                }
+                StatusCode::NOT_IMPLEMENTED => RetryAction::DontRetry(reason),
                 _ => {
                     if status.is_server_error() {
                         RetryAction::Retry(reason)
@@ -665,7 +663,7 @@ impl<Req: Clone + Send + Sync + 'static> RetryLogic for HttpRetryLogic<Req> {
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         if self.retry_strategy == RetryStrategy::None {
-            false 
+            false
         } else {
             error.is_retriable()
         }
@@ -714,7 +712,7 @@ where
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         if self.retry_strategy == RetryStrategy::None {
-            false 
+            false
         } else {
             error.is_retriable()
         }
