@@ -1,0 +1,31 @@
+# Kubernetes Logs API to Console
+# ------------------------------------------------------------------------------
+# Collect pod logs via the Kubernetes `pods/log` API instead of tailing kubelet
+# files on the node. This is useful when the host log paths are not mounted
+# into the Vector pod, but the pod has permission to `get` `pods/log`.
+
+data_dir: "/var/lib/vector"
+
+sources:
+  kubernetes_logs_api:
+    type: "kubernetes_logs_api"
+    self_node_name: "${VECTOR_SELF_NODE_NAME}"
+
+    # Optional selectors to narrow the watched pod set.
+    extra_label_selector: "app=my-app"
+    extra_field_selector: "metadata.name!=my-app-migration"
+
+    # Request the last 50 lines on first connect, then use a small reconnect
+    # window to avoid gaps if the API closes the stream.
+    tail_lines: 50
+    since_seconds: 15
+
+    # Limit concurrent pod log streams when watching many containers.
+    max_log_requests: 10
+
+sinks:
+  out:
+    type: "console"
+    inputs: [ "kubernetes_logs_api" ]
+    encoding:
+      codec: "json"
