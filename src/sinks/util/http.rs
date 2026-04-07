@@ -660,8 +660,12 @@ impl<Req: Clone + Send + Sync + 'static> RetryLogic for HttpRetryLogic<Req> {
     type Request = Req;
     type Response = hyper::Response<Bytes>;
 
-    fn is_retriable_error(&self, _error: &Self::Error) -> bool {
-        true
+    fn is_retriable_error(&self, error: &Self::Error) -> bool {
+        if self.retry_strategy == RetryStrategy::None {
+            false 
+        } else {
+            error.is_retriable()
+        }
     }
 
     fn should_retry_response(&self, response: &Self::Response) -> RetryAction<Self::Request> {
@@ -705,8 +709,12 @@ where
     type Request = Req;
     type Response = Res;
 
-    fn is_retriable_error(&self, _error: &Self::Error) -> bool {
-        true
+    fn is_retriable_error(&self, error: &Self::Error) -> bool {
+        if self.retry_strategy == RetryStrategy::None {
+            false 
+        } else {
+            error.is_retriable()
+        }
     }
 
     fn should_retry_response(&self, response: &Res) -> RetryAction<Req> {
