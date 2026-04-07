@@ -589,7 +589,11 @@ pub async fn load_configs(
         for (name, transform) in config.transforms() {
             let files = transform.inner.files_to_watch();
             let component_config = ComponentConfig::new(
-                files.into_iter().cloned().collect(),
+                files
+                    .into_iter()
+                    .chain(config_paths.iter().map(<&PathBuf>::from))
+                    .cloned()
+                    .collect(),
                 name.clone(),
                 ComponentType::Transform,
             );
@@ -599,7 +603,11 @@ pub async fn load_configs(
         for (name, sink) in config.sinks() {
             let files = sink.inner.files_to_watch();
             let component_config = ComponentConfig::new(
-                files.into_iter().cloned().collect(),
+                files
+                    .into_iter()
+                    .chain(config_paths.iter().map(<&PathBuf>::from))
+                    .cloned()
+                    .collect(),
                 name.clone(),
                 ComponentType::Sink,
             );
