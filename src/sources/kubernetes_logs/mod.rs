@@ -60,13 +60,13 @@ use crate::{
 
 mod k8s_paths_provider;
 mod lifecycle;
-mod namespace_metadata_annotator;
-mod node_metadata_annotator;
+pub(crate) mod namespace_metadata_annotator;
+pub(crate) mod node_metadata_annotator;
 mod parser;
 mod partial_events_merger;
 mod path_helpers;
-mod pod_metadata_annotator;
-mod transform_utils;
+pub(crate) mod pod_metadata_annotator;
+pub(crate) mod transform_utils;
 mod util;
 
 use self::{
@@ -76,7 +76,7 @@ use self::{
 };
 
 /// The `self_node_name` value env var key.
-const SELF_NODE_NAME_ENV_KEY: &str = "VECTOR_SELF_NODE_NAME";
+pub(crate) const SELF_NODE_NAME_ENV_KEY: &str = "VECTOR_SELF_NODE_NAME";
 
 /// Configuration for the `kubernetes_logs` source.
 #[serde_as]
@@ -604,7 +604,8 @@ impl Source {
             config.self_node_name.clone()
         };
 
-        let field_selector = prepare_field_selector(config, self_node_name.as_str())?;
+        let field_selector =
+            prepare_field_selector(&config.extra_field_selector, self_node_name.as_str())?;
         let label_selector = prepare_label_selector(config.extra_label_selector.as_ref());
         let namespace_label_selector =
             prepare_label_selector(config.extra_namespace_label_selector.as_ref());
@@ -801,10 +802,10 @@ impl Source {
             exclude_paths,
             insert_namespace_fields,
         );
-        let annotator = PodMetadataAnnotator::new(pod_state, pod_fields_spec, log_namespace);
+        let annotator = PodMetadataAnnotator::new(pod_state, pod_fields_spec, log_namespace, Config::NAME);
         let ns_annotator =
-            NamespaceMetadataAnnotator::new(ns_state, namespace_fields_spec, log_namespace);
-        let node_annotator = NodeMetadataAnnotator::new(node_state, node_field_spec, log_namespace);
+            NamespaceMetadataAnnotator::new(ns_state, namespace_fields_spec, log_namespace, Config::NAME);
+        let node_annotator = NodeMetadataAnnotator::new(node_state, node_field_spec, log_namespace, Config::NAME);
 
         let ignore_before = calculate_ignore_before(ignore_older_secs);
 
@@ -987,7 +988,7 @@ impl Source {
 }
 
 // Set page size to None if use_apiserver_cache is true, to make the list requests containing `resourceVersion=0`` parameters.
-fn get_page_size(use_apiserver_cache: bool) -> Option<u32> {
+pub(crate) fn get_page_size(use_apiserver_cache: bool) -> Option<u32> {
     if use_apiserver_cache {
         None
     } else {
@@ -1038,8 +1039,8 @@ fn create_event(
 
 /// This function returns the default value for `self_node_name` variable
 /// as it should be at the generated config file.
-fn default_self_node_name_env_template() -> String {
-    format!("${{{}}}", SELF_NODE_NAME_ENV_KEY.to_owned())
+pub(crate) fn default_self_node_name_env_template() -> String {
+    format!("${{{SELF_NODE_NAME_ENV_KEY}}}")
 }
 
 fn default_path_inclusion() -> Vec<PathBuf> {
@@ -1132,7 +1133,10 @@ fn prepare_glob_patterns(paths: &[PathBuf], op: &str) -> crate::Result<Vec<glob:
 
 // This function constructs the effective field selector to use, based on
 // the specified configuration.
-fn prepare_field_selector(config: &Config, self_node_name: &str) -> crate::Result<String> {
+pub(crate) fn prepare_field_selector(
+    extra_field_selector: &str,
+    self_node_name: &str,
+) -> crate::Result<String> {
     info!(
         message = "Obtained Kubernetes Node name to collect logs for (self).",
         ?self_node_name
@@ -1140,24 +1144,21 @@ fn prepare_field_selector(config: &Config, self_node_name: &str) -> crate::Resul
 
     let field_selector = format!("spec.nodeName={self_node_name}");
 
-    if config.extra_field_selector.is_empty() {
+    if extra_field_selector.is_empty() {
         return Ok(field_selector);
     }
 
-    Ok(format!(
-        "{},{}",
-        field_selector, config.extra_field_selector
-    ))
+    Ok(format!("{field_selector},{extra_field_selector}"))
 }
 
 // This function constructs the selector for a node to annotate entries with a node metadata.
-fn prepare_node_selector(self_node_name: &str) -> crate::Result<String> {
+pub(crate) fn prepare_node_selector(self_node_name: &str) -> crate::Result<String> {
     Ok(format!("metadata.name={self_node_name}"))
 }
 
 // This function constructs the effective label selector to use, based on
 // the specified configuration.
-fn prepare_label_selector(selector: &str) -> String {
+pub(crate) fn prepare_label_selector(selector: &str) -> String {
     const BUILT_IN: &str = "vector.dev/exclude!=true";
 
     if selector.is_empty() {
@@ -1311,7 +1312,8 @@ mod tests {
         ];
 
         for (input, expected) in cases {
-            let output = super::prepare_field_selector(&input, "qwe").unwrap();
+            let output =
+                super::prepare_field_selector(&input.extra_field_selector, "qwe").unwrap();
             assert_eq!(expected, output, "expected left, actual right");
         }
     }
