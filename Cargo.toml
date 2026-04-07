@@ -636,6 +636,7 @@ sources-logs = [
   "sources-journald",
   "sources-kafka",
   "sources-kubernetes_logs",
+  "sources-kubernetes_logs_api",
   "sources-logstash",
   "sources-mqtt",
   "sources-nats",
@@ -695,6 +696,7 @@ sources-static_metrics = []
 sources-journald = []
 sources-kafka = ["dep:rdkafka"]
 sources-kubernetes_logs = ["vector-lib/file-source", "kubernetes", "transforms-reduce"]
+sources-kubernetes_logs_api = ["sources-kubernetes_logs"]
 sources-logstash = ["sources-utils-net-tcp", "tokio-util/net"]
 sources-mongodb_metrics = ["dep:mongodb"]
 sources-mqtt = ["dep:rumqttc"]
