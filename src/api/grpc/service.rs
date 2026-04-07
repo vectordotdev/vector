@@ -436,6 +436,19 @@ impl observability::Service for ObservabilityService {
         Ok(Response::new(GetMetaResponse { version, hostname }))
     }
 
+    async fn get_allocation_tracing_status(
+        &self,
+        _request: Request<GetAllocationTracingStatusRequest>,
+    ) -> Result<Response<GetAllocationTracingStatusResponse>, Status> {
+        #[cfg(feature = "allocation-tracing")]
+        let enabled = crate::internal_telemetry::allocations::is_allocation_tracing_enabled();
+        #[cfg(not(feature = "allocation-tracing"))]
+        let enabled = false;
+        Ok(Response::new(GetAllocationTracingStatusResponse {
+            enabled,
+        }))
+    }
+
     async fn get_components(
         &self,
         request: Request<GetComponentsRequest>,

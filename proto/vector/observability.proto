@@ -17,6 +17,9 @@ service ObservabilityService {
   // Get information about configured components (sources, transforms, sinks)
   rpc GetComponents(GetComponentsRequest) returns (GetComponentsResponse);
 
+  // Check whether allocation tracing is active on this instance
+  rpc GetAllocationTracingStatus(GetAllocationTracingStatusRequest) returns (GetAllocationTracingStatusResponse);
+
   // ========== Real-time Metric Streams ==========
   // All streaming RPCs send periodic updates at the specified interval
 
@@ -52,6 +55,12 @@ message GetMetaRequest {}
 message GetMetaResponse {
   string version = 1;
   string hostname = 2;
+}
+
+message GetAllocationTracingStatusRequest {}
+
+message GetAllocationTracingStatusResponse {
+  bool enabled = 1;
 }
 
 // ========== Component Messages ==========
