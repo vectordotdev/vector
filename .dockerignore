@@ -13,3 +13,8 @@
 
 # Exclude target directories to avoid copying build artifacts
 target
+
+# `*` does not match dotfiles, so exclude them explicitly
+.git
+.github
+.gitignore
