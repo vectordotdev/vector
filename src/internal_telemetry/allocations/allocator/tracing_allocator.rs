@@ -175,7 +175,7 @@ mod tests {
     }
 
     #[test]
-    fn sentinel_does_not_collide_with_registered_ids() {
+    fn sentinels_do_not_collide_with_root_id() {
         assert_eq!(UNTRACED, u8::MAX);
         assert_ne!(UNTRACED, AllocationGroupId::ROOT.as_raw());
         assert_ne!(UNTRACKED, AllocationGroupId::ROOT.as_raw());
@@ -208,7 +208,8 @@ mod tests {
     }
 
     /// Tracked allocation: header is a valid non-zero, non-sentinel group
-    /// ID and dealloc completes without panic.
+    /// ID, tracing fires for both alloc and dealloc, and dealloc completes
+    /// without panic.
     #[test]
     #[serial]
     fn tracked_alloc_dealloc_does_not_panic() {
@@ -221,31 +222,53 @@ mod tests {
 
         let (_, offset) = get_wrapped_layout(layout);
         let raw_id = unsafe { ptr.add(offset).cast::<u8>().read() };
-        assert_ne!(
-            raw_id, UNTRACKED,
-            "header must not be UNTRACKED when tracking is on"
+        assert_eq!(
+            raw_id,
+            AllocationGroupId::ROOT.as_raw(),
+            "header must be the ROOT group ID"
         );
+        assert_eq!(allocator.tracer.allocs.load(Ordering::Relaxed), 1);
 
         unsafe { allocator.dealloc(ptr, layout) };
+
+        assert_eq!(allocator.tracer.deallocs.load(Ordering::Relaxed), 1);
     }
 
-    /// Verify the UNTRACED sentinel dealloc path: manually write UNTRACED
-    /// into the header and confirm dealloc skips trace_deallocation.
+    /// End-to-end reentrant allocation: hold a mutable borrow on the
+    /// thread-local group stack so `try_with_suspended_allocation_group`
+    /// skips the tracing closure. The header must be UNTRACED and both
+    /// trace counters must stay at zero through alloc + dealloc.
     #[test]
     #[serial]
-    fn untraced_sentinel_dealloc_skips_tracing() {
+    fn reentrant_alloc_writes_untraced_and_skips_tracing() {
+        use crate::internal_telemetry::allocations::allocator::token::LOCAL_ALLOCATION_GROUP_STACK;
+
         let allocator = GroupedTraceableAllocator::new(System, CountingTracer::new());
         let layout = Layout::from_size_align(64, 8).unwrap();
 
         let _guard = TrackingGuard::enable();
-        let (wrapped_layout, offset) = get_wrapped_layout(layout);
-        let ptr = unsafe { System.alloc(wrapped_layout) };
-        assert!(!ptr.is_null());
 
-        unsafe { ptr.add(offset).cast::<u8>().write(UNTRACED) };
+        // Hold a mutable borrow to simulate reentrancy -- any nested
+        // `try_borrow_mut` inside `try_with_suspended_allocation_group`
+        // will fail, causing the tracing closure to be skipped.
+        LOCAL_ALLOCATION_GROUP_STACK.with(|group_stack| {
+            let _borrow = group_stack.borrow_mut();
 
-        unsafe { allocator.dealloc(ptr, layout) };
+            let ptr = unsafe { allocator.alloc(layout) };
+            assert!(!ptr.is_null());
 
-        assert_eq!(allocator.tracer.deallocs.load(Ordering::Relaxed), 0);
+            let (_, offset) = get_wrapped_layout(layout);
+            let raw_id = unsafe { ptr.add(offset).cast::<u8>().read() };
+            assert_eq!(
+                raw_id, UNTRACED,
+                "reentrant alloc must write UNTRACED sentinel"
+            );
+
+            assert_eq!(allocator.tracer.allocs.load(Ordering::Relaxed), 0);
+
+            unsafe { allocator.dealloc(ptr, layout) };
+
+            assert_eq!(allocator.tracer.deallocs.load(Ordering::Relaxed), 0);
+        });
     }
 }
