@@ -440,7 +440,10 @@ impl observability::Service for ObservabilityService {
         &self,
         _request: Request<GetAllocationTracingStatusRequest>,
     ) -> Result<Response<GetAllocationTracingStatusResponse>, Status> {
+        #[cfg(feature = "allocation-tracing")]
         let enabled = crate::internal_telemetry::allocations::is_allocation_tracing_enabled();
+        #[cfg(not(feature = "allocation-tracing"))]
+        let enabled = false;
         Ok(Response::new(GetAllocationTracingStatusResponse {
             enabled,
         }))

@@ -573,6 +573,11 @@ pub async fn init_components(
 
     #[cfg(feature = "allocation-tracing")]
     {
+        // Allocation tracing is a compile-time + startup-time setting on the
+        // server, so querying once per connection is sufficient. On error
+        // (e.g. older server without this RPC) we default to false, matching
+        // pre-existing behavior. This is re-evaluated on every reconnect via
+        // the retry loop in `subscription()`.
         state.allocation_tracing_active = client
             .get_allocation_tracing_status()
             .await
