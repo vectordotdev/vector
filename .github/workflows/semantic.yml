@@ -160,6 +160,7 @@ jobs:
             heroku_logs source
             host_metrics source
             http_client source
+            http_server source
             http_scrape source
             internal_logs source
             internal_metrics source

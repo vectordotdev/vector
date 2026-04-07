@@ -1,20 +1,18 @@
 features:
-- pulsar-integration-tests
+  - pulsar-integration-tests
 
-test_filter: '::pulsar::integration_tests::'
+test_filter: "::pulsar::integration_tests::"
 
 env:
   PULSAR_HOST: pulsar
 
 matrix:
-  # TODO: re-enable `latest` once TLS tests pass with newer Pulsar images.
-  # See https://github.com/vectordotdev/vector/issues/25096
-  version: ["4.1.3"]
+  version: [latest]
 
 # changes to these files/paths will invoke the integration test in CI
 # expressions are evaluated using https://github.com/micromatch/picomatch
 paths:
-- "src/internal_events/pulsar.rs"
-- "src/sinks/pulsar/**"
-- "src/sinks/util/**"
-- "tests/integration/pulsar/**"
+  - "src/internal_events/pulsar.rs"
+  - "src/sinks/pulsar/**"
+  - "src/sinks/util/**"
+  - "tests/integration/pulsar/**"
