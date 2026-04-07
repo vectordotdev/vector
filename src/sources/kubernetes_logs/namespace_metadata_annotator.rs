@@ -14,7 +14,6 @@ use vector_lib::{
     },
 };
 
-use super::Config;
 use crate::event::{Event, LogEvent};
 
 /// Configuration for how the events are enriched with Namespace metadata.
@@ -44,10 +43,12 @@ impl Default for FieldsSpec {
 }
 
 /// Annotate the event with namespace metadata.
+#[derive(Clone)]
 pub struct NamespaceMetadataAnnotator {
     namespace_state_reader: Store<Namespace>,
     fields_spec: FieldsSpec,
     log_namespace: LogNamespace,
+    source_name: &'static str,
 }
 
 impl NamespaceMetadataAnnotator {
@@ -56,11 +57,13 @@ impl NamespaceMetadataAnnotator {
         namespace_state_reader: Store<Namespace>,
         fields_spec: FieldsSpec,
         log_namespace: LogNamespace,
+        source_name: &'static str,
     ) -> Self {
         Self {
             namespace_state_reader,
             fields_spec,
             log_namespace,
+            source_name,
         }
     }
 }
@@ -78,6 +81,7 @@ impl NamespaceMetadataAnnotator {
             &self.fields_spec,
             &namespace.metadata,
             self.log_namespace,
+            self.source_name,
         );
         Some(())
     }
@@ -88,6 +92,7 @@ fn annotate_from_metadata(
     fields_spec: &FieldsSpec,
     metadata: &ObjectMeta,
     log_namespace: LogNamespace,
+    source_name: &'static str,
 ) {
     if let Some(labels) = &metadata.labels
         && let Some(prefix_path) = &fields_spec.namespace_labels.path
@@ -96,7 +101,7 @@ fn annotate_from_metadata(
             let key_path = path!(key);
 
             log_namespace.insert_source_metadata(
-                Config::NAME,
+                source_name,
                 log,
                 Some(LegacyKey::Overwrite((&prefix_path.path).concat(key_path))),
                 path!("namespace_labels", key),
@@ -294,7 +299,7 @@ mod tests {
 
         for (fields_spec, metadata, expected, log_namespace) in cases.into_iter() {
             let mut log = LogEvent::default();
-            annotate_from_metadata(&mut log, &fields_spec, &metadata, log_namespace);
+            annotate_from_metadata(&mut log, &fields_spec, &metadata, log_namespace, "kubernetes_logs");
             assert_eq!(log, expected);
         }
     }
