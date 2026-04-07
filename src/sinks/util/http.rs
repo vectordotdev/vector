@@ -560,7 +560,7 @@ impl<T: fmt::Debug> sink::Response for http::Response<T> {
 #[serde(tag = "type", rename_all = "snake_case")]
 #[configurable(metadata(docs::enum_tag_description = "The retry strategy enum."))]
 pub enum RetryStrategy {
-    /// Don't retry any errors
+    /// Don't retry any errors, including request timeouts.
     None,
 
     /// Default strategy. See [`RetryStrategy::retry_action`] for more details.
@@ -669,6 +669,10 @@ impl<Req: Clone + Send + Sync + 'static> RetryLogic for HttpRetryLogic<Req> {
         }
     }
 
+    fn is_retriable_timeout(&self) -> bool {
+        self.retry_strategy != RetryStrategy::None
+    }
+
     fn should_retry_response(&self, response: &Self::Response) -> RetryAction<Self::Request> {
         self.retry_strategy.retry_action(response.status())
     }
@@ -716,6 +720,10 @@ where
         } else {
             error.is_retriable()
         }
+    }
+
+    fn is_retriable_timeout(&self) -> bool {
+        self.retry_strategy != RetryStrategy::None
     }
 
     fn should_retry_response(&self, response: &Res) -> RetryAction<Req> {
@@ -1064,6 +1072,19 @@ mod test {
                 .retry_action::<()>(StatusCode::INTERNAL_SERVER_ERROR)
                 .is_not_retryable()
         );
+    }
+
+    #[test]
+    fn retry_strategy_none_disables_timeout_retries() {
+        let logic = HttpRetryLogic::<()> {
+            request: PhantomData,
+            retry_strategy: RetryStrategy::None,
+        };
+        let status_logic =
+            HttpStatusRetryLogic::<_, (), ()>::new(|_: &()| StatusCode::OK, RetryStrategy::None);
+
+        assert!(!logic.is_retriable_timeout());
+        assert!(!status_logic.is_retriable_timeout());
     }
 
     #[test]
