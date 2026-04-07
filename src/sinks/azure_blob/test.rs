@@ -357,6 +357,12 @@ async fn azure_blob_build_config_with_account_name() {
 
             [encoding]
             codec = "json"
+
+            [auth]
+            azure_credential_kind = "client_secret_credential"
+            azure_tenant_id = "00000000-0000-0000-0000-000000000000"
+            azure_client_id = "mock-client-id"
+            azure_client_secret = "mock-client-secret"
         "#,
     )
     .unwrap_or_else(|error| panic!("Config parsing failed: {error:?}"));
@@ -366,6 +372,88 @@ async fn azure_blob_build_config_with_account_name() {
         .build(cx)
         .await
         .unwrap_or_else(|error| panic!("Failed to build sink: {error:?}"));
+}
+
+#[tokio::test]
+async fn azure_blob_build_config_with_account_name_with_no_auth() {
+    let config: AzureBlobSinkConfig = toml::from_str::<AzureBlobSinkConfig>(
+        r#"
+            account_name = "mylogstorage"
+            container_name = "my-logs"
+
+            [encoding]
+            codec = "json"
+        "#,
+    )
+    .unwrap_or_else(|error| panic!("Config parsing failed: {error:?}"));
+
+    let cx = SinkContext::default();
+    let sink = config.build(cx).await;
+    match sink {
+        Ok(_) => panic!("Config build should have errored due to missing `auth`"),
+        Err(e) => {
+            let err_str = e.to_string();
+            assert!(
+                err_str.contains("`auth` configuration must be provided"),
+                "Config build did not complain about missing `auth`: {}",
+                err_str
+            );
+        }
+    }
+}
+
+#[tokio::test]
+async fn azure_blob_build_config_with_blob_endpoint() {
+    let config: AzureBlobSinkConfig = toml::from_str::<AzureBlobSinkConfig>(
+        r#"
+            blob_endpoint = "https://localhost:10000/devstoreaccount1"
+            container_name = "my-logs"
+
+            [encoding]
+            codec = "json"
+
+            [auth]
+            azure_credential_kind = "client_secret_credential"
+            azure_tenant_id = "00000000-0000-0000-0000-000000000000"
+            azure_client_id = "mock-client-id"
+            azure_client_secret = "mock-client-secret"
+        "#,
+    )
+    .unwrap_or_else(|error| panic!("Config parsing failed: {error:?}"));
+
+    let cx = SinkContext::default();
+    let _ = config
+        .build(cx)
+        .await
+        .unwrap_or_else(|error| panic!("Failed to build sink: {error:?}"));
+}
+
+#[tokio::test]
+async fn azure_blob_build_config_with_blob_endpoint_with_no_auth() {
+    let config: AzureBlobSinkConfig = toml::from_str::<AzureBlobSinkConfig>(
+        r#"
+            blob_endpoint = "https://localhost:10000/devstoreaccount1"
+            container_name = "my-logs"
+
+            [encoding]
+            codec = "json"
+        "#,
+    )
+    .unwrap_or_else(|error| panic!("Config parsing failed: {error:?}"));
+
+    let cx = SinkContext::default();
+    let sink = config.build(cx).await;
+    match sink {
+        Ok(_) => panic!("Config build should have errored due to missing `auth`"),
+        Err(e) => {
+            let err_str = e.to_string();
+            assert!(
+                err_str.contains("`auth` configuration must be provided"),
+                "Config build did not complain about missing `auth`: {}",
+                err_str
+            );
+        }
+    }
 }
 
 #[tokio::test]
@@ -450,6 +538,12 @@ async fn azure_blob_build_config_with_custom_ca_certificate() {
 
             [tls]
             ca_file = "tests/data/ca/certs/ca.cert.pem"
+
+            [auth]
+            azure_credential_kind = "client_secret_credential"
+            azure_tenant_id = "00000000-0000-0000-0000-000000000000"
+            azure_client_id = "mock-client-id"
+            azure_client_secret = "mock-client-secret"
         "#,
     )
     .unwrap_or_else(|error| panic!("Config parsing failed: {error:?}"));

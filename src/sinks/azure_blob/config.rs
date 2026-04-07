@@ -206,9 +206,19 @@ impl SinkConfig for AzureBlobSinkConfig {
         ) {
             (Some(connstr), None, None) => connstr.inner().into(),
             (None, Some(account_name), None) => {
+                if self.auth.is_none() {
+                    return Err(
+                        "`auth` configuration must be provided when using `account_name`".into(),
+                    );
+                }
                 format!("AccountName={}", account_name)
             }
             (None, None, Some(blob_endpoint)) => {
+                if self.auth.is_none() {
+                    return Err(
+                        "`auth` configuration must be provided when using `blob_endpoint`".into(),
+                    );
+                }
                 // BlobEndpoint must always end in a trailing slash
                 let blob_endpoint = if blob_endpoint.ends_with('/') {
                     blob_endpoint.clone()
