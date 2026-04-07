@@ -619,7 +619,10 @@ impl RetryStrategy {
             Self::Default => match status {
                 StatusCode::TOO_MANY_REQUESTS | StatusCode::REQUEST_TIMEOUT => {
                     RetryAction::Retry(reason)
-                }
+                },
+                StatusCode::NOT_IMPLEMENTED => {
+                    RetryAction::DontRetry(reason)
+                },
                 _ => {
                     if status.is_server_error() {
                         RetryAction::Retry(reason)
