@@ -9,7 +9,23 @@ use super::{
 };
 use crate::internal_telemetry::allocations::TRACK_ALLOCATIONS;
 
+/// Header value for allocations made while tracking is disabled.
+/// On deallocation we free with the wrapped layout but skip tracing.
+const UNTRACKED: u8 = 0;
+
+/// Header value for allocations whose tracing closure was skipped due to
+/// reentrancy. `register()` never hands out `u8::MAX`, so this cannot
+/// collide with a real group ID. On deallocation we free with the wrapped
+/// layout but skip `trace_deallocation` to keep accounting balanced.
+const UNTRACED: u8 = u8::MAX;
+
 /// A tracing allocator that groups allocation events by groups.
+///
+/// Every allocation made through this allocator uses the "wrapped" layout:
+/// the requested layout extended by one byte to store an allocation group
+/// ID. This byte is always present regardless of whether tracking is
+/// enabled, which guarantees that `dealloc` can always read a valid header
+/// and free with the correct (wrapped) layout.
 ///
 /// This allocator can only be used when specified via `#[global_allocator]`.
 pub struct GroupedTraceableAllocator<A, T> {
@@ -29,11 +45,6 @@ unsafe impl<A: GlobalAlloc, T: Tracer> GlobalAlloc for GroupedTraceableAllocator
     #[inline]
     unsafe fn alloc(&self, object_layout: Layout) -> *mut u8 {
         unsafe {
-            if !TRACK_ALLOCATIONS.load(Ordering::Relaxed) {
-                return self.allocator.alloc(object_layout);
-            }
-
-            // Allocate our wrapped layout and make sure the allocation succeeded.
             let (actual_layout, offset_to_group_id) = get_wrapped_layout(object_layout);
             let actual_ptr = self.allocator.alloc(actual_layout);
             if actual_ptr.is_null() {
@@ -41,6 +52,16 @@ unsafe impl<A: GlobalAlloc, T: Tracer> GlobalAlloc for GroupedTraceableAllocator
             }
 
             let group_id_ptr = actual_ptr.add(offset_to_group_id).cast::<u8>();
+
+            if !TRACK_ALLOCATIONS.load(Ordering::Relaxed) {
+                group_id_ptr.write(UNTRACKED);
+                return actual_ptr;
+            }
+
+            // Write the untraced sentinel so that `dealloc` always finds a
+            // valid header, even when the tracing closure below is skipped
+            // due to reentrancy.
+            group_id_ptr.write(UNTRACED);
 
             let object_size = object_layout.size();
 
@@ -58,18 +79,18 @@ unsafe impl<A: GlobalAlloc, T: Tracer> GlobalAlloc for GroupedTraceableAllocator
     #[inline]
     unsafe fn dealloc(&self, object_ptr: *mut u8, object_layout: Layout) {
         unsafe {
-            if !TRACK_ALLOCATIONS.load(Ordering::Relaxed) {
-                self.allocator.dealloc(object_ptr, object_layout);
-                return;
-            }
-            // Regenerate the wrapped layout so we know where we have to look, as the pointer we've given relates to the
-            // requested layout, not the wrapped layout that was actually allocated.
             let (wrapped_layout, offset_to_group_id) = get_wrapped_layout(object_layout);
-
             let raw_group_id = object_ptr.add(offset_to_group_id).cast::<u8>().read();
 
-            // Deallocate before tracking, just to make sure we're reclaiming memory as soon as possible.
+            // Always free with the wrapped layout since all allocations
+            // (tracked or not) use it.
             self.allocator.dealloc(object_ptr, wrapped_layout);
+
+            // Skip tracing for untracked (tracking was off) and untraced
+            // (reentrant, closure skipped) allocations.
+            if raw_group_id == UNTRACKED || raw_group_id == UNTRACED {
+                return;
+            }
 
             let object_size = object_layout.size();
             let source_group_id = AllocationGroupId::from_raw(raw_group_id);
@@ -95,4 +116,136 @@ fn get_wrapped_layout(object_layout: Layout) -> (Layout, usize) {
         .expect("wrapping requested layout resulted in overflow");
 
     (actual_layout.pad_to_align(), offset_to_group_id)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        alloc::{GlobalAlloc, Layout, System},
+        sync::atomic::{AtomicUsize, Ordering},
+    };
+
+    use serial_test::serial;
+
+    use super::*;
+    use crate::internal_telemetry::allocations::allocator::{
+        token::AllocationGroupId, tracer::Tracer,
+    };
+
+    /// RAII guard that enables `TRACK_ALLOCATIONS` on creation and
+    /// restores it to `false` on drop, ensuring cleanup even if the
+    /// test panics.
+    struct TrackingGuard;
+
+    impl TrackingGuard {
+        fn enable() -> Self {
+            TRACK_ALLOCATIONS.store(true, Ordering::Release);
+            Self
+        }
+    }
+
+    impl Drop for TrackingGuard {
+        fn drop(&mut self) {
+            TRACK_ALLOCATIONS.store(false, Ordering::Release);
+        }
+    }
+
+    struct CountingTracer {
+        allocs: AtomicUsize,
+        deallocs: AtomicUsize,
+    }
+
+    impl CountingTracer {
+        const fn new() -> Self {
+            Self {
+                allocs: AtomicUsize::new(0),
+                deallocs: AtomicUsize::new(0),
+            }
+        }
+    }
+
+    impl Tracer for CountingTracer {
+        fn trace_allocation(&self, _size: usize, _group_id: AllocationGroupId) {
+            self.allocs.fetch_add(1, Ordering::Relaxed);
+        }
+
+        fn trace_deallocation(&self, _size: usize, _source_group_id: AllocationGroupId) {
+            self.deallocs.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+
+    #[test]
+    fn sentinel_does_not_collide_with_registered_ids() {
+        assert_eq!(UNTRACED, u8::MAX);
+        assert_ne!(UNTRACED, AllocationGroupId::ROOT.as_raw());
+        assert_ne!(UNTRACKED, AllocationGroupId::ROOT.as_raw());
+    }
+
+    /// Allocations made while tracking is disabled get UNTRACKED (0) in the
+    /// header. Deallocating them (whether tracking is on or off) must use
+    /// the wrapped layout and skip tracing.
+    #[test]
+    #[serial]
+    fn untracked_alloc_dealloc_skips_tracing() {
+        let allocator = GroupedTraceableAllocator::new(System, CountingTracer::new());
+        let layout = Layout::from_size_align(64, 8).unwrap();
+
+        // Tracking starts off (default state). Allocate while disabled.
+        let ptr = unsafe { allocator.alloc(layout) };
+        assert!(!ptr.is_null());
+
+        // Header must be UNTRACKED.
+        let (_, offset) = get_wrapped_layout(layout);
+        let raw_id = unsafe { ptr.add(offset).cast::<u8>().read() };
+        assert_eq!(raw_id, UNTRACKED);
+
+        // Enable tracking, then dealloc -- must not panic, no trace events.
+        let _guard = TrackingGuard::enable();
+        unsafe { allocator.dealloc(ptr, layout) };
+
+        assert_eq!(allocator.tracer.allocs.load(Ordering::Relaxed), 0);
+        assert_eq!(allocator.tracer.deallocs.load(Ordering::Relaxed), 0);
+    }
+
+    /// Tracked allocation: header is a valid non-zero, non-sentinel group
+    /// ID and dealloc completes without panic.
+    #[test]
+    #[serial]
+    fn tracked_alloc_dealloc_does_not_panic() {
+        let allocator = GroupedTraceableAllocator::new(System, CountingTracer::new());
+        let layout = Layout::from_size_align(64, 8).unwrap();
+
+        let _guard = TrackingGuard::enable();
+        let ptr = unsafe { allocator.alloc(layout) };
+        assert!(!ptr.is_null());
+
+        let (_, offset) = get_wrapped_layout(layout);
+        let raw_id = unsafe { ptr.add(offset).cast::<u8>().read() };
+        assert_ne!(
+            raw_id, UNTRACKED,
+            "header must not be UNTRACKED when tracking is on"
+        );
+
+        unsafe { allocator.dealloc(ptr, layout) };
+    }
+
+    /// Verify the UNTRACED sentinel dealloc path: manually write UNTRACED
+    /// into the header and confirm dealloc skips trace_deallocation.
+    #[test]
+    #[serial]
+    fn untraced_sentinel_dealloc_skips_tracing() {
+        let allocator = GroupedTraceableAllocator::new(System, CountingTracer::new());
+        let layout = Layout::from_size_align(64, 8).unwrap();
+
+        let _guard = TrackingGuard::enable();
+        let (wrapped_layout, offset) = get_wrapped_layout(layout);
+        let ptr = unsafe { System.alloc(wrapped_layout) };
+        assert!(!ptr.is_null());
+
+        unsafe { ptr.add(offset).cast::<u8>().write(UNTRACED) };
+
+        unsafe { allocator.dealloc(ptr, layout) };
+
+        assert_eq!(allocator.tracer.deallocs.load(Ordering::Relaxed), 0);
+    }
 }
