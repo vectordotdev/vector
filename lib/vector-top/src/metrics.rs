@@ -569,5 +569,16 @@ pub async fn init_components(
         })
         .collect::<BTreeMap<_, _>>();
 
-    Ok(state::State::new(rows))
+    let mut state = state::State::new(rows);
+
+    #[cfg(feature = "allocation-tracing")]
+    {
+        state.allocation_tracing_active = client
+            .get_allocation_tracing_status()
+            .await
+            .map(|r| r.enabled)
+            .unwrap_or(false);
+    }
+
+    Ok(state)
 }
