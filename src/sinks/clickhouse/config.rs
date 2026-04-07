@@ -279,7 +279,7 @@ impl ClickhouseConfig {
         };
 
         if let Some(batch_encoding) = &self.batch_encoding {
-            use vector_lib::codecs::{BatchEncoder, BatchSerializer};
+            use vector_lib::codecs::BatchEncoder;
 
             // Validate that batch_encoding is only compatible with ArrowStream format
             if self.format != Format::ArrowStream {

@@ -9,6 +9,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use arrow::datatypes::{DataType, Field, Fields, Schema, SchemaRef, TimeUnit};
+use arrow::json::reader::infer_json_schema_from_iterator;
 use bytes::{BufMut, BytesMut};
 use parquet::arrow::ArrowWriter;
 use parquet::basic::Compression as ParquetCodecCompression;
@@ -19,6 +20,17 @@ use vector_config::configurable_component;
 use vector_core::event::Event;
 
 use super::arrow::{ArrowEncodingError, build_record_batch};
+use derivative::Derivative;
+
+use crate::encoding::internal_events::{JsonSerializationError, SchemaGenerationError};
+use arrow::error::ArrowError;
+use std::io::{Error, ErrorKind};
+use vector_common::internal_event::{
+    ComponentEventsDropped, Count, InternalEventHandle, Registered, UNINTENTIONAL, emit, register,
+};
+use vector_core::event::Value;
+
+type EventsDroppedError = ComponentEventsDropped<'static, UNINTENTIONAL>;
 
 /// Parquet compression codec options.
 #[configurable_component]
@@ -60,6 +72,8 @@ pub enum SchemaMode {
     Relaxed,
     /// Missing fields become null. Extra fields cause an error.
     Strict,
+    /// Auto infer schema based on the batch. No schema file needed.
+    AutoInfer,
 }
 
 /// Arrow data type for Parquet schema field definitions.
@@ -255,6 +269,10 @@ impl ParquetSerializerConfig {
     /// Validates that exactly one schema source is provided and that schema
     /// strings are non-empty.
     fn resolve_schema(&self) -> Result<Schema, Box<dyn std::error::Error + Send + Sync>> {
+        if self.schema_mode == SchemaMode::AutoInfer {
+            return Ok(Schema::empty());
+        }
+
         let has_inline = !self.schema.is_empty();
         let has_parquet = self.parquet_schema.is_some();
         let has_file = self.schema_file.is_some();
@@ -702,11 +720,7 @@ fn proto_kind_to_arrow(
 fn reject_unsupported_arrow_types(
     schema: &Schema,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    fn check_field(
-        field: &Field,
-        path: &str,
-        bad: &mut Vec<String>,
-    ) {
+    fn check_field(field: &Field, path: &str, bad: &mut Vec<String>) {
         let name = if path.is_empty() {
             field.name().to_string()
         } else {
@@ -752,13 +766,17 @@ fn reject_unsupported_arrow_types(
 }
 
 /// Parquet batch serializer.
-#[derive(Clone, Debug)]
+#[derive(Derivative)]
+#[derivative(Debug, Clone)]
 pub struct ParquetSerializer {
     schema: SchemaRef,
     writer_props: Arc<WriterProperties>,
     schema_mode: SchemaMode,
     /// Pre-built set of schema field names for O(1) strict-mode lookups.
     schema_field_names: HashSet<String>,
+
+    #[derivative(Debug = "ignore")]
+    events_dropped_handle: Registered<EventsDroppedError>,
 }
 
 impl ParquetSerializer {
@@ -787,6 +805,7 @@ impl ParquetSerializer {
             writer_props,
             schema_mode: config.schema_mode,
             schema_field_names,
+            events_dropped_handle: default_events_dropped(),
         })
     }
 
@@ -838,6 +857,12 @@ impl tokio_util::codec::Encoder<Vec<Event>> for ParquetSerializer {
                     }
                 }
             }
+        } else if self.schema_mode == SchemaMode::AutoInfer {
+            // auto infer schema here.
+            self.schema = Arc::new(
+                ParquetSchemaGenerator::new(self.events_dropped_handle.clone())
+                    .infer_schema(&events)?,
+            );
         }
 
         // Build RecordBatch using the shared Arrow logic
@@ -854,6 +879,153 @@ impl tokio_util::codec::Encoder<Vec<Event>> for ParquetSerializer {
         writer.close()?;
 
         Ok(())
+    }
+}
+
+fn default_events_dropped() -> Registered<EventsDroppedError> {
+    register(EventsDroppedError::from(
+        "Events could not be serialized to parquet",
+    ))
+}
+
+struct LogEventsIter<'a> {
+    events: &'a [Event],
+    events_dropped_handle: Registered<EventsDroppedError>,
+    index: usize,
+    dropped_events_count: usize,
+}
+
+impl<'a> LogEventsIter<'a> {
+    fn new(events: &'a [Event], events_dropped_handle: Registered<EventsDroppedError>) -> Self {
+        Self {
+            events,
+            events_dropped_handle,
+            index: 0,
+            dropped_events_count: 0,
+        }
+    }
+
+    fn mark_event_dropped(&mut self) {
+        self.dropped_events_count += 1;
+        self.events_dropped_handle.emit(Count(1));
+    }
+
+    fn dropped_events(&self) -> usize {
+        self.dropped_events_count
+    }
+}
+
+impl<'a> Iterator for LogEventsIter<'a> {
+    type Item = Result<serde_json::Value, ArrowError>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index == self.events.len() {
+            return None;
+        }
+
+        let event = self.events[self.index].as_log();
+        self.index += 1;
+
+        match serde_json::to_value(event) {
+            Ok(value) => Some(Ok(value)),
+            Err(e) => {
+                // emit an error metric and then move on to the next event.
+                emit(JsonSerializationError { error: &e });
+                self.mark_event_dropped();
+                self.next()
+            }
+        }
+    }
+}
+
+pub struct ParquetSchemaGenerator {
+    events_dropped_handle: Registered<EventsDroppedError>,
+}
+
+impl ParquetSchemaGenerator {
+    fn new(events_dropped_handle: Registered<EventsDroppedError>) -> Self {
+        Self {
+            events_dropped_handle,
+        }
+    }
+    pub fn infer_schema(&self, events: &[Event]) -> Result<Schema, Error> {
+        let mut events_iter = LogEventsIter::new(events, self.events_dropped_handle.clone());
+
+        let mut schema = infer_json_schema_from_iterator(&mut events_iter).map_err(|e| {
+            self.events_dropped_handle
+                .emit(Count(events.len() - events_iter.dropped_events()));
+            emit(SchemaGenerationError { error: &e });
+            Error::new(ErrorKind::InvalidData, e.to_string())
+        })?;
+
+        schema = Self::try_normalize_schema(events, schema);
+
+        Ok(schema)
+    }
+
+    /// attempt to modify schema to set timestamp fields as Timestamp instead of Utf8
+    /// only works for top level fields, we DO NOT look at nested fields
+    fn try_normalize_schema(events: &[Event], schema: Schema) -> Schema {
+        use std::collections::HashMap;
+        use std::collections::HashSet;
+
+        // get all timestamp fields in log events into map key: column name, value: num_events with column name
+        let mut map: HashMap<String, usize> = HashMap::new();
+        for event in events {
+            if let Some(object_map) = event.as_log().as_map() {
+                for (path, value) in object_map {
+                    if value.is_timestamp() {
+                        *map.entry(path.to_string()).or_insert(0) += 1;
+                    }
+                }
+            }
+        }
+
+        // run through events again, looking for logs where a timestamp field is missing and if it is then add that log to the count,
+        // we wanna do this because we can make fields nullable so if one log event in the batch has a timestamp field but that field is missing
+        // in all the other log events, then it's fine to set that field as a timestamp in the schema.
+        let all_timestamp_fields: HashSet<String> = map.keys().cloned().collect();
+        for event in events {
+            for timestamp_field in &all_timestamp_fields {
+                let value = event
+                    .as_log()
+                    .as_map()
+                    .and_then(|e| e.get(timestamp_field.as_str()));
+
+                // if timestamp_field is not in this event or it's null then it's safe to update the generated schema
+                if value.is_none_or(Value::is_null) {
+                    map.entry(timestamp_field.clone()).and_modify(|v| *v += 1);
+                }
+            }
+        }
+
+        let timestamp_fields: HashSet<String> = map
+            .iter()
+            // check to make sure all the fields are Value::Timestamp
+            .filter(|(_, v)| **v == events.len())
+            .map(|(k, _)| k.clone())
+            .collect();
+
+        let new_fields: Vec<Field> = schema
+            .fields()
+            .iter()
+            .map(|f| {
+                if timestamp_fields.contains(f.name()) {
+                    Field::new(
+                        f.name(),
+                        DataType::Timestamp(
+                            arrow::datatypes::TimeUnit::Microsecond,
+                            Some("UTC".into()),
+                        ),
+                        f.is_nullable(),
+                    )
+                } else {
+                    f.as_ref().clone()
+                }
+            })
+            .collect();
+
+        Schema::new(new_fields)
     }
 }
 
@@ -2447,10 +2619,7 @@ mod tests {
 
         let mut buffer = BytesMut::new();
         let result = serializer.encode(events, &mut buffer);
-        assert!(
-            result.is_err(),
-            "Batch of only non-log events should error"
-        );
+        assert!(result.is_err(), "Batch of only non-log events should error");
     }
 
     #[test]
