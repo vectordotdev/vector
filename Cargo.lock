@@ -1072,9 +1072,9 @@ dependencies = [
 
 [[package]]
 name = "aws-sdk-kms"
-version = "1.99.0"
+version = "1.103.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aa37c3e267142899d18cb1617258c93ed7a78873e9adff0221838b0e621188be"
+checksum = "8e6bfd8dfb5a562f9a605bbd5c3aef09db9231c826a1e0488ce3f4338c70dbbb"
 dependencies = [
  "aws-credential-types",
  "aws-runtime",
@@ -1131,9 +1131,9 @@ dependencies = [
 
 [[package]]
 name = "aws-sdk-secretsmanager"
-version = "1.99.0"
+version = "1.102.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "81f5e5b4f5612dc147e56bf2c1c436e8e098dc3433fb525cfd7562128a78b53f"
+checksum = "c9e9668477f18fd7ef9c606a3be827051f0c14030ccb5e6d3958f66c7956cd20"
 dependencies = [
  "aws-credential-types",
  "aws-runtime",
@@ -1485,9 +1485,9 @@ dependencies = [
 
 [[package]]
 name = "aws-smithy-types"
-version = "1.4.6"
+version = "1.4.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d2b1117b3b2bbe166d11199b540ceed0d0f7676e36e7b962b5a437a9971eac75"
+checksum = "9d73dbfbaa8e4bc57b9045137680b958d274823509a360abfd8e1d514d40c95c"
 dependencies = [
  "base64-simd",
  "bytes",
