@@ -6,6 +6,8 @@ use bytes::Bytes;
 use chrono::{SecondsFormat, Utc};
 use serde_json::{json, to_vec};
 
+use vector_lib::lookup::lookup_v2::OptionalTargetPath;
+
 use crate::sinks::{
     prelude::*,
     util::encoding::{Encoder as SinkEncoder, write_all},
@@ -13,6 +15,7 @@ use crate::sinks::{
 
 pub(super) struct HoneycombEncoder {
     pub(super) transformer: Transformer,
+    pub(super) samplerate_field: Option<OptionalTargetPath>,
 }
 
 impl SinkEncoder<Vec<Event>> for HoneycombEncoder {
@@ -37,10 +40,30 @@ impl SinkEncoder<Vec<Event>> for HoneycombEncoder {
                 _ => Utc::now(),
             };
 
-            let data = json!({
+            let samplerate = self.samplerate_field.as_ref().and_then(|field| {
+                field.path.as_ref().and_then(|path| {
+                    log.remove(path).and_then(|value| match value {
+                        Value::Integer(rate) => Some(rate),
+                        other => {
+                            warn!(
+                                message = "Samplerate field value was not an integer, ignoring.",
+                                field = %path,
+                                value_type = other.kind_str(),
+                            );
+                            None
+                        }
+                    })
+                })
+            });
+
+            let mut data = json!({
                 "time": timestamp.to_rfc3339_opts(SecondsFormat::Nanos, true),
                 "data": log.convert_to_fields(),
             });
+
+            if let Some(rate) = samplerate {
+                data["samplerate"] = json!(rate);
+            }
 
             json_events.push(data);
         }
