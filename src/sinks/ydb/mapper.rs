@@ -108,90 +108,92 @@ fn convert_value(vector_val: &VectorValue, ydb_type_hint: &Value) -> Result<Valu
         ydb_type_hint.clone()
     };
 
-    match vector_val {
-        VectorValue::Integer(i) => match &inner_type {
-            Value::Int64(_) => Ok(Value::Int64(*i)),
-            _ => Err(type_mismatch("Integer", &inner_type)),
-        },
+    match (vector_val, &inner_type) {
+        (VectorValue::Integer(i), Value::Int64(_)) => Ok(Value::Int64(*i)),
 
-        VectorValue::Float(f) => match &inner_type {
-            Value::Double(_) => Ok(Value::Double(f.into_inner())),
-            Value::Decimal(_) => Ok(Value::Decimal(Decimal::try_from(f.into_inner()).map_err(
+        (VectorValue::Float(f), Value::Double(_)) => Ok(Value::Double(f.into_inner())),
+        (VectorValue::Float(f), Value::Decimal(_)) => {
+            Ok(Value::Decimal(Decimal::try_from(f.into_inner()).map_err(
                 |e| MappingError::ConversionFailed {
                     message: format!("failed to convert Float to Decimal: {}", e),
                 },
-            )?)),
-            _ => Err(type_mismatch("Float", &inner_type)),
-        },
+            )?))
+        }
 
-        VectorValue::Bytes(b) => match &inner_type {
-            Value::Bytes(_) => Ok(Value::Bytes(b.to_vec().into())),
-            Value::Text(_) => {
-                let text =
-                    String::from_utf8(b.to_vec()).map_err(|_| MappingError::ConversionFailed {
-                        message: "invalid UTF-8 in Bytes for Text field".to_string(),
-                    })?;
-                Ok(Value::Text(text))
-            }
-            _ => Err(type_mismatch("Bytes", &inner_type)),
-        },
+        (VectorValue::Bytes(b), Value::Bytes(_)) => Ok(Value::Bytes(b.to_vec().into())),
+        (VectorValue::Bytes(b), Value::Text(_)) => {
+            let text = String::from_utf8(b.to_vec()).map_err(|_| {
+                MappingError::ConversionFailed {
+                    message: "invalid UTF-8 in Bytes for Text field".to_string(),
+                }
+            })?;
+            Ok(Value::Text(text))
+        }
 
-        VectorValue::Boolean(b) => match &inner_type {
-            Value::Bool(_) => Ok(Value::Bool(*b)),
-            _ => Err(type_mismatch("Boolean", &inner_type)),
-        },
+        (VectorValue::Boolean(b), Value::Bool(_)) => Ok(Value::Bool(*b)),
 
-        VectorValue::Timestamp(ts) => match &inner_type {
-            Value::Timestamp(_) => Ok(Value::Timestamp(std::time::SystemTime::from(*ts))),
-            Value::Date(_) => {
-                let date = ts.date_naive();
-                let datetime =
-                    date.and_hms_opt(0, 0, 0)
-                        .ok_or_else(|| MappingError::ConversionFailed {
-                            message: "failed to create datetime".to_string(),
-                        })?;
-                let datetime_utc = chrono::Utc.from_utc_datetime(&datetime);
-                Ok(Value::Date(std::time::SystemTime::from(datetime_utc)))
-            }
-            Value::DateTime(_) => Ok(Value::DateTime(std::time::SystemTime::from(*ts))),
-            _ => Err(type_mismatch("Timestamp", &inner_type)),
-        },
+        (VectorValue::Timestamp(ts), Value::Timestamp(_)) => {
+            Ok(Value::Timestamp(std::time::SystemTime::from(*ts)))
+        }
+        (VectorValue::Timestamp(ts), Value::Date(_)) => {
+            let date = ts.date_naive();
+            let datetime = date.and_hms_opt(0, 0, 0).ok_or_else(|| {
+                MappingError::ConversionFailed {
+                    message: "failed to create datetime".to_string(),
+                }
+            })?;
+            let datetime_utc = chrono::Utc.from_utc_datetime(&datetime);
+            Ok(Value::Date(std::time::SystemTime::from(datetime_utc)))
+        }
+        (VectorValue::Timestamp(ts), Value::DateTime(_)) => {
+            Ok(Value::DateTime(std::time::SystemTime::from(*ts)))
+        }
 
-        VectorValue::Array(_) => {
+        (VectorValue::Array(_), Value::JsonDocument(_)) => {
             let json_str = serde_json::to_string(vector_val).map_err(|e| {
                 MappingError::SerializationFailed {
                     what: "Array".to_string(),
                     reason: e.to_string(),
                 }
             })?;
-
-            match &inner_type {
-                Value::JsonDocument(_) => Ok(Value::JsonDocument(json_str)),
-                Value::Json(_) => Ok(Value::Json(json_str)),
-                _ => Err(type_mismatch("Array", &inner_type)),
-            }
+            Ok(Value::JsonDocument(json_str))
+        }
+        (VectorValue::Array(_), Value::Json(_)) => {
+            let json_str = serde_json::to_string(vector_val).map_err(|e| {
+                MappingError::SerializationFailed {
+                    what: "Array".to_string(),
+                    reason: e.to_string(),
+                }
+            })?;
+            Ok(Value::Json(json_str))
         }
 
-        VectorValue::Object(_) => {
+        (VectorValue::Object(_), Value::JsonDocument(_)) => {
             let json_str = serde_json::to_string(vector_val).map_err(|e| {
                 MappingError::SerializationFailed {
                     what: "Object".to_string(),
                     reason: e.to_string(),
                 }
             })?;
-
-            match &inner_type {
-                Value::JsonDocument(_) => Ok(Value::JsonDocument(json_str)),
-                Value::Json(_) => Ok(Value::Json(json_str)),
-                _ => Err(type_mismatch("Object", &inner_type)),
-            }
+            Ok(Value::JsonDocument(json_str))
+        }
+        (VectorValue::Object(_), Value::Json(_)) => {
+            let json_str = serde_json::to_string(vector_val).map_err(|e| {
+                MappingError::SerializationFailed {
+                    what: "Object".to_string(),
+                    reason: e.to_string(),
+                }
+            })?;
+            Ok(Value::Json(json_str))
         }
 
-        VectorValue::Null => Ok(Value::Null),
+        (VectorValue::Null, _) => Ok(Value::Null),
 
         // TODO: add support for Regex type later
-        VectorValue::Regex(_) => Err(MappingError::ConversionFailed {
+        (VectorValue::Regex(_), _) => Err(MappingError::ConversionFailed {
             message: "Regex type is not supported".to_string(),
         }),
+
+        (val, typ) => Err(type_mismatch(val.to_string().as_str(), typ)),
     }
 }
