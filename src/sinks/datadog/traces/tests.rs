@@ -78,6 +78,7 @@ fn simple_span(resource: String) -> ObjectMap {
             Value::Object(ObjectMap::from([
                 ("foo".into(), Value::from("bar")),
                 ("bar".into(), Value::from("baz")),
+                ("span.kind".into(), Value::from("server")),
             ])),
         ),
         (
@@ -183,6 +184,10 @@ async fn smoke() {
     assert_eq!(cgs.name, "a_name");
     assert_eq!(cgs.resource, "a_resource");
     assert_eq!(cgs.service, "a_service");
+    assert_eq!(cgs.span_kind, "server");
+    // parent_id is 789 (non-zero), so is_trace_root should be TRILEAN_FALSE (2)
+    assert_eq!(cgs.is_trace_root, 2);
+    assert!(cgs.peer_tags.is_empty());
 
     let ok_summary = ddsketch_full::DdSketch::decode(&cgs.ok_summary[..]).unwrap();
     let error_summary = ddsketch_full::DdSketch::decode(&cgs.error_summary[..]).unwrap();
@@ -396,4 +401,125 @@ async fn override_global_options() {
         keys.iter()
             .all(|value| value.to_str().unwrap() == "local-key")
     );
+}
+
+/// Creates a span with a specific span.kind and parent_id for testing aggregation dimensions.
+fn span_with_kind_and_parent(resource: &str, span_kind: &str, parent_id: i64) -> ObjectMap {
+    ObjectMap::from([
+        ("service".into(), Value::from("a_service")),
+        ("name".into(), Value::from("a_name")),
+        ("resource".into(), Value::from(resource)),
+        ("type".into(), Value::from("a_type")),
+        ("trace_id".into(), Value::Integer(123)),
+        ("span_id".into(), Value::Integer(456)),
+        ("parent_id".into(), Value::Integer(parent_id)),
+        (
+            "start".into(),
+            Value::from(Utc.timestamp_nanos(1_431_648_000_000_001i64)),
+        ),
+        ("duration".into(), Value::Integer(1_000_000)),
+        ("error".into(), Value::Integer(0)),
+        (
+            "meta".into(),
+            Value::Object(ObjectMap::from([
+                ("span.kind".into(), Value::from(span_kind)),
+            ])),
+        ),
+        (
+            "metrics".into(),
+            Value::Object(ObjectMap::from([
+                ("_top_level".into(), Value::Float(NotNan::new(1.0).unwrap())),
+            ])),
+        ),
+    ])
+}
+
+fn trace_event_with_spans(spans: Vec<ObjectMap>) -> TraceEvent {
+    let mut t = TraceEvent::default();
+    t.insert(event_path!("language"), "a_language");
+    t.insert(event_path!("agent_version"), "1.23456");
+    t.insert(event_path!("host"), "a_host");
+    t.insert(event_path!("env"), "an_env");
+    t.insert(event_path!("trace_id"), Value::Integer(123));
+    t.insert(event_path!("target_tps"), Value::Integer(10));
+    t.insert(event_path!("error_tps"), Value::Integer(5));
+    t.insert(
+        event_path!("spans"),
+        Value::Array(spans.into_iter().map(Value::from).collect()),
+    );
+    t
+}
+
+#[tokio::test]
+async fn span_kind_produces_separate_buckets() {
+    let spans = vec![
+        span_with_kind_and_parent("a_resource", "server", 0),
+        span_with_kind_and_parent("a_resource", "client", 789),
+    ];
+
+    let mut t = trace_event_with_spans(spans);
+    t.metadata_mut().set_datadog_api_key(Arc::from("a_key"));
+    let events = vec![Event::Trace(t)];
+    let rx = start_test(BatchStatus::Delivered, StatusCode::OK, events).await;
+
+    let mut output = rx.take(2).collect::<Vec<_>>().await;
+    let stats = output.pop();
+    assert!(stats.is_some());
+
+    let (_stats_parts, stats_body) = stats.unwrap();
+    let mut sp: StatsPayload = rmp_serde::from_slice(&stats_body).unwrap();
+    assert_eq!(sp.stats.len(), 1);
+    let mut csp = sp.stats.pop().unwrap();
+    assert_eq!(csp.stats.len(), 1);
+    let mut csb = csp.stats.pop().unwrap();
+
+    // Two different span.kind values should produce two separate grouped stats
+    assert_eq!(csb.stats.len(), 2);
+
+    let cgs_1 = csb.stats.pop().unwrap();
+    let cgs_2 = csb.stats.pop().unwrap();
+
+    let mut kinds: Vec<String> = vec![cgs_1.span_kind.clone(), cgs_2.span_kind.clone()];
+    kinds.sort();
+    assert_eq!(kinds, vec!["client", "server"]);
+}
+
+#[tokio::test]
+async fn is_trace_root_set_correctly() {
+    // Span with parent_id=0 is a trace root
+    let root_span = span_with_kind_and_parent("root_resource", "server", 0);
+    // Span with parent_id!=0 is not a trace root
+    let child_span = span_with_kind_and_parent("child_resource", "server", 789);
+
+    let mut t = trace_event_with_spans(vec![root_span, child_span]);
+    t.metadata_mut().set_datadog_api_key(Arc::from("a_key"));
+    let events = vec![Event::Trace(t)];
+    let rx = start_test(BatchStatus::Delivered, StatusCode::OK, events).await;
+
+    let mut output = rx.take(2).collect::<Vec<_>>().await;
+    let stats = output.pop();
+    assert!(stats.is_some());
+
+    let (_stats_parts, stats_body) = stats.unwrap();
+    let mut sp: StatsPayload = rmp_serde::from_slice(&stats_body).unwrap();
+    let mut csp = sp.stats.pop().unwrap();
+    let mut csb = csp.stats.pop().unwrap();
+
+    // Two different resources + is_trace_root values should produce two separate grouped stats
+    assert_eq!(csb.stats.len(), 2);
+
+    let cgs_1 = csb.stats.pop().unwrap();
+    let cgs_2 = csb.stats.pop().unwrap();
+
+    // Find root and child by resource name
+    let (root_cgs, child_cgs) = if cgs_1.resource == "root_resource" {
+        (cgs_1, cgs_2)
+    } else {
+        (cgs_2, cgs_1)
+    };
+
+    // TRILEAN_TRUE = 1 for trace root (parent_id == 0)
+    assert_eq!(root_cgs.is_trace_root, 1);
+    // TRILEAN_FALSE = 2 for non-root (parent_id != 0)
+    assert_eq!(child_cgs.is_trace_root, 2);
 }

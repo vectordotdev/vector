@@ -48,6 +48,13 @@ impl GroupedStats {
             error_summary: encode_sketch(&self.err_distribution),
             synthetics: key.bucket_key.synthetics,
             top_level_hits: self.top_level_hits.round() as u64,
+            span_kind: key.bucket_key.span_kind.clone(),
+            peer_tags: vec![],
+            is_trace_root: key.bucket_key.is_trace_root,
+            grpc_status_code: key.bucket_key.grpc_status_code.clone(),
+            http_method: key.bucket_key.http_method.clone(),
+            http_endpoint: key.bucket_key.http_endpoint.clone(),
+            service_source: key.bucket_key.service_source.clone(),
         }
     }
 }

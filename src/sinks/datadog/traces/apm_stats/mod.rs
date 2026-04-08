@@ -97,6 +97,17 @@ pub(crate) struct ClientGroupedStats {
     pub(crate) error_summary: Vec<u8>,
     pub(crate) synthetics: bool,
     pub(crate) top_level_hits: u64,
+    pub(crate) span_kind: String,
+    pub(crate) peer_tags: Vec<String>,
+    pub(crate) is_trace_root: i32,
+    #[serde(rename = "GRPCStatusCode")]
+    pub(crate) grpc_status_code: String,
+    #[serde(rename = "HTTPMethod")]
+    pub(crate) http_method: String,
+    #[serde(rename = "HTTPEndpoint")]
+    pub(crate) http_endpoint: String,
+    #[serde(rename = "srv_src")]
+    pub(crate) service_source: String,
 }
 
 /// Computes APM stats from the incoming trace events.

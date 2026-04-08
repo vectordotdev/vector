@@ -14,6 +14,16 @@ const PARTIAL_VERSION_KEY: &str = "_dd.partial_version";
 const TAG_STATUS_CODE: &str = "http.status_code";
 const TAG_SYNTHETICS: &str = "synthetics";
 const TOP_LEVEL_KEY: &str = "_top_level";
+const TAG_SPAN_KIND: &str = "span.kind";
+const TAG_SERVICE_SOURCE: &str = "_dd.svc_src";
+const TAG_GRPC_STATUS_CODE: &str = "grpc.status.code";
+const TAG_HTTP_METHOD: &str = "http.method";
+const TAG_HTTP_ROUTE: &str = "http.route";
+
+/// Trilean values for is_trace_root field.
+/// TRILEAN_NOT_SET (0) is unused but defined by the DD Agent protocol.
+const TRILEAN_TRUE: i32 = 1;
+const TRILEAN_FALSE: i32 = 2;
 
 /// The number of bucket durations to keep in memory before flushing them.
 const BUCKET_WINDOW_LEN: u64 = 2;
@@ -30,6 +40,24 @@ impl AggregationKey {
         payload_key: PayloadAggregationKey,
         synthetics: bool,
     ) -> Self {
+        let meta = span.get("meta").and_then(|m| m.as_object());
+
+        let get_meta_str = |key: &str| -> String {
+            meta.and_then(|m| m.get(key))
+                .map(|s| s.to_string_lossy().into_owned())
+                .unwrap_or_default()
+        };
+
+        let parent_id = match span.get("parent_id") {
+            Some(Value::Integer(val)) => *val as u64,
+            _ => 0,
+        };
+        let is_trace_root = if parent_id == 0 {
+            TRILEAN_TRUE
+        } else {
+            TRILEAN_FALSE
+        };
+
         AggregationKey {
             payload_key: payload_key.with_span_context(span),
             bucket_key: BucketAggregationKey {
@@ -49,14 +77,19 @@ impl AggregationKey {
                     .get("type")
                     .map(|v| v.to_string_lossy().into_owned())
                     .unwrap_or_default(),
-                status_code: span
-                    .get("meta")
-                    .and_then(|m| m.as_object())
+                status_code: meta
                     .and_then(|m| m.get(TAG_STATUS_CODE))
                     // the meta field is supposed to be a string/string map
                     .and_then(|s| s.to_string_lossy().parse::<u32>().ok())
                     .unwrap_or_default(),
                 synthetics,
+                span_kind: get_meta_str(TAG_SPAN_KIND),
+                peer_tags_hash: 0,
+                is_trace_root,
+                grpc_status_code: get_meta_str(TAG_GRPC_STATUS_CODE),
+                http_method: get_meta_str(TAG_HTTP_METHOD),
+                http_endpoint: get_meta_str(TAG_HTTP_ROUTE),
+                service_source: get_meta_str(TAG_SERVICE_SOURCE),
             },
         }
     }
@@ -94,6 +127,13 @@ pub(crate) struct BucketAggregationKey {
     pub(crate) ty: String,
     pub(crate) status_code: u32,
     pub(crate) synthetics: bool,
+    pub(crate) span_kind: String,
+    pub(crate) peer_tags_hash: u64,
+    pub(crate) is_trace_root: i32,
+    pub(crate) grpc_status_code: String,
+    pub(crate) http_method: String,
+    pub(crate) http_endpoint: String,
+    pub(crate) service_source: String,
 }
 
 pub struct Aggregator {
