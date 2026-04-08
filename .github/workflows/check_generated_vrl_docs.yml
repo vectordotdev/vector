@@ -52,6 +52,7 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           rust: true
+          protoc: true
           vdev: false
           mold: false
           cargo-cache: false
