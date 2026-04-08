@@ -22,6 +22,7 @@ use vector_core::event::Event;
 use super::arrow::{ArrowEncodingError, build_record_batch};
 use derivative::Derivative;
 
+use crate::encoding::format::arrow::vector_log_events_to_json_values;
 use crate::encoding::internal_events::{JsonSerializationError, SchemaGenerationError};
 use arrow::error::ArrowError;
 use std::io::{Error, ErrorKind};
@@ -823,15 +824,18 @@ impl tokio_util::codec::Encoder<Vec<Event>> for ParquetSerializer {
             return Ok(());
         }
 
-        // Warn about non-log events that will be silently dropped by the Arrow layer.
-        // Parquet encoding only supports Log events (declared via input_type).
-        let non_log_count = events.iter().filter(|e| e.maybe_as_log().is_none()).count();
+        let json_values = vector_log_events_to_json_values(&events);
+        let non_log_count = events.len() - json_values.len();
+        // Parquet encoding only supports Log events.
+        // emit dropped events metric
         if non_log_count > 0 {
             warn!(
                 message = "Non-log events dropped by Parquet encoder.",
                 %non_log_count,
                 internal_log_rate_secs = 10,
             );
+            self.events_dropped_handle
+                .emit(Count(events.len() - json_values.len()))
         }
 
         // In strict mode, check for extra top-level fields not in the schema
@@ -859,14 +863,16 @@ impl tokio_util::codec::Encoder<Vec<Event>> for ParquetSerializer {
             }
         } else if self.schema_mode == SchemaMode::AutoInfer {
             // auto infer schema here.
-            self.schema = Arc::new(
-                ParquetSchemaGenerator::new(self.events_dropped_handle.clone())
-                    .infer_schema(&events)?,
-            );
+            let schema = ParquetSchemaGenerator::new(self.events_dropped_handle.clone())
+                .infer_schema(&json_values)?;
+
+            self.schema = Arc::new(ParquetSchemaGenerator::try_normalize_schema(
+                &events, schema,
+            ));
         }
 
         // Build RecordBatch using the shared Arrow logic
-        let record_batch = build_record_batch(Arc::clone(&self.schema), &events)
+        let record_batch = build_record_batch(Arc::clone(&self.schema), &json_values)
             .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
 
         // Write Parquet directly into the output buffer (no intermediate Vec)
@@ -888,6 +894,7 @@ fn default_events_dropped() -> Registered<EventsDroppedError> {
     ))
 }
 
+#[allow(dead_code)]
 struct LogEventsIter<'a> {
     events: &'a [Event],
     events_dropped_handle: Registered<EventsDroppedError>,
@@ -895,6 +902,7 @@ struct LogEventsIter<'a> {
     dropped_events_count: usize,
 }
 
+#[allow(dead_code)]
 impl<'a> LogEventsIter<'a> {
     fn new(events: &'a [Event], events_dropped_handle: Registered<EventsDroppedError>) -> Self {
         Self {
@@ -956,17 +964,15 @@ impl ParquetSchemaGenerator {
             events_dropped_handle,
         }
     }
-    pub fn infer_schema(&self, events: &[Event]) -> Result<Schema, Error> {
-        let mut events_iter = LogEventsIter::new(events, self.events_dropped_handle.clone());
+    pub fn infer_schema(&self, events: &[serde_json::Value]) -> Result<Schema, Error> {
+        // let mut events_iter = LogEventsIter::new(events, self.events_dropped_handle.clone());
 
-        let mut schema = infer_json_schema_from_iterator(&mut events_iter).map_err(|e| {
-            self.events_dropped_handle
-                .emit(Count(events.len() - events_iter.dropped_events()));
-            emit(SchemaGenerationError { error: &e });
-            Error::new(ErrorKind::InvalidData, e.to_string())
-        })?;
-
-        schema = Self::try_normalize_schema(events, schema);
+        let schema = infer_json_schema_from_iterator(events.iter().map(Ok::<_, ArrowError>))
+            .map_err(|e| {
+                self.events_dropped_handle.emit(Count(events.len()));
+                emit(SchemaGenerationError { error: &e });
+                Error::new(ErrorKind::InvalidData, e.to_string())
+            })?;
 
         Ok(schema)
     }

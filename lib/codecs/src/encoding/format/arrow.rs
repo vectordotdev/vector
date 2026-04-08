@@ -203,7 +203,7 @@ pub fn encode_events_to_arrow_ipc_stream(
         return Err(ArrowEncodingError::NoEvents);
     }
 
-    let record_batch = build_record_batch(schema, events)?;
+    let record_batch = build_record_batch(schema, &vector_log_events_to_json_values(events))?;
 
     let mut buffer = BytesMut::new().writer();
     let mut writer =
@@ -271,7 +271,7 @@ fn make_field_nullable(field: &Field) -> Result<Field, ArrowEncodingError> {
 /// Find non-nullable schema fields that are missing or null in any of the given events.
 pub fn find_null_non_nullable_fields<'a>(
     schema: &'a Schema,
-    values: &[&vrl::value::Value],
+    values: &[serde_json::Value],
 ) -> Vec<&'a str> {
     schema
         .fields()
@@ -282,29 +282,31 @@ pub fn find_null_non_nullable_fields<'a>(
                     value
                         .as_object()
                         .and_then(|map| map.get(field.name().as_str()))
-                        .is_none_or(vrl::value::Value::is_null)
+                        .is_none_or(serde_json::Value::is_null)
                 })
         })
         .map(|field| field.name().as_str())
         .collect()
 }
 
+pub(crate) fn vector_log_events_to_json_values(events: &[Event]) -> Vec<serde_json::Value> {
+    events
+        .iter()
+        .filter_map(Event::maybe_as_log)
+        .filter_map(|log| serde_json::to_value(log).ok())
+        .collect()
+}
+
 /// Build an Arrow RecordBatch from a slice of events using the provided schema.
 pub(crate) fn build_record_batch(
     schema: SchemaRef,
-    events: &[Event],
+    values: &[serde_json::Value],
 ) -> Result<RecordBatch, ArrowEncodingError> {
-    let values: Vec<_> = events
-        .iter()
-        .filter_map(Event::maybe_as_log)
-        .map(|log| log.value())
-        .collect();
-
     if values.is_empty() {
         return Err(ArrowEncodingError::NoEvents);
     }
 
-    let missing = find_null_non_nullable_fields(&schema, &values);
+    let missing = find_null_non_nullable_fields(&schema, values);
     if !missing.is_empty() {
         for field_name in &missing {
             let error: vector_common::Error = Box::new(ArrowEncodingError::NullConstraint {
@@ -323,7 +325,7 @@ pub(crate) fn build_record_batch(
         .build_decoder()
         .context(RecordBatchCreationSnafu)?;
 
-    decoder.serialize(&values).context(ArrowJsonDecodeSnafu)?;
+    decoder.serialize(values).context(ArrowJsonDecodeSnafu)?;
 
     decoder
         .flush()
@@ -885,8 +887,8 @@ mod tests {
                 ("a", Value::Bytes("val".into())),
                 ("b", Value::Integer(42)),
             ]);
-            let value = event.as_log().value();
-            let missing = find_null_non_nullable_fields(&schema, &[value]);
+            let missing =
+                find_null_non_nullable_fields(&schema, &vector_log_events_to_json_values(&[event]));
             assert!(
                 missing.is_empty(),
                 "Expected no missing fields, got: {missing:?}"
@@ -898,8 +900,8 @@ mod tests {
             let schema = Schema::new(vec![Field::new("a", DataType::Utf8, false)]);
 
             let event = create_event(vec![("a", Value::Null)]);
-            let value = event.as_log().value();
-            let missing = find_null_non_nullable_fields(&schema, &[value]);
+            let missing =
+                find_null_non_nullable_fields(&schema, &vector_log_events_to_json_values(&[event]));
             assert_eq!(missing, vec!["a"]);
         }
     }
