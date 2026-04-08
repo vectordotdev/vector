@@ -919,20 +919,28 @@ impl<'a> Iterator for LogEventsIter<'a> {
     type Item = Result<serde_json::Value, ArrowError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.index == self.events.len() {
-            return None;
-        }
+        loop {
+            if self.index == self.events.len() {
+                return None;
+            }
 
-        let event = self.events[self.index].as_log();
-        self.index += 1;
+            let idx = self.index;
+            self.index += 1;
 
-        match serde_json::to_value(event) {
-            Ok(value) => Some(Ok(value)),
-            Err(e) => {
-                // emit an error metric and then move on to the next event.
-                emit(JsonSerializationError { error: &e });
+            let Some(event) = self.events[idx].maybe_as_log() else {
+                // not a log event so we skip it, and mark it as dropped.
                 self.mark_event_dropped();
-                self.next()
+                continue;
+            };
+
+            match serde_json::to_value(event) {
+                Ok(value) => return Some(Ok(value)),
+                Err(e) => {
+                    // emit an error metric and then move on to the next event.
+                    emit(JsonSerializationError { error: &e });
+                    self.mark_event_dropped();
+                    continue;
+                }
             }
         }
     }
@@ -972,7 +980,9 @@ impl ParquetSchemaGenerator {
         // get all timestamp fields in log events into map key: column name, value: num_events with column name
         let mut map: HashMap<String, usize> = HashMap::new();
         for event in events {
-            if let Some(object_map) = event.as_log().as_map() {
+            if let Some(log_event) = event.maybe_as_log()
+                && let Some(object_map) = log_event.as_map()
+            {
                 for (path, value) in object_map {
                     if value.is_timestamp() {
                         *map.entry(path.to_string()).or_insert(0) += 1;
@@ -1025,7 +1035,7 @@ impl ParquetSchemaGenerator {
             })
             .collect();
 
-        Schema::new(new_fields)
+        Schema::new_with_metadata(new_fields, schema.metadata().clone())
     }
 }
 
