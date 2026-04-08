@@ -150,14 +150,19 @@ impl TopologyController {
         }
     }
 
+    #[cfg(feature = "api")]
     pub async fn stop(mut self) {
         // Signal NOT_SERVING before draining the topology so that Kubernetes
         // readiness probes fail early and the pod is removed from endpoints.
-        #[cfg(feature = "api")]
         if let Some(server) = self.api_server.as_mut() {
             server.set_not_serving().await;
         }
 
+        self.topology.stop().await;
+    }
+
+    #[cfg(not(feature = "api"))]
+    pub async fn stop(self) {
         self.topology.stop().await;
     }
 
