@@ -28,7 +28,9 @@ use crate::{
     config::{self, ComponentConfig, ComponentType, Config, ConfigPath},
     extra_context::ExtraContext,
     heartbeat,
-    internal_events::{VectorConfigLoadError, VectorQuit, VectorStarted, VectorStopped},
+    internal_events::{
+        VectorConfigLoadError, VectorQuit, VectorStarted, VectorStopped, VectorStopping,
+    },
     signal::{SignalHandler, SignalPair, SignalRx, SignalTo},
     topology::{
         ReloadOutcome, RunningTopology, SharedTopologyController, ShutdownErrorReceiver,
@@ -493,6 +495,7 @@ impl FinishedApplication {
     }
 
     async fn stop(topology_controller: TopologyController, mut signal_rx: SignalRx) -> ExitStatus {
+        emit!(VectorStopping);
         tokio::select! {
             _ = topology_controller.stop() => {
                 emit!(VectorStopped);
