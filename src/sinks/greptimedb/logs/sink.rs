@@ -52,7 +52,8 @@ where
                     self.logs_sink_setting.pipeline_name,
                     self.logs_sink_setting.pipeline_version,
                 ),
-                || batcher_settings.as_byte_size_config(),
+                batcher_settings.timeout,
+                |_| batcher_settings.as_byte_size_config(),
             )
             .filter_map(|(key, batch)| async move { key.map(move |k| (k, batch)) })
             .request_builder(

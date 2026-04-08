@@ -54,7 +54,7 @@
             "optional": true,
             "sort": false,
             "stem": false,
-              "type": "string",
+            "type": "string",
             "stem_dictionary": "",
             "store": true
           },

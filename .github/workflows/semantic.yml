@@ -15,8 +15,8 @@ permissions:
 jobs:
   main:
     permissions:
-      pull-requests: read  # for amannn/action-semantic-pull-request to analyze PRs
-      statuses: write  # for amannn/action-semantic-pull-request to mark status of analyzed PR
+      pull-requests: read # for amannn/action-semantic-pull-request to analyze PRs
+      statuses: write # for amannn/action-semantic-pull-request to mark status of analyzed PR
     name: Check Semantic PR
     runs-on: ubuntu-24.04
     steps:
@@ -36,6 +36,8 @@ jobs:
           scopes: |
             administration
             api
+            api top
+            api tap
             ARC
             architecture
             auth
@@ -158,6 +160,7 @@ jobs:
             heroku_logs source
             host_metrics source
             http_client source
+            http_server source
             http_scrape source
             internal_logs source
             internal_metrics source
@@ -213,6 +216,7 @@ jobs:
             aws_sqs sink
             axiom sink
             azure_blob sink
+            azure_logs_ingestion sink
             azure_monitor_logs sink
             blackhole sink
             clickhouse sink
