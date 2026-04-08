@@ -458,12 +458,6 @@ impl StreamSink<Event> for CuckooMemoryTable {
 mod tests {
     use super::*;
 
-    // fn build_memory_config(modfn: impl Fn(&mut MemoryConfig)) -> MemoryConfig {
-    //     let mut config = MemoryConfig::default();
-    //     modfn(&mut config);
-    //     config
-    // }
-
     fn build_cuckoo_config(modfn: impl Fn(&mut CuckooMemoryConfig)) -> CuckooMemoryConfig {
         let mut config = CuckooMemoryConfig {
             fingerprint_bits: default_cuckoo_fingerprint_bits(),
