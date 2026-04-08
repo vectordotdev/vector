@@ -457,7 +457,7 @@ The [`aws_kinesis_firehose`][aws_kinesis_firehose] source:
   access_key = "my secret key" # this will also be set in the Firehose config
 ```
 
-will accept this request, decode the record (which is gzip'd and then base64 encoded), to produce an event that looks like:
+will accept this request, decode the record (which is gzip'ed and then base64 encoded), to produce an event that looks like:
 
 ```json
 {
