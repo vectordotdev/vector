@@ -1668,6 +1668,7 @@ dependencies = [
  "async-trait",
  "azure_core",
  "futures",
+ "openssl",
  "pin-project",
  "serde",
  "time",

@@ -210,6 +210,7 @@ greptimedb
 GSM
 gvisor
 gws
+gzip'd
 hadoop
 Haier
 Haipad
@@ -460,6 +461,7 @@ rumqttc
 Salesforce
 Samsung
 SBT
+schema'd
 scriptblock
 Sega
 Segoe
