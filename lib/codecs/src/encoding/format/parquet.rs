@@ -1101,6 +1101,166 @@ mod tests {
             .collect()
     }
 
+    // ── Schema generation helpers ────────────────────────────────────────────
+
+    fn parse_timestamp(s: &str) -> chrono::DateTime<chrono::Utc> {
+        chrono::DateTime::parse_from_rfc3339(s)
+            .expect("invalid test timestamp")
+            .with_timezone(&chrono::Utc)
+    }
+
+    /// Builds a log event with a fixed set of fields, using `Value::Timestamp`
+    /// for the two time fields so that `try_normalize_schema` can promote them.
+    fn demo_log_event(
+        message: &str,
+        timestamp: chrono::DateTime<chrono::Utc>,
+        status_code: i64,
+        response_time_secs: f64,
+    ) -> Event {
+        use vector_core::event::Value;
+        let mut log = LogEvent::default();
+        log.insert("host", "localhost");
+        log.insert("message", message);
+        log.insert("service", "vector");
+        log.insert("source_type", "demo_logs");
+        log.insert("timestamp", Value::Timestamp(timestamp));
+        log.insert("random_time", Value::Timestamp(timestamp));
+        log.insert("status_code", Value::Integer(status_code));
+        log.insert("response_time_secs", response_time_secs);
+        Event::Log(log)
+    }
+
+    fn sample_events() -> Vec<Event> {
+        const EVENTS: [(&str, &str, i64, f64); 5] = [
+            (
+                "GET /api/v1/health HTTP/1.1",
+                "2026-03-05T20:49:08.037194Z",
+                200,
+                0.037,
+            ),
+            (
+                "POST /api/v1/ingest HTTP/1.1",
+                "2026-03-05T20:49:09.038051Z",
+                201,
+                0.013,
+            ),
+            (
+                "GET /metrics HTTP/1.1",
+                "2026-03-05T20:49:10.036612Z",
+                200,
+                0.022,
+            ),
+            (
+                "DELETE /api/v1/resource HTTP/1.1",
+                "2026-03-05T20:49:11.537131Z",
+                404,
+                0.005,
+            ),
+            (
+                "PATCH /api/v1/config HTTP/1.1",
+                "2026-03-05T20:49:12.037491Z",
+                500,
+                0.091,
+            ),
+        ];
+        EVENTS
+            .iter()
+            .map(|(msg, ts, status, rt)| demo_log_event(msg, parse_timestamp(ts), *status, *rt))
+            .collect()
+    }
+
+    /// Encodes `events` with `AutoInfer` and returns the inferred Arrow schema
+    /// and total row count read back from the Parquet output.
+    fn encode_autoinfer_and_read_schema(
+        events: Vec<Event>,
+    ) -> (arrow::datatypes::SchemaRef, usize) {
+        use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
+
+        let mut serializer = ParquetSerializer::new(ParquetSerializerConfig {
+            schema_mode: SchemaMode::AutoInfer,
+            ..Default::default()
+        })
+        .expect("AutoInfer serializer should be created without a static schema");
+
+        let mut buffer = BytesMut::new();
+        serializer
+            .encode(events, &mut buffer)
+            .expect("encoding should succeed");
+
+        let data = buffer.freeze();
+        assert_parquet_magic(&data);
+
+        let builder = ParquetRecordBatchReaderBuilder::try_new(data)
+            .expect("should build ParquetRecordBatchReaderBuilder");
+        let schema = builder.schema().clone();
+        let num_rows: usize = builder
+            .build()
+            .expect("should build reader")
+            .map(|b| b.expect("batch read error").num_rows())
+            .sum();
+        (schema, num_rows)
+    }
+
+    // ── Schema generation tests ──────────────────────────────────────────────
+
+    /// Verifies that encoding a batch of events with `AutoInfer` produces valid
+    /// Parquet output and that `try_normalize_schema` promotes `Value::Timestamp`
+    /// fields to `Timestamp(Microsecond, UTC)` rather than leaving them as Utf8.
+    #[test]
+    fn encode_input_produces_parquet_output() {
+        let events = sample_events();
+        let n_events = events.len();
+        let (schema, num_rows) = encode_autoinfer_and_read_schema(events);
+
+        assert_eq!(num_rows, n_events, "row count should match event count");
+
+        // Both timestamp fields must be promoted to Timestamp(Microsecond, UTC)
+        for field_name in &["timestamp", "random_time"] {
+            let field = schema
+                .field_with_name(field_name)
+                .unwrap_or_else(|_| panic!("field '{field_name}' should exist in schema"));
+            assert!(
+                matches!(
+                    field.data_type(),
+                    DataType::Timestamp(TimeUnit::Microsecond, Some(tz)) if tz.as_ref() == "UTC"
+                ),
+                "'{field_name}' should be Timestamp(Microsecond, UTC), got {:?}",
+                field.data_type()
+            );
+        }
+
+        // Numeric fields must be inferred as the correct Arrow primitives
+        let status_field = schema
+            .field_with_name("status_code")
+            .expect("status_code field should exist");
+        assert_eq!(
+            status_field.data_type(),
+            &DataType::Int64,
+            "status_code should be Int64"
+        );
+
+        let rt_field = schema
+            .field_with_name("response_time_secs")
+            .expect("response_time_secs field should exist");
+        assert_eq!(
+            rt_field.data_type(),
+            &DataType::Float64,
+            "response_time_secs should be Float64"
+        );
+
+        // String fields must stay as Utf8
+        for field_name in &["host", "message", "service", "source_type"] {
+            let field = schema
+                .field_with_name(field_name)
+                .unwrap_or_else(|_| panic!("field '{field_name}' should exist in schema"));
+            assert_eq!(
+                field.data_type(),
+                &DataType::Utf8,
+                "'{field_name}' should be Utf8"
+            );
+        }
+    }
+
     #[test]
     fn test_parquet_encode_basic() {
         use vector_core::event::Value;
