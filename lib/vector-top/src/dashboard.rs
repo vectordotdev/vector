@@ -349,7 +349,11 @@ impl<'a> Widgets<'a> {
                     self.human_metrics,
                 ),
                 #[cfg(feature = "allocation-tracing")]
-                r.allocated_bytes.human_format_bytes(),
+                if state.allocation_tracing_active {
+                    r.allocated_bytes.human_format_bytes()
+                } else {
+                    "disabled".to_string()
+                },
                 if self.human_metrics {
                     r.errors.human_format()
                 } else {
