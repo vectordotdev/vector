@@ -3,7 +3,10 @@ use futures::FutureExt;
 use http_1::{HeaderValue, Request, StatusCode};
 use http_body_util::BodyExt;
 use vector_http::full_body;
-use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
+use vector_lib::{
+    configurable::configurable_component, lookup::lookup_v2::OptionalTargetPath,
+    sensitive_string::SensitiveString,
+};
 use vrl::value::Kind;
 
 use super::{
@@ -62,6 +65,16 @@ pub struct HoneycombConfig {
     /// The compression algorithm to use.
     #[serde(default = "Compression::zstd_default")]
     compression: Compression,
+
+    /// An optional field name that contains the sample rate for the event.
+    ///
+    /// If set, the value of this field is extracted from the event and sent as the
+    /// `samplerate` field in the Honeycomb batch API. The field is removed from the
+    /// event data. If the field is missing or its value is not an integer, the
+    /// `samplerate` field is omitted from the API request.
+    #[configurable(metadata(docs::examples = "sample_rate"))]
+    #[serde(default)]
+    samplerate_field: Option<OptionalTargetPath>,
 
     #[serde(
         default,
@@ -157,6 +170,7 @@ impl ValidatedSink for HoneycombConfig {
         let request_builder = HoneycombRequestBuilder {
             encoder: HoneycombEncoder {
                 transformer: self.encoding.clone(),
+                samplerate_field: self.samplerate_field.clone(),
             },
             compression: self.compression,
         };
