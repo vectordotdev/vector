@@ -1,5 +1,4 @@
 use snafu::{ResultExt, Snafu};
-use tracing::debug;
 use vector_lib::event::Event;
 use ydb::{Query, TableClient, TableDescription, Value, YdbError, ydb_params};
 
@@ -58,22 +57,12 @@ impl YdbRequestHandler {
 
         match strategy {
             InsertStrategy::BulkUpsert => {
-                debug!(
-                    message = "Using bulk_upsert",
-                    table = %table_path,
-                    rows_count = rows.len(),
-                );
                 table_client
                     .retry_execute_bulk_upsert(table_path, rows)
                     .await
                     .context(YdbSnafu)?;
             }
             InsertStrategy::Upsert => {
-                debug!(
-                    message = "Using UPSERT in transaction",
-                    table = %table_path,
-                    rows_count = rows.len(),
-                );
                 execute_upsert_in_transaction(table_client, table_path, rows)
                     .await
                     .context(YdbSnafu)?;
@@ -93,6 +82,9 @@ async fn execute_upsert_in_transaction(
         return Ok(());
     }
 
+    let table_client = table_client
+        .clone_with_transaction_options(ydb::TransactionOptions::new().with_autocommit(true));
+
     table_client
         .retry_transaction(|mut tx| {
             let table_path = table_path.clone();
@@ -105,17 +97,10 @@ async fn execute_upsert_in_transaction(
                     table_path
                 );
 
-                debug!(
-                    message = "Executing UPSERT in transaction",
-                    table = %table_path,
-                    rows_count = rows.len(),
-                );
-
                 let values_list = Value::list_from(type_example.clone(), rows)?;
                 let query = Query::new(yql).with_params(ydb_params!("$values" => values_list));
 
                 tx.query(query).await?;
-                tx.commit().await?;
                 Ok(())
             }
         })

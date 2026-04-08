@@ -687,6 +687,7 @@ urls: {
 	woothee:                                    "https://github.com/woothee/woothee"
 	xxhash_rust:                                "https://github.com/DoumanAsh/xxhash-rust"
 	yaml:                                       "https://yaml.org/"
+	ydb:                                        "https://ydb.tech"
 	ytt:                                        "https://carvel.dev/ytt/"
 	yum:                                        "\(wikipedia)/wiki/Yum_(software)"
 	zlib:                                       "https://www.zlib.net"

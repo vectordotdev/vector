@@ -2,7 +2,7 @@ use futures::FutureExt;
 use tower::ServiceBuilder;
 use tracing::debug;
 use vector_lib::{
-    config::AcknowledgementsConfig,
+    config::{AcknowledgementsConfig, DataType},
     configurable::{component::GenerateConfig, configurable_component},
     sink::VectorSink,
 };
@@ -29,7 +29,11 @@ use crate::{
 #[serde(deny_unknown_fields)]
 pub struct YdbConfig {
     /// The YDB connection string (gRPC endpoint with database).
-    #[configurable(metadata(docs::examples = "grpc://localhost:2136?database=/local"))]
+    ///
+    #[configurable(metadata(
+        docs::examples = "grpc://localhost:2136?database=/local",
+        docs::examples = "grpcs://ydb.example.com:2135?database=/local&ca_certificate=/path/to/ca.pem"
+    ))]
     pub endpoint: String,
 
     /// The YDB table path to insert data into.
@@ -129,7 +133,7 @@ impl SinkConfig for YdbConfig {
     }
 
     fn input(&self) -> Input {
-        Input::all()
+        Input::new(DataType::Log | DataType::Trace)
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

@@ -13066,6 +13066,7 @@ dependencies = [
  "csv",
  "databend-client",
  "deadpool",
+ "decimal-rs",
  "derivative",
  "dirs-next",
  "dnsmsg-parser",
@@ -14608,8 +14609,9 @@ checksum = "fdd20c5420375476fbd4394763288da7eb0cc0b8c11deed431a91562af7335d3"
 
 [[package]]
 name = "ydb"
-version = "0.10.1"
-source = "git+https://github.com/1NepuNep1/ydb-rs-sdk.git#8f8bbdffc31851a58ca4f6b98afa0aac39a9d78c"
+version = "0.10.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1e797601d61fae231465ba3621b6692b0b49b6b6c11a55bc94ba00ca25288361"
 dependencies = [
  "async-trait",
  "chrono",
@@ -14648,7 +14650,8 @@ dependencies = [
 [[package]]
 name = "ydb-grpc"
 version = "0.2.0"
-source = "git+https://github.com/1NepuNep1/ydb-rs-sdk.git#8f8bbdffc31851a58ca4f6b98afa0aac39a9d78c"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "59e9102bced1098de7735d02dab52cba021f9cd9ee95e34d7fa2468f1baa0226"
 dependencies = [
  "pbjson",
  "pbjson-build",

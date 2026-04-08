@@ -78,7 +78,7 @@ jobs:
           "datadog-logs", "datadog-metrics", "datadog-traces", "dnstap", "docker-logs", "doris", "elasticsearch",
           "eventstoredb", "fluent", "gcp", "greptimedb", "http-client", "influxdb", "kafka", "logstash",
           "loki", "mqtt", "mongodb", "nats", "nginx", "opentelemetry", "postgres", "prometheus", "pulsar",
-          "redis", "webhdfs"
+          "redis", "webhdfs", "ydb"
         ]
     timeout-minutes: 90
     steps:
