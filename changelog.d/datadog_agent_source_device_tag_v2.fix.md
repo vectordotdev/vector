@@ -2,4 +2,4 @@
 instead of incorrectly prefixing it as `resource.device`. This matches the v1 series behavior
 and fixes tag remapping for disk, SNMP, and other integrations that use the `device` resource type.
 
-authors: lisa.vu
+authors: lisaqvu
