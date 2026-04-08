@@ -112,6 +112,8 @@ pub(crate) mod sink_ext;
 pub mod sinks;
 #[allow(unreachable_pub)]
 pub mod sources;
+#[cfg(target_os = "linux")]
+pub mod systemd;
 #[cfg(feature = "api-client")]
 #[allow(unreachable_pub)]
 pub mod tap;

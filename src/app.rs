@@ -257,6 +257,8 @@ impl Application {
 
         emit!(VectorStarted);
         handle.spawn(heartbeat::heartbeat());
+        #[cfg(target_os = "linux")]
+        handle.spawn(crate::systemd::watchdog());
 
         let Self {
             root_opts,
@@ -275,6 +277,9 @@ impl Application {
             require_healthy: root_opts.require_healthy,
             extra_context: config.extra_context,
         });
+
+        #[cfg(target_os = "linux")]
+        crate::systemd::sd_notify_ready();
 
         Ok(StartedApplication {
             config_paths: config.config_paths,
@@ -493,6 +498,8 @@ impl FinishedApplication {
     }
 
     async fn stop(topology_controller: TopologyController, mut signal_rx: SignalRx) -> ExitStatus {
+        #[cfg(target_os = "linux")]
+        crate::systemd::sd_notify_stopping();
         emit!(VectorStopped);
         tokio::select! {
             _ = topology_controller.stop() => ExitStatus::from_raw({
