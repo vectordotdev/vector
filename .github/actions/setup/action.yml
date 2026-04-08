@@ -76,10 +76,14 @@ inputs:
     description: "Install vdev CLI tool (cached by vdev/ directory changes)."
 
   # prepare.sh - npm
-  markdownlint:
+  markdownlint-cli2:
     required: false
     default: false
-    description: "Install markdownlint (npm)."
+    description: "Install markdownlint-cli2 (npm)."
+  prettier:
+    required: false
+    default: false
+    description: "Install prettier (npm)."
   datadog-ci:
     required: false
     default: false
@@ -139,7 +143,6 @@ runs:
           # Set nice CI colors
           echo "CARGO_TERM_COLOR=always" >> "$GITHUB_ENV"
         fi
-
 
     - name: Enable rust matcher
       if: ${{ env.NEEDS_RUST == 'true' }}
@@ -253,8 +256,8 @@ runs:
       with:
         skip-cache: ${{ env.VDEV_NEEDS_COMPILE == 'true' }}
 
-    - name: Cache prepare.sh binaries
-      id: cache-prepare-binaries
+    - name: Cache cargo binaries
+      id: cache-cargo-binaries
       uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
       with:
         path: |
@@ -267,11 +270,16 @@ runs:
           ~/.cargo/bin/cargo-llvm-cov
           ~/.cargo/bin/dd-rust-license-tool
           ~/.cargo/bin/wasm-pack
-          /usr/local/bin/markdownlint
-          /usr/local/bin/datadog-ci
-        key: ${{ runner.os }}-prepare-binaries-${{ hashFiles('scripts/environment/*') }}
+        key: ${{ runner.os }}-cargo-binaries-${{ hashFiles('scripts/environment/*.sh') }}
         restore-keys: |
-          ${{ runner.os }}-prepare-binaries-
+          ${{ runner.os }}-cargo-binaries-
+
+    - name: Cache npm tools
+      id: cache-npm-tools
+      uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+      with:
+        path: scripts/environment/npm-tools/node_modules
+        key: ${{ runner.os }}-npm-tools-${{ hashFiles('scripts/environment/npm-tools/*') }}
 
     - name: Run prepare.sh
       shell: bash
@@ -287,7 +295,8 @@ runs:
         [[ "${{ inputs.cargo-llvm-cov }}" == "true" ]] && mods+=("cargo-llvm-cov")
         [[ "${{ inputs.dd-rust-license-tool }}" == "true" ]] && mods+=("dd-rust-license-tool")
         [[ "${{ inputs.wasm-pack }}" == "true" ]] && mods+=("wasm-pack")
-        [[ "${{ inputs.markdownlint }}" == "true" ]] && mods+=("markdownlint")
+        [[ "${{ inputs.markdownlint-cli2 }}" == "true" ]] && mods+=("markdownlint-cli2")
+        [[ "${{ inputs.prettier }}" == "true" ]] && mods+=("prettier")
         [[ "${{ inputs.datadog-ci }}" == "true" ]] && mods+=("datadog-ci")
         csm=$(IFS=,; echo "${mods[*]}")
 

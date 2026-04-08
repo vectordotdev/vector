@@ -15,51 +15,51 @@ updates:
       patches:
         applies-to: version-updates
         patterns:
-        - "*"
+          - "*"
         update-types:
-        - "patch"
+          - "patch"
 
       amq:
         patterns:
-        - "amq-*"
+          - "amq-*"
       aws:
         patterns:
-        - "aws-*"
+          - "aws-*"
       aws-security:
         applies-to: security-updates
         patterns:
-        - "aws-*"
+          - "aws-*"
       azure:
         patterns:
-        - "azure_*"
+          - "azure_*"
       clap:
         patterns:
-        - "clap*"
+          - "clap*"
       crossbeam:
         patterns:
-        - "crossbeam*"
+          - "crossbeam*"
       csv:
         patterns:
-        - "csv*"
+          - "csv*"
       futures:
         patterns:
-        - "futures"
-        - "futures-util"
+          - "futures"
+          - "futures-util"
       metrics:
         patterns:
-        - "metrics"
-        - "metrics-tracing-context"
-        - "metrics-util"
+          - "metrics"
+          - "metrics-tracing-context"
+          - "metrics-util"
       netlink:
         patterns:
-        - "netlink-*"
+          - "netlink-*"
       phf:
         patterns:
-        - "phf*"
+          - "phf*"
       prost:
         patterns:
-        - "prost"
-        - "prost-*"
+          - "prost"
+          - "prost-*"
       serde:
         patterns:
           - "serde"
@@ -70,22 +70,22 @@ updates:
           - "tokio-*"
       tonic:
         patterns:
-        - "tonic"
-        - "tonic-*"
+          - "tonic"
+          - "tonic-*"
       tower:
         patterns:
-        - "tower"
-        - "tower-*"
+          - "tower"
+          - "tower-*"
       tracing:
         patterns:
           - "tracing"
           - "tracing-*"
       wasm-bindgen:
         patterns:
-        - "wasm-bindgen-*"
+          - "wasm-bindgen-*"
       zstd:
         patterns:
-        - "zstd*"
+          - "zstd*"
   - package-ecosystem: "docker"
     directory: "/distribution/docker/alpine"
     schedule:
@@ -158,8 +158,8 @@ updates:
     groups:
       artifact:
         patterns:
-        - "actions/download-artifact"
-        - "actions/upload-artifact"
+          - "actions/download-artifact"
+          - "actions/upload-artifact"
   - package-ecosystem: "npm"
     directory: "website/"
     schedule:
