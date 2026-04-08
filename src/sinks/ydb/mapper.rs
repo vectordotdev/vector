@@ -1,7 +1,7 @@
 use chrono::TimeZone;
 use decimal_rs::Decimal;
 use snafu::Snafu;
-use tracing::debug;
+use tracing::warn;
 use vector_lib::event::{Event, Value as VectorValue};
 use ydb::{TableDescription, Value};
 
@@ -60,7 +60,7 @@ impl<'a> EventMapper<'a> {
                 let type_example = match &column.type_value {
                     Ok(val) => val,
                     Err(e) => {
-                        debug!(
+                        warn!(
                             message = "Skipping column with unsupported type",
                             column = %column.name,
                             error = %e.error,
@@ -72,7 +72,7 @@ impl<'a> EventMapper<'a> {
                 let ydb_val = match convert_value(vector_value, type_example) {
                     Ok(val) => val,
                     Err(e) => {
-                        debug!(
+                        warn!(
                             message = "Failed to convert field, skipping",
                             column = %column.name,
                             error = %e.to_string(),

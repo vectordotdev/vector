@@ -112,7 +112,8 @@ jobs:
             "prometheus",
             "pulsar",
             "redis",
-            "webhdfs"
+            "webhdfs",
+            "ydb"
           ]
     timeout-minutes: 90
     steps:

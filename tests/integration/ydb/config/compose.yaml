@@ -1,0 +1,17 @@
+version: '3'
+
+services:
+  ydb:
+    image: docker.io/ydbplatform/local-ydb:${CONFIG_VERSION}
+    hostname: localhost
+    environment:
+      - YDB_USE_IN_MEMORY_PDISKS=true
+    ports:
+      - "2135:2135"
+      - "2136:2136"
+      - "8765:8765"
+
+networks:
+  default:
+    name: ${VECTOR_NETWORK}
+    external: true
