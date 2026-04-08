@@ -4,7 +4,7 @@ on:
   workflow_call:
     inputs:
       ref:
-        description: 'Git ref to checkout'
+        description: "Git ref to checkout"
         required: false
         type: string
 
@@ -15,12 +15,12 @@ on:
         type: boolean
         default: false
       ref:
-        description: 'Git ref to checkout'
+        description: "Git ref to checkout"
         required: false
         type: string
 
   schedule:
-    - cron: '0 6 * * 1'  # Every Monday at 06:00 UTC
+    - cron: "0 6 * * 1" # Every Monday at 06:00 UTC
 
 env:
   VERBOSE: true
