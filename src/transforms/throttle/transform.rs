@@ -99,13 +99,7 @@ where
 
         Box::pin(stream! {
             while let Some(event) = input_rx.next().await {
-                let (throttle, event) = match self.exclude.as_ref() {
-                    Some(condition) => {
-                        let (result, event) = condition.check(event);
-                        (!result, event)
-                    },
-                    _ => (true, event)
-                };
+                let throttle = !self.exclude.as_ref().is_some_and(|c| c.check_borrowed(&event));
                 let output = if throttle {
                     let key = self.key_field.as_ref().and_then(|t| {
                         t.render_string(&event)

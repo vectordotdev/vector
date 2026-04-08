@@ -48,15 +48,12 @@ impl Window {
 
 impl FunctionTransform for Window {
     fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
-        let (pass, event) = match self.forward_when.as_ref() {
-            Some(condition) => {
-                let (result, event) = condition.check(event);
-                (result, event)
-            }
-            _ => (false, event),
-        };
+        let pass = self
+            .forward_when
+            .as_ref()
+            .is_some_and(|c| c.check_borrowed(&event));
 
-        let (flush, event) = self.flush_when.check(event);
+        let flush = self.flush_when.check_borrowed(&event);
 
         if self.buffer.capacity() < self.num_events_before {
             self.buffer.reserve(self.num_events_before);

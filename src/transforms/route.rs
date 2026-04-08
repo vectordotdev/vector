@@ -39,16 +39,14 @@ impl Route {
 
 impl SyncTransform for Route {
     fn transform(&mut self, event: Event, output: &mut vector_lib::transform::TransformOutputsBuf) {
-        let mut check_failed: usize = 0;
+        let mut matched = false;
         for (output_name, condition) in &self.conditions {
-            let (result, event) = condition.check(event.clone());
-            if result {
-                output.push(Some(output_name), event);
-            } else {
-                check_failed += 1;
+            if condition.check_borrowed(&event) {
+                matched = true;
+                output.push(Some(output_name), event.clone());
             }
         }
-        if self.reroute_unmatched && check_failed == self.conditions.len() {
+        if self.reroute_unmatched && !matched {
             output.push(Some(UNMATCHED_ROUTE), event);
         }
     }

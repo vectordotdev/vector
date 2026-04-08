@@ -481,6 +481,63 @@ impl SecretTarget for VrlTarget {
     }
 }
 
+/// A read-only VRL target that borrows the event's Value and metadata without
+/// cloning or decomposing. Used for VRL conditions compiled with `set_read_only()`,
+/// where the VRL type system guarantees no mutations occur.
+///
+/// This avoids the `Arc::make_mut` deep clone that `VrlTarget::new()` triggers
+/// via `LogEvent::decompose()` when the event's Arc refcount > 1 (e.g., after fan-out).
+#[derive(Debug)]
+pub struct ReadOnlyVrlTarget<'a> {
+    value: &'a Value,
+    metadata: &'a EventMetadata,
+}
+
+impl<'a> ReadOnlyVrlTarget<'a> {
+    pub fn new(value: &'a Value, metadata: &'a EventMetadata) -> Self {
+        Self { value, metadata }
+    }
+}
+
+impl Target for ReadOnlyVrlTarget<'_> {
+    fn target_insert(&mut self, _path: &OwnedTargetPath, _value: Value) -> Result<(), String> {
+        unreachable!("ReadOnlyVrlTarget: target_insert called on read-only target")
+    }
+
+    fn target_get(&self, target_path: &OwnedTargetPath) -> Result<Option<&Value>, String> {
+        match target_path.prefix {
+            PathPrefix::Event => Ok(self.value.get(&target_path.path)),
+            PathPrefix::Metadata => Ok(self.metadata.value().get(&target_path.path)),
+        }
+    }
+
+    fn target_get_mut(&mut self, _path: &OwnedTargetPath) -> Result<Option<&mut Value>, String> {
+        unreachable!("ReadOnlyVrlTarget: target_get_mut called on read-only target")
+    }
+
+    fn target_remove(
+        &mut self,
+        _path: &OwnedTargetPath,
+        _compact: bool,
+    ) -> Result<Option<Value>, String> {
+        unreachable!("ReadOnlyVrlTarget: target_remove called on read-only target")
+    }
+}
+
+impl SecretTarget for ReadOnlyVrlTarget<'_> {
+    fn get_secret(&self, key: &str) -> Option<&str> {
+        self.metadata.secrets().get_secret(key)
+    }
+
+    fn insert_secret(&mut self, _key: &str, _value: &str) {
+        unreachable!("ReadOnlyVrlTarget: insert_secret called on read-only target")
+    }
+
+    fn remove_secret(&mut self, _key: &str) {
+        unreachable!("ReadOnlyVrlTarget: remove_secret called on read-only target")
+    }
+}
+
 /// Retrieves a value from a the provided metric using the path.
 /// Currently the root path and the following paths are supported:
 /// - `name`

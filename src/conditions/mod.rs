@@ -66,6 +66,21 @@ impl Condition {
         }
     }
 
+    /// Checks if a condition is true by borrowing the event, avoiding clone and
+    /// decompose overhead. Only supported for VRL conditions (which are read-only).
+    /// For non-VRL conditions, falls back to simple type checks.
+    pub fn check_borrowed(&self, e: &Event) -> bool {
+        match self {
+            Condition::IsLog => matches!(e, Event::Log(_)),
+            Condition::IsMetric => matches!(e, Event::Metric(_)),
+            Condition::IsTrace => matches!(e, Event::Trace(_)),
+            Condition::Vrl(x) => x.check_borrowed(e),
+            Condition::DatadogSearch(x) => x.check_borrowed(e),
+            Condition::AlwaysPass => true,
+            Condition::AlwaysFail => false,
+        }
+    }
+
     /// Checks if a condition is true, with a `Result`-oriented return for easier composition.
     ///
     /// This can be mildly expensive for conditions that do not often match, as it allocates a string for the error

@@ -11,7 +11,7 @@ use vrl::{
 use crate::{
     conditions::{Condition, Conditional, ConditionalConfig},
     config::LogNamespace,
-    event::{Event, TargetEvents, VrlTarget},
+    event::{Event, ReadOnlyVrlTarget, TargetEvents, VrlTarget},
     format_vrl_diagnostics,
     internal_events::VrlConditionExecutionError,
 };
@@ -103,6 +103,31 @@ impl Vrl {
         };
         (original_event, result)
     }
+
+    /// Evaluate this VRL condition against a borrowed event without cloning or
+    /// decomposing. This is safe because VRL conditions are compiled with
+    /// `set_read_only()`, which guarantees the program cannot mutate the target.
+    ///
+    /// This avoids the `Arc::make_mut` deep clone that `VrlTarget::new()` triggers
+    /// via `LogEvent::decompose()` when the event's Arc refcount > 1.
+    pub(crate) fn check_borrowed(&self, event: &Event) -> bool {
+        let result = match event.maybe_as_log() {
+            Some(log) => {
+                let mut target = ReadOnlyVrlTarget::new(log.value(), event.metadata());
+                let timezone = TimeZone::default();
+                Runtime::default().resolve(&mut target, &self.program, &timezone)
+            }
+            None => {
+                // For non-log events, fall back to the owning path.
+                // This shouldn't happen in practice for exclusive_route conditions.
+                return false;
+            }
+        };
+        match result {
+            Ok(Value::Boolean(b)) => b,
+            _ => false,
+        }
+    }
 }
 
 impl Conditional for Vrl {
@@ -169,7 +194,7 @@ mod test {
 
     use super::*;
     use crate::{
-        event::{Metric, MetricKind, MetricValue},
+        event::{LogEvent, Metric, MetricKind, MetricValue},
         log_event,
     };
 
@@ -261,6 +286,57 @@ mod test {
                     check.map_err(|e| e.to_string())
                 );
             }
+        }
+    }
+
+    #[test]
+    fn check_borrowed_matches_check() {
+        let checks: Vec<(Event, &str, bool)> = vec![
+            (log_event![], "true == true", true),
+            (log_event![], "true == false", false),
+            (
+                log_event!["foo" => true, "bar" => false],
+                "to_bool(.bar || .foo) ?? false",
+                true,
+            ),
+            (
+                {
+                    let mut log = LogEvent::default();
+                    log.insert("payload.type", "service.1");
+                    log.into()
+                },
+                r#"match_any!(.payload.type, [r'service.1'])"#,
+                true,
+            ),
+            (
+                {
+                    let mut log = LogEvent::default();
+                    log.insert("payload.type", "event.2");
+                    log.into()
+                },
+                r#"match_any!(.payload.type, [r'service.1'])"#,
+                false,
+            ),
+        ];
+
+        for (event, source, expected) in checks {
+            let config = VrlConfig {
+                source: source.to_owned(),
+                runtime: Default::default(),
+            };
+            let cond = config
+                .build(&Default::default(), &Default::default())
+                .unwrap();
+            let (check_result, _) = cond.check(event.clone());
+            let borrowed_result = cond.check_borrowed(&event);
+            assert_eq!(
+                check_result, borrowed_result,
+                "check vs check_borrowed mismatch for source: {source}"
+            );
+            assert_eq!(
+                borrowed_result, expected,
+                "unexpected result for source: {source}"
+            );
         }
     }
 }

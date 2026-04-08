@@ -87,8 +87,7 @@ impl Filter {
 
 impl FunctionTransform for Filter {
     fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
-        let (result, event) = self.condition.check(event);
-        if result {
+        if self.condition.check_borrowed(&event) {
             output.push(event);
         } else {
             self.events_dropped.emit(Count(1));

@@ -264,15 +264,15 @@ impl Reduce {
     }
 
     pub fn transform_one(&mut self, emitter: &mut Emitter<Event>, event: Event) {
-        let (starts_here, event) = match &self.starts_when {
-            Some(condition) => condition.check(event),
-            None => (false, event),
-        };
+        let starts_here = self
+            .starts_when
+            .as_ref()
+            .is_some_and(|c| c.check_borrowed(&event));
 
-        let (mut ends_here, event) = match &self.ends_when {
-            Some(condition) => condition.check(event),
-            None => (false, event),
-        };
+        let mut ends_here = self
+            .ends_when
+            .as_ref()
+            .is_some_and(|c| c.check_borrowed(&event));
 
         let event = event.into_log();
         let discriminant = Discriminant::from_log_event(&event, &self.group_by);

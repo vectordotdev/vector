@@ -75,6 +75,10 @@ impl DatadogSearchRunner {
             _ => false,
         }
     }
+
+    pub(crate) fn check_borrowed(&self, event: &Event) -> bool {
+        self.matches(event)
+    }
 }
 
 impl Conditional for DatadogSearchRunner {

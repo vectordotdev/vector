@@ -147,13 +147,11 @@ impl FunctionTransform for Sample {
     fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
         let mut event = {
             if let Some(condition) = self.exclude.as_ref() {
-                let (result, event) = condition.check(event);
-                if result {
+                if condition.check_borrowed(&event) {
                     output.push(event);
                     return;
-                } else {
-                    event
                 }
+                event
             } else {
                 event
             }
