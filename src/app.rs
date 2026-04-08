@@ -36,8 +36,6 @@ use crate::{
     },
     trace,
 };
-#[cfg(feature = "api")]
-use std::sync::Arc;
 
 static WORKER_THREADS: AtomicUsize = AtomicUsize::new(0);
 
@@ -141,7 +139,6 @@ impl ApplicationConfig {
             let api_server = handle.block_on(api::GrpcServer::start(
                 self.topology.config(),
                 self.topology.watch(),
-                Arc::clone(&self.topology.running),
             ));
             match api_server {
                 Ok(server) => {

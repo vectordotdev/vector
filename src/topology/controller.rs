@@ -76,13 +76,7 @@ impl TopologyController {
         } else if self.api_server.is_none() {
             debug!("Starting gRPC API server.");
 
-            match api::GrpcServer::start(
-                self.topology.config(),
-                self.topology.watch(),
-                Arc::clone(&self.topology.running),
-            )
-            .await
-            {
+            match api::GrpcServer::start(self.topology.config(), self.topology.watch()).await {
                 Ok(api_server) => {
                     let addr = api_server.addr();
                     info!(
@@ -156,7 +150,14 @@ impl TopologyController {
         }
     }
 
-    pub async fn stop(self) {
+    pub async fn stop(mut self) {
+        // Signal NOT_SERVING before draining the topology so that Kubernetes
+        // readiness probes fail early and the pod is removed from endpoints.
+        #[cfg(feature = "api")]
+        if let Some(server) = self.api_server.as_mut() {
+            server.set_not_serving().await;
+        }
+
         self.topology.stop().await;
     }
 

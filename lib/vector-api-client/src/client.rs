@@ -1,17 +1,20 @@
 use http::Uri;
 use tokio_stream::{Stream, StreamExt};
 use tonic::transport::{Channel, Endpoint};
+use tonic_health::pb::{
+    HealthCheckRequest, health_check_response::ServingStatus, health_client::HealthClient,
+};
 
 use crate::{
     error::{Error, Result},
     proto::{
         GetAllocationTracingStatusRequest, GetAllocationTracingStatusResponse,
-        GetComponentsRequest, GetComponentsResponse, GetMetaRequest, GetMetaResponse,
-        HealthRequest, HealthResponse, MetricName, StreamComponentAllocatedBytesRequest,
-        StreamComponentAllocatedBytesResponse, StreamComponentMetricsRequest,
-        StreamComponentMetricsResponse, StreamHeartbeatRequest, StreamHeartbeatResponse,
-        StreamOutputEventsRequest, StreamOutputEventsResponse, StreamUptimeRequest,
-        StreamUptimeResponse, observability_service_client::ObservabilityServiceClient,
+        GetComponentsRequest, GetComponentsResponse, GetMetaRequest, GetMetaResponse, MetricName,
+        StreamComponentAllocatedBytesRequest, StreamComponentAllocatedBytesResponse,
+        StreamComponentMetricsRequest, StreamComponentMetricsResponse, StreamHeartbeatRequest,
+        StreamHeartbeatResponse, StreamOutputEventsRequest, StreamOutputEventsResponse,
+        StreamUptimeRequest, StreamUptimeResponse,
+        observability_service_client::ObservabilityServiceClient,
     },
 };
 
@@ -19,6 +22,7 @@ use crate::{
 #[derive(Debug, Clone)]
 pub struct Client {
     endpoint: Endpoint,
+    channel: Option<Channel>,
     client: Option<ObservabilityServiceClient<Channel>>,
 }
 
@@ -33,6 +37,7 @@ impl Client {
     pub fn new(uri: Uri) -> Self {
         Self {
             endpoint: Endpoint::from(uri),
+            channel: None,
             client: None,
         }
     }
@@ -40,7 +45,8 @@ impl Client {
     /// Connect to the gRPC server
     pub async fn connect(&mut self) -> Result<()> {
         let channel = self.endpoint.connect().await?;
-        self.client = Some(ObservabilityServiceClient::new(channel));
+        self.client = Some(ObservabilityServiceClient::new(channel.clone()));
+        self.channel = Some(channel);
         Ok(())
     }
 
@@ -49,13 +55,34 @@ impl Client {
         self.client.as_mut().ok_or(Error::NotConnected)
     }
 
+    /// Get the underlying channel
+    fn channel(&self) -> Result<&Channel> {
+        self.channel.as_ref().ok_or(Error::NotConnected)
+    }
+
     // ========== Unary RPCs ==========
 
-    /// Check if the API server is healthy
-    pub async fn health(&mut self) -> Result<HealthResponse> {
-        let client = self.ensure_connected()?;
-        let response = client.health(HealthRequest {}).await?;
-        Ok(response.into_inner())
+    /// Check if the API server is healthy using the standard gRPC health check
+    /// protocol (grpc.health.v1.Health/Check).
+    ///
+    /// Queries the empty service name (`""`), which represents whole-server
+    /// health. This is the default used by Kubernetes gRPC probes and
+    /// `grpc-health-probe`.
+    ///
+    /// Returns `Ok(())` if the server is `SERVING`, or an error otherwise.
+    pub async fn health(&mut self) -> Result<()> {
+        let channel = self.channel()?.clone();
+        let mut health_client = HealthClient::new(channel);
+        let response = health_client
+            .check(HealthCheckRequest {
+                service: String::new(),
+            })
+            .await?;
+        let status = response.into_inner().status;
+        if status != ServingStatus::Serving as i32 {
+            return Err(Error::NotServing { status });
+        }
+        Ok(())
     }
 
     /// Get metadata about the Vector instance
