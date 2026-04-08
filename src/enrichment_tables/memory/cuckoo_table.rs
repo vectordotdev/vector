@@ -121,7 +121,7 @@ impl CuckooMemoryTable {
         config: MemoryConfig,
         cuckoo_config: CuckooMemoryConfig,
     ) -> crate::Result<Self> {
-        let ttl_val = config.ttl / config.scan_interval.get();
+        let ttl_val = (config.ttl / config.scan_interval.get()).max(1);
         let mut builder = CuckooConfiguration::builder(cuckoo_config.max_entries)
             .fingerprint_bits(cuckoo_config.fingerprint_bits.get().try_into()?)
             .bucket_size(cuckoo_config.bucket_size)
