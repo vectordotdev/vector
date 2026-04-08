@@ -7,7 +7,7 @@ on:
 
 # Workflow-level permissions - read access to repository contents
 permissions:
-  contents: read  # Required to checkout code
+  contents: read # Required to checkout code
 
 concurrency:
   # `github.ref` is unique for MQ runs and PRs
@@ -31,13 +31,14 @@ jobs:
   check-fmt:
     name: Check code format
     runs-on: ubuntu-24.04
-    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.test-yml == 'true' }}
+    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.test-yml == 'true' || needs.changes.outputs.prettier == 'true' }}
     needs: changes
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: ./.github/actions/setup
         with:
           rust: true
+          prettier: true
       - run: make check-fmt
 
   check-clippy:
