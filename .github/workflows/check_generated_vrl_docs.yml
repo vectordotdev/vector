@@ -54,8 +54,6 @@ jobs:
           rust: true
           protoc: true
           vdev: false
-          mold: false
-          cargo-cache: false
 
       - uses: ./.github/actions/install-vrl-doc-builder
 
