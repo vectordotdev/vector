@@ -302,7 +302,7 @@ aws-smithy-types = { version = "1.2.11", default-features = false, features = ["
 
 # Azure
 azure_core = { version = "0.30", features = ["reqwest", "hmac_openssl"], optional = true }
-azure_identity = { version = "0.30", optional = true }
+azure_identity = { version = "0.30", features = ["client_certificate"], optional = true }
 
 # Azure Storage
 azure_storage_blob = { version = "0.7", optional = true }
@@ -877,8 +877,8 @@ sinks-aws_s3 = ["dep:base64", "dep:md-5", "aws-core", "dep:aws-sdk-s3"]
 sinks-aws_sqs = ["aws-core", "dep:aws-sdk-sqs"]
 sinks-aws_sns = ["aws-core", "dep:aws-sdk-sns"]
 sinks-axiom = ["sinks-http"]
-sinks-azure_blob = ["dep:azure_core", "dep:azure_storage_blob"]
-sinks-azure_logs_ingestion = ["dep:azure_core", "dep:azure_identity"]
+sinks-azure_blob = ["dep:azure_core", "dep:azure_identity", "dep:azure_storage_blob", "dep:base64"]
+sinks-azure_logs_ingestion = ["dep:azure_core", "dep:azure_identity", "dep:azure_storage_blob", "dep:base64"]
 sinks-azure_monitor_logs = []
 sinks-blackhole = []
 sinks-chronicle = []
@@ -989,7 +989,8 @@ aws-integration-tests = [
 ]
 
 azure-integration-tests = [
-  "azure-blob-integration-tests"
+  "azure-blob-integration-tests",
+  "azure-logs-ingestion-integration-tests",
 ]
 
 aws-cloudwatch-logs-integration-tests = ["sinks-aws_cloudwatch_logs"]
@@ -1003,6 +1004,7 @@ aws-sqs-integration-tests = ["sinks-aws_sqs"]
 aws-sns-integration-tests = ["sinks-aws_sns"]
 axiom-integration-tests = ["sinks-axiom"]
 azure-blob-integration-tests = ["sinks-azure_blob"]
+azure-logs-ingestion-integration-tests = ["sinks-azure_logs_ingestion"]
 chronicle-integration-tests = ["sinks-gcp"]
 clickhouse-integration-tests = ["sinks-clickhouse"]
 databend-integration-tests = ["sinks-databend"]
