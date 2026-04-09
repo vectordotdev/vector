@@ -522,11 +522,14 @@ mod tests {
     }
 
     /// Write a temporary Parquet schema file and return its path.
-    fn write_temp_schema(content: &str) -> std::path::PathBuf {
+    ///
+    /// `name` must be unique per test to avoid parallel-test races on the same file.
+    fn write_temp_schema(name: &str, content: &str) -> std::path::PathBuf {
         use std::io::Write;
         let path = std::env::temp_dir().join(format!(
-            "vector_parquet_test_{}.schema",
-            std::process::id()
+            "vector_parquet_test_{}_{}.schema",
+            std::process::id(),
+            name,
         ));
         let mut f = std::fs::File::create(&path).expect("Failed to create schema file");
         write!(f, "{content}").expect("Failed to write schema");
@@ -699,6 +702,7 @@ mod tests {
     #[test]
     fn test_parquet_schema_file() {
         let schema_path = write_temp_schema(
+            "schema_file",
             "message logs {\n  required binary name (STRING);\n  optional int64 age;\n}",
         );
 
@@ -743,7 +747,7 @@ mod tests {
 
     #[test]
     fn test_parquet_schema_file_invalid_syntax_error() {
-        let schema_path = write_temp_schema("this is not valid parquet schema syntax !!!");
+        let schema_path = write_temp_schema("invalid_syntax", "this is not valid parquet schema syntax !!!");
 
         let config: ParquetSerializerConfig = serde_json::from_value(serde_json::json!({
             "schema_file": schema_path.to_str().unwrap()
@@ -773,7 +777,7 @@ mod tests {
     #[test]
     fn test_parquet_strict_mode_rejects_extra_fields() {
         let schema_path =
-            write_temp_schema("message logs {\n  required binary name (STRING);\n}");
+            write_temp_schema("strict_rejects", "message logs {\n  required binary name (STRING);\n}");
 
         let mut serializer = ParquetSerializer::new(ParquetSerializerConfig {
             schema_file: Some(schema_path),
@@ -792,6 +796,7 @@ mod tests {
     #[test]
     fn test_parquet_strict_mode_allows_schema_fields() {
         let schema_path = write_temp_schema(
+            "strict_allows",
             "message logs {\n  required binary name (STRING);\n  required binary level (STRING);\n}",
         );
 
@@ -818,7 +823,7 @@ mod tests {
     #[test]
     fn test_parquet_relaxed_mode_drops_extra_fields() {
         let schema_path =
-            write_temp_schema("message logs {\n  required binary name (STRING);\n}");
+            write_temp_schema("relaxed_drops", "message logs {\n  required binary name (STRING);\n}");
 
         let mut serializer = ParquetSerializer::new(ParquetSerializerConfig {
             schema_file: Some(schema_path),
@@ -845,6 +850,7 @@ mod tests {
         // Native Parquet "binary" without (STRING) annotation resolves to Arrow Binary,
         // which is rejected at config time.
         let schema_path = write_temp_schema(
+            "binary_rejected",
             "message logs {\n  required binary name (STRING);\n  optional binary raw_data;\n}",
         );
 
