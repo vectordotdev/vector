@@ -235,3 +235,22 @@ where
         Poll::Ready(result)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::io;
+
+    use super::{is_peer_shutdown_error, peer_shutdown_io_error};
+
+    #[test]
+    fn detects_typed_peer_shutdown_error() {
+        let error = peer_shutdown_io_error("ShutdownCheck::Close");
+        assert!(is_peer_shutdown_error(&error));
+    }
+
+    #[test]
+    fn ignores_non_peer_shutdown_error() {
+        let error = io::Error::other("not peer shutdown");
+        assert!(!is_peer_shutdown_error(&error));
+    }
+}
