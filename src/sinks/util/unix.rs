@@ -4,6 +4,7 @@ use std::{
     path::PathBuf,
     pin::Pin,
     task::Poll,
+    time::Duration,
 };
 
 use async_trait::async_trait;
@@ -190,12 +191,28 @@ impl<E> UnixSink<E>
 where
     E: Encoder<Event, Error = vector_lib::codecs::encoding::Error> + Clone + Send + Sync,
 {
+    const SEND_FAILURE_MAX_BACKOFF: Duration = Duration::from_secs(5);
+
     pub const fn new(connector: UnixConnector, transformer: Transformer, encoder: E) -> Self {
         Self {
             connector,
             transformer,
             encoder,
         }
+    }
+
+    fn fresh_send_failure_backoff() -> ExponentialBackoff {
+        ExponentialBackoff::default().max_delay(Self::SEND_FAILURE_MAX_BACKOFF)
+    }
+
+    fn add_full_jitter(d: Duration) -> Duration {
+        let max_millis = u64::try_from(d.as_millis()).unwrap_or(u64::MAX);
+        if max_millis == 0 {
+            return Duration::ZERO;
+        }
+
+        let jitter_millis = (rand::random::<u64>() % max_millis) + 1;
+        Duration::from_millis(jitter_millis)
     }
 
     async fn connect(&mut self) -> BytesSink<UnixStream> {
@@ -246,6 +263,7 @@ where
         // partially writing bytes, we resend the whole batch on reconnect (at-least-once).
         let mut pending_batch: Vec<EncodedEvent<Bytes>> = Vec::new();
         let mut connection: Option<(BytesSink<UnixStream>, OpenToken<fn(usize)>)> = None;
+        let mut send_failure_backoff = Self::fresh_send_failure_backoff();
 
         loop {
             if pending_batch.is_empty() {
@@ -322,6 +340,7 @@ where
                     for enc in pending_batch.drain(..) {
                         enc.finalizers.update_status(EventStatus::Delivered);
                     }
+                    send_failure_backoff.reset();
                 }
                 Err(ref error) => {
                     emit!(UnixSocketSendError {
@@ -330,6 +349,10 @@ where
                     });
                     if let Some((mut sink, _open_token)) = connection.take() {
                         let _ = sink.close().await;
+                    }
+
+                    if let Some(delay) = send_failure_backoff.next() {
+                        sleep(Self::add_full_jitter(delay)).await;
                     }
                 }
             }

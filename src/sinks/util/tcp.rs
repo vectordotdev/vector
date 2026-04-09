@@ -2,6 +2,7 @@ use std::{
     net::SocketAddr,
     pin::Pin,
     task::{Context, Poll},
+    time::Duration,
 };
 
 use async_trait::async_trait;
@@ -234,12 +235,28 @@ impl<E> TcpSink<E>
 where
     E: Encoder<Event, Error = vector_lib::codecs::encoding::Error> + Clone + Send + Sync + 'static,
 {
+    const SEND_FAILURE_MAX_BACKOFF: Duration = Duration::from_secs(5);
+
     const fn new(connector: TcpConnector, transformer: Transformer, encoder: E) -> Self {
         Self {
             connector,
             transformer,
             encoder,
         }
+    }
+
+    fn fresh_send_failure_backoff() -> ExponentialBackoff {
+        ExponentialBackoff::default().max_delay(Self::SEND_FAILURE_MAX_BACKOFF)
+    }
+
+    fn add_full_jitter(d: Duration) -> Duration {
+        let max_millis = u64::try_from(d.as_millis()).unwrap_or(u64::MAX);
+        if max_millis == 0 {
+            return Duration::ZERO;
+        }
+
+        let jitter_millis = (rand::random::<u64>() % max_millis) + 1;
+        Duration::from_millis(jitter_millis)
     }
 
     async fn connect(&self) -> BytesSink<MaybeTlsStream<TcpStream>> {
@@ -314,6 +331,7 @@ where
         let mut pending_batch: Vec<EncodedEvent<Bytes>> = Vec::new();
         let mut connection: Option<(BytesSink<MaybeTlsStream<TcpStream>>, OpenToken<fn(usize)>)> =
             None;
+        let mut send_failure_backoff = Self::fresh_send_failure_backoff();
 
         loop {
             if pending_batch.is_empty() {
@@ -389,6 +407,7 @@ where
                     for enc in pending_batch.drain(..) {
                         enc.finalizers.update_status(EventStatus::Delivered);
                     }
+                    send_failure_backoff.reset();
                 }
                 Err(error) => {
                     if is_peer_shutdown_error(&error) {
@@ -401,6 +420,10 @@ where
                     if let Some((mut sink, _open_token)) = connection.take() {
                         let _ = sink.close().await;
                     }
+
+                    if let Some(delay) = send_failure_backoff.next() {
+                        sleep(Self::add_full_jitter(delay)).await;
+                    }
                 }
             }
         }
@@ -411,6 +434,8 @@ where
 
 #[cfg(test)]
 mod test {
+    use std::time::Duration;
+
     use tokio::net::TcpListener;
 
     use super::*;
@@ -428,5 +453,20 @@ mod test {
         let (_guard, addr) = next_addr();
         let bad = TcpConnector::from_host_port(addr.ip().to_string(), addr.port());
         assert!(bad.healthcheck().await.is_err());
+    }
+
+    #[test]
+    fn send_failure_jitter_stays_bounded() {
+        let max = Duration::from_millis(500);
+        let mut backoff = ExponentialBackoff::from_millis(2)
+            .factor(250)
+            .max_delay(max);
+
+        for _ in 0..32 {
+            let delay =
+                TcpSink::<crate::codecs::Encoder<()>>::add_full_jitter(backoff.next().unwrap());
+            assert!(delay > Duration::ZERO);
+            assert!(delay <= max);
+        }
     }
 }
