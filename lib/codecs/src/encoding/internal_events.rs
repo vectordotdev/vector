@@ -1,5 +1,5 @@
-#[cfg(feature = "parquet")]
-mod parquet_events {
+#[cfg(feature = "arrow")]
+mod arrow_events {
     use metrics::counter;
     use tracing::error;
     use vector_common::NamedInternalEvent;
@@ -28,6 +28,17 @@ mod parquet_events {
             .increment(1);
         }
     }
+}
+
+#[cfg(feature = "arrow")]
+pub(crate) use arrow_events::JsonSerializationError;
+
+#[cfg(feature = "parquet")]
+mod parquet_events {
+    use metrics::counter;
+    use tracing::error;
+    use vector_common::NamedInternalEvent;
+    use vector_common::internal_event::{InternalEvent, error_stage, error_type};
 
     #[derive(NamedInternalEvent)]
     pub(crate) struct SchemaGenerationError<'a> {
@@ -55,4 +66,4 @@ mod parquet_events {
 }
 
 #[cfg(feature = "parquet")]
-pub(crate) use parquet_events::{JsonSerializationError, SchemaGenerationError};
+pub(crate) use parquet_events::SchemaGenerationError;
