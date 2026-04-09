@@ -258,7 +258,7 @@ impl CuckooMemoryTable {
                     .and_then(|p| value.get(p))
                     .and_then(|v| v.as_integer())
                     .and_then(|v| u64::try_from(v).ok())
-                    .map(|v| v / self.config.scan_interval.get())
+                    .map(|v| (v / self.config.scan_interval.get()).max(1))
                     .and_then(|v| u32::try_from(v).ok());
                 let counter = self
                     .cuckoo_config
