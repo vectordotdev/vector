@@ -9,6 +9,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use arrow::datatypes::{DataType, Field, Fields, Schema, SchemaRef, TimeUnit};
+use arrow::json::reader::infer_json_schema_from_iterator;
 use bytes::{BufMut, BytesMut};
 use parquet::arrow::ArrowWriter;
 use parquet::basic::Compression as ParquetCodecCompression;
@@ -19,6 +20,17 @@ use vector_config::configurable_component;
 use vector_core::event::Event;
 
 use super::arrow::{ArrowEncodingError, build_record_batch};
+use derivative::Derivative;
+
+use crate::encoding::format::arrow::vector_log_events_to_json_values;
+use crate::encoding::internal_events::SchemaGenerationError;
+use arrow::error::ArrowError;
+use std::io::{Error, ErrorKind};
+use vector_common::internal_event::{
+    ComponentEventsDropped, Count, InternalEventHandle, Registered, UNINTENTIONAL, emit, register,
+};
+
+type EventsDroppedError = ComponentEventsDropped<'static, UNINTENTIONAL>;
 
 /// Parquet compression codec options.
 #[configurable_component]
@@ -60,6 +72,8 @@ pub enum SchemaMode {
     Relaxed,
     /// Missing fields become null. Extra fields cause an error.
     Strict,
+    /// Auto infer schema based on the batch. No schema file needed.
+    AutoInfer,
 }
 
 /// Arrow data type for Parquet schema field definitions.
@@ -255,6 +269,10 @@ impl ParquetSerializerConfig {
     /// Validates that exactly one schema source is provided and that schema
     /// strings are non-empty.
     fn resolve_schema(&self) -> Result<Schema, Box<dyn std::error::Error + Send + Sync>> {
+        if self.schema_mode == SchemaMode::AutoInfer {
+            return Ok(Schema::empty());
+        }
+
         let has_inline = !self.schema.is_empty();
         let has_parquet = self.parquet_schema.is_some();
         let has_file = self.schema_file.is_some();
@@ -702,11 +720,7 @@ fn proto_kind_to_arrow(
 fn reject_unsupported_arrow_types(
     schema: &Schema,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    fn check_field(
-        field: &Field,
-        path: &str,
-        bad: &mut Vec<String>,
-    ) {
+    fn check_field(field: &Field, path: &str, bad: &mut Vec<String>) {
         let name = if path.is_empty() {
             field.name().to_string()
         } else {
@@ -752,13 +766,17 @@ fn reject_unsupported_arrow_types(
 }
 
 /// Parquet batch serializer.
-#[derive(Clone, Debug)]
+#[derive(Derivative)]
+#[derivative(Debug, Clone)]
 pub struct ParquetSerializer {
     schema: SchemaRef,
     writer_props: Arc<WriterProperties>,
     schema_mode: SchemaMode,
     /// Pre-built set of schema field names for O(1) strict-mode lookups.
     schema_field_names: HashSet<String>,
+
+    #[derivative(Debug = "ignore")]
+    events_dropped_handle: Registered<EventsDroppedError>,
 }
 
 impl ParquetSerializer {
@@ -787,6 +805,9 @@ impl ParquetSerializer {
             writer_props,
             schema_mode: config.schema_mode,
             schema_field_names,
+            events_dropped_handle: register(EventsDroppedError::from(
+                "Events could not be serialized to parquet",
+            )),
         })
     }
 
@@ -804,15 +825,18 @@ impl tokio_util::codec::Encoder<Vec<Event>> for ParquetSerializer {
             return Ok(());
         }
 
-        // Warn about non-log events that will be silently dropped by the Arrow layer.
-        // Parquet encoding only supports Log events (declared via input_type).
-        let non_log_count = events.iter().filter(|e| e.maybe_as_log().is_none()).count();
+        let json_values = vector_log_events_to_json_values(&events);
+        let non_log_count = events.len() - json_values.len();
+
+        // Parquet encoding only supports Log events.
+        // emit dropped events metric
         if non_log_count > 0 {
             warn!(
-                message = "Non-log events dropped by Parquet encoder.",
+                message = "Non-log / Non JSON serializable events dropped by Parquet encoder ",
                 %non_log_count,
                 internal_log_rate_secs = 10,
             );
+            self.events_dropped_handle.emit(Count(non_log_count))
         }
 
         // In strict mode, check for extra top-level fields not in the schema
@@ -838,10 +862,18 @@ impl tokio_util::codec::Encoder<Vec<Event>> for ParquetSerializer {
                     }
                 }
             }
+        } else if self.schema_mode == SchemaMode::AutoInfer {
+            // auto infer schema here.
+            let schema = ParquetSchemaGenerator::new(self.events_dropped_handle.clone())
+                .infer_schema(&json_values)?;
+
+            self.schema = Arc::new(ParquetSchemaGenerator::try_normalize_schema(
+                &events, schema,
+            ));
         }
 
         // Build RecordBatch using the shared Arrow logic
-        let record_batch = build_record_batch(Arc::clone(&self.schema), &events)
+        let record_batch = build_record_batch(Arc::clone(&self.schema), &json_values)
             .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
 
         // Write Parquet directly into the output buffer (no intermediate Vec)
@@ -854,6 +886,74 @@ impl tokio_util::codec::Encoder<Vec<Event>> for ParquetSerializer {
         writer.close()?;
 
         Ok(())
+    }
+}
+
+pub struct ParquetSchemaGenerator {
+    events_dropped_handle: Registered<EventsDroppedError>,
+}
+
+impl ParquetSchemaGenerator {
+    fn new(events_dropped_handle: Registered<EventsDroppedError>) -> Self {
+        Self {
+            events_dropped_handle,
+        }
+    }
+    pub fn infer_schema(&self, events: &[serde_json::Value]) -> Result<Schema, Error> {
+        let schema = infer_json_schema_from_iterator(events.iter().map(Ok::<_, ArrowError>))
+            .map_err(|e| {
+                self.events_dropped_handle.emit(Count(events.len()));
+                emit(SchemaGenerationError { error: &e });
+                Error::new(ErrorKind::InvalidData, e.to_string())
+            })?;
+
+        Ok(schema)
+    }
+
+    /// attempt to modify schema to set timestamp fields as Timestamp instead of Utf8
+    /// only works for top level fields, we DO NOT look at nested fields
+    fn try_normalize_schema(events: &[Event], schema: Schema) -> Schema {
+        use std::collections::HashSet;
+
+        // get all timestamp and non_timestamp fields.
+        let mut ts_seen: HashSet<String> = HashSet::new();
+        let mut non_ts_seen: HashSet<String> = HashSet::new();
+
+        for event in events.iter().filter_map(Event::maybe_as_log) {
+            if let Some(object_map) = event.as_map() {
+                for (path, value) in object_map {
+                    if value.is_timestamp() {
+                        ts_seen.insert(path.to_string());
+                    } else if !value.is_null() {
+                        non_ts_seen.insert(path.to_string());
+                    }
+                }
+            }
+        }
+
+        // generate new fields, promote to timestamp if it appears as a timestamp field in some events and
+        // doesn't appear as a non-timestamp field in others i.e. update field to timestamp if it's consistently
+        // Value::timestamp across all events.
+        let new_fields: Vec<Field> = schema
+            .fields()
+            .iter()
+            .map(|f| {
+                if ts_seen.contains(f.name()) && !non_ts_seen.contains(f.name()) {
+                    Field::new(
+                        f.name(),
+                        DataType::Timestamp(
+                            arrow::datatypes::TimeUnit::Microsecond,
+                            Some("UTC".into()),
+                        ),
+                        f.is_nullable(),
+                    )
+                } else {
+                    f.as_ref().clone()
+                }
+            })
+            .collect();
+
+        Schema::new_with_metadata(new_fields, schema.metadata().clone())
     }
 }
 
@@ -927,6 +1027,166 @@ mod tests {
             .iter()
             .map(|c| c.name().to_string())
             .collect()
+    }
+
+    // ── Schema generation helpers ────────────────────────────────────────────
+
+    fn parse_timestamp(s: &str) -> chrono::DateTime<chrono::Utc> {
+        chrono::DateTime::parse_from_rfc3339(s)
+            .expect("invalid test timestamp")
+            .with_timezone(&chrono::Utc)
+    }
+
+    /// Builds a log event with a fixed set of fields, using `Value::Timestamp`
+    /// for the two time fields so that `try_normalize_schema` can promote them.
+    fn demo_log_event(
+        message: &str,
+        timestamp: chrono::DateTime<chrono::Utc>,
+        status_code: i64,
+        response_time_secs: f64,
+    ) -> Event {
+        use vector_core::event::Value;
+        let mut log = LogEvent::default();
+        log.insert("host", "localhost");
+        log.insert("message", message);
+        log.insert("service", "vector");
+        log.insert("source_type", "demo_logs");
+        log.insert("timestamp", Value::Timestamp(timestamp));
+        log.insert("random_time", Value::Timestamp(timestamp));
+        log.insert("status_code", Value::Integer(status_code));
+        log.insert("response_time_secs", response_time_secs);
+        Event::Log(log)
+    }
+
+    fn sample_events() -> Vec<Event> {
+        const EVENTS: [(&str, &str, i64, f64); 5] = [
+            (
+                "GET /api/v1/health HTTP/1.1",
+                "2026-03-05T20:49:08.037194Z",
+                200,
+                0.037,
+            ),
+            (
+                "POST /api/v1/ingest HTTP/1.1",
+                "2026-03-05T20:49:09.038051Z",
+                201,
+                0.013,
+            ),
+            (
+                "GET /metrics HTTP/1.1",
+                "2026-03-05T20:49:10.036612Z",
+                200,
+                0.022,
+            ),
+            (
+                "DELETE /api/v1/resource HTTP/1.1",
+                "2026-03-05T20:49:11.537131Z",
+                404,
+                0.005,
+            ),
+            (
+                "PATCH /api/v1/config HTTP/1.1",
+                "2026-03-05T20:49:12.037491Z",
+                500,
+                0.091,
+            ),
+        ];
+        EVENTS
+            .iter()
+            .map(|(msg, ts, status, rt)| demo_log_event(msg, parse_timestamp(ts), *status, *rt))
+            .collect()
+    }
+
+    /// Encodes `events` with `AutoInfer` and returns the inferred Arrow schema
+    /// and total row count read back from the Parquet output.
+    fn encode_autoinfer_and_read_schema(
+        events: Vec<Event>,
+    ) -> (arrow::datatypes::SchemaRef, usize) {
+        use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
+
+        let mut serializer = ParquetSerializer::new(ParquetSerializerConfig {
+            schema_mode: SchemaMode::AutoInfer,
+            ..Default::default()
+        })
+        .expect("AutoInfer serializer should be created without a static schema");
+
+        let mut buffer = BytesMut::new();
+        serializer
+            .encode(events, &mut buffer)
+            .expect("encoding should succeed");
+
+        let data = buffer.freeze();
+        assert_parquet_magic(&data);
+
+        let builder = ParquetRecordBatchReaderBuilder::try_new(data)
+            .expect("should build ParquetRecordBatchReaderBuilder");
+        let schema = builder.schema().clone();
+        let num_rows: usize = builder
+            .build()
+            .expect("should build reader")
+            .map(|b| b.expect("batch read error").num_rows())
+            .sum();
+        (schema, num_rows)
+    }
+
+    // ── Schema generation tests ──────────────────────────────────────────────
+
+    /// Verifies that encoding a batch of events with `AutoInfer` produces valid
+    /// Parquet output and that `try_normalize_schema` promotes `Value::Timestamp`
+    /// fields to `Timestamp(Microsecond, UTC)` rather than leaving them as Utf8.
+    #[test]
+    fn encode_input_produces_parquet_output() {
+        let events = sample_events();
+        let n_events = events.len();
+        let (schema, num_rows) = encode_autoinfer_and_read_schema(events);
+
+        assert_eq!(num_rows, n_events, "row count should match event count");
+
+        // Both timestamp fields must be promoted to Timestamp(Microsecond, UTC)
+        for field_name in &["timestamp", "random_time"] {
+            let field = schema
+                .field_with_name(field_name)
+                .unwrap_or_else(|_| panic!("field '{field_name}' should exist in schema"));
+            assert!(
+                matches!(
+                    field.data_type(),
+                    DataType::Timestamp(TimeUnit::Microsecond, Some(tz)) if tz.as_ref() == "UTC"
+                ),
+                "'{field_name}' should be Timestamp(Microsecond, UTC), got {:?}",
+                field.data_type()
+            );
+        }
+
+        // Numeric fields must be inferred as the correct Arrow primitives
+        let status_field = schema
+            .field_with_name("status_code")
+            .expect("status_code field should exist");
+        assert_eq!(
+            status_field.data_type(),
+            &DataType::Int64,
+            "status_code should be Int64"
+        );
+
+        let rt_field = schema
+            .field_with_name("response_time_secs")
+            .expect("response_time_secs field should exist");
+        assert_eq!(
+            rt_field.data_type(),
+            &DataType::Float64,
+            "response_time_secs should be Float64"
+        );
+
+        // String fields must stay as Utf8
+        for field_name in &["host", "message", "service", "source_type"] {
+            let field = schema
+                .field_with_name(field_name)
+                .unwrap_or_else(|_| panic!("field '{field_name}' should exist in schema"));
+            assert_eq!(
+                field.data_type(),
+                &DataType::Utf8,
+                "'{field_name}' should be Utf8"
+            );
+        }
     }
 
     #[test]
@@ -2447,10 +2707,7 @@ mod tests {
 
         let mut buffer = BytesMut::new();
         let result = serializer.encode(events, &mut buffer);
-        assert!(
-            result.is_err(),
-            "Batch of only non-log events should error"
-        );
+        assert!(result.is_err(), "Batch of only non-log events should error");
     }
 
     #[test]

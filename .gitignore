@@ -4,6 +4,7 @@ cargo-timing*.html
 target
 tests/data/wasm/*/target
 bench_output.txt
+rust-analyzer.toml
 
 # Python
 *.pyc
@@ -64,3 +65,9 @@ volumes/
 
 # LLM tools
 copilot-instructions.md
+
+# local files not checked in
+local/
+
+# vscode
+.vscode/
