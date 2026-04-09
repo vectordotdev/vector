@@ -567,7 +567,7 @@ pub enum RetryStrategy {
     #[default]
     Default,
 
-    /// Retry on *all* errorcodes
+    /// Retry on *all* HTTP status codes except for success codes (2xx)
     All,
 
     /// Custom retry strategy
