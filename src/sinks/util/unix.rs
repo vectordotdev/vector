@@ -30,7 +30,7 @@ use crate::{
     common::backoff::ExponentialBackoff,
     event::{Event, Finalizable},
     internal_events::{
-        ConnectionOpen, OpenGauge, SocketMode, UnixSocketConnectionEstablished,
+        ConnectionOpen, OpenGauge, OpenToken, SocketMode, UnixSocketConnectionEstablished,
         UnixSocketOutgoingConnectionError, UnixSocketSendError,
     },
     sinks::{
@@ -245,7 +245,7 @@ where
             .peekable();
 
         let mut pending_batch: Vec<EncodedEvent<Bytes>> = Vec::new();
-        let mut connection = None;
+        let mut connection: Option<(BytesSink<UnixStream>, OpenToken<fn(usize)>)> = None;
 
         loop {
             if pending_batch.is_empty() {
@@ -295,7 +295,8 @@ where
 
             if connection.is_none() {
                 let sink = self.connect().await;
-                let open_token = OpenGauge::new().open(emit_unix_stream_connection_open);
+                let open_token =
+                    OpenGauge::new().open(emit_unix_stream_connection_open as fn(usize));
                 connection = Some((sink, open_token));
             }
 
