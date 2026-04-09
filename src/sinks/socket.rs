@@ -603,7 +603,8 @@ mod test {
         let context = SinkContext::default();
         let (sink, _healthcheck) = config.build(context).await.unwrap();
 
-        let (_, events) = random_lines_with_stream(1000, 10000, None);
+        // Exceed stream sink pending batch cap (1024) to exercise split-batch retry path.
+        let (_, events) = random_lines_with_stream(2000, 10000, None);
         let sink_handle = tokio::spawn(run_and_assert_sink_compliance(sink, events, &SINK_TAGS));
 
         // First listener
