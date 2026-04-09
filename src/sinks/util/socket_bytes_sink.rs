@@ -18,7 +18,7 @@ use vector_lib::{
 use super::EncodedEvent;
 use crate::internal_events::{SocketBytesSent, SocketEventsSent, SocketMode};
 
-const MAX_PENDING_ITEMS: usize = 1_000;
+pub(crate) const MAX_PENDING_ITEMS: usize = 1_000;
 
 pub enum ShutdownCheck {
     Error(IoError),

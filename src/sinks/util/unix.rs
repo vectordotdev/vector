@@ -38,7 +38,7 @@ use crate::{
         util::{
             EncodedEvent, StreamSink,
             service::net::UnixMode,
-            socket_bytes_sink::{BytesSink, ShutdownCheck},
+            socket_bytes_sink::{BytesSink, MAX_PENDING_ITEMS, ShutdownCheck},
         },
     },
 };
@@ -46,8 +46,6 @@ use crate::{
 fn emit_unix_stream_connection_open(count: usize) {
     emit!(ConnectionOpen { count });
 }
-
-const MAX_PENDING_BATCH_ITEMS: usize = 1_000;
 
 #[derive(Debug, Snafu)]
 pub enum UnixError {
@@ -252,7 +250,7 @@ where
                 poll_fn(|cx| {
                     let mut input = Pin::new(&mut input);
                     loop {
-                        if pending_batch.len() >= MAX_PENDING_BATCH_ITEMS {
+                        if pending_batch.len() >= MAX_PENDING_ITEMS {
                             return Poll::Ready(());
                         }
                         match input.as_mut().poll_peek(cx) {

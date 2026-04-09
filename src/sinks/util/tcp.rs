@@ -36,7 +36,7 @@ use crate::{
         Healthcheck, VectorSink,
         util::{
             EncodedEvent, SinkBuildError, StreamSink,
-            socket_bytes_sink::{BytesSink, ShutdownCheck},
+            socket_bytes_sink::{BytesSink, MAX_PENDING_ITEMS, ShutdownCheck},
         },
     },
     tcp::TcpKeepaliveConfig,
@@ -46,8 +46,6 @@ use crate::{
 fn emit_tcp_connection_open(count: usize) {
     emit!(ConnectionOpen { count });
 }
-
-const MAX_PENDING_BATCH_ITEMS: usize = 1_000;
 
 #[derive(Debug, Snafu)]
 enum TcpError {
@@ -319,7 +317,7 @@ where
                 poll_fn(|cx| {
                     let mut input = Pin::new(&mut input);
                     loop {
-                        if pending_batch.len() >= MAX_PENDING_BATCH_ITEMS {
+                        if pending_batch.len() >= MAX_PENDING_ITEMS {
                             return Poll::Ready(());
                         }
                         match input.as_mut().poll_peek(cx) {
