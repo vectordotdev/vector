@@ -29,6 +29,25 @@ pub struct EventMetadata {
     #[serde(flatten)]
     pub(super) inner: Arc<Inner>,
 
+    /// The id of the component this event originated from. This is used to
+    /// determine which schema definition to attach to an event in transforms.
+    /// This should always have a value set for events in transforms. It will always be `None`
+    /// in a source, and there is currently no use-case for reading the value in a sink.
+    ///
+    /// Stored outside the `Arc<Inner>` to avoid triggering `Arc::make_mut`
+    /// deep-clones when this field is updated at every transform output.
+    #[serde(default, skip)]
+    pub(crate) upstream_id: Option<Arc<OutputId>>,
+
+    /// An identifier for a globally registered schema definition which provides information about
+    /// the event shape (type information, and semantic meaning of fields).
+    /// This definition is only currently valid for logs, and shouldn't be used for other event types.
+    ///
+    /// Stored outside the `Arc<Inner>` to avoid triggering `Arc::make_mut`
+    /// deep-clones when this field is updated at every transform output.
+    #[serde(default = "default_schema_definition", skip)]
+    pub(crate) schema_definition: Arc<schema::Definition>,
+
     /// The timestamp when the event last entered a transform buffer.
     #[derivative(PartialEq = "ignore")]
     #[serde(default, skip)]
@@ -56,20 +75,6 @@ pub(super) struct Inner {
 
     /// The type of the source
     pub(crate) source_type: Option<Cow<'static, str>>,
-
-    /// The id of the component this event originated from. This is used to
-    /// determine which schema definition to attach to an event in transforms.
-    /// This should always have a value set for events in transforms. It will always be `None`
-    /// in a source, and there is currently no use-case for reading the value in a sink.
-    pub(crate) upstream_id: Option<Arc<OutputId>>,
-
-    /// An identifier for a globally registered schema definition which provides information about
-    /// the event shape (type information, and semantic meaning of fields).
-    /// This definition is only currently valid for logs, and shouldn't be used for other event types.
-    ///
-    /// TODO(Jean): must not skip serialization to track schemas across restarts.
-    #[serde(default = "default_schema_definition", skip)]
-    pub(crate) schema_definition: Arc<schema::Definition>,
 
     /// A store of values that may be dropped during the encoding process but may be needed
     /// later on. The map is indexed by meaning.
@@ -143,6 +148,8 @@ impl EventMetadata {
                 value,
                 ..Default::default()
             }),
+            upstream_id: None,
+            schema_definition: default_schema_definition(),
             last_transform_timestamp: None,
         }
     }
@@ -191,7 +198,7 @@ impl EventMetadata {
     /// of the previous component the event was sent through (if any).
     #[must_use]
     pub fn upstream_id(&self) -> Option<&OutputId> {
-        self.inner.upstream_id.as_deref()
+        self.upstream_id.as_deref()
     }
 
     /// Sets the `source_id` in the metadata to the provided value.
@@ -206,7 +213,7 @@ impl EventMetadata {
 
     /// Sets the `upstream_id` in the metadata to the provided value.
     pub fn set_upstream_id(&mut self, upstream_id: Arc<OutputId>) {
-        self.get_mut().upstream_id = Some(upstream_id);
+        self.upstream_id = Some(upstream_id);
     }
 
     /// Return the datadog API key, if it exists
@@ -270,10 +277,8 @@ impl Default for Inner {
             value: Value::Object(ObjectMap::new()),
             secrets: Secrets::new(),
             finalizers: Default::default(),
-            schema_definition: default_schema_definition(),
             source_id: None,
             source_type: None,
-            upstream_id: None,
             dropped_fields: ObjectMap::new(),
             datadog_origin_metadata: None,
             source_event_id: Some(Uuid::new_v4()),
@@ -285,6 +290,8 @@ impl Default for EventMetadata {
     fn default() -> Self {
         Self {
             inner: Arc::new(Inner::default()),
+            upstream_id: None,
+            schema_definition: default_schema_definition(),
             last_transform_timestamp: None,
         }
     }
@@ -339,7 +346,7 @@ impl EventMetadata {
     /// Replace the schema definition with the given one.
     #[must_use]
     pub fn with_schema_definition(mut self, schema_definition: &Arc<schema::Definition>) -> Self {
-        self.get_mut().schema_definition = Arc::clone(schema_definition);
+        self.schema_definition = Arc::clone(schema_definition);
         self
     }
 
@@ -425,12 +432,12 @@ impl EventMetadata {
 
     /// Get the schema definition.
     pub fn schema_definition(&self) -> &Arc<schema::Definition> {
-        &self.inner.schema_definition
+        &self.schema_definition
     }
 
     /// Set the schema definition.
     pub fn set_schema_definition(&mut self, definition: &Arc<schema::Definition>) {
-        self.get_mut().schema_definition = Arc::clone(definition);
+        self.schema_definition = Arc::clone(definition);
     }
 
     /// Helper function to add a semantic meaning to the schema definition.
@@ -449,7 +456,7 @@ impl EventMetadata {
     ///     .set_schema_definition(new_schema);
     /// ````
     pub fn add_schema_meaning(&mut self, target_path: OwnedTargetPath, meaning: &str) {
-        let schema = Arc::make_mut(&mut self.get_mut().schema_definition);
+        let schema = Arc::make_mut(&mut self.schema_definition);
         schema.add_meaning(target_path, meaning);
     }
 }

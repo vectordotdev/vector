@@ -619,12 +619,12 @@ impl From<OutputId> for crate::config::OutputId {
 
 impl From<EventMetadata> for Metadata {
     fn from(value: EventMetadata) -> Self {
+        let upstream_id = value.upstream_id.clone();
         let super::metadata::Inner {
             value,
             secrets,
             source_id,
             source_type,
-            upstream_id,
             datadog_origin_metadata,
             source_event_id,
             ..
@@ -685,12 +685,12 @@ impl From<Metadata> for EventMetadata {
                 finalizers: EventFinalizers::default(),
                 source_id,
                 source_type: source_type.map(Into::into),
-                upstream_id,
-                schema_definition: default_schema_definition(),
                 dropped_fields: ObjectMap::new(),
                 datadog_origin_metadata,
                 source_event_id,
             }),
+            upstream_id,
+            schema_definition: default_schema_definition(),
             last_transform_timestamp: None,
         }
     }
