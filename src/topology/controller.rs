@@ -150,19 +150,18 @@ impl TopologyController {
         }
     }
 
-    #[cfg(feature = "api")]
+    #[allow(unused_mut)] // `mut` is only needed when the `api` feature is enabled
     pub async fn stop(mut self) {
-        // Signal NOT_SERVING before draining the topology so that Kubernetes
-        // readiness probes fail early and the pod is removed from endpoints.
+        // Phase 1: Mark the gRPC API as unavailable so that external probes
+        // (e.g. Kubernetes readiness) fail early and stop routing traffic
+        // to this instance.
+        #[cfg(feature = "api")]
         if let Some(server) = self.api_server.as_mut() {
             server.set_not_serving().await;
         }
 
-        self.topology.stop().await;
-    }
-
-    #[cfg(not(feature = "api"))]
-    pub async fn stop(self) {
+        // Phase 2: Drain the topology -- shuts down sources, waits for
+        // in-flight events to flush through transforms and sinks.
         self.topology.stop().await;
     }
 
