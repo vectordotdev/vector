@@ -47,6 +47,8 @@ fn emit_unix_stream_connection_open(count: usize) {
     emit!(ConnectionOpen { count });
 }
 
+const MAX_PENDING_BATCH_ITEMS: usize = 1024;
+
 #[derive(Debug, Snafu)]
 pub enum UnixError {
     #[snafu(display("Failed connecting to socket at path {}: {}", path.display(), source))]
@@ -243,14 +245,16 @@ where
             .peekable();
 
         let mut pending_batch: Vec<EncodedEvent<Bytes>> = Vec::new();
-        let mut sink = self.connect().await;
-        let mut open_token = OpenGauge::new().open(emit_unix_stream_connection_open);
+        let mut connection = None;
 
         loop {
             if pending_batch.is_empty() {
                 poll_fn(|cx| {
                     let mut input = Pin::new(&mut input);
                     loop {
+                        if pending_batch.len() >= MAX_PENDING_BATCH_ITEMS {
+                            return Poll::Ready(());
+                        }
                         match input.as_mut().poll_peek(cx) {
                             Poll::Pending => {
                                 return if pending_batch.is_empty() {
@@ -277,18 +281,28 @@ where
                 .await;
 
                 if pending_batch.is_empty() {
-                    drop(open_token);
-                    if let Err(error) = sink.close().await {
-                        emit!(UnixSocketSendError {
-                            error: &error,
-                            path: &self.connector.path
-                        });
+                    if let Some((mut sink, _open_token)) = connection.take() {
+                        if let Err(error) = sink.close().await {
+                            emit!(UnixSocketSendError {
+                                error: &error,
+                                path: &self.connector.path
+                            });
+                        }
                     }
                     break;
                 }
             }
 
+            if connection.is_none() {
+                let sink = self.connect().await;
+                let open_token = OpenGauge::new().open(emit_unix_stream_connection_open);
+                connection = Some((sink, open_token));
+            }
+
             let send_result: io::Result<()> = async {
+                let (sink, _open_token) = connection
+                    .as_mut()
+                    .expect("connection should be initialized before send");
                 for enc in &pending_batch {
                     let wire = EncodedEvent {
                         item: enc.item.clone(),
@@ -313,10 +327,9 @@ where
                         error,
                         path: &self.connector.path
                     });
-                    drop(open_token);
-                    let _ = sink.close().await;
-                    sink = self.connect().await;
-                    open_token = OpenGauge::new().open(emit_unix_stream_connection_open);
+                    if let Some((mut sink, _open_token)) = connection.take() {
+                        let _ = sink.close().await;
+                    }
                 }
             }
         }
