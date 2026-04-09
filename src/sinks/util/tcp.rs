@@ -47,7 +47,7 @@ fn emit_tcp_connection_open(count: usize) {
     emit!(ConnectionOpen { count });
 }
 
-const MAX_PENDING_BATCH_ITEMS: usize = 1024;
+const MAX_PENDING_BATCH_ITEMS: usize = 1_000;
 
 #[derive(Debug, Snafu)]
 enum TcpError {
