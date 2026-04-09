@@ -550,6 +550,36 @@ impl<T: fmt::Debug> sink::Response for http::Response<T> {
     }
 }
 
+/// Serializes and deserializes a [`Vec<StatusCode>`]
+mod status_code_vec {
+    use http::StatusCode;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer, de::Error};
+
+    /// Deserializes a [`Vec<StatusCode>`]
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Vec<StatusCode>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Vec::<u16>::deserialize(deserializer)?
+            .into_iter()
+            .map(StatusCode::from_u16)
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(Error::custom)
+    }
+
+    /// Serializes a [`Vec<StatusCode>`]
+    pub fn serialize<S>(status_codes: &[StatusCode], serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        status_codes
+            .iter()
+            .map(StatusCode::as_u16)
+            .collect::<Vec<_>>()
+            .serialize(serializer)
+    }
+}
+
 /// Configurable retry strategy for `http` based sinks.
 ///
 /// For more information about error responses, see [Client Error Responses][error_responses].
@@ -573,7 +603,8 @@ pub enum RetryStrategy {
     /// Custom retry strategy
     Custom {
         /// Retry on these specific HTTP status codes
-        status_codes: Vec<u16>,
+        #[serde(with = "status_code_vec")]
+        status_codes: Vec<StatusCode>,
     },
 }
 
@@ -631,7 +662,7 @@ impl RetryStrategy {
             },
             Self::All => RetryAction::Retry(reason),
             Self::Custom { status_codes } => {
-                if status_codes.contains(&status.as_u16()) {
+                if status_codes.contains(&status) {
                     RetryAction::Retry(reason)
                 } else {
                     RetryAction::DontRetry(reason)
@@ -1107,7 +1138,7 @@ mod test {
     #[test]
     fn retry_strategy_custom_only_retries_configured_statuses() {
         let strategy = RetryStrategy::Custom {
-            status_codes: vec![StatusCode::BAD_REQUEST.as_u16()],
+            status_codes: vec![StatusCode::BAD_REQUEST],
         };
 
         assert!(strategy.retry_action::<()>(StatusCode::OK).is_successful());
@@ -1120,6 +1151,32 @@ mod test {
             strategy
                 .retry_action::<()>(StatusCode::INTERNAL_SERVER_ERROR)
                 .is_not_retryable()
+        );
+    }
+
+    #[test]
+    fn retry_strategy_custom_serde_roundtrips_status_codes() {
+        let json = r#"{"type":"custom","status_codes":[400,503]}"#;
+        let strategy: RetryStrategy = serde_json::from_str(json).unwrap();
+        assert_eq!(
+            strategy,
+            RetryStrategy::Custom {
+                status_codes: vec![StatusCode::BAD_REQUEST, StatusCode::SERVICE_UNAVAILABLE],
+            }
+        );
+        let encoded = serde_json::to_string(&strategy).unwrap();
+        let roundtrip: RetryStrategy = serde_json::from_str(&encoded).unwrap();
+        assert_eq!(roundtrip, strategy);
+    }
+
+    #[test]
+    fn retry_strategy_custom_serde_rejects_invalid_status_codes() {
+        // `http::StatusCode::from_u16` only accepts 100–999; 1000 is out of range.
+        let json = r#"{"type":"custom","status_codes":[1000]}"#;
+        let result = serde_json::from_str::<RetryStrategy>(json);
+        assert!(
+            result.is_err(),
+            "expected invalid status code to fail deserialization"
         );
     }
 
