@@ -367,13 +367,13 @@ where
                 .await;
 
                 if pending_batch.is_empty() {
-                    if let Some((mut sink, _open_token)) = connection.take() {
-                        if let Err(error) = sink.close().await {
-                            emit!(SocketSendError {
-                                mode: SocketMode::Tcp,
-                                error
-                            });
-                        }
+                    if let Some((mut sink, _open_token)) = connection.take()
+                        && let Err(error) = sink.close().await
+                    {
+                        emit!(SocketSendError {
+                            mode: SocketMode::Tcp,
+                            error
+                        });
                     }
                     break;
                 }

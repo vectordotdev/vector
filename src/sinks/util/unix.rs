@@ -299,13 +299,13 @@ where
                 .await;
 
                 if pending_batch.is_empty() {
-                    if let Some((mut sink, _open_token)) = connection.take() {
-                        if let Err(error) = sink.close().await {
-                            emit!(UnixSocketSendError {
-                                error: &error,
-                                path: &self.connector.path
-                            });
-                        }
+                    if let Some((mut sink, _open_token)) = connection.take()
+                        && let Err(error) = sink.close().await
+                    {
+                        emit!(UnixSocketSendError {
+                            error: &error,
+                            path: &self.connector.path
+                        });
                     }
                     break;
                 }
