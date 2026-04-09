@@ -7,7 +7,9 @@ use std::{
 
 use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
-use futures::{SinkExt, StreamExt, stream::BoxStream, task::noop_waker_ref};
+use futures::{
+    SinkExt, Stream, StreamExt, future::poll_fn, stream::BoxStream, task::noop_waker_ref,
+};
 use snafu::{ResultExt, Snafu};
 use tokio::{
     io::{AsyncRead, ReadBuf},
@@ -39,6 +41,10 @@ use crate::{
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, MaybeTlsStream, TlsEnableableConfig, TlsError},
 };
+
+fn emit_tcp_connection_open(count: usize) {
+    emit!(ConnectionOpen { count });
+}
 
 #[derive(Debug, Snafu)]
 enum TcpError {
@@ -301,47 +307,87 @@ where
             })
             .peekable();
 
-        while Pin::new(&mut input).peek().await.is_some() {
-            let mut sink = self.connect().await;
-            let _open_token = OpenGauge::new().open(|count| emit!(ConnectionOpen { count }));
+        let mut pending_batch: Vec<EncodedEvent<Bytes>> = Vec::new();
+        let mut sink = self.connect().await;
+        let mut open_token = OpenGauge::new().open(emit_tcp_connection_open);
 
-            // `BytesSink` only tracks empty finalizers; we mark the real ones delivered only
-            // after a successful `Sink::send` (flush). The stream is not advanced until then, so a
-            // disconnect during `poll_ready` (shutdown check before send) does not drop the event.
-            let result = async {
-                loop {
-                    let (item, byte_size, json_byte_size) = match Pin::new(&mut input).peek().await
-                    {
-                        None => break,
-                        Some(p) => (p.item.clone(), p.byte_size, p.json_byte_size),
-                    };
-                    let wire = EncodedEvent {
-                        item,
-                        finalizers: Default::default(),
-                        byte_size,
-                        json_byte_size,
-                    };
-                    match sink.send(wire).await {
-                        Ok(()) => {
-                            let delivered = Pin::new(&mut input).next().await.ok_or_else(|| {
-                                std::io::Error::other("peekable stream returned no item after peek")
-                            })?;
-                            delivered.finalizers.update_status(EventStatus::Delivered);
+        loop {
+            if pending_batch.is_empty() {
+                poll_fn(|cx| {
+                    let mut input = Pin::new(&mut input);
+                    loop {
+                        match input.as_mut().poll_peek(cx) {
+                            Poll::Pending => {
+                                return if pending_batch.is_empty() {
+                                    Poll::Pending
+                                } else {
+                                    Poll::Ready(())
+                                };
+                            }
+                            Poll::Ready(None) => return Poll::Ready(()),
+                            Poll::Ready(Some(_)) => match input.as_mut().poll_next(cx) {
+                                Poll::Ready(Some(item)) => pending_batch.push(item),
+                                Poll::Ready(None) => return Poll::Ready(()),
+                                Poll::Pending => {
+                                    return if pending_batch.is_empty() {
+                                        Poll::Pending
+                                    } else {
+                                        Poll::Ready(())
+                                    };
+                                }
+                            },
                         }
-                        Err(error) => return Err(error),
                     }
+                })
+                .await;
+
+                if pending_batch.is_empty() {
+                    drop(open_token);
+                    if let Err(error) = sink.close().await {
+                        emit!(SocketSendError {
+                            mode: SocketMode::Tcp,
+                            error
+                        });
+                    }
+                    break;
                 }
-                sink.close().await
+            }
+
+            let send_result: std::io::Result<()> = async {
+                for enc in &pending_batch {
+                    let wire = EncodedEvent {
+                        item: enc.item.clone(),
+                        finalizers: Default::default(),
+                        byte_size: enc.byte_size,
+                        json_byte_size: enc.json_byte_size,
+                    };
+                    sink.feed(wire).await?;
+                }
+                sink.flush().await
             }
             .await;
-            if let Err(error) = result {
-                if error.kind() == ErrorKind::Other && error.to_string() == "ShutdownCheck::Close" {
-                    emit!(TcpSocketConnectionShutdown {});
+
+            match send_result {
+                Ok(()) => {
+                    for enc in pending_batch.drain(..) {
+                        enc.finalizers.update_status(EventStatus::Delivered);
+                    }
                 }
-                emit!(SocketSendError {
-                    mode: SocketMode::Tcp,
-                    error
-                });
+                Err(error) => {
+                    if error.kind() == ErrorKind::Other
+                        && error.to_string() == "ShutdownCheck::Close"
+                    {
+                        emit!(TcpSocketConnectionShutdown {});
+                    }
+                    emit!(SocketSendError {
+                        mode: SocketMode::Tcp,
+                        error
+                    });
+                    drop(open_token);
+                    let _ = sink.close().await;
+                    sink = self.connect().await;
+                    open_token = OpenGauge::new().open(emit_tcp_connection_open);
+                }
             }
         }
 

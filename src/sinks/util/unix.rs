@@ -3,11 +3,12 @@ use std::{
     os::fd::{AsFd, BorrowedFd},
     path::PathBuf,
     pin::Pin,
+    task::Poll,
 };
 
 use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
-use futures::{SinkExt, StreamExt, stream::BoxStream};
+use futures::{SinkExt, Stream, StreamExt, future::poll_fn, stream::BoxStream};
 use snafu::{ResultExt, Snafu};
 use tokio::{
     io::AsyncWriteExt,
@@ -41,6 +42,10 @@ use crate::{
         },
     },
 };
+
+fn emit_unix_stream_connection_open(count: usize) {
+    emit!(ConnectionOpen { count });
+}
 
 #[derive(Debug, Snafu)]
 pub enum UnixError {
@@ -237,42 +242,82 @@ where
             })
             .peekable();
 
-        while Pin::new(&mut input).peek().await.is_some() {
-            let mut sink = self.connect().await;
-            let _open_token = OpenGauge::new().open(|count| emit!(ConnectionOpen { count }));
+        let mut pending_batch: Vec<EncodedEvent<Bytes>> = Vec::new();
+        let mut sink = self.connect().await;
+        let mut open_token = OpenGauge::new().open(emit_unix_stream_connection_open);
 
-            let result = async {
-                loop {
-                    let (item, byte_size, json_byte_size) = match Pin::new(&mut input).peek().await
-                    {
-                        None => break,
-                        Some(p) => (p.item.clone(), p.byte_size, p.json_byte_size),
-                    };
-                    let wire = EncodedEvent {
-                        item,
-                        finalizers: Default::default(),
-                        byte_size,
-                        json_byte_size,
-                    };
-                    match sink.send(wire).await {
-                        Ok(()) => {
-                            let delivered = Pin::new(&mut input).next().await.ok_or_else(|| {
-                                io::Error::other("peekable stream returned no item after peek")
-                            })?;
-                            delivered.finalizers.update_status(EventStatus::Delivered);
+        loop {
+            if pending_batch.is_empty() {
+                poll_fn(|cx| {
+                    let mut input = Pin::new(&mut input);
+                    loop {
+                        match input.as_mut().poll_peek(cx) {
+                            Poll::Pending => {
+                                return if pending_batch.is_empty() {
+                                    Poll::Pending
+                                } else {
+                                    Poll::Ready(())
+                                };
+                            }
+                            Poll::Ready(None) => return Poll::Ready(()),
+                            Poll::Ready(Some(_)) => match input.as_mut().poll_next(cx) {
+                                Poll::Ready(Some(item)) => pending_batch.push(item),
+                                Poll::Ready(None) => return Poll::Ready(()),
+                                Poll::Pending => {
+                                    return if pending_batch.is_empty() {
+                                        Poll::Pending
+                                    } else {
+                                        Poll::Ready(())
+                                    };
+                                }
+                            },
                         }
-                        Err(error) => return Err(error),
                     }
+                })
+                .await;
+
+                if pending_batch.is_empty() {
+                    drop(open_token);
+                    if let Err(error) = sink.close().await {
+                        emit!(UnixSocketSendError {
+                            error: &error,
+                            path: &self.connector.path
+                        });
+                    }
+                    break;
                 }
-                sink.close().await
+            }
+
+            let send_result: io::Result<()> = async {
+                for enc in &pending_batch {
+                    let wire = EncodedEvent {
+                        item: enc.item.clone(),
+                        finalizers: Default::default(),
+                        byte_size: enc.byte_size,
+                        json_byte_size: enc.json_byte_size,
+                    };
+                    sink.feed(wire).await?;
+                }
+                sink.flush().await
             }
             .await;
 
-            if let Err(error) = result {
-                emit!(UnixSocketSendError {
-                    error: &error,
-                    path: &self.connector.path
-                });
+            match send_result {
+                Ok(()) => {
+                    for enc in pending_batch.drain(..) {
+                        enc.finalizers.update_status(EventStatus::Delivered);
+                    }
+                }
+                Err(ref error) => {
+                    emit!(UnixSocketSendError {
+                        error,
+                        path: &self.connector.path
+                    });
+                    drop(open_token);
+                    let _ = sink.close().await;
+                    sink = self.connect().await;
+                    open_token = OpenGauge::new().open(emit_unix_stream_connection_open);
+                }
             }
         }
 

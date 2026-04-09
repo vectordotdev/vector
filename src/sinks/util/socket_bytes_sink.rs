@@ -119,9 +119,10 @@ where
     type Error = <FramedWrite<T, BytesCodec> as Sink<Bytes>>::Error;
 
     fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        // Detect peer shutdown before `start_send` (and before `FramedWrite::poll_ready`) so callers
-        // such as the TCP/Unix stream sinks (peek, then `Sink::send`) fail here without consuming
-        // the next stream item.
+        // Detect peer shutdown before `start_send` (and before `FramedWrite::poll_ready`) so the
+        // next encoded frame is not queued while the peer is gone. TCP/Unix stream sinks collect
+        // a batch (`feed` per item, one `flush` per batch) and reconnect with the same batch on
+        // error.
         let close_reason = {
             let pinned = self.as_mut().project();
             match (pinned.shutdown_check)(pinned.inner.get_mut().get_mut()) {
