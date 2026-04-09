@@ -309,6 +309,8 @@ where
             })
             .peekable();
 
+        // Keep a full batch in memory until a flush succeeds. If the connection fails after
+        // partially writing bytes, we resend the whole batch on reconnect (at-least-once).
         let mut pending_batch: Vec<EncodedEvent<Bytes>> = Vec::new();
         let mut connection: Option<(BytesSink<MaybeTlsStream<TcpStream>>, OpenToken<fn(usize)>)> =
             None;

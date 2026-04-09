@@ -700,6 +700,7 @@ mod test {
 
         sink_handle.await.unwrap();
         let remaining = receiver.await;
+        // Stream reconnect retries are at-least-once, so duplicates are allowed; assert no loss.
         assert!(first_batch.len() + remaining.len() >= lines.len());
     }
 
