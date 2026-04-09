@@ -23,13 +23,12 @@ use super::arrow::{ArrowEncodingError, build_record_batch};
 use derivative::Derivative;
 
 use crate::encoding::format::arrow::vector_log_events_to_json_values;
-use crate::encoding::internal_events::{JsonSerializationError, SchemaGenerationError};
+use crate::encoding::internal_events::SchemaGenerationError;
 use arrow::error::ArrowError;
 use std::io::{Error, ErrorKind};
 use vector_common::internal_event::{
     ComponentEventsDropped, Count, InternalEventHandle, Registered, UNINTENTIONAL, emit, register,
 };
-use vector_core::event::Value;
 
 type EventsDroppedError = ComponentEventsDropped<'static, UNINTENTIONAL>;
 
@@ -806,7 +805,9 @@ impl ParquetSerializer {
             writer_props,
             schema_mode: config.schema_mode,
             schema_field_names,
-            events_dropped_handle: default_events_dropped(),
+            events_dropped_handle: register(EventsDroppedError::from(
+                "Events could not be serialized to parquet",
+            )),
         })
     }
 
@@ -826,16 +827,16 @@ impl tokio_util::codec::Encoder<Vec<Event>> for ParquetSerializer {
 
         let json_values = vector_log_events_to_json_values(&events);
         let non_log_count = events.len() - json_values.len();
+
         // Parquet encoding only supports Log events.
         // emit dropped events metric
         if non_log_count > 0 {
             warn!(
-                message = "Non-log events dropped by Parquet encoder.",
+                message = "Non-log / Non JSON serializable events dropped by Parquet encoder ",
                 %non_log_count,
                 internal_log_rate_secs = 10,
             );
-            self.events_dropped_handle
-                .emit(Count(events.len() - json_values.len()))
+            self.events_dropped_handle.emit(Count(non_log_count))
         }
 
         // In strict mode, check for extra top-level fields not in the schema
@@ -888,72 +889,6 @@ impl tokio_util::codec::Encoder<Vec<Event>> for ParquetSerializer {
     }
 }
 
-fn default_events_dropped() -> Registered<EventsDroppedError> {
-    register(EventsDroppedError::from(
-        "Events could not be serialized to parquet",
-    ))
-}
-
-#[allow(dead_code)]
-struct LogEventsIter<'a> {
-    events: &'a [Event],
-    events_dropped_handle: Registered<EventsDroppedError>,
-    index: usize,
-    dropped_events_count: usize,
-}
-
-#[allow(dead_code)]
-impl<'a> LogEventsIter<'a> {
-    fn new(events: &'a [Event], events_dropped_handle: Registered<EventsDroppedError>) -> Self {
-        Self {
-            events,
-            events_dropped_handle,
-            index: 0,
-            dropped_events_count: 0,
-        }
-    }
-
-    fn mark_event_dropped(&mut self) {
-        self.dropped_events_count += 1;
-        self.events_dropped_handle.emit(Count(1));
-    }
-
-    fn dropped_events(&self) -> usize {
-        self.dropped_events_count
-    }
-}
-
-impl<'a> Iterator for LogEventsIter<'a> {
-    type Item = Result<serde_json::Value, ArrowError>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            if self.index == self.events.len() {
-                return None;
-            }
-
-            let idx = self.index;
-            self.index += 1;
-
-            let Some(event) = self.events[idx].maybe_as_log() else {
-                // not a log event so we skip it, and mark it as dropped.
-                self.mark_event_dropped();
-                continue;
-            };
-
-            match serde_json::to_value(event) {
-                Ok(value) => return Some(Ok(value)),
-                Err(e) => {
-                    // emit an error metric and then move on to the next event.
-                    emit(JsonSerializationError { error: &e });
-                    self.mark_event_dropped();
-                    continue;
-                }
-            }
-        }
-    }
-}
-
 pub struct ParquetSchemaGenerator {
     events_dropped_handle: Registered<EventsDroppedError>,
 }
@@ -965,8 +900,6 @@ impl ParquetSchemaGenerator {
         }
     }
     pub fn infer_schema(&self, events: &[serde_json::Value]) -> Result<Schema, Error> {
-        // let mut events_iter = LogEventsIter::new(events, self.events_dropped_handle.clone());
-
         let schema = infer_json_schema_from_iterator(events.iter().map(Ok::<_, ArrowError>))
             .map_err(|e| {
                 self.events_dropped_handle.emit(Count(events.len()));
@@ -980,53 +913,32 @@ impl ParquetSchemaGenerator {
     /// attempt to modify schema to set timestamp fields as Timestamp instead of Utf8
     /// only works for top level fields, we DO NOT look at nested fields
     fn try_normalize_schema(events: &[Event], schema: Schema) -> Schema {
-        use std::collections::HashMap;
         use std::collections::HashSet;
 
-        // get all timestamp fields in log events into map key: column name, value: num_events with column name
-        let mut map: HashMap<String, usize> = HashMap::new();
-        for event in events {
-            if let Some(log_event) = event.maybe_as_log()
-                && let Some(object_map) = log_event.as_map()
-            {
+        // get all timestamp and non_timestamp fields.
+        let mut ts_seen: HashSet<String> = HashSet::new();
+        let mut non_ts_seen: HashSet<String> = HashSet::new();
+
+        for event in events.iter().filter_map(Event::maybe_as_log) {
+            if let Some(object_map) = event.as_map() {
                 for (path, value) in object_map {
                     if value.is_timestamp() {
-                        *map.entry(path.to_string()).or_insert(0) += 1;
+                        ts_seen.insert(path.to_string());
+                    } else if !value.is_null() {
+                        non_ts_seen.insert(path.to_string());
                     }
                 }
             }
         }
 
-        // run through events again, looking for logs where a timestamp field is missing and if it is then add that log to the count,
-        // we wanna do this because we can make fields nullable so if one log event in the batch has a timestamp field but that field is missing
-        // in all the other log events, then it's fine to set that field as a timestamp in the schema.
-        let all_timestamp_fields: HashSet<String> = map.keys().cloned().collect();
-        for event in events {
-            for timestamp_field in &all_timestamp_fields {
-                let value = event
-                    .as_log()
-                    .as_map()
-                    .and_then(|e| e.get(timestamp_field.as_str()));
-
-                // if timestamp_field is not in this event or it's null then it's safe to update the generated schema
-                if value.is_none_or(Value::is_null) {
-                    map.entry(timestamp_field.clone()).and_modify(|v| *v += 1);
-                }
-            }
-        }
-
-        let timestamp_fields: HashSet<String> = map
-            .iter()
-            // check to make sure all the fields are Value::Timestamp
-            .filter(|(_, v)| **v == events.len())
-            .map(|(k, _)| k.clone())
-            .collect();
-
+        // generate new fields, promote to timestamp if it appears as a timestamp field in some events and
+        // doesn't appear as a non-timestamp field in others i.e. update field to timestamp if it's consistently
+        // Value::timestamp across all events.
         let new_fields: Vec<Field> = schema
             .fields()
             .iter()
             .map(|f| {
-                if timestamp_fields.contains(f.name()) {
+                if ts_seen.contains(f.name()) && !non_ts_seen.contains(f.name()) {
                     Field::new(
                         f.name(),
                         DataType::Timestamp(

@@ -4,6 +4,7 @@
 //! This implements the streaming variant of the Arrow IPC protocol, which writes
 //! a continuous stream of record batches without a file footer.
 
+use crate::encoding::internal_events::JsonSerializationError;
 use arrow::{
     datatypes::{DataType, Field, Fields, Schema, SchemaRef},
     ipc::writer::StreamWriter,
@@ -13,6 +14,7 @@ use arrow::{
 use async_trait::async_trait;
 use bytes::{BufMut, Bytes, BytesMut};
 use snafu::{ResultExt, Snafu, ensure};
+use vector_common::internal_event::emit;
 use vector_config::configurable_component;
 use vector_core::event::Event;
 
@@ -293,7 +295,13 @@ pub(crate) fn vector_log_events_to_json_values(events: &[Event]) -> Vec<serde_js
     events
         .iter()
         .filter_map(Event::maybe_as_log)
-        .filter_map(|log| serde_json::to_value(log).ok())
+        .filter_map(|log| match serde_json::to_value(log) {
+            Ok(result) => Some(result),
+            Err(e) => {
+                emit(JsonSerializationError { error: &e });
+                None
+            }
+        })
         .collect()
 }
 
