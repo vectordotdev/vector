@@ -10,7 +10,7 @@ use std::{
 use bytes::{Buf, BufMut, BytesMut};
 use flate2::write::GzDecoder;
 use futures_util::FutureExt;
-use http::{Request, Response};
+use http::{HeaderValue, Request, Response};
 use hyper::{
     Body,
     body::{HttpBody, Sender},
@@ -30,6 +30,10 @@ use crate::internal_events::{GrpcError, GrpcInvalidCompressionSchemeError};
 const GRPC_MESSAGE_HEADER_LEN: usize = mem::size_of::<u8>() + mem::size_of::<u32>();
 const GRPC_ENCODING_HEADER: &str = "grpc-encoding";
 const GRPC_ACCEPT_ENCODING_HEADER: &str = "grpc-accept-encoding";
+// Advertised to clients via `grpc-accept-encoding`. This layer is the single
+// owner of gRPC compression negotiation for all Vector gRPC sources, so the
+// list must stay in sync with the schemes handled in `CompressionScheme`.
+const GRPC_ACCEPT_ENCODING_VALUE: &str = "gzip,zstd,identity";
 
 enum CompressionScheme {
     Gzip,
@@ -53,6 +57,10 @@ impl CompressionScheme {
                 Some(scheme) => match scheme.as_str() {
                     "gzip" => Ok(Some(CompressionScheme::Gzip)),
                     "zstd" => Ok(Some(CompressionScheme::Zstd)),
+                    // `identity` is the gRPC no-op encoding: the request body is already
+                    // uncompressed, so there's nothing to decompress. We advertise it in
+                    // `grpc-accept-encoding`, so we must also accept it here.
+                    "identity" => Ok(None),
                     other => Err(Status::unimplemented(format!(
                         "compression scheme `{other}` is not supported"
                     ))),
@@ -61,7 +69,7 @@ impl CompressionScheme {
             .map_err(|mut status| {
                 status.metadata_mut().insert(
                     GRPC_ACCEPT_ENCODING_HEADER,
-                    AsciiMetadataValue::from_static("gzip,zstd,identity"),
+                    AsciiMetadataValue::from_static(GRPC_ACCEPT_ENCODING_VALUE),
                 );
                 status
             })
@@ -313,7 +321,7 @@ where
     let mut body_eof = false;
     let mut body_bytes_received = 0;
 
-    let result = loop {
+    let mut result = loop {
         select! {
             biased;
 
@@ -347,6 +355,17 @@ where
             emit!(GrpcError { error: &error });
         }
     };
+
+    // Advertise the set of compression schemes this layer can accept to the client.
+    // Since this layer is the single owner of compression negotiation, individual
+    // services no longer call `.accept_compressed(..)` and therefore tonic would not
+    // set this header itself.
+    if let Ok(res) = result.as_mut() {
+        res.headers_mut().insert(
+            GRPC_ACCEPT_ENCODING_HEADER,
+            HeaderValue::from_static(GRPC_ACCEPT_ENCODING_VALUE),
+        );
+    }
 
     result
 }
@@ -384,7 +403,15 @@ where
             // need be, and then track the bytes that flowed through.
             Ok(scheme) => {
                 let (destination, decompressed_body) = Body::channel();
-                let (req_parts, req_body) = req.into_parts();
+                let (mut req_parts, req_body) = req.into_parts();
+                // Since this layer owns compression negotiation and is about to hand the
+                // inner service a fully decompressed body (with the per-message compressed
+                // flag cleared), strip the `grpc-encoding` header so tonic's codegen treats
+                // the request as uncompressed and does not try to validate the encoding
+                // against any per-service `accept_compressed(..)` configuration.
+                if scheme.is_some() {
+                    req_parts.headers.remove(GRPC_ENCODING_HEADER);
+                }
                 let mapped_req = Request::from_parts(req_parts, decompressed_body);
 
                 let inner = self.inner.call(mapped_req);

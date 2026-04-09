@@ -177,14 +177,16 @@ impl SourceConfig for VectorConfig {
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
         let log_namespace = cx.log_namespace(self.log_namespace);
 
-        // Create the custom Vector service (existing)
+        // Create the custom Vector service (existing).
+        //
+        // Compression negotiation (gzip, zstd) is handled centrally by
+        // `DecompressionAndMetricsLayer` in `sources::util::grpc`, so we
+        // deliberately do not call `.accept_compressed(..)` here.
         let vector_service = proto::Server::new(Service {
             pipeline: cx.out,
             acknowledgements,
             log_namespace,
         })
-        .accept_compressed(tonic::codec::CompressionEncoding::Gzip)
-        .accept_compressed(tonic::codec::CompressionEncoding::Zstd)
         // Tonic added a default of 4MB in 0.9. This replaces the old behavior.
         .max_decoding_message_size(usize::MAX);
 
