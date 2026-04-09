@@ -50,6 +50,8 @@ pub trait Deserializer: DynClone + Send + Sync {
     /// by not requiring heap allocations for it.
     ///
     /// **Note**: The type of the produced events depends on the implementation.
+    ///
+    /// TODO: <https://github.com/vectordotdev/vector/issues/25044>
     fn parse(
         &self,
         bytes: Bytes,

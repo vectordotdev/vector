@@ -52,7 +52,10 @@ use crate::{
     spawn_named,
     topology::task::TaskError,
     transforms::{SyncTransform, TaskTransform, Transform, TransformOutputs, TransformOutputsBuf},
-    utilization::{UtilizationComponentSender, UtilizationEmitter, UtilizationRegistry, wrap},
+    utilization::{
+        OutputUtilization, Utilization, UtilizationComponentSender, UtilizationEmitter,
+        UtilizationRegistry,
+    },
 };
 
 static ENRICHMENT_TABLES: LazyLock<vector_lib::enrichment::TableRegistry> =
@@ -267,7 +270,9 @@ impl<'a> Builder<'a> {
             let mut builder = SourceSender::builder()
                 .with_buffer(*SOURCE_SENDER_BUFFER_SIZE)
                 .with_timeout(source.inner.send_timeout())
-                .with_ewma_alpha(self.config.global.buffer_utilization_ewma_alpha);
+                .with_ewma_half_life_seconds(
+                    self.config.global.buffer_utilization_ewma_half_life_seconds,
+                );
             let mut pumps = Vec::new();
             let mut controls = HashMap::new();
             let mut schema_definitions = HashMap::with_capacity(source_outputs.len());
@@ -509,7 +514,7 @@ impl<'a> Builder<'a> {
                 WhenFull::Block,
                 &span,
                 Some(metrics),
-                self.config.global.buffer_utilization_ewma_alpha,
+                self.config.global.buffer_utilization_ewma_half_life_seconds,
             );
 
             self.inputs
@@ -639,7 +644,7 @@ impl<'a> Builder<'a> {
                     .take()
                     .expect("Task started but input has been taken.");
 
-                let mut rx = wrap(utilization_sender, component_key.clone(), rx);
+                let mut rx = Utilization::new(utilization_sender, component_key.clone(), rx);
 
                 let events_received = register!(EventsReceived);
                 sink.run(
@@ -799,7 +804,8 @@ impl<'a> Builder<'a> {
         let sender = self
             .utilization_registry
             .add_component(key.clone(), gauge!("utilization"));
-        let input_rx = wrap(sender, key.clone(), input_rx.into_stream());
+        let output_sender = sender.clone();
+        let input_rx = Utilization::new(sender, key.clone(), input_rx.into_stream());
 
         let events_received = register!(EventsReceived);
         let filtered = input_rx
@@ -844,6 +850,7 @@ impl<'a> Builder<'a> {
                     events.estimated_json_encoded_size_of(),
                 ));
             });
+        let stream = OutputUtilization::new(output_sender, stream);
         let transform = async move {
             debug!("Task transform starting.");
 

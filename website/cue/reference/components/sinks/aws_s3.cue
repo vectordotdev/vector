@@ -214,6 +214,191 @@ components: sinks: aws_s3: components._aws & {
 				`storage_class` option.
 				"""
 		}
+
+		parquet_encoding: {
+			title: "Parquet Batch Encoding"
+			body:  """
+				The S3 sink supports Apache Parquet batch encoding via the `batch_encoding`
+				option. When configured, events are encoded together as Parquet columnar files
+				instead of the default per-event JSON or text encoding. Parquet files are
+				optimized for analytical queries via Athena, Trino, Spark, and other columnar
+				query engines.
+
+				Parquet handles compression internally at the column page level, so the
+				top-level `compression` setting must be set to `"none"`.
+
+				Output files automatically use the `.parquet` extension.
+
+				This feature requires the `codecs-parquet` feature flag at compile time.
+
+				Six mutually exclusive schema input options are available. Exactly one must
+				be specified.
+
+				#### Option 1: Inline Field List
+
+				Schemas using Vector type names. Scalar types: `utf8`, `int32`, `int64`,
+				`float32`, `float64`, `boolean`, `timestamp_millisecond`,
+				`timestamp_microsecond`, `timestamp_nanosecond`, `date32`.
+				Note: `binary` is not supported because the Arrow JSON encoder
+				cannot materialize binary columns; use `utf8` with base64/hex encoding.
+				Compound types (one level of nesting): `struct` (with `fields`),
+				`list` (with `items`), `map` (with `key_type` and `value_type`).
+
+				```toml
+				[sinks.s3_parquet]
+				type = "aws_s3"
+				bucket = "my-analytics-bucket"
+				key_prefix = "logs/date=%F"
+				compression = "none"
+
+				[sinks.s3_parquet.batch_encoding]
+				codec = "parquet"
+				compression = "snappy"
+				schema_mode = "relaxed"
+
+				[[sinks.s3_parquet.batch_encoding.schema]]
+				name = "message"
+				type = "utf8"
+
+				[[sinks.s3_parquet.batch_encoding.schema]]
+				name = "timestamp"
+				type = "timestamp_millisecond"
+
+				[[sinks.s3_parquet.batch_encoding.schema]]
+				name = "metadata"
+				type = "struct"
+
+				  [[sinks.s3_parquet.batch_encoding.schema.fields]]
+				  name = "source"
+				  type = "utf8"
+
+				  [[sinks.s3_parquet.batch_encoding.schema.fields]]
+				  name = "region"
+				  type = "utf8"
+
+				[[sinks.s3_parquet.batch_encoding.schema]]
+				name = "tags"
+				type = "list"
+				items = "utf8"
+				```
+
+				#### Option 2: Native Parquet Schema (Inline)
+
+				Full Parquet schema string with support for nested types, repetition
+				levels, and logical annotations.
+
+				```toml
+				[sinks.s3_parquet.batch_encoding]
+				codec = "parquet"
+				compression = "snappy"
+				parquet_schema = "message logs { required binary message (STRING); required binary host (STRING); optional int64 timestamp (TIMESTAMP_MILLIS); }"
+				```
+
+				#### Option 3: Native Parquet Schema (File)
+
+				Load the Parquet schema from a `.schema` file.
+
+				```toml
+				[sinks.s3_parquet.batch_encoding]
+				codec = "parquet"
+				compression = "snappy"
+				schema_file = "/etc/vector/schemas/logs.schema"
+				```
+
+				#### Option 4: Avro Schema (Inline)
+
+				Avro JSON schema supporting nested records, arrays, maps, and nullable
+				unions. Automatically converted to Arrow/Parquet types.
+
+				```toml
+				[sinks.s3_parquet.batch_encoding]
+				codec = "parquet"
+				compression = "snappy"
+				avro_schema = '{"type":"record","name":"logs","fields":[{"name":"message","type":"string"},{"name":"host","type":"string"},{"name":"level","type":"string"}]}'
+				```
+
+				#### Option 5: Avro Schema (File)
+
+				Load the Avro schema from a `.avsc` file.
+
+				```toml
+				[sinks.s3_parquet.batch_encoding]
+				codec = "parquet"
+				compression = "snappy"
+				avro_schema_file = "/etc/vector/schemas/logs.avsc"
+				```
+
+				#### Option 6: Protobuf Descriptor (File)
+
+				Compiled `.desc` file with message type. Supports nested messages, maps,
+				and well-known types (Timestamp, Duration, wrappers).
+
+				```toml
+				[sinks.s3_parquet.batch_encoding]
+				codec = "parquet"
+				compression = "snappy"
+				proto_desc_file = "/etc/vector/schemas/logs.desc"
+				proto_message_type = "logs.LogRecord"
+				```
+
+				#### YAML Example (Inline with Nested Types)
+
+				```yaml
+				sinks:
+				  s3_parquet:
+				    type: aws_s3
+				    bucket: my-analytics-bucket
+				    key_prefix: "logs/date=%F"
+				    compression: none
+				    batch_encoding:
+				      codec: parquet
+				      compression: snappy
+				      schema_mode: relaxed
+				      schema:
+				          - name: message
+				            type: utf8
+				          - name: timestamp
+				            type: timestamp_millisecond
+				          - name: metadata
+				            type: struct
+				            fields:
+				              - name: source
+				                type: utf8
+				              - name: region
+				                type: utf8
+				          - name: tags
+				            type: list
+				            items: utf8
+				          - name: labels
+				            type: map
+				            key_type: utf8
+				            value_type: utf8
+				```
+
+				#### Configuration Reference
+
+				| Field | Type | Description |
+				|---|---|---|
+				| `schema` | array of objects | Inline field list with `name`, `type`, and optional `fields`/`items`/`key_type`/`value_type` for nesting |
+				| `parquet_schema` | string | Native Parquet schema string |
+				| `schema_file` | path | Path to `.schema` file |
+				| `avro_schema` | string | Avro JSON schema string |
+				| `avro_schema_file` | path | Path to `.avsc` file |
+				| `proto_desc_file` | path | Path to `.desc` file |
+				| `proto_message_type` | string | Protobuf message type (required with `proto_desc_file`) |
+				| `compression` | string | `snappy` (default), `zstd`, `gzip`, `lz4`, `none` |
+				| `schema_mode` | string | `relaxed` (default) or `strict` |
+
+				#### Unsupported Types
+
+				Binary fields (`binary`, `bytes`, `fixed`) are rejected at config
+				time because the internal Arrow JSON encoder cannot materialize them.
+				This applies across all schema sources: inline `binary` type, Avro
+				`bytes`/`fixed`, Protobuf `bytes`, and native Parquet `BYTE_ARRAY`
+				without a `(STRING)` annotation. Use `utf8` (or Avro/Protobuf
+				`string`) with base64 or hex encoding for binary data instead.
+				"""
+		}
 	}
 
 	permissions: iam: [

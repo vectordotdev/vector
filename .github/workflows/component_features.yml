@@ -13,17 +13,17 @@ on:
   workflow_call:
     inputs:
       ref:
-        description: 'Git ref to checkout'
+        description: "Git ref to checkout"
         required: false
         type: string
   workflow_dispatch:
     inputs:
       ref:
-        description: 'Git ref to checkout'
+        description: "Git ref to checkout"
         required: false
         type: string
   schedule:
-    - cron: '0 10 * * 1' # 10:00 UTC Monday (6 AM EST NYC)
+    - cron: "0 10 * * 1" # 10:00 UTC Monday (6 AM EST NYC)
 
 permissions:
   contents: read
@@ -39,11 +39,16 @@ jobs:
         with:
           ref: ${{ inputs.ref }}
 
+      - name: Free disk space
+        shell: bash
+        run: sudo -E bash scripts/ci-free-disk-space.sh
+
       - uses: ./.github/actions/setup
         with:
           rust: true
           cargo-nextest: true
           protoc: true
           libsasl2: true
+          cargo-hack: true
 
       - run: make check-component-features

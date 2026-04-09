@@ -218,19 +218,7 @@ async fn get_v2_series_from_pipeline(address: String) -> SeriesIntake {
     intake
 }
 
-pub(super) async fn validate() {
-    info!("==== getting series data from agent-only pipeline ==== ");
-    let agent_intake = get_v2_series_from_pipeline(fake_intake_agent_address()).await;
-
-    info!("==== getting series data from agent-vector pipeline ====");
-    let vector_intake = get_v1_series_from_pipeline(fake_intake_vector_address()).await;
-
-    assert_eq!(
-        agent_intake.len(),
-        vector_intake.len(),
-        "different number of unique Series contexts received"
-    );
-
+fn compare_intakes(agent_intake: &SeriesIntake, vector_intake: &SeriesIntake) {
     // The assertions we make below can be summarized as follows:
     //   - For each metric type, we have a different set of assertions which are relevant to
     //     the expectations for that metric type's behavior. For example, gauges are a last
@@ -248,6 +236,12 @@ pub(super) async fn validate() {
     //     Together, this means that data sets passing these validations confirm that the Vector version
     //     used in the test case is not introducing inconsistencies in the data flowing between the
     //     Agent and the Datadog backend.
+
+    assert_eq!(
+        agent_intake.len(),
+        vector_intake.len(),
+        "different number of unique Series contexts received"
+    );
 
     agent_intake
         .iter()
@@ -301,4 +295,21 @@ pub(super) async fn validate() {
                 assert_eq!(agent_sum, vector_sum, "Mismatch of rate data");
             }
         });
+}
+
+pub(super) async fn validate() {
+    let api_version = std::env::var("CONFIG_SERIES_API_VERSION")
+        .expect("CONFIG_SERIES_API_VERSION must be set (e.g. 'v1' or 'v2')");
+
+    info!("==== getting series data from agent-only pipeline ==== ");
+    let agent_intake = get_v2_series_from_pipeline(fake_intake_agent_address()).await;
+
+    info!("==== getting series data from agent-vector pipeline ({api_version}) ====");
+    let vector_intake = match api_version.as_str() {
+        "v1" => get_v1_series_from_pipeline(fake_intake_vector_address()).await,
+        "v2" => get_v2_series_from_pipeline(fake_intake_vector_address()).await,
+        v => panic!("Unknown CONFIG_SERIES_API_VERSION: {v}"),
+    };
+
+    compare_intakes(&agent_intake, &vector_intake);
 }
