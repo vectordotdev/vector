@@ -207,6 +207,14 @@ pub struct SimpleHttpConfig {
     /// Responses returned via `abort` are not subject to this — they are sent immediately before
     /// any events reach the sink, so acknowledgement results can never override them.
     ///
+    /// ## Log namespace
+    ///
+    /// When [`log_namespace`][Self::log_namespace] is set to `vector`, request metadata such as
+    /// the request path, headers, query parameters, and source IP are stored in event metadata
+    /// rather than in the event fields that the program can access via `.`. Programs that rely
+    /// on inspecting this context should use the default `legacy` log namespace, where all
+    /// metadata is written directly into the event fields before the program runs.
+    ///
     /// [acknowledgements]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
     /// [VRL]: https://vector.dev/docs/reference/vrl
     #[configurable(metadata(
@@ -1058,6 +1066,54 @@ mod tests {
         assert_eq!(resp.status().as_u16(), 429);
         assert_eq!(resp.headers()["retry-after"], "60");
         assert_eq!(resp.text().await.unwrap(), "rate limited");
+
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        let events = collect_ready(rx).await;
+        assert!(events.is_empty(), "abort must not forward events to sink");
+    }
+
+    /// When `abort` is called with a JSON object whose `status` value is out of the valid u16
+    /// range, the cast must not wrap — `reject_code` is used as the fallback instead.
+    #[tokio::test]
+    async fn response_source_abort_json_out_of_range_status_falls_back_to_reject_code() {
+        // 65736 wraps to 200 with `as u16` — with `u16::try_from` it is rejected and
+        // `reject_code` (422) must be used instead.
+        let program = r#"abort encode_json({ "status": 65736, "body": "wrapped" })"#;
+
+        let (rx, addr) =
+            source_with_program_and_reject_code(program, StatusCode::UNPROCESSABLE_ENTITY).await;
+
+        let resp = post_raw(addr, "hello\n").await;
+
+        assert_eq!(
+            resp.status().as_u16(),
+            422,
+            "out-of-range status must not wrap via as u16 — reject_code should be used"
+        );
+        assert_eq!(resp.text().await.unwrap(), "wrapped");
+
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        let events = collect_ready(rx).await;
+        assert!(events.is_empty(), "abort must not forward events to sink");
+    }
+
+    /// When `abort` is called with a JSON object that contains no recognised control keys
+    /// (`status`, `body`, `headers`), the entire message string is used as the response body
+    /// rather than silently dropping its content.
+    #[tokio::test]
+    async fn response_source_abort_json_without_control_keys_used_as_plain_body() {
+        // This object has no control keys — it should be treated as a plain string body,
+        // not as a (empty) control object that discards the content.
+        let program = r#"abort encode_json({ "error": "bad request" })"#;
+
+        let (rx, addr) =
+            source_with_program_and_reject_code(program, StatusCode::BAD_REQUEST).await;
+
+        let resp = post_raw(addr, "hello\n").await;
+
+        assert_eq!(resp.status().as_u16(), 400);
+        // The full JSON string must be the body — content must not be silently dropped.
+        assert_eq!(resp.text().await.unwrap(), r#"{"error":"bad request"}"#);
 
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         let events = collect_ready(rx).await;

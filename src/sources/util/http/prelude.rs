@@ -399,8 +399,16 @@ fn build_vrl_response(
             };
             let response = match message {
                 Some(msg) => match serde_json::from_str::<JsonValue>(&msg) {
-                    Ok(JsonValue::Object(obj)) => build_response_from_json_obj(&obj, reject_code)?,
-                    // Not a JSON object (plain string, or JSON but not an object) — use as-is.
+                    Ok(JsonValue::Object(obj))
+                        if obj.contains_key("status")
+                            || obj.contains_key("body")
+                            || obj.contains_key("headers") =>
+                    {
+                        build_response_from_json_obj(&obj, reject_code)?
+                    }
+                    // Not a JSON object, or a JSON object with no recognised control keys
+                    // (e.g. `abort encode_json({"error": "bad"})`) — treat the whole message
+                    // string as the response body so the content is not silently dropped.
                     _ => build_plain_reject_response(reject_code, msg)?,
                 },
                 None => warp::http::Response::builder()
@@ -466,7 +474,8 @@ fn build_response_from_vrl_obj(
     let status = obj
         .get("status")
         .and_then(|v| v.as_integer())
-        .and_then(|n| StatusCode::from_u16(n as u16).ok())
+        .and_then(|n| u16::try_from(n).ok())
+        .and_then(|n| StatusCode::from_u16(n).ok())
         .unwrap_or(default_status);
 
     let body = obj
@@ -508,7 +517,8 @@ fn build_response_from_json_obj(
     let status = obj
         .get("status")
         .and_then(|v| v.as_u64())
-        .and_then(|n| StatusCode::from_u16(n as u16).ok())
+        .and_then(|n| u16::try_from(n).ok())
+        .and_then(|n| StatusCode::from_u16(n).ok())
         .unwrap_or(default_status);
 
     let body = obj
