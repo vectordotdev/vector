@@ -9,6 +9,7 @@ publish = false
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(ddsketch_extended)'] }
 
 [dependencies]
+ahash = { version = "0.8", default-features = false, features = ["std"] }
 async-trait.workspace = true
 bitmask-enum = { version = "2.2.5", default-features = false }
 bytes = { workspace = true, features = ["serde"] }

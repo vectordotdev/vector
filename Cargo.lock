@@ -12593,6 +12593,7 @@ dependencies = [
 name = "vector-core"
 version = "0.1.0"
 dependencies = [
+ "ahash 0.8.11",
  "async-trait",
  "base64 0.22.1",
  "bitmask-enum",

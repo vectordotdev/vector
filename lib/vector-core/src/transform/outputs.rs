@@ -1,5 +1,7 @@
 use std::{collections::HashMap, error, sync::Arc, time::Instant};
 
+use ahash::AHashMap;
+
 use vector_common::{
     EventDataEq,
     byte_size_of::ByteSizeOf,
@@ -28,7 +30,7 @@ struct TransformOutput {
 pub struct TransformOutputs {
     outputs_spec: Vec<config::TransformOutput>,
     primary_output: Option<TransformOutput>,
-    named_outputs: HashMap<String, TransformOutput>,
+    named_outputs: AHashMap<String, TransformOutput>,
 }
 
 impl TransformOutputs {
@@ -38,7 +40,7 @@ impl TransformOutputs {
     ) -> (Self, HashMap<Option<String>, fanout::ControlChannel>) {
         let outputs_spec = outputs_in.clone();
         let mut primary_output = None;
-        let mut named_outputs = HashMap::new();
+        let mut named_outputs = AHashMap::new();
         let mut controls = HashMap::new();
 
         for output in outputs_in {
@@ -145,13 +147,13 @@ impl TransformOutputs {
 #[derive(Debug, Clone)]
 pub struct TransformOutputsBuf {
     pub(super) primary_buffer: Option<OutputBuffer>,
-    pub(super) named_buffers: HashMap<String, OutputBuffer>,
+    pub(super) named_buffers: AHashMap<String, OutputBuffer>,
 }
 
 impl TransformOutputsBuf {
     pub fn new_with_capacity(outputs_in: Vec<config::TransformOutput>, capacity: usize) -> Self {
         let mut primary_buffer = None;
-        let mut named_buffers = HashMap::new();
+        let mut named_buffers = AHashMap::new();
 
         for output in outputs_in {
             match output.port {
@@ -217,7 +219,7 @@ impl TransformOutputsBuf {
         std::mem::take(self.primary_buffer.as_mut().expect("no default output"))
     }
 
-    pub fn take_all_named(&mut self) -> HashMap<String, OutputBuffer> {
+    pub fn take_all_named(&mut self) -> AHashMap<String, OutputBuffer> {
         std::mem::take(&mut self.named_buffers)
     }
 

@@ -1590,7 +1590,7 @@ mod tests {
 
         CollectedOuput {
             primary: outputs.take_primary(),
-            named: outputs.take_all_named(),
+            named: outputs.take_all_named().into_iter().collect(),
         }
     }
 
