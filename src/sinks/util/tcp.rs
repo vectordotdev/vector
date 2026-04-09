@@ -1,5 +1,4 @@
 use std::{
-    io::ErrorKind,
     net::SocketAddr,
     pin::Pin,
     task::{Context, Poll},
@@ -36,7 +35,9 @@ use crate::{
         Healthcheck, VectorSink,
         util::{
             EncodedEvent, SinkBuildError, StreamSink,
-            socket_bytes_sink::{BytesSink, MAX_PENDING_ITEMS, ShutdownCheck},
+            socket_bytes_sink::{
+                BytesSink, MAX_PENDING_ITEMS, ShutdownCheck, is_peer_shutdown_error,
+            },
         },
     },
     tcp::TcpKeepaliveConfig,
@@ -388,9 +389,7 @@ where
                     }
                 }
                 Err(error) => {
-                    if error.kind() == ErrorKind::Other
-                        && error.to_string() == "ShutdownCheck::Close"
-                    {
+                    if is_peer_shutdown_error(&error) {
                         emit!(TcpSocketConnectionShutdown {});
                     }
                     emit!(SocketSendError {

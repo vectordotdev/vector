@@ -1,4 +1,5 @@
 use std::{
+    fmt,
     io::Error as IoError,
     marker::Unpin,
     pin::Pin,
@@ -24,6 +25,33 @@ pub enum ShutdownCheck {
     Error(IoError),
     Close(&'static str),
     Alive,
+}
+
+#[derive(Debug)]
+struct PeerShutdownError {
+    reason: &'static str,
+}
+
+impl fmt::Display for PeerShutdownError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.reason)
+    }
+}
+
+impl std::error::Error for PeerShutdownError {}
+
+pub(crate) fn peer_shutdown_io_error(reason: &'static str) -> IoError {
+    IoError::new(
+        std::io::ErrorKind::ConnectionAborted,
+        PeerShutdownError { reason },
+    )
+}
+
+pub(crate) fn is_peer_shutdown_error(error: &IoError) -> bool {
+    error
+        .get_ref()
+        .and_then(|inner| inner.downcast_ref::<PeerShutdownError>())
+        .is_some()
 }
 
 /// [FramedWrite](https://docs.rs/tokio-util/0.3.1/tokio_util/codec/struct.FramedWrite.html) wrapper.
@@ -142,7 +170,7 @@ where
                     return Poll::Ready(Err(error));
                 }
                 self.as_mut().get_mut().state.ack(EventStatus::Errored);
-                return Poll::Ready(Err(IoError::other(reason)));
+                return Poll::Ready(Err(peer_shutdown_io_error(reason)));
             }
         }
 
@@ -182,7 +210,7 @@ where
                     return Poll::Ready(Err(error));
                 }
                 self.as_mut().get_mut().state.ack(EventStatus::Errored);
-                return Poll::Ready(Err(IoError::other(reason)));
+                return Poll::Ready(Err(peer_shutdown_io_error(reason)));
             }
             ShutdownCheck::Alive => {}
         }
