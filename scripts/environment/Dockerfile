@@ -1,4 +1,4 @@
-FROM docker.io/ubuntu:24.04
+FROM docker.io/ubuntu:24.04@sha256:d1e2e92c075e5ca139d51a140fff46f84315c0fdce203eab2807c7e495eff4f9
 ENV DEBIAN_FRONTEND=noninteractive \
     TZ='America/New York' \
     PATH=/root/.cargo/bin:/root/.local/bin/:$PATH \
@@ -16,6 +16,7 @@ WORKDIR /git/vectordotdev/vector
 
 # Setup the env
 COPY scripts/environment/*.sh scripts/environment/
+COPY scripts/environment/npm-tools/ scripts/environment/npm-tools/
 RUN ./scripts/environment/bootstrap-ubuntu-24.04.sh
 
 # Setup the toolchain

@@ -170,9 +170,9 @@ static HEADER: [&str; NUM_COLUMNS] = [
     columns::BYTES_IN,
     columns::EVENTS_OUT,
     columns::BYTES_OUT,
-    columns::ERRORS,
     #[cfg(feature = "allocation-tracing")]
     columns::MEMORY_USED,
+    columns::ERRORS,
 ];
 
 struct Widgets<'a> {
@@ -348,13 +348,17 @@ impl<'a> Widgets<'a> {
                     r.sent_bytes_throughput_sec,
                     self.human_metrics,
                 ),
+                #[cfg(feature = "allocation-tracing")]
+                if state.allocation_tracing_active {
+                    r.allocated_bytes.human_format_bytes()
+                } else {
+                    "disabled".to_string()
+                },
                 if self.human_metrics {
                     r.errors.human_format()
                 } else {
                     r.errors.thousands_format()
                 },
-                #[cfg(feature = "allocation-tracing")]
-                r.allocated_bytes.human_format_bytes(),
             ];
 
             data.extend_from_slice(&formatted_metrics);
@@ -373,7 +377,7 @@ impl<'a> Widgets<'a> {
                         .map(Cell::from)
                         .collect::<Vec<_>>();
                     data[1] = Cell::from(id.as_str());
-                    data[5] = Cell::from(sent_events_metric);
+                    data[6] = Cell::from(sent_events_metric);
                     items.push(Row::new(data).style(Style::default()));
                 }
             }
@@ -383,26 +387,26 @@ impl<'a> Widgets<'a> {
             &[
                 Constraint::Percentage(13), // ID
                 Constraint::Percentage(8),  // Output
-                Constraint::Percentage(4),  // Kind
+                Constraint::Percentage(5),  // Kind
                 Constraint::Percentage(9),  // Type
                 Constraint::Percentage(10), // Events In
                 Constraint::Percentage(12), // Bytes In
                 Constraint::Percentage(10), // Events Out
                 Constraint::Percentage(12), // Bytes Out
-                Constraint::Percentage(8),  // Errors
-                Constraint::Percentage(14), // Allocated Bytes
+                Constraint::Percentage(14), // Memory Used
+                Constraint::Percentage(7),  // Errors
             ]
         } else {
             &[
                 Constraint::Percentage(13), // ID
                 Constraint::Percentage(12), // Output
-                Constraint::Percentage(9),  // Kind
+                Constraint::Percentage(10), // Kind
                 Constraint::Percentage(6),  // Type
                 Constraint::Percentage(12), // Events In
                 Constraint::Percentage(14), // Bytes In
                 Constraint::Percentage(12), // Events Out
                 Constraint::Percentage(14), // Bytes Out
-                Constraint::Percentage(8),  // Errors
+                Constraint::Percentage(7),  // Errors
             ]
         };
         let w = Table::new(items, widths)

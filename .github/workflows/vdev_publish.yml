@@ -1,14 +1,16 @@
 name: Publish vdev
 on:
   push:
-    tags: [ "vdev-v*.*.*" ]
+    tags: ["vdev-v*.*.*"]
 
 permissions:
-  contents: write  # needed for creating releases
+  contents: read # Restrictive default
 
 jobs:
   build:
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write # Required to upload release assets
     strategy:
       matrix:
         include:
