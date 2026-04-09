@@ -6,7 +6,7 @@ pub use finalization::{
     BatchNotifier, BatchStatus, BatchStatusReceiver, EventFinalizer, EventFinalizers, EventStatus,
     Finalizable,
 };
-pub use log_event::LogEvent;
+pub use log_event::{LogEvent, LogEventResidual};
 pub use metadata::{DatadogMetricOriginMetadata, EventMetadata, WithMetadata};
 pub use metric::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind};
 pub use r#ref::{EventMutRef, EventRef};

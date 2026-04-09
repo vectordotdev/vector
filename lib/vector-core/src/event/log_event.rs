@@ -160,6 +160,12 @@ pub struct LogEvent {
     metadata: EventMetadata,
 }
 
+/// Opaque handle holding the Arc allocation from a decomposed `LogEvent`.
+/// Used with [`LogEvent::decompose`] and [`LogEvent::recompose`] to avoid
+/// re-allocating the Arc when round-tripping through VRL execution.
+#[derive(Clone, Debug)]
+pub struct LogEventResidual(Arc<Inner>);
+
 impl LogEvent {
     /// This used to be the implementation for `LogEvent::from(&'str)`, but this is now only
     /// valid for `LogNamespace::Legacy`
@@ -282,6 +288,52 @@ impl LogEvent {
             .fields;
         let metadata = self.metadata;
         (value, metadata)
+    }
+
+    /// Decompose a `LogEvent` into its `Value`, `EventMetadata`, and an opaque handle
+    /// that allows the `LogEvent` to be reconstructed without a new Arc allocation.
+    ///
+    /// This is an optimization for VRL execution: the Value is extracted for in-place
+    /// mutation, then put back via [`LogEvent::recompose`] reusing the same heap allocation.
+    pub fn decompose(mut self) -> (Value, EventMetadata, LogEventResidual) {
+        // Ensure we have unique ownership of the Arc contents.
+        // When refcount == 1, this is just an atomic load (no clone).
+        let inner = Arc::make_mut(&mut self.inner);
+        // Extract the Value, leaving a placeholder behind.
+        let value = std::mem::replace(&mut inner.fields, Value::Null);
+        (value, self.metadata, LogEventResidual(self.inner))
+    }
+
+    /// Reconstruct a `LogEvent` from a `Value`, `EventMetadata`, and the residual handle
+    /// from a prior [`LogEvent::decompose`] call. Reuses the original Arc allocation.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `LogEventResidual` Arc is not uniquely owned (i.e., if it was cloned
+    /// after calling [`LogEvent::decompose`]).
+    pub fn recompose(
+        value: Value,
+        metadata: EventMetadata,
+        mut residual: LogEventResidual,
+    ) -> Self {
+        // The residual Arc should be uniquely owned since we took it via decompose.
+        let inner =
+            Arc::get_mut(&mut residual.0).expect("LogEventResidual Arc must be uniquely owned");
+        inner.fields = value;
+        // Eagerly compute and cache sizes rather than invalidating.
+        // This moves the cost of size computation into the spawned transform task
+        // (concurrent path), so the main thread's send_single_buffer only reads
+        // cached values instead of recomputing from a full BTreeMap walk.
+        let json_size = inner.fields.estimated_json_encoded_size_of();
+        inner.json_encoded_size_cache.store(
+            NonZeroJsonSize::new(json_size),
+        );
+        let byte_size = size_of::<Inner>() + inner.fields.allocated_bytes();
+        inner.size_cache.store(NonZeroUsize::new(byte_size));
+        Self {
+            inner: residual.0,
+            metadata,
+        }
     }
 
     #[must_use]
