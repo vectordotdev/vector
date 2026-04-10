@@ -7,7 +7,6 @@ use vector_common::internal_event::{
 };
 use vector_common_macros::NamedInternalEvent;
 
-
 #[derive(Debug, NamedInternalEvent)]
 /// Emitted when a decoder framing error occurs.
 pub struct DecoderFramingError<E> {
