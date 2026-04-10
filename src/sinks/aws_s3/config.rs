@@ -367,11 +367,12 @@ mod tests {
             codec = "text"
 
             [batch_encoding]
-            codec = "parquet"
-            [compression]
-            algorithm = "snappy"
-            
             schema_mode = "auto_infer"
+            codec = "parquet"
+
+            [batch_encoding.compression]
+            algorithm = "snappy"
+    
             "#,
         )
         .expect("correct batch_encoding shape should parse");
@@ -396,7 +397,7 @@ mod tests {
     #[test]
     fn parquet_content_type_auto_detected() {
         use vector_lib::codecs::encoding::format::{
-            ParquetCompression, ParquetSerializerConfig, ParquetSchemaMode,
+            ParquetCompression, ParquetSchemaMode, ParquetSerializerConfig,
         };
 
         use crate::sinks::s3_common::config::S3Options;
@@ -463,7 +464,8 @@ mod tests {
             [batch_encoding]
             codec = "parquet"
             schema_mode = "auto_infer"
-            [compression]
+
+            [batch_encoding.compression]
             algorithm = "gzip"
             level = 9
             "#,
