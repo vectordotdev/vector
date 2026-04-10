@@ -133,6 +133,33 @@ fn validate_ignore_healthcheck() {
 }
 
 #[test]
+fn validate_no_environment_reports_transform_vrl_errors() {
+    assert_eq!(
+        validate_with_args(
+            indoc! {r#"
+                data_dir = "${VECTOR_DATA_DIR}"
+
+                [sources.in]
+                    type = "demo_logs"
+                    format = "shuffle"
+                    lines = ["log"]
+
+                [transforms.broken]
+                    inputs = ["in"]
+                    type = "remap"
+                    source = ".foo = to_int(.bar)"
+
+                [sinks.out]
+                    inputs = ["broken"]
+                    type = "blackhole"
+            "#},
+            &["--no-environment"],
+        ),
+        exitcode::CONFIG
+    );
+}
+
+#[test]
 fn test_command_no_escape_codes_in_output() {
     // A config with an unhandled fallible VRL function call (missing `!`).
     // This triggers a VRL compilation error reported through the test runner.
@@ -183,6 +210,10 @@ fn test_command_no_escape_codes_in_output() {
 }
 
 fn validate(config: &str) -> i32 {
+    validate_with_args(config, &[])
+}
+
+fn validate_with_args(config: &str, args: &[&str]) -> i32 {
     let dir = create_directory();
 
     // Config with some components that write to file system.
@@ -190,7 +221,11 @@ fn validate(config: &str) -> i32 {
 
     // Run vector
     let mut cmd = Command::cargo_bin("vector").unwrap();
-    cmd.arg("validate").arg(config).env("VECTOR_DATA_DIR", dir);
+    cmd.arg("validate");
+    for arg in args {
+        cmd.arg(arg);
+    }
+    cmd.arg(config).env("VECTOR_DATA_DIR", dir);
 
     let output = cmd.output().unwrap();
     println!(
