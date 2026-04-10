@@ -329,7 +329,8 @@ impl RunningTopology {
                 .run_healthchecks(&diff, &mut new_pieces, new_config.healthchecks)
                 .await
             {
-                self.connect_diff(&diff, &mut new_pieces, &force_removed_sinks).await;
+                self.connect_diff(&diff, &mut new_pieces, &force_removed_sinks)
+                    .await;
                 self.spawn_diff(&diff, new_pieces);
                 self.config = new_config;
 
@@ -355,7 +356,8 @@ impl RunningTopology {
                 .run_healthchecks(&diff, &mut new_pieces, self.config.healthchecks)
                 .await
         {
-            self.connect_diff(&diff, &mut new_pieces, &force_removed_sinks).await;
+            self.connect_diff(&diff, &mut new_pieces, &force_removed_sinks)
+                .await;
             self.spawn_diff(&diff, new_pieces);
 
             info!("Old configuration restored successfully.");
@@ -682,7 +684,8 @@ impl RunningTopology {
                     buffer_tx.insert((*key).clone(), self.inputs.get(key).unwrap().clone());
                 }
             }
-            self.remove_inputs(key, diff, new_config, force_remove).await;
+            self.remove_inputs(key, diff, new_config, force_remove)
+                .await;
         }
 
         // Now that we've disconnected or temporarily detached the inputs to all changed/removed
@@ -865,7 +868,8 @@ impl RunningTopology {
         // Now that all sources and transforms are fully configured, we can wire up sinks.
         for key in diff.sinks.changed_and_added() {
             debug!(component_id = %key, "Connecting inputs for sink.");
-            self.setup_inputs(key, diff, new_pieces, force_removed_sinks.contains(key)).await;
+            self.setup_inputs(key, diff, new_pieces, force_removed_sinks.contains(key))
+                .await;
         }
         let added_changed_tables: Vec<&ComponentKey> = diff
             .enrichment_tables
@@ -874,7 +878,8 @@ impl RunningTopology {
             .collect();
         for key in added_changed_tables.iter() {
             debug!(component_id = %key, "Connecting inputs for enrichment table sink.");
-            self.setup_inputs(key, diff, new_pieces, force_removed_sinks.contains(key)).await;
+            self.setup_inputs(key, diff, new_pieces, force_removed_sinks.contains(key))
+                .await;
         }
 
         // We do a final pass here to reconnect unchanged components.
@@ -988,10 +993,7 @@ impl RunningTopology {
         for input in inputs {
             let output = self.outputs.get_mut(&input).expect("unknown output");
 
-            if force_removed
-                || diff.contains(&input.component)
-                || inputs_to_add.contains(&input)
-            {
+            if force_removed || diff.contains(&input.component) || inputs_to_add.contains(&input) {
                 // Cases where we need to add (not replace) the component input:
                 //
                 // Case 1: The component was force-removed from the fanout during shutdown_diff
