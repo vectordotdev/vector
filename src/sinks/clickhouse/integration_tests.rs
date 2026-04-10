@@ -53,7 +53,7 @@ async fn insert_events() {
     batch.max_events = Some(1);
 
     let config = ClickhouseConfig {
-        endpoint: host.parse().unwrap(),
+        endpoints: vec![host.clone()],
         table: table.clone().try_into().unwrap(),
         compression: Compression::None,
         batch,
@@ -102,7 +102,7 @@ async fn skip_unknown_fields() {
     batch.max_events = Some(1);
 
     let config = ClickhouseConfig {
-        endpoint: host.parse().unwrap(),
+        endpoints: vec![host.clone()],
         table: table.clone().try_into().unwrap(),
         skip_unknown_fields: Some(true),
         compression: Compression::None,
@@ -148,7 +148,7 @@ async fn insert_events_unix_timestamps() {
     batch.max_events = Some(1);
 
     let config = ClickhouseConfig {
-        endpoint: host.parse().unwrap(),
+        endpoints: vec![host.clone()],
         table: table.clone().try_into().unwrap(),
         compression: Compression::None,
         encoding: Transformer::new(None, None, Some(TimestampFormat::Unix)).unwrap(),
@@ -205,7 +205,7 @@ async fn insert_events_unix_timestamps_toml_config() {
 
     let config: ClickhouseConfig = toml::from_str(&format!(
         r#"
-host = "{host}"
+endpoints = ["{host}"]
 table = "{table}"
 compression = "none"
 [request]
@@ -264,7 +264,7 @@ async fn no_retry_on_incorrect_data() {
     batch.max_events = Some(1);
 
     let config = ClickhouseConfig {
-        endpoint: host.parse().unwrap(),
+        endpoints: vec![host.clone()],
         table: table.clone().try_into().unwrap(),
         compression: Compression::None,
         batch,
@@ -315,7 +315,7 @@ async fn no_retry_on_incorrect_data_warp() {
     batch.max_events = Some(1);
 
     let config = ClickhouseConfig {
-        endpoint: host.parse().unwrap(),
+        endpoints: vec![host.clone()],
         table: random_table_name().try_into().unwrap(),
         batch,
         ..Default::default()
@@ -354,7 +354,7 @@ async fn templated_table() {
     batch.max_events = Some(1);
 
     let config = ClickhouseConfig {
-        endpoint: host.parse().unwrap(),
+        endpoints: vec![host.clone()],
         table: "{{ .table }}".try_into().unwrap(),
         batch,
         ..Default::default()
@@ -498,7 +498,7 @@ async fn insert_events_arrow_format() {
     batch.max_events = Some(5);
 
     let config = ClickhouseConfig {
-        endpoint: host.parse().unwrap(),
+        endpoints: vec![host.clone()],
         table: table.clone().try_into().unwrap(),
         compression: Compression::None,
         format: crate::sinks::clickhouse::config::Format::ArrowStream,
@@ -570,7 +570,7 @@ async fn insert_events_arrow_with_schema_fetching() {
         .await;
 
     let config = ClickhouseConfig {
-        endpoint: host.parse().unwrap(),
+        endpoints: vec![host.clone()],
         table: table.clone().try_into().unwrap(),
         compression: Compression::None,
         format: crate::sinks::clickhouse::config::Format::ArrowStream,
