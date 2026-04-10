@@ -15,6 +15,7 @@
 import argparse
 import re
 import sys
+from collections.abc import Iterator
 from pathlib import Path
 
 from yamllint import linter
@@ -22,18 +23,28 @@ from yamllint.config import YamlLintConfig
 from yamlfix import fix_code
 from yamlfix.model import YamlfixConfig, YamlNodeStyle
 
+# ---------------------------------------------------------------------------
+# Regex constants
+# ---------------------------------------------------------------------------
+
 FENCE_OPEN = re.compile(r"^```ya?ml\b", re.IGNORECASE)
 FENCE_CLOSE = re.compile(r"^```\s*$")
+DIFF_LINE = re.compile(r"^[+ -]")
+DOC_SEPARATOR = re.compile(r"^---\s*$", re.MULTILINE)
+
+# ---------------------------------------------------------------------------
+# YAML block extraction
+# ---------------------------------------------------------------------------
 
 
-def extract_yaml_blocks(path: Path) -> list[tuple[int, int, str]]:
+def extract_yaml_blocks(text: str) -> list[tuple[int, int, str]]:
     """Return a list of (start_line, end_line, yaml_content) from fenced code blocks.
 
     start_line is the first line of YAML content (1-indexed).
     end_line is the last line of YAML content (1-indexed, inclusive).
     """
     blocks: list[tuple[int, int, str]] = []
-    lines = path.read_text().splitlines(keepends=True)
+    lines = text.splitlines(keepends=True)
 
     inside = False
     start_line = 0
@@ -54,7 +65,28 @@ def extract_yaml_blocks(path: Path) -> list[tuple[int, int, str]]:
     return blocks
 
 
-DIFF_LINE = re.compile(r"^[+ -]")
+def iter_file_blocks(
+    files: list[Path], *, verbose: bool = False
+) -> Iterator[tuple[Path, str, list[tuple[int, int, str]]]]:
+    """Yield (path, file_text, blocks) for each file that has YAML blocks."""
+    for path in files:
+        if not path.exists():
+            print(f"ERROR: {path} does not exist", file=sys.stderr)
+            continue
+
+        text = path.read_text()
+        blocks = extract_yaml_blocks(text)
+        if not blocks:
+            if verbose:
+                print(f"{path}: no YAML blocks found")
+            continue
+
+        yield path, text, blocks
+
+
+# ---------------------------------------------------------------------------
+# Diff-marker handling
+# ---------------------------------------------------------------------------
 
 
 def strip_diff_markers(content: str) -> str | None:
@@ -64,9 +96,20 @@ def strip_diff_markers(content: str) -> str | None:
     lines = content.splitlines(keepends=True)
     if not lines:
         return None
+
+    has_diff_marker = False
     for line in lines:
-        if line.strip() and not DIFF_LINE.match(line):
+        if not line.strip():
+            continue
+        if not DIFF_LINE.match(line):
             return None
+        if line[0] in ("+", "-"):
+            has_diff_marker = True
+
+    # A block where every line starts with a space is normal YAML, not a diff.
+    if not has_diff_marker:
+        return None
+
     after_lines: list[str] = []
     for line in lines:
         if not line.strip():
@@ -76,6 +119,10 @@ def strip_diff_markers(content: str) -> str | None:
         # skip '-' lines (removed in the diff)
     return "".join(after_lines)
 
+
+# ---------------------------------------------------------------------------
+# Lint configuration & command
+# ---------------------------------------------------------------------------
 
 YAMLLINT_CONFIG = YamlLintConfig("extends: default")
 YAMLLINT_RELAXED_CONFIG = YamlLintConfig(
@@ -98,20 +145,8 @@ def lint_block(
 
 def cmd_lint(args: argparse.Namespace) -> int:
     had_failure = False
-    verbose = args.verbose
 
-    for path in args.files:
-        if not path.exists():
-            print(f"ERROR: {path} does not exist", file=sys.stderr)
-            had_failure = True
-            continue
-
-        blocks = extract_yaml_blocks(path)
-        if not blocks:
-            if verbose:
-                print(f"{path}: no YAML blocks found")
-            continue
-
+    for path, _text, blocks in iter_file_blocks(args.files, verbose=args.verbose):
         for idx, (start_line, _end_line, content) in enumerate(blocks, start=1):
             lint_content = strip_diff_markers(content)
             is_diff = lint_content is not None
@@ -126,18 +161,23 @@ def cmd_lint(args: argparse.Namespace) -> int:
                 for p in problems:
                     md_line = p.line + start_line - 1
                     print(f"  line {md_line}:{p.column}: [{p.level}] {p.message}")
-            elif verbose:
+            elif args.verbose:
                 print(f"{path}: block {idx} (line {start_line}){suffix} OK")
 
     return 1 if had_failure else 0
 
 
+# ---------------------------------------------------------------------------
+# Fix configuration & command
+# ---------------------------------------------------------------------------
+
 # yamlfix config tuned for YAML snippets inside markdown:
 #   - no document-start marker (---)
 #   - no line-length enforcement
 #   - preserve existing quoting style
-#   - 1 space before inline comments (matches RELAXED_CONFIG)
-YAMLFIX_CFG = YamlfixConfig(
+#   - 1 space before inline comments (matches YAMLLINT_RELAXED_CONFIG)
+#   - keep existing sequence style (block vs flow)
+YAMLFIX_CONFIG = YamlfixConfig(
     explicit_start=False,
     line_length=9999,
     comments_min_spaces_from_content=1,
@@ -146,21 +186,21 @@ YAMLFIX_CFG = YamlfixConfig(
 )
 
 
+def fix_yaml_content(content: str) -> str:
+    """Fix YAML content, handling multi-document blocks by fixing each
+    document separately and preserving --- separators."""
+    parts = DOC_SEPARATOR.split(content)
+    if len(parts) == 1:
+        return fix_code(content, config=YAMLFIX_CONFIG)
+    fixed_parts = [fix_code(part, config=YAMLFIX_CONFIG) for part in parts]
+    return "---\n".join(fixed_parts)
+
+
 def cmd_fix(args: argparse.Namespace) -> int:
     had_failure = False
 
-    for path in args.files:
-        if not path.exists():
-            print(f"ERROR: {path} does not exist", file=sys.stderr)
-            had_failure = True
-            continue
-
-        blocks = extract_yaml_blocks(path)
-        if not blocks:
-            print(f"{path}: no YAML blocks found")
-            continue
-
-        lines = path.read_text().splitlines(keepends=True)
+    for path, text, blocks in iter_file_blocks(args.files, verbose=args.verbose):
+        lines = text.splitlines(keepends=True)
         fixed_any = False
 
         # Process blocks in reverse so earlier line numbers stay valid
@@ -169,8 +209,9 @@ def cmd_fix(args: argparse.Namespace) -> int:
             list(enumerate(blocks, start=1))
         ):
             try:
-                fixed = fix_code(content, config=YAMLFIX_CFG)
+                fixed = fix_yaml_content(content)
             except Exception as exc:
+                had_failure = True
                 print(
                     f"{path}: block {idx} (line {start_line}) SKIPPED"
                     f" — yamlfix could not parse: {exc}",
@@ -189,7 +230,7 @@ def cmd_fix(args: argparse.Namespace) -> int:
                 fixed_lines = fixed.splitlines(keepends=True)
                 lines[start_line - 1 : end_line] = fixed_lines
                 print(f"{path}: block {idx} (line {start_line}) FIXED")
-            else:
+            elif args.verbose:
                 print(f"{path}: block {idx} (line {start_line}) OK")
 
         if fixed_any:
@@ -198,9 +239,20 @@ def cmd_fix(args: argparse.Namespace) -> int:
     return 1 if had_failure else 0
 
 
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Lint and fix YAML code blocks inside markdown files."
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="Print OK status for passing blocks and files with no YAML blocks",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -215,12 +267,6 @@ def main() -> int:
         "--strict",
         action="store_true",
         help="Use default yamllint rules (document-start, line-length, comments spacing enforced)",
-    )
-    lint_parser.add_argument(
-        "-v",
-        "--verbose",
-        action="store_true",
-        help="Print OK status for passing blocks and files with no YAML blocks",
     )
     lint_parser.set_defaults(func=cmd_lint)
 
