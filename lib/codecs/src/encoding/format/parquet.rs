@@ -80,7 +80,7 @@ impl ParquetCompression {
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum SchemaMode {
+pub enum ParquetSchemaMode {
     /// Missing fields become null. Extra fields are silently dropped.
     #[default]
     Relaxed,
@@ -114,13 +114,13 @@ pub struct ParquetSerializerConfig {
     /// Controls how events with fields not present in the schema are handled.
     #[serde(default)]
     #[configurable(derived)]
-    pub schema_mode: SchemaMode,
+    pub schema_mode: ParquetSchemaMode,
 }
 
 impl ParquetSerializerConfig {
     /// Resolve the Arrow schema from the configured schema source.
     fn resolve_schema(&self) -> Result<Schema, Box<dyn std::error::Error + Send + Sync>> {
-        if self.schema_mode == SchemaMode::AutoInfer {
+        if self.schema_mode == ParquetSchemaMode::AutoInfer {
             return Ok(Schema::empty());
         }
 
@@ -225,7 +225,7 @@ fn reject_unsupported_arrow_types(
 pub struct ParquetSerializer {
     schema: SchemaRef,
     writer_props: Arc<WriterProperties>,
-    schema_mode: SchemaMode,
+    schema_mode: ParquetSchemaMode,
     /// Pre-built set of schema field names for O(1) strict-mode lookups.
     schema_field_names: HashSet<String>,
 
@@ -292,18 +292,13 @@ impl tokio_util::codec::Encoder<Vec<Event>> for ParquetSerializer {
         }
 
         // In strict mode, check for extra top-level fields not in the schema.
-        if self.schema_mode == SchemaMode::Strict {
+        if self.schema_mode == ParquetSchemaMode::Strict {
             for event in &events {
                 if let Some(log) = event.maybe_as_log()
-                    && let Some(fields) = log.all_event_fields()
+                    && let Some(object_map) = log.as_map()
                 {
-                    for (key, _) in fields {
-                        let field_name = key.strip_prefix('.').unwrap_or(&key);
-                        let top_level = field_name
-                            .find(['.', '['])
-                            .map(|pos| &field_name[..pos])
-                            .unwrap_or(field_name);
-                        if !self.schema_field_names.contains(top_level) {
+                    for top_level in object_map.keys() {
+                        if !self.schema_field_names.contains(top_level.as_str()) {
                             return Err(Box::new(ArrowEncodingError::SchemaFetchError {
                                 message: format!(
                                     "Strict schema mode: event contains field '{top_level}' not in schema",
@@ -313,7 +308,7 @@ impl tokio_util::codec::Encoder<Vec<Event>> for ParquetSerializer {
                     }
                 }
             }
-        } else if self.schema_mode == SchemaMode::AutoInfer {
+        } else if self.schema_mode == ParquetSchemaMode::AutoInfer {
             let schema = ParquetSchemaGenerator::new(self.events_dropped_handle.clone())
                 .infer_schema(&json_values)?;
             self.schema = Arc::new(ParquetSchemaGenerator::try_normalize_schema(
@@ -512,7 +507,7 @@ mod tests {
         use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 
         let mut serializer = ParquetSerializer::new(ParquetSerializerConfig {
-            schema_mode: SchemaMode::AutoInfer,
+            schema_mode: ParquetSchemaMode::AutoInfer,
             ..Default::default()
         })
         .expect("AutoInfer serializer should be created without a static schema");
@@ -596,7 +591,7 @@ mod tests {
     #[test]
     fn test_parquet_empty_events() {
         let mut serializer = ParquetSerializer::new(ParquetSerializerConfig {
-            schema_mode: SchemaMode::AutoInfer,
+            schema_mode: ParquetSchemaMode::AutoInfer,
             ..Default::default()
         })
         .expect("AutoInfer serializer should succeed");
@@ -624,7 +619,7 @@ mod tests {
 
         for compression in compressions {
             let mut serializer = ParquetSerializer::new(ParquetSerializerConfig {
-                schema_mode: SchemaMode::AutoInfer,
+                schema_mode: ParquetSchemaMode::AutoInfer,
                 compression,
                 ..Default::default()
             })
@@ -649,7 +644,7 @@ mod tests {
     #[test]
     fn test_parquet_output_has_footer() {
         let mut serializer = ParquetSerializer::new(ParquetSerializerConfig {
-            schema_mode: SchemaMode::AutoInfer,
+            schema_mode: ParquetSchemaMode::AutoInfer,
             ..Default::default()
         })
         .expect("AutoInfer serializer should succeed");
@@ -671,7 +666,7 @@ mod tests {
     #[test]
     fn test_writer_props_arc_shared() {
         let serializer = ParquetSerializer::new(ParquetSerializerConfig {
-            schema_mode: SchemaMode::AutoInfer,
+            schema_mode: ParquetSchemaMode::AutoInfer,
             ..Default::default()
         })
         .expect("AutoInfer serializer should succeed");
@@ -687,7 +682,7 @@ mod tests {
         use vector_core::event::{Metric, MetricKind, MetricValue};
 
         let mut serializer = ParquetSerializer::new(ParquetSerializerConfig {
-            schema_mode: SchemaMode::AutoInfer,
+            schema_mode: ParquetSchemaMode::AutoInfer,
             ..Default::default()
         })
         .expect("AutoInfer serializer should succeed");
@@ -804,7 +799,7 @@ mod tests {
 
         let mut serializer = ParquetSerializer::new(ParquetSerializerConfig {
             schema_file: Some(schema_path),
-            schema_mode: SchemaMode::Strict,
+            schema_mode: ParquetSchemaMode::Strict,
             ..Default::default()
         })
         .expect("Failed to create strict serializer");
@@ -825,7 +820,7 @@ mod tests {
 
         let mut serializer = ParquetSerializer::new(ParquetSerializerConfig {
             schema_file: Some(schema_path),
-            schema_mode: SchemaMode::Strict,
+            schema_mode: ParquetSchemaMode::Strict,
             ..Default::default()
         })
         .expect("Failed to create strict serializer");
@@ -852,7 +847,7 @@ mod tests {
 
         let mut serializer = ParquetSerializer::new(ParquetSerializerConfig {
             schema_file: Some(schema_path),
-            schema_mode: SchemaMode::Relaxed,
+            schema_mode: ParquetSchemaMode::Relaxed,
             ..Default::default()
         })
         .expect("Failed to create relaxed serializer");

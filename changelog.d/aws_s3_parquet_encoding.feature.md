@@ -7,4 +7,4 @@ Includes configurable compression (Snappy, ZSTD, GZIP, LZ4, None) and strict/rel
 
 Enable the `codecs-parquet` feature and configure `batch_encoding` with `codec = "parquet"` in the S3 sink configuration.
 
-authors: szibis, peter-datadog
+authors: @szibis, @petere-datadog

@@ -29,7 +29,9 @@ pub use format::{
 #[cfg(feature = "opentelemetry")]
 pub use format::{OtlpSerializer, OtlpSerializerConfig};
 #[cfg(feature = "parquet")]
-pub use format::{ParquetCompression, ParquetSerializer, ParquetSerializerConfig, SchemaMode};
+pub use format::{
+    ParquetCompression, ParquetSchemaMode, ParquetSerializer, ParquetSerializerConfig,
+};
 #[cfg(feature = "syslog")]
 pub use format::{SyslogSerializer, SyslogSerializerConfig};
 pub use framing::{

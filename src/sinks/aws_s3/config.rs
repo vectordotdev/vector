@@ -281,7 +281,7 @@ impl S3SinkConfig {
                 api_options.content_type = Some(batch_encoder.content_type().to_string());
             }
 
-            let encoder = EncoderKind::Batch(Box::new(batch_encoder));
+            let encoder = EncoderKind::Batch(batch_encoder);
 
             // Auto-detect file extension from batch format
             let filename_extension =
@@ -381,8 +381,8 @@ mod tests {
             .expect("batch_encoding should be Some");
         match batch_enc {
             vector_lib::codecs::encoding::BatchSerializerConfig::Parquet(ref p) => {
-                use vector_lib::codecs::encoding::format::{ParquetCompression, SchemaMode};
-                assert_eq!(p.schema_mode, SchemaMode::AutoInfer);
+                use vector_lib::codecs::encoding::format::{ParquetCompression, ParquetSchemaMode};
+                assert_eq!(p.schema_mode, ParquetSchemaMode::AutoInfer);
                 assert_eq!(p.compression, ParquetCompression::Snappy);
             }
             #[allow(unreachable_patterns)]
@@ -396,7 +396,7 @@ mod tests {
     #[test]
     fn parquet_content_type_auto_detected() {
         use vector_lib::codecs::encoding::format::{
-            ParquetCompression, ParquetSerializerConfig, SchemaMode,
+            ParquetCompression, ParquetSerializerConfig, ParquetSchemaMode,
         };
 
         use crate::sinks::s3_common::config::S3Options;
@@ -405,7 +405,7 @@ mod tests {
         use vector_lib::codecs::encoding::{BatchSerializerConfig, FramingConfig};
 
         let parquet_config = ParquetSerializerConfig {
-            schema_mode: SchemaMode::AutoInfer,
+            schema_mode: ParquetSchemaMode::AutoInfer,
             compression: ParquetCompression::Snappy,
             ..Default::default()
         };
@@ -552,7 +552,7 @@ mod tests {
     #[cfg(feature = "codecs-parquet")]
     #[test]
     fn parquet_schema_mode_defaults_to_relaxed() {
-        use vector_lib::codecs::encoding::format::SchemaMode;
+        use vector_lib::codecs::encoding::format::ParquetSchemaMode;
 
         let config: S3SinkConfig = toml::from_str(
             r#"
@@ -570,7 +570,7 @@ mod tests {
 
         match config.batch_encoding.unwrap() {
             vector_lib::codecs::encoding::BatchSerializerConfig::Parquet(p) => {
-                assert_eq!(p.schema_mode, SchemaMode::Relaxed);
+                assert_eq!(p.schema_mode, ParquetSchemaMode::Relaxed);
             }
             #[allow(unreachable_patterns)]
             _ => panic!("expected Parquet variant"),
@@ -581,7 +581,7 @@ mod tests {
     #[cfg(feature = "codecs-parquet")]
     #[test]
     fn parquet_schema_mode_strict_parsed() {
-        use vector_lib::codecs::encoding::format::SchemaMode;
+        use vector_lib::codecs::encoding::format::ParquetSchemaMode;
 
         let config: S3SinkConfig = toml::from_str(
             r#"
@@ -600,7 +600,7 @@ mod tests {
 
         match config.batch_encoding.unwrap() {
             vector_lib::codecs::encoding::BatchSerializerConfig::Parquet(p) => {
-                assert_eq!(p.schema_mode, SchemaMode::Strict);
+                assert_eq!(p.schema_mode, ParquetSchemaMode::Strict);
             }
             #[allow(unreachable_patterns)]
             _ => panic!("expected Parquet variant"),

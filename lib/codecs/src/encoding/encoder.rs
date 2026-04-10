@@ -87,7 +87,7 @@ pub enum EncoderKind {
     Framed(Box<Encoder<Framer>>),
     /// Encodes events in batches without framing
     #[cfg(any(feature = "arrow", feature = "parquet"))]
-    Batch(Box<BatchEncoder>),
+    Batch(BatchEncoder),
 }
 
 #[derive(Debug, Clone)]
