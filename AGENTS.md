@@ -149,7 +149,7 @@ make cue-build
 
 ## Configuration Format
 
-Always generate Vector configuration examples in **YAML** unless the user explicitly asks for TOML or JSON. YAML is Vector's recommended and default configuration format since v0.34.
+Always generate Vector configuration examples in **YAML** unless the user explicitly asks for TOML or JSON. YAML is Vector's recommended and default configuration format.
 
 ## Common Patterns
 
