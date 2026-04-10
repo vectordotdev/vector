@@ -160,6 +160,68 @@ fn validate_no_environment_reports_transform_vrl_errors() {
 }
 
 #[test]
+fn validate_no_environment_builds_condition_transforms() {
+    assert_eq!(
+        validate_with_args(
+            indoc! {r#"
+                data_dir = "${VECTOR_DATA_DIR}"
+
+                [sources.in]
+                    type = "demo_logs"
+                    format = "shuffle"
+                    lines = ["log"]
+
+                [transforms.filtered]
+                    inputs = ["in"]
+                    type = "filter"
+                    condition = "exists(.message)"
+
+                [sinks.out]
+                    inputs = ["filtered"]
+                    type = "blackhole"
+            "#},
+            &["--no-environment"],
+        ),
+        exitcode::OK
+    );
+}
+
+#[test]
+fn validate_no_environment_skips_environment_dependent_transform_builds() {
+    let output = validate_output_with_args(
+        indoc! {r#"
+            data_dir = "${VECTOR_DATA_DIR}"
+
+            [sources.in]
+                type = "demo_logs"
+                format = "shuffle"
+                lines = ["log"]
+
+            [transforms.meta]
+                inputs = ["in"]
+                type = "aws_ec2_metadata"
+                endpoint = "http://127.0.0.1:9"
+
+            [sinks.out]
+                inputs = ["meta"]
+                type = "blackhole"
+        "#},
+        &["--no-environment"],
+    );
+    let stdout = String::from_utf8(output.stdout).expect("Vector output isn't a valid utf8 string");
+
+    println!("{stdout}");
+
+    assert_eq!(output.status.code(), Some(exitcode::OK));
+    assert!(
+        stdout.contains(
+            "Transform \"meta\" skipped build validation because it requires environment-dependent setup."
+        ),
+        "missing skip warning in output: {stdout}"
+    );
+}
+
+#[test]
 fn test_command_no_escape_codes_in_output() {
     // A config with an unhandled fallible VRL function call (missing `!`).
     // This triggers a VRL compilation error reported through the test runner.
@@ -214,6 +276,13 @@ fn validate(config: &str) -> i32 {
 }
 
 fn validate_with_args(config: &str, args: &[&str]) -> i32 {
+    validate_output_with_args(config, args)
+        .status
+        .code()
+        .unwrap()
+}
+
+fn validate_output_with_args(config: &str, args: &[&str]) -> std::process::Output {
     let dir = create_directory();
 
     // Config with some components that write to file system.
@@ -230,7 +299,7 @@ fn validate_with_args(config: &str, args: &[&str]) -> i32 {
     let output = cmd.output().unwrap();
     println!(
         "{}",
-        String::from_utf8(output.stdout).expect("Vector output isn't a valid utf8 string")
+        String::from_utf8(output.stdout.clone()).expect("Vector output isn't a valid utf8 string")
     );
-    output.status.code().unwrap()
+    output
 }

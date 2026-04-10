@@ -119,7 +119,7 @@ pub async fn validate(opts: &Opts, color: bool) -> ExitCode {
     };
 
     if opts.no_environment {
-        validated &= validate_transforms_no_environment(&config, &mut fmt).await;
+        validated &= validate_transforms_no_environment(opts, &config, &mut fmt).await;
     } else if let Some(tmp_directory) = create_tmp_directory(&mut config, &mut fmt) {
         validated &= validate_environment(opts, &config, &mut fmt).await;
         remove_tmp_directory(tmp_directory);
@@ -181,11 +181,23 @@ pub fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
     Some(config)
 }
 
-async fn validate_transforms_no_environment(config: &Config, fmt: &mut Formatter) -> bool {
+async fn validate_transforms_no_environment(
+    opts: &Opts,
+    config: &Config,
+    fmt: &mut Formatter,
+) -> bool {
     let mut definition_cache = HashMap::new();
+    let mut warnings = Vec::new();
     let mut errors = Vec::new();
 
     for (key, transform) in config.transforms() {
+        if transform.inner.build_requires_environment() {
+            warnings.push(format!(
+                "Transform \"{key}\" skipped build validation because it requires environment-dependent setup."
+            ));
+            continue;
+        }
+
         let merged_schema_definition = topology::schema::input_definitions(
             &transform.inputs,
             config,
@@ -209,14 +221,21 @@ async fn validate_transforms_no_environment(config: &Config, fmt: &mut Formatter
             ..Default::default()
         };
 
-        if let Err(error) = transform.inner.validate_no_environment(&context).await {
+        if let Err(error) = transform.inner.build(&context).await {
             errors.push(format!("Transform \"{key}\": {error}"));
         }
     }
 
-    if errors.is_empty() {
+    if !warnings.is_empty() {
+        fmt.title("Transform warnings");
+        fmt.sub_warning(&warnings);
+    }
+
+    if errors.is_empty() && warnings.is_empty() {
         fmt.success("Transform configuration");
         true
+    } else if errors.is_empty() {
+        !opts.deny_warnings
     } else {
         fmt.title("Transform errors");
         fmt.sub_error(errors);

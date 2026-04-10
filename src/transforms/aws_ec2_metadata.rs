@@ -248,6 +248,10 @@ impl TransformConfig for Ec2Metadata {
         Ok(Transform::event_task(Ec2MetadataTransform { state }))
     }
 
+    fn build_requires_environment(&self) -> bool {
+        true
+    }
+
     fn input(&self) -> Input {
         Input::new(DataType::Metric | DataType::Log)
     }

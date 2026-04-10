@@ -123,10 +123,6 @@ impl TransformConfig for ReduceConfig {
             .map(Transform::event_task)
     }
 
-    async fn validate_no_environment(&self, context: &TransformContext) -> crate::Result<()> {
-        self.build(context).await.map(|_| ())
-    }
-
     fn input(&self) -> Input {
         Input::log()
     }
