@@ -14,7 +14,8 @@ use arrow::json::reader::infer_json_schema_from_iterator;
 use bytes::{BufMut, BytesMut};
 use derivative::Derivative;
 use parquet::arrow::ArrowWriter;
-use parquet::basic::Compression as ParquetCodecCompression;
+use parquet::basic::ZstdLevel;
+use parquet::basic::{Compression as ParquetCodecCompression, GzipLevel};
 use parquet::file::properties::WriterProperties;
 use std::io::{Error, ErrorKind};
 use tracing::warn;
@@ -30,31 +31,46 @@ use crate::encoding::internal_events::SchemaGenerationError;
 
 type EventsDroppedError = ComponentEventsDropped<'static, UNINTENTIONAL>;
 
-/// Parquet compression codec options.
+/// Compression algorithm and optional level for archive objects.
 #[configurable_component]
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
+#[derive(Default, Copy, Clone, Debug, PartialEq)]
+#[serde(tag = "algorithm", rename_all = "snake_case")]
 pub enum ParquetCompression {
-    /// No compression.
-    None,
-    /// Snappy compression.
+    /// Zstd compression. Level must be between 1 and 21.
+    Zstd {
+        /// Compression level (1–21). This is the range Vector currently supports; higher values compress more but are slower.
+        #[configurable(validation(range(min = 1, max = 21)))]
+        level: u8,
+    },
+    /// Gzip compression. Level must be between 1 and 9.
+    Gzip {
+        /// Compression level (1–9). This is the range Vector currently supports; higher values compress more but are slower.
+        #[configurable(validation(range(min = 1, max = 9)))]
+        level: u8,
+    },
+
+    /// Snappy compression (no level).
     #[default]
     Snappy,
-    /// Zstandard compression.
-    Zstd,
-    /// Gzip compression.
-    Gzip,
-    /// LZ4 raw compression.
+
+    /// LZ4 raw compression
     Lz4,
+
+    /// No compression
+    None,
 }
 
 impl ParquetCompression {
-    fn to_parquet_compression(self) -> ParquetCodecCompression {
+    fn into(self) -> ParquetCodecCompression {
         match self {
             Self::None => ParquetCodecCompression::UNCOMPRESSED,
             Self::Snappy => ParquetCodecCompression::SNAPPY,
-            Self::Zstd => ParquetCodecCompression::ZSTD(Default::default()),
-            Self::Gzip => ParquetCodecCompression::GZIP(Default::default()),
+            Self::Zstd { level } => ParquetCodecCompression::ZSTD(
+                ZstdLevel::try_new(level.into()).expect("level is already validated."),
+            ),
+            Self::Gzip { level } => ParquetCodecCompression::GZIP(
+                GzipLevel::try_new(level.into()).expect("level is already validated."),
+            ),
             Self::Lz4 => ParquetCodecCompression::LZ4_RAW,
         }
     }
@@ -116,8 +132,7 @@ impl ParquetSerializerConfig {
         let content = read_schema_file(path, "schema_file")?;
         let parquet_type = parquet::schema::parser::parse_message_type(&content)
             .map_err(|e| format!("Failed to parse Parquet schema: {e}"))?;
-        let schema_desc =
-            parquet::schema::types::SchemaDescriptor::new(Arc::new(parquet_type));
+        let schema_desc = parquet::schema::types::SchemaDescriptor::new(Arc::new(parquet_type));
         let arrow_schema = parquet::arrow::parquet_to_arrow_schema(&schema_desc, None)
             .map_err(|e| format!("Failed to convert Parquet schema to Arrow: {e}"))?;
         Ok(arrow_schema)
@@ -235,7 +250,7 @@ impl ParquetSerializer {
 
         let writer_props = Arc::new(
             WriterProperties::builder()
-                .set_compression(config.compression.to_parquet_compression())
+                .set_compression(config.compression.into())
                 .build(),
         );
 
@@ -602,8 +617,8 @@ mod tests {
         let compressions = vec![
             ParquetCompression::None,
             ParquetCompression::Snappy,
-            ParquetCompression::Zstd,
-            ParquetCompression::Gzip,
+            ParquetCompression::Zstd { level: 1 },
+            ParquetCompression::Gzip { level: 1 },
             ParquetCompression::Lz4,
         ];
 
@@ -747,7 +762,10 @@ mod tests {
 
     #[test]
     fn test_parquet_schema_file_invalid_syntax_error() {
-        let schema_path = write_temp_schema("invalid_syntax", "this is not valid parquet schema syntax !!!");
+        let schema_path = write_temp_schema(
+            "invalid_syntax",
+            "this is not valid parquet schema syntax !!!",
+        );
 
         let config: ParquetSerializerConfig = serde_json::from_value(serde_json::json!({
             "schema_file": schema_path.to_str().unwrap()
@@ -769,15 +787,20 @@ mod tests {
     fn test_parquet_no_schema_error() {
         let config = ParquetSerializerConfig::default();
         let result = ParquetSerializer::new(config);
-        assert!(result.is_err(), "Should fail without schema_file or auto_infer");
+        assert!(
+            result.is_err(),
+            "Should fail without schema_file or auto_infer"
+        );
     }
 
     // ── Schema mode: strict / relaxed ────────────────────────────────────────
 
     #[test]
     fn test_parquet_strict_mode_rejects_extra_fields() {
-        let schema_path =
-            write_temp_schema("strict_rejects", "message logs {\n  required binary name (STRING);\n}");
+        let schema_path = write_temp_schema(
+            "strict_rejects",
+            "message logs {\n  required binary name (STRING);\n}",
+        );
 
         let mut serializer = ParquetSerializer::new(ParquetSerializerConfig {
             schema_file: Some(schema_path),
@@ -822,8 +845,10 @@ mod tests {
 
     #[test]
     fn test_parquet_relaxed_mode_drops_extra_fields() {
-        let schema_path =
-            write_temp_schema("relaxed_drops", "message logs {\n  required binary name (STRING);\n}");
+        let schema_path = write_temp_schema(
+            "relaxed_drops",
+            "message logs {\n  required binary name (STRING);\n}",
+        );
 
         let mut serializer = ParquetSerializer::new(ParquetSerializerConfig {
             schema_file: Some(schema_path),

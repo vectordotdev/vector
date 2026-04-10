@@ -368,17 +368,22 @@ mod tests {
 
             [batch_encoding]
             codec = "parquet"
-            compression = "snappy"
+            [compression]
+            algorithm = "snappy"
+            
             schema_mode = "auto_infer"
             "#,
         )
         .expect("correct batch_encoding shape should parse");
 
-        let batch_enc = config.batch_encoding.expect("batch_encoding should be Some");
+        let batch_enc = config
+            .batch_encoding
+            .expect("batch_encoding should be Some");
         match batch_enc {
             vector_lib::codecs::encoding::BatchSerializerConfig::Parquet(ref p) => {
-                use vector_lib::codecs::encoding::format::SchemaMode;
+                use vector_lib::codecs::encoding::format::{ParquetCompression, SchemaMode};
                 assert_eq!(p.schema_mode, SchemaMode::AutoInfer);
+                assert_eq!(p.compression, ParquetCompression::Snappy);
             }
             #[allow(unreachable_patterns)]
             _ => panic!("expected Parquet variant"),
@@ -390,12 +395,14 @@ mod tests {
     #[cfg(feature = "codecs-parquet")]
     #[test]
     fn parquet_content_type_auto_detected() {
-        use vector_lib::codecs::encoding::format::{ParquetCompression, ParquetSerializerConfig, SchemaMode};
+        use vector_lib::codecs::encoding::format::{
+            ParquetCompression, ParquetSerializerConfig, SchemaMode,
+        };
 
         use crate::sinks::s3_common::config::S3Options;
         use crate::sinks::util::{BatchConfig, BulkSizeBasedDefaultBatchSettings, Compression};
-        use vector_lib::codecs::encoding::{BatchSerializerConfig, FramingConfig};
         use vector_lib::codecs::TextSerializerConfig;
+        use vector_lib::codecs::encoding::{BatchSerializerConfig, FramingConfig};
 
         let parquet_config = ParquetSerializerConfig {
             schema_mode: SchemaMode::AutoInfer,
@@ -456,6 +463,9 @@ mod tests {
             [batch_encoding]
             codec = "parquet"
             schema_mode = "auto_infer"
+            [compression]
+            algorithm = "gzip"
+            level = 9
             "#,
         )
         .unwrap();
@@ -501,13 +511,16 @@ mod tests {
         );
 
         let batch_config = config.batch_encoding.as_ref().unwrap();
-        let extension = config.filename_extension.clone().or_else(|| match batch_config {
-            vector_lib::codecs::encoding::BatchSerializerConfig::Parquet(_) => {
-                Some("parquet".to_string())
-            }
-            #[allow(unreachable_patterns)]
-            _ => None,
-        });
+        let extension = config
+            .filename_extension
+            .clone()
+            .or_else(|| match batch_config {
+                vector_lib::codecs::encoding::BatchSerializerConfig::Parquet(_) => {
+                    Some("parquet".to_string())
+                }
+                #[allow(unreachable_patterns)]
+                _ => None,
+            });
 
         assert_eq!(extension.as_deref(), Some("parquet"));
     }
