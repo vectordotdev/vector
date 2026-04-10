@@ -524,7 +524,7 @@ mod tests {
     async fn smoke_fails() {
         let (_hosts, _partitions, mut rx) =
             smoke_start(StatusCode::FORBIDDEN, BatchStatus::Rejected).await;
-        assert!(rx.try_recv().is_err());
+        assert!(matches!(rx.try_next(), Err(mpsc::TryRecvError { .. })));
     }
 
     #[tokio::test]

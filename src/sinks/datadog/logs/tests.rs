@@ -4,7 +4,10 @@ use std::sync::Arc;
 
 use bytes::Bytes;
 use chrono::Utc;
-use futures::{StreamExt, channel::mpsc::Receiver};
+use futures::{
+    StreamExt,
+    channel::mpsc::{Receiver, TryRecvError},
+};
 use http::request::Parts;
 use indoc::indoc;
 use vector_lib::{
@@ -192,7 +195,9 @@ async fn telemetry() {
 async fn handles_failure_v1() {
     let (_expected, mut rx) =
         start_test_error(ApiStatus::BadRequestv1, BatchStatus::Rejected).await;
-    assert!(rx.try_recv().is_err());
+    let res = rx.try_next();
+
+    assert!(matches!(res, Err(TryRecvError { .. })));
 }
 
 #[tokio::test]
@@ -204,7 +209,9 @@ async fn handles_failure_v1() {
 async fn handles_failure_v2() {
     let (_expected, mut rx) =
         start_test_error(ApiStatus::BadRequestv2, BatchStatus::Rejected).await;
-    assert!(rx.try_recv().is_err());
+    let res = rx.try_next();
+
+    assert!(matches!(res, Err(TryRecvError { .. })));
 }
 
 #[tokio::test]

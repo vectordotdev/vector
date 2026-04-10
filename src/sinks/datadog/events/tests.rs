@@ -1,7 +1,11 @@
 use std::sync::Arc;
 
 use bytes::Bytes;
-use futures::{StreamExt, channel::mpsc::Receiver, stream::Stream};
+use futures::{
+    StreamExt,
+    channel::mpsc::{Receiver, TryRecvError},
+    stream::Stream,
+};
 use hyper::StatusCode;
 use indoc::indoc;
 use similar_asserts::assert_eq;
@@ -101,7 +105,7 @@ async fn smoke() {
 async fn handles_failure() {
     let (_expected, mut rx) = start_test(StatusCode::FORBIDDEN, BatchStatus::Rejected).await;
 
-    assert!(rx.try_recv().is_err());
+    assert!(matches!(rx.try_next(), Err(TryRecvError { .. })));
 }
 
 #[tokio::test]
