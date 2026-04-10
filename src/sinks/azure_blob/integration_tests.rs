@@ -335,7 +335,7 @@ impl AzureBlobSinkConfig {
         let mut names = Vec::new();
         while let Some(result) = pager.next().await {
             let item = result.expect("Failed to fetch blobs");
-            if let Some(name) = item.name.and_then(|bn| bn.content)
+            if let Some(name) = item.name
                 && name.starts_with(&prefix)
             {
                 names.push(name);
@@ -403,7 +403,7 @@ impl AzureBlobSinkConfig {
 
     async fn ensure_container(&self) {
         let client = self.build_test_client().await;
-        let result = client.create_container(None).await;
+        let result = client.create(None).await;
 
         let response = match result {
             Ok(_) => Ok(()),
