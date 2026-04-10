@@ -372,7 +372,7 @@ mod tests {
 
             [batch_encoding.compression]
             algorithm = "snappy"
-    
+
             "#,
         )
         .expect("correct batch_encoding shape should parse");

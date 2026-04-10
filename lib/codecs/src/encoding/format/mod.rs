@@ -27,7 +27,9 @@ mod text;
 use std::fmt::Debug;
 
 #[cfg(feature = "parquet")]
-pub use self::parquet::{ParquetCompression, ParquetSerializer, ParquetSerializerConfig, ParquetSchemaMode};
+pub use self::parquet::{
+    ParquetCompression, ParquetSchemaMode, ParquetSerializer, ParquetSerializerConfig,
+};
 #[cfg(feature = "arrow")]
 pub use arrow::{
     ArrowEncodingError, ArrowStreamSerializer, ArrowStreamSerializerConfig, SchemaProvider,
