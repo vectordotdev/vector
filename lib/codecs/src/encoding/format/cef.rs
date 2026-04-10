@@ -352,6 +352,7 @@ fn get_log_event_value(log: &LogEvent, field: &ConfigTargetPath) -> String {
         Some(Value::Float(float)) => float.to_string(),
         Some(Value::Boolean(bool)) => bool.to_string(),
         Some(Value::Timestamp(timestamp)) => timestamp.to_rfc3339_opts(SecondsFormat::AutoSi, true),
+        Some(Value::Decimal(decimal)) => decimal.to_string(),
         Some(Value::Null) => String::from(""),
         // Other value types: Array, Regex, Object are not supported by the CEF format.
         Some(_) => String::from(""),

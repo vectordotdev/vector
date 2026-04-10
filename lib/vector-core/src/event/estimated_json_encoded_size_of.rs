@@ -79,6 +79,7 @@ impl EstimatedJsonEncodedSizeOf for Value {
             Value::Float(v) => v.estimated_json_encoded_size_of(),
             Value::Boolean(v) => v.estimated_json_encoded_size_of(),
             Value::Null => NULL_SIZE,
+            Value::Decimal(v) => v.estimated_json_encoded_size_of(),
         }
     }
 }
@@ -421,6 +422,12 @@ impl EstimatedJsonEncodedSizeOf for i64 {
             } else if v < 1_000_000_000_000_000_000 { 18
             } else                                  { 19 }
         )
+    }
+}
+
+impl EstimatedJsonEncodedSizeOf for rust_decimal::Decimal {
+    fn estimated_json_encoded_size_of(&self) -> JsonSize {
+        JsonSize::new(self.to_string().len())
     }
 }
 

@@ -2,6 +2,7 @@ use std::{collections::BTreeMap, sync::Arc};
 
 use chrono::TimeZone;
 use ordered_float::NotNan;
+use rust_decimal::Decimal;
 use uuid::Uuid;
 
 use super::{MetricTags, WithMetadata};
@@ -711,6 +712,11 @@ fn decode_value(input: Value) -> Option<super::Value> {
         Some(value::Kind::Map(map)) => decode_map(map.fields),
         Some(value::Kind::Array(array)) => decode_array(array.items),
         Some(value::Kind::Null(_)) => Some(super::Value::Null),
+        Some(value::Kind::Decimal(s)) => s
+            .parse::<Decimal>()
+            .map(super::Value::Decimal)
+            .map_err(|error| error!(%error, decimal = %s, "Failed to parse decimal value."))
+            .ok(),
         None => {
             error!("Encoded event contains unknown value kind.");
             None
@@ -749,6 +755,7 @@ fn encode_value(value: super::Value) -> Value {
             super::Value::Object(fields) => Some(value::Kind::Map(encode_map(fields))),
             super::Value::Array(items) => Some(value::Kind::Array(encode_array(items))),
             super::Value::Null => Some(value::Kind::Null(ValueNull::NullValue as i32)),
+            super::Value::Decimal(d) => Some(value::Kind::Decimal(d.to_string())),
         },
     }
 }

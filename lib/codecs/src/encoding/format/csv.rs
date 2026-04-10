@@ -254,6 +254,7 @@ impl Encoder<Event> for CsvSerializer {
                 Some(Value::Timestamp(timestamp)) => {
                     timestamp.to_rfc3339_opts(SecondsFormat::AutoSi, true)
                 }
+                Some(Value::Decimal(decimal)) => decimal.to_string(),
                 Some(Value::Null) => String::new(),
                 // Other value types: Array, Regex, Object are not supported by the CSV format.
                 Some(_) => String::new(),
