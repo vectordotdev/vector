@@ -12,6 +12,9 @@ data. Any option that supports this syntax will be clearly documented as such in
 Let's partition data on AWS S3 by "application_id" and "date". We can accomplish this with the `key_prefix` option in
 the `aws_s3` sink:
 
+{{< tabs default="YAML" >}}
+{{< tab title="YAML" >}}
+
 ```yaml
 sinks:
   backup:
@@ -19,6 +22,19 @@ sinks:
     bucket: "all_application_logs"
     key_prefix: "application_id={{ application_id }}/date=%F/"
 ```
+
+{{< /tab >}}
+{{< tab title="TOML" >}}
+
+```toml
+[sinks.backup]
+  type = "aws_s3"
+  bucket = "all_application_logs"
+  key_prefix = "application_id={{ application_id }}/date=%F/"
+```
+
+{{< /tab >}}
+{{< /tabs >}}
 
 Notice that Vector allows direct field references as well as "strftime" specifiers. If we were to run the following log
 event through Vector:
@@ -46,17 +62,43 @@ enables dynamic partitioning, something fundamental to storing log data in files
 
 Individual [log event][log] fields can be accessed using `{{ ... }}` to wrap a VRL [path expression][path_expression]:
 
+{{< tabs default="YAML" >}}
+{{< tab title="YAML" >}}
+
 ```yaml
 option: "{{ .parent.child }}"
 ```
+
+{{< /tab >}}
+{{< tab title="TOML" >}}
+
+```toml
+option = "{{ .parent.child }}"
+```
+
+{{< /tab >}}
+{{< /tabs >}}
 
 ### Strftime specifiers
 
 In addition to directly accessing fields, Vector offers a shortcut for injecting [strftime specifiers][strftime]:
 
+{{< tabs default="YAML" >}}
+{{< tab title="YAML" >}}
+
 ```yaml
 option: "year=%Y/month=%m/day=%d/"
 ```
+
+{{< /tab >}}
+{{< tab title="TOML" >}}
+
+```toml
+option = "year=%Y/month=%m/day=%d/"
+```
+
+{{< /tab >}}
+{{< /tabs >}}
 
 {{< info >}}
 The value is derived from the [`timestamp` field](/docs/architecture/data-model/log/#timestamps)
@@ -68,15 +110,41 @@ and the name of this field can be changed via the [global `timestamp_key` option
 You can escape this syntax by prefixing the character with a `\`. For example, you can escape the event field syntax
 like this:
 
+{{< tabs default="YAML" >}}
+{{< tab title="YAML" >}}
+
 ```yaml
 option: '\{{ field_name }}'
 ```
 
+{{< /tab >}}
+{{< tab title="TOML" >}}
+
+```toml
+option = "\{{ field_name }}"
+```
+
+{{< /tab >}}
+{{< /tabs >}}
+
 And [strftime] specified like so:
+
+{{< tabs default="YAML" >}}
+{{< tab title="YAML" >}}
 
 ```yaml
 option: "year=\\%Y/month=\\%m/day=\\%d/"
 ```
+
+{{< /tab >}}
+{{< tab title="TOML" >}}
+
+```toml
+option = "year=\%Y/month=\%m/day=\%d/"
+```
+
+{{< /tab >}}
+{{< /tabs >}}
 
 Each of the values above would be treated literally.
 
@@ -92,6 +160,9 @@ You can find additional examples for accessing fields in the
 Vector doesn't currently support fallback values, [issue 1692][1692] is open to add this functionality. In the interim,
 you can use the [`remap` transform][remap] to set a default value:
 
+{{< tabs default="YAML" >}}
+{{< tab title="YAML" >}}
+
 ```yaml
 transforms:
   set_defaults:
@@ -103,6 +174,23 @@ transforms:
         .my_field = "default"
       }
 ```
+
+{{< /tab >}}
+{{< tab title="TOML" >}}
+
+```toml
+[transforms.set_defaults]
+  type = "remap"
+  inputs = ["my-source-id"]
+  source = '''
+    if !exists(.my_field) {
+      .my_field = "default"
+    }
+  '''
+```
+
+{{< /tab >}}
+{{< /tabs >}}
 
 ### Missing fields
 
