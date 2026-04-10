@@ -16,69 +16,73 @@ a graph in [DOT][DOT] format. This output can then be visualized using [Graphviz
 
 For example, if you had a config, `vector.toml`, like:
 
-```toml
+```yaml
 ##
 ## Sources
 ##
 
-[sources.internal_metrics]
-type = "internal_metrics"
+sources:
+  internal_metrics:
+    type: "internal_metrics"
 
-[sources.dd_logs]
-type = "datadog_logs" # required
-acknowledgements = false # optional, default
-address = "0.0.0.0:8282" # required
+  dd_logs:
+    type: "datadog_logs" # required
+    acknowledgements: false # optional, default
+    address: "0.0.0.0:8282" # required
 
-[sources.file_gen]
-type = "file"
-include = ["/var/log/file_gen/**/*.log"]
-read_from = "beginning"
+  file_gen:
+    type: "file"
+    include: ["/var/log/file_gen/**/*.log"]
+    read_from: "beginning"
 
 ##
 ## Transforms
 ##
 
-[transforms.remap]
-type = "remap"
-inputs = ["file_gen"]
-source = '''
-.agent_name = "vector"
-parsed, err = parse_json(.message)
-if err == null {
-    .message = parsed
-    .format = "json"
-} else {
-    .format = "ascii"
-}
-matches = parse_regex!(.file, r'.*/(?P<num>\d+)-(?P<name>\w+).log')
-.origin, err = .host + "/" + matches.name + "/" + matches.num
-if err != null {
-    log("Failed to parse origin from file name", level: "error")
-}
-'''
+transforms:
+  remap:
+    type: "remap"
+    inputs: ["file_gen"]
+    source: |
+      .agent_name = "vector"
+      parsed, err = parse_json(.message)
+      if err == null {
+          .message = parsed
+          .format = "json"
+      } else {
+          .format = "ascii"
+      }
+      matches = parse_regex!(.file, r'.*/(?P<num>\d+)-(?P<name>\w+).log')
+      .origin, err = .host + "/" + matches.name + "/" + matches.num
+      if err != null {
+          log("Failed to parse origin from file name", level: "error")
+      }
 
 ##
 ## Sinks
 ##
 
-[sinks.prometheus]
-type = "prometheus_exporter"
-inputs = ["internal_metrics"]
-address = "0.0.0.0:9598"
+sinks:
+  prometheus:
+    type: "prometheus_exporter"
+    inputs: ["internal_metrics"]
+    address: "0.0.0.0:9598"
 
-[sinks.dd_logs_egress]
-type = "datadog_logs"
-inputs = ["dd_logs"]
-default_api_key = ""
-encoding.codec = "json"
-request.concurrency = "adaptive"
-batch.max_bytes = 5242880
-request.rate_limit_num = 1000
+  dd_logs_egress:
+    type: "datadog_logs"
+    inputs: ["dd_logs"]
+    default_api_key: ""
+    encoding:
+      codec: "json"
+    request:
+      concurrency: "adaptive"
+      rate_limit_num: 1000
+    batch:
+      max_bytes: 5242880
 
-
-[sinks.blackhole]
-type = "blackhole"
-inputs = ["remap"]
+  blackhole:
+    type: "blackhole"
+    inputs: ["remap"]
 ```
 
 And you ran the new `vector graph --config vector.toml` you would see:

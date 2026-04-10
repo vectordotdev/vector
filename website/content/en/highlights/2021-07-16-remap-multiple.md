@@ -20,13 +20,13 @@ will create one log event for each event in the array.
 
 For example:
 
-```toml
-[transforms.remap]
-type = "remap"
-inputs = []
-source = """
-. = [{"message": "hello"}, {"message": "world"}]
-"""
+```yaml
+transforms:
+  remap:
+    type: "remap"
+    inputs: []
+    source: |
+      . = [{"message": "hello"}, {"message": "world"}]
 ```
 
 Would generate two output events:
@@ -45,15 +45,15 @@ Additionally, to make it easier to convert an incoming log event into an array, 
 function to VRL that transforms an incoming event where one of the fields is an array into an array of events, each with
 one of the elements from the array field. This is easiest to see with an example:
 
-```toml
-[transforms.remap]
-type = "remap"
-inputs = []
-source = """
-. = {"host": "localhost", "events": [{"message": "hello"}, {"message": "world"}]} # to represent the incoming event
+```yaml
+transforms:
+  remap:
+    type: "remap"
+    inputs: []
+    source: |
+      . = {"host": "localhost", "events": [{"message": "hello"}, {"message": "world"}]} # to represent the incoming event
 
-. = unnest(.events)
-"""
+      . = unnest(.events)
 ```
 
 Would output the following log events:
@@ -69,24 +69,23 @@ and another `remap` transform to receive each new event.
 
 An example of this:
 
-```toml
-[transforms.explode]
-type = "remap"
-inputs = []
-source = """
-. = {"host": "localhost", "events": [{"message": "hello"}, {"message": "world"}]} # to represent the incoming event
+```yaml
+transforms:
+  explode:
+    type: "remap"
+    inputs: []
+    source: |
+      . = {"host": "localhost", "events": [{"message": "hello"}, {"message": "world"}]} # to represent the incoming event
 
-. = unnest(.events)
-"""
+      . = unnest(.events)
 
-[transforms.map]
-type = "remap"
-inputs = ["explode"]
-source = """
-# example of pulling up the nested field to merge it into the top-level
-. |= .events
-del(.events)
-"""
+  map:
+    type: "remap"
+    inputs: ["explode"]
+    source: |
+      # example of pulling up the nested field to merge it into the top-level
+      . |= .events
+      del(.events)
 ```
 
 Would output the following log events:

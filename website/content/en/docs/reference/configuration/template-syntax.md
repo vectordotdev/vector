@@ -12,11 +12,12 @@ data. Any option that supports this syntax will be clearly documented as such in
 Let's partition data on AWS S3 by "application_id" and "date". We can accomplish this with the `key_prefix` option in
 the `aws_s3` sink:
 
-```toml
-[sinks.backup]
-  type = "aws_s3"
-  bucket = "all_application_logs"
-  key_prefix = "application_id={{ application_id }}/date=%F/"
+```yaml
+sinks:
+  backup:
+    type: "aws_s3"
+    bucket: "all_application_logs"
+    key_prefix: "application_id={{ application_id }}/date=%F/"
 ```
 
 Notice that Vector allows direct field references as well as "strftime" specifiers. If we were to run the following log
@@ -45,16 +46,16 @@ enables dynamic partitioning, something fundamental to storing log data in files
 
 Individual [log event][log] fields can be accessed using `{{ ... }}` to wrap a VRL [path expression][path_expression]:
 
-```toml
-option = "{{ .parent.child }}"
+```yaml
+option: "{{ .parent.child }}"
 ```
 
 ### Strftime specifiers
 
 In addition to directly accessing fields, Vector offers a shortcut for injecting [strftime specifiers][strftime]:
 
-```toml
-option = "year=%Y/month=%m/day=%d/"
+```yaml
+option: "year=%Y/month=%m/day=%d/"
 ```
 
 {{< info >}}
@@ -67,14 +68,14 @@ and the name of this field can be changed via the [global `timestamp_key` option
 You can escape this syntax by prefixing the character with a `\`. For example, you can escape the event field syntax
 like this:
 
-```toml
-option = "\{{ field_name }}"
+```yaml
+option: "\{{ field_name }}"
 ```
 
 And [strftime] specified like so:
 
-```toml
-option = "year=\%Y/month=\%m/day=\%d/"
+```yaml
+option: "year=\\%Y/month=\\%m/day=\\%d/"
 ```
 
 Each of the values above would be treated literally.
@@ -91,15 +92,16 @@ You can find additional examples for accessing fields in the
 Vector doesn't currently support fallback values, [issue 1692][1692] is open to add this functionality. In the interim,
 you can use the [`remap` transform][remap] to set a default value:
 
-```toml
-[transforms.set_defaults]
-  type = "remap"
-  inputs = ["my-source-id"]
-  source = '''
-    if !exists(.my_field) {
-      .my_field = "default"
-    }
-  '''
+```yaml
+transforms:
+  set_defaults:
+    type: "remap"
+    inputs:
+      - "my-source-id"
+    source: |
+      if !exists(.my_field) {
+        .my_field = "default"
+      }
 ```
 
 ### Missing fields
