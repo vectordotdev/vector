@@ -7,6 +7,7 @@ use vector_lib::{
 
 use super::{channel::AmqpSinkChannels, sink::AmqpSink};
 use crate::{amqp::AmqpConfig, sinks::prelude::*};
+use tracing::warn;
 
 /// AMQP properties configuration.
 #[configurable_component]

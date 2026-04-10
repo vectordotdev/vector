@@ -27,7 +27,7 @@ use vector_core::event::Event;
 
 use super::arrow::{ArrowEncodingError, build_record_batch};
 use crate::encoding::format::arrow::vector_log_events_to_json_values;
-use crate::encoding::internal_events::SchemaGenerationError;
+use crate::internal_events::SchemaGenerationError;
 
 type EventsDroppedError = ComponentEventsDropped<'static, UNINTENTIONAL>;
 
@@ -60,18 +60,21 @@ pub enum ParquetCompression {
     None,
 }
 
-impl ParquetCompression {
-    fn into(self) -> ParquetCodecCompression {
-        match self {
-            Self::None => ParquetCodecCompression::UNCOMPRESSED,
-            Self::Snappy => ParquetCodecCompression::SNAPPY,
-            Self::Zstd { level } => ParquetCodecCompression::ZSTD(
-                ZstdLevel::try_new(level.into()).expect("level is already validated."),
-            ),
-            Self::Gzip { level } => ParquetCodecCompression::GZIP(
-                GzipLevel::try_new(level.into()).expect("level is already validated."),
-            ),
-            Self::Lz4 => ParquetCodecCompression::LZ4_RAW,
+impl TryFrom<ParquetCompression> for ParquetCodecCompression {
+    type Error = parquet::errors::ParquetError;
+    fn try_from(
+        value: ParquetCompression,
+    ) -> Result<ParquetCodecCompression, parquet::errors::ParquetError> {
+        match value {
+            ParquetCompression::None => Ok(ParquetCodecCompression::UNCOMPRESSED),
+            ParquetCompression::Snappy => Ok(ParquetCodecCompression::SNAPPY),
+            ParquetCompression::Zstd { level } => Ok(ParquetCodecCompression::ZSTD(
+                ZstdLevel::try_new(level.into())?,
+            )),
+            ParquetCompression::Gzip { level } => Ok(ParquetCodecCompression::GZIP(
+                GzipLevel::try_new(level.into())?,
+            )),
+            ParquetCompression::Lz4 => Ok(ParquetCodecCompression::LZ4_RAW),
         }
     }
 }
@@ -250,7 +253,7 @@ impl ParquetSerializer {
 
         let writer_props = Arc::new(
             WriterProperties::builder()
-                .set_compression(config.compression.into())
+                .set_compression(config.compression.try_into()?)
                 .build(),
         );
 
@@ -289,6 +292,10 @@ impl tokio_util::codec::Encoder<Vec<Event>> for ParquetSerializer {
                 internal_log_rate_secs = 10,
             );
             self.events_dropped_handle.emit(Count(non_log_count))
+        }
+
+        if json_values.is_empty() {
+            return Ok(());
         }
 
         // In strict mode, check for extra top-level fields not in the schema.

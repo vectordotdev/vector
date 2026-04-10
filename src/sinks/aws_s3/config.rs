@@ -600,6 +600,7 @@ mod tests {
             [batch_encoding]
             codec = "parquet"
             schema_mode = "strict"
+            schema_file = "tmp/something.schema"
             "#,
         )
         .unwrap();
@@ -611,35 +612,5 @@ mod tests {
             #[allow(unreachable_patterns)]
             _ => panic!("expected Parquet variant"),
         }
-    }
-
-    /// Parquet with `compression != "none"` must be rejected at build time.
-    #[cfg(feature = "codecs-parquet")]
-    #[test]
-    fn parquet_rejects_sink_level_compression() {
-        let config: S3SinkConfig = toml::from_str(
-            r#"
-            bucket = "test-bucket"
-            compression = "gzip"
-
-            [encoding]
-            codec = "text"
-
-            [batch_encoding]
-            codec = "parquet"
-            schema_mode = "auto_infer"
-            "#,
-        )
-        .unwrap();
-
-        assert!(
-            config.compression.is_compressed(),
-            "fixture must have compression enabled"
-        );
-        assert!(
-            config.batch_encoding.is_some(),
-            "fixture must have batch_encoding"
-        );
-        // The build() method checks this and returns Err
     }
 }

@@ -6,7 +6,6 @@ mod config;
 mod encoder;
 pub mod format;
 pub mod framing;
-mod internal_events;
 pub mod serializer;
 mod transformer;
 pub use chunking::{Chunker, Chunking, GelfChunker};

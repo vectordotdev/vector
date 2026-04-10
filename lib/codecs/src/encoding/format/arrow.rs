@@ -4,7 +4,7 @@
 //! This implements the streaming variant of the Arrow IPC protocol, which writes
 //! a continuous stream of record batches without a file footer.
 
-use crate::encoding::internal_events::JsonSerializationError;
+use crate::internal_events::JsonSerializationError;
 use arrow::{
     datatypes::{DataType, Field, Fields, Schema, SchemaRef},
     ipc::writer::StreamWriter,
@@ -316,14 +316,13 @@ pub(crate) fn build_record_batch(
 
     let missing = find_null_non_nullable_fields(&schema, values);
     if !missing.is_empty() {
-        for field_name in &missing {
-            let error: vector_common::Error = Box::new(ArrowEncodingError::NullConstraint {
-                field_name: field_name.to_string(),
-            });
-            vector_common::internal_event::emit(
-                crate::internal_events::EncoderNullConstraintError { error: &error },
-            );
-        }
+        let error: vector_common::Error = Box::new(ArrowEncodingError::NullConstraint {
+            field_name: missing.join(", "),
+        });
+        vector_common::internal_event::emit(crate::internal_events::EncoderNullConstraintError {
+            error: &error,
+            count: values.len(),
+        });
         return Err(ArrowEncodingError::NullConstraint {
             field_name: missing.join(", "),
         });

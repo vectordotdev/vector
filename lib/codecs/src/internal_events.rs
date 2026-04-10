@@ -7,6 +7,7 @@ use vector_common::internal_event::{
 };
 use vector_common_macros::NamedInternalEvent;
 
+
 #[derive(Debug, NamedInternalEvent)]
 /// Emitted when a decoder framing error occurs.
 pub struct DecoderFramingError<E> {
@@ -157,6 +158,8 @@ impl<E: std::fmt::Display> InternalEvent for EncoderWriteError<'_, E> {
 pub struct EncoderNullConstraintError<'a> {
     /// The schema constraint error that occurred.
     pub error: &'a vector_common::Error,
+    /// The number of events dropped due to the constraint violation.
+    pub count: usize,
 }
 
 #[cfg(feature = "arrow")]
@@ -178,8 +181,58 @@ impl InternalEvent for EncoderNullConstraintError<'_> {
         )
         .increment(1);
         emit(ComponentEventsDropped::<UNINTENTIONAL> {
-            count: 1,
+            count: self.count,
             reason: CONSTRAINT_REASON,
         });
+    }
+}
+
+#[cfg(feature = "arrow")]
+#[derive(NamedInternalEvent)]
+pub(crate) struct JsonSerializationError<'a> {
+    pub error: &'a serde_json::Error,
+}
+
+#[cfg(feature = "arrow")]
+impl InternalEvent for JsonSerializationError<'_> {
+    fn emit(self) {
+        error!(
+            message = "Could not serialize event to JSON.",
+            error = %self.error,
+            error_type = error_type::ENCODER_FAILED,
+            stage = error_stage::SENDING,
+            internal_log_rate_limit = true,
+        );
+        counter!(
+            "component_errors_total",
+            "error_type" => error_type::ENCODER_FAILED,
+            "stage" => error_stage::SENDING,
+        )
+        .increment(1);
+    }
+}
+
+#[cfg(feature = "parquet")]
+#[derive(NamedInternalEvent)]
+pub(crate) struct SchemaGenerationError<'a> {
+    pub error: &'a arrow::error::ArrowError,
+}
+
+#[cfg(feature = "parquet")]
+impl InternalEvent for SchemaGenerationError<'_> {
+    fn emit(self) {
+        error!(
+            message = "Could not generate schema for batched events",
+            error = %self.error,
+            error_type = error_type::ENCODER_FAILED,
+            stage = error_stage::SENDING,
+            internal_log_rate_limit = false,
+        );
+        counter!(
+            "component_errors_total",
+            "error_type" => error_type::ENCODER_FAILED,
+            "stage" => error_stage::SENDING,
+        )
+        .increment(1);
     }
 }
