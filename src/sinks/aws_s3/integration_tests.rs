@@ -498,7 +498,7 @@ async fn s3_flush_on_exhaustion() {
 #[tokio::test]
 async fn s3_parquet_insert_message() {
     use vector_lib::codecs::encoding::format::{
-        ParquetCompression, ParquetFieldType, ParquetSchemaField, ParquetSerializerConfig,
+        ParquetCompression, ParquetSerializerConfig, SchemaMode,
     };
 
     let cx = SinkContext::default();
@@ -506,18 +506,7 @@ async fn s3_parquet_insert_message() {
     create_bucket(&bucket, false).await;
 
     let parquet_config = ParquetSerializerConfig {
-        schema: vec![
-            ParquetSchemaField {
-                name: "message".to_string(),
-                data_type: ParquetFieldType::Utf8,
-                fields: Vec::new(), items: None, key_type: None, value_type: None,
-            },
-            ParquetSchemaField {
-                name: "host".to_string(),
-                data_type: ParquetFieldType::Utf8,
-                fields: Vec::new(), items: None, key_type: None, value_type: None,
-            },
-        ],
+        schema_mode: SchemaMode::AutoInfer,
         compression: ParquetCompression::Snappy,
         ..Default::default()
     };
