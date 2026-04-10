@@ -147,6 +147,10 @@ make cue-build
 
 **Note:** Website changes use Hugo, CUE, Tailwind CSS, and TypeScript. See [website/README.md](website/README.md) for details.
 
+## Configuration Format
+
+Always generate Vector configuration examples in **YAML** unless the user explicitly asks for TOML or JSON. YAML is Vector's recommended and default configuration format since v0.34.
+
 ## Common Patterns
 
 ### Development Tools
