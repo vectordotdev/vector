@@ -1,1 +1,1 @@
-Fixed API server reload behavior: the server now only restarts after a successful topology reload (preventing inconsistent state on rollback), and compares configured addresses instead of bound addresses (preventing spurious restarts with port-0 or similar configs).
+Fixed a bug where the API server would not respect a configured `api.address` on config reload. The API server now starts with the correct address when re-enabled, and only starts after a successful topology reload to prevent inconsistent state on rollback.

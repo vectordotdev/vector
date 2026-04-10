@@ -66,46 +66,10 @@ impl TopologyController {
             .healthchecks
             .set_require_healthy(self.require_healthy);
 
-        // Start the api server or disable it, if necessary
+        // Save whether we need to start/stop the API server before the
+        // topology reload consumes new_config.
         #[cfg(feature = "api")]
-        if !new_config.api.enabled {
-            if let Some(server) = self.api_server.take() {
-                debug!("Stopping gRPC API server.");
-                drop(server);
-            }
-        } else if self.api_server.is_none() {
-            debug!("Starting gRPC API server.");
-
-            match api::GrpcServer::start(
-                &new_config,
-                self.topology.watch(),
-                Arc::clone(&self.topology.running),
-            )
-            .await
-            {
-                Ok(api_server) => {
-                    let addr = api_server.addr();
-                    info!(
-                        message = "GRPC API server started.",
-                        addr = %addr,
-                    );
-                    self.api_server = Some(api_server);
-                }
-                Err(error) => {
-                    let error_string = error.to_string();
-                    error!(
-                        message = "An error occurred that Vector couldn't handle.",
-                        error = %error_string,
-                        internal_log_rate_limit = false,
-                    );
-                    // Fail fast when API is explicitly enabled but fails to start
-                    // This ensures users don't run with a broken configuration thinking top/tap will work
-                    return ReloadOutcome::FatalError(ShutdownError::ApiFailed {
-                        error: error_string,
-                    });
-                }
-            }
-        }
+        let new_api_enabled = new_config.api.enabled;
 
         match self
             .topology
@@ -113,6 +77,47 @@ impl TopologyController {
             .await
         {
             Ok(()) => {
+                // Topology reload succeeded — now start or stop the API server.
+                // This ordering ensures we don't touch the API server if the
+                // topology rolls back.
+                #[cfg(feature = "api")]
+                if !new_api_enabled {
+                    if let Some(server) = self.api_server.take() {
+                        debug!("Stopping gRPC API server.");
+                        drop(server);
+                    }
+                } else if self.api_server.is_none() {
+                    debug!("Starting gRPC API server.");
+
+                    match api::GrpcServer::start(
+                        self.topology.config(),
+                        self.topology.watch(),
+                        Arc::clone(&self.topology.running),
+                    )
+                    .await
+                    {
+                        Ok(api_server) => {
+                            let addr = api_server.addr();
+                            info!(
+                                message = "GRPC API server started.",
+                                addr = %addr,
+                            );
+                            self.api_server = Some(api_server);
+                        }
+                        Err(error) => {
+                            let error_string = error.to_string();
+                            error!(
+                                message = "An error occurred that Vector couldn't handle.",
+                                error = %error_string,
+                                internal_log_rate_limit = false,
+                            );
+                            return ReloadOutcome::FatalError(ShutdownError::ApiFailed {
+                                error: error_string,
+                            });
+                        }
+                    }
+                }
+
                 emit!(VectorReloaded {
                     config_paths: &self.config_paths
                 });
