@@ -21,7 +21,6 @@ transforms:
     drop_on_abort: true
     reroute_dropped: true
     source: "abort"
-
 tests:
   - name: "remap_dropped_output"
     no_outputs_from: ["foo"]

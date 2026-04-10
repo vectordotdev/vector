@@ -76,7 +76,7 @@ transforms:
     inputs: ["in"]
     rate: 10
     key_field: "message"
-    exclude: |
+    exclude: |-
       contains!(.message, "error")
 ```
 
@@ -94,7 +94,7 @@ transforms:
   filter_a:
     inputs: ["stdin"]
     type: "filter"
-    condition: |
+    condition: |-
       message = if exists(.tags) { .tags.message } else { .message }
       message == "test filter 1"
 ```
@@ -108,7 +108,7 @@ transforms:
     type: "filter"
     condition:
       type: "remap"
-      source: |
+      source: |-
         message = if exists(.tags) { .tags.message } else { .message }
         message == "test filter 1"
 ```
@@ -122,7 +122,7 @@ transforms:
     type: "filter"
     condition:
       type: "vrl"
-      source: |
+      source: |-
         message = if exists(.tags) { .tags.message } else { .message }
         message == "test filter 1"
 ```

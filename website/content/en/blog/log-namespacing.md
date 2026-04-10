@@ -42,21 +42,18 @@ source.
 ```yaml
 schema:
   log_namespace: true
-
 sources:
   input_with_log_namespace:
     type: "demo_logs"
     format: "shuffle"
     lines: ["input_with_log_namespace"]
     interval: 1
-
   input_without_log_namespace:
     type: "demo_logs"
     format: "shuffle"
     lines: ["input_without_log_namespace"]
     interval: 1
     log_namespace: false
-
 sinks:
   console:
     type: "console"

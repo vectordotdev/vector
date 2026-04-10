@@ -31,7 +31,6 @@ This simple Vector configuration, for example, would suffice to send logs from *
 sources:
   k8s_all:
     type: "kubernetes_logs"
-
 sinks:
   es_out:
     type: "elasticsearch"
