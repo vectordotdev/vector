@@ -14,7 +14,7 @@ badges:
 This release adds a new subcommand `vector graph` to output the topology specified by you Vector configuration as
 a graph in [DOT][DOT] format. This output can then be visualized using [Graphviz] to produce an image.
 
-For example, if you had a config, `vector.toml`, like:
+For example, if you had a config, `vector.yaml`, like:
 
 ```yaml
 ##
@@ -85,7 +85,7 @@ sinks:
     inputs: ["remap"]
 ```
 
-And you ran the new `vector graph --config vector.toml` you would see:
+And you ran the new `vector graph --config vector.yaml` you would see:
 
 ```dot
 digraph {
@@ -106,7 +106,7 @@ digraph {
 To render this, if you have [Graphviz] installed, you could do:
 
 ```shell
-vector graph --config vector.toml | dot -Tpng > graph.png
+vector graph --config vector.yaml | dot -Tpng > graph.png
 ```
 
 To get an image that looks like:

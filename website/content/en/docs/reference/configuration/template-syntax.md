@@ -69,7 +69,7 @@ You can escape this syntax by prefixing the character with a `\`. For example, y
 like this:
 
 ```yaml
-option: "\{{ field_name }}"
+option: '\{{ field_name }}'
 ```
 
 And [strftime] specified like so:

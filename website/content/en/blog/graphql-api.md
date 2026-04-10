@@ -193,7 +193,7 @@ query {
 
 The API is an opt-in feature that spawns an HTTP server to accept queries.
 
-To enable, open your `vector.toml`, and add the following:
+To enable, open your `vector.yaml`, and add the following:
 
 ```yaml
 api:

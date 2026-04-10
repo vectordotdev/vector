@@ -56,9 +56,9 @@ tests:
 And you can run the tests via the new `test` subcommand:
 
 ```sh
-$ vector test ./vector.toml
-Running ./vector.toml tests
-Test ./vector.toml: verify_regex ... passed
+$ vector test ./vector.yaml
+Running ./vector.yaml tests
+Test ./vector.yaml: verify_regex ... passed
 ```
 
 ## Why?
