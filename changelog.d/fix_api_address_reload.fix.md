@@ -1,0 +1,1 @@
+Fixed API server reload behavior: the server now only restarts after a successful topology reload (preventing inconsistent state on rollback), and compares configured addresses instead of bound addresses (preventing spurious restarts with port-0 or similar configs).
