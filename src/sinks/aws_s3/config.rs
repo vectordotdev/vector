@@ -294,6 +294,11 @@ impl S3SinkConfig {
                         _ => None,
                     });
 
+            if self.compression != Compression::None {
+                // warn that we're overriding the configured top level compression setting.
+                warn!("top level compression setting ignored wehen batch_encoding set to parquet.")
+            }
+
             let request_options = S3RequestOptions {
                 bucket: self.bucket.clone(),
                 api_options,
