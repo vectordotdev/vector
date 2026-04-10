@@ -249,6 +249,9 @@ impl TransformConfig for Ec2Metadata {
     }
 
     fn build_requires_environment(&self) -> bool {
+        // `build` performs network initialization and starts the refresh task, so
+        // `validate --no-environment` must skip this transform until #25162 is resolved:
+        // https://github.com/vectordotdev/vector/issues/25162
         true
     }
 
