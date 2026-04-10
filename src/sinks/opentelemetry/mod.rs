@@ -49,7 +49,6 @@ impl Default for Protocol {
             uri: Default::default(),
             method: HttpMethod::Post,
             auth: Default::default(),
-            headers: Default::default(),
             compression: Default::default(),
             payload_prefix: Default::default(),
             payload_suffix: Default::default(),

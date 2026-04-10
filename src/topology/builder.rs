@@ -52,7 +52,10 @@ use crate::{
     spawn_named,
     topology::task::TaskError,
     transforms::{SyncTransform, TaskTransform, Transform, TransformOutputs, TransformOutputsBuf},
-    utilization::{UtilizationComponentSender, UtilizationEmitter, UtilizationRegistry, wrap},
+    utilization::{
+        OutputUtilization, Utilization, UtilizationComponentSender, UtilizationEmitter,
+        UtilizationRegistry,
+    },
 };
 
 static ENRICHMENT_TABLES: LazyLock<vector_lib::enrichment::TableRegistry> =
@@ -641,7 +644,7 @@ impl<'a> Builder<'a> {
                     .take()
                     .expect("Task started but input has been taken.");
 
-                let mut rx = wrap(utilization_sender, component_key.clone(), rx);
+                let mut rx = Utilization::new(utilization_sender, component_key.clone(), rx);
 
                 let events_received = register!(EventsReceived);
                 sink.run(
@@ -801,7 +804,8 @@ impl<'a> Builder<'a> {
         let sender = self
             .utilization_registry
             .add_component(key.clone(), gauge!("utilization"));
-        let input_rx = wrap(sender, key.clone(), input_rx.into_stream());
+        let output_sender = sender.clone();
+        let input_rx = Utilization::new(sender, key.clone(), input_rx.into_stream());
 
         let events_received = register!(EventsReceived);
         let filtered = input_rx
@@ -846,6 +850,7 @@ impl<'a> Builder<'a> {
                     events.estimated_json_encoded_size_of(),
                 ));
             });
+        let stream = OutputUtilization::new(output_sender, stream);
         let transform = async move {
             debug!("Task transform starting.");
 
