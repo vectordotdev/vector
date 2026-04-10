@@ -31,13 +31,11 @@ sources:
   my_logs:
     type: "file"
     include: ["/var/log/my-app.log"]
-
 transforms:
   parser:
     inputs: ["my_logs"]
     type: "regex_parser"
     regex: "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$"
-
 tests:
   - name: "verify_regex"
     input:

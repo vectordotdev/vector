@@ -48,7 +48,6 @@ log_schema:
   host_key: "instance" # default "host"
   message_key: "info" # default "message"
   timestamp_key: "datetime" # default "timestamp"
-
 # Sources, transforms, and sinks...
 ```
 
@@ -70,7 +69,6 @@ If your vector pipeline is only working with data passing through these systems,
 ```yaml title="vector.yaml"
 log_schema:
   timestamp_key: "@timestamp" # Applies to all sources, sinks, and transforms!
-
 sources:
   my_naming_confused_source:
     type: "logplex"
@@ -97,7 +95,7 @@ transforms:
   strip_personal_details:
     type: "remap"
     inputs: ["my-source-id"]
-    source: |
+    source: |-
       del(.email, .passport_number)
 ```
 
@@ -108,7 +106,7 @@ transforms:
   strip_personal_details:
     type: "remap"
     inputs: ["my-source-id"]
-    source: |
+    source: |-
       only_fields(.timestamp, .message, .host, .user_id)
 ```
 
@@ -131,34 +129,28 @@ We can build a config that will do the first part of this, but we'll just output
 ```yaml title="vector.yaml"
 data_dir: "./data"
 dns_servers: []
-
 sources:
   application:
     max_length: 102400
     type: "stdin"
-
 transforms:
   parse:
     inputs: ["application"]
     type: "remap"
     source: |
       . = parse_json!(.message)
-
   not_gdpr:
     type: "filter"
     inputs: ["parse"]
     condition: ".gdpr == false"
-
   gdpr_to_strip:
     type: "filter"
     inputs: ["parse"]
     condition: ".gdpr == true"
-
   gdpr_stripped:
     type: "remap"
     inputs: ["gdpr_to_strip"]
     source: "del(.email)"
-
 sinks:
   console:
     healthcheck: true
@@ -216,7 +208,6 @@ sinks:
     topic: "{{service}}"
     encoding:
       except_fields: ["service"] # Remove this field now and save some bytes
-    # ...
 ```
 
 {{< warning >}}
@@ -233,7 +224,7 @@ transforms:
   rename_timestamp:
     type: "remap"
     inputs: ["source0"]
-    source: |
+    source: |-
       ."@timestamp" = .timestamp
       del(.timestamp)
 ```
@@ -257,7 +248,7 @@ transforms:
   moosh_names:
     type: "remap"
     inputs: ["source0"]
-    source: |
+    source: |-
       .name = .first_name + " " + .last_name
       del(.first_name, .last_name)
 ```
@@ -274,7 +265,7 @@ transforms:
   correct_source_types:
     type: "remap"
     inputs: ["source0"]
-    source: |
+    source: |-
       .count = int(.count)
       .date = timestamp(.date, "%F")
 ```
@@ -296,7 +287,7 @@ friendly logs up to the great white north!
 transforms:
   format_timestamp:
     type: "remap"
-    source: |
+    source: |-
       .timestamp = timestamp(.timestamp, "%Y/%m/%d:%H:%M:%S %z")
 ```
 

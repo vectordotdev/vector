@@ -43,7 +43,6 @@ To get started with these sources, define them and go:
 sources:
   host_metrics:
     type: "host_metrics" # or apache_metrics, mongodb_metrics, or internal_metrics
-
 # Then connect them to a sink:
 sinks:
   prometheus:

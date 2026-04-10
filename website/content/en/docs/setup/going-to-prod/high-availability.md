@@ -57,19 +57,16 @@ The following is an example configuration that routes failed events from a `rema
 sources:
   input:
     type: "datadog_agent"
-
 transforms:
   parsing:
     inputs: ["input"]
     type: "remap"
     reroute_dropped: true
     source: "..."
-
 sinks:
   analysis:
     inputs: ["parsing"]
     type: "datadog_logs"
-
   backup:
     inputs: ["parsing.dropped"] # dropped events from the `parsing` transform
     type: "aws_s3"

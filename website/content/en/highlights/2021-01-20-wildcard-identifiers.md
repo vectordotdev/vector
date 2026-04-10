@@ -20,20 +20,16 @@ sources:
   app1_logs:
     type: "file"
     includes: ["/var/log/app1.log"]
-
   app2_logs:
     type: "file"
     includes: ["/var/log/app.log"]
-
   system_logs:
     type: "file"
     includes: ["/var/log/system.log"]
-
 sinks:
   app_logs:
     type: "datadog_logs"
     inputs: ["app*"]
-
   archive:
     type: "aws_s3"
     inputs: ["app*", "system_logs"]

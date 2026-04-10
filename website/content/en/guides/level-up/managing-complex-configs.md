@@ -54,13 +54,11 @@ transforms:
       - "somewhere"
     type: "remap"
     # etc ...
-
   transform1:
     inputs:
       - "transform0"
     type: "filter"
     # etc ...
-
   transform2:
     inputs:
       - "transform1"
@@ -89,13 +87,12 @@ sources:
     type: "socket"
     mode: "tcp"
     address: "0.0.0.0:9000"
-
 transforms:
   foo:
     inputs:
       - "over_tcp"
     type: "remap"
-    source: |
+    source: |-
       . = parse_grok!(.message, s'%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}')
 ```
 
@@ -199,7 +196,6 @@ sources:
     address: "0.0.0.0:514"
     max_length: 42000
     mode: "tcp"
-
 transforms:
   change_fields:
     type: "remap"
@@ -207,7 +203,6 @@ transforms:
       - "syslog"
     source: |
       .new_field = "some value"
-
 sinks:
   stdout:
     type: "console"
@@ -233,7 +228,7 @@ The `change_fields` transform in the file `/etc/vector/transforms/change_fields.
 type: "remap"
 inputs:
   - "syslog"
-source: |
+source: |-
   .new_field = "some value"
 ```
 

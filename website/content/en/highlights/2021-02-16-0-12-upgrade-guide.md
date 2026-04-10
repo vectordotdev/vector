@@ -121,7 +121,7 @@ migrate to the new `remap` transform. For example, migrating from the `json_pars
 transforms:
   remap:
     type: "remap"
-    source: |
+    source: |-
       . = merge(., parse_json!(.message))
 ```
 

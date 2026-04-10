@@ -42,10 +42,8 @@ allows its internal metrics to be scraped by [Prometheus]:
 sources:
   vector_logs:
     type: "internal_logs"
-
   vector_metrics:
     type: "internal_metrics"
-
 sinks:
   splunk:
     type: "splunk_hec"
@@ -54,7 +52,6 @@ sinks:
     token: "${SPLUNK_HEC_TOKEN}"
     encoding:
       codec: "json"
-
   prometheus:
     type: "prometheus"
     inputs: ["vector_metrics"]

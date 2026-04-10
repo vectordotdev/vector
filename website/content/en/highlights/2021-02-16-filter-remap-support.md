@@ -39,6 +39,11 @@ transforms:
         severity:
           ne: "info"
           # ne: "debug"
+---
+transforms:
+  filter_out_non_critical:
+    type: "filter"
+    inputs: ["http-server-logs"]
 
     # Using remap
     condition:

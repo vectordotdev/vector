@@ -85,7 +85,6 @@ sources:
     type: "aws_kinesis_firehose"
     address: "0.0.0.0:8080" # the public URL will be set when configuring Firehose
     access_key: "${FIREHOSE_ACCESS_KEY}" # this will also be set when configuring Firehose
-
 transforms:
   parse:
     type: "remap"
@@ -100,9 +99,7 @@ transforms:
          message = del(.message)
          . |= object!(parse_json!(message))
       }
-
 # you may want to add more transforms here
-
 sinks:
   console:
     type: "console"
@@ -492,7 +489,7 @@ transforms:
     type: "remap"
     inputs: ["firehose"]
     drop_on_error: false
-    source: |
+    source: |-
       parsed = parse_aws_cloudwatch_log_subscription_message!(.message)
       . = unnest(parsed.log_events)
       . = map_values(.) -> |value| {

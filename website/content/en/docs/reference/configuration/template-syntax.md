@@ -169,7 +169,7 @@ transforms:
     type: "remap"
     inputs:
       - "my-source-id"
-    source: |
+    source: |-
       if !exists(.my_field) {
         .my_field = "default"
       }

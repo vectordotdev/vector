@@ -54,6 +54,29 @@ def extract_yaml_blocks(path: Path) -> list[tuple[int, int, str]]:
     return blocks
 
 
+DIFF_LINE = re.compile(r"^[+ -]")
+
+
+def strip_diff_markers(content: str) -> str | None:
+    """If every non-empty line starts with a diff prefix (+, -, or space),
+    return the "after" state: context and added lines with the prefix stripped.
+    Removed (-) lines are dropped.  Returns None if the block is not a diff."""
+    lines = content.splitlines(keepends=True)
+    if not lines:
+        return None
+    for line in lines:
+        if line.strip() and not DIFF_LINE.match(line):
+            return None
+    after_lines: list[str] = []
+    for line in lines:
+        if not line.strip():
+            after_lines.append(line)
+        elif line[0] in (" ", "+"):
+            after_lines.append(line[1:])
+        # skip '-' lines (removed in the diff)
+    return "".join(after_lines)
+
+
 YAMLLINT_CONFIG = YamlLintConfig("extends: default")
 YAMLLINT_RELAXED_CONFIG = YamlLintConfig(
     "extends: default\n"
@@ -75,6 +98,7 @@ def lint_block(
 
 def cmd_lint(args: argparse.Namespace) -> int:
     had_failure = False
+    verbose = args.verbose
 
     for path in args.files:
         if not path.exists():
@@ -84,19 +108,26 @@ def cmd_lint(args: argparse.Namespace) -> int:
 
         blocks = extract_yaml_blocks(path)
         if not blocks:
-            print(f"{path}: no YAML blocks found")
+            if verbose:
+                print(f"{path}: no YAML blocks found")
             continue
 
         for idx, (start_line, _end_line, content) in enumerate(blocks, start=1):
-            problems = lint_block(content, strict=args.strict)
+            lint_content = strip_diff_markers(content)
+            is_diff = lint_content is not None
+            if lint_content is None:
+                lint_content = content
+
+            problems = lint_block(lint_content, strict=args.strict)
+            suffix = " (diff)" if is_diff else ""
             if problems:
                 had_failure = True
-                print(f"{path}: block {idx} (line {start_line}) FAILED")
+                print(f"{path}: block {idx} (line {start_line}){suffix} FAILED")
                 for p in problems:
                     md_line = p.line + start_line - 1
                     print(f"  line {md_line}:{p.column}: [{p.level}] {p.message}")
-            else:
-                print(f"{path}: block {idx} (line {start_line}) OK")
+            elif verbose:
+                print(f"{path}: block {idx} (line {start_line}){suffix} OK")
 
     return 1 if had_failure else 0
 
@@ -137,7 +168,15 @@ def cmd_fix(args: argparse.Namespace) -> int:
         for idx, (start_line, end_line, content) in reversed(
             list(enumerate(blocks, start=1))
         ):
-            fixed = fix_code(content, config=YAMLFIX_CFG)
+            try:
+                fixed = fix_code(content, config=YAMLFIX_CFG)
+            except Exception as exc:
+                print(
+                    f"{path}: block {idx} (line {start_line}) SKIPPED"
+                    f" — yamlfix could not parse: {exc}",
+                    file=sys.stderr,
+                )
+                continue
 
             # Ensure the fixed content ends with a newline so the closing
             # fence stays on its own line.
@@ -176,6 +215,12 @@ def main() -> int:
         "--strict",
         action="store_true",
         help="Use default yamllint rules (document-start, line-length, comments spacing enforced)",
+    )
+    lint_parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="Print OK status for passing blocks and files with no YAML blocks",
     )
     lint_parser.set_defaults(func=cmd_lint)
 

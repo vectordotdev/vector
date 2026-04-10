@@ -56,7 +56,6 @@ We'll run this config:
 
 ```yaml title=vector.yaml
 data_dir: "tmp"
-
 sources:
   source0:
     include: ["input.log"]
@@ -64,13 +63,11 @@ sources:
     type: "file"
     fingerprinting:
       strategy: "device_and_inode"
-
 transforms:
   transform0:
     inputs: ["source0"]
     type: "json_parser"
     field: "message"
-
   transform1:
     inputs: ["transform0"]
     type: "reduce"
@@ -85,7 +82,6 @@ transforms:
       query_duration_ms: "sum"
       render_duration_ms: "sum"
       response_duration_ms: "sum"
-
 sinks:
   sink0:
     healthcheck: true

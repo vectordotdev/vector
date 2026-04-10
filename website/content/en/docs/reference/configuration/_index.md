@@ -21,14 +21,12 @@ will differ based on your needs.
 ```yaml
 # Set global options
 data_dir: "/var/lib/vector"
-
 # Vector's API (disabled by default)
 # Enable and try it out with the `vector top` command
 # NOTE: this is _enabled_ for helm chart deployments, see: https://github.com/vectordotdev/helm-charts/blob/develop/charts/vector/examples/datadog-values.yaml#L78-L81
 api:
   enabled: false
 # address = "127.0.0.1:8686"
-
 # Ingest data by tailing one or more files
 sources:
   apache_logs:
@@ -36,7 +34,6 @@ sources:
     include:
       - "/var/log/apache2/*.log" # supports globbing
     ignore_older_secs: 86400     # 1 day
-
 # Structure and parse via Vector's Remap Language
 transforms:
   apache_parser:
@@ -51,7 +48,6 @@ transforms:
       - "apache_parser"
     type: "sample"
     rate: 2 # only keep 50% (1/`rate`)
-
 # Send structured data to a short-term storage
 sinks:
   es_cluster:
@@ -284,7 +280,6 @@ You can also split your configuration by grouping the components by their type, 
 ```yaml
 # Set global options
 data_dir: "/var/lib/vector"
-
 # Vector's API (disabled by default)
 # Enable and try it out with the `vector top` command
 api:
@@ -310,7 +305,7 @@ ignore_older: 86400                    # 1 day
 inputs:
   - "apache_logs"
 type: "remap"
-source: |
+source: |-
   . = parse_apache_log(.message)
 ```
 
@@ -378,20 +373,16 @@ sources:
   app1_logs:
     type: "file"
     includes: ["/var/log/app1.log"]
-
   app2_logs:
     type: "file"
     includes: ["/var/log/app.log"]
-
   system_logs:
     type: "file"
     includes: ["/var/log/system.log"]
-
 sinks:
   app_logs:
     type: "datadog_logs"
     inputs: ["app*"]
-
   archive:
     type: "aws_s3"
     inputs: ["app*", "system_logs"]
@@ -414,12 +405,10 @@ enrichment_tables:
     ttl: 60
     flush_interval: 5
     inputs: ["cache_generator"]
-
 sources:
   demo_logs_test:
     type: "demo_logs"
     format: "json"
-
 transforms:
   demo_logs_processor:
     type: "remap"
@@ -430,7 +419,6 @@ transforms:
 
       # Look for existing value in the table, using "user-identifier" as key
       existing, err = get_enrichment_table_record("memory_table", { "key": user_id })
-
       if err == null {
         # Value found, just use the cached value
         # In this case existing looks like this { "key": user_id, "value": {}, "ttl": 50 }
@@ -444,7 +432,6 @@ transforms:
         .referer.host = encode_punycode!(.referer.host)
         .source = "transform"
       }
-
   cache_generator:
     type: "remap"
     inputs: ["demo_logs_processor"]
@@ -460,7 +447,6 @@ transforms:
       } else {
         . = {}
       }
-
 # We can observe that after some time that some events have "source" set to "cache"
 sinks:
   console:
@@ -483,24 +469,21 @@ enrichment_tables:
     flush_interval: 5
     inputs: ["cache_generator"]
     source_config:
-       # Export the cache every 3 minutes (100 seconds).
-       export_interval: 180
-       # If set to false (which is the default) it will not remove data from cache after exporting.
-       remove_after_export: false
-       # Source key has to be defined and be different from the main key ("memory_table").
-       # This key is then used to define this component as an input to other components
-       source_key: "memory_table_source"
-       # export_batch_size can be used to reduce memory usage when handling larger tables.
-       # When set, data will be exported from the table in batches, waiting for downstream components
-       # to process the data
-       # export_batch_size: 10000
-
-
+      # Export the cache every 3 minutes (100 seconds).
+      export_interval: 180
+      # If set to false (which is the default) it will not remove data from cache after exporting.
+      remove_after_export: false
+      # Source key has to be defined and be different from the main key ("memory_table").
+      # This key is then used to define this component as an input to other components
+      source_key: "memory_table_source"
+      # export_batch_size can be used to reduce memory usage when handling larger tables.
+      # When set, data will be exported from the table in batches, waiting for downstream components
+      # to process the data
+      # export_batch_size: 10000
 sources:
   demo_logs_test:
     type: "demo_logs"
     format: "json"
-
 transforms:
   demo_logs_processor:
     type: "remap"
@@ -511,7 +494,6 @@ transforms:
 
       # Look for existing value in the table, using "user-identifier" as key
       existing, err = get_enrichment_table_record("memory_table", { "key": user_id })
-
       if err == null {
         # Value found, just use the cached value
         # In this case existing looks like this { "key": user_id, "value": {}, "ttl": 50 }
@@ -525,7 +507,6 @@ transforms:
         .referer.host = encode_punycode!(.referer.host)
         .source = "transform"
       }
-
   cache_generator:
     type: "remap"
     inputs: ["demo_logs_processor"]
@@ -541,7 +522,6 @@ transforms:
       } else {
         . = {}
       }
-
 # We can observe that after some time data will be exported to console from the cache
 sinks:
   console:
