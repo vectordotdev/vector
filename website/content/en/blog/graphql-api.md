@@ -39,13 +39,11 @@ Start up Vector locally with the following config:
 ```yaml
 api:
   enabled: true
-
 sources:
   demo:
     type: "demo_logs"
     format: "json"
     interval: 1.0
-
 sinks:
   console:
     type: "console"

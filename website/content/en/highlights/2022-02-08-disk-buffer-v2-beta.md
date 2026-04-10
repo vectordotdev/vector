@@ -83,7 +83,7 @@ sinks:
     # ...
     buffer:
       type: "disk"
-
+---
 # To this:
 sinks:
   http:

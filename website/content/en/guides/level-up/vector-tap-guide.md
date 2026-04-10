@@ -34,13 +34,11 @@ tap` to work. See [under the hood](#under-the-hood) for more details.
 ```yaml
 api:
   enabled: true
-
 sources:
   in:
     type: "demo_logs"
     format: "shuffle"
     lines: ["test1", "test2"]
-
 sinks:
   out:
     type: "blackhole"
@@ -155,7 +153,6 @@ We'll use the following Vector configuration.
 ```yaml
 api:
   enabled: true
-
 sources:
   in:
     type: "demo_logs"
@@ -164,7 +161,6 @@ sources:
       - '{ "type": "icecream", "flavor": "strawberry" }'
       - '{ "type": "icecream", "flavor": "chocolate" }'
       - '{ "type": "icecream", "flavor": "wasabi" }'
-
 transforms:
   picky:
     type: "remap"
@@ -179,7 +175,6 @@ transforms:
       } else {
         abort
       }
-
 sinks:
   store:
     type: "console"
@@ -187,7 +182,6 @@ sinks:
     target: "stdout"
     encoding:
       codec: "json"
-
   trash:
     type: "blackhole"
     inputs: ["picky.dropped"]

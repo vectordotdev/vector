@@ -54,7 +54,7 @@ transforms:
       expected_columns = 23 -- expected number of columns in incoming CSV lines
       line_separator = "\r\n"
     hooks:
-      process: |
+      process: |-
         function (event, emit)
           merged_event = merge(event)
           if merged_event == nil then -- a global variable containing the merged event
@@ -64,16 +64,13 @@ transforms:
             merged_event.log.message = merged_event.log.message ..
                                       line_separator .. event.log.message
           end
-
           fields = csv.openstring(event.log.message):lines()() -- parse CSV
-          if #fields < expected_columns then
+          if # fields < expected_columns then
             return -- not all fields are present in the merged event yet
           end
-
           -- do something with the array of the parsed fields
           merged_event.log.csv_fields = fields -- for example, just store them in an
                                                -- array field
-
           emit(merged_event) -- emit the resulting event
           merged_event = nil -- clear the merged event
         end

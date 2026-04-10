@@ -20,25 +20,20 @@ For example, if you had a config, `vector.yaml`, like:
 ##
 ## Sources
 ##
-
 sources:
   internal_metrics:
     type: "internal_metrics"
-
   dd_logs:
     type: "datadog_logs" # required
     acknowledgements: false # optional, default
     address: "0.0.0.0:8282" # required
-
   file_gen:
     type: "file"
     include: ["/var/log/file_gen/**/*.log"]
     read_from: "beginning"
-
 ##
 ## Transforms
 ##
-
 transforms:
   remap:
     type: "remap"
@@ -57,17 +52,14 @@ transforms:
       if err != null {
           log("Failed to parse origin from file name", level: "error")
       }
-
 ##
 ## Sinks
 ##
-
 sinks:
   prometheus:
     type: "prometheus_exporter"
     inputs: ["internal_metrics"]
     address: "0.0.0.0:9598"
-
   dd_logs_egress:
     type: "datadog_logs"
     inputs: ["dd_logs"]
@@ -79,7 +71,6 @@ sinks:
       rate_limit_num: 1000
     batch:
       max_bytes: 5242880
-
   blackhole:
     type: "blackhole"
     inputs: ["remap"]

@@ -38,13 +38,11 @@ Let us draft an initial version of the Vector's configuration file:
 
 ```yaml title="vector.yaml"
 data_dir: "."
-
 sources:
   file:
     type: "file"
     include: ["*.csv"]
     ignore_checkpoints: true
-
 transforms:
   lua:
     inputs: ["file"]
@@ -56,7 +54,6 @@ transforms:
           -- to be expanded
           emit(event)
         end
-
 sinks:
   console:
     inputs: ["lua"]
@@ -91,7 +88,7 @@ Then it would be possible to load it by calling [`require`][urls.lua_require] Lu
 [`source`][docs.transforms.lua#source] configuration section:
 
 ```yaml
-source: |
+source: |-
   csv = require("csv")
 ```
 
@@ -104,20 +101,17 @@ With the `csv` module, the [`hooks.process`][docs.transforms.lua#process] can be
 
 ```yaml
 hooks:
-  process: |
+  process: |-
     function (event, emit)
       fields = csv.openstring(event.log.message):lines()() -- parse the `message` field
       event.log.message = nil -- drop the `message` field
-
       column_names = {  -- a sequence containing CSV column names
         -- ...
       }
-
       for column, value in ipairs(fields) do -- iterate over CSV columns
         column_name = column_names[column] -- get column name
         event.log[column_name] = value -- set the corresponding field in the event
       end
-
       emit(event) -- emit the transformed event
     end
 ```
@@ -169,12 +163,10 @@ transforms:
         function (event, emit)
           fields = csv.openstring(event.log.message):lines()() -- parse the `message` field
           event.log.message = nil -- drop the `message` field
-
           for column, column_name in ipairs(column_names) do -- iterate over column names
             value = fields[column] -- get field value
             event.log[column_name] = value -- set the corresponding field in the event
           end
-
           emit(event) -- emit the transformed event
         end
 # ...

@@ -33,7 +33,7 @@ The most important of them is `process`, which is called on each incoming events
 
 ```yaml
 hooks:
-  process: |
+  process: |-
     function (event, emit)
       -- do something
     end
@@ -82,18 +82,15 @@ transforms:
     type: "lua"
     version: "2"
     inputs: [] # add IDs of the input components here
-
     hooks:
       init: |
         function (emit)
           count = 0 -- initialize state by setting a global variable
         end
-
       process: |
         function (event, emit)
           count = count + 1 -- increment the counter and exit
         end
-
       shutdown: |
         function (emit)
           emit {
@@ -107,10 +104,9 @@ transforms:
             }
           }
         end
-
     timers:
       - interval_seconds: 5
-        handler: |
+        handler: |-
           function (emit)
             emit {
               metric = {
@@ -138,7 +134,7 @@ a dedicated function. Such a function can be placed into the [source][docs.trans
 section of the config:
 
 ```yaml
-source: |
+source: |-
   function make_counter(value)
     return metric = {
       name = "event_counter",
@@ -156,7 +152,7 @@ and then adjusting the timer handler
 ```yaml
 timers:
   - interval_seconds: 5
-    handler: |
+    handler: |-
       function (emit)
         emit(make_counter(counter))
         counter = 0
@@ -167,7 +163,7 @@ and the `shutdown` hook:
 
 ```yaml
 hooks:
-  shutdown: |
+  shutdown: |-
     function (emit)
       emit(make_counter(counter))
     end
@@ -191,25 +187,20 @@ transforms:
     timers:
       - interval_seconds: 5
         handler: "timer_handler"
-
-    source: |
+    source: |-
       function init()
         count = 0
       end
-
       function process()
         count = count + 1
       end
-
       function timer_handler(emit)
         emit(make_counter(counter))
         counter = 0
       end
-
       function shutdown(emit)
         emit(make_counter(counter))
       end
-
       function make_counter(value)
         return metric = {
           name = "event_counter",
