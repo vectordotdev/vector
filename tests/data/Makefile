@@ -61,6 +61,27 @@ ca/intermediate_server/certs/localhost.cert.pem: ca/intermediate_server/csr/loca
 ca/intermediate_server/certs/localhost-chain.cert.pem: ca/intermediate_server/certs/ca-chain.cert.pem ca/intermediate_server/certs/localhost.cert.pem
 	cat ca/intermediate_server/certs/localhost.cert.pem ca/intermediate_server/certs/ca-chain.cert.pem > ca/intermediate_server/certs/localhost-chain.cert.pem
 
+ca/intermediate_server/private/azurite.key.pem:
+	openssl genrsa -out ca/intermediate_server/private/azurite.key.pem 2048
+
+ca/intermediate_server/csr/azurite.csr.pem: ca/intermediate_server/private/azurite.key.pem
+	openssl req -config ca/intermediate_server/openssl.cnf \
+		-key ca/intermediate_server/private/azurite.key.pem \
+		-subj '/CN=azurite/OU=Vector/O=Datadog/ST=New York/L=New York/C=US' \
+		-addext 'subjectAltName=DNS:azurite' \
+		-addext 'basicConstraints=critical,CA:FALSE' \
+		-addext 'extendedKeyUsage=serverAuth' \
+		-new -sha256 -out ca/intermediate_server/csr/azurite.csr.pem
+
+ca/intermediate_server/certs/azurite.cert.pem: ca/intermediate_server/csr/azurite.csr.pem
+	openssl ca -batch -config ca/intermediate_server/openssl.cnf \
+		-extensions server_cert -days 3650 -notext -md sha256 \
+		-in ca/intermediate_server/csr/azurite.csr.pem \
+		-out ca/intermediate_server/certs/azurite.cert.pem
+
+ca/intermediate_server/certs/azurite-chain.cert.pem: ca/intermediate_server/certs/ca-chain.cert.pem ca/intermediate_server/certs/azurite.cert.pem
+	cat ca/intermediate_server/certs/azurite.cert.pem ca/intermediate_server/certs/ca-chain.cert.pem > ca/intermediate_server/certs/azurite-chain.cert.pem
+
 ca/intermediate_server/private/elasticsearch-secure.key.pem:
 	openssl genrsa -out ca/intermediate_server/private/elasticsearch-secure.key.pem 2048
 

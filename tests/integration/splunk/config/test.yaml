@@ -1,7 +1,7 @@
 features:
-- splunk-integration-tests
+  - splunk-integration-tests
 
-test_filter: '::splunk_hec::'
+test_filter: "::splunk_hec::"
 
 env:
   SPLUNK_API_ADDRESS: https://splunk-hec:8089
@@ -13,9 +13,9 @@ matrix:
 # changes to these files/paths will invoke the integration test in CI
 # expressions are evaluated using https://github.com/micromatch/picomatch
 paths:
-- "src/internal_events/splunk_hec.rs"
-- "src/sources/splunk_hec/**"
-- "src/sources/util/**"
-- "src/sinks/splunk_hec/**"
-- "src/sinks/util/**"
-- "tests/integration/splunk/**"
+  - "src/internal_events/splunk_hec.rs"
+  - "src/sources/splunk_hec/**"
+  - "src/sources/util/**"
+  - "src/sinks/splunk_hec/**"
+  - "src/sinks/util/**"
+  - "tests/integration/splunk/**"
