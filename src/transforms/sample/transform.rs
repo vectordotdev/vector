@@ -250,14 +250,6 @@ impl Sample {
 
         match value {
             Value::Integer(value) => (*value > 0).then_some(*value as u64),
-            Value::Float(value) => {
-                let value = value.into_inner();
-                (value.is_finite()
-                    && value > 0.0
-                    && value.fract() == 0.0
-                    && value <= u64::MAX as f64)
-                    .then_some(value as u64)
-            }
             Value::Bytes(bytes) => std::str::from_utf8(bytes)
                 .ok()?
                 .parse::<u64>()
@@ -318,17 +310,6 @@ impl Sample {
 
         self.get_event_value(event, key_field)
     }
-
-    fn dynamic_sampling_key(&self, event: &Event, group_by_key: Option<&str>) -> Option<String> {
-        if let SampleKeySource::Static { key_field, .. } = &self.key_source
-            && let Some(key_field) = key_field.as_ref()
-            && let Some(value) = self.get_event_value(event, key_field)
-        {
-            return Some(value.to_string_lossy().into_owned());
-        }
-
-        group_by_key.map(ToString::to_string)
-    }
 }
 
 impl FunctionTransform for Sample {
@@ -358,12 +339,10 @@ impl FunctionTransform for Sample {
 
         let should_sample = match event_sample_mode {
             Some(EventSampleMode::Ratio(ratio)) => {
-                let sampling_key = self.dynamic_sampling_key(&event, group_by_key.as_deref());
-                Self::sample_with_dynamic_ratio(ratio, sampling_key.as_deref())
+                Self::sample_with_dynamic_ratio(ratio, group_by_key.as_deref())
             }
             Some(EventSampleMode::Rate(rate)) => {
-                let sampling_key = self.dynamic_sampling_key(&event, group_by_key.as_deref());
-                Self::sample_with_dynamic_rate(rate, sampling_key.as_deref())
+                Self::sample_with_dynamic_rate(rate, group_by_key.as_deref())
             }
             None => self.static_mode.increment(group_by_key, value),
         };

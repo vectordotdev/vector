@@ -74,9 +74,10 @@ pub struct SampleConfig {
     #[configurable(validation(range(min = 0.0, max = 1.0)))]
     pub ratio: Option<f64>,
 
-    /// The event field whose numeric value is used as the sampling ratio on a per-event basis.
+    /// The event field whose floating point value is used as the sampling ratio on a per-event basis.
     ///
-    /// The value must be in `(0, 1]` to be considered valid. If the field is missing or invalid,
+    /// The value must be in `(0, 1]` to be considered valid (for example, `0.25` keeps 25%).
+    /// If the field is missing or invalid,
     /// static sampling settings (`rate` or `ratio`) are used as a fallback.
     /// This option cannot be used together with `rate_field`.
     #[configurable(metadata(docs::examples = "sample_rate"))]
@@ -84,7 +85,8 @@ pub struct SampleConfig {
 
     /// The event field whose integer value is used as the sampling rate on a per-event basis, expressed as `1/N`.
     ///
-    /// The value must be a positive integer to be considered valid. If the field is missing or invalid,
+    /// The value must be a positive integer to be considered valid. Floating point values are rejected.
+    /// If the field is missing or invalid,
     /// static sampling settings (`rate` or `ratio`) are used as a fallback.
     /// This option cannot be used together with `ratio_field`.
     #[configurable(metadata(docs::examples = "sample_rate_n"))]
@@ -115,6 +117,9 @@ pub struct SampleConfig {
     ///
     /// If left unspecified, or if the event doesn't have `group_by`, then the event is not
     /// sampled separately.
+    ///
+    /// This can also be used with `ratio_field` or `rate_field` to apply dynamic sampling
+    /// independently per rendered group value.
     #[configurable(metadata(
         docs::examples = "{{ service }}",
         docs::examples = "{{ hostname }}-{{ service }}"

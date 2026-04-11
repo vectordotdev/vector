@@ -427,6 +427,28 @@ fn dynamic_rate_field_falls_back_to_static_ratio_when_missing() {
 }
 
 #[test]
+fn dynamic_rate_field_rejects_float_and_falls_back_to_static_ratio() {
+    let mut sampler = Sample::new_with_dynamic(
+        "sample".to_string(),
+        SampleMode::new_ratio(1.0),
+        DynamicSampleFields {
+            ratio_field: None,
+            rate_field: Some("dynamic_rate".to_string()),
+        },
+        None,
+        None,
+        default_sample_rate_key(),
+    );
+
+    let mut event = Event::Log(LogEvent::from("hello"));
+    let log = event.as_mut_log();
+    log.insert("dynamic_rate", 2.0);
+
+    let output = transform_one(&mut sampler, event).expect("event should be sampled");
+    assert_eq!(output.as_log()["sample_rate"], "1".into());
+}
+
+#[test]
 fn dynamic_ratio_honors_group_by_key() {
     let ratio = 0.5;
     let (sampled_service, dropped_service) =
