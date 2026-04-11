@@ -139,8 +139,8 @@ pub struct Sample {
     name: String,
     static_mode: SampleMode,
     key_source: SampleKeySource,
-    dynamic_rate_counters: HashMap<Option<String>, u64>,
-    dynamic_ratio_values: HashMap<Option<String>, f64>,
+    dynamic_rate_counters: HashMap<(Option<String>, u64), u64>,
+    dynamic_ratio_values: HashMap<(Option<String>, u64), f64>,
     exclude: Option<Condition>,
     sample_rate_key: OptionalValuePath,
 }
@@ -213,9 +213,10 @@ impl Sample {
     }
 
     fn sample_with_dynamic_ratio(&mut self, ratio: f64, group_by_key: Option<String>) -> bool {
+        let state_key = (group_by_key, ratio.to_bits());
         let value = self
             .dynamic_ratio_values
-            .entry(group_by_key)
+            .entry(state_key)
             .or_insert(1.0 - ratio);
         let increment = *value + ratio;
         *value = if increment >= 1.0 {
@@ -279,7 +280,8 @@ impl Sample {
     }
 
     fn sample_with_dynamic_rate(&mut self, rate: u64, group_by_key: Option<String>) -> bool {
-        let counter_value = self.dynamic_rate_counters.entry(group_by_key).or_default();
+        let state_key = (group_by_key, rate);
+        let counter_value = self.dynamic_rate_counters.entry(state_key).or_default();
         let old_counter_value = *counter_value;
         *counter_value += 1;
 

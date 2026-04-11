@@ -526,6 +526,90 @@ fn dynamic_rate_honors_group_by_key() {
     }
 }
 
+#[test]
+fn dynamic_ratio_group_by_partitions_state_by_ratio_value() {
+    let mut sampler = Sample::new_with_dynamic(
+        "sample".to_string(),
+        SampleMode::new_ratio(0.0),
+        DynamicSampleFields {
+            ratio_field: Some("dynamic_ratio".to_string()),
+            rate_field: None,
+        },
+        Some(Template::try_from("{{ service }}").unwrap()),
+        None,
+        default_sample_rate_key(),
+    );
+
+    for (ratio, should_sample) in [
+        (0.25_f64, true),
+        (0.75_f64, true),
+        (0.25_f64, false),
+        (0.75_f64, false),
+        (0.25_f64, false),
+        (0.75_f64, true),
+        (0.25_f64, false),
+        (0.75_f64, true),
+    ] {
+        let mut event = Event::Log(LogEvent::from("hello"));
+        let log = event.as_mut_log();
+        log.insert("service", "service-a");
+        log.insert("dynamic_ratio", ratio);
+        let output = transform_one(&mut sampler, event);
+        assert_eq!(
+            output.is_some(),
+            should_sample,
+            "ratio={ratio}, should_sample={should_sample}"
+        );
+        if let Some(output) = output {
+            assert_eq!(output.as_log()["sample_rate"], ratio.to_string().into());
+        }
+    }
+}
+
+#[test]
+fn dynamic_rate_group_by_partitions_state_by_rate_value() {
+    let mut sampler = Sample::new_with_dynamic(
+        "sample".to_string(),
+        SampleMode::new_ratio(0.0),
+        DynamicSampleFields {
+            ratio_field: None,
+            rate_field: Some("dynamic_rate".to_string()),
+        },
+        Some(Template::try_from("{{ service }}").unwrap()),
+        None,
+        default_sample_rate_key(),
+    );
+
+    for (rate, should_sample) in [
+        (2_i64, true),
+        (3_i64, true),
+        (2_i64, false),
+        (3_i64, false),
+        (2_i64, true),
+        (3_i64, false),
+        (2_i64, false),
+        (3_i64, true),
+        (2_i64, true),
+        (3_i64, false),
+        (2_i64, false),
+        (3_i64, false),
+    ] {
+        let mut event = Event::Log(LogEvent::from("hello"));
+        let log = event.as_mut_log();
+        log.insert("service", "service-a");
+        log.insert("dynamic_rate", rate);
+        let output = transform_one(&mut sampler, event);
+        assert_eq!(
+            output.is_some(),
+            should_sample,
+            "rate={rate}, should_sample={should_sample}"
+        );
+        if let Some(output) = output {
+            assert_eq!(output.as_log()["sample_rate"], rate.to_string().into());
+        }
+    }
+}
+
 fn condition_contains(key: &str, needle: &str) -> Condition {
     let vrl_config = VrlConfig {
         source: format!(r#"contains!(."{key}", "{needle}")"#),
