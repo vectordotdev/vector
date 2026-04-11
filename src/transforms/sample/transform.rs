@@ -89,12 +89,6 @@ impl SampleMode {
             } => hash <= *hash_ratio_threshold,
         }
     }
-
-    fn hash_with_ratio(value: &[u8], ratio: f64) -> bool {
-        let hash = seahash::hash(value);
-        let hash_ratio_threshold = (ratio * (u64::MAX as u128) as f64) as u64;
-        hash <= hash_ratio_threshold
-    }
 }
 
 enum EventSampleMode {
@@ -145,6 +139,8 @@ pub struct Sample {
     name: String,
     static_mode: SampleMode,
     key_source: SampleKeySource,
+    dynamic_rate_counters: HashMap<Option<String>, u64>,
+    dynamic_ratio_values: HashMap<Option<String>, f64>,
     exclude: Option<Condition>,
     sample_rate_key: OptionalValuePath,
 }
@@ -153,7 +149,7 @@ impl Sample {
     // This function is dead code when the feature flag `transforms-impl-sample` is specified but not
     // `transforms-sample`.
     #![allow(dead_code)]
-    pub const fn new(
+    pub fn new(
         name: String,
         static_mode: SampleMode,
         key_field: Option<String>,
@@ -173,7 +169,7 @@ impl Sample {
         )
     }
 
-    pub const fn new_with_dynamic(
+    pub fn new_with_dynamic(
         name: String,
         static_mode: SampleMode,
         fields: DynamicSampleFields,
@@ -190,7 +186,7 @@ impl Sample {
         )
     }
 
-    const fn new_with_source(
+    fn new_with_source(
         name: String,
         static_mode: SampleMode,
         key_source: SampleKeySource,
@@ -201,6 +197,8 @@ impl Sample {
             name,
             static_mode,
             key_source,
+            dynamic_rate_counters: HashMap::default(),
+            dynamic_ratio_values: HashMap::default(),
             exclude,
             sample_rate_key,
         }
@@ -214,12 +212,19 @@ impl Sample {
         }
     }
 
-    fn sample_with_dynamic_ratio(ratio: f64, sampling_key: Option<&str>) -> bool {
-        if let Some(sampling_key) = sampling_key {
-            SampleMode::hash_with_ratio(sampling_key.as_bytes(), ratio)
+    fn sample_with_dynamic_ratio(&mut self, ratio: f64, group_by_key: Option<String>) -> bool {
+        let value = self
+            .dynamic_ratio_values
+            .entry(group_by_key)
+            .or_insert(1.0 - ratio);
+        let increment = *value + ratio;
+        *value = if increment >= 1.0 {
+            increment - 1.0
         } else {
-            rand::random::<f64>() < ratio
-        }
+            increment
+        };
+
+        increment >= 1.0
     }
 
     fn event_ratio(&self, event: &Event) -> Option<f64> {
@@ -273,12 +278,12 @@ impl Sample {
             .or_else(|| self.event_rate(event).map(EventSampleMode::Rate))
     }
 
-    fn sample_with_dynamic_rate(rate: u64, sampling_key: Option<&str>) -> bool {
-        if let Some(sampling_key) = sampling_key {
-            seahash::hash(sampling_key.as_bytes()).is_multiple_of(rate)
-        } else {
-            rand::random::<f64>() < (1.0 / rate as f64)
-        }
+    fn sample_with_dynamic_rate(&mut self, rate: u64, group_by_key: Option<String>) -> bool {
+        let counter_value = self.dynamic_rate_counters.entry(group_by_key).or_default();
+        let old_counter_value = *counter_value;
+        *counter_value += 1;
+
+        old_counter_value.is_multiple_of(rate)
     }
 
     fn group_by_key(&self, event: &Event) -> Option<String> {
@@ -339,11 +344,9 @@ impl FunctionTransform for Sample {
 
         let should_sample = match event_sample_mode {
             Some(EventSampleMode::Ratio(ratio)) => {
-                Self::sample_with_dynamic_ratio(ratio, group_by_key.as_deref())
+                self.sample_with_dynamic_ratio(ratio, group_by_key)
             }
-            Some(EventSampleMode::Rate(rate)) => {
-                Self::sample_with_dynamic_rate(rate, group_by_key.as_deref())
-            }
+            Some(EventSampleMode::Rate(rate)) => self.sample_with_dynamic_rate(rate, group_by_key),
             None => self.static_mode.increment(group_by_key, value),
         };
 

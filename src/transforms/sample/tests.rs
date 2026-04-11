@@ -450,12 +450,7 @@ fn dynamic_rate_field_rejects_float_and_falls_back_to_static_ratio() {
 
 #[test]
 fn dynamic_ratio_honors_group_by_key() {
-    let ratio = 0.5;
-    let (sampled_service, dropped_service) =
-        find_group_by_keys_with_opposing_decisions(|service| {
-            dynamic_ratio_should_sample(service, ratio)
-        });
-
+    let ratio = 0.5_f64;
     let mut sampler = Sample::new_with_dynamic(
         "sample".to_string(),
         SampleMode::new_ratio(0.0),
@@ -468,32 +463,33 @@ fn dynamic_ratio_honors_group_by_key() {
         default_sample_rate_key(),
     );
 
-    for _ in 0..5 {
+    for (service, should_sample) in [
+        ("service-a", true),
+        ("service-b", true),
+        ("service-a", false),
+        ("service-b", false),
+        ("service-a", true),
+        ("service-b", true),
+    ] {
         let mut event = Event::Log(LogEvent::from("hello"));
         let log = event.as_mut_log();
-        log.insert("service", sampled_service.as_str());
+        log.insert("service", service);
         log.insert("dynamic_ratio", ratio);
-        let output = transform_one(&mut sampler, event).expect("sampled service should pass");
-        assert_eq!(output.as_log()["sample_rate"], "0.5".into());
-    }
-
-    for _ in 0..5 {
-        let mut event = Event::Log(LogEvent::from("hello"));
-        let log = event.as_mut_log();
-        log.insert("service", dropped_service.as_str());
-        log.insert("dynamic_ratio", ratio);
-        assert!(transform_one(&mut sampler, event).is_none());
+        let output = transform_one(&mut sampler, event);
+        assert_eq!(
+            output.is_some(),
+            should_sample,
+            "service={service}, should_sample={should_sample}"
+        );
+        if let Some(output) = output {
+            assert_eq!(output.as_log()["sample_rate"], "0.5".into());
+        }
     }
 }
 
 #[test]
 fn dynamic_rate_honors_group_by_key() {
-    let rate = 2;
-    let (sampled_service, dropped_service) =
-        find_group_by_keys_with_opposing_decisions(|service| {
-            dynamic_rate_should_sample(service, rate)
-        });
-
+    let rate = 2_i64;
     let mut sampler = Sample::new_with_dynamic(
         "sample".to_string(),
         SampleMode::new_ratio(0.0),
@@ -506,21 +502,27 @@ fn dynamic_rate_honors_group_by_key() {
         default_sample_rate_key(),
     );
 
-    for _ in 0..5 {
+    for (service, should_sample) in [
+        ("service-a", true),
+        ("service-b", true),
+        ("service-a", false),
+        ("service-b", false),
+        ("service-a", true),
+        ("service-b", true),
+    ] {
         let mut event = Event::Log(LogEvent::from("hello"));
         let log = event.as_mut_log();
-        log.insert("service", sampled_service.as_str());
-        log.insert("dynamic_rate", rate as i64);
-        let output = transform_one(&mut sampler, event).expect("sampled service should pass");
-        assert_eq!(output.as_log()["sample_rate"], "2".into());
-    }
-
-    for _ in 0..5 {
-        let mut event = Event::Log(LogEvent::from("hello"));
-        let log = event.as_mut_log();
-        log.insert("service", dropped_service.as_str());
-        log.insert("dynamic_rate", rate as i64);
-        assert!(transform_one(&mut sampler, event).is_none());
+        log.insert("service", service);
+        log.insert("dynamic_rate", rate);
+        let output = transform_one(&mut sampler, event);
+        assert_eq!(
+            output.is_some(),
+            should_sample,
+            "service={service}, should_sample={should_sample}"
+        );
+        if let Some(output) = output {
+            assert_eq!(output.as_log()["sample_rate"], "2".into());
+        }
     }
 }
 
@@ -540,37 +542,4 @@ fn random_events(n: usize) -> Vec<Event> {
         .take(n)
         .map(|e| Event::Log(LogEvent::from(e)))
         .collect()
-}
-
-fn dynamic_ratio_should_sample(service: &str, ratio: f64) -> bool {
-    let hash = seahash::hash(service.as_bytes());
-    let threshold = (ratio * (u64::MAX as u128) as f64) as u64;
-    hash <= threshold
-}
-
-fn dynamic_rate_should_sample(service: &str, rate: u64) -> bool {
-    seahash::hash(service.as_bytes()).is_multiple_of(rate)
-}
-
-fn find_group_by_keys_with_opposing_decisions<F>(should_sample: F) -> (String, String)
-where
-    F: Fn(&str) -> bool,
-{
-    let mut sampled = None;
-    let mut dropped = None;
-
-    for i in 0..10_000 {
-        let candidate = format!("service-{i}");
-        if should_sample(&candidate) {
-            sampled = Some(candidate);
-        } else {
-            dropped = Some(candidate);
-        }
-
-        if let (Some(sampled), Some(dropped)) = (sampled.as_ref(), dropped.as_ref()) {
-            return (sampled.clone(), dropped.clone());
-        }
-    }
-
-    panic!("failed to find group_by keys with opposing sample decisions");
 }
