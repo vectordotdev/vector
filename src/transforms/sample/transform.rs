@@ -1,4 +1,8 @@
-use std::{collections::HashMap, fmt};
+use std::{
+    collections::HashMap,
+    fmt,
+    hash::{Hash, Hasher},
+};
 
 use vector_lib::{
     config::LegacyKey,
@@ -139,8 +143,7 @@ pub struct Sample {
     name: String,
     static_mode: SampleMode,
     key_source: SampleKeySource,
-    dynamic_rate_counters: HashMap<(Option<String>, u64), u64>,
-    dynamic_ratio_values: HashMap<(Option<String>, u64), f64>,
+    dynamic_event_counters: HashMap<Option<String>, u64>,
     exclude: Option<Condition>,
     sample_rate_key: OptionalValuePath,
 }
@@ -197,8 +200,7 @@ impl Sample {
             name,
             static_mode,
             key_source,
-            dynamic_rate_counters: HashMap::default(),
-            dynamic_ratio_values: HashMap::default(),
+            dynamic_event_counters: HashMap::default(),
             exclude,
             sample_rate_key,
         }
@@ -212,20 +214,24 @@ impl Sample {
         }
     }
 
-    fn sample_with_dynamic_ratio(&mut self, ratio: f64, group_by_key: Option<String>) -> bool {
-        let state_key = (group_by_key, ratio.to_bits());
-        let value = self
-            .dynamic_ratio_values
-            .entry(state_key)
-            .or_insert(1.0 - ratio);
-        let increment = *value + ratio;
-        *value = if increment >= 1.0 {
-            increment - 1.0
-        } else {
-            increment
-        };
+    fn dynamic_sample_hash(group_by_key: Option<&str>, counter: u64) -> u64 {
+        let mut hasher = seahash::SeaHasher::new();
+        group_by_key.hash(&mut hasher);
+        counter.hash(&mut hasher);
+        hasher.finish()
+    }
 
-        increment >= 1.0
+    fn sample_with_dynamic_ratio(&mut self, ratio: f64, group_by_key: Option<String>) -> bool {
+        let counter_value = self
+            .dynamic_event_counters
+            .entry(group_by_key.clone())
+            .or_default();
+        let old_counter_value = *counter_value;
+        *counter_value += 1;
+
+        let hash = Self::dynamic_sample_hash(group_by_key.as_deref(), old_counter_value);
+        let hash_ratio_threshold = (ratio * (u64::MAX as u128) as f64) as u64;
+        hash <= hash_ratio_threshold
     }
 
     fn event_ratio(&self, event: &Event) -> Option<f64> {
@@ -280,12 +286,15 @@ impl Sample {
     }
 
     fn sample_with_dynamic_rate(&mut self, rate: u64, group_by_key: Option<String>) -> bool {
-        let state_key = (group_by_key, rate);
-        let counter_value = self.dynamic_rate_counters.entry(state_key).or_default();
+        let counter_value = self
+            .dynamic_event_counters
+            .entry(group_by_key.clone())
+            .or_default();
         let old_counter_value = *counter_value;
         *counter_value += 1;
+        let hash = Self::dynamic_sample_hash(group_by_key.as_deref(), old_counter_value);
 
-        old_counter_value.is_multiple_of(rate)
+        hash.is_multiple_of(rate)
     }
 
     fn group_by_key(&self, event: &Event) -> Option<String> {
