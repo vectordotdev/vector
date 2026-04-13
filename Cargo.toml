@@ -561,6 +561,7 @@ docker = ["dep:bollard", "dep:dirs-next"]
 api = [
   "dep:base64",
   "dep:tonic",
+  "dep:tonic-health",
   "dep:tonic-reflection",
   "dep:prost",
   "dep:prost-types",
