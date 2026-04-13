@@ -1,9 +1,12 @@
 use std::{sync::Arc, task::Poll};
 
 use greptimedb_ingester::{
-    Client, ClientBuilder, Compression, Database, Error as GreptimeError,
-    api::v1::{auth_header::AuthScheme, *},
-    channel_manager::*,
+    Error as GreptimeError,
+    api::v1::Basic,
+    api::v1::auth_header::AuthScheme,
+    channel_manager::{ChannelConfig, ChannelManager, ClientTlsOption},
+    client::Client,
+    database::Database,
 };
 use vector_lib::sensitive_string::SensitiveString;
 
@@ -22,31 +25,30 @@ pub struct GreptimeDBGrpcService {
 }
 
 fn new_client_from_config(config: &GreptimeDBGrpcServiceConfig) -> crate::Result<Client> {
-    let mut builder = ClientBuilder::default().peers(vec![&config.endpoint]);
-
-    if let Some(compression) = config.compression.as_ref() {
-        let compression = match compression.as_str() {
-            "gzip" => Compression::Gzip,
-            "zstd" => Compression::Zstd,
-            _ => {
-                warn!(message = "Unknown gRPC compression type: {compression}, disabled.");
-                Compression::None
-            }
-        };
-        builder = builder.compression(compression);
+    let send_compression = config
+        .compression
+        .as_deref()
+        .is_some_and(|c| c == "gzip" || c == "zstd");
+    if let Some(c) = config.compression.as_deref()
+        && c != "gzip" && c != "zstd"
+    {
+        warn!(message = "Unknown gRPC compression type: {c}, disabled.");
     }
 
-    if let Some(tls_config) = &config.tls {
-        let channel_config = ChannelConfig {
-            client_tls: Some(try_from_tls_config(tls_config)?),
-            ..Default::default()
-        };
+    let mut channel_config = ChannelConfig {
+        send_compression,
+        ..Default::default()
+    };
 
-        builder = builder
-            .channel_manager(ChannelManager::with_tls_config(channel_config).map_err(Box::new)?);
-    }
+    let channel_manager = if let Some(tls_config) = &config.tls {
+        channel_config.client_tls = Some(try_from_tls_config(tls_config)?);
+        ChannelManager::with_tls_config(channel_config).map_err(Box::new)?
+    } else {
+        ChannelManager::with_config(channel_config)
+    };
+    let client = Client::with_manager_and_urls(channel_manager, vec![&config.endpoint]);
 
-    Ok(builder.build())
+    Ok(client)
 }
 
 fn try_from_tls_config(tls_config: &TlsConfig) -> crate::Result<ClientTlsOption> {
@@ -60,10 +62,16 @@ fn try_from_tls_config(tls_config: &TlsConfig) -> crate::Result<ClientTlsOption>
         );
     }
 
+    let path_to_string = |p: &Option<std::path::PathBuf>| -> String {
+        p.as_ref()
+            .map(|p| p.to_string_lossy().into_owned())
+            .unwrap_or_default()
+    };
+
     Ok(ClientTlsOption {
-        server_ca_cert_path: tls_config.ca_file.clone(),
-        client_cert_path: tls_config.crt_file.clone(),
-        client_key_path: tls_config.key_file.clone(),
+        server_ca_cert_path: path_to_string(&tls_config.ca_file),
+        client_cert_path: path_to_string(&tls_config.crt_file),
+        client_key_path: path_to_string(&tls_config.key_file),
     })
 }
 
@@ -103,7 +111,7 @@ impl Service<GreptimeDBGrpcRequest> for GreptimeDBGrpcService {
 
         Box::pin(async move {
             let metadata = req.metadata;
-            let result = client.row_insert(req.items).await?;
+            let result = client.insert(req.items).await?;
 
             Ok(GreptimeDBGrpcBatchOutput {
                 _item_count: result,
