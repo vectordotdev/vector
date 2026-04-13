@@ -12788,6 +12788,7 @@ dependencies = [
  "tokio-stream",
  "tonic 0.11.0",
  "tonic-build",
+ "tonic-health",
 ]
 
 [[package]]
