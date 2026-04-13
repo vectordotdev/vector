@@ -2,7 +2,7 @@ use vector_lib::{configurable::configurable_component, sensitive_string::Sensiti
 
 use crate::sinks::{
     greptimedb::{
-        GrpcCompression, GreptimeDBDefaultBatchSettings, default_dbname,
+        GreptimeDBDefaultBatchSettings, GrpcCompression, default_dbname,
         metrics::{
             request::GreptimeDBGrpcRetryLogic,
             request_builder::RequestBuilderOptions,
