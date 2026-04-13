@@ -256,8 +256,8 @@ runs:
       with:
         skip-cache: ${{ env.VDEV_NEEDS_COMPILE == 'true' }}
 
-    - name: Cache prepare.sh binaries
-      id: cache-prepare-binaries
+    - name: Cache cargo binaries
+      id: cache-cargo-binaries
       uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
       with:
         path: |
@@ -270,12 +270,16 @@ runs:
           ~/.cargo/bin/cargo-llvm-cov
           ~/.cargo/bin/dd-rust-license-tool
           ~/.cargo/bin/wasm-pack
-          /usr/local/bin/markdownlint-cli2
-          /usr/local/bin/prettier
-          /usr/local/bin/datadog-ci
-        key: ${{ runner.os }}-prepare-binaries-${{ hashFiles('scripts/environment/*') }}
+        key: ${{ runner.os }}-cargo-binaries-${{ hashFiles('scripts/environment/*.sh') }}
         restore-keys: |
-          ${{ runner.os }}-prepare-binaries-
+          ${{ runner.os }}-cargo-binaries-
+
+    - name: Cache npm tools
+      id: cache-npm-tools
+      uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+      with:
+        path: scripts/environment/npm-tools/node_modules
+        key: ${{ runner.os }}-npm-tools-${{ hashFiles('scripts/environment/npm-tools/*') }}
 
     - name: Run prepare.sh
       shell: bash
