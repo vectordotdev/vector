@@ -1,0 +1,1 @@
+Fixed a bug where the API server would not respect a configured `api.address` on config reload. The API server now starts with the correct address when re-enabled, and only starts after a successful topology reload to prevent inconsistent state on rollback.
