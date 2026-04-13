@@ -138,14 +138,14 @@ pub fn spawn_thread<'a>(
 
                         info!("Configuration file changed.");
                         if !changed_components.is_empty() {
-                            info!(
-                                "Component {:?} configuration changed.",
-                                changed_components.keys()
-                            );
                             if changed_components
                                 .iter()
                                 .all(|(_, t)| *t == ComponentType::EnrichmentTable)
                             {
+                                info!(
+                                    "Component {:?} configuration changed.",
+                                    changed_components.keys()
+                                );
                                 info!("Only enrichment tables have changed.");
                                 _ = signal_tx
                                     .send(crate::signal::SignalTo::ReloadEnrichmentTables)
