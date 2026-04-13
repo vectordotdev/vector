@@ -2,7 +2,7 @@ use vector_lib::{configurable::configurable_component, sensitive_string::Sensiti
 
 use crate::sinks::{
     greptimedb::{
-        GreptimeDBDefaultBatchSettings, default_dbname,
+        GrpcCompression, GreptimeDBDefaultBatchSettings, default_dbname,
         metrics::{
             request::GreptimeDBGrpcRetryLogic,
             request_builder::RequestBuilderOptions,
@@ -85,11 +85,9 @@ pub struct GreptimeDBMetricsConfig {
     #[configurable(metadata(docs::examples = "password"))]
     #[serde(default)]
     pub password: Option<SensitiveString>,
-    /// Set gRPC compression encoding for the request
-    /// Default to none, `gzip` or `zstd` is supported.
-    #[configurable(metadata(docs::examples = "gzip"))]
+    /// Set gRPC compression encoding for the request.
     #[serde(default)]
-    pub grpc_compression: Option<String>,
+    pub grpc_compression: GrpcCompression,
 
     #[configurable(derived)]
     #[serde(default)]

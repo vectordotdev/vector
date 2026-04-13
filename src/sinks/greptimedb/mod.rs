@@ -4,6 +4,18 @@ use crate::sinks::prelude::*;
 mod logs;
 mod metrics;
 
+/// Compression algorithm for gRPC requests to GreptimeDB.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Default)]
+#[serde(rename_all = "lowercase")]
+enum GrpcCompression {
+    /// No compression.
+    #[default]
+    None,
+    /// Zstandard compression.
+    Zstd,
+}
+
 fn default_dbname() -> String {
     greptimedb_ingester::DEFAULT_SCHEMA_NAME.to_string()
 }

@@ -11,9 +11,12 @@ use greptimedb_ingester::{
 use vector_lib::sensitive_string::SensitiveString;
 
 use crate::sinks::{
-    greptimedb::metrics::{
-        config::GreptimeDBMetricsConfig,
-        request::{GreptimeDBGrpcBatchOutput, GreptimeDBGrpcRequest},
+    greptimedb::{
+        GrpcCompression,
+        metrics::{
+            config::GreptimeDBMetricsConfig,
+            request::{GreptimeDBGrpcBatchOutput, GreptimeDBGrpcRequest},
+        },
     },
     prelude::*,
 };
@@ -25,14 +28,7 @@ pub struct GreptimeDBGrpcService {
 }
 
 fn new_client_from_config(config: &GreptimeDBGrpcServiceConfig) -> crate::Result<Client> {
-    let send_compression = match config.compression.as_deref() {
-        Some("zstd") => true,
-        Some(other) => {
-            warn!(message = format!("Unsupported gRPC compression type: {other}, disabled. Only 'zstd' is supported."));
-            false
-        }
-        None => false,
-    };
+    let send_compression = matches!(config.compression, GrpcCompression::Zstd);
 
     let mut channel_config = ChannelConfig {
         send_compression,
@@ -126,7 +122,7 @@ pub(super) struct GreptimeDBGrpcServiceConfig {
     dbname: String,
     username: Option<String>,
     password: Option<SensitiveString>,
-    compression: Option<String>,
+    compression: GrpcCompression,
     tls: Option<TlsConfig>,
 }
 
@@ -137,7 +133,7 @@ impl From<&GreptimeDBMetricsConfig> for GreptimeDBGrpcServiceConfig {
             dbname: val.dbname.clone(),
             username: val.username.clone(),
             password: val.password.clone(),
-            compression: val.grpc_compression.clone(),
+            compression: val.grpc_compression,
             tls: val.tls.clone(),
         }
     }
