@@ -182,11 +182,7 @@ impl Output {
         self.send_with_timeout(events, send_reference).await?;
 
         if let Some(send_latency) = &self.metrics.send_latency {
-            send_latency.record(
-                Instant::now()
-                    .saturating_duration_since(send_reference)
-                    .as_secs_f64(),
-            );
+            send_latency.record(send_reference.elapsed().as_secs_f64());
         }
         self.events_sent.emit(CountByteSize(count, byte_size));
         unsent_event_count.decr(count);
@@ -270,11 +266,7 @@ impl Output {
                 })?;
         }
         if let Some(send_batch_latency) = &self.metrics.send_batch_latency {
-            send_batch_latency.record(
-                Instant::now()
-                    .saturating_duration_since(send_batch_start)
-                    .as_secs_f64(),
-            );
+            send_batch_latency.record(send_batch_start.elapsed().as_secs_f64());
         }
         Ok(())
     }
