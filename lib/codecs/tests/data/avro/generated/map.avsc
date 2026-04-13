@@ -1,1 +1,1 @@
-{"name":"test","type":"record","fields":[{"name":"map_field","type":{"type":"map","values":"long"},"values":"long"}]}
+{"type":"record","name":"test","fields":[{"name":"map_field","type":{"type":"map","values":"long","default":{}},"default":{},"values":"long"}]}
