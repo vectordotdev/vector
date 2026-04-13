@@ -25,15 +25,14 @@ pub struct GreptimeDBGrpcService {
 }
 
 fn new_client_from_config(config: &GreptimeDBGrpcServiceConfig) -> crate::Result<Client> {
-    let send_compression = config
-        .compression
-        .as_deref()
-        .is_some_and(|c| c == "gzip" || c == "zstd");
-    if let Some(c) = config.compression.as_deref()
-        && c != "gzip" && c != "zstd"
-    {
-        warn!(message = "Unknown gRPC compression type: {c}, disabled.");
-    }
+    let send_compression = match config.compression.as_deref() {
+        Some("zstd") => true,
+        Some(other) => {
+            warn!(message = format!("Unsupported gRPC compression type: {other}, disabled. Only 'zstd' is supported."));
+            false
+        }
+        None => false,
+    };
 
     let mut channel_config = ChannelConfig {
         send_compression,
