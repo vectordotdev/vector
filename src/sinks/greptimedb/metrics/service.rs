@@ -36,38 +36,44 @@ fn new_client_from_config(config: &GreptimeDBGrpcServiceConfig) -> crate::Result
     };
 
     let channel_manager = if let Some(tls_config) = &config.tls {
-        channel_config.client_tls = Some(try_from_tls_config(tls_config)?);
-        ChannelManager::with_tls_config(channel_config).map_err(Box::new)?
+        if tls_config.key_pass.is_some()
+            || tls_config.alpn_protocols.is_some()
+            || tls_config.verify_certificate.is_some()
+            || tls_config.verify_hostname.is_some()
+        {
+            warn!(
+                message = "TlsConfig: key_pass, alpn_protocols, verify_certificate and verify_hostname are not supported by greptimedb client at the moment."
+            );
+        }
+
+        // The greptimedb ingester requires all three TLS paths (ca_file, crt_file,
+        // key_file) to be set. If any are missing, fall back to a plain connection.
+        match (
+            &tls_config.ca_file,
+            &tls_config.crt_file,
+            &tls_config.key_file,
+        ) {
+            (Some(ca), Some(crt), Some(key)) => {
+                channel_config.client_tls = Some(ClientTlsOption {
+                    server_ca_cert_path: ca.to_string_lossy().into_owned(),
+                    client_cert_path: crt.to_string_lossy().into_owned(),
+                    client_key_path: key.to_string_lossy().into_owned(),
+                });
+                ChannelManager::with_tls_config(channel_config).map_err(Box::new)?
+            }
+            _ => {
+                warn!(
+                    message = "GreptimeDB TLS requires ca_file, crt_file, and key_file to all be set. Falling back to a non-TLS connection."
+                );
+                ChannelManager::with_config(channel_config)
+            }
+        }
     } else {
         ChannelManager::with_config(channel_config)
     };
     let client = Client::with_manager_and_urls(channel_manager, vec![&config.endpoint]);
 
     Ok(client)
-}
-
-fn try_from_tls_config(tls_config: &TlsConfig) -> crate::Result<ClientTlsOption> {
-    if tls_config.key_pass.is_some()
-        || tls_config.alpn_protocols.is_some()
-        || tls_config.verify_certificate.is_some()
-        || tls_config.verify_hostname.is_some()
-    {
-        warn!(
-            message = "TlsConfig: key_pass, alpn_protocols, verify_certificate and verify_hostname are not supported by greptimedb client at the moment."
-        );
-    }
-
-    let require_path = |p: &Option<std::path::PathBuf>, name: &str| -> crate::Result<String> {
-        p.as_ref()
-            .map(|p| p.to_string_lossy().into_owned())
-            .ok_or_else(|| format!("GreptimeDB TLS requires `{name}` to be set").into())
-    };
-
-    Ok(ClientTlsOption {
-        server_ca_cert_path: require_path(&tls_config.ca_file, "ca_file")?,
-        client_cert_path: require_path(&tls_config.crt_file, "crt_file")?,
-        client_key_path: require_path(&tls_config.key_file, "key_file")?,
-    })
 }
 
 impl GreptimeDBGrpcService {
