@@ -150,7 +150,7 @@ impl TopologyController {
         }
     }
 
-    #[allow(unused_mut)] // `mut` is only needed when the `api` feature is enabled
+    #[cfg_attr(not(feature = "api"), allow(unused_mut))]
     pub async fn stop(mut self) {
         // Phase 1: Mark the gRPC API as unavailable so that external probes
         // (e.g. Kubernetes readiness) fail early and stop routing traffic
