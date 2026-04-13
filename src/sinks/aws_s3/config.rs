@@ -271,6 +271,13 @@ impl S3SinkConfig {
         // with internal compression and appropriate file extension.
         #[cfg(feature = "codecs-parquet")]
         if let Some(batch_config) = &self.batch_encoding {
+            if !matches!(batch_config, BatchSerializerConfig::Parquet(_)) {
+                return Err(
+                    "batch_encoding only supports encoding with parquet format for amazon s3 sink"
+                        .into(),
+                );
+            }
+
             let batch_serializer = batch_config.build_batch_serializer()?;
             let batch_encoder = BatchEncoder::new(batch_serializer);
 
