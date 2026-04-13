@@ -186,31 +186,6 @@ impl InternalEvent for EncoderNullConstraintError<'_> {
     }
 }
 
-#[cfg(feature = "arrow")]
-#[derive(NamedInternalEvent)]
-pub(crate) struct JsonSerializationError<'a> {
-    pub error: &'a serde_json::Error,
-}
-
-#[cfg(feature = "arrow")]
-impl InternalEvent for JsonSerializationError<'_> {
-    fn emit(self) {
-        error!(
-            message = "Could not serialize event to JSON.",
-            error = %self.error,
-            error_type = error_type::ENCODER_FAILED,
-            stage = error_stage::SENDING,
-            internal_log_rate_limit = true,
-        );
-        counter!(
-            "component_errors_total",
-            "error_type" => error_type::ENCODER_FAILED,
-            "stage" => error_stage::SENDING,
-        )
-        .increment(1);
-    }
-}
-
 #[cfg(feature = "parquet")]
 #[derive(NamedInternalEvent)]
 pub(crate) struct SchemaGenerationError<'a> {

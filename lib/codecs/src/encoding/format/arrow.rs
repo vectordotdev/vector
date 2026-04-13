@@ -4,9 +4,9 @@
 //! This implements the streaming variant of the Arrow IPC protocol, which writes
 //! a continuous stream of record batches without a file footer.
 
-use crate::internal_events::JsonSerializationError;
 use arrow::{
     datatypes::{DataType, Field, Fields, Schema, SchemaRef},
+    error::ArrowError,
     ipc::writer::StreamWriter,
     json::reader::ReaderBuilder,
     record_batch::RecordBatch,
@@ -14,7 +14,6 @@ use arrow::{
 use async_trait::async_trait;
 use bytes::{BufMut, Bytes, BytesMut};
 use snafu::{ResultExt, Snafu, ensure};
-use vector_common::internal_event::emit;
 use vector_config::configurable_component;
 use vector_core::event::Event;
 
@@ -205,7 +204,13 @@ pub fn encode_events_to_arrow_ipc_stream(
         return Err(ArrowEncodingError::NoEvents);
     }
 
-    let record_batch = build_record_batch(schema, &vector_log_events_to_json_values(events))?;
+    let json_values = vector_log_events_to_json_values(events).map_err(|e| {
+        ArrowEncodingError::RecordBatchCreation {
+            source: ArrowError::JsonError(e.to_string()),
+        }
+    })?;
+
+    let record_batch = build_record_batch(schema, &json_values)?;
 
     let mut buffer = BytesMut::new().writer();
     let mut writer =
@@ -291,17 +296,13 @@ pub fn find_null_non_nullable_fields<'a>(
         .collect()
 }
 
-pub(crate) fn vector_log_events_to_json_values(events: &[Event]) -> Vec<serde_json::Value> {
+pub(crate) fn vector_log_events_to_json_values(
+    events: &[Event],
+) -> Result<Vec<serde_json::Value>, serde_json::Error> {
     events
         .iter()
         .filter_map(Event::maybe_as_log)
-        .filter_map(|log| match serde_json::to_value(log) {
-            Ok(result) => Some(result),
-            Err(e) => {
-                emit(JsonSerializationError { error: &e });
-                None
-            }
-        })
+        .map(serde_json::to_value)
         .collect()
 }
 
@@ -894,8 +895,10 @@ mod tests {
                 ("a", Value::Bytes("val".into())),
                 ("b", Value::Integer(42)),
             ]);
-            let missing =
-                find_null_non_nullable_fields(&schema, &vector_log_events_to_json_values(&[event]));
+            let missing = find_null_non_nullable_fields(
+                &schema,
+                &vector_log_events_to_json_values(&[event]).unwrap(),
+            );
             assert!(
                 missing.is_empty(),
                 "Expected no missing fields, got: {missing:?}"
@@ -907,8 +910,10 @@ mod tests {
             let schema = Schema::new(vec![Field::new("a", DataType::Utf8, false)]);
 
             let event = create_event(vec![("a", Value::Null)]);
-            let missing =
-                find_null_non_nullable_fields(&schema, &vector_log_events_to_json_values(&[event]));
+            let missing = find_null_non_nullable_fields(
+                &schema,
+                &vector_log_events_to_json_values(&[event]).unwrap(),
+            );
             assert_eq!(missing, vec!["a"]);
         }
     }

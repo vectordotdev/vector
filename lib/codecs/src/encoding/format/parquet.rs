@@ -282,12 +282,12 @@ impl tokio_util::codec::Encoder<Vec<Event>> for ParquetSerializer {
             return Ok(());
         }
 
-        let json_values = vector_log_events_to_json_values(&events);
+        let json_values = vector_log_events_to_json_values(&events)?;
         let non_log_count = events.len() - json_values.len();
 
         if non_log_count > 0 {
             warn!(
-                message = "Non-log / Non JSON serializable events dropped by Parquet encoder ",
+                message = "Non-log events dropped by Parquet encoder ",
                 %non_log_count,
                 internal_log_rate_secs = 10,
             );
