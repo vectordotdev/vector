@@ -3,6 +3,7 @@ use std::{collections::HashMap, convert::Infallible, io};
 use bytes::{Buf, Bytes};
 use chrono::Utc;
 use flate2::read::MultiGzDecoder;
+use http::header::HeaderValue;
 use snafu::ResultExt;
 use vector_lib::{
     config::LogNamespace,
@@ -119,15 +120,20 @@ fn parse_common_attributes_header(
 ) -> impl Filter<Extract = (HashMap<String, String>,), Error = warp::reject::Rejection> + Clone {
     warp::any()
         .and(warp::header("X-Amz-Firehose-Request-Id"))
-        .and(warp::header::optional("X-Amz-Firehose-Common-Attributes"))
+        .and(warp::header::optional::<HeaderValue>(
+            "X-Amz-Firehose-Common-Attributes",
+        ))
         .and_then(
-            move |request_id: String, common_attributes: Option<String>| async move {
+            move |request_id: String, common_attributes_raw: Option<HeaderValue>| async move {
                 if !is_common_attributes_configured {
                     return Ok(HashMap::new());
                 }
 
+                let common_attributes =
+                    common_attributes_raw.as_ref().and_then(|v| v.to_str().ok());
+
                 match common_attributes {
-                    Some(common_attributes) => serde_json::from_str(&common_attributes)
+                    Some(common_attributes) => serde_json::from_str(common_attributes)
                         .context(ParseSnafu {
                             request_id: request_id.clone(),
                         })
