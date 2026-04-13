@@ -92,14 +92,15 @@ generated: components: sinks: greptimedb: configuration: {
 		type: string: examples: ["example.com:4001"]
 	}
 	grpc_compression: {
-		description: """
-			Set gRPC compression encoding for the request
-			Default to none, `gzip` or `zstd` is supported.
-			"""
-		required: false
-		type: string: examples: [
-			"gzip",
-		]
+		description: "Set gRPC compression encoding for the request."
+		required:    false
+		type: string: {
+			default: "none"
+			enum: {
+				none: "No compression."
+				zstd: "Zstandard compression."
+			}
+		}
 	}
 	new_naming: {
 		description: """
