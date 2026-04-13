@@ -10,7 +10,7 @@ runner:
     no_proxy: greptimedb
 
 matrix:
-  version: [v1.0.0]
+  version: [v1.0.0, latest]
 
 # changes to these files/paths will invoke the integration test in CI
 # expressions are evaluated using https://github.com/micromatch/picomatch
