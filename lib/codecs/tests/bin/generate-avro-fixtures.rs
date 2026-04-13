@@ -475,7 +475,7 @@ fn generate_test_case_from_value(schema: &str, value: Value, filename: &str) -> 
 
     let mut schema_file = File::create(format!("{FIXTURES_PATH}/{filename}.avsc"))?;
     let mut avro_file = File::create(format!("{FIXTURES_PATH}/{filename}.avro"))?;
-    schema_file.write_all(schema.canonical_form().as_bytes())?;
+    schema_file.write_all(serde_json::to_string(&schema)?.as_bytes())?;
     avro_file.write_all(&bytes)?;
     Ok(())
 }

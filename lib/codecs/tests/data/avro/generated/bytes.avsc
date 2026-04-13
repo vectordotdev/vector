@@ -1,1 +1,1 @@
-{"name":"test","type":"record","fields":[{"name":"bytes_field","type":"bytes"}]}
+{"type":"record","name":"test","fields":[{"name":"bytes_field","type":"bytes"}]}
