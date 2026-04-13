@@ -57,16 +57,16 @@ fn try_from_tls_config(tls_config: &TlsConfig) -> crate::Result<ClientTlsOption>
         );
     }
 
-    let path_to_string = |p: &Option<std::path::PathBuf>| -> String {
+    let require_path = |p: &Option<std::path::PathBuf>, name: &str| -> crate::Result<String> {
         p.as_ref()
             .map(|p| p.to_string_lossy().into_owned())
-            .unwrap_or_default()
+            .ok_or_else(|| format!("GreptimeDB TLS requires `{name}` to be set").into())
     };
 
     Ok(ClientTlsOption {
-        server_ca_cert_path: path_to_string(&tls_config.ca_file),
-        client_cert_path: path_to_string(&tls_config.crt_file),
-        client_key_path: path_to_string(&tls_config.key_file),
+        server_ca_cert_path: require_path(&tls_config.ca_file, "ca_file")?,
+        client_cert_path: require_path(&tls_config.crt_file, "crt_file")?,
+        client_key_path: require_path(&tls_config.key_file, "key_file")?,
     })
 }
 
