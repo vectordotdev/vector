@@ -186,7 +186,8 @@ updates:
       - "no-changelog"
     commit-message:
       prefix: "chore(deps)"
-    open-pull-requests-limit: 50
+    # Disable version updates; security updates bypass this limit
+    open-pull-requests-limit: 0
     groups:
       npm_and_yarn:
         patterns:
