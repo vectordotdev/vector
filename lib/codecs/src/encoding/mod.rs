@@ -6,6 +6,7 @@ mod config;
 mod encoder;
 pub mod format;
 pub mod framing;
+mod internal_events;
 pub mod serializer;
 mod transformer;
 pub use chunking::{Chunker, Chunking, GelfChunker};
@@ -27,6 +28,11 @@ pub use format::{
 };
 #[cfg(feature = "opentelemetry")]
 pub use format::{OtlpSerializer, OtlpSerializerConfig};
+#[cfg(feature = "parquet")]
+pub use format::{
+    ParquetCompression, ParquetFieldType, ParquetSchemaField, ParquetSerializer,
+    ParquetSerializerConfig, SchemaMode,
+};
 #[cfg(feature = "syslog")]
 pub use format::{SyslogSerializer, SyslogSerializerConfig};
 pub use framing::{
