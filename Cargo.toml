@@ -127,6 +127,7 @@ members = [
   "lib/vector-vrl/category",
   "lib/vector-vrl/cli",
   "lib/vector-vrl/dnstap-parser",
+  "lib/vector-vrl/doc-builder",
   "lib/vector-vrl/enrichment",
   "lib/vector-vrl/functions",
   "lib/vector-vrl/metrics",
