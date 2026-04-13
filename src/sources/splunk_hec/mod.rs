@@ -48,10 +48,7 @@ use warp::{
 };
 
 use self::{
-    acknowledgements::{
-        HecAckStatusRequest, HecAckStatusResponse, HecAcknowledgementsConfig,
-        IndexerAcknowledgement,
-    },
+    acknowledgements::{HecAckStatusRequest, HecAckStatusResponse, IndexerAcknowledgement},
     splunk_response::{HecResponse, HecResponseMetadata, HecStatusCode},
 };
 use crate::{
@@ -67,6 +64,7 @@ use crate::{
 };
 
 mod acknowledgements;
+pub use acknowledgements::HecAcknowledgementsConfig;
 use std::marker::PhantomData;
 
 // Event fields unique to splunk_hec source
@@ -156,7 +154,7 @@ impl SourceConfig for SplunkConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let tls = MaybeTlsSettings::from_config(self.tls.as_ref(), true)?;
 
-        let source: SplunkSource = SplunkSource::new(self, tls.http_protocol_name(), cx);
+        let source: SplunkSource = SplunkSource::new(self, (), tls.http_protocol_name(), cx);
 
         let listener = tls.bind(&self.address).await?;
 
@@ -258,12 +256,17 @@ pub struct SplunkSource<E: Extractor = DefaultExtractor> {
     events_received: Registered<EventsReceived>,
     shutdown: vector_lib::shutdown::ShutdownSignal,
     out: SourceSender,
-
+    extractor_config: E::Config,
     _extractor: PhantomData<E>,
 }
 
 impl<E: Extractor> SplunkSource<E> {
-    fn new(config: &SplunkConfig, protocol: &'static str, cx: SourceContext) -> Self {
+    fn new(
+        config: &SplunkConfig,
+        extractor_config: E::Config,
+        protocol: &'static str,
+        cx: SourceContext,
+    ) -> Self {
         let log_namespace = cx.log_namespace(config.log_namespace);
         let acknowledgements = cx.do_acknowledgements(config.acknowledgements.enabled.into());
         let shutdown = cx.shutdown.clone();
@@ -289,13 +292,48 @@ impl<E: Extractor> SplunkSource<E> {
             store_hec_token: config.store_hec_token,
             log_namespace,
             events_received: register!(EventsReceived),
+            extractor_config,
             _extractor: PhantomData,
             shutdown: cx.shutdown,
             out: cx.out,
         }
     }
 
-    fn listen(
+    /// Construct a `SplunkSource` from individual parameters, without requiring a `SplunkConfig`.
+    /// Intended for use by wrapper source implementations (e.g. OPW's `splunk_hec_opw`).
+    pub fn new_from_parts(
+        valid_tokens: impl Iterator<Item = impl AsRef<str>>,
+        store_hec_token: bool,
+        acknowledgements: HecAcknowledgementsConfig,
+        log_namespace_override: Option<bool>,
+        extractor_config: E::Config,
+        protocol: &'static str,
+        cx: SourceContext,
+    ) -> Self {
+        let log_namespace = cx.log_namespace(log_namespace_override);
+        let acknowledgements_enabled = cx.do_acknowledgements(acknowledgements.enabled.into());
+        let shutdown = cx.shutdown.clone();
+
+        let idx_ack = acknowledgements_enabled
+            .then(|| Arc::new(IndexerAcknowledgement::new(acknowledgements, shutdown)));
+
+        SplunkSource::<E> {
+            valid_credentials: valid_tokens
+                .map(|token| format!("Splunk {}", token.as_ref()))
+                .collect(),
+            protocol,
+            idx_ack,
+            store_hec_token,
+            log_namespace,
+            events_received: register!(EventsReceived),
+            extractor_config,
+            _extractor: PhantomData,
+            shutdown: cx.shutdown,
+            out: cx.out,
+        }
+    }
+
+    pub fn listen(
         self,
         listener: vector_lib::tls::MaybeTlsListener,
         keepalive_settings: KeepaliveConfig,
@@ -363,6 +401,7 @@ impl<E: Extractor> SplunkSource<E> {
         let store_hec_token = self.store_hec_token;
         let log_namespace = self.log_namespace;
         let events_received = self.events_received.clone();
+        let extractor_config = self.extractor_config.clone();
         warp::post()
             .and(
                 path!("event")
@@ -388,6 +427,7 @@ impl<E: Extractor> SplunkSource<E> {
                     let mut out = out.clone();
                     let idx_ack = idx_ack.clone();
                     let events_received = events_received.clone();
+                    let extractor_config = extractor_config.clone();
 
                     async move {
                         if idx_ack.is_some() && channel.is_none() {
@@ -436,7 +476,12 @@ impl<E: Extractor> SplunkSource<E> {
                             batch,
                             log_namespace,
                             events_received,
-                            extractor: E::new(meta, log_namespace, store_hec_token),
+                            extractor: E::new(
+                                &extractor_config,
+                                meta,
+                                log_namespace,
+                                store_hec_token,
+                            ),
                         }
                         .into();
 
@@ -1047,8 +1092,16 @@ impl FieldExtractor {
 ///
 /// This DefaultExtractor can be wrapped in a custom implementation to extract additional properties.
 pub trait Extractor {
+    /// Config data passed at source construction time; available to `new` for each request.
+    type Config: Send + Sync + Clone + 'static;
+
     /// create a new instance of the extractor
-    fn new(meta: RequestMeta, log_namespace: LogNamespace, store_hec_token: bool) -> Self;
+    fn new(
+        config: &Self::Config,
+        meta: RequestMeta,
+        log_namespace: LogNamespace,
+        store_hec_token: bool,
+    ) -> Self;
 
     /// extract will be called for each value in the request and the associated log.
     fn extract(&mut self, log: &mut LogEvent, value: &mut JsonValue);
@@ -1061,7 +1114,14 @@ pub struct DefaultExtractor {
 }
 
 impl Extractor for DefaultExtractor {
-    fn new(meta: RequestMeta, log_namespace: LogNamespace, store_hec_token: bool) -> Self {
+    type Config = ();
+
+    fn new(
+        _config: &(),
+        meta: RequestMeta,
+        log_namespace: LogNamespace,
+        store_hec_token: bool,
+    ) -> Self {
         DefaultExtractor {
             extractors: [
                 // Extract the host field with the given priority:
