@@ -94,13 +94,15 @@ This decision tree is always active and Vector always "knows" what to do, even i
 
 Vector never stops quietly making the linear up vs. exponential down decision in the background, and it works out of the box with zero configuration beyond enabling the feature, which is currently on an opt-in basis in version 0.11. You can enable ARC in an HTTP sink by setting the [`request.concurrency`][request_concurrency] parameter to `adaptive`. Here's an example for a Clickhouse sink:
 
-```toml
-[sinks.clickhouse_internal]
-type = "clickhouse"
-inputs = ["log_stream_1", "log_stream_2"]
-host = "http://clickhouse-prod:8123"
-table = "prod-log-data"
-request.concurrency = "adaptive"
+```yaml
+sinks:
+  clickhouse_internal:
+    type: "clickhouse"
+    inputs: ["log_stream_1", "log_stream_2"]
+    host: "http://clickhouse-prod:8123"
+    table: "prod-log-data"
+    request:
+      concurrency: "adaptive"
 ```
 
 There's also room for fine-tuning if you find yourself needing additional knobs:
