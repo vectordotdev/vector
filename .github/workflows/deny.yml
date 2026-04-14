@@ -14,14 +14,14 @@ on:
   workflow_call:
     inputs:
       ref:
-        description: 'Git ref to checkout'
+        description: "Git ref to checkout"
         required: false
         type: string
 
   workflow_dispatch:
     inputs:
       ref:
-        description: 'Git ref to checkout'
+        description: "Git ref to checkout"
         required: false
         type: string
 
@@ -30,7 +30,7 @@ on:
     types: [checks_requested]
   schedule:
     # Same schedule as nightly.yml
-    - cron: "0 5 * * 2-6"  # Runs at 5:00 AM UTC, Tuesday through Saturday
+    - cron: "0 5 * * 2-6" # Runs at 5:00 AM UTC, Tuesday through Saturday
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.number || github.sha }}

@@ -380,6 +380,7 @@ mycie
 mycorp
 mydatabase
 mylabel
+mylogstorage
 mypod
 myvalue
 Namazu

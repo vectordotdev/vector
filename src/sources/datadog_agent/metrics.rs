@@ -289,6 +289,10 @@ pub(crate) fn decode_ddseries_v2(
                     log_schema()
                         .host_key()
                         .and_then(|key| tags.replace(key.to_string(), r.name));
+                } else if r.r#type.eq("device") {
+                    // The `device` resource type is used by Agent checks (disk, SNMP/NDM, etc.)
+                    // and must be preserved as a plain `device` tag to match the v1 series behavior.
+                    tags.replace("device".into(), r.name);
                 } else {
                     // But to avoid losing information if this situation changes, any other resource type/name will be saved in the tags map
                     tags.replace(format!("resource.{}", r.r#type), r.name);

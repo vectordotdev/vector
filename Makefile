@@ -508,7 +508,25 @@ check-markdown: ## Check that markdown is styled properly
 
 .PHONY: fix-markdown
 fix-markdown: ## Auto-fix markdown style issues
-	${MAYBE_ENVIRONMENT_EXEC} markdownlint --fix --config .markdownlint.jsonc $(shell git ls-files '*.md')
+	${MAYBE_ENVIRONMENT_EXEC} markdownlint-cli2 --fix $(shell git ls-files '*.md')
+
+.PHONY: check-prettier
+check-prettier: ## Check that JS/TS/YAML/JSON files are formatted with prettier
+	@for ext in yml yaml js ts tsx json; do \
+		files=$$(git ls-files "*.$$ext"); \
+		if [ -n "$$files" ]; then \
+			${MAYBE_ENVIRONMENT_EXEC} prettier --ignore-path .prettierignore --check $$files || exit 1; \
+		fi; \
+	done
+
+.PHONY: fix-prettier
+fix-prettier: ## Auto-fix JS/TS/YAML/JSON formatting with prettier
+	@for ext in yml yaml js ts tsx json; do \
+		files=$$(git ls-files "*.$$ext"); \
+		if [ -n "$$files" ]; then \
+			${MAYBE_ENVIRONMENT_EXEC} prettier --ignore-path .prettierignore --write $$files || exit 1; \
+		fi; \
+	done
 
 .PHONY: check-examples
 check-examples: ## Check that the config/examples files are valid
@@ -716,9 +734,16 @@ generate-component-docs: ## Generate per-component Cue docs from the configurati
 		$(if $(findstring true,$(CI)),>/dev/null,)
 	./scripts/cue.sh fmt
 
+VRL_DOC_BUILDER := $(shell command -v vector-vrl-doc-builder 2>/dev/null)
+ifndef VRL_DOC_BUILDER
+VRL_DOC_BUILDER_CMD = cargo run -p vector-vrl-doc-builder --
+else
+VRL_DOC_BUILDER_CMD = vector-vrl-doc-builder
+endif
+
 .PHONY: generate-vector-vrl-docs
 generate-vector-vrl-docs: ## Generate VRL function documentation from Rust source.
-	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) build vector-vrl-docs --output docs/generated/ \
+	${MAYBE_ENVIRONMENT_EXEC} $(VRL_DOC_BUILDER_CMD) --output docs/generated/ \
 		$(if $(findstring true,$(CI)),>/dev/null,)
 
 .PHONY: generate-vrl-docs
