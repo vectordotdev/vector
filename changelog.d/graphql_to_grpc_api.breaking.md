@@ -27,8 +27,8 @@ vector top --url http://localhost:8686
   [grpcurl](https://github.com/fullstorydev/grpcurl):
 
 ```bash
-# Check health
-grpcurl -plaintext localhost:8686 vector.observability.v1.ObservabilityService/Health
+# Check health (standard gRPC health check, compatible with Kubernetes gRPC probes)
+grpcurl -plaintext localhost:8686 grpc.health.v1.Health/Check
 
 # List components
 grpcurl -plaintext localhost:8686 vector.observability.v1.ObservabilityService/GetComponents
