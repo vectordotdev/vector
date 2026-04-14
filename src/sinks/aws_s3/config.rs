@@ -295,7 +295,6 @@ impl S3SinkConfig {
                 self.filename_extension
                     .clone()
                     .or_else(|| match batch_config {
-                        #[cfg(feature = "codecs-parquet")]
                         BatchSerializerConfig::Parquet(_) => Some("parquet".to_string()),
                         #[allow(unreachable_patterns)]
                         _ => None,

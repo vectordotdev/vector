@@ -198,12 +198,14 @@ impl InternalEvent for SchemaGenerationError<'_> {
         error!(
             message = "Could not generate schema for batched events",
             error = %self.error,
+            error_code = "parquet_schema_generation_failed",
             error_type = error_type::ENCODER_FAILED,
             stage = error_stage::SENDING,
             internal_log_rate_limit = false,
         );
         counter!(
             "component_errors_total",
+            "error_code" => "parquet_schema_generation_failed",
             "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::SENDING,
         )

@@ -298,29 +298,33 @@ impl tokio_util::codec::Encoder<Vec<Event>> for ParquetSerializer {
             return Ok(());
         }
 
-        // In strict mode, check for extra top-level fields not in the schema.
-        if self.schema_mode == ParquetSchemaMode::Strict {
-            for event in &events {
-                if let Some(log) = event.maybe_as_log()
-                    && let Some(object_map) = log.as_map()
-                {
-                    for top_level in object_map.keys() {
-                        if !self.schema_field_names.contains(top_level.as_str()) {
-                            return Err(Box::new(ArrowEncodingError::SchemaFetchError {
-                                message: format!(
-                                    "Strict schema mode: event contains field '{top_level}' not in schema",
-                                ),
-                            }));
+        match self.schema_mode {
+            // In strict mode, check for extra top-level fields not in the schema.
+            ParquetSchemaMode::Strict => {
+                for event in &events {
+                    if let Some(log) = event.maybe_as_log()
+                        && let Some(object_map) = log.as_map()
+                    {
+                        for top_level in object_map.keys() {
+                            if !self.schema_field_names.contains(top_level.as_str()) {
+                                return Err(Box::new(ArrowEncodingError::SchemaFetchError {
+                                    message: format!(
+                                        "Strict schema mode: event contains field '{top_level}' not in schema",
+                                    ),
+                                }));
+                            }
                         }
                     }
                 }
             }
-        } else if self.schema_mode == ParquetSchemaMode::AutoInfer {
-            let schema = ParquetSchemaGenerator::new(self.events_dropped_handle.clone())
-                .infer_schema(&json_values)?;
-            self.schema = Arc::new(ParquetSchemaGenerator::try_normalize_schema(
-                &events, schema,
-            ));
+            ParquetSchemaMode::AutoInfer => {
+                let schema = ParquetSchemaGenerator::new(self.events_dropped_handle.clone())
+                    .infer_schema(&json_values)?;
+                self.schema = Arc::new(ParquetSchemaGenerator::try_normalize_schema(
+                    &events, schema,
+                ));
+            }
+            ParquetSchemaMode::Relaxed => {}
         }
 
         let record_batch = build_record_batch(Arc::clone(&self.schema), &json_values)
