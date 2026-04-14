@@ -8,9 +8,9 @@ on:
     types: [opened, reopened]
     # Keep these paths in sync with the documentation team entries in .github/CODEOWNERS
     paths:
-      - 'docs/**'
-      - 'website/content/**'
-      - 'website/cue/reference/**'
+      - "docs/**"
+      - "website/content/**"
+      - "website/cue/reference/**"
 
   pull_request_review:
     types: [submitted]
