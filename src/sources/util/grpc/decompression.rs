@@ -124,15 +124,14 @@ impl Decompressor {
     fn finish(self) -> io::Result<Vec<u8>> {
         match self {
             Decompressor::Gzip(d) => (*d).finish(),
-            // Use decode_all to validate the complete zstd frame. Unlike flush()+into_inner()
-            // on a write::Decoder, this will return an error if the frame is truncated or
-            // corrupted.
+            // Decode directly into output_buf to avoid a temporary intermediate Vec that
+            // decode_all would produce; peak memory is compressed + decompressed rather than
+            // compressed + 2 × decompressed.
             Decompressor::Zstd {
                 compressed,
                 mut output_buf,
             } => {
-                let decompressed = zstd::stream::decode_all(io::Cursor::new(&compressed))?;
-                output_buf.extend_from_slice(&decompressed);
+                zstd::stream::copy_decode(io::Cursor::new(&compressed), &mut output_buf)?;
                 Ok(output_buf)
             }
         }
