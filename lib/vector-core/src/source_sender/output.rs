@@ -179,10 +179,12 @@ impl Output {
         let byte_size = events.estimated_json_encoded_size_of();
         let count = events.len();
 
+        let send_start = Instant::now();
+
         self.send_with_timeout(events, send_reference).await?;
 
         if let Some(send_latency) = &self.metrics.send_latency {
-            send_latency.record(send_reference.elapsed().as_secs_f64());
+            send_latency.record(send_start.elapsed().as_secs_f64());
         }
         self.events_sent.emit(CountByteSize(count, byte_size));
         unsent_event_count.decr(count);
