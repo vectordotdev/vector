@@ -12435,6 +12435,7 @@ dependencies = [
  "warp",
  "windows 0.58.0",
  "windows-service",
+ "windows-sys 0.52.0",
  "wiremock",
  "zstd 0.13.2",
 ]

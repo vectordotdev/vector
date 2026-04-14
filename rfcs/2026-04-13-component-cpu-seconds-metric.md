@@ -150,39 +150,39 @@ well under 500ns per batch on either platform.
 
 **Windows — `GetThreadTimes`**
 
-Windows exposes per-thread CPU time via `GetThreadTimes`. A precise
-implementation is feasible but requires adding a `windows-sys` (or `winapi`)
-dependency, which is not currently used by Vector. The implementation is
-deferred; Windows falls back to wall-clock time for now (see below).
+Windows exposes per-thread CPU time via `GetThreadTimes`, providing the same
+guarantee as `CLOCK_THREAD_CPUTIME_ID` with 100ns granularity. It is
+implemented using the `windows-sys` crate (added as a
+`[target.'cfg(windows)'.dependencies]`), which is already a transitive
+dependency of Vector.
 
 ```rust
-// Future work — not yet implemented.
 #[cfg(target_os = "windows")]
 fn thread_cpu_time() -> Duration {
-    use windows_sys::Win32::System::Threading::*;
-    let mut creation = 0u64;
-    let mut exit = 0u64;
-    let mut kernel = 0u64;
-    let mut user = 0u64;
+    use windows_sys::Win32::Foundation::FILETIME;
+    use windows_sys::Win32::System::Threading::{GetCurrentThread, GetThreadTimes};
+
+    let mut creation = FILETIME { dwLowDateTime: 0, dwHighDateTime: 0 };
+    let mut exit     = FILETIME { dwLowDateTime: 0, dwHighDateTime: 0 };
+    let mut kernel   = FILETIME { dwLowDateTime: 0, dwHighDateTime: 0 };
+    let mut user     = FILETIME { dwLowDateTime: 0, dwHighDateTime: 0 };
+
     // SAFETY: GetCurrentThread() returns a pseudo-handle that is always valid.
     unsafe {
-        GetThreadTimes(
-            GetCurrentThread(),
-            &mut creation as *mut _ as *mut _,
-            &mut exit as *mut _ as *mut _,
-            &mut kernel as *mut _ as *mut _,
-            &mut user as *mut _ as *mut _,
-        );
+        GetThreadTimes(GetCurrentThread(), &mut creation, &mut exit, &mut kernel, &mut user);
     }
-    // FILETIME is in 100ns units
-    Duration::from_nanos((kernel + user) * 100)
+
+    // FILETIME stores time as 100ns intervals split across two u32 fields.
+    let to_nanos = |ft: FILETIME| {
+        (((ft.dwHighDateTime as u64) << 32) | ft.dwLowDateTime as u64) * 100
+    };
+    Duration::from_nanos(to_nanos(kernel) + to_nanos(user))
 }
 ```
 
-#### Fallback: Wall-clock timing (Windows and other platforms)
+#### Fallback: Wall-clock timing (other platforms)
 
-On Windows and any other platform not covered above, fall back to wall-clock
-time:
+On any platform not covered above, fall back to wall-clock time:
 
 ```rust
 fn thread_cpu_time() -> Duration {
@@ -317,11 +317,8 @@ independently.
 ## Drawbacks
 
 - **Platform-specific code.** The precise implementation uses `cfg`-gated FFI
-  for Linux and macOS. Windows and other platforms fall back to wall-clock time.
-- **Windows accuracy gap.** Windows ships a suitable API (`GetThreadTimes`) but
-  it is not yet implemented because it requires adding a `windows-sys` dependency
-  that Vector does not currently carry. Windows users get wall-clock time until
-  that is addressed.
+  for Linux, macOS, and Windows. Other platforms fall back to wall-clock time,
+  giving three maintained code paths plus one fallback.
 
 ## Alternatives
 
@@ -391,5 +388,3 @@ on modern kernels. The higher precision is worth the identical cost.
   computed by the `UtilizationEmitter` for operators who prefer a ready-to-use
   ratio.
 - Add `mode="user"` / `mode="system"` tag split for deeper CPU profiling.
-- Implement the Windows `GetThreadTimes` path once a `windows-sys` dependency
-  is available in Vector.

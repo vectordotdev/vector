@@ -6,6 +6,9 @@ use std::time::Duration;
 /// only the time the calling thread was actually scheduled on a CPU (true CPU
 /// time, excluding preemption and context switches to other threads/processes).
 ///
+/// On Windows this uses `GetThreadTimes`, which provides the same guarantee
+/// with 100ns granularity.
+///
 /// On other platforms this falls back to wall-clock time via
 /// [`std::time::Instant`].
 ///
@@ -73,12 +76,65 @@ impl Inner {
     }
 }
 
+// ── Windows: GetThreadTimes ───────────────────────────────────────────────
+
+#[cfg(target_os = "windows")]
+struct Inner(Duration);
+
+#[cfg(target_os = "windows")]
+impl Inner {
+    fn now() -> Self {
+        use windows_sys::Win32::Foundation::FILETIME;
+        use windows_sys::Win32::System::Threading::{GetCurrentThread, GetThreadTimes};
+
+        let mut creation = FILETIME { dwLowDateTime: 0, dwHighDateTime: 0 };
+        let mut exit    = FILETIME { dwLowDateTime: 0, dwHighDateTime: 0 };
+        let mut kernel  = FILETIME { dwLowDateTime: 0, dwHighDateTime: 0 };
+        let mut user    = FILETIME { dwLowDateTime: 0, dwHighDateTime: 0 };
+
+        // SAFETY:
+        // - `GetCurrentThread()` returns a pseudo-handle that is always valid
+        //   and does not need to be closed.
+        // - All four `FILETIME` pointers are valid, properly aligned, and
+        //   stack-allocated.
+        // - The return value is intentionally ignored: failure is only possible
+        //   with an invalid handle, which cannot occur with `GetCurrentThread()`.
+        unsafe {
+            GetThreadTimes(
+                GetCurrentThread(),
+                &mut creation,
+                &mut exit,
+                &mut kernel,
+                &mut user,
+            );
+        }
+
+        // Combine the low/high halves of each FILETIME into a u64, then sum
+        // kernel + user. FILETIME units are 100-nanosecond intervals.
+        let kernel_ns = filetime_to_nanos(kernel);
+        let user_ns   = filetime_to_nanos(user);
+        Inner(Duration::from_nanos(kernel_ns + user_ns))
+    }
+
+    #[inline]
+    fn elapsed(&self) -> Duration {
+        Self::now().0.saturating_sub(self.0)
+    }
+}
+
+#[cfg(target_os = "windows")]
+#[inline]
+fn filetime_to_nanos(ft: windows_sys::Win32::Foundation::FILETIME) -> u64 {
+    let ticks = ((ft.dwHighDateTime as u64) << 32) | (ft.dwLowDateTime as u64);
+    ticks * 100 // convert 100ns intervals to nanoseconds
+}
+
 // ── Other platforms: wall-clock fallback ──────────────────────────────────
 
-#[cfg(not(any(target_os = "linux", target_os = "macos")))]
+#[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
 struct Inner(std::time::Instant);
 
-#[cfg(not(any(target_os = "linux", target_os = "macos")))]
+#[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
 impl Inner {
     fn now() -> Self {
         Inner(std::time::Instant::now())
