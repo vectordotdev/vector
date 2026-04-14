@@ -181,11 +181,14 @@ impl Output {
 
         let send_start = Instant::now();
 
-        self.send_with_timeout(events, send_reference).await?;
+        let send_result = self.send_with_timeout(events, send_reference).await;
 
         if let Some(send_latency) = &self.metrics.send_latency {
             send_latency.record(send_start.elapsed().as_secs_f64());
         }
+
+        send_result?;
+
         self.events_sent.emit(CountByteSize(count, byte_size));
         unsent_event_count.decr(count);
         Ok(())
@@ -253,17 +256,23 @@ impl Output {
         let events = events.into_iter().map(Into::into);
         let mut unsent_event_count = UnsentEventCount::new(events.len());
         let send_batch_start = Instant::now();
+
         for events in array::events_into_arrays(events, Some(CHUNK_SIZE)) {
             self.send(events, &mut unsent_event_count)
                 .await
-                .inspect_err(|error| match error {
-                    SendError::Timeout => {
-                        unsent_event_count.timed_out();
+                .inspect_err(|error| {
+                    match error {
+                        SendError::Timeout => {
+                            unsent_event_count.timed_out();
+                        }
+                        SendError::Closed => {
+                            // The unsent event count is discarded here because the callee emits the
+                            // `StreamClosedError`.
+                            unsent_event_count.discard();
+                        }
                     }
-                    SendError::Closed => {
-                        // The unsent event count is discarded here because the callee emits the
-                        // `StreamClosedError`.
-                        unsent_event_count.discard();
+                    if let Some(send_batch_latency) = &self.metrics.send_batch_latency {
+                        send_batch_latency.record(send_batch_start.elapsed().as_secs_f64());
                     }
                 })?;
         }
