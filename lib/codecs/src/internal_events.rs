@@ -190,13 +190,15 @@ impl InternalEvent for EncoderNullConstraintError<'_> {
 #[derive(NamedInternalEvent)]
 pub(crate) struct SchemaGenerationError<'a> {
     pub error: &'a arrow::error::ArrowError,
+    pub batch_count: usize,
 }
 
 #[cfg(feature = "parquet")]
 impl InternalEvent for SchemaGenerationError<'_> {
     fn emit(self) {
+        const REASON: &str = "Could not generate schema for batched events";
         error!(
-            message = "Could not generate schema for batched events",
+            message = REASON,
             error = %self.error,
             error_code = "parquet_schema_generation_failed",
             error_type = error_type::ENCODER_FAILED,
@@ -210,5 +212,40 @@ impl InternalEvent for SchemaGenerationError<'_> {
             "stage" => error_stage::SENDING,
         )
         .increment(1);
+        emit(ComponentEventsDropped::<UNINTENTIONAL> {
+            count: self.batch_count,
+            reason: REASON,
+        });
+    }
+}
+
+#[cfg(feature = "arrow")]
+#[derive(NamedInternalEvent)]
+pub(crate) struct JsonSerializationError<'a> {
+    pub error: &'a serde_json::Error,
+    pub batch_count: usize,
+}
+
+#[cfg(feature = "arrow")]
+impl InternalEvent for JsonSerializationError<'_> {
+    fn emit(self) {
+        const CONSTRAINT_REASON: &str = "Could not serialize event to JSON.";
+        error!(
+            message = CONSTRAINT_REASON,
+            error = %self.error,
+            error_type = error_type::ENCODER_FAILED,
+            stage = error_stage::SENDING,
+            internal_log_rate_limit = true,
+        );
+        counter!(
+            "component_errors_total",
+            "error_type" => error_type::ENCODER_FAILED,
+            "stage" => error_stage::SENDING,
+        )
+        .increment(1);
+        emit(ComponentEventsDropped::<UNINTENTIONAL> {
+            count: self.batch_count,
+            reason: CONSTRAINT_REASON,
+        });
     }
 }

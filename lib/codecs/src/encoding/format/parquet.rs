@@ -27,7 +27,7 @@ use vector_core::event::Event;
 
 use super::arrow::{ArrowEncodingError, build_record_batch};
 use crate::encoding::format::arrow::vector_log_events_to_json_values;
-use crate::internal_events::SchemaGenerationError;
+use crate::internal_events::{JsonSerializationError, SchemaGenerationError};
 
 type EventsDroppedError = ComponentEventsDropped<'static, UNINTENTIONAL>;
 
@@ -282,7 +282,17 @@ impl tokio_util::codec::Encoder<Vec<Event>> for ParquetSerializer {
             return Ok(());
         }
 
-        let json_values = vector_log_events_to_json_values(&events)?;
+        let json_values = match vector_log_events_to_json_values(&events) {
+            Ok(values) => values,
+            Err(e) => {
+                emit(JsonSerializationError {
+                    error: &e,
+                    batch_count: events.len(),
+                });
+                return Err(Box::new(e));
+            }
+        };
+
         let non_log_count = events.len() - json_values.len();
 
         if non_log_count > 0 {
@@ -307,6 +317,7 @@ impl tokio_util::codec::Encoder<Vec<Event>> for ParquetSerializer {
                     {
                         for top_level in object_map.keys() {
                             if !self.schema_field_names.contains(top_level.as_str()) {
+                                self.events_dropped_handle.emit(Count(events.len()));
                                 return Err(Box::new(ArrowEncodingError::SchemaFetchError {
                                     message: format!(
                                         "Strict schema mode: event contains field '{top_level}' not in schema",
@@ -318,8 +329,7 @@ impl tokio_util::codec::Encoder<Vec<Event>> for ParquetSerializer {
                 }
             }
             ParquetSchemaMode::AutoInfer => {
-                let schema = ParquetSchemaGenerator::new(self.events_dropped_handle.clone())
-                    .infer_schema(&json_values)?;
+                let schema = ParquetSchemaGenerator::infer_schema(&json_values)?;
                 self.schema = Arc::new(ParquetSchemaGenerator::try_normalize_schema(
                     &events, schema,
                 ));
@@ -342,22 +352,16 @@ impl tokio_util::codec::Encoder<Vec<Event>> for ParquetSerializer {
     }
 }
 
-pub struct ParquetSchemaGenerator {
-    events_dropped_handle: Registered<EventsDroppedError>,
-}
+pub struct ParquetSchemaGenerator {}
 
 impl ParquetSchemaGenerator {
-    fn new(events_dropped_handle: Registered<EventsDroppedError>) -> Self {
-        Self {
-            events_dropped_handle,
-        }
-    }
-
-    pub fn infer_schema(&self, events: &[serde_json::Value]) -> Result<Schema, Error> {
+    pub fn infer_schema(events: &[serde_json::Value]) -> Result<Schema, Error> {
         let schema = infer_json_schema_from_iterator(events.iter().map(Ok::<_, ArrowError>))
             .map_err(|e| {
-                self.events_dropped_handle.emit(Count(events.len()));
-                emit(SchemaGenerationError { error: &e });
+                emit(SchemaGenerationError {
+                    error: &e,
+                    batch_count: events.len(),
+                });
                 Error::new(ErrorKind::InvalidData, e.to_string())
             })?;
 
