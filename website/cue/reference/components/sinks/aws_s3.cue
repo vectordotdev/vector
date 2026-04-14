@@ -218,10 +218,10 @@ components: sinks: aws_s3: components._aws & {
 		parquet_encoding: {
 			title: "Parquet Batch Encoding"
 			body: """
-				The S3 sink supports Apache Parquet batch encoding via the `batch_encoding`
+				The S3 sink supports Apache Parquet batch encoding with the `batch_encoding`
 				option. When configured, events are encoded together as Parquet columnar files
 				instead of the default per-event JSON or text encoding. Parquet files are
-				optimized for analytical queries via Athena, Trino, Spark, and other columnar
+				optimized for analytical queries using Athena, Trino, Spark, and other columnar
 				query engines.
 
 				Parquet handles compression internally at the column page level, so the
@@ -235,7 +235,7 @@ components: sinks: aws_s3: components._aws & {
 				`schema_mode` to `auto_infer` and let Vector derive the schema from each
 				incoming batch.
 
-				#### Option 1: Schema File
+				#### Option 1: Schema file
 
 				Load the schema from a native Parquet `.schema` file. The file must
 				contain a valid Parquet message type definition.
@@ -260,7 +260,7 @@ components: sinks: aws_s3: components._aws & {
 				algorithm = "snappy"
 				```
 
-				#### Option 2: Auto-Infer Schema
+				#### Option 2: Auto-infer schema
 
 				Vector infers the Arrow schema from the fields present in each batch.
 				`Value::Timestamp` fields are automatically promoted to
@@ -285,7 +285,7 @@ components: sinks: aws_s3: components._aws & {
 				algorithm = "snappy"
 				```
 
-				#### YAML Example
+				#### YAML example
 
 				```yaml
 				sinks:
@@ -306,16 +306,16 @@ components: sinks: aws_s3: components._aws & {
 				        level: 9
 				```
 
-				#### Configuration Reference
+				#### Configuration reference
 
 				| Field | Type | Required | Description |
 				|---|---|---|---|
 				| `codec` | string | yes | Must be `"parquet"` |
 				| `schema_file` | path | no | Path to a native Parquet `.schema` file. Required when `schema_mode` is `relaxed` or `strict`. |
-				| `schema_mode` | string | no | `relaxed` (default), `strict`, or `auto_infer`. See below. |
-				| `compression` | object | no | Column-level compression. See compression options below. |
+				| `schema_mode` | string | no | `relaxed` (default), `strict`, or `auto_infer`. See the section on schema_mode values. |
+				| `compression` | object | no | Column-level compression. See the section on compression options. |
 
-				#### `schema_mode` Values
+				#### `schema_mode` values
 
 				| Value | Description |
 				|---|---|
@@ -323,7 +323,7 @@ components: sinks: aws_s3: components._aws & {
 				| `strict` | Missing schema fields become null. Extra event fields cause an encoding error. |
 				| `auto_infer` | Schema is inferred from each batch. No `schema_file` needed. `Value::Timestamp` fields are promoted to `Timestamp(Microsecond, UTC)`. |
 
-				#### Compression Options
+				#### Compression options
 
 				Compression is configured as a nested object with an `algorithm` key.
 				Algorithms that support levels accept an additional `level` key.
@@ -336,7 +336,7 @@ components: sinks: aws_s3: components._aws & {
 				| `lz4` | — | — |
 				| `none` | — | — |
 
-				#### Unsupported Types
+				#### Unsupported types
 
 				Binary fields are rejected at config time because the internal Arrow JSON
 				encoder cannot materialize them. Use `utf8` with base64 or hex encoding
