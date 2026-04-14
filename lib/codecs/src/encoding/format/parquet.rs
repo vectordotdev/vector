@@ -11,6 +11,7 @@ use std::sync::Arc;
 use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
 use arrow::error::ArrowError;
 use arrow::json::reader::infer_json_schema_from_iterator;
+use arrow::record_batch::RecordBatch;
 use bytes::{BufMut, BytesMut};
 use derivative::Derivative;
 use parquet::arrow::ArrowWriter;
@@ -27,7 +28,7 @@ use vector_core::event::Event;
 
 use super::arrow::{ArrowEncodingError, build_record_batch};
 use crate::encoding::format::arrow::vector_log_events_to_json_values;
-use crate::internal_events::{JsonSerializationError, SchemaGenerationError};
+use crate::internal_events::{ArrowWriterError, JsonSerializationError, SchemaGenerationError};
 
 type EventsDroppedError = ComponentEventsDropped<'static, UNINTENTIONAL>;
 
@@ -272,6 +273,46 @@ impl ParquetSerializer {
     pub const fn content_type(&self) -> &'static str {
         "application/vnd.apache.parquet"
     }
+
+    /// Writes `record_batch` into `buffer` as a complete Parquet file.
+    ///
+    /// On failure, emits an [`ArrowWriterError`] internal event (which also
+    /// increments `component_errors_total` and emits the events-dropped metric)
+    /// before returning the error.
+    fn write_record_batch(
+        &self,
+        record_batch: &RecordBatch,
+        buffer: &mut BytesMut,
+        event_count: usize,
+    ) -> Result<(), parquet::errors::ParquetError> {
+        let mut writer = ArrowWriter::try_new(
+            buffer.writer(),
+            Arc::clone(record_batch.schema_ref()),
+            Some((*self.writer_props).clone()),
+        )
+        .inspect_err(|e| {
+            emit(ArrowWriterError {
+                error: e,
+                batch_count: event_count,
+            });
+        })?;
+
+        writer.write(record_batch).inspect_err(|e| {
+            emit(ArrowWriterError {
+                error: e,
+                batch_count: event_count,
+            });
+        })?;
+
+        writer.close().inspect_err(|e| {
+            emit(ArrowWriterError {
+                error: e,
+                batch_count: event_count,
+            });
+        })?;
+
+        Ok(())
+    }
 }
 
 impl tokio_util::codec::Encoder<Vec<Event>> for ParquetSerializer {
@@ -337,16 +378,11 @@ impl tokio_util::codec::Encoder<Vec<Event>> for ParquetSerializer {
             ParquetSchemaMode::Relaxed => {}
         }
 
-        let record_batch = build_record_batch(Arc::clone(&self.schema), &json_values)
-            .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
+        let record_batch =
+            build_record_batch(Arc::clone(&self.schema), &json_values).map_err(Box::new)?;
 
-        let mut writer = ArrowWriter::try_new(
-            buffer.writer(),
-            Arc::clone(record_batch.schema_ref()),
-            Some((*self.writer_props).clone()),
-        )?;
-        writer.write(&record_batch)?;
-        writer.close()?;
+        self.write_record_batch(&record_batch, buffer, json_values.len())
+            .map_err(Box::new)?;
 
         Ok(())
     }

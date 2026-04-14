@@ -221,6 +221,39 @@ impl InternalEvent for SchemaGenerationError<'_> {
 
 #[cfg(feature = "parquet")]
 #[derive(NamedInternalEvent)]
+pub(crate) struct ArrowWriterError<'a> {
+    pub error: &'a parquet::errors::ParquetError,
+    pub batch_count: usize,
+}
+
+#[cfg(feature = "parquet")]
+impl InternalEvent for ArrowWriterError<'_> {
+    fn emit(self) {
+        const REASON: &str = "Failed to write record batch with ArrowWriter.";
+        error!(
+            message = REASON,
+            error = %self.error,
+            error_code = "parquet_arrow_writer_failed",
+            error_type = error_type::ENCODER_FAILED,
+            stage = error_stage::SENDING,
+            internal_log_rate_limit = false,
+        );
+        counter!(
+            "component_errors_total",
+            "error_code" => "parquet_arrow_writer_failed",
+            "error_type" => error_type::ENCODER_FAILED,
+            "stage" => error_stage::SENDING,
+        )
+        .increment(1);
+        emit(ComponentEventsDropped::<UNINTENTIONAL> {
+            count: self.batch_count,
+            reason: REASON,
+        });
+    }
+}
+
+#[cfg(feature = "parquet")]
+#[derive(NamedInternalEvent)]
 pub(crate) struct JsonSerializationError<'a> {
     pub error: &'a serde_json::Error,
     pub batch_count: usize,
