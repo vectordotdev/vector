@@ -1298,3 +1298,194 @@ async fn test_glob_input() {
     let mut tests = build_unit_tests(config).await.unwrap();
     assert!(tests.remove(0).run().await.errors.is_empty());
 }
+
+#[tokio::test]
+async fn expected_event_count_correct() {
+    crate::test_util::trace_init();
+
+    let config: ConfigBuilder = crate::config::format::deserialize(
+        indoc! {r#"
+                transforms:
+                  foo:
+                    inputs:
+                      - ignored
+                    type: remap
+                    source: |
+                      . = [{"message": "one"}, {"message": "two"}, {"message": "three"}]
+                tests:
+                  - name: event count check
+                    inputs:
+                      - insert_at: foo
+                        value: doesnt matter
+                    outputs:
+                      - extract_from: foo
+                        expected_event_count: 3
+                        conditions:
+                          - type: vrl
+                            source: |
+                              assert!(exists(.message), "message field must exist")
+            "#},
+        crate::config::Format::Yaml,
+    )
+    .unwrap();
+
+    let mut tests = build_unit_tests(config).await.unwrap();
+    assert!(tests.remove(0).run().await.errors.is_empty());
+}
+
+#[tokio::test]
+async fn expected_event_count_wrong() {
+    crate::test_util::trace_init();
+
+    let config: ConfigBuilder = crate::config::format::deserialize(
+        indoc! {r#"
+                transforms:
+                  foo:
+                    inputs:
+                      - ignored
+                    type: remap
+                    source: |
+                      . = [{"message": "one"}, {"message": "two"}, {"message": "three"}]
+                tests:
+                  - name: wrong event count
+                    inputs:
+                      - insert_at: foo
+                        value: doesnt matter
+                    outputs:
+                      - extract_from: foo
+                        expected_event_count: 2
+                        conditions:
+                          - type: vrl
+                            source: |
+                              assert!(exists(.message), "message field must exist")
+            "#},
+        crate::config::Format::Yaml,
+    )
+    .unwrap();
+
+    let mut tests = build_unit_tests(config).await.unwrap();
+    let errors = tests.remove(0).run().await.errors;
+    assert!(!errors.is_empty());
+    assert!(
+        errors
+            .iter()
+            .any(|e| e.contains("expected 2 events") && e.contains("but received 3")),
+        "expected event count error, got: {errors:?}"
+    );
+}
+
+#[tokio::test]
+async fn expected_event_count_zero_no_conditions() {
+    crate::test_util::trace_init();
+
+    let config: ConfigBuilder = crate::config::format::deserialize(
+        indoc! {r#"
+            transforms:
+              foo:
+                inputs:
+                  - ignored
+                type: remap
+                source: |
+                  if .message == "drop me" {
+                    abort
+                  }
+            tests:
+              - name: zero events expected
+                inputs:
+                  - insert_at: foo
+                    value: "drop me"
+                outputs:
+                  - extract_from: foo
+                    expected_event_count: 0
+        "#},
+        crate::config::Format::Yaml,
+    )
+    .unwrap();
+
+    let mut tests = build_unit_tests(config).await.unwrap();
+    assert!(tests.remove(0).run().await.errors.is_empty());
+}
+
+#[tokio::test]
+async fn expected_event_count_zero_with_conditions_rejected() {
+    crate::test_util::trace_init();
+
+    let config: ConfigBuilder = crate::config::format::deserialize(
+        indoc! {r#"
+            transforms:
+              foo:
+                inputs:
+                  - ignored
+                type: remap
+                source: |
+                  if .message == "drop me" {
+                    abort
+                  }
+            tests:
+              - name: zero with conditions
+                inputs:
+                  - insert_at: foo
+                    value: "drop me"
+                outputs:
+                  - extract_from: foo
+                    expected_event_count: 0
+                    conditions:
+                      - type: vrl
+                        source: |
+                          assert!(exists(.message), "unreachable")
+        "#},
+        crate::config::Format::Yaml,
+    )
+    .unwrap();
+
+    let errs = build_unit_tests(config).await.err().unwrap();
+    assert!(
+        errs.iter()
+            .any(|e| e.contains("expected_event_count of 0") && e.contains("conditions")),
+        "expected config error about zero count with conditions, got: {errs:?}"
+    );
+}
+
+#[tokio::test]
+async fn expected_event_count_conflicting_values() {
+    crate::test_util::trace_init();
+
+    let config: ConfigBuilder = crate::config::format::deserialize(
+        indoc! {r#"
+            transforms:
+              foo:
+                inputs:
+                  - ignored
+                type: remap
+                source: |
+                  . = [{"message": "one"}, {"message": "two"}]
+            tests:
+              - name: conflicting counts
+                inputs:
+                  - insert_at: foo
+                    value: doesnt matter
+                outputs:
+                  - extract_from: foo
+                    expected_event_count: 2
+                    conditions:
+                      - type: vrl
+                        source: |
+                          assert!(exists(.message), "ok")
+                  - extract_from: foo
+                    expected_event_count: 5
+                    conditions:
+                      - type: vrl
+                        source: |
+                          assert!(exists(.message), "ok")
+        "#},
+        crate::config::Format::Yaml,
+    )
+    .unwrap();
+
+    let errs = build_unit_tests(config).await.err().unwrap();
+    assert!(
+        errs.iter()
+            .any(|e| e.contains("conflicting expected_event_count")),
+        "expected conflicting count error, got: {errs:?}"
+    );
+}
