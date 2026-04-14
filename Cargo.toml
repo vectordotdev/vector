@@ -275,7 +275,6 @@ aws-config = { version = "1.8.13", default-features = false, features = ["behavi
 aws-credential-types = { version = "1.2.4", default-features = false, features = ["hardcoded-credentials"], optional = true }
 aws-sdk-cloudwatch = { version = "1.102.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
 aws-sdk-cloudwatchlogs = { version = "1.116.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
-aws-sdk-elasticsearch = { version = "1.96.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
 aws-sdk-firehose = { version = "1.101.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
 aws-sdk-kinesis = { version = "1.99.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
 aws-sdk-kms = { version = "1.99.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
@@ -994,7 +993,7 @@ aws-cloudwatch-logs-integration-tests = ["sinks-aws_cloudwatch_logs"]
 aws-cloudwatch-metrics-integration-tests = ["sinks-aws_cloudwatch_metrics"]
 aws-ec2-metadata-integration-tests = ["transforms-aws_ec2_metadata"]
 aws-ecs-metrics-integration-tests = ["sources-aws_ecs_metrics"]
-aws-kinesis-firehose-integration-tests = ["sinks-aws_kinesis_firehose", "dep:aws-sdk-elasticsearch", "sinks-elasticsearch"]
+aws-kinesis-firehose-integration-tests = ["sinks-aws_kinesis_firehose", "sinks-aws_s3"]
 aws-kinesis-streams-integration-tests = ["sinks-aws_kinesis_streams"]
 aws-s3-integration-tests = ["sinks-aws_s3", "sources-aws_s3"]
 aws-sqs-integration-tests = ["sinks-aws_sqs"]
