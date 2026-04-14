@@ -1245,7 +1245,7 @@ impl Runner {
                     let blocked_completions = completed_count.fetch_sub(yielded_since_last_record, Ordering::Relaxed);
                     yielded_since_last_record = 0;
                     histogram!(
-                        "transform_concurrent_scheduling_pressure",
+                        "estimated_concurrent_transform_scheduling_pressure",
                         "component_id" => self.component_id.clone()
                     )
                     .record((blocked_completions as f64 / *TRANSFORM_CONCURRENCY_LIMIT as f64).min(1.0));
