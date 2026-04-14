@@ -32,7 +32,9 @@ fn f64_for_arbitrary(g: &mut Gen) -> f64 {
         while value.is_nan() || value == -0.0 {
             value = f64::arbitrary(g) % MAX_F64_SIZE;
         }
-        (value * 10_000.0).round() / 10_000.0
+        let rounded = (value * 10_000.0).round() / 10_000.0;
+        // Rounding can produce -0.0 from small negatives; normalize to +0.0.
+        if rounded == -0.0_f64 { 0.0 } else { rounded }
     }
     #[cfg(not(feature = "generate-fixtures"))]
     {
