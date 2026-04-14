@@ -16,10 +16,6 @@ fn ydb_endpoint() -> String {
     std::env::var("YDB_ENDPOINT").unwrap_or_else(|_| "grpc://localhost:2136?database=/local".into())
 }
 
-fn ydb_database() -> String {
-    std::env::var("YDB_DATABASE").unwrap_or_else(|_| "/local".into())
-}
-
 fn timestamp() -> DateTime<Utc> {
     Utc::now()
 }
@@ -45,6 +41,7 @@ fn create_events(count: usize) -> (Vec<Event>, BatchStatusReceiver) {
 }
 
 struct YdbTestClient {
+    client: ydb::Client,
     table_client: TableClient,
 }
 
@@ -57,9 +54,16 @@ impl YdbTestClient {
 
         client.wait().await.expect("Failed to connect to YDB");
 
+        let table_client = client.table_client();
+
         Self {
-            table_client: client.table_client(),
+            client,
+            table_client,
         }
+    }
+
+    fn database(&self) -> String {
+        self.client.database().to_string()
     }
 
     async fn create_table(&self, table_path: &str) {
@@ -114,7 +118,9 @@ impl YdbTestClient {
 
 async fn prepare_config() -> (YdbConfig, String, YdbTestClient) {
     let endpoint = ydb_endpoint();
-    let database = ydb_database();
+    let client = YdbTestClient::new(&endpoint).await;
+
+    let database = client.database();
     let table_name = random_table_name();
     let table = format!("{}/{}", database, table_name);
 
@@ -126,8 +132,6 @@ async fn prepare_config() -> (YdbConfig, String, YdbTestClient) {
         "#,
     );
     let (config, _) = load_sink::<YdbConfig>(&config_str).expect("Failed to parse config");
-
-    let client = YdbTestClient::new(&endpoint).await;
 
     (config, table, client)
 }

@@ -163,8 +163,11 @@ impl YdbService {
         &self,
         request: YdbRequest,
     ) -> Result<YdbResponse, YdbServiceError> {
-        let metadata = request.metadata.clone();
-        let events = request.events.clone();
+        let YdbRequest {
+            events,
+            metadata,
+            finalizers: _,
+        } = request;
 
         let schema = self
             .table_schema
