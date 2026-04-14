@@ -219,14 +219,14 @@ impl InternalEvent for SchemaGenerationError<'_> {
     }
 }
 
-#[cfg(feature = "arrow")]
+#[cfg(feature = "parquet")]
 #[derive(NamedInternalEvent)]
 pub(crate) struct JsonSerializationError<'a> {
     pub error: &'a serde_json::Error,
     pub batch_count: usize,
 }
 
-#[cfg(feature = "arrow")]
+#[cfg(feature = "parquet")]
 impl InternalEvent for JsonSerializationError<'_> {
     fn emit(self) {
         const CONSTRAINT_REASON: &str = "Could not serialize event to JSON.";
