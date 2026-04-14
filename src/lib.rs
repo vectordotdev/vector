@@ -126,6 +126,7 @@ pub mod trace;
 pub mod transforms;
 pub mod types;
 pub mod unit_test;
+pub(crate) mod cpu_time;
 pub(crate) mod utilization;
 pub mod validate;
 #[cfg(windows)]
