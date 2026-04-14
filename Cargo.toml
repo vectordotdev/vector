@@ -127,6 +127,7 @@ members = [
   "lib/vector-vrl/category",
   "lib/vector-vrl/cli",
   "lib/vector-vrl/dnstap-parser",
+  "lib/vector-vrl/doc-builder",
   "lib/vector-vrl/enrichment",
   "lib/vector-vrl/functions",
   "lib/vector-vrl/metrics",
@@ -560,6 +561,7 @@ docker = ["dep:bollard", "dep:dirs-next"]
 api = [
   "dep:base64",
   "dep:tonic",
+  "dep:tonic-health",
   "dep:tonic-reflection",
   "dep:prost",
   "dep:prost-types",
