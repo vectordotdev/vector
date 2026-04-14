@@ -620,6 +620,18 @@ fn build_outputs(
             .or_insert((expected_event_count, vec![conditions.clone()]));
     }
 
+    // Post-merge validation: after merging entries that share the same
+    // extract_from, reject any that ended up with expected_event_count of 0 and
+    // non-empty conditions (which would pass vacuously against zero events).
+    for (extract_from, (count, conditions)) in &outputs {
+        if count == &Some(0) && conditions.iter().any(|c| !c.is_empty()) {
+            errors.push(format!(
+                "output for {extract_from:?} has expected_event_count of 0 but also defines conditions; \
+                 conditions cannot be evaluated when no events are expected",
+            ));
+        }
+    }
+
     if errors.is_empty() {
         Ok(outputs)
     } else {

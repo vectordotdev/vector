@@ -1489,3 +1489,47 @@ async fn expected_event_count_conflicting_values() {
         "expected conflicting count error, got: {errs:?}"
     );
 }
+
+#[tokio::test]
+async fn expected_event_count_zero_split_with_conditions_rejected() {
+    crate::test_util::trace_init();
+
+    // Splitting expected_event_count: 0 and conditions across two output
+    // entries that share the same extract_from must still be rejected after
+    // merge, otherwise the conditions would pass vacuously against zero events.
+    let config: ConfigBuilder = crate::config::format::deserialize(
+        indoc! {r#"
+            transforms:
+              foo:
+                inputs:
+                  - ignored
+                type: remap
+                source: |
+                  if .message == "drop me" {
+                    abort
+                  }
+            tests:
+              - name: split zero with conditions
+                inputs:
+                  - insert_at: foo
+                    value: "drop me"
+                outputs:
+                  - extract_from: foo
+                    expected_event_count: 0
+                  - extract_from: foo
+                    conditions:
+                      - type: vrl
+                        source: |
+                          assert!(false, "should never be evaluated")
+        "#},
+        crate::config::Format::Yaml,
+    )
+    .unwrap();
+
+    let errs = build_unit_tests(config).await.err().unwrap();
+    assert!(
+        errs.iter()
+            .any(|e| e.contains("expected_event_count of 0") && e.contains("conditions")),
+        "expected config error about zero count with conditions after merge, got: {errs:?}"
+    );
+}
