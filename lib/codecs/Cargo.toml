@@ -34,9 +34,7 @@ dyn-clone = { version = "1", default-features = false }
 flate2.workspace = true
 futures.workspace = true
 influxdb-line-protocol = { version = "2", default-features = false }
-lookup = { package = "vector-lookup", path = "../vector-lookup", default-features = false, features = [
-    "test",
-] }
+lookup = { package = "vector-lookup", path = "../vector-lookup", default-features = false, features = ["test"] }
 memchr = { version = "2", default-features = false }
 metrics.workspace = true
 opentelemetry-proto = { path = "../opentelemetry-proto", optional = true }
@@ -62,9 +60,7 @@ vector-common = { path = "../vector-common", default-features = false }
 vector-common-macros.workspace = true
 vector-config = { path = "../vector-config", default-features = false }
 vector-config-macros = { path = "../vector-config-macros", default-features = false }
-vector-core = { path = "../vector-core", default-features = false, features = [
-    "vrl",
-] }
+vector-core = { path = "../vector-core", default-features = false, features = ["vrl"] }
 vector-vrl-functions.workspace = true
 toml = { version = "0.9.8", optional = true }
 
@@ -74,10 +70,7 @@ indoc.workspace = true
 tokio = { workspace = true, features = ["test-util"] }
 toml.workspace = true
 similar-asserts = "1.7.0"
-vector-core = { path = "../vector-core", default-features = false, features = [
-    "vrl",
-    "test",
-] }
+vector-core = { path = "../vector-core", default-features = false, features = ["vrl", "test"] }
 rstest = "0.26.1"
 tracing-test = "0.2.6"
 uuid.workspace = true
@@ -87,11 +80,5 @@ vrl.workspace = true
 arrow = ["dep:arrow", "arrow/chrono-tz"]
 parquet = ["dep:parquet", "arrow"]
 opentelemetry = ["dep:opentelemetry-proto"]
-syslog = [
-    "dep:syslog_loose",
-    "dep:strum",
-    "dep:derive_more",
-    "dep:serde-aux",
-    "dep:toml",
-]
+syslog = ["dep:syslog_loose", "dep:strum", "dep:derive_more", "dep:serde-aux", "dep:toml"]
 test = []
