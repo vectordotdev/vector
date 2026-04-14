@@ -82,6 +82,11 @@ async fn execute_upsert_in_transaction(
         return Ok(());
     }
 
+    let type_example = rows
+        .first()
+        .expect("rows is not empty, checked above")
+        .clone();
+
     let table_client = table_client
         .clone_with_transaction_options(ydb::TransactionOptions::new().with_autocommit(true));
 
@@ -89,15 +94,15 @@ async fn execute_upsert_in_transaction(
         .retry_transaction(|mut tx| {
             let table_path = table_path.clone();
             let rows = rows.clone();
+            let type_example = type_example.clone();
 
             async move {
-                let type_example = rows.first().unwrap();
                 let yql = format!(
                     "UPSERT INTO `{}`\nSELECT * FROM AS_TABLE($values);",
                     table_path
                 );
 
-                let values_list = Value::list_from(type_example.clone(), rows)?;
+                let values_list = Value::list_from(type_example, rows)?;
                 let query = Query::new(yql).with_params(ydb_params!("$values" => values_list));
 
                 tx.query(query).await?;

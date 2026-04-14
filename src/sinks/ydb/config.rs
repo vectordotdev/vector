@@ -30,17 +30,21 @@ use crate::{
 pub struct YdbConfig {
     /// The YDB connection string (gRPC endpoint with database).
     ///
+    /// Supports TLS connections via `grpcs://` scheme and various authentication methods.
     #[configurable(metadata(
         docs::examples = "grpc://localhost:2136?database=/local",
-        docs::examples = "grpcs://ydb.example.com:2135?database=/local&ca_certificate=/path/to/ca.pem"
+        docs::examples = "grpcs://ydb.example.com:2135?database=/production&ca_certificate=/path/to/ca.pem",
+        docs::examples = "grpcs://ydb.example.com:2135?database=/production&token_static_username=user&token_static_password=pass",
+        docs::examples = "grpcs://ydb.example.com:2135?database=/production&token_metadata=yandex-cloud",
+        docs::examples = "grpcs://ydb.example.com:2135?database=/production&token_cmd=yc iam create-token"
     ))]
     pub endpoint: String,
 
     /// The YDB table path to insert data into.
     ///
-    /// Must be a full absolute path from the database root, starting with `/`.
+    /// Can be either an absolute path (starting with `/`) or relative to the database.
     /// The table must already exist with the required schema.
-    #[configurable(metadata(docs::examples = "/local/logs"))]
+    #[configurable(metadata(docs::examples = "/local/logs", docs::examples = "logs"))]
     pub table: String,
 
     #[configurable(derived)]
@@ -67,15 +71,15 @@ pub(crate) enum InsertStrategy {
 }
 
 pub(crate) fn choose_insert_strategy(schema: &TableDescription) -> InsertStrategy {
-    let has_sync_indexes = schema
+    let all_indexes_async = schema
         .indexes
         .iter()
-        .any(|idx| matches!(idx.index_type, IndexType::Global | IndexType::GlobalUnique));
+        .all(|idx| matches!(idx.index_type, IndexType::GlobalAsync));
 
-    if has_sync_indexes {
-        InsertStrategy::Upsert
-    } else {
+    if schema.indexes.is_empty() || all_indexes_async {
         InsertStrategy::BulkUpsert
+    } else {
+        InsertStrategy::Upsert
     }
 }
 
@@ -100,23 +104,30 @@ impl SinkConfig for YdbConfig {
 
         let table_client = client.table_client();
 
-        let healthcheck = healthcheck(table_client.clone()).boxed();
+        let table_path = if self.table.starts_with('/') {
+            self.table.clone()
+        } else {
+            format!("{}/{}", client.database(), self.table)
+        };
+
+        healthcheck(table_client.clone(), table_path.clone()).await?;
+        let healthcheck = futures::future::ready(Ok(())).boxed();
 
         let table_schema = table_client
-            .describe_table(self.table.clone())
+            .describe_table(table_path.clone())
             .await
-            .map_err(|e| format!("Failed to fetch table schema for '{}': {}", self.table, e))?;
+            .map_err(|e| format!("Failed to fetch table schema for '{}': {}", table_path, e))?;
 
         debug!(
             message = "Fetched YDB table schema",
-            table = %self.table,
+            table = %table_path,
             columns = table_schema.columns.len(),
             primary_key = ?table_schema.primary_key,
         );
 
         let service = YdbService::new(
             table_client,
-            self.table.clone(),
+            table_path,
             self.endpoint.clone(),
             table_schema,
         );
@@ -141,17 +152,22 @@ impl SinkConfig for YdbConfig {
     }
 }
 
-async fn healthcheck(table_client: ydb::TableClient) -> crate::Result<()> {
+async fn healthcheck(table_client: ydb::TableClient, table_path: String) -> crate::Result<()> {
     let table_client = table_client.clone_with_transaction_options(
         ydb::TransactionOptions::new()
             .with_mode(ydb::Mode::OnlineReadonly)
             .with_autocommit(true),
     );
 
+    let query = format!("SELECT 1 FROM `{}` LIMIT 1", table_path);
+
     table_client
-        .retry_transaction(|mut t| async move {
-            t.query(ydb::Query::new("SELECT 1")).await?;
-            Ok(())
+        .retry_transaction(|mut t| {
+            let query = query.clone();
+            async move {
+                t.query(ydb::Query::new(query)).await?;
+                Ok(())
+            }
         })
         .await?;
     Ok(())
@@ -177,5 +193,69 @@ mod tests {
         .unwrap();
         assert_eq!(cfg.endpoint, "grpc://localhost:2136?database=/local");
         assert_eq!(cfg.table, "/local/logs");
+    }
+
+    #[test]
+    fn parse_config_relative_table() {
+        let cfg = toml::from_str::<YdbConfig>(
+            r#"
+            endpoint = "grpc://localhost:2136?database=/local"
+            table = "logs"
+        "#,
+        )
+        .unwrap();
+        assert_eq!(cfg.endpoint, "grpc://localhost:2136?database=/local");
+        assert_eq!(cfg.table, "logs");
+    }
+
+    #[test]
+    fn test_insert_strategy_no_indexes() {
+        use ydb::StoreType;
+
+        let schema = TableDescription {
+            columns: vec![],
+            primary_key: vec![],
+            indexes: vec![],
+            store_type: StoreType::Row,
+        };
+        assert_eq!(choose_insert_strategy(&schema), InsertStrategy::BulkUpsert);
+    }
+
+    #[test]
+    fn test_insert_strategy_async_indexes() {
+        use ydb::{IndexDescription, IndexStatus, StoreType};
+
+        let schema = TableDescription {
+            columns: vec![],
+            primary_key: vec![],
+            indexes: vec![IndexDescription {
+                name: "idx_async".to_string(),
+                index_columns: vec![],
+                index_type: IndexType::GlobalAsync,
+                data_columns: vec![],
+                status: IndexStatus::Ready,
+            }],
+            store_type: StoreType::Row,
+        };
+        assert_eq!(choose_insert_strategy(&schema), InsertStrategy::BulkUpsert);
+    }
+
+    #[test]
+    fn test_insert_strategy_sync_indexes() {
+        use ydb::{IndexDescription, IndexStatus, StoreType};
+
+        let schema = TableDescription {
+            columns: vec![],
+            primary_key: vec![],
+            indexes: vec![IndexDescription {
+                name: "idx_sync".to_string(),
+                index_columns: vec![],
+                index_type: IndexType::Global,
+                data_columns: vec![],
+                status: IndexStatus::Ready,
+            }],
+            store_type: StoreType::Row,
+        };
+        assert_eq!(choose_insert_strategy(&schema), InsertStrategy::Upsert);
     }
 }

@@ -1,8 +1,6 @@
-version: '3'
-
 services:
   ydb:
-    image: docker.io/ydbplatform/local-ydb:${CONFIG_VERSION}
+    image: ydbplatform/local-ydb:${CONFIG_VERSION}
     hostname: localhost
     environment:
       - YDB_USE_IN_MEMORY_PDISKS=true

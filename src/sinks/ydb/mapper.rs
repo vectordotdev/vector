@@ -45,10 +45,9 @@ impl<'a> EventMapper<'a> {
                         source: "Trace event is not an object/map".into(),
                     })?
             }
-            Event::Metric(_) => {
-                // TODO: cover metrics
+            _ => {
                 return Err(MappingError::VectorCommon {
-                    source: "Metric events are not yet supported, only Log and Trace".into(),
+                    source: "Only Log and Trace events are supported".into(),
                 });
             }
         };
@@ -112,21 +111,18 @@ fn convert_value(vector_val: &VectorValue, ydb_type_hint: &Value) -> Result<Valu
         (VectorValue::Integer(i), Value::Int64(_)) => Ok(Value::Int64(*i)),
 
         (VectorValue::Float(f), Value::Double(_)) => Ok(Value::Double(f.into_inner())),
-        (VectorValue::Float(f), Value::Decimal(_)) => {
-            Ok(Value::Decimal(Decimal::try_from(f.into_inner()).map_err(
-                |e| MappingError::ConversionFailed {
-                    message: format!("failed to convert Float to Decimal: {}", e),
-                },
-            )?))
-        }
+        (VectorValue::Float(f), Value::Decimal(_)) => Ok(Value::Decimal(
+            Decimal::try_from(f.into_inner()).map_err(|e| MappingError::ConversionFailed {
+                message: format!("failed to convert Float to Decimal: {}", e),
+            })?,
+        )),
 
         (VectorValue::Bytes(b), Value::Bytes(_)) => Ok(Value::Bytes(b.to_vec().into())),
         (VectorValue::Bytes(b), Value::Text(_)) => {
-            let text = String::from_utf8(b.to_vec()).map_err(|_| {
-                MappingError::ConversionFailed {
+            let text =
+                String::from_utf8(b.to_vec()).map_err(|_| MappingError::ConversionFailed {
                     message: "invalid UTF-8 in Bytes for Text field".to_string(),
-                }
-            })?;
+                })?;
             Ok(Value::Text(text))
         }
 
@@ -137,11 +133,11 @@ fn convert_value(vector_val: &VectorValue, ydb_type_hint: &Value) -> Result<Valu
         }
         (VectorValue::Timestamp(ts), Value::Date(_)) => {
             let date = ts.date_naive();
-            let datetime = date.and_hms_opt(0, 0, 0).ok_or_else(|| {
-                MappingError::ConversionFailed {
-                    message: "failed to create datetime".to_string(),
-                }
-            })?;
+            let datetime =
+                date.and_hms_opt(0, 0, 0)
+                    .ok_or_else(|| MappingError::ConversionFailed {
+                        message: "failed to create datetime".to_string(),
+                    })?;
             let datetime_utc = chrono::Utc.from_utc_datetime(&datetime);
             Ok(Value::Date(std::time::SystemTime::from(datetime_utc)))
         }
@@ -189,7 +185,6 @@ fn convert_value(vector_val: &VectorValue, ydb_type_hint: &Value) -> Result<Valu
 
         (VectorValue::Null, _) => Ok(Value::Null),
 
-        // TODO: add support for Regex type later
         (VectorValue::Regex(_), _) => Err(MappingError::ConversionFailed {
             message: "Regex type is not supported".to_string(),
         }),

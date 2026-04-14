@@ -60,9 +60,13 @@ generated: components: sinks: ydb: configuration: {
 		}
 	}
 	endpoint: {
-		description: "The YDB connection string (gRPC endpoint with database)."
-		required:    true
-		type: string: examples: ["grpc://localhost:2136?database=/local", "grpcs://ydb.example.com:2135?database=/local&ca_certificate=/path/to/ca.pem"]
+		description: """
+			The YDB connection string (gRPC endpoint with database).
+
+			Supports TLS connections via `grpcs://` scheme and various authentication methods.
+			"""
+		required: true
+		type: string: examples: ["grpc://localhost:2136?database=/local", "grpcs://ydb.example.com:2135?database=/production&ca_certificate=/path/to/ca.pem", "grpcs://ydb.example.com:2135?database=/production&token_static_username=user&token_static_password=pass", "grpcs://ydb.example.com:2135?database=/production&token_metadata=yandex-cloud", "grpcs://ydb.example.com:2135?database=/production&token_cmd=yc iam create-token"]
 	}
 	request: {
 		description: """
@@ -254,10 +258,10 @@ generated: components: sinks: ydb: configuration: {
 		description: """
 			The YDB table path to insert data into.
 
-			Must be a full absolute path from the database root, starting with `/`.
+			Can be either an absolute path (starting with `/`) or relative to the database.
 			The table must already exist with the required schema.
 			"""
 		required: true
-		type: string: examples: ["/local/logs"]
+		type: string: examples: ["/local/logs", "logs"]
 	}
 }
