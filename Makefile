@@ -734,9 +734,16 @@ generate-component-docs: ## Generate per-component Cue docs from the configurati
 		$(if $(findstring true,$(CI)),>/dev/null,)
 	./scripts/cue.sh fmt
 
+VRL_DOC_BUILDER := $(shell command -v vector-vrl-doc-builder 2>/dev/null)
+ifndef VRL_DOC_BUILDER
+VRL_DOC_BUILDER_CMD = cargo run -p vector-vrl-doc-builder --
+else
+VRL_DOC_BUILDER_CMD = vector-vrl-doc-builder
+endif
+
 .PHONY: generate-vector-vrl-docs
 generate-vector-vrl-docs: ## Generate VRL function documentation from Rust source.
-	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) build vector-vrl-docs --output docs/generated/ \
+	${MAYBE_ENVIRONMENT_EXEC} $(VRL_DOC_BUILDER_CMD) --output docs/generated/ \
 		$(if $(findstring true,$(CI)),>/dev/null,)
 
 .PHONY: generate-vrl-docs
