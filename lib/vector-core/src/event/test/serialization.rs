@@ -170,9 +170,18 @@ fn create_saturated_metric(depth: usize) -> Metric {
 /// Build all three EventArray variants with every Value field at the given depth.
 fn saturated_event_arrays(depth: usize) -> Vec<(&'static str, EventArray)> {
     vec![
-        ("Log", EventArray::Logs(LogArray::from(vec![create_saturated_log(depth)]))),
-        ("Trace", EventArray::Traces(TraceArray::from(vec![create_saturated_trace(depth)]))),
-        ("Metric", EventArray::Metrics(MetricArray::from(vec![create_saturated_metric(depth)]))),
+        (
+            "Log",
+            EventArray::Logs(LogArray::from(vec![create_saturated_log(depth)])),
+        ),
+        (
+            "Trace",
+            EventArray::Traces(TraceArray::from(vec![create_saturated_trace(depth)])),
+        ),
+        (
+            "Metric",
+            EventArray::Metrics(MetricArray::from(vec![create_saturated_metric(depth)])),
+        ),
     ]
 }
 
@@ -223,16 +232,19 @@ fn max_nesting_depth_is_correct() {
     // --- Depth MAX+1 must fail for at least one event type ---
     // (proves the limit can't be raised without hitting prost's recursion limit)
 
-    let any_array_fails = saturated_event_arrays(max + 1).into_iter().any(|(_, array)| {
-        let proto_array = proto::EventArray::from(array);
-        let mut buf = BytesMut::with_capacity(65536);
-        proto_array.encode(&mut buf).unwrap();
-        proto::EventArray::decode(buf.freeze()).is_err()
-    });
+    let any_array_fails = saturated_event_arrays(max + 1)
+        .into_iter()
+        .any(|(_, array)| {
+            let proto_array = proto::EventArray::from(array);
+            let mut buf = BytesMut::with_capacity(65536);
+            proto_array.encode(&mut buf).unwrap();
+            proto::EventArray::decode(buf.freeze()).is_err()
+        });
     assert!(
         any_array_fails,
         "All EventArray types decoded at depth {}. MAX_NESTING_DEPTH ({}) could be raised.",
-        max + 1, max,
+        max + 1,
+        max,
     );
 
     let any_wrapper_fails = saturated_events(max + 1).into_iter().any(|(_, event)| {
@@ -244,7 +256,8 @@ fn max_nesting_depth_is_correct() {
     assert!(
         any_wrapper_fails,
         "All EventWrapper types decoded at depth {}. MAX_NESTING_DEPTH ({}) could be raised.",
-        max + 1, max,
+        max + 1,
+        max,
     );
 }
 
