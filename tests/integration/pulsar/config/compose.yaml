@@ -1,4 +1,4 @@
-version: '3'
+version: "3"
 
 services:
   pulsar:
@@ -8,6 +8,10 @@ services:
       - 6650:6650
       - 6651:6651
     environment:
+      # Since apache/pulsar#25238, standalone mode advertises the container's FQDN
+      # (the container ID) instead of localhost. Set explicitly so TLS hostname
+      # verification matches the certificate's DNS SAN.
+      - PULSAR_PREFIX_advertisedAddress=pulsar
       - PULSAR_PREFIX_brokerServicePortTls=6651
       - PULSAR_PREFIX_tlsKeyFilePath=/etc/pulsar/certs/pulsar.key.pem
       - PULSAR_PREFIX_tlsCertificateFilePath=/etc/pulsar/certs/pulsar.cert.pem

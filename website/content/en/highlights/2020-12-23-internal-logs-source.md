@@ -38,24 +38,27 @@ metrics and modify and ship them however you wish.
 Here's an example Vector configuration that ships Vector's logs to Splunk and
 allows its internal metrics to be scraped by [Prometheus]:
 
-```toml
-[sources.vector_logs]
-type = "internal_logs"
+```yaml
+sources:
+  vector_logs:
+    type: "internal_logs"
 
-[sources.vector_metrics]
-type = "internal_metrics"
+  vector_metrics:
+    type: "internal_metrics"
 
-[sinks.splunk]
-type = "splunk_hec"
-inputs = ["vector_logs"]
-endpoint = "https://my-account.splunkcloud.com"
-token = "${SPLUNK_HEC_TOKEN}"
-encoding.codec = "json"
+sinks:
+  splunk:
+    type: "splunk_hec"
+    inputs: ["vector_logs"]
+    endpoint: "https://my-account.splunkcloud.com"
+    token: "${SPLUNK_HEC_TOKEN}"
+    encoding:
+      codec: "json"
 
-[sinks.prometheus]
-type = "prometheus"
-inputs = ["vector_metrics"]
-address = "0.0.0.0:9090"
+  prometheus:
+    type: "prometheus"
+    inputs: ["vector_metrics"]
+    address: "0.0.0.0:9090"
 ```
 
 [internal_logs]: /docs/reference/configuration/sources/internal_logs

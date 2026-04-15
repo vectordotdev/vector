@@ -34,7 +34,7 @@ jobs:
           filters: |
             docs:
               - "lib/vector-vrl/**"
-              - "vdev/**"
+              - "Makefile"
               - "Cargo.lock"
               - ".github/workflows/check_generated_vrl_docs.yml"
 
@@ -51,9 +51,11 @@ jobs:
 
       - uses: ./.github/actions/setup
         with:
-          vdev: true
-          mold: false
-          cargo-cache: false
+          rust: true
+          protoc: true
+          vdev: false
+
+      - uses: ./.github/actions/install-vrl-doc-builder
 
       - name: Regenerate VRL docs
         run: make generate-vector-vrl-docs
@@ -112,7 +114,7 @@ jobs:
           && steps.last-commit.outputs.is-auto != 'true'
           && github.event_name == 'pull_request'
           && steps.push.outcome != 'success'
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: vrl-docs-check-pr
           path: /tmp/docs-check/pr-number
