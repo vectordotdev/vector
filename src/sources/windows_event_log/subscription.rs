@@ -18,9 +18,9 @@ use windows::Win32::System::EventLog::{
     EvtSubscribeStartAfterBookmark, EvtSubscribeStartAtOldestRecord, EvtSubscribeStrict,
     EvtSubscribeToFutureEvents,
 };
-#[cfg(test)]
-use windows::Win32::System::Threading::SetEvent;
-use windows::Win32::System::Threading::{CreateEventW, ResetEvent, WaitForMultipleObjects};
+use windows::Win32::System::Threading::{
+    CreateEventW, ResetEvent, SetEvent, WaitForMultipleObjects,
+};
 use windows::core::HSTRING;
 
 use super::{
@@ -479,9 +479,25 @@ impl EventLogSubscription {
             let mut bookmark_failed = false;
             let mut channel_count = 0usize;
 
-            // Drain loop: keep calling EvtNext until ERROR_NO_MORE_ITEMS or channel budget.
-            // Only reset the signal once the channel is fully drained; if we hit the
-            // budget limit the signal stays set so WaitForMultipleObjects returns immediately.
+            // Reset the signal BEFORE draining to avoid a lost-wakeup race
+            // (see vectordotdev/vector#25194). The Windows Event Log service
+            // signals this manual-reset event via SetEvent each time a new
+            // matching event is recorded; SetEvent on an already-signaled
+            // event is a no-op, so if we reset AFTER draining, any signal
+            // that arrives between our last EvtNext and ResetEvent is lost
+            // — the subscription then hangs until the next event arrives.
+            // Resetting first means any signal raised during the drain is
+            // preserved, causing the next WaitForMultipleObjects to return
+            // immediately.
+            //
+            // If we exit the drain loop early (channel budget exhausted or
+            // bookmark update failed mid-batch), we re-SetEvent at the end
+            // of this iteration so the next pull_events call revisits this
+            // channel without waiting for a fresh OS signal.
+            unsafe {
+                let _ = ResetEvent(channel_sub.signal_event);
+            }
+
             'drain: loop {
                 if channel_count >= channel_limit {
                     break;
@@ -697,15 +713,20 @@ impl EventLogSubscription {
             }
 
             if channel_drained && !bookmark_failed {
-                unsafe {
-                    let _ = ResetEvent(channel_sub.signal_event);
-                }
-
                 // Update channel record count gauge for lag detection.
                 super::render::update_channel_records(
                     &channel_sub.channel,
                     &channel_sub.channel_records_gauge,
                 );
+            } else {
+                // Drain exited early (budget exhausted or bookmark_failed
+                // mid-batch). Re-arm the signal so the next pull_events
+                // revisits this channel immediately without waiting for a
+                // fresh OS notification. Pairs with the pre-drain ResetEvent
+                // above.
+                unsafe {
+                    let _ = SetEvent(channel_sub.signal_event);
+                }
             }
         }
 
@@ -1271,5 +1292,83 @@ mod tests {
         // subscription will fall back to reading from scratch. We only assert
         // that the subscription is functional.
         let _events = subscription.pull_events(100).unwrap_or_default();
+    }
+
+    /// Regression test for vectordotdev/vector#25194.
+    ///
+    /// The Windows Event Log service signals the pull-mode wait handle via
+    /// `SetEvent` each time a new matching event is recorded. Because the
+    /// handle is manual-reset, `SetEvent` on an already-signaled handle is
+    /// a no-op. If `pull_events` resets the signal *after* draining events
+    /// via `EvtNext`, any signal that fires between the last `EvtNext` and
+    /// the `ResetEvent` call is silently lost — the subscription then
+    /// permanently hangs until a subsequent event arrives.
+    ///
+    /// The fix is to reset the signal *before* the drain loop, so signals
+    /// raised during the drain are preserved and the next wait returns
+    /// immediately. This test pins that invariant by simulating the race
+    /// with a `std::sync::Barrier` for deterministic ordering — it fails
+    /// with `WAIT_TIMEOUT` under the old "reset after drain" order.
+    #[test]
+    fn test_signal_not_lost_when_set_during_drain() {
+        use std::sync::{Arc as StdArc, Barrier};
+        use windows::Win32::System::Threading::WaitForSingleObject;
+
+        // Manual-reset event, initially non-signaled (we SetEvent first to
+        // mirror the post-initial-drain state of a real subscription).
+        let signal = unsafe { CreateEventW(None, true, false, None).unwrap() };
+        let signal_raw = signal.0 as isize;
+
+        // Prime: simulate the OS having signaled (events arrived).
+        unsafe {
+            let _ = SetEvent(signal);
+        }
+
+        // Barrier pair: the helper thread waits until the main thread has
+        // simulated entering the drain (by resetting), then calls SetEvent
+        // to simulate a new event notification arriving during the drain.
+        // A second barrier pair lets the main thread wait until the helper
+        // has fired SetEvent before we check the signal state.
+        let barrier_enter = StdArc::new(Barrier::new(2));
+        let barrier_exit = StdArc::new(Barrier::new(2));
+        let barrier_enter_helper = StdArc::clone(&barrier_enter);
+        let barrier_exit_helper = StdArc::clone(&barrier_exit);
+
+        let helper = std::thread::spawn(move || {
+            barrier_enter_helper.wait();
+            unsafe {
+                let h = HANDLE(signal_raw as *mut std::ffi::c_void);
+                let _ = SetEvent(h);
+            }
+            barrier_exit_helper.wait();
+        });
+
+        // Main thread: simulate the pull_events sequence with the fix
+        // (ResetEvent is the FIRST signal-handling step).
+        unsafe {
+            let _ = ResetEvent(signal);
+        }
+        // Release helper — it now fires SetEvent, simulating the OS
+        // signaling a new event "during" the drain window.
+        barrier_enter.wait();
+        // Wait until helper has definitely fired SetEvent.
+        barrier_exit.wait();
+        helper.join().unwrap();
+
+        // With the fix, the SetEvent above is preserved in the signal and
+        // this wait returns WAIT_OBJECT_0 immediately. With the old
+        // post-drain ResetEvent order, the SetEvent would have been
+        // clobbered by the reset and this wait would return WAIT_TIMEOUT.
+        let wait_result = unsafe { WaitForSingleObject(signal, 500) };
+        assert_eq!(
+            wait_result, WAIT_OBJECT_0,
+            "signal set during the drain window was lost — this is the \
+             lost-wakeup race from vectordotdev/vector#25194. \
+             pull_events must call ResetEvent BEFORE draining, not after."
+        );
+
+        unsafe {
+            let _ = CloseHandle(signal);
+        }
     }
 }
