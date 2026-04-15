@@ -128,9 +128,10 @@ impl Encoder<Vec<Event>> for (Transformer, vector_lib::codecs::BatchEncoder) {
                 // (e.g. SchemaGenerationError, EncoderNullConstraintError) which
                 // logs the error and increments component_errors_total.
                 // We only emit the drop count here to avoid double-counting.
-                // Note: n_events is the pre-filter count, so if the codec
-                // partially dropped events (e.g. non-log events) before failing,
-                // the total may slightly overcount.
+                // n_events is the pre-filter count; Parquet filters non-log
+                // events before encoding, but that only happens if a sink is
+                // misconfigured to send non-log events into a log-only encoder,
+                // so the overcount is not a practical concern.
                 emit!(ComponentEventsDropped::<UNINTENTIONAL> {
                     count: n_events,
                     reason: "Failed to batch encode events.",
