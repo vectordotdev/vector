@@ -55,7 +55,6 @@ fn benchmark_http(c: &mut Criterion) {
                                 compression: *compression,
                                 method: Default::default(),
                                 auth: Default::default(),
-                                headers: Default::default(),
                                 payload_prefix: Default::default(),
                                 payload_suffix: Default::default(),
                                 batch,
