@@ -134,7 +134,7 @@ fn create_nested_value(wrapping_levels: usize) -> Value {
     value
 }
 
-/// Create a LogEvent with both event data and metadata at the given nesting depth.
+/// Create a [`LogEvent`] with both event data and metadata at the given nesting depth.
 fn create_saturated_log(depth: usize) -> LogEvent {
     let nested = create_nested_value(depth);
     let mut event = LogEvent::default();
@@ -146,7 +146,7 @@ fn create_saturated_log(depth: usize) -> LogEvent {
     event
 }
 
-/// Create a TraceEvent with both event data and metadata at the given nesting depth.
+/// Create a [`TraceEvent`] with both event data and metadata at the given nesting depth.
 fn create_saturated_trace(depth: usize) -> TraceEvent {
     let nested = create_nested_value(depth);
     let mut trace = TraceEvent::default();
@@ -167,7 +167,7 @@ fn create_saturated_metric(depth: usize) -> Metric {
     metric
 }
 
-/// Build all three EventArray variants with every Value field at the given depth.
+/// Build all three `EventArray` variants with every Value field at the given depth.
 fn saturated_event_arrays(depth: usize) -> Vec<(&'static str, EventArray)> {
     vec![
         (
@@ -185,7 +185,7 @@ fn saturated_event_arrays(depth: usize) -> Vec<(&'static str, EventArray)> {
     ]
 }
 
-/// Build all three Event variants for EventWrapper encoding.
+/// Build all three Event variants for `EventWrapper` encoding.
 fn saturated_events(depth: usize) -> Vec<(&'static str, Event)> {
     vec![
         ("Log", Event::Log(create_saturated_log(depth))),
@@ -194,7 +194,7 @@ fn saturated_events(depth: usize) -> Vec<(&'static str, Event)> {
     ]
 }
 
-/// Verify MAX_NESTING_DEPTH is exactly right: all event types roundtrip at depth 32,
+/// Verify `MAX_NESTING_DEPTH` is exactly right: all event types roundtrip at depth 32,
 /// and at least one fails prost decode at depth 33.
 ///
 /// Each event has ALL Value-carrying fields saturated at the test depth, so every
@@ -261,7 +261,7 @@ fn max_nesting_depth_is_correct() {
     );
 }
 
-/// Verify the nesting gate accepts all event types at MAX_NESTING_DEPTH.
+/// Verify the nesting gate accepts all event types at `MAX_NESTING_DEPTH`.
 #[test]
 fn nesting_gate_accepts_all_types_at_max_depth() {
     for (name, array) in saturated_event_arrays(super::super::ser::MAX_NESTING_DEPTH) {
@@ -273,7 +273,7 @@ fn nesting_gate_accepts_all_types_at_max_depth() {
     }
 }
 
-/// Verify the nesting gate rejects all event types at MAX_NESTING_DEPTH + 1.
+/// Verify the nesting gate rejects all event types at `MAX_NESTING_DEPTH` + 1.
 #[test]
 fn nesting_gate_rejects_all_types_above_max_depth() {
     let max = super::super::ser::MAX_NESTING_DEPTH;
