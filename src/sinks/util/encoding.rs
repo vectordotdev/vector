@@ -7,6 +7,7 @@ use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::{Transformer, encoding::Framer, internal_events::EncoderWriteError},
     config::telemetry,
+    internal_event::{ComponentEventsDropped, UNINTENTIONAL},
     request_metadata::GroupedCountByteSize,
 };
 
@@ -123,9 +124,12 @@ impl Encoder<Vec<Event>> for (Transformer, vector_lib::codecs::BatchEncoder) {
         encoder
             .encode(transformed_events, &mut bytes)
             .map_err(|error| {
-                emit!(EncoderWriteError {
-                    error: &error,
+                // Codec-specific internal events (e.g. SchemaGenerationError,
+                // EncoderNullConstraintError) already log the error and increment
+                // component_errors_total. We only need to emit the drop count here.
+                emit!(ComponentEventsDropped::<UNINTENTIONAL> {
                     count: n_events,
+                    reason: "Failed to batch encode events.",
                 });
                 io::Error::new(io::ErrorKind::InvalidData, error)
             })?;
