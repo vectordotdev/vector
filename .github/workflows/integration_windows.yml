@@ -32,7 +32,7 @@ jobs:
   run-test-integration-windows:
     needs: changes
     if: needs.changes.outputs.windows == 'true'
-    runs-on: windows-2025-8core
+    runs-on: windows-latest
     timeout-minutes: 60
     steps:
       - name: Checkout branch
