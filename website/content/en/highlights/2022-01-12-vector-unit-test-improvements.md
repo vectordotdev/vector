@@ -13,30 +13,28 @@ full support for testing task-style transforms (previously there may have been
 issues when using multiple inputs with task transforms). For example, you can
 now test `remap` transform's `dropped` output like so,
 
-```toml
-[transforms.foo]
-  type = "remap"
-  inputs = []
-  drop_on_abort = true
-  reroute_dropped = true
-  source = "abort"
+```yaml
+transforms:
+  foo:
+    type: "remap"
+    inputs: []
+    drop_on_abort: true
+    reroute_dropped: true
+    source: "abort"
 
-[[tests]]
-  name = "remap_dropped_output"
-  no_outputs_from = [ "foo" ]
-
-  [[tests.inputs]]
-    insert_at = "foo"
-    type = "log"
-    [tests.inputs.log_fields]
-      message = "I will be dropped"
-
-  [[tests.outputs]]
-    extract_from = "foo.dropped"
-
-    [[tests.outputs.conditions]]
-      type = "vrl"
-      source = 'assert_eq!(.message, "I will be dropped", "incorrect message")'
+tests:
+  - name: "remap_dropped_output"
+    no_outputs_from: ["foo"]
+    inputs:
+      - insert_at: "foo"
+        type: "log"
+        log_fields:
+          message: "I will be dropped"
+    outputs:
+      - extract_from: "foo.dropped"
+        conditions:
+          - type: "vrl"
+            source: 'assert_eq!(.message, "I will be dropped", "incorrect message")'
 ```
 
 Under-the-hood, we've reworked the unit testing implementation to more closely
