@@ -159,11 +159,20 @@ impl Output {
 
     pub(super) async fn send(
         &mut self,
-        mut events: EventArray,
+        events: EventArray,
         unsent_event_count: &mut UnsentEventCount,
     ) -> Result<(), SendError> {
-        let send_reference = Instant::now();
         let reference = Utc::now().timestamp_millis();
+        self.send_inner(events, unsent_event_count, reference).await
+    }
+
+    async fn send_inner(
+        &mut self,
+        mut events: EventArray,
+        unsent_event_count: &mut UnsentEventCount,
+        reference: i64,
+    ) -> Result<(), SendError> {
+        let send_reference = Instant::now();
         events
             .iter_events()
             .for_each(|event| self.emit_lag_time(event, reference));
@@ -250,6 +259,10 @@ impl Output {
         I: IntoIterator<Item = E>,
         <I as IntoIterator>::IntoIter: ExactSizeIterator,
     {
+        // Capture a single reference timestamp for the entire batch so that lag time
+        // measurements are not inflated by channel-send latency for later chunks.
+        let reference = Utc::now().timestamp_millis();
+
         // It's possible that the caller stops polling this future while it is blocked waiting
         // on `self.send()`. When that happens, we use `UnsentEventCount` to correctly emit
         // `ComponentEventsDropped` events.
@@ -258,7 +271,7 @@ impl Output {
         let send_batch_start = Instant::now();
 
         for events in array::events_into_arrays(events, Some(CHUNK_SIZE)) {
-            self.send(events, &mut unsent_event_count)
+            self.send_inner(events, &mut unsent_event_count, reference)
                 .await
                 .inspect_err(|error| {
                     match error {
