@@ -129,11 +129,10 @@ fn parse_common_attributes_header(
                     return Ok(HashMap::new());
                 }
 
-                let common_attributes =
-                    common_attributes_raw.as_ref().and_then(|v| v.to_str().ok());
+                let common_attributes = common_attributes_raw.as_ref().map(HeaderValue::as_bytes);
 
                 match common_attributes {
-                    Some(common_attributes) => serde_json::from_str(common_attributes)
+                    Some(common_attributes) => serde_json::from_slice(common_attributes)
                         .context(ParseSnafu {
                             request_id: request_id.clone(),
                         })
