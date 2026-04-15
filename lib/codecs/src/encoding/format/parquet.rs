@@ -367,8 +367,7 @@ impl tokio_util::codec::Encoder<Vec<Event>> for ParquetSerializer {
         let record_batch =
             build_record_batch(Arc::clone(&self.schema), &json_values).map_err(Box::new)?;
 
-        Self::write_record_batch(&record_batch, buffer, &self.writer_props)
-            .map_err(Box::new)?;
+        Self::write_record_batch(&record_batch, buffer, &self.writer_props).map_err(Box::new)?;
 
         Ok(())
     }
