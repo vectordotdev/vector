@@ -5,7 +5,7 @@ permissions:
 
 on:
   pull_request_target:
-    types: [opened, reopened]
+    types: [opened, reopened, synchronize]
     # Keep these paths in sync with the documentation team entries in .github/CODEOWNERS
     paths:
       - "docs/**"
