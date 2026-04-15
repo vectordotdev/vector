@@ -80,11 +80,23 @@ mod tests {
     }
 
     async fn run_sink_test(test_type: TestType) {
+        run_sink_test_with_compression(test_type, None).await;
+    }
+
+    async fn run_sink_test_with_compression(test_type: TestType, compression: Option<&str>) {
         let num_lines = 10;
 
         let (_guard, in_addr) = next_addr();
 
-        let config = format!(r#"address = "http://{in_addr}/""#);
+        let config = match compression {
+            Some(c) => format!(
+                r#"
+                    address = "http://{in_addr}/"
+                    compression = "{c}"
+                "#
+            ),
+            None => format!(r#"address = "http://{in_addr}/""#),
+        };
         let config: VectorConfig = toml::from_str(&config).unwrap();
 
         let cx = SinkContext::default();
@@ -116,13 +128,29 @@ mod tests {
 
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
-        let output_lines = get_received(rx, |parts| {
+        let expected_encoding = compression;
+        let output_lines = get_received(rx, move |parts| {
             assert_eq!(Method::POST, parts.method);
             assert_eq!("/vector.Vector/PushEvents", parts.uri.path());
             assert_eq!(
                 "application/grpc",
                 parts.headers.get("content-type").unwrap().to_str().unwrap()
             );
+            match expected_encoding {
+                Some(enc) => assert_eq!(
+                    enc,
+                    parts
+                        .headers
+                        .get("grpc-encoding")
+                        .unwrap_or_else(|| panic!("missing grpc-encoding header (expected {enc})"))
+                        .to_str()
+                        .unwrap()
+                ),
+                None => assert!(
+                    parts.headers.get("grpc-encoding").is_none(),
+                    "unexpected grpc-encoding header present"
+                ),
+            }
         })
         .await;
 
@@ -133,6 +161,21 @@ mod tests {
     #[tokio::test]
     async fn deliver_message() {
         run_sink_test(TestType::Normal).await;
+    }
+
+    #[tokio::test]
+    async fn deliver_message_gzip() {
+        run_sink_test_with_compression(TestType::Normal, Some("gzip")).await;
+    }
+
+    #[tokio::test]
+    async fn deliver_message_zstd() {
+        run_sink_test_with_compression(TestType::Normal, Some("zstd")).await;
+    }
+
+    #[tokio::test]
+    async fn deliver_message_none() {
+        run_sink_test_with_compression(TestType::Normal, None).await;
     }
 
     #[tokio::test]
@@ -198,9 +241,35 @@ mod tests {
         assert_parts: impl Fn(Parts),
     ) -> Vec<String> {
         rx.map(|(parts, body)| {
+            let encoding = parts
+                .headers
+                .get("grpc-encoding")
+                .map(|v| v.to_str().unwrap().to_owned());
             assert_parts(parts);
 
+            let compressed = body[0] == 1;
             let proto_body = body.slice(GRPC_HEADER_SIZE..);
+            let proto_body = if compressed {
+                use std::io::Read;
+                let mut out = Vec::new();
+                match encoding.as_deref() {
+                    Some("gzip") => {
+                        flate2::read::GzDecoder::new(&proto_body[..])
+                            .read_to_end(&mut out)
+                            .unwrap();
+                    }
+                    Some("zstd") => {
+                        zstd::stream::read::Decoder::new(&proto_body[..])
+                            .unwrap()
+                            .read_to_end(&mut out)
+                            .unwrap();
+                    }
+                    other => panic!("unexpected grpc-encoding for compressed frame: {other:?}"),
+                }
+                Bytes::from(out)
+            } else {
+                proto_body
+            };
 
             let req = proto::PushEventsRequest::decode(proto_body).unwrap();
 
