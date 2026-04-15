@@ -6,7 +6,7 @@ and function transforms can run concurrently across multiple tokio worker
 threads, and because wall-clock "not idle" includes time the OS has preempted
 the thread, this gauge does not accurately reflect how much CPU a component
 actually consumes. This RFC proposes a new **counter** metric,
-`component_cpu_seconds_total`, that tracks the cumulative CPU time consumed
+`component_cpu_usage_seconds_total`, that tracks the cumulative CPU time consumed
 by a component's transform work, measured via OS thread-level CPU clocks.
 
 ## Context
@@ -29,7 +29,7 @@ by a component's transform work, measured via OS thread-level CPU clocks.
 
 ### In scope
 
-- A new `component_cpu_seconds_total` counter for **sync and function
+- A new `component_cpu_usage_seconds_total` counter for **sync and function
   transforms** (both inline and concurrent execution paths).
 - Two implementation tiers: a wall-clock fallback that works everywhere, and a
   precise thread-CPU-time implementation using OS APIs.
@@ -74,7 +74,7 @@ by a component's transform work, measured via OS thread-level CPU clocks.
 A new counter metric is emitted for every sync/function transform:
 
 ```prometheus
-component_cpu_seconds_total{component_id="my_remap",component_kind="transform",component_type="remap"} 14.207
+component_cpu_usage_seconds_total{component_id="my_remap",component_kind="transform",component_type="remap"} 14.207
 ```
 
 Operators use it exactly like `process_cpu_seconds_total` from the Prometheus
@@ -82,10 +82,10 @@ ecosystem:
 
 ```promql
 # Per-component CPU core usage (can exceed 1.0 with concurrency)
-component_cpu_seconds_total{component_id="my_remap"}.as_rate()
+component_cpu_usage_seconds_total{component_id="my_remap"}.as_rate()
 
 # Compare against utilization to spot backpressure vs CPU bottleneck
-rate(component_cpu_seconds_total{component_id="my_remap"}[1m])
+rate(component_cpu_usage_seconds_total{component_id="my_remap"}[1m])
   /
   utilization{component_id="my_remap"}
 ```
@@ -97,7 +97,7 @@ configuration knob.
 
 #### Metric definition
 
-Register a `counter!("component_cpu_seconds_total")` in the `Runner` struct,
+Register a `counter!("component_cpu_usage_seconds_total")` in the `Runner` struct,
 alongside the existing `timer_tx` and `events_received` fields:
 
 ```rust
@@ -350,7 +350,7 @@ on modern kernels. The higher precision is worth the identical cost.
 
 ## Outstanding Questions
 
-1. **Metric name:** Should it be `component_cpu_seconds_total` (following
+1. **Metric name:** Should it be `component_cpu_usage_seconds_total` (following
    Prometheus conventions and the `component_` prefix used by existing Vector
    metrics) or `transform_cpu_seconds_total` (since only transforms emit it
    initially)? The `component_` prefix is preferred for consistency and to allow
@@ -366,20 +366,20 @@ on modern kernels. The higher precision is worth the identical cost.
 - Add `src/cpu_time.rs` module with `thread_cpu_time()` and platform-specific
   implementations behind `#[cfg]` gates. Include unit tests that verify the
   returned duration is non-zero and monotonically increasing.
-- Register `counter!("component_cpu_seconds_total")` in `Runner::new` and
+- Register `counter!("component_cpu_usage_seconds_total")` in `Runner::new` and
   instrument `run_inline` with wall-clock timing (Tier 1).
 - Instrument `run_concurrently` with wall-clock timing (Tier 1). Verify the
   counter increments correctly when multiple tasks run in parallel.
 - Switch from `Instant::now()` to `thread_cpu_time()` (Tier 2). Benchmark
   the overhead on Linux to confirm it is <100ns per call.
 - Add integration test: run a CPU-intensive remap transform, verify
-  `component_cpu_seconds_total` is within 10% of expected CPU time.
+  `component_cpu_usage_seconds_total` is within 10% of expected CPU time.
 - Add documentation for the new metric in the generated component docs.
 - Add changelog fragment.
 
 ## Future Improvements
 
-- Extend `component_cpu_seconds_total` to **task transforms** by measuring CPU
+- Extend `component_cpu_usage_seconds_total` to **task transforms** by measuring CPU
   time per `poll` of the transform stream. This requires careful accounting to
   exclude time spent in the tokio runtime between polls.
 - Extend to **sources and sinks** where the component owns a synchronous

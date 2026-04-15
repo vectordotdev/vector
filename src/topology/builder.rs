@@ -41,11 +41,11 @@ use super::{
 };
 use crate::{
     SourceSender,
-    cpu_time::ThreadTime,
     config::{
         ComponentKey, Config, DataType, EnrichmentTableConfig, Input, Inputs, OutputId,
         ProxyConfig, SinkContext, SourceContext, TransformContext, TransformOuter, TransformOutput,
     },
+    cpu_time::ThreadTime,
     event::{EventArray, EventContainer},
     extra_context::ExtraContext,
     internal_events::EventsReceived,
@@ -1151,7 +1151,7 @@ impl Runner {
             timer_tx,
             latency_recorder,
             events_received: register!(EventsReceived),
-            cpu_seconds: gauge!("component_cpu_seconds_total"),
+            cpu_seconds: gauge!("component_cpu_usage_seconds_total"),
         }
     }
 
