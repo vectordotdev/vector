@@ -127,6 +127,7 @@ members = [
   "lib/vector-vrl/category",
   "lib/vector-vrl/cli",
   "lib/vector-vrl/dnstap-parser",
+  "lib/vector-vrl/doc-builder",
   "lib/vector-vrl/enrichment",
   "lib/vector-vrl/functions",
   "lib/vector-vrl/metrics",
@@ -203,7 +204,7 @@ tonic-build = { version = "0.11", default-features = false, features = ["transpo
 tonic-health = { version = "0.11", default-features = false }
 tonic-reflection = { version = "0.11", default-features = false, features = ["server"] }
 tracing = { version = "0.1.44", default-features = false }
-tracing-subscriber = { version = "0.3.22", default-features = false, features = ["fmt"]  }
+tracing-subscriber = { version = "0.3.22", default-features = false, features = ["fmt"] }
 url = { version = "2.5.4", default-features = false, features = ["serde"] }
 uuid = { version = "1.22.0", features = ["v4", "v7", "serde", "fast-rng"] }
 vector-config = { path = "lib/vector-config" }
@@ -302,7 +303,7 @@ aws-smithy-types = { version = "1.2.11", default-features = false, features = ["
 
 # Azure
 azure_core = { version = "0.30", features = ["reqwest", "hmac_openssl"], optional = true }
-azure_identity = { version = "0.30", optional = true }
+azure_identity = { version = "0.30", features = ["client_certificate"], optional = true }
 
 # Azure Storage
 azure_storage_blob = { version = "0.7", optional = true }
@@ -352,6 +353,13 @@ async-compression = { version = "0.4.27", default-features = false, features = [
 apache-avro = { version = "0.16.0", default-features = false, optional = true }
 arrow = { version = "56.2.0", default-features = false, features = ["ipc"], optional = true }
 arrow-schema = { version = "56.2.0", default-features = false, optional = true }
+parquet = { version = "56.2.0", default-features = false, features = [
+  "arrow",
+  "snap",
+  "zstd",
+  "lz4",
+  "flate2-rust_backened",
+], optional = true }
 axum = { version = "0.6.20", default-features = false }
 base64 = { workspace = true, optional = true }
 bloomy = { version = "1.2.0", default-features = false, optional = true }
@@ -560,6 +568,7 @@ docker = ["dep:bollard", "dep:dirs-next"]
 api = [
   "dep:base64",
   "dep:tonic",
+  "dep:tonic-health",
   "dep:tonic-reflection",
   "dep:prost",
   "dep:prost-types",
@@ -607,6 +616,7 @@ enrichment-tables-memory = ["dep:evmap", "dep:evmap-derive", "dep:thread_local"]
 
 # Codecs
 codecs-arrow = ["dep:arrow", "dep:arrow-schema", "vector-lib/arrow"]
+codecs-parquet = ["dep:parquet", "codecs-arrow", "vector-lib/parquet"]
 codecs-opentelemetry = ["vector-lib/opentelemetry"]
 codecs-syslog = ["vector-lib/syslog"]
 
@@ -875,8 +885,8 @@ sinks-aws_s3 = ["dep:base64", "dep:md-5", "aws-core", "dep:aws-sdk-s3"]
 sinks-aws_sqs = ["aws-core", "dep:aws-sdk-sqs"]
 sinks-aws_sns = ["aws-core", "dep:aws-sdk-sns"]
 sinks-axiom = ["sinks-http"]
-sinks-azure_blob = ["dep:azure_core", "dep:azure_storage_blob"]
-sinks-azure_logs_ingestion = ["dep:azure_core", "dep:azure_identity"]
+sinks-azure_blob = ["dep:azure_core", "dep:azure_identity", "dep:azure_storage_blob", "dep:base64"]
+sinks-azure_logs_ingestion = ["dep:azure_core", "dep:azure_identity", "dep:azure_storage_blob", "dep:base64"]
 sinks-azure_monitor_logs = []
 sinks-blackhole = []
 sinks-chronicle = []
@@ -987,7 +997,8 @@ aws-integration-tests = [
 ]
 
 azure-integration-tests = [
-  "azure-blob-integration-tests"
+  "azure-blob-integration-tests",
+  "azure-logs-ingestion-integration-tests",
 ]
 
 aws-cloudwatch-logs-integration-tests = ["sinks-aws_cloudwatch_logs"]
@@ -1001,6 +1012,7 @@ aws-sqs-integration-tests = ["sinks-aws_sqs"]
 aws-sns-integration-tests = ["sinks-aws_sns"]
 axiom-integration-tests = ["sinks-axiom"]
 azure-blob-integration-tests = ["sinks-azure_blob"]
+azure-logs-ingestion-integration-tests = ["sinks-azure_logs_ingestion"]
 chronicle-integration-tests = ["sinks-gcp"]
 clickhouse-integration-tests = ["sinks-clickhouse"]
 databend-integration-tests = ["sinks-databend"]
