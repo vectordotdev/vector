@@ -899,6 +899,29 @@ mod tests {
     }
 
     #[test]
+    fn test_parquet_type_mismatch_returns_error() {
+        let schema_path =
+            write_temp_schema("type_mismatch", "message logs {\n  required int64 name;\n}");
+
+        let mut serializer = ParquetSerializer::new(ParquetSerializerConfig {
+            schema_file: Some(schema_path),
+            schema_mode: ParquetSchemaMode::Relaxed,
+            ..Default::default()
+        })
+        .expect("Failed to create serializer");
+
+        let events = vec![create_event(vec![("name", "not_an_integer")])];
+        let mut buffer = BytesMut::new();
+        let result = serializer.encode(events, &mut buffer);
+        assert!(result.is_err(), "Type mismatch should return an error");
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("Int64"),
+            "Error should mention the expected type, got: {err}"
+        );
+    }
+
+    #[test]
     fn test_parquet_schema_file_binary_without_string_annotation_rejected() {
         // Native Parquet "binary" without (STRING) annotation resolves to Arrow Binary,
         // which is rejected at config time.
