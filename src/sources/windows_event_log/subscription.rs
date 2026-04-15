@@ -1386,13 +1386,23 @@ mod tests {
             *DRAIN_STEP_HOOK.lock().unwrap() = Some(hook);
         }
 
-        // Drive pull_events. Regardless of how many events are
-        // actually in the Application channel, the drain loop runs at
-        // least one EvtNext and the hook fires exactly once.
-        let _ = subscription.pull_events(100).unwrap_or_default();
+        // Drop-guard: clear the hook even if the test panics, so it
+        // doesn't contaminate other tests in the same process.
+        struct HookGuard;
+        impl Drop for HookGuard {
+            fn drop(&mut self) {
+                *DRAIN_STEP_HOOK.lock().unwrap() = None;
+            }
+        }
+        let _guard = HookGuard;
 
-        // Clear the hook so other tests aren't affected.
-        *DRAIN_STEP_HOOK.lock().unwrap() = None;
+        // Drive pull_events with a very large budget so the drain
+        // exits via ERROR_NO_MORE_ITEMS (channel_drained = true),
+        // which is the path that ran the post-drain ResetEvent in the
+        // old buggy code. Exiting via budget exhaustion would skip
+        // that reset and cause this test to false-pass against the
+        // pre-fix code.
+        let _ = subscription.pull_events(usize::MAX).unwrap_or_default();
 
         assert!(
             fired.load(std::sync::atomic::Ordering::SeqCst),
