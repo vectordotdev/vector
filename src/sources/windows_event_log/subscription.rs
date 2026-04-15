@@ -30,6 +30,16 @@ use super::{
 
 use crate::internal_events::WindowsEventLogBookmarkError;
 
+/// Test-only hook called inside the `pull_events` drain loop after each
+/// `EvtNext` invocation. Used by the lost-wakeup regression test
+/// (see `test_pull_events_preserves_setevent_during_drain`) to race a
+/// `SetEvent` against the drain without relying on thread-timing.
+/// No-op and zero-cost in non-test builds.
+#[cfg(test)]
+static DRAIN_STEP_HOOK: std::sync::Mutex<
+    Option<std::sync::Arc<dyn Fn(HANDLE) + Send + Sync>>,
+> = std::sync::Mutex::new(None);
+
 /// Maximum number of entries in the EvtFormatMessage result cache.
 pub const FORMAT_CACHE_CAPACITY: usize = 10_000;
 /// Maximum number of cached publisher metadata handles.
@@ -517,6 +527,17 @@ impl EventLogSubscription {
                     )
                 };
 
+                // Test-only hook: lets the lost-wakeup regression test race
+                // a SetEvent against the drain without thread-timing. No-op
+                // and zero-cost in non-test builds.
+                #[cfg(test)]
+                {
+                    let hook = DRAIN_STEP_HOOK.lock().unwrap().clone();
+                    if let Some(h) = hook {
+                        h(channel_sub.signal_event);
+                    }
+                }
+
                 if let Err(err) = result {
                     let code = (err.code().0 as u32) & 0xFFFF;
                     if code == ERROR_NO_MORE_ITEMS {
@@ -557,6 +578,17 @@ impl EventLogSubscription {
                                 break;
                             }
                         }
+                    }
+                    // Re-arm the signal before returning. We reset it pre-drain
+                    // but are bailing out without confirming the drain completed,
+                    // so if events were left un-drained the next pull_events must
+                    // still revisit this channel without waiting for a fresh OS
+                    // signal. This mirrors the `else` branch below that handles
+                    // budget-exhaustion and bookmark-failure early breaks, and
+                    // avoids the same lost-wakeup symptom (vectordotdev/vector#25194)
+                    // on transient EvtNext failures.
+                    unsafe {
+                        let _ = SetEvent(channel_sub.signal_event);
                     }
                     return Err(WindowsEventLogError::PullEventsError {
                         channel: channel_sub.channel.clone(),
@@ -1306,69 +1338,87 @@ mod tests {
     ///
     /// The fix is to reset the signal *before* the drain loop, so signals
     /// raised during the drain are preserved and the next wait returns
-    /// immediately. This test pins that invariant by simulating the race
-    /// with a `std::sync::Barrier` for deterministic ordering — it fails
-    /// with `WAIT_TIMEOUT` under the old "reset after drain" order.
-    #[test]
-    fn test_signal_not_lost_when_set_during_drain() {
-        use std::sync::{Arc as StdArc, Barrier};
-        use windows::Win32::System::Threading::WaitForSingleObject;
+    /// immediately.
+    ///
+    /// This test pins that invariant by driving the real `pull_events`
+    /// against a real `EvtSubscribe` handle. It installs a
+    /// `DRAIN_STEP_HOOK` that runs inside the drain loop after each
+    /// `EvtNext` and fires `SetEvent` on the subscription's signal
+    /// handle — simulating the OS signaling a new event arrival during
+    /// the drain window. After `pull_events` returns, the signal must
+    /// still be set (the subsequent `wait_for_events_blocking` must
+    /// return `EventsAvailable`, not `Timeout`). Under the old
+    /// post-drain `ResetEvent` order, the hook's `SetEvent` would be
+    /// clobbered by the reset and the wait would time out — which is
+    /// exactly what #25194 reports.
+    #[tokio::test]
+    async fn test_pull_events_preserves_setevent_during_drain() {
+        use std::sync::Arc as StdArc;
 
-        // Manual-reset event, initially non-signaled (we SetEvent first to
-        // mirror the post-initial-drain state of a real subscription).
-        let signal = unsafe { CreateEventW(None, true, false, None).unwrap() };
-        let signal_raw = signal.0 as isize;
+        let mut config = WindowsEventLogConfig::default();
+        config.channels = vec!["Application".to_string()];
+        config.read_existing_events = true;
+        config.event_timeout_ms = 1000;
 
-        // Prime: simulate the OS having signaled (events arrived).
-        unsafe {
-            let _ = SetEvent(signal);
+        let (checkpointer, _temp_dir) = create_test_checkpointer().await;
+
+        let mut subscription = EventLogSubscription::new(&config, checkpointer, false)
+            .await
+            .expect("Subscription creation should succeed");
+
+        // Install the drain-loop hook: every EvtNext call inside
+        // pull_events fires SetEvent on the subscription's signal
+        // handle. This simulates the OS signaling a fresh event
+        // mid-drain, which is exactly the race window #25194 exposes.
+        // The hook only needs to fire once to prove the invariant; we
+        // use an AtomicBool to keep it deterministic.
+        let fired = StdArc::new(std::sync::atomic::AtomicBool::new(false));
+        {
+            let fired = StdArc::clone(&fired);
+            let hook: StdArc<dyn Fn(HANDLE) + Send + Sync> =
+                StdArc::new(move |signal: HANDLE| {
+                    if !fired.swap(true, std::sync::atomic::Ordering::SeqCst) {
+                        unsafe {
+                            let _ = SetEvent(signal);
+                        }
+                    }
+                });
+            *DRAIN_STEP_HOOK.lock().unwrap() = Some(hook);
         }
 
-        // Barrier pair: the helper thread waits until the main thread has
-        // simulated entering the drain (by resetting), then calls SetEvent
-        // to simulate a new event notification arriving during the drain.
-        // A second barrier pair lets the main thread wait until the helper
-        // has fired SetEvent before we check the signal state.
-        let barrier_enter = StdArc::new(Barrier::new(2));
-        let barrier_exit = StdArc::new(Barrier::new(2));
-        let barrier_enter_helper = StdArc::clone(&barrier_enter);
-        let barrier_exit_helper = StdArc::clone(&barrier_exit);
+        // Drive pull_events. Regardless of how many events are
+        // actually in the Application channel, the drain loop runs at
+        // least one EvtNext and the hook fires exactly once.
+        let _ = subscription.pull_events(100).unwrap_or_default();
 
-        let helper = std::thread::spawn(move || {
-            barrier_enter_helper.wait();
-            unsafe {
-                let h = HANDLE(signal_raw as *mut std::ffi::c_void);
-                let _ = SetEvent(h);
-            }
-            barrier_exit_helper.wait();
-        });
+        // Clear the hook so other tests aren't affected.
+        *DRAIN_STEP_HOOK.lock().unwrap() = None;
 
-        // Main thread: simulate the pull_events sequence with the fix
-        // (ResetEvent is the FIRST signal-handling step).
-        unsafe {
-            let _ = ResetEvent(signal);
-        }
-        // Release helper — it now fires SetEvent, simulating the OS
-        // signaling a new event "during" the drain window.
-        barrier_enter.wait();
-        // Wait until helper has definitely fired SetEvent.
-        barrier_exit.wait();
-        helper.join().unwrap();
-
-        // With the fix, the SetEvent above is preserved in the signal and
-        // this wait returns WAIT_OBJECT_0 immediately. With the old
-        // post-drain ResetEvent order, the SetEvent would have been
-        // clobbered by the reset and this wait would return WAIT_TIMEOUT.
-        let wait_result = unsafe { WaitForSingleObject(signal, 500) };
-        assert_eq!(
-            wait_result, WAIT_OBJECT_0,
-            "signal set during the drain window was lost — this is the \
-             lost-wakeup race from vectordotdev/vector#25194. \
-             pull_events must call ResetEvent BEFORE draining, not after."
+        assert!(
+            fired.load(std::sync::atomic::Ordering::SeqCst),
+            "drain-loop hook never ran — pull_events must call EvtNext \
+             at least once even on an empty channel"
         );
 
-        unsafe {
-            let _ = CloseHandle(signal);
+        // With the fix, the SetEvent fired by the hook during the
+        // drain is preserved; the next wait returns EventsAvailable
+        // immediately. Under the old post-drain ResetEvent order, it
+        // would time out — that is the #25194 freeze.
+        let (_subscription, result) = tokio::task::spawn_blocking(move || {
+            let r = subscription.wait_for_events_blocking(500);
+            (subscription, r)
+        })
+        .await
+        .unwrap();
+
+        match result {
+            WaitResult::EventsAvailable => {}
+            WaitResult::Timeout => panic!(
+                "signal set during the drain window was lost — this is the \
+                 lost-wakeup race from vectordotdev/vector#25194. \
+                 pull_events must call ResetEvent BEFORE draining, not after."
+            ),
+            WaitResult::Shutdown => panic!("unexpected shutdown"),
         }
     }
 }
