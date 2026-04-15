@@ -122,7 +122,13 @@ impl Encoder<Vec<Event>> for (Transformer, vector_lib::codecs::BatchEncoder) {
         let mut bytes = BytesMut::new();
         encoder
             .encode(transformed_events, &mut bytes)
-            .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
+            .map_err(|error| {
+                emit!(EncoderWriteError {
+                    error: &error,
+                    count: n_events,
+                });
+                io::Error::new(io::ErrorKind::InvalidData, error)
+            })?;
 
         write_all(writer, n_events, &bytes)?;
         Ok((bytes.len(), byte_size))

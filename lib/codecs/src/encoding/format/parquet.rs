@@ -276,39 +276,29 @@ impl ParquetSerializer {
 
     /// Writes `record_batch` into `buffer` as a complete Parquet file.
     ///
-    /// On failure, emits an [`ArrowWriterError`] internal event (which also
-    /// increments `component_errors_total` and emits the events-dropped metric)
-    /// before returning the error.
+    /// On failure, emits an [`ArrowWriterError`] internal event (which
+    /// increments `component_errors_total`) before returning the error.
+    /// The caller is responsible for emitting `events_dropped`.
     fn write_record_batch(
-        &self,
         record_batch: &RecordBatch,
         buffer: &mut BytesMut,
-        event_count: usize,
+        writer_props: &WriterProperties,
     ) -> Result<(), parquet::errors::ParquetError> {
         let mut writer = ArrowWriter::try_new(
             buffer.writer(),
             Arc::clone(record_batch.schema_ref()),
-            Some((*self.writer_props).clone()),
+            Some(writer_props.clone()),
         )
         .inspect_err(|e| {
-            emit(ArrowWriterError {
-                error: e,
-                batch_count: event_count,
-            });
+            emit(ArrowWriterError { error: e });
         })?;
 
         writer.write(record_batch).inspect_err(|e| {
-            emit(ArrowWriterError {
-                error: e,
-                batch_count: event_count,
-            });
+            emit(ArrowWriterError { error: e });
         })?;
 
         writer.close().inspect_err(|e| {
-            emit(ArrowWriterError {
-                error: e,
-                batch_count: event_count,
-            });
+            emit(ArrowWriterError { error: e });
         })?;
 
         Ok(())
@@ -326,10 +316,7 @@ impl tokio_util::codec::Encoder<Vec<Event>> for ParquetSerializer {
         let json_values = match vector_log_events_to_json_values(&events) {
             Ok(values) => values,
             Err(e) => {
-                emit(JsonSerializationError {
-                    error: &e,
-                    batch_count: events.len(),
-                });
+                emit(JsonSerializationError { error: &e });
                 return Err(Box::new(e));
             }
         };
@@ -358,7 +345,6 @@ impl tokio_util::codec::Encoder<Vec<Event>> for ParquetSerializer {
                     {
                         for top_level in object_map.keys() {
                             if !self.schema_field_names.contains(top_level.as_str()) {
-                                self.events_dropped_handle.emit(Count(events.len()));
                                 return Err(Box::new(ArrowEncodingError::SchemaFetchError {
                                     message: format!(
                                         "Strict schema mode: event contains field '{top_level}' not in schema",
@@ -381,7 +367,7 @@ impl tokio_util::codec::Encoder<Vec<Event>> for ParquetSerializer {
         let record_batch =
             build_record_batch(Arc::clone(&self.schema), &json_values).map_err(Box::new)?;
 
-        self.write_record_batch(&record_batch, buffer, json_values.len())
+        Self::write_record_batch(&record_batch, buffer, &self.writer_props)
             .map_err(Box::new)?;
 
         Ok(())
@@ -394,10 +380,7 @@ impl ParquetSchemaGenerator {
     pub fn infer_schema(events: &[serde_json::Value]) -> Result<Schema, Error> {
         let schema = infer_json_schema_from_iterator(events.iter().map(Ok::<_, ArrowError>))
             .map_err(|e| {
-                emit(SchemaGenerationError {
-                    error: &e,
-                    batch_count: events.len(),
-                });
+                emit(SchemaGenerationError { error: &e });
                 Error::new(ErrorKind::InvalidData, e.to_string())
             })?;
 
