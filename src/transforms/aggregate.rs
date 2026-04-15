@@ -24,7 +24,7 @@ use crate::{
 
 /// Configuration for the `aggregate` transform.
 #[configurable_component(transform("aggregate", "Aggregate metrics passing through a topology."))]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct AggregateConfig {
     /// The interval between flushes, in milliseconds.
@@ -42,7 +42,7 @@ pub struct AggregateConfig {
 }
 
 #[configurable_component]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 #[configurable(description = "The aggregation mode to use.")]
 pub enum AggregationMode {
     /// Default mode. Sums incremental metrics and uses the latest value for absolute metrics.
@@ -77,6 +77,75 @@ pub enum AggregationMode {
     /// Histograms: For each count in the bucket, a sample is added at the bucket's upper limit
     /// This preserves the distribution shape.
     Distribution,
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+enum InnerMode {
+    /// Default mode. Sums incremental metrics and uses the latest value for absolute metrics.
+    #[default]
+    Auto,
+
+    /// Sums incremental metrics, ignores absolute
+    Sum,
+
+    /// Returns the latest value for absolute metrics, ignores incremental
+    Latest,
+
+    /// Counts metrics for incremental and absolute metrics
+    Count,
+
+    /// Returns difference between latest value for absolute, ignores incremental
+    Diff {
+        prev_map: HashMap<MetricSeries, MetricEntry>,
+    },
+
+    /// Max value of absolute metric, ignores incremental
+    Max,
+
+    /// Min value of absolute metric, ignores incremental
+    Min,
+
+    /// Mean value of absolute metric, ignores incremental
+    Mean {
+        multi_map: HashMap<MetricSeries, Vec<MetricEntry>>,
+    },
+
+    /// Stdev value of absolute metric, ignores incremental
+    Stdev {
+        multi_map: HashMap<MetricSeries, Vec<MetricEntry>>,
+    },
+
+    /// Aggregates absolute metrics into a distribution, ignores incremental.
+    /// Histograms: For each count in the bucket, a sample is added at the bucket's upper limit
+    /// This preserves the distribution shape.
+    Distribution {
+        multi_map: HashMap<MetricSeries, Vec<MetricEntry>>,
+    },
+}
+
+impl From<AggregationMode> for InnerMode {
+    fn from(value: AggregationMode) -> Self {
+        match value {
+            AggregationMode::Auto => InnerMode::Auto,
+            AggregationMode::Sum => InnerMode::Sum,
+            AggregationMode::Latest => InnerMode::Latest,
+            AggregationMode::Count => InnerMode::Count,
+            AggregationMode::Diff => InnerMode::Diff {
+                prev_map: HashMap::default(),
+            },
+            AggregationMode::Max => InnerMode::Max,
+            AggregationMode::Min => InnerMode::Min,
+            AggregationMode::Mean => InnerMode::Mean {
+                multi_map: HashMap::default(),
+            },
+            AggregationMode::Stdev => InnerMode::Stdev {
+                multi_map: HashMap::default(),
+            },
+            AggregationMode::Distribution => InnerMode::Distribution {
+                multi_map: HashMap::default(),
+            },
+        }
+    }
 }
 
 const fn default_mode() -> AggregationMode {
@@ -115,9 +184,7 @@ type MetricEntry = (MetricData, EventMetadata);
 pub struct Aggregate {
     interval: Duration,
     map: HashMap<MetricSeries, MetricEntry>,
-    prev_map: HashMap<MetricSeries, MetricEntry>,
-    multi_map: HashMap<MetricSeries, Vec<MetricEntry>>,
-    mode: AggregationMode,
+    mode: InnerMode,
 }
 
 impl Aggregate {
@@ -125,39 +192,34 @@ impl Aggregate {
         Ok(Self {
             interval: Duration::from_millis(config.interval_ms),
             map: Default::default(),
-            prev_map: Default::default(),
-            multi_map: Default::default(),
-            mode: config.mode.clone(),
+            mode: config.mode.into(),
         })
     }
 
     fn record(&mut self, event: Event) {
         let (series, data, metadata) = event.into_metric().into_parts();
 
-        match self.mode {
-            AggregationMode::Auto => match data.kind {
+        match &mut self.mode {
+            InnerMode::Auto => match data.kind {
                 MetricKind::Incremental => self.record_sum(series, data, metadata),
                 MetricKind::Absolute => {
                     self.map.insert(series, (data, metadata));
                 }
             },
-            AggregationMode::Sum => self.record_sum(series, data, metadata),
-            AggregationMode::Latest | AggregationMode::Diff => match data.kind {
+            InnerMode::Sum => self.record_sum(series, data, metadata),
+            InnerMode::Latest | InnerMode::Diff { .. } => match data.kind {
                 MetricKind::Incremental => (),
                 MetricKind::Absolute => {
                     self.map.insert(series, (data, metadata));
                 }
             },
-            AggregationMode::Count => self.record_count(series, data, metadata),
-            AggregationMode::Max | AggregationMode::Min => {
-                self.record_comparison(series, data, metadata)
-            }
-            AggregationMode::Mean | AggregationMode::Stdev | AggregationMode::Distribution => {
-                match data.kind {
-                    MetricKind::Incremental => (),
-                    MetricKind::Absolute => {
-                        // For Distribution mode, we accept any metric value type
-                        match self.multi_map.entry(series) {
+            InnerMode::Count => self.record_count(series, data, metadata),
+            InnerMode::Max | InnerMode::Min => self.record_comparison(series, data, metadata),
+            InnerMode::Mean { multi_map } | InnerMode::Stdev { multi_map } => match data.kind {
+                MetricKind::Incremental => (),
+                MetricKind::Absolute => {
+                    if matches!(data.value, MetricValue::Gauge { value: _ }) {
+                        match multi_map.entry(series) {
                             Entry::Occupied(mut entry) => {
                                 let existing = entry.get_mut();
                                 existing.push((data, metadata));
@@ -168,7 +230,21 @@ impl Aggregate {
                         }
                     }
                 }
-            }
+            },
+            InnerMode::Distribution { multi_map } => match data.kind {
+                MetricKind::Incremental => (),
+                MetricKind::Absolute => {
+                    match multi_map.entry(series) {
+                        Entry::Occupied(mut entry) => {
+                            let existing = entry.get_mut();
+                            existing.push((data, metadata));
+                        }
+                        Entry::Vacant(entry) => {
+                            entry.insert(vec![(data, metadata)]);
+                        }
+                    }
+                }
+            },
         }
 
         emit!(AggregateEventRecorded);
@@ -233,8 +309,8 @@ impl Aggregate {
                             && let MetricValue::Gauge { value: new_value } = data.value()
                         {
                             let should_update = match self.mode {
-                                AggregationMode::Max => new_value > existing_value,
-                                AggregationMode::Min => new_value < existing_value,
+                                InnerMode::Max => new_value > existing_value,
+                                InnerMode::Min => new_value < existing_value,
                                 _ => false,
                             };
                             if should_update {
@@ -257,8 +333,8 @@ impl Aggregate {
         let map = std::mem::take(&mut self.map);
         for (series, entry) in map.clone().into_iter() {
             let mut metric = Metric::from_parts(series, entry.0, entry.1);
-            if matches!(self.mode, AggregationMode::Diff)
-                && let Some(prev_entry) = self.prev_map.get(metric.series())
+            if let InnerMode::Diff { prev_map } = &self.mode
+                && let Some(prev_entry) = prev_map.get(metric.series())
                 && metric.data().kind == prev_entry.0.kind
                 && !metric.subtract(&prev_entry.0)
             {
@@ -267,9 +343,31 @@ impl Aggregate {
             output.push(Event::Metric(metric));
         }
 
-        let multi_map = std::mem::take(&mut self.multi_map);
+        let multi_map = match &mut self.mode {
+            InnerMode::Mean { multi_map }
+            | InnerMode::Stdev { multi_map }
+            | InnerMode::Distribution { multi_map } => std::mem::take(multi_map),
+            _ => HashMap::default(),
+        };
+
         'outer: for (series, entries) in multi_map.into_iter() {
             if entries.is_empty() {
+                continue;
+            }
+
+            // Distribution mode builds its output directly from raw entries without
+            // needing to accumulate via update(), which only works for same-type metrics.
+            if let InnerMode::Distribution { .. } = self.mode {
+                let final_metadata = entries
+                    .iter()
+                    .skip(1)
+                    .fold(entries.first().unwrap().1.clone(), |mut acc, (_, m)| {
+                        acc.merge(m.clone());
+                        acc
+                    });
+                let distribution_data = self.create_distribution_from_entries(&entries);
+                let metric = Metric::from_parts(series, distribution_data, final_metadata);
+                output.push(Event::Metric(metric));
                 continue;
             }
 
@@ -293,11 +391,11 @@ impl Aggregate {
 
             let final_mean = final_sum.clone();
             match self.mode {
-                AggregationMode::Mean => {
+                InnerMode::Mean { .. } => {
                     let metric = Metric::from_parts(series, final_mean, final_metadata);
                     output.push(Event::Metric(metric));
                 }
-                AggregationMode::Stdev => {
+                InnerMode::Stdev { .. } => {
                     let variance = entries
                         .iter()
                         .filter_map(|(data, _)| {
@@ -317,16 +415,13 @@ impl Aggregate {
                     let metric = Metric::from_parts(series, final_stdev, final_metadata);
                     output.push(Event::Metric(metric));
                 }
-                AggregationMode::Distribution => {
-                    let distribution_data = self.create_distribution_from_entries(&entries);
-                    let metric = Metric::from_parts(series, distribution_data, final_metadata);
-                    output.push(Event::Metric(metric));
-                }
                 _ => (),
             }
         }
 
-        self.prev_map = map;
+        if let InnerMode::Diff { prev_map } = &mut self.mode {
+            *prev_map = map;
+        }
         emit!(AggregateFlushed);
     }
 

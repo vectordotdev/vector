@@ -1,5 +1,4 @@
 use bytes::{BufMut, BytesMut};
-use derivative::Derivative;
 use snafu::Snafu;
 use tokio_util::codec::Encoder;
 use vector_config::configurable_component;
@@ -17,8 +16,7 @@ impl FramingError for VarintFramingError {}
 
 /// Config used to build a `VarintLengthDelimitedEncoder`.
 #[configurable_component]
-#[derive(Debug, Clone, PartialEq, Eq, Derivative)]
-#[derivative(Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct VarintLengthDelimitedEncoderConfig {
     /// Maximum frame length
     #[serde(default = "default_max_frame_length")]

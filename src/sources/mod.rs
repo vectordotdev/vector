@@ -17,7 +17,7 @@ pub mod aws_sqs;
 pub mod datadog_agent;
 #[cfg(feature = "sources-demo_logs")]
 pub mod demo_logs;
-#[cfg(feature = "sources-dnstap")]
+#[cfg(all(unix, feature = "sources-dnstap"))]
 pub mod dnstap;
 #[cfg(feature = "sources-docker_logs")]
 pub mod docker_logs;
@@ -94,6 +94,8 @@ pub mod syslog;
 pub mod vector;
 #[cfg(feature = "sources-websocket")]
 pub mod websocket;
+#[cfg(feature = "sources-windows_event_log")]
+pub mod windows_event_log;
 
 pub mod util;
 

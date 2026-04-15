@@ -54,6 +54,14 @@ inputs:
     required: false
     default: false
     description: "Install cargo-msrv for minimum supported Rust version checks."
+  cargo-hack:
+    required: false
+    default: false
+    description: "Install cargo-hack for feature compilation checks."
+  cargo-llvm-cov:
+    required: false
+    default: false
+    description: "Install cargo-llvm-cov for code coverage."
   dd-rust-license-tool:
     required: false
     default: false
@@ -68,10 +76,14 @@ inputs:
     description: "Install vdev CLI tool (cached by vdev/ directory changes)."
 
   # prepare.sh - npm
-  markdownlint:
+  markdownlint-cli2:
     required: false
     default: false
-    description: "Install markdownlint (npm)."
+    description: "Install markdownlint-cli2 (npm)."
+  prettier:
+    required: false
+    default: false
+    description: "Install prettier (npm)."
   datadog-ci:
     required: false
     default: false
@@ -86,7 +98,8 @@ runs:
       uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
       with:
         path: ~/.cargo/bin/vdev
-        key: ${{ runner.os }}-vdev-${{ hashFiles('vdev/**', 'Cargo.toml', 'Cargo.lock') }}
+        # WARNING: this key need to be in sync with the key in .github/actions/install-vdev/action.yml
+        key: ${{ runner.os }}-vdev-${{ hashFiles('vdev/**', 'lib/vector-vrl/**', 'Cargo.toml', 'Cargo.lock') }}
         restore-keys: |
           ${{ runner.os }}-vdev-
         lookup-only: true
@@ -105,6 +118,8 @@ runs:
                    "${{ inputs.cargo-nextest }}" \
                    "${{ inputs.cargo-deny }}" \
                    "${{ inputs.cargo-msrv }}" \
+                   "${{ inputs.cargo-hack }}" \
+                   "${{ inputs.cargo-llvm-cov }}" \
                    "${{ inputs.dd-rust-license-tool }}" \
                    "${{ inputs.wasm-pack }}"; do
           if [[ "$val" == "true" ]]; then
@@ -128,7 +143,6 @@ runs:
           # Set nice CI colors
           echo "CARGO_TERM_COLOR=always" >> "$GITHUB_ENV"
         fi
-
 
     - name: Enable rust matcher
       if: ${{ env.NEEDS_RUST == 'true' }}
@@ -176,7 +190,7 @@ runs:
         # We explicitly put `mold-wrapper.so` right beside `mold` itself because it's hard-coded to look in the same directory
         # first when trying to load the shared object, so we can dodge having to care about the "right" lib folder to put it in.
         TEMP=$(mktemp -d)
-        MOLD_VERSION=1.2.1
+        MOLD_VERSION=2.40.4
         MOLD_TARGET=mold-${MOLD_VERSION}-$(uname -m)-linux
         curl -fsSL "https://github.com/rui314/mold/releases/download/v${MOLD_VERSION}/${MOLD_TARGET}.tar.gz" \
         --output "$TEMP/${MOLD_TARGET}.tar.gz"
@@ -206,7 +220,7 @@ runs:
         EOF
 
     - name: Install protoc
-      if: ${{ inputs.protoc == 'true' }}
+      if: ${{ inputs.protoc == 'true' || env.VDEV_NEEDS_COMPILE == 'true' }}
       shell: bash
       run: |
         echo "Installing protoc"
@@ -242,8 +256,8 @@ runs:
       with:
         skip-cache: ${{ env.VDEV_NEEDS_COMPILE == 'true' }}
 
-    - name: Cache prepare.sh binaries
-      id: cache-prepare-binaries
+    - name: Cache cargo binaries
+      id: cache-cargo-binaries
       uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
       with:
         path: |
@@ -252,13 +266,20 @@ runs:
           ~/.cargo/bin/cargo-nextest
           ~/.cargo/bin/cargo-deny
           ~/.cargo/bin/cargo-msrv
+          ~/.cargo/bin/cargo-hack
+          ~/.cargo/bin/cargo-llvm-cov
           ~/.cargo/bin/dd-rust-license-tool
           ~/.cargo/bin/wasm-pack
-          /usr/local/bin/markdownlint
-          /usr/local/bin/datadog-ci
-        key: ${{ runner.os }}-prepare-binaries-${{ hashFiles('scripts/environment/*') }}
+        key: ${{ runner.os }}-cargo-binaries-${{ hashFiles('scripts/environment/*.sh') }}
         restore-keys: |
-          ${{ runner.os }}-prepare-binaries-
+          ${{ runner.os }}-cargo-binaries-
+
+    - name: Cache npm tools
+      id: cache-npm-tools
+      uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+      with:
+        path: scripts/environment/npm-tools/node_modules
+        key: ${{ runner.os }}-npm-tools-${{ hashFiles('scripts/environment/npm-tools/*') }}
 
     - name: Run prepare.sh
       shell: bash
@@ -270,9 +291,12 @@ runs:
         [[ "${{ inputs.cargo-nextest }}" == "true" ]] && mods+=("cargo-nextest")
         [[ "${{ inputs.cargo-deny }}" == "true" ]] && mods+=("cargo-deny")
         [[ "${{ inputs.cargo-msrv }}" == "true" ]] && mods+=("cargo-msrv")
+        [[ "${{ inputs.cargo-hack }}" == "true" ]] && mods+=("cargo-hack")
+        [[ "${{ inputs.cargo-llvm-cov }}" == "true" ]] && mods+=("cargo-llvm-cov")
         [[ "${{ inputs.dd-rust-license-tool }}" == "true" ]] && mods+=("dd-rust-license-tool")
         [[ "${{ inputs.wasm-pack }}" == "true" ]] && mods+=("wasm-pack")
-        [[ "${{ inputs.markdownlint }}" == "true" ]] && mods+=("markdownlint")
+        [[ "${{ inputs.markdownlint-cli2 }}" == "true" ]] && mods+=("markdownlint-cli2")
+        [[ "${{ inputs.prettier }}" == "true" ]] && mods+=("prettier")
         [[ "${{ inputs.datadog-ci }}" == "true" ]] && mods+=("datadog-ci")
         csm=$(IFS=,; echo "${mods[*]}")
 
