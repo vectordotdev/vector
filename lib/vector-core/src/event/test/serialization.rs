@@ -328,6 +328,86 @@ fn nesting_gate_rejects_deeply_nested_metadata() {
     );
 }
 
+/// Creates a Value with the specified number of nested Object wrapping levels.
+///
+/// Returns a Value that is `wrapping_levels` nested Objects deep, with a string leaf.
+/// `check_value_depth` will measure this as depth `wrapping_levels` (the leaf).
+fn create_nested_value(wrapping_levels: usize) -> Value {
+    let mut value = Value::from("innermost");
+    for _ in 0..wrapping_levels {
+        let mut map = ObjectMap::new();
+        map.insert("nested".into(), value);
+        value = Value::Object(map);
+    }
+    value
+}
+
+/// The metadata_full encoding path (EventArray → LogArray → Log → Metadata → Value) is the
+/// tightest proto path, using exactly 100 of prost's 100 recursion budget at depth 32.
+/// This test proves depth-32 metadata roundtrips via raw prost encode/decode.
+#[test]
+fn metadata_at_max_depth_roundtrips_via_prost() {
+    let mut event = LogEvent::from("normal event data");
+
+    // 32 wrapping levels = leaf at depth 32 = MAX_NESTING_DEPTH
+    let value = create_nested_value(32);
+    *event.metadata_mut().value_mut() = value.clone();
+
+    let array = EventArray::Logs(LogArray::from(vec![event]));
+
+    // Encode via proto directly (same path as Encodable::encode but without the depth gate)
+    let proto_array = proto::EventArray::from(array);
+    let mut buffer = BytesMut::with_capacity(16384);
+    proto_array
+        .encode(&mut buffer)
+        .expect("prost encode should succeed for depth-32 metadata");
+
+    // Decode must also succeed — this is the tightest path (exactly 100/100 prost budget)
+    let decoded_proto = proto::EventArray::decode(buffer.freeze())
+        .expect("prost decode should succeed for depth-32 metadata (tightest path)");
+    let decoded_array = EventArray::from(decoded_proto);
+
+    let decoded_event = decoded_array.into_events().next().unwrap().into_log();
+    assert_eq!(
+        decoded_event.metadata().value(),
+        &value,
+        "metadata value should roundtrip at MAX_NESTING_DEPTH"
+    );
+}
+
+/// Same test for metric metadata, which follows the same tightest path:
+/// EventArray → MetricArray → Metric → Metadata → Value
+#[test]
+fn metric_metadata_at_max_depth_roundtrips_via_prost() {
+    let mut metric = Metric::new(
+        "test_counter",
+        MetricKind::Incremental,
+        MetricValue::Counter { value: 1.0 },
+    );
+
+    let value = create_nested_value(32);
+    *metric.metadata_mut().value_mut() = value.clone();
+
+    let array = EventArray::Metrics(MetricArray::from(vec![metric]));
+
+    let proto_array = proto::EventArray::from(array);
+    let mut buffer = BytesMut::with_capacity(16384);
+    proto_array
+        .encode(&mut buffer)
+        .expect("prost encode should succeed for depth-32 metric metadata");
+
+    let decoded_proto = proto::EventArray::decode(buffer.freeze())
+        .expect("prost decode should succeed for depth-32 metric metadata");
+    let decoded_array = EventArray::from(decoded_proto);
+
+    let decoded_event = decoded_array.into_events().next().unwrap().into_metric();
+    assert_eq!(
+        decoded_event.metadata().value(),
+        &value,
+        "metric metadata value should roundtrip at MAX_NESTING_DEPTH"
+    );
+}
+
 #[test]
 fn check_value_depth_with_configurable_limit() {
     let mut value = Value::from("leaf");
