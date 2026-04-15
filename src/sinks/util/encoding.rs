@@ -7,7 +7,6 @@ use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::{Transformer, encoding::Framer, internal_events::EncoderWriteError},
     config::telemetry,
-    internal_event::{ComponentEventsDropped, UNINTENTIONAL},
     request_metadata::GroupedCountByteSize,
 };
 
@@ -108,6 +107,7 @@ impl Encoder<Vec<Event>> for (Transformer, vector_lib::codecs::BatchEncoder) {
         writer: &mut dyn io::Write,
     ) -> io::Result<(usize, GroupedCountByteSize)> {
         use tokio_util::codec::Encoder as _;
+        use vector_lib::internal_event::{ComponentEventsDropped, UNINTENTIONAL};
 
         let mut encoder = self.1.clone();
         let mut byte_size = telemetry().create_request_count_byte_size();
