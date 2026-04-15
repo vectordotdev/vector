@@ -124,9 +124,13 @@ impl Encoder<Vec<Event>> for (Transformer, vector_lib::codecs::BatchEncoder) {
         encoder
             .encode(transformed_events, &mut bytes)
             .map_err(|error| {
-                // Codec-specific internal events (e.g. SchemaGenerationError,
-                // EncoderNullConstraintError) already log the error and increment
-                // component_errors_total. We only need to emit the drop count here.
+                // Most codec error paths already emit their own internal event
+                // (e.g. SchemaGenerationError, EncoderNullConstraintError) which
+                // logs the error and increments component_errors_total.
+                // We only emit the drop count here to avoid double-counting.
+                // Note: n_events is the pre-filter count, so if the codec
+                // partially dropped events (e.g. non-log events) before failing,
+                // the total may slightly overcount.
                 emit!(ComponentEventsDropped::<UNINTENTIONAL> {
                     count: n_events,
                     reason: "Failed to batch encode events.",
