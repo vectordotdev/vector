@@ -507,6 +507,7 @@ async fn client() -> S3Client {
         &proxy,
         tls_options.as_ref(),
         None,
+        None,
     )
     .await
     .unwrap()
