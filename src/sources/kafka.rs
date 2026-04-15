@@ -651,6 +651,7 @@ impl ConsumerStateInner<Consuming> {
         let handle = join_set.spawn(async move {
             let mut messages = p.stream().ready_chunks(CHUNK_SIZE);
             let (finalizer, mut ack_stream) = OrderedFinalizer::<FinalizerEntry>::new(None);
+            let (future_done_tx, mut future_done_rx) = mpsc::channel::<()>(256);
             let mut processing_futures = FuturesOrdered::<JoinHandle<Option<(OwnedMessage, BatchStatusReceiver)>>>::new();
 
             // finalizer is the entry point for new pending acknowledgements;
@@ -709,11 +710,13 @@ impl ConsumerStateInner<Consuming> {
                                 let mut out = out.clone();
                                 let message_handling_tasks_semaphore = Arc::clone(message_handling_tasks_semaphore);
                                 let permit = message_handling_tasks_semaphore.acquire_owned().await.expect("Message handling tasks semaphore closed");
+                                let future_done_tx = future_done_tx.clone();
                                 processing_futures.push_back(tokio::spawn(async move {
                                     let result = parse_message(msgs, &decoder, &keys, &mut out, acknowledgements, log_namespace).await;
                                     // Force moving permit into the task, to release only once done
                                     // parsing
                                     drop(permit);
+                                    let _ = future_done_tx.send(()).await;
                                     result
                                 }.instrument(span.clone())));
                             } else {
@@ -734,11 +737,13 @@ impl ConsumerStateInner<Consuming> {
                         }
                     },
 
-                    // This has to be the lowest priority future, because it will be ready with None even if
-                    // no futures are available
-                    res = processing_futures.next(), if finalizer.is_some() => if let Some(Ok(batch_result)) = res {
-                        Self::finalize_batch(batch_result, finalizer.as_ref());
-                    },
+                    Some(()) = future_done_rx.recv(), if finalizer.is_some() => {
+                        while let Some(res) = processing_futures.next().await {
+                            if let Ok(batch_result) = res {
+                                Self::finalize_batch(batch_result, finalizer.as_ref());
+                            }
+                        }
+                    }
                 )
             }
             (tp, status)
