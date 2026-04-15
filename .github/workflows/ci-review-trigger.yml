@@ -11,6 +11,7 @@
 #
 # /ci-run-all                 : runs all of the below
 # /ci-run-cli                 : runs CLI - Linux
+# /ci-run-test-vector-api     : runs make test-vector-api
 # /ci-run-test-behavior       : runs make test-behavior
 # /ci-run-check-examples      : runs make check-examples
 # /ci-run-test-docs           : runs make test-docs
@@ -53,18 +54,19 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     if: |
-        startsWith(github.event.review.body, '/ci-run-all')
-        || startsWith(github.event.review.body, '/ci-run-cli')
-        || startsWith(github.event.review.body, '/ci-run-test-behavior')
-        || startsWith(github.event.review.body, '/ci-run-check-examples')
-        || startsWith(github.event.review.body, '/ci-run-test-docs')
-        || startsWith(github.event.review.body, '/ci-run-deny')
-        || startsWith(github.event.review.body, '/ci-run-component-features')
-        || startsWith(github.event.review.body, '/ci-run-cross')
-        || startsWith(github.event.review.body, '/ci-run-unit-mac')
-        || startsWith(github.event.review.body, '/ci-run-unit-windows')
-        || startsWith(github.event.review.body, '/ci-run-environment')
-        || startsWith(github.event.review.body, '/ci-run-k8s')
+      startsWith(github.event.review.body, '/ci-run-all')
+      || startsWith(github.event.review.body, '/ci-run-cli')
+      || startsWith(github.event.review.body, '/ci-run-test-vector-api')
+      || startsWith(github.event.review.body, '/ci-run-test-behavior')
+      || startsWith(github.event.review.body, '/ci-run-check-examples')
+      || startsWith(github.event.review.body, '/ci-run-test-docs')
+      || startsWith(github.event.review.body, '/ci-run-deny')
+      || startsWith(github.event.review.body, '/ci-run-component-features')
+      || startsWith(github.event.review.body, '/ci-run-cross')
+      || startsWith(github.event.review.body, '/ci-run-unit-mac')
+      || startsWith(github.event.review.body, '/ci-run-unit-windows')
+      || startsWith(github.event.review.body, '/ci-run-environment')
+      || startsWith(github.event.review.body, '/ci-run-k8s')
     steps:
       - name: Generate authentication token
         id: generate_token
@@ -77,7 +79,7 @@ jobs:
         uses: tspascoal/get-user-teams-membership@57e9f42acd78f4d0f496b3be4368fc5f62696662 # v3.0.0
         with:
           username: ${{ github.actor }}
-          team: 'Vector'
+          team: "Vector"
           GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
 
       - name: Validate author membership
@@ -85,10 +87,25 @@ jobs:
         run: exit 1
 
   cli:
+    needs: validate
     if: startsWith(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-cli')
-    uses: ./.github/workflows/cli.yml
+    uses: ./.github/workflows/test-make-command.yml
     with:
       ref: ${{ github.event.review.commit_id }}
+      command: test-cli
+      job_name: CLI tests
+      cargo_nextest: true
+    secrets: inherit
+
+  make-test-vector-api:
+    needs: validate
+    if: startsWith(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-test-vector-api')
+    uses: ./.github/workflows/test-make-command.yml
+    with:
+      ref: ${{ github.event.review.commit_id }}
+      command: test-vector-api
+      job_name: make test-vector-api
+      cargo_nextest: true
     secrets: inherit
 
   make-test-behavior:

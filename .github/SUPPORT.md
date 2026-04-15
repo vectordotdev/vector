@@ -32,21 +32,21 @@ you are observing.
 
 Essential details to include:
 
-- Errors: for each error, please provide the full error message snippet, and
+* Errors: for each error, please provide the full error message snippet, and
   details such as where the error is observed, at what stage in the process
   (e.g. at boot time, after some specific condition etc.).
-- What is the version of Vector (and the Helm chart if deploying via Helm) and
+* What is the version of Vector (and the Helm chart if deploying via Helm) and
   the versions of any other systems in use (like Elasticsearch, NATS, etc.).
-- What is your Vector configuration. See the below section on [how to format
+* What is your Vector configuration. See the below section on [how to format
   your config](#formatting).
-- How are you [deploying](https://vector.dev/docs/setup/deployment/) Vector?
-- What is your complete deployment architecture? For example: I have Logstash
+* How are you [deploying](https://vector.dev/docs/setup/deployment/) Vector?
+* What is your complete deployment architecture? For example: I have Logstash
   agents sending to Vector over syslog that is being forwarded to Loki.
 
 Situation specific (not exhaustive):
 
-- Did it occur after upgrading to a new version of Vector?
-- Are you trying out Vector for the first time, or did you have a previous
+* Did it occur after upgrading to a new version of Vector?
+* Are you trying out Vector for the first time, or did you have a previous
   working configuration?
 
 These are just some examples of questions that may or may not apply to your

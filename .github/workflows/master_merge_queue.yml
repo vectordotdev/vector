@@ -47,8 +47,24 @@ jobs:
     secrets: inherit
 
   test-cli:
-    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.cli-yml == 'true' }}
-    uses: ./.github/workflows/cli.yml
+    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.test-make-command-yml == 'true' }}
+    uses: ./.github/workflows/test-make-command.yml
+    with:
+      command: test-cli
+      job_name: CLI tests
+      cargo_nextest: true
+      upload_test_results: true
+    needs: changes
+    secrets: inherit
+
+  test-vector-api:
+    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.test-make-command-yml == 'true' }}
+    uses: ./.github/workflows/test-make-command.yml
+    with:
+      command: test-vector-api
+      job_name: make test-vector-api
+      cargo_nextest: true
+      upload_test_results: true
     needs: changes
     secrets: inherit
 
@@ -122,6 +138,7 @@ jobs:
     needs:
       - changes
       - test-cli
+      - test-vector-api
       - make-test-behavior
       - make-check-examples
       - make-test-docs
