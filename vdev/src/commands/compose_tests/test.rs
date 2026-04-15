@@ -5,6 +5,7 @@ use anyhow::{Result, bail};
 use crate::testing::{
     config::ComposeTestConfig,
     integration::{ComposeTest, ComposeTestLocalConfig},
+    runner::{LOCAL_COVERAGE_OUTPUT_DIR, coverage_filename},
 };
 
 use super::active_projects::find_active_environment_for_integration;
@@ -33,9 +34,39 @@ pub fn exec(
         (None, None) => Box::new(envs.keys()),
     };
 
+    let mut ran_environments: Vec<String> = Vec::new();
     for environment in environments {
         ComposeTest::generate(local_config, integration, environment, retries, coverage)?
             .test(args.to_owned())?;
+        if coverage {
+            ran_environments.push(environment.clone());
+        }
     }
+
+    // Merge per-environment coverage files into a single lcov.info when
+    // multiple environments were tested.
+    if coverage && ran_environments.len() > 1 {
+        let coverage_dir = std::path::Path::new(LOCAL_COVERAGE_OUTPUT_DIR);
+        let merged_path = coverage_dir.join(coverage_filename(None));
+        let mut merged = String::new();
+        for env_name in &ran_environments {
+            let env_file = coverage_dir.join(coverage_filename(Some(env_name)));
+            match std::fs::read_to_string(&env_file) {
+                Ok(contents) => {
+                    merged.push_str(&contents);
+                    // Clean up per-environment file after merging.
+                    let _ = std::fs::remove_file(&env_file);
+                }
+                Err(e) => {
+                    warn!("Could not read coverage file {}: {e}", env_file.display());
+                }
+            }
+        }
+        if !merged.is_empty() {
+            std::fs::write(&merged_path, merged)?;
+            info!("Merged coverage from {} environments into {}", ran_environments.len(), merged_path.display());
+        }
+    }
+
     Ok(())
 }

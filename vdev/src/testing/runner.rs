@@ -39,7 +39,7 @@ const COVERAGE_COMMAND: &[&str] = &[
 /// Coverage output path inside the test runner container.
 const COVERAGE_OUTPUT_DIR: &str = "/coverage";
 /// Coverage output path on the host (relative to project root).
-const LOCAL_COVERAGE_OUTPUT_DIR: &str = "target/coverage";
+pub(crate) const LOCAL_COVERAGE_OUTPUT_DIR: &str = "target/coverage";
 // The upstream container we publish artifacts to on a successful master build.
 const UPSTREAM_IMAGE: &str = "docker.io/timberio/vector-dev:latest";
 
@@ -63,6 +63,7 @@ pub fn get_agent_test_runner(container: bool) -> Result<Box<dyn TestRunner>> {
 }
 
 pub trait TestRunner {
+    #[allow(clippy::too_many_arguments)]
     fn test(
         &self,
         outer_env: &Environment,
@@ -71,7 +72,16 @@ pub trait TestRunner {
         args: &[String],
         build: bool,
         coverage: bool,
+        coverage_env: Option<&str>,
     ) -> Result<()>;
+}
+
+/// Return the coverage output filename, optionally scoped to an environment.
+pub(crate) fn coverage_filename(coverage_env: Option<&str>) -> String {
+    match coverage_env {
+        Some(env) => format!("lcov-{env}.info"),
+        None => "lcov.info".to_string(),
+    }
 }
 
 pub trait ContainerTestRunner: TestRunner {
@@ -250,6 +260,7 @@ where
         args: &[String],
         build: bool,
         coverage: bool,
+        coverage_env: Option<&str>,
     ) -> Result<()> {
         self.ensure_running(features, config_environment_variables, build)?;
 
@@ -276,10 +287,11 @@ where
         });
         command.args(args);
         if coverage {
+            let filename = coverage_filename(coverage_env);
             command.args([
                 "--lcov",
                 "--output-path",
-                &format!("{COVERAGE_OUTPUT_DIR}/lcov.info"),
+                &format!("{COVERAGE_OUTPUT_DIR}/{filename}"),
             ]);
         }
 
@@ -433,6 +445,7 @@ impl TestRunner for LocalTestRunner {
         args: &[String],
         _build: bool,
         coverage: bool,
+        coverage_env: Option<&str>,
     ) -> Result<()> {
         let test_cmd = if coverage {
             COVERAGE_COMMAND
@@ -444,10 +457,11 @@ impl TestRunner for LocalTestRunner {
         command.args(args);
         if coverage {
             std::fs::create_dir_all(LOCAL_COVERAGE_OUTPUT_DIR)?;
+            let filename = coverage_filename(coverage_env);
             command.args([
                 "--lcov",
                 "--output-path",
-                &format!("{LOCAL_COVERAGE_OUTPUT_DIR}/lcov.info"),
+                &format!("{LOCAL_COVERAGE_OUTPUT_DIR}/{filename}"),
             ]);
         }
 

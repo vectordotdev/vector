@@ -155,10 +155,15 @@ for TEST_ENV in "${TEST_ENVIRONMENTS[@]}"; do
     # Datadog can resolve files against the repository root (e.g. SF:src/foo.rs).
     # Append each environment's coverage to a combined file so multi-env services
     # preserve all coverage data (not just the last environment).
-    if [[ "$COVERAGE" == "true" && "$RET" -eq 0 && -f target/coverage/lcov.info ]]; then
-      sed -i 's|SF:/home/vector/|SF:|g' target/coverage/lcov.info
-      cat target/coverage/lcov.info >> target/coverage/lcov-combined.info
-      rm target/coverage/lcov.info
+    # vdev now writes per-environment coverage files (lcov-{env}.info).
+    # Find the file for this environment and append it to the combined output.
+    if [[ "$COVERAGE" == "true" && "$RET" -eq 0 ]]; then
+      LCOV_FILE="target/coverage/lcov-${TEST_ENV}.info"
+      if [[ -f "$LCOV_FILE" ]]; then
+        sed -i 's|SF:/home/vector/|SF:|g' "$LCOV_FILE"
+        cat "$LCOV_FILE" >> target/coverage/lcov-combined.info
+        rm "$LCOV_FILE"
+      fi
     fi
 
     # Upload test results only if the vdev test step ran

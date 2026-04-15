@@ -234,6 +234,11 @@ impl ComposeTest {
             &args,
             self.local_config.kind == ComposeTestKind::E2E,
             self.coverage,
+            if self.coverage {
+                Some(self.environment.as_str())
+            } else {
+                None
+            },
         )?;
 
         Ok(())
