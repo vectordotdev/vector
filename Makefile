@@ -392,7 +392,7 @@ test-integration: test-integration-datadog-traces test-integration-shutdown
 .PHONY: test-integration-windows-event-log
 test-integration-windows-event-log: ## Runs Windows Event Log integration tests (Windows only)
 ifeq ($(OS),Windows_NT)
-	${MAYBE_ENVIRONMENT_EXEC} cargo test -p vector --no-default-features --features sources-windows_event_log-integration-tests windows_event_log::integration_tests
+	${MAYBE_ENVIRONMENT_EXEC} cargo test -p vector --no-default-features --features sources-windows_event_log-integration-tests windows_event_log::integration_tests -- --test-threads=1
 else
 	@echo "Skipping windows-event-log integration tests (Windows only)"
 endif
