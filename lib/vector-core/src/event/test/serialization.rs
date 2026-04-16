@@ -360,6 +360,12 @@ fn nesting_gate_accepts_flat_events() {
     let mut buf = BytesMut::with_capacity(1024);
     assert!(events.encode(&mut buf).is_ok());
 
+    let mut trace = TraceEvent::default();
+    trace.insert("foo", "bar");
+    let events = EventArray::Traces(TraceArray::from(vec![trace]));
+    let mut buf = BytesMut::with_capacity(1024);
+    assert!(events.encode(&mut buf).is_ok());
+
     let metric = Metric::new(
         "test_counter",
         MetricKind::Incremental,
