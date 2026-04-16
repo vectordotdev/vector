@@ -12,11 +12,13 @@ use tower::ServiceBuilder;
 use uuid::Uuid;
 use vector_lib::{
     TimeZone,
-    codecs::encoding::Framer,
+    codecs::{EncoderKind, encoding::Framer},
     configurable::configurable_component,
     event::{EventFinalizers, Finalizable},
     request_metadata::RequestMetadata,
 };
+#[cfg(feature = "codecs-parquet")]
+use vector_lib::codecs::{BatchEncoder, encoding::BatchSerializerConfig};
 
 use crate::{
     codecs::{Encoder, EncodingConfigWithFraming, SinkType, Transformer},
@@ -151,6 +153,16 @@ pub struct GcsSinkConfig {
     #[serde(flatten)]
     encoding: EncodingConfigWithFraming,
 
+    /// Batch encoding configuration for columnar formats.
+    ///
+    /// When set, events are encoded together as a batch in a columnar format (e.g., Parquet)
+    /// instead of the standard per-event framing-based encoding. The columnar format handles
+    /// its own internal compression, so the top-level `compression` setting is bypassed.
+    #[cfg(feature = "codecs-parquet")]
+    #[configurable(derived)]
+    #[serde(default)]
+    pub batch_encoding: Option<BatchSerializerConfig>,
+
     /// Compression configuration.
     ///
     /// All compression algorithms use the default compression level unless otherwise specified.
@@ -238,6 +250,8 @@ fn default_config(encoding: EncodingConfigWithFraming) -> GcsSinkConfig {
         content_encoding: Default::default(),
         cache_control: Default::default(),
         encoding,
+        #[cfg(feature = "codecs-parquet")]
+        batch_encoding: None,
         compression: Compression::gzip_default(),
         batch: Default::default(),
         endpoint: Default::default(),
@@ -282,6 +296,10 @@ impl SinkConfig for GcsSinkConfig {
     }
 
     fn input(&self) -> Input {
+        #[cfg(feature = "codecs-parquet")]
+        if let Some(batch_config) = &self.batch_encoding {
+            return Input::new(batch_config.input_type() & DataType::Log);
+        }
         Input::new(self.encoding.config().1.input_type() & DataType::Log)
     }
 
@@ -340,7 +358,7 @@ struct RequestSettings {
     extension: String,
     time_format: String,
     append_uuid: bool,
-    encoder: (Transformer, Encoder<Framer>),
+    encoder: (Transformer, EncoderKind),
     compression: Compression,
     tz_offset: Option<FixedOffset>,
 }
@@ -348,7 +366,7 @@ struct RequestSettings {
 impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
     type Metadata = (String, EventFinalizers);
     type Events = Vec<Event>;
-    type Encoder = (Transformer, Encoder<Framer>);
+    type Encoder = (Transformer, EncoderKind);
     type Payload = Bytes;
     type Request = GcsRequest;
     type Error = io::Error;
@@ -419,20 +437,69 @@ impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
 impl RequestSettings {
     fn new(config: &GcsSinkConfig, cx: SinkContext) -> crate::Result<Self> {
         let transformer = config.encoding.transformer();
-        let (framer, serializer) = config.encoding.build(SinkType::MessageBased)?;
-        let encoder = Encoder::<Framer>::new(framer, serializer);
+
+        // Build encoder, compression, extension, and content_type_str together
+        // so that batch mode (Parquet) can override all four coherently.
+        #[cfg(feature = "codecs-parquet")]
+        let (encoder, compression, extension, content_type_str) =
+            if let Some(batch_config) = &config.batch_encoding {
+                let batch_serializer = batch_config.build_batch_serializer()?;
+                let batch_encoder = BatchEncoder::new(batch_serializer);
+                let ct = config
+                    .content_type
+                    .clone()
+                    .unwrap_or_else(|| batch_encoder.content_type().to_string());
+                let ext = config
+                    .filename_extension
+                    .clone()
+                    .or_else(|| match batch_config {
+                        BatchSerializerConfig::Parquet(_) => Some("parquet".to_string()),
+                        #[allow(unreachable_patterns)]
+                        _ => None,
+                    })
+                    .unwrap_or_else(|| config.compression.extension().into());
+                (
+                    EncoderKind::Batch(batch_encoder),
+                    Compression::None,
+                    ext,
+                    ct,
+                )
+            } else {
+                let (framer, serializer) = config.encoding.build(SinkType::MessageBased)?;
+                let enc = Encoder::<Framer>::new(framer, serializer);
+                let ct = config
+                    .content_type
+                    .clone()
+                    .unwrap_or_else(|| enc.content_type().to_string());
+                let ext = config
+                    .filename_extension
+                    .clone()
+                    .unwrap_or_else(|| config.compression.extension().into());
+                (EncoderKind::Framed(Box::new(enc)), config.compression, ext, ct)
+            };
+
+        #[cfg(not(feature = "codecs-parquet"))]
+        let (encoder, compression, extension, content_type_str) = {
+            let (framer, serializer) = config.encoding.build(SinkType::MessageBased)?;
+            let enc = Encoder::<Framer>::new(framer, serializer);
+            let ct = config
+                .content_type
+                .clone()
+                .unwrap_or_else(|| enc.content_type().to_string());
+            let ext = config
+                .filename_extension
+                .clone()
+                .unwrap_or_else(|| config.compression.extension().into());
+            (EncoderKind::Framed(Box::new(enc)), config.compression, ext, ct)
+        };
+
         let acl = config
             .acl
             .map(|acl| HeaderValue::from_str(&to_string(acl)).unwrap());
-        let content_type_str = config
-            .content_type
-            .as_deref()
-            .unwrap_or_else(|| encoder.content_type());
-        let content_type = HeaderValue::from_str(content_type_str)?;
+        let content_type = HeaderValue::from_str(&content_type_str)?;
         let content_encoding = match &config.content_encoding {
             Some(ce) => Some(HeaderValue::from_str(ce)?),
-            None => config
-                .compression
+            None => compression
                 .content_encoding()
                 .map(|ce| HeaderValue::from_str(&to_string(ce)).unwrap()),
         };
@@ -453,10 +520,6 @@ impl RequestSettings {
                     .collect::<Result<Vec<_>, _>>()
             })
             .unwrap_or_else(|| Ok(vec![]))?;
-        let extension = config
-            .filename_extension
-            .clone()
-            .unwrap_or_else(|| config.compression.extension().into());
         let time_format = config.filename_time_format.clone();
         let append_uuid = config.filename_append_uuid;
         let offset = config
@@ -474,7 +537,7 @@ impl RequestSettings {
             extension,
             time_format,
             append_uuid,
-            compression: config.compression,
+            compression,
             encoder: (transformer, encoder),
             tz_offset: offset,
         })
