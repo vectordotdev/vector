@@ -359,8 +359,8 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
-		component_cpu_usage_seconds_total: {
-			description:       "The CPU time consumed by a component. Available for sync and function transforms."
+		component_cpu_usage_ns_total: {
+			description:       "The CPU time consumed by a component in nanoseconds. Available for sync and function transforms."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags
