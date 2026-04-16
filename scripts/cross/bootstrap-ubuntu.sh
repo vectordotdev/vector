@@ -22,5 +22,6 @@ apt-get install -y \
   llvm \
   clang \
   unzip \
-  libsasl2-dev
+  libsasl2-dev \
+  libcurl4-openssl-dev
 
