@@ -214,7 +214,10 @@ mod tests {
             "https://api.datadoghq.eu"
         );
         assert_eq!(
-            get_api_base_endpoint(Some("https://http-intake.logs.us3.datadoghq.com"), DD_US_SITE),
+            get_api_base_endpoint(
+                Some("https://http-intake.logs.us3.datadoghq.com"),
+                DD_US_SITE
+            ),
             "https://api.us3.datadoghq.com"
         );
     }
