@@ -170,40 +170,6 @@ components: sinks: gcp_cloud_storage: {
 					data items with the object that are not part of the uploaded data.
 					"""
 		}
-
-		parquet_encoding: {
-			title: "Parquet Batch Encoding"
-			body:  """
-				The GCS sink supports Apache Parquet batch encoding via the `batch_encoding`
-				option. When configured, events are encoded together as Parquet columnar files
-				instead of the default per-event encoding. Parquet handles compression
-				internally, so the top-level `compression` setting must be `"none"`.
-				Output files automatically use the `.parquet` extension and the
-				`Content-Type` is set to `application/vnd.apache.parquet`.
-
-				This feature requires the `codecs-parquet` feature flag at compile time.
-
-				```toml
-				[sinks.gcs_parquet]
-				type = "gcp_cloud_storage"
-				bucket = "my-analytics-bucket"
-				key_prefix = "logs/date=%F/"
-				compression = "none"
-
-				[sinks.gcs_parquet.batch_encoding]
-				codec = "parquet"
-				compression = "snappy"
-
-				[[sinks.gcs_parquet.batch_encoding.schema]]
-				name = "message"
-				type = "utf8"
-
-				[[sinks.gcs_parquet.batch_encoding.schema]]
-				name = "timestamp"
-				type = "timestamp_millisecond"
-				```
-				"""
-		}
 	}
 
 	permissions: iam: [
