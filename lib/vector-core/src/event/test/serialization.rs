@@ -290,51 +290,50 @@ fn nesting_gate_rejects_all_types_above_max_depth() {
     }
 }
 
-/// Verify that `Log.fields` (the loosest path) can handle depth 33 when metadata is flat.
-/// This proves the uniform limit of 32 is conservative for this path — it's constrained
-/// by the tighter `metadata_full` path, not by `Log.fields` itself.
+/// Verify the per-path boundaries for the loosest and tightest encoding paths.
+///
+/// `Log.fields` is the loosest path (3 entries of headroom at depth 32):
+///   - depth 33 succeeds (100/100 budget)
+///   - depth 34 fails (103/100 budget)
+///
+/// `metadata_full` is the tightest path (0 headroom at depth 32):
+///   - depth 32 succeeds (100/100 budget)
+///   - depth 33 fails (103/100 budget)
+///
+/// The uniform `MAX_NESTING_DEPTH = 32` is set by the tightest path.
 #[test]
-fn log_fields_has_headroom_beyond_max_depth() {
+fn per_path_boundaries() {
     let max = super::super::ser::MAX_NESTING_DEPTH;
 
-    // Event value at depth MAX+1, but metadata left flat (default).
-    // This isolates the Log.fields path from the metadata_full path.
-    let mut event = LogEvent::default();
-    event.insert("data", create_nested_value(max)); // leaf at depth max+1
+    // Helper: encode a LogEvent with nested value and flat metadata via EventArray.
+    let roundtrip_value = |depth: usize| -> bool {
+        let mut event = LogEvent::default();
+        event.insert("data", create_nested_value(depth - 1));
+        let array = EventArray::Logs(LogArray::from(vec![event]));
+        let proto_array = proto::EventArray::from(array);
+        let mut buf = BytesMut::with_capacity(65536);
+        proto_array.encode(&mut buf).unwrap();
+        proto::EventArray::decode(buf.freeze()).is_ok()
+    };
 
-    let array = EventArray::Logs(LogArray::from(vec![event]));
-    let proto_array = proto::EventArray::from(array);
-    let mut buf = BytesMut::with_capacity(65536);
-    proto_array.encode(&mut buf).unwrap();
+    // Helper: encode a LogEvent with flat value and nested metadata via EventArray.
+    let roundtrip_metadata = |depth: usize| -> bool {
+        let mut event = LogEvent::from("flat");
+        *event.metadata_mut().value_mut() = create_nested_value(depth);
+        let array = EventArray::Logs(LogArray::from(vec![event]));
+        let proto_array = proto::EventArray::from(array);
+        let mut buf = BytesMut::with_capacity(65536);
+        proto_array.encode(&mut buf).unwrap();
+        proto::EventArray::decode(buf.freeze()).is_ok()
+    };
 
-    assert!(
-        proto::EventArray::decode(buf.freeze()).is_ok(),
-        "Log.fields path should succeed at depth {} (has headroom beyond MAX_NESTING_DEPTH)",
-        max + 1,
-    );
-}
+    // Log.fields (loosest): succeeds at 33, fails at 34
+    assert!(roundtrip_value(max + 1), "Log.fields should succeed at depth {}", max + 1);
+    assert!(!roundtrip_value(max + 2), "Log.fields should fail at depth {}", max + 2);
 
-/// Verify that `metadata_full` (the tightest path) fails at depth 33.
-/// This is the path that actually constrains `MAX_NESTING_DEPTH`.
-#[test]
-fn metadata_full_fails_beyond_max_depth() {
-    let max = super::super::ser::MAX_NESTING_DEPTH;
-
-    // Metadata at depth MAX+1, event value left flat.
-    // This isolates the metadata_full path.
-    let mut event = LogEvent::from("flat data");
-    *event.metadata_mut().value_mut() = create_nested_value(max + 1);
-
-    let array = EventArray::Logs(LogArray::from(vec![event]));
-    let proto_array = proto::EventArray::from(array);
-    let mut buf = BytesMut::with_capacity(65536);
-    proto_array.encode(&mut buf).unwrap();
-
-    assert!(
-        proto::EventArray::decode(buf.freeze()).is_err(),
-        "metadata_full path should fail at depth {} (this is the tightest path)",
-        max + 1,
-    );
+    // metadata_full (tightest): succeeds at 32, fails at 33
+    assert!(roundtrip_metadata(max), "metadata_full should succeed at depth {max}");
+    assert!(!roundtrip_metadata(max + 1), "metadata_full should fail at depth {}", max + 1);
 }
 
 /// Verify flat events pass without issues.
