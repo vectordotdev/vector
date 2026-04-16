@@ -1,7 +1,7 @@
-ARG CROSS_VERSION=0.2.5
 ARG TARGET=x86_64-unknown-linux-musl
+ARG CROSS_DIGEST
 
-FROM ghcr.io/cross-rs/${TARGET}:${CROSS_VERSION}
+FROM ghcr.io/cross-rs/${TARGET}@${CROSS_DIGEST}
 
 # Common steps for all targets
 COPY scripts/cross/bootstrap-ubuntu.sh /
