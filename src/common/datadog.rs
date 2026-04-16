@@ -105,7 +105,7 @@ fn compute_api_endpoint(endpoint: &str) -> String {
     // https://github.com/DataDog/datadog-agent/blob/cdcf0fc809b9ac1cd6e08057b4971c7dbb8dbe30/comp/forwarder/defaultforwarder/forwarder_health.go#L45-L47
     // https://github.com/DataDog/datadog-agent/blob/cdcf0fc809b9ac1cd6e08057b4971c7dbb8dbe30/comp/forwarder/defaultforwarder/forwarder_health.go#L188-L190
     static DOMAIN_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r"(?:[a-z]{2}\d\.)?(datadoghq\.[a-z]+|ddog-gov\.com)/*$")
+        Regex::new(r"((?:[a-z]{2}\d\.)?(?:datadoghq\.[a-z]+|ddog-gov\.com))/*$")
             .expect("Could not build Datadog domain regex")
     });
 
@@ -176,6 +176,30 @@ mod tests {
     }
 
     #[test]
+    fn preserves_site_prefix_in_api_endpoint() {
+        assert_eq!(
+            compute_api_endpoint("https://http-intake.logs.us3.datadoghq.com"),
+            "https://api.us3.datadoghq.com"
+        );
+        assert_eq!(
+            compute_api_endpoint("https://http-intake.logs.us5.datadoghq.com"),
+            "https://api.us5.datadoghq.com"
+        );
+        assert_eq!(
+            compute_api_endpoint("https://http-intake.logs.ap1.datadoghq.com"),
+            "https://api.ap1.datadoghq.com"
+        );
+        assert_eq!(
+            compute_api_endpoint("https://http-intake.logs.eu1.datadoghq.eu"),
+            "https://api.eu1.datadoghq.eu"
+        );
+        assert_eq!(
+            compute_api_endpoint("https://1-2-3-observability-pipelines.agent.us3.datadoghq.com"),
+            "https://api.us3.datadoghq.com"
+        );
+    }
+
+    #[test]
     fn gets_correct_api_base_endpoint() {
         assert_eq!(
             get_api_base_endpoint(None, DD_US_SITE),
@@ -188,6 +212,10 @@ mod tests {
         assert_eq!(
             get_api_base_endpoint(Some("https://logs.datadoghq.eu"), DD_US_SITE),
             "https://api.datadoghq.eu"
+        );
+        assert_eq!(
+            get_api_base_endpoint(Some("https://http-intake.logs.us3.datadoghq.com"), DD_US_SITE),
+            "https://api.us3.datadoghq.com"
         );
     }
 }
