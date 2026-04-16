@@ -7,23 +7,26 @@ use vrl::value::Value;
 
 use super::{Event, EventArray, proto};
 
-/// Maximum nesting depth for event data values (Log.fields, Trace.fields).
+/// Maximum nesting depth for event data values (`Log.fields`, `Trace.fields`).
 ///
 /// Prost enforces a decode recursion limit of 100 (no limit on encode). Each Value nesting
-/// level consumes 3 prost recursion entries (`Value` + `ValueMap` + `map_entry`). The event data
-/// path (`EventArray → *Array → Event → fields map_entry → Value`) has 3 proto wrapper
-/// messages before the Value tree, leaving room for 33 depth levels: 3 + (33 × 3) + 1 = 100.
+/// level consumes multiple prost recursion entries (`Value` + `ValueMap` + `map_entry` for
+/// Objects), and each encoding path has a fixed number of proto wrapper messages before the
+/// Value tree starts. The event data path (`EventArray` → `*Array` → Event → fields) has
+/// fewer wrappers than the metadata path, allowing one extra depth level.
 ///
-/// Verified by `per_path_boundaries`: depth 33 succeeds, depth 34 fails prost decode.
+/// Determined empirically and verified by `per_path_boundaries`: depth 33 roundtrips
+/// successfully via prost, depth 34 fails decode.
 pub const MAX_NESTING_DEPTH: usize = 33;
 
 /// Maximum nesting depth for event metadata values (via `metadata_full`).
 ///
-/// The metadata path (`EventArray → *Array → Event → Metadata → Value`) has 4 proto wrapper
-/// messages — one more than the event data path due to the `Metadata` message. This leaves
-/// room for 32 depth levels: 4 + (32 × 3) + 1 = 100, exactly at prost's recursion limit.
+/// The metadata path (`EventArray` → `*Array` → Event → `Metadata` → Value) has one more
+/// proto wrapper message than the event data path due to the `Metadata` message, reducing
+/// the maximum safe depth by one level.
 ///
-/// Verified by `per_path_boundaries`: depth 32 succeeds, depth 33 fails prost decode.
+/// Determined empirically and verified by `per_path_boundaries`: depth 32 roundtrips
+/// successfully via prost, depth 33 fails decode.
 pub const MAX_METADATA_NESTING_DEPTH: usize = 32;
 
 /// Check the nesting depth of a `Value`, returning `Err(actual_depth)` if it exceeds `max_depth`.

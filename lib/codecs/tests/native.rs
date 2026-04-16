@@ -382,3 +382,55 @@ fn native_codec_roundtrip_max_depth_event() {
     let decoded_log = decoded_events.into_iter().next().unwrap().into_log();
     assert_eq!(original_data.as_ref(), decoded_log.value().get("data"),);
 }
+
+fn create_nested_value(wrapping_levels: usize) -> Value {
+    let mut value = Value::from("innermost");
+    for _ in 0..wrapping_levels {
+        let mut map = ObjectMap::new();
+        map.insert("nested".into(), value);
+        value = Value::Object(map);
+    }
+    value
+}
+
+#[test]
+fn native_codec_rejects_overly_nested_metadata() {
+    // Metadata at depth 33 > MAX_METADATA_NESTING_DEPTH (32)
+    let mut event = LogEvent::from("flat data");
+    *event.metadata_mut().value_mut() = create_nested_value(33);
+    let event = Event::Log(event);
+
+    let mut serializer = NativeSerializerConfig.build();
+    let mut buffer = BytesMut::with_capacity(8192);
+
+    let result = serializer.encode(event, &mut buffer);
+    assert!(
+        result.is_err(),
+        "native codec should reject events with metadata exceeding MAX_METADATA_NESTING_DEPTH"
+    );
+}
+
+#[test]
+fn native_codec_roundtrip_max_metadata_depth_event() {
+    // Metadata at depth 32 = MAX_METADATA_NESTING_DEPTH
+    let mut event = LogEvent::from("flat data");
+    let metadata_value = create_nested_value(32);
+    *event.metadata_mut().value_mut() = metadata_value.clone();
+    let event = Event::Log(event);
+
+    let mut serializer = NativeSerializerConfig.build();
+    let mut buffer = BytesMut::with_capacity(8192);
+
+    serializer
+        .encode(event, &mut buffer)
+        .expect("native codec should accept events at MAX_METADATA_NESTING_DEPTH");
+
+    let deserializer = NativeDeserializerConfig.build();
+    let decoded_events = deserializer
+        .parse(buffer.freeze(), LogNamespace::Legacy)
+        .expect("native codec should decode events at MAX_METADATA_NESTING_DEPTH");
+
+    assert_eq!(decoded_events.len(), 1);
+    let decoded_log = decoded_events.into_iter().next().unwrap().into_log();
+    assert_eq!(decoded_log.metadata().value(), &metadata_value);
+}
