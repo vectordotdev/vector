@@ -81,6 +81,7 @@ pub mod aws;
 pub mod common;
 pub mod completion;
 mod convert_config;
+pub(crate) mod cpu_time;
 pub mod encoding_transcode;
 pub mod enrichment_tables;
 pub mod extra_context;
@@ -126,7 +127,6 @@ pub mod trace;
 pub mod transforms;
 pub mod types;
 pub mod unit_test;
-pub(crate) mod cpu_time;
 pub(crate) mod utilization;
 pub mod validate;
 #[cfg(windows)]

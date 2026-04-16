@@ -87,10 +87,22 @@ impl Inner {
         use windows_sys::Win32::Foundation::FILETIME;
         use windows_sys::Win32::System::Threading::{GetCurrentThread, GetThreadTimes};
 
-        let mut creation = FILETIME { dwLowDateTime: 0, dwHighDateTime: 0 };
-        let mut exit    = FILETIME { dwLowDateTime: 0, dwHighDateTime: 0 };
-        let mut kernel  = FILETIME { dwLowDateTime: 0, dwHighDateTime: 0 };
-        let mut user    = FILETIME { dwLowDateTime: 0, dwHighDateTime: 0 };
+        let mut creation = FILETIME {
+            dwLowDateTime: 0,
+            dwHighDateTime: 0,
+        };
+        let mut exit = FILETIME {
+            dwLowDateTime: 0,
+            dwHighDateTime: 0,
+        };
+        let mut kernel = FILETIME {
+            dwLowDateTime: 0,
+            dwHighDateTime: 0,
+        };
+        let mut user = FILETIME {
+            dwLowDateTime: 0,
+            dwHighDateTime: 0,
+        };
 
         // SAFETY:
         // - `GetCurrentThread()` returns a pseudo-handle that is always valid
@@ -112,7 +124,7 @@ impl Inner {
         // Combine the low/high halves of each FILETIME into a u64, then sum
         // kernel + user. FILETIME units are 100-nanosecond intervals.
         let kernel_ns = filetime_to_nanos(kernel);
-        let user_ns   = filetime_to_nanos(user);
+        let user_ns = filetime_to_nanos(user);
         Inner(Duration::from_nanos(kernel_ns + user_ns))
     }
 
@@ -167,6 +179,9 @@ mod tests {
         let first = t0.elapsed();
         let _: u64 = (0u64..10_000).sum();
         let second = t0.elapsed();
-        assert!(second >= first, "clock went backwards: {second:?} < {first:?}");
+        assert!(
+            second >= first,
+            "clock went backwards: {second:?} < {first:?}"
+        );
     }
 }
