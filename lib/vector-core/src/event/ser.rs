@@ -10,7 +10,7 @@ use super::{Event, EventArray, proto};
 /// Maximum nesting depth for event data values (Log.fields, Trace.fields).
 ///
 /// Prost enforces a decode recursion limit of 100 (no limit on encode). Each Value nesting
-/// level consumes 3 prost recursion entries (Value + ValueMap + map_entry). The event data
+/// level consumes 3 prost recursion entries (`Value` + `ValueMap` + `map_entry`). The event data
 /// path (`EventArray → *Array → Event → fields map_entry → Value`) has 3 proto wrapper
 /// messages before the Value tree, leaving room for 33 depth levels: 3 + (33 × 3) + 1 = 100.
 ///
