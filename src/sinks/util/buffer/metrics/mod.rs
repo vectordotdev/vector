@@ -760,8 +760,9 @@ mod tests {
             metric.metadata_mut().take_finalizers();
         }
 
-        // Before the fix, this fails with Err(Empty) — the MetricSet cache
-        // holds Arc<EventFinalizer> clones, preventing the batch from completing.
+        // The normalization cache must not retain Arc<EventFinalizer> references.
+        // If it did, the batch notification would never fire and the disk buffer
+        // could not acknowledge the events, eventually causing a deadlock.
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
     }
 }
