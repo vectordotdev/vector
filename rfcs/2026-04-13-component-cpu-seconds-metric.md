@@ -6,8 +6,9 @@ and function transforms can run concurrently across multiple tokio worker
 threads, and because wall-clock "not idle" includes time the OS has preempted
 the thread, this gauge does not accurately reflect how much CPU a component
 actually consumes. This RFC proposes a new **counter** metric,
-`component_cpu_usage_seconds_total`, that tracks the cumulative CPU time consumed
-by a component's transform work, measured via OS thread-level CPU clocks.
+`component_cpu_usage_ns_total`, that tracks the cumulative CPU time consumed
+by a component's transform work in nanoseconds, measured via OS thread-level
+CPU clocks.
 
 ## Context
 
@@ -29,7 +30,7 @@ by a component's transform work, measured via OS thread-level CPU clocks.
 
 ### In scope
 
-- A new `component_cpu_usage_seconds_total` counter for **sync and function
+- A new `component_cpu_usage_ns_total` counter for **sync and function
   transforms** (both inline and concurrent execution paths).
 - Two implementation tiers: a wall-clock fallback that works everywhere, and a
   precise thread-CPU-time implementation using OS APIs.
@@ -63,9 +64,9 @@ by a component's transform work, measured via OS thread-level CPU clocks.
    "2 cores" from "0.3 cores at 100% occupancy."
 
 2. **No way to detect CPU-bound transforms.** Operators tuning pipelines need to
-   know which transforms are CPU-bottlenecked. A `cpu_seconds_total` counter,
-   when divided by wall-clock time, directly gives CPU core utilization and can
-   exceed 1.0 when a transform genuinely uses multiple cores.
+   know which transforms are CPU-bottlenecked. A `cpu_usage_ns_total` counter,
+   when divided by wall-clock time (in ns), directly gives CPU core utilization
+   and can exceed 1.0 when a transform genuinely uses multiple cores.
 
 ## Proposal
 
@@ -74,18 +75,18 @@ by a component's transform work, measured via OS thread-level CPU clocks.
 A new counter metric is emitted for every sync/function transform:
 
 ```prometheus
-component_cpu_usage_seconds_total{component_id="my_remap",component_kind="transform",component_type="remap"} 14.207
+component_cpu_usage_ns_total{component_id="my_remap",component_kind="transform",component_type="remap"} 14207
 ```
 
-Operators use it exactly like `process_cpu_seconds_total` from the Prometheus
-ecosystem:
+The value is cumulative CPU nanoseconds consumed by the component. Operators
+use it to compute CPU core utilization:
 
 ```promql
 # Per-component CPU core usage (can exceed 1.0 with concurrency)
-component_cpu_usage_seconds_total{component_id="my_remap"}.as_rate()
+rate(component_cpu_usage_ns_total{component_id="my_remap"}[1m]) / 1e9
 
-# Compare against utilization to spot backpressure vs CPU bottleneck
-rate(component_cpu_usage_seconds_total{component_id="my_remap"}[1m])
+# Compare against utilization to separate CPU cost from pipeline pressure
+rate(component_cpu_usage_ns_total{component_id="my_remap"}[1m]) / 1e9
   /
   utilization{component_id="my_remap"}
 ```
@@ -97,7 +98,7 @@ configuration knob.
 
 #### Metric definition
 
-Register a `counter!("component_cpu_usage_seconds_total")` in the `Runner` struct,
+Register a `counter!("component_cpu_usage_ns_total")` in the `Runner` struct,
 alongside the existing `timer_tx` and `events_received` fields:
 
 ```rust
@@ -109,9 +110,16 @@ struct Runner {
     timer_tx: UtilizationComponentSender,
     latency_recorder: LatencyRecorder,
     events_received: Registered<EventsReceived>,
-    cpu_seconds: Counter,  // NEW
+    cpu_ns: Counter,  // NEW
 }
 ```
+
+Using nanoseconds as the counter unit fits naturally in the `metrics` crate's
+`u64`-based `Counter`: each call to `counter.increment(delta.as_nanos() as u64)`
+is exact integer arithmetic with no floating-point accumulation. The `metrics`
+crate stores the counter as `AtomicU64` and casts to `f64` only once at scrape
+time, bounding the conversion error to a single rounding rather than an
+accumulated sum of many small imprecise additions.
 
 #### Supported OS: Thread CPU time (precise, Linux and macOS)
 
@@ -197,7 +205,7 @@ schedules another process onto the core during `transform_all`, that wall-clock
 time is counted as CPU time even though Vector was not executing.
 
 For small workloads (lightly loaded hosts, transforms that complete in
-microseconds to low milliseconds), the preemption error is negligible.
+microseconds to low nanoseconds), the preemption error is negligible.
 
 #### Why thread CPU time works for sync transforms
 
@@ -224,13 +232,14 @@ interleave with unrelated futures on the same worker thread.
 #### Concurrent execution and multi-core accounting
 
 In the concurrent path (`run_concurrently`), each `tokio::spawn` task measures
-its own CPU time independently. If 4 tasks each consume 0.25s of CPU in
-parallel, the counter increments by 1.0s total — correctly reflecting that the
-transform used 1.0 CPU-second even though only 0.25s of wall time elapsed.
+its own CPU time independently and increments the shared counter handle (which
+is `Clone` and backed by `AtomicU64::fetch_add`). If 4 tasks each consume 250ms
+of CPU in parallel, the counter increments by 1000ns total — correctly
+reflecting that the transform used 1 CPU-second even though only 250ms of wall
+time elapsed.
 
-This matches the semantics of `process_cpu_seconds_total` and Linux's
-`/proc/[pid]/stat` CPU accounting: the counter can increase faster than
-wall-clock time when work is parallelized.
+The counter can therefore increase faster than wall-clock time (in ns), matching
+the semantics of `process_cpu_seconds_total` for multi-core workloads.
 
 #### Integration into the Runner
 
@@ -247,11 +256,9 @@ impl Runner {
         while let Some(events) = input_rx.next().await {
             self.on_events_received(&events);
 
-            let cpu_before = thread_cpu_time();          // NEW
+            let t0 = ThreadTime::now();
             self.transform.transform_all(events, &mut outputs_buf);
-            let cpu_after = thread_cpu_time();            // NEW
-            let cpu_delta = cpu_after.saturating_sub(cpu_before);
-            self.cpu_seconds.increment(cpu_delta.as_secs_f64());
+            self.cpu_ns.increment(t0.elapsed().as_nanos() as u64); // NEW
 
             self.send_outputs(&mut outputs_buf).await
                 .map_err(TaskError::wrapped)?;
@@ -267,15 +274,13 @@ impl Runner {
                     // ... (existing event counting) ...
                     let mut t = self.transform.clone();
                     let mut outputs_buf = self.outputs.new_buf_with_capacity(len);
-                    let cpu_counter = self.cpu_seconds.clone(); // NEW
+                    let cpu_ns = self.cpu_ns.clone(); // NEW
                     let task = tokio::spawn(async move {
-                        let cpu_before = thread_cpu_time();     // NEW
+                        let t0 = ThreadTime::now();
                         for events in input_arrays {
                             t.transform_all(events, &mut outputs_buf);
                         }
-                        let cpu_after = thread_cpu_time();       // NEW
-                        let cpu_delta = cpu_after.saturating_sub(cpu_before);
-                        cpu_counter.increment(cpu_delta.as_secs_f64());
+                        cpu_ns.increment(t0.elapsed().as_nanos() as u64); // NEW
                         outputs_buf
                     }.in_current_span());
                     in_flight.push_back(task);
@@ -307,12 +312,13 @@ independently.
 
 - **Direct CPU cost visibility.** Operators can identify which transforms are
   CPU-bottlenecked vs. backpressure-limited, enabling informed tuning.
-- **Composable with existing metrics.** `rate(cpu_seconds[1m])` gives CPU
-  cores used; dividing by `utilization` separates CPU from pipeline effects.
+- **Composable with existing metrics.** `rate(component_cpu_usage_ns_total[1m]) / 1e9`
+  gives CPU cores used; dividing by `utilization` separates CPU from pipeline effects.
 - **Low overhead.** Two `clock_gettime` calls per batch (~80ns total on Linux)
   is negligible relative to the work `transform_all` performs.
-- **Familiar semantics.** Follows the `cpu_seconds_total` convention from
-  Prometheus, Linux `/proc`, and cAdvisor — operators already know how to use it.
+- **No accumulation errors.** The counter stores `u64` nanoseconds; each
+  increment is exact integer arithmetic. The single `u64 → f64` cast at scrape
+  time has bounded, non-accumulated error.
 
 ## Drawbacks
 
@@ -337,7 +343,7 @@ Emit a histogram of per-event processing time instead of a cumulative counter.
 **Rejected because:** Histograms are expensive at high throughput (Vector
 processes millions of events/sec). A counter that increments once per batch is
 far cheaper. Per-event latency can be derived from the counter and
-`events_sent_total` if needed (`cpu_seconds / events = avg cpu per event`).
+`events_sent_total` if needed (`cpu_ns / events = avg cpu ns per event`).
 
 ### `getrusage(RUSAGE_THREAD)` instead of `clock_gettime`
 
@@ -350,12 +356,7 @@ on modern kernels. The higher precision is worth the identical cost.
 
 ## Outstanding Questions
 
-1. **Metric name:** Should it be `component_cpu_usage_seconds_total` (following
-   Prometheus conventions and the `component_` prefix used by existing Vector
-   metrics) or `transform_cpu_seconds_total` (since only transforms emit it
-   initially)? The `component_` prefix is preferred for consistency and to allow
-   future extension to sources and sinks.
-2. **User/system split:** Should we report user and system CPU time separately
+1. **User/system split:** Should we report user and system CPU time separately
    (as `mode="user"` / `mode="system"` tags) like `host_cpu_seconds_total`
    does? The Linux API supports this. It adds cardinality but helps distinguish
    transforms that trigger syscalls (e.g., enrichment table lookups) from pure
@@ -366,20 +367,20 @@ on modern kernels. The higher precision is worth the identical cost.
 - Add `src/cpu_time.rs` module with `thread_cpu_time()` and platform-specific
   implementations behind `#[cfg]` gates. Include unit tests that verify the
   returned duration is non-zero and monotonically increasing.
-- Register `counter!("component_cpu_usage_seconds_total")` in `Runner::new` and
+- Register `counter!("component_cpu_usage_ns_total")` in `Runner::new` and
   instrument `run_inline` with wall-clock timing (Tier 1).
 - Instrument `run_concurrently` with wall-clock timing (Tier 1). Verify the
   counter increments correctly when multiple tasks run in parallel.
 - Switch from `Instant::now()` to `thread_cpu_time()` (Tier 2). Benchmark
   the overhead on Linux to confirm it is <100ns per call.
 - Add integration test: run a CPU-intensive remap transform, verify
-  `component_cpu_usage_seconds_total` is within 10% of expected CPU time.
+  `component_cpu_usage_ns_total` is within 10% of expected CPU time.
 - Add documentation for the new metric in the generated component docs.
 - Add changelog fragment.
 
 ## Future Improvements
 
-- Extend `component_cpu_usage_seconds_total` to **task transforms** by measuring CPU
+- Extend `component_cpu_usage_ns_total` to **task transforms** by measuring CPU
   time per `poll` of the transform stream. This requires careful accounting to
   exclude time spent in the tokio runtime between polls.
 - Extend to **sources and sinks** where the component owns a synchronous
