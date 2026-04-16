@@ -4,6 +4,7 @@ use std::{
     io::{self, Write},
     mem,
     pin::Pin,
+    sync::LazyLock,
     task::{Context, Poll},
 };
 
@@ -30,10 +31,55 @@ use crate::internal_events::{GrpcError, GrpcInvalidCompressionSchemeError};
 const GRPC_MESSAGE_HEADER_LEN: usize = mem::size_of::<u8>() + mem::size_of::<u32>();
 const GRPC_ENCODING_HEADER: &str = "grpc-encoding";
 const GRPC_ACCEPT_ENCODING_HEADER: &str = "grpc-accept-encoding";
-// Advertised to clients via `grpc-accept-encoding`. This layer is the single
-// owner of gRPC compression negotiation for all Vector gRPC sources, so the
-// list must stay in sync with the schemes handled in `CompressionScheme`.
-const GRPC_ACCEPT_ENCODING_VALUE: &str = "gzip,zstd,identity";
+
+// The encodings this layer advertises to clients via `grpc-accept-encoding`.
+// Each variant maps to a `CompressionScheme` (or `None` for `identity`) through
+// `to_scheme`, so adding a variant here forces the decompression match to be
+// updated and the advertised list cannot drift from the schemes actually handled.
+#[derive(Clone, Copy)]
+enum AdvertisedEncoding {
+    Gzip,
+    Zstd,
+    Identity,
+}
+
+impl AdvertisedEncoding {
+    const ALL: &'static [Self] = &[Self::Gzip, Self::Zstd, Self::Identity];
+
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Gzip => "gzip",
+            Self::Zstd => "zstd",
+            Self::Identity => "identity",
+        }
+    }
+
+    fn parse(s: &str) -> Option<Self> {
+        Self::ALL.iter().copied().find(|e| e.as_str() == s)
+    }
+
+    // `identity` is the gRPC no-op encoding: the request body is already
+    // uncompressed, so there's nothing to decompress.
+    fn to_scheme(self) -> Option<CompressionScheme> {
+        match self {
+            Self::Gzip => Some(CompressionScheme::Gzip),
+            Self::Zstd => Some(CompressionScheme::Zstd),
+            Self::Identity => None,
+        }
+    }
+}
+
+// Advertised to clients via `grpc-accept-encoding`. Derived from
+// `AdvertisedEncoding::ALL` so this layer is the single owner of gRPC compression
+// negotiation for all Vector gRPC sources and the header value cannot drift from
+// the set of schemes actually handled.
+static GRPC_ACCEPT_ENCODING_VALUE: LazyLock<String> = LazyLock::new(|| {
+    AdvertisedEncoding::ALL
+        .iter()
+        .map(|e| e.as_str())
+        .collect::<Vec<_>>()
+        .join(",")
+});
 
 enum CompressionScheme {
     Gzip,
@@ -54,22 +100,18 @@ impl CompressionScheme {
             .transpose()
             .and_then(|value| match value {
                 None => Ok(None),
-                Some(scheme) => match scheme.as_str() {
-                    "gzip" => Ok(Some(CompressionScheme::Gzip)),
-                    "zstd" => Ok(Some(CompressionScheme::Zstd)),
-                    // `identity` is the gRPC no-op encoding: the request body is already
-                    // uncompressed, so there's nothing to decompress. We advertise it in
-                    // `grpc-accept-encoding`, so we must also accept it here.
-                    "identity" => Ok(None),
-                    other => Err(Status::unimplemented(format!(
-                        "compression scheme `{other}` is not supported"
+                Some(scheme) => match AdvertisedEncoding::parse(&scheme) {
+                    Some(encoding) => Ok(encoding.to_scheme()),
+                    None => Err(Status::unimplemented(format!(
+                        "compression scheme `{scheme}` is not supported"
                     ))),
                 },
             })
             .map_err(|mut status| {
                 status.metadata_mut().insert(
                     GRPC_ACCEPT_ENCODING_HEADER,
-                    AsciiMetadataValue::from_static(GRPC_ACCEPT_ENCODING_VALUE),
+                    AsciiMetadataValue::try_from(GRPC_ACCEPT_ENCODING_VALUE.as_str())
+                        .expect("advertised encoding value must be valid ASCII"),
                 );
                 status
             })
@@ -362,7 +404,8 @@ where
     if let Ok(res) = result.as_mut() {
         res.headers_mut().insert(
             GRPC_ACCEPT_ENCODING_HEADER,
-            HeaderValue::from_static(GRPC_ACCEPT_ENCODING_VALUE),
+            HeaderValue::from_str(&GRPC_ACCEPT_ENCODING_VALUE)
+                .expect("advertised encoding value must be valid ASCII"),
         );
     }
 
