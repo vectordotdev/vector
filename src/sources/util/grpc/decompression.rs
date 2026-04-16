@@ -226,6 +226,16 @@ async fn drive_body_decompression(
                     // decompressor incrementally because there's no good reason to make both the internal buffer and
                     // the decompressor buffer expand if we don't have to.
                     if is_compressed {
+                        // Per the gRPC compression spec, the compressed flag requires a
+                        // negotiated encoding. Reject frames that set it under identity
+                        // (or with no `grpc-encoding` header) rather than silently
+                        // falling back to gzip and masking client/server mismatches.
+                        if scheme.is_none() {
+                            return Err(Status::internal(
+                                "received compressed frame but no compression scheme was negotiated",
+                            ));
+                        }
+
                         // We skip the header in the buffer because it doesn't matter to the decompressor and we
                         // recreate it anyways.
                         buf.advance(GRPC_MESSAGE_HEADER_LEN);
@@ -266,14 +276,12 @@ async fn drive_body_decompression(
                             // asynchronously since we already have the data, and that's the only asynchronous part.
                             let to_take = cmp::min(available, *remaining);
                             if decompressor.is_none() {
-                                decompressor = Some(
-                                    Decompressor::new(
-                                        scheme.as_ref().unwrap_or(&CompressionScheme::Gzip),
-                                    )
-                                    .map_err(|_| {
-                                        Status::internal("failed to initialize decompressor")
-                                    })?,
+                                let scheme = scheme.as_ref().expect(
+                                    "compressed frames without a negotiated scheme are rejected earlier",
                                 );
+                                decompressor = Some(Decompressor::new(scheme).map_err(|_| {
+                                    Status::internal("failed to initialize decompressor")
+                                })?);
                             }
                             let d = decompressor.as_mut().expect("decompressor must be set");
                             if d.write_all(&buf[..to_take]).is_err() {
