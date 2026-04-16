@@ -177,22 +177,19 @@ mod tests {
 
     #[test]
     fn preserves_site_prefix_in_api_endpoint() {
-        assert_eq!(
-            compute_api_endpoint("https://http-intake.logs.us3.datadoghq.com"),
-            "https://api.us3.datadoghq.com"
-        );
-        assert_eq!(
-            compute_api_endpoint("https://http-intake.logs.us5.datadoghq.com"),
-            "https://api.us5.datadoghq.com"
-        );
-        assert_eq!(
-            compute_api_endpoint("https://http-intake.logs.ap1.datadoghq.com"),
-            "https://api.ap1.datadoghq.com"
-        );
-        assert_eq!(
-            compute_api_endpoint("https://http-intake.logs.eu1.datadoghq.eu"),
-            "https://api.eu1.datadoghq.eu"
-        );
+        for (prefix, tld) in [
+            ("us3", "com"),
+            ("us5", "com"),
+            ("ap1", "com"),
+            ("eu1", "eu"),
+        ] {
+            assert_eq!(
+                compute_api_endpoint(&format!(
+                    "https://http-intake.logs.{prefix}.datadoghq.{tld}"
+                )),
+                format!("https://api.{prefix}.datadoghq.{tld}")
+            );
+        }
         assert_eq!(
             compute_api_endpoint("https://1-2-3-observability-pipelines.agent.us3.datadoghq.com"),
             "https://api.us3.datadoghq.com"
