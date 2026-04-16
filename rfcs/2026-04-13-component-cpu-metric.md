@@ -121,6 +121,10 @@ crate stores the counter as `AtomicU64` and casts to `f64` only once at scrape
 time, bounding the conversion error to a single rounding rather than an
 accumulated sum of many small imprecise additions.
 
+This choice was necessary because the `tracing` API only supports integer
+increments of counters, unlike `host_cpu_seconds_total` which is directly
+submitted as a floating number.
+
 #### Supported OS: Thread CPU time (precise, Linux and macOS)
 
 For precise measurement, we read the calling thread's CPU clock before and after
@@ -237,9 +241,6 @@ is `Clone` and backed by `AtomicU64::fetch_add`). If 4 tasks each consume 250ms
 of CPU in parallel, the counter increments by 1000ns total — correctly
 reflecting that the transform used 1 CPU-second even though only 250ms of wall
 time elapsed.
-
-The counter can therefore increase faster than wall-clock time (in ns), matching
-the semantics of `process_cpu_seconds_total` for multi-core workloads.
 
 #### Integration into the Runner
 
