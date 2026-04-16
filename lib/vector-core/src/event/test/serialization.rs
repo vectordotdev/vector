@@ -300,7 +300,7 @@ fn log_fields_has_headroom_beyond_max_depth() {
     // Event value at depth MAX+1, but metadata left flat (default).
     // This isolates the Log.fields path from the metadata_full path.
     let mut event = LogEvent::default();
-    event.insert("data", create_nested_value(max));  // leaf at depth max+1
+    event.insert("data", create_nested_value(max)); // leaf at depth max+1
 
     let array = EventArray::Logs(LogArray::from(vec![event]));
     let proto_array = proto::EventArray::from(array);
