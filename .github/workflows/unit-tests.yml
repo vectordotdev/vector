@@ -94,7 +94,7 @@ jobs:
           fi
 
           add_suite "${{ inputs.component-validation }}" "component-validation-tests" "test(components::validation::tests)"
-          add_suite "${{ inputs.cli }}" "cli-tests" "binary(=integration)"
+          add_suite "${{ inputs.cli }}" "cli-tests" "package(vector) & binary(=integration)"
           add_suite "${{ inputs.vector-api }}" "vector-api-tests" "binary(=vector_api)"
 
           if [[ -n "${SCOPE}" ]]; then
