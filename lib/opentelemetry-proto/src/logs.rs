@@ -53,7 +53,7 @@ struct ResourceLog {
     log_record: LogRecord,
 }
 
-// https://github.com/open-telemetry/opentelemetry-specification/blob/v1.40.0/specification/logs/data-model.md
+// https://github.com/open-telemetry/opentelemetry-specification/blob/v1.44.0/specification/logs/data-model.md
 impl ResourceLog {
     fn into_event(self, log_namespace: LogNamespace, now: DateTime<Utc>) -> Event {
         let mut log = match log_namespace {
