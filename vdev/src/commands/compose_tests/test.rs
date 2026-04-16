@@ -43,9 +43,10 @@ pub fn exec(
         }
     }
 
-    // Merge per-environment coverage files into a single lcov.info when
-    // multiple environments were tested.
-    if coverage && ran_environments.len() > 1 {
+    // Consolidate per-environment coverage files into the canonical lcov.info
+    // so callers get a single, predictable output path regardless of how many
+    // environments ran.
+    if coverage && !ran_environments.is_empty() {
         let coverage_dir = std::path::Path::new(LOCAL_COVERAGE_OUTPUT_DIR);
         let merged_path = coverage_dir.join(coverage_filename(None));
         let mut merged = String::new();
@@ -54,7 +55,6 @@ pub fn exec(
             match std::fs::read_to_string(&env_file) {
                 Ok(contents) => {
                     merged.push_str(&contents);
-                    // Clean up per-environment file after merging.
                     let _ = std::fs::remove_file(&env_file);
                 }
                 Err(e) => {
@@ -64,7 +64,11 @@ pub fn exec(
         }
         if !merged.is_empty() {
             std::fs::write(&merged_path, merged)?;
-            info!("Merged coverage from {} environments into {}", ran_environments.len(), merged_path.display());
+            info!(
+                "Wrote coverage for {} environment(s) to {}",
+                ran_environments.len(),
+                merged_path.display()
+            );
         }
     }
 

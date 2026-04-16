@@ -5,7 +5,7 @@
 # via boolean inputs.
 #
 # With coverage: false (default), plain cargo-nextest; uploads test results to Datadog.
-# With coverage: true, cargo-llvm-cov (COVERAGE=1); uploads an lcov artifact named "coverage-unit".
+# With coverage: true, cargo-llvm-cov (COVERAGE=true); uploads an lcov artifact named "coverage-unit".
 #
 # When `default` is true (the default), all nextest-based suites run in a
 # single `make test` invocation with the relevant features enabled. When
@@ -22,7 +22,7 @@ on:
         required: false
         type: string
       coverage:
-        description: "Collect code coverage (sets COVERAGE=1 for make targets)"
+        description: "Collect code coverage (sets COVERAGE=true for make targets)"
         required: false
         type: boolean
         default: false
