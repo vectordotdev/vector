@@ -198,6 +198,7 @@ gostring
 goversion
 gpg
 gql
+grpcs
 grafana
 graphiql
 greptime
@@ -548,6 +549,7 @@ yandex
 Yarvik
 Yifang
 yjagdale
+ydb
 zadd
 zeek
 zookeeper
