@@ -328,12 +328,27 @@ fn per_path_boundaries() {
     };
 
     // Log.fields (loosest): succeeds at 33, fails at 34
-    assert!(roundtrip_value(max + 1), "Log.fields should succeed at depth {}", max + 1);
-    assert!(!roundtrip_value(max + 2), "Log.fields should fail at depth {}", max + 2);
+    assert!(
+        roundtrip_value(max + 1),
+        "Log.fields should succeed at depth {}",
+        max + 1
+    );
+    assert!(
+        !roundtrip_value(max + 2),
+        "Log.fields should fail at depth {}",
+        max + 2
+    );
 
     // metadata_full (tightest): succeeds at 32, fails at 33
-    assert!(roundtrip_metadata(max), "metadata_full should succeed at depth {max}");
-    assert!(!roundtrip_metadata(max + 1), "metadata_full should fail at depth {}", max + 1);
+    assert!(
+        roundtrip_metadata(max),
+        "metadata_full should succeed at depth {max}"
+    );
+    assert!(
+        !roundtrip_metadata(max + 1),
+        "metadata_full should fail at depth {}",
+        max + 1
+    );
 }
 
 /// Verify flat events pass without issues.
