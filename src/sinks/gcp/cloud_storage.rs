@@ -639,7 +639,10 @@ mod tests {
         assert_eq!(key, "key: value");
     }
 
-    fn request_settings(sink_config: &GcsSinkConfig, context: SinkContext) -> RequestSettings {
+    fn try_request_settings(
+        sink_config: &GcsSinkConfig,
+        context: SinkContext,
+    ) -> crate::Result<RequestSettings> {
         let (framer, serializer) = sink_config
             .encoding
             .build(SinkType::MessageBased)
@@ -661,7 +664,10 @@ mod tests {
             extension,
             content_type_str,
         )
-        .expect("Could not create request settings")
+    }
+
+    fn request_settings(sink_config: &GcsSinkConfig, context: SinkContext) -> RequestSettings {
+        try_request_settings(sink_config, context).expect("Could not create request settings")
     }
 
     fn build_request(extension: Option<&str>, uuid: bool, compression: Compression) -> GcsRequest {
@@ -752,10 +758,10 @@ mod tests {
         let sink_config = GcsSinkConfig {
             // Invalid header value with newline character
             content_type: Some("text/plain\nInvalid".to_string()),
-            ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
+            ..default_config(EncodingConfigWithFraming::from((None::<FramingConfig>, TextSerializerConfig::default())))
         };
 
-        let result = RequestSettings::new(&sink_config, context);
+        let result = try_request_settings(&sink_config, context);
         // Should return an error, not panic
         assert!(result.is_err());
     }
@@ -817,7 +823,7 @@ mod tests {
             ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
         };
 
-        let result = RequestSettings::new(&sink_config, context);
+        let result = try_request_settings(&sink_config, context);
         // Should return an error, not panic
         assert!(result.is_err());
     }
@@ -877,7 +883,7 @@ mod tests {
             ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
         };
 
-        let result = RequestSettings::new(&sink_config, context);
+        let result = try_request_settings(&sink_config, context);
         // Should return an error, not panic
         assert!(result.is_err());
     }
