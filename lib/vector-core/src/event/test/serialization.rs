@@ -162,19 +162,30 @@ fn create_saturated_metric(metadata_depth: usize) -> Metric {
 }
 
 /// Build all three `EventArray` variants with each field at its respective max depth.
-fn saturated_event_arrays(value_depth: usize, metadata_depth: usize) -> Vec<(&'static str, EventArray)> {
+fn saturated_event_arrays(
+    value_depth: usize,
+    metadata_depth: usize,
+) -> Vec<(&'static str, EventArray)> {
     vec![
         (
             "Log",
-            EventArray::Logs(LogArray::from(vec![create_saturated_log(value_depth, metadata_depth)])),
+            EventArray::Logs(LogArray::from(vec![create_saturated_log(
+                value_depth,
+                metadata_depth,
+            )])),
         ),
         (
             "Trace",
-            EventArray::Traces(TraceArray::from(vec![create_saturated_trace(value_depth, metadata_depth)])),
+            EventArray::Traces(TraceArray::from(vec![create_saturated_trace(
+                value_depth,
+                metadata_depth,
+            )])),
         ),
         (
             "Metric",
-            EventArray::Metrics(MetricArray::from(vec![create_saturated_metric(metadata_depth)])),
+            EventArray::Metrics(MetricArray::from(vec![create_saturated_metric(
+                metadata_depth,
+            )])),
         ),
     ]
 }
@@ -182,9 +193,18 @@ fn saturated_event_arrays(value_depth: usize, metadata_depth: usize) -> Vec<(&'s
 /// Build all three Event variants for `EventWrapper` encoding.
 fn saturated_events(value_depth: usize, metadata_depth: usize) -> Vec<(&'static str, Event)> {
     vec![
-        ("Log", Event::Log(create_saturated_log(value_depth, metadata_depth))),
-        ("Trace", Event::Trace(create_saturated_trace(value_depth, metadata_depth))),
-        ("Metric", Event::Metric(create_saturated_metric(metadata_depth))),
+        (
+            "Log",
+            Event::Log(create_saturated_log(value_depth, metadata_depth)),
+        ),
+        (
+            "Trace",
+            Event::Trace(create_saturated_trace(value_depth, metadata_depth)),
+        ),
+        (
+            "Metric",
+            Event::Metric(create_saturated_metric(metadata_depth)),
+        ),
     ]
 }
 
@@ -228,7 +248,11 @@ fn max_nesting_depths_are_correct() {
             proto_array.encode(&mut buf).unwrap();
             proto::EventArray::decode(buf.freeze()).is_err()
         });
-    assert!(any_fails, "No path failed at value depth {}. MAX_NESTING_DEPTH could be raised.", max_val + 1);
+    assert!(
+        any_fails,
+        "No path failed at value depth {}. MAX_NESTING_DEPTH could be raised.",
+        max_val + 1
+    );
 
     // Exceed metadata depth
     let any_fails = saturated_event_arrays(max_val, max_meta + 1)
@@ -239,7 +263,11 @@ fn max_nesting_depths_are_correct() {
             proto_array.encode(&mut buf).unwrap();
             proto::EventArray::decode(buf.freeze()).is_err()
         });
-    assert!(any_fails, "No path failed at metadata depth {}. MAX_METADATA_NESTING_DEPTH could be raised.", max_meta + 1);
+    assert!(
+        any_fails,
+        "No path failed at metadata depth {}. MAX_METADATA_NESTING_DEPTH could be raised.",
+        max_meta + 1
+    );
 }
 
 /// Verify the nesting gate accepts all event types at the max depths.
@@ -323,12 +351,26 @@ fn per_path_boundaries() {
     };
 
     // Log.fields: MAX_NESTING_DEPTH succeeds, MAX_NESTING_DEPTH+1 fails
-    assert!(roundtrip_value(max_val), "Log.fields should succeed at depth {max_val}");
-    assert!(!roundtrip_value(max_val + 1), "Log.fields should fail at depth {}", max_val + 1);
+    assert!(
+        roundtrip_value(max_val),
+        "Log.fields should succeed at depth {max_val}"
+    );
+    assert!(
+        !roundtrip_value(max_val + 1),
+        "Log.fields should fail at depth {}",
+        max_val + 1
+    );
 
     // metadata_full: MAX_METADATA_NESTING_DEPTH succeeds, MAX_METADATA_NESTING_DEPTH+1 fails
-    assert!(roundtrip_metadata(max_meta), "metadata_full should succeed at depth {max_meta}");
-    assert!(!roundtrip_metadata(max_meta + 1), "metadata_full should fail at depth {}", max_meta + 1);
+    assert!(
+        roundtrip_metadata(max_meta),
+        "metadata_full should succeed at depth {max_meta}"
+    );
+    assert!(
+        !roundtrip_metadata(max_meta + 1),
+        "metadata_full should fail at depth {}",
+        max_meta + 1
+    );
 }
 
 /// Verify flat events pass without issues.

@@ -71,9 +71,7 @@ pub(crate) fn check_value_depth(
 pub fn event_exceeds_max_nesting_depth(event: &Event) -> Option<usize> {
     match event {
         Event::Log(log) => check_value_depth(log.value(), 0, MAX_NESTING_DEPTH)
-            .and_then(|()| {
-                check_value_depth(log.metadata().value(), 0, MAX_METADATA_NESTING_DEPTH)
-            })
+            .and_then(|()| check_value_depth(log.metadata().value(), 0, MAX_METADATA_NESTING_DEPTH))
             .err(),
         Event::Trace(trace) => check_value_depth(trace.value(), 0, MAX_NESTING_DEPTH)
             .and_then(|()| {
@@ -93,10 +91,8 @@ pub fn event_exceeds_max_nesting_depth(event: &Event) -> Option<usize> {
 /// metric values have a fixed structure.
 fn check_event_array_nesting_depth(events: &EventArray) -> Result<(), EncodeError> {
     let check = |value: &Value, max_depth: usize| {
-        check_value_depth(value, 0, max_depth).map_err(|depth| EncodeError::NestingTooDeep {
-            depth,
-            max_depth,
-        })
+        check_value_depth(value, 0, max_depth)
+            .map_err(|depth| EncodeError::NestingTooDeep { depth, max_depth })
     };
     match events {
         EventArray::Logs(logs) => {
