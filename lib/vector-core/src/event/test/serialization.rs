@@ -103,22 +103,21 @@ fn type_serialization() {
 // Nesting depth validation tests
 // ---------------------------------------------------------------------------
 //
-// MAX_NESTING_DEPTH (32) is the highest Value depth that roundtrips through prost
-// encode/decode across ALL proto encoding paths. The limit is constrained by prost's
-// fixed recursion budget of 100 (RECURSION_LIMIT in prost/src/lib.rs).
+// Prost enforces a decode recursion limit of 100 (no limit on encode). Each Value
+// nesting level consumes 3 prost recursion entries (Value + ValueMap + map_entry),
+// and each encoding path has a different number of proto wrapper messages before
+// the Value tree starts:
 //
-// Each Value nesting level consumes 3 prost recursion entries (Value + ValueMap +
-// map_entry for Objects), and each encoding path has a different number of proto
-// wrapper messages before the Value tree starts. The tightest path is metadata_full
-// (EventArray → *Array → Event → Metadata → Value) which uses exactly 100/100
-// budget at depth 32.
+//   - Event data path (Log.fields, Trace.fields): 3 wrappers → max depth 33
+//   - Metadata path (metadata_full): 4 wrappers → max depth 32
 //
-// Rather than enumerating individual proto paths, the tests below create events with
-// ALL Value-carrying fields set to max depth simultaneously. The proto conversion code
-// populates every field (including deprecated ones like Log.metadata), so a single
-// roundtrip covers every path for a given event type. If a new Value-carrying field
-// is added to the proto schema, the conversion code must populate it, and these tests
-// automatically cover it with zero maintenance.
+// These limits are encoded as MAX_NESTING_DEPTH (33) and MAX_METADATA_NESTING_DEPTH (32).
+// The `per_path_boundaries` test verifies both boundaries empirically via prost roundtrip.
+//
+// The saturated-event tests create events with ALL Value-carrying fields at their
+// respective max depths simultaneously. The proto conversion code populates every field
+// (including deprecated ones like Log.metadata), so a single roundtrip per event type
+// covers every proto path automatically.
 
 /// Creates a Value with the specified number of nested Object wrapping levels.
 ///
@@ -134,105 +133,94 @@ fn create_nested_value(wrapping_levels: usize) -> Value {
     value
 }
 
-/// Create a [`LogEvent`] with both event data and metadata at the given nesting depth.
-fn create_saturated_log(depth: usize) -> LogEvent {
-    let nested = create_nested_value(depth);
+/// Create a [`LogEvent`] with event data at `value_depth` and metadata at `metadata_depth`.
+fn create_saturated_log(value_depth: usize, metadata_depth: usize) -> LogEvent {
     let mut event = LogEvent::default();
-    // Event data: "data" key + (depth-1) wrapping levels = leaf at `depth`.
-    // This covers Log.fields (or Log.value for non-Object roots).
-    event.insert("data", create_nested_value(depth - 1));
-    // Metadata: covers both Log.metadata (deprecated) and Log.metadata_full.value.
-    *event.metadata_mut().value_mut() = nested;
+    event.insert("data", create_nested_value(value_depth - 1));
+    *event.metadata_mut().value_mut() = create_nested_value(metadata_depth);
     event
 }
 
-/// Create a [`TraceEvent`] with both event data and metadata at the given nesting depth.
-fn create_saturated_trace(depth: usize) -> TraceEvent {
-    let nested = create_nested_value(depth);
+/// Create a [`TraceEvent`] with event data at `value_depth` and metadata at `metadata_depth`.
+fn create_saturated_trace(value_depth: usize, metadata_depth: usize) -> TraceEvent {
     let mut trace = TraceEvent::default();
-    trace.insert("data", create_nested_value(depth - 1));
-    *trace.metadata_mut().value_mut() = nested;
+    trace.insert("data", create_nested_value(value_depth - 1));
+    *trace.metadata_mut().value_mut() = create_nested_value(metadata_depth);
     trace
 }
 
-/// Create a Metric with metadata at the given nesting depth.
+/// Create a Metric with metadata at `metadata_depth`.
 /// (Metric values have fixed structure — only metadata carries arbitrary Values.)
-fn create_saturated_metric(depth: usize) -> Metric {
+fn create_saturated_metric(metadata_depth: usize) -> Metric {
     let mut metric = Metric::new(
         "test",
         MetricKind::Incremental,
         MetricValue::Counter { value: 1.0 },
     );
-    *metric.metadata_mut().value_mut() = create_nested_value(depth);
+    *metric.metadata_mut().value_mut() = create_nested_value(metadata_depth);
     metric
 }
 
-/// Build all three `EventArray` variants with every Value field at the given depth.
-fn saturated_event_arrays(depth: usize) -> Vec<(&'static str, EventArray)> {
+/// Build all three `EventArray` variants with each field at its respective max depth.
+fn saturated_event_arrays(value_depth: usize, metadata_depth: usize) -> Vec<(&'static str, EventArray)> {
     vec![
         (
             "Log",
-            EventArray::Logs(LogArray::from(vec![create_saturated_log(depth)])),
+            EventArray::Logs(LogArray::from(vec![create_saturated_log(value_depth, metadata_depth)])),
         ),
         (
             "Trace",
-            EventArray::Traces(TraceArray::from(vec![create_saturated_trace(depth)])),
+            EventArray::Traces(TraceArray::from(vec![create_saturated_trace(value_depth, metadata_depth)])),
         ),
         (
             "Metric",
-            EventArray::Metrics(MetricArray::from(vec![create_saturated_metric(depth)])),
+            EventArray::Metrics(MetricArray::from(vec![create_saturated_metric(metadata_depth)])),
         ),
     ]
 }
 
 /// Build all three Event variants for `EventWrapper` encoding.
-fn saturated_events(depth: usize) -> Vec<(&'static str, Event)> {
+fn saturated_events(value_depth: usize, metadata_depth: usize) -> Vec<(&'static str, Event)> {
     vec![
-        ("Log", Event::Log(create_saturated_log(depth))),
-        ("Trace", Event::Trace(create_saturated_trace(depth))),
-        ("Metric", Event::Metric(create_saturated_metric(depth))),
+        ("Log", Event::Log(create_saturated_log(value_depth, metadata_depth))),
+        ("Trace", Event::Trace(create_saturated_trace(value_depth, metadata_depth))),
+        ("Metric", Event::Metric(create_saturated_metric(metadata_depth))),
     ]
 }
 
-/// Verify `MAX_NESTING_DEPTH` is exactly right: all event types roundtrip at depth 32,
-/// and at least one fails prost decode at depth 33.
-///
-/// Each event has ALL Value-carrying fields saturated at the test depth, so every
-/// proto field (including deprecated ones) is exercised. No path enumeration needed —
-/// if a new Value field is added to the proto schema, the conversion code populates it
-/// and this test covers it automatically.
+/// Verify both depth constants are exactly right: all event types roundtrip at the
+/// max depths, and at least one fails prost decode when either limit is exceeded.
 #[test]
-fn max_nesting_depth_is_correct() {
-    let max = super::super::ser::MAX_NESTING_DEPTH;
+fn max_nesting_depths_are_correct() {
+    let max_val = super::super::ser::MAX_NESTING_DEPTH;
+    let max_meta = super::super::ser::MAX_METADATA_NESTING_DEPTH;
 
-    // --- Depth MAX must roundtrip for all event types ---
+    // --- Both limits at max must roundtrip for all event types ---
 
-    for (name, array) in saturated_event_arrays(max) {
+    for (name, array) in saturated_event_arrays(max_val, max_meta) {
         let proto_array = proto::EventArray::from(array);
         let mut buf = BytesMut::with_capacity(65536);
         proto_array.encode(&mut buf).unwrap();
         assert!(
             proto::EventArray::decode(buf.freeze()).is_ok(),
-            "EventArray decode FAILED at depth {max} for {name}.\n\
-             MAX_NESTING_DEPTH is too high — lower it or check for new proto wrappers.",
+            "EventArray decode FAILED for {name} at value depth {max_val}, metadata depth {max_meta}.",
         );
     }
 
-    for (name, event) in saturated_events(max) {
+    for (name, event) in saturated_events(max_val, max_meta) {
         let wrapper = proto::EventWrapper::from(event);
         let mut buf = BytesMut::with_capacity(65536);
         wrapper.encode(&mut buf).unwrap();
         assert!(
             proto::EventWrapper::decode(buf.freeze()).is_ok(),
-            "EventWrapper decode FAILED at depth {max} for {name}.\n\
-             MAX_NESTING_DEPTH is too high for the EventWrapper path.",
+            "EventWrapper decode FAILED for {name} at value depth {max_val}, metadata depth {max_meta}.",
         );
     }
 
-    // --- Depth MAX+1 must fail for at least one event type ---
-    // (proves the limit can't be raised without hitting prost's recursion limit)
+    // --- Exceeding either limit must fail for at least one event type ---
 
-    let any_array_fails = saturated_event_arrays(max + 1)
+    // Exceed value depth
+    let any_fails = saturated_event_arrays(max_val + 1, max_meta)
         .into_iter()
         .any(|(_, array)| {
             let proto_array = proto::EventArray::from(array);
@@ -240,72 +228,80 @@ fn max_nesting_depth_is_correct() {
             proto_array.encode(&mut buf).unwrap();
             proto::EventArray::decode(buf.freeze()).is_err()
         });
-    assert!(
-        any_array_fails,
-        "All EventArray types decoded at depth {}. MAX_NESTING_DEPTH ({}) could be raised.",
-        max + 1,
-        max,
-    );
+    assert!(any_fails, "No path failed at value depth {}. MAX_NESTING_DEPTH could be raised.", max_val + 1);
 
-    let any_wrapper_fails = saturated_events(max + 1).into_iter().any(|(_, event)| {
-        let wrapper = proto::EventWrapper::from(event);
-        let mut buf = BytesMut::with_capacity(65536);
-        wrapper.encode(&mut buf).unwrap();
-        proto::EventWrapper::decode(buf.freeze()).is_err()
-    });
-    assert!(
-        any_wrapper_fails,
-        "All EventWrapper types decoded at depth {}. MAX_NESTING_DEPTH ({}) could be raised.",
-        max + 1,
-        max,
-    );
+    // Exceed metadata depth
+    let any_fails = saturated_event_arrays(max_val, max_meta + 1)
+        .into_iter()
+        .any(|(_, array)| {
+            let proto_array = proto::EventArray::from(array);
+            let mut buf = BytesMut::with_capacity(65536);
+            proto_array.encode(&mut buf).unwrap();
+            proto::EventArray::decode(buf.freeze()).is_err()
+        });
+    assert!(any_fails, "No path failed at metadata depth {}. MAX_METADATA_NESTING_DEPTH could be raised.", max_meta + 1);
 }
 
-/// Verify the nesting gate accepts all event types at `MAX_NESTING_DEPTH`.
+/// Verify the nesting gate accepts all event types at the max depths.
 #[test]
 fn nesting_gate_accepts_all_types_at_max_depth() {
-    for (name, array) in saturated_event_arrays(super::super::ser::MAX_NESTING_DEPTH) {
+    let max_val = super::super::ser::MAX_NESTING_DEPTH;
+    let max_meta = super::super::ser::MAX_METADATA_NESTING_DEPTH;
+    for (name, array) in saturated_event_arrays(max_val, max_meta) {
         let mut buf = BytesMut::with_capacity(65536);
         assert!(
             array.encode(&mut buf).is_ok(),
-            "nesting gate rejected {name} at MAX_NESTING_DEPTH",
+            "nesting gate rejected {name} at max depths",
         );
     }
 }
 
-/// Verify the nesting gate rejects all event types at `MAX_NESTING_DEPTH` + 1.
+/// Verify the nesting gate rejects when either limit is exceeded.
 #[test]
-fn nesting_gate_rejects_all_types_above_max_depth() {
-    let max = super::super::ser::MAX_NESTING_DEPTH;
-    for (name, array) in saturated_event_arrays(max + 1) {
+fn nesting_gate_rejects_above_max_depth() {
+    let max_val = super::super::ser::MAX_NESTING_DEPTH;
+    let max_meta = super::super::ser::MAX_METADATA_NESTING_DEPTH;
+
+    // Exceed value depth (Log and Trace have event data; Metric does not)
+    for (name, array) in saturated_event_arrays(max_val + 1, max_meta) {
+        // Metric has no event data field, so it won't be rejected here
+        if name == "Metric" {
+            continue;
+        }
         let mut buf = BytesMut::with_capacity(65536);
         assert!(
             matches!(
                 array.encode(&mut buf),
                 Err(super::super::ser::EncodeError::NestingTooDeep { .. })
             ),
-            "nesting gate should reject {name} at depth {}",
-            max + 1,
+            "nesting gate should reject {name} at value depth {}",
+            max_val + 1,
+        );
+    }
+
+    // Exceed metadata depth
+    for (name, array) in saturated_event_arrays(max_val, max_meta + 1) {
+        let mut buf = BytesMut::with_capacity(65536);
+        assert!(
+            matches!(
+                array.encode(&mut buf),
+                Err(super::super::ser::EncodeError::NestingTooDeep { .. })
+            ),
+            "nesting gate should reject {name} at metadata depth {}",
+            max_meta + 1,
         );
     }
 }
 
-/// Verify the per-path boundaries for the loosest and tightest encoding paths.
+/// Verify the per-path prost boundaries match the constants.
 ///
-/// `Log.fields` is the loosest path (3 entries of headroom at depth 32):
-///   - depth 33 succeeds (100/100 budget)
-///   - depth 34 fails (103/100 budget)
-///
-/// `metadata_full` is the tightest path (0 headroom at depth 32):
-///   - depth 32 succeeds (100/100 budget)
-///   - depth 33 fails (103/100 budget)
-///
-/// The uniform `MAX_NESTING_DEPTH = 32` is set by the tightest path.
+/// `Log.fields` (loosest): `MAX_NESTING_DEPTH` (33) succeeds, 34 fails.
+/// `metadata_full` (tightest): `MAX_METADATA_NESTING_DEPTH` (32) succeeds, 33 fails.
 #[test]
 fn per_path_boundaries() {
-    let max = super::super::ser::MAX_NESTING_DEPTH;
+    let max_val = super::super::ser::MAX_NESTING_DEPTH;
+    let max_meta = super::super::ser::MAX_METADATA_NESTING_DEPTH;
 
-    // Helper: encode a LogEvent with nested value and flat metadata via EventArray.
     let roundtrip_value = |depth: usize| -> bool {
         let mut event = LogEvent::default();
         event.insert("data", create_nested_value(depth - 1));
@@ -316,7 +312,6 @@ fn per_path_boundaries() {
         proto::EventArray::decode(buf.freeze()).is_ok()
     };
 
-    // Helper: encode a LogEvent with flat value and nested metadata via EventArray.
     let roundtrip_metadata = |depth: usize| -> bool {
         let mut event = LogEvent::from("flat");
         *event.metadata_mut().value_mut() = create_nested_value(depth);
@@ -327,28 +322,13 @@ fn per_path_boundaries() {
         proto::EventArray::decode(buf.freeze()).is_ok()
     };
 
-    // Log.fields (loosest): succeeds at 33, fails at 34
-    assert!(
-        roundtrip_value(max + 1),
-        "Log.fields should succeed at depth {}",
-        max + 1
-    );
-    assert!(
-        !roundtrip_value(max + 2),
-        "Log.fields should fail at depth {}",
-        max + 2
-    );
+    // Log.fields: MAX_NESTING_DEPTH succeeds, MAX_NESTING_DEPTH+1 fails
+    assert!(roundtrip_value(max_val), "Log.fields should succeed at depth {max_val}");
+    assert!(!roundtrip_value(max_val + 1), "Log.fields should fail at depth {}", max_val + 1);
 
-    // metadata_full (tightest): succeeds at 32, fails at 33
-    assert!(
-        roundtrip_metadata(max),
-        "metadata_full should succeed at depth {max}"
-    );
-    assert!(
-        !roundtrip_metadata(max + 1),
-        "metadata_full should fail at depth {}",
-        max + 1
-    );
+    // metadata_full: MAX_METADATA_NESTING_DEPTH succeeds, MAX_METADATA_NESTING_DEPTH+1 fails
+    assert!(roundtrip_metadata(max_meta), "metadata_full should succeed at depth {max_meta}");
+    assert!(!roundtrip_metadata(max_meta + 1), "metadata_full should fail at depth {}", max_meta + 1);
 }
 
 /// Verify flat events pass without issues.

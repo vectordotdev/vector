@@ -345,8 +345,8 @@ fn create_nested_log_event(wrapping_levels: usize) -> LogEvent {
 
 #[test]
 fn native_codec_rejects_overly_nested_event() {
-    // 32 wrapping levels + "data" key = depth 33 > MAX_NESTING_DEPTH (32)
-    let event = create_nested_log_event(32);
+    // 33 wrapping levels + "data" key = depth 34 > MAX_NESTING_DEPTH (33)
+    let event = create_nested_log_event(33);
     let event = Event::Log(event);
 
     let mut serializer = NativeSerializerConfig.build();
@@ -361,8 +361,8 @@ fn native_codec_rejects_overly_nested_event() {
 
 #[test]
 fn native_codec_roundtrip_max_depth_event() {
-    // 31 wrapping levels + "data" key = depth 32 = MAX_NESTING_DEPTH
-    let event = create_nested_log_event(31);
+    // 32 wrapping levels + "data" key = depth 33 = MAX_NESTING_DEPTH
+    let event = create_nested_log_event(32);
     let original_data = event.value().get("data").cloned();
     let event = Event::Log(event);
 
