@@ -590,10 +590,19 @@ impl MetricSet {
                     metric = metric.with_value(new_value);
                 }
                 // Insert the updated stored value, or as store a new reference value (if the Metric changed type)
-                self.insert(metric.clone(), timestamp);
+                let mut cache_metric = metric.clone();
+                // Strip finalizers from the clone before caching. The normalization
+                // cache must not hold Arc<EventFinalizer> references, as that
+                // prevents the disk buffer from acknowledging events — leading to
+                // a deadlock once the buffer fills and no new events can replace
+                // cache entries.
+                cache_metric.metadata_mut().take_finalizers();
+                self.insert(cache_metric, timestamp);
             }
             None => {
-                self.insert(metric.clone(), timestamp);
+                let mut cache_metric = metric.clone();
+                cache_metric.metadata_mut().take_finalizers();
+                self.insert(cache_metric, timestamp);
             }
         }
         metric.into_absolute()
@@ -636,26 +645,25 @@ impl MetricSet {
                     self.insert_with_tracking(metric.series().clone(), new_reference);
                     Some(metric.into_incremental())
                 } else {
-                    // Metric changed type, store this and emit nothing
+                    // Metric changed type, store this and emit nothing.
+                    // Strip finalizers — the normalization cache must not hold
+                    // Arc<EventFinalizer> references (see incremental_to_absolute).
+                    metric.metadata_mut().take_finalizers();
                     self.insert(metric, timestamp);
                     None
                 }
             }
             None => {
-                // No reference so store this and emit nothing
+                // No reference so store this and emit nothing.
+                // Strip finalizers before caching (see incremental_to_absolute).
+                metric.metadata_mut().take_finalizers();
                 self.insert(metric, timestamp);
                 None
             }
         }
     }
 
-    fn insert(&mut self, mut metric: Metric, timestamp: Option<Instant>) {
-        // Strip finalizers before caching. The cache is only used for
-        // normalization state (tracking running totals) and must not hold
-        // Arc<EventFinalizer> references, as that prevents the disk buffer
-        // from acknowledging events — leading to a deadlock once the buffer
-        // fills up and no new events can replace cache entries.
-        metric.metadata_mut().take_finalizers();
+    fn insert(&mut self, metric: Metric, timestamp: Option<Instant>) {
         let (series, entry) = MetricEntry::from_metric(metric, timestamp);
         self.insert_with_tracking(series, entry);
     }

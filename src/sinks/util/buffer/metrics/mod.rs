@@ -728,4 +728,40 @@ mod tests {
         // as incremental metrics and this results in an empty buffer.
         assert_eq!(buffer.len(), 0);
     }
+
+    #[test]
+    fn normalizer_does_not_hold_finalizer_references() {
+        use vector_common::finalization::{BatchNotifier, BatchStatus, EventFinalizer, EventStatus};
+
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+
+        let metrics: Vec<Metric> = (0..3)
+            .map(|i| {
+                let mut m = sample_counter(i, "production", Incremental, 1.0);
+                m.add_finalizer(EventFinalizer::new(batch.clone()));
+                m
+            })
+            .collect();
+
+        // Drop our handle so only the metrics hold references
+        drop(batch);
+
+        let mut normalizer = MetricNormalizer::<AbsoluteMetricNormalizer>::default();
+        let mut normalized = Vec::new();
+        for metric in metrics {
+            if let Some(m) = normalizer.normalize(metric) {
+                normalized.push(m);
+            }
+        }
+
+        // Simulate what the Driver does: mark delivered, then drop finalizers
+        for mut metric in normalized {
+            metric.metadata().update_status(EventStatus::Delivered);
+            metric.metadata_mut().take_finalizers();
+        }
+
+        // Before the fix, this fails with Err(Empty) — the MetricSet cache
+        // holds Arc<EventFinalizer> clones, preventing the batch from completing.
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+    }
 }
