@@ -716,7 +716,11 @@ impl ConsumerStateInner<Consuming> {
                                     // Force moving permit into the task, to release only once done
                                     // parsing
                                     drop(permit);
-                                    let _ = future_done_tx.send(()).await;
+                                    // Using try send because we just use this to notify that any
+                                    // task has completed. If buffer is full, that means there is
+                                    // already a notification waiting, meaning this task will get
+                                    // processed anyways
+                                    let _ = future_done_tx.try_send(());
                                     result
                                 }.instrument(span.clone())));
                             } else {
