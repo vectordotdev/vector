@@ -231,7 +231,7 @@ pub trait SinkBuilderExt: Stream {
         Self: Stream<Item = Metric> + Unpin + Sized,
         N: MetricNormalize + Default,
     {
-        match maybe_ttl_secs {
+        match maybe_ttl_secs.filter(|&ttl| ttl > 0.0) {
             None => Normalizer::new(self, N::default()),
             Some(ttl) => {
                 Normalizer::new_with_ttl(self, N::default(), Duration::from_secs(ttl as u64))
