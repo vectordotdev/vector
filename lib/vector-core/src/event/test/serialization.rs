@@ -290,6 +290,53 @@ fn nesting_gate_rejects_all_types_above_max_depth() {
     }
 }
 
+/// Verify that `Log.fields` (the loosest path) can handle depth 33 when metadata is flat.
+/// This proves the uniform limit of 32 is conservative for this path — it's constrained
+/// by the tighter `metadata_full` path, not by `Log.fields` itself.
+#[test]
+fn log_fields_has_headroom_beyond_max_depth() {
+    let max = super::super::ser::MAX_NESTING_DEPTH;
+
+    // Event value at depth MAX+1, but metadata left flat (default).
+    // This isolates the Log.fields path from the metadata_full path.
+    let mut event = LogEvent::default();
+    event.insert("data", create_nested_value(max));  // leaf at depth max+1
+
+    let array = EventArray::Logs(LogArray::from(vec![event]));
+    let proto_array = proto::EventArray::from(array);
+    let mut buf = BytesMut::with_capacity(65536);
+    proto_array.encode(&mut buf).unwrap();
+
+    assert!(
+        proto::EventArray::decode(buf.freeze()).is_ok(),
+        "Log.fields path should succeed at depth {} (has headroom beyond MAX_NESTING_DEPTH)",
+        max + 1,
+    );
+}
+
+/// Verify that `metadata_full` (the tightest path) fails at depth 33.
+/// This is the path that actually constrains `MAX_NESTING_DEPTH`.
+#[test]
+fn metadata_full_fails_beyond_max_depth() {
+    let max = super::super::ser::MAX_NESTING_DEPTH;
+
+    // Metadata at depth MAX+1, event value left flat.
+    // This isolates the metadata_full path.
+    let mut event = LogEvent::from("flat data");
+    *event.metadata_mut().value_mut() = create_nested_value(max + 1);
+
+    let array = EventArray::Logs(LogArray::from(vec![event]));
+    let proto_array = proto::EventArray::from(array);
+    let mut buf = BytesMut::with_capacity(65536);
+    proto_array.encode(&mut buf).unwrap();
+
+    assert!(
+        proto::EventArray::decode(buf.freeze()).is_err(),
+        "metadata_full path should fail at depth {} (this is the tightest path)",
+        max + 1,
+    );
+}
+
 /// Verify flat events pass without issues.
 #[test]
 fn nesting_gate_accepts_flat_events() {
