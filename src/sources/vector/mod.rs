@@ -306,9 +306,11 @@ mod tests {
         test_util,
     };
 
-    async fn run_test(vector_source_config_str: &str, addr: SocketAddr) {
-        let config = format!(r#"address = "{addr}""#);
-        let source: VectorConfig = toml::from_str(&config).unwrap();
+    async fn run_test(compression: Option<&str>) {
+        let (_guard, addr) = test_util::addr::next_addr();
+
+        let source_config = format!(r#"address = "{addr}""#);
+        let source: VectorConfig = toml::from_str(&source_config).unwrap();
 
         let (tx, rx) = SourceSender::new_test();
         let server = source
@@ -321,7 +323,16 @@ mod tests {
         // Ideally, this would be a fully custom agent to send the data,
         // but the sink side already does such a test and this is good
         // to ensure interoperability.
-        let sink: SinkConfig = toml::from_str(vector_source_config_str).unwrap();
+        let sink_config = match compression {
+            Some(c) => format!(
+                r#"
+                    address = "{addr}"
+                    compression = "{c}"
+                "#
+            ),
+            None => format!(r#"address = "{addr}""#),
+        };
+        let sink: SinkConfig = toml::from_str(&sink_config).unwrap();
         let cx = SinkContext::default();
         let (sink, _) = sink.build(cx).await.unwrap();
 
@@ -341,32 +352,17 @@ mod tests {
 
     #[tokio::test]
     async fn receive_message() {
-        let (_guard, addr) = test_util::addr::next_addr();
-
-        let config = format!(r#"address = "{addr}""#);
-        run_test(&config, addr).await;
+        run_test(None).await;
     }
 
     #[tokio::test]
-    async fn receive_compressed_message() {
-        let (_guard, addr) = test_util::addr::next_addr();
-
-        let config = format!(
-            r#"address = "{addr}"
-            compression=true"#
-        );
-        run_test(&config, addr).await;
+    async fn receive_gzip_compressed_message() {
+        run_test(Some("gzip")).await;
     }
 
     #[tokio::test]
     async fn receive_zstd_compressed_message() {
-        let (_guard, addr) = test_util::addr::next_addr();
-
-        let config = format!(
-            r#"address = "{addr}"
-            compression = "zstd""#
-        );
-        run_test(&config, addr).await;
+        run_test(Some("zstd")).await;
     }
 
     #[tokio::test]
