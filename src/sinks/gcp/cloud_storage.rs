@@ -10,6 +10,8 @@ use indoc::indoc;
 use snafu::{ResultExt, Snafu};
 use tower::ServiceBuilder;
 use uuid::Uuid;
+#[cfg(feature = "codecs-parquet")]
+use vector_lib::codecs::{BatchEncoder, encoding::BatchSerializerConfig};
 use vector_lib::{
     TimeZone,
     codecs::{EncoderKind, encoding::Framer},
@@ -17,8 +19,6 @@ use vector_lib::{
     event::{EventFinalizers, Finalizable},
     request_metadata::RequestMetadata,
 };
-#[cfg(feature = "codecs-parquet")]
-use vector_lib::codecs::{BatchEncoder, encoding::BatchSerializerConfig};
 
 use crate::{
     codecs::{Encoder, EncodingConfigWithFraming, SinkType, Transformer},
@@ -575,8 +575,8 @@ mod tests {
         request_metadata::GroupedCountByteSize,
     };
 
-    use vector_lib::codecs::encoding::Framer;
     use vector_lib::codecs::EncoderKind;
+    use vector_lib::codecs::encoding::Framer;
 
     use super::*;
     use crate::{
@@ -758,7 +758,10 @@ mod tests {
         let sink_config = GcsSinkConfig {
             // Invalid header value with newline character
             content_type: Some("text/plain\nInvalid".to_string()),
-            ..default_config(EncodingConfigWithFraming::from((None::<FramingConfig>, TextSerializerConfig::default())))
+            ..default_config(EncodingConfigWithFraming::from((
+                None::<FramingConfig>,
+                TextSerializerConfig::default(),
+            )))
         };
 
         let result = try_request_settings(&sink_config, context);
