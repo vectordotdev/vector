@@ -1151,7 +1151,7 @@ impl Runner {
             timer_tx,
             latency_recorder,
             events_received: register!(EventsReceived),
-            cpu_ns: counter!("component_cpu_usage_ms_total"),
+            cpu_ns: counter!("component_cpu_usage_ns_total"),
         }
     }
 
