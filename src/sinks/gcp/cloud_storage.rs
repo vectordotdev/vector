@@ -317,21 +317,79 @@ impl GcsSinkConfig {
         cx: SinkContext,
     ) -> crate::Result<VectorSink> {
         let request = self.request.into_settings();
-
         let batch_settings = self.batch.into_batcher_settings()?;
-
         let partitioner = self.key_partitioner()?;
-
         let protocol = get_http_scheme_from_uri(&base_url.parse::<Uri>().unwrap());
 
         let svc = ServiceBuilder::new()
             .settings(request, GcsRetryLogic::default())
             .service(GcsService::new(client, base_url, auth));
 
-        let request_settings = RequestSettings::new(self, cx)?;
+        #[cfg(feature = "codecs-parquet")]
+        if let Some(batch_config) = &self.batch_encoding {
+            if !matches!(batch_config, BatchSerializerConfig::Parquet(_)) {
+                return Err(
+                    "batch_encoding only supports encoding with parquet format for gcp_cloud_storage sink"
+                        .into(),
+                );
+            }
+
+            let batch_serializer = batch_config.build_batch_serializer()?;
+            let batch_encoder = BatchEncoder::new(batch_serializer);
+
+            let content_type_str = self
+                .content_type
+                .clone()
+                .unwrap_or_else(|| batch_encoder.content_type().to_string());
+
+            let extension = self
+                .filename_extension
+                .clone()
+                .or_else(|| match batch_config {
+                    BatchSerializerConfig::Parquet(_) => Some("parquet".to_string()),
+                    #[allow(unreachable_patterns)]
+                    _ => None,
+                })
+                .unwrap_or_else(|| self.compression.extension().into());
+
+            if self.compression != Compression::None {
+                warn!("Top level compression setting ignored when batch_encoding set to parquet.")
+            }
+
+            let request_settings = RequestSettings::new(
+                self,
+                cx,
+                EncoderKind::Batch(batch_encoder),
+                Compression::None,
+                extension,
+                content_type_str,
+            )?;
+
+            let sink = GcsSink::new(svc, request_settings, partitioner, batch_settings, protocol);
+            return Ok(VectorSink::from_event_streamsink(sink));
+        }
+
+        let (framer, serializer) = self.encoding.build(SinkType::MessageBased)?;
+        let enc = Encoder::<Framer>::new(framer, serializer);
+        let content_type_str = self
+            .content_type
+            .clone()
+            .unwrap_or_else(|| enc.content_type().to_string());
+        let extension = self
+            .filename_extension
+            .clone()
+            .unwrap_or_else(|| self.compression.extension().into());
+
+        let request_settings = RequestSettings::new(
+            self,
+            cx,
+            EncoderKind::Framed(Box::new(enc)),
+            self.compression,
+            extension,
+            content_type_str,
+        )?;
 
         let sink = GcsSink::new(svc, request_settings, partitioner, batch_settings, protocol);
-
         Ok(VectorSink::from_event_streamsink(sink))
     }
 
@@ -435,63 +493,15 @@ impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
 }
 
 impl RequestSettings {
-    fn new(config: &GcsSinkConfig, cx: SinkContext) -> crate::Result<Self> {
+    fn new(
+        config: &GcsSinkConfig,
+        cx: SinkContext,
+        encoder: EncoderKind,
+        compression: Compression,
+        extension: String,
+        content_type_str: String,
+    ) -> crate::Result<Self> {
         let transformer = config.encoding.transformer();
-
-        // Build encoder, compression, extension, and content_type_str together
-        // so that batch mode (Parquet) can override all four coherently.
-        #[cfg(feature = "codecs-parquet")]
-        let (encoder, compression, extension, content_type_str) =
-            if let Some(batch_config) = &config.batch_encoding {
-                let batch_serializer = batch_config.build_batch_serializer()?;
-                let batch_encoder = BatchEncoder::new(batch_serializer);
-                let ct = config
-                    .content_type
-                    .clone()
-                    .unwrap_or_else(|| batch_encoder.content_type().to_string());
-                let ext = config
-                    .filename_extension
-                    .clone()
-                    .or_else(|| match batch_config {
-                        BatchSerializerConfig::Parquet(_) => Some("parquet".to_string()),
-                        #[allow(unreachable_patterns)]
-                        _ => None,
-                    })
-                    .unwrap_or_else(|| config.compression.extension().into());
-                (
-                    EncoderKind::Batch(batch_encoder),
-                    Compression::None,
-                    ext,
-                    ct,
-                )
-            } else {
-                let (framer, serializer) = config.encoding.build(SinkType::MessageBased)?;
-                let enc = Encoder::<Framer>::new(framer, serializer);
-                let ct = config
-                    .content_type
-                    .clone()
-                    .unwrap_or_else(|| enc.content_type().to_string());
-                let ext = config
-                    .filename_extension
-                    .clone()
-                    .unwrap_or_else(|| config.compression.extension().into());
-                (EncoderKind::Framed(Box::new(enc)), config.compression, ext, ct)
-            };
-
-        #[cfg(not(feature = "codecs-parquet"))]
-        let (encoder, compression, extension, content_type_str) = {
-            let (framer, serializer) = config.encoding.build(SinkType::MessageBased)?;
-            let enc = Encoder::<Framer>::new(framer, serializer);
-            let ct = config
-                .content_type
-                .clone()
-                .unwrap_or_else(|| enc.content_type().to_string());
-            let ext = config
-                .filename_extension
-                .clone()
-                .unwrap_or_else(|| config.compression.extension().into());
-            (EncoderKind::Framed(Box::new(enc)), config.compression, ext, ct)
-        };
 
         let acl = config
             .acl
@@ -565,8 +575,12 @@ mod tests {
         request_metadata::GroupedCountByteSize,
     };
 
+    use vector_lib::codecs::encoding::Framer;
+    use vector_lib::codecs::EncoderKind;
+
     use super::*;
     use crate::{
+        codecs::{Encoder, SinkType},
         event::LogEvent,
         test_util::{
             components::{SINK_TAGS, run_and_assert_sink_compliance},
@@ -626,7 +640,28 @@ mod tests {
     }
 
     fn request_settings(sink_config: &GcsSinkConfig, context: SinkContext) -> RequestSettings {
-        RequestSettings::new(sink_config, context).expect("Could not create request settings")
+        let (framer, serializer) = sink_config
+            .encoding
+            .build(SinkType::MessageBased)
+            .expect("Could not build encoder");
+        let enc = Encoder::<Framer>::new(framer, serializer);
+        let content_type_str = sink_config
+            .content_type
+            .clone()
+            .unwrap_or_else(|| enc.content_type().to_string());
+        let extension = sink_config
+            .filename_extension
+            .clone()
+            .unwrap_or_else(|| sink_config.compression.extension().into());
+        RequestSettings::new(
+            sink_config,
+            context,
+            EncoderKind::Framed(Box::new(enc)),
+            sink_config.compression,
+            extension,
+            content_type_str,
+        )
+        .expect("Could not create request settings")
     }
 
     fn build_request(extension: Option<&str>, uuid: bool, compression: Compression) -> GcsRequest {
