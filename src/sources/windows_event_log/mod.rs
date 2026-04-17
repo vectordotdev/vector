@@ -384,7 +384,7 @@ impl WindowsEventLogSource {
             // and async code. The shutdown watcher uses a raw HANDLE value (just an
             // integer) to signal shutdown without needing access to the subscription.
             let (returned_sub, wait_result) =
-                with_subscription_blocking(subscription, |sub| {
+                with_subscription_blocking(subscription, move |sub| {
                     let result = sub.wait_for_events_blocking(timeout_ms);
                     (sub, result)
                 })
@@ -395,7 +395,7 @@ impl WindowsEventLogSource {
                 WaitResult::EventsAvailable => {
                     // Pull events via spawn_blocking (EvtNext/EvtRender are blocking APIs)
                     let (returned_sub, events_result) =
-                        with_subscription_blocking(subscription, |mut sub| {
+                        with_subscription_blocking(subscription, move |mut sub| {
                             let result = sub.pull_events(batch_size);
                             (sub, result)
                         })
@@ -491,7 +491,7 @@ impl WindowsEventLogSource {
                     // EvtNext returns ERROR_NO_MORE_ITEMS on an empty channel, which
                     // is near-zero cost, so it is safe to attempt every cycle.
                     let (returned_sub, speculative_result) =
-                        with_subscription_blocking(subscription, |mut sub| {
+                        with_subscription_blocking(subscription, move |mut sub| {
                             let result = sub.pull_events(batch_size);
                             (sub, result)
                         })
