@@ -689,6 +689,14 @@ impl ConsumerStateInner<Consuming> {
                         }
                     },
 
+                    Some(()) = future_done_rx.recv(), if finalizer.is_some() => {
+                        while let Some(res) = processing_futures.next().await {
+                            if let Ok(batch_result) = res {
+                                Self::finalize_batch(batch_result, finalizer.as_ref());
+                            }
+                        }
+                    }
+
                     message = messages.next(), if finalizer.is_some() => match message {
                         None => unreachable!("MessageStream never calls Ready(None)"),
                         Some(msgs) => {
@@ -740,14 +748,6 @@ impl ConsumerStateInner<Consuming> {
                             }
                         }
                     },
-
-                    Some(()) = future_done_rx.recv(), if finalizer.is_some() => {
-                        while let Some(res) = processing_futures.next().await {
-                            if let Ok(batch_result) = res {
-                                Self::finalize_batch(batch_result, finalizer.as_ref());
-                            }
-                        }
-                    }
                 )
             }
             (tp, status)
