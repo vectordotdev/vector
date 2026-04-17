@@ -287,7 +287,7 @@ impl TraceSubscription {
     ///
     /// `Err(n)` items signal that the underlying broadcast receiver lagged and `n` events were
     /// dropped before the next successful receive. Callers are expected to surface this via a
-    /// metric — they MUST NOT log it through `tracing`, since that would feed back into this
+    /// metric. They MUST NOT log it through `tracing`, since that would feed back into this
     /// broadcast and can amplify the lag.
     pub fn into_stream(self) -> impl Stream<Item = Result<LogEvent, u64>> + Unpin {
         BroadcastStream::new(self.trace_rx)
