@@ -1076,6 +1076,7 @@ impl Drop for EventLogSubscription {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serial_test::serial;
 
     async fn create_test_checkpointer() -> (Arc<Checkpointer>, tempfile::TempDir) {
         let temp_dir = tempfile::TempDir::new().unwrap();
@@ -1354,7 +1355,41 @@ mod tests {
     /// 4. Assert `pull_events` still returns events — `EvtNext` fetches from the queue
     ///    regardless of signal state, so the speculative pull in mod.rs self-heals.
     #[tokio::test]
-    async fn test_speculative_pull_recovers_without_signal() {
+    #[serial]
+    async fn test_pull_events_works_with_cleared_signal() {
+        // Seed the Application log with a record so the "events remain
+        // available despite cleared signal" assertion below does not depend
+        // on whatever backlog the runner happens to have. Freshly provisioned
+        // CI images can have an empty Application log, which would otherwise
+        // make `pull_events` legitimately return empty and produce a spurious
+        // failure unrelated to the invariant under test.
+        let seed_output = std::process::Command::new("eventcreate")
+            .args([
+                "/T",
+                "INFORMATION",
+                "/ID",
+                "100",
+                "/L",
+                "APPLICATION",
+                "/SO",
+                "VectorTestSpeculativePullSeed",
+                "/D",
+                "seed event for #25194 speculative-pull regression test",
+            ])
+            .output()
+            .expect("failed to spawn eventcreate — required for deterministic seeding");
+        assert!(
+            seed_output.status.success(),
+            "eventcreate failed to seed Application log (exit={:?}): stdout={:?} stderr={:?}. \
+             This test requires a seeded event to be deterministic; a locked-down runner \
+             without the privilege to write to Application cannot run this test reliably.",
+            seed_output.status.code(),
+            String::from_utf8_lossy(&seed_output.stdout),
+            String::from_utf8_lossy(&seed_output.stderr),
+        );
+        // Give the service a moment to persist the record before we subscribe.
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+
         let mut config = WindowsEventLogConfig::default();
         config.channels = vec!["Application".to_string()];
         config.read_existing_events = true;
@@ -1366,21 +1401,20 @@ mod tests {
             .await
             .expect("Subscription creation should succeed");
 
-        // Manually clear the signal to simulate a lost wakeup. The Application
-        // log always has existing events on a running Windows system, so even
-        // with the signal cleared events remain available via EvtNext.
+        // Manually clear the signal to simulate a lost wakeup. The seeded
+        // event above guarantees at least one record is queued in EvtNext
+        // regardless of the runner's pre-existing log state.
         let signal_raw = subscription.first_channel_signal_raw();
         unsafe {
             let _ = ResetEvent(HANDLE(signal_raw as *mut std::ffi::c_void));
         }
 
-        // Signal is cleared: wait must time out.
-        let (mut subscription, wait_result) = tokio::task::spawn_blocking(move || {
-            let r = subscription.wait_for_events_blocking(500);
-            (subscription, r)
-        })
-        .await
-        .unwrap();
+        // Signal is cleared: an immediate (0ms) poll must report Timeout.
+        // A 0ms wait reads only the current signal state with no grace
+        // window, so unrelated Windows system events arriving between the
+        // `ResetEvent` above and the poll cannot re-signal the handle and
+        // cause a spurious failure.
+        let wait_result = subscription.wait_for_events_blocking(0);
 
         assert!(
             matches!(wait_result, WaitResult::Timeout),
@@ -1417,12 +1451,15 @@ mod tests {
     /// `EvtNext` and fires `SetEvent` on the subscription's signal
     /// handle — simulating the OS signaling a new event arrival during
     /// the drain window. After `pull_events` returns, the signal must
-    /// still be set (the subsequent `wait_for_events_blocking` must
-    /// return `EventsAvailable`, not `Timeout`). Under the old
+    /// still be set — observed via a 0ms `wait_for_events_blocking`
+    /// so the check measures only the reset/preserve behavior of
+    /// `pull_events` and is not contaminated by unrelated Windows
+    /// system events arriving during a nonzero wait. Under the old
     /// post-drain `ResetEvent` order, the hook's `SetEvent` would be
-    /// clobbered by the reset and the wait would time out — which is
-    /// exactly what #25194 reports.
+    /// clobbered by the reset and the immediate poll would return
+    /// `Timeout` — which is exactly what #25194 reports.
     #[tokio::test]
+    #[serial]
     async fn test_pull_events_preserves_setevent_during_drain() {
         use std::sync::Arc as StdArc;
 
@@ -1492,16 +1529,15 @@ mod tests {
              at least once even on an empty channel"
         );
 
-        // With the fix, the SetEvent fired by the hook during the
-        // drain is preserved; the next wait returns EventsAvailable
-        // immediately. Under the old post-drain ResetEvent order, it
-        // would time out — that is the #25194 freeze.
-        let (_subscription, result) = tokio::task::spawn_blocking(move || {
-            let r = subscription.wait_for_events_blocking(500);
-            (subscription, r)
-        })
-        .await
-        .unwrap();
+        // Observe the signal state IMMEDIATELY with a 0ms wait. We want
+        // to know whether pull_events's reset clobbered the hook's
+        // SetEvent — NOT whether new real events arrive during some
+        // wait window. A nonzero timeout against the live Application
+        // channel lets arbitrary Windows system events re-signal us
+        // and false-pass against the pre-fix code. 0ms = WaitForMultiple-
+        // Objects returns the current state with no grace period, so
+        // only the reset/preserve behavior of pull_events is measured.
+        let result = subscription.wait_for_events_blocking(0);
 
         match result {
             WaitResult::EventsAvailable => {}
