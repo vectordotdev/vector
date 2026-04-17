@@ -15,9 +15,17 @@ path = "tests/bin/generate-avro-fixtures.rs"
 [dependencies]
 apache-avro = { version = "0.20.0", default-features = false }
 arrow = { version = "56.2.0", default-features = false, features = ["ipc", "json"], optional = true }
+parquet = { version = "56.2.0", default-features = false, features = [
+    "arrow",
+    "snap",
+    "zstd",
+    "lz4",
+    "flate2-rust_backened",
+], optional = true }
 async-trait.workspace = true
 bytes.workspace = true
 chrono.workspace = true
+chrono-tz.workspace = true
 rust_decimal.workspace = true
 csv-core = { version = "0.1.13", default-features = false }
 derivative.workspace = true
@@ -69,7 +77,8 @@ uuid.workspace = true
 vrl.workspace = true
 
 [features]
-arrow = ["dep:arrow"]
+arrow = ["dep:arrow", "arrow/chrono-tz"]
+parquet = ["dep:parquet", "arrow"]
 opentelemetry = ["dep:opentelemetry-proto"]
 syslog = ["dep:syslog_loose", "dep:strum", "dep:derive_more", "dep:serde-aux", "dep:toml"]
 test = []
