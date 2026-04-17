@@ -267,13 +267,27 @@ cross-enable: cargo-install-cross
 CARGO_HANDLES_FRESHNESS:
 	${EMPTY}
 
+# Pinned digests for ghcr.io/cross-rs/<target>:edge.
+# Source: cross-rs/cross @ f86fd03bb70b4c6802847c18087e21391498b0b4, built 2026-04-10 (Ubuntu 20.04 focal).
+# Refresh with: crane digest ghcr.io/cross-rs/<target>:edge
+CROSS_DIGEST_x86_64-unknown-linux-gnu       := sha256:13f7a68e55cb05a19e840bce65834fc785dc069e0c2218d12b8fdb8f8a1519d5
+CROSS_DIGEST_aarch64-unknown-linux-gnu      := sha256:3bf094d22fc4f73c9bdce45ddd7a8bbae349efdbd51b4d4b5ee1bedd8454466b
+CROSS_DIGEST_x86_64-unknown-linux-musl      := sha256:c59deede3efcd7cb6f6a57641241ba1c63cfe35b7965be09a851242b4209639d
+CROSS_DIGEST_aarch64-unknown-linux-musl     := sha256:dad492e0f040c6e712d4be9b970c9de5f3b8ef9cde6b9a2b437d56d1dabeb808
+CROSS_DIGEST_armv7-unknown-linux-gnueabihf  := sha256:73294ebb06e077e49bbbecfe8f17507e9e0b733a2a1ba23056abcd9c0ba617c9
+CROSS_DIGEST_armv7-unknown-linux-musleabihf := sha256:49bdc9a4cf2f1bcb385389c85be8f43c4399fa6d6fe22883702ef13eb921e443
+CROSS_DIGEST_arm-unknown-linux-gnueabi      := sha256:0c70b0e54724bd599dff00a2888f8ea176a5b6c85af47aad9ad25296f63e2967
+CROSS_DIGEST_arm-unknown-linux-musleabi     := sha256:0ca8f4afcc29fb5964aa63e482452e8869311a610c5868f22ded400c4e483328
+
 # GNU Make < 3.82 pattern matching priority depends on the definition order
 # so cross-image-% must be defined before cross-%
 .PHONY: cross-image-%
 cross-image-%: export TRIPLE =$($(strip @):cross-image-%=%)
 cross-image-%:
+	$(if $(CROSS_DIGEST_$*),,$(error No CROSS_DIGEST pinned for $*. Add it to the digest table in Makefile.))
 	$(CONTAINER_TOOL) build \
 		--build-arg TARGET=${TRIPLE} \
+		--build-arg CROSS_DIGEST=$(CROSS_DIGEST_$*) \
 		--file scripts/cross/Dockerfile \
 		--tag vector-cross-env:${TRIPLE} \
 		.
@@ -373,7 +387,7 @@ test-behavior-config: ## Runs configuration related behavioral tests
 
 .PHONY: test-behavior-%
 test-behavior-%: ## Runs behavioral test for a given category
-	${MAYBE_ENVIRONMENT_EXEC} cargo run --no-default-features --features transforms,vrl-functions-env,vrl-functions-system,vrl-functions-network -- test tests/behavior/$*/*
+	${MAYBE_ENVIRONMENT_EXEC} cargo run --no-default-features --features transforms,vrl-functions-env,vrl-functions-system,vrl-functions-network,vrl-functions-crypto -- test tests/behavior/$*/*
 
 .PHONY: test-behavior
 test-behavior: ## Runs all behavioral tests
@@ -734,9 +748,16 @@ generate-component-docs: ## Generate per-component Cue docs from the configurati
 		$(if $(findstring true,$(CI)),>/dev/null,)
 	./scripts/cue.sh fmt
 
+VRL_DOC_BUILDER := $(shell command -v vector-vrl-doc-builder 2>/dev/null)
+ifndef VRL_DOC_BUILDER
+VRL_DOC_BUILDER_CMD = cargo run -p vector-vrl-doc-builder --
+else
+VRL_DOC_BUILDER_CMD = vector-vrl-doc-builder
+endif
+
 .PHONY: generate-vector-vrl-docs
 generate-vector-vrl-docs: ## Generate VRL function documentation from Rust source.
-	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) build vector-vrl-docs --output docs/generated/ \
+	${MAYBE_ENVIRONMENT_EXEC} $(VRL_DOC_BUILDER_CMD) --output docs/generated/ \
 		$(if $(findstring true,$(CI)),>/dev/null,)
 
 .PHONY: generate-vrl-docs

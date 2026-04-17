@@ -5,5 +5,6 @@
 
 mod common;
 mod harness;
+mod health;
 mod tap;
 mod top;

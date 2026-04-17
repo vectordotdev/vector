@@ -31,17 +31,20 @@ Prometheus operators can route a stream of Prometheus data to the archiving
 solution of their choice. For this use case we recommend object stores for their
 cheap and durable qualities:
 
-```toml title="vector.toml"
-[sources.prometheus]
-  type = "prometheus_remote_write"
+```yaml title="vector.yaml"
+sources:
+  prometheus:
+    type: "prometheus_remote_write"
 
-[transforms.convert]
-  type = "metric_to_log"
-  inputs = ["prometheus"]
+transforms:
+  convert:
+    type: "metric_to_log"
+    inputs: ["prometheus"]
 
-[sinks.backup]
-  type = "aws_s3"
-  inputs = ["convert"]
+sinks:
+  backup:
+    type: "aws_s3"
+    inputs: ["convert"]
 ```
 
 Swap `aws_s3` with `gcp_cloud_storage` or other object stores.
@@ -68,13 +71,15 @@ To get started, setup the new
 your metrics to [Datadog][datadog], [New Relic][new_relic], [Influx][influx],
 [Elasticsearch][elastic], and [many other sinks][sinks]:
 
-```toml title="vector.toml"
-[sources.prometheus]
-  type = "prometheus_remote_write"
+```yaml title="vector.yaml"
+sources:
+  prometheus:
+    type: "prometheus_remote_write"
 
-[sinks.datadog]
-  type = "datadog_metrics"
-  inputs = ["prometheus"]
+sinks:
+  datadog:
+    type: "datadog_metrics"
+    inputs: ["prometheus"]
 ```
 
 [chronosphere]: https://chronosphere.io/
