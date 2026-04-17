@@ -1,9 +1,13 @@
 mod experiment;
 mod experiment_no_truncations;
 
-use std::str;
+use std::{path::PathBuf, str, thread};
 
+use bytes::{Bytes, BytesMut};
 use quickcheck::{Arbitrary, Gen};
+use tokio::time::Instant;
+
+use super::{EOF_READ_BACKOFF_MAX, EOF_READ_BACKOFF_MIN, FileWatcher, null_reader};
 
 // Welcome.
 //
@@ -169,6 +173,68 @@ impl Arbitrary for FileWatcherAction {
             _ => FileWatcherAction::Exit,
         }
     }
+}
+
+fn watcher_for_timing() -> FileWatcher {
+    let now = Instant::now();
+
+    FileWatcher {
+        path: PathBuf::new(),
+        findable: true,
+        reader: Box::new(null_reader()),
+        file_position: 0,
+        devno: 0,
+        inode: 0,
+        is_dead: false,
+        reached_eof: false,
+        last_read_attempt: now,
+        last_read_success: now,
+        read_retry_delay: EOF_READ_BACKOFF_MIN,
+        last_seen: now,
+        max_line_bytes: 1024,
+        line_delimiter: Bytes::from_static(b"\n"),
+        buf: BytesMut::new(),
+    }
+}
+
+#[test]
+fn backs_off_after_eof() {
+    let mut watcher = watcher_for_timing();
+
+    watcher.track_read_attempt();
+    watcher.track_read_eof();
+
+    assert_eq!(watcher.read_retry_delay, EOF_READ_BACKOFF_MIN);
+    assert!(!watcher.should_read());
+
+    thread::sleep(EOF_READ_BACKOFF_MIN);
+
+    assert!(watcher.should_read());
+
+    watcher.track_read_attempt();
+    watcher.track_read_eof();
+
+    assert_eq!(
+        watcher.read_retry_delay,
+        EOF_READ_BACKOFF_MIN.saturating_mul(2)
+    );
+}
+
+#[test]
+fn caps_and_resets_eof_backoff() {
+    let mut watcher = watcher_for_timing();
+
+    for _ in 0..16 {
+        watcher.track_read_attempt();
+        watcher.track_read_eof();
+    }
+
+    assert_eq!(watcher.read_retry_delay, EOF_READ_BACKOFF_MAX);
+
+    watcher.track_read_success();
+
+    assert_eq!(watcher.read_retry_delay, EOF_READ_BACKOFF_MIN);
+    assert!(!watcher.reached_eof());
 }
 
 #[inline]
