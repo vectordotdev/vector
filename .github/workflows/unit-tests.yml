@@ -97,10 +97,15 @@ jobs:
           add_suite "${{ inputs.cli }}" "cli-tests" "package(vector) & binary(=integration)"
           add_suite "${{ inputs.vector-api }}" "vector-api-tests" "binary(=vector_api)"
 
-          if [[ -n "${SCOPE}" ]]; then
+          # Skip `make test` entirely if no nextest-based suite was selected
+          # (e.g. behavior-only runs). Running `make test` with empty FEATURES
+          # would otherwise execute the workspace-wide suite.
+          if [[ "${{ inputs.default }}" == "true" ]]; then
+            make test FEATURES="${FEATURES}"
+          elif [[ -n "${SCOPE}" ]]; then
             make test FEATURES="${FEATURES}" SCOPE="-E '${SCOPE}'"
           else
-            make test FEATURES="${FEATURES}"
+            echo "No nextest suites selected; skipping 'make test'"
           fi
         env:
           COVERAGE: ${{ inputs.coverage }}
