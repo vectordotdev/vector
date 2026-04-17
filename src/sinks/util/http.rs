@@ -640,9 +640,7 @@ impl RetryStrategy {
         let reason = format!(
             "{}: {}",
             self.name(),
-            status
-                .canonical_reason()
-                .unwrap_or(status.to_string().as_str())
+            status.canonical_reason().unwrap_or_else(|| status.as_str())
         )
         .into();
 
