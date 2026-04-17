@@ -14,7 +14,7 @@ sources:
 sinks:
   http_out:
     type: "http"
-    inputs: [ "demo_logs" ]
+    inputs: ["demo_logs"]
     uri: "https://example.com/ingest"
     method: "post"
 
@@ -39,4 +39,4 @@ sinks:
     # treats as temporary failures.
     retry_strategy:
       type: "custom"
-      status_codes: [ 408, 425, 429, 503 ]
+      status_codes: [408, 425, 429, 503]
