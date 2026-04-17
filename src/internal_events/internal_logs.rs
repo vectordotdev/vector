@@ -34,3 +34,21 @@ impl InternalEvent for InternalLogsEventsReceived {
             .increment(self.byte_size.get() as u64);
     }
 }
+
+#[derive(Debug, NamedInternalEvent)]
+pub struct InternalLogsLagged {
+    pub count: u64,
+}
+
+impl InternalEvent for InternalLogsLagged {
+    fn emit(self) {
+        // MUST NOT emit logs here to avoid an infinite log loop. We mirror the
+        // standard `ComponentEventsDropped` metric so the loss surfaces in the
+        // usual dropped-events dashboards.
+        counter!(
+            "component_discarded_events_total",
+            "intentional" => "false",
+        )
+        .increment(self.count);
+    }
+}
