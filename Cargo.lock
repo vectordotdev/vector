@@ -14841,9 +14841,9 @@ checksum = "fdd20c5420375476fbd4394763288da7eb0cc0b8c11deed431a91562af7335d3"
 
 [[package]]
 name = "ydb"
-version = "0.10.4"
+version = "0.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ed28cd1e43acf2a8997b1c097dde28bd1d2ac1fab4f2ee0e8683e4ec08767d35"
+checksum = "57c640dd03763d8d225969388a3d453a73d7ff4b47c8953ff964f1458b6cd7f6"
 dependencies = [
  "async-trait",
  "chrono",

@@ -1,8 +1,8 @@
 use chrono::TimeZone;
-use decimal_rs::Decimal;
 use snafu::Snafu;
 use tracing::warn;
 use vector_lib::event::{Event, Value as VectorValue};
+use ydb::YdbDecimal;
 use ydb::{TableDescription, Value};
 
 #[derive(Debug, Snafu)]
@@ -111,11 +111,19 @@ fn convert_value(vector_val: &VectorValue, ydb_type_hint: &Value) -> Result<Valu
         (VectorValue::Integer(i), Value::Int64(_)) => Ok(Value::Int64(*i)),
 
         (VectorValue::Float(f), Value::Double(_)) => Ok(Value::Double(f.into_inner())),
-        (VectorValue::Float(f), Value::Decimal(_)) => Ok(Value::Decimal(
-            Decimal::try_from(f.into_inner()).map_err(|e| MappingError::ConversionFailed {
-                message: format!("failed to convert Float to Decimal: {}", e),
-            })?,
-        )),
+        (VectorValue::Float(f), Value::Decimal(ydb_decimal)) => {
+            let decimal_val = decimal_rs::Decimal::try_from(f.into_inner()).map_err(|e| {
+                MappingError::ConversionFailed {
+                    message: format!("failed to convert Float to Decimal: {}", e),
+                }
+            })?;
+            let ydb_decimal =
+                YdbDecimal::try_new(decimal_val, ydb_decimal.precision(), ydb_decimal.scale())
+                    .map_err(|e| MappingError::ConversionFailed {
+                        message: format!("failed to create YdbDecimal: {}", e),
+                    })?;
+            Ok(Value::Decimal(ydb_decimal))
+        }
 
         (VectorValue::Bytes(b), Value::Bytes(_)) => Ok(Value::Bytes(b.to_vec().into())),
         (VectorValue::Bytes(b), Value::Text(_)) => {
