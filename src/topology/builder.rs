@@ -1219,8 +1219,7 @@ impl Runner {
         let mut input_rx =
             super::ready_arrays::ReadyArrays::with_capacity(input_rx, READY_ARRAY_CAPACITY);
 
-        let mut in_flight =
-            super::in_flight_queue::InFlightQueue::new(self.preserve_ordering);
+        let mut in_flight = super::in_flight_queue::InFlightQueue::new(self.preserve_ordering);
         let mut shutting_down = false;
         let completed_count = Arc::new(AtomicU64::new(0));
         let mut yielded_since_last_record: u64 = 0;

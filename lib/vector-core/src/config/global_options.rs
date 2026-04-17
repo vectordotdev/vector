@@ -309,8 +309,7 @@ impl GlobalOptions {
             with.preserve_ordering_stateless_transforms.as_ref(),
         ) {
             errors.push(
-                "conflicting values for 'preserve_ordering_stateless_transforms' found"
-                    .to_owned(),
+                "conflicting values for 'preserve_ordering_stateless_transforms' found".to_owned(),
             );
         }
 
