@@ -9,13 +9,13 @@ use std::{
     },
 };
 
-use futures_util::{Stream, StreamExt, future::ready};
+use futures_util::{Stream, StreamExt};
 use metrics_tracing_context::MetricsLayer;
 use tokio::sync::{
     broadcast::{self, Receiver, Sender},
     oneshot,
 };
-use tokio_stream::wrappers::BroadcastStream;
+use tokio_stream::wrappers::{BroadcastStream, errors::BroadcastStreamRecvError};
 use tracing::{Event, Subscriber};
 use tracing_limit::RateLimitedLayer;
 use tracing_subscriber::{
@@ -169,9 +169,14 @@ fn consume_early_buffer() -> Vec<LogEvent> {
         .expect("early buffer was already consumed")
 }
 
+/// Capacity of the broadcast channel used to fan out internal log events to subscribers
+/// (e.g. the `internal_logs` source). Sized to absorb bursts without dropping events at
+/// elevated log levels while keeping worst-case memory bounded.
+const TRACE_BROADCAST_CAPACITY: usize = 10_000;
+
 /// Gets or creates a trace sender for sending internal log events.
 fn get_trace_sender() -> &'static broadcast::Sender<LogEvent> {
-    SENDER.get_or_init(|| broadcast::channel(99).0)
+    SENDER.get_or_init(|| broadcast::channel(TRACE_BROADCAST_CAPACITY).0)
 }
 
 /// Attempts to get the trace sender for sending internal log events.
@@ -279,10 +284,14 @@ impl TraceSubscription {
     }
 
     /// Converts this subscription into a raw stream of log events.
-    pub fn into_stream(self) -> impl Stream<Item = LogEvent> + Unpin {
-        // We ignore errors because the only error we get is when the broadcast receiver lags, and there's nothing we
-        // can actually do about that so there's no reason to force callers to even deal with it.
-        BroadcastStream::new(self.trace_rx).filter_map(|event| ready(event.ok()))
+    ///
+    /// `Err(n)` items signal that the underlying broadcast receiver lagged and `n` events were
+    /// dropped before the next successful receive. Callers are expected to surface this via a
+    /// metric — they MUST NOT log it through `tracing`, since that would feed back into this
+    /// broadcast and can amplify the lag.
+    pub fn into_stream(self) -> impl Stream<Item = Result<LogEvent, u64>> + Unpin {
+        BroadcastStream::new(self.trace_rx)
+            .map(|event| event.map_err(|BroadcastStreamRecvError::Lagged(n)| n))
     }
 }
 

@@ -13,7 +13,10 @@ use crate::{
     SourceSender,
     config::{DataType, SourceConfig, SourceContext, SourceOutput},
     event::{EstimatedJsonEncodedSizeOf, Event},
-    internal_events::{InternalLogsBytesReceived, InternalLogsEventsReceived, StreamClosedError},
+    internal_events::{
+        InternalLogsBytesReceived, InternalLogsEventsReceived, InternalLogsLagged,
+        StreamClosedError,
+    },
     shutdown::ShutdownSignal,
     trace::TraceSubscription,
 };
@@ -150,16 +153,25 @@ async fn run(
     let pid = std::process::id();
 
     // Chain any log events that were captured during early buffering to the front,
-    // and then continue with the normal stream of internal log events.
+    // and then continue with the normal stream of internal log events. Buffered events are
+    // wrapped in `Ok` to match the `Result<LogEvent, u64>` items produced by the live
+    // subscription, where `Err(n)` indicates that `n` events were dropped due to broadcast lag.
     let buffered_events = subscription.buffered_events().await;
-    let mut rx = stream::iter(buffered_events.into_iter().flatten())
+    let mut rx = stream::iter(buffered_events.into_iter().flatten().map(Ok))
         .chain(subscription.into_stream())
         .take_until(shutdown);
 
     // Note: This loop, or anything called within it, MUST NOT generate
     // any logs that don't break the loop, as that could cause an
     // infinite loop since it receives all such logs.
-    while let Some(mut log) = rx.next().await {
+    while let Some(item) = rx.next().await {
+        let mut log = match item {
+            Ok(log) => log,
+            Err(skipped) => {
+                emit!(InternalLogsLagged { count: skipped });
+                continue;
+            }
+        };
         // TODO: Should this actually be in memory size?
         let byte_size = log.estimated_json_encoded_size_of().get();
         let json_byte_size = log.estimated_json_encoded_size_of();
