@@ -1,0 +1,137 @@
+name: Check Generated VRL Docs Freshness
+
+on:
+  pull_request:
+  merge_group:
+    types: [checks_requested]
+  push:
+    branches:
+      - master
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.number || github.sha }}
+  cancel-in-progress: true
+
+env:
+  COMMIT_MESSAGE: "Update generated VRL docs"
+  COMMIT_AUTHOR: "github-actions[bot]"
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      docs: ${{ steps.filter.outputs.docs }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
+        id: filter
+        with:
+          filters: |
+            docs:
+              - "lib/vector-vrl/**"
+              - "Makefile"
+              - "Cargo.lock"
+              - ".github/workflows/check_generated_vrl_docs.yml"
+
+  run-check-generated-vrl-docs:
+    needs: changes
+    if: needs.changes.outputs.docs == 'true'
+    runs-on: ubuntu-24.04-8core
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
+          protoc: true
+          vdev: false
+
+      - uses: ./.github/actions/install-vrl-doc-builder
+
+      - name: Regenerate VRL docs
+        run: make generate-vector-vrl-docs
+
+      - name: Check for changes
+        id: check
+        run: |
+          git add docs/generated/
+          if git diff --cached --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check last commit
+        if: steps.check.outputs.changed == 'true'
+        id: last-commit
+        run: |
+          MSG=$(git log -1 --pretty=%s)
+          AUTHOR=$(git log -1 --pretty=%an)
+          if [ "$MSG" = "$COMMIT_MESSAGE" ] && [ "$AUTHOR" = "$COMMIT_AUTHOR" ]; then
+            echo "is-auto=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "is-auto=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit and push
+        if: >
+          steps.check.outputs.changed == 'true'
+          && steps.last-commit.outputs.is-auto != 'true'
+          && github.event_name == 'pull_request'
+          && github.event.pull_request.head.repo.full_name == github.repository
+        id: push
+        continue-on-error: true
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -m "$COMMIT_MESSAGE"
+          git push origin HEAD:refs/heads/$HEAD_REF
+
+      - name: Save PR number for comment workflow
+        if: >
+          steps.check.outputs.changed == 'true'
+          && steps.last-commit.outputs.is-auto != 'true'
+          && github.event_name == 'pull_request'
+          && steps.push.outcome != 'success'
+        run: |
+          mkdir -p /tmp/docs-check
+          echo "${{ github.event.pull_request.number }}" > /tmp/docs-check/pr-number
+
+      - name: Upload PR metadata
+        if: >
+          steps.check.outputs.changed == 'true'
+          && steps.last-commit.outputs.is-auto != 'true'
+          && github.event_name == 'pull_request'
+          && steps.push.outcome != 'success'
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: vrl-docs-check-pr
+          path: /tmp/docs-check/pr-number
+
+      - name: Fail if docs are out of date
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          echo "docs/generated/ is out of date. Regenerate with: make generate-vector-vrl-docs"
+          exit 1
+
+  check-generated-vrl-docs:
+    if: always()
+    runs-on: ubuntu-latest
+    needs: run-check-generated-vrl-docs
+    steps:
+      - run: |
+          if [[ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
+            echo "One or more jobs failed or were cancelled"
+            exit 1
+          fi

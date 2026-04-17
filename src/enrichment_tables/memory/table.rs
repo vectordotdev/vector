@@ -22,7 +22,7 @@ use tokio_stream::wrappers::IntervalStream;
 use vector_lib::{
     ByteSizeOf, EstimatedJsonEncodedSizeOf,
     config::LogNamespace,
-    enrichment::{Case, Condition, IndexHandle, Table},
+    enrichment::{Case, Condition, Error, IndexHandle, InternalError, Table},
     event::{Event, EventStatus, Finalizable},
     internal_event::{
         ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle, Output, Protocol,
@@ -60,7 +60,7 @@ impl ByteSizeOf for MemoryEntry {
 }
 
 impl MemoryEntry {
-    pub(super) fn as_object_map(&self, now: Instant, key: &str) -> Result<ObjectMap, String> {
+    pub(super) fn as_object_map(&self, now: Instant, key: &str) -> Result<ObjectMap, Error> {
         let ttl = self
             .ttl
             .saturating_sub(now.duration_since(*self.update_time).as_secs());
@@ -71,8 +71,12 @@ impl MemoryEntry {
             ),
             (
                 KeyString::from("value"),
-                serde_json::from_str::<Value>(&self.value)
-                    .map_err(|_| "Failed to read value from memory!")?,
+                // Unreachable in normal operation: `value` was serialized by `handle_value`.
+                serde_json::from_str::<Value>(&self.value).map_err(|source| Error::Internal {
+                    source: InternalError::FailedToDecode {
+                        details: source.to_string(),
+                    },
+                })?,
             ),
             (
                 KeyString::from("ttl"),
@@ -321,13 +325,13 @@ impl Table for Memory {
         select: Option<&'a [String]>,
         wildcard: Option<&Value>,
         index: Option<IndexHandle>,
-    ) -> Result<ObjectMap, String> {
+    ) -> Result<ObjectMap, Error> {
         let mut rows = self.find_table_rows(case, condition, select, wildcard, index)?;
 
         match rows.pop() {
             Some(row) if rows.is_empty() => Ok(row),
-            Some(_) => Err("More than 1 row found".to_string()),
-            None => Err("Key not found".to_string()),
+            Some(_) => Err(Error::MoreThanOneRowFound),
+            None => Err(Error::NoRowsFound),
         }
     }
 
@@ -338,9 +342,9 @@ impl Table for Memory {
         _select: Option<&'a [String]>,
         _wildcard: Option<&Value>,
         _index: Option<IndexHandle>,
-    ) -> Result<Vec<ObjectMap>, String> {
+    ) -> Result<Vec<ObjectMap>, Error> {
         match condition.first() {
-            Some(_) if condition.len() > 1 => Err("Only one condition is allowed".to_string()),
+            Some(_) if condition.len() > 1 => Err(Error::OnlyOneConditionAllowed),
             Some(Condition::Equals { value, .. }) => {
                 let key = value.to_string_lossy();
                 match self.get_read_handle().get_one(key.as_ref()) {
@@ -360,16 +364,16 @@ impl Table for Memory {
                     }
                 }
             }
-            Some(_) => Err("Only equality condition is allowed".to_string()),
-            None => Err("Key condition must be specified".to_string()),
+            Some(_) => Err(Error::OnlyEqualityConditionAllowed),
+            None => Err(Error::MissingCondition { kind: "Key" }),
         }
     }
 
-    fn add_index(&mut self, _case: Case, fields: &[&str]) -> Result<IndexHandle, String> {
+    fn add_index(&mut self, _case: Case, fields: &[&str]) -> Result<IndexHandle, Error> {
         match fields.len() {
-            0 => Err("Key field is required".to_string()),
+            0 => Err(Error::MissingRequiredField { field: "Key" }),
             1 => Ok(IndexHandle(0)),
-            _ => Err("Only one field is allowed".to_string()),
+            _ => Err(Error::OnlyOneFieldAllowed),
         }
     }
 

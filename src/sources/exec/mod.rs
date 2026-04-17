@@ -11,11 +11,10 @@ use tokio::{
     time::{self, Duration, Instant, sleep},
 };
 use tokio_stream::wrappers::IntervalStream;
-use tokio_util::codec::FramedRead;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::{
-        Decoder, DecodingConfig, StreamDecodingError,
+        Decoder, DecoderFramedRead, DecodingConfig, StreamDecodingError,
         decoding::{DeserializerConfig, FramingConfig},
     },
     config::{LegacyKey, LogNamespace, log_schema},
@@ -728,7 +727,7 @@ fn spawn_reader_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
     drop(tokio::spawn(async move {
         debug!("Start capturing {} command output.", origin);
 
-        let mut stream = FramedRead::new(reader, decoder);
+        let mut stream = DecoderFramedRead::new(reader, decoder);
         while let Some(result) = stream.next().await {
             match result {
                 Ok(next) => {

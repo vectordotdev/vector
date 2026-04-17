@@ -214,6 +214,135 @@ components: sinks: aws_s3: components._aws & {
 				`storage_class` option.
 				"""
 		}
+
+		parquet_encoding: {
+			title: "Parquet Batch Encoding"
+			body: """
+				The S3 sink supports Apache Parquet batch encoding with the `batch_encoding`
+				option. When configured, events are encoded together as Parquet columnar files
+				instead of the default per-event JSON or text encoding. Parquet files are
+				optimized for analytical queries using Athena, Trino, Spark, and other columnar
+				query engines.
+
+				Parquet handles compression internally at the column page level, so the
+				top-level `compression` setting must be set to `"none"`.
+
+				Output files automatically use the `.parquet` extension.
+
+				This feature requires the `codecs-parquet` feature flag at compile time.
+
+				There are two ways to provide a schema: supply a `schema_file`, or set
+				`schema_mode` to `auto_infer` and let Vector derive the schema from each
+				incoming batch.
+
+				#### Option 1: Schema file
+
+				Load the schema from a native Parquet `.schema` file. The file must
+				contain a valid Parquet message type definition.
+
+				```toml
+				[sinks.s3_parquet]
+				type = "aws_s3"
+				inputs = ["my-source"]
+				bucket = "my-analytics-bucket"
+				key_prefix = "logs/date=%F"
+				compression = "none"
+
+				[sinks.s3_parquet.encoding]
+				codec = "text"
+
+				[sinks.s3_parquet.batch_encoding]
+				codec = "parquet"
+				schema_file = "/etc/vector/schemas/logs.schema"
+				schema_mode = "relaxed"
+
+				[sinks.s3_parquet.batch_encoding.compression]
+				algorithm = "snappy"
+				```
+
+				#### Option 2: Auto-infer schema
+
+				Vector infers the Arrow schema from the fields present in each batch.
+				`Value::Timestamp` fields are automatically promoted to
+				`Timestamp(Microsecond, UTC)`. No schema file is required.
+
+				```toml
+				[sinks.s3_parquet]
+				type = "aws_s3"
+				inputs = ["my-source"]
+				bucket = "my-analytics-bucket"
+				key_prefix = "logs/date=%F"
+				compression = "none"
+
+				[sinks.s3_parquet.encoding]
+				codec = "text"
+
+				[sinks.s3_parquet.batch_encoding]
+				codec = "parquet"
+				schema_mode = "auto_infer"
+
+				[sinks.s3_parquet.batch_encoding.compression]
+				algorithm = "snappy"
+				```
+
+				#### YAML example
+
+				```yaml
+				sinks:
+				  s3_parquet:
+				    type: aws_s3
+				    inputs:
+				      - my-source
+				    bucket: my-analytics-bucket
+				    key_prefix: "logs/date=%F"
+				    compression: none
+				    encoding:
+				      codec: text
+				    batch_encoding:
+				      codec: parquet
+				      schema_mode: auto_infer
+				      compression:
+				        algorithm: gzip
+				        level: 9
+				```
+
+				#### Configuration reference
+
+				| Field | Type | Required | Description |
+				|---|---|---|---|
+				| `codec` | string | yes | Must be `"parquet"` |
+				| `schema_file` | path | no | Path to a native Parquet `.schema` file. Required when `schema_mode` is `relaxed` or `strict`. |
+				| `schema_mode` | string | no | `relaxed` (default), `strict`, or `auto_infer`. See the section on schema_mode values. |
+				| `compression` | object | no | Column-level compression. See the section on compression options. |
+
+				#### `schema_mode` values
+
+				| Value | Description |
+				|---|---|
+				| `relaxed` (default) | Missing schema fields become null. Extra event fields are silently dropped. |
+				| `strict` | Missing schema fields become null. Extra event fields cause an encoding error. |
+				| `auto_infer` | Schema is inferred from each batch. No `schema_file` needed. `Value::Timestamp` fields are promoted to `Timestamp(Microsecond, UTC)`. |
+
+				#### Compression options
+
+				Compression is configured as a nested object with an `algorithm` key.
+				Algorithms that support levels accept an additional `level` key.
+
+				| Algorithm | Level range | Default |
+				|---|---|---|
+				| `snappy` | — | yes |
+				| `zstd` | 1–21 | — |
+				| `gzip` | 1–9 | — |
+				| `lz4` | — | — |
+				| `none` | — | — |
+
+				#### Unsupported types
+
+				Binary fields are rejected at config time because the internal Arrow JSON
+				encoder cannot materialize them. Use `utf8` with base64 or hex encoding
+				for binary data instead.
+				"""
+		}
 	}
 
 	permissions: iam: [

@@ -85,7 +85,7 @@ impl Drop for UnsentEventCount {
 #[derive(Clone)]
 pub(super) struct Output {
     sender: LimitedSender<SourceSenderItem>,
-    lag_time: Option<Histogram>,
+    metrics: OutputMetrics,
     events_sent: Registered<EventsSent>,
     /// The schema definition that will be attached to Log events sent through here
     log_definition: Option<Arc<Definition>>,
@@ -93,6 +93,27 @@ pub(super) struct Output {
     /// `EventMetadata` for all event sent through here.
     id: Arc<OutputId>,
     timeout: Option<Duration>,
+}
+
+#[derive(Clone, Default)]
+pub(super) struct OutputMetrics {
+    lag_time: Option<Histogram>,
+    send_latency: Option<Histogram>,
+    send_batch_latency: Option<Histogram>,
+}
+
+impl OutputMetrics {
+    pub(super) fn new(
+        lag_time: Option<Histogram>,
+        send_latency: Option<Histogram>,
+        send_batch_latency: Option<Histogram>,
+    ) -> Self {
+        Self {
+            lag_time,
+            send_latency,
+            send_batch_latency,
+        }
+    }
 }
 
 #[expect(clippy::missing_fields_in_debug)]
@@ -111,19 +132,20 @@ impl Output {
     pub(super) fn new_with_buffer(
         n: usize,
         output: String,
-        lag_time: Option<Histogram>,
+        metrics: OutputMetrics,
         log_definition: Option<Arc<Definition>>,
         output_id: OutputId,
         timeout: Option<Duration>,
-        ewma_alpha: Option<f64>,
+        ewma_half_life_seconds: Option<f64>,
     ) -> (Self, LimitedReceiver<SourceSenderItem>) {
         let limit = MemoryBufferSize::MaxEvents(NonZeroUsize::new(n).unwrap());
-        let metrics = ChannelMetricMetadata::new(UTILIZATION_METRIC_PREFIX, Some(output.clone()));
-        let (tx, rx) = channel::limited(limit, Some(metrics), ewma_alpha);
+        let channel_metrics =
+            ChannelMetricMetadata::new(UTILIZATION_METRIC_PREFIX, Some(output.clone()));
+        let (tx, rx) = channel::limited(limit, Some(channel_metrics), ewma_half_life_seconds);
         (
             Self {
                 sender: tx,
-                lag_time,
+                metrics,
                 events_sent: internal_event::register(EventsSent::from(internal_event::Output(
                     Some(output.into()),
                 ))),
@@ -137,11 +159,20 @@ impl Output {
 
     pub(super) async fn send(
         &mut self,
-        mut events: EventArray,
+        events: EventArray,
         unsent_event_count: &mut UnsentEventCount,
     ) -> Result<(), SendError> {
-        let send_reference = Instant::now();
         let reference = Utc::now().timestamp_millis();
+        self.send_inner(events, unsent_event_count, reference).await
+    }
+
+    async fn send_inner(
+        &mut self,
+        mut events: EventArray,
+        unsent_event_count: &mut UnsentEventCount,
+        reference: i64,
+    ) -> Result<(), SendError> {
+        let send_reference = Instant::now();
         events
             .iter_events()
             .for_each(|event| self.emit_lag_time(event, reference));
@@ -156,7 +187,17 @@ impl Output {
 
         let byte_size = events.estimated_json_encoded_size_of();
         let count = events.len();
-        self.send_with_timeout(events, send_reference).await?;
+
+        let send_start = Instant::now();
+
+        let send_result = self.send_with_timeout(events, send_reference).await;
+
+        if let Some(send_latency) = &self.metrics.send_latency {
+            send_latency.record(send_start.elapsed().as_secs_f64());
+        }
+
+        send_result?;
+
         self.events_sent.emit(CountByteSize(count, byte_size));
         unsent_event_count.decr(count);
         Ok(())
@@ -218,24 +259,38 @@ impl Output {
         I: IntoIterator<Item = E>,
         <I as IntoIterator>::IntoIter: ExactSizeIterator,
     {
+        // Capture a single reference timestamp for the entire batch so that lag time
+        // measurements are not inflated by channel-send latency for later chunks.
+        let reference = Utc::now().timestamp_millis();
+
         // It's possible that the caller stops polling this future while it is blocked waiting
         // on `self.send()`. When that happens, we use `UnsentEventCount` to correctly emit
         // `ComponentEventsDropped` events.
         let events = events.into_iter().map(Into::into);
         let mut unsent_event_count = UnsentEventCount::new(events.len());
+        let send_batch_start = Instant::now();
+
         for events in array::events_into_arrays(events, Some(CHUNK_SIZE)) {
-            self.send(events, &mut unsent_event_count)
+            self.send_inner(events, &mut unsent_event_count, reference)
                 .await
-                .inspect_err(|error| match error {
-                    SendError::Timeout => {
-                        unsent_event_count.timed_out();
+                .inspect_err(|error| {
+                    match error {
+                        SendError::Timeout => {
+                            unsent_event_count.timed_out();
+                        }
+                        SendError::Closed => {
+                            // The unsent event count is discarded here because the callee emits the
+                            // `StreamClosedError`.
+                            unsent_event_count.discard();
+                        }
                     }
-                    SendError::Closed => {
-                        // The unsent event count is discarded here because the callee emits the
-                        // `StreamClosedError`.
-                        unsent_event_count.discard();
+                    if let Some(send_batch_latency) = &self.metrics.send_batch_latency {
+                        send_batch_latency.record(send_batch_start.elapsed().as_secs_f64());
                     }
                 })?;
+        }
+        if let Some(send_batch_latency) = &self.metrics.send_batch_latency {
+            send_batch_latency.record(send_batch_start.elapsed().as_secs_f64());
         }
         Ok(())
     }
@@ -244,7 +299,7 @@ impl Output {
     /// timestamp stored in the given event reference, and emit the
     /// different, as expressed in milliseconds, as a histogram.
     pub(super) fn emit_lag_time(&self, event: EventRef<'_>, reference: i64) {
-        if let Some(lag_time_metric) = &self.lag_time {
+        if let Some(lag_time_metric) = &self.metrics.lag_time {
             let timestamp = match event {
                 EventRef::Log(log) => {
                     log_schema()

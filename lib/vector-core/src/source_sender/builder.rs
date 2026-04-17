@@ -1,19 +1,22 @@
 use std::{collections::HashMap, time::Duration};
 
-use metrics::{Histogram, histogram};
+use metrics::histogram;
 use vector_buffers::topology::channel::LimitedReceiver;
 use vector_common::internal_event::DEFAULT_OUTPUT;
 
-use super::{CHUNK_SIZE, LAG_TIME_NAME, Output, SourceSender, SourceSenderItem};
+use super::{
+    CHUNK_SIZE, LAG_TIME_NAME, Output, OutputMetrics, SEND_BATCH_LATENCY_NAME, SEND_LATENCY_NAME,
+    SourceSender, SourceSenderItem,
+};
 use crate::config::{ComponentKey, OutputId, SourceOutput};
 
 pub struct Builder {
     buf_size: usize,
     default_output: Option<Output>,
     named_outputs: HashMap<String, Output>,
-    lag_time: Option<Histogram>,
+    output_metrics: OutputMetrics,
     timeout: Option<Duration>,
-    ewma_alpha: Option<f64>,
+    ewma_half_life_seconds: Option<f64>,
 }
 
 impl Default for Builder {
@@ -22,9 +25,13 @@ impl Default for Builder {
             buf_size: CHUNK_SIZE,
             default_output: None,
             named_outputs: Default::default(),
-            lag_time: Some(histogram!(LAG_TIME_NAME)),
+            output_metrics: OutputMetrics::new(
+                Some(histogram!(LAG_TIME_NAME)),
+                Some(histogram!(SEND_LATENCY_NAME)),
+                Some(histogram!(SEND_BATCH_LATENCY_NAME)),
+            ),
             timeout: None,
-            ewma_alpha: None,
+            ewma_half_life_seconds: None,
         }
     }
 }
@@ -43,8 +50,8 @@ impl Builder {
     }
 
     #[must_use]
-    pub fn with_ewma_alpha(mut self, alpha: Option<f64>) -> Self {
-        self.ewma_alpha = alpha;
+    pub fn with_ewma_half_life_seconds(mut self, half_life_seconds: Option<f64>) -> Self {
+        self.ewma_half_life_seconds = half_life_seconds;
         self
     }
 
@@ -53,7 +60,6 @@ impl Builder {
         output: SourceOutput,
         component_key: ComponentKey,
     ) -> LimitedReceiver<SourceSenderItem> {
-        let lag_time = self.lag_time.clone();
         let log_definition = output.schema_definition.clone();
         let output_id = OutputId {
             component: component_key,
@@ -64,11 +70,11 @@ impl Builder {
                 let (output, rx) = Output::new_with_buffer(
                     self.buf_size,
                     DEFAULT_OUTPUT.to_owned(),
-                    lag_time,
+                    self.output_metrics.clone(),
                     log_definition,
                     output_id,
                     self.timeout,
-                    self.ewma_alpha,
+                    self.ewma_half_life_seconds,
                 );
                 self.default_output = Some(output);
                 rx
@@ -77,11 +83,11 @@ impl Builder {
                 let (output, rx) = Output::new_with_buffer(
                     self.buf_size,
                     name.clone(),
-                    lag_time,
+                    self.output_metrics.clone(),
                     log_definition,
                     output_id,
                     self.timeout,
-                    self.ewma_alpha,
+                    self.ewma_half_life_seconds,
                 );
                 self.named_outputs.insert(name, output);
                 rx

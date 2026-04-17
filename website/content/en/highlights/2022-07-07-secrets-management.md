@@ -19,21 +19,24 @@ these values can be read if a user on a host has access to read from the `/proc`
 
 A secret backend can be configured like this:
 
-```toml
-[secret.backend_1]
-type = "exec" # exec is the only supported backend as of writing
-command = ["/path/to/cmd1"]
+```yaml
+secret:
+  backend_1:
+    type: "exec" # exec is the only supported backend as of writing
+    command: ["/path/to/cmd1"]
 ```
 
 You can then specify where secrets should be read via `SECRET[<backend name>.<secret name>]` in the config like:
 
-```toml
-[sources.my_source_id]
-type = "aws_sqs"
-region = "us-east-1"
-queue_url = "https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue"
-auth.access_key_id = "SECRET[backend_1.aws_access_key_id]"
-auth.secret_access_key = "SECRET[backend_1.aws_secret_access_key]"
+```yaml
+sources:
+  my_source_id:
+    type: "aws_sqs"
+    region: "us-east-1"
+    queue_url: "https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue"
+    auth:
+      access_key_id: "SECRET[backend_1.aws_access_key_id]"
+      secret_access_key: "SECRET[backend_1.aws_secret_access_key]"
 ```
 
 Here `auth.access_key_id` and `auth.secret_access_key` will use secrets provided by the `backend_1` secret backend.
@@ -59,4 +62,4 @@ Vector will then use the returned values when loading the configuration.
 
 If an `error` is returned, or the command exits non-zero, Vector will log any errors and stop.
 
-See the [documentation](/docs/reference/configuration/global-options/#secret) for additional details.
+See the [documentation](/docs/reference/configuration/secrets/#secret) for additional details.

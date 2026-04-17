@@ -267,13 +267,27 @@ cross-enable: cargo-install-cross
 CARGO_HANDLES_FRESHNESS:
 	${EMPTY}
 
+# Pinned digests for ghcr.io/cross-rs/<target>:edge.
+# Source: cross-rs/cross @ f86fd03bb70b4c6802847c18087e21391498b0b4, built 2026-04-10 (Ubuntu 20.04 focal).
+# Refresh with: crane digest ghcr.io/cross-rs/<target>:edge
+CROSS_DIGEST_x86_64-unknown-linux-gnu       := sha256:13f7a68e55cb05a19e840bce65834fc785dc069e0c2218d12b8fdb8f8a1519d5
+CROSS_DIGEST_aarch64-unknown-linux-gnu      := sha256:3bf094d22fc4f73c9bdce45ddd7a8bbae349efdbd51b4d4b5ee1bedd8454466b
+CROSS_DIGEST_x86_64-unknown-linux-musl      := sha256:c59deede3efcd7cb6f6a57641241ba1c63cfe35b7965be09a851242b4209639d
+CROSS_DIGEST_aarch64-unknown-linux-musl     := sha256:dad492e0f040c6e712d4be9b970c9de5f3b8ef9cde6b9a2b437d56d1dabeb808
+CROSS_DIGEST_armv7-unknown-linux-gnueabihf  := sha256:73294ebb06e077e49bbbecfe8f17507e9e0b733a2a1ba23056abcd9c0ba617c9
+CROSS_DIGEST_armv7-unknown-linux-musleabihf := sha256:49bdc9a4cf2f1bcb385389c85be8f43c4399fa6d6fe22883702ef13eb921e443
+CROSS_DIGEST_arm-unknown-linux-gnueabi      := sha256:0c70b0e54724bd599dff00a2888f8ea176a5b6c85af47aad9ad25296f63e2967
+CROSS_DIGEST_arm-unknown-linux-musleabi     := sha256:0ca8f4afcc29fb5964aa63e482452e8869311a610c5868f22ded400c4e483328
+
 # GNU Make < 3.82 pattern matching priority depends on the definition order
 # so cross-image-% must be defined before cross-%
 .PHONY: cross-image-%
 cross-image-%: export TRIPLE =$($(strip @):cross-image-%=%)
 cross-image-%:
+	$(if $(CROSS_DIGEST_$*),,$(error No CROSS_DIGEST pinned for $*. Add it to the digest table in Makefile.))
 	$(CONTAINER_TOOL) build \
 		--build-arg TARGET=${TRIPLE} \
+		--build-arg CROSS_DIGEST=$(CROSS_DIGEST_$*) \
 		--file scripts/cross/Dockerfile \
 		--tag vector-cross-env:${TRIPLE} \
 		.
@@ -373,7 +387,7 @@ test-behavior-config: ## Runs configuration related behavioral tests
 
 .PHONY: test-behavior-%
 test-behavior-%: ## Runs behavioral test for a given category
-	${MAYBE_ENVIRONMENT_EXEC} cargo run --no-default-features --features transforms -- test tests/behavior/$*/*
+	${MAYBE_ENVIRONMENT_EXEC} cargo run --no-default-features --features transforms,vrl-functions-env,vrl-functions-system,vrl-functions-network,vrl-functions-crypto -- test tests/behavior/$*/*
 
 .PHONY: test-behavior
 test-behavior: ## Runs all behavioral tests
@@ -388,6 +402,14 @@ test-integration: test-integration-kafka test-integration-logstash test-integrat
 test-integration: test-integration-nginx test-integration-opentelemetry test-integration-postgres test-integration-prometheus test-integration-pulsar
 test-integration: test-integration-redis test-integration-splunk test-integration-dnstap test-integration-datadog-agent test-integration-datadog-logs test-integration-e2e-datadog-logs test-integration-e2e-opentelemetry-logs
 test-integration: test-integration-datadog-traces test-integration-shutdown
+
+.PHONY: test-integration-windows-event-log
+test-integration-windows-event-log: ## Runs Windows Event Log integration tests (Windows only)
+ifeq ($(OS),Windows_NT)
+	${MAYBE_ENVIRONMENT_EXEC} cargo test -p vector --no-default-features --features sources-windows_event_log-integration-tests windows_event_log::integration_tests
+else
+	@echo "Skipping windows-event-log integration tests (Windows only)"
+endif
 
 test-integration-%-cleanup:
 	$(VDEV) --verbose integration stop $*
@@ -406,9 +428,13 @@ test-e2e-kubernetes: ## Runs Kubernetes E2E tests (Sorry, no `ENVIRONMENT=true` 
 test-cli: ## Runs cli tests
 	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --no-fail-fast --no-default-features --features cli-tests --test integration --test-threads 4
 
+.PHONY: test-vector-api
+test-vector-api: ## Runs vector API tests (top and tap)
+	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --no-fail-fast --no-default-features --features vector-api-tests --test vector_api
+
 .PHONY: test-component-validation
 test-component-validation: ## Runs component validation tests
-	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --no-fail-fast --no-default-features --features component-validation-tests --status-level pass --test-threads 4 components::validation::tests
+	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --no-fail-fast --no-default-features --features component-validation-tests --status-level pass --test-threads 4 --lib components::validation::tests
 
 ##@ Benching (Supports `ENVIRONMENT=true`)
 
@@ -468,7 +494,7 @@ check: ## Run prerequisite code checks
 check-all: ## Check everything
 check-all: check-fmt check-clippy check-docs
 check-all: check-examples check-component-features
-check-all: check-scripts check-deny check-component-docs check-licenses
+check-all: check-scripts check-deny check-generated-docs check-licenses
 
 .PHONY: check-component-features
 check-component-features: ## Check that all component features are setup properly
@@ -479,7 +505,7 @@ check-clippy: ## Check code with Clippy
 	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) check rust
 
 .PHONY: check-docs
-check-docs: ## Check that all /docs file are valid
+check-docs: generate-vrl-docs ## Check that all /docs file are valid - vrl docs due to remap.functions.* references
 	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) check docs
 
 .PHONY: check-fmt
@@ -494,6 +520,28 @@ check-licenses: ## Check that the 3rd-party license file is up to date
 check-markdown: ## Check that markdown is styled properly
 	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) check markdown
 
+.PHONY: fix-markdown
+fix-markdown: ## Auto-fix markdown style issues
+	${MAYBE_ENVIRONMENT_EXEC} markdownlint-cli2 --fix $(shell git ls-files '*.md')
+
+.PHONY: check-prettier
+check-prettier: ## Check that JS/TS/YAML/JSON files are formatted with prettier
+	@for ext in yml yaml js ts tsx json; do \
+		files=$$(git ls-files "*.$$ext"); \
+		if [ -n "$$files" ]; then \
+			${MAYBE_ENVIRONMENT_EXEC} prettier --ignore-path .prettierignore --check $$files || exit 1; \
+		fi; \
+	done
+
+.PHONY: fix-prettier
+fix-prettier: ## Auto-fix JS/TS/YAML/JSON formatting with prettier
+	@for ext in yml yaml js ts tsx json; do \
+		files=$$(git ls-files "*.$$ext"); \
+		if [ -n "$$files" ]; then \
+			${MAYBE_ENVIRONMENT_EXEC} prettier --ignore-path .prettierignore --write $$files || exit 1; \
+		fi; \
+	done
+
 .PHONY: check-examples
 check-examples: ## Check that the config/examples files are valid
 	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) check examples
@@ -506,13 +554,17 @@ check-scripts: ## Check that scripts do not have common mistakes
 check-deny: ## Check advisories licenses and sources for crate dependencies
 	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) check deny
 
+.PHONY: check-deny-licenses
+check-deny-licenses: ## Check licenses for crate dependencies
+	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) check deny --licenses-only
+
 .PHONY: check-events
 check-events: ## Check that events satisfy patterns set in https://github.com/vectordotdev/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
 	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) check events
 
-.PHONY: check-component-docs
-check-component-docs: generate-component-docs ## Checks that the machine-generated component Cue docs are up-to-date.
-	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) check component-docs
+.PHONY: check-generated-docs
+check-generated-docs: generate-docs ## Checks that the machine-generated component Cue docs are up-to-date.
+	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) check generated-docs
 
 ##@ Rustdoc
 build-rustdoc: ## Build Vector's Rustdocs
@@ -536,22 +588,28 @@ package: build ## Build the Vector archive
 	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) package archive
 
 .PHONY: package-x86_64-unknown-linux-gnu-all
-package-x86_64-unknown-linux-gnu-all: package-x86_64-unknown-linux-gnu package-deb-x86_64-unknown-linux-gnu package-rpm-x86_64-unknown-linux-gnu # Build all x86_64 GNU packages
+package-x86_64-unknown-linux-gnu-all: package-x86_64-unknown-linux-gnu package-deb-x86_64-unknown-linux-gnu package-rpm-x86_64-unknown-linux-gnu # .tar.gz, .deb, .rpm
 
 .PHONY: package-x86_64-unknown-linux-musl-all
-package-x86_64-unknown-linux-musl-all: package-x86_64-unknown-linux-musl # Build all x86_64 MUSL packages
+package-x86_64-unknown-linux-musl-all: package-x86_64-unknown-linux-musl # .tar.gz
 
 .PHONY: package-aarch64-unknown-linux-musl-all
-package-aarch64-unknown-linux-musl-all: package-aarch64-unknown-linux-musl # Build all aarch64 MUSL packages
+package-aarch64-unknown-linux-musl-all: package-aarch64-unknown-linux-musl # .tar.gz
 
 .PHONY: package-aarch64-unknown-linux-gnu-all
-package-aarch64-unknown-linux-gnu-all: package-aarch64-unknown-linux-gnu package-deb-aarch64 package-rpm-aarch64 # Build all aarch64 GNU packages
+package-aarch64-unknown-linux-gnu-all: package-aarch64-unknown-linux-gnu package-deb-aarch64 package-rpm-aarch64 # .tar.gz, .deb, .rpm
 
 .PHONY: package-armv7-unknown-linux-gnueabihf-all
-package-armv7-unknown-linux-gnueabihf-all: package-armv7-unknown-linux-gnueabihf package-deb-armv7-gnu package-rpm-armv7hl-gnu  # Build all armv7-unknown-linux-gnueabihf MUSL packages
+package-armv7-unknown-linux-gnueabihf-all: package-armv7-unknown-linux-gnueabihf package-deb-armv7-gnu package-rpm-armv7hl-gnu # .tar.gz, .deb, .rpm
+
+.PHONY: package-armv7-unknown-linux-musleabihf-all
+package-armv7-unknown-linux-musleabihf-all: package-armv7-unknown-linux-musleabihf # .tar.gz
 
 .PHONY: package-arm-unknown-linux-gnueabi-all
-package-arm-unknown-linux-gnueabi-all: package-arm-unknown-linux-gnueabi package-deb-arm-gnu  # Build all arm-unknown-linux-gnueabihf GNU packages
+package-arm-unknown-linux-gnueabi-all: package-arm-unknown-linux-gnueabi package-deb-arm-gnu # .tar.gz, .deb
+
+.PHONY: package-arm-unknown-linux-musleabi-all
+package-arm-unknown-linux-musleabi-all: package-arm-unknown-linux-musleabi # .tar.gz
 
 .PHONY: package-x86_64-unknown-linux-gnu
 package-x86_64-unknown-linux-gnu: target/artifacts/vector-${VERSION}-x86_64-unknown-linux-gnu.tar.gz ## Build an archive suitable for the `x86_64-unknown-linux-gnu` triple.
@@ -589,41 +647,41 @@ package-arm-unknown-linux-musleabi: target/artifacts/vector-${VERSION}-arm-unkno
 
 .PHONY: package-deb-x86_64-unknown-linux-gnu
 package-deb-x86_64-unknown-linux-gnu: package-x86_64-unknown-linux-gnu ## Build the x86_64 GNU deb package
-	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=x86_64-unknown-linux-gnu -e VECTOR_VERSION $(ENVIRONMENT_UPSTREAM) cargo vdev package deb
+	TARGET=x86_64-unknown-linux-gnu $(VDEV) package deb
 
 .PHONY: package-deb-x86_64-unknown-linux-musl
 package-deb-x86_64-unknown-linux-musl: package-x86_64-unknown-linux-musl ## Build the x86_64 GNU deb package
-	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=x86_64-unknown-linux-musl -e VECTOR_VERSION $(ENVIRONMENT_UPSTREAM) cargo vdev package deb
+	TARGET=x86_64-unknown-linux-musl $(VDEV) package deb
 
 .PHONY: package-deb-aarch64
 package-deb-aarch64: package-aarch64-unknown-linux-gnu ## Build the aarch64 deb package
-	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=aarch64-unknown-linux-gnu -e VECTOR_VERSION $(ENVIRONMENT_UPSTREAM) cargo vdev package deb
+	TARGET=aarch64-unknown-linux-gnu $(VDEV) package deb
 
 .PHONY: package-deb-armv7-gnu
 package-deb-armv7-gnu: package-armv7-unknown-linux-gnueabihf ## Build the armv7-unknown-linux-gnueabihf deb package
-	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=armv7-unknown-linux-gnueabihf -e VECTOR_VERSION $(ENVIRONMENT_UPSTREAM) cargo vdev package deb
+	TARGET=armv7-unknown-linux-gnueabihf $(VDEV) package deb
 
 .PHONY: package-deb-arm-gnu
 package-deb-arm-gnu: package-arm-unknown-linux-gnueabi ## Build the arm-unknown-linux-gnueabi deb package
-	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=arm-unknown-linux-gnueabi -e VECTOR_VERSION $(ENVIRONMENT_UPSTREAM) cargo vdev package deb
+	TARGET=arm-unknown-linux-gnueabi $(VDEV) package deb
 
 # rpms
 
 .PHONY: package-rpm-x86_64-unknown-linux-gnu
 package-rpm-x86_64-unknown-linux-gnu: package-x86_64-unknown-linux-gnu ## Build the x86_64 rpm package
-	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=x86_64-unknown-linux-gnu -e VECTOR_VERSION $(ENVIRONMENT_UPSTREAM) cargo vdev package rpm
+	TARGET=x86_64-unknown-linux-gnu $(VDEV) package rpm
 
 .PHONY: package-rpm-x86_64-unknown-linux-musl
 package-rpm-x86_64-unknown-linux-musl: package-x86_64-unknown-linux-musl ## Build the x86_64 musl rpm package
-	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=x86_64-unknown-linux-musl -e VECTOR_VERSION $(ENVIRONMENT_UPSTREAM) cargo vdev package rpm
+	TARGET=x86_64-unknown-linux-musl $(VDEV) package rpm
 
 .PHONY: package-rpm-aarch64
 package-rpm-aarch64: package-aarch64-unknown-linux-gnu ## Build the aarch64 rpm package
-	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=aarch64-unknown-linux-gnu -e VECTOR_VERSION $(ENVIRONMENT_UPSTREAM) cargo vdev package rpm
+	TARGET=aarch64-unknown-linux-gnu $(VDEV) package rpm
 
 .PHONY: package-rpm-armv7hl-gnu
 package-rpm-armv7hl-gnu: package-armv7-unknown-linux-gnueabihf ## Build the armv7hl-unknown-linux-gnueabihf rpm package
-	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=armv7-unknown-linux-gnueabihf -e ARCH=armv7hl -e VECTOR_VERSION $(ENVIRONMENT_UPSTREAM) cargo vdev package rpm
+	TARGET=armv7-unknown-linux-gnueabihf ARCH=armv7hl $(VDEV) package rpm
 
 ##@ Releasing
 
@@ -688,6 +746,26 @@ generate-component-docs: ## Generate per-component Cue docs from the configurati
 	target/debug/vector generate-schema > /tmp/vector-config-schema.json 2>/dev/null
 	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) build component-docs /tmp/vector-config-schema.json \
 		$(if $(findstring true,$(CI)),>/dev/null,)
+	./scripts/cue.sh fmt
+
+VRL_DOC_BUILDER := $(shell command -v vector-vrl-doc-builder 2>/dev/null)
+ifndef VRL_DOC_BUILDER
+VRL_DOC_BUILDER_CMD = cargo run -p vector-vrl-doc-builder --
+else
+VRL_DOC_BUILDER_CMD = vector-vrl-doc-builder
+endif
+
+.PHONY: generate-vector-vrl-docs
+generate-vector-vrl-docs: ## Generate VRL function documentation from Rust source.
+	${MAYBE_ENVIRONMENT_EXEC} $(VRL_DOC_BUILDER_CMD) --output docs/generated/ \
+		$(if $(findstring true,$(CI)),>/dev/null,)
+
+.PHONY: generate-vrl-docs
+generate-vrl-docs: ## Generate combined VRL function documentation for the website.
+	$(MAKE) -C website generate-vrl-docs
+
+.PHONY: generate-docs
+generate-docs: generate-component-docs generate-vector-vrl-docs generate-vrl-docs
 
 .PHONY: signoff
 signoff: ## Signsoff all previous commits since branch creation

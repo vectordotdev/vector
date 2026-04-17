@@ -79,7 +79,7 @@ components: sources: internal_metrics: {
 			tags:              _component_tags
 		}
 		api_started_total: {
-			description:       "The number of times the Vector GraphQL API has been started."
+			description:       "The number of times the Vector API has been started."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
@@ -272,6 +272,28 @@ components: sources: internal_metrics: {
 			tags: _internal_metrics_tags & {
 				reason: _reason
 			}
+		}
+		component_latency_seconds: {
+			description: """
+				The elapsed time, in fractional seconds, that an event spends in a single transform.
+
+				This includes both the time spent queued in the transform’s input buffer and the time spent executing the transform itself.
+				"""
+			type:              "histogram"
+			default_namespace: "vector"
+			tags:              _internal_metrics_tags
+		}
+		component_latency_mean_seconds: {
+			description: """
+				The mean elapsed time, in fractional seconds, that an event spends in a single transform.
+
+				This includes both the time spent queued in the transform’s input buffer and the time spent executing the transform itself.
+
+				This value is smoothed over time using an exponentially weighted moving average (EWMA).
+				"""
+			type:              "gauge"
+			default_namespace: "vector"
+			tags:              _internal_metrics_tags
 		}
 		buffer_byte_size: {
 			description:        "The number of bytes currently in the buffer."
@@ -752,6 +774,18 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
+		source_send_batch_latency_seconds: {
+			description:       "The time elapsed blocking on the downstream channel to accept an entire batch of events received at the source"
+			type:              "histogram"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		source_send_latency_seconds: {
+			description:       "The time elapsed blocking on the downstream channel to accept a single chunk from a batch of events received at the source"
+			type:              "histogram"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
 		source_buffer_max_byte_size: {
 			description:       "The maximum number of bytes the source buffer can hold. The outputs of the source send data to this buffer."
 			type:              "gauge"
@@ -900,11 +934,29 @@ components: sources: internal_metrics: {
 		tag_value_limit_exceeded_total: {
 			description: """
 				The total number of events discarded because the tag has been rejected after
-				hitting the configured `value_limit`.
+				hitting the configured `value_limit`. When `internal_metrics.include_extended_tags`
+				is enabled in the `tag_cardinality_limit` transform, this metric includes
+				`metric_name` and `tag_key` labels. By default, this metric has no labels to
+				keep cardinality low.
 				"""
 			type:              "counter"
 			default_namespace: "vector"
-			tags:              _component_tags
+			tags: _component_tags & {
+				metric_name: {
+					description: """
+						The name of the metric whose tag value limit was exceeded.
+						Only present when `internal_metrics.include_extended_tags` is enabled.
+						"""
+					required: false
+				}
+				tag_key: {
+					description: """
+						The key of the tag whose value limit was exceeded.
+						Only present when `internal_metrics.include_extended_tags` is enabled.
+						"""
+					required: false
+				}
+			}
 		}
 		timestamp_parse_errors_total: {
 			description:       "The total number of errors encountered parsing [RFC 3339](\(urls.rfc_3339)) timestamps."

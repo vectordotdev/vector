@@ -7,6 +7,7 @@ use std::{
     },
 };
 
+use chrono::{TimeZone, Utc};
 use futures::{
     future::{ok, ready},
     stream,
@@ -31,10 +32,11 @@ use crate::{
         util::{BatchConfig, Compression, TowerRequestConfig},
     },
     test_util::{
-        components::{SINK_TAGS, run_and_assert_sink_compliance},
+        components::{SINK_TAGS, init_test, run_and_assert_sink_compliance},
         random_table_name, trace_init,
     },
 };
+use vector_lib::metrics::Controller;
 
 fn clickhouse_address() -> String {
     std::env::var("CLICKHOUSE_ADDRESS").unwrap_or_else(|_| "http://localhost:8123".into())
@@ -433,6 +435,20 @@ impl ClickhouseClient {
         }
     }
 
+    async fn create_table_with_sql(&self, sql: &str) {
+        let response = self
+            .client
+            .post(&self.host)
+            .body(sql.to_owned())
+            .send()
+            .await
+            .unwrap();
+
+        if !response.status().is_success() {
+            panic!("create table failed: {}", response.text().await.unwrap())
+        }
+    }
+
     async fn select_all(&self, table: &str) -> QueryResponse {
         let response = self
             .client
@@ -549,7 +565,7 @@ async fn insert_events_arrow_with_schema_fetching() {
     client
         .create_table(
             &table,
-            "host String, timestamp DateTime64(3), message String, id Int64, name String, score Float64, active Bool",
+            "host String, timestamp DateTime64(3), message String, id Int64, name String, score Float64, active Bool, request_id UUID",
         )
         .await;
 
@@ -579,6 +595,10 @@ async fn insert_events_arrow_with_schema_fetching() {
         event.insert("name", format!("user_{}", i));
         event.insert("score", 95.5 + i as f64);
         event.insert("active", i % 2 == 0);
+        event.insert(
+            "request_id",
+            format!("550e8400-e29b-41d4-a716-44665544000{}", i),
+        );
         events.push(event.into());
     }
 
@@ -588,7 +608,7 @@ async fn insert_events_arrow_with_schema_fetching() {
     assert_eq!(3, output.rows);
 
     // Verify all fields exist and have the correct types
-    for row in output.data.iter() {
+    for (i, row) in output.data.iter().enumerate() {
         // Check standard Vector fields exist
         assert!(row.get("host").and_then(|v| v.as_str()).is_some());
         assert!(row.get("message").and_then(|v| v.as_str()).is_some());
@@ -604,6 +624,16 @@ async fn insert_events_arrow_with_schema_fetching() {
         assert!(row.get("name").and_then(|v| v.as_str()).is_some());
         assert!(row.get("score").and_then(|v| v.as_f64()).is_some());
         assert!(row.get("active").and_then(|v| v.as_bool()).is_some());
+
+        // Check UUID field
+        let request_id = row
+            .get("request_id")
+            .and_then(|v| v.as_str())
+            .expect("request_id should be present");
+        assert_eq!(
+            request_id,
+            format!("550e8400-e29b-41d4-a716-44665544000{}", i)
+        );
     }
 }
 
@@ -1173,4 +1203,202 @@ async fn test_complex_types() {
         .and_then(|v| v.as_array())
         .unwrap();
     assert_eq!(2, nested3.len());
+}
+
+/// Tests that missing required fields emit EncoderNullConstraintError and reject the batch
+#[tokio::test]
+async fn test_missing_required_field_emits_null_constraint_error() {
+    init_test();
+
+    let table = random_table_name();
+    let host = clickhouse_address();
+
+    let mut batch = BatchConfig::default();
+    batch.max_events = Some(1);
+
+    let client = ClickhouseClient::new(host.clone());
+
+    // Create table with non-nullable required_field column
+    client
+        .create_table(
+            &table,
+            "host String, timestamp DateTime64(3), message String, required_field String",
+        )
+        .await;
+
+    let config = ClickhouseConfig {
+        endpoint: host.parse().unwrap(),
+        table: table.clone().try_into().unwrap(),
+        compression: Compression::None,
+        format: crate::sinks::clickhouse::config::Format::ArrowStream,
+        batch_encoding: Some(BatchSerializerConfig::ArrowStream(Default::default())),
+        batch,
+        request: TowerRequestConfig {
+            retry_attempts: 1,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    // Building the sink fetches the schema - required_field will be detected as non-nullable
+    let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
+
+    // Create an event WITHOUT the required_field
+    let mut event = LogEvent::from("test message");
+    event.insert("host", "example.com");
+    // Deliberately NOT inserting "required_field"
+
+    // Run the sink - should fail due to missing required field
+    timeout(Duration::from_secs(5), sink.run_events(vec![event.into()]))
+        .await
+        .unwrap()
+        .unwrap();
+
+    // NOTE: The batch should be rejected (BatchStatus::Rejected) but the generic
+    // RequestBuilder drops event finalizers without updating their status on encoding
+    // failure, so BatchStatus defaults to Delivered. See:
+    // https://github.com/vectordotdev/vector/issues/24723
+    // assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
+
+    // Verify the component_errors_total metric was incremented with the correct error_code
+    let metrics = Controller::get().unwrap().capture_metrics();
+    let null_constraint_errors: Vec<_> = metrics
+        .iter()
+        .filter(|m| {
+            m.name() == "component_errors_total"
+                && m.tags()
+                    .map(|t| t.get("error_code") == Some("encoding_null_constraint"))
+                    .unwrap_or(false)
+        })
+        .collect();
+
+    assert!(
+        !null_constraint_errors.is_empty(),
+        "Expected component_errors_total with error_code=encoding_null_constraint to be emitted"
+    );
+}
+
+/// Tests that Arrow schema fetching correctly handles special ClickHouse column types:
+/// - MATERIALIZED and ALIAS columns are excluded from the schema (can't receive INSERT data)
+/// - DEFAULT columns are kept but marked nullable (server fills them in if omitted)
+/// - EPHEMERAL columns are excluded (not stored, only used in expressions)
+///
+/// The sink should successfully insert data without providing values for any of these
+/// special column types.
+#[tokio::test]
+async fn arrow_schema_excludes_non_insertable_columns() {
+    trace_init();
+
+    let table = random_table_name();
+    let host = clickhouse_address();
+
+    let client = ClickhouseClient::new(host.clone());
+
+    // Create a table with all special column types:
+    // - Regular columns: timestamp, host, message, resource_attributes
+    // - DEFAULT: timestamp_date (computed from timestamp if not provided)
+    // - MATERIALIZED: cluster_name (computed on INSERT, cannot receive data)
+    // - ALIAS: host_upper (virtual, computed on SELECT)
+    // - EPHEMERAL: _ttl (not stored, only usable in DEFAULT/MATERIALIZED expressions)
+    client
+        .create_table_with_sql(&format!(
+            "CREATE TABLE {table} (\
+                host String, \
+                timestamp DateTime64(3), \
+                message String, \
+                timestamp_date DateTime DEFAULT toDateTime(timestamp), \
+                resource_attributes Map(String, String), \
+                cluster_name String MATERIALIZED resource_attributes['k8s.cluster.name'], \
+                host_upper String ALIAS upper(host), \
+                _ttl UInt32 EPHEMERAL 0\
+            ) ENGINE = MergeTree ORDER BY (host, timestamp)"
+        ))
+        .await;
+
+    let mut batch = BatchConfig::default();
+    batch.max_events = Some(2);
+
+    let config = ClickhouseConfig {
+        endpoint: host.parse().unwrap(),
+        table: table.clone().try_into().unwrap(),
+        compression: Compression::None,
+        format: crate::sinks::clickhouse::config::Format::ArrowStream,
+        batch_encoding: Some(BatchSerializerConfig::ArrowStream(
+            ArrowStreamSerializerConfig::default(),
+        )),
+        batch,
+        request: TowerRequestConfig {
+            retry_attempts: 1,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    // Building the sink fetches the schema — this should succeed even with
+    // MATERIALIZED/ALIAS/EPHEMERAL columns in the table definition.
+    let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
+
+    // Create events:
+    // - Event 0: omit timestamp_date → server fills via DEFAULT expression
+    // - Event 1: explicitly provide timestamp_date → server uses provided value
+    let mut events: Vec<Event> = Vec::new();
+    for i in 0..2 {
+        let mut event = LogEvent::from(format!("log message {i}"));
+        event.insert("host", format!("host-{i}.example.com"));
+
+        if i == 1 {
+            event.insert(
+                "timestamp_date",
+                vector_lib::event::Value::Timestamp(
+                    Utc.with_ymd_and_hms(2025, 6, 15, 12, 0, 0).unwrap(),
+                ),
+            );
+        }
+
+        let mut attrs = vector_lib::event::ObjectMap::new();
+        attrs.insert(
+            "k8s.cluster.name".into(),
+            vector_lib::event::Value::Bytes(format!("cluster-{i}").into()),
+        );
+        event.insert(
+            "resource_attributes",
+            vector_lib::event::Value::Object(attrs),
+        );
+
+        events.push(event.into());
+    }
+
+    run_and_assert_sink_compliance(sink, stream::iter(events), &SINK_TAGS).await;
+
+    let output = client.select_all(&table).await;
+    assert_eq!(2, output.rows);
+
+    for (i, row) in output.data.iter().enumerate() {
+        // Verify regular columns were inserted
+        assert!(
+            row.get("host")
+                .and_then(|v| v.as_str())
+                .is_some_and(|s| s == format!("host-{i}.example.com")),
+            "host should match"
+        );
+        assert!(
+            row.get("message")
+                .and_then(|v| v.as_str())
+                .is_some_and(|s| s == format!("log message {i}")),
+            "message should match"
+        );
+
+        // Verify DEFAULT column behavior
+        assert!(
+            row.get("timestamp_date").is_some(),
+            "DEFAULT column timestamp_date should always be present"
+        );
+        if i == 1 {
+            assert_eq!(
+                row.get("timestamp_date").and_then(|v| v.as_str()),
+                Some("2025-06-15 12:00:00"),
+                "User-provided DEFAULT column value should be preserved"
+            );
+        }
+    }
 }
