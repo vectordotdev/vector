@@ -39,6 +39,18 @@ impl InternalEvent for VectorReloaded<'_> {
 }
 
 #[derive(Debug, NamedInternalEvent)]
+pub struct VectorStopping;
+
+impl InternalEvent for VectorStopping {
+    fn emit(self) {
+        info!(
+            target: "vector",
+            message = "Vector is stopping.",
+        );
+    }
+}
+
+#[derive(Debug, NamedInternalEvent)]
 pub struct VectorStopped;
 
 impl InternalEvent for VectorStopped {

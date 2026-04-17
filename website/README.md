@@ -139,8 +139,8 @@ When you make changes to the Markdown sources, Sass/CSS, or JavaScript, the site
 ### Add a new version of Vector
 
 1. Add the new version to the `versions` list in [`cue/reference/versions.cue`](./cue/reference/versions.cue). Make sure to preserve reverse ordering.
-1. Generate a new CUE file for the release by running `make release-prepare` in the root directory of the Vector repo. This generates a CUE file at `cue/releases/{VERSION}.cue`.
-1. Add a new Markdown file to [`content/en/releases`](./content/en/releases), where the filename is `{version}.md` (e.g. `0.12.0.md`) and the file has metadata that looks like this:
+2. Generate a new CUE file for the release by running `make release-prepare` in the root directory of the Vector repo. This generates a CUE file at `cue/releases/{VERSION}.cue`.
+3. Add a new Markdown file to [`content/en/releases`](./content/en/releases), where the filename is `{version}.md` (e.g. `0.12.0.md`) and the file has metadata that looks like this:
 
     ```markdown
     ---
