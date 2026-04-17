@@ -49,6 +49,9 @@ pub fn exec(
     if coverage && !ran_environments.is_empty() {
         let coverage_dir = std::path::Path::new(LOCAL_COVERAGE_OUTPUT_DIR);
         let merged_path = coverage_dir.join(coverage_filename(None));
+        // Remove any stale lcov.info from a previous run so callers never pick
+        // up outdated data if the merge below fails to read a per-env file.
+        let _ = std::fs::remove_file(&merged_path);
         let mut merged = String::new();
         for env_name in &ran_environments {
             let env_file = coverage_dir.join(coverage_filename(Some(env_name)));
