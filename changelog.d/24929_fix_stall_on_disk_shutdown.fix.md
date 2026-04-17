@@ -1,4 +1,6 @@
-Fixed issue during in-situ reload of a sink with disk buffer configured where
-component would stall for batch.timeout_sec before fully gracefully reloading.
+Fixed issue during in place reload of a sink with a disk buffer configured, where
+the component would stall for batch.timeout_sec before gracefully reloading.
+This fix also remediates issues Vector had where it would ignore SIGINT during
+cases where the pipeline stall was occuring.
 
 authors: graphcareful
