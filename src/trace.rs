@@ -169,14 +169,9 @@ fn consume_early_buffer() -> Vec<LogEvent> {
         .expect("early buffer was already consumed")
 }
 
-/// Capacity of the broadcast channel used to fan out internal log events to subscribers
-/// (e.g. the `internal_logs` source). Sized to absorb bursts without dropping events at
-/// elevated log levels while keeping worst-case memory bounded.
-const TRACE_BROADCAST_CAPACITY: usize = 10_000;
-
 /// Gets or creates a trace sender for sending internal log events.
 fn get_trace_sender() -> &'static broadcast::Sender<LogEvent> {
-    SENDER.get_or_init(|| broadcast::channel(TRACE_BROADCAST_CAPACITY).0)
+    SENDER.get_or_init(|| broadcast::channel(99).0)
 }
 
 /// Attempts to get the trace sender for sending internal log events.
