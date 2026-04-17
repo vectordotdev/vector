@@ -10,6 +10,7 @@ pub use log_event::LogEvent;
 pub use metadata::{DatadogMetricOriginMetadata, EventMetadata, WithMetadata};
 pub use metric::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind};
 pub use r#ref::{EventMutRef, EventRef};
+pub use ser::{MAX_METADATA_NESTING_DEPTH, MAX_NESTING_DEPTH, event_exceeds_max_nesting_depth};
 use serde::{Deserialize, Serialize};
 pub use trace::TraceEvent;
 use vector_buffers::EventCount;
