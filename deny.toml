@@ -44,4 +44,8 @@ ignore = [
   { id = "RUSTSEC-2024-0388", reason = "derivative is unmaintained (https://github.com/vectordotdev/vector/issues/24940)" },
   { id = "RUSTSEC-2025-0134", reason = "rustls-pemfile is unmaintained - unpatched crate (https://github.com/bytebeamio/rumqtt/issues/1010) & tonic/reqwest upgrade (https://github.com/vectordotdev/vector/issues/19179)" },
   { id = "RUSTSEC-2026-0049", reason = "rustls-webpki 0.102 is vulnerable - tonic upgrade (https://github.com/vectordotdev/vector/issues/19179)" },
+  { id = "RUSTSEC-2026-0098", reason = "rustls-webpki 0.102/0.101 is vulnerable - tonic upgrade (https://github.com/vectordotdev/vector/issues/19179)" },
+  { id = "RUSTSEC-2026-0099", reason = "rustls-webpki 0.102/0.101 is vulnerable - tonic upgrade (https://github.com/vectordotdev/vector/issues/19179)" },
+  { id = "RUSTSEC-2024-0436", reason = "paste crate is unmaintained - transitive dependency via parquet v56.2.0, no safe upgrade available" },
+  { id = "RUSTSEC-2026-0097", reason = "rand 0.8.5 unsound with custom logger - transitive dependency, upstream crates have not updated to rand 0.9+" },
 ]
