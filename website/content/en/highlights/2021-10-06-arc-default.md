@@ -20,8 +20,9 @@ increased pressure downstream, to avoid overwhelming the sink destination.
 This feature was previously able to be opted into with the following
 configuration:
 
-```toml
-request.concurrency = "adaptive"
+```yaml
+request:
+  concurrency: "adaptive"
 ```
 
 This is the new default for HTTP-based sinks. As mentioned in the [announcement
@@ -35,8 +36,9 @@ If you would like to instead use a fixed concurrency as was previously the
 default, you can set a static value like:
 
 
-```toml
-request.concurrency = 5
+```yaml
+request:
+  concurrency: 5
 ```
 
 This will tell Vector to limit to 5 concurrent requests.
