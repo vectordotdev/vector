@@ -4,6 +4,7 @@ use vector_lib::{
     codecs::BytesDeserializerConfig,
     config::{LegacyKey, LogNamespace, log_schema},
     configurable::configurable_component,
+    internal_event::{ComponentEventsDropped, UNINTENTIONAL},
     lookup::{OwnedValuePath, lookup_v2::OptionalValuePath, owned_value_path, path},
     schema::Definition,
 };
@@ -13,10 +14,7 @@ use crate::{
     SourceSender,
     config::{DataType, SourceConfig, SourceContext, SourceOutput},
     event::{EstimatedJsonEncodedSizeOf, Event},
-    internal_events::{
-        InternalLogsBytesReceived, InternalLogsEventsReceived, InternalLogsLagged,
-        StreamClosedError,
-    },
+    internal_events::{InternalLogsBytesReceived, InternalLogsEventsReceived, StreamClosedError},
     shutdown::ShutdownSignal,
     trace::TraceSubscription,
 };
@@ -163,12 +161,18 @@ async fn run(
 
     // Note: This loop, or anything called within it, MUST NOT generate
     // any logs that don't break the loop, as that could cause an
-    // infinite loop since it receives all such logs.
+    // infinite loop since it receives all such logs. The one exception is
+    // `ComponentEventsDropped` below, which is only emitted in response to
+    // an already-observed lag and therefore produces at most one extra log
+    // per lag incident (bounded amplification, not recursion).
     while let Some(item) = rx.next().await {
         let mut log = match item {
             Ok(log) => log,
             Err(skipped) => {
-                emit!(InternalLogsLagged { count: skipped });
+                emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+                    count: skipped as usize,
+                    reason: "Internal logs broadcast receiver lagged.",
+                });
                 continue;
             }
         };
