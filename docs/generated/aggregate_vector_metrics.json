@@ -1,0 +1,73 @@
+{
+  "anchor": "aggregate_vector_metrics",
+  "name": "aggregate_vector_metrics",
+  "category": "Metrics",
+  "description": "Aggregates internal Vector metrics, using one of 4 aggregation functions, filtering by name and optionally by tags. Returns the aggregated value. Only includes counter and gauge metrics.\n\nInternal Vector metrics functions work with a snapshot of the metrics. The interval at which the snapshot is updated is controlled through the [`metrics_storage_refresh_period`](/docs/reference/configuration/global-options/#metrics_storage_refresh_period) global option. Higher values can reduce performance impact of that process, but may cause stale metrics data in the snapshot.",
+  "arguments": [
+    {
+      "name": "function",
+      "description": "The aggregation function to apply to the matched metrics.",
+      "required": true,
+      "type": [
+        "string"
+      ],
+      "enum": {
+        "sum": "Sum the values of all the matched metrics.",
+        "avg": "Find the average of the values of all the matched metrics.",
+        "max": "Find the highest metric value of all the matched metrics.",
+        "min": "Find the lowest metric value of all the matched metrics."
+      }
+    },
+    {
+      "name": "key",
+      "description": "The metric name to aggregate.",
+      "required": true,
+      "type": [
+        "string"
+      ]
+    },
+    {
+      "name": "tags",
+      "description": "Tags to filter the results on. Values in this object support wildcards ('*') to match on parts of the tag value.",
+      "required": false,
+      "type": [
+        "object"
+      ],
+      "default": "{  }"
+    }
+  ],
+  "return": {
+    "types": [
+      "float",
+      "null"
+    ]
+  },
+  "examples": [
+    {
+      "title": "Sum vector internal metrics matching the name",
+      "source": "aggregate_vector_metrics(\"sum\", \"utilization\")",
+      "return": 0.5
+    },
+    {
+      "title": "Sum vector internal metrics matching the name and tags",
+      "source": "aggregate_vector_metrics(\"sum\", \"utilization\", tags: {\"component_id\": \"test\"})",
+      "return": 0.5
+    },
+    {
+      "title": "Average of vector internal metrics matching the name",
+      "source": "aggregate_vector_metrics(\"avg\", \"utilization\")",
+      "return": 0.5
+    },
+    {
+      "title": "Max of vector internal metrics matching the name",
+      "source": "aggregate_vector_metrics(\"max\", \"utilization\")",
+      "return": 0.5
+    },
+    {
+      "title": "Min of vector internal metrics matching the name",
+      "source": "aggregate_vector_metrics(\"min\", \"utilization\")",
+      "return": 0.5
+    }
+  ],
+  "pure": true
+}

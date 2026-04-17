@@ -3,8 +3,9 @@
 .github/workflows/regression.yml @vectordotdev/vector @vectordotdev/single-machine-performance
 regression/config.yaml @vectordotdev/vector @vectordotdev/single-machine-performance
 
-docs/ @vectordotdev/vector @vectordotdev/ux-team @vectordotdev/documentation
-website/ @vectordotdev/vector @vectordotdev/ux-team
+# Keep documentation team paths in sync with .github/workflows/add_wip_label.yml
+docs/ @vectordotdev/vector @vectordotdev/documentation
+website/ @vectordotdev/vector
 website/content @vectordotdev/vector @vectordotdev/documentation
 website/cue/reference @vectordotdev/vector @vectordotdev/documentation
 

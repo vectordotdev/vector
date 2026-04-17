@@ -52,16 +52,18 @@ jobs:
     with:
       command: test-cli
       job_name: CLI tests
+      cargo_nextest: true
       upload_test_results: true
     needs: changes
     secrets: inherit
 
-  test-top:
+  test-vector-api:
     if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.test-make-command-yml == 'true' }}
     uses: ./.github/workflows/test-make-command.yml
     with:
-      command: test-top
-      job_name: make test-top
+      command: test-vector-api
+      job_name: make test-vector-api
+      cargo_nextest: true
       upload_test_results: true
     needs: changes
     secrets: inherit
@@ -136,7 +138,7 @@ jobs:
     needs:
       - changes
       - test-cli
-      - test-top
+      - test-vector-api
       - make-test-behavior
       - make-check-examples
       - make-test-docs

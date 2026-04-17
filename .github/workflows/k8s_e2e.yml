@@ -4,7 +4,7 @@
 #    - manual dispatch in GH UI
 #    - on a PR commit if the kubernetes_logs source was changed
 #    - in the merge queue
-#    - on a schedule at midnight UTC Tue-Sat
+#    - on a weekly schedule (Monday 01:00 UTC)
 #    - on demand by either of the following comments in a PR:
 #        - '/ci-run-k8s'
 #        - '/ci-run-all'
@@ -21,20 +21,20 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: 'Git ref to checkout'
+        description: "Git ref to checkout"
         required: false
         type: string
   workflow_call:
     inputs:
       ref:
-        description: 'Git ref to checkout'
+        description: "Git ref to checkout"
         required: false
         type: string
   pull_request:
   merge_group:
     types: [checks_requested]
   schedule:
-    - cron: '0 1 * * 2-6' # 01:00 UTC Tue-Sat
+    - cron: "0 1 * * 1" # 01:00 UTC every Monday
 
 concurrency:
   # In flight runs will be canceled through re-trigger in the merge queue, scheduled run, or if
@@ -88,10 +88,14 @@ jobs:
           rust: true
           cross: true
           mold: false
+          cargo-deb: true
+
+      - name: Install packaging dependencies
+        run: sudo apt-get install -y cmark-gfm
 
       - run: VECTOR_VERSION="$(vdev version)" make package-deb-x86_64-unknown-linux-gnu
 
-      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+      - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: e2e-test-deb-package
           path: target/artifacts/*
@@ -160,7 +164,7 @@ jobs:
   test-e2e-kubernetes:
     name: K8s ${{ matrix.kubernetes_version.version }} / ${{ matrix.container_runtime }} (${{ matrix.kubernetes_version.role }})
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 60
     needs:
       - build-x86_64-unknown-linux-gnu
       - compute-k8s-test-plan
@@ -175,7 +179,13 @@ jobs:
         with:
           ref: ${{ inputs.ref }}
 
-      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+      - uses: ./.github/actions/setup
+        with:
+          vdev: true
+          mold: false
+          cargo-cache: false
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: e2e-test-deb-package
           path: target/artifacts
@@ -187,17 +197,56 @@ jobs:
           MINIKUBE_VERSION: ${{ matrix.minikube_version }}
           CONTAINER_RUNTIME: ${{ matrix.container_runtime }}
 
+      - name: Checkout helm-charts
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: vectordotdev/helm-charts
+          ref: develop
+          path: helm-charts
+
       # TODO: This job has been quite flakey. Need to investigate further and then remove the retries.
       - name: Run tests
-        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
         env:
           USE_MINIKUBE_CACHE: "true"
           SKIP_PACKAGE_DEB: "true"
           CARGO_INCREMENTAL: 0
+          HELM_CHART_REPO: ${{ github.workspace }}/helm-charts/charts/vector
         with:
           timeout_minutes: 45
           max_attempts: 3
           command: make test-e2e-kubernetes
+
+      - name: Collect K8s diagnostics on failure
+        if: ${{ !success() }}
+        run: |
+          set +e +o pipefail
+          # Best-effort diagnostics -- never fail the job
+          run_diag() { local label="$1"; shift; echo "--- $label ---"; "$@" 2>&1 || true; echo; }
+          # For commands with pipes that can't be passed as args
+          run_diag_sh() { echo "--- $1 ---"; bash -c "$2" 2>&1 || true; echo; }
+
+          run_diag "Cluster-wide pods" kubectl get pods -A -o wide
+          run_diag "Cluster-wide events" kubectl get events -A --sort-by=.metadata.creationTimestamp
+          run_diag "Nodes" kubectl get nodes -o wide
+
+          for ns in $(kubectl get namespaces -o jsonpath='{.items[*].metadata.name}' 2>/dev/null | tr ' ' '\n' | grep -E '^vector-' || true); do
+            echo "=========================================="
+            echo "=== Namespace: $ns ==="
+            echo "=========================================="
+            run_diag "Pods"             kubectl get pods -n "$ns" -o wide
+            run_diag "Pod descriptions" kubectl describe pods -n "$ns"
+            run_diag "Events"           kubectl get events -n "$ns" --sort-by=.metadata.creationTimestamp
+            run_diag "ConfigMaps"       kubectl get configmaps -n "$ns" -o yaml
+
+            for pod in $(kubectl get pods -n "$ns" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || true); do
+              run_diag "Logs: $pod"          kubectl logs -n "$ns" "$pod" --all-containers=true --tail=100
+              run_diag "Previous logs: $pod" kubectl logs -n "$ns" "$pod" --all-containers=true --previous --tail=50
+            done
+          done
+
+          run_diag_sh "Node resources" "kubectl describe nodes | grep -A20 'Allocated resources'"
+          run_diag "Minikube logs" minikube logs --length=100
 
   final-result:
     name: K8s E2E Suite

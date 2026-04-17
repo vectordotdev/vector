@@ -1,23 +1,43 @@
-//! Vector GraphQL client library, for the Vector GraphQL API server.
+//! Vector gRPC API client library
 //!
-//! Contains:
+//! This library provides a Rust client for the Vector gRPC observability API.
 //!
-//! 1. A GraphQL query client, for queries/mutations over HTTP(s)
-//! 2. A GraphQL subscription client, for long-lived, multiplexed subscriptions over WebSockets
-//! 3. GraphQL queries/mutations/subscriptions, defined in `graphql/**/*.graphql` files
-//! 4. Extension methods for each client, for executing queries/subscriptions, and returning
-//!    deserialized JSON responses
+//! # Example
 //!
-
-#![deny(warnings)]
-#![deny(missing_debug_implementations, missing_copy_implementations)]
-#![allow(async_fn_in_trait)]
+//! ```no_run
+//! use vector_api_client::Client;
+//!
+//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+//! let mut client = Client::new("http://localhost:9999".parse().unwrap());
+//! client.connect().await?;
+//!
+//! // Check health (standard gRPC health check)
+//! client.health().await?;
+//! println!("Server is healthy");
+//!
+//! // Get components
+//! let components = client.get_components(0).await?;
+//! for component in components.components {
+//!     println!("Component: {}", component.component_id);
+//! }
+//! # Ok(())
+//! # }
+//! ```
 
 mod client;
-/// GraphQL queries
-pub mod gql;
-mod subscription;
-pub mod test;
+mod error;
 
-pub use client::*;
-pub use subscription::*;
+pub use client::Client;
+pub use error::{Error, Result};
+
+/// How long (ms) to wait before attempting to reconnect to the Vector API after a disconnect.
+pub const RECONNECT_DELAY_MS: u64 = 5000;
+
+/// Re-export generated protobuf types
+pub mod proto {
+    pub mod event {
+        tonic::include_proto!("event");
+    }
+
+    tonic::include_proto!("vector.observability.v1");
+}

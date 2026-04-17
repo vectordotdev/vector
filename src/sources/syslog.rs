@@ -1208,7 +1208,7 @@ mod test {
             // Create and spawn the source.
             let config = SyslogConfig::from_mode(Mode::Udp {
                 address: in_addr.into(),
-                receive_buffer_bytes: None,
+                receive_buffer_bytes: Some(4 * 1024 * 1024),
             });
 
             let key = ComponentKey::from("in");
