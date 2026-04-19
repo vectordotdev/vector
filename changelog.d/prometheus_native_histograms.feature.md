@@ -11,4 +11,4 @@ For sinks that do not natively support this format (such as the
 native histograms are automatically converted to classic aggregated histograms.
 This conversion is lossy but allows existing pipelines to continue operating.
 
-authors: l1n
+authors: l1n sanjams2

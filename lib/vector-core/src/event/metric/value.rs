@@ -199,33 +199,35 @@ impl MetricValue {
             } => {
                 let mut buckets = Vec::new();
 
-                // All negative observations collapse into one bucket at upper_limit = -zero_threshold (or 0 if
-                // zero_threshold is 0). This is lossy but aggregated histograms don't naturally represent negative
-                // exponential buckets.
+                // All negative observations collapse into one bucket at upper_limit = -zero_threshold. This is lossy
+                // but aggregated histograms don't naturally represent negative exponential buckets.
                 let neg_total: f64 = iter_span_counts(negative_spans, negative_buckets)
                     .map(|(_, c)| c)
                     .sum();
-                if neg_total > 0.0 {
-                    let limit = if *zero_threshold > 0.0 {
-                        -*zero_threshold
-                    } else {
-                        0.0
-                    };
-                    buckets.push(Bucket {
-                        upper_limit: limit,
-                        // Truncation: fractional counts from float histograms are floored.
-                        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-                        count: neg_total.max(0.0) as u64,
-                    });
-                }
-
-                // Zero bucket.
                 let zc = zero_count.as_f64();
-                if zc > 0.0 {
+
+                if *zero_threshold > 0.0 {
+                    if neg_total > 0.0 {
+                        buckets.push(Bucket {
+                            upper_limit: -*zero_threshold,
+                            // Truncation: fractional counts from float histograms are floored.
+                            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+                            count: neg_total.max(0.0) as u64,
+                        });
+                    }
+                    if zc > 0.0 {
+                        buckets.push(Bucket {
+                            upper_limit: *zero_threshold,
+                            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+                            count: zc.max(0.0) as u64,
+                        });
+                    }
+                } else if neg_total > 0.0 || zc > 0.0 {
+                    // zero_threshold == 0: negative and zero buckets would both land at upper_limit 0.0, so merge them.
                     buckets.push(Bucket {
-                        upper_limit: *zero_threshold,
+                        upper_limit: 0.0,
                         #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-                        count: zc.max(0.0) as u64,
+                        count: (neg_total.max(0.0) + zc.max(0.0)) as u64,
                     });
                 }
 
@@ -346,13 +348,13 @@ impl MetricValue {
                 negative_buckets,
                 ..
             } => {
-                *count = NativeHistogramCount::default();
+                count.zero();
                 *sum = 0.0;
-                *zero_count = NativeHistogramCount::default();
+                zero_count.zero();
                 positive_spans.clear();
-                *positive_buckets = NativeHistogramBuckets::default();
+                positive_buckets.clear();
                 negative_spans.clear();
-                *negative_buckets = NativeHistogramBuckets::default();
+                negative_buckets.clear();
             }
         }
     }
@@ -1004,6 +1006,14 @@ impl NativeHistogramCount {
     pub const fn is_float(&self) -> bool {
         matches!(self, Self::Float(_))
     }
+
+    /// Resets the count to zero while preserving the integer/float variant.
+    pub const fn zero(&mut self) {
+        *self = match self {
+            Self::Integer(_) => Self::Integer(0),
+            Self::Float(_) => Self::Float(0.0),
+        };
+    }
 }
 
 impl PartialEq for NativeHistogramCount {
@@ -1078,6 +1088,14 @@ impl NativeHistogramBuckets {
     /// Returns `true` if there are no buckets.
     pub fn is_empty(&self) -> bool {
         self.len() == 0
+    }
+
+    /// Clears all bucket counts while preserving the integer/float variant.
+    pub fn clear(&mut self) {
+        match self {
+            Self::IntegerDeltas(v) => v.clear(),
+            Self::FloatCounts(v) => v.clear(),
+        }
     }
 
     /// Iterates over absolute bucket counts as floating-point values.
@@ -1333,6 +1351,87 @@ mod native_histogram_tests {
                 assert_eq!(buckets[1].count, 3);
             }
             _ => panic!("expected AggregatedHistogram"),
+        }
+    }
+
+    #[test]
+    fn native_histogram_to_agg_histogram_merges_neg_and_zero_at_zero_threshold() {
+        // zero_threshold == 0 with both negative observations and a nonzero zero_count must yield
+        // a single bucket at upper_limit 0.0 (not two colliding buckets).
+        let native = MetricValue::NativeHistogram {
+            count: NativeHistogramCount::Integer(7),
+            sum: -1.5,
+            schema: 0,
+            zero_threshold: 0.0,
+            zero_count: NativeHistogramCount::Integer(2),
+            positive_spans: vec![NativeHistogramSpan {
+                offset: 1,
+                length: 1,
+            }],
+            positive_buckets: NativeHistogramBuckets::IntegerDeltas(vec![1]),
+            negative_spans: vec![NativeHistogramSpan {
+                offset: 1,
+                length: 1,
+            }],
+            negative_buckets: NativeHistogramBuckets::IntegerDeltas(vec![4]),
+            reset_hint: NativeHistogramResetHint::Unknown,
+        };
+
+        let agg = native.native_histogram_to_agg_histogram().unwrap();
+        match agg {
+            MetricValue::AggregatedHistogram { buckets, .. } => {
+                assert_eq!(buckets.len(), 2);
+                assert_eq!(buckets[0].upper_limit, 0.0);
+                assert_eq!(buckets[0].count, 6); // 4 negative + 2 zero
+                assert_eq!(buckets[1].upper_limit, 2.0);
+                assert_eq!(buckets[1].count, 1);
+            }
+            _ => panic!("expected AggregatedHistogram"),
+        }
+    }
+
+    #[test]
+    fn zero_preserves_float_variant() {
+        let mut native = MetricValue::NativeHistogram {
+            count: NativeHistogramCount::Float(5.0),
+            sum: 3.0,
+            schema: 0,
+            zero_threshold: 0.0,
+            zero_count: NativeHistogramCount::Float(1.0),
+            positive_spans: vec![NativeHistogramSpan {
+                offset: 1,
+                length: 1,
+            }],
+            positive_buckets: NativeHistogramBuckets::FloatCounts(vec![5.0]),
+            negative_spans: vec![],
+            negative_buckets: NativeHistogramBuckets::FloatCounts(vec![]),
+            reset_hint: NativeHistogramResetHint::Gauge,
+        };
+
+        native.zero();
+
+        match native {
+            MetricValue::NativeHistogram {
+                count,
+                zero_count,
+                positive_buckets,
+                negative_buckets,
+                ..
+            } => {
+                assert!(count.is_float());
+                assert_eq!(count, NativeHistogramCount::Float(0.0));
+                assert!(zero_count.is_float());
+                assert!(matches!(
+                    positive_buckets,
+                    NativeHistogramBuckets::FloatCounts(_)
+                ));
+                assert!(positive_buckets.is_empty());
+                assert!(matches!(
+                    negative_buckets,
+                    NativeHistogramBuckets::FloatCounts(_)
+                ));
+            }
+            _ => panic!("expected NativeHistogram"),
         }
     }
 

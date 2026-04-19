@@ -114,7 +114,9 @@ message Histogram {
 message TimeSeries {
   repeated Label labels        = 1 [(nullable) = false];
   repeated Sample samples      = 2 [(nullable) = false];
-  repeated Histogram histograms = 3 [(nullable) = false];
+  // field 3 is `exemplars` upstream; reserved here for wire compatibility.
+  reserved 3;
+  repeated Histogram histograms = 4 [(nullable) = false];
 }
 
 message Label {
