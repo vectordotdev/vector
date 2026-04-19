@@ -75,7 +75,7 @@ generated: components: sinks: gcp_cloud_storage: configuration: {
 				This is the default.
 				"""
 			"public-read": """
-				Bucket/object can be read publically.
+				Bucket/object can be read publicly.
 
 				The bucket/object owner is granted the `OWNER` permission, and all other users, whether
 				authenticated or anonymous, are granted the `READER` permission.

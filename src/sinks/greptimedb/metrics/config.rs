@@ -18,7 +18,7 @@ use crate::sinks::{
 #[configurable(metadata(
     deprecated = "The `greptimedb` sink has been renamed. Please use `greptimedb_metrics` instead."
 ))]
-#[derive(Clone, Debug, Derivative)]
+#[derive(Clone, Debug, Default)]
 pub struct GreptimeDBConfig(GreptimeDBMetricsConfig);
 
 impl GenerateConfig for GreptimeDBConfig {

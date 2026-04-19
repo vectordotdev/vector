@@ -1,0 +1,39 @@
+name: Code Coverage
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch: # Allow manual trigger from GitHub UI
+
+permissions:
+  contents: read
+
+env:
+  CI: true
+  CARGO_INCREMENTAL: "0" # Disable incremental compilation for coverage
+
+jobs:
+  coverage:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
+          libsasl2: true
+          protoc: true
+          cargo-llvm-cov: true
+          cargo-nextest: true
+          datadog-ci: true
+
+      - name: "Generate code coverage"
+        run: cargo llvm-cov nextest --workspace --lcov --output-path lcov.info
+
+      - name: "Upload coverage to Datadog"
+        env:
+          DD_API_KEY: ${{ secrets.DD_API_KEY }}
+          DD_SITE: datadoghq.com
+          DD_ENV: ci
+        run: datadog-ci coverage upload lcov.info

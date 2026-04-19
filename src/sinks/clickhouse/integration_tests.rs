@@ -565,7 +565,7 @@ async fn insert_events_arrow_with_schema_fetching() {
     client
         .create_table(
             &table,
-            "host String, timestamp DateTime64(3), message String, id Int64, name String, score Float64, active Bool",
+            "host String, timestamp DateTime64(3), message String, id Int64, name String, score Float64, active Bool, request_id UUID",
         )
         .await;
 
@@ -595,6 +595,10 @@ async fn insert_events_arrow_with_schema_fetching() {
         event.insert("name", format!("user_{}", i));
         event.insert("score", 95.5 + i as f64);
         event.insert("active", i % 2 == 0);
+        event.insert(
+            "request_id",
+            format!("550e8400-e29b-41d4-a716-44665544000{}", i),
+        );
         events.push(event.into());
     }
 
@@ -604,7 +608,7 @@ async fn insert_events_arrow_with_schema_fetching() {
     assert_eq!(3, output.rows);
 
     // Verify all fields exist and have the correct types
-    for row in output.data.iter() {
+    for (i, row) in output.data.iter().enumerate() {
         // Check standard Vector fields exist
         assert!(row.get("host").and_then(|v| v.as_str()).is_some());
         assert!(row.get("message").and_then(|v| v.as_str()).is_some());
@@ -620,6 +624,16 @@ async fn insert_events_arrow_with_schema_fetching() {
         assert!(row.get("name").and_then(|v| v.as_str()).is_some());
         assert!(row.get("score").and_then(|v| v.as_f64()).is_some());
         assert!(row.get("active").and_then(|v| v.as_bool()).is_some());
+
+        // Check UUID field
+        let request_id = row
+            .get("request_id")
+            .and_then(|v| v.as_str())
+            .expect("request_id should be present");
+        assert_eq!(
+            request_id,
+            format!("550e8400-e29b-41d4-a716-44665544000{}", i)
+        );
     }
 }
 
