@@ -173,7 +173,14 @@ async fn run(
     // and then continue with the normal stream of internal log events. Buffered events are
     // wrapped in `Ok` to match the `Result<LogEvent, u64>` items produced by the live
     // subscription, where `Err(n)` indicates that `n` events were dropped due to broadcast lag.
+    //
+    // `shutdown` is cloned so the drain task can terminate its stream via `take_until`, while
+    // the main task still holds a live handle. The `ShutdownSignalToken` must outlive the
+    // entire `run()` scope — the source is only considered complete once every clone is
+    // dropped — so giving the drain task sole ownership would let topology teardown race with
+    // in-flight batches still being processed by the main task.
     let buffered_events = subscription.buffered_events().await;
+    let _shutdown_guard = shutdown.clone();
     let rx = stream::iter(buffered_events.into_iter().flatten().map(Ok))
         .chain(subscription.into_stream())
         .take_until(shutdown);
