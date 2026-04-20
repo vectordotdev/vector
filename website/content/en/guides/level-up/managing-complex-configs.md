@@ -40,28 +40,32 @@ For example, if we wished to create a chain of three transforms; `remap`, `filte
 and `reduce`, we can run:
 
 ```bash
-vector generate /remap,filter,reduce > vector.toml
+vector generate /remap,filter,reduce > vector.yaml
 # Find out more with `vector generate --help`
 ```
 
 And most of the boilerplate will be written for us, with each component printed
 with an `inputs` field that specifies the component before it:
 
-```toml title="vector.toml"
-[transforms.transform0]
-  inputs = [ "somewhere" ]
-  type = "remap"
-  # etc ...
+```yaml title="vector.yaml"
+transforms:
+  transform0:
+    inputs:
+      - "somewhere"
+    type: "remap"
+    # etc ...
 
-[transforms.transform1]
-  inputs = [ "transform0" ]
-  type = "filter"
-  # etc ...
+  transform1:
+    inputs:
+      - "transform0"
+    type: "filter"
+    # etc ...
 
-[transforms.transform2]
-  inputs = [ "transform1" ]
-  type = "reduce"
-  # etc ...
+  transform2:
+    inputs:
+      - "transform1"
+    type: "reduce"
+    # etc ...
 ```
 
 The IDs of the generated components are sequential (`transform0`,
@@ -79,18 +83,20 @@ Let's imagine we are in the process of building the config from the [unit test
 guide][guides.unit-testing], we might start off with our source and
 the grok parser:
 
-```toml title="vector.toml"
-[sources.over_tcp]
-  type = "socket"
-  mode = "tcp"
-  address = "0.0.0.0:9000"
+```yaml title="vector.yaml"
+sources:
+  over_tcp:
+    type: "socket"
+    mode: "tcp"
+    address: "0.0.0.0:9000"
 
-[transforms.foo]
-  inputs = ["over_tcp"]
-  type = "remap"
-  source = '''
-  . = parse_grok!(.message, s'%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}')
-'''
+transforms:
+  foo:
+    inputs:
+      - "over_tcp"
+    type: "remap"
+    source: |
+      . = parse_grok!(.message, s'%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}')
 ```
 
 A common way to test this transform might be to temporarily change the source
@@ -101,30 +107,28 @@ our config to run tests rather than focusing on features.
 Instead, we can leave our source as a `socket` type and add a unit test to the
 end of our config:
 
-```toml title="vector.toml"
-[[tests]]
-  name = "check_simple_log"
-
-  [[tests.inputs]]
-    insert_at = "foo"
-    type = "raw"
-    value = "2019-11-28T12:00:00+00:00 info Sorry, I'm busy this week Cecil"
-
-  [[tests.outputs]]
-    extract_from = "foo"
+```yaml title="vector.yaml"
+tests:
+  - name: "check_simple_log"
+    inputs:
+      - insert_at: "foo"
+        type: "raw"
+        value: "2019-11-28T12:00:00+00:00 info Sorry, I'm busy this week Cecil"
+    outputs:
+      - extract_from: "foo"
 ```
 
 When we add a unit test output without any conditions it will simply print the
 input and output events of a transform, allowing us to inspect its behavior:
 
 ```sh
-$ vector test ./vector.toml
-Running vector.toml tests
-test vector.toml: check_simple_log ... passed
+$ vector test ./vector.yaml
+Running vector.yaml tests
+test vector.yaml: check_simple_log ... passed
 
 inspections:
 
---- vector.toml ---
+--- vector.yaml ---
 
 test 'check_simple_log':
 
@@ -137,28 +141,23 @@ As we introduce new transforms to our config we can change the test output
 to check the latest transform. Or, occasionally, we can add conditions to an
 output in order to turn it into a regression test:
 
-```toml title="vector.toml"
-[[tests]]
-  name = "check_simple_log"
-
-  [[tests.inputs]]
-    insert_at = "foo"
-    type = "raw"
-    value = "2019-11-28T12:00:00+00:00 info Sorry, I'm busy this week Cecil"
-
-  # This is now a regression test
-  [[tests.outputs]]
-    extract_from = "foo"
-    [[tests.outputs.conditions]]
-      type = "vrl"
-      source = """
-        assert_eq!(.message, "Sorry, I'm busy this week Cecil")
-      """
-
-  # And we add a new output without conditions for inspecting
-  # a new transform
-  [[tests.outputs]]
-    extract_from = "bar"
+```yaml title="vector.yaml"
+tests:
+  - name: "check_simple_log"
+    inputs:
+      - insert_at: "foo"
+        type: "raw"
+        value: "2019-11-28T12:00:00+00:00 info Sorry, I'm busy this week Cecil"
+    outputs:
+      # This is now a regression test
+      - extract_from: "foo"
+        conditions:
+          - type: "vrl"
+            source: |
+              assert_eq!(.message, "Sorry, I'm busy this week Cecil")
+      # And we add a new output without conditions for inspecting
+      # a new transform
+      - extract_from: "bar"
 ```
 
 How many tests you add is at your discretion, but you probably don't need to
@@ -175,10 +174,10 @@ With Vector you can split a config down into as many files as you like and run
 them all as a larger topology:
 
 ```bash
-# These three examples run the same two configs together:
-vector -c ./configs/foo.toml -c ./configs/bar.toml
-vector -c ./configs/*.toml
-vector -c ./configs/foo.toml ./configs/bar.toml
+# These three examples run the same two configs together:
+vector -c ./configs/foo.yaml -c ./configs/bar.yaml
+vector -c ./configs/*.yaml
+vector -c ./configs/foo.yaml ./configs/bar.yaml
 ```
 
 If you have a large chain of components it's a good idea to break them out into
@@ -193,52 +192,58 @@ With Vector you can define a component configuration inside a component type fol
 
 Let's take an example with the following configuration file:
 
-```toml title="vector.toml"
-[sources.syslog]
-type = "syslog"
-address = "0.0.0.0:514"
-max_length = 42000
-mode = "tcp"
+```yaml title="vector.yaml"
+sources:
+  syslog:
+    type: "syslog"
+    address: "0.0.0.0:514"
+    max_length: 42000
+    mode: "tcp"
 
-[transforms.change_fields]
-type = "remap"
-inputs = ["syslog"]
-source = """
-.new_field = "some value"
-"""
+transforms:
+  change_fields:
+    type: "remap"
+    inputs:
+      - "syslog"
+    source: |
+      .new_field = "some value"
 
-[sinks.stdout]
-type = "console"
-inputs = ["change_fields"]
-target = "stdout"
-encoding.codec = "json"
+sinks:
+  stdout:
+    type: "console"
+    inputs:
+      - "change_fields"
+    target: "stdout"
+    encoding:
+      codec: "json"
 ```
 
-We can extract the `syslog` source in the file `/etc/vector/sources/syslog.toml`
+We can extract the `syslog` source in the file `/etc/vector/sources/syslog.yaml`
 
-```toml title="syslog.toml"
-type = "syslog"
-address = "0.0.0.0:514"
-max_length = 42000
-mode = "tcp"
+```yaml title="syslog.yaml"
+type: "syslog"
+address: "0.0.0.0:514"
+max_length: 42000
+mode: "tcp"
 ```
 
-The `change_fields` transform in the file `/etc/vector/transforms/change_fields.toml`
+The `change_fields` transform in the file `/etc/vector/transforms/change_fields.yaml`
 
-```toml title="change_fields.toml"
-type = "remap"
-inputs = ["syslog"]
-source = """
-.new_field = "some value"
-"""
+```yaml title="change_fields.yaml"
+type: "remap"
+inputs:
+  - "syslog"
+source: |
+  .new_field = "some value"
 ```
 
-And the `stdout` sink in the file `/etc/vector/sinks/stdout.toml`
+And the `stdout` sink in the file `/etc/vector/sinks/stdout.yaml`
 
-```toml title="stdout.toml"
-type = "console"
-inputs = ["change_fields"]
-target = "stdout"
+```yaml title="stdout.yaml"
+type: "console"
+inputs:
+  - "change_fields"
+target: "stdout"
 ```
 
 And for Vector to look for the configuration in the component type related folders,
