@@ -20,6 +20,7 @@ use bytes::Buf;
 use flate2::read::MultiGzDecoder;
 use futures::{Stream, stream};
 use similar_asserts::assert_eq;
+use tempfile::TempDir;
 use tokio_stream::StreamExt;
 #[cfg(feature = "codecs-parquet")]
 use vector_lib::codecs::encoding::BatchSerializerConfig;
@@ -47,7 +48,7 @@ use crate::{
             run_and_assert_sink_error,
         },
         mock::basic_source,
-        random_lines_with_stream, random_string, start_topology, temp_dir,
+        random_lines_with_stream, random_string, start_topology,
     },
 };
 
@@ -570,8 +571,7 @@ async fn s3_disk_buffer_reload_delivers_all_events() {
     let bucket = uuid::Uuid::new_v4().to_string();
     create_bucket(&bucket, false).await;
 
-    let data_dir = temp_dir();
-    std::fs::create_dir(&data_dir).unwrap();
+    let data_dir = TempDir::new().expect("Could not create tempdir");
 
     // batch.timeout_secs is deliberately large (300 s) so that the test would
     // hang if the reload waited for the batch timer instead of cancelling it.
@@ -582,7 +582,7 @@ async fn s3_disk_buffer_reload_delivers_all_events() {
     let (mut source_tx, source_config) = basic_source();
 
     let mut old_config = Config::builder();
-    old_config.global.data_dir = Some(data_dir);
+    old_config.global.data_dir = Some(data_dir.path().to_path_buf());
     old_config.add_source("in", source_config);
     old_config.add_sink("out", &["in"], s3_config);
 
