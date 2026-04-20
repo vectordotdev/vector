@@ -63,8 +63,10 @@ async fn s3_insert_message_into_with_flat_key_prefix() {
 
     create_bucket(&bucket, false).await;
 
-    let mut config = config(&bucket, 1000000, 5.0);
-    config.key_prefix = "test-prefix".to_string();
+    let config = S3SinkConfig {
+        key_prefix: "test-prefix".to_string(),
+        ..config(&bucket, 1000000, 5.0)
+    };
     let prefix = config.key_prefix.clone();
     let service = config.create_service(&cx.globals.proxy).await.unwrap();
     let sink = config.build_processor(service, cx).unwrap();
@@ -97,8 +99,10 @@ async fn s3_insert_message_into_with_folder_key_prefix() {
 
     create_bucket(&bucket, false).await;
 
-    let mut config = config(&bucket, 1000000, 5.0);
-    config.key_prefix = "test-prefix/".to_string();
+    let config = S3SinkConfig {
+        key_prefix: "test-prefix/".to_string(),
+        ..config(&bucket, 1000000, 5.0)
+    };
     let prefix = config.key_prefix.clone();
     let service = config.create_service(&cx.globals.proxy).await.unwrap();
     let sink = config.build_processor(service, cx).unwrap();
@@ -131,11 +135,16 @@ async fn s3_insert_message_into_with_ssekms_key_id() {
 
     create_bucket(&bucket, false).await;
 
-    let mut config = config(&bucket, 1000000, 5.0);
-    config.key_prefix = "test-prefix".to_string();
+    let config = S3SinkConfig {
+        key_prefix: "test-prefix".to_string(),
+        options: S3Options {
+            server_side_encryption: Some(S3ServerSideEncryption::AwsKms),
+            ssekms_key_id: Some("alias/aws/s3".to_string()),
+            ..S3Options::default()
+        },
+        ..config(&bucket, 1000000, 5.0)
+    };
     let prefix = config.key_prefix.clone();
-    config.options.server_side_encryption = Some(S3ServerSideEncryption::AwsKms);
-    config.options.ssekms_key_id = Some("alias/aws/s3".to_string());
 
     let service = config.create_service(&cx.globals.proxy).await.unwrap();
     let sink = config.build_processor(service, cx).unwrap();
@@ -369,9 +378,10 @@ async fn acknowledges_failures() {
 
     create_bucket(&bucket, false).await;
 
-    let mut config = config(&bucket, 1, 5.0);
-    // Break the bucket name
-    config.bucket = format!("BREAK{}IT", config.bucket);
+    let config = S3SinkConfig {
+        bucket: format!("BREAK{}IT", &bucket), // Break the bucket name
+        ..config(&bucket, 1, 5.0)
+    };
     let prefix = config.key_prefix.clone();
     let service = config.create_service(&cx.globals.proxy).await.unwrap();
     let sink = config.build_processor(service, cx).unwrap();
