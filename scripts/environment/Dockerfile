@@ -16,6 +16,7 @@ WORKDIR /git/vectordotdev/vector
 
 # Setup the env
 COPY scripts/environment/*.sh scripts/environment/
+COPY scripts/environment/npm-tools/ scripts/environment/npm-tools/
 RUN ./scripts/environment/bootstrap-ubuntu-24.04.sh
 
 # Setup the toolchain

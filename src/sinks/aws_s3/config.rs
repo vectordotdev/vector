@@ -1,9 +1,13 @@
 use aws_sdk_s3::Client as S3Client;
 use tower::ServiceBuilder;
+#[cfg(feature = "codecs-parquet")]
+use vector_lib::codecs::BatchEncoder;
+#[cfg(feature = "codecs-parquet")]
+use vector_lib::codecs::encoding::BatchSerializerConfig;
 use vector_lib::{
     TimeZone,
     codecs::{
-        TextSerializerConfig,
+        EncoderKind, TextSerializerConfig,
         encoding::{Framer, FramingConfig},
     },
     configurable::configurable_component,
@@ -105,6 +109,16 @@ pub struct S3SinkConfig {
     #[serde(flatten)]
     pub encoding: EncodingConfigWithFraming,
 
+    /// Batch encoding configuration for columnar formats.
+    ///
+    /// When set, events are encoded together as a batch in a columnar format (e.g., Parquet)
+    /// instead of the standard per-event framing-based encoding. The columnar format handles
+    /// its own internal compression, so the top-level `compression` setting is bypassed.
+    #[cfg(feature = "codecs-parquet")]
+    #[configurable(derived)]
+    #[serde(default)]
+    pub batch_encoding: Option<BatchSerializerConfig>,
+
     /// Compression configuration.
     ///
     /// All compression algorithms use the default compression level unless otherwise specified.
@@ -176,6 +190,8 @@ impl GenerateConfig for S3SinkConfig {
             options: S3Options::default(),
             region: RegionOrEndpoint::default(),
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
+            #[cfg(feature = "codecs-parquet")]
+            batch_encoding: None,
             compression: Compression::gzip_default(),
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
@@ -201,6 +217,10 @@ impl SinkConfig for S3SinkConfig {
     }
 
     fn input(&self) -> Input {
+        #[cfg(feature = "codecs-parquet")]
+        if let Some(batch_config) = &self.batch_encoding {
+            return Input::new(batch_config.input_type());
+        }
         Input::new(self.encoding.config().1.input_type())
     }
 
@@ -246,8 +266,62 @@ impl S3SinkConfig {
         let partitioner = S3KeyPartitioner::new(key_prefix, ssekms_key_id, None);
 
         let transformer = self.encoding.transformer();
+
+        // When batch_encoding is configured (e.g., Parquet), use batch mode
+        // with internal compression and appropriate file extension.
+        #[cfg(feature = "codecs-parquet")]
+        if let Some(batch_config) = &self.batch_encoding {
+            if !matches!(batch_config, BatchSerializerConfig::Parquet(_)) {
+                return Err(
+                    "batch_encoding only supports encoding with parquet format for amazon s3 sink"
+                        .into(),
+                );
+            }
+
+            let batch_serializer = batch_config.build_batch_serializer()?;
+            let batch_encoder = BatchEncoder::new(batch_serializer);
+
+            // Auto-detect Content-Type from batch format. Users can still
+            // override via `options.content_type`; we only set it when unset.
+            let mut api_options = self.options.clone();
+            if api_options.content_type.is_none() {
+                api_options.content_type = Some(batch_encoder.content_type().to_string());
+            }
+
+            let encoder = EncoderKind::Batch(batch_encoder);
+
+            // Auto-detect file extension from batch format
+            let filename_extension =
+                self.filename_extension
+                    .clone()
+                    .or_else(|| match batch_config {
+                        BatchSerializerConfig::Parquet(_) => Some("parquet".to_string()),
+                        #[allow(unreachable_patterns)]
+                        _ => None,
+                    });
+
+            if self.compression != Compression::None {
+                warn!("Top level compression setting ignored when batch_encoding set to parquet.")
+            }
+
+            let request_options = S3RequestOptions {
+                bucket: self.bucket.clone(),
+                api_options,
+                filename_extension,
+                filename_time_format: self.filename_time_format.clone(),
+                filename_append_uuid: self.filename_append_uuid,
+                encoder: (transformer, encoder),
+                // Batch formats handle their own compression internally
+                compression: Compression::None,
+                filename_tz_offset: offset,
+            };
+
+            let sink = S3Sink::new(service, request_options, partitioner, batch_settings);
+            return Ok(VectorSink::from_event_streamsink(sink));
+        }
+
         let (framer, serializer) = self.encoding.build(SinkType::MessageBased)?;
-        let encoder = Encoder::<Framer>::new(framer, serializer);
+        let encoder = EncoderKind::Framed(Box::new(Encoder::<Framer>::new(framer, serializer)));
 
         let request_options = S3RequestOptions {
             bucket: self.bucket.clone(),
@@ -288,5 +362,261 @@ mod tests {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<S3SinkConfig>();
+    }
+
+    /// Correct TOML shape: `batch_encoding.codec = "parquet"` with `schema_mode = "auto_infer"`.
+    #[cfg(feature = "codecs-parquet")]
+    #[test]
+    fn parquet_batch_encoding_correct_toml_shape() {
+        let config: S3SinkConfig = toml::from_str(
+            r#"
+            bucket = "test-bucket"
+            compression = "none"
+
+            [encoding]
+            codec = "text"
+
+            [batch_encoding]
+            schema_mode = "auto_infer"
+            codec = "parquet"
+
+            [batch_encoding.compression]
+            algorithm = "snappy"
+
+            "#,
+        )
+        .expect("correct batch_encoding shape should parse");
+
+        let batch_enc = config
+            .batch_encoding
+            .expect("batch_encoding should be Some");
+        match batch_enc {
+            vector_lib::codecs::encoding::BatchSerializerConfig::Parquet(ref p) => {
+                use vector_lib::codecs::encoding::format::{ParquetCompression, ParquetSchemaMode};
+                assert_eq!(p.schema_mode, ParquetSchemaMode::AutoInfer);
+                assert_eq!(p.compression, ParquetCompression::Snappy);
+            }
+            #[allow(unreachable_patterns)]
+            _ => panic!("expected Parquet variant"),
+        }
+    }
+
+    /// Content-Type must be auto-detected as `application/vnd.apache.parquet`
+    /// when `batch_encoding` is set and `content_type` is not explicitly provided.
+    #[cfg(feature = "codecs-parquet")]
+    #[test]
+    fn parquet_content_type_auto_detected() {
+        use vector_lib::codecs::encoding::format::{
+            ParquetCompression, ParquetSchemaMode, ParquetSerializerConfig,
+        };
+
+        use crate::sinks::s3_common::config::S3Options;
+        use crate::sinks::util::{BatchConfig, BulkSizeBasedDefaultBatchSettings, Compression};
+        use vector_lib::codecs::TextSerializerConfig;
+        use vector_lib::codecs::encoding::{BatchSerializerConfig, FramingConfig};
+
+        let parquet_config = ParquetSerializerConfig {
+            schema_mode: ParquetSchemaMode::AutoInfer,
+            compression: ParquetCompression::Snappy,
+            ..Default::default()
+        };
+
+        let config = S3SinkConfig {
+            bucket: "test".to_string(),
+            key_prefix: super::default_key_prefix(),
+            filename_time_format: super::default_filename_time_format(),
+            filename_append_uuid: true,
+            filename_extension: None,
+            options: S3Options::default(),
+            region: crate::aws::RegionOrEndpoint::with_both("us-east-1", "http://localhost:4566"),
+            encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
+            batch_encoding: Some(BatchSerializerConfig::Parquet(parquet_config)),
+            compression: Compression::None,
+            batch: BatchConfig::<BulkSizeBasedDefaultBatchSettings>::default(),
+            request: Default::default(),
+            tls: Default::default(),
+            auth: Default::default(),
+            acknowledgements: Default::default(),
+            timezone: Default::default(),
+            force_path_style: true,
+            retry_strategy: Default::default(),
+        };
+
+        let batch_config = config.batch_encoding.as_ref().unwrap();
+        let batch_serializer = batch_config.build_batch_serializer().unwrap();
+        let batch_encoder = vector_lib::codecs::BatchEncoder::new(batch_serializer);
+
+        let mut api_options = config.options.clone();
+        if api_options.content_type.is_none() {
+            api_options.content_type = Some(batch_encoder.content_type().to_string());
+        }
+
+        assert_eq!(
+            api_options.content_type.as_deref(),
+            Some("application/vnd.apache.parquet"),
+            "Content-Type must be auto-detected for Parquet"
+        );
+    }
+
+    /// When user explicitly sets `content_type`, the auto-detection must not override it.
+    #[cfg(feature = "codecs-parquet")]
+    #[test]
+    fn parquet_content_type_user_override_preserved() {
+        let config: S3SinkConfig = toml::from_str(
+            r#"
+            bucket = "test-bucket"
+            compression = "none"
+            content_type = "application/octet-stream"
+
+            [encoding]
+            codec = "text"
+
+            [batch_encoding]
+            codec = "parquet"
+            schema_mode = "auto_infer"
+
+            [batch_encoding.compression]
+            algorithm = "gzip"
+            level = 9
+            "#,
+        )
+        .unwrap();
+
+        let batch_config = config.batch_encoding.as_ref().unwrap();
+        let batch_serializer = batch_config.build_batch_serializer().unwrap();
+        let batch_encoder = vector_lib::codecs::BatchEncoder::new(batch_serializer);
+
+        let mut api_options = config.options.clone();
+        if api_options.content_type.is_none() {
+            api_options.content_type = Some(batch_encoder.content_type().to_string());
+        }
+
+        assert_eq!(
+            api_options.content_type.as_deref(),
+            Some("application/octet-stream"),
+            "User-specified Content-Type must not be overridden"
+        );
+    }
+
+    /// Parquet filename extension defaults to `.parquet` when not explicitly set.
+    #[cfg(feature = "codecs-parquet")]
+    #[test]
+    fn parquet_filename_extension_defaults_to_parquet() {
+        let config: S3SinkConfig = toml::from_str(
+            r#"
+            bucket = "test-bucket"
+            compression = "none"
+
+            [encoding]
+            codec = "text"
+
+            [batch_encoding]
+            codec = "parquet"
+            schema_mode = "auto_infer"
+            "#,
+        )
+        .unwrap();
+
+        assert!(
+            config.filename_extension.is_none(),
+            "fixture must not set filename_extension"
+        );
+
+        let batch_config = config.batch_encoding.as_ref().unwrap();
+        let extension = config
+            .filename_extension
+            .clone()
+            .or_else(|| match batch_config {
+                vector_lib::codecs::encoding::BatchSerializerConfig::Parquet(_) => {
+                    Some("parquet".to_string())
+                }
+                #[allow(unreachable_patterns)]
+                _ => None,
+            });
+
+        assert_eq!(extension.as_deref(), Some("parquet"));
+    }
+
+    /// Explicit filename_extension overrides the `.parquet` default.
+    #[cfg(feature = "codecs-parquet")]
+    #[test]
+    fn parquet_filename_extension_user_override() {
+        let config: S3SinkConfig = toml::from_str(
+            r#"
+            bucket = "test-bucket"
+            compression = "none"
+            filename_extension = "pq"
+
+            [encoding]
+            codec = "text"
+
+            [batch_encoding]
+            codec = "parquet"
+            schema_mode = "auto_infer"
+            "#,
+        )
+        .unwrap();
+
+        assert_eq!(config.filename_extension.as_deref(), Some("pq"));
+    }
+
+    /// `schema_mode` defaults to `relaxed` when not specified.
+    #[cfg(feature = "codecs-parquet")]
+    #[test]
+    fn parquet_schema_mode_defaults_to_relaxed() {
+        use vector_lib::codecs::encoding::format::ParquetSchemaMode;
+
+        let config: S3SinkConfig = toml::from_str(
+            r#"
+            bucket = "test-bucket"
+            compression = "none"
+
+            [encoding]
+            codec = "text"
+
+            [batch_encoding]
+            codec = "parquet"
+            "#,
+        )
+        .unwrap();
+
+        match config.batch_encoding.unwrap() {
+            vector_lib::codecs::encoding::BatchSerializerConfig::Parquet(p) => {
+                assert_eq!(p.schema_mode, ParquetSchemaMode::Relaxed);
+            }
+            #[allow(unreachable_patterns)]
+            _ => panic!("expected Parquet variant"),
+        }
+    }
+
+    /// Explicit `schema_mode = "strict"` is correctly parsed.
+    #[cfg(feature = "codecs-parquet")]
+    #[test]
+    fn parquet_schema_mode_strict_parsed() {
+        use vector_lib::codecs::encoding::format::ParquetSchemaMode;
+
+        let config: S3SinkConfig = toml::from_str(
+            r#"
+            bucket = "test-bucket"
+            compression = "none"
+
+            [encoding]
+            codec = "text"
+
+            [batch_encoding]
+            codec = "parquet"
+            schema_mode = "strict"
+            schema_file = "tmp/something.schema"
+            "#,
+        )
+        .unwrap();
+
+        match config.batch_encoding.unwrap() {
+            vector_lib::codecs::encoding::BatchSerializerConfig::Parquet(p) => {
+                assert_eq!(p.schema_mode, ParquetSchemaMode::Strict);
+            }
+            #[allow(unreachable_patterns)]
+            _ => panic!("expected Parquet variant"),
+        }
     }
 }

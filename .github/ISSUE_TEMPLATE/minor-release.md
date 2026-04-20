@@ -37,6 +37,7 @@ cargo vdev release prepare --version "${NEW_VECTOR_VERSION}" --vrl-version "${NE
 ```
 
 Automated steps include:
+
 - Create a new release branch from master to freeze commits
   - `git fetch && git checkout origin/master && git checkout -b "${RELEASE_BRANCH}" && git push -u`
 - Create a new release preparation branch from `master`
@@ -79,7 +80,7 @@ Automated steps include:
       - [ ] Squash the release preparation commits (but not the cherry-picked commits!) to a single
           commit. This makes it easier to cherry-pick to master after the release.
     - [ ] Merge release preparation branch into the release branch.
-        - `git switch "${RELEASE_BRANCH}" && git merge --ff-only "${PREP_BRANCH}"`
+      - `git switch "${RELEASE_BRANCH}" && git merge --ff-only "${PREP_BRANCH}"`
 
 - [ ] Tag new release
   - [ ] `git tag v"${NEW_VECTOR_VERSION}" -a -m v"${NEW_VECTOR_VERSION}"`
