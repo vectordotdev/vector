@@ -774,18 +774,6 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
-		source_send_batch_latency_seconds: {
-			description:       "The time elapsed blocking on the downstream channel to accept an entire batch of events received at the source"
-			type:              "histogram"
-			default_namespace: "vector"
-			tags:              _component_tags
-		}
-		source_send_latency_seconds: {
-			description:       "The time elapsed blocking on the downstream channel to accept a single chunk from a batch of events received at the source"
-			type:              "histogram"
-			default_namespace: "vector"
-			tags:              _component_tags
-		}
 		source_buffer_max_byte_size: {
 			description:       "The maximum number of bytes the source buffer can hold. The outputs of the source send data to this buffer."
 			type:              "gauge"

@@ -22,9 +22,7 @@ use vector_common::{
 
 use super::{Builder, Output, SendError};
 #[cfg(any(test, feature = "test"))]
-use super::{
-    LAG_TIME_NAME, OutputMetrics, SEND_BATCH_LATENCY_NAME, SEND_LATENCY_NAME, TEST_BUFFER_SIZE,
-};
+use super::{LAG_TIME_NAME, TEST_BUFFER_SIZE};
 use crate::{
     EstimatedJsonEncodedSizeOf,
     event::{Event, EventArray, EventContainer, array::EventArrayIntoIter},
@@ -110,8 +108,6 @@ impl SourceSender {
         timeout: Option<Duration>,
     ) -> (Self, LimitedReceiver<SourceSenderItem>) {
         let lag_time = Some(histogram!(LAG_TIME_NAME));
-        let send_latency = Some(histogram!(SEND_LATENCY_NAME));
-        let send_batch_latency = Some(histogram!(SEND_BATCH_LATENCY_NAME));
         let output_id = OutputId {
             component: "test".to_string().into(),
             port: None,
@@ -119,7 +115,7 @@ impl SourceSender {
         let (default_output, rx) = Output::new_with_buffer(
             n,
             DEFAULT_OUTPUT.to_owned(),
-            OutputMetrics::new(lag_time, send_latency, send_batch_latency),
+            lag_time,
             None,
             output_id,
             timeout,
@@ -196,15 +192,8 @@ impl SourceSender {
             component: "test".to_string().into(),
             port: Some(name.clone()),
         };
-        let (output, recv) = Output::new_with_buffer(
-            100,
-            name.clone(),
-            OutputMetrics::default(),
-            None,
-            output_id,
-            None,
-            None,
-        );
+        let (output, recv) =
+            Output::new_with_buffer(100, name.clone(), None, None, output_id, None, None);
         let recv = recv.into_stream().map(move |mut item| {
             item.events.iter_events_mut().for_each(|mut event| {
                 let metadata = event.metadata_mut();
