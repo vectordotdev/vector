@@ -1510,6 +1510,19 @@ generated: configuration: {
 				"""
 			group: "global_options"
 		}
+		preserve_ordering_stateless_transforms: {
+			type: bool: {}
+			description: """
+				Whether to preserve event ordering in stateless transforms that process events concurrently.
+
+				When `true` (the default), output events are emitted in the same order they were received.
+				When `false`, output ordering is not guaranteed, which may improve throughput when
+				processing time varies across events.
+				"""
+			common:   false
+			required: false
+			group:    "global_options"
+		}
 		proxy: {
 			type: object: options: {
 				enabled: {
