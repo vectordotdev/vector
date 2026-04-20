@@ -6,6 +6,52 @@ releases: "0.55.0": {
 
 	whats_next: []
 
+	description: """
+		The [COSE team](https://opensource.datadoghq.com/about/#the-community-open-source-engineering-team) is excited to announce version `0.55.0`!
+
+		## Release highlights
+
+		- New `windows_event_log` source that collects logs from Windows Event Log channels using the
+		  native Windows Event Log API, with pull-mode subscriptions, bookmark-based checkpointing, and
+		  configurable field filtering.
+		- The `aws_s3` sink now supports Apache Parquet batch encoding. Events can be written as
+		  Parquet columnar files with either an auto-generated native schema or a supplied `.schema`
+		  file, and configurable compression (Snappy, ZSTD, GZIP, LZ4, or none).
+		- The `azure_blob` sink re-gains first-class [Azure authentication](https://learn.microsoft.com/en-us/azure/storage/blobs/authorize-access-azure-active-directory):
+		  Azure CLI, Managed Identity, Workload Identity, and Managed Identity-based Client Assertion
+		  credential kinds are all supported again.
+		- The `datadog_metrics` sink now defaults to the Series v2 endpoint (`/api/v2/series`) and
+		  uses zstd compression for Series v2 and Sketches, which should yield smaller payloads
+		  and more efficient batching and intake. A new `series_api_version` option (`v1` or `v2`)
+		  is available to opt back to the legacy v1 endpoint; Series v1 continues to use zlib.
+		- `vector top` is more trustworthy: per-output events for components with multiple output
+		  ports are now shown in the correct `Events Out` column, and the `Memory Used` column
+		  now reports `disabled` when the target Vector instance was started without
+		  `--allocation-tracing` instead of a misleading `0`.
+		- Better internal metrics for capacity planning and alerting:
+		  - New source-send latency distributions (`source_send_latency_seconds`,
+		    `source_send_batch_latency_seconds`) surface backpressure close to the source.
+		  - Task-transform `utilization` no longer counts time spent waiting on downstream
+		    components, giving a more representative view of transform saturation.
+		  - Fixed a regression in buffer utilization metric tracking around underflow.
+		- Fixed a performance regression in the `file` and `kubernetes_logs` sources that could
+		  cause unexpectedly high CPU usage, introduced in 0.50.0.
+
+		## Breaking Changes
+
+		See the [0.55 upgrade guide](/highlights/2026-04-20-0-55-0-upgrade-guide/) for full details
+		and migration steps. At a glance, you are affected if you:
+
+		- query or tail the Vector observability API in any way: the API has moved from
+		  GraphQL to gRPC. This includes `vector top`, `vector tap`, and anything that talked to
+		  `/graphql` or the `/playground`. The HTTP `GET /health` endpoint is unchanged and continues
+		  to serve Kubernetes HTTP probes as before.
+		- set the top-level `headers` option on the `http` or `opentelemetry` sinks: it has been
+		  removed.
+		- use the `azure_logs_ingestion` sink with Client Secret credentials: `azure_credential_kind`
+		  must now be set explicitly.
+		"""
+
 	changelog: [
 		{
 			type: "enhancement"
@@ -277,7 +323,9 @@ releases: "0.55.0": {
 			type: "chore"
 			description: #"""
 				The `headers` option has been removed from the `http` and `opentelemetry` sinks.
-				Use `request.headers` instead. This option has been deprecated since v0.33.0.
+				Use `request.headers` instead. On the `opentelemetry` sink, `request` is nested under
+				`protocol`; see the [0.55 upgrade guide](/highlights/2026-04-20-0-55-0-upgrade-guide/)
+				for examples. This option has been deprecated since v0.33.0.
 				"""#
 			contributors: ["thomasqueirozb"]
 		},
