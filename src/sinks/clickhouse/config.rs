@@ -292,11 +292,9 @@ impl ClickhouseConfig {
 
             let mut arrow_config = match batch_encoding {
                 BatchSerializerConfig::ArrowStream(config) => config.clone(),
-                #[cfg(feature = "codecs-parquet")]
-                BatchSerializerConfig::Parquet(_) => {
+                _ => {
                     return Err(
-                        "ClickHouse sink does not support Parquet batch encoding. Use 'arrow_stream' instead."
-                            .into(),
+                        "'batch_encoding' for ClickHouse must use 'arrow_stream' codec.".into(),
                     );
                 }
             };
