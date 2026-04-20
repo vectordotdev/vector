@@ -191,11 +191,11 @@ pub struct GlobalOptions {
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub metrics_storage_refresh_period: Option<f64>,
 
-    /// Whether to preserve event ordering for concurrent stateless transforms.
+    /// Whether to preserve event ordering in stateless transforms that process events concurrently.
     ///
-    /// When `true` (the default), concurrent stateless transforms use `FuturesOrdered`,
-    /// guaranteeing output order matches input order. When `false`, `FuturesUnordered`
-    /// is used, which may improve throughput at the cost of ordering guarantees.
+    /// When `true` (the default), output events are emitted in the same order they were received.
+    /// When `false`, output ordering is not guaranteed, which may improve throughput when
+    /// processing time varies across events.
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     #[configurable(metadata(docs::common = false, docs::required = false))]
     pub preserve_ordering_stateless_transforms: Option<bool>,
