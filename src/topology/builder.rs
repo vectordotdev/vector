@@ -892,9 +892,7 @@ async fn run_source_output_pump(
             // is idle, so that config reloads can proceed without waiting for the
             // next event.
             alive = fanout.recv_control_message(), if control_channel_open => {
-                if !alive {
-                    control_channel_open = false;
-                }
+                control_channel_open = alive;
             }
             item = rx.next() => {
                 match item {
