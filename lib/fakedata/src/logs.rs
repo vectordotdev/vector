@@ -29,7 +29,14 @@ static FAKE_USERNAMES: [&str; 20] = [
 ];
 
 static FAKE_DOMAIN_NAMES: [&str; 8] = [
-    "some", "random", "names", "we", "make", "up", "for", "testing",
+    "acme",
+    "contoso",
+    "widgets",
+    "example",
+    "placeholder",
+    "sample",
+    "foobar",
+    "testbench",
 ];
 
 static FAKE_DOMAIN_TLDS: [&str; 8] = ["com", "net", "org", "io", "dev", "co", "app", "biz"];
