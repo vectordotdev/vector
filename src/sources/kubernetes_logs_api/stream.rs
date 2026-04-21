@@ -151,7 +151,7 @@ async fn stream_target(
         match lines.next().await {
             Some(Ok(line)) => {
                 let (timestamp_raw, message) = split_timestamped_line(&line);
-                if timestamp_raw <= last_ts.as_str() {
+                if timestamp_raw < last_ts.as_str() {
                     continue;
                 }
                 last_ts = timestamp_raw.to_owned();
