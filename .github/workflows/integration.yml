@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
   pull_request:
   merge_group:
-    types: [ checks_requested ]
+    types: [checks_requested]
 
 concurrency:
   # `github.event.number` exists for pull requests, otherwise fall back to SHA for merge queue
@@ -57,7 +57,7 @@ jobs:
       needs.changes.outputs.integration-yml == 'true' ||
       needs.changes.outputs.int-tests-any == 'true' ||
       needs.changes.outputs.e2e-tests-any == 'true')))
-     }}
+      }}
     uses: ./.github/workflows/build-test-runner.yml
     with:
       commit_sha: ${{ github.sha }}
@@ -77,17 +77,47 @@ jobs:
       matrix:
         # TODO: Add "splunk" back once https://github.com/vectordotdev/vector/issues/23474 is fixed.
         # If you modify this list, please also update the `int_tests` job in changes.yml.
-        service: [
-          "amqp", "appsignal", "axiom", "aws", "azure", "clickhouse", "databend", "datadog-agent",
-          "datadog-logs", "datadog-metrics", "datadog-traces", "dnstap", "docker-logs", "doris", "elasticsearch",
-          "eventstoredb", "fluent", "gcp", "greptimedb", "http-client", "influxdb", "kafka", "logstash",
-          "loki", "mqtt", "mongodb", "nats", "nginx", "opentelemetry", "postgres", "prometheus", "pulsar",
-          "redis", "webhdfs"
-        ]
+        service:
+          [
+            "amqp",
+            "appsignal",
+            "axiom",
+            "aws",
+            "azure",
+            "clickhouse",
+            "databend",
+            "datadog-agent",
+            "datadog-logs",
+            "datadog-metrics",
+            "datadog-traces",
+            "dnstap",
+            "docker-logs",
+            "doris",
+            "elasticsearch",
+            "eventstoredb",
+            "fluent",
+            "gcp",
+            "greptimedb",
+            "http-client",
+            "influxdb",
+            "kafka",
+            "logstash",
+            "loki",
+            "mqtt",
+            "mongodb",
+            "nats",
+            "nginx",
+            "opentelemetry",
+            "postgres",
+            "prometheus",
+            "pulsar",
+            "redis",
+            "webhdfs"
+          ]
     timeout-minutes: 90
     steps:
       - name: Download JSON artifact from changes.yml
-        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         if: github.event_name == 'merge_group'
         with:
           name: int_tests_changes
@@ -141,13 +171,12 @@ jobs:
 
       - name: Run Integration Tests for ${{ matrix.service }}
         if: steps.check.outputs.should_run == 'true'
-        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
         with:
           timeout_minutes: 30
           max_attempts: 3
           command: |
             bash scripts/run-integration-test.sh int ${{ matrix.service }}
-
 
   e2e-tests:
     runs-on: ubuntu-24.04-8core
@@ -161,12 +190,12 @@ jobs:
       (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch') }}
     strategy:
       matrix:
-        service: [ "datadog-logs", "datadog-metrics", "opentelemetry-logs", "opentelemetry-metrics" ]
+        service: ["datadog-logs", "datadog-metrics", "opentelemetry-logs", "opentelemetry-metrics"]
     timeout-minutes: 90
 
     steps:
       - name: Download JSON artifact from changes.yml
-        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         if: github.event_name == 'merge_group'
         with:
           name: e2e_tests_changes
@@ -220,7 +249,7 @@ jobs:
 
       - name: Run E2E Tests for ${{ matrix.service }}
         if: steps.check.outputs.should_run == 'true'
-        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
         with:
           timeout_minutes: 30
           max_attempts: 3

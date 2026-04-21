@@ -61,8 +61,14 @@ up() {
   # A Vector container image to use.
   CONTAINER_IMAGE="${CONTAINER_IMAGE:?"You must assign CONTAINER_IMAGE variable with the Vector container image name"}"
 
-  $VECTOR_TEST_HELM repo add "$CUSTOM_HELM_REPO_LOCAL_NAME" "$CHART_REPO" --force-update || true
-  $VECTOR_TEST_HELM repo update
+  # Support both remote repos (https://...) and local chart paths
+  if [[ "$CHART_REPO" == http* ]]; then
+    $VECTOR_TEST_HELM repo add "$CUSTOM_HELM_REPO_LOCAL_NAME" "$CHART_REPO" --force-update || true
+    $VECTOR_TEST_HELM repo update
+    HELM_INSTALL_TARGET="$CUSTOM_HELM_REPO_LOCAL_NAME/$HELM_CHART"
+  else
+    HELM_INSTALL_TARGET="$CHART_REPO"
+  fi
 
   $VECTOR_TEST_KUBECTL create namespace "$NAMESPACE" --dry-run -o yaml | $VECTOR_TEST_KUBECTL apply -f -
 
@@ -95,7 +101,7 @@ up() {
     --namespace "$NAMESPACE" \
     "${HELM_VALUES[@]}" \
     "$RELEASE_NAME" \
-    "$CUSTOM_HELM_REPO_LOCAL_NAME/$HELM_CHART"
+    "$HELM_INSTALL_TARGET"
   { set +x; } &>/dev/null
 }
 

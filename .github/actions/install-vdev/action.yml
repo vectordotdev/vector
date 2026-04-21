@@ -9,7 +9,7 @@ inputs:
   skip-cache:
     description: "Skip cache lookup and force compilation"
     required: false
-    default: 'false'
+    default: "false"
 
 runs:
   using: "composite"

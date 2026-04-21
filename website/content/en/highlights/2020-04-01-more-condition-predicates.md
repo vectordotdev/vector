@@ -31,10 +31,12 @@ following predicates were added:
 For example, you can filter all messages that contain the `error` term with
 the new `contains` predicate:
 
-```toml
-[transforms.errors]
-  type = "filter"
-  condition."message.contain" = "error"
+```yaml
+transforms:
+  errors:
+    type: "filter"
+    condition:
+      "message.contain": "error"
 ```
 
 The world is your oyster.
