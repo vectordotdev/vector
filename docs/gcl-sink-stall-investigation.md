@@ -266,11 +266,31 @@ arm 3 can fetch the next batch. No evidence that adjusting them changes stall fr
 ### Load correlation
 
 The stall is strongly correlated with weekday business-hours traffic. It is consistently observed
-between roughly **10:00–17:00 EST on weekdays** and has not been observed on weekends. This
-implicates load volume as a necessary condition — either the stall requires a minimum throughput
-to trigger (e.g., the `ConcurrentMap` limit must be saturated, or batcher timers must be racing
-with flush cycles at high frequency), or it requires some GCP-side behavior (API quota pressure,
-h2 connection churn) that only manifests under load.
+between roughly **10:00–17:00 EST on weekdays** and has not been observed on weekends.
+
+**Autoscaling rules out per-pod event rate as the distinguishing variable.** The cluster uses
+horizontal pod autoscaling, which adds pods to keep per-pod CPU utilization at a fixed target.
+This means pods on weekdays and weekends are targeted to the same events/s rate. The weekday-only
+correlation therefore cannot be explained by volume alone — something about the *character* of
+weekday events differs from weekend events.
+
+Likely distinguishing factors:
+
+- **Log content complexity.** Weekday business-hours traffic routes through more of the 54-transform
+  chain (different `route_*` branches, more `grok_*` parses, more `parse_regex` hits). Each event
+  consumes more CPU per unit even at the same ingress rate. This increases Tokio runtime contention
+  without changing events/s — consistent with a race-condition trigger that is sensitive to
+  scheduler pressure rather than throughput.
+- **GCP-side behavior.** GCL API quota pressure, h2 connection churn, or GOAWAY frames may be more
+  frequent during business hours when other Etsy services are also writing to Cloud Logging.
+- **Kafka partition activity.** More topic partitions may be actively producing on weekdays, changing
+  the consumer's poll batching behavior and the inter-arrival time distribution of events at the
+  channel feeding the Batcher.
+
+The practical implication: **increasing per-pod CPU utilization target** (by raising the autoscaler
+threshold) would increase Tokio scheduler contention without raising events/s, which — if the bug
+is a waker registration race — would make the stall more frequent. See the race condition analysis
+in the "Race condition hypothesis" section below.
 
 ### Scope — multiple pods, multiple stalls per hour
 
@@ -398,17 +418,115 @@ the dev environment first:
 
 ---
 
+## Race Condition Hypothesis
+
+### Evidence for a race condition rather than a logic error
+
+The rd9bh pod ran for over an hour (15:45–16:55 UTC) during which arm 4 fired dozens of times in
+the `in_flight=0, next_batch=None` state (`stalled_secs=0`) and recovered each time — meaning
+`batched_input.next()` correctly registered its waker on every one of those calls. The permanent
+stall occurred on one specific call where it did not. This intermittency is the hallmark of a race
+condition: the same code path succeeds under normal scheduling and fails under a specific
+interleaving.
+
+A pure logic error (wrong branch taken based on deterministic state) would fail consistently once
+the state is reached, not intermittently across dozens of successful iterations.
+
+### The TOCTOU waker race pattern
+
+Async waker correctness requires avoiding a time-of-check / time-of-use (TOCTOU) gap:
+
+```
+Thread A (poller):           Thread B (producer):
+1. check: no data yet
+                             2. data arrives, fire waker → no waker stored yet, noop
+3. store waker
+   [waker never fired again]
+→ permanent Poll::Pending
+```
+
+Tokio's `mpsc` channel uses `AtomicWaker` which handles this with a two-phase store + re-check.
+However, custom stream combinators (`Batcher`, `ConcurrentMap`) that wrap the channel introduce
+their own state machines. If any wrapper layer has a TOCTOU gap between "upstream returned Pending"
+and "waker stored in cx by upstream poll", a producer wake that fires between those two events is
+silently lost.
+
+### CPU utilization target as a race amplifier
+
+Higher CPU utilization means Tokio's worker threads are more frequently preempted and rescheduled.
+This widens every TOCTOU window — the gap between step 1 and step 3 above becomes longer in wall
+time, giving step 2 more opportunity to occur in between.
+
+**Prediction:** increasing the autoscaler's CPU utilization target (causing each pod to run hotter)
+would make the stall **more frequent** if the root cause is a waker TOCTOU race. It would have
+no effect if the root cause is a deterministic logic error or a Kafka source issue.
+
+This prediction is testable: deploy v5 to dev, raise the CPU target, and observe whether stall
+rate increases. A confirmed increase is strong evidence for a race condition, and rules out
+Kafka-source and logic-error hypotheses.
+
+### Implication for the weekday correlation
+
+Weekday business-hours events are more parse-intensive (more grok paths, more VRL remap work per
+event). This raises per-event CPU cost without raising events/s (which autoscaling normalizes).
+The result is higher Tokio runtime contention at the same throughput — consistent with a race
+condition that is sensitive to scheduler pressure rather than raw event volume.
+
+---
+
+## Findings from v4/v5 Debug Images (2026-04-21)
+
+### Cross-pod validation: cnp24, rd9bh, 928m7
+
+Three pods stalled and were SIGTERM'd on 2026-04-21. All three show identical behavior:
+
+| Pod | Last arm-1 tick | Persistent arm-3 starts | stalled_secs at SIGTERM | async_backtrace suspension |
+|---|---|---|---|---|
+| cnp24 | 17:13:34 (in_flight=3) | 17:14:34 | 916s | `driver.rs:208:30` |
+| rd9bh | 16:54:33 (in_flight=2) | 16:55:33 | 1226s | `driver.rs:208:30` |
+| 928m7 | 17:54:33 (in_flight=1) | 17:55:33 | 1230s | `driver.rs:208:30` |
+
+The async_backtrace Driver frame is byte-for-byte identical across all three pods: arm 3,
+`batched_input.next()` at `driver.rs:208:30`. This is confirmed, not a hypothesis.
+
+### "Source send cancelled" timing
+
+| Pod | Arm-3 stall start | Source send cancelled | Lag |
+|---|---|---|---|
+| cnp24 | ~17:14:34 | 17:16:21 | ~107s |
+| rd9bh | ~16:55:07 | 17:15:08 (at SIGTERM) | ~20 min (buffers held) |
+| 928m7 | ~17:55:03 | 17:57:17 | ~134s |
+
+"Source send cancelled" is a backpressure consequence, not the cause. In rd9bh it did not appear
+until pod termination (upstream buffers absorbed 20 minutes of backpressure), confirming it is not
+on the causal path to the stall.
+
+### Batcher waker static analysis
+
+Static analysis of `Batcher::poll_next` found all three `Poll::Pending` sub-paths correctly
+register wakers. No logic error was identified. Three regression tests were added
+(`batch_delivered_after_timer_flush_and_dormant_period`,
+`upstream_waker_registered_when_timer_none_and_batch_empty`,
+`second_batch_delivered_after_timer_flush_during_at_limit_gap`) to guard these paths.
+
+The v5 image adds named `async_backtrace` frames inside `Batcher::poll_next` and
+`ConcurrentMap::poll_next`. The next SIGTERM dump will resolve which of four specific await points
+is the leaf, identifying the exact layer where waker registration fails.
+
+---
+
 ## Next Steps
 
-1. **Deploy the v4 image** and reproduce the stall (or wait for the next natural occurrence).
-2. **On next stall:** the arm 4 stall log with `stalled_secs > 0` will confirm which case is
-   active. If it logs "Input stream has not produced a batch", the stall is definitively at arm 3.
-3. **Examine the SIGTERM async task dump** from the v4 image. The `async_backtrace` tree will show
-   the full await chain from `batched_input.next()` down through `ready_chunks` → `ConcurrentMap`
-   → `Batcher` → Kafka channel, identifying exactly which layer is stuck and at which `await` point.
-4. **Correlate with Kafka consumer lag metrics** in the 18:24–18:28 window to determine if the
-   source stopped before or after the driver froze.
-5. **If source stopped first:** investigate Kafka rebalance / partition events; the stall is a
-   source issue, not a sink issue.
-6. **If source was producing:** the stall is inside the Batcher or ConcurrentMap transform chain;
-   add per-layer waker instrumentation or a targeted reproducer.
+1. **Deploy v5 image** (`0.53.0-debug-sigterm-async-bt-h2ping-v5`) to dev and wait for next stall.
+2. **On next SIGTERM dump:** look for the leaf frame — one of:
+   - `Batcher::poll_next - waiting for timer` (`batcher/mod.rs:122`) → timer waker issue
+   - `Batcher::poll_next - waiting for upstream` (`batcher/mod.rs:137`) → channel empty; Kafka source stopped before stall
+   - `ConcurrentMap::poll_next - waiting for in-flight` (`concurrent_map.rs:106`) → stall above Batcher
+   - `ConcurrentMap::poll_next - waiting for upstream` (`concurrent_map.rs:125`) → ConcurrentMap upstream polling issue
+3. **If "waiting for upstream":** correlate with Kafka consumer lag metrics at stall onset to
+   confirm whether the source stopped before or after the driver froze.
+4. **Race condition test:** raise the dev autoscaler CPU utilization target and observe whether
+   stall frequency increases. An increase confirms race-condition hypothesis and rules out
+   deterministic logic error and pure Kafka-source theories.
+5. **If source was producing at stall onset:** the bug is a waker TOCTOU race inside the Batcher
+   or ConcurrentMap chain; add `AtomicWaker` audit or targeted synthetic reproducer under load.

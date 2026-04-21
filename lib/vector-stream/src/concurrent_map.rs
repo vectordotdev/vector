@@ -3,7 +3,7 @@ use std::{
     num::NonZeroUsize,
     panic,
     pin::Pin,
-    task::{Context, Poll, ready},
+    task::{Context, Poll},
 };
 
 use futures_util::{
@@ -12,6 +12,10 @@ use futures_util::{
 };
 use pin_project::pin_project;
 use tokio::task::JoinHandle;
+
+/// A type-erased, boxed, pinned future used solely to register a named
+/// `async_backtrace` frame in the task dump while `ConcurrentMap` is parked.
+type BtFrame = Pin<Box<dyn Future<Output = ()> + Send + 'static>>;
 
 #[pin_project]
 pub struct ConcurrentMap<St, T>
@@ -24,6 +28,9 @@ where
     limit: Option<NonZeroUsize>,
     in_flight: FuturesOrdered<JoinHandle<T>>,
     f: Box<dyn Fn(St::Item) -> Pin<Box<dyn Future<Output = T> + Send + 'static>> + Send>,
+    /// Holds a named async-backtrace frame while this stream is parked, so that
+    /// SIGTERM task dumps show *why* ConcurrentMap is pending (upstream vs in-flight).
+    bt_frame: Option<BtFrame>,
 }
 
 impl<St, T> ConcurrentMap<St, T>
@@ -40,6 +47,7 @@ where
             limit,
             in_flight: FuturesOrdered::new(),
             f: Box::new(f),
+            bt_frame: None,
         }
     }
 }
@@ -56,6 +64,8 @@ where
 
         // The underlying stream is done, and we have no more in-flight futures.
         if this.stream.is_done() && this.in_flight.is_empty() {
+            // Clear any lingering backtrace frame on the way out.
+            *this.bt_frame = None;
             return Poll::Ready(None);
         }
 
@@ -71,6 +81,8 @@ where
                     // futures to check, so we don't return just yet.
                     Poll::Pending | Poll::Ready(None) => break,
                     Poll::Ready(Some(item)) => {
+                        // We received an item — clear any stale backtrace frame.
+                        *this.bt_frame = None;
                         let fut = (this.f)(item);
                         let handle = tokio::spawn(fut);
                         this.in_flight.push_back(handle);
@@ -82,26 +94,57 @@ where
             }
         }
 
-        match ready!(this.in_flight.poll_next_unpin(cx)) {
-            // If the stream is done and there is no futures managed by FuturesOrdered,
-            // we must end the stream by returning Poll::Ready(None).
-            None if this.stream.is_done() => Poll::Ready(None),
-            // If there are no in-flight futures managed by FuturesOrdered but the underlying
-            // stream is not done, then we must keep polling that stream.
-            None => Poll::Pending,
-            Some(result) => match result {
-                Ok(item) => Poll::Ready(Some(item)),
-                Err(e) => {
-                    if let Ok(reason) = e.try_into_panic() {
-                        // Resume the panic here on the calling task.
-                        panic::resume_unwind(reason);
-                    } else {
-                        // The task was cancelled, which makes no sense, because _we_ hold the join
-                        // handle. Only sensible thing to do is panic, because this is a bug.
-                        panic!("concurrent map task cancelled outside of our control");
+        // Poll in-flight futures. If Pending, we're blocked waiting for spawned tasks to finish.
+        // If Ready(None) with a non-empty upstream, we're blocked waiting for the upstream stream.
+        match this.in_flight.poll_next_unpin(cx) {
+            Poll::Pending => {
+                // At least one in-flight task exists but hasn't completed yet.
+                // Register (or keep alive) a named async-backtrace frame so SIGTERM
+                // task dumps show "ConcurrentMap::poll_next - waiting for in-flight"
+                // at the leaf, distinguishing this from the upstream-wait path.
+                let frame = this.bt_frame.get_or_insert_with(|| {
+                    Box::pin(async_backtrace::location!().frame(
+                        std::future::pending::<()>(),
+                    ))
+                });
+                let _ = frame.as_mut().poll(cx);
+                Poll::Pending
+            }
+            Poll::Ready(None) if this.stream.is_done() => {
+                // The stream is done, and we have no more in-flight futures.
+                *this.bt_frame = None;
+                Poll::Ready(None)
+            }
+            Poll::Ready(None) => {
+                // No in-flight futures managed by FuturesOrdered, but the upstream
+                // stream is not done — we must keep polling that stream.
+                // Register (or keep alive) a named async-backtrace frame so SIGTERM
+                // task dumps show "ConcurrentMap::poll_next - waiting for upstream"
+                // at the leaf, distinguishing this from the in-flight-wait path.
+                let frame = this.bt_frame.get_or_insert_with(|| {
+                    Box::pin(async_backtrace::location!().frame(
+                        std::future::pending::<()>(),
+                    ))
+                });
+                let _ = frame.as_mut().poll(cx);
+                Poll::Pending
+            }
+            Poll::Ready(Some(result)) => {
+                *this.bt_frame = None;
+                match result {
+                    Ok(item) => Poll::Ready(Some(item)),
+                    Err(e) => {
+                        if let Ok(reason) = e.try_into_panic() {
+                            // Resume the panic here on the calling task.
+                            panic::resume_unwind(reason);
+                        } else {
+                            // The task was cancelled, which makes no sense, because _we_ hold the join
+                            // handle. Only sensible thing to do is panic, because this is a bug.
+                            panic!("concurrent map task cancelled outside of our control");
+                        }
                     }
                 }
-            },
+            }
         }
     }
 }
