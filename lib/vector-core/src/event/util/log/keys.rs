@@ -1,16 +1,19 @@
+use lookup::OwnedTargetPath;
+
 use super::all_fields;
-use crate::event::{KeyString, ObjectMap};
+use crate::event::ObjectMap;
 
 /// Iterates over all paths in form `a.b[0].c[1]` in alphabetical order.
 /// It is implemented as a wrapper around `all_fields` to reduce code
 /// duplication.
-pub fn keys(fields: &ObjectMap) -> impl Iterator<Item = KeyString> + '_ {
+pub fn keys(fields: &ObjectMap) -> impl Iterator<Item = OwnedTargetPath> + '_ {
     all_fields(fields).map(|(k, _)| k)
 }
 
 #[cfg(test)]
 mod test {
     use serde_json::json;
+    use vrl::owned_value_path;
 
     use super::{super::test::fields_from_json, *};
 
@@ -21,9 +24,9 @@ mod test {
             "field1": 4,
             "field3": 5
         }));
-        let expected: Vec<_> = vec!["field1", "field2", "field3"]
+        let expected: Vec<OwnedTargetPath> = vec!["field1", "field2", "field3"]
             .into_iter()
-            .map(KeyString::from)
+            .map(|val| OwnedTargetPath::event(owned_value_path!(val)))
             .collect();
 
         let collected: Vec<_> = keys(&fields).collect();
@@ -44,15 +47,15 @@ mod test {
             }
         }));
         let expected: Vec<_> = vec![
-            "a.a",
-            "a.array[0]",
-            "a.array[1]",
-            "a.array[2].x",
-            "a.array[3][0]",
-            "a.b.c",
+            owned_value_path!("a", "a"),
+            owned_value_path!("a", "array", 0),
+            owned_value_path!("a", "array", 1),
+            owned_value_path!("a", "array", 2, "x"),
+            owned_value_path!("a", "array", 3, 0),
+            owned_value_path!("a", "b", "c"),
         ]
         .into_iter()
-        .map(KeyString::from)
+        .map(OwnedTargetPath::event)
         .collect();
 
         let collected: Vec<_> = keys(&fields).collect();

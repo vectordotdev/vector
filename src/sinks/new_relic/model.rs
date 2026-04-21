@@ -12,7 +12,12 @@ use vector_lib::{
     event::ObjectMap,
     internal_event::{ComponentEventsDropped, INTENTIONAL, UNINTENTIONAL},
 };
-use vrl::event_path;
+use vrl::{
+    event_path,
+    path::{OwnedSegment, OwnedValuePath},
+};
+
+use std::fmt::Write;
 
 use super::NewRelicSinkError;
 use crate::event::{Event, MetricKind, MetricValue, Value};
@@ -172,8 +177,10 @@ impl TryFrom<Vec<Event>> for EventsApiModel {
                 };
 
                 let mut event_model = ObjectMap::new();
-                for (k, v) in log.convert_to_fields_unquoted() {
-                    event_model.insert(k, v.clone());
+                for (k, v) in log.convert_to_fields() {
+                    let flatten_unquoted_key = build_unquoted_value_path(&k.path);
+
+                    event_model.insert(flatten_unquoted_key.into(), v.clone());
                 }
 
                 if let Some(message) = log.get(event_path!("message")) {
@@ -239,6 +246,34 @@ impl TryFrom<Vec<Event>> for EventsApiModel {
             Err(NewRelicSinkError::new("No valid events to generate"))
         }
     }
+}
+
+// TODO: move to vrl package?
+
+fn build_unquoted_value_path(path: &OwnedValuePath) -> String {
+    let mut output = String::new();
+    for (i, segment) in path.segments.iter().enumerate() {
+        match segment {
+            OwnedSegment::Field(field) => {
+                serialize_field_unquoted(&mut output, field.as_ref(), (i != 0).then_some("."))
+            }
+            OwnedSegment::Index(index) => {
+                write!(output, "[{index}]").expect("write to string always succeed")
+            }
+        }
+    }
+
+    output
+}
+
+fn serialize_field_unquoted(string: &mut String, field: &str, separator: Option<&str>) {
+    let separator_len = separator.map_or(0, |x| x.len());
+    string.reserve(field.len() + separator_len);
+    if let Some(separator) = separator {
+        string.push_str(separator);
+    }
+
+    string.push_str(field);
 }
 
 /// The logs API data model.

@@ -3,6 +3,9 @@ mod size_of;
 
 use std::collections::HashSet;
 
+use lookup::OwnedTargetPath;
+use vrl::owned_value_path;
+
 use super::*;
 
 #[test]
@@ -21,11 +24,11 @@ fn event_iteration() {
         all,
         vec![
             (
-                "Pitbull".into(),
+                OwnedTargetPath::event(owned_value_path!("Pitbull")),
                 "The bigger they are, the harder they fall".into()
             ),
             (
-                "\"Ke$ha\"".into(),
+                OwnedTargetPath::event(owned_value_path!("Ke$ha")), // quotes are removed during the log.insert
                 "It's going down, I'm yelling timber".into()
             ),
         ]
@@ -45,9 +48,40 @@ fn event_iteration_order() {
     assert_eq!(
         collected,
         vec![
-            ("YRjhxXcg".into(), &Value::from("nw8iM5Jr")),
-            ("lZDfzKIL".into(), &Value::from("tOVrjveM")),
-            ("o9amkaRY".into(), &Value::from("pGsfG7Nr")),
+            (
+                OwnedTargetPath::event(owned_value_path!("YRjhxXcg")),
+                &Value::from("nw8iM5Jr")
+            ),
+            (
+                OwnedTargetPath::event(owned_value_path!("lZDfzKIL")),
+                &Value::from("tOVrjveM")
+            ),
+            (
+                OwnedTargetPath::event(owned_value_path!("o9amkaRY")),
+                &Value::from("pGsfG7Nr")
+            ),
         ]
     );
+}
+
+#[test]
+fn special_fields_iterate_and_get_round_trip() {
+    let mut log = LogEvent::default();
+    log.insert("\"Ke$ha\"", "timber");
+    log.insert("normal", "value");
+    log.insert("a.nested.path", 42);
+    log.insert(
+        "arr",
+        Value::Array(vec![Value::Integer(1), Value::Integer(2)]),
+    );
+
+    // Every path returned by the iterator should resolve back to the same value via get().
+    for (path, expected_value) in log.all_event_fields().unwrap() {
+        let actual = log.get(&path);
+        assert_eq!(
+            actual,
+            Some(expected_value),
+            "round-trip failed for path: {path}"
+        );
+    }
 }

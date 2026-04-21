@@ -16,7 +16,7 @@ use vrl::{
 use crate::{
     conditions::Condition,
     event::{Event, EventMetadata, LogEvent, discriminant::Discriminant},
-    internal_events::{ReduceAddEventError, ReduceStaleEventFlushed},
+    internal_events::ReduceStaleEventFlushed,
     transforms::{
         TaskTransform,
         reduce::{
@@ -85,20 +85,12 @@ impl ReduceState {
 
         if let Some(fields_iter) = e.all_event_fields_skip_array_elements() {
             for (path, value) in fields_iter {
-                // This should not return an error, unless there is a bug in the event fields iterator.
-                let parsed_path = match parse_target_path(&path) {
-                    Ok(path) => path,
-                    Err(error) => {
-                        emit!(ReduceAddEventError { error, path });
-                        continue;
-                    }
-                };
-                if is_covered_by_strategy(&parsed_path, strategies) {
+                if is_covered_by_strategy(&path, strategies) {
                     continue;
                 }
 
-                let maybe_strategy = strategies.get(&parsed_path);
-                match self.fields.entry(parsed_path) {
+                let maybe_strategy = strategies.get(&path);
+                match self.fields.entry(path) {
                     Entry::Vacant(entry) => {
                         if let Some(strategy) = maybe_strategy {
                             match get_value_merger(value.clone(), strategy) {
