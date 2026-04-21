@@ -69,10 +69,10 @@ pub struct HoneycombConfig {
 
     /// An optional field name that contains the sample rate for the event.
     ///
-    /// If set, the value of this field is extracted from the event and sent as the
-    /// `samplerate` field in the Honeycomb batch API. The field is removed from the
-    /// event data. If the field is missing or its value is not an integer, the
-    /// `samplerate` field is omitted from the API request.
+    /// If set, the field is removed from the event data. When the value is a positive
+    /// integer, it is sent as the `samplerate` field in the Honeycomb batch API.
+    /// If the field is missing or its value is not a positive integer, the `samplerate`
+    /// field is omitted from the API request.
     #[configurable(metadata(docs::examples = "sample_rate"))]
     #[serde(default)]
     samplerate_field: Option<OptionalTargetPath>,

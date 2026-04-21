@@ -142,14 +142,15 @@ mod samplerate {
 
         // samplerate should be omitted for non-integer values
         assert!(event.get("samplerate").is_none());
-        // "rate" should still be removed from data (it was extracted)
+        // Configured field is always removed from data
         assert!(event["data"].get("rate").is_none());
     }
 
     #[test]
-    fn encode_event_samplerate_field_value_zero() {
+    fn encode_event_samplerate_field_value_zero_or_negative() {
         let encoder = make_encoder(Some("rate"));
 
+        // Zero is invalid (samplerate means "1 in N", N must be > 0)
         let mut log = LogEvent::default();
         log.insert("rate", 0);
         log.insert("message", "hello");
@@ -162,8 +163,24 @@ mod samplerate {
         let output = decode_output(buf.get_ref());
         let event = &output[0];
 
-        // 0 is a valid samplerate
-        assert_eq!(event["samplerate"], serde_json::json!(0));
+        assert!(event.get("samplerate").is_none());
+        // Invalid integer values are still removed from data
+        assert!(event["data"].get("rate").is_none());
+
+        // Negative is also invalid
+        let mut log = LogEvent::default();
+        log.insert("rate", -5);
+        log.insert("message", "hello");
+
+        let mut buf = Cursor::new(Vec::new());
+        encoder
+            .encode_input(vec![Event::Log(log)], &mut buf)
+            .unwrap();
+
+        let output = decode_output(buf.get_ref());
+        let event = &output[0];
+
+        assert!(event.get("samplerate").is_none());
         assert!(event["data"].get("rate").is_none());
     }
 
@@ -200,7 +217,7 @@ mod samplerate {
         // Second event: no samplerate field at all
         assert!(output[1].get("samplerate").is_none());
 
-        // Third event: non-integer, so no samplerate
+        // Third event: non-integer, so no samplerate; field still removed from data
         assert!(output[2].get("samplerate").is_none());
         assert!(output[2]["data"].get("rate").is_none());
     }

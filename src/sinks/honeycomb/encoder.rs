@@ -43,7 +43,15 @@ impl SinkEncoder<Vec<Event>> for HoneycombEncoder {
             let samplerate = self.samplerate_field.as_ref().and_then(|field| {
                 field.path.as_ref().and_then(|path| {
                     log.remove(path).and_then(|value| match value {
-                        Value::Integer(rate) => Some(rate),
+                        Value::Integer(rate) if rate > 0 => Some(rate),
+                        Value::Integer(rate) => {
+                            warn!(
+                                message = "Samplerate field value must be a positive integer, ignoring.",
+                                field = %path,
+                                value = %rate,
+                            );
+                            None
+                        }
                         other => {
                             warn!(
                                 message = "Samplerate field value was not an integer, ignoring.",
