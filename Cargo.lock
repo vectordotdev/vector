@@ -3909,20 +3909,7 @@ name = "fakedata"
 version = "0.1.0"
 dependencies = [
  "chrono",
- "fakedata_generator",
  "rand 0.9.4",
-]
-
-[[package]]
-name = "fakedata_generator"
-version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b42ec18312c068f0d6008ad66ad2fa289ab40a16d07a06406c200baa09eb1e7c"
-dependencies = [
- "passt",
- "rand 0.9.4",
- "serde",
- "serde_json",
 ]
 
 [[package]]
@@ -7614,12 +7601,6 @@ name = "parse-size"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "487f2ccd1e17ce8c1bfab3a65c89525af41cfad4c8659021a1e9a2aacd73b89b"
-
-[[package]]
-name = "passt"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "13242a5ce97f39a8095d03c8b273e91d09f2690c0b7d69a2af844941115bab24"
 
 [[package]]
 name = "paste"
