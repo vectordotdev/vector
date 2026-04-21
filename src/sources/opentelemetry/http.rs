@@ -58,7 +58,8 @@ pub(crate) async fn run_http_server(
     shutdown: ShutdownSignal,
     keepalive_settings: KeepaliveConfig,
 ) -> crate::Result<()> {
-    let listener = tls_settings.bind(&address).await?;
+    let mut listener = tls_settings.bind(&address).await?;
+    listener.set_retry_accept(true);
     let routes = filters.recover(handle_rejection);
 
     info!(message = "Building HTTP server.", address = %address);
