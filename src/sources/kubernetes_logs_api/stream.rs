@@ -31,6 +31,7 @@ pub(super) struct StreamTarget {
     pub(super) namespace: String,
     pub(super) pod_name: String,
     pub(super) container_name: String,
+    pub(super) stream: &'static str,
 }
 
 pub(super) struct StreamRuntime<'a> {
@@ -161,7 +162,7 @@ async fn stream_target(
                 let mut event = create_event(
                     message,
                     timestamp,
-                    &target.container_name,
+                    target.stream,
                     context.ingestion_timestamp_field.as_ref(),
                     context.log_namespace,
                 );

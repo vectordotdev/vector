@@ -77,19 +77,22 @@ pub(super) fn stream_targets_for_pod(
                 .map(|configured| configured == &container.name)
                 .unwrap_or(true)
         })
-        .map(|container| StreamTarget {
-            key: format!("{namespace}/{pod_name}/{}", container.name),
-            namespace: namespace.clone(),
-            pod_name: pod_name.clone(),
-            container_name: container.name.clone(),
+        .flat_map(|container| {
+            ["stdout", "stderr"].map(|stream| StreamTarget {
+                key: format!("{namespace}/{pod_name}/{}/{stream}", container.name),
+                namespace: namespace.clone(),
+                pod_name: pod_name.clone(),
+                container_name: container.name.clone(),
+                stream,
+            })
         })
         .collect()
 }
 
 pub(super) fn log_url(target: &StreamTarget, tail_lines: i64, since_seconds: i64) -> String {
     let mut url = format!(
-        "/api/v1/namespaces/{}/pods/{}/log?follow=true&timestamps=true&container={}",
-        target.namespace, target.pod_name, target.container_name
+        "/api/v1/namespaces/{}/pods/{}/log?follow=true&timestamps=true&container={}&{}=true",
+        target.namespace, target.pod_name, target.container_name, target.stream
     );
     if tail_lines > 0 {
         url.push_str(&format!("&tailLines={tail_lines}"));
@@ -198,14 +201,14 @@ mod tests {
             }),
         };
 
-        assert_eq!(stream_targets_for_pod(&pod, &None).len(), 2);
-        assert_eq!(
-            stream_targets_for_pod(&pod, &Some("app".to_string()))
-                .into_iter()
-                .map(|target| target.container_name)
-                .collect::<Vec<_>>(),
-            vec!["app".to_string()]
-        );
+        // 2 containers × 2 streams (stdout + stderr) = 4 targets
+        assert_eq!(stream_targets_for_pod(&pod, &None).len(), 4);
+        let app_targets = stream_targets_for_pod(&pod, &Some("app".to_string()));
+        assert_eq!(app_targets.len(), 2);
+        assert!(app_targets.iter().all(|t| t.container_name == "app"));
+        let streams: Vec<_> = app_targets.iter().map(|t| t.stream).collect();
+        assert!(streams.contains(&"stdout"));
+        assert!(streams.contains(&"stderr"));
     }
 
     #[test]
