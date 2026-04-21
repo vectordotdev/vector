@@ -5,11 +5,6 @@ use chrono::{
 };
 use rand::{Rng, rng};
 
-// Small fixed pools for fake log components. These replace the previous
-// `fakedata_generator` dependency, which had an upstream bug where
-// `gen_domain` emitted `"Error: dataset not found"` in the TLD position
-// and spammed stderr on every call.
-
 static FAKE_USERNAMES: [&str; 20] = [
     "log_whisperer",
     "commit_conductor",
