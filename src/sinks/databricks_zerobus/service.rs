@@ -1,7 +1,10 @@
 //! Zerobus service wrapper for Vector sink integration.
 
+use crate::config::ProxyConfig;
 use crate::sinks::util::retries::RetryLogic;
-use databricks_zerobus_ingest_sdk::{TableProperties, ZerobusSdk, ZerobusStream};
+use databricks_zerobus_ingest_sdk::{
+    ConnectorFactory, ProxyConnector, TableProperties, ZerobusSdk, ZerobusStream,
+};
 use futures::future::BoxFuture;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -12,6 +15,43 @@ use vector_lib::request_metadata::{GroupedCountByteSize, MetaDescriptive, Reques
 use vector_lib::stream::DriverResponse;
 
 use super::{config::ZerobusSinkConfig, error::ZerobusSinkError, unity_catalog_schema};
+
+/// Build a connector factory that routes Zerobus gRPC traffic through
+/// Vector's configured proxy, honoring `no_proxy` rules.
+///
+/// The Zerobus endpoint is always HTTPS gRPC, so the `https` proxy is
+/// preferred; the `http` proxy is used as a fallback if only that is set.
+/// When the factory is installed on the SDK it fully replaces the SDK's
+/// default env-var proxy detection — which is intentional, since Vector's
+/// `ProxyConfig` has already merged the process environment at a higher
+/// layer and is the single source of truth for proxy decisions.
+///
+/// Returns `None` when `enabled = false` or no proxy URL is configured, in
+/// which case the SDK falls back to its built-in env-var detection. Because
+/// Vector has already merged env vars into `ProxyConfig`, reaching that
+/// fallback path means the user has not configured a proxy anywhere.
+fn build_connector_factory(proxy: &ProxyConfig) -> Option<ConnectorFactory> {
+    if !proxy.enabled {
+        return None;
+    }
+    let proxy_url = proxy.https.clone().or_else(|| proxy.http.clone())?;
+    let no_proxy = proxy.no_proxy.clone();
+    Some(Arc::new(move |host: &str| {
+        if no_proxy.matches(host) {
+            return None;
+        }
+        match ProxyConnector::new(&proxy_url) {
+            Ok(c) => Some(c),
+            Err(e) => {
+                warn!(
+                    message = "Failed to build Zerobus proxy connector; falling back to direct connection.",
+                    error = %e,
+                );
+                None
+            }
+        }
+    }))
+}
 
 /// The payload for a Zerobus request.
 ///
@@ -161,15 +201,17 @@ impl ZerobusService {
         config: ZerobusSinkConfig,
         stream_mode: StreamMode,
         require_acknowledgements: bool,
+        proxy: &ProxyConfig,
     ) -> Result<Self, ZerobusSinkError> {
-        // Create SDK instance
-        let sdk = ZerobusSdk::builder()
+        let mut builder = ZerobusSdk::builder()
             .endpoint(&config.ingestion_endpoint)
-            .unity_catalog_url(&config.unity_catalog_endpoint)
-            .build()
-            .map_err(|e| ZerobusSinkError::ConfigError {
-                message: format!("Failed to create Zerobus SDK: {}", e),
-            })?;
+            .unity_catalog_url(&config.unity_catalog_endpoint);
+        if let Some(factory) = build_connector_factory(proxy) {
+            builder = builder.connector_factory(factory);
+        }
+        let sdk = builder.build().map_err(|e| ZerobusSinkError::ConfigError {
+            message: format!("Failed to create Zerobus SDK: {}", e),
+        })?;
 
         Ok(Self {
             sdk: Arc::new(sdk),

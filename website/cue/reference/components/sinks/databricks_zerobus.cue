@@ -25,7 +25,7 @@ components: sinks: databricks_zerobus: {
 			}
 			compression: enabled: false
 			encoding: enabled:    false
-			proxy: enabled:       false
+			proxy: enabled:       true
 			request: {
 				enabled: true
 				headers: false
@@ -123,14 +123,19 @@ components: sinks: databricks_zerobus: {
 		proxy: {
 			title: "Proxy"
 			body: """
-				Vector's `proxy` configuration is not supported for this sink because the
-				underlying Zerobus SDK manages its own gRPC connections. The SDK reads proxy
-				settings from standard environment variables (`grpc_proxy`, `https_proxy`,
-				`http_proxy`, and their uppercase equivalents). Set these environment variables
-				if your environment requires egress through an HTTP proxy.
+				Both the Zerobus gRPC ingestion channel and the Unity Catalog schema
+				discovery requests honor Vector's `proxy` configuration (`proxy.http`,
+				`proxy.https`, `proxy.no_proxy`), which itself is merged with the standard
+				`HTTP_PROXY`, `HTTPS_PROXY`, and `NO_PROXY` environment variables.
 
-				The Unity Catalog schema discovery requests do respect Vector's runtime proxy
-				configuration.
+				Because the Zerobus endpoint is always HTTPS gRPC, the `proxy.https` URL is
+				used when set; `proxy.http` is used as a fallback only if `proxy.https` is
+				not configured. Hosts matching `proxy.no_proxy` bypass the proxy. Both
+				`http://` and `https://` proxy URIs are supported — for HTTPS proxies, the
+				client-to-proxy hop does its own TLS handshake using the system trust store.
+
+				Setting `proxy.enabled = false` disables proxying entirely, including the
+				SDK's built-in env-var fallback.
 				"""
 		}
 
