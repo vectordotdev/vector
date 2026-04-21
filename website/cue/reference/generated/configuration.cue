@@ -773,6 +773,21 @@ generated: configuration: {
 						required:      false
 						relevant_when: "type = \"aws_secrets_manager\""
 					}
+					use_fips_endpoint: {
+						type: bool: {}
+						description: """
+														Whether to use [FIPS-compliant endpoints][fips] when communicating with AWS services.
+
+														When enabled, the SDK resolves FIPS-compliant endpoints for the target service.
+														This is required for FedRAMP and other compliance environments. When omitted, the
+														SDK falls back to its default provider chain (the `AWS_USE_FIPS_ENDPOINT` environment
+														variable and AWS config files).
+
+														[fips]: https://docs.aws.amazon.com/sdkref/latest/guide/setting-global-aws_use_fips_endpoint.html
+														"""
+						required:      false
+						relevant_when: "type = \"aws_secrets_manager\""
+					}
 					type: {
 						required: true
 						type: string: enum: {
