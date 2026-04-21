@@ -247,18 +247,11 @@ impl AwsAuthentication {
     ) -> crate::Result<AssumeRoleProviderBuilder> {
         let connector = super::connector(proxy, tls_options)?;
 
-        // Resolve the FIPS endpoint setting so that the STS client used for
-        // AssumeRole uses FIPS endpoints when configured.
-        let use_fips =
-            aws_config::default_provider::use_fips::use_fips_provider(&ProviderConfig::empty())
-                .await
-                .unwrap_or(false);
-
         let config = SdkConfig::builder()
             .http_client(connector)
             .region(region.clone())
             .time_source(SystemTimeSource::new())
-            .use_fips(use_fips)
+            .use_fips(resolve_use_fips().await.unwrap_or(false))
             .build();
 
         let mut builder = AssumeRoleProviderBuilder::new(assume_role)
@@ -332,7 +325,8 @@ impl AwsAuthentication {
                 let auth_region = region.clone().map(Region::new).unwrap_or(service_region);
                 let provider_config = ProviderConfig::empty()
                     .with_region(Option::from(auth_region))
-                    .with_http_client(connector);
+                    .with_http_client(connector)
+                    .with_use_fips(resolve_use_fips().await);
 
                 let profile_provider = ProfileFileCredentialsProvider::builder()
                     .profile_files(profile_files)
@@ -396,6 +390,15 @@ impl AwsAuthentication {
     }
 }
 
+/// Resolves the FIPS endpoint setting from the environment variable
+/// `AWS_USE_FIPS_ENDPOINT`.
+///
+/// Returns `Some(true)` if FIPS is enabled, `Some(false)` if explicitly
+/// disabled, or `None` if the environment variable is not set.
+async fn resolve_use_fips() -> Option<bool> {
+    aws_config::default_provider::use_fips::use_fips_provider(&ProviderConfig::empty()).await
+}
+
 async fn default_credentials_provider(
     region: Region,
     proxy: &ProxyConfig,
@@ -407,10 +410,7 @@ async fn default_credentials_provider(
     let provider_config = ProviderConfig::empty()
         .with_region(Some(region.clone()))
         .with_http_client(connector)
-        .with_use_fips(
-            aws_config::default_provider::use_fips::use_fips_provider(&ProviderConfig::empty())
-                .await,
-        );
+        .with_use_fips(resolve_use_fips().await);
 
     let client = imds::Client::builder()
         .max_attempts(imds.max_attempts)
