@@ -23,6 +23,9 @@ use super::{
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(tag = "strategy", rename_all = "snake_case")]
+#[configurable(metadata(
+    docs::enum_tag_description = "The authentication strategy to use for Databricks."
+))]
 pub enum DatabricksAuthentication {
     /// Authenticate using OAuth 2.0 client credentials.
     #[serde(rename = "oauth")]
@@ -192,8 +195,13 @@ impl SinkConfig for ZerobusSinkConfig {
             .merge_default(&cx.globals.acknowledgements)
             .enabled();
 
-        let service =
-            ZerobusService::new(self.clone(), stream_mode, acknowledgements_enabled).await?;
+        let service = ZerobusService::new(
+            self.clone(),
+            stream_mode,
+            acknowledgements_enabled,
+            cx.proxy(),
+        )
+        .await?;
         let healthcheck_service = service.clone();
 
         let request_limits = self.request.into_settings();
@@ -236,9 +244,10 @@ impl ZerobusSinkConfig {
             });
         }
 
-        if self.table_name.matches('.').count() != 2 {
+        let parts: Vec<&str> = self.table_name.split('.').collect();
+        if parts.len() != 3 || parts.iter().any(|p| p.is_empty()) {
             return Err(ZerobusSinkError::ConfigError {
-                message: "table_name must be in format 'catalog.schema.table' (exactly 3 parts)"
+                message: "table_name must be in format 'catalog.schema.table' (exactly 3 non-empty parts)"
                     .to_string(),
             });
         }
@@ -372,6 +381,30 @@ mod tests {
             assert!(message.contains("catalog.schema.table"));
         } else {
             panic!("Expected ConfigError for invalid table_name format");
+        }
+    }
+
+    #[test]
+    fn test_config_validation_table_name_empty_segments() {
+        for bad in [
+            "catalog..table",
+            ".schema.table",
+            "catalog.schema.",
+            "..",
+            "catalog.schema.table.extra",
+        ] {
+            let mut config = create_test_config();
+            config.table_name = bad.to_string();
+            let result = config.validate();
+            assert!(result.is_err(), "expected error for table_name={bad:?}");
+            if let Err(crate::sinks::databricks_zerobus::error::ZerobusSinkError::ConfigError {
+                message,
+            }) = result
+            {
+                assert!(message.contains("catalog.schema.table"));
+            } else {
+                panic!("Expected ConfigError for table_name={bad:?}");
+            }
         }
     }
 
