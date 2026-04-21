@@ -458,6 +458,7 @@ rstest
 rsyslog
 rsyslogd
 rumqttc
+samplerate
 Salesforce
 Samsung
 SBT
