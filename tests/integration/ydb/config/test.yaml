@@ -1,0 +1,17 @@
+features:
+  - sinks-ydb-integration-tests
+
+test_filter: ::ydb
+
+env:
+  YDB_ENDPOINT: grpc://ydb:2136?database=/local
+  YDB_TABLE: /local/logs
+
+matrix:
+  version: ["25.3"]
+
+# changes to these files/paths will invoke the integration test in CI
+# expressions are evaluated using https://github.com/micromatch/picomatch
+paths:
+  - "src/sinks/ydb/**"
+  - "tests/integration/ydb/**"

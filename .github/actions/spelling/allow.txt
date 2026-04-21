@@ -202,6 +202,7 @@ gostring
 goversion
 gpg
 gql
+grpcs
 grafana
 graphiql
 greptime
@@ -380,6 +381,7 @@ nsupdate
 ntapi
 ntfs
 Odys
+OLAP
 onig
 opendal
 Openpeak
@@ -555,6 +557,7 @@ yandex
 Yarvik
 Yifang
 yjagdale
+ydb
 zadd
 zeek
 zookeeper

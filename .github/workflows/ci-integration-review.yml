@@ -139,7 +139,8 @@ jobs:
             "prometheus",
             "pulsar",
             "redis",
-            "webhdfs"
+            "webhdfs",
+            "ydb"
           ]
     steps:
       - name: Evaluate run condition

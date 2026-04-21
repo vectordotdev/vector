@@ -1,6 +1,6 @@
 package metadata
 
-generated: components: sinks: greptimedb_logs: configuration: {
+generated: components: sinks: ydb: configuration: {
 	acknowledgements: {
 		description: """
 			Controls how acknowledgements are handled for this sink.
@@ -39,15 +39,15 @@ generated: components: sinks: greptimedb_logs: configuration: {
 					serialized or compressed.
 					"""
 				required: false
-				type: uint: unit: "bytes"
+				type: uint: {
+					default: 10000000
+					unit:    "bytes"
+				}
 			}
 			max_events: {
 				description: "The maximum size of a batch before it is flushed."
 				required:    false
-				type: uint: {
-					default: 20
-					unit:    "events"
-				}
+				type: uint: unit: "events"
 			}
 			timeout_secs: {
 				description: "The maximum age of a batch before it is flushed."
@@ -59,152 +59,14 @@ generated: components: sinks: greptimedb_logs: configuration: {
 			}
 		}
 	}
-	compression: {
-		description: """
-			Set http compression encoding for the request
-			Default to none, `gzip` or `zstd` is supported.
-			"""
-		required: false
-		type: string: {
-			default: "gzip"
-			enum: {
-				gzip: """
-					[Gzip][gzip] compression.
-
-					[gzip]: https://www.gzip.org/
-					"""
-				none: "No compression."
-				snappy: """
-					[Snappy][snappy] compression.
-
-					[snappy]: https://github.com/google/snappy/blob/main/docs/README.md
-					"""
-				zlib: """
-					[Zlib][zlib] compression.
-
-					[zlib]: https://zlib.net/
-					"""
-				zstd: """
-					[Zstandard][zstd] compression.
-
-					[zstd]: https://facebook.github.io/zstd/
-					"""
-			}
-		}
-	}
-	dbname: {
-		description: """
-			The [GreptimeDB database][database] name to connect.
-
-			Default to `public`, the default database of GreptimeDB.
-
-			Database can be created via `create database` statement on
-			GreptimeDB. If you are using GreptimeCloud, use `dbname` from the
-			connection information of your instance.
-
-			[database]: https://docs.greptime.com/user-guide/concepts/key-concepts#database
-			"""
-		required: false
-		type: string: {
-			default: "public"
-			examples: [
-				"public",
-			]
-			syntax: "template"
-		}
-	}
-	encoding: {
-		description: "Transformations to prepare an event for serialization."
-		required:    false
-		type: object: options: {
-			except_fields: {
-				description: "List of fields that are excluded from the encoded event."
-				required:    false
-				type: array: items: type: string: {}
-			}
-			only_fields: {
-				description: "List of fields that are included in the encoded event."
-				required:    false
-				type: array: items: type: string: {}
-			}
-			timestamp_format: {
-				description: "Format used for timestamp fields."
-				required:    false
-				type: string: enum: {
-					rfc3339:    "Represent the timestamp as a RFC 3339 timestamp."
-					unix:       "Represent the timestamp as a Unix timestamp."
-					unix_float: "Represent the timestamp as a Unix timestamp in floating point."
-					unix_ms:    "Represent the timestamp as a Unix timestamp in milliseconds."
-					unix_ns:    "Represent the timestamp as a Unix timestamp in nanoseconds."
-					unix_us:    "Represent the timestamp as a Unix timestamp in microseconds."
-				}
-			}
-		}
-	}
 	endpoint: {
-		description: "The endpoint of the GreptimeDB server."
-		required:    true
-		type: string: examples: ["http://localhost:4000"]
-	}
-	extra_headers: {
 		description: """
-			Custom headers to add to the HTTP request sent to GreptimeDB.
-			Note that these headers will override the existing headers.
-			"""
-		required: false
-		type: object: {
-			examples: [{},
-			]
-			options: "*": {
-				description: "Extra header key-value pairs."
-				required:    true
-				type: string: {}
-			}
-		}
-	}
-	extra_params: {
-		description: "Custom parameters to add to the query string for each HTTP request sent to GreptimeDB."
-		required:    false
-		type: object: {
-			examples: [{
-				source: "vector"
-			}]
-			options: "*": {
-				description: "A query string parameter."
-				required:    true
-				type: string: {}
-			}
-		}
-	}
-	password: {
-		description: """
-			The password for your GreptimeDB instance.
+			The YDB connection string (gRPC endpoint with database).
 
-			This is required if your instance has authentication enabled.
+			Supports TLS connections via `grpcs://` scheme and various authentication methods.
 			"""
-		required: false
-		type: string: examples: ["password"]
-	}
-	pipeline_name: {
-		description: """
-			Pipeline name to be used for the logs.
-
-			Default to `greptime_identity`, use the original log structure
-			"""
-		required: false
-		type: string: {
-			default: "greptime_identity"
-			examples: ["pipeline_name"]
-			syntax: "template"
-		}
-	}
-	pipeline_version: {
-		description: "Pipeline version to be used for the logs."
-		required:    false
-		type: string: {
-			examples: ["2024-06-07 06:46:23.858293"]
-			syntax: "template"
-		}
+		required: true
+		type: string: examples: ["grpc://localhost:2136?database=/local", "grpcs://ydb.example.com:2135?database=/production&ca_certificate=/path/to/ca.pem", "grpcs://ydb.example.com:2135?database=/production&token_static_username=user&token_static_password=pass", "grpcs://ydb.example.com:2135?database=/production&token_metadata=yandex-cloud", "grpcs://ydb.example.com:2135?database=/production&token_cmd=yc iam create-token"]
 	}
 	request: {
 		description: """
@@ -393,114 +255,13 @@ generated: components: sinks: greptimedb_logs: configuration: {
 		}
 	}
 	table: {
-		description: "The table that data is inserted into."
-		required:    true
-		type: string: {
-			examples: ["mytable"]
-			syntax: "template"
-		}
-	}
-	tls: {
-		description: "TLS configuration."
-		required:    false
-		type: object: options: {
-			alpn_protocols: {
-				description: """
-					Sets the list of supported ALPN protocols.
-
-					Declare the supported ALPN protocols, which are used during negotiation with a peer. They are prioritized in the order
-					that they are defined.
-					"""
-				required: false
-				type: array: items: type: string: examples: ["h2"]
-			}
-			ca_file: {
-				description: """
-					Absolute path to an additional CA certificate file.
-
-					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
-					"""
-				required: false
-				type: string: examples: ["/path/to/certificate_authority.crt"]
-			}
-			crt_file: {
-				description: """
-					Absolute path to a certificate file used to identify this server.
-
-					The certificate must be in DER, PEM (X.509), or PKCS#12 format. Additionally, the certificate can be provided as
-					an inline string in PEM format.
-
-					If this is set _and_ is not a PKCS#12 archive, `key_file` must also be set.
-					"""
-				required: false
-				type: string: examples: ["/path/to/host_certificate.crt"]
-			}
-			key_file: {
-				description: """
-					Absolute path to a private key file used to identify this server.
-
-					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
-					"""
-				required: false
-				type: string: examples: ["/path/to/host_certificate.key"]
-			}
-			key_pass: {
-				description: """
-					Passphrase used to unlock the encrypted key file.
-
-					This has no effect unless `key_file` is set.
-					"""
-				required: false
-				type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
-			}
-			server_name: {
-				description: """
-					Server name to use when using Server Name Indication (SNI).
-
-					Only relevant for outgoing connections.
-					"""
-				required: false
-				type: string: examples: ["www.example.com"]
-			}
-			verify_certificate: {
-				description: """
-					Enables certificate verification. For components that create a server, this requires that the
-					client connections have a valid client certificate. For components that initiate requests,
-					this validates that the upstream has a valid certificate.
-
-					If enabled, certificates must not be expired and must be issued by a trusted
-					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
-					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
-					so on, until the verification process reaches a root certificate.
-
-					Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
-					"""
-				required: false
-				type: bool: {}
-			}
-			verify_hostname: {
-				description: """
-					Enables hostname verification.
-
-					If enabled, the hostname used to connect to the remote host must be present in the TLS certificate presented by
-					the remote host, either as the Common Name or as an entry in the Subject Alternative Name extension.
-
-					Only relevant for outgoing connections.
-
-					Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
-					"""
-				required: false
-				type: bool: {}
-			}
-		}
-	}
-	username: {
 		description: """
-			The username for your GreptimeDB instance.
+			The YDB table path to insert data into.
 
-			This is required if your instance has authentication enabled.
+			Can be either an absolute path (starting with `/`) or relative to the database.
+			The table must already exist with the required schema.
 			"""
-		required: false
-		type: string: examples: ["username"]
+		required: true
+		type: string: examples: ["/local/logs", "logs"]
 	}
 }
