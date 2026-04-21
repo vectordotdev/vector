@@ -1,9 +1,9 @@
 //! Configuration for the `gcp_stackdriver_logs` sink.
 
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Duration};
 
 use http::{Request, Uri};
-use hyper::Body;
+use hyper::{Body, Client};
 use snafu::Snafu;
 use vector_lib::lookup::lookup_v2::ConfigValuePath;
 use vrl::value::Kind;
@@ -258,7 +258,18 @@ impl SinkConfig for StackdriverConfig {
         let request_limits = self.request.into_settings();
 
         let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
-        let client = HttpClient::new(tls_settings, cx.proxy())?;
+
+        // Configure HTTP/2 keepalive PINGs so that dead GCP connections are detected quickly.
+        // Without this, hyper pools a TCP-ESTABLISHED connection that GCP has stopped processing,
+        // and every retry reuses it — cycling through 30s timeouts indefinitely until GCP sends a
+        // RST hours later. With PINGs enabled, an unanswered PING closes the pooled connection
+        // within keep_alive_timeout seconds and the next retry opens a fresh TCP connection.
+        let mut h2_client_builder = Client::builder();
+        h2_client_builder
+            .http2_keep_alive_interval(Some(Duration::from_secs(60)))
+            .http2_keep_alive_timeout(Duration::from_secs(15))
+            .http2_keep_alive_while_idle(true);
+        let client = HttpClient::new_with_custom_client(tls_settings, cx.proxy(), &mut h2_client_builder)?;
 
         let uri: Uri = self.endpoint.parse()?;
 

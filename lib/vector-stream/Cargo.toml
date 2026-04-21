@@ -6,6 +6,7 @@ edition = "2024"
 publish = false
 
 [dependencies]
+async-backtrace.workspace = true
 async-stream.workspace = true
 futures.workspace = true
 futures-util.workspace = true

@@ -1,0 +1,62 @@
+# Dockerfile.debug - Builds Vector 0.53.0 with SIGTERM debug dump patch
+# Target: linux/amd64, distroless-libc compatible (mirrors timberio/vector:0.53.0-distroless-libc)
+# Enables --cfg tokio_unstable for Tokio runtime metrics in the SIGTERM dump.
+
+# ─── Stage 1: Build ──────────────────────────────────────────────────────────
+FROM rust:1.92-bookworm AS builder
+
+WORKDIR /vector
+
+# Install system build dependencies (mirrors what cross/CI uses for x86_64-unknown-linux-gnu)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    cmake \
+    libssl-dev \
+    libsasl2-dev \
+    pkg-config \
+    python3 \
+    protobuf-compiler \
+    clang \
+    libclang-dev \
+    llvm-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy source
+COPY . .
+
+# Build Vector with the feature set Etsy needs:
+#   unix               - jemalloc + allocation tracing (Linux standard)
+#   api                - Vector internal API (vector top, health checks)
+#   enrichment-tables  - MaxMind GeoIP / CSV enrichment tables
+#   sinks-gcp          - Google Cloud Logging (Stackdriver) sink
+#   sources-kafka      - Kafka source
+#   transforms         - All transforms (VRL/remap, Lua, route, etc.)
+#   secrets            - Secret backends
+#
+# RUSTFLAGS "--cfg tokio_unstable" enables tokio::runtime::Handle::metrics(),
+# which the debug_dump module uses to emit per-worker queue depths on SIGTERM.
+# "-C link-args=-rdynamic" retains symbol names in backtraces (matches x86_64-unknown-linux-gnu target config).
+# JEMALLOC_SYS_WITH_LG_PAGE is also set via .cargo/config.toml [env], but set here
+# explicitly for clarity. tokio_unstable is enabled via .cargo/config.toml rustflags.
+ENV JEMALLOC_SYS_WITH_LG_PAGE=16
+
+RUN cargo build --release \
+    --no-default-features \
+    --features "unix,api,enrichment-tables,sinks-gcp,sinks-prometheus,sources-kafka,sources-internal_metrics,transforms,secrets"
+
+# ─── Stage 2: Runtime (debian:12-slim — has all system libs the binary needs) ──
+# Using debian:12-slim instead of distroless for this debug image: distroless
+# lacks libz, libssl, libsasl2, etc. that the dynamically-linked vector binary needs.
+FROM debian:12-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
+
+LABEL org.opencontainers.image.url="https://vector.dev"
+LABEL org.opencontainers.image.source="https://github.com/vectordotdev/vector"
+LABEL org.opencontainers.image.documentation="https://vector.dev/docs"
+LABEL org.opencontainers.image.version="0.53.0-debug-sigterm-async-bt-h2ping-v4"
+LABEL com.etsy.build="sigterm-debug-dump-async-backtrace-h2-keepalive-v4"
+
+COPY --from=builder /vector/target/release/vector /usr/bin/vector
+
+ENTRYPOINT ["/usr/bin/vector"]

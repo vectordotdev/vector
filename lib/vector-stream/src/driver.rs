@@ -1,7 +1,7 @@
 use std::{collections::VecDeque, fmt, future::poll_fn, task::Poll};
 
 use futures::{FutureExt, Stream, StreamExt, TryFutureExt, poll};
-use tokio::{pin, select};
+use tokio::{pin, select, time::{Instant, interval, MissedTickBehavior}};
 use tower::Service;
 use tracing::Instrument;
 use vector_common::{
@@ -100,6 +100,15 @@ where
         let bytes_sent = protocol.map(|protocol| register(BytesSent { protocol }));
         let events_sent = RegisteredEventCache::new(());
 
+        // Stall detection: warn if in-flight requests stop completing for an extended period.
+        // This surfaces GCP hangs even when tower's timeout logs are not visible (e.g., swamped
+        // by SIGTERM dump volume, or requests stuck before the timeout layer fires).
+        let mut stall_check = interval(std::time::Duration::from_secs(60));
+        stall_check.set_missed_tick_behavior(MissedTickBehavior::Skip);
+        // Consume the first tick that fires immediately on interval creation.
+        let mut last_completion = Instant::now();
+        stall_check.tick().await;
+
         loop {
             // Core behavior of the loop:
             // - always check to see if we have any response futures that have completed
@@ -127,10 +136,14 @@ where
                 biased;
 
                 // One or more of our service calls have completed.
-                Some(_count) = in_flight.next(), if !in_flight.is_empty() => {}
+                Some(_count) = in_flight.next(), if !in_flight.is_empty() => {
+                    last_completion = Instant::now();
+                }
 
                 // We've got an input batch to process and the service is ready to accept a request.
-                maybe_ready = poll_fn(|cx| service.poll_ready(cx)), if next_batch.is_some() => {
+                // Wrapped in a backtrace frame so that a SIGTERM dump shows this arm as a named
+                // subtree when poll_ready() is suspended (e.g. ACL semaphore blocked).
+                maybe_ready = async_backtrace::location!().frame(poll_fn(|cx| service.poll_ready(cx))), if next_batch.is_some() => {
                     let mut batch = next_batch.take()
                         .unwrap_or_else(|| unreachable!("batch should be populated"));
 
@@ -168,25 +181,62 @@ where
                         let events_sent = events_sent.clone();
                         let event_count = req.get_metadata().event_count();
 
-                        let fut = svc.call(req)
-                            .err_into()
-                            .map(move |result| Self::handle_response(
-                                result,
-                                request_id,
-                                finalizers,
-                                event_count,
-                                bytes_sent.as_ref(),
-                                &events_sent,
-                            ))
-                            .instrument(info_span!("request", request_id).or_current());
+                        // Wrap in an async_backtrace frame so that each in-flight HTTP request
+                        // appears as a named subtree in the SIGTERM task dump, revealing exactly
+                        // where it is suspended (retry backoff, hyper send, awaiting response).
+                        let fut = async_backtrace::location!().frame(
+                            svc.call(req)
+                                .err_into()
+                                .map(move |result| Self::handle_response(
+                                    result,
+                                    request_id,
+                                    finalizers,
+                                    event_count,
+                                    bytes_sent.as_ref(),
+                                    &events_sent,
+                                ))
+                                .instrument(info_span!("request", request_id).or_current())
+                        );
 
                         in_flight.push(fut);
                     }
                 }
 
                 // We've received some items from the input stream.
-                Some(reqs) = batched_input.next(), if next_batch.is_none() => {
+                // Wrapped in a backtrace frame so that a SIGTERM dump shows this arm as a named
+                // subtree when the source stream is idle (distinguishable from the poll_ready hang).
+                Some(reqs) = async_backtrace::location!().frame(batched_input.next()), if next_batch.is_none() => {
                     next_batch = Some(reqs.into());
+                }
+
+                // Stall detection: warn periodically when the driver is making no forward progress.
+                // Case 1: in-flight requests exist but none have completed — downstream stall.
+                // Case 2: a batch is queued but the service won't become ready — controller stall
+                //         (e.g. ACL semaphore blocked with no in-flight requests to free it).
+                // Case 3: no in-flight requests and no queued batch — the input stream is not
+                //         producing. This is the silent case: neither arm 1 nor arm 2 fires, so
+                //         without this branch the stall check produces no output at all. This was
+                //         observed in production when batched_input.next() became permanently
+                //         Pending despite events existing upstream (back-pressure / waker starvation
+                //         in the ConcurrentMap request-builder chain).
+                _ = stall_check.tick() => {
+                    if !in_flight.is_empty() {
+                        warn!(
+                            message = "In-flight requests have not completed; possible downstream stall.",
+                            in_flight_requests = in_flight.len(),
+                            stalled_secs = last_completion.elapsed().as_secs(),
+                        );
+                    } else if next_batch.is_some() {
+                        warn!(
+                            message = "Service poll_ready() has not completed with no in-flight requests; possible concurrency controller stall.",
+                            stalled_secs = last_completion.elapsed().as_secs(),
+                        );
+                    } else {
+                        warn!(
+                            message = "Input stream has not produced a batch; possible upstream pipeline stall.",
+                            stalled_secs = last_completion.elapsed().as_secs(),
+                        );
+                    }
                 }
 
                 else => break

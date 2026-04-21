@@ -108,6 +108,9 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
+    use futures::channel::mpsc as futures_mpsc;
     use futures_util::stream::StreamExt;
 
     use super::*;
@@ -122,5 +125,119 @@ mod tests {
 
         // Assert that the stream does not hang
         assert_eq!(concurrent_map.next().await, None);
+    }
+
+    /// Regression test for the at-limit waker gap.
+    ///
+    /// When `in_flight.len() == limit`, `ConcurrentMap::poll_next` skips polling the upstream
+    /// stream entirely — it breaks out of the loop before calling `stream.poll_next(cx)`. This
+    /// means `cx` is **not** registered with the upstream waker while tasks are saturating the
+    /// limit. The upstream can become ready during this window without being able to wake the
+    /// `ConcurrentMap` task directly.
+    ///
+    /// The correct behaviour is that the item eventually flows through once the at-limit tasks
+    /// drain and the next `poll_next` call registers with upstream. This test verifies that
+    /// no item is silently lost or causes a permanent `Pending` in this scenario.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_item_delivered_when_upstream_ready_while_at_limit() {
+        // limit=1 so we reach the at-limit branch after a single spawned task.
+        let limit = Some(NonZeroUsize::new(1).unwrap());
+
+        // A channel-backed stream so we can inject items on demand.
+        // futures::channel::mpsc::UnboundedReceiver implements Stream directly.
+        let (upstream_tx, upstream_rx) = futures_mpsc::unbounded::<u32>();
+
+        // A watch channel gates item 0's task: it blocks until we flip the flag to true.
+        // watch::Receiver is Clone, so it can be used inside the Fn closure.
+        let (hold_tx, hold_rx) = tokio::sync::watch::channel(false);
+
+        let f = move |v: u32| {
+            let mut hold_rx = hold_rx.clone();
+            Box::pin(async move {
+                if v == 0 {
+                    // Wait until the test releases us, keeping in_flight saturated at limit=1.
+                    hold_rx.wait_for(|&released| released).await.unwrap();
+                }
+                v
+            }) as _
+        };
+
+        // Collect outputs in a background task so we can interleave sends.
+        let (result_tx, mut result_rx) = futures_mpsc::unbounded::<u32>();
+        let collect = tokio::spawn(async move {
+            let mut map = ConcurrentMap::new(upstream_rx, limit, f);
+            while let Some(v) = map.next().await {
+                result_tx.unbounded_send(v).unwrap();
+            }
+        });
+
+        // Send item 0 — spawns a task that blocks immediately, filling in_flight to the limit.
+        upstream_tx.unbounded_send(0).unwrap();
+
+        // Yield so the spawned map task runs and parks on hold_rx.
+        tokio::time::sleep(Duration::from_millis(20)).await;
+
+        // Send item 1 while in_flight is at its limit. ConcurrentMap has NOT polled upstream
+        // since hitting the limit, so cx is not registered there. Item 1 waits in the channel.
+        upstream_tx.unbounded_send(1).unwrap();
+
+        // Close the upstream so the stream ends after item 1.
+        drop(upstream_tx);
+
+        // Release item 0's task. ConcurrentMap should then drain, poll upstream, get item 1.
+        hold_tx.send(true).unwrap();
+
+        // Both items must arrive within a generous timeout.
+        let r0 = tokio::time::timeout(Duration::from_secs(5), result_rx.next())
+            .await
+            .expect("timed out waiting for item 0")
+            .expect("channel closed");
+        let r1 = tokio::time::timeout(Duration::from_secs(5), result_rx.next())
+            .await
+            .expect("ConcurrentMap hung — item 1 not delivered after at-limit task completed")
+            .expect("channel closed");
+
+        assert_eq!((r0, r1), (0, 1));
+        collect.await.unwrap();
+    }
+
+    /// Tests that an item arriving in the upstream while ConcurrentMap has zero in-flight
+    /// tasks (the `None => Poll::Pending` arm) is eventually delivered without hanging.
+    ///
+    /// This exercises the code path where `FuturesOrdered::poll_next_unpin` returns
+    /// `Ready(None)` synchronously (empty queue), `ready!` fires immediately, and
+    /// `Poll::Pending` is returned. The only wake path is via the upstream's registered `cx`.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_item_delivered_after_pending_with_empty_in_flight() {
+        let limit = Some(NonZeroUsize::new(4).unwrap());
+
+        let (tx, rx) = futures_mpsc::unbounded::<u32>();
+
+        let f = |v: u32| Box::pin(async move { v }) as _;
+
+        // Collect in background so we can send after the first Pending.
+        let (result_tx, mut result_rx) = futures_mpsc::unbounded::<u32>();
+        let collect = tokio::spawn(async move {
+            let mut map = ConcurrentMap::new(rx, limit, f);
+            while let Some(v) = map.next().await {
+                result_tx.unbounded_send(v).unwrap();
+            }
+        });
+
+        // Yield to let the map task start and reach Pending on the empty channel.
+        tokio::time::sleep(Duration::from_millis(20)).await;
+
+        // Send an item. The upstream channel's waker (registered when map got Pending)
+        // must fire and deliver the item.
+        tx.unbounded_send(42).unwrap();
+        drop(tx);
+
+        let result = tokio::time::timeout(Duration::from_secs(5), result_rx.next())
+            .await
+            .expect("ConcurrentMap hung after upstream became ready following empty-in-flight Pending")
+            .expect("channel closed");
+
+        assert_eq!(result, 42);
+        collect.await.unwrap();
     }
 }

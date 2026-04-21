@@ -347,3 +347,185 @@ fn fails_invalid_log_names() {
         "#})
     .expect_err("Config parsing failed to error with extraneous ids");
 }
+
+/// Tests that exercise the sink's behaviour when the downstream HTTP backend
+/// is reachable at the TCP level but never returns a response — the scenario
+/// that caused the pod deadlock in production.
+mod sink_hang_tests {
+    use std::{convert::Infallible, num::NonZeroU64, time::Duration};
+
+    use futures::{future::ready, stream};
+    use http::{Request, Response};
+    use hyper::Body;
+    use serde::Deserialize;
+    use vector_lib::finalization::{BatchNotifier, BatchStatus};
+
+    use crate::{
+        config::{GenerateConfig, SinkConfig, SinkContext},
+        event::LogEvent,
+        sinks::gcp::stackdriver::logs::config::StackdriverConfig,
+        test_util::http::spawn_blackhole_http_server,
+    };
+
+    /// HTTP handler that accepts the connection but never sends a response.
+    ///
+    /// Models GCP's LB being reachable at the TCP/HTTP level (so H2 keepalive
+    /// PINGs are answered and the connection stays ESTABLISHED) while the backend
+    /// has stopped processing requests.  Every request hangs here until Tower's
+    /// `Timeout` layer fires.
+    async fn never_respond(_req: Request<Body>) -> Result<Response<Body>, Infallible> {
+        std::future::pending().await
+    }
+
+    /// Build a StackdriverConfig pointed at `endpoint` with test-friendly timeouts.
+    fn make_config(endpoint: &str, timeout_secs: u64, retry_attempts: usize) -> StackdriverConfig {
+        let raw = StackdriverConfig::generate_config().to_string();
+        let mut cfg = StackdriverConfig::deserialize(
+            toml::de::ValueDeserializer::parse(&raw).expect("toml should deserialize"),
+        )
+        .expect("config should be valid");
+        cfg.auth.credentials_path = None;
+        cfg.auth.api_key = Some("fake-key".to_string().into());
+        cfg.endpoint = endpoint.to_string();
+        cfg.request.timeout_secs = timeout_secs;
+        cfg.request.retry_attempts = retry_attempts;
+        cfg.request.retry_initial_backoff_secs = NonZeroU64::new(1).unwrap();
+        cfg.request.retry_max_duration_secs = NonZeroU64::new(2).unwrap();
+        cfg
+    }
+
+    /// End-to-end regression test for the production deadlock.
+    ///
+    /// A `never_respond` HTTP server simulates GCP stopping request processing
+    /// while keeping the connection open.  With `timeout_secs = 2` and
+    /// `retry_attempts = 2` the full cycle is 3 attempts × 2 s + 2 × 1 s
+    /// backoff ≈ 8 s.
+    ///
+    /// Asserts:
+    /// - The Driver exits (does NOT hang forever).
+    /// - The events are finalized as `Failed` after retry exhaustion.
+    /// - The elapsed time is consistent with the configured timeouts.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn sink_retries_exhaust_and_reject_events_on_hanging_backend() {
+        crate::test_util::trace_init();
+
+        let endpoint = spawn_blackhole_http_server(never_respond).await;
+        let config = make_config(&endpoint.to_string(), 2, 2);
+
+        let (sink, _healthcheck) = config.build(SinkContext::default()).await.unwrap();
+
+        let (batch, receiver) = BatchNotifier::new_with_receiver();
+        let event = LogEvent::from("test message").with_batch_notifier(&batch);
+        drop(batch);
+
+        let start = tokio::time::Instant::now();
+        sink.run_events(stream::once(ready(event))).await.unwrap();
+        let elapsed = start.elapsed();
+
+        // Yield so the finalizer task can propagate the Rejected status.
+        tokio::task::yield_now().await;
+
+        let status = receiver.await;
+        assert_eq!(
+            status,
+            BatchStatus::Failed,
+            "events should be Rejected after all retries are exhausted"
+        );
+
+        // 3 attempts × 2 s timeout + 2 × 1 s Fibonacci backoff = ~8 s.
+        // The lower bound catches cases where the timeout isn't firing at all;
+        // the upper bound catches regressions where the Driver hangs indefinitely.
+        assert!(
+            elapsed >= Duration::from_secs(5),
+            "retries finished too quickly ({:?}); tower Timeout may not be firing",
+            elapsed
+        );
+        assert!(
+            elapsed < Duration::from_secs(30),
+            "Driver hung for {:?} — possible regression of the deadlock bug",
+            elapsed
+        );
+    }
+
+    /// Regression test using synthetic time.
+    ///
+    /// With Tokio's time paused we can drive the full retry + stall-detection
+    /// cycle in wall-clock milliseconds.  This verifies that:
+    ///
+    /// 1. The Driver's new stall-detection `select!` arm (fires every 60 s) does
+    ///    not interfere with normal retry processing.
+    /// 2. After each Tower `Timeout` fires (at `t = timeout_secs`) the retry
+    ///    policy re-submits the request.
+    /// 3. Once retries are exhausted the Driver exits and events are `Failed`.
+    ///
+    /// Uses `start_paused = true` so the test completes in milliseconds rather
+    /// than the 90+ seconds that a 30 s timeout × 3 attempts would require.
+    #[tokio::test(start_paused = true)]
+    async fn sink_driver_completes_with_paused_time_advancing_through_stall_window() {
+        crate::test_util::trace_init();
+
+        // 30 s timeout mirrors production; 2 retries keeps the test short.
+        let endpoint = spawn_blackhole_http_server(never_respond).await;
+        let config = make_config(&endpoint.to_string(), 30, 2);
+
+        let (sink, _healthcheck) = config.build(SinkContext::default()).await.unwrap();
+
+        let (batch, receiver) = BatchNotifier::new_with_receiver();
+        let event = LogEvent::from("stall test").with_batch_notifier(&batch);
+        drop(batch);
+
+        // Run the sink in a background task; drive it by advancing simulated time.
+        let sink_task = tokio::spawn(async move {
+            sink.run_events(stream::once(ready(event))).await
+        });
+
+        // Yield several times to let the sink task start, establish the TCP
+        // connection to the server, and submit the first request before we begin
+        // advancing time.
+        for _ in 0..20 {
+            tokio::task::yield_now().await;
+        }
+
+        // ── Attempt 1 ────────────────────────────────────────────────────────
+        // Advance past: 30 s timeout + 1 s Fibonacci backoff.
+        // The stall-detection interval (60 s) does NOT fire here; it fires later.
+        tokio::time::advance(Duration::from_secs(31)).await;
+        // Yield to let the retry task re-submit the request on a new connection.
+        for _ in 0..20 {
+            tokio::task::yield_now().await;
+        }
+
+        // ── Attempt 2 + stall-detection window ───────────────────────────────
+        // Advance 31 s (timeout) + enough to cross the 60 s stall-check mark.
+        // At t ≈ 62 s the stall-detection arm in the Driver fires and emits a
+        // warn! — this is the new observability signal added in this patch.
+        tokio::time::advance(Duration::from_secs(31)).await;
+        for _ in 0..20 {
+            tokio::task::yield_now().await;
+        }
+
+        // ── Attempt 3 (final) ────────────────────────────────────────────────
+        // Advance past the final timeout.  Retries are now exhausted; the Driver
+        // should return and finalize the event as Failed.
+        tokio::time::advance(Duration::from_secs(31)).await;
+        for _ in 0..20 {
+            tokio::task::yield_now().await;
+        }
+
+        // The sink task must have completed — if it hasn't, the Driver deadlocked.
+        // Note: do NOT wrap in tokio::time::timeout here because time is still paused;
+        // a timer-based timeout would never fire.  If there is a regression the test will
+        // simply hang, which is the correct failure signal for a deadlock bug.
+        let result = sink_task.await.expect("sink task panicked");
+        assert!(result.is_ok(), "Driver returned Err unexpectedly");
+
+        tokio::task::yield_now().await;
+
+        let status = receiver.await;
+        assert_eq!(
+            status,
+            BatchStatus::Failed,
+            "events should be Rejected after retry exhaustion (paused-time run)"
+        );
+    }
+}

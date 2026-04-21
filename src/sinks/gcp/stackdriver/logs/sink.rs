@@ -32,6 +32,7 @@ where
         }
     }
 
+    #[async_backtrace::framed]
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         input
             // Batch the input stream with size calculation based on the estimated encoded json size
@@ -67,6 +68,7 @@ where
     S::Response: DriverResponse + Send + 'static,
     S::Error: std::fmt::Debug + Into<crate::Error> + Send,
 {
+    #[async_backtrace::framed]
     async fn run(
         self: Box<Self>,
         input: futures_util::stream::BoxStream<'_, Event>,

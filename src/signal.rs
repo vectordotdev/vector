@@ -208,6 +208,7 @@ fn os_signals(runtime: &Runtime) -> impl Stream<Item = SignalTo> + use<> {
                     },
                     _ = sigterm.recv() => {
                         info!(message = "Signal received.", signal = "SIGTERM");
+                        crate::debug_dump::mark_sigterm();
                         SignalTo::Shutdown(None)
                     } ,
                     _ = sigquit.recv() => {

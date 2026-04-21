@@ -249,6 +249,7 @@ impl Application {
 
         emit!(VectorStarted);
         handle.spawn(heartbeat::heartbeat());
+        handle.spawn(crate::debug_dump::dump_debug_info_on_sigterm());
 
         let Self {
             root_opts,
