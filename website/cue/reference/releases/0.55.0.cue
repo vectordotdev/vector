@@ -59,7 +59,7 @@ releases: "0.55.0": {
 				`vector` source: Implement standard gRPC health checking protocol (`grpc.health.v1.Health`)
 				alongside the existing custom health check endpoint. This enables compatibility with standard
 				tools like `grpc-health-probe` for Kubernetes and other orchestration systems.
-				
+
 				Issue: https://github.com/vectordotdev/vector/issues/23657
 				"""#
 			contributors: ["jpds"]
@@ -84,17 +84,17 @@ releases: "0.55.0": {
 			description: #"""
 				The `opentelemetry` source now supports independent configuration of OTLP decoding for logs, metrics, and traces. This allows more granular
 				control over which signal types are decoded, while maintaining backward compatibility with the existing boolean configuration.
-				
+
 				## Simple boolean form (applies to all signals)
-				
+
 				```yaml
 				use_otlp_decoding: true  # All signals preserve OTLP format
 				# or
 				use_otlp_decoding: false # All signals use Vector native format (default)
 				```
-				
+
 				## Per-signal configuration
-				
+
 				```yaml
 				use_otlp_decoding:
 				  logs: false     # Convert to Vector native format
@@ -108,7 +108,7 @@ releases: "0.55.0": {
 			type: "fix"
 			description: #"""
 				Fixed log message ordering on shutdown where `Vector has stopped.` was logged before components had finished draining, causing confusing output interleaved with `Waiting on running components` messages.
-				
+
 				A new `VectorStopping` event was added in the place of the `VectorStopped` event.
 				"""#
 			contributors: ["tronboto"]
@@ -133,7 +133,7 @@ releases: "0.55.0": {
 				`opentelemetry` source: Implemented header enrichment for OTLP metrics and traces. Unlike logs, which support enriching
 				the event itself or its metadata, depending on `log_namespace` settings, for metrics and traces this setting is ignored
 				and header values are added to the event metadata.
-				
+
 				Issue: https://github.com/vectordotdev/vector/issues/24619
 				"""#
 			contributors: ["ozanichkovsky"]
@@ -173,7 +173,7 @@ releases: "0.55.0": {
 		{
 			type: "chore"
 			description: #"""
-				If using the `azure_logs_ingestion` sink (added in Vector 0.54.0) with Client Secret credentials, add `azure_credential_kind = "client_secret_credential"` to your sink config (this was previously the default, and now must be explicitly configured).
+				If using the `azure_logs_ingestion` sink (added in Vector 0.54.0) with Client Secret credentials, add `azure_credential_kind = "client_secret_credential"` under the sink's `auth` block (alongside `azure_tenant_id`, `azure_client_id`, and `azure_client_secret`). This was previously the default, and now must be explicitly configured. See the [0.55 upgrade guide](/highlights/2026-04-20-0-55-0-upgrade-guide/) for an example.
 				"""#
 			contributors: ["jlaundry"]
 		},
@@ -217,12 +217,12 @@ releases: "0.55.0": {
 			type: "feat"
 			description: #"""
 				Add Apache Parquet batch encoding support for the `aws_s3` sink with flexible schema definitions.
-				
+
 				Events can now be encoded as Parquet columnar files with multiple schema input options:
-				
+
 				- **Native Parquet schema** — automatically generate a schema or supply `.schema` file
 				- **Configurable compression** - (Snappy, ZSTD, GZIP, LZ4, None).
-				
+
 				Enable the `codecs-parquet` feature and configure `batch_encoding` with `codec = "parquet"` in the S3 sink configuration.
 				"""#
 			contributors: ["szibis", "petere-datadog"]
@@ -281,36 +281,36 @@ releases: "0.55.0": {
 				commands continue to work as before, as they have been updated to use the new
 				gRPC API internally. The gRPC service definition is available in
 				[`proto/vector/observability.proto`](https://github.com/vectordotdev/vector/blob/master/proto/vector/observability.proto).
-				
+
 				Note: `vector top` and `vector tap` from version 0.55.0 or later are not
 				compatible with Vector instances running earlier versions.
-				
+
 				- Remove the `api.graphql` and `api.playground` fields from your config. Vector
 				  now rejects configs that contain them.
-				
+
 				- If you use `vector top` or `vector tap` with an explicit `--url`, remove the
 				  `/graphql` path suffix:
-				
+
 				```bash
 				# Old
 				vector top --url http://localhost:8686/graphql
-				
+
 				# New (the gRPC API listens at the root)
 				vector top --url http://localhost:8686
 				```
-				
+
 				- The GraphQL API (HTTP endpoint `/graphql`, WebSocket subscriptions, and the
 				  GraphQL Playground at `/playground`) has been removed. You can interact with
 				  the new gRPC API using tools like
 				  [grpcurl](https://github.com/fullstorydev/grpcurl):
-				
+
 				```bash
 				# Check health (standard gRPC health check, compatible with Kubernetes gRPC probes)
 				grpcurl -plaintext localhost:8686 grpc.health.v1.Health/Check
-				
+
 				# List components
 				grpcurl -plaintext localhost:8686 vector.observability.v1.ObservabilityService/GetComponents
-				
+
 				# Stream events (tap) — limit and interval_ms are required and must be >= 1
 				grpcurl -plaintext \
 				  -d '{"outputs_patterns": ["*"], "limit": 100, "interval_ms": 500}' \
@@ -376,29 +376,29 @@ releases: "0.55.0": {
 
 	vrl_changelog: """
 		### [0.32.0 (2026-04-16)]
-		
+
 		#### New Features
-		
+
 		- Added a new `encode_csv` function that encodes an array of values into a CSV-formatted string. This is the inverse of the existing `parse_csv` function and supports an optional single-byte delimiter (defaults to `,`).
-		
+
 		authors: armleth (https://github.com/vectordotdev/vrl/pull/1649)
 		- Added `to_entries` and `from_entries` with jq-compatible behavior: `to_entries` supports both objects and arrays, and `from_entries` accepts `key`/`Key`/`name`/`Name` and `value`/`Value` aliases.
-		
+
 		authors: close2code-palm (https://github.com/vectordotdev/vrl/pull/1653)
-		
+
 		#### Enhancements
-		
+
 		- Added `except` parameter to `flatten` function to exclude specific keys from being flattened.
-		
+
 		authors: benjamin-awd (https://github.com/vectordotdev/vrl/pull/1682)
-		
+
 		#### Fixes
-		
+
 		- Fixed a bug where the REPL input validator was executing programs instead of only compiling them, causing functions with side effects (e.g. `http_request`) to run twice per submission.
-		
+
 		authors: prontidis (https://github.com/vectordotdev/vrl/pull/1701)
-		
-		
+
+
 		### [0.31.0 (2026-03-05)]
 		"""
 
