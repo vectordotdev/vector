@@ -95,7 +95,7 @@ discord = "https://chat.vector.dev"
 [params.datadog_config]
 application_id = "894af722-5919-4a62-97fc-33f49bc52803"
 client_token = "pubcee1dc56e7f5bd03397cc3624eb7961c"
-site = "cose.datadoghq.com"
+site = "datadoghq.com"
 service_name = "vector"
 
 ## Menus
