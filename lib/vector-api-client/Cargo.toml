@@ -9,6 +9,7 @@ license = "MPL-2.0"
 [dependencies]
 # gRPC
 tonic.workspace = true
+tonic-health.workspace = true
 prost.workspace = true
 prost-types.workspace = true
 

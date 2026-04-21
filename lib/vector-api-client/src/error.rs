@@ -16,6 +16,9 @@ pub enum Error {
     #[snafu(display("Not connected to gRPC server"))]
     NotConnected,
 
+    #[snafu(display("Server is not serving (status: {})", status))]
+    NotServing { status: i32 },
+
     #[snafu(display("Stream error: {}", message))]
     Stream { message: String },
 }

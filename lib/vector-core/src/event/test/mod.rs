@@ -1,4 +1,3 @@
-mod common;
 mod serialization;
 mod size_of;
 
