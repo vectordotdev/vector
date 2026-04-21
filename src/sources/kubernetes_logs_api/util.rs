@@ -90,9 +90,13 @@ pub(super) fn stream_targets_for_pod(
 }
 
 pub(super) fn log_url(target: &StreamTarget, tail_lines: i64, since_seconds: i64) -> String {
+    let (want_stdout, want_stderr) = match target.stream {
+        "stdout" => ("true", "false"),
+        _ => ("false", "true"),
+    };
     let mut url = format!(
-        "/api/v1/namespaces/{}/pods/{}/log?follow=true&timestamps=true&container={}&{}=true",
-        target.namespace, target.pod_name, target.container_name, target.stream
+        "/api/v1/namespaces/{}/pods/{}/log?follow=true&timestamps=true&container={}&stdout={want_stdout}&stderr={want_stderr}",
+        target.namespace, target.pod_name, target.container_name
     );
     if tail_lines > 0 {
         url.push_str(&format!("&tailLines={tail_lines}"));
