@@ -1,6 +1,5 @@
 use std::{error::Error as StdError, net::SocketAddr};
 use tokio::sync::oneshot;
-use tokio_stream::wrappers::TcpListenerStream;
 use tonic::transport::Server as TonicServer;
 use tonic_health::server::{HealthReporter, health_reporter};
 use vector_lib::tap::topology::WatchRx;
@@ -48,10 +47,16 @@ impl GrpcServer {
 
         let (_shutdown, rx) = oneshot::channel();
 
+        // Convert the tokio TcpListener into a std listener for axum/hyper's Server.
+        let std_listener = listener.into_std().map_err(|e| {
+            crate::Error::from(format!("Failed to convert TCP listener: {}", e))
+        })?;
+        std_listener.set_nonblocking(true).map_err(|e| {
+            crate::Error::from(format!("Failed to set TCP listener non-blocking: {}", e))
+        })?;
+
         // Spawn the server with the already-bound listener
         tokio::spawn(async move {
-            let incoming = TcpListenerStream::new(listener);
-
             // Build reflection service for tools like grpcurl
             let reflection_service = tonic_reflection::server::Builder::configure()
                 .register_encoded_file_descriptor_set(
@@ -61,11 +66,19 @@ impl GrpcServer {
                 .build()
                 .expect("Failed to build reflection service");
 
-            let result = TonicServer::builder()
+            // Build the tonic router (gRPC services) and convert it to an axum Router
+            // so we can serve both gRPC and HTTP routes on the same port.
+            let router = TonicServer::builder()
+                .accept_http1(true)
                 .add_service(health_service)
                 .add_service(ObservabilityServer::new(service))
                 .add_service(reflection_service)
-                .serve_with_incoming_shutdown(incoming, async {
+                .into_router();
+
+            let result = hyper::Server::from_tcp(std_listener)
+                .expect("Failed to build HTTP server from TCP listener")
+                .serve(router.into_make_service())
+                .with_graceful_shutdown(async {
                     rx.await.ok();
                     info!("GRPC API server shutting down.");
                 })
