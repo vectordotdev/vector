@@ -165,7 +165,7 @@ jobs:
         id: dd-sts
         uses: DataDog/dd-sts-action@2e8187910199bd93129520183c093e19aa585c75
         with:
-          policy: vector-ci
+          policy: public-vectordotdev-vector
 
       - name: Set Datadog credentials
         if: steps.run_condition.outputs.should_run == 'true'
@@ -231,7 +231,7 @@ jobs:
         id: dd-sts
         uses: DataDog/dd-sts-action@2e8187910199bd93129520183c093e19aa585c75
         with:
-          policy: vector-ci
+          policy: public-vectordotdev-vector
 
       - name: Set Datadog credentials
         if: steps.run_condition.outputs.should_run == 'true'

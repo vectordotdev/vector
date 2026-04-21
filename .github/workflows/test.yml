@@ -69,7 +69,7 @@ jobs:
         id: dd-sts
         uses: DataDog/dd-sts-action@2e8187910199bd93129520183c093e19aa585c75
         with:
-          policy: vector-ci
+          policy: public-vectordotdev-vector
 
       - name: Set Datadog credentials
         run: echo "DD_API_KEY=${{ steps.dd-sts.outputs.api_key }}" >> "$GITHUB_ENV"
