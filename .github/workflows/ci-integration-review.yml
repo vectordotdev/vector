@@ -201,7 +201,7 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: read
-      packages: read    # Required to pull test runner image from GHCR
+      packages: read # Required to pull test runner image from GHCR
       id-token: write
     strategy:
       fail-fast: false
