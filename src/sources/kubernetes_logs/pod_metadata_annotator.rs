@@ -205,8 +205,21 @@ impl PodMetadataAnnotator {
         let resource = self.pods_state_reader.get(&obj)?;
         let pod: &Pod = resource.as_ref();
 
-        annotate_from_file_info(log, &self.fields_spec, &file_info, self.log_namespace, self.source_name);
-        annotate_event_from_pod(log, &self.fields_spec, pod, None, self.log_namespace, self.source_name);
+        annotate_from_file_info(
+            log,
+            &self.fields_spec,
+            &file_info,
+            self.log_namespace,
+            self.source_name,
+        );
+        annotate_event_from_pod(
+            log,
+            &self.fields_spec,
+            pod,
+            Some(file_info.container_name),
+            self.log_namespace,
+            self.source_name,
+        );
 
         Some(file_info)
     }
@@ -229,9 +242,8 @@ pub(crate) fn annotate_event_from_pod(
     if let Some(ref pod_spec) = pod.spec {
         annotate_from_pod_spec(log, fields_spec, pod_spec, log_namespace, source_name);
 
-        let container_name = container_name.or_else(|| {
-            pod_spec.containers.first().map(|c| c.name.as_str())
-        });
+        let container_name =
+            container_name.or_else(|| pod_spec.containers.first().map(|c| c.name.as_str()));
         if let Some(name) = container_name
             && let Some(container) = pod_spec.containers.iter().find(|c| c.name == name)
         {
@@ -250,8 +262,7 @@ pub(crate) fn annotate_event_from_pod(
                     .map(|cs| cs.name.as_str())
             });
             if let Some(name) = container_name
-                && let Some(container_status) =
-                    container_statuses.iter().find(|c| c.name == name)
+                && let Some(container_status) = container_statuses.iter().find(|c| c.name == name)
             {
                 annotate_from_container_status(
                     log,
@@ -778,7 +789,13 @@ mod tests {
 
         for (fields_spec, metadata, expected, log_namespace) in cases.into_iter() {
             let mut log = LogEvent::default();
-            annotate_from_metadata(&mut log, &fields_spec, &metadata, log_namespace, "kubernetes_logs");
+            annotate_from_metadata(
+                &mut log,
+                &fields_spec,
+                &metadata,
+                log_namespace,
+                "kubernetes_logs",
+            );
             assert_eq!(log, expected);
         }
     }
@@ -836,7 +853,13 @@ mod tests {
         for (fields_spec, file, expected, log_namespace) in cases.into_iter() {
             let mut log = LogEvent::default();
             let file_info = parse_log_file_path(file).unwrap();
-            annotate_from_file_info(&mut log, &fields_spec, &file_info, log_namespace, "kubernetes_logs");
+            annotate_from_file_info(
+                &mut log,
+                &fields_spec,
+                &file_info,
+                log_namespace,
+                "kubernetes_logs",
+            );
             assert_eq!(log, expected);
         }
     }
@@ -886,7 +909,13 @@ mod tests {
 
         for (fields_spec, pod_spec, expected, log_namespace) in cases.into_iter() {
             let mut log = LogEvent::default();
-            annotate_from_pod_spec(&mut log, &fields_spec, &pod_spec, log_namespace, "kubernetes_logs");
+            annotate_from_pod_spec(
+                &mut log,
+                &fields_spec,
+                &pod_spec,
+                log_namespace,
+                "kubernetes_logs",
+            );
             assert_eq!(log, expected);
         }
     }
@@ -994,7 +1023,13 @@ mod tests {
 
         for (fields_spec, pod_status, expected, log_namespace) in cases.into_iter() {
             let mut log = LogEvent::default();
-            annotate_from_pod_status(&mut log, &fields_spec, &pod_status, log_namespace, "kubernetes_logs");
+            annotate_from_pod_status(
+                &mut log,
+                &fields_spec,
+                &pod_status,
+                log_namespace,
+                "kubernetes_logs",
+            );
             assert_eq!(log, expected);
         }
     }
@@ -1095,7 +1130,13 @@ mod tests {
 
         for (fields_spec, container, expected, log_namespace) in cases.into_iter() {
             let mut log = LogEvent::default();
-            annotate_from_container(&mut log, &fields_spec, &container, log_namespace, "kubernetes_logs");
+            annotate_from_container(
+                &mut log,
+                &fields_spec,
+                &container,
+                log_namespace,
+                "kubernetes_logs",
+            );
             assert_eq!(log, expected);
         }
     }
