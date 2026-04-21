@@ -234,12 +234,24 @@ mod source {
 
     impl InternalEvent for SplunkHecRequestError {
         fn emit(self) {
-            error!(
-                message = "Error processing request.",
-                error = ?self.error,
-                error_type = error_type::REQUEST_FAILED,
-                stage = error_stage::RECEIVING
-            );
+            match self.error {
+                ApiError::InvalidAuthorization | ApiError::MissingAuthorization => {
+                    warn!(
+                        message = "Unauthenticated request.",
+                        error = ?self.error,
+                        error_type = error_type::REQUEST_FAILED,
+                        stage = error_stage::RECEIVING
+                    );
+                }
+                _ => {
+                    error!(
+                        message = "Error processing request.",
+                        error = ?self.error,
+                        error_type = error_type::REQUEST_FAILED,
+                        stage = error_stage::RECEIVING
+                    );
+                }
+            }
             counter!(
                 "component_errors_total",
                 "error_type" => error_type::REQUEST_FAILED,
