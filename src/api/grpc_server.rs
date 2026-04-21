@@ -70,9 +70,9 @@ impl GrpcServer {
         let (_shutdown, rx) = oneshot::channel();
 
         // Convert the tokio TcpListener into a std listener for hyper's Server.
-        let std_listener = listener.into_std().map_err(|e| {
-            crate::Error::from(format!("Failed to convert TCP listener: {}", e))
-        })?;
+        let std_listener = listener
+            .into_std()
+            .map_err(|e| crate::Error::from(format!("Failed to convert TCP listener: {}", e)))?;
         std_listener.set_nonblocking(true).map_err(|e| {
             crate::Error::from(format!("Failed to set TCP listener non-blocking: {}", e))
         })?;
