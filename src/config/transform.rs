@@ -206,6 +206,14 @@ pub trait TransformConfig: DynClone + NamedComponent + core::fmt::Debug + Send +
     /// returned.
     async fn build(&self, globals: &TransformContext) -> crate::Result<Transform>;
 
+    /// Whether `build` requires environment-dependent setup.
+    ///
+    /// This is used by `vector validate --no-environment` to skip transforms that intentionally do
+    /// network or runtime initialization as part of `build`.
+    fn build_requires_environment(&self) -> bool {
+        false
+    }
+
     /// Gets the input configuration for this transform.
     fn input(&self) -> Input;
 
