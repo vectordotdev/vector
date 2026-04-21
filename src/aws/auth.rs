@@ -237,7 +237,7 @@ impl AwsAuthentication {
 
     /// Create the AssumeRoleProviderBuilder, ensuring we create the HTTP client with
     /// the correct proxy and TLS options.
-    fn assume_role_provider_builder(
+    async fn assume_role_provider_builder(
         proxy: &ProxyConfig,
         tls_options: Option<&TlsConfig>,
         region: &Region,
@@ -246,10 +246,19 @@ impl AwsAuthentication {
         session_name: Option<&str>,
     ) -> crate::Result<AssumeRoleProviderBuilder> {
         let connector = super::connector(proxy, tls_options)?;
+
+        // Resolve the FIPS endpoint setting so that the STS client used for
+        // AssumeRole uses FIPS endpoints when configured.
+        let use_fips =
+            aws_config::default_provider::use_fips::use_fips_provider(&ProviderConfig::empty())
+                .await
+                .unwrap_or(false);
+
         let config = SdkConfig::builder()
             .http_client(connector)
             .region(region.clone())
             .time_source(SystemTimeSource::new())
+            .use_fips(use_fips)
             .build();
 
         let mut builder = AssumeRoleProviderBuilder::new(assume_role)
@@ -298,7 +307,8 @@ impl AwsAuthentication {
                         assume_role,
                         external_id.as_deref(),
                         session_name.as_deref(),
-                    )?;
+                    )
+                    .await?;
 
                     let provider = builder.build_from_provider(provider).await;
 
@@ -347,7 +357,8 @@ impl AwsAuthentication {
                     assume_role,
                     external_id.as_deref(),
                     session_name.as_deref(),
-                )?;
+                )
+                .await?;
 
                 let provider = builder
                     .build_from_provider(
@@ -395,7 +406,11 @@ async fn default_credentials_provider(
 
     let provider_config = ProviderConfig::empty()
         .with_region(Some(region.clone()))
-        .with_http_client(connector);
+        .with_http_client(connector)
+        .with_use_fips(
+            aws_config::default_provider::use_fips::use_fips_provider(&ProviderConfig::empty())
+                .await,
+        );
 
     let client = imds::Client::builder()
         .max_attempts(imds.max_attempts)
