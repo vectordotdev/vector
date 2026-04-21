@@ -274,7 +274,6 @@ event-listener-strategy,https://github.com/smol-rs/event-listener-strategy,Apach
 evmap,https://github.com/jonhoo/rust-evmap,MIT OR Apache-2.0,Jon Gjengset <jon@thesquareplanet.com>
 evmap-derive,https://github.com/jonhoo/rust-evmap,MIT OR Apache-2.0,Jon Gjengset <jon@thesquareplanet.com>
 exitcode,https://github.com/benwilber/exitcode,Apache-2.0,Ben Wilber <benwilber@gmail.com>
-fakedata_generator,https://github.com/KevinGimbel/fakedata_generator,MIT,Kevin Gimbel <kevin@gimbel.dev>
 fallible-iterator,https://github.com/sfackler/rust-fallible-iterator,MIT OR Apache-2.0,Steven Fackler <sfackler@gmail.com>
 fancy-regex,https://github.com/fancy-regex/fancy-regex,MIT,"Raph Levien <raph@google.com>, Robin Stocker <robin@nibor.org>, Keith Hall <keith.hall@available.systems>"
 fastrand,https://github.com/smol-rs/fastrand,Apache-2.0 OR MIT,Stjepan Glavina <stjepang@gmail.com>
@@ -541,7 +540,6 @@ parking_lot,https://github.com/Amanieu/parking_lot,MIT OR Apache-2.0,Amanieu d'A
 parking_lot_core,https://github.com/Amanieu/parking_lot,MIT OR Apache-2.0,Amanieu d'Antras <amanieu@gmail.com>
 parquet,https://github.com/apache/arrow-rs,Apache-2.0,Apache Arrow <dev@arrow.apache.org>
 parse-size,https://github.com/kennytm/parse-size,MIT,kennytm <kennytm@gmail.com>
-passt,https://github.com/kevingimbel/passt,MIT OR Apache-2.0,Kevin Gimbel <hallo@kevingimbel.com>
 paste,https://github.com/dtolnay/paste,MIT OR Apache-2.0,David Tolnay <dtolnay@gmail.com>
 pastey,https://github.com/as1100k/pastey,MIT OR Apache-2.0,"Aditya Kumar <git@adityais.dev>, David Tolnay <dtolnay@gmail.com>"
 pbkdf2,https://github.com/RustCrypto/password-hashes/tree/master/pbkdf2,MIT OR Apache-2.0,RustCrypto Developers
