@@ -294,7 +294,6 @@ const fn default_server_ack_timeout_ms() -> u64 {
     60000
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;

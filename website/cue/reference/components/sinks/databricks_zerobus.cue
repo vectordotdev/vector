@@ -86,15 +86,9 @@ components: sinks: databricks_zerobus: {
 				The sink requires a schema to encode events into protobuf format.
 
 				The sink automatically fetches the table schema from the Unity Catalog API
-				at startup, ensuring the schema always matches the target table.
-
-				```yaml
-				sinks:
-				  zerobus:
-				    type: databricks_zerobus
-				    schema:
-				      type: unity_catalog
-				```
+				at startup using the configured `table_name` and `unity_catalog_endpoint`,
+				ensuring the schema always matches the target table. No additional schema
+				configuration is required.
 				"""
 		}
 
@@ -135,8 +129,8 @@ components: sinks: databricks_zerobus: {
 				`http_proxy`, and their uppercase equivalents). Set these environment variables
 				if your environment requires egress through an HTTP proxy.
 
-				The Unity Catalog schema discovery requests (used when `schema.type` is set to
-				`unity_catalog`) do respect Vector's runtime proxy configuration.
+				The Unity Catalog schema discovery requests do respect Vector's runtime proxy
+				configuration.
 				"""
 		}
 

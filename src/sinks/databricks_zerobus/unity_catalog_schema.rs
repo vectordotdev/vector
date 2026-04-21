@@ -37,12 +37,11 @@ pub async fn fetch_table_schema(
     client_secret: &str,
     proxy: &ProxyConfig,
 ) -> Result<UnityCatalogTableSchema, ZerobusSinkError> {
-    let http_client =
-        HttpClient::new(TlsSettings::default(), proxy).map_err(|e| {
-            ZerobusSinkError::ConfigError {
-                message: format!("Failed to create HTTP client: {}", e),
-            }
-        })?;
+    let http_client = HttpClient::new(TlsSettings::default(), proxy).map_err(|e| {
+        ZerobusSinkError::ConfigError {
+            message: format!("Failed to create HTTP client: {}", e),
+        }
+    })?;
 
     // First, get OAuth token
     let token = get_oauth_token(
@@ -360,7 +359,13 @@ fn sanitize_package_name(name: &str) -> String {
         .map(|segment| {
             let mut s: String = segment
                 .chars()
-                .map(|c| if c.is_alphanumeric() || c == '_' { c } else { '_' })
+                .map(|c| {
+                    if c.is_alphanumeric() || c == '_' {
+                        c
+                    } else {
+                        '_'
+                    }
+                })
                 .collect();
             if s.is_empty() || !s.starts_with(|c: char| c.is_alphabetic()) {
                 s.insert(0, PACKAGE_SEGMENT_PREFIX);
@@ -403,8 +408,8 @@ mod tests {
             ],
         };
 
-        let descriptor = generate_descriptor_from_schema(&schema)
-            .expect("descriptor should be generated");
+        let descriptor =
+            generate_descriptor_from_schema(&schema).expect("descriptor should be generated");
         assert_eq!(descriptor.fields().len(), 2);
         assert!(descriptor.get_field_by_name("id").is_some());
         assert!(descriptor.get_field_by_name("body").is_some());

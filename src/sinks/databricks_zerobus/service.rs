@@ -1,5 +1,6 @@
 //! Zerobus service wrapper for Vector sink integration.
 
+use crate::sinks::util::retries::RetryLogic;
 use databricks_zerobus_ingest_sdk::{TableProperties, ZerobusSdk, ZerobusStream};
 use futures::future::BoxFuture;
 use std::sync::Arc;
@@ -9,7 +10,6 @@ use tracing::warn;
 use vector_lib::finalization::{EventFinalizers, Finalizable};
 use vector_lib::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
 use vector_lib::stream::DriverResponse;
-use crate::sinks::util::retries::RetryLogic;
 
 use super::{config::ZerobusSinkConfig, error::ZerobusSinkError, unity_catalog_schema};
 
