@@ -93,6 +93,7 @@ struct ChannelSubscription {
 
 // SAFETY: Same rationale as EventLogSubscription - Windows kernel handles are thread-safe.
 unsafe impl Send for ChannelSubscription {}
+unsafe impl Sync for ChannelSubscription {}
 
 /// Result of waiting for events across all channels.
 pub enum WaitResult {
@@ -143,8 +144,10 @@ pub struct EventLogSubscription {
 
 // SAFETY: Windows HANDLE and EVT_HANDLE are kernel objects safe to use across
 // threads. In windows 0.58, HANDLE wraps *mut c_void which is !Send/!Sync,
-// but the underlying kernel handles are thread-safe.
+// but the underlying kernel handles are thread-safe. All mutation requires
+// &mut self; &self methods are read-only or delegate to Sync types (RateLimiter).
 unsafe impl Send for EventLogSubscription {}
+unsafe impl Sync for EventLogSubscription {}
 
 impl EventLogSubscription {
     /// Create a new pull-model subscription for all configured channels.
