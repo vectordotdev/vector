@@ -10,7 +10,7 @@ use crate::sinks::{
 };
 
 use vector_lib::codecs::encoding::{
-    BatchEncoder, BatchSerializerConfig, ProtoBatchSerializerConfig,
+    BatchEncoder, BatchSerializer, ProtoBatchSerializer, ProtoBatchSerializerConfig,
 };
 
 use super::{
@@ -185,10 +185,9 @@ impl SinkConfig for ZerobusSinkConfig {
         let proto_config = ProtoBatchSerializerConfig {
             descriptor: Some(descriptor),
         };
-        let batch_serializer = BatchSerializerConfig::ProtoBatch(proto_config)
-            .build_batch_serializer()
+        let serializer = ProtoBatchSerializer::new(proto_config)
             .map_err(|e| format!("Failed to build batch serializer: {}", e))?;
-        let encoder = BatchEncoder::new(batch_serializer);
+        let encoder = BatchEncoder::new(BatchSerializer::ProtoBatch(serializer));
 
         let acknowledgements_enabled = self
             .acknowledgements
