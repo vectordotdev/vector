@@ -340,6 +340,7 @@ impl From<SourceAcknowledgementsConfig> for AcknowledgementsConfig {
     fn from(config: SourceAcknowledgementsConfig) -> Self {
         Self {
             enabled: config.enabled,
+            authoritative: None,
         }
     }
 }
@@ -365,25 +366,56 @@ pub struct AcknowledgementsConfig {
     ///
     /// [global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
     enabled: Option<bool>,
+
+    /// Whether this sink is authoritative for acknowledgements.
+    ///
+    /// When a source has end-to-end acknowledgements enabled, it waits for all
+    /// **authoritative** sinks to finalize events before acknowledging them.
+    /// Non-authoritative sinks have their finalizers stripped, so the source
+    /// does not wait for them.
+    ///
+    /// Defaults to the value of `enabled`. Set to `false` on a sink with
+    /// acknowledgements enabled to prevent that sink from blocking source
+    /// acknowledgements.
+    #[serde(default)]
+    authoritative: Option<bool>,
 }
 
 impl AcknowledgementsConfig {
-    pub const DEFAULT: Self = Self { enabled: None };
+    pub const DEFAULT: Self = Self {
+        enabled: None,
+        authoritative: None,
+    };
 
     #[must_use]
     pub fn merge_default(&self, other: &Self) -> Self {
         let enabled = self.enabled.or(other.enabled);
-        Self { enabled }
+        let authoritative = self.authoritative.or(other.authoritative);
+        Self {
+            enabled,
+            authoritative,
+        }
     }
 
     pub fn enabled(&self) -> bool {
         self.enabled.unwrap_or(false)
     }
+
+    /// Returns whether this sink is authoritative for acknowledgements.
+    ///
+    /// Defaults to `enabled()` if not explicitly set, preserving backwards
+    /// compatibility: all ack-enabled sinks are authoritative by default.
+    pub fn authoritative(&self) -> bool {
+        self.authoritative.unwrap_or_else(|| self.enabled())
+    }
 }
 
 impl From<Option<bool>> for AcknowledgementsConfig {
     fn from(enabled: Option<bool>) -> Self {
-        Self { enabled }
+        Self {
+            enabled,
+            authoritative: None,
+        }
     }
 }
 
@@ -710,5 +742,62 @@ mod test {
         let definition = schema::Definition::any();
         let output = SourceOutput::new_maybe_logs(DataType::Log, definition.clone());
         assert_eq!(output.schema_definition(true), Some(definition));
+    }
+
+    #[test]
+    fn ack_config_authoritative_defaults_to_enabled() {
+        // Default: both None -> enabled=false, authoritative=false
+        let config = AcknowledgementsConfig::DEFAULT;
+        assert!(!config.enabled());
+        assert!(!config.authoritative());
+
+        // Enabled true, authoritative unset -> authoritative=true
+        let config = AcknowledgementsConfig::from(true);
+        assert!(config.enabled());
+        assert!(config.authoritative());
+
+        // Enabled true, authoritative explicitly false
+        let config = AcknowledgementsConfig {
+            enabled: Some(true),
+            authoritative: Some(false),
+        };
+        assert!(config.enabled());
+        assert!(!config.authoritative());
+
+        // Enabled false, authoritative explicitly true (edge case)
+        let config = AcknowledgementsConfig {
+            enabled: Some(false),
+            authoritative: Some(true),
+        };
+        assert!(!config.enabled());
+        assert!(config.authoritative());
+    }
+
+    #[test]
+    fn ack_config_merge_default_authoritative() {
+        let local = AcknowledgementsConfig {
+            enabled: Some(true),
+            authoritative: None,
+        };
+        let global = AcknowledgementsConfig {
+            enabled: None,
+            authoritative: Some(false),
+        };
+        let merged = local.merge_default(&global);
+        assert!(merged.enabled());
+        // authoritative falls through to global
+        assert!(!merged.authoritative());
+
+        // Local authoritative takes precedence
+        let local = AcknowledgementsConfig {
+            enabled: Some(true),
+            authoritative: Some(true),
+        };
+        let global = AcknowledgementsConfig {
+            enabled: None,
+            authoritative: Some(false),
+        };
+        let merged = local.merge_default(&global);
+        assert!(merged.authoritative());
     }
 }

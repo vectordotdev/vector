@@ -615,6 +615,16 @@ impl<'a> Builder<'a> {
                 extra_context: self.extra_context.clone(),
             };
 
+            // Determine whether this sink is authoritative for acknowledgements.
+            // Non-authoritative sinks have their finalizers stripped so the source's
+            // BatchNotifier doesn't wait for them. By default, authoritative matches
+            // the acknowledgements.enabled setting, preserving backwards compatibility.
+            let sink_is_authoritative = sink
+                .inner
+                .acknowledgements()
+                .merge_default(&self.config.global.acknowledgements)
+                .authoritative();
+
             let (sink, healthcheck) = match sink.inner.build(cx).await {
                 Err(error) => {
                     self.errors.push(format!("Sink \"{key}\": {error}"));
@@ -650,6 +660,22 @@ impl<'a> Builder<'a> {
                 sink.run(
                     rx.by_ref()
                         .filter(|events: &EventArray| ready(filter_events_type(events, input_type)))
+                        .map(move |mut events: EventArray| {
+                            // For non-authoritative sinks, strip finalizers from all events.
+                            // This drops the Arc<EventFinalizer> references immediately,
+                            // allowing the source's BatchNotifier to resolve as soon as all
+                            // authoritative sinks have finished — without waiting for this
+                            // non-authoritative sink.
+                            //
+                            // The stripped finalizers are dropped here, which calls
+                            // EventFinalizer::drop -> update_batch(Dropped). Since Dropped
+                            // is a no-op update to BatchStatus, this has no effect on the
+                            // final batch status.
+                            if !sink_is_authoritative {
+                                let _ = events.take_finalizers();
+                            }
+                            events
+                        })
                         .inspect(|events| {
                             events_received.emit(CountByteSize(
                                 events.len(),
