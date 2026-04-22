@@ -22,6 +22,15 @@
 # /ci-run-unit-windows        : runs Unit - Windows
 # /ci-run-environment         : runs Environment Suite
 # /ci-run-k8s                 : runs K8s E2E Suite
+# /ci-run-regression          : runs Regression Detection Suite. The comparison ref is
+#                               the review's commit. An optional baseline ref can be
+#                               passed as an argument (full/short SHA, branch such as
+#                               `origin/master`, or tag); otherwise the baseline defaults
+#                               to the SHA from 7 days ago. Examples:
+#                                 /ci-run-regression
+#                                 /ci-run-regression origin/master
+#                                 /ci-run-regression v0.55.0
+#                               Not included in `/ci-run-all` because it is expensive.
 
 name: CI Review Trigger
 
@@ -67,6 +76,7 @@ jobs:
       || startsWith(github.event.review.body, '/ci-run-unit-windows')
       || startsWith(github.event.review.body, '/ci-run-environment')
       || startsWith(github.event.review.body, '/ci-run-k8s')
+      || startsWith(github.event.review.body, '/ci-run-regression')
     steps:
       - name: Generate authentication token
         id: generate_token
@@ -192,4 +202,35 @@ jobs:
     uses: ./.github/workflows/k8s_e2e.yml
     with:
       ref: ${{ github.event.review.commit_id }}
+    secrets: inherit
+
+  # Parse an optional baseline ref from a `/ci-run-regression <ref>` comment line.
+  # The captured ref is passed to the regression workflow; an empty value lets it
+  # fall back to its default (the SHA from 7 days ago).
+  regression-parse:
+    needs: validate
+    if: contains(github.event.review.body, '/ci-run-regression')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      baseline-sha: ${{ steps.parse.outputs.baseline }}
+    steps:
+      - name: Parse baseline ref from review body
+        id: parse
+        env:
+          REVIEW_BODY: ${{ github.event.review.body }}
+        run: |
+          BASELINE=$(printf '%s\n' "${REVIEW_BODY}" \
+            | sed -nE 's|^[[:space:]]*/ci-run-regression[[:space:]]+([^[:space:]]+).*$|\1|p' \
+            | head -n1)
+          echo "Parsed baseline ref: '${BASELINE}'"
+          echo "baseline=${BASELINE}" >> "$GITHUB_OUTPUT"
+
+  regression:
+    needs: [validate, regression-parse]
+    if: contains(github.event.review.body, '/ci-run-regression')
+    uses: ./.github/workflows/regression.yml
+    with:
+      baseline-sha: ${{ needs.regression-parse.outputs.baseline-sha }}
+      comparison-sha: ${{ github.event.review.commit_id }}
     secrets: inherit
