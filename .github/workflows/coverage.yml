@@ -34,15 +34,10 @@ jobs:
       - name: "Generate code coverage"
         run: cargo llvm-cov nextest --workspace --lcov --output-path lcov.info
 
-      - name: Get Datadog credentials
-        id: dd-sts
-        uses: DataDog/dd-sts-action@2e8187910199bd93129520183c093e19aa585c75
-        with:
-          policy: public-vectordotdev-vector
+      - uses: ./.github/actions/dd-token
 
       - name: "Upload coverage to Datadog"
         env:
-          DD_API_KEY: ${{ steps.dd-sts.outputs.api_key }}
           DD_SITE: datadoghq.com
           DD_ENV: ci
         run: datadog-ci coverage upload lcov.info

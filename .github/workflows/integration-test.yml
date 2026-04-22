@@ -53,14 +53,7 @@ jobs:
         if: ${{ github.event_name != 'issue_comment' }}
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Get Datadog credentials
-        id: dd-sts
-        uses: DataDog/dd-sts-action@2e8187910199bd93129520183c093e19aa585c75
-        with:
-          policy: public-vectordotdev-vector
-
-      - name: Set Datadog credentials
-        run: echo "DD_API_KEY=${{ steps.dd-sts.outputs.api_key }}" >> "$GITHUB_ENV"
+      - uses: ./.github/actions/dd-token
 
       - run: bash scripts/environment/prepare.sh --modules=rustup,datadog-ci
 

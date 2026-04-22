@@ -45,16 +45,8 @@ jobs:
         with:
           ref: ${{ inputs.ref }}
 
-      - name: Get Datadog credentials
+      - uses: ./.github/actions/dd-token
         if: ${{ inputs.upload_test_results }}
-        id: dd-sts
-        uses: DataDog/dd-sts-action@2e8187910199bd93129520183c093e19aa585c75
-        with:
-          policy: public-vectordotdev-vector
-
-      - name: Set Datadog credentials
-        if: ${{ inputs.upload_test_results }}
-        run: echo "DD_API_KEY=${{ steps.dd-sts.outputs.api_key }}" >> "$GITHUB_ENV"
 
       - uses: ./.github/actions/setup
         with:

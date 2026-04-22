@@ -19,18 +19,15 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Get Datadog credentials
-        id: dd-sts
-        uses: DataDog/dd-sts-action@2e8187910199bd93129520183c093e19aa585c75
-        continue-on-error: true
+      - id: dd-token
+        uses: ./.github/actions/dd-token
         with:
-          policy: vector-static-analysis
+          policy: public-vectordotdev-vrl-static-analysis
 
       - name: Datadog Static Analyzer
-        if: steps.dd-sts.outcome == 'success'
         uses: DataDog/datadog-static-analyzer-github-action@8340f18875fcefca86844b5f947ce2431387e552 # v3.0.0
         with:
-          dd_api_key: ${{ steps.dd-sts.outputs.api_key }}
-          dd_app_key: ${{ steps.dd-sts.outputs.app_key }}
+          dd_api_key: ${{ env.DD_API_KEY }}
+          dd_app_key: ${{ env.DD_APP_KEY }}
           dd_site: datadoghq.com
           secrets_enabled: true
