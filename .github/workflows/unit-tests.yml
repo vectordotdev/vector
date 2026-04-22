@@ -57,6 +57,8 @@ permissions:
 env:
   CARGO_INCREMENTAL: "0"
   CI: true
+  DD_ENV: "ci"
+  DD_API_KEY: ${{ secrets.DD_API_KEY }}
 
 jobs:
   tests:
