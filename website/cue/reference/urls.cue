@@ -497,6 +497,7 @@ urls: {
 	signal:                                     "\(wikipedia)/wiki/Signal_(IPC)"
 	snake_case:                                 "\(wikipedia)/wiki/Snake_case"
 	snappy:                                     "https://google.github.io/snappy/"
+	snmp:                                       "\(wikipedia)/wiki/Simple_Network_Management_Protocol"
 	socket:                                     "\(wikipedia)/wiki/Network_socket"
 	splunk:                                     "https://www.splunk.com"
 	splunk_hec:                                 "https://dev.splunk.com/enterprise/docs/dataapps/httpeventcollector/"
