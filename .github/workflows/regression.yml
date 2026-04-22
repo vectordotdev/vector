@@ -200,10 +200,6 @@ jobs:
     needs:
       - should-run-gate
       - resolve-inputs
-    # Job-level permissions for artifact upload
-    permissions:
-      contents: read # Required to checkout code
-      actions: write # Required to upload artifacts
     steps:
       - uses: colpal/actions-clean@36e6ca1abd35efe61cb60f912bd7837f67887c8a # v1.1.1
 
@@ -243,10 +239,6 @@ jobs:
     needs:
       - should-run-gate
       - resolve-inputs
-    # Job-level permissions for artifact upload
-    permissions:
-      contents: read # Required to checkout code
-      actions: write # Required to upload artifacts
     steps:
       - uses: colpal/actions-clean@36e6ca1abd35efe61cb60f912bd7837f67887c8a # v1.1.1
 
@@ -400,10 +392,8 @@ jobs:
       - resolve-inputs
       - upload-baseline-image-to-ecr
       - upload-comparison-image-to-ecr
-    # Job-level permissions for artifact upload
     permissions:
       contents: read # Required to checkout code
-      actions: write # Required to upload artifacts
       id-token: write # Required for GitHub OIDC token exchange
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -521,10 +511,8 @@ jobs:
       - should-run-gate
       - submit-job
       - resolve-inputs
-    # Job-level permissions for artifact upload
     permissions:
       contents: read # Required to checkout code
-      actions: write # Required to upload artifacts
       id-token: write # Required for GitHub OIDC token exchange
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2

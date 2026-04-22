@@ -231,6 +231,9 @@ jobs:
   regression:
     needs: [validate, regression-parse]
     if: contains(github.event.review.body, '/ci-run-regression')
+    permissions:
+      contents: read # Required to checkout code
+      id-token: write # Required for AWS OIDC token exchange in regression.yml
     uses: ./.github/workflows/regression.yml
     with:
       baseline-sha: ${{ needs.regression-parse.outputs.baseline-sha }}
