@@ -67,8 +67,6 @@ generated: components: sources: aws_kinesis_firehose: configuration: {
 																**Note**: The following [`apache_avro::types::Value`] variants are *not* supported:
 																* `Decimal`
 																* `Duration`
-																* `Fixed`
-																* `TimeMillis`
 																"""
 						required: true
 						type: string: examples: ["{ \"type\": \"record\", \"name\": \"log\", \"fields\": [{ \"name\": \"message\", \"type\": \"string\" }] }"]

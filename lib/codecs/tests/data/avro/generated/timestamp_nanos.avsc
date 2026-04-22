@@ -1,0 +1,1 @@
+{"type":"record","name":"test","fields":[{"name":"timestamp_nanos_field","type":{"type":"long","logicalType":"timestamp-nanos"}}]}
