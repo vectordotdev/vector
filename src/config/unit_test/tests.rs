@@ -1305,26 +1305,26 @@ async fn expected_event_count_correct() {
 
     let config: ConfigBuilder = crate::config::format::deserialize(
         indoc! {r#"
-                transforms:
-                  foo:
-                    inputs:
-                      - ignored
-                    type: remap
-                    source: |
-                      . = [{"message": "one"}, {"message": "two"}, {"message": "three"}]
-                tests:
-                  - name: event count check
-                    inputs:
-                      - insert_at: foo
-                        value: doesnt matter
-                    outputs:
-                      - extract_from: foo
-                        expected_event_count: 3
-                        conditions:
-                          - type: vrl
-                            source: |
-                              assert!(exists(.message), "message field must exist")
-            "#},
+            transforms:
+              foo:
+                inputs:
+                  - ignored
+                type: remap
+                source: |
+                  . = [{"message": "one"}, {"message": "two"}, {"message": "three"}]
+            tests:
+              - name: event count check
+                inputs:
+                  - insert_at: foo
+                    value: doesnt matter
+                outputs:
+                  - extract_from: foo
+                    expected_event_count: 3
+                    conditions:
+                      - type: vrl
+                        source: |
+                          assert!(exists(.message), "message field must exist")
+        "#},
         crate::config::Format::Yaml,
     )
     .unwrap();
@@ -1339,26 +1339,26 @@ async fn expected_event_count_wrong() {
 
     let config: ConfigBuilder = crate::config::format::deserialize(
         indoc! {r#"
-                transforms:
-                  foo:
-                    inputs:
-                      - ignored
-                    type: remap
-                    source: |
-                      . = [{"message": "one"}, {"message": "two"}, {"message": "three"}]
-                tests:
-                  - name: wrong event count
-                    inputs:
-                      - insert_at: foo
-                        value: doesnt matter
-                    outputs:
-                      - extract_from: foo
-                        expected_event_count: 2
-                        conditions:
-                          - type: vrl
-                            source: |
-                              assert!(exists(.message), "message field must exist")
-            "#},
+            transforms:
+              foo:
+                inputs:
+                  - ignored
+                type: remap
+                source: |
+                  . = [{"message": "one"}, {"message": "two"}, {"message": "three"}]
+            tests:
+              - name: wrong event count
+                inputs:
+                  - insert_at: foo
+                    value: doesnt matter
+                outputs:
+                  - extract_from: foo
+                    expected_event_count: 2
+                    conditions:
+                      - type: vrl
+                        source: |
+                          assert!(exists(.message), "message field must exist")
+        "#},
         crate::config::Format::Yaml,
     )
     .unwrap();
