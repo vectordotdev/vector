@@ -15,6 +15,118 @@ use vector_core::event::{EventFinalizers, EventStatus, Finalizable};
 
 use super::FuturesUnorderedCount;
 
+#[cfg(all(
+    tokio_unstable,
+    feature = "tokio-taskdump",
+    target_os = "linux",
+    any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
+))]
+#[derive(Clone, Copy, Debug)]
+struct StallTaskdumpConfig {
+    threshold: std::time::Duration,
+    timeout: std::time::Duration,
+}
+
+#[cfg(all(
+    tokio_unstable,
+    feature = "tokio-taskdump",
+    target_os = "linux",
+    any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
+))]
+fn stall_taskdump_config() -> Option<&'static StallTaskdumpConfig> {
+    static CONFIG: std::sync::OnceLock<Option<StallTaskdumpConfig>> = std::sync::OnceLock::new();
+
+    CONFIG
+        .get_or_init(|| {
+            let threshold_secs = std::env::var("VECTOR_DRIVER_STALL_TASKDUMP_SECS")
+                .ok()
+                .and_then(|value| value.parse::<u64>().ok())
+                .filter(|value| *value > 0)?;
+            let timeout_secs = std::env::var("VECTOR_TOKIO_TASKDUMP_TIMEOUT_SECS")
+                .ok()
+                .and_then(|value| value.parse::<u64>().ok())
+                .filter(|value| *value > 0)
+                .unwrap_or(2);
+
+            Some(StallTaskdumpConfig {
+                threshold: std::time::Duration::from_secs(threshold_secs),
+                timeout: std::time::Duration::from_secs(timeout_secs),
+            })
+        })
+        .as_ref()
+}
+
+#[cfg(all(
+    tokio_unstable,
+    feature = "tokio-taskdump",
+    target_os = "linux",
+    any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
+))]
+fn maybe_spawn_stall_taskdump(reason: &'static str, stalled_for: std::time::Duration) -> bool {
+    let Some(config) = stall_taskdump_config().copied() else {
+        return false;
+    };
+
+    if stalled_for < config.threshold {
+        return false;
+    }
+
+    let runtime = tokio::runtime::Handle::current();
+    tokio::spawn(async move {
+        use std::io::Write as _;
+
+        {
+            let stderr = std::io::stderr();
+            let mut err = stderr.lock();
+            let _ = writeln!(err, "");
+            let _ = writeln!(err, "=== VECTOR DRIVER STALL TOKIO TASK DUMP ===");
+            let _ = writeln!(err, "timestamp: {:?}", std::time::SystemTime::now());
+            let _ = writeln!(err, "reason: {}", reason);
+            let _ = writeln!(err, "stalled_secs: {}", stalled_for.as_secs());
+            let _ = writeln!(err, "timeout_secs: {}", config.timeout.as_secs());
+            let _ = err.flush();
+        }
+
+        match tokio::time::timeout(config.timeout, runtime.dump()).await {
+            Ok(dump) => {
+                let stderr = std::io::stderr();
+                let mut err = stderr.lock();
+                let _ = writeln!(err, "task_count: {}", dump.tasks().iter().count());
+                for task in dump.tasks().iter() {
+                    let _ = writeln!(err, "TASK {}:", task.id());
+                    let _ = writeln!(err, "{}\n", task.trace());
+                }
+                let _ = writeln!(err, "=== END VECTOR DRIVER STALL TOKIO TASK DUMP ===");
+                let _ = writeln!(err, "");
+                let _ = err.flush();
+            }
+            Err(_) => {
+                let stderr = std::io::stderr();
+                let mut err = stderr.lock();
+                let _ = writeln!(
+                    err,
+                    "[tokio task dump timed out; a runtime worker may be blocked]"
+                );
+                let _ = writeln!(err, "=== END VECTOR DRIVER STALL TOKIO TASK DUMP ===");
+                let _ = writeln!(err, "");
+                let _ = err.flush();
+            }
+        }
+    });
+
+    true
+}
+
+#[cfg(not(all(
+    tokio_unstable,
+    feature = "tokio-taskdump",
+    target_os = "linux",
+    any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
+)))]
+fn maybe_spawn_stall_taskdump(_reason: &'static str, _stalled_for: std::time::Duration) -> bool {
+    false
+}
+
 pub trait DriverResponse {
     fn event_status(&self) -> EventStatus;
     fn events_sent(&self) -> &GroupedCountByteSize;
@@ -107,6 +219,7 @@ where
         stall_check.set_missed_tick_behavior(MissedTickBehavior::Skip);
         // Consume the first tick that fires immediately on interval creation.
         let mut last_completion = Instant::now();
+        let mut stall_taskdump_emitted = false;
         stall_check.tick().await;
 
         loop {
@@ -138,12 +251,14 @@ where
                 // One or more of our service calls have completed.
                 Some(_count) = in_flight.next(), if !in_flight.is_empty() => {
                     last_completion = Instant::now();
+                    stall_taskdump_emitted = false;
                 }
 
                 // We've got an input batch to process and the service is ready to accept a request.
                 // Wrapped in a backtrace frame so that a SIGTERM dump shows this arm as a named
                 // subtree when poll_ready() is suspended (e.g. ACL semaphore blocked).
                 maybe_ready = async_backtrace::location!().frame(poll_fn(|cx| service.poll_ready(cx))), if next_batch.is_some() => {
+                    stall_taskdump_emitted = false;
                     let mut batch = next_batch.take()
                         .unwrap_or_else(|| unreachable!("batch should be populated"));
 
@@ -206,6 +321,7 @@ where
                 // Wrapped in a backtrace frame so that a SIGTERM dump shows this arm as a named
                 // subtree when the source stream is idle (distinguishable from the poll_ready hang).
                 Some(reqs) = async_backtrace::location!().frame(batched_input.next()), if next_batch.is_none() => {
+                    stall_taskdump_emitted = false;
                     next_batch = Some(reqs.into());
                 }
 
@@ -220,22 +336,35 @@ where
                 //         Pending despite events existing upstream (back-pressure / waker starvation
                 //         in the ConcurrentMap request-builder chain).
                 _ = stall_check.tick() => {
+                    let stalled_for = last_completion.elapsed();
+                    let stall_reason = if !in_flight.is_empty() {
+                        "in_flight_requests"
+                    } else if next_batch.is_some() {
+                        "service_poll_ready"
+                    } else {
+                        "input_stream"
+                    };
+
                     if !in_flight.is_empty() {
                         warn!(
                             message = "In-flight requests have not completed; possible downstream stall.",
                             in_flight_requests = in_flight.len(),
-                            stalled_secs = last_completion.elapsed().as_secs(),
+                            stalled_secs = stalled_for.as_secs(),
                         );
                     } else if next_batch.is_some() {
                         warn!(
                             message = "Service poll_ready() has not completed with no in-flight requests; possible concurrency controller stall.",
-                            stalled_secs = last_completion.elapsed().as_secs(),
+                            stalled_secs = stalled_for.as_secs(),
                         );
                     } else {
                         warn!(
                             message = "Input stream has not produced a batch; possible upstream pipeline stall.",
-                            stalled_secs = last_completion.elapsed().as_secs(),
+                            stalled_secs = stalled_for.as_secs(),
                         );
+                    }
+
+                    if !stall_taskdump_emitted {
+                        stall_taskdump_emitted = maybe_spawn_stall_taskdump(stall_reason, stalled_for);
                     }
                 }
 
