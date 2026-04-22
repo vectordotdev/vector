@@ -1,12 +1,12 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, VecDeque},
     future::ready,
     num::NonZeroUsize,
     sync::{Arc, LazyLock, Mutex},
     time::Instant,
 };
 
-use futures::{FutureExt, StreamExt, TryStreamExt, stream::FuturesOrdered};
+use futures::{FutureExt, StreamExt, TryStreamExt};
 use futures_util::stream::FuturesUnordered;
 use metrics::gauge;
 use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
@@ -74,6 +74,15 @@ static TRANSFORM_CONCURRENCY_LIMIT: LazyLock<usize> = LazyLock::new(|| {
         .map(std::num::NonZeroUsize::get)
         .unwrap_or_else(crate::num_threads)
 });
+
+// Maximum number of completed-but-not-yet-emitted results that may accumulate
+// in the reorder buffer while waiting for a slow head task. This decouples the
+// "keep CPUs busy" limit (TRANSFORM_CONCURRENCY_LIMIT, based on running tasks)
+// from the "prevent unbounded memory growth" limit. Set to 4× the concurrency
+// limit so that even in the worst case (head task very slow, all others fast)
+// we buffer at most this many TransformOutputsBufs before back-pressuring.
+static REORDER_BUFFER_CAP: LazyLock<usize> =
+    LazyLock::new(|| *TRANSFORM_CONCURRENCY_LIMIT * 4);
 
 const INTERNAL_SOURCES: [&str; 2] = ["internal_logs", "internal_metrics"];
 
@@ -1218,27 +1227,72 @@ impl Runner {
         let mut input_rx =
             super::ready_arrays::ReadyArrays::with_capacity(input_rx, READY_ARRAY_CAPACITY);
 
-        let mut in_flight = FuturesOrdered::new();
+        // Use FuturesUnordered so tasks can complete in any order, paired with
+        // a reorder buffer that ensures outputs are still emitted in input order.
+        // Each task carries a u64 sequence number; u64 is used (rather than usize)
+        // to guarantee no overflow on 32-bit targets.
+        let mut in_flight: FuturesUnordered<
+            tokio::task::JoinHandle<(u64, TransformOutputsBuf)>,
+        > = FuturesUnordered::new();
+
+        // Slots indexed by (seq - next_seq). None = task still running; Some = completed.
+        let mut reorder_buf: VecDeque<Option<TransformOutputsBuf>> = VecDeque::new();
+        let mut next_seq: u64 = 0; // next sequence number to emit
+        let mut queue_seq: u64 = 0; // next sequence number to assign
         let mut shutting_down = false;
 
         self.timer_tx.try_send_start_wait();
         loop {
+            // Drain all consecutive completed slots from the front before blocking.
+            // This runs to exhaustion so we never re-enter the scheduler with
+            // ready outputs sitting undelivered in the buffer.
+            while reorder_buf.front().is_some_and(Option::is_some) {
+                let mut outputs_buf = reorder_buf.pop_front().unwrap().unwrap();
+                next_seq += 1;
+                self.send_outputs(&mut outputs_buf)
+                    .await
+                    .map_err(TaskError::wrapped)?;
+            }
+
+            if shutting_down && in_flight.is_empty() && reorder_buf.is_empty() {
+                break;
+            }
+
             tokio::select! {
                 biased;
 
+                // A task finished — store its result in the correct reorder slot.
                 result = in_flight.next(), if !in_flight.is_empty() => {
                     match result {
-                        Some(Ok(mut outputs_buf)) => {
-                            self.send_outputs(&mut outputs_buf).await
-                                .map_err(TaskError::wrapped)?;
+                        Some(Ok((seq, outputs_buf))) => {
+                            // seq - next_seq is the VecDeque index. The slot was
+                            // pushed as None when the task was scheduled, so it is
+                            // always in bounds.
+                            reorder_buf[(seq - next_seq) as usize] = Some(outputs_buf);
                         }
-                        _ => unreachable!("join error or bad poll"),
+                        Some(Err(join_err)) => {
+                            return Err(TaskError::from(join_err));
+                        }
+                        None => unreachable!("in_flight is non-empty per guard"),
                     }
                 }
 
-                input_arrays = input_rx.next(), if in_flight.len() < *TRANSFORM_CONCURRENCY_LIMIT && !shutting_down => {
+                // Accept new input when a CPU slot is free AND the reorder buffer
+                // hasn't grown too large. Gating on in_flight.len() (not
+                // reorder_buf.len()) keeps all CPU cores busy even when completed
+                // results are buffered waiting behind a slow head task.
+                // REORDER_BUFFER_CAP bounds the worst-case memory usage of the buffer.
+                input_arrays = input_rx.next(),
+                    if in_flight.len() < *TRANSFORM_CONCURRENCY_LIMIT
+                        && reorder_buf.len() < *REORDER_BUFFER_CAP
+                        && !shutting_down =>
+                {
                     match input_arrays {
                         Some(input_arrays) => {
+                            let seq = queue_seq;
+                            queue_seq += 1;
+                            reorder_buf.push_back(None); // reserve ordering slot
+
                             let mut len = 0;
                             for events in &input_arrays {
                                 self.on_events_received(events);
@@ -1247,26 +1301,25 @@ impl Runner {
 
                             let mut t = self.transform.clone();
                             let mut outputs_buf = self.outputs.new_buf_with_capacity(len);
-                            let task = tokio::spawn(async move {
-                                for events in input_arrays {
-                                    t.transform_all(events, &mut outputs_buf);
+                            let task = tokio::spawn(
+                                async move {
+                                    for events in input_arrays {
+                                        t.transform_all(events, &mut outputs_buf);
+                                    }
+                                    (seq, outputs_buf)
                                 }
-                                outputs_buf
-                            }.in_current_span());
-                            in_flight.push_back(task);
+                                .in_current_span(),
+                            );
+                            in_flight.push(task);
                         }
                         None => {
                             shutting_down = true;
-                            continue
+                            // fall through to top of loop to drain and check termination
                         }
                     }
                 }
 
-                else => {
-                    if shutting_down {
-                        break
-                    }
-                }
+                else => {}
             }
         }
 
