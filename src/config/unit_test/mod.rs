@@ -293,7 +293,7 @@ impl UnitTestBuildMetadata {
         let mut template_sinks = IndexMap::new();
         let mut test_result_rxs = Vec::new();
         // Add sinks with checks
-        for (ids, (expected_event_count, checks)) in outputs {
+        for (ids, built) in outputs {
             let (tx, rx) = oneshot::channel();
             let sink_ids = ids.clone();
             let sink_config = UnitTestSinkConfig {
@@ -301,8 +301,8 @@ impl UnitTestBuildMetadata {
                 transform_ids: ids.iter().map(|id| id.to_string()).collect(),
                 result_tx: Arc::new(Mutex::new(Some(tx))),
                 check: UnitTestSinkCheck::Checks {
-                    conditions: checks,
-                    expected_event_count,
+                    conditions: built.conditions,
+                    expected_event_count: built.expected_event_count,
                 },
             };
 
@@ -570,11 +570,16 @@ fn build_and_validate_inputs(
     }
 }
 
+#[derive(Default)]
+pub(super) struct BuiltOutput {
+    pub(super) expected_event_count: Option<usize>,
+    pub(super) conditions: Vec<Vec<Condition>>,
+}
+
 fn build_outputs(
     test_outputs: &[TestOutput],
-) -> Result<IndexMap<Vec<OutputId>, (Option<usize>, Vec<Vec<Condition>>)>, Vec<String>> {
-    let mut outputs: IndexMap<Vec<OutputId>, (Option<usize>, Vec<Vec<Condition>>)> =
-        IndexMap::new();
+) -> Result<IndexMap<Vec<OutputId>, BuiltOutput>, Vec<String>> {
+    let mut outputs: IndexMap<Vec<OutputId>, BuiltOutput> = IndexMap::new();
     let mut errors = Vec::new();
 
     for output in test_outputs {
@@ -604,27 +609,32 @@ fn build_outputs(
         }
         outputs
             .entry(output.extract_from.clone().to_vec())
-            .and_modify(|(existing_count, existing_conditions)| {
-                if let (Some(existing), Some(new)) = (*existing_count, expected_event_count) {
-                    if existing != new {
+            .and_modify(|existing| {
+                if let (Some(prev), Some(new)) =
+                    (existing.expected_event_count, expected_event_count)
+                {
+                    if prev != new {
                         errors.push(format!(
                             "conflicting expected_event_count for extract_from {:?}: {} vs {}",
-                            output.extract_from, existing, new
+                            output.extract_from, prev, new
                         ));
                     }
-                } else if existing_count.is_none() {
-                    *existing_count = expected_event_count;
+                } else if existing.expected_event_count.is_none() {
+                    existing.expected_event_count = expected_event_count;
                 }
-                existing_conditions.push(conditions.clone());
+                existing.conditions.push(conditions.clone());
             })
-            .or_insert((expected_event_count, vec![conditions.clone()]));
+            .or_insert_with(|| BuiltOutput {
+                expected_event_count,
+                conditions: vec![conditions.clone()],
+            });
     }
 
     // Post-merge validation: after merging entries that share the same
     // extract_from, reject any that ended up with expected_event_count of 0 and
     // non-empty conditions (which would pass vacuously against zero events).
-    for (extract_from, (count, conditions)) in &outputs {
-        if count == &Some(0) && conditions.iter().any(|c| !c.is_empty()) {
+    for (extract_from, built) in &outputs {
+        if built.expected_event_count == Some(0) && built.conditions.iter().any(|c| !c.is_empty()) {
             errors.push(format!(
                 "output for {extract_from:?} has expected_event_count of 0 but also defines conditions; \
                  conditions cannot be evaluated when no events are expected",
