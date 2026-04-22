@@ -19,9 +19,9 @@ use tracing_subscriber::{Layer, layer::Context, registry::LookupSpan};
 
 /// Returns a leaked `&'static AtomicU32` unique to the current thread.
 ///
-/// On first access, allocates a byte via `Box::leak` and calls
+/// On first access, allocates an `AtomicU32` via `Box::leak` and calls
 /// [`vector_register_thread`] so bpftrace can map this thread's TID
-/// to the byte's address. The leaked byte is valid for the process lifetime.
+/// to its address. The leaked allocation is valid for the process lifetime.
 fn thread_label() -> &'static AtomicU32 {
     thread_local! {
         static LABEL: &'static AtomicU32 = {
