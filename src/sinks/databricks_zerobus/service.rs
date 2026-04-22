@@ -26,13 +26,21 @@ use super::{config::ZerobusSinkConfig, error::ZerobusSinkError, unity_catalog_sc
 /// `ProxyConfig` has already merged the process environment at a higher
 /// layer and is the single source of truth for proxy decisions.
 ///
-/// Returns `None` when `enabled = false` or no proxy URL is configured, in
-/// which case the SDK falls back to its built-in env-var detection. Because
-/// Vector has already merged env vars into `ProxyConfig`, reaching that
-/// fallback path means the user has not configured a proxy anywhere.
+/// When `enabled = false`, returns a factory that unconditionally yields
+/// `None`, forcing the SDK to use direct connections and overriding any
+/// ambient `HTTP_PROXY`/`HTTPS_PROXY` environment variables that would
+/// otherwise be picked up by the SDK's default autodetection.
+///
+/// When `enabled = true` but no proxy URL is configured, returns `None` so
+/// the SDK falls back to its built-in env-var detection. Because Vector has
+/// already merged env vars into `ProxyConfig`, reaching that fallback path
+/// means the user has not configured a proxy anywhere.
 fn build_connector_factory(proxy: &ProxyConfig) -> Option<ConnectorFactory> {
     if !proxy.enabled {
-        return None;
+        // Explicit direct-connection factory: prevents the SDK from
+        // autodetecting proxies from the process environment when the user
+        // has explicitly disabled proxying in Vector's config.
+        return Some(Arc::new(|_host: &str| None));
     }
     let proxy_url = proxy.https.clone().or_else(|| proxy.http.clone())?;
     let no_proxy = proxy.no_proxy.clone();
