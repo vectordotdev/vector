@@ -21,43 +21,34 @@ use super::{config::ZerobusSinkConfig, error::ZerobusSinkError, unity_catalog_sc
 ///
 /// The Zerobus endpoint is always HTTPS gRPC, so the `https` proxy is
 /// preferred; the `http` proxy is used as a fallback if only that is set.
-/// When the factory is installed on the SDK it fully replaces the SDK's
-/// default env-var proxy detection — which is intentional, since Vector's
-/// `ProxyConfig` has already merged the process environment at a higher
-/// layer and is the single source of truth for proxy decisions.
+/// The returned factory fully replaces the SDK's default env-var proxy
+/// detection — Vector's `ProxyConfig` has already merged the process
+/// environment at a higher layer and is the single source of truth.
 ///
-/// When `enabled = false`, returns a factory that unconditionally yields
-/// `None`, forcing the SDK to use direct connections and overriding any
-/// ambient `HTTP_PROXY`/`HTTPS_PROXY` environment variables that would
-/// otherwise be picked up by the SDK's default autodetection.
-///
-/// When `enabled = true` but no proxy URL is configured, returns `None` so
-/// the SDK falls back to its built-in env-var detection. Because Vector has
-/// already merged env vars into `ProxyConfig`, reaching that fallback path
-/// means the user has not configured a proxy anywhere.
-fn build_connector_factory(proxy: &ProxyConfig) -> Option<ConnectorFactory> {
-    if !proxy.enabled {
-        // Explicit direct-connection factory: prevents the SDK from
-        // autodetecting proxies from the process environment when the user
-        // has explicitly disabled proxying in Vector's config.
-        return Some(Arc::new(|_host: &str| None));
-    }
-    let proxy_url = proxy.https.clone().or_else(|| proxy.http.clone())?;
+/// When proxying is disabled or no proxy URL is configured, returns a
+/// factory that unconditionally yields `None`, forcing direct connections.
+/// Returns an error if the configured proxy URL is malformed, so the
+/// problem surfaces at sink startup rather than per-connection.
+fn build_connector_factory(proxy: &ProxyConfig) -> Result<ConnectorFactory, ZerobusSinkError> {
+    let proxy_url = if proxy.enabled {
+        proxy.https.clone().or_else(|| proxy.http.clone())
+    } else {
+        None
+    };
+    let Some(proxy_url) = proxy_url else {
+        return Ok(Arc::new(|_host: &str| None));
+    };
+    // Validate the proxy URL once up-front so a malformed value surfaces at
+    // sink startup rather than per-connection.
+    ProxyConnector::new(&proxy_url).map_err(|e| ZerobusSinkError::ConfigError {
+        message: format!("Invalid proxy URL '{}': {}", proxy_url, e),
+    })?;
     let no_proxy = proxy.no_proxy.clone();
-    Some(Arc::new(move |host: &str| {
+    Ok(Arc::new(move |host: &str| {
         if no_proxy.matches(host) {
             return None;
         }
-        match ProxyConnector::new(&proxy_url) {
-            Ok(c) => Some(c),
-            Err(e) => {
-                warn!(
-                    message = "Failed to build Zerobus proxy connector; falling back to direct connection.",
-                    error = %e,
-                );
-                None
-            }
-        }
+        ProxyConnector::new(&proxy_url).ok()
     }))
 }
 
@@ -214,9 +205,7 @@ impl ZerobusService {
         let mut builder = ZerobusSdk::builder()
             .endpoint(&config.ingestion_endpoint)
             .unity_catalog_url(&config.unity_catalog_endpoint);
-        if let Some(factory) = build_connector_factory(proxy) {
-            builder = builder.connector_factory(factory);
-        }
+        builder = builder.connector_factory(build_connector_factory(proxy)?);
         let sdk = builder.build().map_err(|e| ZerobusSinkError::ConfigError {
             message: format!("Failed to create Zerobus SDK: {}", e),
         })?;
