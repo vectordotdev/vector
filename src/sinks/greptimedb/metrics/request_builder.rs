@@ -130,6 +130,19 @@ pub fn metric_to_insert_request(
             let MetricSketch::AgentDDSketch(sketch) = sketch;
             encode_sketch(sketch, &mut schema, &mut columns);
         }
+        value @ MetricValue::NativeHistogram { .. } => {
+            // GreptimeDB doesn't support native histograms natively; convert to classic histogram.
+            if let Some(MetricValue::AggregatedHistogram {
+                buckets,
+                count,
+                sum,
+            }) = value.native_histogram_to_agg_histogram()
+            {
+                encode_histogram(buckets.as_ref(), &mut schema, &mut columns);
+                encode_f64_value("count", count as f64, &mut schema, &mut columns);
+                encode_f64_value("sum", sum, &mut schema, &mut columns);
+            }
+        }
     }
 
     RowInsertRequest {

@@ -111,12 +111,22 @@ pub struct SimpleMetric {
     pub value: f64,
 }
 
+/// A Prometheus native (exponential) histogram received via remote write.
+///
+/// The raw proto representation is preserved so that downstream code can convert it into Vector's internal
+/// `NativeHistogram` metric type without loss of information.
+#[derive(Debug, PartialEq)]
+pub struct NativeHistogramMetric {
+    pub histogram: proto::Histogram,
+}
+
 type MetricMap<T> = IndexMap<GroupKey, T>;
 
 #[derive(Debug)]
 pub enum GroupKind {
     Summary(MetricMap<SummaryMetric>),
     Histogram(MetricMap<HistogramMetric>),
+    NativeHistogram(MetricMap<NativeHistogramMetric>),
     Gauge(MetricMap<SimpleMetric>),
     Counter(MetricMap<SimpleMetric>),
     Untyped(MetricMap<SimpleMetric>),
@@ -143,7 +153,7 @@ impl GroupKind {
         match self {
             Self::Counter { .. } => kind == MetricKind::Counter,
             Self::Gauge { .. } => kind == MetricKind::Gauge,
-            Self::Histogram { .. } => kind == MetricKind::Histogram,
+            Self::Histogram { .. } | Self::NativeHistogram { .. } => kind == MetricKind::Histogram,
             Self::Summary { .. } => kind == MetricKind::Summary,
             Self::Untyped { .. } => true,
         }
@@ -204,6 +214,17 @@ impl GroupKind {
                     }));
                 }
             },
+            // Native histograms only receive data via proto Histogram messages, not float samples.
+            // If a float sample is pushed to a native histogram group, bounce it back to be
+            // reprocessed as a separate group.
+            Self::NativeHistogram(_) => {
+                return Ok(Some(Metric {
+                    name: metric.name,
+                    timestamp: key.timestamp,
+                    labels: key.labels,
+                    value,
+                }));
+            }
             Self::Summary(metrics) => match suffix {
                 "" => {
                     let quantile = key
@@ -393,6 +414,39 @@ impl MetricGroupSet {
         Ok(())
     }
 
+    fn insert_native_histogram(
+        &mut self,
+        name: &str,
+        labels: &BTreeMap<String, String>,
+        histogram: proto::Histogram,
+    ) {
+        let key = GroupKey {
+            timestamp: Some(histogram.timestamp),
+            labels: labels.clone(),
+        };
+
+        // Look up an existing group for this name. If it's already a native histogram group, push
+        // into it. If it's a classic histogram group with no data yet (created from metadata),
+        // upgrade it to a native histogram group. Otherwise, create a new group.
+        match self.0.get_mut(name) {
+            Some(GroupKind::NativeHistogram(metrics)) => {
+                metrics.insert(key, NativeHistogramMetric { histogram });
+            }
+            Some(GroupKind::Histogram(metrics)) if metrics.is_empty() => {
+                let mut new_metrics = IndexMap::default();
+                new_metrics.insert(key, NativeHistogramMetric { histogram });
+                self.0
+                    .insert(name.into(), GroupKind::NativeHistogram(new_metrics));
+            }
+            _ => {
+                let mut metrics = IndexMap::default();
+                metrics.insert(key, NativeHistogramMetric { histogram });
+                self.0
+                    .insert(name.into(), GroupKind::NativeHistogram(metrics));
+            }
+        }
+    }
+
     fn finish(self) -> Vec<MetricGroup> {
         self.0
             .into_iter()
@@ -430,6 +484,10 @@ pub fn parse_request(
 
         for sample in timeseries.samples {
             groups.insert_sample(&name, &labels, sample)?;
+        }
+
+        for histogram in timeseries.histograms {
+            groups.insert_native_histogram(&name, &labels, histogram);
         }
     }
 
@@ -756,6 +814,7 @@ mod test {
                     samples: vec![
                         $( proto::Sample { value: $sample as f64, timestamp: $timestamp as i64 }, )*
                     ],
+                    histograms: vec![],
                 }, )* ],
             }
         };
@@ -947,6 +1006,7 @@ mod test {
                     value: 12345.0,
                     timestamp: 1395066367500,
                 }],
+                histograms: vec![],
             }],
         };
 
@@ -967,5 +1027,57 @@ mod test {
             err,
             ParserError::MultipleMetricKinds { name } if name == "go_memstats_alloc_bytes"
         ));
+    }
+
+    #[test]
+    fn parse_request_native_histogram() {
+        use proto::histogram::{Count, ResetHint, ZeroCount};
+
+        let histogram = proto::Histogram {
+            count: Some(Count::CountInt(6)),
+            sum: 18.5,
+            schema: 0,
+            zero_threshold: 0.0,
+            zero_count: Some(ZeroCount::ZeroCountInt(0)),
+            negative_spans: vec![],
+            negative_deltas: vec![],
+            negative_counts: vec![],
+            positive_spans: vec![proto::BucketSpan {
+                offset: 1,
+                length: 3,
+            }],
+            positive_deltas: vec![2, 1, -2],
+            positive_counts: vec![],
+            reset_hint: ResetHint::No as i32,
+            timestamp: 1_612_325_106_789,
+        };
+
+        let request = proto::WriteRequest {
+            metadata: vec![proto::MetricMetadata {
+                r#type: proto::MetricType::Histogram as i32,
+                metric_family_name: "request_latency".into(),
+                help: String::default(),
+                unit: String::default(),
+            }],
+            timeseries: vec![proto::TimeSeries {
+                labels: vec![proto::Label {
+                    name: "__name__".into(),
+                    value: "request_latency".into(),
+                }],
+                samples: vec![],
+                histograms: vec![histogram],
+            }],
+        };
+
+        let parsed = parse_request(request, MetadataConflictStrategy::Reject).unwrap();
+        assert_eq!(parsed.len(), 1);
+        match_group!(parsed[0], "request_latency", NativeHistogram => |metrics: &MetricMap<NativeHistogramMetric>| {
+            assert_eq!(metrics.len(), 1);
+            let (key, metric) = metrics.get_index(0).unwrap();
+            assert_eq!(key.timestamp, Some(1_612_325_106_789));
+            assert_eq!(metric.histogram.sum, 18.5);
+            assert_eq!(metric.histogram.schema, 0);
+            assert_eq!(metric.histogram.positive_deltas, vec![2, 1, -2]);
+        });
     }
 }

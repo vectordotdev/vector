@@ -50,10 +50,73 @@ message Sample {
   int64 timestamp = 2;
 }
 
+// A BucketSpan defines a number of consecutive buckets with their
+// offset. Logically, it would be more straightforward to include
+// the bucket counts in the Span. However, the protobuf representation
+// is more compact if the bucket counts are in a separate array.
+message BucketSpan {
+  sint32 offset = 1; // Gap to previous span, or starting point for 1st span (which can be negative).
+  uint32 length = 2; // Length of consecutive buckets.
+}
+
+// A native histogram, also known as a sparse histogram.
+// Source: https://github.com/prometheus/prometheus/blob/main/prompb/types.proto
+message Histogram {
+  enum ResetHint {
+    UNKNOWN = 0; // Need to test for a counter reset explicitly.
+    YES     = 1; // This is the 1st histogram after a counter reset.
+    NO      = 2; // There was no counter reset between this and the previous Histogram.
+    GAUGE   = 3; // This is a gauge histogram where counter resets don't happen.
+  }
+
+  oneof count { // Count of observations in the histogram.
+    uint64 count_int   = 1;
+    double count_float = 2;
+  }
+  double sum = 3; // Sum of observations in the histogram.
+
+  // The schema defines the bucket schema. Currently, valid numbers
+  // are -4 <= n <= 8. They are all for base-2 bucket schemas, where 1
+  // is a bucket boundary in each case, and then each power of two is
+  // divided into 2^n logarithmic buckets. Or in other words, each
+  // bucket boundary is the previous boundary times 2^(2^-n).
+  sint32 schema         = 4;
+  double zero_threshold = 5; // Breadth of the zero bucket.
+
+  oneof zero_count { // Count in zero bucket.
+    uint64 zero_count_int   = 6;
+    double zero_count_float = 7;
+  }
+
+  // Negative Buckets.
+  repeated BucketSpan negative_spans = 8 [(nullable) = false];
+  // Use either "negative_deltas" or "negative_counts", the former for
+  // regular histograms with integer counts, the latter for float
+  // histograms.
+  repeated sint64 negative_deltas = 9; // Count delta of each bucket compared to previous one (or to zero for 1st bucket).
+  repeated double negative_counts = 10; // Absolute count of each bucket.
+
+  // Positive Buckets.
+  repeated BucketSpan positive_spans = 11 [(nullable) = false];
+  // Use either "positive_deltas" or "positive_counts", the former for
+  // regular histograms with integer counts, the latter for float
+  // histograms.
+  repeated sint64 positive_deltas = 12; // Count delta of each bucket compared to previous one (or to zero for 1st bucket).
+  repeated double positive_counts = 13; // Absolute count of each bucket.
+
+  ResetHint reset_hint = 14;
+
+  // timestamp is in ms format.
+  int64 timestamp = 15;
+}
+
 // TimeSeries represents samples and labels for a single time series.
 message TimeSeries {
-  repeated Label labels   = 1 [(nullable) = false];
-  repeated Sample samples = 2 [(nullable) = false];
+  repeated Label labels        = 1 [(nullable) = false];
+  repeated Sample samples      = 2 [(nullable) = false];
+  // field 3 is `exemplars` upstream; reserved here for wire compatibility.
+  reserved 3;
+  repeated Histogram histograms = 4 [(nullable) = false];
 }
 
 message Label {

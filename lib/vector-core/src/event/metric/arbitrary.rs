@@ -5,7 +5,8 @@ use proptest::{
 };
 
 use super::{
-    Bucket, MetricSketch, MetricTags, MetricValue, Quantile, Sample, StatisticKind, TagValue,
+    Bucket, MetricSketch, MetricTags, MetricValue, NativeHistogramBuckets, NativeHistogramCount,
+    NativeHistogramResetHint, NativeHistogramSpan, Quantile, Sample, StatisticKind, TagValue,
     TagValueSet, samples_to_buckets,
 };
 use crate::metrics::AgentDDSketch;
@@ -60,9 +61,90 @@ impl Arbitrary for MetricValue {
                 }
             }),
             any::<MetricSketch>().prop_map(|sketch| MetricValue::Sketch { sketch }),
+            native_histogram_strategy(),
         ];
         strategy.boxed()
     }
+}
+
+// Generates spans and a bucket count vector whose lengths are consistent (sum of
+// span lengths == number of bucket values). The `is_float` flag decides which
+// bucket encoding is used.
+fn native_spans_and_buckets(
+    is_float: bool,
+) -> impl Strategy<Value = (Vec<NativeHistogramSpan>, NativeHistogramBuckets)> {
+    use proptest::collection::vec as arb_vec;
+    arb_vec((-8i32..8, 1u32..5), 0..3).prop_flat_map(move |raw_spans| {
+        let spans: Vec<_> = raw_spans
+            .iter()
+            .map(|&(offset, length)| NativeHistogramSpan { offset, length })
+            .collect();
+        let total: usize = raw_spans.iter().map(|&(_, l)| l as usize).sum();
+        if is_float {
+            arb_vec(realistic_float().prop_map(f64::abs), total..=total)
+                .prop_map(move |v| (spans.clone(), NativeHistogramBuckets::FloatCounts(v)))
+                .boxed()
+        } else {
+            arb_vec(-100i64..100, total..=total)
+                .prop_map(move |v| (spans.clone(), NativeHistogramBuckets::IntegerDeltas(v)))
+                .boxed()
+        }
+    })
+}
+
+fn native_histogram_strategy() -> impl Strategy<Value = MetricValue> {
+    let reset_hint = prop_oneof![
+        Just(NativeHistogramResetHint::Unknown),
+        Just(NativeHistogramResetHint::Yes),
+        Just(NativeHistogramResetHint::No),
+        Just(NativeHistogramResetHint::Gauge),
+    ];
+    (
+        any::<bool>(),
+        -4i32..=8,
+        0.0f64..1.0,
+        realistic_float(),
+        reset_hint,
+    )
+        .prop_flat_map(|(is_float, schema, zero_threshold, sum, reset_hint)| {
+            let count = if is_float {
+                realistic_float()
+                    .prop_map(|v| NativeHistogramCount::Float(v.abs()))
+                    .boxed()
+            } else {
+                (0u64..10_000)
+                    .prop_map(NativeHistogramCount::Integer)
+                    .boxed()
+            };
+            let zero_count = count.clone();
+            (
+                count,
+                zero_count,
+                native_spans_and_buckets(is_float),
+                native_spans_and_buckets(is_float),
+            )
+                .prop_map(
+                    move |(
+                        count,
+                        zero_count,
+                        (positive_spans, positive_buckets),
+                        (negative_spans, negative_buckets),
+                    )| {
+                        MetricValue::NativeHistogram {
+                            count,
+                            sum,
+                            schema,
+                            zero_threshold,
+                            zero_count,
+                            positive_spans,
+                            positive_buckets,
+                            negative_spans,
+                            negative_buckets,
+                            reset_hint,
+                        }
+                    },
+                )
+        })
 }
 
 impl Arbitrary for MetricSketch {

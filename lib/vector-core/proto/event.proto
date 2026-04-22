@@ -119,6 +119,7 @@ message Metric {
     Sketch sketch = 15;
     AggregatedHistogram3 aggregated_histogram3 = 16;
     AggregatedSummary3 aggregated_summary3 = 17;
+    NativeHistogram native_histogram = 22;
   }
   string namespace = 11;
   uint32 interval_ms = 18;
@@ -238,4 +239,53 @@ message Sketch {
   oneof sketch {
     AgentDDSketch agent_dd_sketch = 1;
   }
+}
+
+message NativeHistogram {
+  // Span of consecutive populated buckets.
+  message BucketSpan {
+    sint32 offset = 1;
+    uint32 length = 2;
+  }
+
+  // Reset hint for the histogram.
+  enum ResetHint {
+    UNKNOWN = 0;
+    YES = 1;
+    NO = 2;
+    GAUGE = 3;
+  }
+
+  // Total observation count: either integer (counter) or float (gauge).
+  oneof count {
+    uint64 count_int = 1;
+    double count_float = 2;
+  }
+
+  double sum = 3;
+
+  // Resolution schema: higher = finer resolution.
+  sint32 schema = 4;
+
+  double zero_threshold = 5;
+
+  // Zero bucket count: either integer (counter) or float (gauge).
+  oneof zero_count {
+    uint64 zero_count_int = 6;
+    double zero_count_float = 7;
+  }
+
+  repeated BucketSpan negative_spans = 8;
+  // For integer histograms, delta-encoded. Mutually exclusive with negative_counts.
+  repeated sint64 negative_deltas = 9;
+  // For float histograms, absolute values. Mutually exclusive with negative_deltas.
+  repeated double negative_counts = 10;
+
+  repeated BucketSpan positive_spans = 11;
+  // For integer histograms, delta-encoded. Mutually exclusive with positive_counts.
+  repeated sint64 positive_deltas = 12;
+  // For float histograms, absolute values. Mutually exclusive with positive_deltas.
+  repeated double positive_counts = 13;
+
+  ResetHint reset_hint = 14;
 }
