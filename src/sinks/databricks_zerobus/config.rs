@@ -446,6 +446,24 @@ mod tests {
         }
     }
 
+    /// When `batch.max_bytes` is `None` (user omitted the field or set it to `null`),
+    /// `into_batcher_settings()` must merge it against
+    /// `RealtimeSizeBasedDefaultBatchSettings::MAX_BYTES` (10MB) — never unbounded.
+    /// This guarantees the Zerobus SDK's 10MB limit cannot be exceeded at runtime
+    /// even without an explicit user cap.
+    #[test]
+    fn test_batch_max_bytes_none_defaults_to_10mb() {
+        let mut config = create_test_config();
+        config.batch.max_bytes = None;
+
+        let settings = config
+            .batch
+            .into_batcher_settings()
+            .expect("batch settings should build");
+
+        assert_eq!(settings.size_limit, 10_000_000);
+    }
+
     #[test]
     fn test_stream_options_conversion() {
         let options = ZerobusStreamOptions {
