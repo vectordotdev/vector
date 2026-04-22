@@ -189,7 +189,7 @@ pub fn try_from(value: AvroValue) -> vector_common::Result<VrlValue> {
             Ok(VrlValue::Array(vector))
         }
         AvroValue::Boolean(boolean) => Ok(VrlValue::from(boolean)),
-        AvroValue::Bytes(bytes) => Ok(VrlValue::from(bytes)),
+        AvroValue::Bytes(bytes) => Ok(VrlValue::Bytes(Bytes::from(bytes))),
         AvroValue::Date(days) => Ok(VrlValue::from(days)),
         AvroValue::Decimal(_) => Err(vector_common::Error::from(
             "AvroValue::Decimal is not supported",
