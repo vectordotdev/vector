@@ -22,10 +22,12 @@
 # /ci-run-unit-windows        : runs Unit - Windows
 # /ci-run-environment         : runs Environment Suite
 # /ci-run-k8s                 : runs K8s E2E Suite
+#
+# Not included in /ci-run-all:
+#
 # /ci-run-regression          : runs Regression Detection Suite. The comparison ref is
 #                               the review's commit. An optional baseline ref can be
-#                               passed as an argument (full/short SHA, branch such as
-#                               `origin/master`, or tag); otherwise the baseline defaults
+#                               passed as an argument, otherwise the baseline defaults
 #                               to the SHA from 7 days ago. Examples:
 #                                 /ci-run-regression
 #                                 /ci-run-regression origin/master
