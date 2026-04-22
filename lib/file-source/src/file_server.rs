@@ -58,6 +58,7 @@ where
     pub remove_after: Option<Duration>,
     pub emitter: E,
     pub rotate_wait: Duration,
+    pub max_open_files: Option<usize>,
 }
 
 /// `FileServer` as Source
@@ -185,6 +186,21 @@ where
                 for (_file_id, watcher) in &mut fp_map {
                     watcher.set_file_findable(false); // assume not findable until found
                 }
+
+                // Pre-build eviction candidates sorted by last_read_success (oldest first).
+                // This avoids O(n) scans per eviction when many new files appear at once.
+                let eviction_candidates: Vec<FileFingerprint> = if self.max_open_files.is_some() {
+                    let mut candidates: Vec<_> = fp_map
+                        .iter()
+                        .map(|(&fid, w)| (w.last_read_success(), fid))
+                        .collect();
+                    candidates.sort_unstable();
+                    candidates.into_iter().map(|(_, fid)| fid).collect()
+                } else {
+                    Vec::new()
+                };
+                let mut eviction_idx = 0;
+
                 for path in self.paths_provider.paths().into_iter() {
                     if let Some(file_id) = self
                         .fingerprinter
@@ -230,6 +246,41 @@ where
                             }
                         } else {
                             // untracked file fingerprint
+                            // Check max_open_files limit before adding new file
+                            if let Some(max) = self.max_open_files
+                                && fp_map.len() >= max
+                            {
+                                let mut evicted = false;
+                                while eviction_idx < eviction_candidates.len() {
+                                    let evict_id = eviction_candidates[eviction_idx];
+                                    eviction_idx += 1;
+                                    // Skip candidates already removed from fp_map
+                                    if let Some(watcher) = fp_map.swap_remove(&evict_id) {
+                                        info!(
+                                            message = "Evicting least recently read file due to max_open_files limit.",
+                                            evicted_path = ?watcher.path,
+                                            new_path = ?path,
+                                            max_open_files = max,
+                                        );
+                                        self.emitter.emit_file_unwatched(
+                                            &watcher.path,
+                                            watcher.reached_eof(),
+                                        );
+                                        // Do NOT call checkpoints.set_dead() here:
+                                        // eviction is a temporary close for FD pressure,
+                                        // not file deletion. The checkpoint must be
+                                        // preserved so reading resumes from the saved
+                                        // offset when the file is rediscovered.
+                                        evicted = true;
+                                        break;
+                                    }
+                                }
+                                if !evicted {
+                                    // No eviction candidate available; skip this file
+                                    // and retry on the next glob cycle.
+                                    continue;
+                                }
+                            }
                             self.watch_new_file(path, file_id, &mut fp_map, &checkpoints, false)
                                 .await;
                             self.emitter.emit_files_open(fp_map.len());
