@@ -12,6 +12,9 @@ generated: components: transforms: sample: configuration: {
 
 			If left unspecified, or if the event doesn't have `group_by`, then the event is not
 			sampled separately.
+
+			This can also be used with `ratio_field` or `rate_field` to apply dynamic sampling
+			independently per rendered group value.
 			"""
 		required: false
 		type: string: {
@@ -32,6 +35,8 @@ generated: components: transforms: sample: configuration: {
 
 			This can be useful to, for example, ensure that all logs for a given transaction are
 			sampled together, but that overall `1/N` transactions are sampled.
+
+			This option cannot be combined with `ratio_field` or `rate_field`.
 			"""
 		required: false
 		type: string: examples: ["message"]
@@ -49,6 +54,18 @@ generated: components: transforms: sample: configuration: {
 			1500,
 		]
 	}
+	rate_field: {
+		description: """
+			The event field whose integer value is used as the sampling rate on a per-event basis, expressed as `1/N`.
+
+			The value must be a positive integer to be considered valid. Floating point values are rejected.
+			If the field is missing or invalid,
+			static sampling settings (`rate` or `ratio`) are used as a fallback.
+			This option cannot be used together with `ratio_field`.
+			"""
+		required: false
+		type: string: examples: ["sample_rate_n"]
+	}
 	ratio: {
 		description: """
 			The rate at which events are forwarded, expressed as a percentage
@@ -62,6 +79,18 @@ generated: components: transforms: sample: configuration: {
 		type: float: examples: [
 			0.13,
 		]
+	}
+	ratio_field: {
+		description: """
+			The event field whose floating point value is used as the sampling ratio on a per-event basis.
+
+			The value must be in `(0, 1]` to be considered valid (for example, `0.25` keeps 25%).
+			If the field is missing or invalid,
+			static sampling settings (`rate` or `ratio`) are used as a fallback.
+			This option cannot be used together with `rate_field`.
+			"""
+		required: false
+		type: string: examples: ["sample_rate"]
 	}
 	sample_rate_key: {
 		description: "The event key in which the sample rate is stored. If set to an empty string, the sample rate will not be added to the event."
