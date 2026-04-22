@@ -211,7 +211,7 @@ jobs:
   # fall back to its default (the SHA from 7 days ago).
   regression-parse:
     needs: validate
-    if: contains(github.event.review.body, '/ci-run-regression')
+    if: startsWith(github.event.review.body, '/ci-run-regression')
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
@@ -222,15 +222,15 @@ jobs:
         env:
           REVIEW_BODY: ${{ github.event.review.body }}
         run: |
-          BASELINE=$(printf '%s\n' "${REVIEW_BODY}" \
-            | sed -nE 's|^[[:space:]]*/ci-run-regression[[:space:]]+([^[:space:]]+).*$|\1|p' \
-            | head -n1)
+          # The body starts with `/ci-run-regression`; take the second whitespace-
+          # delimited token on the first line as the optional baseline ref.
+          read -r _ BASELINE _ <<< "${REVIEW_BODY}"
           echo "Parsed baseline ref: '${BASELINE}'"
           echo "baseline=${BASELINE}" >> "$GITHUB_OUTPUT"
 
   regression:
     needs: [validate, regression-parse]
-    if: contains(github.event.review.body, '/ci-run-regression')
+    if: startsWith(github.event.review.body, '/ci-run-regression')
     permissions:
       contents: read # Required to checkout code
       id-token: write # Required for AWS OIDC token exchange in regression.yml
