@@ -87,8 +87,16 @@ jobs:
             fi
           }
 
+          # Mirror the Makefile's OS-based default: `default-msvc` on Windows,
+          # `default` elsewhere. Keep in sync with the FEATURES defaults in Makefile.
+          if [[ "${RUNNER_OS}" == "Windows" ]]; then
+            DEFAULT_FEATURES="default-msvc"
+          else
+            DEFAULT_FEATURES="default"
+          fi
+
           if [[ "${{ inputs.default }}" == "true" ]]; then
-            FEATURES="default"
+            FEATURES="${DEFAULT_FEATURES}"
           else
             FEATURES=""
           fi
