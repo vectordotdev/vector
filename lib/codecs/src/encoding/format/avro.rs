@@ -39,16 +39,31 @@ pub(crate) fn to_avro(
         (VrlValue::Integer(i), Schema::TimeMicros) => Ok(AvroValue::TimeMicros(*i)),
         (VrlValue::Integer(i), Schema::TimestampMillis) => Ok(AvroValue::TimestampMillis(*i)),
         (VrlValue::Integer(i), Schema::TimestampMicros) => Ok(AvroValue::TimestampMicros(*i)),
+        (VrlValue::Integer(i), Schema::TimestampNanos) => Ok(AvroValue::TimestampNanos(*i)),
         (VrlValue::Integer(i), Schema::LocalTimestampMillis) => {
             Ok(AvroValue::LocalTimestampMillis(*i))
         }
         (VrlValue::Integer(i), Schema::LocalTimestampMicros) => {
             Ok(AvroValue::LocalTimestampMicros(*i))
         }
+        (VrlValue::Integer(i), Schema::LocalTimestampNanos) => {
+            Ok(AvroValue::LocalTimestampNanos(*i))
+        }
 
         (VrlValue::Float(f), Schema::Float) => Ok(AvroValue::Float(f.into_inner() as f32)),
         (VrlValue::Float(f), Schema::Double) => Ok(AvroValue::Double(f.into_inner())),
 
+        (VrlValue::Bytes(b), Schema::Fixed(fixed_schema)) => {
+            let bytes = b.to_vec();
+            if bytes.len() != fixed_schema.size {
+                return Err(vector_common::Error::from(format!(
+                    "Bytes length {} does not match fixed schema size {}",
+                    bytes.len(),
+                    fixed_schema.size
+                )));
+            }
+            Ok(AvroValue::Fixed(fixed_schema.size, bytes))
+        }
         (VrlValue::Bytes(b), Schema::Bytes) => Ok(AvroValue::Bytes(b.to_vec())),
         (VrlValue::Bytes(b), Schema::String) => String::from_utf8(b.to_vec())
             .map(AvroValue::String)
@@ -90,6 +105,22 @@ pub(crate) fn to_avro(
         (VrlValue::Timestamp(ts), Schema::LocalTimestampMicros) => {
             Ok(AvroValue::LocalTimestampMicros(ts.timestamp_micros()))
         }
+        (VrlValue::Timestamp(ts), Schema::TimestampNanos) => ts
+            .timestamp_nanos_opt()
+            .map(AvroValue::TimestampNanos)
+            .ok_or_else(|| {
+                vector_common::Error::from(format!(
+                    "Timestamp {ts} is out of range for timestamp-nanos"
+                ))
+            }),
+        (VrlValue::Timestamp(ts), Schema::LocalTimestampNanos) => ts
+            .timestamp_nanos_opt()
+            .map(AvroValue::LocalTimestampNanos)
+            .ok_or_else(|| {
+                vector_common::Error::from(format!(
+                    "Timestamp {ts} is out of range for local-timestamp-nanos"
+                ))
+            }),
         (VrlValue::Timestamp(ts), Schema::Long) => Ok(AvroValue::Long(ts.timestamp_millis())),
         (VrlValue::Timestamp(ts), Schema::String) => Ok(AvroValue::String(
             ts.to_rfc3339_opts(chrono::SecondsFormat::AutoSi, true),
