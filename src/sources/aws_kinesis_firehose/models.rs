@@ -10,6 +10,7 @@ use std::collections::HashMap;
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FirehoseCommonAttributesHeader {
+    #[serde(default)]
     pub common_attributes: HashMap<String, String>,
 }
 
