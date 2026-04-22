@@ -1,0 +1,108 @@
+# Reusable Workflow: Tests
+#
+# Runs test suites via the Makefile. By default runs unit tests and component
+# validation. Callers can enable additional suites (CLI, Vector API, behavior)
+# via boolean inputs.
+#
+# When `default` is true, all nextest-based suites run in a single `make test`
+# invocation with the relevant features enabled. When `default` is false, only
+# the explicitly enabled suites run, using a nextest filter expression to
+# select the matching tests.
+
+name: Tests
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: "Git ref to checkout"
+        required: false
+        type: string
+      default:
+        description: "Run the full default unit test suite (--workspace with default features)"
+        required: true
+        type: boolean
+      component-validation:
+        description: "Include component validation tests"
+        required: false
+        type: boolean
+        default: true
+      cli:
+        description: "Include CLI tests"
+        required: false
+        type: boolean
+        default: false
+      vector-api:
+        description: "Include Vector API tests"
+        required: false
+        type: boolean
+        default: false
+      behavior:
+        description: "Include behavior tests"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  CARGO_INCREMENTAL: "0"
+  CI: true
+
+jobs:
+  tests:
+    name: Tests
+    runs-on: ubuntu-24.04-8core
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.ref }}
+
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
+          cargo-nextest: true
+          datadog-ci: true
+          protoc: true
+          libsasl2: true
+
+      - name: Run tests
+        run: |
+          add_suite() {
+            local enabled="$1" feature="$2" filter="$3"
+            [[ "${enabled}" != "true" ]] && return
+            FEATURES="${FEATURES:+$FEATURES,}${feature}"
+            if [[ "${{ inputs.default }}" != "true" ]]; then
+              SCOPE="${SCOPE:+$SCOPE | }${filter}"
+            fi
+          }
+
+          if [[ "${{ inputs.default }}" == "true" ]]; then
+            FEATURES="default"
+          else
+            FEATURES=""
+          fi
+
+          add_suite "${{ inputs.component-validation }}" "component-validation-tests" "test(components::validation::tests)"
+          add_suite "${{ inputs.cli }}" "cli-tests" "package(vector) & binary(=integration)"
+          add_suite "${{ inputs.vector-api }}" "vector-api-tests" "binary(=vector_api)"
+
+          # Skip `make test` entirely if no nextest-based suite was selected
+          # (e.g. behavior-only runs). Running `make test` with empty FEATURES
+          # would otherwise execute the workspace-wide suite.
+          if [[ "${{ inputs.default }}" == "true" ]]; then
+            make test FEATURES="${FEATURES}"
+          elif [[ -n "${SCOPE}" ]]; then
+            make test FEATURES="${FEATURES}" SCOPE="-E '${SCOPE}'"
+          else
+            echo "No nextest suites selected; skipping 'make test'"
+          fi
+
+      - name: Behavior tests
+        if: ${{ inputs.behavior }}
+        run: make test-behavior
+
+      - name: Upload test results to Datadog
+        if: ${{ always() }}
+        run: scripts/upload-test-results.sh
