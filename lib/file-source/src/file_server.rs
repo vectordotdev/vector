@@ -138,6 +138,13 @@ where
 
         existing_files.sort_by_key(|(key, _, _)| *key);
 
+        // Enforce max_open_files at startup: only open the most recent files
+        // up to the limit. Remaining files will be picked up via the runtime
+        // glob cycle with LRU eviction once existing files are checkpointed.
+        if let Some(max) = self.max_open_files {
+            existing_files.truncate(max);
+        }
+
         let checkpoints = checkpointer.view();
 
         for (_key, path, file_id) in existing_files {
