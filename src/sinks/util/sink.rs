@@ -323,7 +323,9 @@ where
                     this.lingers.remove(partition);
 
                     let batch = batch.finish();
-                    let future = tokio::spawn(this.service.call(batch));
+                    // Wrap in an async_backtrace frame so spawned service tasks appear as
+                    // top-level trees in the SIGTERM task dump.
+                    let future = tokio::spawn(async_backtrace::location!().frame(this.service.call(batch)));
 
                     if let Some(map) = this.in_flight.as_mut() {
                         map.insert(partition.clone(), future.map(|_| ()).fuse().boxed());

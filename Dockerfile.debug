@@ -1,0 +1,70 @@
+# Dockerfile.debug - Builds Vector 0.53.0 with Tokio-native stall diagnostics
+# Target: linux/amd64, distroless-libc compatible (mirrors timberio/vector:0.53.0-distroless-libc)
+# Enables --cfg tokio_unstable, Tokio taskdump support, and release debuginfo for task dumps.
+
+# ─── Stage 1: Build ──────────────────────────────────────────────────────────
+FROM rust:1.92-bookworm AS builder
+
+WORKDIR /vector
+
+# Install system build dependencies (mirrors what cross/CI uses for x86_64-unknown-linux-gnu)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    cmake \
+    libssl-dev \
+    libsasl2-dev \
+    pkg-config \
+    python3 \
+    protobuf-compiler \
+    clang \
+    libclang-dev \
+    llvm-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy source
+COPY . .
+
+# Build Vector with the feature set Etsy needs:
+#   unix               - jemalloc + allocation tracing (Linux standard)
+#   api                - Vector internal API (vector top, health checks)
+#   enrichment-tables  - MaxMind GeoIP / CSV enrichment tables
+#   sinks-gcp          - Google Cloud Logging (Stackdriver) sink
+#   sources-kafka      - Kafka source
+#   transforms         - All transforms (VRL/remap, Lua, route, etc.)
+#   secrets            - Secret backends
+#
+# RUSTFLAGS enables Tokio unstable APIs used by the SIGTERM/runtime dumps and retains symbol
+# names in backtraces. CARGO_PROFILE_RELEASE_DEBUG keeps debuginfo in the release binary so
+# Tokio task dumps resolve to file/line locations.
+ENV JEMALLOC_SYS_WITH_LG_PAGE=16 \
+    RUSTFLAGS="--cfg tokio_unstable -C link-args=-rdynamic" \
+    CARGO_PROFILE_RELEASE_DEBUG=1 \
+    CARGO_PROFILE_RELEASE_SPLIT_DEBUGINFO=off
+
+RUN cargo build --release \
+    --no-default-features \
+    --features "unix,api,enrichment-tables,sinks-gcp,sinks-prometheus,sources-kafka,sources-internal_metrics,transforms,secrets,tokio-debug"
+
+# ─── Stage 2: Runtime (debian:12-slim — has all system libs the binary needs) ──
+# Using debian:12-slim instead of distroless for this debug image: distroless
+# lacks libz, libssl, libsasl2, etc. that the dynamically-linked vector binary needs.
+FROM debian:12-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
+
+LABEL org.opencontainers.image.url="https://vector.dev"
+LABEL org.opencontainers.image.source="https://github.com/vectordotdev/vector"
+LABEL org.opencontainers.image.documentation="https://vector.dev/docs"
+ENV TOKIO_CONSOLE_BIND=0.0.0.0:6669 \
+    TOKIO_CONSOLE_RETENTION=600 \
+    VECTOR_DRIVER_STALL_TASKDUMP_SECS=180 \
+    VECTOR_TOKIO_TASKDUMP_TIMEOUT_SECS=2
+
+LABEL org.opencontainers.image.version="0.53.0-debug-sigterm-async-bt-h2ping-tokio-taskdump-v6"
+LABEL com.etsy.build="sigterm-debug-dump-async-backtrace-h2-keepalive-tokio-taskdump-v6"
+
+COPY --from=builder /vector/target/release/vector /usr/bin/vector
+
+EXPOSE 6669
+
+ENTRYPOINT ["/usr/bin/vector"]

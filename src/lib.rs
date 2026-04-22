@@ -72,6 +72,8 @@ pub mod amqp;
 pub mod api;
 pub mod app;
 pub mod async_read;
+/// SIGTERM debug dump: dumps thread/runtime diagnostics to stderr on shutdown.
+pub mod debug_dump;
 #[cfg(feature = "aws-config")]
 pub mod aws;
 pub mod common;

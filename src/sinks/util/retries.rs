@@ -130,7 +130,11 @@ impl<L: RetryLogic> FibonacciRetryPolicy<L> {
         self.advance();
         let delay = Box::pin(sleep(self.backoff()));
 
-        debug!(message = "Retrying request.", delay_ms = %self.backoff().as_millis());
+        info!(
+            message = "Retrying request.",
+            delay_ms = %self.backoff().as_millis(),
+            remaining_attempts = self.remaining_attempts,
+        );
         RetryPolicyFuture { delay }
     }
 }
@@ -197,8 +201,10 @@ where
                         None
                     }
                 } else if error.downcast_ref::<Elapsed>().is_some() {
-                    warn!(
-                        "Request timed out. If this happens often while the events are actually reaching their destination, try decreasing `batch.max_bytes` and/or using `compression` if applicable. Alternatively `request.timeout_secs` can be increased."
+                    info!(
+                        message = "Request timed out; will retry.",
+                        remaining_attempts = self.remaining_attempts,
+                        next_backoff_ms = %self.backoff().as_millis(),
                     );
                     Some(self.build_retry())
                 } else {

@@ -697,6 +697,244 @@ impl IntoIterator for QueryParameterValue {
 
 pub type QueryParameters = HashMap<String, QueryParameterValue>;
 
+/// End-to-end tests for HTTP/2 keepalive behaviour on HttpClient.
+///
+/// These tests reproduce the production deadlock where GCP (or any remote) holds a
+/// TCP-ESTABLISHED connection open but silently stops responding to new H2 streams and
+/// PING frames.  A TCP proxy with a "freeze" control simulates this exactly:
+///
+///   hyper client  ──►  DeadConnectionProxy (freeze-able)  ──►  real h2c server
+///
+/// When frozen, the proxy reads server→client bytes and discards them. The client-side
+/// TCP socket stays ESTABLISHED, so the OS never delivers a RST or error. The client
+/// only learns the connection is dead via H2 PING timeout — which requires keepalive to
+/// be configured.
+///
+/// Two assertions are validated:
+///   1. Without keepalive: a request to the dead connection hangs indefinitely.
+///   2. With keepalive (short interval for test speed): hyper detects the unanswered
+///      PING, evicts the connection, and the next request succeeds on a fresh connection.
+#[cfg(test)]
+#[allow(deprecated)]
+mod h2_keepalive_tests {
+    use std::{
+        convert::Infallible,
+        sync::{
+            Arc,
+            atomic::{AtomicBool, Ordering},
+        },
+        time::Duration,
+    };
+
+    use http::Request;
+    use hyper::{Body, Response, server::conn::Http, service::service_fn};
+    use tokio::{
+        io::{AsyncReadExt, AsyncWriteExt},
+        net::{TcpListener, TcpStream},
+        time::timeout,
+    };
+
+    use super::{HttpClient, client};
+    use crate::config::ProxyConfig;
+
+    /// Starts a minimal HTTP/2 cleartext (h2c) echo server at an ephemeral port.
+    /// Returns the bound socket address. The server runs for the lifetime of the test.
+    async fn start_h2c_server() -> std::net::SocketAddr {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            loop {
+                let Ok((stream, _)) = listener.accept().await else {
+                    break;
+                };
+                tokio::spawn(
+                    Http::new()
+                        .http2_only(true)
+                        .serve_connection(
+                            stream,
+                            service_fn(|_req: hyper::Request<Body>| async {
+                                Ok::<Response<Body>, Infallible>(Response::new(Body::from("ok")))
+                            }),
+                        ),
+                );
+            }
+        });
+        addr
+    }
+
+    /// TCP proxy that can be "frozen" to simulate a remote endpoint that has stopped
+    /// responding (no FIN/RST, no H2 responses, no PING ACKs) while keeping the TCP
+    /// connection ESTABLISHED.
+    ///
+    /// When frozen: server→client bytes are read and silently discarded. The client
+    /// continues to write (requests, PINGs) which the proxy forwards to the server, but
+    /// the client receives nothing back.
+    ///
+    /// The proxy accepts multiple sequential connections, so after hyper evicts the dead
+    /// connection and opens a fresh one it will be served normally (once thawed).
+    struct DeadConnectionProxy {
+        pub listen_addr: std::net::SocketAddr,
+        pub frozen: Arc<AtomicBool>,
+    }
+
+    impl DeadConnectionProxy {
+        async fn start(upstream: std::net::SocketAddr) -> Self {
+            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let listen_addr = listener.local_addr().unwrap();
+            let frozen = Arc::new(AtomicBool::new(false));
+            let frozen_srv = Arc::clone(&frozen);
+
+            tokio::spawn(async move {
+                loop {
+                    let Ok((client_conn, _)) = listener.accept().await else {
+                        break;
+                    };
+                    let frozen = Arc::clone(&frozen_srv);
+                    tokio::spawn(async move {
+                        let server_conn =
+                            TcpStream::connect(upstream).await.expect("proxy→server connect");
+
+                        let (mut cr, mut cw) = tokio::io::split(client_conn);
+                        let (mut sr, mut sw) = tokio::io::split(server_conn);
+                        let frozen_s2c = Arc::clone(&frozen);
+
+                        // client→server: always forward so the server keeps receiving requests
+                        // and PINGs (important: we want the server to send responses/ACKs that
+                        // the proxy then discards, keeping the TCP open from both sides).
+                        let c2s = tokio::spawn(async move {
+                            tokio::io::copy(&mut cr, &mut sw).await.ok();
+                        });
+
+                        // server→client: forward normally, or read-and-discard when frozen.
+                        let s2c = tokio::spawn(async move {
+                            let mut buf = vec![0u8; 65_536];
+                            loop {
+                                match sr.read(&mut buf).await {
+                                    Ok(0) | Err(_) => break,
+                                    Ok(n) => {
+                                        if frozen_s2c.load(Ordering::Acquire) {
+                                            // Discard: client sees an ESTABLISHED connection
+                                            // that never delivers any bytes.
+                                        } else if cw.write_all(&buf[..n]).await.is_err() {
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        });
+
+                        let _ = tokio::join!(c2s, s2c);
+                    });
+                }
+            });
+
+            Self { listen_addr, frozen }
+        }
+
+        fn freeze(&self) {
+            self.frozen.store(true, Ordering::Release);
+        }
+
+        fn thaw(&self) {
+            self.frozen.store(false, Ordering::Release);
+        }
+    }
+
+    fn post(addr: std::net::SocketAddr) -> Request<Body> {
+        Request::post(format!("http://{addr}/"))
+            .body(Body::from("payload"))
+            .unwrap()
+    }
+
+    // ── Test 1 ────────────────────────────────────────────────────────────────
+    /// Without H2 keepalive, a dead connection is never detected proactively.
+    /// The client reuses the pooled connection and the request hangs indefinitely,
+    /// mirroring the production deadlock where Vector would loop through Tower
+    /// timeouts + Fibonacci retries for 10+ minutes until GCP sends a RST.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn h2_dead_connection_hangs_without_keepalive() {
+        let server_addr = start_h2c_server().await;
+        let proxy = DeadConnectionProxy::start(server_addr).await;
+
+        // Client with NO keepalive — bare builder, mirrors current HttpClient::new().
+        let mut builder = client::Builder::default();
+        builder.http2_only(true);
+        let client: HttpClient<Body> =
+            HttpClient::new_with_custom_client(None, &ProxyConfig::default(), &mut builder)
+                .unwrap();
+
+        // Warm up: first request goes through normally, pooling the connection.
+        client
+            .send(post(proxy.listen_addr))
+            .await
+            .expect("first request should succeed");
+
+        // Freeze: from this point the server never delivers another byte to the client.
+        proxy.freeze();
+
+        // The second request reuses the pooled dead connection. Without keepalive the
+        // client has no mechanism to detect this — the future pends forever.
+        let result = timeout(Duration::from_secs(4), client.send(post(proxy.listen_addr))).await;
+
+        assert!(
+            result.is_err(),
+            "expected request to hang on dead connection, but it completed: {:?}",
+            result.unwrap()
+        );
+    }
+
+    // ── Test 2 ────────────────────────────────────────────────────────────────
+    /// With H2 keepalive configured, an unanswered PING causes hyper to evict the
+    /// dead connection from its pool. The next request opens a fresh TCP connection
+    /// to the proxy (which now thaws) and succeeds — recovery in O(interval+timeout)
+    /// seconds instead of hours.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn h2_keepalive_recovers_from_dead_connection() {
+        let server_addr = start_h2c_server().await;
+        let proxy = DeadConnectionProxy::start(server_addr).await;
+
+        // Client WITH keepalive — short intervals so the test runs in a few seconds.
+        let mut builder = client::Builder::default();
+        builder
+            .http2_only(true)
+            .http2_keep_alive_interval(Some(Duration::from_secs(2)))
+            .http2_keep_alive_timeout(Duration::from_secs(2))
+            .http2_keep_alive_while_idle(true);
+        let client: HttpClient<Body> =
+            HttpClient::new_with_custom_client(None, &ProxyConfig::default(), &mut builder)
+                .unwrap();
+
+        // Warm up: establish and pool the connection.
+        client
+            .send(post(proxy.listen_addr))
+            .await
+            .expect("first request should succeed");
+
+        // Freeze: proxy stops delivering bytes to the client.
+        proxy.freeze();
+
+        // Wait for keepalive to fire (interval=2s), go unanswered, and time out (2s).
+        // Add 1 s of margin so hyper has time to finish evicting the connection.
+        tokio::time::sleep(Duration::from_secs(5)).await;
+
+        // Thaw: new TCP connections through the proxy are served normally again.
+        proxy.thaw();
+
+        // Hyper has evicted the dead connection. The next request opens a fresh TCP
+        // connection and should complete without hanging.
+        let result = timeout(Duration::from_secs(5), client.send(post(proxy.listen_addr))).await;
+
+        assert!(
+            result.is_ok(),
+            "request timed out — keepalive did not evict the dead connection in time"
+        );
+        assert!(
+            result.unwrap().is_ok(),
+            "request failed on fresh connection after keepalive eviction"
+        );
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::convert::Infallible;

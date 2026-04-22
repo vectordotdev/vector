@@ -506,6 +506,12 @@ where
                 .layer(DecompressionLayer::new())
                 .service(http_client);
 
+            debug!(
+                message = "Sending HTTP request.",
+                endpoint = %endpoint,
+                body_bytes = byte_size,
+            );
+
             // Any errors raised in `http_client.call` results in a `GotHttpWarning` event being emitted
             // in `HttpClient::send`. This does not result in incrementing `component_errors_total` however,
             // because that is incremented by the driver when retries have been exhausted.
