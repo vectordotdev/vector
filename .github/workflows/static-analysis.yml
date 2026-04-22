@@ -22,7 +22,7 @@ jobs:
       - id: dd-token
         uses: ./.github/actions/dd-token
         with:
-          policy: public-vectordotdev-vrl-static-analysis
+          policy: public-vectordotdev-vector-static-analysis
 
       - name: Datadog Static Analyzer
         uses: DataDog/datadog-static-analyzer-github-action@8340f18875fcefca86844b5f947ce2431387e552 # v3.0.0
