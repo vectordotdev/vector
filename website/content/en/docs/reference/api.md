@@ -21,6 +21,12 @@ instance. This page covers how to configure and enable Vector's API.
 The API exposes a gRPC service defined in [`proto/vector/observability.proto`](https://github.com/vectordotdev/vector/blob/master/proto/vector/observability.proto).
 You can interact with it using any standard gRPC tooling.
 
+For compatibility with Vector 0.54.0 and earlier, the HTTP `GET /health`
+endpoint continues to be served on the same port as the gRPC API, so
+existing HTTP probes (for example AWS ALB health checks and Kubernetes
+HTTP liveness/readiness probes) keep working without changes. See the
+[Endpoints](#endpoints) section above for details.
+
 ### Example using grpcurl
 
 ```bash
@@ -34,4 +40,11 @@ grpcurl -plaintext localhost:8686 vector.observability.v1.ObservabilityService/G
 grpcurl -plaintext \
   -d '{"outputs_patterns": ["*"], "limit": 100, "interval_ms": 500}' \
   localhost:8686 vector.observability.v1.ObservabilityService/StreamOutputEvents
+```
+
+### Example using curl (HTTP health)
+
+```bash
+# 200 with body {"ok":true} while serving, 503 {"ok":false} during drain
+curl -i http://localhost:8686/health
 ```

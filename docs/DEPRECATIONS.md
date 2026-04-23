@@ -21,3 +21,5 @@ For example:
 ## To be migrated
 
 ## To be removed
+
+- `v0.56.0` | `greptimedb-v0-support` | The `greptimedb_metrics` and `greptimedb_logs` sinks drop support for GreptimeDB v0.x. Users must upgrade their GreptimeDB instance to v1.x before upgrading Vector.
