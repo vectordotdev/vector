@@ -615,15 +615,29 @@ impl<'a> Builder<'a> {
                 extra_context: self.extra_context.clone(),
             };
 
-            // Determine whether this sink is authoritative for acknowledgements.
-            // Non-authoritative sinks have their finalizers stripped so the source's
-            // BatchNotifier doesn't wait for them. By default, authoritative matches
-            // the acknowledgements.enabled setting, preserving backwards compatibility.
-            let sink_is_authoritative = sink
-                .inner
-                .acknowledgements()
-                .merge_default(&self.config.global.acknowledgements)
-                .authoritative();
+            // Per-sink authoritative acknowledgement control (RFC 6517).
+            //
+            // When at least one sink in the topology has `authoritative: true` explicitly
+            // set, we activate per-sink stripping: non-authoritative sinks have their
+            // finalizers removed so the source only waits for authoritative sinks.
+            //
+            // When NO sink has `authoritative` set, all sinks participate in the ack
+            // chain (preserving backwards compatibility with the pre-authoritative behavior).
+            let any_sink_explicitly_authoritative = self.config.sinks().any(|(_, s)| {
+                s.inner
+                    .acknowledgements()
+                    .merge_default(&self.config.global.acknowledgements)
+                    .is_explicitly_authoritative()
+            });
+
+            let sink_is_authoritative = if any_sink_explicitly_authoritative {
+                sink.inner
+                    .acknowledgements()
+                    .merge_default(&self.config.global.acknowledgements)
+                    .authoritative()
+            } else {
+                true // No authoritative sinks set → all sinks participate (backwards compat)
+            };
 
             let (sink, healthcheck) = match sink.inner.build(cx).await {
                 Err(error) => {
