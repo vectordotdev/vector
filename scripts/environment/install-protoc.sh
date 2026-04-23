@@ -69,8 +69,10 @@ install_protoc() {
   local download_path="${TMP_DIR}/protoc.zip"
 
   echo "Downloading ${url}"
-  # --retry-all-errors covers transient CDN blips without masking 4xx that should fail fast.
-  curl --retry 5 --retry-delay 10 --retry-all-errors -fsSL "${url}" -o "${download_path}"
+  # Stay compatible with the curl shipped by Ubuntu 20.04 focal (7.68.x) used
+  # in the ghcr.io/cross-rs/* base images: --retry-all-errors was only added
+  # in curl 7.71.0, so rely on the transport-level retry that --retry covers.
+  curl --retry 5 --retry-delay 10 -fsSL "${url}" -o "${download_path}"
 
   unzip -qq "${download_path}" -d "${TMP_DIR}"
   mv -f -v "${TMP_DIR}/bin/$(get_bin_name)" "${install_path}"
