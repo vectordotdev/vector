@@ -275,15 +275,17 @@ async fn drive_body_decompression(
                             // the decompressor. This is _technically_ synchronous but there's really no way to do it
                             // asynchronously since we already have the data, and that's the only asynchronous part.
                             let to_take = cmp::min(available, *remaining);
-                            if decompressor.is_none() {
-                                let scheme = scheme.as_ref().expect(
-                                    "compressed frames without a negotiated scheme are rejected earlier",
-                                );
-                                decompressor = Some(Decompressor::new(scheme).map_err(|_| {
-                                    Status::internal("failed to initialize decompressor")
-                                })?);
-                            }
-                            let d = decompressor.as_mut().expect("decompressor must be set");
+                            let d = match &mut decompressor {
+                                Some(d) => d,
+                                slot @ None => {
+                                    let scheme = scheme.as_ref().expect(
+                                        "compressed frames without a negotiated scheme are rejected earlier",
+                                    );
+                                    slot.insert(Decompressor::new(scheme).map_err(|_| {
+                                        Status::internal("failed to initialize decompressor")
+                                    })?)
+                                }
+                            };
                             if d.write_all(&buf[..to_take]).is_err() {
                                 return Err(Status::internal("failed to write to decompressor"));
                             }
