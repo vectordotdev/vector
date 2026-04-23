@@ -50,6 +50,8 @@ pub(crate) fn to_avro(
             Ok(AvroValue::LocalTimestampNanos(*i))
         }
 
+        (VrlValue::Integer(i), Schema::Float) => Ok(AvroValue::Float(*i as f32)),
+        (VrlValue::Integer(i), Schema::Double) => Ok(AvroValue::Double(*i as f64)),
         (VrlValue::Float(f), Schema::Float) => Ok(AvroValue::Float(f.into_inner() as f32)),
         (VrlValue::Float(f), Schema::Double) => Ok(AvroValue::Double(f.into_inner())),
 
