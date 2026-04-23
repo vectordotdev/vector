@@ -280,6 +280,7 @@ jobs:
               - ".github/workflows/changes.yml"
             test-yml:
               - ".github/workflows/test.yml"
+              - ".github/workflows/unit-tests.yml"
               - ".github/workflows/changes.yml"
             integration-yml:
               - ".github/workflows/integration.yml"
