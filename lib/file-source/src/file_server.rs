@@ -141,27 +141,18 @@ where
 
         existing_files.sort_by_key(|(key, _, _)| *key);
 
+        // Limit startup file opens to max_open_files to avoid exhausting FDs
+        if let Some(max) = self.max_open_files
+            && max > 0
+        {
+            existing_files.truncate(max);
+        }
+
         let checkpoints = checkpointer.view();
 
         for (_key, path, file_id) in existing_files {
             self.watch_new_file(path, file_id, &mut fp_map, &checkpoints, true)
                 .await;
-        }
-
-        // Evict oldest files down to max_open_files after opening them all with
-        // correct startup read_from semantics. This preserves checkpoints so
-        // evicted files resume from the right offset when re-discovered.
-        if let Some(max) = self.max_open_files
-            && max > 0
-        {
-            while fp_map.len() > max {
-                // fp_map is an IndexMap ordered by insertion (oldest-created first),
-                // so removing from the front evicts the oldest file.
-                if let Some((_, watcher)) = fp_map.shift_remove_index(0) {
-                    self.emitter
-                        .emit_file_unwatched(&watcher.path, watcher.reached_eof());
-                }
-            }
         }
         self.emitter.emit_files_open(fp_map.len());
 
