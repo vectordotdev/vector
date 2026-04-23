@@ -321,7 +321,7 @@ impl Default for Config {
             ingestion_timestamp_field: None,
             timezone: None,
             kube_config_file: None,
-            use_apiserver_cache: false,
+            use_apiserver_cache: true,
             delay_deletion_ms: default_delay_deletion_ms(),
             log_namespace: None,
             internal_metrics: Default::default(),
