@@ -23,13 +23,12 @@ trap 'rm -rf "${TMP_DIR?}"' EXIT
 get_platform() {
   local os
   os=$(uname)
-  if [[ "${os}" == "Darwin" ]]; then
-    echo "osx"
-  elif [[ "${os}" == "Linux" ]]; then
-    echo "linux"
-  else
-    >&2 echo "unsupported os: ${os}" && exit 1
-  fi
+  case "${os}" in
+    Darwin) echo "osx" ;;
+    Linux) echo "linux" ;;
+    MINGW*|MSYS*|CYGWIN*) echo "win64" ;;
+    *) >&2 echo "unsupported os: ${os}" && exit 1 ;;
+  esac
 }
 
 get_arch() {
@@ -47,20 +46,34 @@ get_arch() {
   fi
 }
 
+get_bin_name() {
+  if [[ "$(get_platform)" == "win64" ]]; then
+    echo "protoc.exe"
+  else
+    echo "protoc"
+  fi
+}
+
 install_protoc() {
   local version=$1
   local install_path=$2
 
   local base_url="https://github.com/protocolbuffers/protobuf/releases/download"
   local url
-  url="${base_url}/v${version}/protoc-${version}-$(get_platform)-$(get_arch).zip"
+  if [[ "$(get_platform)" == "win64" ]]; then
+    # Windows release assets are named without an explicit arch suffix.
+    url="${base_url}/v${version}/protoc-${version}-win64.zip"
+  else
+    url="${base_url}/v${version}/protoc-${version}-$(get_platform)-$(get_arch).zip"
+  fi
   local download_path="${TMP_DIR}/protoc.zip"
 
   echo "Downloading ${url}"
-  curl -fsSL "${url}" -o "${download_path}"
+  # --retry-all-errors covers transient CDN blips without masking 4xx that should fail fast.
+  curl --retry 5 --retry-delay 10 --retry-all-errors -fsSL "${url}" -o "${download_path}"
 
   unzip -qq "${download_path}" -d "${TMP_DIR}"
-  mv -f -v "${TMP_DIR}/bin/protoc" "${install_path}"
+  mv -f -v "${TMP_DIR}/bin/$(get_bin_name)" "${install_path}"
 }
 
-install_protoc "21.12" "${INSTALL_PATH}/protoc"
+install_protoc "21.12" "${INSTALL_PATH}/$(get_bin_name)"
