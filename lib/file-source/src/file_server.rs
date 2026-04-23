@@ -58,6 +58,10 @@ where
     pub remove_after: Option<Duration>,
     pub emitter: E,
     pub rotate_wait: Duration,
+    /// Maximum number of files to keep open simultaneously.
+    /// When this limit is reached, the least recently read file is evicted
+    /// (closed with its checkpoint preserved) to make room for new files.
+    pub max_open_files: Option<usize>,
 }
 
 /// `FileServer` as Source
@@ -137,6 +141,11 @@ where
 
         existing_files.sort_by_key(|(key, _, _)| *key);
 
+        // Limit startup file opens to max_open_files to avoid exhausting FDs
+        if let Some(max) = self.max_open_files {
+            existing_files.truncate(max);
+        }
+
         let checkpoints = checkpointer.view();
 
         for (_key, path, file_id) in existing_files {
@@ -185,6 +194,20 @@ where
                 for (_file_id, watcher) in &mut fp_map {
                     watcher.set_file_findable(false); // assume not findable until found
                 }
+
+                // Pre-sort eviction candidates by last read time (oldest first)
+                let eviction_candidates: Vec<FileFingerprint> = if self.max_open_files.is_some() {
+                    let mut candidates: Vec<_> = fp_map
+                        .iter()
+                        .map(|(&fid, w)| (w.last_read_success(), fid))
+                        .collect();
+                    candidates.sort_unstable();
+                    candidates.into_iter().map(|(_, fid)| fid).collect()
+                } else {
+                    Vec::new()
+                };
+                let mut eviction_idx = 0;
+
                 for path in self.paths_provider.paths().into_iter() {
                     if let Some(file_id) = self
                         .fingerprinter
@@ -229,7 +252,35 @@ where
                                 }
                             }
                         } else {
-                            // untracked file fingerprint
+                            // untracked file fingerprint — evict LRU file if at limit
+                            if let Some(max) = self.max_open_files
+                                && fp_map.len() >= max
+                            {
+                                let mut evicted = false;
+                                while eviction_idx < eviction_candidates.len() {
+                                    let evict_id = eviction_candidates[eviction_idx];
+                                    eviction_idx += 1;
+                                    if let Some(watcher) = fp_map.swap_remove(&evict_id) {
+                                        info!(
+                                            message = "Evicting least recently read file due to max_open_files limit.",
+                                            evicted_path = ?watcher.path,
+                                            new_path = ?path,
+                                            max_open_files = max,
+                                        );
+                                        self.emitter
+                                            .emit_file_unwatched(&watcher.path, watcher.reached_eof());
+                                        // Do NOT call checkpoints.set_dead() here — the file
+                                        // is evicted temporarily, not gone. Its checkpoint
+                                        // must survive so we resume from the right offset
+                                        // if the file reappears in a later glob cycle.
+                                        evicted = true;
+                                        break;
+                                    }
+                                }
+                                if !evicted {
+                                    continue; // skip this file, retry next glob cycle
+                                }
+                            }
                             self.watch_new_file(path, file_id, &mut fp_map, &checkpoints, false)
                                 .await;
                             self.emitter.emit_files_open(fp_map.len());
