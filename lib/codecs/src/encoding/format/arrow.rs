@@ -93,6 +93,19 @@ pub struct ArrowStreamSerializer {
 }
 
 impl ArrowStreamSerializer {
+    /// Encode events into a `RecordBatch` without writing to IPC stream format.
+    pub fn encode_to_record_batch(
+        &self,
+        events: &[Event],
+    ) -> Result<RecordBatch, ArrowEncodingError> {
+        let values = vector_log_events_to_json_values(events).map_err(|e| {
+            ArrowEncodingError::RecordBatchCreation {
+                source: arrow::error::ArrowError::JsonError(e.to_string()),
+            }
+        })?;
+        build_record_batch(self.schema.clone(), &values)
+    }
+
     /// Create a new ArrowStreamSerializer with the given configuration
     pub fn new(config: ArrowStreamSerializerConfig) -> Result<Self, ArrowEncodingError> {
         let schema = config.schema.ok_or(ArrowEncodingError::MissingSchema)?;
