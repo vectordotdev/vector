@@ -140,6 +140,8 @@ When you make changes to the Markdown sources, Sass/CSS, or JavaScript, the site
 
 If you don't want to install Hugo, CUE, or Node.js locally, you can use Docker instead. You still need Rust and [vdev] on the host for one step.
 
+> **Note:** This Docker setup is experimental and not currently enforced by CI. It may break as dependencies or the build process evolve.
+
 **Step 1:** Generate VRL function docs (required once; only re-run when VRL function signatures change):
 
 ```shell
