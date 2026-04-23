@@ -19,8 +19,12 @@
 //!    transition due to uprobe traps), but negligible when not profiling.
 
 use std::{
+    collections::HashMap,
     marker::PhantomData,
-    sync::atomic::{AtomicU32, Ordering},
+    sync::{
+        Mutex,
+        atomic::{AtomicU32, Ordering},
+    },
 };
 
 use tracing::{
@@ -94,6 +98,10 @@ pub extern "C" fn vector_component_exit() {
 /// Next probe group ID. 0 means idle (no component active).
 static NEXT_PROBE_ID: AtomicU32 = AtomicU32::new(1);
 
+/// Maps component_id strings to their assigned probe group IDs so that
+/// duplicate spans (e.g. builder + spawn) reuse the same ID.
+static REGISTERED: Mutex<Option<HashMap<String, u32>>> = Mutex::new(None);
+
 /// Stored in span extensions to associate a span with a probe group ID.
 struct ProbeGroupId(u32);
 
@@ -151,19 +159,32 @@ where
         attrs.record(&mut visitor);
 
         if let Some(component_id) = visitor.component_id {
-            let probe_id = NEXT_PROBE_ID.fetch_add(1, Ordering::Relaxed);
-            if probe_id == 0 {
-                return;
-            }
+            let probe_id = {
+                let mut guard = REGISTERED.lock().unwrap_or_else(|e| e.into_inner());
+                let map = guard.get_or_insert_with(HashMap::new);
 
-            // Null-terminate for bpftrace: the kernel's bpf_probe_read_user_str
-            // treats the length as buffer size including the null terminator, so
-            // str(ptr, len) reads at most len-1 chars. Using str(ptr) instead
-            // reads until the null byte, which works across all bpftrace versions.
-            let c_name = std::ffi::CString::new(component_id)
-                .expect("component_id should not contain null bytes");
-            let name_bytes = c_name.as_bytes_with_nul();
-            vector_register_component(probe_id, name_bytes.as_ptr(), name_bytes.len());
+                if let Some(&existing) = map.get(&component_id) {
+                    existing
+                } else {
+                    let new_id = NEXT_PROBE_ID.fetch_add(1, Ordering::Relaxed);
+                    if new_id == 0 {
+                        return;
+                    }
+
+                    // Null-terminate for bpftrace: the kernel's
+                    // bpf_probe_read_user_str treats the length as buffer size
+                    // including the null terminator, so str(ptr, len) reads at
+                    // most len-1 chars. Using str(ptr) reads until the null
+                    // byte, which works across all bpftrace versions.
+                    let c_name = std::ffi::CString::new(component_id.as_str())
+                        .expect("component_id should not contain null bytes");
+                    let name_bytes = c_name.as_bytes_with_nul();
+                    vector_register_component(new_id, name_bytes.as_ptr(), name_bytes.len());
+
+                    map.insert(component_id, new_id);
+                    new_id
+                }
+            };
 
             if let Some(span) = ctx.span(id) {
                 span.extensions_mut().insert(ProbeGroupId(probe_id));
