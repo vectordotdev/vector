@@ -1,9 +1,6 @@
 use std::{
     collections::{HashMap, HashSet},
-    sync::{
-        Arc, Mutex,
-        atomic::{AtomicBool, Ordering},
-    },
+    sync::{Arc, Mutex},
 };
 
 use futures::{Future, FutureExt, future};
@@ -66,7 +63,6 @@ pub struct RunningTopology {
     pub(crate) config: Config,
     pub(crate) abort_tx: mpsc::UnboundedSender<ShutdownError>,
     watch: (WatchTx, WatchRx),
-    pub(crate) running: Arc<AtomicBool>,
     graceful_shutdown_duration: Option<Duration>,
     utilization_registry: Option<UtilizationRegistry>,
     utilization_task: Option<TaskHandle>,
@@ -90,7 +86,6 @@ impl RunningTopology {
             tasks: HashMap::new(),
             abort_tx,
             watch: watch::channel(TapResource::default()),
-            running: Arc::new(AtomicBool::new(true)),
             graceful_shutdown_duration: config.graceful_shutdown_duration,
             config,
             utilization_registry: None,
@@ -148,8 +143,6 @@ impl RunningTopology {
     /// dropped then everything from this RunningTopology instance is fully
     /// dropped.
     pub fn stop(self) -> impl Future<Output = ()> {
-        // Update the API's health endpoint to signal shutdown
-        self.running.store(false, Ordering::Relaxed);
         // Create handy handles collections of all tasks for the subsequent
         // operations.
         let mut wait_handles = Vec::new();
