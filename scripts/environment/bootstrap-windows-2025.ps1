@@ -11,7 +11,10 @@ function Install-ChocoPackage {
 
     for ($attempt = 1; $attempt -le $MaxRetries; $attempt++) {
         choco install $Package --execution-timeout=7200 -y
-        if ($LASTEXITCODE -eq 0) {
+        # Both `choco install` and `choco list` can exit 0 even on 5xx errors
+        # from the feed, so verify install by matching a "name|version" line
+        # in the list output. --limit-output strips headers/warnings.
+        if ((choco list --limit-output -e $Package) -match "^$([regex]::Escape($Package))\|") {
             return
         }
 
