@@ -4,6 +4,19 @@
 //! [`ComponentProbesLayer`] that tags each Tokio worker thread with the ID of
 //! the currently executing component. External bpftrace scripts read this tag
 //! on a profile timer to produce per-component flamegraphs.
+//!
+//! Two complementary mechanisms are exposed for bpftrace scripts:
+//!
+//! 1. **Per-thread `AtomicU32` + `vector_register_thread`** — a polling approach
+//!    where the profiler reads user-space memory at a fixed sampling rate. Very
+//!    low overhead when profiling, but requires `bpf_probe_read_user` support
+//!    (works on x86_64 via legacy `bpf_probe_read`; fails on arm64).
+//!
+//! 2. **`vector_component_enter` / `vector_component_exit` uprobes** — an
+//!    event-driven approach where bpftrace maintains the active component
+//!    mapping in a BPF map. Works on all architectures and bpftrace versions.
+//!    Slightly higher overhead when bpftrace is attached (~1–5 µs per span
+//!    transition due to uprobe traps), but negligible when not profiling.
 
 use std::{
     marker::PhantomData,
@@ -19,9 +32,9 @@ use tracing_subscriber::{Layer, layer::Context, registry::LookupSpan};
 
 /// Returns a leaked `&'static AtomicU32` unique to the current thread.
 ///
-/// On first access, allocates a byte via `Box::leak` and calls
+/// On first access, allocates an `AtomicU32` via `Box::leak` and calls
 /// [`vector_register_thread`] so bpftrace can map this thread's TID
-/// to the byte's address. The leaked byte is valid for the process lifetime.
+/// to its address. The leaked allocation is valid for the process lifetime.
 fn thread_label() -> &'static AtomicU32 {
     thread_local! {
         static LABEL: &'static AtomicU32 = {
@@ -53,6 +66,29 @@ pub extern "C" fn vector_register_thread(tid: u64, label_ptr: *const u8) {
 #[allow(clippy::missing_const_for_fn)]
 pub extern "C" fn vector_register_component(id: u32, name_ptr: *const u8, name_len: usize) {
     std::hint::black_box((id, name_ptr, name_len));
+}
+
+/// Uprobe attachment point fired on every component span enter.
+///
+/// bpftrace hooks this to record `tid -> component_id` in a BPF map,
+/// avoiding user-space memory reads from `profile` probes (required
+/// for arm64 compatibility where `bpf_probe_read` is kernel-only).
+#[unsafe(no_mangle)]
+#[inline(never)]
+#[allow(clippy::missing_const_for_fn)]
+pub extern "C" fn vector_component_enter(component_id: u32) {
+    std::hint::black_box(component_id);
+}
+
+/// Uprobe attachment point fired on every component span exit.
+///
+/// bpftrace hooks this to clear the active component for the current
+/// thread, setting the BPF map entry to 0 (idle).
+#[unsafe(no_mangle)]
+#[inline(never)]
+#[allow(clippy::missing_const_for_fn)]
+pub extern "C" fn vector_component_exit() {
+    std::hint::black_box(());
 }
 
 /// Next probe group ID. 0 means idle (no component active).
@@ -120,8 +156,14 @@ where
                 return;
             }
 
-            let id_bytes = component_id.as_bytes();
-            vector_register_component(probe_id, id_bytes.as_ptr(), id_bytes.len());
+            // Null-terminate for bpftrace: the kernel's bpf_probe_read_user_str
+            // treats the length as buffer size including the null terminator, so
+            // str(ptr, len) reads at most len-1 chars. Using str(ptr) instead
+            // reads until the null byte, which works across all bpftrace versions.
+            let c_name = std::ffi::CString::new(component_id)
+                .expect("component_id should not contain null bytes");
+            let name_bytes = c_name.as_bytes_with_nul();
+            vector_register_component(probe_id, name_bytes.as_ptr(), name_bytes.len());
 
             if let Some(span) = ctx.span(id) {
                 span.extensions_mut().insert(ProbeGroupId(probe_id));
@@ -134,6 +176,7 @@ where
             && let Some(probe) = span.extensions().get::<ProbeGroupId>()
         {
             thread_label().store(probe.0, Ordering::Relaxed);
+            vector_component_enter(probe.0);
         }
     }
 
@@ -142,6 +185,7 @@ where
             && span.extensions().get::<ProbeGroupId>().is_some()
         {
             thread_label().store(0, Ordering::Relaxed);
+            vector_component_exit();
         }
     }
 }
@@ -191,5 +235,11 @@ mod tests {
     fn register_component_does_not_panic() {
         let name = b"test_component";
         vector_register_component(1, name.as_ptr(), name.len());
+    }
+
+    #[test]
+    fn component_enter_exit_do_not_panic() {
+        vector_component_enter(42);
+        vector_component_exit();
     }
 }

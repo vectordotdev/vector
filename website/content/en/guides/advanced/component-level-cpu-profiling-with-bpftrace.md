@@ -43,7 +43,7 @@ uprobe:/path/to/vector:vector_register_thread {
 }
 
 uprobe:/path/to/vector:vector_register_component {
-    @names[arg0] = str(arg1, arg2);
+    @names[arg0] = str(arg1);
 }
 
 profile:hz:997 {
