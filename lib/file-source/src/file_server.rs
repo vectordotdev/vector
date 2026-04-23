@@ -265,7 +265,7 @@ where
                                 while eviction_idx < eviction_candidates.len() {
                                     let evict_id = eviction_candidates[eviction_idx];
                                     eviction_idx += 1;
-                                    if let Some(watcher) = fp_map.swap_remove(&evict_id) {
+                                    if let Some(watcher) = fp_map.shift_remove(&evict_id) {
                                         info!(
                                             message = "Evicting least recently read file due to max_open_files limit.",
                                             evicted_path = ?watcher.path,
