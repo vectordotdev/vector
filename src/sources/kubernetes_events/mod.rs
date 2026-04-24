@@ -26,7 +26,7 @@ use kube::{
     Api, Client, Config as ClientConfig, Error as KubeError,
     api::PostParams,
     config::{self, KubeConfigOptions},
-    runtime::watcher,
+    runtime::{WatchStreamExt, watcher},
 };
 use tokio::select;
 use tokio::time::{MissedTickBehavior, interval, sleep};
@@ -34,7 +34,7 @@ use vector_lib::{
     config::{LegacyKey, LogNamespace, log_schema},
     configurable::configurable_component,
     internal_event::{ComponentEventsDropped, INTENTIONAL},
-    lookup::{event_path, owned_value_path},
+    lookup::{event_path, owned_value_path, path},
     schema::Definition,
 };
 use vrl::value::{Kind, kind::Collection};
@@ -414,7 +414,11 @@ impl KubernetesEventsSource {
 
     fn make_stream(&self, api: Api<KubeEvent>, namespace: Option<String>) -> WatchStream {
         let cfg = self.watcher_config.clone();
-        Box::pin(watcher(api, cfg).map(move |event| (namespace.clone(), event)))
+        Box::pin(
+            watcher(api, cfg)
+                .backoff(watcher::DefaultBackoff::default())
+                .map(move |event| (namespace.clone(), event)),
+        )
     }
 
     async fn run(
@@ -665,17 +669,19 @@ impl KubernetesEventsSource {
             log.try_insert(timestamp_path, timestamp);
         }
 
-        log.insert(event_path!("verb"), verb.to_string());
-        log.insert(event_path!("event_uid"), uid.clone());
-        if let Some(ns) = namespace.or(event.metadata.namespace.as_deref()) {
-            log.insert(event_path!("namespace"), ns.to_string());
-        }
-        if let Some(reason) = &event.reason {
-            log.insert(event_path!("reason"), reason.clone());
-        }
-        if let Some(type_) = &event.type_ {
-            log.insert(event_path!("type"), type_.clone());
-        }
+        let event_namespace = namespace.or(event.metadata.namespace.as_deref());
+        insert_kubernetes_events_metadata(
+            log_namespace,
+            &mut log,
+            KubernetesEventMetadata {
+                verb,
+                uid: &uid,
+                namespace: event_namespace,
+                reason: event.reason.as_deref(),
+                type_: event.type_.as_deref(),
+                received_at: Utc::now(),
+            },
+        );
         if let Some(controller) = &event.reporting_controller {
             log.insert(event_path!("reporting_controller"), controller.clone());
         }
@@ -697,12 +703,6 @@ impl KubernetesEventsSource {
         {
             emit!(KubernetesEventsSerializationError { error });
         }
-
-        log_namespace.insert_standard_vector_source_metadata(
-            &mut log,
-            KubernetesEventsConfig::NAME,
-            timestamp,
-        );
 
         let byte_size = log.estimated_json_encoded_size_of();
         emit!(KubernetesEventsReceived { byte_size });
@@ -750,6 +750,68 @@ impl KubernetesEventsSource {
             Err(_) => false,
         }
     }
+}
+
+struct KubernetesEventMetadata<'a> {
+    verb: &'a str,
+    uid: &'a str,
+    namespace: Option<&'a str>,
+    reason: Option<&'a str>,
+    type_: Option<&'a str>,
+    received_at: DateTime<Utc>,
+}
+
+fn insert_kubernetes_events_metadata(
+    log_namespace: LogNamespace,
+    log: &mut LogEvent,
+    metadata: KubernetesEventMetadata<'_>,
+) {
+    log_namespace.insert_source_metadata(
+        KubernetesEventsConfig::NAME,
+        log,
+        Some(LegacyKey::InsertIfEmpty(path!("verb"))),
+        path!("verb"),
+        metadata.verb,
+    );
+    log_namespace.insert_source_metadata(
+        KubernetesEventsConfig::NAME,
+        log,
+        Some(LegacyKey::InsertIfEmpty(path!("event_uid"))),
+        path!("event_uid"),
+        metadata.uid,
+    );
+    if let Some(namespace) = metadata.namespace {
+        log_namespace.insert_source_metadata(
+            KubernetesEventsConfig::NAME,
+            log,
+            Some(LegacyKey::InsertIfEmpty(path!("namespace"))),
+            path!("namespace"),
+            namespace,
+        );
+    }
+    if let Some(reason) = metadata.reason {
+        log_namespace.insert_source_metadata(
+            KubernetesEventsConfig::NAME,
+            log,
+            Some(LegacyKey::InsertIfEmpty(path!("reason"))),
+            path!("reason"),
+            reason,
+        );
+    }
+    if let Some(type_) = metadata.type_ {
+        log_namespace.insert_source_metadata(
+            KubernetesEventsConfig::NAME,
+            log,
+            Some(LegacyKey::InsertIfEmpty(path!("type"))),
+            path!("type"),
+            type_,
+        );
+    }
+    log_namespace.insert_standard_vector_source_metadata(
+        log,
+        KubernetesEventsConfig::NAME,
+        metadata.received_at,
+    );
 }
 
 #[derive(Clone, Debug)]
@@ -1114,6 +1176,7 @@ mod tests {
     use chrono::{Duration as ChronoDuration, TimeZone};
     use k8s_openapi::api::events::v1::EventSeries;
     use k8s_openapi::apimachinery::pkg::apis::meta::v1::{MicroTime, ObjectMeta, Time};
+    use vrl::value;
 
     fn kube_timestamp(timestamp: DateTime<Utc>) -> KubeTimestamp {
         KubeTimestamp::from_microsecond(timestamp.timestamp_micros())
@@ -1164,6 +1227,102 @@ mod tests {
                 ..LeaseSpec::default()
             }),
         }
+    }
+
+    #[test]
+    fn inserts_kubernetes_event_metadata_in_vector_namespace() {
+        let mut log = LogEvent::default();
+        let received_at = Utc.timestamp_opt(1_700_000_500, 0).unwrap();
+
+        insert_kubernetes_events_metadata(
+            LogNamespace::Vector,
+            &mut log,
+            KubernetesEventMetadata {
+                verb: "ADDED",
+                uid: "event-uid",
+                namespace: Some("kube-system"),
+                reason: Some("FailedScheduling"),
+                type_: Some("Warning"),
+                received_at,
+            },
+        );
+
+        let meta = log.metadata().value();
+        assert_eq!(
+            meta.get(path!(KubernetesEventsConfig::NAME, "verb")),
+            Some(&value!("ADDED"))
+        );
+        assert_eq!(
+            meta.get(path!(KubernetesEventsConfig::NAME, "event_uid")),
+            Some(&value!("event-uid"))
+        );
+        assert_eq!(
+            meta.get(path!(KubernetesEventsConfig::NAME, "namespace")),
+            Some(&value!("kube-system"))
+        );
+        assert_eq!(
+            meta.get(path!(KubernetesEventsConfig::NAME, "reason")),
+            Some(&value!("FailedScheduling"))
+        );
+        assert_eq!(
+            meta.get(path!(KubernetesEventsConfig::NAME, "type")),
+            Some(&value!("Warning"))
+        );
+        assert_eq!(
+            meta.get(path!("vector", "source_type")),
+            Some(&value!(KubernetesEventsConfig::NAME))
+        );
+        assert_eq!(
+            meta.get(path!("vector", "ingest_timestamp")),
+            Some(&value!(received_at))
+        );
+
+        assert!(log.value().get(path!("verb")).is_none());
+        assert!(log.value().get(path!("event_uid")).is_none());
+        assert!(log.value().get(path!("namespace")).is_none());
+        assert!(log.value().get(path!("reason")).is_none());
+        assert!(log.value().get(path!("type")).is_none());
+    }
+
+    #[test]
+    fn inserts_kubernetes_event_metadata_in_legacy_namespace() {
+        let mut log = LogEvent::default();
+        let event_timestamp = Utc.timestamp_opt(1_700_000_000, 0).unwrap();
+        let received_at = event_timestamp + ChronoDuration::seconds(500);
+
+        log.insert(event_path!("timestamp"), event_timestamp);
+        insert_kubernetes_events_metadata(
+            LogNamespace::Legacy,
+            &mut log,
+            KubernetesEventMetadata {
+                verb: "UPDATED",
+                uid: "event-uid",
+                namespace: Some("default"),
+                reason: Some("BackOff"),
+                type_: Some("Normal"),
+                received_at,
+            },
+        );
+
+        assert_eq!(log.value().get(path!("verb")), Some(&value!("UPDATED")));
+        assert_eq!(
+            log.value().get(path!("event_uid")),
+            Some(&value!("event-uid"))
+        );
+        assert_eq!(
+            log.value().get(path!("namespace")),
+            Some(&value!("default"))
+        );
+        assert_eq!(log.value().get(path!("reason")), Some(&value!("BackOff")));
+        assert_eq!(log.value().get(path!("type")), Some(&value!("Normal")));
+        assert_eq!(
+            log.value().get(path!("source_type")),
+            Some(&value!(KubernetesEventsConfig::NAME))
+        );
+        assert_eq!(
+            log.value().get(path!("timestamp")),
+            Some(&value!(event_timestamp))
+        );
     }
 
     #[test]
