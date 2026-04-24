@@ -19,7 +19,7 @@ use crate::{
 };
 use futures::FutureExt;
 use futures_util::{TryFutureExt, future::join};
-use tonic::{codec::CompressionEncoding, transport::server::RoutesBuilder};
+use tonic::transport::server::RoutesBuilder;
 use vector_config::indexmap::IndexSet;
 use vector_lib::{
     codecs::decoding::{OtlpDeserializer, OtlpSignalType},
@@ -285,6 +285,9 @@ impl SourceConfig for OpentelemetryConfig {
         let metrics_deserializer = self.get_signal_deserializer(OtlpSignalType::Metrics)?;
         let traces_deserializer = self.get_signal_deserializer(OtlpSignalType::Traces)?;
 
+        // Compression negotiation (gzip, zstd) is handled centrally by
+        // `DecompressionAndMetricsLayer` in `sources::util::grpc`, so these
+        // services deliberately do not call `.accept_compressed(..)`.
         let log_service = LogsServiceServer::new(Service {
             pipeline: cx.out.clone(),
             acknowledgements,
@@ -292,7 +295,6 @@ impl SourceConfig for OpentelemetryConfig {
             events_received: events_received.clone(),
             deserializer: logs_deserializer.clone(),
         })
-        .accept_compressed(CompressionEncoding::Gzip)
         .max_decoding_message_size(usize::MAX);
 
         let metrics_service = MetricsServiceServer::new(Service {
@@ -302,7 +304,6 @@ impl SourceConfig for OpentelemetryConfig {
             events_received: events_received.clone(),
             deserializer: metrics_deserializer.clone(),
         })
-        .accept_compressed(CompressionEncoding::Gzip)
         .max_decoding_message_size(usize::MAX);
 
         let trace_service = TraceServiceServer::new(Service {
@@ -312,7 +313,6 @@ impl SourceConfig for OpentelemetryConfig {
             events_received: events_received.clone(),
             deserializer: traces_deserializer.clone(),
         })
-        .accept_compressed(CompressionEncoding::Gzip)
         .max_decoding_message_size(usize::MAX);
 
         let mut builder = RoutesBuilder::default();

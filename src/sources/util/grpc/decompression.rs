@@ -1,16 +1,17 @@
 use std::{
     cmp,
     future::Future,
-    io::Write,
+    io::{self, Write},
     mem,
     pin::Pin,
+    sync::LazyLock,
     task::{Context, Poll},
 };
 
 use bytes::{Buf, BufMut, BytesMut};
 use flate2::write::GzDecoder;
 use futures_util::FutureExt;
-use http::{Request, Response};
+use http::{HeaderValue, Request, Response};
 use hyper::{
     Body,
     body::{HttpBody, Sender},
@@ -31,8 +32,58 @@ const GRPC_MESSAGE_HEADER_LEN: usize = mem::size_of::<u8>() + mem::size_of::<u32
 const GRPC_ENCODING_HEADER: &str = "grpc-encoding";
 const GRPC_ACCEPT_ENCODING_HEADER: &str = "grpc-accept-encoding";
 
+// The encodings this layer advertises to clients via `grpc-accept-encoding`.
+// Each variant maps to a `CompressionScheme` (or `None` for `identity`) through
+// `to_scheme`, so adding a variant here forces the decompression match to be
+// updated and the advertised list cannot drift from the schemes actually handled.
+#[derive(Clone, Copy)]
+enum AdvertisedEncoding {
+    Gzip,
+    Zstd,
+    Identity,
+}
+
+impl AdvertisedEncoding {
+    const ALL: &'static [Self] = &[Self::Gzip, Self::Zstd, Self::Identity];
+
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Gzip => "gzip",
+            Self::Zstd => "zstd",
+            Self::Identity => "identity",
+        }
+    }
+
+    fn parse(s: &str) -> Option<Self> {
+        Self::ALL.iter().copied().find(|e| e.as_str() == s)
+    }
+
+    // `identity` is the gRPC no-op encoding: the request body is already
+    // uncompressed, so there's nothing to decompress.
+    fn to_scheme(self) -> Option<CompressionScheme> {
+        match self {
+            Self::Gzip => Some(CompressionScheme::Gzip),
+            Self::Zstd => Some(CompressionScheme::Zstd),
+            Self::Identity => None,
+        }
+    }
+}
+
+// Advertised to clients via `grpc-accept-encoding`. Derived from
+// `AdvertisedEncoding::ALL` so this layer is the single owner of gRPC compression
+// negotiation for all Vector gRPC sources and the header value cannot drift from
+// the set of schemes actually handled.
+static GRPC_ACCEPT_ENCODING_VALUE: LazyLock<String> = LazyLock::new(|| {
+    AdvertisedEncoding::ALL
+        .iter()
+        .map(|e| e.as_str())
+        .collect::<Vec<_>>()
+        .join(",")
+});
+
 enum CompressionScheme {
     Gzip,
+    Zstd,
 }
 
 impl CompressionScheme {
@@ -49,17 +100,18 @@ impl CompressionScheme {
             .transpose()
             .and_then(|value| match value {
                 None => Ok(None),
-                Some(scheme) => match scheme.as_str() {
-                    "gzip" => Ok(Some(CompressionScheme::Gzip)),
-                    other => Err(Status::unimplemented(format!(
-                        "compression scheme `{other}` is not supported"
+                Some(scheme) => match AdvertisedEncoding::parse(&scheme) {
+                    Some(encoding) => Ok(encoding.to_scheme()),
+                    None => Err(Status::unimplemented(format!(
+                        "compression scheme `{scheme}` is not supported"
                     ))),
                 },
             })
             .map_err(|mut status| {
                 status.metadata_mut().insert(
                     GRPC_ACCEPT_ENCODING_HEADER,
-                    AsciiMetadataValue::from_static("gzip,identity"),
+                    AsciiMetadataValue::try_from(GRPC_ACCEPT_ENCODING_VALUE.as_str())
+                        .expect("advertised encoding value must be valid ASCII"),
                 );
                 status
             })
@@ -78,21 +130,64 @@ enum State {
     },
 }
 
-fn new_decompressor() -> GzDecoder<Vec<u8>> {
-    // Create the backing buffer for the decompressor and set the compression flag to false (0) and pre-allocate
-    // the space for the length prefix, which we'll fill out once we've finalized the decompressor.
-    let buf = vec![0; GRPC_MESSAGE_HEADER_LEN];
+enum Decompressor {
+    Gzip(Box<GzDecoder<Vec<u8>>>),
+    Zstd {
+        compressed: Vec<u8>,
+        output_buf: Vec<u8>,
+    },
+}
 
-    GzDecoder::new(buf)
+impl Decompressor {
+    fn new(scheme: &CompressionScheme) -> Result<Self, io::Error> {
+        // Create the backing buffer for the decompressor and set the compression flag to false (0)
+        // and pre-allocate the space for the length prefix, which we'll fill out once we've
+        // finalized the decompressor.
+        let buf = vec![0; GRPC_MESSAGE_HEADER_LEN];
+        match scheme {
+            CompressionScheme::Gzip => Ok(Decompressor::Gzip(Box::new(GzDecoder::new(buf)))),
+            CompressionScheme::Zstd => Ok(Decompressor::Zstd {
+                compressed: Vec::new(),
+                output_buf: buf,
+            }),
+        }
+    }
+
+    fn write_all(&mut self, data: &[u8]) -> io::Result<()> {
+        match self {
+            Decompressor::Gzip(d) => d.write_all(data),
+            Decompressor::Zstd { compressed, .. } => {
+                compressed.extend_from_slice(data);
+                Ok(())
+            }
+        }
+    }
+
+    fn finish(self) -> io::Result<Vec<u8>> {
+        match self {
+            Decompressor::Gzip(d) => (*d).finish(),
+            // Decode directly into output_buf to avoid a temporary intermediate Vec that
+            // decode_all would produce; peak memory is compressed + decompressed rather than
+            // compressed + 2 × decompressed.
+            Decompressor::Zstd {
+                compressed,
+                mut output_buf,
+            } => {
+                zstd::stream::copy_decode(io::Cursor::new(&compressed), &mut output_buf)?;
+                Ok(output_buf)
+            }
+        }
+    }
 }
 
 async fn drive_body_decompression(
     mut source: Body,
     mut destination: Sender,
+    scheme: Option<CompressionScheme>,
 ) -> Result<usize, Status> {
     let mut state = State::default();
     let mut buf = BytesMut::new();
-    let mut decompressor = None;
+    let mut decompressor: Option<Decompressor> = None;
     let mut bytes_received = 0;
 
     // Drain all message chunks from the body first.
@@ -131,6 +226,16 @@ async fn drive_body_decompression(
                     // decompressor incrementally because there's no good reason to make both the internal buffer and
                     // the decompressor buffer expand if we don't have to.
                     if is_compressed {
+                        // Per the gRPC compression spec, the compressed flag requires a
+                        // negotiated encoding. Reject frames that set it under identity
+                        // (or with no `grpc-encoding` header) rather than silently
+                        // falling back to gzip and masking client/server mismatches.
+                        if scheme.is_none() {
+                            return Err(Status::internal(
+                                "received compressed frame but no compression scheme was negotiated",
+                            ));
+                        }
+
                         // We skip the header in the buffer because it doesn't matter to the decompressor and we
                         // recreate it anyways.
                         buf.advance(GRPC_MESSAGE_HEADER_LEN);
@@ -170,8 +275,18 @@ async fn drive_body_decompression(
                             // the decompressor. This is _technically_ synchronous but there's really no way to do it
                             // asynchronously since we already have the data, and that's the only asynchronous part.
                             let to_take = cmp::min(available, *remaining);
-                            let decompressor = decompressor.get_or_insert_with(new_decompressor);
-                            if decompressor.write_all(&buf[..to_take]).is_err() {
+                            let d = match &mut decompressor {
+                                Some(d) => d,
+                                slot @ None => {
+                                    let scheme = scheme.as_ref().expect(
+                                        "compressed frames without a negotiated scheme are rejected earlier",
+                                    );
+                                    slot.insert(Decompressor::new(scheme).map_err(|_| {
+                                        Status::internal("failed to initialize decompressor")
+                                    })?)
+                                }
+                            };
+                            if d.write_all(&buf[..to_take]).is_err() {
                                 return Err(Status::internal("failed to write to decompressor"));
                             }
 
@@ -243,12 +358,13 @@ async fn drive_request<F, E>(
     destination: Sender,
     inner: F,
     bytes_received: Registered<BytesReceived>,
+    scheme: Option<CompressionScheme>,
 ) -> Result<Response<BoxBody>, E>
 where
     F: Future<Output = Result<Response<BoxBody>, E>>,
     E: std::fmt::Display,
 {
-    let body_decompression = drive_body_decompression(source, destination);
+    let body_decompression = drive_body_decompression(source, destination, scheme);
 
     pin!(inner);
     pin!(body_decompression);
@@ -256,7 +372,7 @@ where
     let mut body_eof = false;
     let mut body_bytes_received = 0;
 
-    let result = loop {
+    let mut result = loop {
         select! {
             biased;
 
@@ -290,6 +406,18 @@ where
             emit!(GrpcError { error: &error });
         }
     };
+
+    // Advertise the set of compression schemes this layer can accept to the client.
+    // Since this layer is the single owner of compression negotiation, individual
+    // services no longer call `.accept_compressed(..)` and therefore tonic would not
+    // set this header itself.
+    if let Ok(res) = result.as_mut() {
+        res.headers_mut().insert(
+            GRPC_ACCEPT_ENCODING_HEADER,
+            HeaderValue::from_str(&GRPC_ACCEPT_ENCODING_VALUE)
+                .expect("advertised encoding value must be valid ASCII"),
+        );
+    }
 
     result
 }
@@ -325,16 +453,29 @@ where
             // The request either isn't using compression, or it has indicated compression may be used and we know we
             // can support decompression based on the indicated compression scheme... so wrap the body to decompress, if
             // need be, and then track the bytes that flowed through.
-            //
-            // TODO: Actually use the scheme given back to us to support other compression schemes.
-            Ok(_) => {
+            Ok(scheme) => {
                 let (destination, decompressed_body) = Body::channel();
-                let (req_parts, req_body) = req.into_parts();
+                let (mut req_parts, req_body) = req.into_parts();
+                // Since this layer owns compression negotiation and is about to hand the
+                // inner service a fully decompressed body (with the per-message compressed
+                // flag cleared), strip the `grpc-encoding` header so tonic's codegen treats
+                // the request as uncompressed and does not try to validate the encoding
+                // against any per-service `accept_compressed(..)` configuration.
+                if scheme.is_some() {
+                    req_parts.headers.remove(GRPC_ENCODING_HEADER);
+                }
                 let mapped_req = Request::from_parts(req_parts, decompressed_body);
 
                 let inner = self.inner.call(mapped_req);
 
-                drive_request(req_body, destination, inner, self.bytes_received.clone()).boxed()
+                drive_request(
+                    req_body,
+                    destination,
+                    inner,
+                    self.bytes_received.clone(),
+                    scheme,
+                )
+                .boxed()
             }
         }
     }
@@ -359,7 +500,7 @@ where
 /// request was valid, and was processed -- we can now report the number of bytes (after decompression) that were
 /// received _and_ processed correctly.
 ///
-/// The only supported compression scheme is gzip, which is also the only supported compression scheme in `tonic` itself.
+/// The supported compression schemes are gzip and zstd.
 #[derive(Clone, Default)]
 pub struct DecompressionAndMetricsLayer;
 
