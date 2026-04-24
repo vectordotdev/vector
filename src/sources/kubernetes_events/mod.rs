@@ -16,6 +16,7 @@ use chrono::{DateTime, Utc};
 use futures::{Stream, StreamExt, stream::SelectAll};
 use http_1::{HeaderName, HeaderValue};
 use k8s_openapi::api::events::v1::Event as KubeEvent;
+use k8s_openapi::jiff::Timestamp as KubeTimestamp;
 use kube::{
     Api, Client, Config as ClientConfig,
     config::{self, KubeConfigOptions},
@@ -625,26 +626,32 @@ fn compare_resource_versions(lhs: &str, rhs: &str) -> std::cmp::Ordering {
 
 fn event_timestamp(event: &KubeEvent) -> DateTime<Utc> {
     event
-        .event_time
+        .series
         .as_ref()
-        .map(|t| t.0)
-        .or_else(|| {
-            event
-                .series
-                .as_ref()
-                .map(|series| series.last_observed_time.0)
-        })
+        .map(|series| series.last_observed_time.0)
         .or_else(|| event.deprecated_last_timestamp.as_ref().map(|t| t.0))
+        .or_else(|| event.event_time.as_ref().map(|t| t.0))
         .or_else(|| event.deprecated_first_timestamp.as_ref().map(|t| t.0))
         .or_else(|| event.metadata.creation_timestamp.as_ref().map(|t| t.0))
+        .and_then(kube_timestamp_to_chrono)
         .unwrap_or_else(Utc::now)
+}
+
+fn kube_timestamp_to_chrono(timestamp: KubeTimestamp) -> Option<DateTime<Utc>> {
+    DateTime::from_timestamp_micros(timestamp.as_microsecond())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use chrono::{Duration as ChronoDuration, TimeZone};
+    use k8s_openapi::api::events::v1::EventSeries;
     use k8s_openapi::apimachinery::pkg::apis::meta::v1::{MicroTime, ObjectMeta, Time};
+
+    fn kube_timestamp(timestamp: DateTime<Utc>) -> KubeTimestamp {
+        KubeTimestamp::from_microsecond(timestamp.timestamp_micros())
+            .expect("timestamp should fit in Kubernetes timestamp range")
+    }
 
     fn make_event(uid: &str, resource_version: &str, timestamp: DateTime<Utc>) -> KubeEvent {
         KubeEvent {
@@ -653,7 +660,7 @@ mod tests {
                 resource_version: Some(resource_version.to_string()),
                 ..ObjectMeta::default()
             },
-            event_time: Some(MicroTime(timestamp)),
+            event_time: Some(MicroTime(kube_timestamp(timestamp))),
             note: Some("test".to_string()),
             ..KubeEvent::default()
         }
@@ -734,10 +741,16 @@ mod tests {
     }
 
     #[test]
-    fn event_timestamp_prefers_event_time() {
+    fn event_timestamp_prefers_series_last_observed_time() {
         let ts = Utc.timestamp_opt(1_700_000_000, 0).unwrap();
-        let event = make_event("uid", "1", ts);
-        assert_eq!(event_timestamp(&event), ts);
+        let last_observed_ts = ts + ChronoDuration::seconds(10);
+        let mut event = make_event("uid", "1", ts);
+        event.series = Some(EventSeries {
+            count: 2,
+            last_observed_time: MicroTime(kube_timestamp(last_observed_ts)),
+        });
+
+        assert_eq!(event_timestamp(&event), last_observed_ts);
     }
 
     #[test]
@@ -746,7 +759,7 @@ mod tests {
         let mut event = make_event("uid", "1", Utc::now());
         event.event_time = None;
         event.deprecated_last_timestamp = None;
-        event.metadata.creation_timestamp = Some(Time(creation_ts));
+        event.metadata.creation_timestamp = Some(Time(kube_timestamp(creation_ts)));
 
         assert_eq!(event_timestamp(&event), creation_ts);
     }
@@ -756,7 +769,7 @@ mod tests {
         let deprecated_ts = Utc.timestamp_opt(1_700_000_200, 0).unwrap();
         let mut event = make_event("uid", "1", Utc::now());
         event.event_time = None;
-        event.deprecated_last_timestamp = Some(Time(deprecated_ts));
+        event.deprecated_last_timestamp = Some(Time(kube_timestamp(deprecated_ts)));
 
         assert_eq!(event_timestamp(&event), deprecated_ts);
     }
