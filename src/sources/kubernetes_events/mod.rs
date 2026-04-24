@@ -29,7 +29,7 @@ use kube::{
     runtime::{WatchStreamExt, watcher},
 };
 use tokio::select;
-use tokio::time::{MissedTickBehavior, interval, sleep};
+use tokio::time::{Interval, MissedTickBehavior, interval, sleep};
 use vector_lib::{
     config::{LegacyKey, LogNamespace, log_schema},
     configurable::configurable_component,
@@ -460,7 +460,10 @@ impl KubernetesEventsSource {
                 maybe_event = streams.next() => {
                     match maybe_event {
                         Some((namespace, Ok(event))) => {
-                            if let Err(()) = self.handle_event(namespace.as_deref(), event, out, log_namespace, deduper).await {
+                            if let Some(event) =
+                                self.handle_event(namespace.as_deref(), event, log_namespace, deduper)?
+                                && send_event(out, event).await.is_err()
+                            {
                                 return Err(());
                             }
                         }
@@ -530,26 +533,26 @@ impl KubernetesEventsSource {
             select! {
                 _ = &mut *shutdown => return Ok(LeadershipEnd::Shutdown),
                 _ = renew_interval.tick() => {
-                    match coordinator.try_acquire_or_renew().await {
-                        Ok(LeaseUpdate::Held) => {
-                            last_renewal = Instant::now();
-                        }
-                        Ok(LeaseUpdate::HeldByOther) => {
-                            return Ok(LeadershipEnd::Lost("lease_taken_by_another_holder"));
-                        }
-                        Err(error) => {
-                            emit!(KubernetesEventsLeaderElectionError { error });
-                            if last_renewal.elapsed() >= coordinator.settings.renew_deadline {
-                                return Ok(LeadershipEnd::Lost("renew_deadline_exceeded"));
-                            }
-                        }
+                    if let Some(end) = renew_leadership(coordinator, &mut last_renewal).await {
+                        return Ok(end);
                     }
                 }
                 maybe_event = streams.next() => {
                     match maybe_event {
                         Some((namespace, Ok(event))) => {
-                            if let Err(()) = self.handle_event(namespace.as_deref(), event, out, log_namespace, deduper).await {
-                                return Err(());
+                            if let Some(event) =
+                                self.handle_event(namespace.as_deref(), event, log_namespace, deduper)?
+                                && let Some(end) = send_event_with_leadership(
+                                    out,
+                                    event,
+                                    shutdown,
+                                    &mut renew_interval,
+                                    &mut last_renewal,
+                                    coordinator,
+                                )
+                                .await?
+                            {
+                                return Ok(end);
                             }
                         }
                         Some((_, Err(error))) => {
@@ -562,41 +565,38 @@ impl KubernetesEventsSource {
         }
     }
 
-    async fn handle_event(
+    fn handle_event(
         &mut self,
         namespace: Option<&str>,
         event: watcher::Event<KubeEvent>,
-        out: &mut SourceSender,
         log_namespace: LogNamespace,
         deduper: &mut Deduper,
-    ) -> Result<(), ()> {
+    ) -> Result<Option<Event>, ()> {
         match event {
             watcher::Event::Apply(ev) | watcher::Event::InitApply(ev) => {
-                self.process_apply_event(namespace, ev, out, log_namespace, deduper)
-                    .await
+                self.process_apply_event(namespace, ev, log_namespace, deduper)
             }
             watcher::Event::Delete(ev) => {
                 if let Some(uid) = ev.metadata.uid.as_deref() {
                     deduper.remove(uid);
                 }
-                Ok(())
+                Ok(None)
             }
-            watcher::Event::Init => Ok(()),
+            watcher::Event::Init => Ok(None),
             watcher::Event::InitDone => {
                 deduper.prune();
-                Ok(())
+                Ok(None)
             }
         }
     }
 
-    async fn process_apply_event(
+    fn process_apply_event(
         &mut self,
         namespace: Option<&str>,
         event: KubeEvent,
-        out: &mut SourceSender,
         log_namespace: LogNamespace,
         deduper: &mut Deduper,
-    ) -> Result<(), ()> {
+    ) -> Result<Option<Event>, ()> {
         let uid = match event.metadata.uid.clone() {
             Some(uid) => uid,
             None => {
@@ -604,7 +604,7 @@ impl KubernetesEventsSource {
                     count: 1,
                     reason: "missing_uid"
                 });
-                return Ok(());
+                return Ok(None);
             }
         };
 
@@ -615,7 +615,7 @@ impl KubernetesEventsSource {
                     count: 1,
                     reason: "missing_resource_version"
                 });
-                return Ok(());
+                return Ok(None);
             }
         };
 
@@ -625,7 +625,7 @@ impl KubernetesEventsSource {
                 count: 1,
                 reason: "filtered"
             });
-            return Ok(());
+            return Ok(None);
         }
 
         let timestamp = event_timestamp(&event);
@@ -634,7 +634,7 @@ impl KubernetesEventsSource {
                 count: 1,
                 reason: "expired"
             });
-            return Ok(());
+            return Ok(None);
         }
 
         deduper.prune();
@@ -653,7 +653,7 @@ impl KubernetesEventsSource {
                     count: 1,
                     reason: "duplicate"
                 });
-                return Ok(());
+                return Ok(None);
             }
             DedupResult::Added => ("ADDED", None),
             DedupResult::Updated { previous } => ("UPDATED", previous),
@@ -693,7 +693,7 @@ impl KubernetesEventsSource {
             Ok(_) => {}
             Err(error) => {
                 emit!(KubernetesEventsSerializationError { error });
-                return Ok(());
+                return Ok(None);
             }
         }
 
@@ -707,12 +707,7 @@ impl KubernetesEventsSource {
         let byte_size = log.estimated_json_encoded_size_of();
         emit!(KubernetesEventsReceived { byte_size });
 
-        if out.send_event(Event::from(log)).await.is_err() {
-            emit!(StreamClosedError { count: 1 });
-            return Err(());
-        }
-
-        Ok(())
+        Ok(Some(Event::from(log)))
     }
 
     fn type_allowed(&self, event: &KubeEvent) -> bool {
@@ -962,6 +957,63 @@ enum LeadershipEnd {
     RestartWatch,
 }
 
+async fn send_event(out: &mut SourceSender, event: Event) -> Result<(), ()> {
+    if out.send_event(event).await.is_err() {
+        emit!(StreamClosedError { count: 1 });
+        return Err(());
+    }
+
+    Ok(())
+}
+
+async fn send_event_with_leadership(
+    out: &mut SourceSender,
+    event: Event,
+    shutdown: &mut ShutdownSignal,
+    renew_interval: &mut Interval,
+    last_renewal: &mut Instant,
+    coordinator: &LeaseCoordinator,
+) -> Result<Option<LeadershipEnd>, ()> {
+    let send = out.send_event(event);
+    tokio::pin!(send);
+
+    loop {
+        select! {
+            _ = &mut *shutdown => return Ok(Some(LeadershipEnd::Shutdown)),
+            result = &mut send => {
+                if result.is_err() {
+                    emit!(StreamClosedError { count: 1 });
+                    return Err(());
+                }
+                return Ok(None);
+            }
+            _ = renew_interval.tick() => {
+                if let Some(end) = renew_leadership(coordinator, last_renewal).await {
+                    return Ok(Some(end));
+                }
+            }
+        }
+    }
+}
+
+async fn renew_leadership(
+    coordinator: &LeaseCoordinator,
+    last_renewal: &mut Instant,
+) -> Option<LeadershipEnd> {
+    match coordinator.try_acquire_or_renew().await {
+        Ok(LeaseUpdate::Held) => {
+            *last_renewal = Instant::now();
+            None
+        }
+        Ok(LeaseUpdate::HeldByOther) => Some(LeadershipEnd::Lost("lease_taken_by_another_holder")),
+        Err(error) => {
+            emit!(KubernetesEventsLeaderElectionError { error });
+            (last_renewal.elapsed() >= coordinator.settings.renew_deadline)
+                .then_some(LeadershipEnd::Lost("renew_deadline_exceeded"))
+        }
+    }
+}
+
 struct Deduper {
     entries: HashMap<String, CachedEvent>,
     retention: Duration,
@@ -1000,7 +1052,11 @@ impl Deduper {
         match self.entries.get_mut(&uid) {
             Some(entry) => {
                 match compare_resource_versions(&resource_version, &entry.resource_version) {
-                    std::cmp::Ordering::Less | std::cmp::Ordering::Equal => DedupResult::Duplicate,
+                    std::cmp::Ordering::Less => DedupResult::Duplicate,
+                    std::cmp::Ordering::Equal => {
+                        entry.last_seen = Instant::now();
+                        DedupResult::Duplicate
+                    }
                     std::cmp::Ordering::Greater => {
                         let previous = include_previous.then(|| Box::new(entry.event.clone()));
                         entry.event = event.clone();
@@ -1396,6 +1452,34 @@ mod tests {
         assert!(
             !deduper.entries.contains_key("uid"),
             "entry should be pruned after retention elapses"
+        );
+    }
+
+    #[test]
+    fn deduper_refreshes_ttl_for_replayed_resource_version() {
+        let retention = Duration::from_secs(60);
+        let mut deduper = Deduper::new(retention);
+        let timestamp = Utc.timestamp_opt(1_700_000_000, 0).unwrap();
+        let event = make_event("uid", "1", timestamp);
+
+        assert!(matches!(
+            deduper.record("uid".to_string(), "1".to_string(), &event, timestamp, false),
+            DedupResult::Added
+        ));
+
+        if let Some(entry) = deduper.entries.get_mut("uid") {
+            entry.last_seen = Instant::now() - retention - Duration::from_secs(1);
+        }
+
+        assert!(matches!(
+            deduper.record("uid".to_string(), "1".to_string(), &event, timestamp, false),
+            DedupResult::Duplicate
+        ));
+
+        deduper.prune();
+        assert!(
+            deduper.entries.contains_key("uid"),
+            "same resourceVersion replay should refresh the dedupe retention"
         );
     }
 
