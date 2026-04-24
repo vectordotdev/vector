@@ -1,8 +1,11 @@
+use std::borrow::Cow;
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::time::Duration;
 
 use bytes::Bytes;
 use futures_util::FutureExt;
+use glob::Pattern;
 use http::{response::Parts, Uri};
 use serde_with::serde_as;
 use snafu::ResultExt;
@@ -97,6 +100,35 @@ pub struct PrometheusScrapeConfig {
     #[configurable(metadata(docs::examples = "query_example()"))]
     query: QueryParameters,
 
+    /// Only scrape metrics whose name matches one of these glob patterns.
+    ///
+    /// Applied pre-parse, on the raw exposition text, so unwanted series never become
+    /// `Metric` events. This is the most effective way to cap the memory footprint of a
+    /// `prometheus_scrape` source against a high-cardinality endpoint.
+    ///
+    /// An empty list disables the allowlist (everything is allowed). Patterns use shell-style
+    /// globbing (`*`, `?`, character classes). `# HELP` and `# TYPE` lines are preserved for any
+    /// kept metric name; unrelated comment lines are passed through unchanged.
+    ///
+    /// For metric families that expose derived series through name suffixes (e.g. Prometheus
+    /// `histogram` `_bucket` / `_count` / `_sum`, or statistic-suffixed gauges such as
+    /// `foo_Count` / `foo_99thPercentile`), either list every suffix or use a glob such as
+    /// `foo_*`.
+    #[serde(default)]
+    #[configurable(metadata(docs::advanced))]
+    #[configurable(metadata(docs::examples = "metric_name_allowlist_example()"))]
+    metric_name_allowlist: Vec<String>,
+
+    /// Drop metrics whose name matches one of these glob patterns.
+    ///
+    /// Applied after `metric_name_allowlist` on the raw exposition text, so denied series
+    /// never become `Metric` events. Useful for pruning a small set of known-noisy metrics
+    /// from an endpoint where an allowlist is impractical.
+    #[serde(default)]
+    #[configurable(metadata(docs::advanced))]
+    #[configurable(metadata(docs::examples = "metric_name_denylist_example()"))]
+    metric_name_denylist: Vec<String>,
+
     #[configurable(derived)]
     tls: Option<TlsConfig>,
 
@@ -114,6 +146,14 @@ fn query_example() -> serde_json::Value {
     })
 }
 
+fn metric_name_allowlist_example() -> serde_json::Value {
+    serde_json::json!(["http_requests_total", "http_request_duration_seconds_*"])
+}
+
+fn metric_name_denylist_example() -> serde_json::Value {
+    serde_json::json!(["go_*", "process_*"])
+}
+
 impl GenerateConfig for PrometheusScrapeConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
@@ -124,6 +164,8 @@ impl GenerateConfig for PrometheusScrapeConfig {
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: false,
             query: HashMap::new(),
+            metric_name_allowlist: Vec::new(),
+            metric_name_denylist: Vec::new(),
             tls: None,
             auth: None,
         })
@@ -143,10 +185,16 @@ impl SourceConfig for PrometheusScrapeConfig {
             .collect::<std::result::Result<Vec<Uri>, sources::BuildError>>()?;
         let tls = TlsSettings::from_options(self.tls.as_ref())?;
 
+        let metric_name_filter = Arc::new(
+            MetricNameFilter::compile(&self.metric_name_allowlist, &self.metric_name_denylist)
+                .map_err(|error| format!("invalid metric name pattern: {error}"))?,
+        );
+
         let builder = PrometheusScrapeBuilder {
             honor_labels: self.honor_labels,
             instance_tag: self.instance_tag.clone(),
             endpoint_tag: self.endpoint_tag.clone(),
+            metric_name_filter,
         };
 
         warn_if_interval_too_low(self.timeout, self.interval);
@@ -201,6 +249,7 @@ struct PrometheusScrapeBuilder {
     honor_labels: bool,
     instance_tag: Option<String>,
     endpoint_tag: Option<String>,
+    metric_name_filter: Arc<MetricNameFilter>,
 }
 
 impl HttpClientBuilder for PrometheusScrapeBuilder {
@@ -232,6 +281,7 @@ impl HttpClientBuilder for PrometheusScrapeBuilder {
         PrometheusScrapeContext {
             instance_info,
             endpoint_info,
+            metric_name_filter: Arc::clone(&self.metric_name_filter),
         }
     }
 }
@@ -240,6 +290,7 @@ impl HttpClientBuilder for PrometheusScrapeBuilder {
 struct PrometheusScrapeContext {
     instance_info: Option<InstanceInfo>,
     endpoint_info: Option<EndpointInfo>,
+    metric_name_filter: Arc<MetricNameFilter>,
 }
 
 impl HttpClientContext for PrometheusScrapeContext {
@@ -286,6 +337,7 @@ impl HttpClientContext for PrometheusScrapeContext {
     /// Parses the Prometheus HTTP response into metric events
     fn on_response(&mut self, url: &Uri, _header: &Parts, body: &Bytes) -> Option<Vec<Event>> {
         let body = String::from_utf8_lossy(body);
+        let body = filter_exposition_text(&body, &self.metric_name_filter);
 
         match parser::parse_text(&body) {
             Ok(events) => Some(events),
@@ -315,6 +367,263 @@ impl HttpClientContext for PrometheusScrapeContext {
                 endpoint = %url,
             );
         }
+    }
+}
+
+/// Compiled metric-name allow/deny patterns, applied to the raw exposition text before parsing.
+#[derive(Clone, Debug, Default)]
+struct MetricNameFilter {
+    allow: Vec<Pattern>,
+    deny: Vec<Pattern>,
+}
+
+impl MetricNameFilter {
+    fn compile(allow: &[String], deny: &[String]) -> std::result::Result<Self, glob::PatternError> {
+        let allow = allow
+            .iter()
+            .map(|s| Pattern::new(s))
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        let deny = deny
+            .iter()
+            .map(|s| Pattern::new(s))
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        Ok(Self { allow, deny })
+    }
+
+    fn is_active(&self) -> bool {
+        !self.allow.is_empty() || !self.deny.is_empty()
+    }
+
+    fn allows(&self, name: &str) -> bool {
+        let allowed = self.allow.is_empty() || self.allow.iter().any(|p| p.matches(name));
+        let denied = !self.deny.is_empty() && self.deny.iter().any(|p| p.matches(name));
+        allowed && !denied
+    }
+}
+
+/// Line-level pre-filter for Prometheus exposition text.
+///
+/// When the filter is active (at least one allow or deny pattern), walks the body line by line
+/// and keeps only lines whose metric name is allowed. `# HELP <name> …` and `# TYPE <name> …`
+/// lines are treated as belonging to `<name>`; unrelated comment lines are passed through.
+/// Blank lines are dropped. When the filter is empty, the body is returned unchanged via
+/// `Cow::Borrowed` (zero-copy fast path).
+fn filter_exposition_text<'a>(body: &'a str, filter: &MetricNameFilter) -> Cow<'a, str> {
+    if !filter.is_active() {
+        return Cow::Borrowed(body);
+    }
+
+    // Aggressive filtering collapses the output dramatically; pre-allocate ~2% and let the
+    // String grow organically if the ratio is off.
+    let mut out = String::with_capacity(body.len() / 50);
+    for line in body.lines() {
+        let trimmed = line.trim_start();
+        if trimmed.is_empty() {
+            continue;
+        }
+        let metric_name = if let Some(rest) = trimmed
+            .strip_prefix("# HELP ")
+            .or_else(|| trimmed.strip_prefix("# TYPE "))
+        {
+            rest.split_whitespace().next().unwrap_or("")
+        } else if trimmed.starts_with('#') {
+            // Unrelated comments (not HELP/TYPE): pass through verbatim.
+            out.push_str(line);
+            out.push('\n');
+            continue;
+        } else {
+            let end = trimmed
+                .find(|c: char| c == '{' || c.is_whitespace())
+                .unwrap_or(trimmed.len());
+            &trimmed[..end]
+        };
+
+        if filter.allows(metric_name) {
+            out.push_str(line);
+            out.push('\n');
+        }
+    }
+    Cow::Owned(out)
+}
+
+#[cfg(test)]
+mod filter_tests {
+    use super::*;
+
+    fn filter(allow: &[&str], deny: &[&str]) -> MetricNameFilter {
+        MetricNameFilter::compile(
+            &allow.iter().map(|s| s.to_string()).collect::<Vec<_>>(),
+            &deny.iter().map(|s| s.to_string()).collect::<Vec<_>>(),
+        )
+        .expect("valid patterns")
+    }
+
+    #[test]
+    fn empty_filter_is_zero_copy_passthrough() {
+        let body = "foo 1\nbar 2\n";
+        let f = MetricNameFilter::default();
+        assert!(!f.is_active());
+        match filter_exposition_text(body, &f) {
+            Cow::Borrowed(s) => assert_eq!(s, body),
+            Cow::Owned(_) => panic!("inactive filter must not copy"),
+        }
+    }
+
+    #[test]
+    fn allowlist_keeps_only_matching_metrics_and_their_help_type() {
+        let body = "\
+# HELP http_requests_total Number of requests
+# TYPE http_requests_total counter
+http_requests_total{code=\"200\"} 42
+# HELP go_goroutines Number of goroutines
+# TYPE go_goroutines gauge
+go_goroutines 7
+http_requests_total{code=\"500\"} 3
+";
+        let f = filter(&["http_requests_total"], &[]);
+        let out = filter_exposition_text(body, &f);
+        assert!(out.contains("# HELP http_requests_total"));
+        assert!(out.contains("# TYPE http_requests_total"));
+        assert!(out.contains("http_requests_total{code=\"200\"} 42"));
+        assert!(out.contains("http_requests_total{code=\"500\"} 3"));
+        assert!(!out.contains("go_goroutines"));
+    }
+
+    #[test]
+    fn denylist_drops_named_metrics() {
+        let body = "\
+# HELP go_goroutines N goroutines
+# TYPE go_goroutines gauge
+go_goroutines 7
+# HELP http_requests_total N requests
+# TYPE http_requests_total counter
+http_requests_total 5
+";
+        let f = filter(&[], &["go_goroutines"]);
+        let out = filter_exposition_text(body, &f);
+        assert!(out.contains("http_requests_total"));
+        assert!(!out.contains("go_goroutines"));
+    }
+
+    #[test]
+    fn allow_then_deny_is_applied_in_order() {
+        // allow all go_*, then deny go_memstats_*
+        let body = "\
+go_goroutines 1
+go_memstats_alloc_bytes 2
+go_gc_duration_seconds 3
+other_metric 4
+";
+        let f = filter(&["go_*"], &["go_memstats_*"]);
+        let out = filter_exposition_text(body, &f);
+        assert!(out.contains("go_goroutines 1"));
+        assert!(out.contains("go_gc_duration_seconds 3"));
+        assert!(!out.contains("go_memstats_alloc_bytes"));
+        assert!(!out.contains("other_metric"));
+    }
+
+    #[test]
+    fn glob_patterns_expand_histogram_suffixes() {
+        // Pinot-style: each statistic is exposed as its own metric name.
+        let body = "\
+pinot_broker_queryTotalTimeMs_Count{table=\"t1\"} 10
+pinot_broker_queryTotalTimeMs_99thPercentile{table=\"t1\"} 123
+pinot_broker_queryTotalTimeMs_99thPercentile{table=\"t2\"} 456
+pinot_broker_nettyConnectionSendRequestLatency_Count{table=\"t1\"} 5
+unrelated_metric 7
+";
+        let f = filter(&["pinot_broker_queryTotalTimeMs_*"], &[]);
+        let out = filter_exposition_text(body, &f);
+        assert_eq!(out.lines().filter(|l| l.starts_with("pinot_broker_queryTotalTimeMs_")).count(), 3);
+        assert!(!out.contains("nettyConnectionSendRequestLatency"));
+        assert!(!out.contains("unrelated_metric"));
+    }
+
+    #[test]
+    fn unrelated_comments_pass_through() {
+        let body = "\
+# Generated at 1234
+# HELP http_requests_total req
+# TYPE http_requests_total counter
+http_requests_total 1
+# Generated at 5678
+go_goroutines 2
+";
+        let f = filter(&["http_requests_total"], &[]);
+        let out = filter_exposition_text(body, &f);
+        // Both non-HELP/TYPE comments kept
+        assert_eq!(out.matches("# Generated at").count(), 2);
+        assert!(!out.contains("go_goroutines"));
+    }
+
+    #[test]
+    fn metric_with_labels_and_timestamp_is_matched_by_name() {
+        let body = "\
+http_requests_total{method=\"GET\",code=\"200\"} 1 1700000000000
+go_goroutines 7
+";
+        let f = filter(&["http_requests_total"], &[]);
+        let out = filter_exposition_text(body, &f);
+        assert!(out.contains("http_requests_total{method=\"GET\",code=\"200\"} 1 1700000000000"));
+        assert!(!out.contains("go_goroutines"));
+    }
+
+    #[test]
+    fn unlabeled_metric_line_is_matched_by_name() {
+        // No braces, just `name value` separated by whitespace.
+        let body = "foo 1\nbar 2\n";
+        let f = filter(&["foo"], &[]);
+        let out = filter_exposition_text(body, &f);
+        assert!(out.contains("foo 1"));
+        assert!(!out.contains("bar 2"));
+    }
+
+    #[test]
+    fn blank_lines_are_stripped() {
+        let body = "\nfoo 1\n\n\nbar 2\n\n";
+        let f = filter(&["foo"], &[]);
+        let out = filter_exposition_text(body, &f);
+        assert_eq!(out, "foo 1\n");
+    }
+
+    #[test]
+    fn invalid_glob_pattern_is_surfaced() {
+        // Unbalanced `[` is invalid.
+        let err =
+            MetricNameFilter::compile(&["foo[bar".to_string()], &[]).expect_err("must fail");
+        let _ = format!("{}", err);
+    }
+
+    #[test]
+    fn empty_body_is_passthrough() {
+        let f = filter(&["foo"], &[]);
+        let out = filter_exposition_text("", &f);
+        assert_eq!(out, "");
+    }
+
+    #[test]
+    fn filter_shrinks_high_cardinality_payload() {
+        // Sanity: 1000 lines of a denied metric + 3 of an allowed metric → output should have 3 metric lines.
+        let mut body = String::new();
+        body.push_str("# HELP wanted req\n# TYPE wanted counter\n");
+        for i in 0..3 {
+            body.push_str(&format!("wanted{{idx=\"{i}\"}} {i}\n"));
+        }
+        body.push_str("# HELP noise garbage\n# TYPE noise gauge\n");
+        for i in 0..1000 {
+            body.push_str(&format!("noise{{idx=\"{i}\"}} {i}\n"));
+        }
+
+        let f = filter(&["wanted"], &[]);
+        let out = filter_exposition_text(&body, &f);
+        assert_eq!(out.lines().filter(|l| l.starts_with("wanted{")).count(), 3);
+        assert!(!out.contains("noise"));
+        assert!(
+            out.len() < body.len() / 100,
+            "expected >100x reduction, got {} -> {}",
+            body.len(),
+            out.len()
+        );
     }
 }
 
