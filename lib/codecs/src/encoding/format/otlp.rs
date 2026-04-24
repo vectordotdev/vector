@@ -1,10 +1,14 @@
 use crate::encoding::ProtobufSerializer;
 use bytes::BytesMut;
-use opentelemetry_proto::proto::{
-    DESCRIPTOR_BYTES, LOGS_REQUEST_MESSAGE_TYPE, METRICS_REQUEST_MESSAGE_TYPE,
-    RESOURCE_LOGS_JSON_FIELD, RESOURCE_METRICS_JSON_FIELD, RESOURCE_SPANS_JSON_FIELD,
-    TRACES_REQUEST_MESSAGE_TYPE,
+use opentelemetry_proto::{
+    metrics::native_metric_to_otlp_request,
+    proto::{
+        DESCRIPTOR_BYTES, LOGS_REQUEST_MESSAGE_TYPE, METRICS_REQUEST_MESSAGE_TYPE,
+        RESOURCE_LOGS_JSON_FIELD, RESOURCE_METRICS_JSON_FIELD, RESOURCE_SPANS_JSON_FIELD,
+        TRACES_REQUEST_MESSAGE_TYPE,
+    },
 };
+use prost::Message;
 use tokio_util::codec::Encoder;
 use vector_config_macros::configurable_component;
 use vector_core::{config::DataType, event::Event, schema};
@@ -25,7 +29,7 @@ impl OtlpSerializerConfig {
 
     /// The data type of events that are accepted by `OtlpSerializer`.
     pub fn input_type(&self) -> DataType {
-        DataType::Log | DataType::Trace
+        DataType::all_bits()
     }
 
     /// The schema required by the serializer.
@@ -36,27 +40,49 @@ impl OtlpSerializerConfig {
 
 /// Serializer that converts an `Event` to bytes using the OTLP (OpenTelemetry Protocol) protobuf format.
 ///
-/// This serializer encodes events using the OTLP protobuf specification, which is the recommended
-/// encoding format for OpenTelemetry data. The output is suitable for sending to OTLP-compatible
-/// endpoints with `content-type: application/x-protobuf`.
+/// The output is suitable for sending to OTLP-compatible endpoints with
+/// `content-type: application/x-protobuf`.
 ///
-/// # Implementation approach
+/// # Pre-formatted OTLP events
 ///
-/// This serializer converts Vector's internal event representation to the appropriate OTLP message type
-/// based on the top-level field in the event:
-/// - `resourceLogs` → `ExportLogsServiceRequest`
-/// - `resourceMetrics` → `ExportMetricsServiceRequest`
-/// - `resourceSpans` → `ExportTraceServiceRequest`
+/// These are passed through to the matching OTLP request type:
+/// - Log events with `resourceLogs` -> `ExportLogsServiceRequest`
+/// - Log events with `resourceMetrics` -> `ExportMetricsServiceRequest`
+/// - Trace events with `resourceSpans` -> `ExportTraceServiceRequest`
 ///
-/// The implementation is the inverse of what the `opentelemetry` source does when decoding,
-/// ensuring round-trip compatibility.
+/// Pre-formatted events are typically produced by the `opentelemetry` source with
+/// `use_otlp_decoding: true`.
+///
+/// # Native Vector events
+///
+/// Native Vector metrics are automatically converted to OTLP format:
+/// - Counter → Sum (monotonic, Delta/Cumulative based on MetricKind)
+/// - Gauge → Gauge
+/// - AggregatedHistogram → Histogram
+/// - AggregatedSummary → Summary
+/// - Distribution → Histogram (samples converted to buckets)
+/// - Set → Gauge (cardinality count)
+/// - Sketch → dropped with warning (not representable in OTLP)
+///
+/// Tag decomposition reverses the decode-path flattening:
+/// - `resource.*` tags → `Resource.attributes[]` (prefix stripped)
+/// - `resource.dropped_attributes_count` → `Resource.dropped_attributes_count`
+/// - `resource.schema_url` → `ResourceMetrics.schema_url`
+/// - `scope.name` / `scope.version` → `InstrumentationScope` fields
+/// - `scope.dropped_attributes_count` → `InstrumentationScope.dropped_attributes_count`
+/// - `scope.schema_url` → `ScopeMetrics.schema_url`
+/// - `scope.*` (other) → `InstrumentationScope.attributes[]` (prefix stripped)
+/// - All other tags → data point `attributes[]`
+///
+/// **Note:** The `resource.*` and `scope.*` tag prefixes are reserved for OTLP
+/// structural mapping. Native metrics using these prefixes will have those tags
+/// routed into the corresponding OTLP proto fields rather than kept as flat
+/// data point attributes.
 #[derive(Debug, Clone)]
-#[allow(dead_code)] // Fields will be used once encoding is implemented
 pub struct OtlpSerializer {
     logs_descriptor: ProtobufSerializer,
     metrics_descriptor: ProtobufSerializer,
     traces_descriptor: ProtobufSerializer,
-    options: Options,
 }
 
 impl OtlpSerializer {
@@ -88,7 +114,6 @@ impl OtlpSerializer {
             logs_descriptor,
             metrics_descriptor,
             traces_descriptor,
-            options,
         })
     }
 }
@@ -124,8 +149,16 @@ impl Encoder<Event> for OtlpSerializer {
                         .into())
                 }
             }
-            Event::Metric(_) => {
-                Err("OTLP serializer does not support native Vector metrics yet.".into())
+            Event::Metric(metric) => {
+                // Native Vector metric → OTLP conversion
+                // Tags are decomposed back into resource/scope/data-point attributes.
+                // Returns None for unsupported types (e.g. Sketch) which are truly dropped.
+                match native_metric_to_otlp_request(metric) {
+                    Some(otlp_request) => otlp_request
+                        .encode(buffer)
+                        .map_err(|e| format!("Failed to encode OTLP metric request: {e}").into()),
+                    None => Ok(()),
+                }
             }
         }
     }

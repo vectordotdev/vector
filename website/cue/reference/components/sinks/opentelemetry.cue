@@ -31,13 +31,46 @@ components: sinks: opentelemetry: {
 	}
 
 	support: {
-		requirements: ["This sink accepts events conforming to the [OTEL proto format](\(urls.opentelemetry_proto)). You can use [Remap](\(urls.vector_remap_transform)) to prepare events for ingestion."]
+		requirements: ["With `codec: otlp`, native Vector logs, traces, and metrics are automatically converted to OTLP protobuf format. Pre-formatted OTLP events (from `use_otlp_decoding: true`) are passed through unchanged. Native metrics use tag prefix decomposition (`resource.*`, `scope.*`) to reconstruct the original OTLP resource/scope/data-point attribute hierarchy."]
 		warnings: []
 		notices: []
 	}
 
 	configuration: generated.components.sinks.opentelemetry.configuration
 	how_it_works: {
+		metric_tag_prefixes: {
+			title: "Metric tag prefix conventions"
+			body: """
+				When encoding native Vector metrics with `codec: otlp`, the following tag prefixes are reserved and control
+				how tags are mapped into the OTLP protobuf structure:
+
+				- `resource.*` — Strips the prefix from the tag and adds the tag to `Resource.attributes[]` (for example, `resource.service.name` becomes attribute `service.name`)
+				- `resource_dropped_attributes_count` — Maps the tag to `Resource.dropped_attributes_count` (not an attribute)
+				- `resource_schema_url` — Maps the tag to `ResourceMetrics.schema_url` (not an attribute)
+				- `scope.name` — Maps the tag to `InstrumentationScope.name`
+				- `scope.version` — Maps the tag to `InstrumentationScope.version`
+				- `scope_dropped_attributes_count` — Maps the tag to `InstrumentationScope.dropped_attributes_count` (not an attribute)
+				- `scope_schema_url` — Maps the tag to `ScopeMetrics.schema_url` (not an attribute)
+				- `scope.*` (other) — Strips the prefix from the tag and adds the tag to `InstrumentationScope.attributes[]`
+
+				All other tags are added to the data point `attributes[]` array unchanged.
+
+				Native metrics from non-OTLP sources (e.g., `host_metrics`, `internal_metrics`) that happen to use
+				`resource.*` or `scope.*` tag names will have those tags placed into the OTLP `Resource.attributes[]` or
+				`InstrumentationScope.attributes[]` structures instead of the data point `attributes[]` array. This is
+				expected for OTLP round-trips but may cause unexpected attribute placement for non-OTLP metrics that
+				coincidentally use these prefixes. If this is not desired, rename the tags before sending to the OTLP sink.
+
+				**Known limitations:**
+
+				- Metric attribute types are preserved during a OTLP→Vector→OTLP round-trip with a typed metadata sidecar.
+				  All OTLP value kinds (`StringValue`, `BytesValue`, `IntValue`, `BoolValue`, `DoubleValue`, `ArrayValue`,
+				  `KvlistValue`) are stored with the kind's wrapper and reconstructed on encode. If a VRL transform changes the
+				  metric tags, the sidecar is invalidated and all attributes fall back to `StringValue`.
+				- `start_time_unix_nano` is preserved for OTLP-sourced metrics using metadata stash. For native Vector
+				  incremental metrics, `start_time_unix_nano` is set to `timestamp - interval_ms` when available, otherwise set to `0`.
+				"""
+		}
 		quickstart: {
 			title: "Quickstart"
 			body: """
