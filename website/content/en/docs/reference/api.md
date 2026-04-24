@@ -1,11 +1,12 @@
 ---
-title: The Vector API
+title: The Vector Observability API
 short: API
 weight: 6
-tags: ["api", "graphql"]
+tags: ["api", "grpc"]
 ---
 
-Vector ships with a [GraphQL] API that allows you to interact with a running Vector instance. This page covers how to configure and enable Vector's API.
+Vector ships with a [gRPC](https://grpc.io) API that allows you to interact with a running Vector
+instance. This page covers how to configure and enable Vector's API.
 
 ## Configuration
 
@@ -17,12 +18,33 @@ Vector ships with a [GraphQL] API that allows you to interact with a running Vec
 
 ## How it works
 
-### GraphQL
+The API exposes a gRPC service defined in [`proto/vector/observability.proto`](https://github.com/vectordotdev/vector/blob/master/proto/vector/observability.proto).
+You can interact with it using any standard gRPC tooling.
 
-Vector chose [GraphQL] for its API because GraphQL is self-documenting and type safe. We believe that this offers a superior client experience and makes Vector richly programmable through its API.
+For compatibility with Vector 0.54.0 and earlier, the HTTP `GET /health`
+endpoint continues to be served on the same port as the gRPC API, so
+existing HTTP probes (for example AWS ALB health checks and Kubernetes
+HTTP liveness/readiness probes) keep working without changes. See the
+[Endpoints](#endpoints) section above for details.
 
-### Playground
+### Example using grpcurl
 
-Vector's GraphQL API ships with a built-in playground that allows you to explore the available commands and manually run queries against the API. This can be accessed at the `/playground` path.
+```bash
+# Check health (standard gRPC health check, compatible with Kubernetes gRPC probes)
+grpcurl -plaintext localhost:8686 grpc.health.v1.Health/Check
 
-[graphql]: https://graphql.org
+# List components
+grpcurl -plaintext localhost:8686 vector.observability.v1.ObservabilityService/GetComponents
+
+# Stream events (tap)
+grpcurl -plaintext \
+  -d '{"outputs_patterns": ["*"], "limit": 100, "interval_ms": 500}' \
+  localhost:8686 vector.observability.v1.ObservabilityService/StreamOutputEvents
+```
+
+### Example using curl (HTTP health)
+
+```bash
+# 200 with body {"ok":true} while serving, 503 {"ok":false} during drain
+curl -i http://localhost:8686/health
+```

@@ -15,26 +15,28 @@ badges:
 [PR 6170][pr_6170] introduced wildcards when referencing component names in the `inputs` option. This allows you to build
 dynamic topologies. This feature comes with one limitation: the wildcard must be at the end of the string.
 
-```toml
-[sources.app1_logs]
-type = "file"
-includes = ["/var/log/app1.log"]
+```yaml
+sources:
+  app1_logs:
+    type: "file"
+    includes: ["/var/log/app1.log"]
 
-[sources.app2_logs]
-type = "file"
-includes = ["/var/log/app.log"]
+  app2_logs:
+    type: "file"
+    includes: ["/var/log/app.log"]
 
-[sources.system_logs]
-type = "file"
-includes = ["/var/log/system.log"]
+  system_logs:
+    type: "file"
+    includes: ["/var/log/system.log"]
 
-[sinks.app_logs]
-type = "datadog_logs"
-inputs = ["app*"]
+sinks:
+  app_logs:
+    type: "datadog_logs"
+    inputs: ["app*"]
 
-[sinks.archive]
-type = "aws_s3"
-inputs = ["app*", "system_logs"]
+  archive:
+    type: "aws_s3"
+    inputs: ["app*", "system_logs"]
 ```
 
 [pr_6170]: https://github.com/vectordotdev/vector/pull/6170

@@ -684,13 +684,6 @@ fn headers_examples() -> BTreeMap<String, String> {
 }
 
 impl RequestConfig {
-    pub fn add_old_option(&mut self, headers: Option<BTreeMap<String, String>>) {
-        if let Some(headers) = headers {
-            warn!("Option `headers` has been deprecated. Use `request.headers` instead.");
-            self.headers.extend(headers);
-        }
-    }
-
     pub fn split_headers(&self) -> (BTreeMap<String, String>, BTreeMap<String, Template>) {
         let mut static_headers = BTreeMap::new();
         let mut template_headers = BTreeMap::new();
