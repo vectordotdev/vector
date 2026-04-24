@@ -1,9 +1,6 @@
-use std::time::Duration;
-
 use anyhow::{Context as _, Result, bail};
-use sha2::{Digest, Sha256};
 
-use super::{VerifyOutcome, resolve_version};
+use super::{resolve_version, util};
 
 const DEFAULT_FORMULA_URL: &str =
     "https://raw.githubusercontent.com/vectordotdev/homebrew-brew/master/Formula/vector.rb";
@@ -23,37 +20,21 @@ pub struct Cli {
 impl Cli {
     pub fn exec(self) -> Result<()> {
         let version = resolve_version(self.version)?;
-        match verify_inner(&version, &self.formula_url) {
-            Ok(summary) => {
-                println!("OK: {summary}");
-                Ok(())
-            }
-            Err(e) => Err(e),
-        }
+        let summary = verify_with_url(&version, &self.formula_url)?;
+        println!("OK: {summary}");
+        Ok(())
     }
 }
 
-pub fn verify(version: &str) -> VerifyOutcome {
-    match verify_inner(version, DEFAULT_FORMULA_URL) {
-        Ok(summary) => VerifyOutcome::Ok(summary),
-        Err(e) => VerifyOutcome::Failed(e),
-    }
+pub fn verify(version: &str) -> Result<String> {
+    verify_with_url(version, DEFAULT_FORMULA_URL)
 }
 
-fn verify_inner(version: &str, formula_url: &str) -> Result<String> {
-    let client = reqwest::blocking::Client::builder()
-        .timeout(Duration::from_secs(300))
-        .build()?;
+fn verify_with_url(version: &str, formula_url: &str) -> Result<String> {
+    let client = util::stream_client()?;
 
     info!("Fetching Homebrew formula from {formula_url}");
-    let formula = client
-        .get(formula_url)
-        .send()
-        .with_context(|| format!("fetching {formula_url}"))?
-        .error_for_status()
-        .with_context(|| format!("fetching {formula_url}"))?
-        .text()
-        .with_context(|| format!("reading {formula_url}"))?;
+    let formula = util::fetch_text(&client, formula_url)?;
 
     let formula_version =
         extract_version(&formula).context("no `version \"...\"` line found in formula")?;
@@ -82,15 +63,14 @@ fn verify_inner(version: &str, formula_url: &str) -> Result<String> {
             println!("  FAIL  {url}: sha256 {sha:?} is not a 64-char hex digest");
             continue;
         }
-        match download_and_digest(&client, url) {
+        match util::stream_sha256(&client, url) {
+            Ok(digest) if digest.eq_ignore_ascii_case(sha) => {
+                verified += 1;
+                println!("  OK    {url} sha256={digest}");
+            }
             Ok(digest) => {
-                if digest.eq_ignore_ascii_case(sha) {
-                    verified += 1;
-                    println!("  OK    {url} sha256={digest}");
-                } else {
-                    failures += 1;
-                    println!("  FAIL  {url}: digest mismatch (formula={sha}, computed={digest})");
-                }
+                failures += 1;
+                println!("  FAIL  {url}: digest mismatch (formula={sha}, computed={digest})");
             }
             Err(e) => {
                 failures += 1;
@@ -147,19 +127,6 @@ fn extract_url_sha_pairs(formula: &str) -> Vec<(String, String)> {
 
 fn is_hex64(s: &str) -> bool {
     s.len() == 64 && s.bytes().all(|b| b.is_ascii_hexdigit())
-}
-
-fn download_and_digest(client: &reqwest::blocking::Client, url: &str) -> Result<String> {
-    let mut resp = client
-        .get(url)
-        .send()
-        .with_context(|| format!("GET {url}"))?
-        .error_for_status()
-        .with_context(|| format!("GET {url}"))?;
-    let mut hasher = Sha256::new();
-    resp.copy_to(&mut hasher)
-        .with_context(|| format!("streaming {url}"))?;
-    Ok(hex::encode(hasher.finalize()))
 }
 
 #[cfg(test)]

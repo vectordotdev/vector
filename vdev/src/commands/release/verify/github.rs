@@ -1,11 +1,9 @@
-use std::{collections::HashMap, env, time::Duration};
+use std::{collections::HashMap, env};
 
 use anyhow::{Context as _, Result, bail};
-use sha2::{Digest, Sha256};
 
-use super::{VerifyOutcome, resolve_version};
+use super::{resolve_version, util};
 
-const USER_AGENT: &str = "vdev-release-verify";
 const API_BASE: &str = "https://api.github.com";
 const REPO: &str = "vectordotdev/vector";
 
@@ -37,28 +35,14 @@ pub struct Cli {
 impl Cli {
     pub fn exec(self) -> Result<()> {
         let version = resolve_version(self.version)?;
-        match verify_inner(&version) {
-            Ok(summary) => {
-                println!("OK: {summary}");
-                Ok(())
-            }
-            Err(e) => Err(e),
-        }
+        let summary = verify(&version)?;
+        println!("OK: {summary}");
+        Ok(())
     }
 }
 
-pub fn verify(version: &str) -> VerifyOutcome {
-    match verify_inner(version) {
-        Ok(summary) => VerifyOutcome::Ok(summary),
-        Err(e) => VerifyOutcome::Failed(e),
-    }
-}
-
-fn verify_inner(version: &str) -> Result<String> {
-    let client = reqwest::blocking::Client::builder()
-        .timeout(Duration::from_secs(300))
-        .user_agent(USER_AGENT)
-        .build()?;
+pub fn verify(version: &str) -> Result<String> {
+    let client = util::stream_client()?;
 
     info!("Fetching GitHub release v{version} from {REPO}");
 
@@ -87,20 +71,11 @@ fn verify_inner(version: &str) -> Result<String> {
         );
     }
 
-    // SHA256SUMS is already in `expected`/`assets`, but grab its URL for download.
     let sums_name = format!("vector-{version}-SHA256SUMS");
     let sums_url = assets
         .get(&sums_name)
         .ok_or_else(|| anyhow::anyhow!("{sums_name} missing from assets"))?;
-    let sums_body = client
-        .get(sums_url)
-        .send()
-        .with_context(|| format!("fetching {sums_name}"))?
-        .error_for_status()
-        .with_context(|| format!("fetching {sums_name}"))?
-        .text()
-        .with_context(|| format!("reading {sums_name}"))?;
-    let sums = parse_sha256sums(&sums_body);
+    let sums = util::parse_sha256sums(&util::fetch_text(&client, sums_url)?);
 
     let samples = [
         format!("vector_{version}-1_amd64.deb"),
@@ -209,23 +184,6 @@ fn parse_assets(release: &serde_json::Value) -> Result<HashMap<String, String>> 
     Ok(out)
 }
 
-// Lines look like: `<hex>  <filename>` (two spaces, coreutils style).
-fn parse_sha256sums(body: &str) -> HashMap<String, String> {
-    let mut out = HashMap::new();
-    for line in body.lines() {
-        let line = line.trim();
-        if line.is_empty() || line.starts_with('#') {
-            continue;
-        }
-        let Some((digest, name)) = line.split_once("  ") else {
-            continue;
-        };
-        let name = name.trim_start_matches('*').trim();
-        out.insert(name.to_string(), digest.trim().to_string());
-    }
-    out
-}
-
 fn verify_sample(
     client: &reqwest::blocking::Client,
     name: &str,
@@ -238,19 +196,7 @@ fn verify_sample(
     let expected = sums
         .get(name)
         .ok_or_else(|| anyhow::anyhow!("{name} not in SHA256SUMS"))?;
-
-    let mut resp = client
-        .get(url)
-        .send()
-        .with_context(|| format!("downloading {name}"))?
-        .error_for_status()
-        .with_context(|| format!("downloading {name}"))?;
-
-    let mut hasher = Sha256Writer(Sha256::new());
-    resp.copy_to(&mut hasher)
-        .with_context(|| format!("streaming {name} into hasher"))?;
-    let actual = hex::encode(hasher.0.finalize());
-
+    let actual = util::stream_sha256(client, url)?;
     if actual.eq_ignore_ascii_case(expected) {
         Ok(actual)
     } else {
@@ -258,23 +204,9 @@ fn verify_sample(
     }
 }
 
-// Thin `io::Write` adapter so `Response::copy_to` can stream into a Sha256 hasher
-// without buffering the asset in memory.
-struct Sha256Writer(Sha256);
-
-impl std::io::Write for Sha256Writer {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        self.0.update(buf);
-        Ok(buf.len())
-    }
-    fn flush(&mut self) -> std::io::Result<()> {
-        Ok(())
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{expected_assets, parse_sha256sums};
+    use super::expected_assets;
 
     #[test]
     fn expected_asset_list_is_complete() {
@@ -287,35 +219,5 @@ mod tests {
         assert!(names.contains(&"vector-0.55.0-x86_64-pc-windows-msvc.zip".to_string()));
         assert!(names.contains(&"vector-0.55.0-x64.msi".to_string()));
         assert!(names.contains(&"vector-0.55.0-SHA256SUMS".to_string()));
-    }
-
-    #[test]
-    fn parses_coreutils_sha256sums() {
-        let body = "\
-abc123  vector-0.55.0-x64.msi
-deadbeef  vector_0.55.0-1_amd64.deb
-# comment line
-";
-        let sums = parse_sha256sums(body);
-        assert_eq!(
-            sums.get("vector-0.55.0-x64.msi").map(String::as_str),
-            Some("abc123")
-        );
-        assert_eq!(
-            sums.get("vector_0.55.0-1_amd64.deb").map(String::as_str),
-            Some("deadbeef"),
-        );
-        assert_eq!(sums.len(), 2);
-    }
-
-    #[test]
-    fn parses_binary_mode_sha256sums() {
-        // coreutils writes `*filename` for binary mode; strip the leading `*`.
-        let body = "feedface  *vector-0.55.0-x64.msi\n";
-        let sums = parse_sha256sums(body);
-        assert_eq!(
-            sums.get("vector-0.55.0-x64.msi").map(String::as_str),
-            Some("feedface")
-        );
     }
 }

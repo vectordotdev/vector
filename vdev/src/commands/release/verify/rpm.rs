@@ -1,9 +1,6 @@
-use std::{io::Read, time::Duration};
-
 use anyhow::{Context as _, Result, bail};
-use flate2::read::GzDecoder;
 
-use super::{VerifyOutcome, resolve_version};
+use super::{resolve_version, util};
 
 const DEFAULT_BASE_URL: &str = "https://yum.vector.dev";
 const DEFAULT_SUITE: &str = "stable";
@@ -40,34 +37,25 @@ pub struct Cli {
 impl Cli {
     pub fn exec(self) -> Result<()> {
         let version = resolve_version(self.version)?;
-        match verify_inner(&version, &self.url, &self.suite, &self.component) {
-            Ok(summary) => {
-                println!("OK: {summary}");
-                Ok(())
-            }
-            Err(e) => Err(e),
-        }
+        let summary = verify_with(&version, &self.url, &self.suite, &self.component)?;
+        println!("OK: {summary}");
+        Ok(())
     }
 }
 
-pub fn verify(version: &str) -> VerifyOutcome {
-    match verify_inner(version, DEFAULT_BASE_URL, DEFAULT_SUITE, DEFAULT_COMPONENT) {
-        Ok(summary) => VerifyOutcome::Ok(summary),
-        Err(e) => VerifyOutcome::Failed(e),
-    }
+pub fn verify(version: &str) -> Result<String> {
+    verify_with(version, DEFAULT_BASE_URL, DEFAULT_SUITE, DEFAULT_COMPONENT)
 }
 
-fn verify_inner(version: &str, base_url: &str, suite: &str, component: &str) -> Result<String> {
-    let client = reqwest::blocking::Client::builder()
-        .timeout(Duration::from_secs(30))
-        .build()?;
+fn verify_with(version: &str, base_url: &str, suite: &str, component: &str) -> Result<String> {
+    let client = util::client()?;
 
     info!("Checking Vector {version} in {base_url}/{suite}/{component}");
 
     let mut failures = 0usize;
     for arch in ARCHES {
         match check_arch(&client, base_url, suite, component, arch, version) {
-            Ok(ArchResult { filename, rpm_size }) => {
+            Ok((filename, rpm_size)) => {
                 println!("  {arch:<8} OK    {filename} ({rpm_size} bytes)");
             }
             Err(e) => {
@@ -86,11 +74,6 @@ fn verify_inner(version: &str, base_url: &str, suite: &str, component: &str) -> 
     Ok(format!("{}/{} arches OK", ARCHES.len(), ARCHES.len()))
 }
 
-struct ArchResult {
-    filename: String,
-    rpm_size: u64,
-}
-
 fn check_arch(
     client: &reqwest::blocking::Client,
     base_url: &str,
@@ -98,54 +81,22 @@ fn check_arch(
     component: &str,
     arch: &str,
     version: &str,
-) -> Result<ArchResult> {
+) -> Result<(String, u64)> {
     let arch_base = format!("{base_url}/{suite}/{component}/{arch}");
-    let repomd_url = format!("{arch_base}/repodata/repomd.xml");
-    let repomd = client
-        .get(&repomd_url)
-        .send()
-        .with_context(|| format!("fetching {repomd_url}"))?
-        .error_for_status()
-        .with_context(|| format!("fetching {repomd_url}"))?
-        .text()
-        .with_context(|| format!("reading {repomd_url}"))?;
 
+    let repomd_url = format!("{arch_base}/repodata/repomd.xml");
+    let repomd = util::fetch_text(client, &repomd_url)?;
     let primary_href = find_primary_href(&repomd)
         .with_context(|| format!("no primary data entry in {repomd_url}"))?;
 
     let primary_url = format!("{arch_base}/{primary_href}");
-    let primary_body = client
-        .get(&primary_url)
-        .send()
-        .with_context(|| format!("fetching {primary_url}"))?
-        .error_for_status()
-        .with_context(|| format!("fetching {primary_url}"))?
-        .bytes()
-        .with_context(|| format!("reading {primary_url}"))?;
-
-    let mut primary = String::new();
-    GzDecoder::new(primary_body.as_ref())
-        .read_to_string(&mut primary)
-        .with_context(|| format!("gunzipping {primary_url}"))?;
-
+    let primary = util::fetch_gz_text(client, &primary_url)?;
     let filename = find_rpm_location(&primary, version)
         .with_context(|| format!("version {version}-1 not found in {primary_url}"))?;
 
     let rpm_url = format!("{arch_base}/{filename}");
-    let head = client
-        .head(&rpm_url)
-        .send()
-        .with_context(|| format!("HEAD {rpm_url}"))?
-        .error_for_status()
-        .with_context(|| format!("HEAD {rpm_url}"))?;
-    let rpm_size = head
-        .headers()
-        .get(reqwest::header::CONTENT_LENGTH)
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.parse::<u64>().ok())
-        .unwrap_or(0);
-
-    Ok(ArchResult { filename, rpm_size })
+    let size = util::head_size(client, &rpm_url)?;
+    Ok((filename, size))
 }
 
 // Pull the `<location href="..."/>` out of the `<data type="primary">` block of a repomd.xml.

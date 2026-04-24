@@ -1,8 +1,6 @@
-use std::time::Duration;
-
 use anyhow::{Context as _, Result, bail};
 
-use super::{VerifyOutcome, resolve_version};
+use super::{resolve_version, util};
 
 const DEFAULT_BASE_URL: &str = "https://vector.dev";
 
@@ -25,27 +23,18 @@ pub struct Cli {
 impl Cli {
     pub fn exec(self) -> Result<()> {
         let version = resolve_version(self.version)?;
-        match verify_inner(&version, &self.url) {
-            Ok(summary) => {
-                println!("OK: {summary}");
-                Ok(())
-            }
-            Err(e) => Err(e),
-        }
+        let summary = verify_with_url(&version, &self.url)?;
+        println!("OK: {summary}");
+        Ok(())
     }
 }
 
-pub fn verify(version: &str) -> VerifyOutcome {
-    match verify_inner(version, DEFAULT_BASE_URL) {
-        Ok(summary) => VerifyOutcome::Ok(summary),
-        Err(e) => VerifyOutcome::Failed(e),
-    }
+pub fn verify(version: &str) -> Result<String> {
+    verify_with_url(version, DEFAULT_BASE_URL)
 }
 
-fn verify_inner(version: &str, base_url: &str) -> Result<String> {
-    let client = reqwest::blocking::Client::builder()
-        .timeout(Duration::from_secs(30))
-        .build()?;
+fn verify_with_url(version: &str, base_url: &str) -> Result<String> {
+    let client = util::client()?;
 
     info!("Checking Vector {version} on {base_url}");
 
@@ -54,29 +43,21 @@ fn verify_inner(version: &str, base_url: &str) -> Result<String> {
 
     // Per-release page: `/releases/<ver>/` must 200 and mention `<ver>`.
     let release_page = format!("{base_url}/releases/{version}/");
-    match fetch_page_containing(&client, &release_page, version) {
-        Ok(PageResult { status, bytes }) => {
-            println!("  release page    OK    {status} {release_page} ({bytes} bytes)");
-        }
-        Err(e) => {
-            failures += 1;
-            println!("  release page    FAIL  {release_page} -- {e:#}");
-        }
-    }
+    failures += report(
+        "release page",
+        &release_page,
+        fetch_page_containing(&client, &release_page, version),
+    );
 
     // Releases index: must include a link to the per-release page, not just the bare
     // version string (which appears in unrelated changelog blurbs on the page).
     let releases_index = format!("{base_url}/releases/");
     let release_link = format!("/releases/{version}/");
-    match fetch_page_containing(&client, &releases_index, &release_link) {
-        Ok(PageResult { status, bytes }) => {
-            println!("  releases index  OK    {status} {releases_index} ({bytes} bytes)");
-        }
-        Err(e) => {
-            failures += 1;
-            println!("  releases index  FAIL  {releases_index} -- {e:#}");
-        }
-    }
+    failures += report(
+        "releases index",
+        &releases_index,
+        fetch_page_containing(&client, &releases_index, &release_link),
+    );
 
     // Download page: the first non-nightly version in the selector must equal `<ver>`.
     // See `website/layouts/partials/download/version-selector.html`: the range runs over
@@ -86,15 +67,11 @@ fn verify_inner(version: &str, base_url: &str) -> Result<String> {
     // emits its own `setVersion('X')` button, so an older release page can contain the
     // new version string before Hugo rebuilds.
     let download_page = format!("{base_url}/download/");
-    match check_download_page(&client, &download_page, version) {
-        Ok(PageResult { status, bytes }) => {
-            println!("  download page   OK    {status} {download_page} ({bytes} bytes)");
-        }
-        Err(e) => {
-            failures += 1;
-            println!("  download page   FAIL  {download_page} -- {e:#}");
-        }
-    }
+    failures += report(
+        "download page",
+        &download_page,
+        check_download_page(&client, &download_page, version),
+    );
 
     if failures > 0 {
         bail!("{failures}/{total} website pages missing or stale for {version}");
@@ -102,35 +79,38 @@ fn verify_inner(version: &str, base_url: &str) -> Result<String> {
     Ok(format!("{total}/{total} pages OK"))
 }
 
-struct PageResult {
-    status: u16,
-    bytes: usize,
+// Pretty-print a per-check line and return 1 if the check failed, 0 otherwise.
+fn report(label: &str, url: &str, result: Result<usize>) -> usize {
+    match result {
+        Ok(bytes) => {
+            println!("  {label:<15} OK    {url} ({bytes} bytes)");
+            0
+        }
+        Err(e) => {
+            println!("  {label:<15} FAIL  {url} -- {e:#}");
+            1
+        }
+    }
 }
 
 fn fetch_page_containing(
     client: &reqwest::blocking::Client,
     url: &str,
     needle: &str,
-) -> Result<PageResult> {
-    let (status, body) = fetch(client, url)?;
+) -> Result<usize> {
+    let body = util::fetch_text(client, url)?;
     if !body.contains(needle) {
-        bail!(
-            "body did not contain {needle:?} (status {status}, {} bytes)",
-            body.len()
-        );
+        bail!("body did not contain {needle:?} ({} bytes)", body.len());
     }
-    Ok(PageResult {
-        status,
-        bytes: body.len(),
-    })
+    Ok(body.len())
 }
 
 fn check_download_page(
     client: &reqwest::blocking::Client,
     url: &str,
     version: &str,
-) -> Result<PageResult> {
-    let (status, body) = fetch(client, url)?;
+) -> Result<usize> {
+    let body = util::fetch_text(client, url)?;
     let latest = latest_selector_version(&body).with_context(|| {
         format!("no `setVersion('<ver>')` button found on {url} (template changed?)")
     })?;
@@ -139,24 +119,7 @@ fn check_download_page(
             "download page lists {latest:?} as the latest release, expected {version:?} (Hugo still stale?)"
         );
     }
-    Ok(PageResult {
-        status,
-        bytes: body.len(),
-    })
-}
-
-fn fetch(client: &reqwest::blocking::Client, url: &str) -> Result<(u16, String)> {
-    let resp = client
-        .get(url)
-        .send()
-        .with_context(|| format!("fetching {url}"))?
-        .error_for_status()
-        .with_context(|| format!("fetching {url}"))?;
-    let status = resp.status().as_u16();
-    let body = resp
-        .text()
-        .with_context(|| format!("reading body of {url}"))?;
-    Ok((status, body))
+    Ok(body.len())
 }
 
 // Scan the download page for the first `setVersion('X')` call whose argument is not

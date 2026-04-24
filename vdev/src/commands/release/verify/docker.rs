@@ -1,9 +1,7 @@
-use std::time::Duration;
-
 use anyhow::{Context as _, Result, bail};
 use serde_json::Value;
 
-use super::{VerifyOutcome, resolve_version};
+use super::{resolve_version, util};
 
 // Repos that `publish-docker` in `.github/workflows/publish.yml` pushes to.
 //
@@ -126,28 +124,14 @@ pub struct Cli {
 impl Cli {
     pub fn exec(self) -> Result<()> {
         let version = resolve_version(self.version)?;
-        match verify_inner(&version) {
-            Ok(summary) => {
-                println!("OK: {summary}");
-                Ok(())
-            }
-            Err(e) => Err(e),
-        }
+        let summary = verify(&version)?;
+        println!("OK: {summary}");
+        Ok(())
     }
 }
 
-pub fn verify(version: &str) -> VerifyOutcome {
-    match verify_inner(version) {
-        Ok(summary) => VerifyOutcome::Ok(summary),
-        Err(e) => VerifyOutcome::Failed(e),
-    }
-}
-
-fn verify_inner(version: &str) -> Result<String> {
-    let client = reqwest::blocking::Client::builder()
-        .timeout(Duration::from_secs(30))
-        .user_agent("vdev-release-verify-docker")
-        .build()?;
+pub fn verify(version: &str) -> Result<String> {
+    let client = util::client()?;
 
     let aliases = tag_aliases(version)?;
     info!(

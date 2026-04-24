@@ -1,9 +1,6 @@
-use std::{io::Read, time::Duration};
-
 use anyhow::{Context as _, Result, bail};
-use flate2::read::GzDecoder;
 
-use super::{VerifyOutcome, resolve_version};
+use super::{resolve_version, util};
 
 const DEFAULT_BASE_URL: &str = "https://apt.vector.dev";
 const DEFAULT_COMPONENT: &str = "vector-0";
@@ -37,35 +34,26 @@ pub struct Cli {
 impl Cli {
     pub fn exec(self) -> Result<()> {
         let version = resolve_version(self.version)?;
-        match verify_inner(&version, &self.url, &self.suite, &self.component) {
-            Ok(summary) => {
-                println!("OK: {summary}");
-                Ok(())
-            }
-            Err(e) => Err(e),
-        }
+        let summary = verify_with(&version, &self.url, &self.suite, &self.component)?;
+        println!("OK: {summary}");
+        Ok(())
     }
 }
 
-pub fn verify(version: &str) -> VerifyOutcome {
-    match verify_inner(version, DEFAULT_BASE_URL, DEFAULT_SUITE, DEFAULT_COMPONENT) {
-        Ok(summary) => VerifyOutcome::Ok(summary),
-        Err(e) => VerifyOutcome::Failed(e),
-    }
+pub fn verify(version: &str) -> Result<String> {
+    verify_with(version, DEFAULT_BASE_URL, DEFAULT_SUITE, DEFAULT_COMPONENT)
 }
 
-fn verify_inner(version: &str, base_url: &str, suite: &str, component: &str) -> Result<String> {
+fn verify_with(version: &str, base_url: &str, suite: &str, component: &str) -> Result<String> {
     let debian_version = format!("{version}-1");
-    let client = reqwest::blocking::Client::builder()
-        .timeout(Duration::from_secs(30))
-        .build()?;
+    let client = util::client()?;
 
     info!("Checking Vector {version} in {base_url}/dists/{suite}/{component}");
 
     let mut failures = 0usize;
     for arch in ARCHES {
         match check_arch(&client, base_url, suite, component, arch, &debian_version) {
-            Ok(ArchResult { filename, deb_size }) => {
+            Ok((filename, deb_size)) => {
                 println!("  {arch:<8} OK    {filename} ({deb_size} bytes)");
             }
             Err(e) => {
@@ -84,11 +72,6 @@ fn verify_inner(version: &str, base_url: &str, suite: &str, component: &str) -> 
     Ok(format!("{}/{} arches OK", ARCHES.len(), ARCHES.len()))
 }
 
-struct ArchResult {
-    filename: String,
-    deb_size: u64,
-}
-
 fn check_arch(
     client: &reqwest::blocking::Client,
     base_url: &str,
@@ -96,40 +79,14 @@ fn check_arch(
     component: &str,
     arch: &str,
     debian_version: &str,
-) -> Result<ArchResult> {
+) -> Result<(String, u64)> {
     let index_url = format!("{base_url}/dists/{suite}/{component}/binary-{arch}/Packages.gz");
-    let body = client
-        .get(&index_url)
-        .send()
-        .with_context(|| format!("fetching {index_url}"))?
-        .error_for_status()
-        .with_context(|| format!("fetching {index_url}"))?
-        .bytes()
-        .with_context(|| format!("reading {index_url}"))?;
-
-    let mut decoded = String::new();
-    GzDecoder::new(body.as_ref())
-        .read_to_string(&mut decoded)
-        .with_context(|| format!("gunzipping {index_url}"))?;
-
-    let filename = find_filename(&decoded, debian_version)
+    let packages = util::fetch_gz_text(client, &index_url)?;
+    let filename = find_filename(&packages, debian_version)
         .with_context(|| format!("version {debian_version} not found in {index_url}"))?;
-
     let deb_url = format!("{base_url}/{filename}");
-    let head = client
-        .head(&deb_url)
-        .send()
-        .with_context(|| format!("HEAD {deb_url}"))?
-        .error_for_status()
-        .with_context(|| format!("HEAD {deb_url}"))?;
-    let deb_size = head
-        .headers()
-        .get(reqwest::header::CONTENT_LENGTH)
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.parse::<u64>().ok())
-        .unwrap_or(0);
-
-    Ok(ArchResult { filename, deb_size })
+    let size = util::head_size(client, &deb_url)?;
+    Ok((filename, size))
 }
 
 // Walk the Packages stanzas (separated by blank lines) and return the `Filename:` of

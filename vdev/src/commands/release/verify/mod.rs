@@ -5,8 +5,8 @@
 //
 //   * `pub struct Cli` — clap args; the user can run a probe directly with
 //     `vdev release verify <probe> [VERSION]`.
-//   * `pub fn verify(version: &str) -> VerifyOutcome` — called by `run_all`; prints detail
-//     inline and returns a short summary string on success.
+//   * `pub fn verify(version: &str) -> Result<String>` — called by `run_all`; prints
+//     detail inline and returns a short summary string on success.
 //
 // `vdev release verify` with no subcommand runs every probe and prints a summary.
 
@@ -16,6 +16,7 @@ mod github;
 mod homebrew;
 mod rpm;
 mod timber_io;
+mod util;
 mod website;
 
 use anyhow::{Context as _, Result, bail};
@@ -78,18 +79,13 @@ impl Cli {
     }
 }
 
-pub enum VerifyOutcome {
-    Ok(String),
-    Failed(anyhow::Error),
-}
-
-type ProbeFn = fn(&str) -> VerifyOutcome;
+type ProbeFn = fn(&str) -> Result<String>;
 
 struct Probe {
     name: &'static str,
     run: ProbeFn,
     // Probes the release pipeline does not guarantee (e.g. `homebrew`, which is updated
-    // by a manual `vdev release homebrew` run — not by `publish.yml`). Their failures
+    // by a manual `vdev release homebrew` run, not by `publish.yml`). Their failures
     // are reported as WARN so `vdev release verify` immediately post-release isn't a
     // false negative.
     best_effort: bool,
@@ -116,15 +112,15 @@ fn run_all(version: &str) -> Result<()> {
         println!();
         println!("== {} ==", probe.name);
         match (probe.run)(version) {
-            VerifyOutcome::Ok(summary) => {
+            Ok(summary) => {
                 ok += 1;
                 println!("  -> OK: {summary}");
             }
-            VerifyOutcome::Failed(e) if probe.best_effort => {
+            Err(e) if probe.best_effort => {
                 warn += 1;
                 println!("  -> WARN (best-effort): {e:#}");
             }
-            VerifyOutcome::Failed(e) => {
+            Err(e) => {
                 failed += 1;
                 println!("  -> FAIL: {e:#}");
             }
