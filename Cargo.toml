@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.55.0"
+version = "0.56.0"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2024"
 description = "A lightweight and ultra-fast tool for building observability pipelines"
@@ -204,7 +204,7 @@ tonic-build = { version = "0.11", default-features = false, features = ["transpo
 tonic-health = { version = "0.11", default-features = false }
 tonic-reflection = { version = "0.11", default-features = false, features = ["server"] }
 tracing = { version = "0.1.44", default-features = false }
-tracing-subscriber = { version = "0.3.22", default-features = false, features = ["fmt"]  }
+tracing-subscriber = { version = "0.3.22", default-features = false, features = ["fmt"] }
 url = { version = "2.5.4", default-features = false, features = ["serde"] }
 uuid = { version = "1.22.0", features = ["v4", "v7", "serde", "fast-rng"] }
 vector-config = { path = "lib/vector-config" }
@@ -353,6 +353,13 @@ async-compression = { version = "0.4.27", default-features = false, features = [
 apache-avro = { version = "0.16.0", default-features = false, optional = true }
 arrow = { version = "56.2.0", default-features = false, features = ["ipc"], optional = true }
 arrow-schema = { version = "56.2.0", default-features = false, optional = true }
+parquet = { version = "56.2.0", default-features = false, features = [
+  "arrow",
+  "snap",
+  "zstd",
+  "lz4",
+  "flate2-rust_backened",
+], optional = true }
 axum = { version = "0.6.20", default-features = false }
 base64 = { workspace = true, optional = true }
 bloomy = { version = "1.2.0", default-features = false, optional = true }
@@ -526,6 +533,7 @@ tokio-console = ["dep:console-subscriber", "tokio/tracing"]
 vrl-functions-env = ["vrl/enable_env_functions"]
 vrl-functions-system = ["vrl/enable_system_functions"]
 vrl-functions-network = ["vrl/enable_network_functions"]
+vrl-functions-crypto = ["vrl/enable_crypto_functions"]
 
 # Enables the binary secret-backend-example
 secret-backend-example = ["transforms"]
@@ -609,6 +617,7 @@ enrichment-tables-memory = ["dep:evmap", "dep:evmap-derive", "dep:thread_local"]
 
 # Codecs
 codecs-arrow = ["dep:arrow", "dep:arrow-schema", "vector-lib/arrow"]
+codecs-parquet = ["dep:parquet", "codecs-arrow", "vector-lib/parquet"]
 codecs-opentelemetry = ["vector-lib/opentelemetry"]
 codecs-syslog = ["vector-lib/syslog"]
 
@@ -1022,7 +1031,7 @@ gcp-integration-tests = ["sinks-gcp"]
 gcp-pubsub-integration-tests = ["sinks-gcp", "sources-gcp_pubsub"]
 greptimedb-integration-tests = ["sinks-greptimedb_metrics", "sinks-greptimedb_logs"]
 humio-integration-tests = ["sinks-humio"]
-http-client-integration-tests = ["sources-http_client"]
+http-client-integration-tests = ["sources-http_client", "vrl-functions-crypto"]
 influxdb-integration-tests = ["sinks-influxdb"]
 kafka-integration-tests = ["sinks-kafka", "sources-kafka"]
 logstash-integration-tests = ["docker", "sources-logstash"]

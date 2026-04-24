@@ -9,14 +9,13 @@ metadata:
     app.kubernetes.io/name: vector
     app.kubernetes.io/instance: vector
     app.kubernetes.io/component: Agent
-    app.kubernetes.io/version: "0.54.0-distroless-libc"
+    app.kubernetes.io/version: "0.55.0-distroless-libc"
 data:
   agent.yaml: |
     data_dir: /vector-data-dir
     api:
       enabled: true
-      address: 127.0.0.1:8686
-      playground: false
+      address: 0.0.0.0:8686
     sources:
       kubernetes_logs:
         type: kubernetes_logs

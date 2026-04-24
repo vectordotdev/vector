@@ -105,7 +105,7 @@ fn compute_api_endpoint(endpoint: &str) -> String {
     // https://github.com/DataDog/datadog-agent/blob/cdcf0fc809b9ac1cd6e08057b4971c7dbb8dbe30/comp/forwarder/defaultforwarder/forwarder_health.go#L45-L47
     // https://github.com/DataDog/datadog-agent/blob/cdcf0fc809b9ac1cd6e08057b4971c7dbb8dbe30/comp/forwarder/defaultforwarder/forwarder_health.go#L188-L190
     static DOMAIN_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r"(?:[a-z]{2}\d\.)?(datadoghq\.[a-z]+|ddog-gov\.com)/*$")
+        Regex::new(r"((?:[a-z]{2}\d\.)?(?:datadoghq\.[a-z]+|ddog-gov\.com))/*$")
             .expect("Could not build Datadog domain regex")
     });
 
@@ -176,6 +176,27 @@ mod tests {
     }
 
     #[test]
+    fn preserves_site_prefix_in_api_endpoint() {
+        for (prefix, tld) in [
+            ("us3", "com"),
+            ("us5", "com"),
+            ("ap1", "com"),
+            ("eu1", "eu"),
+        ] {
+            assert_eq!(
+                compute_api_endpoint(&format!(
+                    "https://http-intake.logs.{prefix}.datadoghq.{tld}"
+                )),
+                format!("https://api.{prefix}.datadoghq.{tld}")
+            );
+        }
+        assert_eq!(
+            compute_api_endpoint("https://1-2-3-observability-pipelines.agent.us3.datadoghq.com"),
+            "https://api.us3.datadoghq.com"
+        );
+    }
+
+    #[test]
     fn gets_correct_api_base_endpoint() {
         assert_eq!(
             get_api_base_endpoint(None, DD_US_SITE),
@@ -188,6 +209,13 @@ mod tests {
         assert_eq!(
             get_api_base_endpoint(Some("https://logs.datadoghq.eu"), DD_US_SITE),
             "https://api.datadoghq.eu"
+        );
+        assert_eq!(
+            get_api_base_endpoint(
+                Some("https://http-intake.logs.us3.datadoghq.com"),
+                DD_US_SITE
+            ),
+            "https://api.us3.datadoghq.com"
         );
     }
 }
