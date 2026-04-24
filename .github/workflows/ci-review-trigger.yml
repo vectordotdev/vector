@@ -32,6 +32,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 env:
   DD_ENV: "ci"

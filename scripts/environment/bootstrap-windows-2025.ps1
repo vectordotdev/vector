@@ -2,32 +2,6 @@
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
-# Helper function to install choco packages with exponential backoff retry
-function Install-ChocoPackage {
-    param(
-        [string]$Package,
-        [int]$MaxRetries = 5
-    )
-
-    for ($attempt = 1; $attempt -le $MaxRetries; $attempt++) {
-        choco install $Package --execution-timeout=7200 -y
-        # Both `choco install` and `choco list` can exit 0 even on 5xx errors
-        # from the feed, so verify install by matching a "name|version" line
-        # in the list output. --limit-output strips headers/warnings.
-        if ((choco list --limit-output -e $Package) -match "^$([regex]::Escape($Package))\|") {
-            return
-        }
-
-        if ($attempt -lt $MaxRetries) {
-            $delay = 5 * [math]::Pow(2, $attempt)  # Exponential: 10, 20, 40, 80 seconds
-            Write-Host "choco install $Package failed (attempt $attempt of $MaxRetries). Retrying in $delay seconds..."
-            Start-Sleep -Seconds $delay
-        } else {
-            throw "choco install $Package failed after $MaxRetries attempts"
-        }
-    }
-}
-
 # Set up our Cargo path so we can do Rust-y things.
 echo "$HOME\.cargo\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
@@ -37,9 +11,19 @@ if ($env:RELEASE_BUILDER -ne "true") {
     bash scripts/environment/prepare.sh --modules=rustup
 }
 
-# Install Chocolatey packages with exponential backoff retry
-Install-ChocoPackage "make"
-Install-ChocoPackage "protoc"
+# Install protoc via the shared cross-platform script. It pins the same version
+# used on Linux/macOS and downloads directly from the upstream GitHub release,
+# so we avoid the recurring Chocolatey CDN failures.
+$ProtocInstallDir = Join-Path $env:RUNNER_TEMP "protoc-bin"
+bash scripts/environment/install-protoc.sh "$ProtocInstallDir"
+if ($LASTEXITCODE -ne 0) {
+    throw "install-protoc.sh failed with exit code $LASTEXITCODE"
+}
+echo "$ProtocInstallDir" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+# GNU make is already on PATH on the windows-2025 runner image via the
+# pre-installed MinGW toolchain at C:\mingw64\bin, so no extra install is
+# needed here.
 
 # Set a specific override path for libclang.
 echo "LIBCLANG_PATH=$( (gcm clang).source -replace "clang.exe" )" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append

@@ -41,7 +41,6 @@ env:
   TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}
   CONTAINER_TOOL: "docker"
   DD_ENV: "ci"
-  DD_API_KEY: ${{ secrets.DD_API_KEY }}
   RUST_BACKTRACE: full
   VECTOR_LOG: vector=debug
   VERBOSE: true
@@ -100,6 +99,7 @@ jobs:
     timeout-minutes: 90
     permissions:
       contents: read
+      id-token: write
       packages: read # Required to pull test runner image from GHCR
     strategy:
       fail-fast: false
@@ -160,6 +160,9 @@ jobs:
           submodules: "recursive"
           ref: ${{ github.event.review.commit_id }}
 
+      - uses: ./.github/actions/dd-token
+        if: steps.run_condition.outputs.should_run == 'true'
+
       - uses: ./.github/actions/setup
         with:
           vdev: true
@@ -191,6 +194,7 @@ jobs:
     permissions:
       contents: read
       packages: read # Required to pull test runner image from GHCR
+      id-token: write
     strategy:
       fail-fast: false
       matrix:
@@ -213,6 +217,9 @@ jobs:
         with:
           submodules: "recursive"
           ref: ${{ github.event.review.commit_id }}
+
+      - uses: ./.github/actions/dd-token
+        if: steps.run_condition.outputs.should_run == 'true'
 
       - uses: ./.github/actions/setup
         with:

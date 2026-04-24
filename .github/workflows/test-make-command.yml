@@ -32,16 +32,21 @@ permissions:
 jobs:
   run-make-command:
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
     timeout-minutes: 90
     env:
       CARGO_INCREMENTAL: 0
       DD_ENV: "ci"
-      DD_API_KEY: ${{ secrets.DD_API_KEY }}
     steps:
       - name: Checkout branch
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ inputs.ref }}
+
+      - uses: ./.github/actions/dd-token
+        if: ${{ inputs.upload_test_results }}
 
       - uses: ./.github/actions/setup
         with:
