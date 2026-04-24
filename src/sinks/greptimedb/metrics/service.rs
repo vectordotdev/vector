@@ -51,7 +51,7 @@ fn new_client_from_config(config: &GreptimeDBGrpcServiceConfig) -> crate::Result
         }
 
         // The greptimedb ingester requires all three TLS paths (ca_file, crt_file,
-        // key_file) to be set. If any are missing, fall back to a plain connection.
+        // key_file) to be set. Refuse a partial config rather than downgrading to plaintext.
         match (
             &tls_config.ca_file,
             &tls_config.crt_file,
@@ -66,10 +66,7 @@ fn new_client_from_config(config: &GreptimeDBGrpcServiceConfig) -> crate::Result
                 ChannelManager::with_tls_config(channel_config).map_err(Box::new)?
             }
             _ => {
-                warn!(
-                    message = "GreptimeDB TLS requires ca_file, crt_file, and key_file to all be set. Falling back to a non-TLS connection."
-                );
-                ChannelManager::with_config(channel_config)
+                return Err("GreptimeDB TLS requires ca_file, crt_file, and key_file to all be set.".into());
             }
         }
     } else {
