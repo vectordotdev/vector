@@ -34,7 +34,7 @@ metrics-util.workspace = true
 mlua = { version = "0.10.5", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
 no-proxy = { version = "0.3.6", default-features = false, features = ["serialize"] }
 ordered-float.workspace = true
-openssl = { version = "0.10.75", default-features = false, features = ["vendored"] }
+openssl = { version = "0.10.78", default-features = false, features = ["vendored"] }
 parking_lot = { version = "0.12.5", default-features = false }
 pin-project.workspace = true
 proptest = { workspace = true, optional = true }
@@ -65,6 +65,7 @@ vector-config = { path = "../vector-config" }
 vector-config-common = { path = "../vector-config-common" }
 vrl.workspace = true
 cfg-if.workspace = true
+quickcheck = { workspace = true, optional = true }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 security-framework = "3.6.0"
@@ -100,6 +101,12 @@ default = []
 lua = ["dep:mlua", "dep:tokio-stream", "vrl/lua"]
 vrl = []
 test = ["vector-common/test", "proptest"]
+generate-fixtures = ["vrl/generate-fixtures", "dep:quickcheck"]
+
+[[bin]]
+name = "generate-fixtures"
+path = "src/bin/generate_fixtures.rs"
+required-features = ["generate-fixtures"]
 
 [[bench]]
 name = "event"
