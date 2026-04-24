@@ -39,17 +39,18 @@ If `docs/specs/component_maturity.md` exists in the repo, read it and use it as 
 - **deprecated** — replacement is documented in component support notes; removal release is targeted.
 
 **Regression (demotion) triggers:**
-- `stable` → `beta`: P0/P1 correctness bug open >180 days, or breaking config change shipped in last minor release.
+- `stable` → `beta`: P0/P1 correctness bug open >180 days, or breaking config change shipped in last minor release. Only evaluated when `--include-stable` (or a named stable `--component`) is passed.
 - `beta` → `alpha`: rubric fields in the CUE file are incomplete or the component has been silent (no commits, no changelog entries) for 4+ consecutive minor releases.
 
 ## Steps
 
 ### 1. Parse arguments
 
-- `--component <name>`: audit only this one component (match against CUE filename stem).
+- `--component <name>`: audit only this one component (match against CUE filename stem). Overrides the default stable-exclusion — a named stable component is audited.
 - `--kind sources|transforms|sinks`: restrict to a single kind.
 - `--only-changes`: final report suppresses the Unchanged section.
-- No args: audit every component.
+- `--include-stable`: include stable components in the audit (default: skip them, per the Scope section).
+- No args: audit every non-stable component.
 
 ### 2. Enumerate components and current tiers
 
