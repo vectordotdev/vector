@@ -76,3 +76,59 @@ impl<E: std::fmt::Display> InternalEvent for KubernetesEventsSerializationError<
         });
     }
 }
+
+#[derive(Debug, NamedInternalEvent)]
+pub struct KubernetesEventsLeaderAcquired {
+    pub identity: String,
+    pub lease_namespace: String,
+    pub lease_name: String,
+}
+
+impl InternalEvent for KubernetesEventsLeaderAcquired {
+    fn emit(self) {
+        info!(
+            message = "Kubernetes events leadership acquired.",
+            identity = %self.identity,
+            lease_namespace = %self.lease_namespace,
+            lease_name = %self.lease_name,
+        );
+    }
+}
+
+#[derive(Debug, NamedInternalEvent)]
+pub struct KubernetesEventsLeaderLost {
+    pub identity: String,
+    pub reason: &'static str,
+}
+
+impl InternalEvent for KubernetesEventsLeaderLost {
+    fn emit(self) {
+        warn!(
+            message = "Kubernetes events leadership lost.",
+            identity = %self.identity,
+            reason = %self.reason,
+        );
+    }
+}
+
+#[derive(Debug, NamedInternalEvent)]
+pub struct KubernetesEventsLeaderElectionError<E> {
+    pub error: E,
+}
+
+impl<E: std::fmt::Display> InternalEvent for KubernetesEventsLeaderElectionError<E> {
+    fn emit(self) {
+        error!(
+            message = "Kubernetes events leader election error.",
+            error = %self.error,
+            error_type = error_type::READER_FAILED,
+            stage = error_stage::RECEIVING,
+        );
+        counter!(
+            "component_errors_total",
+            "error_type" => error_type::READER_FAILED,
+            "stage" => error_stage::RECEIVING,
+        )
+        .increment(1);
+    }
+}

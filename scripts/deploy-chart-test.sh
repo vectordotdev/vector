@@ -79,12 +79,16 @@ up() {
     )
   done
 
-  # Set a reasonable log level to avoid issues with internal logs
-  # overwriting console output.
   split-container-image "$CONTAINER_IMAGE"
+  if [[ -z "${VECTOR_TEST_SKIP_LOG_ENV:-}" ]]; then
+    # Set a reasonable log level to avoid issues with internal logs
+    # overwriting console output.
+    HELM_VALUES+=(
+      --set "env[0].name=VECTOR_LOG"
+      --set "env[0].value=info"
+    )
+  fi
   HELM_VALUES+=(
-    --set "env[0].name=VECTOR_LOG"
-    --set "env[0].value=info"
     --set "image.repository=$CONTAINER_IMAGE_REPOSITORY"
     --set "image.tag=$CONTAINER_IMAGE_TAG"
   )

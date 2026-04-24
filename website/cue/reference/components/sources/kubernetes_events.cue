@@ -4,7 +4,7 @@ components: sources: kubernetes_events: {
 	title: "Kubernetes Events"
 
 	description: """
-		Streams [`Event`](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.29/#event-v1-events-k8s-io) \
+		Streams [`Event`](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.29/#event-v1-events-k8s-io)
 		objects from the Kubernetes API so you can monitor changes happening inside your cluster.
 		"""
 

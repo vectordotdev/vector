@@ -7,6 +7,7 @@
 
 use std::{
     collections::{BTreeSet, HashMap, HashSet},
+    env, fs,
     path::PathBuf,
     pin::Pin,
     time::{Duration, Instant},
@@ -15,14 +16,20 @@ use std::{
 use chrono::{DateTime, Utc};
 use futures::{Stream, StreamExt, stream::SelectAll};
 use http_1::{HeaderName, HeaderValue};
-use k8s_openapi::api::events::v1::Event as KubeEvent;
+use k8s_openapi::api::{
+    coordination::v1::{Lease, LeaseSpec},
+    events::v1::Event as KubeEvent,
+};
+use k8s_openapi::apimachinery::pkg::apis::meta::v1::{MicroTime, ObjectMeta};
 use k8s_openapi::jiff::Timestamp as KubeTimestamp;
 use kube::{
-    Api, Client, Config as ClientConfig,
+    Api, Client, Config as ClientConfig, Error as KubeError,
+    api::PostParams,
     config::{self, KubeConfigOptions},
     runtime::watcher,
 };
 use tokio::select;
+use tokio::time::{MissedTickBehavior, interval, sleep};
 use vector_lib::{
     config::{LegacyKey, LogNamespace, log_schema},
     configurable::configurable_component,
@@ -37,8 +44,9 @@ use crate::{
     config::{DataType, SourceConfig, SourceContext, SourceOutput},
     event::{EstimatedJsonEncodedSizeOf, Event, LogEvent},
     internal_events::{
-        KubernetesEventsReceived, KubernetesEventsSerializationError, KubernetesEventsWatchError,
-        StreamClosedError,
+        KubernetesEventsLeaderAcquired, KubernetesEventsLeaderElectionError,
+        KubernetesEventsLeaderLost, KubernetesEventsReceived, KubernetesEventsSerializationError,
+        KubernetesEventsWatchError, StreamClosedError,
     },
     shutdown::ShutdownSignal,
 };
@@ -46,6 +54,15 @@ use crate::{
 const DEFAULT_MAX_EVENT_AGE_SECS: u64 = 3600;
 const DEFAULT_DEDUPE_RETENTION_SECS: u64 = 900;
 const DEFAULT_WATCH_TIMEOUT_SECS: u32 = 290;
+const DEFAULT_LEASE_NAME: &str = "vector-kubernetes-events";
+const DEFAULT_IDENTITY_ENV_VAR: &str = "VECTOR_SELF_POD_NAME";
+const FALLBACK_IDENTITY_ENV_VAR: &str = "HOSTNAME";
+const POD_NAMESPACE_ENV_VAR: &str = "VECTOR_SELF_POD_NAMESPACE";
+const SERVICE_ACCOUNT_NAMESPACE_PATH: &str =
+    "/var/run/secrets/kubernetes.io/serviceaccount/namespace";
+const DEFAULT_LEASE_DURATION_SECS: u64 = 15;
+const DEFAULT_RENEW_DEADLINE_SECS: u64 = 10;
+const DEFAULT_RETRY_PERIOD_SECS: u64 = 2;
 
 type WatchItem = (Option<String>, watcher::Result<watcher::Event<KubeEvent>>);
 type WatchStream = Pin<Box<dyn Stream<Item = WatchItem> + Send>>;
@@ -112,10 +129,73 @@ pub struct KubernetesEventsConfig {
     #[serde(default)]
     include_previous_event: bool,
 
+    /// Lease-based leader election settings for running multiple replicas safely.
+    #[serde(default)]
+    leader_election: KubernetesEventsLeaderElectionConfig,
+
     /// The namespace to use for logs. This overrides the global setting.
     #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     log_namespace: Option<bool>,
+}
+
+/// Configuration for Kubernetes Lease-based leader election.
+#[configurable_component]
+#[derive(Clone, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct KubernetesEventsLeaderElectionConfig {
+    /// Enables Lease-based leader election.
+    #[serde(default)]
+    enabled: bool,
+
+    /// Name of the Kubernetes Lease object used for coordination.
+    #[serde(default = "default_lease_name")]
+    #[configurable(metadata(docs::examples = "vector-kubernetes-events"))]
+    lease_name: String,
+
+    /// Namespace containing the Kubernetes Lease object.
+    ///
+    /// If omitted, Vector uses `VECTOR_SELF_POD_NAMESPACE`, then the in-cluster service account
+    /// namespace file, then `default`.
+    #[serde(default)]
+    #[configurable(metadata(docs::examples = "observability"))]
+    lease_namespace: Option<String>,
+
+    /// Environment variable containing this replica's leader election identity.
+    ///
+    /// If this variable is not set, Vector falls back to `HOSTNAME`.
+    #[serde(default = "default_identity_env_var")]
+    #[configurable(metadata(docs::examples = "VECTOR_SELF_POD_NAME"))]
+    identity_env_var: String,
+
+    /// Lease duration.
+    #[serde(default = "default_lease_duration_seconds")]
+    #[configurable(metadata(docs::type_unit = "seconds", docs::human_name = "Lease Duration"))]
+    lease_duration_seconds: u64,
+
+    /// Maximum time this replica will continue as leader without a successful renewal.
+    #[serde(default = "default_renew_deadline_seconds")]
+    #[configurable(metadata(docs::type_unit = "seconds", docs::human_name = "Renew Deadline"))]
+    renew_deadline_seconds: u64,
+
+    /// Time between leader election acquire and renew attempts.
+    #[serde(default = "default_retry_period_seconds")]
+    #[configurable(metadata(docs::type_unit = "seconds", docs::human_name = "Retry Period"))]
+    retry_period_seconds: u64,
+}
+
+impl Default for KubernetesEventsLeaderElectionConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            lease_name: DEFAULT_LEASE_NAME.to_string(),
+            lease_namespace: None,
+            identity_env_var: DEFAULT_IDENTITY_ENV_VAR.to_string(),
+            lease_duration_seconds: DEFAULT_LEASE_DURATION_SECS,
+            renew_deadline_seconds: DEFAULT_RENEW_DEADLINE_SECS,
+            retry_period_seconds: DEFAULT_RETRY_PERIOD_SECS,
+        }
+    }
 }
 
 impl Default for KubernetesEventsConfig {
@@ -132,6 +212,7 @@ impl Default for KubernetesEventsConfig {
             dedupe_retention_seconds: DEFAULT_DEDUPE_RETENTION_SECS,
             watch_timeout_seconds: DEFAULT_WATCH_TIMEOUT_SECS,
             include_previous_event: false,
+            leader_election: KubernetesEventsLeaderElectionConfig::default(),
             log_namespace: None,
         }
     }
@@ -149,6 +230,26 @@ const fn default_dedupe_retention_seconds() -> u64 {
 
 const fn default_watch_timeout_seconds() -> u32 {
     DEFAULT_WATCH_TIMEOUT_SECS
+}
+
+fn default_lease_name() -> String {
+    DEFAULT_LEASE_NAME.to_string()
+}
+
+fn default_identity_env_var() -> String {
+    DEFAULT_IDENTITY_ENV_VAR.to_string()
+}
+
+const fn default_lease_duration_seconds() -> u64 {
+    DEFAULT_LEASE_DURATION_SECS
+}
+
+const fn default_renew_deadline_seconds() -> u64 {
+    DEFAULT_RENEW_DEADLINE_SECS
+}
+
+const fn default_retry_period_seconds() -> u64 {
+    DEFAULT_RETRY_PERIOD_SECS
 }
 
 #[async_trait::async_trait]
@@ -180,7 +281,7 @@ impl SourceConfig for KubernetesEventsConfig {
 
         let client = Client::try_from(client_config)?;
 
-        let source = KubernetesEventsSource::new(client, self.clone());
+        let source = KubernetesEventsSource::new(client, self.clone())?;
 
         Ok(Box::pin(source.run(cx.out, cx.shutdown, log_namespace)))
     }
@@ -251,10 +352,11 @@ struct KubernetesEventsSource {
     dedupe_retention: Duration,
     watcher_config: watcher::Config,
     include_previous_event: bool,
+    leader_election: Option<LeaderElectionSettings>,
 }
 
 impl KubernetesEventsSource {
-    fn new(client: Client, config: KubernetesEventsConfig) -> Self {
+    fn new(client: Client, config: KubernetesEventsConfig) -> crate::Result<Self> {
         let type_filter = (!config.include_types.is_empty())
             .then(|| config.include_types.iter().map(|s| s.to_owned()).collect());
         let reason_filter = (!config.include_reasons.is_empty()).then(|| {
@@ -280,7 +382,7 @@ impl KubernetesEventsSource {
             watcher_config = watcher_config.labels(selector);
         }
 
-        Self {
+        Ok(Self {
             client,
             namespaces: config.namespaces.clone(),
             type_filter,
@@ -290,7 +392,8 @@ impl KubernetesEventsSource {
             dedupe_retention: Duration::from_secs(config.dedupe_retention_seconds),
             watcher_config,
             include_previous_event: config.include_previous_event,
-        }
+            leader_election: LeaderElectionSettings::from_config(&config.leader_election)?,
+        })
     }
 
     fn build_streams(&self) -> SelectAll<WatchStream> {
@@ -320,16 +423,40 @@ impl KubernetesEventsSource {
         mut shutdown: ShutdownSignal,
         log_namespace: LogNamespace,
     ) -> Result<(), ()> {
-        let mut streams = self.build_streams();
         let mut deduper = Deduper::new(self.dedupe_retention);
+
+        if let Some(settings) = self.leader_election.clone() {
+            return self
+                .run_with_leader_election(
+                    &mut out,
+                    &mut shutdown,
+                    log_namespace,
+                    &mut deduper,
+                    settings,
+                )
+                .await;
+        }
+
+        self.run_active(&mut out, &mut shutdown, log_namespace, &mut deduper)
+            .await
+    }
+
+    async fn run_active(
+        &mut self,
+        out: &mut SourceSender,
+        shutdown: &mut ShutdownSignal,
+        log_namespace: LogNamespace,
+        deduper: &mut Deduper,
+    ) -> Result<(), ()> {
+        let mut streams = self.build_streams();
 
         loop {
             select! {
-                _ = &mut shutdown => break,
+                _ = &mut *shutdown => break,
                 maybe_event = streams.next() => {
                     match maybe_event {
                         Some((namespace, Ok(event))) => {
-                            if let Err(()) = self.handle_event(namespace.as_deref(), event, &mut out, log_namespace, &mut deduper).await {
+                            if let Err(()) = self.handle_event(namespace.as_deref(), event, out, log_namespace, deduper).await {
                                 return Err(());
                             }
                         }
@@ -343,6 +470,92 @@ impl KubernetesEventsSource {
         }
 
         Ok(())
+    }
+
+    async fn run_with_leader_election(
+        &mut self,
+        out: &mut SourceSender,
+        shutdown: &mut ShutdownSignal,
+        log_namespace: LogNamespace,
+        deduper: &mut Deduper,
+        settings: LeaderElectionSettings,
+    ) -> Result<(), ()> {
+        let coordinator = LeaseCoordinator::new(self.client.clone(), settings);
+
+        loop {
+            if !coordinator.wait_for_leadership(shutdown).await {
+                break;
+            }
+
+            emit!(KubernetesEventsLeaderAcquired {
+                identity: coordinator.settings.identity.clone(),
+                lease_namespace: coordinator.settings.lease_namespace.clone(),
+                lease_name: coordinator.settings.lease_name.clone(),
+            });
+
+            match self
+                .run_leadership_epoch(out, shutdown, log_namespace, deduper, &coordinator)
+                .await?
+            {
+                LeadershipEnd::Shutdown => break,
+                LeadershipEnd::RestartWatch => {}
+                LeadershipEnd::Lost(reason) => emit!(KubernetesEventsLeaderLost {
+                    identity: coordinator.settings.identity.clone(),
+                    reason,
+                }),
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn run_leadership_epoch(
+        &mut self,
+        out: &mut SourceSender,
+        shutdown: &mut ShutdownSignal,
+        log_namespace: LogNamespace,
+        deduper: &mut Deduper,
+        coordinator: &LeaseCoordinator,
+    ) -> Result<LeadershipEnd, ()> {
+        let mut streams = self.build_streams();
+        let mut renew_interval = interval(coordinator.settings.retry_period);
+        renew_interval.set_missed_tick_behavior(MissedTickBehavior::Delay);
+        let mut last_renewal = Instant::now();
+
+        loop {
+            select! {
+                _ = &mut *shutdown => return Ok(LeadershipEnd::Shutdown),
+                _ = renew_interval.tick() => {
+                    match coordinator.try_acquire_or_renew().await {
+                        Ok(LeaseUpdate::Held) => {
+                            last_renewal = Instant::now();
+                        }
+                        Ok(LeaseUpdate::HeldByOther) => {
+                            return Ok(LeadershipEnd::Lost("lease_taken_by_another_holder"));
+                        }
+                        Err(error) => {
+                            emit!(KubernetesEventsLeaderElectionError { error });
+                            if last_renewal.elapsed() >= coordinator.settings.renew_deadline {
+                                return Ok(LeadershipEnd::Lost("renew_deadline_exceeded"));
+                            }
+                        }
+                    }
+                }
+                maybe_event = streams.next() => {
+                    match maybe_event {
+                        Some((namespace, Ok(event))) => {
+                            if let Err(()) = self.handle_event(namespace.as_deref(), event, out, log_namespace, deduper).await {
+                                return Err(());
+                            }
+                        }
+                        Some((_, Err(error))) => {
+                            emit!(KubernetesEventsWatchError { error });
+                        }
+                        None => return Ok(LeadershipEnd::RestartWatch),
+                    }
+                }
+            }
+        }
     }
 
     async fn handle_event(
@@ -539,6 +752,154 @@ impl KubernetesEventsSource {
     }
 }
 
+#[derive(Clone, Debug)]
+struct LeaderElectionSettings {
+    lease_name: String,
+    lease_namespace: String,
+    identity: String,
+    lease_duration: Duration,
+    renew_deadline: Duration,
+    retry_period: Duration,
+}
+
+impl LeaderElectionSettings {
+    fn from_config(config: &KubernetesEventsLeaderElectionConfig) -> crate::Result<Option<Self>> {
+        if !config.enabled {
+            return Ok(None);
+        }
+
+        if config.lease_duration_seconds == 0 {
+            return Err("leader_election.lease_duration_seconds must be greater than 0".into());
+        }
+        if config.renew_deadline_seconds == 0 {
+            return Err("leader_election.renew_deadline_seconds must be greater than 0".into());
+        }
+        if config.retry_period_seconds == 0 {
+            return Err("leader_election.retry_period_seconds must be greater than 0".into());
+        }
+        if config.renew_deadline_seconds >= config.lease_duration_seconds {
+            return Err(
+                "leader_election.renew_deadline_seconds must be less than lease_duration_seconds"
+                    .into(),
+            );
+        }
+        if config.retry_period_seconds > config.renew_deadline_seconds {
+            return Err(
+                "leader_election.retry_period_seconds must be less than or equal to renew_deadline_seconds"
+                    .into(),
+            );
+        }
+
+        Ok(Some(Self {
+            lease_name: config.lease_name.clone(),
+            lease_namespace: resolve_lease_namespace(config.lease_namespace.as_deref()),
+            identity: resolve_identity(&config.identity_env_var)?,
+            lease_duration: Duration::from_secs(config.lease_duration_seconds),
+            renew_deadline: Duration::from_secs(config.renew_deadline_seconds),
+            retry_period: Duration::from_secs(config.retry_period_seconds),
+        }))
+    }
+}
+
+struct LeaseCoordinator {
+    api: Api<Lease>,
+    settings: LeaderElectionSettings,
+}
+
+impl LeaseCoordinator {
+    fn new(client: Client, settings: LeaderElectionSettings) -> Self {
+        let api = Api::namespaced(client, &settings.lease_namespace);
+        Self { api, settings }
+    }
+
+    async fn wait_for_leadership(&self, shutdown: &mut ShutdownSignal) -> bool {
+        loop {
+            match self.try_acquire_or_renew().await {
+                Ok(LeaseUpdate::Held) => return true,
+                Ok(LeaseUpdate::HeldByOther) => {}
+                Err(error) => emit!(KubernetesEventsLeaderElectionError { error }),
+            }
+
+            select! {
+                _ = &mut *shutdown => return false,
+                _ = sleep(self.settings.retry_period) => {}
+            }
+        }
+    }
+
+    async fn try_acquire_or_renew(&self) -> Result<LeaseUpdate, KubeError> {
+        let now = Utc::now();
+        match self.api.get(&self.settings.lease_name).await {
+            Ok(lease) => self.update_existing_lease(lease, now).await,
+            Err(KubeError::Api(status)) if status.is_not_found() => {
+                match self.create_lease(now).await {
+                    Ok(_) => Ok(LeaseUpdate::Held),
+                    Err(KubeError::Api(status))
+                        if status.is_already_exists() || status.is_conflict() =>
+                    {
+                        Ok(LeaseUpdate::HeldByOther)
+                    }
+                    Err(error) => Err(error),
+                }
+            }
+            Err(error) => Err(error),
+        }
+    }
+
+    async fn create_lease(&self, now: DateTime<Utc>) -> Result<Lease, KubeError> {
+        let lease = Lease {
+            metadata: ObjectMeta {
+                name: Some(self.settings.lease_name.clone()),
+                namespace: Some(self.settings.lease_namespace.clone()),
+                ..ObjectMeta::default()
+            },
+            spec: Some(LeaseSpec {
+                acquire_time: Some(kube_micro_time(now)),
+                holder_identity: Some(self.settings.identity.clone()),
+                lease_duration_seconds: Some(duration_as_i32(self.settings.lease_duration)),
+                lease_transitions: Some(0),
+                renew_time: Some(kube_micro_time(now)),
+                strategy: None,
+                preferred_holder: None,
+            }),
+        };
+
+        self.api.create(&PostParams::default(), &lease).await
+    }
+
+    async fn update_existing_lease(
+        &self,
+        lease: Lease,
+        now: DateTime<Utc>,
+    ) -> Result<LeaseUpdate, KubeError> {
+        let Some(updated) = prepare_lease_update(lease, &self.settings, now) else {
+            return Ok(LeaseUpdate::HeldByOther);
+        };
+
+        match self
+            .api
+            .replace(&self.settings.lease_name, &PostParams::default(), &updated)
+            .await
+        {
+            Ok(_) => Ok(LeaseUpdate::Held),
+            Err(KubeError::Api(status)) if status.is_conflict() => Ok(LeaseUpdate::HeldByOther),
+            Err(error) => Err(error),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum LeaseUpdate {
+    Held,
+    HeldByOther,
+}
+
+enum LeadershipEnd {
+    Shutdown,
+    Lost(&'static str),
+    RestartWatch,
+}
+
 struct Deduper {
     entries: HashMap<String, CachedEvent>,
     retention: Duration,
@@ -624,6 +985,112 @@ fn compare_resource_versions(lhs: &str, rhs: &str) -> std::cmp::Ordering {
     }
 }
 
+fn resolve_identity(identity_env_var: &str) -> crate::Result<String> {
+    resolve_identity_from(identity_env_var, |name| env::var(name).ok()).map_err(Into::into)
+}
+
+fn resolve_identity_from(
+    identity_env_var: &str,
+    mut get_env: impl FnMut(&str) -> Option<String>,
+) -> Result<String, String> {
+    if let Some(identity) = get_env(identity_env_var).and_then(non_empty_trimmed) {
+        return Ok(identity);
+    }
+
+    if identity_env_var != FALLBACK_IDENTITY_ENV_VAR
+        && let Some(identity) = get_env(FALLBACK_IDENTITY_ENV_VAR).and_then(non_empty_trimmed)
+    {
+        return Ok(identity);
+    }
+
+    Err(format!(
+        "leader election is enabled but neither {identity_env_var} nor {FALLBACK_IDENTITY_ENV_VAR} is set"
+    ))
+}
+
+fn resolve_lease_namespace(configured: Option<&str>) -> String {
+    resolve_lease_namespace_from(
+        configured,
+        |name| env::var(name).ok(),
+        || fs::read_to_string(SERVICE_ACCOUNT_NAMESPACE_PATH).ok(),
+    )
+}
+
+fn resolve_lease_namespace_from(
+    configured: Option<&str>,
+    mut get_env: impl FnMut(&str) -> Option<String>,
+    read_service_account_namespace: impl FnOnce() -> Option<String>,
+) -> String {
+    configured
+        .and_then(non_empty_trimmed)
+        .or_else(|| get_env(POD_NAMESPACE_ENV_VAR).and_then(non_empty_trimmed))
+        .or_else(|| read_service_account_namespace().and_then(non_empty_trimmed))
+        .unwrap_or_else(|| "default".to_string())
+}
+
+fn non_empty_trimmed(value: impl AsRef<str>) -> Option<String> {
+    let value = value.as_ref().trim();
+    (!value.is_empty()).then(|| value.to_string())
+}
+
+fn prepare_lease_update(
+    mut lease: Lease,
+    settings: &LeaderElectionSettings,
+    now: DateTime<Utc>,
+) -> Option<Lease> {
+    let spec = lease.spec.get_or_insert_with(LeaseSpec::default);
+    let held_by_self = spec
+        .holder_identity
+        .as_deref()
+        .is_some_and(|holder| holder == settings.identity);
+
+    if !held_by_self && !lease_is_expired(spec, now, settings.lease_duration) {
+        return None;
+    }
+
+    if !held_by_self {
+        spec.acquire_time = Some(kube_micro_time(now));
+        spec.lease_transitions = Some(spec.lease_transitions.unwrap_or(0) + 1);
+    }
+
+    spec.holder_identity = Some(settings.identity.clone());
+    spec.lease_duration_seconds = Some(duration_as_i32(settings.lease_duration));
+    spec.renew_time = Some(kube_micro_time(now));
+    Some(lease)
+}
+
+fn lease_is_expired(spec: &LeaseSpec, now: DateTime<Utc>, fallback_duration: Duration) -> bool {
+    let lease_duration = spec
+        .lease_duration_seconds
+        .and_then(|duration| u64::try_from(duration).ok())
+        .filter(|duration| *duration > 0)
+        .map(Duration::from_secs)
+        .unwrap_or(fallback_duration);
+
+    let Some(renew_time) = spec.renew_time.as_ref() else {
+        return true;
+    };
+    let Some(renewed_at) = kube_timestamp_to_chrono(renew_time.0) else {
+        return true;
+    };
+
+    match now.signed_duration_since(renewed_at).to_std() {
+        Ok(elapsed) => elapsed > lease_duration,
+        Err(_) => false,
+    }
+}
+
+fn duration_as_i32(duration: Duration) -> i32 {
+    i32::try_from(duration.as_secs()).unwrap_or(i32::MAX)
+}
+
+fn kube_micro_time(timestamp: DateTime<Utc>) -> MicroTime {
+    MicroTime(
+        KubeTimestamp::from_microsecond(timestamp.timestamp_micros())
+            .expect("timestamp should fit in Kubernetes timestamp range"),
+    )
+}
+
 fn event_timestamp(event: &KubeEvent) -> DateTime<Utc> {
     event
         .series
@@ -663,6 +1130,39 @@ mod tests {
             event_time: Some(MicroTime(kube_timestamp(timestamp))),
             note: Some("test".to_string()),
             ..KubeEvent::default()
+        }
+    }
+
+    fn leader_settings(identity: &str) -> LeaderElectionSettings {
+        LeaderElectionSettings {
+            lease_name: "events".to_string(),
+            lease_namespace: "default".to_string(),
+            identity: identity.to_string(),
+            lease_duration: Duration::from_secs(15),
+            renew_deadline: Duration::from_secs(10),
+            retry_period: Duration::from_secs(2),
+        }
+    }
+
+    fn make_lease(
+        holder: Option<&str>,
+        renew_time: Option<DateTime<Utc>>,
+        transitions: Option<i32>,
+    ) -> Lease {
+        Lease {
+            metadata: ObjectMeta {
+                name: Some("events".to_string()),
+                namespace: Some("default".to_string()),
+                resource_version: Some("1".to_string()),
+                ..ObjectMeta::default()
+            },
+            spec: Some(LeaseSpec {
+                holder_identity: holder.map(ToString::to_string),
+                lease_duration_seconds: Some(15),
+                renew_time: renew_time.map(kube_micro_time),
+                lease_transitions: transitions,
+                ..LeaseSpec::default()
+            }),
         }
     }
 
@@ -772,5 +1272,132 @@ mod tests {
         event.deprecated_last_timestamp = Some(Time(kube_timestamp(deprecated_ts)));
 
         assert_eq!(event_timestamp(&event), deprecated_ts);
+    }
+
+    #[test]
+    fn leader_election_identity_uses_configured_env_var() {
+        let identity = resolve_identity_from("POD_NAME", |name| match name {
+            "POD_NAME" => Some("vector-0".to_string()),
+            FALLBACK_IDENTITY_ENV_VAR => Some("fallback".to_string()),
+            _ => None,
+        })
+        .expect("identity should resolve");
+
+        assert_eq!(identity, "vector-0");
+    }
+
+    #[test]
+    fn leader_election_identity_falls_back_to_hostname() {
+        let identity = resolve_identity_from("POD_NAME", |name| match name {
+            FALLBACK_IDENTITY_ENV_VAR => Some("vector-hostname".to_string()),
+            _ => None,
+        })
+        .expect("identity should resolve");
+
+        assert_eq!(identity, "vector-hostname");
+    }
+
+    #[test]
+    fn leader_election_identity_errors_when_missing() {
+        let error =
+            resolve_identity_from("POD_NAME", |_| None).expect_err("identity should be required");
+
+        assert!(error.contains("POD_NAME"));
+        assert!(error.contains(FALLBACK_IDENTITY_ENV_VAR));
+    }
+
+    #[test]
+    fn leader_election_namespace_prefers_config() {
+        let namespace = resolve_lease_namespace_from(
+            Some(" configured "),
+            |_| Some("env".to_string()),
+            || Some("service-account".to_string()),
+        );
+
+        assert_eq!(namespace, "configured");
+    }
+
+    #[test]
+    fn leader_election_namespace_falls_back_to_service_account() {
+        let namespace = resolve_lease_namespace_from(
+            None,
+            |_| None,
+            || Some(" service-account \n".to_string()),
+        );
+
+        assert_eq!(namespace, "service-account");
+    }
+
+    #[test]
+    fn leader_election_namespace_defaults_when_missing() {
+        let namespace = resolve_lease_namespace_from(None, |_| None, || None);
+
+        assert_eq!(namespace, "default");
+    }
+
+    #[test]
+    fn leader_election_renews_lease_held_by_self() {
+        let now = Utc.timestamp_opt(1_700_000_000, 0).unwrap();
+        let lease = make_lease(
+            Some("vector-0"),
+            Some(now - ChronoDuration::seconds(5)),
+            Some(2),
+        );
+        let updated = prepare_lease_update(lease, &leader_settings("vector-0"), now)
+            .expect("self-held lease should renew");
+        let spec = updated.spec.expect("lease spec should be set");
+
+        assert_eq!(spec.holder_identity.as_deref(), Some("vector-0"));
+        assert_eq!(spec.lease_transitions, Some(2));
+        assert_eq!(
+            spec.renew_time
+                .and_then(|time| kube_timestamp_to_chrono(time.0)),
+            Some(now)
+        );
+    }
+
+    #[test]
+    fn leader_election_does_not_take_unexpired_lease_held_by_other() {
+        let now = Utc.timestamp_opt(1_700_000_000, 0).unwrap();
+        let lease = make_lease(
+            Some("vector-1"),
+            Some(now - ChronoDuration::seconds(5)),
+            Some(2),
+        );
+
+        assert!(prepare_lease_update(lease, &leader_settings("vector-0"), now).is_none());
+    }
+
+    #[test]
+    fn leader_election_takes_expired_lease_held_by_other() {
+        let now = Utc.timestamp_opt(1_700_000_000, 0).unwrap();
+        let lease = make_lease(
+            Some("vector-1"),
+            Some(now - ChronoDuration::seconds(16)),
+            Some(2),
+        );
+        let updated = prepare_lease_update(lease, &leader_settings("vector-0"), now)
+            .expect("expired lease should be acquired");
+        let spec = updated.spec.expect("lease spec should be set");
+
+        assert_eq!(spec.holder_identity.as_deref(), Some("vector-0"));
+        assert_eq!(spec.lease_transitions, Some(3));
+        assert_eq!(
+            spec.acquire_time
+                .and_then(|time| kube_timestamp_to_chrono(time.0)),
+            Some(now)
+        );
+    }
+
+    #[test]
+    fn leader_election_takes_lease_without_holder() {
+        let now = Utc.timestamp_opt(1_700_000_000, 0).unwrap();
+        let lease = make_lease(None, None, None);
+        let updated = prepare_lease_update(lease, &leader_settings("vector-0"), now)
+            .expect("empty lease should be acquired");
+        let spec = updated.spec.expect("lease spec should be set");
+
+        assert_eq!(spec.holder_identity.as_deref(), Some("vector-0"));
+        assert_eq!(spec.lease_transitions, Some(1));
     }
 }

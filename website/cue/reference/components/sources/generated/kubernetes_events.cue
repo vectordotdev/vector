@@ -10,7 +10,7 @@ generated: components: sources: kubernetes_events: configuration: {
 		}
 	}
 	field_selector: {
-		description: "Field selector applied to the events list and watch request."
+		description: "Field selector applied to the events list/watch request."
 		required:    false
 		type: string: examples: ["regarding.kind=Pod"]
 	}
@@ -44,14 +44,79 @@ generated: components: sources: kubernetes_events: configuration: {
 		}
 	}
 	kube_config_file: {
-		description: "Path to a kubeconfig file. If omitted, the in-cluster configuration or local kubeconfig is used."
+		description: "Path to a kubeconfig file. If omitted, in-cluster configuration or the local kubeconfig is used."
 		required:    false
 		type: string: examples: ["/path/to/kubeconfig"]
 	}
 	label_selector: {
-		description: "Label selector applied to the events list and watch request."
+		description: "Label selector applied to the events list/watch request."
 		required:    false
 		type: string: examples: ["type=Warning"]
+	}
+	leader_election: {
+		description: "Lease-based leader election settings for running multiple replicas safely."
+		required:    false
+		type: object: options: {
+			enabled: {
+				description: "Enables Lease-based leader election."
+				required:    false
+				type: bool: default: false
+			}
+			identity_env_var: {
+				description: """
+					Environment variable containing this replica's leader election identity.
+
+					If this variable is not set, Vector falls back to `HOSTNAME`.
+					"""
+				required: false
+				type: string: {
+					default: "VECTOR_SELF_POD_NAME"
+					examples: ["VECTOR_SELF_POD_NAME"]
+				}
+			}
+			lease_duration_seconds: {
+				description: "Lease duration."
+				required:    false
+				type: uint: {
+					default: 15
+					unit:    "seconds"
+				}
+			}
+			lease_name: {
+				description: "Name of the Kubernetes Lease object used for coordination."
+				required:    false
+				type: string: {
+					default: "vector-kubernetes-events"
+					examples: ["vector-kubernetes-events"]
+				}
+			}
+			lease_namespace: {
+				description: """
+					Namespace containing the Kubernetes Lease object.
+
+					If omitted, Vector uses `VECTOR_SELF_POD_NAMESPACE`, then the in-cluster service account
+					namespace file, then `default`.
+					"""
+				required: false
+				type: string: examples: ["observability"]
+			}
+			renew_deadline_seconds: {
+				description: "Maximum time this replica will continue as leader without a successful renewal."
+				required:    false
+				type: uint: {
+					default: 10
+					unit:    "seconds"
+				}
+			}
+			retry_period_seconds: {
+				description: "Time between leader election acquire and renew attempts."
+				required:    false
+				type: uint: {
+					default: 2
+					unit:    "seconds"
+				}
+			}
+		}
 	}
 	max_event_age_seconds: {
 		description: "Maximum age of an event to forward."
