@@ -4,7 +4,7 @@
   # Only Linux systems are supported as *builders* right now; darwin users
   # need a remote Linux builder to produce the musl artifact.
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
     crane.url = "github:ipetkov/crane";
     rust-overlay = {
       url = "github:oxalica/rust-overlay";
