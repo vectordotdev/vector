@@ -37,6 +37,8 @@ One paragraph description of the change.
 - Explain your change as if you were presenting it to the Vector team.
 - When possible, demonstrate with pseudo code not text.
 - Be specific. Be opinionated. Avoid ambiguity.
+- Keep explanatory text about benefits of choices in "Rationale".
+- Keep discussions of other options in "Alternatives".
 
 ## Rationale
 
