@@ -3,7 +3,7 @@ use std::{io::Read, time::Duration};
 use anyhow::{Context as _, Result, bail};
 use flate2::read::GzDecoder;
 
-use crate::utils::git;
+use super::{VerifyOutcome, resolve_version};
 
 const DEFAULT_BASE_URL: &str = "https://apt.vector.dev";
 const DEFAULT_COMPONENT: &str = "vector-0";
@@ -14,16 +14,11 @@ const DEFAULT_SUITE: &str = "stable";
 // `x86_64` is a legacy Datadog alias that points at the same amd64 deb.
 const ARCHES: &[&str] = &["amd64", "arm64", "armhf", "x86_64"];
 
-/// Check that a Vector release is fully published to the Datadog APT repo.
-///
-/// For each expected architecture, fetches `Packages.gz`, confirms the version is
-/// indexed, and verifies the referenced `.deb` is reachable.
+/// Verify the Datadog APT repo serves a Vector release across every expected architecture.
 #[derive(clap::Args, Debug)]
 #[command()]
 pub struct Cli {
-    /// Version to check (e.g. `0.55.0`). Defaults to the most recent `v*` git tag,
-    /// since `Cargo.toml`'s version is bumped to the next development version
-    /// immediately after a release.
+    /// Version to verify (e.g. `0.55.0`). Defaults to the most recent `v*` git tag.
     version: Option<String>,
 
     /// Base URL of the APT repo.
@@ -41,77 +36,57 @@ pub struct Cli {
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        let version = if let Some(v) = self.version {
-            v
-        } else {
-            latest_release_tag()?
-        };
-        let debian_version = format!("{version}-1");
+        let version = resolve_version(self.version)?;
+        match verify_inner(&version, &self.url, &self.suite, &self.component) {
+            Ok(summary) => {
+                println!("OK: {summary}");
+                Ok(())
+            }
+            Err(e) => Err(e),
+        }
+    }
+}
 
-        let client = reqwest::blocking::Client::builder()
-            .timeout(Duration::from_secs(30))
-            .build()?;
+pub fn verify(version: &str) -> VerifyOutcome {
+    match verify_inner(version, DEFAULT_BASE_URL, DEFAULT_SUITE, DEFAULT_COMPONENT) {
+        Ok(summary) => VerifyOutcome::Ok(summary),
+        Err(e) => VerifyOutcome::Failed(e),
+    }
+}
 
-        info!(
-            "Checking Vector {version} in {}/dists/{}/{}",
-            self.url, self.suite, self.component
-        );
+fn verify_inner(version: &str, base_url: &str, suite: &str, component: &str) -> Result<String> {
+    let debian_version = format!("{version}-1");
+    let client = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(30))
+        .build()?;
 
-        let mut failures = 0usize;
-        for arch in ARCHES {
-            match check_arch(
-                &client,
-                &self.url,
-                &self.suite,
-                &self.component,
-                arch,
-                &debian_version,
-            ) {
-                Ok(ArchResult { filename, deb_size }) => {
-                    println!("  {arch:<8} OK    {filename} ({deb_size} bytes)");
-                }
-                Err(e) => {
-                    failures += 1;
-                    println!("  {arch:<8} FAIL  {e:#}");
-                }
+    info!("Checking Vector {version} in {base_url}/dists/{suite}/{component}");
+
+    let mut failures = 0usize;
+    for arch in ARCHES {
+        match check_arch(&client, base_url, suite, component, arch, &debian_version) {
+            Ok(ArchResult { filename, deb_size }) => {
+                println!("  {arch:<8} OK    {filename} ({deb_size} bytes)");
+            }
+            Err(e) => {
+                failures += 1;
+                println!("  {arch:<8} FAIL  {e:#}");
             }
         }
-
-        if failures > 0 {
-            bail!("{failures}/{} architectures missing {version}", ARCHES.len());
-        }
-        Ok(())
     }
+
+    if failures > 0 {
+        bail!(
+            "{failures}/{} architectures missing {version}",
+            ARCHES.len()
+        );
+    }
+    Ok(format!("{}/{} arches OK", ARCHES.len(), ARCHES.len()))
 }
 
 struct ArchResult {
     filename: String,
     deb_size: u64,
-}
-
-// Return the most recent Vector release tag (e.g. `0.55.0`) with the leading `v` stripped.
-//
-// We use `for-each-ref` sorted by creation date rather than `git describe`, because Vector
-// tags releases on release branches (not master), so HEAD-reachability is the wrong signal.
-// The glob `v[0-9]*` matches tags like `v0.55.0` while excluding `vdev-v*` (second char is
-// `d`, not a digit).
-fn latest_release_tag() -> Result<String> {
-    let tag = git::run_and_check_output(&[
-        "for-each-ref",
-        "--sort=-creatordate",
-        "--count=1",
-        "--format=%(refname:short)",
-        "refs/tags/v[0-9]*",
-    ])
-    .context("finding latest Vector release tag via `git for-each-ref`")?;
-    let tag = tag.trim();
-    if tag.is_empty() {
-        bail!("no matching release tags found (pattern: `v[0-9]*`)");
-    }
-    let version = tag
-        .strip_prefix('v')
-        .ok_or_else(|| anyhow::anyhow!("expected tag {tag:?} to start with 'v'"))?;
-    Ok(version.to_string())
 }
 
 fn check_arch(
