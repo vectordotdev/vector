@@ -109,6 +109,22 @@
                     done
                   '';
                 });
+              # sasl2-sys 0.1.22+2.1.28 build.rs does `cp -R sasl2 $OUT_DIR/sasl2`
+              # but the copy lands read-only in a Nix sandbox, breaking
+              # autoconf's config.log write. Patch the build.rs to chmod +w
+              # after the copy. No matching upstream issue yet; closest is
+              # MaterializeInc/rust-sasl#54 (cross-compile toolchain detection).
+              overrideVendorCargoPackage = package: drv:
+                if package.name == "sasl2-sys" then
+                  drv.overrideAttrs (old: {
+                    postPatch = (old.postPatch or "") + ''
+                      substituteInPlace build.rs \
+                        --replace-fail \
+                          'cmd!("cp", "-R", "sasl2", &src_dir)' \
+                          'cmd!("cp", "-R", "sasl2", &src_dir).run().expect("cp failed"); cmd!("chmod", "-R", "u+w", &src_dir)'
+                    '';
+                  })
+                else drv;
             };
 
             crossPkgs = crossPkgsForTarget target;
@@ -169,20 +185,9 @@
             CFLAGS = "-std=gnu17";
           });
 
-        # The `target-x86_64-unknown-linux-gnu` feature adds `vendored` which
-        # pulls in rdkafka?/gssapi-vendored → sasl2-sys + krb5-src. sasl2-sys
-        # v0.1.22+2.1.28's build.rs copies its vendored source with `cp -R`
-        # that lands read-only in a Nix sandbox, breaking autoconf's
-        # config.log write. Drop to `target-unix` so x86_64-gnu matches the
-        # other linux targets (no GSSAPI). Re-enable in Phase 6 once the
-        # vendoring story is sorted (patch sasl2-sys, or use system libs).
-        cargoFeaturesFor = target:
-          if target == "x86_64-unknown-linux-gnu" then "target-unix"
-          else "target-${target}";
-
         vectorBins = lib.listToAttrs (map (t: {
           name = "vector-${t}";
-          value = mkVector { target = t; cargoFeatures = cargoFeaturesFor t; };
+          value = mkVector { target = t; cargoFeatures = "target-${t}"; };
         }) targets);
 
         # Tarball must match `scripts/package-archive.sh` output byte-shape so
