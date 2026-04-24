@@ -15,9 +15,7 @@ jobs:
   cross-linux:
     name: Cross - ${{ matrix.target }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
-    env:
-      CARGO_INCREMENTAL: 0
+    timeout-minutes: 90
     strategy:
       matrix:
         target:
@@ -35,27 +33,18 @@ jobs:
         with:
           ref: ${{ inputs.ref }}
 
-      - uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
-        name: Cache Cargo registry + index
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22
 
       - run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: |
-          rustup target add x86_64-unknown-linux-gnu
-          cargo install cross --version 0.2.4 --force --locked
+
       # Why is this build, not check? Because we need to make sure the linking phase works.
       # aarch64 and musl in particular are notoriously hard to link.
       # While it may be tempting to slot a `check` in here for quickness, please don't.
-      - run: make cross-build-${{ matrix.target }}
+      - name: Build
+        run: nix build .#vector-${{ matrix.target }} --print-build-logs
+
       - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
-          name: "vector-debug-${{ matrix.target }}"
-          path: "./target/${{ matrix.target }}/debug/vector"
+          name: "vector-${{ matrix.target }}"
+          path: "./result/bin/vector"
