@@ -28,7 +28,8 @@ use crate::utils::git;
 #[derive(clap::Args, Debug)]
 #[command()]
 pub(super) struct Cli {
-    /// Version to verify (e.g. `0.55.0`). Only used when no subcommand is specified.
+    /// Version to verify (e.g. `0.55.0`). Only valid when no subcommand is specified;
+    /// pass the version to the subcommand otherwise (`vdev release verify apt 0.55.0`).
     /// Defaults to the most recent `v*` git tag.
     version: Option<String>,
 
@@ -57,6 +58,13 @@ enum Commands {
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
+        if self.version.is_some() && self.command.is_some() {
+            bail!(
+                "cannot combine a top-level [VERSION] with a subcommand; \
+                 pass the version to the subcommand instead \
+                 (e.g. `vdev release verify apt 0.55.0`)",
+            );
+        }
         match self.command {
             Some(Commands::Apt(cli)) => cli.exec(),
             Some(Commands::Docker(cli)) => cli.exec(),
@@ -77,29 +85,44 @@ pub enum VerifyOutcome {
 
 type ProbeFn = fn(&str) -> VerifyOutcome;
 
+struct Probe {
+    name: &'static str,
+    run: ProbeFn,
+    // Probes the release pipeline does not guarantee (e.g. `homebrew`, which is updated
+    // by a manual `vdev release homebrew` run — not by `publish.yml`). Their failures
+    // are reported as WARN so `vdev release verify` immediately post-release isn't a
+    // false negative.
+    best_effort: bool,
+}
+
+const PROBES: &[Probe] = &[
+    Probe { name: "apt",       run: apt::verify,       best_effort: false },
+    Probe { name: "docker",    run: docker::verify,    best_effort: false },
+    Probe { name: "github",    run: github::verify,    best_effort: false },
+    Probe { name: "homebrew",  run: homebrew::verify,  best_effort: true  },
+    Probe { name: "rpm",       run: rpm::verify,       best_effort: false },
+    Probe { name: "timber-io", run: timber_io::verify, best_effort: false },
+    Probe { name: "website",   run: website::verify,   best_effort: false },
+];
+
 fn run_all(version: &str) -> Result<()> {
     println!("Verifying Vector {version}");
 
-    let probes: &[(&str, ProbeFn)] = &[
-        ("apt", apt::verify),
-        ("docker", docker::verify),
-        ("github", github::verify),
-        ("homebrew", homebrew::verify),
-        ("rpm", rpm::verify),
-        ("timber-io", timber_io::verify),
-        ("website", website::verify),
-    ];
-
     let mut ok = 0usize;
+    let mut warn = 0usize;
     let mut failed = 0usize;
 
-    for (name, probe) in probes {
+    for probe in PROBES {
         println!();
-        println!("== {name} ==");
-        match probe(version) {
+        println!("== {} ==", probe.name);
+        match (probe.run)(version) {
             VerifyOutcome::Ok(summary) => {
                 ok += 1;
                 println!("  -> OK: {summary}");
+            }
+            VerifyOutcome::Failed(e) if probe.best_effort => {
+                warn += 1;
+                println!("  -> WARN (best-effort): {e:#}");
             }
             VerifyOutcome::Failed(e) => {
                 failed += 1;
@@ -109,10 +132,10 @@ fn run_all(version: &str) -> Result<()> {
     }
 
     println!();
-    println!("Summary: {ok} OK, {failed} FAIL");
+    println!("Summary: {ok} OK, {warn} WARN, {failed} FAIL");
 
     if failed > 0 {
-        bail!("{failed} probe(s) failed");
+        bail!("{failed} required probe(s) failed");
     }
     Ok(())
 }

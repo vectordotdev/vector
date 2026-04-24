@@ -51,6 +51,12 @@ const CHECKSUM_SAMPLES: &[&str] = &[
 // Representative file used for aliased-path probes. Picked because the release-s3.sh
 // verification step uses this exact file, so we mirror its contract.
 const ALIAS_PROBE_TEMPLATE: &str = "vector-{v}-x86_64-unknown-linux-gnu.tar.gz";
+// Versionless-stripped form (`${file/-$VERSION_EXACT/}` in release-s3.sh): a website
+// redirect that `release-s3.sh` creates in *every* alias path (exact, `{major}.{minor}.X`,
+// `{major}.X`, `latest`). Must resolve to 200 after following the redirect.
+const ALIAS_PROBE_STRIPPED: &str = "vector-x86_64-unknown-linux-gnu.tar.gz";
+// `latest`-substitution form (`${file/$VERSION_EXACT/latest}` in release-s3.sh): only
+// created under `/vector/latest/`.
 const ALIAS_PROBE_LATEST_TEMPLATE: &str = "vector-latest-x86_64-unknown-linux-gnu.tar.gz";
 
 /// Verify `packages.timber.io/vector/` has every release artifact at the exact-version
@@ -172,9 +178,23 @@ fn check_aliases(
                 println!("  {alias:<8} FAIL  {versioned_alias_file}: {e:#}");
             }
         }
+
+        // Versionless-stripped redirect: created by `release-s3.sh` in every alias path.
+        // Follows a website-redirect to the versioned file.
+        let stripped_url = format!("{base_url}/{alias}/{ALIAS_PROBE_STRIPPED}");
+        match head_follow(client, &stripped_url) {
+            Ok(size) => {
+                println!("  {alias:<8} OK    {ALIAS_PROBE_STRIPPED} -> 200 ({size} bytes)");
+            }
+            Err(e) => {
+                failures += 1;
+                println!("  {alias:<8} FAIL  {ALIAS_PROBE_STRIPPED}: {e:#}");
+            }
+        }
     }
 
-    // The `latest`-named alias (e.g. `vector-latest-...`) is a website-redirect -> 200.
+    // The `latest`-named alias (e.g. `vector-latest-...`) is a website-redirect -> 200,
+    // only present under `/vector/latest/`.
     let url = format!("{base_url}/latest/{latest_named_file}");
     match head_follow(client, &url) {
         Ok(size) => println!("  latest   OK    {latest_named_file} -> 200 ({size} bytes)"),
