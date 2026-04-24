@@ -12,6 +12,8 @@ enum GrpcCompression {
     /// No compression.
     #[default]
     None,
+    /// Gzip compression.
+    Gzip,
     /// Zstandard compression.
     Zstd,
 }

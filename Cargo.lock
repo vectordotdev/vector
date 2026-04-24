@@ -4729,9 +4729,9 @@ dependencies = [
 
 [[package]]
 name = "greptimedb-ingester"
-version = "0.16.0"
+version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6492f7ea4bd631ab3b5a0809ac7d746689772dcfd6de240caf61c3a6387cb9b5"
+checksum = "a5ee8f8f967c2b8183136920bdb0a36d06618cc9402f901495c0da66cb2cc74b"
 dependencies = [
  "arrow 58.1.0",
  "arrow-array 58.1.0",

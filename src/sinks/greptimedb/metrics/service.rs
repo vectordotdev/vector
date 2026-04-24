@@ -1,7 +1,7 @@
 use std::{sync::Arc, task::Poll};
 
 use greptimedb_ingester::{
-    Error as GreptimeError,
+    Error as GreptimeError, GrpcCompression as IngesterGrpcCompression,
     api::v1::Basic,
     api::v1::auth_header::AuthScheme,
     channel_manager::{ChannelConfig, ChannelManager, ClientTlsOption},
@@ -28,10 +28,14 @@ pub struct GreptimeDBGrpcService {
 }
 
 fn new_client_from_config(config: &GreptimeDBGrpcServiceConfig) -> crate::Result<Client> {
-    let send_compression = matches!(config.compression, GrpcCompression::Zstd);
+    let send_compression_encoding = match config.compression {
+        GrpcCompression::None => None,
+        GrpcCompression::Gzip => Some(IngesterGrpcCompression::Gzip),
+        GrpcCompression::Zstd => Some(IngesterGrpcCompression::Zstd),
+    };
 
     let mut channel_config = ChannelConfig {
-        send_compression,
+        send_compression_encoding,
         ..Default::default()
     };
 

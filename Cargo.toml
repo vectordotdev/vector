@@ -345,7 +345,7 @@ deadpool = { version = "0.13.0", default-features = false, features = ["managed"
 hex = { version = "0.4.3", default-features = false, optional = true }
 
 # GreptimeDB
-greptimedb-ingester = { version = "0.16.0", default-features = false, optional = true }
+greptimedb-ingester = { version = "0.17.0", default-features = false, optional = true }
 
 # External libs
 arc-swap = { workspace = true, default-features = false, optional = true }
