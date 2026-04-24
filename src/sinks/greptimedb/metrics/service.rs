@@ -40,23 +40,31 @@ fn new_client_from_config(config: &GreptimeDBGrpcServiceConfig) -> crate::Result
     };
 
     let channel_manager = if let Some(tls_config) = &config.tls {
-        if tls_config.key_pass.is_some()
-            || tls_config.alpn_protocols.is_some()
-            || tls_config.verify_certificate.is_some()
-            || tls_config.verify_hostname.is_some()
+        let TlsConfig {
+            verify_certificate,
+            verify_hostname,
+            alpn_protocols,
+            ca_file,
+            crt_file,
+            key_file,
+            key_pass,
+            server_name,
+        } = tls_config;
+
+        if verify_certificate.is_some()
+            || verify_hostname.is_some()
+            || alpn_protocols.is_some()
+            || key_pass.is_some()
+            || server_name.is_some()
         {
             warn!(
-                message = "TlsConfig: key_pass, alpn_protocols, verify_certificate and verify_hostname are not supported by greptimedb client at the moment."
+                message = "TlsConfig: verify_certificate, verify_hostname, alpn_protocols, key_pass and server_name are not supported by greptimedb client at the moment."
             );
         }
 
         // The greptimedb ingester requires all three TLS paths (ca_file, crt_file,
         // key_file) to be set. Refuse a partial config rather than downgrading to plaintext.
-        match (
-            &tls_config.ca_file,
-            &tls_config.crt_file,
-            &tls_config.key_file,
-        ) {
+        match (ca_file, crt_file, key_file) {
             (Some(ca), Some(crt), Some(key)) => {
                 channel_config.client_tls = Some(ClientTlsOption {
                     server_ca_cert_path: ca.to_string_lossy().into_owned(),
@@ -66,7 +74,9 @@ fn new_client_from_config(config: &GreptimeDBGrpcServiceConfig) -> crate::Result
                 ChannelManager::with_tls_config(channel_config).map_err(Box::new)?
             }
             _ => {
-                return Err("GreptimeDB TLS requires ca_file, crt_file, and key_file to all be set.".into());
+                return Err(
+                    "GreptimeDB TLS requires ca_file, crt_file, and key_file to all be set.".into(),
+                );
             }
         }
     } else {
