@@ -236,12 +236,18 @@ mod source {
         fn emit(self) {
             match self.error {
                 ApiError::InvalidAuthorization | ApiError::MissingAuthorization => {
-                    warn!(
+                    error!(
                         message = "Unauthenticated request.",
                         error = ?self.error,
-                        error_type = error_type::REQUEST_FAILED,
+                        error_type = error_type::AUTHENTICATION_FAILED,
                         stage = error_stage::RECEIVING
                     );
+                    counter!(
+                        "component_errors_total",
+                        "error_type" => error_type::AUTHENTICATION_FAILED,
+                        "stage" => error_stage::RECEIVING,
+                    )
+                    .increment(1);
                 }
                 _ => {
                     error!(
