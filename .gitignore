@@ -6,6 +6,11 @@ tests/data/wasm/*/target
 bench_output.txt
 rust-analyzer.toml
 
+# Nix
+result
+result-*
+.direnv
+
 # Python
 *.pyc
 
