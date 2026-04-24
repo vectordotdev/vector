@@ -97,6 +97,7 @@ generated: components: sinks: greptimedb_metrics: configuration: {
 		type: string: {
 			default: "none"
 			enum: {
+				gzip: "Gzip compression."
 				none: "No compression."
 				zstd: "Zstandard compression."
 			}
