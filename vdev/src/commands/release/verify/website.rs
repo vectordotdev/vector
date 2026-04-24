@@ -10,7 +10,7 @@ const DEFAULT_BASE_URL: &str = "https://vector.dev";
 ///
 /// Checks that Hugo has rebuilt the site post-release: the per-release page at
 /// `/releases/<ver>/` is live, the releases index lists it, and the download page
-/// points at `<ver>`.
+/// treats `<ver>` as the current release.
 #[derive(clap::Args, Debug)]
 #[command()]
 pub struct Cli {
@@ -42,9 +42,6 @@ pub fn verify(version: &str) -> VerifyOutcome {
     }
 }
 
-// Each check is a (label, url, required-substring). The substring must appear in the
-// body of the 200 response; we don't parse the HTML since a plain `contains` is enough
-// to distinguish "Hugo has rebuilt with the new version" from "stale site".
 fn verify_inner(version: &str, base_url: &str) -> Result<String> {
     let client = reqwest::blocking::Client::builder()
         .timeout(Duration::from_secs(30))
@@ -52,34 +49,50 @@ fn verify_inner(version: &str, base_url: &str) -> Result<String> {
 
     info!("Checking Vector {version} on {base_url}");
 
-    let release_page = format!("{base_url}/releases/{version}/");
-    let releases_index = format!("{base_url}/releases/");
-    let download_page = format!("{base_url}/download/");
-    // The releases index should link to the per-release page, not merely mention the
-    // version string (which might appear in unrelated changelog blurbs on the page).
-    let release_link = format!("/releases/{version}/");
-
-    let checks: [(&str, &str, &str); 3] = [
-        ("release page", release_page.as_str(), version),
-        (
-            "releases index",
-            releases_index.as_str(),
-            release_link.as_str(),
-        ),
-        ("download page", download_page.as_str(), version),
-    ];
-
-    let total = checks.len();
+    let total = 3usize;
     let mut failures = 0usize;
-    for (label, url, needle) in checks {
-        match check_page(&client, url, needle) {
-            Ok(CheckResult { status, bytes }) => {
-                println!("  {label:<15} OK    {status} {url} ({bytes} bytes, found {needle:?})");
-            }
-            Err(e) => {
-                failures += 1;
-                println!("  {label:<15} FAIL  {url} -- {e:#}");
-            }
+
+    // Per-release page: `/releases/<ver>/` must 200 and mention `<ver>`.
+    let release_page = format!("{base_url}/releases/{version}/");
+    match fetch_page_containing(&client, &release_page, version) {
+        Ok(PageResult { status, bytes }) => {
+            println!("  release page    OK    {status} {release_page} ({bytes} bytes)");
+        }
+        Err(e) => {
+            failures += 1;
+            println!("  release page    FAIL  {release_page} -- {e:#}");
+        }
+    }
+
+    // Releases index: must include a link to the per-release page, not just the bare
+    // version string (which appears in unrelated changelog blurbs on the page).
+    let releases_index = format!("{base_url}/releases/");
+    let release_link = format!("/releases/{version}/");
+    match fetch_page_containing(&client, &releases_index, &release_link) {
+        Ok(PageResult { status, bytes }) => {
+            println!("  releases index  OK    {status} {releases_index} ({bytes} bytes)");
+        }
+        Err(e) => {
+            failures += 1;
+            println!("  releases index  FAIL  {releases_index} -- {e:#}");
+        }
+    }
+
+    // Download page: the first non-nightly version in the selector must equal `<ver>`.
+    // See `website/layouts/partials/download/version-selector.html`: the range runs over
+    // `site.Data.docs.versions` in order, and `$latest := index $versions 0`, so the
+    // first non-nightly `setVersion('...')` button in the HTML corresponds to $latest.
+    // A plain `contains(version)` match is not enough — every release in `versions.yaml`
+    // emits its own `setVersion('X')` button, so an older release page can contain the
+    // new version string before Hugo rebuilds.
+    let download_page = format!("{base_url}/download/");
+    match check_download_page(&client, &download_page, version) {
+        Ok(PageResult { status, bytes }) => {
+            println!("  download page   OK    {status} {download_page} ({bytes} bytes)");
+        }
+        Err(e) => {
+            failures += 1;
+            println!("  download page   FAIL  {download_page} -- {e:#}");
         }
     }
 
@@ -89,12 +102,50 @@ fn verify_inner(version: &str, base_url: &str) -> Result<String> {
     Ok(format!("{total}/{total} pages OK"))
 }
 
-struct CheckResult {
+struct PageResult {
     status: u16,
     bytes: usize,
 }
 
-fn check_page(client: &reqwest::blocking::Client, url: &str, needle: &str) -> Result<CheckResult> {
+fn fetch_page_containing(
+    client: &reqwest::blocking::Client,
+    url: &str,
+    needle: &str,
+) -> Result<PageResult> {
+    let (status, body) = fetch(client, url)?;
+    if !body.contains(needle) {
+        bail!(
+            "body did not contain {needle:?} (status {status}, {} bytes)",
+            body.len()
+        );
+    }
+    Ok(PageResult {
+        status,
+        bytes: body.len(),
+    })
+}
+
+fn check_download_page(
+    client: &reqwest::blocking::Client,
+    url: &str,
+    version: &str,
+) -> Result<PageResult> {
+    let (status, body) = fetch(client, url)?;
+    let latest = latest_selector_version(&body).with_context(|| {
+        format!("no `setVersion('<ver>')` button found on {url} (template changed?)")
+    })?;
+    if latest != version {
+        bail!(
+            "download page lists {latest:?} as the latest release, expected {version:?} (Hugo still stale?)"
+        );
+    }
+    Ok(PageResult {
+        status,
+        bytes: body.len(),
+    })
+}
+
+fn fetch(client: &reqwest::blocking::Client, url: &str) -> Result<(u16, String)> {
     let resp = client
         .get(url)
         .send()
@@ -105,23 +156,63 @@ fn check_page(client: &reqwest::blocking::Client, url: &str, needle: &str) -> Re
     let body = resp
         .text()
         .with_context(|| format!("reading body of {url}"))?;
-    let bytes = body.len();
-    if !body.contains(needle) {
-        bail!("body did not contain {needle:?} (status {status}, {bytes} bytes)");
+    Ok((status, body))
+}
+
+// Scan the download page for the first `setVersion('X')` call whose argument is not
+// `nightly` — that is, the first release version in the selector's range loop, which
+// Hugo renders in the same order as `site.Data.docs.versions` (latest first).
+fn latest_selector_version(body: &str) -> Option<&str> {
+    const MARKER: &str = "setVersion('";
+    let mut search_from = 0;
+    while let Some(rel) = body[search_from..].find(MARKER) {
+        let start = search_from + rel + MARKER.len();
+        let end = start + body[start..].find('\'')?;
+        let v = &body[start..end];
+        if v != "nightly" {
+            return Some(v);
+        }
+        search_from = end + 1;
     }
-    Ok(CheckResult { status, bytes })
+    None
 }
 
 #[cfg(test)]
 mod tests {
+    use super::latest_selector_version;
+
     #[test]
-    fn needle_contains_is_enough() {
-        // Sanity: the "search for a substring" rule we rely on in `check_page` is the
-        // plain `str::contains`, which is case-sensitive. Document that expectation
-        // here so a future refactor doesn't silently loosen it.
-        let body = "<a href=\"/releases/0.55.0/\">0.55.0</a>";
-        assert!(body.contains("0.55.0"));
-        assert!(body.contains("/releases/0.55.0/"));
-        assert!(!body.contains("0.55.1"));
+    fn finds_first_non_nightly_version() {
+        let body = r#"
+            <button @click="$store.global.setVersion('nightly'); open = false">nightly</button>
+            <button @click="$store.global.setVersion('0.55.0'); open = false">0.55.0</button>
+            <button @click="$store.global.setVersion('0.54.0'); open = false">0.54.0</button>
+        "#;
+        assert_eq!(latest_selector_version(body), Some("0.55.0"));
+    }
+
+    #[test]
+    fn skips_nightly_even_when_it_appears_multiple_times() {
+        let body = r#"setVersion('nightly') setVersion('nightly') setVersion('0.55.0')"#;
+        assert_eq!(latest_selector_version(body), Some("0.55.0"));
+    }
+
+    #[test]
+    fn returns_none_when_only_nightly_present() {
+        let body = r#"setVersion('nightly')"#;
+        assert_eq!(latest_selector_version(body), None);
+    }
+
+    #[test]
+    fn returns_none_when_marker_absent() {
+        assert_eq!(latest_selector_version(""), None);
+    }
+
+    #[test]
+    fn detects_stale_download_page() {
+        // When Hugo still thinks 0.54.0 is latest, `setVersion('0.54.0')` appears before
+        // `setVersion('0.55.0')` — the probe should see 0.54.0 as the latest and flag it.
+        let stale = r#"setVersion('nightly') setVersion('0.54.0') setVersion('0.55.0')"#;
+        assert_eq!(latest_selector_version(stale), Some("0.54.0"));
     }
 }
