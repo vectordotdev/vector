@@ -59,15 +59,6 @@ if [[ "$CHANNEL" == "nightly" ]]; then
   aws s3 cp "$td_nightly" "s3://packages.timber.io/vector/nightly/latest" --recursive --sse --acl public-read
   echo "Uploaded archives"
 
-  echo "Redirecting old artifact names"
-  for file in $(aws s3api list-objects-v2 --bucket packages.timber.io --prefix "vector/$i/" --query 'Contents[*].Key' --output text  | tr "\t" "\n" | grep '\-nightly'); do
-    file=$(basename "$file")
-    # vector-nightly-amd64.deb -> vector-amd64.deb
-    echo -n "" | aws s3 cp - "s3://packages.timber.io/vector/nightly/$DATE/${file/-nightly/}" --website-redirect "/vector/nightly/$DATE/$file" --acl public-read
-    echo -n "" | aws s3 cp - "s3://packages.timber.io/vector/nightly/latest/${file/-nightly/}" --website-redirect "/vector/nightly/latest/$file" --acl public-read
-  done
-  echo "Redirected old artifact names"
-
   # Verify that the files exist and can be downloaded
   echo "Waiting for $VERIFY_TIMEOUT seconds before running the verifications"
   sleep "$VERIFY_TIMEOUT"
