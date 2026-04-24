@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     future::ready,
     num::NonZeroUsize,
     sync::{Arc, LazyLock, Mutex},
@@ -129,6 +129,10 @@ impl<'a> Builder<'a> {
     /// Builds the new pieces of the topology found in `self.diff`.
     async fn build(mut self) -> Result<TopologyPieces, Vec<String>> {
         let enrichment_tables = self.load_enrichment_tables().await;
+
+        // Compute which components are on authoritative paths (for fanout-level stripping).
+        let authoritative_components = self.config.compute_authoritative_components();
+
         let source_tasks = self.build_sources(enrichment_tables).await;
         self.build_transforms(enrichment_tables).await;
         self.build_sinks(enrichment_tables).await;
@@ -150,6 +154,7 @@ impl<'a> Builder<'a> {
                 utilization: self
                     .utilization_emitter
                     .map(|e| (e, self.utilization_registry)),
+                authoritative_components,
             })
         } else {
             Err(self.errors)
@@ -615,30 +620,6 @@ impl<'a> Builder<'a> {
                 extra_context: self.extra_context.clone(),
             };
 
-            // Per-sink authoritative acknowledgement control (RFC 6517).
-            //
-            // When at least one sink in the topology has `authoritative: true` explicitly
-            // set, we activate per-sink stripping: non-authoritative sinks have their
-            // finalizers removed so the source only waits for authoritative sinks.
-            //
-            // When NO sink has `authoritative` set, all sinks participate in the ack
-            // chain (preserving backwards compatibility with the pre-authoritative behavior).
-            let any_sink_explicitly_authoritative = self.config.sinks().any(|(_, s)| {
-                s.inner
-                    .acknowledgements()
-                    .merge_default(&self.config.global.acknowledgements)
-                    .is_explicitly_authoritative()
-            });
-
-            let sink_is_authoritative = if any_sink_explicitly_authoritative {
-                sink.inner
-                    .acknowledgements()
-                    .merge_default(&self.config.global.acknowledgements)
-                    .authoritative()
-            } else {
-                true // No authoritative sinks set → all sinks participate (backwards compat)
-            };
-
             let (sink, healthcheck) = match sink.inner.build(cx).await {
                 Err(error) => {
                     self.errors.push(format!("Sink \"{key}\": {error}"));
@@ -674,22 +655,6 @@ impl<'a> Builder<'a> {
                 sink.run(
                     rx.by_ref()
                         .filter(|events: &EventArray| ready(filter_events_type(events, input_type)))
-                        .map(move |mut events: EventArray| {
-                            // For non-authoritative sinks, strip finalizers from all events.
-                            // This drops the Arc<EventFinalizer> references immediately,
-                            // allowing the source's BatchNotifier to resolve as soon as all
-                            // authoritative sinks have finished — without waiting for this
-                            // non-authoritative sink.
-                            //
-                            // The stripped finalizers are dropped here, which calls
-                            // EventFinalizer::drop -> update_batch(Dropped). Since Dropped
-                            // is a no-op update to BatchStatus, this has no effect on the
-                            // final batch status.
-                            if !sink_is_authoritative {
-                                let _ = events.take_finalizers();
-                            }
-                            events
-                        })
                         .inspect(|events| {
                             events_received.emit(CountByteSize(
                                 events.len(),
@@ -1023,6 +988,9 @@ pub struct TopologyPieces {
     pub(crate) detach_triggers: HashMap<ComponentKey, Trigger>,
     pub(crate) metrics_storage: MetricsStorage,
     pub(crate) utilization: Option<(UtilizationEmitter, UtilizationRegistry)>,
+    /// Components on authoritative acknowledgement paths. None means the feature
+    /// is inactive (no sink has authoritative: true), so all sinks participate.
+    pub(crate) authoritative_components: Option<HashSet<ComponentKey>>,
 }
 
 /// Builder for constructing TopologyPieces with a fluent API.

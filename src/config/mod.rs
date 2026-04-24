@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{HashMap, HashSet, VecDeque},
     fmt::{self, Display, Formatter},
     fs,
     hash::Hash,
@@ -266,6 +266,59 @@ impl Config {
                 }
             })
             .collect()
+    }
+
+    /// Compute which components are "on authoritative paths."
+    ///
+    /// A component is on an authoritative path if it is an authoritative sink,
+    /// or a transform/source that transitively feeds into at least one
+    /// authoritative sink.
+    ///
+    /// Returns `None` if no sink has `authoritative: true` explicitly set,
+    /// meaning the feature is inactive and all sinks participate in acks
+    /// (preserving backwards compatibility).
+    pub fn compute_authoritative_components(&self) -> Option<HashSet<ComponentKey>> {
+        // Step 1: Check if ANY sink is explicitly authoritative.
+        let any_explicitly_authoritative = self.sinks.iter().any(|(_, sink)| {
+            sink.inner
+                .acknowledgements()
+                .merge_default(&self.global.acknowledgements)
+                .is_explicitly_authoritative()
+        });
+
+        if !any_explicitly_authoritative {
+            return None; // Feature inactive; all sinks participate
+        }
+
+        // Step 2: Collect all authoritative sinks.
+        let authoritative_sinks: HashSet<ComponentKey> = self
+            .sinks
+            .iter()
+            .filter(|(_, sink)| {
+                sink.inner
+                    .acknowledgements()
+                    .merge_default(&self.global.acknowledgements)
+                    .authoritative()
+            })
+            .map(|(key, _)| key.clone())
+            .collect();
+
+        // Step 3: BFS backward from authoritative sinks through edges.
+        let mut on_authoritative_path: HashSet<ComponentKey> = authoritative_sinks.clone();
+        let mut queue: VecDeque<ComponentKey> = authoritative_sinks.into_iter().collect();
+
+        while let Some(component) = queue.pop_front() {
+            if let Some(inputs) = self.inputs_for_node(&component) {
+                for input in inputs {
+                    let upstream = &input.component;
+                    if on_authoritative_path.insert(upstream.clone()) {
+                        queue.push_back(upstream.clone());
+                    }
+                }
+            }
+        }
+
+        Some(on_authoritative_path)
     }
 }
 

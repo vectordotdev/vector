@@ -70,6 +70,9 @@ pub struct RunningTopology {
     metrics_task: Option<TaskHandle>,
     metrics_task_shutdown_trigger: Option<Trigger>,
     pending_reload: Option<HashSet<ComponentKey>>,
+    /// Components on authoritative acknowledgement paths. None means the feature
+    /// is inactive (no sink has authoritative: true), so all sinks participate.
+    authoritative_components: Option<HashSet<ComponentKey>>,
 }
 
 impl RunningTopology {
@@ -94,6 +97,7 @@ impl RunningTopology {
             metrics_task: None,
             metrics_task_shutdown_trigger: None,
             pending_reload: None,
+            authoritative_components: None,
         }
     }
 
@@ -719,6 +723,9 @@ impl RunningTopology {
         diff: &ConfigDiff,
         new_pieces: &mut TopologyPieces,
     ) {
+        // Recompute authoritative component set from the current config.
+        self.authoritative_components = new_pieces.authoritative_components.take();
+
         debug!("Connecting changed/added component(s).");
 
         // Update tap metadata
@@ -962,6 +969,15 @@ impl RunningTopology {
         let new_inputs = inputs.iter().cloned().collect::<HashSet<_>>();
         let inputs_to_add = &new_inputs - &old_inputs;
 
+        // Determine whether events flowing into this component should have
+        // finalizers stripped. Strip when authoritative mode is active AND
+        // this component is NOT on an authoritative path.
+        let strip_finalizers = self
+            .authoritative_components
+            .as_ref()
+            .map(|auth| !auth.contains(key))
+            .unwrap_or(false);
+
         for input in inputs {
             let output = self.outputs.get_mut(&input).expect("unknown output");
 
@@ -971,7 +987,7 @@ impl RunningTopology {
                 // output for the first time, since there's nothing to actually replace at this point.
                 debug!(component_id = %key, fanout_id = %input, "Adding component input to fanout.");
 
-                _ = output.send(ControlMessage::Add(key.clone(), tx.clone()));
+                _ = output.send(ControlMessage::Add(key.clone(), tx.clone(), strip_finalizers));
             } else {
                 // We know that if this component is connected to a given input, and neither
                 // components were changed, then the output must still exist, which means we paused
@@ -1043,12 +1059,19 @@ impl RunningTopology {
             .filter(|(key, _)| !diff.transforms.contains(key));
         for (transform_key, transform) in unchanged_transforms {
             let changed_outputs = get_changed_outputs(diff, transform.inputs.clone());
+
+            let strip_finalizers = self
+                .authoritative_components
+                .as_ref()
+                .map(|auth| !auth.contains(transform_key))
+                .unwrap_or(false);
+
             for output_id in changed_outputs {
                 debug!(component_id = %transform_key, fanout_id = %output_id.component, "Reattaching component input to fanout.");
 
                 let input = self.inputs.get(transform_key).cloned().unwrap();
                 let output = self.outputs.get_mut(&output_id).unwrap();
-                _ = output.send(ControlMessage::Add(transform_key.clone(), input));
+                _ = output.send(ControlMessage::Add(transform_key.clone(), input, strip_finalizers));
             }
         }
 
@@ -1058,12 +1081,19 @@ impl RunningTopology {
             .filter(|(key, _)| !diff.sinks.contains(key));
         for (sink_key, sink) in unchanged_sinks {
             let changed_outputs = get_changed_outputs(diff, sink.inputs.clone());
+
+            let strip_finalizers = self
+                .authoritative_components
+                .as_ref()
+                .map(|auth| !auth.contains(sink_key))
+                .unwrap_or(false);
+
             for output_id in changed_outputs {
                 debug!(component_id = %sink_key, fanout_id = %output_id.component, "Reattaching component input to fanout.");
 
                 let input = self.inputs.get(sink_key).cloned().unwrap();
                 let output = self.outputs.get_mut(&output_id).unwrap();
-                _ = output.send(ControlMessage::Add(sink_key.clone(), input));
+                _ = output.send(ControlMessage::Add(sink_key.clone(), input, strip_finalizers));
             }
         }
     }

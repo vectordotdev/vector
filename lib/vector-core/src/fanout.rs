@@ -8,10 +8,12 @@ use tokio_util::sync::ReusableBoxFuture;
 use vector_buffers::topology::channel::BufferSender;
 
 use crate::{config::ComponentKey, event::EventArray};
+use vector_common::finalization::Finalizable;
 
 pub enum ControlMessage {
-    /// Adds a new sink to the fanout.
-    Add(ComponentKey, BufferSender<EventArray>),
+    /// Adds a new sink to the fanout. The bool indicates whether finalizers
+    /// should be stripped from events sent to this sink (non-authoritative path).
+    Add(ComponentKey, BufferSender<EventArray>, bool),
 
     /// Removes a sink from the fanout.
     Remove(ComponentKey),
@@ -23,6 +25,7 @@ pub enum ControlMessage {
     Pause(ComponentKey),
 
     /// Replaces a paused sink with its new sender.
+    /// The strip flag is preserved from the original Add.
     Replace(ComponentKey, BufferSender<EventArray>),
 }
 
@@ -30,7 +33,7 @@ impl fmt::Debug for ControlMessage {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "ControlMessage::")?;
         match self {
-            Self::Add(id, _) => write!(f, "Add({id:?})"),
+            Self::Add(id, _, strip) => write!(f, "Add({id:?}, strip={strip})"),
             Self::Remove(id) => write!(f, "Remove({id:?})"),
             Self::Pause(id) => write!(f, "Pause({id:?})"),
             Self::Replace(id, _) => write!(f, "Replace({id:?})"),
@@ -45,6 +48,7 @@ pub type ControlChannel = mpsc::UnboundedSender<ControlMessage>;
 pub struct Fanout {
     senders: IndexMap<ComponentKey, Option<Sender>>,
     control_channel: mpsc::UnboundedReceiver<ControlMessage>,
+    strip_flags: HashMap<ComponentKey, bool>,
 }
 
 impl Fanout {
@@ -54,6 +58,7 @@ impl Fanout {
         let fanout = Self {
             senders: Default::default(),
             control_channel: control_rx,
+            strip_flags: Default::default(),
         };
 
         (fanout, control_tx)
@@ -64,12 +69,14 @@ impl Fanout {
     /// # Panics
     ///
     /// Function will panic if a sink with the same ID is already present.
-    pub fn add(&mut self, id: ComponentKey, sink: BufferSender<EventArray>) {
+    pub fn add(&mut self, id: ComponentKey, sink: BufferSender<EventArray>, strip_finalizers: bool) {
         assert!(
             !self.senders.contains_key(&id),
             "Adding duplicate output id to fanout: {id}"
         );
-        self.senders.insert(id, Some(Sender::new(sink)));
+        self.senders
+            .insert(id.clone(), Some(Sender::new(sink, strip_finalizers)));
+        self.strip_flags.insert(id, strip_finalizers);
     }
 
     fn remove(&mut self, id: &ComponentKey) {
@@ -77,16 +84,18 @@ impl Fanout {
             self.senders.shift_remove(id).is_some(),
             "Removing nonexistent sink from fanout: {id}"
         );
+        self.strip_flags.remove(id);
     }
 
     fn replace(&mut self, id: &ComponentKey, sink: BufferSender<EventArray>) {
+        let strip = self.strip_flags.get(id).copied().unwrap_or(false);
         match self.senders.get_mut(id) {
             Some(sender) => {
                 // While a sink must be _known_ to be replaced, it must also be empty (previously
                 // paused or consumed when the `SendGroup` was created), otherwise an invalid
                 // sequence of control operations has been applied.
                 assert!(
-                    sender.replace(Sender::new(sink)).is_none(),
+                    sender.replace(Sender::new(sink, strip)).is_none(),
                     "Replacing existing sink is not valid: {id}"
                 );
             }
@@ -129,7 +138,7 @@ impl Fanout {
         trace!("Processing control message outside of send: {:?}", message);
 
         match message {
-            ControlMessage::Add(id, sink) => self.add(id, sink),
+            ControlMessage::Add(id, sink, strip) => self.add(id, sink, strip),
             ControlMessage::Remove(id) => self.remove(&id),
             ControlMessage::Pause(id) => self.pause(&id),
             ControlMessage::Replace(id, sink) => self.replace(&id, sink),
@@ -236,7 +245,7 @@ impl Fanout {
 
         // Create our send group which arms all senders to send the given events, and handles
         // adding/removing/replacing senders while the send is in-flight.
-        let mut send_group = SendGroup::new(&mut self.senders, events, send_reference);
+        let mut send_group = SendGroup::new(&mut self.senders, &mut self.strip_flags, events, send_reference);
 
         loop {
             tokio::select! {
@@ -251,8 +260,8 @@ impl Fanout {
                     // During a send operation, control messages must be applied via the
                     // `SendGroup`, since it has exclusive access to the senders.
                     match maybe_msg {
-                        Some(ControlMessage::Add(id, sink)) => {
-                            send_group.add(id, sink);
+                        Some(ControlMessage::Add(id, sink, strip)) => {
+                            send_group.add(id, sink, strip);
                         },
                         Some(ControlMessage::Remove(id)) => {
                             send_group.remove(&id);
@@ -261,7 +270,8 @@ impl Fanout {
                             send_group.pause(&id);
                         },
                         Some(ControlMessage::Replace(id, sink)) => {
-                            send_group.replace(&id, Sender::new(sink));
+                            let strip = send_group.strip_flags.get(&id).copied().unwrap_or(false);
+                            send_group.replace(&id, Sender::new(sink, strip));
                         },
                         None => {
                             // Control channel is closed, which means Vector is shutting down.
@@ -286,12 +296,14 @@ impl Fanout {
 
 struct SendGroup<'a> {
     senders: &'a mut IndexMap<ComponentKey, Option<Sender>>,
+    strip_flags: &'a mut HashMap<ComponentKey, bool>,
     sends: HashMap<ComponentKey, ReusableBoxFuture<'static, crate::Result<Sender>>>,
 }
 
 impl<'a> SendGroup<'a> {
     fn new(
         senders: &'a mut IndexMap<ComponentKey, Option<Sender>>,
+        strip_flags: &'a mut HashMap<ComponentKey, bool>,
         events: EventArray,
         send_reference: Option<Instant>,
     ) -> Self {
@@ -327,7 +339,7 @@ impl<'a> SendGroup<'a> {
             sends.insert(key.clone(), ReusableBoxFuture::new(send));
         }
 
-        Self { senders, sends }
+        Self { senders, strip_flags, sends }
     }
 
     fn try_detach_send(&mut self, id: &ComponentKey) -> bool {
@@ -347,15 +359,16 @@ impl<'a> SendGroup<'a> {
     }
 
     #[allow(clippy::needless_pass_by_value)]
-    fn add(&mut self, id: ComponentKey, sink: BufferSender<EventArray>) {
+    fn add(&mut self, id: ComponentKey, sink: BufferSender<EventArray>, strip_finalizers: bool) {
         // When we're in the middle of a send, we can only keep track of the new sink, but can't
         // actually send to it, as we don't have the item to send... so only add it to `senders`.
         assert!(
             self.senders
-                .insert(id.clone(), Some(Sender::new(sink)))
+                .insert(id.clone(), Some(Sender::new(sink, strip_finalizers)))
                 .is_none(),
             "Adding duplicate output id to fanout: {id}"
         );
+        self.strip_flags.insert(id, strip_finalizers);
     }
 
     fn remove(&mut self, id: &ComponentKey) {
@@ -366,6 +379,7 @@ impl<'a> SendGroup<'a> {
             self.senders.shift_remove(id).is_some(),
             "Removing nonexistent sink from fanout: {id}"
         );
+        self.strip_flags.remove(id);
 
         // Now try and detach the in-flight send, if it exists.
         //
@@ -450,20 +464,25 @@ struct Sender {
     inner: BufferSender<EventArray>,
     input: Option<EventArray>,
     send_reference: Option<Instant>,
+    strip_finalizers: bool,
 }
 
 impl Sender {
-    fn new(inner: BufferSender<EventArray>) -> Self {
+    fn new(inner: BufferSender<EventArray>, strip_finalizers: bool) -> Self {
         Self {
             inner,
             input: None,
             send_reference: None,
+            strip_finalizers,
         }
     }
 
     async fn flush(&mut self) -> crate::Result<()> {
         let send_reference = self.send_reference.take();
-        if let Some(input) = self.input.take() {
+        if let Some(mut input) = self.input.take() {
+            if self.strip_finalizers {
+                let _ = input.take_finalizers();
+            }
             self.inner.send(input, send_reference).await?;
             self.inner.flush().await?;
         }
@@ -530,7 +549,7 @@ mod tests {
 
         let mut receivers = Vec::new();
         for (i, (sender, receiver)) in pairs.into_iter().enumerate() {
-            fanout.add(ComponentKey::from(i.to_string()), sender);
+            fanout.add(ComponentKey::from(i.to_string()), sender, false);
             receivers.push(receiver);
         }
 
@@ -546,7 +565,7 @@ mod tests {
         let (sender, receiver) = build_sender_pair(capacity);
         receivers.push(receiver);
 
-        fanout.add(ComponentKey::from(sender_id.to_string()), sender);
+        fanout.add(ComponentKey::from(sender_id.to_string()), sender, false);
     }
 
     fn remove_sender_from_fanout(control: &UnboundedSender<ControlMessage>, sender_id: usize) {
@@ -922,6 +941,111 @@ mod tests {
                 expected_events[i]
             );
         }
+    }
+
+    #[tokio::test]
+    async fn fanout_strips_finalizers_for_marked_senders() {
+        use vector_common::finalization::{AddBatchNotifier, BatchNotifier, Finalizable};
+
+        let (mut fanout, _control) = Fanout::new();
+
+        // Create two sender pairs
+        let (sender_auth, mut receiver_auth) = build_sender_pair(4);
+        let (sender_non_auth, mut receiver_non_auth) = build_sender_pair(4);
+
+        // Add one sender with strip=false (authoritative path), one with strip=true
+        fanout.add(ComponentKey::from("auth_sink"), sender_auth, false);
+        fanout.add(
+            ComponentKey::from("non_auth_sink"),
+            sender_non_auth,
+            true,
+        );
+
+        // Create events with a batch notifier (finalizer)
+        let (batch, mut batch_receiver) = BatchNotifier::new_with_receiver();
+        let mut events: EventArray = make_events_inner(1).collect::<Vec<_>>().into();
+        events.add_batch_notifier(batch);
+
+        // Send through the fanout
+        fanout
+            .send(events, None)
+            .await
+            .expect("send should succeed");
+
+        // Receive from non-auth path -- finalizers should be stripped
+        let mut non_auth_events = receiver_non_auth.next().await.unwrap();
+        let stripped_finalizers = non_auth_events.take_finalizers();
+        assert!(
+            stripped_finalizers.is_empty(),
+            "non-auth path should have empty finalizers"
+        );
+
+        // Receive from auth path -- finalizers should be present
+        let mut auth_events = receiver_auth.next().await.unwrap();
+        let auth_finalizers = auth_events.take_finalizers();
+        assert!(
+            !auth_finalizers.is_empty(),
+            "auth path should have finalizers"
+        );
+
+        // Drop all remaining finalizer references from the authoritative path.
+        // After dropping, the batch should resolve.
+        drop(auth_events);
+        drop(auth_finalizers);
+        drop(non_auth_events);
+        drop(stripped_finalizers);
+
+        // The batch_receiver should now have a result since all finalizer references
+        // from the authoritative path have been dropped
+        let status = batch_receiver.try_recv();
+        assert!(
+            status.is_ok(),
+            "batch should resolve after auth finalizers are dropped"
+        );
+    }
+
+    #[tokio::test]
+    async fn fanout_strip_flag_preserved_across_replace() {
+        use vector_common::finalization::{
+            AddBatchNotifier, BatchNotifier, Finalizable,
+        };
+
+        let (mut fanout, control) = Fanout::new();
+
+        // Add a sender with strip=true
+        let (sender, _receiver) = build_sender_pair(4);
+        fanout.add(ComponentKey::from("0"), sender, true);
+
+        // Replace the sender (pause + replace)
+        let (new_sender, mut new_receiver) = build_sender_pair(4);
+        control
+            .send(ControlMessage::Pause(ComponentKey::from("0")))
+            .expect("sending control message should not fail");
+        control
+            .send(ControlMessage::Replace(
+                ComponentKey::from("0"),
+                new_sender,
+            ))
+            .expect("sending control message should not fail");
+
+        // Create events with a batch notifier
+        let (batch, _batch_receiver) = BatchNotifier::new_with_receiver();
+        let mut events: EventArray = make_events_inner(1).collect::<Vec<_>>().into();
+        events.add_batch_notifier(batch);
+
+        // Send through fanout -- this will process the pause+replace control messages
+        fanout
+            .send(events, None)
+            .await
+            .expect("send should succeed");
+
+        // Receive from the replaced sender -- finalizers should still be stripped
+        let mut received_events = new_receiver.next().await.unwrap();
+        let finalizers = received_events.take_finalizers();
+        assert!(
+            finalizers.is_empty(),
+            "strip flag should be preserved across replace: finalizers should be empty"
+        );
     }
 
     fn make_events_inner(count: usize) -> impl Iterator<Item = LogEvent> {
