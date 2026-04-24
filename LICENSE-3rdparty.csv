@@ -64,6 +64,8 @@ atoi,https://github.com/pacman82/atoi-rs,MIT,Markus Klein
 atomic-waker,https://github.com/smol-rs/atomic-waker,Apache-2.0 OR MIT,"Stjepan Glavina <stjepang@gmail.com>, Contributors to futures-rs"
 aws-config,https://github.com/smithy-lang/smithy-rs,Apache-2.0,"AWS Rust SDK Team <aws-sdk-rust@amazon.com>, Russell Cohen <rcoh@amazon.com>"
 aws-credential-types,https://github.com/smithy-lang/smithy-rs,Apache-2.0,AWS Rust SDK Team <aws-sdk-rust@amazon.com>
+aws-lc-rs,https://github.com/aws/aws-lc-rs,ISC AND (Apache-2.0 OR ISC),AWS-LibCrypto
+aws-lc-sys,https://github.com/aws/aws-lc-rs,ISC AND (Apache-2.0 OR ISC) AND Apache-2.0 AND MIT AND BSD-3-Clause AND (Apache-2.0 OR ISC OR MIT) AND (Apache-2.0 OR ISC OR MIT-0),AWS-LC
 aws-runtime,https://github.com/smithy-lang/smithy-rs,Apache-2.0,AWS Rust SDK Team <aws-sdk-rust@amazon.com>
 aws-sdk-cloudwatch,https://github.com/awslabs/aws-sdk-rust,Apache-2.0,"AWS Rust SDK Team <aws-sdk-rust@amazon.com>, Russell Cohen <rcoh@amazon.com>"
 aws-sdk-cloudwatchlogs,https://github.com/awslabs/aws-sdk-rust,Apache-2.0,"AWS Rust SDK Team <aws-sdk-rust@amazon.com>, Russell Cohen <rcoh@amazon.com>"
@@ -276,6 +278,7 @@ fastrand,https://github.com/smol-rs/fastrand,Apache-2.0 OR MIT,Stjepan Glavina <
 ff,https://github.com/zkcrypto/ff,MIT OR Apache-2.0,"Sean Bowe <ewillbefull@gmail.com>, Jack Grigg <thestr4d@gmail.com>"
 fiat-crypto,https://github.com/mit-plv/fiat-crypto,MIT OR Apache-2.0 OR BSD-1-Clause,Fiat Crypto library authors <jgross@mit.edu>
 finl_unicode,https://github.com/dahosek/finl_unicode,MIT OR Apache-2.0,The finl_unicode Authors
+fixedbitset,https://github.com/petgraph/fixedbitset,MIT OR Apache-2.0,bluss
 flatbuffers,https://github.com/google/flatbuffers,Apache-2.0,"Robert Winslow <hello@rwinslow.com>, FlatBuffers Maintainers"
 flate2,https://github.com/rust-lang/flate2-rs,MIT OR Apache-2.0,"Alex Crichton <alex@alexcrichton.com>, Josh Triplett <josh@joshtriplett.org>"
 float_eq,https://github.com/jtempest/float_eq-rs,MIT OR Apache-2.0,jtempest
