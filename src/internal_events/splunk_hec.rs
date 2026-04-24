@@ -250,14 +250,14 @@ mod source {
                         error_type = error_type::REQUEST_FAILED,
                         stage = error_stage::RECEIVING
                     );
+                    counter!(
+                        "component_errors_total",
+                        "error_type" => error_type::REQUEST_FAILED,
+                        "stage" => error_stage::RECEIVING,
+                    )
+                    .increment(1);
                 }
             }
-            counter!(
-                "component_errors_total",
-                "error_type" => error_type::REQUEST_FAILED,
-                "stage" => error_stage::RECEIVING,
-            )
-            .increment(1);
         }
     }
 }
