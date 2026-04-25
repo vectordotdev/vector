@@ -44,7 +44,7 @@ use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{DataType, SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput},
     event::{BatchNotifier, BatchStatus, Event, MaybeAsLogMut, Value},
-    gcp::{GcpAuthConfig, GcpAuthenticator, PUBSUB_URL, Scope},
+    gcp::{GcpAuthConfig, GcpAuthenticator, PUBSUB_URL, SCOPE_PUBSUB},
     internal_events::{
         GcpPubsubConnectError, GcpPubsubReceiveError, GcpPubsubStreamingPullError,
         StreamClosedError,
@@ -281,7 +281,7 @@ impl SourceConfig for PubsubConfig {
             }
         };
 
-        let auth = self.auth.build(Scope::PubSub).await?;
+        let auth = self.auth.build(SCOPE_PUBSUB).await?;
 
         let mut uri: Uri = self.endpoint.parse().context(UriSnafu)?;
         auth.apply_uri(&mut uri);

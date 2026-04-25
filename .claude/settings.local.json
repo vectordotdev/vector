@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:docs.rs)",
+      "WebFetch(domain:crates.io)",
+      "Bash(cargo check *)",
+      "Bash(rustup --version)",
+      "Bash(cargo --version)",
+      "Bash(rustc --version)"
+    ]
+  }
+}

@@ -13,7 +13,7 @@ use crate::{
     codecs::{Encoder, EncodingConfig, Transformer},
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     event::Event,
-    gcp::{GcpAuthConfig, GcpAuthenticator, PUBSUB_URL, Scope},
+    gcp::{GcpAuthConfig, GcpAuthenticator, PUBSUB_URL, SCOPE_PUBSUB},
     http::HttpClient,
     sinks::{
         Healthcheck, UriParseSnafu, VectorSink,
@@ -162,7 +162,7 @@ struct PubsubSink {
 impl PubsubSink {
     async fn from_config(config: &PubsubConfig) -> crate::Result<Self> {
         // We only need to load the credentials if we are not targeting an emulator.
-        let auth = config.auth.build(Scope::PubSub).await?;
+        let auth = config.auth.build(SCOPE_PUBSUB).await?;
 
         let uri_base = format!(
             "{}/v1/projects/{}/topics/{}",
