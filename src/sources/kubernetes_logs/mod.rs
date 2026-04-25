@@ -870,6 +870,8 @@ impl Source {
             },
             // A handle to the current tokio runtime
             rotate_wait,
+            // Auto-derive max open files from OS file descriptor limit.
+            max_open_files: crate::sources::util::default_max_open_files(),
         };
 
         let (file_source_tx, file_source_rx) = futures::channel::mpsc::channel::<Vec<Line>>(2);
