@@ -2,10 +2,12 @@ use std::fs::File;
 use std::io::Read;
 use std::sync::Arc;
 
-use azure_core::{Error, error::ErrorKind};
-use azure_core::credentials::{TokenCredential};
-use azure_core::error::Error as AzureCoreError;
-use azure_core::http::{StatusCode, Url};
+use azure_core::{
+    Error,
+    credentials::TokenCredential,
+    error::ErrorKind,
+    http::{StatusCode, Url},
+};
 use azure_storage_blob::{BlobContainerClient, BlobContainerClientOptions};
 
 use bytes::Bytes;
@@ -29,10 +31,7 @@ use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
     sinks::{
         Healthcheck, VectorSink,
-        azure_blob::{
-            service::AzureBlobService,
-            sink::AzureBlobSink,
-        },
+        azure_blob::{service::AzureBlobService, sink::AzureBlobSink},
         azure_common::{
             config::AzureAuthentication,
             config::AzureBlobTlsConfig,
@@ -41,7 +40,8 @@ use crate::{
         },
         util::{
             BatchConfig, BulkSizeBasedDefaultBatchSettings, Compression, ServiceBuilderExt,
-            TowerRequestConfig, partitioner::KeyPartitioner, retries::RetryLogic, service::TowerRequestConfigDefaults,
+            TowerRequestConfig, partitioner::KeyPartitioner, retries::RetryLogic,
+            service::TowerRequestConfigDefaults,
         },
     },
     template::Template,
@@ -270,10 +270,7 @@ impl SinkConfig for AzureBlobSinkConfig {
         )
         .await?;
 
-        let healthcheck = build_healthcheck(
-            self.container_name.clone(),
-            Arc::clone(&client),
-        )?;
+        let healthcheck = build_healthcheck(self.container_name.clone(), Arc::clone(&client))?;
         let sink = self.build_processor(client)?;
         Ok((sink, healthcheck))
     }
@@ -374,7 +371,7 @@ pub struct AzureBlobMetadata {
 pub struct AzureBlobRetryLogic;
 
 impl RetryLogic for AzureBlobRetryLogic {
-    type Error = AzureCoreError;
+    type Error = Error;
     type Request = AzureBlobRequest;
     type Response = AzureBlobResponse;
 

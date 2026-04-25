@@ -4,7 +4,7 @@ use std::sync::Arc;
 #[cfg(test)]
 use base64::prelude::*;
 
-use azure_core::http::{ClientMethodOptions};
+use azure_core::http::ClientMethodOptions;
 
 use azure_core::credentials::{TokenCredential, TokenRequestOptions};
 use azure_core::{Error, error::ErrorKind};
@@ -16,10 +16,7 @@ use azure_identity::{
     WorkloadIdentityCredentialOptions,
 };
 
-use vector_lib::{
-    configurable::configurable_component,
-    sensitive_string::SensitiveString,
-};
+use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
 
 /// TLS configuration.
 #[configurable_component]
