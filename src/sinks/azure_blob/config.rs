@@ -17,7 +17,6 @@ use tower::ServiceBuilder;
 use vector_lib::{
     codecs::{JsonSerializerConfig, NewlineDelimitedEncoderConfig, encoding::Framer},
     configurable::configurable_component,
-    json_size::JsonSize,
     request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
     sensitive_string::SensitiveString,
     stream::DriverResponse,
@@ -363,7 +362,6 @@ impl MetaDescriptive for AzureBlobRequest {
 pub struct AzureBlobMetadata {
     pub partition_key: String,
     pub count: usize,
-    pub byte_size: JsonSize,
     pub finalizers: EventFinalizers,
 }
 

@@ -1,9 +1,7 @@
 use bytes::Bytes;
 use chrono::Utc;
 use uuid::Uuid;
-use vector_lib::{
-    EstimatedJsonEncodedSizeOf, codecs::encoding::Framer, request_metadata::RequestMetadata,
-};
+use vector_lib::{codecs::encoding::Framer, request_metadata::RequestMetadata};
 
 use crate::{
     codecs::{Encoder, Transformer},
@@ -51,7 +49,6 @@ impl RequestBuilder<(String, Vec<Event>)> for AzureBlobRequestOptions {
         let azure_metadata = AzureBlobMetadata {
             partition_key,
             count: events.len(),
-            byte_size: events.estimated_json_encoded_size_of(),
             finalizers,
         };
 
