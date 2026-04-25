@@ -9,7 +9,7 @@ use crate::{
     codecs::{Encoder, Transformer},
     event::{Event, Finalizable},
     sinks::{
-        azure_common::config::{AzureBlobMetadata, AzureBlobRequest},
+        azure_blob::config::{AzureBlobMetadata, AzureBlobRequest},
         util::{
             Compression, RequestBuilder, metadata::RequestMetadataBuilder,
             request_builder::EncodeResult,
