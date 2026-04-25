@@ -192,6 +192,7 @@ impl CloudWatchMetricsSinkConfig {
             proxy,
             self.tls.as_ref(),
             None,
+            self.region.use_fips_endpoint(),
         )
         .await
     }

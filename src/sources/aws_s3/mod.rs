@@ -241,6 +241,7 @@ impl AwsS3Config {
     ) -> crate::Result<sqs::Ingestor> {
         let region = self.region.region();
         let endpoint = self.region.endpoint();
+        let use_fips_endpoint = self.region.use_fips_endpoint();
 
         let s3_client = create_client::<S3ClientBuilder>(
             &S3ClientBuilder {
@@ -252,6 +253,7 @@ impl AwsS3Config {
             proxy,
             self.tls_options.as_ref(),
             None,
+            use_fips_endpoint,
         )
         .await?;
 
@@ -269,6 +271,7 @@ impl AwsS3Config {
                     proxy,
                     sqs.tls_options.as_ref(),
                     sqs.timeout.as_ref(),
+                    use_fips_endpoint,
                 )
                 .await?;
 
@@ -1026,10 +1029,7 @@ mod integration_tests {
 
     async fn s3_client() -> S3Client {
         let auth = AwsAuthentication::test_auth();
-        let region_endpoint = RegionOrEndpoint {
-            region: Some("us-east-1".to_owned()),
-            endpoint: Some(s3_address()),
-        };
+        let region_endpoint = RegionOrEndpoint::with_both("us-east-1", s3_address());
         let proxy_config = ProxyConfig::default();
         let force_path_style_value: bool = true;
         create_client::<S3ClientBuilder>(
@@ -1042,6 +1042,7 @@ mod integration_tests {
             &proxy_config,
             None,
             None,
+            None,
         )
         .await
         .unwrap()
@@ -1049,10 +1050,7 @@ mod integration_tests {
 
     async fn sqs_client() -> SqsClient {
         let auth = AwsAuthentication::test_auth();
-        let region_endpoint = RegionOrEndpoint {
-            region: Some("us-east-1".to_owned()),
-            endpoint: Some(s3_address()),
-        };
+        let region_endpoint = RegionOrEndpoint::with_both("us-east-1", s3_address());
         let proxy_config = ProxyConfig::default();
         create_client::<SqsClientBuilder>(
             &SqsClientBuilder {},
@@ -1060,6 +1058,7 @@ mod integration_tests {
             region_endpoint.region(),
             region_endpoint.endpoint(),
             &proxy_config,
+            None,
             None,
             None,
         )

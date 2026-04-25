@@ -165,6 +165,7 @@ async fn resolve_region(
 }
 
 /// Create the SDK client using the provided settings.
+#[allow(clippy::too_many_arguments)]
 pub async fn create_client<T>(
     builder: &T,
     auth: &AwsAuthentication,
@@ -173,16 +174,27 @@ pub async fn create_client<T>(
     proxy: &ProxyConfig,
     tls_options: Option<&TlsConfig>,
     timeout: Option<&AwsTimeout>,
+    use_fips_endpoint: Option<bool>,
 ) -> crate::Result<T::Client>
 where
     T: ClientBuilder,
 {
-    create_client_and_region::<T>(builder, auth, region, endpoint, proxy, tls_options, timeout)
-        .await
-        .map(|(client, _)| client)
+    create_client_and_region::<T>(
+        builder,
+        auth,
+        region,
+        endpoint,
+        proxy,
+        tls_options,
+        timeout,
+        use_fips_endpoint,
+    )
+    .await
+    .map(|(client, _)| client)
 }
 
 /// Create the SDK client and resolve the region using the provided settings.
+#[allow(clippy::too_many_arguments)]
 pub async fn create_client_and_region<T>(
     builder: &T,
     auth: &AwsAuthentication,
@@ -191,6 +203,7 @@ pub async fn create_client_and_region<T>(
     proxy: &ProxyConfig,
     tls_options: Option<&TlsConfig>,
     timeout: Option<&AwsTimeout>,
+    use_fips_endpoint: Option<bool>,
 ) -> crate::Result<(T::Client, Region)>
 where
     T: ClientBuilder,
@@ -232,7 +245,9 @@ where
         config_builder = config_builder.endpoint_url(endpoint_from_config);
     }
 
-    if let Some(use_fips) =
+    if let Some(use_fips) = use_fips_endpoint {
+        config_builder = config_builder.use_fips(use_fips);
+    } else if let Some(use_fips) =
         aws_config::default_provider::use_fips::use_fips_provider(&provider_config).await
     {
         config_builder = config_builder.use_fips(use_fips);
