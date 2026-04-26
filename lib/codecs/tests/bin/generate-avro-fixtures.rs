@@ -465,7 +465,9 @@ fn generate_avro_test_case_uuid() -> Result<()> {
 
 fn generate_test_case<S: Serialize>(schema: &str, value: S, filename: &str) -> Result<()> {
     let value = apache_avro::to_value(value)?;
-    generate_test_case_from_value(schema, value, filename)
+    generate_test_case_from_value(schema, value.clone(), filename)?;
+    generate_test_case_ocf_from_value(schema, value, filename)?;
+    Ok(())
 }
 
 fn generate_test_case_from_value(schema: &str, value: Value, filename: &str) -> Result<()> {
@@ -478,6 +480,82 @@ fn generate_test_case_from_value(schema: &str, value: Value, filename: &str) -> 
     let mut avro_file = File::create(format!("{FIXTURES_PATH}/{filename}.avro"))?;
     schema_file.write_all(schema.canonical_form().as_bytes())?;
     avro_file.write_all(&bytes)?;
+    Ok(())
+}
+
+fn generate_test_case_ocf_from_value(schema: &str, value: Value, filename: &str) -> Result<()> {
+    let schema = Schema::parse_str(schema)?;
+    let value = value.resolve(&schema)?;
+
+    let mut buf = Vec::new();
+
+    // OCF magic bytes: 'O', 'b', 'j', 1
+    buf.extend_from_slice(b"Obj\x01");
+
+    // Manually encode metadata map in deterministic order
+    // Avro map format: block count (long), then entries (string key, bytes value) pairs
+    // We have exactly 2 entries, so we write: count=2, then each key-value pair
+
+    // Write block count as varint (2 entries)
+    let count_bytes = apache_avro::to_avro_datum(&Schema::Long, Value::Long(2))?;
+    buf.extend_from_slice(&count_bytes);
+
+    // Write entries in sorted order: avro.codec, then avro.schema
+    // Entry 1: "avro.codec" -> b"null"
+    let codec_key_bytes =
+        apache_avro::to_avro_datum(&Schema::String, Value::String("avro.codec".to_string()))?;
+    buf.extend_from_slice(&codec_key_bytes);
+
+    let codec_value_bytes =
+        apache_avro::to_avro_datum(&Schema::Bytes, Value::Bytes(b"null".to_vec()))?;
+    buf.extend_from_slice(&codec_value_bytes);
+
+    // Entry 2: "avro.schema" -> schema bytes
+    let schema_key_bytes =
+        apache_avro::to_avro_datum(&Schema::String, Value::String("avro.schema".to_string()))?;
+    buf.extend_from_slice(&schema_key_bytes);
+
+    let schema_value_bytes = apache_avro::to_avro_datum(
+        &Schema::Bytes,
+        Value::Bytes(schema.canonical_form().into_bytes()),
+    )?;
+    buf.extend_from_slice(&schema_value_bytes);
+
+    // Write block terminator (count = 0)
+    let terminator_bytes = apache_avro::to_avro_datum(&Schema::Long, Value::Long(0))?;
+    buf.extend_from_slice(&terminator_bytes);
+
+    // Write 16-byte sync marker
+    const SYNC_MARKER: &[u8] = &[
+        0xc3, 0x01, 0x95, 0x6a, 0x7c, 0x8e, 0x4d, 0xb2, 0xa1, 0x3f, 0x5c, 0x72, 0x0e, 0x9d, 0x4b,
+        0x8f,
+    ];
+    buf.extend_from_slice(SYNC_MARKER);
+
+    // Encode the object
+    let object_bytes = apache_avro::to_avro_datum(&schema, value)?;
+
+    // Write block: object count (varint), block size (varint), data, sync marker
+    let count: i64 = 1;
+    let size: i64 = object_bytes.len() as i64;
+
+    // Encode count as varint
+    let count_bytes = apache_avro::to_avro_datum(&Schema::Long, Value::Long(count))?;
+    buf.extend_from_slice(&count_bytes);
+
+    // Encode size as varint
+    let size_bytes = apache_avro::to_avro_datum(&Schema::Long, Value::Long(size))?;
+    buf.extend_from_slice(&size_bytes);
+
+    // Write serialized object data
+    buf.extend_from_slice(&object_bytes);
+
+    // Write sync marker
+    buf.extend_from_slice(SYNC_MARKER);
+
+    // Create OCF file with .ocf.avro extension (schema is shared via .avsc)
+    let mut ocf_file = File::create(format!("{FIXTURES_PATH}/{filename}.ocf.avro"))?;
+    ocf_file.write_all(&buf)?;
     Ok(())
 }
 
