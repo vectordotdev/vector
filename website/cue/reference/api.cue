@@ -1,7 +1,7 @@
 package metadata
 
 // These sources produce JSON providing a structured representation of the
-// Vector GraphQL API
+// Vector gRPC API
 
 api: {
 	description:     !=""
@@ -11,57 +11,46 @@ api: {
 }
 
 api: {
-	description:     """
-		The Vector [GraphQL](\(urls.graphql)) API allows you to interact with a
+	description: """
+		The Vector gRPC API allows you to interact with a
 		running Vector instance, enabling introspection and management of
-		Vector in real-time.
+		Vector in real-time. The service definition is available in
+		`proto/vector/observability.proto`.
 		"""
-	schema_json_url: "https://github.com/vectordotdev/vector/blob/master/lib/vector-api-client/graphql/schema.json"
+	schema_json_url: "https://github.com/vectordotdev/vector/blob/master/proto/vector/observability.proto"
 	configuration:   generated.configuration.configuration.api.type.object.options
 
 	endpoints: {
-		"/graphql": {
-			POST: {
-				description: """
-					Main endpoint for receiving and processing
-					GraphQL queries.
-					"""
-				responses: {
-					"200": {
-						description: """
-							The query has been processed. GraphQL returns 200
-							regardless if the query was successful or not. This
-							is due to the fact that queries can partially fail.
-							Please check for the `errors` key to determine if
-							there were any errors in your query.
-							"""
-					}
-				}
-			}
-		}
 		"/health": {
 			GET: {
 				description: """
-					Healthcheck endpoint. Useful to verify that
-					Vector is up and running.
+					HTTP healthcheck endpoint served on the same port as the
+					gRPC API, preserved for compatibility with Vector 0.54.0
+					and earlier so existing HTTP probes (for example AWS ALB
+					and Kubernetes HTTP probes) keep working unchanged.
+					The response body is `{"ok": true}` while Vector is
+					serving and `{"ok": false}` once Vector begins draining.
 					"""
 				responses: {
 					"200": {
 						description: "Vector is initialized and running."
 					}
+					"503": {
+						description: "Vector is draining or shutting down and should be removed from the load balancer."
+					}
 				}
 			}
-		}
-		"/playground": {
-			GET: {
+			HEAD: {
 				description: """
-					A bundled GraphQL playground that enables you
-					to explore the available queries and manually
-					run queries.
+					Same semantics as `GET /health` but returns no body.
+					Intended for load balancer probes that prefer `HEAD`.
 					"""
 				responses: {
 					"200": {
 						description: "Vector is initialized and running."
+					}
+					"503": {
+						description: "Vector is draining or shutting down and should be removed from the load balancer."
 					}
 				}
 			}

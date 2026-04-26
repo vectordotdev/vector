@@ -783,17 +783,6 @@ generated: components: sinks: opentelemetry: configuration: protocol: {
 				}
 			}
 		}
-		headers: {
-			deprecated:         true
-			deprecated_message: "This option has been deprecated, use `request.headers` instead."
-			description:        "A list of custom headers to add to each request."
-			required:           false
-			type: object: options: "*": {
-				description: "An HTTP request header and it's value."
-				required:    true
-				type: string: {}
-			}
-		}
 		method: {
 			description: "The HTTP method to use when making the request."
 			required:    false
