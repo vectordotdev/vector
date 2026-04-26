@@ -1,206 +1,111 @@
 use bytes::{BufMut, BytesMut};
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::Encoder;
-use uuid::Uuid;
 use vector_config::configurable_component;
 use vector_core::{config::DataType, event::Event, schema};
 
 use crate::encoding::BuildError;
 
-type VrlValue = vrl::value::Value;
 type AvroValue = apache_avro::types::Value;
 
-/// Converts a VRL [`Value`](VrlValue) to an [`apache_avro::types::Value`] using the provided
-/// schema to resolve ambiguous types (e.g. `Integer` -> `Int` vs `Date`).
-pub(crate) fn to_avro(
-    value: &VrlValue,
+/// `apache_avro::to_value` may serialize VRL values into Avro types which later
+/// cannot be resolved against certain Avro types
+/// (e.g. VRL integer (i64) -> Avro `Long` which cannot be resolved to Avro `Date`).
+/// `coerce_logical_types` does a recursive pre-pass to fix such cases.
+fn coerce_logical_types(
+    value: AvroValue,
     schema: &apache_avro::Schema,
-    names: &apache_avro::schema::NamesRef<'_>,
 ) -> vector_common::Result<AvroValue> {
     use apache_avro::Schema;
     match (value, schema) {
-        (VrlValue::Null, Schema::Null) => Ok(AvroValue::Null),
-
-        (VrlValue::Boolean(b), Schema::Boolean) => Ok(AvroValue::Boolean(*b)),
-
-        (VrlValue::Integer(i), Schema::Int) => i32::try_from(*i)
-            .map(AvroValue::Int)
-            .map_err(|_| vector_common::Error::from(format!("Integer {i} overflows Avro int (i32)"))),
-        (VrlValue::Integer(i), Schema::Date) => i32::try_from(*i)
-            .map(AvroValue::Date)
-            .map_err(|_| vector_common::Error::from(format!("Integer {i} overflows Avro date (i32)"))),
-        (VrlValue::Integer(i), Schema::TimeMillis) => i32::try_from(*i)
+        (AvroValue::Long(days), Schema::Date) => {
+            i32::try_from(days).map(AvroValue::Date).map_err(|_| {
+                vector_common::Error::from(format!(
+                    "Avro date value {days} is out of range for i32"
+                ))
+            })
+        }
+        (AvroValue::Long(millis), Schema::TimeMillis) => i32::try_from(millis)
             .map(AvroValue::TimeMillis)
             .map_err(|_| {
-                vector_common::Error::from(format!("Integer {i} overflows Avro time-millis (i32)"))
-            }),
-
-        (VrlValue::Integer(i), Schema::Long) => Ok(AvroValue::Long(*i)),
-        (VrlValue::Integer(i), Schema::TimeMicros) => Ok(AvroValue::TimeMicros(*i)),
-        (VrlValue::Integer(i), Schema::TimestampMillis) => Ok(AvroValue::TimestampMillis(*i)),
-        (VrlValue::Integer(i), Schema::TimestampMicros) => Ok(AvroValue::TimestampMicros(*i)),
-        (VrlValue::Integer(i), Schema::TimestampNanos) => Ok(AvroValue::TimestampNanos(*i)),
-        (VrlValue::Integer(i), Schema::LocalTimestampMillis) => {
-            Ok(AvroValue::LocalTimestampMillis(*i))
-        }
-        (VrlValue::Integer(i), Schema::LocalTimestampMicros) => {
-            Ok(AvroValue::LocalTimestampMicros(*i))
-        }
-        (VrlValue::Integer(i), Schema::LocalTimestampNanos) => {
-            Ok(AvroValue::LocalTimestampNanos(*i))
-        }
-
-        (VrlValue::Integer(i), Schema::Float) => Ok(AvroValue::Float(*i as f32)),
-        (VrlValue::Integer(i), Schema::Double) => Ok(AvroValue::Double(*i as f64)),
-        (VrlValue::Float(f), Schema::Float) => Ok(AvroValue::Float(f.into_inner() as f32)),
-        (VrlValue::Float(f), Schema::Double) => Ok(AvroValue::Double(f.into_inner())),
-
-        (VrlValue::Bytes(b), Schema::Fixed(fixed_schema)) => {
-            let bytes = b.to_vec();
-            if bytes.len() != fixed_schema.size {
-                return Err(vector_common::Error::from(format!(
-                    "Bytes length {} does not match fixed schema size {}",
-                    bytes.len(),
-                    fixed_schema.size
-                )));
-            }
-            Ok(AvroValue::Fixed(fixed_schema.size, bytes))
-        }
-        (VrlValue::Bytes(b), Schema::Bytes) => Ok(AvroValue::Bytes(b.to_vec())),
-        (VrlValue::Bytes(b), Schema::String) => String::from_utf8(b.to_vec())
-            .map(AvroValue::String)
-            .map_err(|e| {
-                vector_common::Error::from(format!("Invalid UTF-8 in string field: {e}"))
-            }),
-        (VrlValue::Regex(b), Schema::String) => Ok(AvroValue::String(b.as_str().to_owned())),
-
-        (VrlValue::Bytes(b), Schema::Uuid) => {
-            let s = String::from_utf8(b.to_vec()).map_err(|e| {
-                vector_common::Error::from(format!("Invalid UTF-8 in UUID field: {e}"))
-            })?;
-            Uuid::parse_str(&s)
-                .map(AvroValue::Uuid)
-                .map_err(|e| vector_common::Error::from(format!("Invalid UUID: {e}")))
-        }
-
-        (VrlValue::Bytes(b), Schema::Enum(enum_schema)) => {
-            let s = String::from_utf8(b.to_vec()).map_err(|e| {
-                vector_common::Error::from(format!("Invalid UTF-8 in enum field: {e}"))
-            })?;
-            let index = enum_schema
-                .symbols
-                .iter()
-                .position(|sym| sym == &s)
-                .ok_or_else(|| vector_common::Error::from(format!("Unknown enum symbol: {s}")))?;
-            Ok(AvroValue::Enum(index as u32, s))
-        }
-
-        (VrlValue::Timestamp(ts), Schema::TimestampMillis) => {
-            Ok(AvroValue::TimestampMillis(ts.timestamp_millis()))
-        }
-        (VrlValue::Timestamp(ts), Schema::TimestampMicros) => {
-            Ok(AvroValue::TimestampMicros(ts.timestamp_micros()))
-        }
-        (VrlValue::Timestamp(ts), Schema::LocalTimestampMillis) => {
-            Ok(AvroValue::LocalTimestampMillis(ts.timestamp_millis()))
-        }
-        (VrlValue::Timestamp(ts), Schema::LocalTimestampMicros) => {
-            Ok(AvroValue::LocalTimestampMicros(ts.timestamp_micros()))
-        }
-        (VrlValue::Timestamp(ts), Schema::TimestampNanos) => ts
-            .timestamp_nanos_opt()
-            .map(AvroValue::TimestampNanos)
-            .ok_or_else(|| {
                 vector_common::Error::from(format!(
-                    "Timestamp {ts} is out of range for timestamp-nanos"
+                    "Avro time-millis value {millis} is out of range for i32"
                 ))
             }),
-        (VrlValue::Timestamp(ts), Schema::LocalTimestampNanos) => ts
-            .timestamp_nanos_opt()
-            .map(AvroValue::LocalTimestampNanos)
-            .ok_or_else(|| {
-                vector_common::Error::from(format!(
-                    "Timestamp {ts} is out of range for local-timestamp-nanos"
-                ))
-            }),
-        (VrlValue::Timestamp(ts), Schema::Long) => Ok(AvroValue::Long(ts.timestamp_millis())),
-        (VrlValue::Timestamp(ts), Schema::String) => Ok(AvroValue::String(
-            ts.to_rfc3339_opts(chrono::SecondsFormat::AutoSi, true),
-        )),
-
-        (v, Schema::Ref { name }) => {
-            let resolved = names.get(name).ok_or_else(|| {
-                vector_common::Error::from(format!("Unknown schema ref: {}", name.fullname(None)))
-            })?;
-            to_avro(v, resolved, names)
-        }
-
-        (VrlValue::Array(items), Schema::Array(array_schema)) => items
-            .iter()
-            .map(|item| to_avro(item, &array_schema.items, names))
-            .collect::<Result<Vec<_>, _>>()
-            .map(AvroValue::Array),
-
-        (VrlValue::Object(map), Schema::Map(map_schema)) => map
-            .iter()
-            .map(|(k, v)| to_avro(v, &map_schema.types, names).map(|av| (k.to_string(), av)))
-            .collect::<Result<Vec<_>, _>>()
-            .map(|items| AvroValue::Map(items.into_iter().collect())),
-
-        (VrlValue::Object(map), Schema::Record(record_schema)) => {
-            let fields = record_schema
-                .fields
-                .iter()
-                .map(|field| {
-                    let av = match map.get(field.name.as_str()) {
-                        Some(v) => to_avro(v, &field.schema, names)?,
-                        None => match &field.default {
-                            Some(json_default) => {
-                                AvroValue::from(json_default.clone()).resolve(&field.schema)?
-                            }
-                            None => {
-                                return Err(vector_common::Error::from(format!(
-                                    "Missing record field: {}",
-                                    field.name
-                                )))
-                            }
-                        },
+        (AvroValue::Record(fields), Schema::Record(record_schema)) => {
+            let fields = fields
+                .into_iter()
+                .map(|(name, value)| {
+                    let value = match record_schema.lookup.get(&name) {
+                        Some(index) => {
+                            let field_schema = &record_schema.fields[*index].schema;
+                            coerce_logical_types(value, field_schema)?
+                        }
+                        None => value,
                     };
-                    Ok((field.name.clone(), av))
+                    Ok((name, value))
                 })
-                .collect::<Result<Vec<_>, _>>()?;
+                .collect::<vector_common::Result<Vec<_>>>()?;
             Ok(AvroValue::Record(fields))
         }
-
-        (v, Schema::Union(union_schema)) => {
-            // Prefer null variant for Null values, otherwise try each variant in order
-            if matches!(v, VrlValue::Null)
-                && let Some(idx) = union_schema
-                    .variants()
-                    .iter()
-                    .position(|s| matches!(s, Schema::Null))
-            {
-                return Ok(AvroValue::Union(idx as u32, Box::new(AvroValue::Null)));
-            }
-            for (idx, variant_schema) in union_schema.variants().iter().enumerate() {
-                if matches!(variant_schema, Schema::Null) {
-                    continue;
-                }
-                if let Ok(av) = to_avro(v, variant_schema, names) {
-                    return Ok(AvroValue::Union(idx as u32, Box::new(av)));
-                }
-            }
-            Err(vector_common::Error::from(format!(
-                "No matching union variant for value of kind {}",
-                v.kind_str()
-            )))
+        (AvroValue::Map(entries), Schema::Record(record_schema)) => {
+            let entries = entries
+                .into_iter()
+                .map(|(name, value)| {
+                    let value = match record_schema.lookup.get(&name) {
+                        Some(index) => {
+                            let field_schema = &record_schema.fields[*index].schema;
+                            coerce_logical_types(value, field_schema)?
+                        }
+                        None => value,
+                    };
+                    Ok((name, value))
+                })
+                .collect::<vector_common::Result<_>>()?;
+            Ok(AvroValue::Map(entries))
         }
+        (AvroValue::Array(items), Schema::Array(array_schema)) => items
+            .into_iter()
+            .map(|item| coerce_logical_types(item, &array_schema.items))
+            .collect::<Result<Vec<_>, _>>()
+            .map(AvroValue::Array),
+        (AvroValue::Map(entries), Schema::Map(map_schema)) => entries
+            .into_iter()
+            .map(|(key, value)| {
+                coerce_logical_types(value, &map_schema.types).map(|value| (key, value))
+            })
+            .collect::<vector_common::Result<_>>()
+            .map(AvroValue::Map),
+        (AvroValue::Union(index, value), Schema::Union(union_schema)) => {
+            let schema = union_schema
+                .variants()
+                .get(index as usize)
+                .unwrap_or(schema);
+            coerce_logical_types(*value, schema)
+                .map(|value| AvroValue::Union(index, Box::new(value)))
+        }
+        (value, Schema::Union(union_schema)) => {
+            if let Ok(resolved) = value.clone().resolve(schema) {
+                return Ok(resolved);
+            }
 
-        (v, s) => Err(vector_common::Error::from(format!(
-            "Cannot convert VRL {} to Avro schema {:?}",
-            v.kind_str(),
-            s
-        ))),
+            let mut last_err = None;
+            for (index, variant) in union_schema.variants().iter().enumerate() {
+                match coerce_logical_types(value.clone(), variant) {
+                    Ok(coerced) if coerced.clone().resolve(variant).is_ok() => {
+                        return Ok(AvroValue::Union(index as u32, Box::new(coerced)));
+                    }
+                    Ok(_) => {}
+                    Err(err) => last_err = Some(err),
+                }
+            }
+
+            match last_err {
+                Some(err) => Err(err),
+                None => Ok(value),
+            }
+        }
+        (value, _) => Ok(value),
     }
 }
 
@@ -268,12 +173,10 @@ impl Encoder<Event> for AvroSerializer {
 
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         let log = event.into_log();
-        let (value, _metadata) = log.into_parts();
-        let resolved = apache_avro::schema::ResolvedSchema::try_from(&self.schema)
-            .map_err(|e| vector_common::Error::from(format!("Failed resolving Avro schema: {e}")))?;
-        let names = resolved.get_names();
-        let avro_value = to_avro(&value, &self.schema, names)?;
-        let bytes = apache_avro::to_avro_datum(&self.schema, avro_value)?;
+        let value = apache_avro::to_value(log)?;
+        let value = coerce_logical_types(value, &self.schema)?;
+        let value = value.resolve(&self.schema)?;
+        let bytes = apache_avro::to_avro_datum(&self.schema, value)?;
         buffer.put_slice(&bytes);
         Ok(())
     }
@@ -313,5 +216,159 @@ mod tests {
         serializer.encode(event, &mut bytes).unwrap();
 
         assert_eq!(bytes.freeze(), b"\0\x06bar".as_slice());
+    }
+
+    #[test]
+    fn coerce_date_fields_recursively() {
+        let schema = apache_avro::Schema::parse_str(indoc! {r#"
+            {
+                "type": "record",
+                "name": "Outer",
+                "fields": [
+                    {
+                        "name": "direct_date",
+                        "type": {"type": "int", "logicalType": "date"}
+                    },
+                    {
+                        "name": "inner",
+                        "type": {
+                            "type": "record",
+                            "name": "Inner",
+                            "fields": [
+                                {
+                                    "name": "date",
+                                    "type": {"type": "int", "logicalType": "date"}
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "name": "record_as_map",
+                        "type": {
+                            "type": "record",
+                            "name": "MapBackedInner",
+                            "fields": [
+                                {
+                                    "name": "date",
+                                    "type": {"type": "int", "logicalType": "date"}
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "name": "date_array",
+                        "type": {
+                            "type": "array",
+                            "items": {"type": "int", "logicalType": "date"}
+                        }
+                    },
+                    {
+                        "name": "date_map",
+                        "type": {
+                            "type": "map",
+                            "values": {"type": "int", "logicalType": "date"}
+                        }
+                    },
+                    {
+                        "name": "union_date",
+                        "type": ["null", {"type": "int", "logicalType": "date"}]
+                    },
+                    {
+                        "name": "fallback_union_date",
+                        "type": [
+                            "null",
+                            {"type": "int", "logicalType": "date"},
+                            "long"
+                        ]
+                    },
+                    {
+                        "name": "logical_only_union_date",
+                        "type": [
+                            "null",
+                            {"type": "int", "logicalType": "date"}
+                        ]
+                    }
+                ]
+            }
+        "#})
+        .unwrap();
+        let value = AvroValue::Record(vec![
+            ("direct_date".to_owned(), AvroValue::Long(20_000)),
+            (
+                "inner".to_owned(),
+                AvroValue::Record(vec![("date".to_owned(), AvroValue::Long(20_001))]),
+            ),
+            (
+                "record_as_map".to_owned(),
+                AvroValue::Map(
+                    [("date".to_owned(), AvroValue::Long(20_002))]
+                        .into_iter()
+                        .collect(),
+                ),
+            ),
+            (
+                "date_array".to_owned(),
+                AvroValue::Array(vec![AvroValue::Long(20_003), AvroValue::Long(20_004)]),
+            ),
+            (
+                "date_map".to_owned(),
+                AvroValue::Map(
+                    [
+                        ("first".to_owned(), AvroValue::Long(20_005)),
+                        ("second".to_owned(), AvroValue::Long(20_006)),
+                    ]
+                    .into_iter()
+                    .collect(),
+                ),
+            ),
+            ("union_date".to_owned(), AvroValue::Long(20_007)),
+            ("fallback_union_date".to_owned(), AvroValue::Long(20_009)),
+            (
+                "logical_only_union_date".to_owned(),
+                AvroValue::Long(20_008),
+            ),
+        ]);
+
+        let value = coerce_logical_types(value, &schema).unwrap();
+        let value = value.resolve(&schema).unwrap();
+
+        assert!(matches!(
+            value,
+            AvroValue::Record(fields) if {
+                matches!(fields[0].1, AvroValue::Date(20_000))
+                    && matches!(
+                        &fields[1].1,
+                        AvroValue::Record(inner) if matches!(inner[0].1, AvroValue::Date(20_001))
+                    )
+                    && matches!(
+                        &fields[2].1,
+                        AvroValue::Record(inner) if matches!(inner[0].1, AvroValue::Date(20_002))
+                    )
+                    && matches!(
+                        &fields[3].1,
+                        AvroValue::Array(items)
+                            if matches!(items.as_slice(), [AvroValue::Date(20_003), AvroValue::Date(20_004)])
+                    )
+                    && matches!(
+                        &fields[4].1,
+                        AvroValue::Map(entries)
+                            if matches!(entries.get("first"), Some(AvroValue::Date(20_005)))
+                                && matches!(entries.get("second"), Some(AvroValue::Date(20_006)))
+                    )
+                    && matches!(
+                        &fields[5].1,
+                        AvroValue::Union(1, value) if matches!(value.as_ref(), AvroValue::Date(20_007))
+                    )
+                    && matches!(
+                        &fields[6].1,
+                        AvroValue::Union(2, value)
+                            if matches!(value.as_ref(), AvroValue::Long(20_009))
+                    )
+                    && matches!(
+                        &fields[7].1,
+                        AvroValue::Union(1, value) if matches!(value.as_ref(), AvroValue::Date(20_008))
+                    )
+            }
+        ));
     }
 }
