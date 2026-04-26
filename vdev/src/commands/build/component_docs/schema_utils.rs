@@ -162,10 +162,7 @@ impl SchemaContext {
         schema: &'a Value,
         property_name: &str,
     ) -> Option<&'a Value> {
-        if let Some(prop) = schema
-            .get("properties")
-            .and_then(|p| p.get(property_name))
-        {
+        if let Some(prop) = schema.get("properties").and_then(|p| p.get(property_name)) {
             return Some(prop);
         }
 
@@ -223,21 +220,13 @@ impl SchemaContext {
                                 .as_object_mut()
                                 .unwrap()
                                 .insert("default".to_string(), prop_default_value.clone());
-                            self.apply_schema_default_value(
-                                &source_with_default,
-                                resolved_prop,
-                            )?;
+                            self.apply_schema_default_value(&source_with_default, resolved_prop)?;
                         } else {
-                            let value_type =
-                                self.get_docs_type_for_value(None, prop_default_value);
+                            let value_type = self.get_docs_type_for_value(None, prop_default_value);
                             if let Some(Value::Object(type_obj)) = resolved_prop.get_mut("type")
-                                && let Some(Value::Object(type_def)) =
-                                    type_obj.get_mut(value_type)
+                                && let Some(Value::Object(type_def)) = type_obj.get_mut(value_type)
                             {
-                                type_def.insert(
-                                    "default".to_string(),
-                                    prop_default_value.clone(),
-                                );
+                                type_def.insert("default".to_string(), prop_default_value.clone());
                             }
                         }
                         resolved_prop
@@ -366,9 +355,7 @@ impl SchemaContext {
     ) {
         let required_properties = parent_schema.get("required").and_then(|r| r.as_array());
 
-        let has_self_default_value = property_schema
-            .get("default")
-            .is_some_and(|v| !v.is_null());
+        let has_self_default_value = property_schema.get("default").is_some_and(|v| !v.is_null());
         let has_parent_default_value = parent_schema
             .get("default")
             .and_then(|d| d.get(property_name))
@@ -429,11 +416,7 @@ impl SchemaContext {
         None
     }
 
-    pub fn get_docs_type_for_value(
-        &self,
-        schema: Option<&Value>,
-        value: &Value,
-    ) -> &'static str {
+    pub fn get_docs_type_for_value(&self, schema: Option<&Value>, value: &Value) -> &'static str {
         let value_type = super::json_type_str(value);
         if matches!(value_type, "number" | "integer")
             && let Some(s) = schema

@@ -328,7 +328,9 @@ impl SchemaContext {
             if unique_kinds.len() == 1 && fixed_subschemas >= 1 && freeform_subschemas == 1 {
                 debug!("Resolved as 'untagged with narrowed free-form' enum schema.");
                 let type_def_kind = type_def_kinds.first().unwrap();
-                return Ok(json!({ "_resolved": { "type": { type_def_kind: {} } }, "annotations": "narrowed_free_form" }));
+                return Ok(
+                    json!({ "_resolved": { "type": { type_def_kind: {} } }, "annotations": "narrowed_free_form" }),
+                );
             }
         }
 
@@ -351,9 +353,10 @@ impl SchemaContext {
                         for (property_name, property_schema) in resolved_properties {
                             let mut prop = property_schema.clone();
                             if !description.is_empty() {
-                                prop.as_object_mut()
-                                    .unwrap()
-                                    .insert("description".to_string(), Value::String(description.clone()));
+                                prop.as_object_mut().unwrap().insert(
+                                    "description".to_string(),
+                                    Value::String(description.clone()),
+                                );
                             }
                             aggregated_properties.insert(property_name.clone(), prop);
                         }
@@ -361,8 +364,12 @@ impl SchemaContext {
                 }
 
                 if !aggregated_properties.is_empty() {
-                    debug!("Resolved as 'externally-tagged with only non-unit variants' enum schema.");
-                    return Ok(json!({ "_resolved": { "type": { "object": { "options": aggregated_properties } } } }));
+                    debug!(
+                        "Resolved as 'externally-tagged with only non-unit variants' enum schema."
+                    );
+                    return Ok(
+                        json!({ "_resolved": { "type": { "object": { "options": aggregated_properties } } } }),
+                    );
                 }
             }
         }

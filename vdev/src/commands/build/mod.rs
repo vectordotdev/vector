@@ -17,7 +17,6 @@ crate::cli_subcommands! {
     vrl_wasm,
 }
 
-
 crate::script_wrapper! {
     manifests = "Build Kubernetes manifests from latest Helm chart"
         => "generate-manifests.sh"
