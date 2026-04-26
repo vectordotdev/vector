@@ -460,11 +460,14 @@ impl KubernetesEventsSource {
                 maybe_event = streams.next() => {
                     match maybe_event {
                         Some((namespace, Ok(event))) => {
-                            if let Some(event) =
+                            if let Some(processed) =
                                 self.handle_event(namespace.as_deref(), event, log_namespace, deduper)?
-                                && send_event(out, event).await.is_err()
                             {
-                                return Err(());
+                                let dedupe_record = processed.dedupe_record;
+                                if send_event(out, processed.event).await.is_err() {
+                                    return Err(());
+                                }
+                                deduper.commit(dedupe_record);
                             }
                         }
                         Some((_, Err(error))) => {
@@ -540,19 +543,23 @@ impl KubernetesEventsSource {
                 maybe_event = streams.next() => {
                     match maybe_event {
                         Some((namespace, Ok(event))) => {
-                            if let Some(event) =
+                            if let Some(processed) =
                                 self.handle_event(namespace.as_deref(), event, log_namespace, deduper)?
-                                && let Some(end) = send_event_with_leadership(
+                            {
+                                let dedupe_record = processed.dedupe_record;
+                                if let Some(end) = send_event_with_leadership(
                                     out,
-                                    event,
+                                    processed.event,
                                     shutdown,
                                     &mut renew_interval,
                                     &mut last_renewal,
                                     coordinator,
                                 )
                                 .await?
-                            {
-                                return Ok(end);
+                                {
+                                    return Ok(end);
+                                }
+                                deduper.commit(dedupe_record);
                             }
                         }
                         Some((_, Err(error))) => {
@@ -571,7 +578,7 @@ impl KubernetesEventsSource {
         event: watcher::Event<KubeEvent>,
         log_namespace: LogNamespace,
         deduper: &mut Deduper,
-    ) -> Result<Option<Event>, ()> {
+    ) -> Result<Option<ProcessedEvent>, ()> {
         match event {
             watcher::Event::Apply(ev) | watcher::Event::InitApply(ev) => {
                 self.process_apply_event(namespace, ev, log_namespace, deduper)
@@ -596,7 +603,7 @@ impl KubernetesEventsSource {
         event: KubeEvent,
         log_namespace: LogNamespace,
         deduper: &mut Deduper,
-    ) -> Result<Option<Event>, ()> {
+    ) -> Result<Option<ProcessedEvent>, ()> {
         let uid = match event.metadata.uid.clone() {
             Some(uid) => uid,
             None => {
@@ -639,13 +646,13 @@ impl KubernetesEventsSource {
 
         deduper.prune();
 
-        let dedup_result = deduper.record(
-            uid.clone(),
-            resource_version.clone(),
-            &event,
-            timestamp,
-            self.include_previous_event,
-        );
+        let dedupe_record = PendingDedupeRecord {
+            uid: uid.clone(),
+            resource_version: resource_version.clone(),
+            event: event.clone(),
+        };
+
+        let dedup_result = deduper.evaluate(&uid, &resource_version, self.include_previous_event);
 
         let (verb, previous) = match dedup_result {
             DedupResult::Duplicate => {
@@ -707,7 +714,10 @@ impl KubernetesEventsSource {
         let byte_size = log.estimated_json_encoded_size_of();
         emit!(KubernetesEventsReceived { byte_size });
 
-        Ok(Some(Event::from(log)))
+        Ok(Some(ProcessedEvent {
+            event: Event::from(log),
+            dedupe_record,
+        }))
     }
 
     fn type_allowed(&self, event: &KubeEvent) -> bool {
@@ -957,6 +967,17 @@ enum LeadershipEnd {
     RestartWatch,
 }
 
+struct ProcessedEvent {
+    event: Event,
+    dedupe_record: PendingDedupeRecord,
+}
+
+struct PendingDedupeRecord {
+    uid: String,
+    resource_version: String,
+    event: KubeEvent,
+}
+
 async fn send_event(out: &mut SourceSender, event: Event) -> Result<(), ()> {
     if out.send_event(event).await.is_err() {
         emit!(StreamClosedError { count: 1 });
@@ -1023,7 +1044,6 @@ struct CachedEvent {
     event: KubeEvent,
     resource_version: String,
     last_seen: Instant,
-    timestamp: DateTime<Utc>,
 }
 
 #[derive(Debug)]
@@ -1041,17 +1061,15 @@ impl Deduper {
         }
     }
 
-    fn record(
+    fn evaluate(
         &mut self,
-        uid: String,
-        resource_version: String,
-        event: &KubeEvent,
-        timestamp: DateTime<Utc>,
+        uid: &str,
+        resource_version: &str,
         include_previous: bool,
     ) -> DedupResult {
-        match self.entries.get_mut(&uid) {
+        match self.entries.get_mut(uid) {
             Some(entry) => {
-                match compare_resource_versions(&resource_version, &entry.resource_version) {
+                match compare_resource_versions(resource_version, &entry.resource_version) {
                     std::cmp::Ordering::Less => DedupResult::Duplicate,
                     std::cmp::Ordering::Equal => {
                         entry.last_seen = Instant::now();
@@ -1059,27 +1077,43 @@ impl Deduper {
                     }
                     std::cmp::Ordering::Greater => {
                         let previous = include_previous.then(|| Box::new(entry.event.clone()));
-                        entry.event = event.clone();
-                        entry.resource_version = resource_version;
-                        entry.last_seen = Instant::now();
-                        entry.timestamp = timestamp;
                         DedupResult::Updated { previous }
                     }
                 }
             }
-            None => {
-                self.entries.insert(
-                    uid,
-                    CachedEvent {
-                        event: event.clone(),
-                        resource_version,
-                        last_seen: Instant::now(),
-                        timestamp,
-                    },
-                );
-                DedupResult::Added
-            }
+            None => DedupResult::Added,
         }
+    }
+
+    fn commit(&mut self, record: PendingDedupeRecord) {
+        self.entries.insert(
+            record.uid,
+            CachedEvent {
+                event: record.event,
+                resource_version: record.resource_version,
+                last_seen: Instant::now(),
+            },
+        );
+    }
+
+    #[cfg(test)]
+    fn record(
+        &mut self,
+        uid: String,
+        resource_version: String,
+        event: &KubeEvent,
+        _timestamp: DateTime<Utc>,
+        include_previous: bool,
+    ) -> DedupResult {
+        let result = self.evaluate(&uid, &resource_version, include_previous);
+        if !matches!(result, DedupResult::Duplicate) {
+            self.commit(PendingDedupeRecord {
+                uid,
+                resource_version,
+                event: event.clone(),
+            });
+        }
+        result
     }
 
     fn prune(&mut self) {
@@ -1429,6 +1463,58 @@ mod tests {
             }
             other => panic!("expected DedupResult::Updated, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn deduper_defers_new_resource_version_until_commit() {
+        let mut deduper = Deduper::new(Duration::from_secs(60));
+        let first_ts = Utc.timestamp_opt(1_700_000_000, 0).unwrap();
+        let later_ts = first_ts + ChronoDuration::seconds(10);
+        let first_event = make_event("uid", "1", first_ts);
+        let updated_event = make_event("uid", "2", later_ts);
+
+        assert!(matches!(
+            deduper.evaluate("uid", "1", false),
+            DedupResult::Added
+        ));
+        assert!(
+            !deduper.entries.contains_key("uid"),
+            "new events should not be marked seen before delivery"
+        );
+
+        deduper.commit(PendingDedupeRecord {
+            uid: "uid".to_string(),
+            resource_version: "1".to_string(),
+            event: first_event,
+        });
+
+        assert!(matches!(
+            deduper.evaluate("uid", "2", true),
+            DedupResult::Updated { .. }
+        ));
+        assert_eq!(
+            deduper.entries.get("uid").and_then(|entry| entry
+                .event
+                .metadata
+                .resource_version
+                .as_deref()),
+            Some("1"),
+            "updates should not replace the cached event before delivery"
+        );
+
+        deduper.commit(PendingDedupeRecord {
+            uid: "uid".to_string(),
+            resource_version: "2".to_string(),
+            event: updated_event,
+        });
+        assert_eq!(
+            deduper.entries.get("uid").and_then(|entry| entry
+                .event
+                .metadata
+                .resource_version
+                .as_deref()),
+            Some("2")
+        );
     }
 
     #[test]
