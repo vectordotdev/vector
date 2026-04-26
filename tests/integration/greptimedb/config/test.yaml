@@ -1,7 +1,7 @@
 features:
-- greptimedb-integration-tests
+  - greptimedb-integration-tests
 
-test_filter: '::greptimedb::'
+test_filter: "::greptimedb::"
 
 runner:
   env:
@@ -10,12 +10,10 @@ runner:
     no_proxy: greptimedb
 
 matrix:
-  # Temporarily pegging to the latest known stable release
-  # since using `latest` is failing consistently.
-  version: [v0.13.2]
+  version: [v1.0.0, latest]
 
 # changes to these files/paths will invoke the integration test in CI
 # expressions are evaluated using https://github.com/micromatch/picomatch
 paths:
-- "src/sinks/greptimedb/**"
-- "tests/integration/greptimedb/**"
+  - "src/sinks/greptimedb/**"
+  - "tests/integration/greptimedb/**"

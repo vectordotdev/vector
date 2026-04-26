@@ -19,30 +19,9 @@ generated: configuration: {
 				}
 				enabled: {
 					type: bool: default: false
-					description: "Whether the GraphQL API is enabled for this Vector instance."
+					description: "Whether the API is enabled for this Vector instance."
 					common:      true
 					required:    false
-				}
-				graphql: {
-					type: bool: default: true
-					description: """
-						Whether the endpoint for receiving and processing GraphQL queries is
-						enabled for the API. The endpoint is accessible via the `/graphql`
-						endpoint of the address set using the `bind` parameter.
-						"""
-					common:   true
-					required: false
-				}
-				playground: {
-					type: bool: default: true
-					description: """
-						Whether the [GraphQL Playground](https://github.com/graphql/graphql-playground) is enabled
-						for the API. The Playground is accessible via the `/playground` endpoint
-						of the address set using the `bind` parameter. Note that the `playground`
-						endpoint will only be enabled if the `graphql` endpoint is also enabled.
-						"""
-					common:   false
-					required: false
 				}
 			}
 			description: "API options."
@@ -53,25 +32,60 @@ generated: configuration: {
 			type: object: options: "*": {
 				type: object: options: {
 					graph: {
-						type: object: options: node_attributes: {
-							type: object: {
-								options: "*": {
-									type: string: {}
-									required:    true
-									description: "A single graph node attribute in graphviz DOT language."
+						type: object: options: {
+							edge_attributes: {
+								type: object: {
+									options: "*": {
+										type: object: {
+											options: "*": {
+												type: string: {}
+												required:    true
+												description: "A single graph edge attribute in graphviz DOT language."
+											}
+											examples: [{
+												color: "red"
+												label: "Example Edge"
+												width: "5.0"
+											}]
+										}
+										description: "A collection of graph edge attributes in graphviz DOT language, related to a single input component."
+										required:    true
+									}
+									examples: [{
+										example_input: {
+											color: "red"
+											label: "Example Edge"
+											width: "5.0"
+										}
+									}]
 								}
-								examples: [{
-									color: "red"
-									name:  "Example Node"
-									width: "5.0"
-								}]
+								description: """
+																		Edge attributes to add to the edges linked to this component's node in resulting graph
+
+																		They are added to the edge as provided
+																		"""
+								required: false
 							}
-							description: """
+							node_attributes: {
+								type: object: {
+									options: "*": {
+										type: string: {}
+										required:    true
+										description: "A single graph node attribute in graphviz DOT language."
+									}
+									examples: [{
+										color: "red"
+										name:  "Example Node"
+										width: "5.0"
+									}]
+								}
+								description: """
 																		Node attributes to add to this component's node in resulting graph
 
 																		They are added to the node as provided
 																		"""
-							required: false
+								required: false
+							}
 						}
 						description: """
 														Extra graph configuration
@@ -855,25 +869,60 @@ generated: configuration: {
 						required: false
 					}
 					graph: {
-						type: object: options: node_attributes: {
-							type: object: {
-								options: "*": {
-									type: string: {}
-									required:    true
-									description: "A single graph node attribute in graphviz DOT language."
+						type: object: options: {
+							edge_attributes: {
+								type: object: {
+									options: "*": {
+										type: object: {
+											options: "*": {
+												type: string: {}
+												required:    true
+												description: "A single graph edge attribute in graphviz DOT language."
+											}
+											examples: [{
+												color: "red"
+												label: "Example Edge"
+												width: "5.0"
+											}]
+										}
+										description: "A collection of graph edge attributes in graphviz DOT language, related to a single input component."
+										required:    true
+									}
+									examples: [{
+										example_input: {
+											color: "red"
+											label: "Example Edge"
+											width: "5.0"
+										}
+									}]
 								}
-								examples: [{
-									color: "red"
-									name:  "Example Node"
-									width: "5.0"
-								}]
+								description: """
+																		Edge attributes to add to the edges linked to this component's node in resulting graph
+
+																		They are added to the edge as provided
+																		"""
+								required: false
 							}
-							description: """
+							node_attributes: {
+								type: object: {
+									options: "*": {
+										type: string: {}
+										required:    true
+										description: "A single graph node attribute in graphviz DOT language."
+									}
+									examples: [{
+										color: "red"
+										name:  "Example Node"
+										width: "5.0"
+									}]
+								}
+								description: """
 																		Node attributes to add to this component's node in resulting graph
 
 																		They are added to the node as provided
 																		"""
-							required: false
+								required: false
+							}
 						}
 						description: """
 														Extra graph configuration
@@ -996,25 +1045,60 @@ generated: configuration: {
 			type: object: options: "*": {
 				type: object: options: {
 					graph: {
-						type: object: options: node_attributes: {
-							type: object: {
-								options: "*": {
-									type: string: {}
-									required:    true
-									description: "A single graph node attribute in graphviz DOT language."
+						type: object: options: {
+							edge_attributes: {
+								type: object: {
+									options: "*": {
+										type: object: {
+											options: "*": {
+												type: string: {}
+												required:    true
+												description: "A single graph edge attribute in graphviz DOT language."
+											}
+											examples: [{
+												color: "red"
+												label: "Example Edge"
+												width: "5.0"
+											}]
+										}
+										description: "A collection of graph edge attributes in graphviz DOT language, related to a single input component."
+										required:    true
+									}
+									examples: [{
+										example_input: {
+											color: "red"
+											label: "Example Edge"
+											width: "5.0"
+										}
+									}]
 								}
-								examples: [{
-									color: "red"
-									name:  "Example Node"
-									width: "5.0"
-								}]
+								description: """
+																		Edge attributes to add to the edges linked to this component's node in resulting graph
+
+																		They are added to the edge as provided
+																		"""
+								required: false
 							}
-							description: """
+							node_attributes: {
+								type: object: {
+									options: "*": {
+										type: string: {}
+										required:    true
+										description: "A single graph node attribute in graphviz DOT language."
+									}
+									examples: [{
+										color: "red"
+										name:  "Example Node"
+										width: "5.0"
+									}]
+								}
+								description: """
 																		Node attributes to add to this component's node in resulting graph
 
 																		They are added to the node as provided
 																		"""
-							required: false
+								required: false
+							}
 						}
 						description: """
 														Extra graph configuration
@@ -1093,25 +1177,60 @@ generated: configuration: {
 			type: object: options: "*": {
 				type: object: options: {
 					graph: {
-						type: object: options: node_attributes: {
-							type: object: {
-								options: "*": {
-									type: string: {}
-									required:    true
-									description: "A single graph node attribute in graphviz DOT language."
+						type: object: options: {
+							edge_attributes: {
+								type: object: {
+									options: "*": {
+										type: object: {
+											options: "*": {
+												type: string: {}
+												required:    true
+												description: "A single graph edge attribute in graphviz DOT language."
+											}
+											examples: [{
+												color: "red"
+												label: "Example Edge"
+												width: "5.0"
+											}]
+										}
+										description: "A collection of graph edge attributes in graphviz DOT language, related to a single input component."
+										required:    true
+									}
+									examples: [{
+										example_input: {
+											color: "red"
+											label: "Example Edge"
+											width: "5.0"
+										}
+									}]
 								}
-								examples: [{
-									color: "red"
-									name:  "Example Node"
-									width: "5.0"
-								}]
+								description: """
+																		Edge attributes to add to the edges linked to this component's node in resulting graph
+
+																		They are added to the edge as provided
+																		"""
+								required: false
 							}
-							description: """
+							node_attributes: {
+								type: object: {
+									options: "*": {
+										type: string: {}
+										required:    true
+										description: "A single graph node attribute in graphviz DOT language."
+									}
+									examples: [{
+										color: "red"
+										name:  "Example Node"
+										width: "5.0"
+									}]
+								}
+								description: """
 																		Node attributes to add to this component's node in resulting graph
 
 																		They are added to the node as provided
 																		"""
-							required: false
+								required: false
+							}
 						}
 						description: """
 														Extra graph configuration

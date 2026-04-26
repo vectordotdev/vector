@@ -1,9 +1,6 @@
 use std::{
     collections::{HashMap, HashSet},
-    sync::{
-        Arc, Mutex,
-        atomic::{AtomicBool, Ordering},
-    },
+    sync::{Arc, Mutex},
 };
 
 use futures::{Future, FutureExt, future};
@@ -58,6 +55,7 @@ pub struct RunningTopology {
     inputs_tap_metadata: HashMap<ComponentKey, Inputs<OutputId>>,
     outputs: HashMap<OutputId, ControlChannel>,
     outputs_tap_metadata: HashMap<ComponentKey, (&'static str, String)>,
+    component_type_names: HashMap<ComponentKey, String>,
     source_tasks: HashMap<ComponentKey, TaskHandle>,
     tasks: HashMap<ComponentKey, TaskHandle>,
     shutdown_coordinator: SourceShutdownCoordinator,
@@ -65,7 +63,6 @@ pub struct RunningTopology {
     pub(crate) config: Config,
     pub(crate) abort_tx: mpsc::UnboundedSender<ShutdownError>,
     watch: (WatchTx, WatchRx),
-    pub(crate) running: Arc<AtomicBool>,
     graceful_shutdown_duration: Option<Duration>,
     utilization_registry: Option<UtilizationRegistry>,
     utilization_task: Option<TaskHandle>,
@@ -82,13 +79,13 @@ impl RunningTopology {
             inputs_tap_metadata: HashMap::new(),
             outputs: HashMap::new(),
             outputs_tap_metadata: HashMap::new(),
+            component_type_names: HashMap::new(),
             shutdown_coordinator: SourceShutdownCoordinator::default(),
             detach_triggers: HashMap::new(),
             source_tasks: HashMap::new(),
             tasks: HashMap::new(),
             abort_tx,
             watch: watch::channel(TapResource::default()),
-            running: Arc::new(AtomicBool::new(true)),
             graceful_shutdown_duration: config.graceful_shutdown_duration,
             config,
             utilization_registry: None,
@@ -146,8 +143,6 @@ impl RunningTopology {
     /// dropped then everything from this RunningTopology instance is fully
     /// dropped.
     pub fn stop(self) -> impl Future<Output = ()> {
-        // Update the API's health endpoint to signal shutdown
-        self.running.store(false, Ordering::Relaxed);
         // Create handy handles collections of all tasks for the subsequent
         // operations.
         let mut wait_handles = Vec::new();
@@ -713,17 +708,20 @@ impl RunningTopology {
             for key in &diff.sources.to_remove {
                 // Sources only have outputs
                 self.outputs_tap_metadata.remove(key);
+                self.component_type_names.remove(key);
             }
 
             for key in &diff.transforms.to_remove {
                 // Transforms can have both inputs and outputs
                 self.outputs_tap_metadata.remove(key);
                 self.inputs_tap_metadata.remove(key);
+                self.component_type_names.remove(key);
             }
 
             for key in &diff.sinks.to_remove {
                 // Sinks only have inputs
                 self.inputs_tap_metadata.remove(key);
+                self.component_type_names.remove(key);
             }
 
             let removed_sinks = diff.enrichment_tables.to_remove.iter().filter(|key| {
@@ -749,8 +747,10 @@ impl RunningTopology {
 
             for key in diff.sources.changed_and_added() {
                 if let Some(task) = new_pieces.tasks.get(key) {
+                    let typetag = task.typetag().to_string();
                     self.outputs_tap_metadata
-                        .insert(key.clone(), ("source", task.typetag().to_string()));
+                        .insert(key.clone(), ("source", typetag.clone()));
+                    self.component_type_names.insert(key.clone(), typetag);
                 }
             }
 
@@ -771,8 +771,17 @@ impl RunningTopology {
 
             for key in diff.transforms.changed_and_added() {
                 if let Some(task) = new_pieces.tasks.get(key) {
+                    let typetag = task.typetag().to_string();
                     self.outputs_tap_metadata
-                        .insert(key.clone(), ("transform", task.typetag().to_string()));
+                        .insert(key.clone(), ("transform", typetag.clone()));
+                    self.component_type_names.insert(key.clone(), typetag);
+                }
+            }
+
+            for key in diff.sinks.changed_and_added() {
+                if let Some(task) = new_pieces.tasks.get(key) {
+                    self.component_type_names
+                        .insert(key.clone(), task.typetag().to_string());
                 }
             }
 
@@ -888,6 +897,11 @@ impl RunningTopology {
                     // Note, only sources and transforms are relevant. Sinks do
                     // not have outputs to tap.
                     removals,
+                    type_names: self
+                        .component_type_names
+                        .iter()
+                        .map(|(k, v)| (k.to_string(), v.clone()))
+                        .collect(),
                 })
                 .expect("Couldn't broadcast config changes.");
         }

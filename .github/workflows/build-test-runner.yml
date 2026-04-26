@@ -9,11 +9,11 @@ on:
   workflow_call:
     inputs:
       commit_sha:
-        description: 'Commit SHA to use for image tag'
+        description: "Commit SHA to use for image tag"
         required: true
         type: string
       checkout_ref:
-        description: 'Git ref to checkout (defaults to commit_sha)'
+        description: "Git ref to checkout (defaults to commit_sha)"
         required: false
         type: string
 
@@ -24,8 +24,8 @@ jobs:
   build:
     runs-on: ubuntu-24.04
     permissions:
-      contents: read   # Required by actions/checkout
-      packages: write  # Required to push test runner image to GitHub Container Registry
+      contents: read # Required by actions/checkout
+      packages: write # Required to push test runner image to GitHub Container Registry
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -36,7 +36,7 @@ jobs:
           vdev: true
 
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
