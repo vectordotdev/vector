@@ -682,6 +682,12 @@ generated: components: sources: aws_sqs: configuration: {
 
 			Generally, this should not be changed unless instructed to do so, as if messages are available,
 			they are always consumed, regardless of the value of `poll_secs`.
+
+			Maps to the SQS `ReceiveMessage` `WaitTimeSeconds` parameter, which is
+			[capped at 20 seconds by AWS][aws_docs]. Values above 20 are rejected by AWS and result in
+			silent ingestion failure, so this field is constrained to the same range.
+
+			[aws_docs]: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/API_ReceiveMessage.html
 			"""
 		required: false
 		type: uint: {

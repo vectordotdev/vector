@@ -41,12 +41,19 @@ pub struct AwsSqsConfig {
     ///
     /// Generally, this should not be changed unless instructed to do so, as if messages are available,
     /// they are always consumed, regardless of the value of `poll_secs`.
+    ///
+    /// Maps to the SQS `ReceiveMessage` `WaitTimeSeconds` parameter, which is
+    /// [capped at 20 seconds by AWS][aws_docs]. Values above 20 are rejected by AWS and result in
+    /// silent ingestion failure, so this field is constrained to the same range.
+    ///
+    /// [aws_docs]: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/API_ReceiveMessage.html
     // NOTE: We restrict this to u32 for safe conversion to i32 later.
     // NOTE: This value isn't used as a `Duration` downstream, so we don't bother using `serde_with`
     #[serde(default = "default_poll_secs")]
     #[derivative(Default(value = "default_poll_secs()"))]
     #[configurable(metadata(docs::type_unit = "seconds"))]
     #[configurable(metadata(docs::human_name = "Poll Wait Time"))]
+    #[configurable(validation(range(max = 20)))]
     pub poll_secs: u32,
 
     /// The visibility timeout to use for messages, in seconds.
