@@ -174,6 +174,9 @@ generated: components: sources: aws_sqs: configuration: {
 					schema: {
 						description: """
 																The Avro schema definition.
+
+																Required when `schema_registry` is not set.
+
 																**Note**: The following [`apache_avro::types::Value`] variants are *not* supported:
 																* `Date`
 																* `Decimal`
@@ -181,16 +184,40 @@ generated: components: sources: aws_sqs: configuration: {
 																* `Fixed`
 																* `TimeMillis`
 																"""
-						required: true
+						required: false
 						type: string: examples: ["{ \"type\": \"record\", \"name\": \"log\", \"fields\": [{ \"name\": \"message\", \"type\": \"string\" }] }"]
+					}
+					schema_registry: {
+						description: """
+																Schema registry configuration for fetching Avro schemas dynamically.
+
+																When set, each message must use the [Confluent wire format][wire_format] (a 5-byte prefix
+																containing a magic byte and a 4-byte big-endian schema ID). The schema is fetched from the
+																registry on first use and cached locally for subsequent messages.
+
+																Mutually exclusive with the inline `schema` field.
+
+																[wire_format]: https://docs.confluent.io/platform/current/schema-registry/fundamentals/serdes-develop/index.html#wire-format
+																"""
+						required: false
+						type: object: options: url: {
+							description: "Base URL of the Confluent Schema Registry, e.g. `http://schema-registry:8081`."
+							required:    true
+							type: string: {}
+						}
 					}
 					strip_schema_id_prefix: {
 						description: """
-																For Avro datum encoded in Kafka messages, the bytes are prefixed with the schema ID.  Set this to `true` to strip the schema ID prefix.
+																For Avro datum encoded in Kafka messages, the bytes are prefixed with the schema ID.
+																Set this to `true` to strip the schema ID prefix.
+
 																According to [Confluent Kafka's document](https://docs.confluent.io/platform/current/schema-registry/fundamentals/serdes-develop/index.html#wire-format).
+
+																This option is ignored when `schema_registry` is set — in that case the prefix is
+																always consumed to extract the schema ID.
 																"""
-						required: true
-						type: bool: {}
+						required: false
+						type: bool: default: false
 					}
 				}
 			}

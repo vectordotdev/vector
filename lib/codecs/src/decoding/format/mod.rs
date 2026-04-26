@@ -18,7 +18,9 @@ mod syslog;
 mod vrl;
 
 use ::bytes::Bytes;
-pub use avro::{AvroDeserializer, AvroDeserializerConfig, AvroDeserializerOptions};
+pub use avro::{
+    AvroDeserializer, AvroDeserializerConfig, AvroDeserializerOptions, SchemaRegistryConfig,
+};
 use dyn_clone::DynClone;
 pub use gelf::{GelfDeserializer, GelfDeserializerConfig, GelfDeserializerOptions};
 pub use influxdb::{InfluxdbDeserializer, InfluxdbDeserializerConfig};
