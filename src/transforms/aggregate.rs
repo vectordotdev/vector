@@ -1,10 +1,11 @@
 use std::{
-    collections::{HashMap, hash_map::Entry},
+    collections::{BTreeMap, HashMap, hash_map::Entry},
     pin::Pin,
     time::Duration,
 };
 
 use async_stream::stream;
+use chrono::{DateTime, Utc};
 use futures::{Stream, StreamExt};
 use vector_lib::{
     configurable::configurable_component,
@@ -17,7 +18,9 @@ use vector_lib::{
 use crate::{
     config::{DataType, Input, OutputId, TransformConfig, TransformContext, TransformOutput},
     event::{Event, EventMetadata},
-    internal_events::{AggregateEventRecorded, AggregateFlushed, AggregateUpdateFailed},
+    internal_events::{
+        AggregateEventDropped, AggregateEventRecorded, AggregateFlushed, AggregateUpdateFailed,
+    },
     schema,
     transforms::{TaskTransform, Transform},
 };
@@ -39,6 +42,64 @@ pub struct AggregateConfig {
     #[serde(default = "default_mode")]
     #[configurable(derived)]
     pub mode: AggregationMode,
+    /// Time source to use for aggregation windows.
+    ///
+    /// When set to `event_time`, events are grouped into buckets based on their timestamps rather than
+    /// when they are processed. Events arriving out of order (after their bucket has been flushed) are rejected.
+    #[serde(default = "default_time_source")]
+    #[configurable(derived)]
+    pub time_source: TimeSource,
+
+    /// Grace period for late-arriving events when using event-time aggregation.
+    ///
+    /// Events with timestamps older than the watermark but within this grace period will still be accepted.
+    /// Set to 0 for strict ordering (no late events allowed).
+    /// Only applies when `time_source` is set to `EventTime`.
+    #[serde(default)]
+    #[configurable(metadata(docs::examples = 0, docs::examples = 5000, docs::examples = 30000))]
+    pub allowed_lateness_ms: u64,
+
+    /// How to handle events with missing timestamps in event-time mode.
+    ///
+    /// When `true`, events without timestamps will use the current system time as a fallback.
+    /// When `false`, events without timestamps will be dropped.
+    /// Only applies when `time_source` is set to `EventTime`.
+    #[serde(default)]
+    pub use_system_time_for_missing_timestamps: bool,
+
+    /// Maximum allowed time drift for future events in event-time mode.
+    ///
+    /// Events with timestamps further in the future than this value will be dropped.
+    /// Set to 0 to allow events at any future time.
+    /// Only applies when `time_source` is set to `EventTime`.
+    #[serde(default = "default_max_future_ms")]
+    #[configurable(metadata(docs::examples = 0, docs::examples = 60000, docs::examples = 300000))]
+    pub max_future_ms: u64,
+}
+
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[configurable(description = "The time source to use for aggregation windows.")]
+pub enum TimeSource {
+    /// Use system clock time for aggregation windows (default).
+    ///
+    /// Events are aggregated based on when they are processed, not their timestamps.
+    #[default]
+    SystemTime,
+
+    /// Use event timestamps for aggregation windows.
+    ///
+    /// Events are grouped into buckets based on their timestamps. Events arriving out of order
+    /// (after their bucket has been flushed) are rejected.
+    EventTime,
+}
+
+const fn default_time_source() -> TimeSource {
+    TimeSource::SystemTime
+}
+
+const fn default_max_future_ms() -> u64 {
+    10000 // 10 seconds default
 }
 
 #[configurable_component]
@@ -165,11 +226,19 @@ impl TransformConfig for AggregateConfig {
 
 type MetricEntry = (MetricData, EventMetadata);
 
+type BucketKey = i64;
+
 #[derive(Debug)]
 pub struct Aggregate {
     interval: Duration,
     map: HashMap<MetricSeries, MetricEntry>,
     mode: InnerMode,
+    time_source: TimeSource,
+    event_time_buckets: BTreeMap<BucketKey, HashMap<MetricSeries, MetricEntry>>,
+    event_time_prev_buckets: BTreeMap<BucketKey, HashMap<MetricSeries, MetricEntry>>,
+    event_time_multi_buckets: BTreeMap<BucketKey, HashMap<MetricSeries, Vec<MetricEntry>>>,
+    watermark: Option<BucketKey>,
+    config: AggregateConfig,
 }
 
 impl Aggregate {
@@ -178,33 +247,201 @@ impl Aggregate {
             interval: Duration::from_millis(config.interval_ms),
             map: Default::default(),
             mode: config.mode.into(),
+            time_source: config.time_source,
+            event_time_buckets: Default::default(),
+            event_time_prev_buckets: Default::default(),
+            event_time_multi_buckets: Default::default(),
+            watermark: None,
+            config: *config,
         })
     }
 
-    fn record(&mut self, event: Event) {
-        let (series, data, metadata) = event.into_metric().into_parts();
+    const fn bucket_key(&self, timestamp: DateTime<Utc>) -> BucketKey {
+        let timestamp_ms = timestamp.timestamp_millis();
+        let interval_ms = self.interval.as_millis() as i64;
+        (timestamp_ms / interval_ms) * interval_ms
+    }
 
-        match &mut self.mode {
-            InnerMode::Auto => match data.kind {
-                MetricKind::Incremental => self.record_sum(series, data, metadata),
+    const fn is_too_late(&self, bucket_key: BucketKey) -> bool {
+        if let Some(watermark) = self.watermark {
+            // Allow events within the grace period (allowed_lateness)
+            let grace_period_ms = self.config.allowed_lateness_ms as i64;
+            bucket_key < watermark.saturating_sub(grace_period_ms)
+        } else {
+            false
+        }
+    }
+
+    fn record(&mut self, event: Event) {
+        let metric = event.into_metric();
+        let timestamp = metric.timestamp();
+        let (series, mut data, metadata) = metric.into_parts();
+
+        if self.time_source == TimeSource::EventTime {
+            // Handle missing timestamp
+            let ts = match timestamp {
+                Some(ts) => ts,
+                None => {
+                    if self.config.use_system_time_for_missing_timestamps {
+                        Utc::now()
+                    } else {
+                        emit!(AggregateEventDropped {
+                            reason: "Event missing timestamp required for event-time aggregation."
+                        });
+                        return;
+                    }
+                }
+            };
+            // Preserve (or synthesize) the timestamp in the stored metric so that
+            // event-time "latest" selection can compare timestamps reliably.
+            data.time.timestamp = Some(ts);
+
+            // Check for future timestamps
+            if self.config.max_future_ms > 0 {
+                let now = Utc::now();
+                let max_future =
+                    now + chrono::Duration::milliseconds(self.config.max_future_ms as i64);
+                if ts > max_future {
+                    emit!(AggregateEventDropped {
+                        reason: "Event timestamp too far in the future."
+                    });
+                    return;
+                }
+            }
+
+            let bucket_key = self.bucket_key(ts);
+
+            // Check if event is too late (past watermark with grace period)
+            if self.is_too_late(bucket_key) {
+                emit!(AggregateEventDropped {
+                    reason: "Event timestamp is too late; bucket already flushed."
+                });
+                return;
+            }
+
+            self.record_into_bucket(bucket_key, series, data, metadata);
+            emit!(AggregateEventRecorded);
+            return;
+        }
+        match self.config.mode {
+            AggregationMode::Auto => match data.kind {
+                MetricKind::Incremental => Self::record_sum(&mut self.map, series, data, metadata),
                 MetricKind::Absolute => {
                     self.map.insert(series, (data, metadata));
                 }
             },
-            InnerMode::Sum => self.record_sum(series, data, metadata),
-            InnerMode::Latest | InnerMode::Diff { .. } => match data.kind {
+            AggregationMode::Sum => Self::record_sum(&mut self.map, series, data, metadata),
+            AggregationMode::Latest | AggregationMode::Diff => match data.kind {
                 MetricKind::Incremental => (),
                 MetricKind::Absolute => {
                     self.map.insert(series, (data, metadata));
                 }
             },
-            InnerMode::Count => self.record_count(series, data, metadata),
-            InnerMode::Max | InnerMode::Min => self.record_comparison(series, data, metadata),
-            InnerMode::Mean { multi_map } | InnerMode::Stdev { multi_map } => match data.kind {
+            AggregationMode::Count => Self::record_count(&mut self.map, series, data, metadata),
+            AggregationMode::Max | AggregationMode::Min => {
+                Self::record_comparison(&mut self.map, series, data, metadata, self.config.mode)
+            }
+            AggregationMode::Mean | AggregationMode::Stdev => {
+                if let InnerMode::Mean { multi_map } | InnerMode::Stdev { multi_map } =
+                    &mut self.mode
+                {
+                    match data.kind {
+                        MetricKind::Incremental => (),
+                        MetricKind::Absolute => {
+                            if matches!(data.value, MetricValue::Gauge { value: _ }) {
+                                match multi_map.entry(series) {
+                                    Entry::Occupied(mut entry) => {
+                                        let existing = entry.get_mut();
+                                        existing.push((data, metadata));
+                                    }
+                                    Entry::Vacant(entry) => {
+                                        entry.insert(vec![(data, metadata)]);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        emit!(AggregateEventRecorded);
+    }
+
+    fn record_into_bucket(
+        &mut self,
+        bucket_key: BucketKey,
+        series: MetricSeries,
+        data: MetricData,
+        metadata: EventMetadata,
+    ) {
+        let mode = self.config.mode;
+        let bucket = self.event_time_buckets.entry(bucket_key).or_default();
+        let multi_bucket = self.event_time_multi_buckets.entry(bucket_key).or_default();
+
+        match mode {
+            AggregationMode::Auto => match data.kind {
+                MetricKind::Incremental => {
+                    Self::record_sum(bucket, series, data, metadata);
+                }
+                MetricKind::Absolute => {
+                    match bucket.entry(series) {
+                        Entry::Vacant(entry) => {
+                            entry.insert((data, metadata));
+                        }
+                        Entry::Occupied(mut entry) => {
+                            // In event-time mode, "latest" means latest *event timestamp*
+                            // within the time bucket, not latest arrival order.
+                            let new_ts = data.timestamp().cloned();
+                            let existing_ts = entry.get().0.timestamp().cloned();
+                            let should_replace = match (new_ts, existing_ts) {
+                                (Some(n), Some(e)) => n >= e,
+                                (Some(_), None) => true,
+                                _ => false,
+                            };
+
+                            if should_replace {
+                                *entry.get_mut() = (data, metadata);
+                            }
+                        }
+                    }
+                }
+            },
+            AggregationMode::Sum => {
+                Self::record_sum(bucket, series, data, metadata);
+            }
+            AggregationMode::Latest | AggregationMode::Diff => match data.kind {
+                MetricKind::Incremental => (),
+                MetricKind::Absolute => match bucket.entry(series) {
+                    Entry::Vacant(entry) => {
+                        entry.insert((data, metadata));
+                    }
+                    Entry::Occupied(mut entry) => {
+                        let new_ts = data.timestamp().cloned();
+                        let existing_ts = entry.get().0.timestamp().cloned();
+                        let should_replace = match (new_ts, existing_ts) {
+                            (Some(n), Some(e)) => n >= e,
+                            (Some(_), None) => true,
+                            _ => false,
+                        };
+
+                        if should_replace {
+                            *entry.get_mut() = (data, metadata);
+                        }
+                    }
+                },
+            },
+            AggregationMode::Count => {
+                Self::record_count(bucket, series, data, metadata);
+            }
+            AggregationMode::Max | AggregationMode::Min => {
+                Self::record_comparison(bucket, series, data, metadata, mode);
+            }
+            AggregationMode::Mean | AggregationMode::Stdev => match data.kind {
                 MetricKind::Incremental => (),
                 MetricKind::Absolute => {
                     if matches!(data.value, MetricValue::Gauge { value: _ }) {
-                        match multi_map.entry(series) {
+                        match multi_bucket.entry(series) {
                             Entry::Occupied(mut entry) => {
                                 let existing = entry.get_mut();
                                 existing.push((data, metadata));
@@ -217,32 +454,16 @@ impl Aggregate {
                 }
             },
         }
-
-        emit!(AggregateEventRecorded);
     }
 
-    fn record_count(
-        &mut self,
+    fn record_sum(
+        bucket: &mut HashMap<MetricSeries, MetricEntry>,
         series: MetricSeries,
-        mut data: MetricData,
+        data: MetricData,
         metadata: EventMetadata,
     ) {
-        let mut count_data = data.clone();
-        let existing = self.map.entry(series).or_insert_with(|| {
-            *data.value_mut() = MetricValue::Counter { value: 0f64 };
-            (data.clone(), metadata.clone())
-        });
-        *count_data.value_mut() = MetricValue::Counter { value: 1f64 };
-        if existing.0.kind == data.kind && existing.0.update(&count_data) {
-            existing.1.merge(metadata);
-        } else {
-            emit!(AggregateUpdateFailed);
-        }
-    }
-
-    fn record_sum(&mut self, series: MetricSeries, data: MetricData, metadata: EventMetadata) {
         match data.kind {
-            MetricKind::Incremental => match self.map.entry(series) {
+            MetricKind::Incremental => match bucket.entry(series) {
                 Entry::Occupied(mut entry) => {
                     let existing = entry.get_mut();
                     // In order to update (add) the new and old kind's must match
@@ -261,15 +482,35 @@ impl Aggregate {
         }
     }
 
+    fn record_count(
+        bucket: &mut HashMap<MetricSeries, MetricEntry>,
+        series: MetricSeries,
+        mut data: MetricData,
+        metadata: EventMetadata,
+    ) {
+        let mut count_data = data.clone();
+        let existing = bucket.entry(series).or_insert_with(|| {
+            *data.value_mut() = MetricValue::Counter { value: 0f64 };
+            (data.clone(), metadata.clone())
+        });
+        *count_data.value_mut() = MetricValue::Counter { value: 1f64 };
+        if existing.0.kind == data.kind && existing.0.update(&count_data) {
+            existing.1.merge(metadata);
+        } else {
+            emit!(AggregateUpdateFailed);
+        }
+    }
+
     fn record_comparison(
-        &mut self,
+        bucket: &mut HashMap<MetricSeries, MetricEntry>,
         series: MetricSeries,
         data: MetricData,
         metadata: EventMetadata,
+        mode: AggregationMode,
     ) {
         match data.kind {
             MetricKind::Incremental => (),
-            MetricKind::Absolute => match self.map.entry(series) {
+            MetricKind::Absolute => match bucket.entry(series) {
                 Entry::Occupied(mut entry) => {
                     let existing = entry.get_mut();
                     // In order to update (add) the new and old kind's must match
@@ -279,9 +520,9 @@ impl Aggregate {
                         } = existing.0.value()
                             && let MetricValue::Gauge { value: new_value } = data.value()
                         {
-                            let should_update = match self.mode {
-                                InnerMode::Max => new_value > existing_value,
-                                InnerMode::Min => new_value < existing_value,
+                            let should_update = match mode {
+                                AggregationMode::Max => new_value > existing_value,
+                                AggregationMode::Min => new_value < existing_value,
                                 _ => false,
                             };
                             if should_update {
@@ -301,6 +542,14 @@ impl Aggregate {
     }
 
     fn flush_into(&mut self, output: &mut Vec<Event>) {
+        if self.time_source == TimeSource::EventTime {
+            self.flush_event_time_buckets(output);
+        } else {
+            self.flush_system_time(output);
+        }
+    }
+
+    fn flush_system_time(&mut self, output: &mut Vec<Event>) {
         let map = std::mem::take(&mut self.map);
         for (series, entry) in map.clone().into_iter() {
             let mut metric = Metric::from_parts(series, entry.0, entry.1);
@@ -379,6 +628,115 @@ impl Aggregate {
         }
         emit!(AggregateFlushed);
     }
+
+    fn flush_event_time_buckets(&mut self, output: &mut Vec<Event>) {
+        let now = Utc::now();
+        let now_ms = now.timestamp_millis();
+        let interval_ms = self.interval.as_millis() as i64;
+        let grace_ms = self.config.allowed_lateness_ms as i64;
+
+        // Flush Logic:
+        // A bucket [bucket_key, bucket_key + interval) is considered ready to flush if:
+        // 1. now >= bucket_key + interval + allowed_lateness (bucket end time + grace window)
+        //
+        // Watermark tracking is still used for late-event rejection in `is_too_late()`.
+        let buckets_to_flush: Vec<BucketKey> = self
+            .event_time_buckets
+            .keys()
+            .filter(|&&bucket_key| now_ms >= bucket_key + interval_ms + grace_ms)
+            .copied()
+            .collect();
+
+        for bucket_key in buckets_to_flush {
+            if let Some(bucket_map) = self.event_time_buckets.remove(&bucket_key) {
+                for (series, entry) in bucket_map.clone().into_iter() {
+                    let mut metric = Metric::from_parts(series, entry.0, entry.1);
+                    let prev_bucket_key = bucket_key.saturating_sub(interval_ms);
+                    if matches!(self.config.mode, AggregationMode::Diff)
+                        && let Some(prev_bucket) =
+                            self.event_time_prev_buckets.get(&prev_bucket_key)
+                        && let Some(prev_entry) = prev_bucket.get(metric.series())
+                        && metric.data().kind == prev_entry.0.kind
+                        && !metric.subtract(&prev_entry.0)
+                    {
+                        emit!(AggregateUpdateFailed);
+                    }
+                    output.push(Event::Metric(metric));
+                }
+
+                if let Some(multi_bucket) = self.event_time_multi_buckets.remove(&bucket_key) {
+                    'outer: for (series, entries) in multi_bucket.into_iter() {
+                        if entries.is_empty() {
+                            continue;
+                        }
+
+                        let (mut final_sum, mut final_metadata) = entries.first().unwrap().clone();
+                        for (data, metadata) in entries.iter().skip(1) {
+                            if !final_sum.update(data) {
+                                emit!(AggregateUpdateFailed);
+                                continue 'outer;
+                            }
+                            final_metadata.merge(metadata.clone());
+                        }
+
+                        let final_mean_value =
+                            if let MetricValue::Gauge { value } = final_sum.value_mut() {
+                                *value /= entries.len() as f64;
+                                *value
+                            } else {
+                                0.0
+                            };
+
+                        let final_mean = final_sum.clone();
+                        match self.config.mode {
+                            AggregationMode::Mean => {
+                                let metric = Metric::from_parts(series, final_mean, final_metadata);
+                                output.push(Event::Metric(metric));
+                            }
+                            AggregationMode::Stdev => {
+                                let variance = entries
+                                    .iter()
+                                    .filter_map(|(data, _)| {
+                                        if let MetricValue::Gauge { value } = data.value() {
+                                            let diff = final_mean_value - value;
+                                            Some(diff * diff)
+                                        } else {
+                                            None
+                                        }
+                                    })
+                                    .sum::<f64>()
+                                    / entries.len() as f64;
+                                let mut final_stdev = final_mean;
+                                if let MetricValue::Gauge { value } = final_stdev.value_mut() {
+                                    *value = variance.sqrt()
+                                }
+                                let metric =
+                                    Metric::from_parts(series, final_stdev, final_metadata);
+                                output.push(Event::Metric(metric));
+                            }
+                            _ => (),
+                        }
+                    }
+                }
+
+                self.event_time_prev_buckets.insert(bucket_key, bucket_map);
+                if matches!(self.config.mode, AggregationMode::Diff) {
+                    // Keep only a small history window to compute the previous bucket diff.
+                    let min_keep = bucket_key.saturating_sub(interval_ms);
+                    self.event_time_prev_buckets.retain(|&k, _| k >= min_keep);
+                }
+            }
+
+            // Update watermark to the highest flushed bucket
+            if self.watermark.is_none_or(|w| bucket_key > w) {
+                self.watermark = Some(bucket_key);
+            }
+        }
+
+        if !output.is_empty() {
+            emit!(AggregateFlushed);
+        }
+    }
 }
 
 impl TaskTransform<Event> for Aggregate {
@@ -421,6 +779,7 @@ impl TaskTransform<Event> for Aggregate {
 mod tests {
     use std::{collections::BTreeSet, sync::Arc, task::Poll};
 
+    use chrono::TimeZone;
     use futures::stream;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
@@ -456,11 +815,34 @@ mod tests {
         event
     }
 
+    fn make_metric_with_timestamp(
+        name: &'static str,
+        kind: MetricKind,
+        value: MetricValue,
+        timestamp: DateTime<Utc>,
+    ) -> Event {
+        let mut event =
+            Event::Metric(Metric::new(name, kind, value).with_timestamp(Some(timestamp)))
+                .with_source_id(Arc::new(ComponentKey::from("in")))
+                .with_upstream_id(Arc::new(OutputId::from("transform")));
+        event.metadata_mut().set_schema_definition(&Arc::new(
+            Definition::new_with_default_metadata(Kind::any_object(), [LogNamespace::Legacy]),
+        ));
+
+        event.metadata_mut().set_source_type("unit_test_stream");
+
+        event
+    }
+
     #[test]
     fn incremental_auto() {
         let mut agg = Aggregate::new(&AggregateConfig {
             interval_ms: 1000_u64,
             mode: AggregationMode::Auto,
+            time_source: TimeSource::SystemTime,
+            allowed_lateness_ms: 0,
+            use_system_time_for_missing_timestamps: false,
+            max_future_ms: 10000,
         })
         .unwrap();
 
@@ -532,6 +914,10 @@ mod tests {
         let mut agg = Aggregate::new(&AggregateConfig {
             interval_ms: 1000_u64,
             mode: AggregationMode::Auto,
+            time_source: TimeSource::SystemTime,
+            allowed_lateness_ms: 0,
+            use_system_time_for_missing_timestamps: false,
+            max_future_ms: 10000,
         })
         .unwrap();
 
@@ -598,6 +984,10 @@ mod tests {
         let mut agg = Aggregate::new(&AggregateConfig {
             interval_ms: 1000_u64,
             mode: AggregationMode::Count,
+            time_source: TimeSource::SystemTime,
+            allowed_lateness_ms: 0,
+            use_system_time_for_missing_timestamps: false,
+            max_future_ms: 10000,
         })
         .unwrap();
 
@@ -654,6 +1044,10 @@ mod tests {
         let mut agg = Aggregate::new(&AggregateConfig {
             interval_ms: 1000_u64,
             mode: AggregationMode::Max,
+            time_source: TimeSource::SystemTime,
+            allowed_lateness_ms: 0,
+            use_system_time_for_missing_timestamps: false,
+            max_future_ms: 10000,
         })
         .unwrap();
 
@@ -700,6 +1094,10 @@ mod tests {
         let mut agg = Aggregate::new(&AggregateConfig {
             interval_ms: 1000_u64,
             mode: AggregationMode::Min,
+            time_source: TimeSource::SystemTime,
+            allowed_lateness_ms: 0,
+            use_system_time_for_missing_timestamps: false,
+            max_future_ms: 10000,
         })
         .unwrap();
 
@@ -746,6 +1144,10 @@ mod tests {
         let mut agg = Aggregate::new(&AggregateConfig {
             interval_ms: 1000_u64,
             mode: AggregationMode::Diff,
+            time_source: TimeSource::SystemTime,
+            allowed_lateness_ms: 0,
+            use_system_time_for_missing_timestamps: false,
+            max_future_ms: 10000,
         })
         .unwrap();
 
@@ -802,6 +1204,10 @@ mod tests {
         let mut agg = Aggregate::new(&AggregateConfig {
             interval_ms: 1000_u64,
             mode: AggregationMode::Diff,
+            time_source: TimeSource::SystemTime,
+            allowed_lateness_ms: 0,
+            use_system_time_for_missing_timestamps: false,
+            max_future_ms: 10000,
         })
         .unwrap();
 
@@ -837,6 +1243,10 @@ mod tests {
         let mut agg = Aggregate::new(&AggregateConfig {
             interval_ms: 1000_u64,
             mode: AggregationMode::Mean,
+            time_source: TimeSource::SystemTime,
+            allowed_lateness_ms: 0,
+            use_system_time_for_missing_timestamps: false,
+            max_future_ms: 10000,
         })
         .unwrap();
 
@@ -894,6 +1304,10 @@ mod tests {
         let mut agg = Aggregate::new(&AggregateConfig {
             interval_ms: 1000_u64,
             mode: AggregationMode::Stdev,
+            time_source: TimeSource::SystemTime,
+            allowed_lateness_ms: 0,
+            use_system_time_for_missing_timestamps: false,
+            max_future_ms: 10000,
         })
         .unwrap();
 
@@ -954,6 +1368,10 @@ mod tests {
         let mut agg = Aggregate::new(&AggregateConfig {
             interval_ms: 1000_u64,
             mode: AggregationMode::Auto,
+            time_source: TimeSource::SystemTime,
+            allowed_lateness_ms: 0,
+            use_system_time_for_missing_timestamps: false,
+            max_future_ms: 10000,
         })
         .unwrap();
 
@@ -1012,6 +1430,10 @@ mod tests {
         let mut agg = Aggregate::new(&AggregateConfig {
             interval_ms: 1000_u64,
             mode: AggregationMode::Auto,
+            time_source: TimeSource::SystemTime,
+            allowed_lateness_ms: 0,
+            use_system_time_for_missing_timestamps: false,
+            max_future_ms: 10000,
         })
         .unwrap();
 
@@ -1200,5 +1622,735 @@ interval_ms = 999999
             assert_eq!(out.next().await, None);
         })
         .await;
+    }
+
+    #[test]
+    fn event_time_incremental_auto() {
+        let mut agg = Aggregate::new(&AggregateConfig {
+            interval_ms: 10000_u64, // 10 seconds
+            mode: AggregationMode::Auto,
+            time_source: TimeSource::EventTime,
+            allowed_lateness_ms: 0,
+            use_system_time_for_missing_timestamps: false,
+            max_future_ms: 10000,
+        })
+        .unwrap();
+
+        // Create events with timestamps in the same bucket (11:00:20 to 11:00:30)
+        let base_time = DateTime::parse_from_rfc3339("2025-12-29T11:00:20Z")
+            .unwrap()
+            .with_timezone(&Utc);
+
+        let counter_a_1 = make_metric_with_timestamp(
+            "counter_a",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 42.0 },
+            base_time,
+        );
+        let counter_a_2 = make_metric_with_timestamp(
+            "counter_a",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 43.0 },
+            base_time + chrono::Duration::seconds(5), // 11:00:25
+        );
+        // Record events in the same bucket
+        agg.record(counter_a_1.clone());
+        agg.record(counter_a_2);
+        let mut out = vec![];
+        // Flush should aggregate them together
+        agg.flush_into(&mut out);
+        assert_eq!(1, out.len());
+        // Check that values are summed (we can't easily compare full events, so check the value)
+        let metric = out[0].as_metric();
+        assert_eq!(metric.series().name.name.as_str(), "counter_a");
+        if let MetricValue::Counter { value } = metric.value() {
+            assert_eq!(*value, 85.0);
+        } else {
+            panic!("Expected Counter value");
+        }
+    }
+
+    #[test]
+    fn event_time_out_of_order_rejection() {
+        let mut agg = Aggregate::new(&AggregateConfig {
+            interval_ms: 10000_u64, // 10 seconds
+            mode: AggregationMode::Auto,
+            time_source: TimeSource::EventTime,
+            allowed_lateness_ms: 0,
+            use_system_time_for_missing_timestamps: false,
+            max_future_ms: 10000,
+        })
+        .unwrap();
+
+        let base_time = DateTime::parse_from_rfc3339("2025-12-29T11:00:20Z")
+            .unwrap()
+            .with_timezone(&Utc);
+
+        // First event at 11:00:30 (end of first bucket)
+        let event1 = make_metric_with_timestamp(
+            "counter_a",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 42.0 },
+            base_time + chrono::Duration::seconds(10), // 11:00:30
+        );
+
+        // Second event at 11:00:50 (second bucket)
+        let event2 = make_metric_with_timestamp(
+            "counter_a",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 43.0 },
+            base_time + chrono::Duration::seconds(30), // 11:00:50
+        );
+
+        // Record first event and flush (this will set watermark)
+        agg.record(event1);
+        let mut out = vec![];
+        agg.flush_into(&mut out);
+        assert_eq!(1, out.len());
+
+        // Now record an out-of-order event from the first bucket (11:00:25)
+        let late_event = make_metric_with_timestamp(
+            "counter_a",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 100.0 },
+            base_time + chrono::Duration::seconds(5), // 11:00:25 - should be rejected
+        );
+
+        // This should be rejected (too late)
+        agg.record(late_event);
+        out.clear();
+        agg.flush_into(&mut out);
+        // Should have no new output (late event was rejected)
+        assert_eq!(0, out.len());
+
+        // Record event from second bucket (should be accepted)
+        agg.record(event2);
+        out.clear();
+        agg.flush_into(&mut out);
+        assert_eq!(1, out.len());
+    }
+
+    #[test]
+    fn event_time_different_buckets() {
+        let mut agg = Aggregate::new(&AggregateConfig {
+            interval_ms: 10000_u64, // 10 seconds
+            mode: AggregationMode::Auto,
+            time_source: TimeSource::EventTime,
+            allowed_lateness_ms: 0,
+            use_system_time_for_missing_timestamps: false,
+            max_future_ms: 10000,
+        })
+        .unwrap();
+
+        let base_time = DateTime::parse_from_rfc3339("2025-12-29T11:00:20Z")
+            .unwrap()
+            .with_timezone(&Utc);
+
+        // Events in first bucket (11:00:20 - 11:00:30)
+        let event1_bucket1 = make_metric_with_timestamp(
+            "counter_a",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 10.0 },
+            base_time,
+        );
+        let event2_bucket1 = make_metric_with_timestamp(
+            "counter_a",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 20.0 },
+            base_time + chrono::Duration::seconds(5), // 11:00:25
+        );
+
+        // Events in second bucket (11:00:30 - 11:00:40)
+        let event1_bucket2 = make_metric_with_timestamp(
+            "counter_a",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 30.0 },
+            base_time + chrono::Duration::seconds(15), // 11:00:35
+        );
+
+        // Record events from first bucket
+        agg.record(event1_bucket1);
+        agg.record(event2_bucket1);
+        let mut out = vec![];
+        agg.flush_into(&mut out);
+        // Should flush first bucket (summed: 10 + 20 = 30)
+        assert_eq!(1, out.len());
+        let metric = out[0].as_metric();
+        if let MetricValue::Counter { value } = metric.value() {
+            assert_eq!(*value, 30.0);
+        } else {
+            panic!("Expected Counter value");
+        }
+
+        // Record event from second bucket
+        agg.record(event1_bucket2);
+        out.clear();
+        agg.flush_into(&mut out);
+        // Should flush second bucket (30.0)
+        assert_eq!(1, out.len());
+        let metric = out[0].as_metric();
+        if let MetricValue::Counter { value } = metric.value() {
+            assert_eq!(*value, 30.0);
+        } else {
+            panic!("Expected Counter value");
+        }
+    }
+
+    #[test]
+    fn event_time_no_timestamp_rejected() {
+        let mut agg = Aggregate::new(&AggregateConfig {
+            interval_ms: 10000_u64,
+            mode: AggregationMode::Auto,
+            time_source: TimeSource::EventTime,
+            allowed_lateness_ms: 0,
+            use_system_time_for_missing_timestamps: false,
+            max_future_ms: 10000,
+        })
+        .unwrap();
+
+        // Event without timestamp should be rejected
+        let event_no_ts = make_metric(
+            "counter_a",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 42.0 },
+        );
+
+        agg.record(event_no_ts);
+        let mut out = vec![];
+        agg.flush_into(&mut out);
+        // Should have no output (event was rejected)
+        assert_eq!(0, out.len());
+    }
+
+    #[test]
+    fn event_time_absolute_latest() {
+        let mut agg = Aggregate::new(&AggregateConfig {
+            interval_ms: 10000_u64,
+            mode: AggregationMode::Auto,
+            time_source: TimeSource::EventTime,
+            allowed_lateness_ms: 0,
+            use_system_time_for_missing_timestamps: false,
+            max_future_ms: 10000,
+        })
+        .unwrap();
+
+        let base_time = DateTime::parse_from_rfc3339("2025-12-29T11:00:20Z")
+            .unwrap()
+            .with_timezone(&Utc);
+
+        // Multiple absolute metrics in same bucket
+        let gauge1 = make_metric_with_timestamp(
+            "gauge_a",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 42.0 },
+            base_time,
+        );
+        let gauge2 = make_metric_with_timestamp(
+            "gauge_a",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 43.0 },
+            base_time + chrono::Duration::seconds(5),
+        );
+
+        // Record out of timestamp order: latest means latest event timestamp, not arrival order.
+        agg.record(gauge2);
+        agg.record(gauge1);
+        let mut out = vec![];
+        agg.flush_into(&mut out);
+        // Should get the latest value (43.0)
+        assert_eq!(1, out.len());
+        let metric = out[0].as_metric();
+        if let MetricValue::Gauge { value } = metric.value() {
+            assert_eq!(*value, 43.0);
+        } else {
+            panic!("Expected Gauge value");
+        }
+    }
+
+    #[test]
+    fn event_time_diff_uses_previous_bucket() {
+        let mut agg = Aggregate::new(&AggregateConfig {
+            interval_ms: 10000_u64, // 10 seconds
+            mode: AggregationMode::Diff,
+            time_source: TimeSource::EventTime,
+            allowed_lateness_ms: 0,
+            use_system_time_for_missing_timestamps: false,
+            max_future_ms: 10000,
+        })
+        .unwrap();
+
+        let base_time = DateTime::parse_from_rfc3339("2025-12-29T11:00:20Z")
+            .unwrap()
+            .with_timezone(&Utc);
+
+        let interval_i64 = 10000_i64;
+        let bucket1_key = (base_time.timestamp_millis() / interval_i64) * interval_i64;
+        let bucket2_key = bucket1_key + interval_i64;
+
+        let ts1 = Utc
+            .timestamp_millis_opt(bucket1_key + 5_000)
+            .latest()
+            .unwrap();
+        let ts2 = Utc
+            .timestamp_millis_opt(bucket2_key + 5_000)
+            .latest()
+            .unwrap();
+
+        let g1 = make_metric_with_timestamp(
+            "diff_gauge",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 10.0 },
+            ts1,
+        );
+        let g2 = make_metric_with_timestamp(
+            "diff_gauge",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 25.0 },
+            ts2,
+        );
+
+        agg.record(g1);
+        agg.record(g2);
+
+        let mut out = vec![];
+        agg.flush_into(&mut out);
+
+        // Both buckets are far in the past, so both flush immediately in this unit test.
+        assert_eq!(2, out.len());
+
+        let mut values: Vec<f64> = out
+            .iter()
+            .map(|event| {
+                let metric = event.as_metric();
+                if let MetricValue::Gauge { value } = metric.value() {
+                    *value
+                } else {
+                    panic!("Expected Gauge metric value");
+                }
+            })
+            .collect();
+
+        values.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        assert!((values[0] - 10.0).abs() < 1e-9);
+        assert!((values[1] - 15.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn event_time_allowed_lateness_delays_flush_for_current_bucket() {
+        let interval_ms = 5000_u64;
+        let allowed_lateness_ms = 3000_u64;
+
+        let mut agg = Aggregate::new(&AggregateConfig {
+            interval_ms,
+            mode: AggregationMode::Auto,
+            time_source: TimeSource::EventTime,
+            allowed_lateness_ms,
+            use_system_time_for_missing_timestamps: false,
+            max_future_ms: 10000,
+        })
+        .unwrap();
+
+        // Put an event in the *current* bucket. With allowed_lateness configured, the bucket should
+        // not be flushable until it has completed + grace window.
+        let now = Utc::now();
+        let now_ms = now.timestamp_millis();
+        let interval_i64 = interval_ms as i64;
+        let current_bucket_key = (now_ms / interval_i64) * interval_i64;
+
+        let ts = Utc
+            .timestamp_millis_opt(current_bucket_key + interval_i64 - 1000)
+            .latest()
+            .unwrap();
+
+        let gauge = make_metric_with_timestamp(
+            "gauge_lateness",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 42.0 },
+            ts,
+        );
+        agg.record(gauge);
+
+        let mut out = vec![];
+        agg.flush_into(&mut out);
+        assert_eq!(0, out.len());
+    }
+
+    #[test]
+    fn event_time_allowed_lateness_accepts_within_grace_rejects_outside() {
+        let interval_ms = 10_000_u64;
+        let allowed_lateness_ms = 10_000_u64;
+
+        let mut agg = Aggregate::new(&AggregateConfig {
+            interval_ms,
+            mode: AggregationMode::Auto,
+            time_source: TimeSource::EventTime,
+            allowed_lateness_ms,
+            use_system_time_for_missing_timestamps: false,
+            max_future_ms: 10000,
+        })
+        .unwrap();
+
+        let now_ms = Utc::now().timestamp_millis();
+        let interval_i64 = interval_ms as i64;
+        let grace_i64 = allowed_lateness_ms as i64;
+
+        let current_bucket_key = (now_ms / interval_i64) * interval_i64;
+
+        // Choose buckets far enough in the past that they flush immediately when present
+        // in `event_time_buckets`, but still distinct enough to test watermark+grace logic.
+        let watermark_bucket_key = current_bucket_key - interval_i64 * 5;
+        let accept_bucket_key = watermark_bucket_key - grace_i64; // exactly at grace boundary
+        let reject_bucket_key = watermark_bucket_key - grace_i64 - interval_i64; // beyond grace
+
+        let ts_in_watermark_bucket = Utc
+            .timestamp_millis_opt(watermark_bucket_key + interval_i64 / 2)
+            .latest()
+            .unwrap();
+        let ts_in_accept_bucket = Utc
+            .timestamp_millis_opt(accept_bucket_key + interval_i64 / 2)
+            .latest()
+            .unwrap();
+        let ts_in_reject_bucket = Utc
+            .timestamp_millis_opt(reject_bucket_key + interval_i64 / 2)
+            .latest()
+            .unwrap();
+
+        // Step 1: flush the watermark bucket so watermark becomes `watermark_bucket_key`.
+        let initial = make_metric_with_timestamp(
+            "gauge_lateness_boundary",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 1.0 },
+            ts_in_watermark_bucket,
+        );
+        agg.record(initial);
+        let mut out = vec![];
+        agg.flush_into(&mut out);
+        assert_eq!(1, out.len());
+
+        out.clear();
+
+        // Step 2: record one event inside grace (should be accepted) and one beyond grace
+        // (should be rejected).
+        let accepted = make_metric_with_timestamp(
+            "gauge_lateness_boundary",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 2.0 },
+            ts_in_accept_bucket,
+        );
+        let rejected = make_metric_with_timestamp(
+            "gauge_lateness_boundary",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 3.0 },
+            ts_in_reject_bucket,
+        );
+
+        agg.record(accepted);
+        agg.record(rejected);
+        agg.flush_into(&mut out);
+
+        // Only the accepted bucket should produce an output metric.
+        assert_eq!(1, out.len());
+        let metric = out[0].as_metric();
+        if let MetricValue::Gauge { value } = metric.value() {
+            assert_eq!(*value, 2.0);
+        } else {
+            panic!("Expected Gauge metric value");
+        }
+    }
+
+    #[test]
+    fn event_time_future_timestamp_rejected() {
+        let mut agg = Aggregate::new(&AggregateConfig {
+            interval_ms: 10000_u64,
+            mode: AggregationMode::Auto,
+            time_source: TimeSource::EventTime,
+            allowed_lateness_ms: 0,
+            use_system_time_for_missing_timestamps: false,
+            max_future_ms: 5000, // only allow 5 seconds into the future
+        })
+        .unwrap();
+
+        // Timestamp 60 seconds in the future — well beyond max_future_ms.
+        let far_future = Utc::now() + chrono::Duration::seconds(60);
+        let event = make_metric_with_timestamp(
+            "counter_future",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 99.0 },
+            far_future,
+        );
+
+        agg.record(event);
+        let mut out = vec![];
+        agg.flush_into(&mut out);
+        assert_eq!(0, out.len(), "Far-future event must be dropped");
+    }
+
+    #[test]
+    fn event_time_missing_timestamp_uses_system_time() {
+        let mut agg = Aggregate::new(&AggregateConfig {
+            interval_ms: 10000_u64,
+            mode: AggregationMode::Auto,
+            time_source: TimeSource::EventTime,
+            allowed_lateness_ms: 0,
+            use_system_time_for_missing_timestamps: true,
+            max_future_ms: 10000,
+        })
+        .unwrap();
+
+        // Event with no timestamp — should be bucketed using system time and accepted.
+        let event = make_metric(
+            "counter_no_ts",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 7.0 },
+        );
+        agg.record(event);
+
+        // The event goes into the current (system-time) bucket, which hasn't completed yet,
+        // so it should NOT flush on the first call.
+        let mut out = vec![];
+        agg.flush_into(&mut out);
+        assert_eq!(
+            0,
+            out.len(),
+            "Current bucket not yet flushed — event is pending"
+        );
+
+        // Verify the event is actually stored (not dropped): the bucket exists.
+        assert_eq!(
+            1,
+            agg.event_time_buckets.len(),
+            "Event should be stored in exactly one bucket"
+        );
+    }
+
+    #[test]
+    fn event_time_diff_first_bucket_no_previous() {
+        let mut agg = Aggregate::new(&AggregateConfig {
+            interval_ms: 10000_u64,
+            mode: AggregationMode::Diff,
+            time_source: TimeSource::EventTime,
+            allowed_lateness_ms: 0,
+            use_system_time_for_missing_timestamps: false,
+            max_future_ms: 10000,
+        })
+        .unwrap();
+
+        let base_time = DateTime::parse_from_rfc3339("2025-12-29T11:00:20Z")
+            .unwrap()
+            .with_timezone(&Utc);
+
+        let event = make_metric_with_timestamp(
+            "diff_gauge",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 42.0 },
+            base_time,
+        );
+        agg.record(event);
+
+        let mut out = vec![];
+        agg.flush_into(&mut out);
+
+        // First bucket has no previous window — should emit raw value without subtraction.
+        assert_eq!(1, out.len());
+        if let MetricValue::Gauge { value } = out[0].as_metric().value() {
+            assert_eq!(*value, 42.0, "First bucket in Diff emits the raw value");
+        } else {
+            panic!("Expected Gauge metric value");
+        }
+    }
+
+    #[test]
+    fn event_time_count_mode() {
+        let mut agg = Aggregate::new(&AggregateConfig {
+            interval_ms: 10000_u64,
+            mode: AggregationMode::Count,
+            time_source: TimeSource::EventTime,
+            allowed_lateness_ms: 0,
+            use_system_time_for_missing_timestamps: false,
+            max_future_ms: 10000,
+        })
+        .unwrap();
+
+        let base_time = DateTime::parse_from_rfc3339("2025-12-29T11:00:20Z")
+            .unwrap()
+            .with_timezone(&Utc);
+
+        // Three events (any kind) in the same bucket should produce count = 3.
+        for i in 0..3 {
+            let event = make_metric_with_timestamp(
+                "count_metric",
+                MetricKind::Incremental,
+                MetricValue::Counter { value: 1.0 },
+                base_time + chrono::Duration::seconds(i),
+            );
+            agg.record(event);
+        }
+
+        let mut out = vec![];
+        agg.flush_into(&mut out);
+
+        assert_eq!(1, out.len());
+        if let MetricValue::Counter { value } = out[0].as_metric().value() {
+            assert_eq!(*value, 3.0, "Count mode should count 3 events");
+        } else {
+            panic!("Expected Counter value from Count mode");
+        }
+    }
+
+    #[test]
+    fn event_time_watermark_only_advances() {
+        let mut agg = Aggregate::new(&AggregateConfig {
+            interval_ms: 10000_u64,
+            mode: AggregationMode::Auto,
+            time_source: TimeSource::EventTime,
+            allowed_lateness_ms: 0,
+            use_system_time_for_missing_timestamps: false,
+            max_future_ms: 10000,
+        })
+        .unwrap();
+
+        let base_time = DateTime::parse_from_rfc3339("2025-12-29T11:00:20Z")
+            .unwrap()
+            .with_timezone(&Utc);
+
+        // Arrive in reverse bucket order: newer first, then older.
+        let newer = make_metric_with_timestamp(
+            "counter_a",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 1.0 },
+            base_time + chrono::Duration::seconds(30), // bucket 3
+        );
+        let older = make_metric_with_timestamp(
+            "counter_a",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 2.0 },
+            base_time, // bucket 1
+        );
+
+        // Flush the newer bucket first so that watermark advances to bucket 3.
+        agg.record(newer);
+        let mut out = vec![];
+        agg.flush_into(&mut out);
+        let watermark_after_newer = agg.watermark;
+        assert!(watermark_after_newer.is_some());
+
+        // Now record the older bucket — it is below watermark and should be rejected.
+        agg.record(older);
+        out.clear();
+        agg.flush_into(&mut out);
+        assert_eq!(0, out.len(), "Older bucket below watermark must be rejected");
+
+        // Watermark must not have regressed.
+        assert_eq!(
+            agg.watermark, watermark_after_newer,
+            "Watermark must never decrease"
+        );
+    }
+
+    #[test]
+    fn event_time_empty_flush_produces_nothing() {
+        let mut agg = Aggregate::new(&AggregateConfig {
+            interval_ms: 10000_u64,
+            mode: AggregationMode::Auto,
+            time_source: TimeSource::EventTime,
+            allowed_lateness_ms: 0,
+            use_system_time_for_missing_timestamps: false,
+            max_future_ms: 10000,
+        })
+        .unwrap();
+
+        let mut out = vec![];
+        agg.flush_into(&mut out);
+        assert_eq!(0, out.len(), "Flush with no events must produce no output");
+
+        // Second call must also be safe.
+        agg.flush_into(&mut out);
+        assert_eq!(0, out.len());
+    }
+
+    #[test]
+    fn event_time_multiple_different_metrics_same_bucket() {
+        let mut agg = Aggregate::new(&AggregateConfig {
+            interval_ms: 10000_u64, // 10 seconds
+            mode: AggregationMode::Auto,
+            time_source: TimeSource::EventTime,
+            allowed_lateness_ms: 0,
+            use_system_time_for_missing_timestamps: false,
+            max_future_ms: 10000,
+        })
+        .unwrap();
+
+        let base_time = DateTime::parse_from_rfc3339("2025-12-29T11:00:20Z")
+            .unwrap()
+            .with_timezone(&Utc);
+
+        // Create multiple different metrics (different names) in the same time bucket
+        let counter_a = make_metric_with_timestamp(
+            "counter_a",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 10.0 },
+            base_time,
+        );
+        let counter_b = make_metric_with_timestamp(
+            "counter_b",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 20.0 },
+            base_time + chrono::Duration::seconds(3), // Still in same bucket
+        );
+        let gauge_c = make_metric_with_timestamp(
+            "gauge_c",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 30.0 },
+            base_time + chrono::Duration::seconds(7), // Still in same bucket
+        );
+
+        // Record all metrics in the same bucket
+        agg.record(counter_a);
+        agg.record(counter_b);
+        agg.record(gauge_c);
+
+        let mut out = vec![];
+        agg.flush_into(&mut out);
+
+        // All three different metrics should be flushed together from the same bucket
+        assert_eq!(
+            3,
+            out.len(),
+            "Should flush all three different metrics from the same bucket"
+        );
+
+        // Verify we have all three metrics
+        let mut found_counter_a = false;
+        let mut found_counter_b = false;
+        let mut found_gauge_c = false;
+
+        for event in out {
+            let metric = event.as_metric();
+            match metric.series().name.name.as_str() {
+                "counter_a" => {
+                    found_counter_a = true;
+                    if let MetricValue::Counter { value } = metric.value() {
+                        assert_eq!(*value, 10.0);
+                    }
+                }
+                "counter_b" => {
+                    found_counter_b = true;
+                    if let MetricValue::Counter { value } = metric.value() {
+                        assert_eq!(*value, 20.0);
+                    }
+                }
+                "gauge_c" => {
+                    found_gauge_c = true;
+                    if let MetricValue::Gauge { value } = metric.value() {
+                        assert_eq!(*value, 30.0);
+                    }
+                }
+                _ => panic!("Unexpected metric name: {}", metric.series().name.name),
+            }
+        }
+
+        assert!(found_counter_a, "Should have found counter_a");
+        assert!(found_counter_b, "Should have found counter_b");
+        assert!(found_gauge_c, "Should have found gauge_c");
     }
 }
