@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.55.0"
+version = "0.56.0"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2024"
 description = "A lightweight and ultra-fast tool for building observability pipelines"
@@ -345,7 +345,7 @@ deadpool = { version = "0.13.0", default-features = false, features = ["managed"
 hex = { version = "0.4.3", default-features = false, optional = true }
 
 # GreptimeDB
-greptimedb-ingester = { git = "https://github.com/GreptimeTeam/greptimedb-ingester-rust", rev = "f7243393808640f5123b0d5b7b798da591a4df6e", optional = true }
+greptimedb-ingester = { version = "0.17.0", default-features = false, optional = true }
 
 # External libs
 arc-swap = { workspace = true, default-features = false, optional = true }
