@@ -819,9 +819,11 @@ generated: components: sources: aws_s3: configuration: {
 			}
 			delete_failed_message: {
 				description: """
-					Whether to delete non-retryable messages.
+					Whether to delete messages that are rejected by the sink.
 
-					If a message is rejected by the sink and not retryable, it is deleted from the queue.
+					When enabled, if the downstream sink explicitly rejects a batch (e.g., due to a schema mismatch or permanent sink error), the corresponding SQS message is deleted from the queue.
+
+					This does NOT affect S3 fetch errors (e.g., NoSuchKey, AccessDenied, network failures). Those errors always leave the message in SQS for retry via visibility timeout or dead-letter queue processing.
 					"""
 				required: false
 				type: bool: default: true

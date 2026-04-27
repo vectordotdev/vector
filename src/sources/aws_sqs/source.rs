@@ -119,7 +119,12 @@ impl SqsSource {
         let receive_message_output = match result {
             Ok(output) => output,
             Err(err) => {
-                emit!(SqsMessageReceiveError { error: &err });
+                let aws_ctx =
+                    Some(crate::aws::error::extract_error_context(&err));
+                emit!(SqsMessageReceiveError {
+                    error: &err,
+                    aws_ctx,
+                });
                 return;
             }
         };
@@ -215,7 +220,12 @@ async fn delete_messages(client: SqsClient, receipts: Vec<String>, queue_url: St
             );
         }
         if let Err(err) = batch.send().await {
-            emit!(SqsMessageDeleteError { error: &err });
+            let aws_ctx =
+                Some(crate::aws::error::extract_error_context(&err));
+            emit!(SqsMessageDeleteError {
+                error: &err,
+                aws_ctx,
+            });
         }
     }
 }

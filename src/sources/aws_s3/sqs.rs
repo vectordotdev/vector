@@ -49,11 +49,12 @@ use crate::{
     config::{SourceAcknowledgementsConfig, SourceContext},
     event::{BatchNotifier, BatchStatus, EstimatedJsonEncodedSizeOf, Event, LogEvent},
     internal_events::{
-        EventsReceived, S3ObjectProcessingFailed, S3ObjectProcessingSucceeded,
-        SqsMessageDeleteBatchError, SqsMessageDeletePartialError, SqsMessageDeleteSucceeded,
-        SqsMessageProcessingError, SqsMessageProcessingSucceeded, SqsMessageReceiveError,
-        SqsMessageReceiveSucceeded, SqsMessageSendBatchError, SqsMessageSentPartialError,
-        SqsMessageSentSucceeded, SqsS3EventRecordInvalidEventIgnored, StreamClosedError,
+        EventsReceived, S3ObjectGetFailed, S3ObjectProcessingFailed,
+        S3ObjectProcessingSucceeded, SqsMessageDeleteBatchError, SqsMessageDeletePartialError,
+        SqsMessageDeleteSucceeded, SqsMessageProcessingError, SqsMessageProcessingSucceeded,
+        SqsMessageReceiveError, SqsMessageReceiveSucceeded, SqsMessageSendBatchError,
+        SqsMessageSentPartialError, SqsMessageSentSucceeded,
+        SqsS3EventRecordInvalidEventIgnored, StreamClosedError,
     },
     line_agg::{self, LineAgg},
     shutdown::ShutdownSignal,
@@ -134,9 +135,15 @@ pub(super) struct Config {
     #[derivative(Default(value = "default_true()"))]
     pub(super) delete_message: bool,
 
-    /// Whether to delete non-retryable messages.
+    /// Whether to delete messages that are rejected by the sink.
     ///
-    /// If a message is rejected by the sink and not retryable, it is deleted from the queue.
+    /// When enabled, if the downstream sink explicitly rejects a batch
+    /// (e.g., due to a schema mismatch or permanent sink error), the
+    /// corresponding SQS message is deleted from the queue.
+    ///
+    /// This does NOT affect S3 fetch errors (e.g., NoSuchKey, AccessDenied,
+    /// network failures). Those errors always leave the message in SQS for
+    /// retry via visibility timeout or dead-letter queue processing.
     #[serde(default = "default_true")]
     #[derivative(Default(value = "default_true()"))]
     pub(super) delete_failed_message: bool,
@@ -203,7 +210,10 @@ const fn default_true() -> bool {
 
 #[derive(Debug, Snafu)]
 pub(super) enum IngestorNewError {
-    #[snafu(display("Invalid value for max_number_of_messages {}", messages))]
+    #[snafu(display(
+        "Invalid value for `sqs.max_number_of_messages`: {} (must be between 1 and 10, per AWS SQS ReceiveMessage API limit)",
+        messages
+    ))]
     InvalidNumberOfMessages { messages: u32 },
 }
 
@@ -238,13 +248,16 @@ pub enum ProcessingError {
         key: String,
     },
     #[snafu(display(
-        "Object notification for s3://{}/{} is a bucket in another region: {}",
+        "Received S3 notification for s3://{}/{} in region {}, but this source is configured for region {}. \
+         Ensure the SQS queue and S3 bucket are in the same region, or deploy a separate Vector source for each region.",
         bucket,
         key,
-        region
+        event_region,
+        configured_region,
     ))]
     WrongRegion {
-        region: String,
+        event_region: String,
+        configured_region: String,
         bucket: String,
         key: String,
     },
@@ -272,6 +285,20 @@ pub enum ProcessingError {
         key: String,
         deferred_queue: String,
     },
+}
+
+impl ProcessingError {
+    /// Returns AWS error context if this error wraps an SdkError.
+    ///
+    /// Only `GetObject` wraps an `SdkError`, so all other variants return `None`.
+    pub fn aws_error_context(&self) -> Option<crate::aws::error::AwsErrorContext<'_>> {
+        match self {
+            ProcessingError::GetObject { source, .. } => {
+                Some(crate::aws::error::extract_error_context(source))
+            }
+            _ => None,
+        }
+    }
 }
 
 pub struct State {
@@ -422,9 +449,10 @@ impl IngestorProcess {
                         }
                         Err(_) => {
                             let delay = self.backoff.next().expect("backoff never ends");
-                            trace!(
+                            warn!(
+                                message = "SQS receive failed, will retry after delay.",
                                 delay_ms = delay.as_millis(),
-                                "`run_once` failed, will retry after delay.",
+                                queue_url = %self.state.queue_url,
                             );
                             tokio::time::sleep(delay).await;
                         }
@@ -443,7 +471,12 @@ impl IngestorProcess {
                 messages
             }
             Err(err) => {
-                emit!(SqsMessageReceiveError { error: &err });
+                let aws_ctx =
+                    Some(crate::aws::error::extract_error_context(&err));
+                emit!(SqsMessageReceiveError {
+                    error: &err,
+                    aws_ctx,
+                });
                 return Err(());
             }
         };
@@ -466,6 +499,22 @@ impl IngestorProcess {
                 .message_id
                 .clone()
                 .unwrap_or_else(|| "<unknown>".to_owned());
+
+            if let Some(ref attrs) = message.attributes
+                && let Some(count_str) = attrs.get(
+                    &aws_sdk_sqs::types::MessageSystemAttributeName::ApproximateReceiveCount,
+                )
+                && let Ok(count) = count_str.parse::<u32>()
+                && count > 5
+            {
+                warn!(
+                    message = "SQS message has been received multiple times, possibly a poison message.",
+                    message_id = %message_id,
+                    approximate_receive_count = count,
+                    queue_url = %self.state.queue_url,
+                );
+            }
+
             match self.handle_sqs_message(message.clone()).await {
                 Ok(()) => {
                     emit!(SqsMessageProcessingSucceeded {
@@ -529,6 +578,38 @@ impl IngestorProcess {
                                 message_id: &message_id,
                                 error: &err,
                             });
+
+                            // Emit structured S3 GetObject failure diagnostics.
+                            // The message is NOT deleted here — it remains in SQS
+                            // for retry via visibility timeout or dead-letter queue.
+                            // Only sink rejections (BatchStatus::Rejected) can trigger
+                            // message deletion, controlled by `delete_failed_message`.
+                            if let ProcessingError::GetObject { source, bucket, key } = &err {
+                                let ctx = crate::aws::error::extract_error_context(source);
+                                let class = crate::aws::error::classify_error(&ctx);
+                                let error_kind = match class {
+                                    crate::aws::error::AwsErrorClass::NotFound => {
+                                        if ctx.aws_error_code == Some("NoSuchBucket") {
+                                            "NoSuchBucket"
+                                        } else {
+                                            "NoSuchKey"
+                                        }
+                                    }
+                                    crate::aws::error::AwsErrorClass::Auth => "AccessDenied",
+                                    crate::aws::error::AwsErrorClass::Throttling => "Throttling",
+                                    crate::aws::error::AwsErrorClass::Connectivity => "Transient",
+                                    crate::aws::error::AwsErrorClass::ServiceError => "ServiceError",
+                                    _ => "Other",
+                                };
+                                let actionable_message =
+                                    s3_get_object_actionable_message(error_kind, bucket, key);
+                                emit!(S3ObjectGetFailed {
+                                    bucket,
+                                    key,
+                                    error_kind,
+                                    actionable_message: &actionable_message,
+                                });
+                            }
                         }
                     }
                 }
@@ -559,10 +640,13 @@ impl IngestorProcess {
                         })
                     }
                 }
-                Err(err) => {
+                Err(ref err) => {
+                    let aws_ctx =
+                        Some(crate::aws::error::extract_error_context(err));
                     emit!(SqsMessageSendBatchError {
                         entries: cloned_entries,
                         error: err,
+                        aws_ctx,
                     });
                 }
             }
@@ -586,10 +670,13 @@ impl IngestorProcess {
                         });
                     }
                 }
-                Err(err) => {
+                Err(ref err) => {
+                    let aws_ctx =
+                        Some(crate::aws::error::extract_error_context(err));
                     emit!(SqsMessageDeleteBatchError {
                         entries: cloned_entries,
                         error: err,
+                        aws_ctx,
                     });
                 }
             }
@@ -599,9 +686,13 @@ impl IngestorProcess {
 
     async fn handle_sqs_message(&mut self, message: Message) -> Result<(), ProcessingError> {
         let sqs_body = message.body.unwrap_or_default();
-        let sqs_body = serde_json::from_str::<SnsNotification>(sqs_body.as_ref())
-            .map(|notification| notification.message)
-            .unwrap_or(sqs_body);
+        let sqs_body = match serde_json::from_str::<SnsNotification>(sqs_body.as_ref()) {
+            Ok(notification) => {
+                debug!(message = "Unwrapped SNS envelope from SQS message.", ?message.message_id);
+                notification.message
+            }
+            Err(_) => sqs_body,
+        };
         let s3_event: SqsEvent =
             serde_json::from_str(sqs_body.as_ref()).context(InvalidSqsMessageSnafu {
                 message_id: message
@@ -612,7 +703,7 @@ impl IngestorProcess {
 
         match s3_event {
             SqsEvent::TestEvent(_s3_test_event) => {
-                debug!(?message.message_id, message = "Found S3 Test Event.");
+                info!(?message.message_id, message = "Received S3 test event, SQS notifications are configured correctly.");
                 Ok(())
             }
             SqsEvent::Event(s3_event) => self.handle_s3_event(s3_event).await,
@@ -655,7 +746,8 @@ impl IngestorProcess {
             return Err(ProcessingError::WrongRegion {
                 bucket: s3_event.s3.bucket.name.clone(),
                 key: s3_event.s3.object.key.clone(),
-                region: s3_event.aws_region,
+                event_region: s3_event.aws_region,
+                configured_region: self.state.region.as_ref().to_string(),
             });
         }
 
@@ -752,16 +844,27 @@ impl IngestorProcess {
             None => lines,
         };
 
+        let mut deserialize_errors: usize = 0;
+        let mut events_produced: usize = 0;
         let mut stream = lines.flat_map(|line| {
             let events = match self.state.decoder.deserializer_parse(line) {
                 Ok((events, _events_size)) => events,
-                Err(_error) => {
-                    // Error is handled by `codecs::Decoder`, no further handling
-                    // is needed here.
+                Err(error) => {
+                    // DecoderDeserializeError is already emitted by the codec layer.
+                    // Add S3 object context since the generic codec error has none.
+                    warn!(
+                        message = "Failed deserializing frame from S3 object.",
+                        bucket = %s3_event.s3.bucket.name,
+                        key = %s3_event.s3.object.key,
+                        error = %error,
+                        internal_log_rate_limit = true,
+                    );
+                    deserialize_errors += 1;
                     SmallVec::new()
                 }
             };
 
+            events_produced += events.len();
             let events = events
                 .into_iter()
                 .map(|mut event: Event| {
@@ -799,8 +902,27 @@ impl IngestorProcess {
         let bucket = &s3_event.s3.bucket.name;
         let duration = download_start.elapsed();
 
-        if read_error.is_some() {
-            emit!(S3ObjectProcessingFailed { bucket, duration });
+        if let Some(ref error) = read_error {
+            emit!(S3ObjectProcessingFailed {
+                bucket,
+                key: &s3_event.s3.object.key,
+                error: &error.to_string(),
+                duration,
+            });
+        } else if deserialize_errors > 0 && events_produced == 0 {
+            warn!(
+                message = "S3 object produced no events due to deserialization errors.",
+                bucket = %bucket,
+                key = %s3_event.s3.object.key,
+                deserialize_errors = %deserialize_errors,
+                duration_ms = %duration.as_millis(),
+            );
+            emit!(S3ObjectProcessingFailed {
+                bucket,
+                key: &s3_event.s3.object.key,
+                error: &format!("{} deserialization errors", deserialize_errors),
+                duration,
+            });
         } else {
             emit!(S3ObjectProcessingSucceeded { bucket, duration });
         }
@@ -873,6 +995,9 @@ impl IngestorProcess {
             .max_number_of_messages(self.state.max_number_of_messages)
             .visibility_timeout(self.state.visibility_timeout_secs)
             .wait_time_seconds(self.state.poll_secs)
+            .message_system_attribute_names(
+                aws_sdk_sqs::types::MessageSystemAttributeName::ApproximateReceiveCount,
+            )
             .send()
             .map_ok(|res| res.messages.unwrap_or_default())
             .await
@@ -903,6 +1028,44 @@ impl IngestorProcess {
             .set_entries(Some(entries))
             .send()
             .await
+    }
+}
+
+fn s3_get_object_actionable_message(error_kind: &str, bucket: &str, key: &str) -> String {
+    match error_kind {
+        "NoSuchKey" => format!(
+            "S3 object s3://{bucket}/{key} does not exist. \
+             The object may have been deleted before Vector could fetch it. \
+             If this is expected (e.g., short-lived objects), consider enabling \
+             a dead-letter queue on your SQS queue to prevent infinite retries."
+        ),
+        "NoSuchBucket" => format!(
+            "S3 bucket '{bucket}' does not exist. \
+             Verify the bucket name in your S3 event notifications and ensure \
+             the bucket has not been deleted."
+        ),
+        "AccessDenied" => format!(
+            "Access denied to s3://{bucket}/{key}. \
+             Ensure the IAM role/user used by Vector has s3:GetObject permission \
+             on this bucket and key prefix. Check bucket policies, ACLs, and \
+             any KMS key policies if the object is encrypted."
+        ),
+        "Throttling" => format!(
+            "AWS is throttling requests to s3://{bucket}/{key}. \
+             The request will be retried automatically."
+        ),
+        "Transient" => format!(
+            "Transient error fetching s3://{bucket}/{key}. \
+             The request will be retried automatically."
+        ),
+        "ServiceError" => format!(
+            "AWS returned a server error for s3://{bucket}/{key}. \
+             This is usually transient and will be retried automatically."
+        ),
+        _ => format!(
+            "Failed to fetch s3://{bucket}/{key}. \
+             Check AWS documentation for this error."
+        ),
     }
 }
 
