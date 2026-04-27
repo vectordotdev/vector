@@ -49,6 +49,22 @@ generated: components: sources: aws_kinesis_firehose: configuration: {
 		required:    true
 		type: string: examples: ["0.0.0.0:443", "localhost:443"]
 	}
+	common_attributes: {
+		description: """
+			A list of attributes from X-Amz-Firehose-Common-Attributes header to include in the log event.
+
+			Accepts the wildcard (`*`) character for attributes matching a specified pattern.
+
+			Specifying "*" results in all common attributes included in the log event.
+
+			These attributes are included in `common_attributes` key in the root of the log event.
+			"""
+		required: false
+		type: array: {
+			default: []
+			items: type: string: examples: ["environment", "application_group", "application_*", "*"]
+		}
+	}
 	decoding: {
 		description: """
 			Configures how events are decoded from raw bytes. Note some decoders can also determine the event output
