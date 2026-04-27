@@ -822,13 +822,16 @@ generated: components: sinks: redis: configuration: {
 			method: {
 				description: "The method to use for pushing messages into a `sorted set`."
 				required:    false
-				type: string: enum: zadd: """
-					Use the `zadd` method.
+				type: string: const: {
+					description: """
+						Use the `zadd` method.
 
-					This adds messages onto a queue with a score.
+						This adds messages with a score into a queue.
 
-					This is the default.
-					"""
+						This is the default.
+						"""
+					value: "zadd"
+				}
 			}
 			score: {
 				description: """
