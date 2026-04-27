@@ -987,7 +987,11 @@ impl RunningTopology {
                 // output for the first time, since there's nothing to actually replace at this point.
                 debug!(component_id = %key, fanout_id = %input, "Adding component input to fanout.");
 
-                _ = output.send(ControlMessage::Add(key.clone(), tx.clone(), strip_finalizers));
+                _ = output.send(ControlMessage::Add {
+                    id: key.clone(),
+                    sender: tx.clone(),
+                    strip_finalizers,
+                });
             } else {
                 // We know that if this component is connected to a given input, and neither
                 // components were changed, then the output must still exist, which means we paused
@@ -1071,7 +1075,11 @@ impl RunningTopology {
 
                 let input = self.inputs.get(transform_key).cloned().unwrap();
                 let output = self.outputs.get_mut(&output_id).unwrap();
-                _ = output.send(ControlMessage::Add(transform_key.clone(), input, strip_finalizers));
+                _ = output.send(ControlMessage::Add {
+                    id: transform_key.clone(),
+                    sender: input,
+                    strip_finalizers,
+                });
             }
         }
 
@@ -1093,7 +1101,11 @@ impl RunningTopology {
 
                 let input = self.inputs.get(sink_key).cloned().unwrap();
                 let output = self.outputs.get_mut(&output_id).unwrap();
-                _ = output.send(ControlMessage::Add(sink_key.clone(), input, strip_finalizers));
+                _ = output.send(ControlMessage::Add {
+                    id: sink_key.clone(),
+                    sender: input,
+                    strip_finalizers,
+                });
             }
         }
     }

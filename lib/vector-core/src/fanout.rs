@@ -6,14 +6,19 @@ use indexmap::IndexMap;
 use tokio::sync::mpsc;
 use tokio_util::sync::ReusableBoxFuture;
 use vector_buffers::topology::channel::BufferSender;
-
-use crate::{config::ComponentKey, event::EventArray};
 use vector_common::finalization::Finalizable;
 
+use crate::{config::ComponentKey, event::EventArray};
+
 pub enum ControlMessage {
-    /// Adds a new sink to the fanout. The bool indicates whether finalizers
-    /// should be stripped from events sent to this sink (non-authoritative path).
-    Add(ComponentKey, BufferSender<EventArray>, bool),
+    /// Adds a new sink to the fanout.
+    Add {
+        id: ComponentKey,
+        sender: BufferSender<EventArray>,
+        /// Whether finalizers should be stripped from events sent to this sink
+        /// (non-authoritative path).
+        strip_finalizers: bool,
+    },
 
     /// Removes a sink from the fanout.
     Remove(ComponentKey),
@@ -33,7 +38,9 @@ impl fmt::Debug for ControlMessage {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "ControlMessage::")?;
         match self {
-            Self::Add(id, _, strip) => write!(f, "Add({id:?}, strip={strip})"),
+            Self::Add { id, strip_finalizers, .. } => {
+                write!(f, "Add({id:?}, strip={strip_finalizers})")
+            }
             Self::Remove(id) => write!(f, "Remove({id:?})"),
             Self::Pause(id) => write!(f, "Pause({id:?})"),
             Self::Replace(id, _) => write!(f, "Replace({id:?})"),
@@ -45,10 +52,19 @@ impl fmt::Debug for ControlMessage {
 // so that high-lever components don't need to do the raw channel sends, etc.
 pub type ControlChannel = mpsc::UnboundedSender<ControlMessage>;
 
+/// Pairs a sender with its strip-finalizers flag so both travel together.
+///
+/// The `sender` field is `None` when the slot has been paused (the sender was
+/// taken out) or temporarily consumed by a `SendGroup` during an in-flight
+/// send. The `strip_finalizers` flag is preserved across pause/replace cycles.
+struct SenderSlot {
+    sender: Option<Sender>,
+    strip_finalizers: bool,
+}
+
 pub struct Fanout {
-    senders: IndexMap<ComponentKey, Option<Sender>>,
+    senders: IndexMap<ComponentKey, SenderSlot>,
     control_channel: mpsc::UnboundedReceiver<ControlMessage>,
-    strip_flags: HashMap<ComponentKey, bool>,
 }
 
 impl Fanout {
@@ -58,7 +74,6 @@ impl Fanout {
         let fanout = Self {
             senders: Default::default(),
             control_channel: control_rx,
-            strip_flags: Default::default(),
         };
 
         (fanout, control_tx)
@@ -74,9 +89,13 @@ impl Fanout {
             !self.senders.contains_key(&id),
             "Adding duplicate output id to fanout: {id}"
         );
-        self.senders
-            .insert(id.clone(), Some(Sender::new(sink, strip_finalizers)));
-        self.strip_flags.insert(id, strip_finalizers);
+        self.senders.insert(
+            id,
+            SenderSlot {
+                sender: Some(Sender::new(sink, strip_finalizers)),
+                strip_finalizers,
+            },
+        );
     }
 
     fn remove(&mut self, id: &ComponentKey) {
@@ -84,18 +103,17 @@ impl Fanout {
             self.senders.shift_remove(id).is_some(),
             "Removing nonexistent sink from fanout: {id}"
         );
-        self.strip_flags.remove(id);
     }
 
     fn replace(&mut self, id: &ComponentKey, sink: BufferSender<EventArray>) {
-        let strip = self.strip_flags.get(id).copied().unwrap_or(false);
         match self.senders.get_mut(id) {
-            Some(sender) => {
+            Some(slot) => {
+                let strip = slot.strip_finalizers;
                 // While a sink must be _known_ to be replaced, it must also be empty (previously
                 // paused or consumed when the `SendGroup` was created), otherwise an invalid
                 // sequence of control operations has been applied.
                 assert!(
-                    sender.replace(Sender::new(sink, strip)).is_none(),
+                    slot.sender.replace(Sender::new(sink, strip)).is_none(),
                     "Replacing existing sink is not valid: {id}"
                 );
             }
@@ -105,11 +123,11 @@ impl Fanout {
 
     fn pause(&mut self, id: &ComponentKey) {
         match self.senders.get_mut(id) {
-            Some(sender) => {
+            Some(slot) => {
                 // A sink must be known and present to be replaced, otherwise an invalid sequence of
                 // control operations has been applied.
                 assert!(
-                    sender.take().is_some(),
+                    slot.sender.take().is_some(),
                     "Pausing nonexistent sink is not valid: {id}"
                 );
             }
@@ -138,7 +156,9 @@ impl Fanout {
         trace!("Processing control message outside of send: {:?}", message);
 
         match message {
-            ControlMessage::Add(id, sink, strip) => self.add(id, sink, strip),
+            ControlMessage::Add { id, sender, strip_finalizers } => {
+                self.add(id, sender, strip_finalizers);
+            }
             ControlMessage::Remove(id) => self.remove(&id),
             ControlMessage::Pause(id) => self.pause(&id),
             ControlMessage::Replace(id, sink) => self.replace(&id, sink),
@@ -150,7 +170,7 @@ impl Fanout {
     /// Control messages are processed until all senders have been replaced, so it is guaranteed
     /// that when this method returns, all senders are ready for the next send to be triggered.
     async fn wait_for_replacements(&mut self) {
-        while self.senders.values().any(Option::is_none) {
+        while self.senders.values().any(|slot| slot.sender.is_none()) {
             if let Some(msg) = self.control_channel.recv().await {
                 self.apply_control_message(msg);
             } else {
@@ -245,7 +265,7 @@ impl Fanout {
 
         // Create our send group which arms all senders to send the given events, and handles
         // adding/removing/replacing senders while the send is in-flight.
-        let mut send_group = SendGroup::new(&mut self.senders, &mut self.strip_flags, events, send_reference);
+        let mut send_group = SendGroup::new(&mut self.senders, events, send_reference);
 
         loop {
             tokio::select! {
@@ -260,8 +280,8 @@ impl Fanout {
                     // During a send operation, control messages must be applied via the
                     // `SendGroup`, since it has exclusive access to the senders.
                     match maybe_msg {
-                        Some(ControlMessage::Add(id, sink, strip)) => {
-                            send_group.add(id, sink, strip);
+                        Some(ControlMessage::Add { id, sender, strip_finalizers }) => {
+                            send_group.add(id, sender, strip_finalizers);
                         },
                         Some(ControlMessage::Remove(id)) => {
                             send_group.remove(&id);
@@ -270,7 +290,10 @@ impl Fanout {
                             send_group.pause(&id);
                         },
                         Some(ControlMessage::Replace(id, sink)) => {
-                            let strip = send_group.strip_flags.get(&id).copied().unwrap_or(false);
+                            let strip = send_group.senders
+                                .get(&id)
+                                .map(|slot| slot.strip_finalizers)
+                                .unwrap_or(false);
                             send_group.replace(&id, Sender::new(sink, strip));
                         },
                         None => {
@@ -295,21 +318,19 @@ impl Fanout {
 }
 
 struct SendGroup<'a> {
-    senders: &'a mut IndexMap<ComponentKey, Option<Sender>>,
-    strip_flags: &'a mut HashMap<ComponentKey, bool>,
+    senders: &'a mut IndexMap<ComponentKey, SenderSlot>,
     sends: HashMap<ComponentKey, ReusableBoxFuture<'static, crate::Result<Sender>>>,
 }
 
 impl<'a> SendGroup<'a> {
     fn new(
-        senders: &'a mut IndexMap<ComponentKey, Option<Sender>>,
-        strip_flags: &'a mut HashMap<ComponentKey, bool>,
+        senders: &'a mut IndexMap<ComponentKey, SenderSlot>,
         events: EventArray,
         send_reference: Option<Instant>,
     ) -> Self {
         // If we don't have a valid `Sender` for all sinks, then something went wrong in our logic
         // to ensure we were starting with all valid/idle senders prior to initiating the send.
-        debug_assert!(senders.values().all(Option::is_some));
+        debug_assert!(senders.values().all(|slot| slot.sender.is_some()));
 
         let last_sender_idx = senders.len().saturating_sub(1);
         let mut events = Some(events);
@@ -317,8 +338,9 @@ impl<'a> SendGroup<'a> {
         // We generate a send future for each sender we have, which arms them with the events to
         // send but also takes ownership of the sender itself, which we give back when the sender completes.
         let mut sends = HashMap::new();
-        for (i, (key, sender)) in senders.iter_mut().enumerate() {
-            let mut sender = sender
+        for (i, (key, slot)) in senders.iter_mut().enumerate() {
+            let mut sender = slot
+                .sender
                 .take()
                 .expect("sender must be present to initialize SendGroup");
 
@@ -339,7 +361,7 @@ impl<'a> SendGroup<'a> {
             sends.insert(key.clone(), ReusableBoxFuture::new(send));
         }
 
-        Self { senders, strip_flags, sends }
+        Self { senders, sends }
     }
 
     fn try_detach_send(&mut self, id: &ComponentKey) -> bool {
@@ -364,11 +386,16 @@ impl<'a> SendGroup<'a> {
         // actually send to it, as we don't have the item to send... so only add it to `senders`.
         assert!(
             self.senders
-                .insert(id.clone(), Some(Sender::new(sink, strip_finalizers)))
+                .insert(
+                    id,
+                    SenderSlot {
+                        sender: Some(Sender::new(sink, strip_finalizers)),
+                        strip_finalizers,
+                    },
+                )
                 .is_none(),
-            "Adding duplicate output id to fanout: {id}"
+            "Adding duplicate output id to fanout"
         );
-        self.strip_flags.insert(id, strip_finalizers);
     }
 
     fn remove(&mut self, id: &ComponentKey) {
@@ -379,7 +406,6 @@ impl<'a> SendGroup<'a> {
             self.senders.shift_remove(id).is_some(),
             "Removing nonexistent sink from fanout: {id}"
         );
-        self.strip_flags.remove(id);
 
         // Now try and detach the in-flight send, if it exists.
         //
@@ -390,12 +416,12 @@ impl<'a> SendGroup<'a> {
 
     fn replace(&mut self, id: &ComponentKey, sink: Sender) {
         match self.senders.get_mut(id) {
-            Some(sender) => {
+            Some(slot) => {
                 // While a sink must be _known_ to be replaced, it must also be empty (previously
                 // paused or consumed when the `SendGroup` was created), otherwise an invalid
                 // sequence of control operations has been applied.
                 assert!(
-                    sender.replace(sink).is_none(),
+                    slot.sender.replace(sink).is_none(),
                     "Replacing existing sink is not valid: {id}"
                 );
             }
@@ -405,14 +431,14 @@ impl<'a> SendGroup<'a> {
 
     fn pause(&mut self, id: &ComponentKey) {
         match self.senders.get_mut(id) {
-            Some(sender) => {
+            Some(slot) => {
                 // If we don't currently own the `Sender` for the given component, that implies
                 // there is an in-flight send: a `SendGroup` cannot be created without all
                 // participating components having a send operation triggered.
                 //
                 // As such, `try_detach_send` should always succeed here, as pausing only occurs
                 // when a component is being _replaced_, and should not be called multiple times.
-                if sender.take().is_none() {
+                if slot.sender.take().is_none() {
                     assert!(
                         self.try_detach_send(id),
                         "Pausing already-paused sink is invalid: {id}"
@@ -1007,7 +1033,7 @@ mod tests {
     #[tokio::test]
     async fn fanout_strip_flag_preserved_across_replace() {
         use vector_common::finalization::{
-            AddBatchNotifier, BatchNotifier, Finalizable,
+            AddBatchNotifier, BatchNotifier, BatchStatus, Finalizable,
         };
 
         let (mut fanout, control) = Fanout::new();
@@ -1029,7 +1055,7 @@ mod tests {
             .expect("sending control message should not fail");
 
         // Create events with a batch notifier
-        let (batch, _batch_receiver) = BatchNotifier::new_with_receiver();
+        let (batch, mut batch_receiver) = BatchNotifier::new_with_receiver();
         let mut events: EventArray = make_events_inner(1).collect::<Vec<_>>().into();
         events.add_batch_notifier(batch);
 
@@ -1045,6 +1071,21 @@ mod tests {
         assert!(
             finalizers.is_empty(),
             "strip flag should be preserved across replace: finalizers should be empty"
+        );
+
+        // Since finalizers were stripped, the batch should resolve immediately
+        // with Delivered status (no outstanding finalizer references).
+        drop(received_events);
+        drop(finalizers);
+        let status = batch_receiver.try_recv();
+        assert!(
+            status.is_ok(),
+            "batch should resolve after all references are dropped"
+        );
+        assert_eq!(
+            status.unwrap(),
+            BatchStatus::Delivered,
+            "batch status should be Delivered when finalizers are stripped"
         );
     }
 

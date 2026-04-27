@@ -374,10 +374,10 @@ pub struct AcknowledgementsConfig {
     /// Non-authoritative sinks have their finalizers stripped, so the source
     /// does not wait for them.
     ///
-    /// Defaults to the value of `enabled`. Set to `false` on a sink with
-    /// acknowledgements enabled to prevent that sink from blocking source
-    /// acknowledgements.
-    #[serde(default)]
+    /// Defaults to `false` per RFC 6517. Backwards compatibility is preserved
+    /// because `compute_authoritative_components()` returns `None` when no sink
+    /// has `authoritative: true`, causing all sinks to participate in the ack
+    /// chain as before.
     authoritative: Option<bool>,
 }
 
@@ -403,10 +403,10 @@ impl AcknowledgementsConfig {
 
     /// Returns whether this sink is authoritative for acknowledgements.
     ///
-    /// Defaults to `false` per RFC 6517. However, stripping only activates when
-    /// at least one sink in the topology has `authoritative: true` explicitly set.
-    /// When no sink is authoritative, all sinks participate in the ack chain
-    /// (preserving backwards compatibility).
+    /// Defaults to `false` per RFC 6517. Stripping only activates when at
+    /// least one sink in the topology has `authoritative: true` explicitly
+    /// set, because `compute_authoritative_components()` returns `None`
+    /// otherwise, preserving backwards compatibility.
     pub fn authoritative(&self) -> bool {
         self.authoritative.unwrap_or(false)
     }

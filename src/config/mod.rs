@@ -304,6 +304,12 @@ impl Config {
             .collect();
 
         // Step 3: BFS backward from authoritative sinks through edges.
+        //
+        // `inputs_for_node` returns `OutputId`s whose `component` field is the
+        // upstream component key. Named outputs (routes) produce `OutputId`s
+        // with different `port` values but the same `component`, so the BFS
+        // correctly marks the upstream component as authoritative regardless of
+        // which specific route feeds into the current node.
         let mut on_authoritative_path: HashSet<ComponentKey> = authoritative_sinks.clone();
         let mut queue: VecDeque<ComponentKey> = authoritative_sinks.into_iter().collect();
 
