@@ -69,7 +69,7 @@ futures.workspace = true
 indoc.workspace = true
 tokio = { workspace = true, features = ["test-util"] }
 toml.workspace = true
-similar-asserts = "1.7.0"
+similar-asserts = "2.0.0"
 vector-core = { path = "../vector-core", default-features = false, features = ["vrl", "test"] }
 rstest = "0.26.1"
 tracing-test = "0.2.6"
