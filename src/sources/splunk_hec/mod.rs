@@ -452,8 +452,30 @@ impl SplunkSource {
                             protocol,
                         });
 
-                        let (batch, receiver) =
+                        let (batch, mut receiver) =
                             BatchNotifier::maybe_new_with_receiver(idx_ack.is_some());
+                        let decoder_in_use = decoder.is_some();
+
+                        // Without a decoder, register the ack id BEFORE iteration so
+                        // capacity-exhaustion (`ServiceUnavailable`) short-circuits
+                        // the request without parsing the body - byte-for-byte parity
+                        // with the pre-decoder behavior.
+                        let mut maybe_ack_id = None;
+                        if !decoder_in_use {
+                            maybe_ack_id =
+                                match (idx_ack.clone(), receiver.take(), channel.clone()) {
+                                    (Some(idx_ack), Some(rx), Some(channel_id)) => {
+                                        match idx_ack
+                                            .get_ack_id_from_channel(channel_id, rx)
+                                            .await
+                                        {
+                                            Ok(ack_id) => Some(ack_id),
+                                            Err(rej) => return Err(rej),
+                                        }
+                                    }
+                                    _ => None,
+                                };
+                        }
 
                         let mut error = None;
                         let mut events = Vec::new();
@@ -485,29 +507,30 @@ impl SplunkSource {
                             }
                         }
 
-                        // Only register an ack id when the request produced events
-                        // *and* the second-stage decoder did not silently drop any
-                        // frames. With newline-style framing one envelope could decode
-                        // to e.g. `valid \n invalid \n valid`; returning an ack id
-                        // there would let `/services/collector/ack` report success for
-                        // data Vector silently lost.
-                        let maybe_ack_id = if events.is_empty() || had_decode_errors {
-                            drop(receiver);
-                            None
-                        } else {
-                            match (idx_ack, receiver, channel) {
-                                (Some(idx_ack), Some(receiver), Some(channel_id)) => {
-                                    match idx_ack
-                                        .get_ack_id_from_channel(channel_id, receiver)
-                                        .await
-                                    {
-                                        Ok(ack_id) => Some(ack_id),
-                                        Err(rej) => return Err(rej),
+                        // With a decoder, defer ack registration until we know whether
+                        // the codec emitted anything *and* whether it dropped any
+                        // frames. Returning an ack id when the decoder silently lost
+                        // data would let `/services/collector/ack` report success for
+                        // a request that lost rows mid-stream.
+                        if decoder_in_use {
+                            maybe_ack_id = if events.is_empty() || had_decode_errors {
+                                drop(receiver);
+                                None
+                            } else {
+                                match (idx_ack, receiver, channel) {
+                                    (Some(idx_ack), Some(receiver), Some(channel_id)) => {
+                                        match idx_ack
+                                            .get_ack_id_from_channel(channel_id, receiver)
+                                            .await
+                                        {
+                                            Ok(ack_id) => Some(ack_id),
+                                            Err(rej) => return Err(rej),
+                                        }
                                     }
+                                    _ => None,
                                 }
-                                _ => None,
-                            }
-                        };
+                            };
+                        }
 
                         if !events.is_empty() {
                             match out.send_batch(events).await {
@@ -572,6 +595,50 @@ impl SplunkSource {
                     async move {
                         let (batch, receiver) =
                             BatchNotifier::maybe_new_with_receiver(idx_ack.is_some());
+
+                        // No-decoder path: byte-for-byte identical to the pre-decoder
+                        // code - register ack first (fast-fail under capacity
+                        // exhaustion), build a single event, send via `send_event`
+                        // (avoids `send_batch_latency` emission).
+                        let Some(decoder) = decoder else {
+                            let maybe_ack_id = match (idx_ack, receiver) {
+                                (Some(idx_ack), Some(receiver)) => Some(
+                                    idx_ack
+                                        .get_ack_id_from_channel(channel_id.clone(), receiver)
+                                        .await?,
+                                ),
+                                _ => None,
+                            };
+                            let (mut events, _) = raw_event(
+                                body,
+                                gzip,
+                                channel_id,
+                                remote,
+                                xff,
+                                batch,
+                                log_namespace,
+                                &events_received,
+                                None,
+                            )?;
+                            // raw_event with no decoder always produces exactly one
+                            // event.
+                            let mut event = events.pop().expect(
+                                "raw_event always produces a single event when no decoder is set",
+                            );
+                            if let Some(token) = token.filter(|_| store_hec_token) {
+                                event
+                                    .metadata_mut()
+                                    .set_splunk_hec_token(token.into());
+                            }
+                            let res = out.send_event(event).await;
+                            return res
+                                .map(|_| maybe_ack_id)
+                                .map_err(|_| Rejection::from(ApiError::ServerShutdown));
+                        };
+
+                        // Decoder path: build events first, then decide whether to
+                        // ack based on whether the codec produced anything and
+                        // whether it dropped any frames mid-stream.
                         let (mut events, had_decode_errors) = raw_event(
                             body,
                             gzip,
@@ -581,7 +648,7 @@ impl SplunkSource {
                             batch,
                             log_namespace,
                             &events_received,
-                            decoder,
+                            Some(decoder),
                         )?;
                         if let Some(token) = token.filter(|_| store_hec_token) {
                             let token: Arc<str> = Arc::from(token);
@@ -592,13 +659,11 @@ impl SplunkSource {
                             }
                         }
 
-                        // Skip ack registration when the decoder produced no events
-                        // *or* hit any errors mid-stream. With newline framing, e.g.,
-                        // `valid \n invalid \n valid` decodes to two events plus one
-                        // dropped frame; returning an ack id there would let
-                        // `/services/collector/ack` report success for data Vector
-                        // silently lost.
                         if events.is_empty() || had_decode_errors {
+                            // With newline framing, `valid \n invalid \n valid`
+                            // decodes to two events plus one dropped frame; returning
+                            // an ack id there would let `/services/collector/ack`
+                            // report success for data Vector silently lost.
                             drop(receiver);
                             if events.is_empty() {
                                 return Ok(None);
