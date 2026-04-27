@@ -11,6 +11,10 @@ license = "MPL-2.0"
 [lib]
 crate-type = ["cdylib"]
 
+[features]
+# Enable the full VRL stdlib, which includes all available VRL functions.
+default = ["vrl/stdlib"]
+
 [dependencies]
 wasm-bindgen = "0.2"
 vrl.workspace = true
