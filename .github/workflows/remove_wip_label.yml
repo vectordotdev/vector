@@ -14,7 +14,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Check association, label, and remove
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const association = context.payload.review.author_association;
