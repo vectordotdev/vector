@@ -33,6 +33,9 @@ env:
 
 jobs:
   tests:
+    permissions:
+      contents: read
+      id-token: write
     uses: ./.github/workflows/unit-tests.yml
     with:
       ref: ${{ inputs.ref }}
@@ -45,6 +48,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write
     uses: ./.github/workflows/integration.yml
     with:
       run_all: true
