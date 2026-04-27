@@ -27,7 +27,7 @@ if `rustfmt` cannot be persuaded to format it correctly for you. :)
 ### Const strings
 
 When re-typing the same raw string literal more than once, this can lead to typo
-errors, especially when names ares similar. In general, when reasonable, it is
+errors, especially when names are similar. In general, when reasonable, it is
 preferred to use [Compile-time constants](https://doc.rust-lang.org/std/keyword.const.html)
 when dealing with non-dynamic strings. For example, when working with field names
 for event metadata.
@@ -85,9 +85,9 @@ info!("Server has started.");
 // A formatted message, with the same formatting support as `println!`/`format!`:
 debug!("User connected: {}", username);
 
-// Adding structured fields to the even, mixing and matching the message format:
-trace!(bytes_sent = 22, "Sent heartbeat packet to client.")`
-error!(client_addr = %conn.get_ref().peer_addr, "Client actor received malformed packet: {}", parse_err.to_string())
+// Adding structured fields to the event, mixing and matching the message format:
+trace!(bytes_sent = 22, "Sent heartbeat packet to client.");
+error!(client_addr = ?conn.get_ref().peer_addr(), "Client actor received malformed packet: {}", parse_err.to_string())
 ```
 
 While this does not cover all the permutations of what the macros in `tracing` support, these
