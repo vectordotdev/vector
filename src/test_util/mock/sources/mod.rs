@@ -1,3 +1,6 @@
+mod ack;
+pub use self::ack::AckSourceConfig;
+
 mod backpressure;
 pub use self::backpressure::BackpressureSourceConfig;
 
