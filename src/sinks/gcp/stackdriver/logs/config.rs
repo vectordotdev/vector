@@ -81,6 +81,21 @@ pub(super) struct StackdriverConfig {
     #[configurable(metadata(docs::examples = "severity"))]
     pub(super) severity_key: Option<ConfigValuePath>,
 
+    /// The field of the log event from which to take the outgoing log's `insertId` field.
+    ///
+    /// The named field is removed from the log event if present, and its value is used as the
+    /// unique identifier for the log entry. The insertId is used by GCP to de-duplicate log
+    /// entries and to order entries with the same logName and timestamp.
+    ///
+    /// If no insertId key is specified, the insertId field is omitted from the LogEntry and the
+    /// GCP Logging API assigns its own unique identifier in this field.
+    ///
+    /// See the [GCP LogEntry insertId documentation][insertid_docs] for more details.
+    ///
+    /// [insertid_docs]: https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry#FIELDS.insert_id
+    #[configurable(metadata(docs::examples = "insert_id"))]
+    pub(super) insert_id_key: Option<ConfigValuePath>,
+
     #[serde(flatten)]
     pub(super) auth: GcpAuthConfig,
 
@@ -245,6 +260,7 @@ impl SinkConfig for StackdriverConfig {
                 self.label_config.clone(),
                 self.resource.clone(),
                 self.severity_key.clone(),
+                self.insert_id_key.clone(),
             ),
         };
 
