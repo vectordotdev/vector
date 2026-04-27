@@ -81,7 +81,7 @@ jobs:
       - name: Build Vector
         run: make package-${{ matrix.target }}-all
       - name: Stage package artifacts for publish
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: vector-${{ env.VECTOR_VERSION }}-${{ matrix.target }}
           path: target/artifacts/vector*
@@ -129,7 +129,7 @@ jobs:
           export PATH="$HOME/.cargo/bin:$PATH"
           make package
       - name: Stage package artifacts for publish
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: vector-${{ env.VECTOR_VERSION }}-${{ matrix.architecture }}-apple-darwin
           path: target/artifacts/vector*
@@ -176,7 +176,7 @@ jobs:
           export PATH="/c/wix:$PATH"
           ./scripts/package-msi.sh
       - name: Stage package artifacts for publish
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-pc-windows-msvc
           path: target/artifacts/vector*
@@ -470,7 +470,7 @@ jobs:
       - name: Generate SHA256 checksums for artifacts
         run: make sha256sum
       - name: Stage checksum for publish
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: vector-${{ env.VECTOR_VERSION }}-SHA256SUMS
           path: target/artifacts/vector-${{ env.VECTOR_VERSION }}-SHA256SUMS
