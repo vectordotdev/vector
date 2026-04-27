@@ -7905,27 +7905,27 @@ dependencies = [
 
 [[package]]
 name = "parquet"
-version = "56.2.0"
+version = "58.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f0dbd48ad52d7dccf8ea1b90a3ddbfaea4f69878dd7683e51c507d4bc52b5b27"
+checksum = "7d3f9f2205199603564127932b89695f52b62322f541d0fc7179d57c2e1c9877"
 dependencies = [
  "ahash 0.8.11",
- "arrow-array 56.2.0",
- "arrow-buffer 56.2.0",
- "arrow-cast 56.2.0",
- "arrow-data 56.2.0",
- "arrow-ipc 56.2.0",
- "arrow-schema 56.2.0",
- "arrow-select 56.2.0",
+ "arrow-array 58.1.0",
+ "arrow-buffer 58.1.0",
+ "arrow-data 58.1.0",
+ "arrow-ipc 58.1.0",
+ "arrow-schema 58.1.0",
+ "arrow-select 58.1.0",
  "base64 0.22.1",
  "bytes",
  "chrono",
  "flate2",
  "half",
  "hashbrown 0.16.0",
- "lz4_flex 0.11.6",
- "num",
+ "lz4_flex 0.13.0",
  "num-bigint",
+ "num-integer",
+ "num-traits",
  "paste",
  "seq-macro",
  "snap",
