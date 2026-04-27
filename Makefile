@@ -17,6 +17,15 @@ else
     export DNSTAP_BENCHES := dnstap-benches
 endif
 
+# When COVERAGE=true, swap cargo-nextest for cargo-llvm-cov so test targets collect
+# coverage data. Run `make coverage-report` afterwards to emit the lcov file.
+export COVERAGE ?= false
+ifeq ($(COVERAGE), true)
+TEST_RUNNER := cargo llvm-cov nextest --no-report
+else
+TEST_RUNNER := cargo nextest run
+endif
+
 # Override this with any scopes for testing/benching.
 export SCOPE ?=
 # Override this with any extra flags for cargo bench
@@ -360,7 +369,7 @@ target/%/vector.tar.gz: target/%/vector CARGO_HANDLES_FRESHNESS
 # https://github.com/rust-lang/cargo/issues/6454
 .PHONY: test
 test: ## Run the unit test suite
-	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --workspace --no-fail-fast --no-default-features --features "${FEATURES}" ${SCOPE}
+	${MAYBE_ENVIRONMENT_EXEC} ${TEST_RUNNER} --workspace --no-fail-fast --no-default-features --features "${FEATURES}" ${SCOPE}
 
 .PHONY: test-docs
 test-docs: ## Run the docs test suite
@@ -423,15 +432,19 @@ test-e2e-kubernetes: ## Runs Kubernetes E2E tests (Sorry, no `ENVIRONMENT=true` 
 
 .PHONY: test-cli
 test-cli: ## Runs cli tests
-	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --no-fail-fast --no-default-features --features cli-tests --test integration --test-threads 4
+	${MAYBE_ENVIRONMENT_EXEC} ${TEST_RUNNER} --no-fail-fast --no-default-features --features cli-tests --test integration --test-threads 4
 
 .PHONY: test-vector-api
 test-vector-api: ## Runs vector API tests (top and tap)
-	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --no-fail-fast --no-default-features --features vector-api-tests --test vector_api
+	${MAYBE_ENVIRONMENT_EXEC} ${TEST_RUNNER} --no-fail-fast --no-default-features --features vector-api-tests --test vector_api
 
 .PHONY: test-component-validation
 test-component-validation: ## Runs component validation tests
-	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --no-fail-fast --no-default-features --features component-validation-tests --status-level pass --test-threads 4 --lib components::validation::tests
+	${MAYBE_ENVIRONMENT_EXEC} ${TEST_RUNNER} --no-fail-fast --no-default-features --features component-validation-tests --status-level pass --test-threads 4 --lib components::validation::tests
+
+.PHONY: coverage-report
+coverage-report: ## Generate lcov report after running tests with COVERAGE=true (outputs lcov.info)
+	cargo llvm-cov report --lcov --output-path lcov.info
 
 ##@ Benching (Supports `ENVIRONMENT=true`)
 
