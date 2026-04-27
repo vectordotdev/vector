@@ -17,7 +17,6 @@ concurrency:
 env:
   CONTAINER_TOOL: "docker"
   DD_ENV: "ci"
-  DD_API_KEY: ${{ secrets.DD_API_KEY }}
   VECTOR_LOG: vector=debug
   VERBOSE: true
   CI: true
@@ -57,6 +56,9 @@ jobs:
 
   test:
     needs: changes
+    permissions:
+      contents: read
+      id-token: write
     if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.test-yml == 'true' }}
     uses: ./.github/workflows/unit-tests.yml
     with:
