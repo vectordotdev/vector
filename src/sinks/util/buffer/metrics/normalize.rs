@@ -6,6 +6,7 @@ use std::{
 use lru::LruCache;
 use serde_with::serde_as;
 use snafu::Snafu;
+use vector_common::finalization::Finalizable;
 use vector_config_macros::configurable_component;
 use vector_lib::{
     ByteSizeOf,
@@ -569,9 +570,21 @@ impl MetricSet {
     /// Either convert the metric to incremental if absolute, or
     /// aggregate it with any previous value if already incremental.
     pub fn make_incremental(&mut self, metric: Metric) -> Option<Metric> {
+        self.make_incremental_consume_dropped_finalizers(metric, false)
+    }
+
+    /// Either convert the metric to incremental if absolute, or
+    /// aggregate it with any previous value if already incremental and optionally consume the dropped finalizers.
+    pub fn make_incremental_consume_dropped_finalizers(
+        &mut self,
+        metric: Metric,
+        consume_dropped_finalizers: bool,
+    ) -> Option<Metric> {
         self.maybe_cleanup();
         match metric.kind() {
-            MetricKind::Absolute => self.absolute_to_incremental(metric),
+            MetricKind::Absolute => {
+                self.absolute_to_incremental(metric, consume_dropped_finalizers)
+            }
             MetricKind::Incremental => Some(metric),
         }
     }
@@ -600,8 +613,12 @@ impl MetricSet {
     }
 
     /// Convert the absolute metric into an incremental by calculating
-    /// the increment from the last saved absolute state.
-    fn absolute_to_incremental(&mut self, mut metric: Metric) -> Option<Metric> {
+    /// the increment from the last saved absolute state and optionally consume the dropped finalizers.
+    fn absolute_to_incremental(
+        &mut self,
+        mut metric: Metric,
+        consume_dropped_finalizers: bool,
+    ) -> Option<Metric> {
         // NOTE: Crucially, like I did, you may wonder: why do we not always return a metric? Could
         // this lead to issues where a metric isn't seen again and we, in effect, never emit it?
         //
@@ -636,12 +653,20 @@ impl MetricSet {
                     self.insert_with_tracking(metric.series().clone(), new_reference);
                     Some(metric.into_incremental())
                 } else {
+                    if consume_dropped_finalizers {
+                        metric.take_finalizers();
+                    }
+
                     // Metric changed type, store this and emit nothing
                     self.insert(metric, timestamp);
                     None
                 }
             }
             None => {
+                if consume_dropped_finalizers {
+                    metric.take_finalizers();
+                }
+
                 // No reference so store this and emit nothing
                 self.insert(metric, timestamp);
                 None
