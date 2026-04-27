@@ -382,6 +382,7 @@ jobs:
       - deb-verify
       - rpm-verify
       - macos-verify
+      - generate-sha256sum
     env:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
       CHANNEL: ${{ needs.generate-publish-metadata.outputs.vector_release_channel }}
