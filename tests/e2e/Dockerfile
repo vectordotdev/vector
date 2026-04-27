@@ -25,7 +25,6 @@ COPY tests/data/ca/certs /certs
 COPY scripts/environment/install-protoc.sh /
 COPY scripts/environment/prepare.sh /
 COPY scripts/environment/binstall.sh /
-COPY scripts/environment/release-flags.sh /
 
 WORKDIR /vector
 COPY rust-toolchain.toml .
