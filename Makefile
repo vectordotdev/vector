@@ -513,8 +513,16 @@ check-fmt: ## Check that all files are formatted properly
 check-licenses: ## Check that the 3rd-party license file is up to date
 	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) check licenses
 
+.PHONY: check-yaml-in-markdown
+check-yaml-in-markdown: ## Check YAML code blocks inside Markdown files
+	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) check yaml-in-markdown
+
+.PHONY: fix-yaml-in-markdown
+fix-yaml-in-markdown: ## Auto-fix YAML code blocks inside Markdown files
+	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) fmt yaml-in-markdown
+
 .PHONY: check-markdown
-check-markdown: ## Check that markdown is styled properly
+check-markdown: check-yaml-in-markdown ## Check that markdown is styled properly
 	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) check markdown
 
 .PHONY: fix-markdown
