@@ -7,7 +7,7 @@ use std::{
     time::Duration,
 };
 
-use bytes::{Buf, Bytes};
+use bytes::{Buf, Bytes, BytesMut};
 use chrono::{DateTime, TimeZone, Utc};
 use flate2::read::MultiGzDecoder;
 use futures::FutureExt;
@@ -20,22 +20,27 @@ use serde_json::{
 };
 use snafu::Snafu;
 use tokio::net::TcpStream;
+use tokio_util::codec::Decoder as _;
 use tower::ServiceBuilder;
 use tracing::Span;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
+    codecs::{
+        Decoder, StreamDecodingError,
+        decoding::{DeserializerConfig, FramingConfig},
+    },
     config::{LegacyKey, LogNamespace},
     configurable::configurable_component,
     event::BatchNotifier,
     internal_event::{CountByteSize, InternalEventHandle as _, Registered},
-    lookup::{self, event_path, lookup_v2::OptionalValuePath, owned_value_path},
+    lookup::{self, event_path, lookup_v2::OptionalValuePath, metadata_path, owned_value_path},
     schema::meaning,
     sensitive_string::SensitiveString,
     source_sender::SendError,
     tls::MaybeTlsIncomingStream,
 };
 use vrl::{
-    path::OwnedTargetPath,
+    path::{OwnedTargetPath, PathPrefix},
     value::{Kind, kind::Collection},
 };
 use warp::{
@@ -56,6 +61,7 @@ use self::{
 };
 use crate::{
     SourceSender,
+    codecs::DecodingConfig,
     config::{DataType, Resource, SourceConfig, SourceContext, SourceOutput, log_schema},
     event::{Event, LogEvent, Value},
     http::{KeepaliveConfig, MaxConnectionAgeLayer, build_http_trace_layer},
@@ -126,6 +132,28 @@ pub struct SplunkConfig {
     #[configurable(derived)]
     #[serde(default)]
     keepalive: KeepaliveConfig,
+
+    /// Framing configuration applied to the payload of each Splunk HEC event.
+    ///
+    /// When set together with `decoding`, Vector applies a second decoding pass after
+    /// the HEC envelope is parsed. On `/services/collector/event` the payload is the
+    /// envelope's `event` field (string contents are passed as raw bytes; objects, arrays,
+    /// and other JSON values are JSON-serialized first to preserve shape). On
+    /// `/services/collector/raw` the payload is the (decompressed) request body.
+    #[configurable(derived)]
+    #[configurable(metadata(docs::advanced))]
+    #[serde(default)]
+    pub framing: Option<FramingConfig>,
+
+    /// Decoding configuration applied to the payload of each Splunk HEC event.
+    ///
+    /// When unset (the default) the source preserves its historical behavior. When set,
+    /// the inner payload is run through `framing` + `decoding` and a single envelope
+    /// can fan out to multiple events.
+    #[configurable(derived)]
+    #[configurable(metadata(docs::advanced))]
+    #[serde(default)]
+    pub decoding: Option<DeserializerConfig>,
 }
 
 impl_generate_config_from_default!(SplunkConfig);
@@ -141,6 +169,8 @@ impl Default for SplunkConfig {
             store_hec_token: false,
             log_namespace: None,
             keepalive: Default::default(),
+            framing: None,
+            decoding: None,
         }
     }
 }
@@ -156,7 +186,18 @@ impl SourceConfig for SplunkConfig {
         let tls = MaybeTlsSettings::from_config(self.tls.as_ref(), true)?;
         let shutdown = cx.shutdown.clone();
         let out = cx.out.clone();
-        let source = SplunkSource::new(self, tls.http_protocol_name(), cx);
+        let log_namespace = cx.log_namespace(self.log_namespace);
+        let decoder = match &self.decoding {
+            Some(decoding) => {
+                let framing = self
+                    .framing
+                    .clone()
+                    .unwrap_or_else(|| decoding.default_message_based_framing());
+                Some(DecodingConfig::new(framing, decoding.clone(), log_namespace).build()?)
+            }
+            None => None,
+        };
+        let source = SplunkSource::new(self, tls.http_protocol_name(), decoder, cx);
 
         let event_service = source.event_service(out.clone());
         let raw_service = source.raw_service(out);
@@ -212,8 +253,9 @@ impl SourceConfig for SplunkConfig {
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
 
-        let schema_definition = match log_namespace {
-            LogNamespace::Legacy => {
+        let base = match (&self.decoding, log_namespace) {
+            (Some(decoding), _) => decoding.schema_definition(log_namespace),
+            (None, LogNamespace::Legacy) => {
                 let definition = vector_lib::schema::Definition::empty_legacy_namespace()
                     .with_event_field(
                         &owned_value_path!("line"),
@@ -233,57 +275,62 @@ impl SourceConfig for SplunkConfig {
                     definition
                 }
             }
-            LogNamespace::Vector => vector_lib::schema::Definition::new_with_default_metadata(
-                Kind::bytes().or_object(Collection::empty()),
-                [log_namespace],
-            )
-            .with_meaning(OwnedTargetPath::event_root(), meaning::MESSAGE),
-        }
-        .with_standard_vector_source_metadata()
-        .with_source_metadata(
-            SplunkConfig::NAME,
-            log_schema()
-                .host_key()
-                .cloned()
-                .map(LegacyKey::InsertIfEmpty),
-            &owned_value_path!("host"),
-            Kind::bytes(),
-            Some(meaning::HOST),
-        )
-        .with_source_metadata(
-            SplunkConfig::NAME,
-            Some(LegacyKey::Overwrite(owned_value_path!(CHANNEL))),
-            &owned_value_path!("channel"),
-            Kind::bytes(),
-            None,
-        )
-        .with_source_metadata(
-            SplunkConfig::NAME,
-            Some(LegacyKey::Overwrite(owned_value_path!(INDEX))),
-            &owned_value_path!("index"),
-            Kind::bytes(),
-            None,
-        )
-        .with_source_metadata(
-            SplunkConfig::NAME,
-            Some(LegacyKey::Overwrite(owned_value_path!(SOURCE))),
-            &owned_value_path!("source"),
-            Kind::bytes(),
-            Some(meaning::SERVICE),
-        )
-        // Not to be confused with `source_type`.
-        .with_source_metadata(
-            SplunkConfig::NAME,
-            Some(LegacyKey::Overwrite(owned_value_path!(SOURCETYPE))),
-            &owned_value_path!("sourcetype"),
-            Kind::bytes(),
-            None,
-        );
+            (None, LogNamespace::Vector) => {
+                vector_lib::schema::Definition::new_with_default_metadata(
+                    Kind::bytes().or_object(Collection::empty()),
+                    [log_namespace],
+                )
+                .with_meaning(OwnedTargetPath::event_root(), meaning::MESSAGE)
+            }
+        };
 
-        vec![SourceOutput::new_maybe_logs(
-            DataType::Log,
-            schema_definition,
-        )]
+        let schema_definition = base
+            .with_standard_vector_source_metadata()
+            .with_source_metadata(
+                SplunkConfig::NAME,
+                log_schema()
+                    .host_key()
+                    .cloned()
+                    .map(LegacyKey::InsertIfEmpty),
+                &owned_value_path!("host"),
+                Kind::bytes(),
+                Some(meaning::HOST),
+            )
+            .with_source_metadata(
+                SplunkConfig::NAME,
+                Some(LegacyKey::Overwrite(owned_value_path!(CHANNEL))),
+                &owned_value_path!("channel"),
+                Kind::bytes(),
+                None,
+            )
+            .with_source_metadata(
+                SplunkConfig::NAME,
+                Some(LegacyKey::Overwrite(owned_value_path!(INDEX))),
+                &owned_value_path!("index"),
+                Kind::bytes(),
+                None,
+            )
+            .with_source_metadata(
+                SplunkConfig::NAME,
+                Some(LegacyKey::Overwrite(owned_value_path!(SOURCE))),
+                &owned_value_path!("source"),
+                Kind::bytes(),
+                Some(meaning::SERVICE),
+            )
+            // Not to be confused with `source_type`.
+            .with_source_metadata(
+                SplunkConfig::NAME,
+                Some(LegacyKey::Overwrite(owned_value_path!(SOURCETYPE))),
+                &owned_value_path!("sourcetype"),
+                Kind::bytes(),
+                None,
+            );
+
+        let output_type = self
+            .decoding
+            .as_ref()
+            .map_or(DataType::Log, |d| d.output_type());
+        vec![SourceOutput::new_maybe_logs(output_type, schema_definition)]
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -303,10 +350,16 @@ struct SplunkSource {
     store_hec_token: bool,
     log_namespace: LogNamespace,
     events_received: Registered<EventsReceived>,
+    decoder: Option<Decoder>,
 }
 
 impl SplunkSource {
-    fn new(config: &SplunkConfig, protocol: &'static str, cx: SourceContext) -> Self {
+    fn new(
+        config: &SplunkConfig,
+        protocol: &'static str,
+        decoder: Option<Decoder>,
+        cx: SourceContext,
+    ) -> Self {
         let log_namespace = cx.log_namespace(config.log_namespace);
         let acknowledgements = cx.do_acknowledgements(config.acknowledgements.enabled.into());
         let shutdown = cx.shutdown;
@@ -332,6 +385,7 @@ impl SplunkSource {
             store_hec_token: config.store_hec_token,
             log_namespace,
             events_received: register!(EventsReceived),
+            decoder,
         }
     }
 
@@ -349,6 +403,7 @@ impl SplunkSource {
         let store_hec_token = self.store_hec_token;
         let log_namespace = self.log_namespace;
         let events_received = self.events_received.clone();
+        let decoder = self.decoder.clone();
 
         warp::post()
             .and(
@@ -375,6 +430,7 @@ impl SplunkSource {
                     let mut out = out.clone();
                     let idx_ack = idx_ack.clone();
                     let events_received = events_received.clone();
+                    let decoder = decoder.clone();
 
                     async move {
                         if idx_ack.is_some() && channel.is_none() {
@@ -398,40 +454,60 @@ impl SplunkSource {
 
                         let (batch, receiver) =
                             BatchNotifier::maybe_new_with_receiver(idx_ack.is_some());
-                        let maybe_ack_id = match (idx_ack, receiver, channel.clone()) {
-                            (Some(idx_ack), Some(receiver), Some(channel_id)) => {
-                                match idx_ack.get_ack_id_from_channel(channel_id, receiver).await {
-                                    Ok(ack_id) => Some(ack_id),
-                                    Err(rej) => return Err(rej),
-                                }
-                            }
-                            _ => None,
-                        };
 
                         let mut error = None;
                         let mut events = Vec::new();
+                        let mut had_decode_errors = false;
 
                         let iter: EventIterator<'_, StrRead<'_>> = EventIteratorGenerator {
                             deserializer: Deserializer::from_str(&body).into_iter::<JsonValue>(),
-                            channel,
+                            channel: channel.clone(),
                             remote,
                             remote_addr,
                             batch,
                             token: token.filter(|_| store_hec_token).map(Into::into),
                             log_namespace,
                             events_received,
+                            decoder,
                         }
                         .into();
 
                         for result in iter {
                             match result {
-                                Ok(event) => events.push(event),
+                                Ok((chunk, errored)) => {
+                                    events.extend(chunk);
+                                    had_decode_errors |= errored;
+                                }
                                 Err(err) => {
                                     error = Some(err);
                                     break;
                                 }
                             }
                         }
+
+                        // Only register an ack id when the request produced events
+                        // *and* the second-stage decoder did not silently drop any
+                        // frames. With newline-style framing one envelope could decode
+                        // to e.g. `valid \n invalid \n valid`; returning an ack id
+                        // there would let `/services/collector/ack` report success for
+                        // data Vector silently lost.
+                        let maybe_ack_id = if events.is_empty() || had_decode_errors {
+                            drop(receiver);
+                            None
+                        } else {
+                            match (idx_ack, receiver, channel) {
+                                (Some(idx_ack), Some(receiver), Some(channel_id)) => {
+                                    match idx_ack
+                                        .get_ack_id_from_channel(channel_id, receiver)
+                                        .await
+                                    {
+                                        Ok(ack_id) => Some(ack_id),
+                                        Err(rej) => return Err(rej),
+                                    }
+                                }
+                                _ => None,
+                            }
+                        };
 
                         if !events.is_empty() {
                             match out.send_batch(events).await {
@@ -463,6 +539,7 @@ impl SplunkSource {
         let store_hec_token = self.store_hec_token;
         let events_received = self.events_received.clone();
         let log_namespace = self.log_namespace;
+        let decoder = self.decoder.clone();
 
         warp::post()
             .and(path!("raw" / "1.0").or(path!("raw")))
@@ -485,6 +562,7 @@ impl SplunkSource {
                     let mut out = out.clone();
                     let idx_ack = idx_ack.clone();
                     let events_received = events_received.clone();
+                    let decoder = decoder.clone();
                     emit!(HttpBytesReceived {
                         byte_size: body.len(),
                         http_path: path.as_str(),
@@ -494,29 +572,55 @@ impl SplunkSource {
                     async move {
                         let (batch, receiver) =
                             BatchNotifier::maybe_new_with_receiver(idx_ack.is_some());
-                        let maybe_ack_id = match (idx_ack, receiver) {
-                            (Some(idx_ack), Some(receiver)) => Some(
-                                idx_ack
-                                    .get_ack_id_from_channel(channel_id.clone(), receiver)
-                                    .await?,
-                            ),
-                            _ => None,
-                        };
-                        let mut event = raw_event(
+                        let (mut events, had_decode_errors) = raw_event(
                             body,
                             gzip,
-                            channel_id,
+                            channel_id.clone(),
                             remote,
                             xff,
                             batch,
                             log_namespace,
                             &events_received,
+                            decoder,
                         )?;
                         if let Some(token) = token.filter(|_| store_hec_token) {
-                            event.metadata_mut().set_splunk_hec_token(token.into());
+                            let token: Arc<str> = Arc::from(token);
+                            for event in &mut events {
+                                event
+                                    .metadata_mut()
+                                    .set_splunk_hec_token(Arc::clone(&token));
+                            }
                         }
 
-                        let res = out.send_event(event).await;
+                        // Skip ack registration when the decoder produced no events
+                        // *or* hit any errors mid-stream. With newline framing, e.g.,
+                        // `valid \n invalid \n valid` decodes to two events plus one
+                        // dropped frame; returning an ack id there would let
+                        // `/services/collector/ack` report success for data Vector
+                        // silently lost.
+                        if events.is_empty() || had_decode_errors {
+                            drop(receiver);
+                            if events.is_empty() {
+                                return Ok(None);
+                            }
+                            // Forward the partial events with no ack so the source's
+                            // existing partial-delivery semantics still apply.
+                            let res = out.send_batch(events).await;
+                            return res
+                                .map(|_| None)
+                                .map_err(|_| Rejection::from(ApiError::ServerShutdown));
+                        }
+
+                        let maybe_ack_id = match (idx_ack, receiver) {
+                            (Some(idx_ack), Some(receiver)) => Some(
+                                idx_ack
+                                    .get_ack_id_from_channel(channel_id, receiver)
+                                    .await?,
+                            ),
+                            _ => None,
+                        };
+
+                        let res = out.send_batch(events).await;
                         res.map(|_| maybe_ack_id)
                             .map_err(|_| Rejection::from(ApiError::ServerShutdown))
                     }
@@ -672,8 +776,11 @@ impl SplunkSource {
 struct EventIterator<'de, R: JsonRead<'de>> {
     /// Remaining request with JSON events
     deserializer: serde_json::StreamDeserializer<'de, R, JsonValue>,
-    /// Count of sent events
-    events: usize,
+    /// Count of HEC envelopes (not fan-out events) processed so far. Used both as the
+    /// `InvalidEventNumber` index in Splunk error responses (zero-indexed: subtract 1
+    /// for build-time errors, use as-is for parse errors that haven't entered build)
+    /// and as the "did we see any envelope?" check that gates the `NoData` error.
+    envelopes_processed: usize,
     /// Optional channel from headers
     channel: Option<Value>,
     /// Default time
@@ -688,6 +795,8 @@ struct EventIterator<'de, R: JsonRead<'de>> {
     log_namespace: LogNamespace,
     /// handle to EventsReceived registry
     events_received: Registered<EventsReceived>,
+    /// Optional second-stage decoder applied to the envelope payload.
+    decoder: Option<Decoder>,
 }
 
 /// Intermediate struct to generate an `EventIterator`
@@ -700,13 +809,24 @@ struct EventIteratorGenerator<'de, R: JsonRead<'de>> {
     events_received: Registered<EventsReceived>,
     remote: Option<SocketAddr>,
     remote_addr: Option<String>,
+    decoder: Option<Decoder>,
 }
 
 impl<'de, R: JsonRead<'de>> From<EventIteratorGenerator<'de, R>> for EventIterator<'de, R> {
     fn from(f: EventIteratorGenerator<'de, R>) -> Self {
+        // The host field can collide with decoder-produced output in legacy namespace
+        // (its legacy key is `log_schema().host_key()`, typically `"host"`). When a
+        // decoder is configured, prefer the decoder's value over the envelope's so the
+        // user's parsed view wins on conflict. With no decoder configured, behavior is
+        // unchanged: every extractor uses `Overwrite`.
+        let extractor_strategy = if f.decoder.is_some() {
+            LegacyKeyStrategy::InsertIfEmpty
+        } else {
+            LegacyKeyStrategy::Overwrite
+        };
         Self {
             deserializer: f.deserializer,
-            events: 0,
+            envelopes_processed: 0,
             channel: f.channel.map(Value::from),
             time: Time::Now(Utc::now()),
             extractors: [
@@ -721,25 +841,73 @@ impl<'de, R: JsonRead<'de>> From<EventIteratorGenerator<'de, R>> for EventIterat
                         .or_else(|| f.remote.map(|addr| addr.to_string()))
                         .map(Value::from),
                     f.log_namespace,
-                ),
-                DefaultExtractor::new("index", OptionalValuePath::new(INDEX), f.log_namespace),
-                DefaultExtractor::new("source", OptionalValuePath::new(SOURCE), f.log_namespace),
+                )
+                .with_legacy_key_strategy(extractor_strategy),
+                DefaultExtractor::new("index", OptionalValuePath::new(INDEX), f.log_namespace)
+                    .with_legacy_key_strategy(extractor_strategy),
+                DefaultExtractor::new("source", OptionalValuePath::new(SOURCE), f.log_namespace)
+                    .with_legacy_key_strategy(extractor_strategy),
                 DefaultExtractor::new(
                     "sourcetype",
                     OptionalValuePath::new(SOURCETYPE),
                     f.log_namespace,
-                ),
+                )
+                .with_legacy_key_strategy(extractor_strategy),
             ],
             batch: f.batch,
             token: f.token,
             log_namespace: f.log_namespace,
             events_received: f.events_received,
+            decoder: f.decoder,
         }
     }
 }
 
 impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
+    /// Process the envelope's `time` field, updating `self.time` (sticky across envelopes
+    /// when not explicitly provided).
+    fn process_time(&mut self, json: &mut JsonValue) -> Result<(), Rejection> {
+        let parsed_time = match json.get_mut("time").map(JsonValue::take) {
+            Some(JsonValue::Number(time)) => Some(Some(time)),
+            Some(JsonValue::String(time)) => Some(time.parse::<serde_json::Number>().ok()),
+            _ => None,
+        };
+
+        match parsed_time {
+            None => Ok(()),
+            Some(Some(t)) => {
+                if let Some(t) = t.as_u64() {
+                    let time = parse_timestamp(t as i64).ok_or(ApiError::InvalidDataFormat {
+                        event: self.envelopes_processed.saturating_sub(1),
+                    })?;
+                    self.time = Time::Provided(time);
+                    Ok(())
+                } else if let Some(t) = t.as_f64() {
+                    self.time = Time::Provided(
+                        Utc.timestamp_opt(
+                            t.floor() as i64,
+                            (t.fract() * 1000.0 * 1000.0 * 1000.0) as u32,
+                        )
+                        .single()
+                        .expect("invalid timestamp"),
+                    );
+                    Ok(())
+                } else {
+                    Err(ApiError::InvalidDataFormat {
+                        event: self.envelopes_processed.saturating_sub(1),
+                    }
+                    .into())
+                }
+            }
+            Some(None) => Err(ApiError::InvalidDataFormat {
+                event: self.envelopes_processed.saturating_sub(1),
+            }
+            .into()),
+        }
+    }
+
     fn build_event(&mut self, mut json: JsonValue) -> Result<Event, Rejection> {
+        self.envelopes_processed += 1;
         // Construct Event from parsed json event
         let mut log = match self.log_namespace {
             LogNamespace::Vector => self.build_log_vector(&mut json)?,
@@ -787,36 +955,7 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
             }
         }
 
-        // Process time field
-        let parsed_time = match json.get_mut("time").map(JsonValue::take) {
-            Some(JsonValue::Number(time)) => Some(Some(time)),
-            Some(JsonValue::String(time)) => Some(time.parse::<serde_json::Number>().ok()),
-            _ => None,
-        };
-
-        match parsed_time {
-            None => (),
-            Some(Some(t)) => {
-                if let Some(t) = t.as_u64() {
-                    let time = parse_timestamp(t as i64)
-                        .ok_or(ApiError::InvalidDataFormat { event: self.events })?;
-
-                    self.time = Time::Provided(time);
-                } else if let Some(t) = t.as_f64() {
-                    self.time = Time::Provided(
-                        Utc.timestamp_opt(
-                            t.floor() as i64,
-                            (t.fract() * 1000.0 * 1000.0 * 1000.0) as u32,
-                        )
-                        .single()
-                        .expect("invalid timestamp"),
-                    );
-                } else {
-                    return Err(ApiError::InvalidDataFormat { event: self.events }.into());
-                }
-            }
-            Some(None) => return Err(ApiError::InvalidDataFormat { event: self.events }.into()),
-        }
+        self.process_time(&mut json)?;
 
         // Add time field
         let timestamp = match self.time.clone() {
@@ -846,9 +985,121 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
             log = log.with_batch_notifier(&batch);
         }
 
-        self.events += 1;
-
         Ok(log.into())
+    }
+
+    /// Decoded path: extract the envelope's `event` field as bytes (preserving shape),
+    /// run it through the second-stage decoder, and overlay envelope metadata so that
+    /// decoder-produced fields win on conflict. Returns the events along with a flag
+    /// indicating whether the codec hit any errors (so the caller can refuse to ack
+    /// a request that lost data).
+    fn build_events_decoded(
+        &mut self,
+        mut json: JsonValue,
+        decoder: Decoder,
+    ) -> Result<(Vec<Event>, bool), Rejection> {
+        self.envelopes_processed += 1;
+        // Extract `event` field while preserving its original JSON shape.
+        // Strings go in as raw UTF-8 bytes (so non-JSON decoders see bare content);
+        // objects, arrays, numbers, and bools are JSON-serialized so a JSON decoder
+        // round-trips them back to the same shape.
+        let payload: Vec<u8> = match json.get_mut("event").map(JsonValue::take) {
+            Some(JsonValue::Null) | None => {
+                return Err(ApiError::MissingEventField {
+                    event: self.envelopes_processed.saturating_sub(1),
+                }
+                .into());
+            }
+            Some(JsonValue::String(s)) => s.into_bytes(),
+            Some(other) => serde_json::to_vec(&other).map_err(|_| ApiError::InvalidDataFormat {
+                event: self.envelopes_processed.saturating_sub(1),
+            })?,
+        };
+
+        self.process_time(&mut json)?;
+
+        // Always forward a fallback timestamp so events without an explicit envelope
+        // `time` field still get one (matches the legacy /event behavior, which always
+        // wrote a timestamp). `decode_message` uses `try_insert`, so a decoder-supplied
+        // timestamp still wins on conflict.
+        let fallback_time = match self.time {
+            Time::Provided(t) | Time::Now(t) => t,
+        };
+
+        let (decoded, had_decode_errors) = decode_payload(
+            decoder,
+            &payload,
+            Some(fallback_time),
+            &self.batch,
+            self.log_namespace,
+            &self.events_received,
+        );
+
+        // Snapshot envelope metadata that has to apply uniformly to every decoded event.
+        let envelope_channel: Option<Value> = match json.get_mut("channel").map(JsonValue::take) {
+            Some(JsonValue::String(guid)) => Some(guid.into()),
+            _ => None,
+        };
+        let envelope_fields: Option<serde_json::Map<String, JsonValue>> =
+            match json.get_mut("fields").map(JsonValue::take) {
+                Some(JsonValue::Object(object)) => Some(object),
+                _ => None,
+            };
+        let channel_path = owned_value_path!(CHANNEL);
+
+        let mut out = Vec::with_capacity(decoded.len());
+        for mut event in decoded {
+            if let Event::Log(log) = &mut event {
+                // channel: envelope value beats header default. Use `InsertIfEmpty`
+                // so a decoder-produced field at `splunk_channel` (legacy ns) wins on
+                // conflict - matches the "decoder wins" rule applied to the rest of
+                // the envelope metadata.
+                if let Some(channel_val) = envelope_channel.clone().or_else(|| self.channel.clone())
+                {
+                    self.log_namespace.insert_source_metadata(
+                        SplunkConfig::NAME,
+                        log,
+                        Some(LegacyKey::InsertIfEmpty(&channel_path)),
+                        lookup::path!(CHANNEL),
+                        channel_val,
+                    );
+                }
+
+                // fields: legacy keys land at bare paths that may conflict with decoder
+                // output, so use `InsertIfEmpty` to preserve decoder-wins semantics.
+                if let Some(ref fields) = envelope_fields {
+                    for (key, value) in fields {
+                        self.log_namespace.insert_source_metadata(
+                            SplunkConfig::NAME,
+                            log,
+                            Some(LegacyKey::InsertIfEmpty(&owned_value_path!(key.as_str()))),
+                            lookup::path!(key.as_str()),
+                            value.clone(),
+                        );
+                    }
+                }
+
+                // Default extractors (host/index/source/sourcetype). These take from
+                // `json` on first call and stay sticky on subsequent calls within the
+                // same envelope, so per-event invocation works correctly.
+                for de in self.extractors.iter_mut() {
+                    de.extract(log, &mut json);
+                }
+            }
+
+            // The token lives on `EventMetadata`, which exists on every event type,
+            // so apply it outside the `Event::Log` branch - codecs like `native` or
+            // `otlp` can emit metrics or traces, and those still need the HEC token
+            // for downstream Splunk HEC sinks.
+            if let Some(token) = &self.token {
+                event
+                    .metadata_mut()
+                    .set_splunk_hec_token(Arc::clone(token));
+            }
+            out.push(event);
+        }
+
+        Ok((out, had_decode_errors))
     }
 
     /// Build the log event for the vector namespace.
@@ -874,7 +1125,10 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
 
                 Ok(log)
             }
-            None => Err(ApiError::MissingEventField { event: self.events }.into()),
+            None => Err(ApiError::MissingEventField {
+                event: self.envelopes_processed.saturating_sub(1),
+            }
+            .into()),
         }
     }
 
@@ -888,13 +1142,19 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
             Some(event) => match event.take() {
                 JsonValue::String(string) => {
                     if string.is_empty() {
-                        return Err(ApiError::EmptyEventField { event: self.events }.into());
+                        return Err(ApiError::EmptyEventField {
+                            event: self.envelopes_processed.saturating_sub(1),
+                        }
+                        .into());
                     }
                     log.maybe_insert(log_schema().message_key_target_path(), string);
                 }
                 JsonValue::Object(mut object) => {
                     if object.is_empty() {
-                        return Err(ApiError::EmptyEventField { event: self.events }.into());
+                        return Err(ApiError::EmptyEventField {
+                            event: self.envelopes_processed.saturating_sub(1),
+                        }
+                        .into());
                     }
 
                     // Add 'line' value as 'event::schema().message_key'
@@ -914,9 +1174,19 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
                         log.insert(event_path!(key.as_str()), value);
                     }
                 }
-                _ => return Err(ApiError::InvalidDataFormat { event: self.events }.into()),
+                _ => {
+                    return Err(ApiError::InvalidDataFormat {
+                        event: self.envelopes_processed.saturating_sub(1),
+                    }
+                    .into());
+                }
             },
-            None => return Err(ApiError::MissingEventField { event: self.events }.into()),
+            None => {
+                return Err(ApiError::MissingEventField {
+                    event: self.envelopes_processed.saturating_sub(1),
+                }
+                .into());
+            }
         };
 
         // EstimatedJsonSizeOf must be calculated before enrichment
@@ -928,13 +1198,23 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
 }
 
 impl<'de, R: JsonRead<'de>> Iterator for EventIterator<'de, R> {
-    type Item = Result<Event, Rejection>;
+    /// Each item is `(events, had_decode_errors)` for one envelope - the boolean is
+    /// only ever `true` in the decoder path. Callers OR these together across the
+    /// whole request to decide whether ack registration is safe.
+    type Item = Result<(Vec<Event>, bool), Rejection>;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.deserializer.next() {
-            Some(Ok(json)) => Some(self.build_event(json)),
+            Some(Ok(json)) => {
+                let result = if let Some(decoder) = self.decoder.clone() {
+                    self.build_events_decoded(json, decoder)
+                } else {
+                    self.build_event(json).map(|event| (vec![event], false))
+                };
+                Some(result)
+            }
             None => {
-                if self.events == 0 {
+                if self.envelopes_processed == 0 {
                     Some(Err(ApiError::NoData.into()))
                 } else {
                     None
@@ -944,12 +1224,91 @@ impl<'de, R: JsonRead<'de>> Iterator for EventIterator<'de, R> {
                 emit!(SplunkHecRequestBodyInvalidError {
                     error: error.into()
                 });
-                Some(Err(
-                    ApiError::InvalidDataFormat { event: self.events }.into()
-                ))
+                // The deserializer failed to parse the next envelope, so the failing
+                // envelope's index is the count of envelopes already processed (not
+                // `envelopes_processed - 1`, which is what build-time errors use).
+                Some(Err(ApiError::InvalidDataFormat {
+                    event: self.envelopes_processed,
+                }
+                .into()))
             }
         }
     }
+}
+
+/// Run a payload through the configured second-stage `framing` + `decoding` codec.
+///
+/// Returns the decoded events along with a flag indicating whether any decode error
+/// occurred. The shared `crate::sources::util::decode_message` helper swallows
+/// decode errors silently, which is fine for sources without ack semantics, but for
+/// `splunk_hec` we need to know about errors so we can refuse to acknowledge a
+/// request that lost data mid-stream.
+///
+/// On each decoded event this helper sets `source_type`, the `vector.ingest_timestamp`
+/// metadata (Vector namespace), and a fallback timestamp via `try_insert` (so a
+/// codec-supplied timestamp wins on conflict). It also attaches the per-request
+/// `BatchNotifier` so acknowledgements flow correctly.
+fn decode_payload(
+    mut decoder: Decoder,
+    payload: &[u8],
+    fallback_timestamp: Option<DateTime<Utc>>,
+    batch: &Option<BatchNotifier>,
+    log_namespace: LogNamespace,
+    events_received: &Registered<EventsReceived>,
+) -> (Vec<Event>, bool) {
+    let mut buffer = BytesMut::with_capacity(payload.len());
+    buffer.extend_from_slice(payload);
+    let now = Utc::now();
+    let mut events: Vec<Event> = Vec::new();
+    let mut had_errors = false;
+
+    loop {
+        match decoder.decode_eof(&mut buffer) {
+            Ok(Some((decoded, _))) => {
+                for mut event in decoded {
+                    if let Event::Log(log) = &mut event {
+                        log_namespace.insert_vector_metadata(
+                            log,
+                            log_schema().source_type_key(),
+                            lookup::path!("source_type"),
+                            Bytes::from_static(SplunkConfig::NAME.as_bytes()),
+                        );
+                        match log_namespace {
+                            LogNamespace::Vector => {
+                                if let Some(timestamp) = fallback_timestamp {
+                                    log.try_insert(
+                                        metadata_path!(SplunkConfig::NAME, "timestamp"),
+                                        timestamp,
+                                    );
+                                }
+                                log.insert(metadata_path!("vector", "ingest_timestamp"), now);
+                            }
+                            LogNamespace::Legacy => {
+                                if let Some(timestamp) = fallback_timestamp
+                                    && let Some(timestamp_key) = log_schema().timestamp_key()
+                                {
+                                    log.try_insert((PathPrefix::Event, timestamp_key), timestamp);
+                                }
+                            }
+                        }
+                    }
+                    events_received.emit(CountByteSize(1, event.estimated_json_encoded_size_of()));
+                    events.push(event.with_batch_notifier_option(batch));
+                }
+            }
+            Ok(None) => break,
+            Err(error) => {
+                // The decoder logs its own error; record that one occurred so the
+                // caller can refuse to ack a request that lost data.
+                had_errors = true;
+                if !error.can_continue() {
+                    break;
+                }
+            }
+        }
+    }
+
+    (events, had_errors)
 }
 
 /// Parse a `i64` unix timestamp that can either be in seconds, milliseconds or
@@ -986,12 +1345,20 @@ fn parse_timestamp(t: i64) -> Option<DateTime<Utc>> {
     Some(ts)
 }
 
+/// How to write the legacy key when `DefaultExtractor::extract` applies a value.
+#[derive(Clone, Copy)]
+enum LegacyKeyStrategy {
+    Overwrite,
+    InsertIfEmpty,
+}
+
 /// Maintains last known extracted value of field and uses it in the absence of field.
 struct DefaultExtractor {
     field: &'static str,
     to_field: OptionalValuePath,
     value: Option<Value>,
     log_namespace: LogNamespace,
+    legacy_key_strategy: LegacyKeyStrategy,
 }
 
 impl DefaultExtractor {
@@ -1005,6 +1372,7 @@ impl DefaultExtractor {
             to_field,
             value: None,
             log_namespace,
+            legacy_key_strategy: LegacyKeyStrategy::Overwrite,
         }
     }
 
@@ -1019,7 +1387,16 @@ impl DefaultExtractor {
             to_field,
             value: value.into(),
             log_namespace,
+            legacy_key_strategy: LegacyKeyStrategy::Overwrite,
         }
+    }
+
+    /// Set the strategy used when writing this extractor's legacy key. Defaults to
+    /// `Overwrite`; the decoder path uses `InsertIfEmpty` for fields that may collide
+    /// with decoder-produced output (e.g. `host`).
+    const fn with_legacy_key_strategy(mut self, strategy: LegacyKeyStrategy) -> Self {
+        self.legacy_key_strategy = strategy;
+        self
     }
 
     fn extract(&mut self, log: &mut LogEvent, value: &mut JsonValue) {
@@ -1032,10 +1409,14 @@ impl DefaultExtractor {
         if let Some(index) = self.value.as_ref()
             && let Some(metadata_key) = self.to_field.path.as_ref()
         {
+            let legacy_key = match self.legacy_key_strategy {
+                LegacyKeyStrategy::Overwrite => LegacyKey::Overwrite(metadata_key),
+                LegacyKeyStrategy::InsertIfEmpty => LegacyKey::InsertIfEmpty(metadata_key),
+            };
             self.log_namespace.insert_source_metadata(
                 SplunkConfig::NAME,
                 log,
-                Some(LegacyKey::Overwrite(metadata_key)),
+                Some(legacy_key),
                 &self.to_field.path.clone().unwrap_or(owned_value_path!("")),
                 index.clone(),
             )
@@ -1052,7 +1433,13 @@ enum Time {
     Provided(DateTime<Utc>),
 }
 
-/// Creates event from raw request
+/// Creates events from a raw HEC request body.
+///
+/// Without a decoder, returns a single event whose message is the (decompressed)
+/// request body. With a decoder, the body is fed through the configured framing +
+/// decoding pipeline and one or more events are returned. The boolean second tuple
+/// element is `true` when the decoder hit any (recoverable or non-recoverable)
+/// errors during the request, so the caller can refuse to acknowledge the request.
 #[allow(clippy::too_many_arguments)]
 fn raw_event(
     bytes: Bytes,
@@ -1063,42 +1450,22 @@ fn raw_event(
     batch: Option<BatchNotifier>,
     log_namespace: LogNamespace,
     events_received: &Registered<EventsReceived>,
-) -> Result<Event, Rejection> {
+    decoder: Option<Decoder>,
+) -> Result<(Vec<Event>, bool), Rejection> {
     // Process gzip
-    let message: Value = if gzip {
+    let body_bytes: Bytes = if gzip {
         let mut data = Vec::new();
         match MultiGzDecoder::new(bytes.reader()).read_to_end(&mut data) {
             Ok(0) => return Err(ApiError::NoData.into()),
-            Ok(_) => Value::from(Bytes::from(data)),
+            Ok(_) => Bytes::from(data),
             Err(error) => {
                 emit!(SplunkHecRequestBodyInvalidError { error });
                 return Err(ApiError::InvalidDataFormat { event: 0 }.into());
             }
         }
     } else {
-        bytes.into()
+        bytes
     };
-
-    // Construct event
-    let mut log = match log_namespace {
-        LogNamespace::Vector => LogEvent::from(message),
-        LogNamespace::Legacy => {
-            let mut log = LogEvent::default();
-            log.maybe_insert(log_schema().message_key_target_path(), message);
-            log
-        }
-    };
-    // We need to calculate the estimated json size of the event BEFORE enrichment.
-    events_received.emit(CountByteSize(1, log.estimated_json_encoded_size_of()));
-
-    // Add channel
-    log_namespace.insert_source_metadata(
-        SplunkConfig::NAME,
-        &mut log,
-        Some(LegacyKey::Overwrite(&owned_value_path!(CHANNEL))),
-        lookup::path!(CHANNEL),
-        channel,
-    );
 
     // host-field priority for raw endpoint:
     // - x-forwarded-for is set to `host` field first, if present. If not present:
@@ -1109,23 +1476,77 @@ fn raw_event(
         remote.map(|remote| remote.to_string())
     };
 
-    if let Some(host) = host {
-        log_namespace.insert_source_metadata(
-            SplunkConfig::NAME,
+    let decoder_in_use = decoder.is_some();
+    let (mut events, had_decode_errors): (Vec<Event>, bool) = if let Some(decoder) = decoder {
+        // Pass ingest time as the fallback timestamp so decoded events always have
+        // one - matches `insert_standard_vector_source_metadata` in the legacy raw
+        // path. `decode_payload` uses `try_insert`, so a decoder-supplied timestamp
+        // still wins on conflict.
+        decode_payload(
+            decoder,
+            &body_bytes,
+            Some(Utc::now()),
+            &batch,
+            log_namespace,
+            events_received,
+        )
+    } else {
+        let message: Value = body_bytes.into();
+        let mut log = match log_namespace {
+            LogNamespace::Vector => LogEvent::from(message),
+            LogNamespace::Legacy => {
+                let mut log = LogEvent::default();
+                log.maybe_insert(log_schema().message_key_target_path(), message);
+                log
+            }
+        };
+        // We need to calculate the estimated json size of the event BEFORE enrichment.
+        events_received.emit(CountByteSize(1, log.estimated_json_encoded_size_of()));
+
+        log_namespace.insert_standard_vector_source_metadata(
             &mut log,
-            log_schema().host_key().map(LegacyKey::InsertIfEmpty),
-            lookup::path!("host"),
-            host,
+            SplunkConfig::NAME,
+            Utc::now(),
         );
+
+        if let Some(batch) = batch.clone() {
+            log = log.with_batch_notifier(&batch);
+        }
+        (vec![Event::from(log)], false)
+    };
+
+    let channel_path = owned_value_path!(CHANNEL);
+    for event in &mut events {
+        if let Event::Log(log) = event {
+            // With a decoder configured, defer to anything it produced at the legacy
+            // `splunk_channel` path so "decoder wins" stays true. Without a decoder,
+            // the log was just constructed and overwriting matches today's behavior.
+            let channel_legacy_key = if decoder_in_use {
+                LegacyKey::InsertIfEmpty(&channel_path)
+            } else {
+                LegacyKey::Overwrite(&channel_path)
+            };
+            log_namespace.insert_source_metadata(
+                SplunkConfig::NAME,
+                log,
+                Some(channel_legacy_key),
+                lookup::path!(CHANNEL),
+                channel.clone(),
+            );
+
+            if let Some(ref host) = host {
+                log_namespace.insert_source_metadata(
+                    SplunkConfig::NAME,
+                    log,
+                    log_schema().host_key().map(LegacyKey::InsertIfEmpty),
+                    lookup::path!("host"),
+                    host.clone(),
+                );
+            }
+        }
     }
 
-    log_namespace.insert_standard_vector_source_metadata(&mut log, SplunkConfig::NAME, Utc::now());
-
-    if let Some(batch) = batch {
-        log = log.with_batch_notifier(&batch);
-    }
-
-    Ok(Event::from(log))
+    Ok((events, had_decode_errors))
 }
 
 #[derive(Clone, Copy, Debug, Snafu)]
@@ -1383,6 +1804,8 @@ mod tests {
                 store_hec_token,
                 log_namespace: None,
                 keepalive: Default::default(),
+                framing: None,
+                decoding: None,
             }
             .build(cx)
             .await
@@ -2627,6 +3050,445 @@ mod tests {
             400,
             send_with(address, "services/collector/ack", message, TOKEN, &opts).await
         );
+    }
+
+    async fn source_with_codec(
+        framing: Option<FramingConfig>,
+        decoding: Option<DeserializerConfig>,
+    ) -> (
+        impl Stream<Item = Event> + Unpin + use<>,
+        SocketAddr,
+        PortGuard,
+    ) {
+        let (sender, recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
+        let (_guard, address) = next_addr();
+        let cx = SourceContext::new_test(sender, None);
+        tokio::spawn(async move {
+            SplunkConfig {
+                address,
+                token: Some(TOKEN.to_owned().into()),
+                valid_tokens: None,
+                tls: None,
+                acknowledgements: Default::default(),
+                store_hec_token: false,
+                log_namespace: None,
+                keepalive: Default::default(),
+                framing,
+                decoding,
+            }
+            .build(cx)
+            .await
+            .unwrap()
+            .await
+            .unwrap()
+        });
+        wait_for_tcp(address).await;
+        (recv, address, _guard)
+    }
+
+    #[tokio::test]
+    async fn decoder_event_endpoint_json_string() {
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let (source, address, _guard) = source_with_codec(
+                None,
+                Some(vector_lib::codecs::JsonDeserializerConfig::default().into()),
+            )
+            .await;
+            let envelope =
+                r#"{"event":"{\"foo\":\"bar\",\"n\":42}","host":"client-host","sourcetype":"my-app"}"#;
+            assert_eq!(
+                200,
+                post(address, "services/collector/event", envelope).await
+            );
+
+            let event = collect_n(source, 1).await.remove(0);
+            let log = event.as_log();
+            assert_eq!(log["foo"], "bar".into());
+            assert_eq!(log["n"], 42.into());
+            assert_eq!(
+                log[log_schema().host_key().unwrap().to_string().as_str()],
+                "client-host".into()
+            );
+            assert_eq!(log[&super::SOURCETYPE], "my-app".into());
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn decoder_event_endpoint_json_object_round_trip() {
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let (source, address, _guard) = source_with_codec(
+                None,
+                Some(vector_lib::codecs::JsonDeserializerConfig::default().into()),
+            )
+            .await;
+            let envelope = r#"{"event":{"foo":"bar","nested":{"k":1}},"host":"h"}"#;
+            assert_eq!(
+                200,
+                post(address, "services/collector/event", envelope).await
+            );
+
+            let event = collect_n(source, 1).await.remove(0);
+            let log = event.as_log();
+            assert_eq!(log["foo"], "bar".into());
+            assert_eq!(*log.get("nested.k").unwrap(), 1.into());
+            assert_eq!(
+                log[log_schema().host_key().unwrap().to_string().as_str()],
+                "h".into()
+            );
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn decoder_event_endpoint_all_envelope_fields_yield_to_decoder() {
+        // The decoded path must defer to the codec for `splunk_channel`,
+        // `splunk_index`, `splunk_source`, and `splunk_sourcetype` in legacy ns -
+        // not just `host`. Otherwise the changelog's "decoder wins on conflict"
+        // promise is broken for HEC envelope metadata.
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let (source, address, _guard) = source_with_codec(
+                None,
+                Some(vector_lib::codecs::JsonDeserializerConfig::default().into()),
+            )
+            .await;
+            // The string `event` decodes to a JSON object that pre-populates each
+            // legacy splunk_* field. The envelope sets conflicting values for the
+            // same fields and must lose.
+            let envelope = r#"{
+                "event":"{\"splunk_channel\":\"decoder-channel\",\"splunk_index\":\"decoder-index\",\"splunk_source\":\"decoder-source\",\"splunk_sourcetype\":\"decoder-sourcetype\"}",
+                "index":"envelope-index",
+                "source":"envelope-source",
+                "sourcetype":"envelope-sourcetype"
+            }"#;
+            assert_eq!(
+                200,
+                post(address, "services/collector/event", envelope).await
+            );
+
+            let event = collect_n(source, 1).await.remove(0);
+            let log = event.as_log();
+            assert_eq!(log[&super::CHANNEL], "decoder-channel".into());
+            assert_eq!(log[&super::INDEX], "decoder-index".into());
+            assert_eq!(log[&super::SOURCE], "decoder-source".into());
+            assert_eq!(log[&super::SOURCETYPE], "decoder-sourcetype".into());
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn decoder_event_endpoint_decoder_field_wins_over_envelope() {
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let (source, address, _guard) = source_with_codec(
+                None,
+                Some(vector_lib::codecs::JsonDeserializerConfig::default().into()),
+            )
+            .await;
+            // The string `event` decodes to {host: "decoder-host"}; the envelope sets
+            // host: "envelope-host". The decoder's value must win.
+            let envelope = r#"{"event":"{\"host\":\"decoder-host\"}","host":"envelope-host"}"#;
+            assert_eq!(
+                200,
+                post(address, "services/collector/event", envelope).await
+            );
+
+            let event = collect_n(source, 1).await.remove(0);
+            let log = event.as_log();
+            assert_eq!(
+                log[log_schema().host_key().unwrap().to_string().as_str()],
+                "decoder-host".into()
+            );
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn decoder_event_endpoint_decode_failure_returns_200() {
+        // A malformed inner JSON must not surface as an HTTP error to the Splunk
+        // client - decode failures are swallowed by the codec like other Vector
+        // sources do.
+        let (_source, address, _guard) = source_with_codec(
+            None,
+            Some(vector_lib::codecs::JsonDeserializerConfig::default().into()),
+        )
+        .await;
+        let envelope = r#"{"event":"not valid json {","host":"h"}"#;
+        assert_eq!(
+            200,
+            post(address, "services/collector/event", envelope).await
+        );
+    }
+
+    #[tokio::test]
+    async fn decoder_raw_endpoint_newline_delimited() {
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let (source, address, _guard) = source_with_codec(
+                Some(FramingConfig::NewlineDelimited(Default::default())),
+                Some(DeserializerConfig::Bytes),
+            )
+            .await;
+            let body = "line1\nline2\nline3";
+            assert_eq!(200, post(address, "services/collector/raw", body).await);
+
+            let events = collect_n(source, 3).await;
+            assert_eq!(events.len(), 3);
+            let messages: Vec<String> = events
+                .iter()
+                .map(|e| {
+                    e.as_log()[log_schema().message_key().unwrap().to_string()]
+                        .to_string_lossy()
+                        .into_owned()
+                })
+                .collect();
+            assert!(messages.contains(&"line1".to_string()));
+            assert!(messages.contains(&"line2".to_string()));
+            assert!(messages.contains(&"line3".to_string()));
+
+            // All events share the channel from the request header.
+            for event in &events {
+                assert_eq!(event.as_log()[&super::CHANNEL], "channel".into());
+            }
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn decoder_event_endpoint_envelope_without_time_has_fallback_timestamp() {
+        // Regression: with a decoder set, an envelope that omits `time` must still
+        // produce events with a timestamp (the legacy /event path always wrote one).
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let (source, address, _guard) = source_with_codec(
+                None,
+                Some(vector_lib::codecs::JsonDeserializerConfig::default().into()),
+            )
+            .await;
+            let envelope = r#"{"event":"{\"foo\":\"bar\"}"}"#;
+            assert_eq!(
+                200,
+                post(address, "services/collector/event", envelope).await
+            );
+
+            let event = collect_n(source, 1).await.remove(0);
+            assert!(
+                event.as_log().get_timestamp().is_some(),
+                "decoded event from envelope without `time` field is missing a timestamp"
+            );
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn decoder_raw_endpoint_event_has_fallback_timestamp() {
+        // Regression: decoded /raw events must carry an ingest timestamp like the
+        // legacy raw_event path did via `insert_standard_vector_source_metadata`.
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let (source, address, _guard) =
+                source_with_codec(None, Some(DeserializerConfig::Bytes)).await;
+            let body = "hello";
+            assert_eq!(200, post(address, "services/collector/raw", body).await);
+
+            let event = collect_n(source, 1).await.remove(0);
+            assert!(
+                event.as_log().get_timestamp().is_some(),
+                "decoded /raw event is missing a timestamp"
+            );
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn decoder_raw_endpoint_empty_decode_does_not_ack() {
+        // Regression: when the decoder produces zero events from a raw payload and
+        // acknowledgements are enabled, the response must not include an `ackId`
+        // because /services/collector/ack would otherwise report success for data
+        // Vector silently dropped.
+        let ack_config = HecAcknowledgementsConfig {
+            enabled: Some(true),
+            ..Default::default()
+        };
+        let (sender, _recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
+        let (_guard, address) = next_addr();
+        let cx = SourceContext::new_test(sender, None);
+        tokio::spawn(async move {
+            SplunkConfig {
+                address,
+                token: Some(TOKEN.to_owned().into()),
+                valid_tokens: None,
+                tls: None,
+                acknowledgements: ack_config,
+                store_hec_token: false,
+                log_namespace: None,
+                keepalive: Default::default(),
+                framing: None,
+                decoding: Some(vector_lib::codecs::JsonDeserializerConfig::default().into()),
+            }
+            .build(cx)
+            .await
+            .unwrap()
+            .await
+            .unwrap()
+        });
+        wait_for_tcp(address).await;
+
+        let opts = SendWithOpts {
+            channel: Some(Channel::Header("guid")),
+            forwarded_for: None,
+        };
+        // A body the JSON decoder cannot parse - codec drops it, no events emitted.
+        let body = "not json {";
+        let response = send_with_response(address, "services/collector/raw", body, TOKEN, &opts)
+            .await
+            .json::<serde_json::Value>()
+            .await
+            .unwrap();
+
+        assert_eq!(response["code"].as_u64(), Some(0), "response: {response:?}");
+        assert!(
+            response.get("ackId").is_none(),
+            "expected no ackId in response when decoder produced zero events, got: {response:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn decoder_raw_endpoint_partial_decode_does_not_ack() {
+        // Regression: a request whose body decodes into some valid frames AND some
+        // dropped frames (e.g., `valid \n invalid \n valid` under newline framing
+        // with a JSON decoder) must not return an `ackId`. Otherwise
+        // /services/collector/ack reports success for data Vector silently dropped.
+        let ack_config = HecAcknowledgementsConfig {
+            enabled: Some(true),
+            ..Default::default()
+        };
+        let (sender, _recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
+        let (_guard, address) = next_addr();
+        let cx = SourceContext::new_test(sender, None);
+        tokio::spawn(async move {
+            SplunkConfig {
+                address,
+                token: Some(TOKEN.to_owned().into()),
+                valid_tokens: None,
+                tls: None,
+                acknowledgements: ack_config,
+                store_hec_token: false,
+                log_namespace: None,
+                keepalive: Default::default(),
+                framing: Some(FramingConfig::NewlineDelimited(Default::default())),
+                decoding: Some(vector_lib::codecs::JsonDeserializerConfig::default().into()),
+            }
+            .build(cx)
+            .await
+            .unwrap()
+            .await
+            .unwrap()
+        });
+        wait_for_tcp(address).await;
+
+        let opts = SendWithOpts {
+            channel: Some(Channel::Header("guid")),
+            forwarded_for: None,
+        };
+        // Two valid JSON frames bracketing one invalid frame.
+        let body = "{\"valid\":1}\nnot json\n{\"valid\":2}";
+        let response = send_with_response(address, "services/collector/raw", body, TOKEN, &opts)
+            .await
+            .json::<serde_json::Value>()
+            .await
+            .unwrap();
+
+        assert_eq!(response["code"].as_u64(), Some(0), "response: {response:?}");
+        assert!(
+            response.get("ackId").is_none(),
+            "expected no ackId when the decoder dropped a frame mid-request, got: {response:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn decoder_event_endpoint_error_index_matches_envelope_not_fanout() {
+        // Regression: with the decoder fanning out one envelope into many events,
+        // `InvalidEventNumber` in error responses must still report the failing
+        // envelope's zero-indexed position, not the cumulative event count.
+        let (source, address, _guard) = source_with_codec(
+            Some(FramingConfig::NewlineDelimited(Default::default())),
+            Some(DeserializerConfig::Bytes),
+        )
+        .await;
+        // Envelope 0 has an `event` string with three lines: with newline framing
+        // and a bytes decoder, that fans out to three events. Envelope 1 omits
+        // `event`, so the decoded path returns `MissingEventField { event: 1 }`.
+        let body = "{\"event\":\"a\\nb\\nc\"}{\"foo\":\"bar\"}";
+
+        let opts = SendWithOpts {
+            channel: Some(Channel::Header("guid")),
+            forwarded_for: None,
+        };
+        let response =
+            send_with_response(address, "services/collector/event", body, TOKEN, &opts).await;
+        let status = response.status();
+        let body: serde_json::Value = response.json().await.unwrap();
+
+        assert_eq!(status.as_u16(), 400, "body: {body:?}");
+        assert_eq!(
+            body["invalid-event-number"].as_u64(),
+            Some(1),
+            "expected envelope index 1 (the failing envelope), not a fan-out event index. body: {body:?}"
+        );
+        // Drain the partially-emitted events so the source task doesn't block.
+        let _ = collect_n(source, 3).await;
+    }
+
+    #[test]
+    fn output_schema_definition_with_decoder_vector_namespace() {
+        let config = SplunkConfig {
+            log_namespace: Some(true),
+            decoding: Some(vector_lib::codecs::JsonDeserializerConfig::default().into()),
+            ..Default::default()
+        };
+        let definition = config
+            .outputs(LogNamespace::Vector)
+            .remove(0)
+            .schema_definition(true);
+
+        // The decoder's schema produces `Kind::json()` at the root, and the splunk_hec
+        // source layers its envelope metadata fields on top.
+        let expected_definition =
+            Definition::new_with_default_metadata(Kind::json(), [LogNamespace::Vector])
+                .with_metadata_field(
+                    &owned_value_path!("vector", "source_type"),
+                    Kind::bytes(),
+                    None,
+                )
+                .with_metadata_field(
+                    &owned_value_path!("vector", "ingest_timestamp"),
+                    Kind::timestamp(),
+                    None,
+                )
+                .with_metadata_field(
+                    &owned_value_path!("splunk_hec", "host"),
+                    Kind::bytes(),
+                    Some("host"),
+                )
+                .with_metadata_field(
+                    &owned_value_path!("splunk_hec", "index"),
+                    Kind::bytes(),
+                    None,
+                )
+                .with_metadata_field(
+                    &owned_value_path!("splunk_hec", "source"),
+                    Kind::bytes(),
+                    Some("service"),
+                )
+                .with_metadata_field(
+                    &owned_value_path!("splunk_hec", "channel"),
+                    Kind::bytes(),
+                    None,
+                )
+                .with_metadata_field(
+                    &owned_value_path!("splunk_hec", "sourcetype"),
+                    Kind::bytes(),
+                    None,
+                );
+
+        assert_eq!(definition, Some(expected_definition));
     }
 
     #[test]
