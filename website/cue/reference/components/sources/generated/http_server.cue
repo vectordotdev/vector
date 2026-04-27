@@ -696,6 +696,27 @@ generated: components: sources: http_server: configuration: {
 			items: type: string: examples: ["application", "source", "param*", "*"]
 		}
 	}
+	reject_code: {
+		description: """
+			The HTTP status code returned to the client when the `response_source` VRL program calls
+			`abort`. Use `abort "message"` in your VRL program to suppress event forwarding and return
+			this status code immediately, bypassing sink acknowledgements entirely.
+
+			The appropriate code depends on the reason for rejection: for example, `400` for invalid
+			input, `403` for an unauthorized source, or `429` for a rate limit. Defaults to `400`.
+
+			To vary the status code per `abort` call rather than using a single fixed value, pass a
+			JSON-encoded object as the abort message instead of a plain string:
+			`abort encode_json({ "status": 403, "body": "forbidden" })`. The object accepts the same
+			optional fields as the `response_source` return value: `status`, `body`, and `headers`.
+			When `status` is omitted from the object, this `reject_code` is used as the fallback.
+			"""
+		required: false
+		type: uint: {
+			default: 400
+			examples: [400, 403]
+		}
+	}
 	response_code: {
 		description: "Specifies the HTTP response status code that will be returned on successful requests."
 		required:    false
@@ -704,6 +725,60 @@ generated: components: sources: http_server: configuration: {
 			examples: [
 				202,
 			]
+		}
+	}
+	response_source: {
+		description: """
+			A [VRL] program to generate the HTTP response sent back to the client.
+
+			The program receives the decoded, enriched events where `.` is an array of event objects.
+			It must return either:
+			- A string, used directly as the response body with the configured `response_code`.
+			- An object with optional fields: `status` (integer), `body` (string), `headers` (object).
+
+			## Aborting and early rejection
+
+			Call `abort` in the program to suppress event forwarding entirely and respond immediately,
+			bypassing sink acknowledgements. The abort message becomes the response body and
+			[`reject_code`][Self::reject_code] is used as the status code.
+
+			To control both the status code and body per `abort` call, pass a JSON-encoded object as
+			the message: `abort encode_json({ "status": 403, "body": "forbidden" })`. The object
+			accepts the same optional fields as the normal return value: `status`, `body`, and
+			`headers`. Any field that is omitted falls back to the same default as the normal path
+			(`status` defaults to `reject_code`, `body` defaults to empty, `headers` to none).
+
+			## Acknowledgements and sink failures
+
+			When [acknowledgements] are enabled, the response defined by this program is only sent to
+			the client if the downstream sink successfully delivers the events (`Delivered`). If the
+			sink reports a failure (`Errored` or `Rejected`), the configured response is discarded and
+			the client receives a `500 Internal Server Error` or `400 Bad Request` instead.
+
+			Responses returned via `abort` are not subject to this — they are sent immediately before
+			any events reach the sink, so acknowledgement results can never override them.
+
+			[acknowledgements]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
+			[VRL]: https://vector.dev/docs/reference/vrl
+			"""
+		required: false
+		type: string: {
+			examples: ["encode_json({ \"ids\": map_values(.) -> |e| { e.id } })", """
+				parsed, err = parse_json(.[0].body)
+				if err != null {
+				  { "status": 400, "body": "invalid JSON" }
+				} else {
+				  { "status": 202, "body": encode_json(parsed), "headers": { "x-request-id": .[0].request_id } }
+				}
+				""", """
+				row, err = get_enrichment_table_record("ip_allowlist", { "ip": .source_ip })
+				if err != null {
+				  abort encode_json({ "status": 403, "body": "source address not permitted" })
+				} else {
+				  { "status": 202, "body": encode_json({ "accepted": true }) }
+				}
+				"""]
+			syntax: "remap_program"
 		}
 	}
 	strict_path: {
