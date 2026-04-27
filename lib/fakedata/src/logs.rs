@@ -3,8 +3,43 @@ use chrono::{
     format::{DelayedFormat, StrftimeItems},
     prelude::Local,
 };
-use fakedata_generator::{gen_domain, gen_ipv4, gen_username};
 use rand::{Rng, rng};
+
+static FAKE_USERNAMES: [&str; 20] = [
+    "log_whisperer",
+    "commit_conductor",
+    "cache_cowboy",
+    "compile_captain",
+    "latency_llama",
+    "yaml_yoda",
+    "regex_rider",
+    "semver_sage",
+    "kernel_keith",
+    "pixel_pilgrim",
+    "kubectl_kev",
+    "pipeline_pat",
+    "telemetry_tina",
+    "merge_maria",
+    "parser_pete",
+    "debug_duchess",
+    "nullable_nate",
+    "grep_greg",
+    "stderr_stan",
+    "segfault_sue",
+];
+
+static FAKE_DOMAIN_NAMES: [&str; 8] = [
+    "acme",
+    "contoso",
+    "widgets",
+    "example",
+    "placeholder",
+    "sample",
+    "foobar",
+    "testbench",
+];
+
+static FAKE_DOMAIN_TLDS: [&str; 8] = ["com", "net", "org", "io", "dev", "co", "app", "biz"];
 
 static APPLICATION_NAMES: [&str; 10] = [
     "auth", "data", "deploy", "etl", "scraper", "cron", "ingress", "egress", "alerter", "fwd",
@@ -156,7 +191,11 @@ fn application() -> &'static str {
 }
 
 fn domain() -> String {
-    gen_domain()
+    format!(
+        "{}.{}",
+        random_from_array(&FAKE_DOMAIN_NAMES),
+        random_from_array(&FAKE_DOMAIN_TLDS),
+    )
 }
 
 fn error_level() -> &'static str {
@@ -188,7 +227,14 @@ fn http_version() -> &'static str {
 }
 
 fn ipv4_address() -> String {
-    gen_ipv4()
+    let mut r = rng();
+    format!(
+        "{}.{}.{}.{}",
+        r.random_range(1..255),
+        r.random_range(1..255),
+        r.random_range(1..255),
+        r.random_range(1..255),
+    )
 }
 
 fn pid() -> usize {
@@ -208,7 +254,7 @@ fn referer() -> String {
 }
 
 fn username() -> String {
-    gen_username()
+    (*random_from_array(&FAKE_USERNAMES)).to_string()
 }
 
 fn syslog_version() -> usize {

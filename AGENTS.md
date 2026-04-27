@@ -21,7 +21,7 @@ reduction and improved data quality for observability infrastructure.
   - `sinks/` - Data output destinations
   - `config/` - Configuration system and validation
   - `topology/` - Component graph management
-  - `api/` - GraphQL API for management and monitoring
+  - `api/` - gRPC API for management and monitoring
   - `cli.rs` - Command-line interface
 
 - `/lib/` - Modular library crates
@@ -147,6 +147,10 @@ make cue-build
 
 **Note:** Website changes use Hugo, CUE, Tailwind CSS, and TypeScript. See [website/README.md](website/README.md) for details.
 
+## Configuration Format
+
+Always generate Vector configuration examples in **YAML** unless the user explicitly asks for TOML or JSON. YAML is Vector's recommended and default configuration format.
+
 ## Common Patterns
 
 ### Development Tools
@@ -189,8 +193,14 @@ Then: `chmod +x .git/hooks/pre-push`
 ## Detailed Documentation
 
 | Topic | Document |
-|-------|----------|
+| ----- | -------- |
 | Rust style patterns | [docs/RUST_STYLE.md](docs/RUST_STYLE.md) |
+| Code style rules (formatting, const strings, organization) | [STYLE.md](STYLE.md) |
+| System architecture (sources, transforms, sinks, topology) | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
+| Component specification (naming, configuration, health checks) | [docs/specs/component.md](docs/specs/component.md) |
+| Instrumentation requirements (event/metric naming) | [docs/specs/instrumentation.md](docs/specs/instrumentation.md) |
+| How to document code changes | [docs/DOCUMENTING.md](docs/DOCUMENTING.md) |
+| Adding changelog entries | [changelog.d/README.md](changelog.d/README.md) |
 
 ## Architecture Notes
 
@@ -258,28 +268,15 @@ make build-licenses
 
 Before opening a PR, read [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md) and use it as the reference for the PR body structure and title.
 
-## Reference Documentation
+### PR Title Format
 
-These documents provide context that AI agents and developers need when working on Vector code.
+PR titles must follow the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) spec and are validated by `.github/workflows/semantic.yml`.
 
-### Essential for Code Changes
+Examples:
 
-- **[STYLE.md](STYLE.md)** - Code style rules (formatting, const strings, code organization)
-- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** - System architecture (sources, transforms, sinks, topology)
-- **[docs/DEVELOPING.md](docs/DEVELOPING.md)** - Development workflow and testing
-
-### Component Development
-
-- **[docs/specs/component.md](docs/specs/component.md)** - Component specification (naming, configuration, health checks)
-- **[docs/specs/instrumentation.md](docs/specs/instrumentation.md)** - Instrumentation requirements (event/metric naming)
-- **[src/internal_events](src/internal_events)** - Internal event examples for telemetry
-
-### Adding Documentation
-
-- **[docs/DOCUMENTING.md](docs/DOCUMENTING.md)** - How to document code changes
-- **[changelog.d/README.md](changelog.d/README.md)** - Adding changelog entries
-
-### Full Guides
-
-- **[CONTRIBUTING.md](CONTRIBUTING.md)** - Complete contributing guide
-- **[website/README.md](website/README.md)** - Website development only (separate from Rust code)
+```text
+feat(kafka source): add consumer group lag metric
+fix(loki sink): handle empty label sets correctly
+docs(internal docs): update contributing guide
+chore(deps): bump tokio to X
+```

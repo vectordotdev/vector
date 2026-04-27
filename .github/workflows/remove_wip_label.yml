@@ -1,0 +1,45 @@
+name: Remove Work In Progress Label
+
+permissions:
+  pull-requests: write
+
+on:
+  pull_request_review:
+    types: [submitted]
+
+jobs:
+  remove_wip_label:
+    if: github.event.review.state == 'approved'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check association, label, and remove
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const association = context.payload.review.author_association;
+            core.info(`Author association: ${association}`);
+
+            const allowed = ['MEMBER', 'OWNER'];
+            if (!allowed.includes(association)) {
+              core.info(`Association "${association}" not in allowed list, skipping`);
+              return;
+            }
+
+            const { data: labels } = await github.rest.issues.listLabelsOnIssue({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+            });
+            const hasLabel = labels.some(l => l.name === 'work in progress');
+            if (!hasLabel) {
+              core.info('Label "work in progress" not found, skipping');
+              return;
+            }
+            await github.rest.issues.removeLabel({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              name: 'work in progress',
+            });
+            core.info('Removed "work in progress" label');

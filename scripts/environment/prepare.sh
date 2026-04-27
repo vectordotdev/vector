@@ -37,9 +37,9 @@ CARGO_HACK_VERSION="0.6.43"
 DD_RUST_LICENSE_TOOL_VERSION="1.0.6"
 CARGO_LLVM_COV_VERSION="0.8.4"
 WASM_PACK_VERSION="0.13.1"
-MARKDOWNLINT_VERSION="0.45.0"
-DATADOG_CI_VERSION="5.9.0"
-VDEV_VERSION="0.3.0"
+# npm tool versions are defined in scripts/environment/npm-tools/package.json
+# and pinned (including transitive deps) in npm-tools/package-lock.json.
+VDEV_VERSION="0.3.2"
 
 ALL_MODULES=(
   rustup
@@ -52,7 +52,8 @@ ALL_MODULES=(
   cargo-llvm-cov
   dd-rust-license-tool
   wasm-pack
-  markdownlint
+  markdownlint-cli2
+  prettier
   datadog-ci
   release-flags  # Not a tool - sources release-flags.sh to set CI env vars
   vdev
@@ -92,7 +93,8 @@ Modules:
   cargo-llvm-cov
   dd-rust-license-tool
   wasm-pack
-  markdownlint
+  markdownlint-cli2
+  prettier
   datadog-ci
   vdev
 
@@ -148,22 +150,58 @@ maybe_install_cargo_tool() {
   fi
 }
 
-# Helper for NPM packages
-# Usage: maybe_install_npm_package <tool-name> <package-name> <version> <version-check-pattern> <version-command>
-maybe_install_npm_package() {
-  local tool="$1"
-  local package="$2"
-  local version="$3"
-  local version_pattern="${4:-$version}"
-  local version_cmd="${5:---version}"  # Default to --version, can override with "version" etc.
+# Install npm tools from the committed package-lock.json so that every
+# transitive dependency version is pinned (no live registry resolution).
+# Versions are defined in npm-tools/package.json; npm ci ensures exact lockfile match.
+# Note: npm ci installs all packages in the lockfile even if only one tool
+# is requested, since it does not support selective installation.
+maybe_install_npm_tools() {
+  local npm_tools=(markdownlint-cli2 prettier datadog-ci)
 
-  if ! contains_module "$tool"; then
+  # Early return when no npm tool is requested, so hosts without npm
+  # (e.g. tests/e2e/Dockerfile calling prepare.sh --modules=cargo-nextest)
+  # are not broken by the npm commands below.
+  local any_requested=false
+  for tool in "${npm_tools[@]}"; do
+    if contains_module "$tool"; then
+      any_requested=true
+      break
+    fi
+  done
+  if [[ "$any_requested" == "false" ]]; then
     return 0
   fi
 
-  if [[ "$("$tool" "$version_cmd" 2>/dev/null)" != "$version_pattern" ]]; then
-    sudo npm install -g "${package}@${version}"
+  local npm_tools_dir="${SCRIPT_DIR}/npm-tools"
+  local npm_bin_dir
+  npm_bin_dir="$(npm config get prefix -g)/bin"
+  local need_install=false
+
+  for tool in "${npm_tools[@]}"; do
+    if contains_module "$tool"; then
+      local expected="${npm_tools_dir}/node_modules/.bin/${tool}"
+      if [[ "$(readlink "${npm_bin_dir}/${tool}" 2>/dev/null)" != "$expected" ]] || [[ ! -x "$expected" ]]; then
+        need_install=true
+        break
+      fi
+    fi
+  done
+
+  if [[ "$need_install" == "false" ]]; then
+    return 0
   fi
+
+  npm ci --prefix "${npm_tools_dir}"
+
+  # Use sudo only when the target directory is not writable (e.g. /usr/local/bin
+  # on Linux CI runners is root-owned, but Homebrew dirs on macOS are user-owned).
+  local ln_cmd=(ln -sf)
+  if [[ ! -w "${npm_bin_dir}" ]]; then
+    ln_cmd=(sudo ln -sf)
+  fi
+  for tool in "${npm_tools[@]}"; do
+    "${ln_cmd[@]}" "${npm_tools_dir}/node_modules/.bin/${tool}" "${npm_bin_dir}/${tool}"
+  done
 }
 
 # Always ensure git safe.directory is set
@@ -218,5 +256,4 @@ maybe_install_cargo_tool dd-rust-license-tool "${DD_RUST_LICENSE_TOOL_VERSION}"
 maybe_install_cargo_tool wasm-pack "${WASM_PACK_VERSION}"
 maybe_install_cargo_tool vdev "${VDEV_VERSION}"
 
-maybe_install_npm_package markdownlint markdownlint-cli "${MARKDOWNLINT_VERSION}"
-maybe_install_npm_package datadog-ci "@datadog/datadog-ci" "${DATADOG_CI_VERSION}" "v${DATADOG_CI_VERSION}" "version"
+maybe_install_npm_tools
