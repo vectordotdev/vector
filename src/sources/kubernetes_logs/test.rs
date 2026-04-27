@@ -1,4 +1,3 @@
-#[cfg(any(test, feature = "all-integration-tests"))]
 mod tests {
     use bytes::Bytes;
     use chrono::Utc;
@@ -21,10 +20,8 @@ mod tests {
     use tokio::time::{Duration, sleep, timeout};
     use tower_test::mock::{Handle, SendResponse};
     use vector_lib::{
-        codecs::BytesDeserializerConfig,
         config::{
-            AcknowledgementsConfig, DataType, GlobalOptions, LegacyKey, LogNamespace,
-            SourceAcknowledgementsConfig, SourceOutput, log_schema,
+            AcknowledgementsConfig, GlobalOptions, LogNamespace, SourceAcknowledgementsConfig,
         },
         id::ComponentKey,
         lookup::{OwnedTargetPath, owned_value_path},
@@ -34,252 +31,13 @@ mod tests {
 
     use crate::{
         SourceSender,
-        config::{SourceConfigTest, SourceContext},
+        config::SourceConfig,
         event::{Event, EventStatus},
-        extra_context::ExtraContext,
         shutdown::ShutdownSignal,
         test_util::components::{SOURCE_TAGS, assert_source_compliance},
     };
 
-    use super::super::Config;
-    use super::super::Source;
-
-    #[async_trait::async_trait]
-    impl SourceConfigTest<Client> for Config {
-        async fn build(
-            &self,
-            cx: SourceContext,
-            client: Client,
-        ) -> crate::Result<super::super::sources::Source> {
-            let log_namespace = cx.log_namespace(self.log_namespace);
-            let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
-            let source = Source::new_test(
-                self,
-                &cx.globals,
-                &cx.key,
-                acknowledgements,
-                client,
-                cx.extra_context.get::<String>().unwrap().to_string(),
-            )
-            .await?;
-
-            Ok(Box::pin(
-                source
-                    .run(cx.out, cx.shutdown, log_namespace)
-                    .map(|result| {
-                        result.map_err(|error| {
-                            error!(message = "Source future failed.", %error);
-                        })
-                    }),
-            ))
-        }
-
-        fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
-            let log_namespace = global_log_namespace.merge(self.log_namespace);
-            let schema_definition = BytesDeserializerConfig
-                .schema_definition(log_namespace)
-                .with_source_metadata(
-                    Self::NAME,
-                    Some(LegacyKey::Overwrite(owned_value_path!("file"))),
-                    &owned_value_path!("file"),
-                    Kind::bytes(),
-                    None,
-                )
-                .with_source_metadata(
-                    Self::NAME,
-                    self.pod_annotation_fields
-                        .container_id
-                        .path
-                        .clone()
-                        .map(|k| k.path)
-                        .map(LegacyKey::Overwrite),
-                    &owned_value_path!("container_id"),
-                    Kind::bytes().or_undefined(),
-                    None,
-                )
-                .with_source_metadata(
-                    Self::NAME,
-                    self.pod_annotation_fields
-                        .container_image
-                        .path
-                        .clone()
-                        .map(|k| k.path)
-                        .map(LegacyKey::Overwrite),
-                    &owned_value_path!("container_image"),
-                    Kind::bytes().or_undefined(),
-                    None,
-                )
-                .with_source_metadata(
-                    Self::NAME,
-                    self.pod_annotation_fields
-                        .container_name
-                        .path
-                        .clone()
-                        .map(|k| k.path)
-                        .map(LegacyKey::Overwrite),
-                    &owned_value_path!("container_name"),
-                    Kind::bytes().or_undefined(),
-                    None,
-                )
-                .with_source_metadata(
-                    Self::NAME,
-                    self.namespace_annotation_fields
-                        .namespace_labels
-                        .path
-                        .clone()
-                        .map(|x| LegacyKey::Overwrite(x.path)),
-                    &owned_value_path!("namespace_labels"),
-                    Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
-                    None,
-                )
-                .with_source_metadata(
-                    Self::NAME,
-                    self.node_annotation_fields
-                        .node_labels
-                        .path
-                        .clone()
-                        .map(|x| LegacyKey::Overwrite(x.path)),
-                    &owned_value_path!("node_labels"),
-                    Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
-                    None,
-                )
-                .with_source_metadata(
-                    Self::NAME,
-                    self.pod_annotation_fields
-                        .pod_annotations
-                        .path
-                        .clone()
-                        .map(|k| k.path)
-                        .map(LegacyKey::Overwrite),
-                    &owned_value_path!("pod_annotations"),
-                    Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
-                    None,
-                )
-                .with_source_metadata(
-                    Self::NAME,
-                    self.pod_annotation_fields
-                        .pod_ip
-                        .path
-                        .clone()
-                        .map(|k| k.path)
-                        .map(LegacyKey::Overwrite),
-                    &owned_value_path!("pod_ip"),
-                    Kind::bytes().or_undefined(),
-                    None,
-                )
-                .with_source_metadata(
-                    Self::NAME,
-                    self.pod_annotation_fields
-                        .pod_ips
-                        .path
-                        .clone()
-                        .map(|k| k.path)
-                        .map(LegacyKey::Overwrite),
-                    &owned_value_path!("pod_ips"),
-                    Kind::array(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
-                    None,
-                )
-                .with_source_metadata(
-                    Self::NAME,
-                    self.pod_annotation_fields
-                        .pod_labels
-                        .path
-                        .clone()
-                        .map(|k| k.path)
-                        .map(LegacyKey::Overwrite),
-                    &owned_value_path!("pod_labels"),
-                    Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
-                    None,
-                )
-                .with_source_metadata(
-                    Self::NAME,
-                    self.pod_annotation_fields
-                        .pod_name
-                        .path
-                        .clone()
-                        .map(|k| k.path)
-                        .map(LegacyKey::Overwrite),
-                    &owned_value_path!("pod_name"),
-                    Kind::bytes().or_undefined(),
-                    None,
-                )
-                .with_source_metadata(
-                    Self::NAME,
-                    self.pod_annotation_fields
-                        .pod_namespace
-                        .path
-                        .clone()
-                        .map(|k| k.path)
-                        .map(LegacyKey::Overwrite),
-                    &owned_value_path!("pod_namespace"),
-                    Kind::bytes().or_undefined(),
-                    None,
-                )
-                .with_source_metadata(
-                    Self::NAME,
-                    self.pod_annotation_fields
-                        .pod_node_name
-                        .path
-                        .clone()
-                        .map(|k| k.path)
-                        .map(LegacyKey::Overwrite),
-                    &owned_value_path!("pod_node_name"),
-                    Kind::bytes().or_undefined(),
-                    None,
-                )
-                .with_source_metadata(
-                    Self::NAME,
-                    self.pod_annotation_fields
-                        .pod_owner
-                        .path
-                        .clone()
-                        .map(|k| k.path)
-                        .map(LegacyKey::Overwrite),
-                    &owned_value_path!("pod_owner"),
-                    Kind::bytes().or_undefined(),
-                    None,
-                )
-                .with_source_metadata(
-                    Self::NAME,
-                    self.pod_annotation_fields
-                        .pod_uid
-                        .path
-                        .clone()
-                        .map(|k| k.path)
-                        .map(LegacyKey::Overwrite),
-                    &owned_value_path!("pod_uid"),
-                    Kind::bytes().or_undefined(),
-                    None,
-                )
-                .with_source_metadata(
-                    Self::NAME,
-                    Some(LegacyKey::Overwrite(owned_value_path!("stream"))),
-                    &owned_value_path!("stream"),
-                    Kind::bytes(),
-                    None,
-                )
-                .with_source_metadata(
-                    Self::NAME,
-                    log_schema()
-                        .timestamp_key()
-                        .cloned()
-                        .map(LegacyKey::Overwrite),
-                    &owned_value_path!("timestamp"),
-                    Kind::timestamp(),
-                    Some("timestamp"),
-                )
-                .with_standard_vector_source_metadata();
-
-            vec![SourceOutput::new_maybe_logs(
-                DataType::Log,
-                schema_definition,
-            )]
-        }
-
-        fn can_acknowledge(&self) -> bool {
-            true
-        }
-    }
+    use super::super::{Config, Source};
 
     #[test]
     fn generate_config() {
@@ -647,6 +405,94 @@ mod tests {
         file_start_position_server_restart_with_file_rotation(Acks).await
     }
 
+    /// Verifies that checkpoints do NOT advance until acks are received.
+    /// When events are rejected (not acknowledged), the source should
+    /// re-read the same data on restart.
+    #[tokio::test]
+    async fn checkpoint_does_not_advance_without_ack() {
+        let (mock_service, handle) = tower_test::mock::pair::<Request<Body>, Response<Body>>();
+        let ns_name = "default";
+        let container_name = "test";
+        let pod_uid = "dd3448e2-60bb-46ab-bd34-d42b61be366d";
+        let pod_name = "test";
+        let node_name = "test";
+        tokio::spawn(get_mock_future(
+            handle,
+            ns_name,
+            pod_name,
+            pod_uid,
+            container_name,
+        ));
+
+        let tmp_dir = tempdir().unwrap();
+        let dir = &format!(
+            "{}/{}_{}_{}/{}",
+            tmp_dir.path().to_str().unwrap(),
+            ns_name,
+            pod_name,
+            pod_uid,
+            container_name
+        );
+        let dir_path = Path::new(dir);
+        fs::create_dir_all(dir_path).unwrap();
+        let mut config = Config {
+            self_node_name: node_name.to_owned(),
+            glob_minimum_cooldown_ms: Duration::from_millis(100),
+            ..Default::default()
+        };
+
+        let path = dir_path.join("log.log");
+        let first_file = File::create(&path).unwrap();
+        sleep_500_millis().await;
+        writeln!(
+            &first_file,
+            "2016-10-06T00:17:09.669794202Z stdout F first line"
+        )
+        .unwrap();
+
+        // Run server with acks enabled but events rejected (not acknowledged).
+        // Checkpoints should NOT advance.
+        {
+            let received = run_kubernetes_source_with_status(
+                &mut config,
+                false, // don't wait for shutdown (it may hang without acks)
+                EventStatus::Rejected,
+                async {
+                    sleep_500_millis().await;
+                },
+                Client::new(mock_service.clone(), ns_name),
+                dir_path.to_path_buf(),
+                tmp_dir.path().to_str().unwrap(),
+            )
+            .await;
+
+            let lines = extract_messages_string(received);
+            assert_eq!(lines, vec!["first line"]);
+        }
+
+        // Restart the server. Since the checkpoint did NOT advance
+        // (events were rejected), we should re-read "first line".
+        {
+            let received = run_kubernetes_source(
+                &mut config,
+                true,
+                Acks,
+                async {
+                    sleep_500_millis().await;
+                },
+                Client::new(mock_service.clone(), ns_name),
+                dir_path.to_path_buf(),
+                tmp_dir.path().to_str().unwrap(),
+            )
+            .await;
+
+            let lines = extract_messages_string(received);
+            assert_eq!(lines, vec!["first line"], "checkpoint should not have advanced when events were rejected");
+        }
+
+        fs::remove_dir_all(dir_path).unwrap();
+    }
+
     async fn get_mock_future(
         handle: Handle<Request<Body>, Response<Body>>,
         namespace_name: &str,
@@ -1007,9 +853,8 @@ mod tests {
 
     #[derive(Clone, Copy, Eq, PartialEq)]
     enum AckingMode {
-        NoAcks,      // No acknowledgement handling and no finalization
-        Unfinalized, // Acknowledgement handling but no finalization
-        Acks,        // Full acknowledgements and proper finalization
+        NoAcks, // No acknowledgement handling and no finalization
+        Acks,   // Full acknowledgements and proper finalization
     }
     use AckingMode::*;
 
@@ -1022,9 +867,9 @@ mod tests {
         data_dir: PathBuf,
         logs_dir: &str,
     ) -> Vec<Event> {
-        let acks = !matches!(acking_mode, NoAcks);
+        let acks = acking_mode == Acks;
         assert_source_compliance(&SOURCE_TAGS, async move {
-            let (tx, rx) = if acking_mode == Acks {
+            let (tx, rx) = if acks {
                 let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
                 (tx, rx.boxed())
             } else {
@@ -1035,39 +880,44 @@ mod tests {
             let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
 
             config.acknowledgements = SourceAcknowledgementsConfig::from(acks);
-            let source = config
-                .build(
-                    SourceContext {
-                        key: ComponentKey::from("default"),
-                        globals: GlobalOptions {
-                            data_dir: Some(data_dir.clone()),
-                            log_schema: Default::default(),
-                            telemetry: Default::default(),
-                            timezone: Default::default(),
-                            proxy: Default::default(),
-                            acknowledgements: AcknowledgementsConfig::from(acks),
-                            expire_metrics: Default::default(),
-                            expire_metrics_secs: Default::default(),
-                            expire_metrics_per_metric_set: Default::default(),
-                            wildcard_matching: Default::default(),
-                            buffer_utilization_ewma_half_life_seconds: Default::default(),
-                            latency_ewma_alpha: Default::default(),
-                            metrics_storage_refresh_period: Default::default(),
-                        },
-                        shutdown,
-                        out: tx,
-                        proxy: Default::default(),
-                        acknowledgements: acks,
-                        schema_definitions: Default::default(),
-                        schema: Default::default(),
-                        extra_context: ExtraContext::single_value(logs_dir.to_owned()),
-                        enrichment_tables: Default::default(),
-                        metrics_storage: Default::default(),
-                    },
-                    client,
-                )
-                .await
-                .unwrap();
+            let globals = GlobalOptions {
+                data_dir: Some(data_dir.clone()),
+                log_schema: Default::default(),
+                telemetry: Default::default(),
+                timezone: Default::default(),
+                proxy: Default::default(),
+                acknowledgements: AcknowledgementsConfig::from(acks),
+                expire_metrics: Default::default(),
+                expire_metrics_secs: Default::default(),
+                expire_metrics_per_metric_set: Default::default(),
+                wildcard_matching: Default::default(),
+                buffer_utilization_ewma_half_life_seconds: Default::default(),
+                latency_ewma_alpha: Default::default(),
+                metrics_storage_refresh_period: Default::default(),
+            };
+            let key = ComponentKey::from("default");
+            let log_namespace = LogNamespace::Legacy;
+
+            let source_inner = Source::new_test(
+                config,
+                &globals,
+                &key,
+                acks,
+                client,
+                logs_dir.to_owned(),
+            )
+            .await
+            .unwrap();
+
+            let source = Box::pin(
+                source_inner
+                    .run(tx, shutdown, log_namespace)
+                    .map(|result| {
+                        result.map_err(|error| {
+                            error!(message = "Source future failed.", %error);
+                        })
+                    }),
+            );
 
             tokio::spawn(source);
 
@@ -1075,17 +925,89 @@ mod tests {
 
             drop(trigger_shutdown);
 
-            let result = if acking_mode == Unfinalized {
-                rx.take_until(tokio::time::sleep(Duration::from_secs(5)))
-                    .collect::<Vec<_>>()
-                    .await
-            } else {
-                timeout(Duration::from_secs(5), rx.collect::<Vec<_>>())
-                    .await
-                    .expect(
-                        "Unclosed channel: may indicate file-server could not shutdown gracefully.",
-                    )
+            let result = timeout(Duration::from_secs(5), rx.collect::<Vec<_>>())
+                .await
+                .expect(
+                    "Unclosed channel: may indicate file-server could not shutdown gracefully.",
+                );
+            if wait_shutdown {
+                shutdown_done.await;
+            }
+
+            result
+        })
+        .await
+    }
+
+    /// Like [`run_kubernetes_source`] but with a custom event status for ack
+    /// finalization. This allows testing the behavior when events are rejected.
+    async fn run_kubernetes_source_with_status(
+        config: &mut Config,
+        wait_shutdown: bool,
+        status: EventStatus,
+        inner: impl Future<Output = ()>,
+        client: Client,
+        data_dir: PathBuf,
+        logs_dir: &str,
+    ) -> Vec<Event> {
+        assert_source_compliance(&SOURCE_TAGS, async move {
+            let (tx, rx) = SourceSender::new_test_finalize(status);
+            let rx = rx.boxed();
+
+            let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
+
+            config.acknowledgements = SourceAcknowledgementsConfig::from(true);
+            let globals = GlobalOptions {
+                data_dir: Some(data_dir.clone()),
+                log_schema: Default::default(),
+                telemetry: Default::default(),
+                timezone: Default::default(),
+                proxy: Default::default(),
+                acknowledgements: AcknowledgementsConfig::from(true),
+                expire_metrics: Default::default(),
+                expire_metrics_secs: Default::default(),
+                expire_metrics_per_metric_set: Default::default(),
+                wildcard_matching: Default::default(),
+                buffer_utilization_ewma_half_life_seconds: Default::default(),
+                latency_ewma_alpha: Default::default(),
+                metrics_storage_refresh_period: Default::default(),
             };
+            let key = ComponentKey::from("default");
+            let log_namespace = LogNamespace::Legacy;
+
+            let source_inner = Source::new_test(
+                config,
+                &globals,
+                &key,
+                true, // acks enabled
+                client,
+                logs_dir.to_owned(),
+            )
+            .await
+            .unwrap();
+
+            let source = Box::pin(
+                source_inner
+                    .run(tx, shutdown, log_namespace)
+                    .map(|result| {
+                        result.map_err(|error| {
+                            error!(message = "Source future failed.", %error);
+                        })
+                    }),
+            );
+
+            tokio::spawn(source);
+
+            inner.await;
+
+            drop(trigger_shutdown);
+
+            // When events are rejected, the finalizer won't complete
+            // the ack stream, so use a timeout-based collection.
+            let result = rx
+                .take_until(tokio::time::sleep(Duration::from_secs(5)))
+                .collect::<Vec<_>>()
+                .await;
             if wait_shutdown {
                 shutdown_done.await;
             }

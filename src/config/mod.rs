@@ -61,8 +61,6 @@ pub use loading::{
 pub use provider::ProviderConfig;
 pub use secret::SecretBackend;
 pub use sink::{BoxedSink, SinkConfig, SinkContext, SinkHealthcheckOptions, SinkOuter};
-#[cfg(any(test, feature = "all-integration-tests"))]
-pub use source::SourceConfigTest;
 pub use source::{BoxedSource, SourceConfig, SourceContext, SourceOuter};
 pub use transform::{
     BoxedTransform, TransformConfig, TransformContext, TransformOuter, get_transform_output_ids,

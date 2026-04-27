@@ -84,7 +84,7 @@ use self::{
 
 /// Entry used by the [`OrderedFinalizer`] to track checkpoint data
 /// for acknowledged events.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 struct FinalizerEntry {
     file_id: FileFingerprint,
     offset: u64,
@@ -606,6 +606,7 @@ struct Source {
     include_file_metric_tag: bool,
     rotate_wait: Duration,
     acknowledgements: bool,
+    logs_dir_override: Option<PathBuf>,
 }
 
 impl Source {
@@ -697,6 +698,73 @@ impl Source {
             include_file_metric_tag: config.internal_metrics.include_file_tag,
             rotate_wait: config.rotate_wait,
             acknowledgements,
+            logs_dir_override: None,
+        })
+    }
+
+    /// Creates a [`Source`] for test contexts, accepting a pre-built [`Client`]
+    /// and a custom logs directory path. This bypasses kubeconfig and
+    /// environment variable resolution.
+    #[cfg(test)]
+    async fn new_test(
+        config: &Config,
+        globals: &GlobalOptions,
+        key: &ComponentKey,
+        acknowledgements: bool,
+        client: Client,
+        logs_dir: String,
+    ) -> crate::Result<Self> {
+        let self_node_name = config.self_node_name.clone();
+
+        let field_selector = prepare_field_selector(config, self_node_name.as_str())?;
+        let label_selector = prepare_label_selector(config.extra_label_selector.as_ref());
+        let namespace_label_selector =
+            prepare_label_selector(config.extra_namespace_label_selector.as_ref());
+        let node_selector = prepare_node_selector(self_node_name.as_str())?;
+
+        let data_dir = globals.resolve_and_make_data_subdir(config.data_dir.as_ref(), key.id())?;
+
+        let include_paths = prepare_include_paths(config)?;
+        let exclude_paths = prepare_exclude_paths(config)?;
+
+        let glob_minimum_cooldown = config.glob_minimum_cooldown_ms;
+        let delay_deletion = config.delay_deletion_ms;
+
+        let ingestion_timestamp_field = config
+            .ingestion_timestamp_field
+            .clone()
+            .and_then(|k| k.path);
+
+        Ok(Self {
+            client,
+            data_dir,
+            auto_partial_merge: config.auto_partial_merge,
+            pod_fields_spec: config.pod_annotation_fields.clone(),
+            namespace_fields_spec: config.namespace_annotation_fields.clone(),
+            node_field_spec: config.node_annotation_fields.clone(),
+            field_selector,
+            label_selector,
+            namespace_label_selector,
+            insert_namespace_fields: config.insert_namespace_fields,
+            node_selector,
+            self_node_name,
+            include_paths,
+            exclude_paths,
+            read_from: ReadFrom::from(config.read_from),
+            ignore_older_secs: config.ignore_older_secs,
+            max_read_bytes: config.max_read_bytes,
+            oldest_first: config.oldest_first,
+            max_line_bytes: config.max_line_bytes,
+            max_merged_line_bytes: config.max_merged_line_bytes,
+            fingerprint_lines: config.fingerprint_lines,
+            glob_minimum_cooldown,
+            use_apiserver_cache: config.use_apiserver_cache,
+            ingestion_timestamp_field,
+            delay_deletion,
+            include_file_metric_tag: config.internal_metrics.include_file_tag,
+            rotate_wait: config.rotate_wait,
+            acknowledgements,
+            logs_dir_override: Some(PathBuf::from(logs_dir)),
         })
     }
 
@@ -735,6 +803,7 @@ impl Source {
             include_file_metric_tag,
             rotate_wait,
             acknowledgements,
+            logs_dir_override,
         } = self;
 
         let mut reflectors = Vec::new();
@@ -825,6 +894,7 @@ impl Source {
             include_paths,
             exclude_paths,
             insert_namespace_fields,
+            logs_dir_override,
         );
         let annotator = PodMetadataAnnotator::new(pod_state, pod_fields_spec, log_namespace);
         let ns_annotator =
