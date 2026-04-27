@@ -1,0 +1,23 @@
+# Template for the two http sinks. The repro script renders this and appends
+# it to base-config.yaml. Placeholders:
+#   @@GOOD_HOST@@      hostname of the always-200 receiver
+#   @@BAD_HOST@@       hostname of the receiver that flips to 429 after a delay
+#   @@EXCEPT_FIELDS@@  rendered YAML list of strings, indented to fit under except_fields:
+  sink_good:
+    type: http
+    inputs: [router.all]
+    uri: http://@@GOOD_HOST@@:8001
+    method: post
+    encoding:
+      codec: json
+      except_fields:
+@@EXCEPT_FIELDS@@
+  sink_bad:
+    type: http
+    inputs: [router.all]
+    uri: http://@@BAD_HOST@@:8001
+    method: post
+    encoding:
+      codec: json
+      except_fields:
+@@EXCEPT_FIELDS@@
