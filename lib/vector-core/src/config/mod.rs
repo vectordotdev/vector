@@ -415,6 +415,14 @@ impl AcknowledgementsConfig {
     pub fn is_explicitly_authoritative(&self) -> bool {
         self.authoritative == Some(true)
     }
+
+    /// Create a new config with the given enabled and authoritative values.
+    pub const fn new(enabled: Option<bool>, authoritative: Option<bool>) -> Self {
+        Self {
+            enabled,
+            authoritative,
+        }
+    }
 }
 
 impl From<Option<bool>> for AcknowledgementsConfig {

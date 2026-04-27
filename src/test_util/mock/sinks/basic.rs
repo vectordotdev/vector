@@ -28,6 +28,9 @@ pub struct BasicSinkConfig {
 
     /// Dummy field used for generating unique configurations to trigger reloads.
     data: Option<String>,
+
+    #[serde(skip)]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 impl_generate_config_from_default!(BasicSinkConfig);
@@ -46,6 +49,7 @@ impl BasicSinkConfig {
             sink: Mode::Normal(sink),
             healthy,
             data: None,
+            acknowledgements: AcknowledgementsConfig::DEFAULT,
         }
     }
 
@@ -54,7 +58,15 @@ impl BasicSinkConfig {
             sink: Mode::Normal(sink),
             healthy,
             data: Some(data.into()),
+            acknowledgements: AcknowledgementsConfig::DEFAULT,
         }
+    }
+
+    /// Set the acknowledgements configuration for this sink.
+    #[cfg(test)]
+    pub fn with_acknowledgements(mut self, acks: AcknowledgementsConfig) -> Self {
+        self.acknowledgements = acks;
+        self
     }
 }
 
@@ -95,7 +107,7 @@ impl SinkConfig for BasicSinkConfig {
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        &AcknowledgementsConfig::DEFAULT
+        &self.acknowledgements
     }
 }
 

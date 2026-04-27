@@ -81,6 +81,17 @@ pub fn basic_sink(channel_size: usize) -> (impl Stream<Item = SourceSenderItem>,
     (rx.into_stream(), sink)
 }
 
+/// Create a basic sink with a custom acknowledgements configuration.
+#[cfg(test)]
+pub fn basic_sink_with_acks(
+    channel_size: usize,
+    acks: vector_lib::config::AcknowledgementsConfig,
+) -> (impl Stream<Item = SourceSenderItem>, BasicSinkConfig) {
+    let (tx, rx) = SourceSender::new_test_sender_with_options(channel_size, None);
+    let sink = BasicSinkConfig::new(tx, true).with_acknowledgements(acks);
+    (rx.into_stream(), sink)
+}
+
 pub fn basic_sink_with_data(
     channel_size: usize,
     data: &str,

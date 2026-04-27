@@ -1487,3 +1487,314 @@ mod resource_config_tests {
         }
     }
 }
+
+#[cfg(test)]
+mod authoritative_tests {
+    use std::collections::HashSet;
+
+    use vector_lib::config::{AcknowledgementsConfig, ComponentKey};
+
+    use super::builder::ConfigBuilder;
+    use crate::test_util::mock::{basic_sink, basic_sink_with_acks, basic_source, basic_transform};
+
+    /// Helper to create an `AcknowledgementsConfig` with specific enabled and authoritative values.
+    fn ack_config(enabled: bool, authoritative: bool) -> AcknowledgementsConfig {
+        AcknowledgementsConfig::new(Some(enabled), Some(authoritative))
+    }
+
+    #[test]
+    fn returns_none_when_no_sink_is_explicitly_authoritative() {
+        // Build a config where sinks have acks enabled but no authoritative: true.
+        let mut config = ConfigBuilder::default();
+        config.add_source("src", basic_source().1);
+        config.add_sink(
+            "sink_acks_enabled",
+            &["src"],
+            basic_sink_with_acks(10, AcknowledgementsConfig::from(true)).1,
+        );
+        config.add_sink("sink_default", &["src"], basic_sink(10).1);
+
+        let config = config.build().unwrap();
+        assert!(
+            config.compute_authoritative_components().is_none(),
+            "Should return None when no sink has authoritative: true"
+        );
+    }
+
+    #[test]
+    fn returns_none_for_empty_config() {
+        let mut config = ConfigBuilder::default();
+        config.allow_empty = true;
+        let config = config.build().unwrap();
+        assert!(
+            config.compute_authoritative_components().is_none(),
+            "Should return None for empty config"
+        );
+    }
+
+    #[test]
+    fn linear_pipeline_returns_all_components() {
+        // source -> transform -> auth_sink
+        let mut config = ConfigBuilder::default();
+        config.add_source("src", basic_source().1);
+        config.add_transform("xform", &["src"], basic_transform("", 0.0));
+        config.add_sink(
+            "auth_sink",
+            &["xform"],
+            basic_sink_with_acks(10, ack_config(true, true)).1,
+        );
+
+        let config = config.build().unwrap();
+        let result = config.compute_authoritative_components();
+        assert!(result.is_some(), "Should return Some when authoritative sink exists");
+
+        let components = result.unwrap();
+        let expected: HashSet<ComponentKey> = [
+            ComponentKey::from("src"),
+            ComponentKey::from("xform"),
+            ComponentKey::from("auth_sink"),
+        ]
+        .into_iter()
+        .collect();
+
+        assert_eq!(
+            components, expected,
+            "Should include source, transform, and authoritative sink"
+        );
+    }
+
+    #[test]
+    fn fan_out_marks_shared_upstream_as_authoritative() {
+        // source -> transform -> auth_sink
+        //                     -> non_auth_sink
+        //
+        // The transform and source feed auth_sink, so they are on the authoritative path.
+        // non_auth_sink is not authoritative but its upstream components (source, transform)
+        // are on the authoritative path because they also feed auth_sink.
+        let mut config = ConfigBuilder::default();
+        config.add_source("src", basic_source().1);
+        config.add_transform("xform", &["src"], basic_transform("", 0.0));
+        config.add_sink(
+            "auth_sink",
+            &["xform"],
+            basic_sink_with_acks(10, ack_config(true, true)).1,
+        );
+        config.add_sink(
+            "non_auth_sink",
+            &["xform"],
+            basic_sink_with_acks(10, ack_config(true, false)).1,
+        );
+
+        let config = config.build().unwrap();
+        let components = config
+            .compute_authoritative_components()
+            .expect("Should return Some");
+
+        // The authoritative path includes: src, xform, auth_sink
+        // non_auth_sink is NOT on the authoritative path
+        assert!(
+            components.contains(&ComponentKey::from("src")),
+            "Source should be on authoritative path"
+        );
+        assert!(
+            components.contains(&ComponentKey::from("xform")),
+            "Transform should be on authoritative path"
+        );
+        assert!(
+            components.contains(&ComponentKey::from("auth_sink")),
+            "Authoritative sink should be on authoritative path"
+        );
+        assert!(
+            !components.contains(&ComponentKey::from("non_auth_sink")),
+            "Non-authoritative sink should NOT be on authoritative path"
+        );
+    }
+
+    #[test]
+    fn fan_out_with_dedicated_non_auth_branch() {
+        // This tests that components exclusively feeding non-authoritative sinks
+        // are NOT on the authoritative path.
+        //
+        //   source1 -> auth_sink
+        //   source2 -> xform_nonauth -> non_auth_sink
+        //
+        // Only source1 and auth_sink should be authoritative.
+        let mut config = ConfigBuilder::default();
+        config.add_source("source1", basic_source().1);
+        config.add_source("source2", basic_source().1);
+        config.add_transform("xform_nonauth", &["source2"], basic_transform("", 0.0));
+        config.add_sink(
+            "auth_sink",
+            &["source1"],
+            basic_sink_with_acks(10, ack_config(true, true)).1,
+        );
+        config.add_sink(
+            "non_auth_sink",
+            &["xform_nonauth"],
+            basic_sink_with_acks(10, ack_config(true, false)).1,
+        );
+
+        let config = config.build().unwrap();
+        let components = config
+            .compute_authoritative_components()
+            .expect("Should return Some");
+
+        assert!(
+            components.contains(&ComponentKey::from("source1")),
+            "source1 feeds auth_sink, should be authoritative"
+        );
+        assert!(
+            components.contains(&ComponentKey::from("auth_sink")),
+            "auth_sink is authoritative"
+        );
+        assert!(
+            !components.contains(&ComponentKey::from("source2")),
+            "source2 only feeds non-auth path, should NOT be authoritative"
+        );
+        assert!(
+            !components.contains(&ComponentKey::from("xform_nonauth")),
+            "xform_nonauth only feeds non-auth path, should NOT be authoritative"
+        );
+        assert!(
+            !components.contains(&ComponentKey::from("non_auth_sink")),
+            "non_auth_sink should NOT be on authoritative path"
+        );
+    }
+
+    #[test]
+    fn multiple_authoritative_sinks() {
+        // source -> xform1 -> auth_sink1
+        // source -> xform2 -> auth_sink2
+        //
+        // All components should be on the authoritative path.
+        let mut config = ConfigBuilder::default();
+        config.add_source("src", basic_source().1);
+        config.add_transform("xform1", &["src"], basic_transform(" a", 0.0));
+        config.add_transform("xform2", &["src"], basic_transform(" b", 0.0));
+        config.add_sink(
+            "auth_sink1",
+            &["xform1"],
+            basic_sink_with_acks(10, ack_config(true, true)).1,
+        );
+        config.add_sink(
+            "auth_sink2",
+            &["xform2"],
+            basic_sink_with_acks(10, ack_config(true, true)).1,
+        );
+
+        let config = config.build().unwrap();
+        let components = config
+            .compute_authoritative_components()
+            .expect("Should return Some");
+
+        let expected: HashSet<ComponentKey> = [
+            ComponentKey::from("src"),
+            ComponentKey::from("xform1"),
+            ComponentKey::from("xform2"),
+            ComponentKey::from("auth_sink1"),
+            ComponentKey::from("auth_sink2"),
+        ]
+        .into_iter()
+        .collect();
+
+        assert_eq!(
+            components, expected,
+            "All paths to all authoritative sinks should be in the set"
+        );
+    }
+
+    #[test]
+    fn backwards_compat_no_authoritative_sinks_disables_stripping() {
+        // Verify that when NO sink has authoritative: true, compute_authoritative_components
+        // returns None, meaning the stripping mechanism is disabled and all sinks participate
+        // in acks as before (backwards compatibility).
+        let mut config = ConfigBuilder::default();
+        config.add_source("src1", basic_source().1);
+        config.add_source("src2", basic_source().1);
+        config.add_transform("xform", &["src1"], basic_transform("", 0.0));
+        // Sink with acks enabled but NOT authoritative (default behavior)
+        config.add_sink(
+            "sink1",
+            &["xform"],
+            basic_sink_with_acks(10, AcknowledgementsConfig::from(true)).1,
+        );
+        // Sink with default acks
+        config.add_sink("sink2", &["src2"], basic_sink(10).1);
+
+        let config = config.build().unwrap();
+        assert!(
+            config.compute_authoritative_components().is_none(),
+            "When no sink has authoritative: true, the function should return None \
+             to preserve backwards compatibility (all sinks participate in acks)"
+        );
+    }
+
+    #[test]
+    fn chain_of_transforms_all_on_authoritative_path() {
+        // src -> t1 -> t2 -> t3 -> auth_sink
+        let mut config = ConfigBuilder::default();
+        config.add_source("src", basic_source().1);
+        config.add_transform("t1", &["src"], basic_transform(" a", 0.0));
+        config.add_transform("t2", &["t1"], basic_transform(" b", 0.0));
+        config.add_transform("t3", &["t2"], basic_transform(" c", 0.0));
+        config.add_sink(
+            "auth_sink",
+            &["t3"],
+            basic_sink_with_acks(10, ack_config(true, true)).1,
+        );
+
+        let config = config.build().unwrap();
+        let components = config
+            .compute_authoritative_components()
+            .expect("Should return Some");
+
+        let expected: HashSet<ComponentKey> = [
+            ComponentKey::from("src"),
+            ComponentKey::from("t1"),
+            ComponentKey::from("t2"),
+            ComponentKey::from("t3"),
+            ComponentKey::from("auth_sink"),
+        ]
+        .into_iter()
+        .collect();
+
+        assert_eq!(
+            components, expected,
+            "Entire chain from source through transforms to auth_sink should be authoritative"
+        );
+    }
+
+    #[test]
+    fn diamond_topology() {
+        // Tests a diamond: source -> [t1, t2] -> merge_transform -> auth_sink
+        // All components should be on the authoritative path.
+        let mut config = ConfigBuilder::default();
+        config.add_source("src", basic_source().1);
+        config.add_transform("t1", &["src"], basic_transform(" left", 0.0));
+        config.add_transform("t2", &["src"], basic_transform(" right", 0.0));
+        config.add_sink(
+            "auth_sink",
+            &["t1", "t2"],
+            basic_sink_with_acks(10, ack_config(true, true)).1,
+        );
+
+        let config = config.build().unwrap();
+        let components = config
+            .compute_authoritative_components()
+            .expect("Should return Some");
+
+        let expected: HashSet<ComponentKey> = [
+            ComponentKey::from("src"),
+            ComponentKey::from("t1"),
+            ComponentKey::from("t2"),
+            ComponentKey::from("auth_sink"),
+        ]
+        .into_iter()
+        .collect();
+
+        assert_eq!(
+            components, expected,
+            "Diamond topology: all components feeding auth_sink should be authoritative"
+        );
+    }
+}
