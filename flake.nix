@@ -43,12 +43,12 @@
           exec ${pkgs.git}/bin/git "$@"
         '';
 
-        src = lib.cleanSourceWith {
-          src = ./.;
-          filter = path: type:
-            let bn = baseNameOf (toString path); in
-            !(bn == "target" || bn == "result" || bn == ".git"
-              || bn == "node_modules" || bn == ".direnv");
+        # Only include files tracked by git. Excludes anything in .gitignore
+        # plus any untracked workspace debris (logs, scratch dirs) that would
+        # otherwise leak into the source hash and break reproducibility.
+        src = lib.fileset.toSource {
+          root = ./.;
+          fileset = lib.fileset.gitTracked ./.;
         };
 
         # Rust target triple -> nixpkgs autoconf config. Mostly identical,
