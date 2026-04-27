@@ -1,0 +1,15 @@
+services:
+  website:
+    build: .
+    ports:
+      - "1313:1313"
+    volumes:
+      - .:/app/website
+      - ../Cargo.lock:/app/Cargo.lock:ro
+      - ../scripts:/app/scripts:ro
+      - website_node_modules:/app/website/node_modules
+    environment:
+      - CI=false
+
+volumes:
+  website_node_modules:

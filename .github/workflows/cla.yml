@@ -14,9 +14,9 @@ jobs:
   CLAAssistant:
     runs-on: ubuntu-latest
     permissions:
-      pull-requests: write
-      id-token: write # Needed to federate tokens.
-      actions: write
+      pull-requests: write # Required to comment on PRs
+      id-token: write # Required to federate tokens with dd-octo-sts-action
+      actions: write # Required to create/update workflow runs
     steps:
       - name: CLA already verified on PR
         if: github.event_name == 'merge_group'
@@ -36,17 +36,16 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PERSONAL_ACCESS_TOKEN: ${{ steps.octo-sts.outputs.token }}
         with:
-          path-to-signatures: 'cla.json'
-          path-to-document: 'https://gist.github.com/bits-bot/55bdc97a4fdad52d97feb4d6c3d1d618' # e.g. a CLA or a DCO document
-          branch: 'vector'
+          path-to-signatures: "cla.json"
+          path-to-document: "https://gist.github.com/bits-bot/55bdc97a4fdad52d97feb4d6c3d1d618" # e.g. a CLA or a DCO document
+          branch: "vector"
           remote-repository-name: cla-signatures
           remote-organization-name: DataDog
           allowlist: step-security-bot
 
-         # the followings are the optional inputs - If the optional inputs are not given, then default values will be taken
-          #create-file-commit-message: 'For example: Creating file for storing CLA Signatures'
-          #signed-commit-message: 'For example: $contributorName has signed the CLA in $owner/$repo#$pullRequestNo'
-          #custom-notsigned-prcomment: 'pull request comment with Introductory message to ask new contributors to sign'
-          #custom-pr-sign-comment: 'The signature to be committed in order to sign the CLA'
-          #custom-allsigned-prcomment: 'pull request comment when all contributors has signed, defaults to **CLA Assistant Lite bot** All Contributors have signed the CLA.'
-          #lock-pullrequest-aftermerge: false - if you don't want this bot to automatically lock the pull request after merging (default - true)
+          custom-notsigned-prcomment: |
+            Thank you for your contribution! Before we can merge this PR, please sign our [Contributor License Agreement](https://gist.github.com/bits-bot/55bdc97a4fdad52d97feb4d6c3d1d618).
+
+            To sign, copy and post the phrase below as a new comment on this PR.
+
+            > **Note:** If the bot says your username was not found, the email used in your git commit may not be linked to your GitHub account. Fix this at [github.com/settings/emails](https://github.com/settings/emails), then comment `recheck` to retry.

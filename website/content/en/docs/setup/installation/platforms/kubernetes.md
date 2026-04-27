@@ -40,7 +40,7 @@ kubectl create namespace --dry-run=client -o yaml vector > namespace.yaml
 
 ##### Prepare your kustomization file
 
-This example configuration file deploys Vector as an Agent, the full default configuration can be found [here](https://github.com/vectordotdev/helm-charts/blob/develop/charts/vector/templates/configmap.yaml). For more information about configuration options, see the [configuration] docs page.
+This example configuration file deploys Vector as an Agent, the [full default configuration](https://github.com/vectordotdev/helm-charts/blob/develop/charts/vector/templates/configmap.yaml) is available in the helm-charts repository. For more information about configuration options, see the [configuration] docs page.
 
 ```shell
 cat <<-'KUSTOMIZATION' > kustomization.yaml
@@ -99,7 +99,7 @@ kubectl create namespace --dry-run=client -o yaml vector > namespace.yaml
 
 ##### Prepare your kustomization file
 
-This example configuration deploys Vector as an Aggregator, the full configuration can be found [here](https://github.com/vectordotdev/helm-charts/blob/develop/charts/vector/templates/configmap.yaml). For more information about configuration options, see the [Configuration] docs page.
+This example configuration deploys Vector as an Aggregator, the [full configuration](https://github.com/vectordotdev/helm-charts/blob/develop/charts/vector/templates/configmap.yaml) is available in the helm-charts repository. For more information about configuration options, see the [Configuration] docs page.
 
 ```shell
 cat <<-'KUSTOMIZATION' > kustomization.yaml

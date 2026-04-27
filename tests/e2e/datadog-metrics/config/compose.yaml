@@ -1,12 +1,11 @@
-version: '3'
+version: "3"
 
 services:
-
   # Emits metrics to the Agent only path
   dogstatsd-client-agent:
     build: ../dogstatsd_client
     environment:
-    - STATSD_HOST=datadog-agent
+      - STATSD_HOST=datadog-agent
     depends_on:
       - datadog-agent
 
@@ -14,7 +13,7 @@ services:
   dogstatsd-client-vector:
     build: ../dogstatsd_client
     environment:
-    - STATSD_HOST=datadog-agent-vector
+      - STATSD_HOST=datadog-agent-vector
     depends_on:
       - datadog-agent-vector
 
@@ -24,8 +23,8 @@ services:
     depends_on:
       - fakeintake-agent
     environment:
-    - DD_API_KEY=${TEST_DATADOG_API_KEY:?TEST_DATADOG_API_KEY required}
-    - DD_HOSTNAME=datadog-agent
+      - DD_API_KEY=${TEST_DATADOG_API_KEY:?TEST_DATADOG_API_KEY required}
+      - DD_HOSTNAME=datadog-agent
     volumes:
       # The Agent config file
       - ../data/agent_only.yaml:/etc/datadog-agent/datadog.yaml
@@ -36,8 +35,8 @@ services:
     depends_on:
       - vector
     environment:
-    - DD_API_KEY=${TEST_DATADOG_API_KEY:?TEST_DATADOG_API_KEY required}
-    - DD_HOSTNAME=datadog-agent-vector
+      - DD_API_KEY=${TEST_DATADOG_API_KEY:?TEST_DATADOG_API_KEY required}
+      - DD_HOSTNAME=datadog-agent-vector
     volumes:
       # The Agent config file
       - ../data/agent_vector.yaml:/etc/datadog-agent/datadog.yaml
@@ -52,6 +51,7 @@ services:
     image: ${CONFIG_VECTOR_IMAGE}
     environment:
       - FEATURES=e2e-tests-datadog
+      - CONFIG_SERIES_API_VERSION
     working_dir: /home/vector
     command:
       - "/usr/bin/vector"

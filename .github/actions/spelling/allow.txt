@@ -60,6 +60,7 @@ Bedove
 Benss
 bigendian
 bindir
+binstall
 binfmt
 bitcast
 bitcode
@@ -146,11 +147,14 @@ EPC
 esbuild
 esensar
 etld
+eventcreate
 eventloop
+Evt
 Evercoss
 exactlyonce
 Explay
 Fabro
+fakedata
 fakeintake
 FAQs
 fargate
@@ -207,6 +211,7 @@ greptimedb
 GSM
 gvisor
 gws
+gzip'd
 hadoop
 Haier
 Haipad
@@ -457,6 +462,7 @@ rumqttc
 Salesforce
 Samsung
 SBT
+schema'd
 scriptblock
 Sega
 Segoe
@@ -498,11 +504,13 @@ Telstra
 Tencent
 Texet
 Thl
+timediff
 timeframe
 timeseries
 timespan
 timestamped
 Tizen
+TLDs
 Tmobile
 tobz
 Tomtec
@@ -558,4 +566,11 @@ zstandard
 ZTE
 Zync
 sighup
+CPPFLAGS
+LDFLAGS
+libsasl
+pkgconfig
 CLAUDE
+grpcurl
+linting
+lexers

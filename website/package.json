@@ -40,7 +40,6 @@
     "domhandler": "^4.2.0",
     "dotenv-defaults": "^2.0.2",
     "downshift": "^6.1.3",
-    "fs": "^0.0.1-security",
     "glob-promise": "^4.2.0",
     "lodash.chunk": "^4.2.0",
     "path": "^0.12.7",

@@ -59,7 +59,6 @@ fn default_cfg(encoding: EncodingConfigWithFraming) -> HttpSinkConfig {
         uri: Default::default(),
         method: Default::default(),
         auth: Default::default(),
-        headers: Default::default(),
         compression: Default::default(),
         encoding,
         payload_prefix: Default::default(),

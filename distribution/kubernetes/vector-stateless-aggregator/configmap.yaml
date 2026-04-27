@@ -9,14 +9,13 @@ metadata:
     app.kubernetes.io/name: vector
     app.kubernetes.io/instance: vector
     app.kubernetes.io/component: Stateless-Aggregator
-    app.kubernetes.io/version: "0.53.0-distroless-libc"
+    app.kubernetes.io/version: "0.55.0-distroless-libc"
 data:
   aggregator.yaml: |
     data_dir: /vector-data-dir
     api:
       enabled: true
-      address: 127.0.0.1:8686
-      playground: false
+      address: 0.0.0.0:8686
     sources:
       datadog_agent:
         address: 0.0.0.0:8282
