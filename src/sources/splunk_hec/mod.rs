@@ -133,27 +133,70 @@ pub struct SplunkConfig {
     #[serde(default)]
     keepalive: KeepaliveConfig,
 
-    /// Framing configuration applied to the payload of each Splunk HEC event.
+    /// Codec configuration applied to events received on `/services/collector/event`.
     ///
-    /// When set together with `decoding`, Vector applies a second decoding pass after
-    /// the HEC envelope is parsed. On `/services/collector/event` the payload is the
-    /// envelope's `event` field (string contents are passed as raw bytes; objects, arrays,
-    /// and other JSON values are JSON-serialized first to preserve shape). On
-    /// `/services/collector/raw` the payload is the (decompressed) request body.
+    /// When `decoding` is set, Vector applies a second decoding pass after the HEC
+    /// envelope is parsed: the envelope's `event` field is fed through the codec
+    /// (string contents are passed as raw bytes; objects, arrays, and other JSON
+    /// values are JSON-serialized first to preserve shape), and a single envelope
+    /// can fan out to multiple events. When unset, the endpoint preserves its
+    /// existing behavior.
+    #[configurable(derived)]
+    #[configurable(metadata(docs::advanced))]
+    #[serde(default)]
+    pub event: EndpointCodecConfig,
+
+    /// Codec configuration applied to events received on `/services/collector/raw`.
+    ///
+    /// When `decoding` is set, the (decompressed) request body is fed through the
+    /// codec instead of being emitted as a single event. When unset, the endpoint
+    /// preserves its existing behavior of one event per request body.
+    #[configurable(derived)]
+    #[configurable(metadata(docs::advanced))]
+    #[serde(default)]
+    pub raw: EndpointCodecConfig,
+}
+
+/// Codec configuration applied to one of the `splunk_hec` endpoints.
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
+#[serde(deny_unknown_fields, default)]
+pub struct EndpointCodecConfig {
+    /// Framing configuration applied to the payload.
+    ///
+    /// Only used when `decoding` is also set. Defaults to a per-codec choice
+    /// (typically `bytes`) that produces one event per payload.
     #[configurable(derived)]
     #[configurable(metadata(docs::advanced))]
     #[serde(default)]
     pub framing: Option<FramingConfig>,
 
-    /// Decoding configuration applied to the payload of each Splunk HEC event.
+    /// Decoding configuration applied to the payload.
     ///
-    /// When unset (the default) the source preserves its historical behavior. When set,
-    /// the inner payload is run through `framing` + `decoding` and a single envelope
-    /// can fan out to multiple events.
+    /// When unset, the endpoint preserves its existing per-endpoint default
+    /// behavior. When set, the inner payload is run through `framing` + `decoding`
+    /// and a single payload can fan out to multiple events.
     #[configurable(derived)]
     #[configurable(metadata(docs::advanced))]
     #[serde(default)]
     pub decoding: Option<DeserializerConfig>,
+}
+
+impl EndpointCodecConfig {
+    fn build_decoder(&self, log_namespace: LogNamespace) -> crate::Result<Option<Decoder>> {
+        match &self.decoding {
+            Some(decoding) => {
+                let framing = self
+                    .framing
+                    .clone()
+                    .unwrap_or_else(|| decoding.default_message_based_framing());
+                Ok(Some(
+                    DecodingConfig::new(framing, decoding.clone(), log_namespace).build()?,
+                ))
+            }
+            None => Ok(None),
+        }
+    }
 }
 
 impl_generate_config_from_default!(SplunkConfig);
@@ -169,8 +212,8 @@ impl Default for SplunkConfig {
             store_hec_token: false,
             log_namespace: None,
             keepalive: Default::default(),
-            framing: None,
-            decoding: None,
+            event: EndpointCodecConfig::default(),
+            raw: EndpointCodecConfig::default(),
         }
     }
 }
@@ -187,17 +230,15 @@ impl SourceConfig for SplunkConfig {
         let shutdown = cx.shutdown.clone();
         let out = cx.out.clone();
         let log_namespace = cx.log_namespace(self.log_namespace);
-        let decoder = match &self.decoding {
-            Some(decoding) => {
-                let framing = self
-                    .framing
-                    .clone()
-                    .unwrap_or_else(|| decoding.default_message_based_framing());
-                Some(DecodingConfig::new(framing, decoding.clone(), log_namespace).build()?)
-            }
-            None => None,
-        };
-        let source = SplunkSource::new(self, tls.http_protocol_name(), decoder, cx);
+        let event_decoder = self.event.build_decoder(log_namespace)?;
+        let raw_decoder = self.raw.build_decoder(log_namespace)?;
+        let source = SplunkSource::new(
+            self,
+            tls.http_protocol_name(),
+            event_decoder,
+            raw_decoder,
+            cx,
+        );
 
         let event_service = source.event_service(out.clone());
         let raw_service = source.raw_service(out);
@@ -253,9 +294,12 @@ impl SourceConfig for SplunkConfig {
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
 
-        let base = match (&self.decoding, log_namespace) {
-            (Some(decoding), _) => decoding.schema_definition(log_namespace),
-            (None, LogNamespace::Legacy) => {
+        // Build the base schema as the union of the per-endpoint decoder schemas.
+        // When an endpoint has no decoder, fall back to the legacy hardcoded shape -
+        // since events from BOTH endpoints flow through the same SourceOutput, the
+        // schema needs to express the union of every shape Vector might emit.
+        let legacy_base = || match log_namespace {
+            LogNamespace::Legacy => {
                 let definition = vector_lib::schema::Definition::empty_legacy_namespace()
                     .with_event_field(
                         &owned_value_path!("line"),
@@ -275,13 +319,19 @@ impl SourceConfig for SplunkConfig {
                     definition
                 }
             }
-            (None, LogNamespace::Vector) => {
-                vector_lib::schema::Definition::new_with_default_metadata(
-                    Kind::bytes().or_object(Collection::empty()),
-                    [log_namespace],
-                )
-                .with_meaning(OwnedTargetPath::event_root(), meaning::MESSAGE)
-            }
+            LogNamespace::Vector => vector_lib::schema::Definition::new_with_default_metadata(
+                Kind::bytes().or_object(Collection::empty()),
+                [log_namespace],
+            )
+            .with_meaning(OwnedTargetPath::event_root(), meaning::MESSAGE),
+        };
+
+        let base = match (&self.event.decoding, &self.raw.decoding) {
+            (None, None) => legacy_base(),
+            (Some(d), None) | (None, Some(d)) => d.schema_definition(log_namespace),
+            (Some(de), Some(dr)) => de
+                .schema_definition(log_namespace)
+                .merge(dr.schema_definition(log_namespace)),
         };
 
         let schema_definition = base
@@ -326,10 +376,13 @@ impl SourceConfig for SplunkConfig {
                 None,
             );
 
-        let output_type = self
-            .decoding
-            .as_ref()
-            .map_or(DataType::Log, |d| d.output_type());
+        // Output type is the union of both endpoints' decoder output types
+        // (logs from a JSON codec, metrics from native, etc.). Defaults to logs.
+        let output_type = match (&self.event.decoding, &self.raw.decoding) {
+            (None, None) => DataType::Log,
+            (Some(d), None) | (None, Some(d)) => d.output_type(),
+            (Some(de), Some(dr)) => de.output_type() | dr.output_type(),
+        };
         vec![SourceOutput::new_maybe_logs(output_type, schema_definition)]
     }
 
@@ -350,14 +403,16 @@ struct SplunkSource {
     store_hec_token: bool,
     log_namespace: LogNamespace,
     events_received: Registered<EventsReceived>,
-    decoder: Option<Decoder>,
+    event_decoder: Option<Decoder>,
+    raw_decoder: Option<Decoder>,
 }
 
 impl SplunkSource {
     fn new(
         config: &SplunkConfig,
         protocol: &'static str,
-        decoder: Option<Decoder>,
+        event_decoder: Option<Decoder>,
+        raw_decoder: Option<Decoder>,
         cx: SourceContext,
     ) -> Self {
         let log_namespace = cx.log_namespace(config.log_namespace);
@@ -385,7 +440,8 @@ impl SplunkSource {
             store_hec_token: config.store_hec_token,
             log_namespace,
             events_received: register!(EventsReceived),
-            decoder,
+            event_decoder,
+            raw_decoder,
         }
     }
 
@@ -403,7 +459,7 @@ impl SplunkSource {
         let store_hec_token = self.store_hec_token;
         let log_namespace = self.log_namespace;
         let events_received = self.events_received.clone();
-        let decoder = self.decoder.clone();
+        let decoder = self.event_decoder.clone();
 
         warp::post()
             .and(
@@ -559,7 +615,7 @@ impl SplunkSource {
         let store_hec_token = self.store_hec_token;
         let events_received = self.events_received.clone();
         let log_namespace = self.log_namespace;
-        let decoder = self.decoder.clone();
+        let decoder = self.raw_decoder.clone();
 
         warp::post()
             .and(path!("raw" / "1.0").or(path!("raw")))
@@ -1862,8 +1918,8 @@ mod tests {
                 store_hec_token,
                 log_namespace: None,
                 keepalive: Default::default(),
-                framing: None,
-                decoding: None,
+                event: EndpointCodecConfig::default(),
+                raw: EndpointCodecConfig::default(),
             }
             .build(cx)
             .await
@@ -3111,8 +3167,8 @@ mod tests {
     }
 
     async fn source_with_codec(
-        framing: Option<FramingConfig>,
-        decoding: Option<DeserializerConfig>,
+        event: EndpointCodecConfig,
+        raw: EndpointCodecConfig,
     ) -> (
         impl Stream<Item = Event> + Unpin + use<>,
         SocketAddr,
@@ -3131,8 +3187,8 @@ mod tests {
                 store_hec_token: false,
                 log_namespace: None,
                 keepalive: Default::default(),
-                framing,
-                decoding,
+                event,
+                raw,
             }
             .build(cx)
             .await
@@ -3144,12 +3200,28 @@ mod tests {
         (recv, address, _guard)
     }
 
+    /// Codec config that just sets `decoding` (default framing).
+    fn codec_decoding(decoding: DeserializerConfig) -> EndpointCodecConfig {
+        EndpointCodecConfig {
+            framing: None,
+            decoding: Some(decoding),
+        }
+    }
+
+    /// Codec config that sets both `framing` and `decoding`.
+    fn codec_full(
+        framing: Option<FramingConfig>,
+        decoding: Option<DeserializerConfig>,
+    ) -> EndpointCodecConfig {
+        EndpointCodecConfig { framing, decoding }
+    }
+
     #[tokio::test]
     async fn decoder_event_endpoint_json_string() {
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let (source, address, _guard) = source_with_codec(
-                None,
-                Some(vector_lib::codecs::JsonDeserializerConfig::default().into()),
+                codec_decoding(vector_lib::codecs::JsonDeserializerConfig::default().into()),
+                EndpointCodecConfig::default(),
             )
             .await;
             let envelope =
@@ -3176,8 +3248,8 @@ mod tests {
     async fn decoder_event_endpoint_json_object_round_trip() {
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let (source, address, _guard) = source_with_codec(
-                None,
-                Some(vector_lib::codecs::JsonDeserializerConfig::default().into()),
+                codec_decoding(vector_lib::codecs::JsonDeserializerConfig::default().into()),
+                EndpointCodecConfig::default(),
             )
             .await;
             let envelope = r#"{"event":{"foo":"bar","nested":{"k":1}},"host":"h"}"#;
@@ -3206,8 +3278,8 @@ mod tests {
         // promise is broken for HEC envelope metadata.
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let (source, address, _guard) = source_with_codec(
-                None,
-                Some(vector_lib::codecs::JsonDeserializerConfig::default().into()),
+                codec_decoding(vector_lib::codecs::JsonDeserializerConfig::default().into()),
+                EndpointCodecConfig::default(),
             )
             .await;
             // The string `event` decodes to a JSON object that pre-populates each
@@ -3238,8 +3310,8 @@ mod tests {
     async fn decoder_event_endpoint_decoder_field_wins_over_envelope() {
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let (source, address, _guard) = source_with_codec(
-                None,
-                Some(vector_lib::codecs::JsonDeserializerConfig::default().into()),
+                codec_decoding(vector_lib::codecs::JsonDeserializerConfig::default().into()),
+                EndpointCodecConfig::default(),
             )
             .await;
             // The string `event` decodes to {host: "decoder-host"}; the envelope sets
@@ -3266,8 +3338,8 @@ mod tests {
         // client - decode failures are swallowed by the codec like other Vector
         // sources do.
         let (_source, address, _guard) = source_with_codec(
-            None,
-            Some(vector_lib::codecs::JsonDeserializerConfig::default().into()),
+            codec_decoding(vector_lib::codecs::JsonDeserializerConfig::default().into()),
+            EndpointCodecConfig::default(),
         )
         .await;
         let envelope = r#"{"event":"not valid json {","host":"h"}"#;
@@ -3281,8 +3353,11 @@ mod tests {
     async fn decoder_raw_endpoint_newline_delimited() {
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let (source, address, _guard) = source_with_codec(
-                Some(FramingConfig::NewlineDelimited(Default::default())),
-                Some(DeserializerConfig::Bytes),
+                EndpointCodecConfig::default(),
+                codec_full(
+                    Some(FramingConfig::NewlineDelimited(Default::default())),
+                    Some(DeserializerConfig::Bytes),
+                ),
             )
             .await;
             let body = "line1\nline2\nline3";
@@ -3316,8 +3391,8 @@ mod tests {
         // produce events with a timestamp (the legacy /event path always wrote one).
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let (source, address, _guard) = source_with_codec(
-                None,
-                Some(vector_lib::codecs::JsonDeserializerConfig::default().into()),
+                codec_decoding(vector_lib::codecs::JsonDeserializerConfig::default().into()),
+                EndpointCodecConfig::default(),
             )
             .await;
             let envelope = r#"{"event":"{\"foo\":\"bar\"}"}"#;
@@ -3336,12 +3411,75 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn decoder_independent_per_endpoint_codecs() {
+        // /event and /raw can be configured with completely different codecs and
+        // each endpoint applies only its own. Here /event uses JSON decoding (so a
+        // string `event` field decodes to fields) and /raw uses newline framing
+        // with a bytes decoder (so a multi-line body fans out to N events).
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let (source, address, _guard) = source_with_codec(
+                codec_decoding(vector_lib::codecs::JsonDeserializerConfig::default().into()),
+                codec_full(
+                    Some(FramingConfig::NewlineDelimited(Default::default())),
+                    Some(DeserializerConfig::Bytes),
+                ),
+            )
+            .await;
+
+            // /event: JSON decoder turns the inner string into structured fields.
+            assert_eq!(
+                200,
+                post(
+                    address,
+                    "services/collector/event",
+                    r#"{"event":"{\"foo\":\"bar\"}"}"#
+                )
+                .await
+            );
+            // /raw: newline framing splits the body into three events.
+            assert_eq!(
+                200,
+                post(address, "services/collector/raw", "a\nb\nc").await
+            );
+
+            let events = collect_n(source, 4).await;
+            assert_eq!(events.len(), 4);
+
+            // The /event request produces one log with `foo=bar`.
+            let event_log = events
+                .iter()
+                .find(|e| e.as_log().contains("foo"))
+                .expect("expected /event request to produce a log with `foo` set");
+            assert_eq!(event_log.as_log()["foo"], "bar".into());
+
+            // The /raw request produces three logs whose messages are the lines.
+            let raw_messages: Vec<String> = events
+                .iter()
+                .filter(|e| !e.as_log().contains("foo"))
+                .map(|e| {
+                    e.as_log()[log_schema().message_key().unwrap().to_string()]
+                        .to_string_lossy()
+                        .into_owned()
+                })
+                .collect();
+            assert_eq!(raw_messages.len(), 3);
+            assert!(raw_messages.contains(&"a".to_string()));
+            assert!(raw_messages.contains(&"b".to_string()));
+            assert!(raw_messages.contains(&"c".to_string()));
+        })
+        .await;
+    }
+
+    #[tokio::test]
     async fn decoder_raw_endpoint_event_has_fallback_timestamp() {
         // Regression: decoded /raw events must carry an ingest timestamp like the
         // legacy raw_event path did via `insert_standard_vector_source_metadata`.
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
-            let (source, address, _guard) =
-                source_with_codec(None, Some(DeserializerConfig::Bytes)).await;
+            let (source, address, _guard) = source_with_codec(
+                EndpointCodecConfig::default(),
+                codec_full(None, Some(DeserializerConfig::Bytes)),
+            )
+            .await;
             let body = "hello";
             assert_eq!(200, post(address, "services/collector/raw", body).await);
 
@@ -3377,8 +3515,8 @@ mod tests {
                 store_hec_token: false,
                 log_namespace: None,
                 keepalive: Default::default(),
-                framing: None,
-                decoding: Some(vector_lib::codecs::JsonDeserializerConfig::default().into()),
+                event: EndpointCodecConfig::default(),
+                raw: codec_decoding(vector_lib::codecs::JsonDeserializerConfig::default().into()),
             }
             .build(cx)
             .await
@@ -3430,8 +3568,11 @@ mod tests {
                 store_hec_token: false,
                 log_namespace: None,
                 keepalive: Default::default(),
-                framing: Some(FramingConfig::NewlineDelimited(Default::default())),
-                decoding: Some(vector_lib::codecs::JsonDeserializerConfig::default().into()),
+                event: EndpointCodecConfig::default(),
+                raw: codec_full(
+                    Some(FramingConfig::NewlineDelimited(Default::default())),
+                    Some(vector_lib::codecs::JsonDeserializerConfig::default().into()),
+                ),
             }
             .build(cx)
             .await
@@ -3466,8 +3607,11 @@ mod tests {
         // `InvalidEventNumber` in error responses must still report the failing
         // envelope's zero-indexed position, not the cumulative event count.
         let (source, address, _guard) = source_with_codec(
-            Some(FramingConfig::NewlineDelimited(Default::default())),
-            Some(DeserializerConfig::Bytes),
+            codec_full(
+                Some(FramingConfig::NewlineDelimited(Default::default())),
+                Some(DeserializerConfig::Bytes),
+            ),
+            EndpointCodecConfig::default(),
         )
         .await;
         // Envelope 0 has an `event` string with three lines: with newline framing
@@ -3498,7 +3642,7 @@ mod tests {
     fn output_schema_definition_with_decoder_vector_namespace() {
         let config = SplunkConfig {
             log_namespace: Some(true),
-            decoding: Some(vector_lib::codecs::JsonDeserializerConfig::default().into()),
+            event: codec_decoding(vector_lib::codecs::JsonDeserializerConfig::default().into()),
             ..Default::default()
         };
         let definition = config
