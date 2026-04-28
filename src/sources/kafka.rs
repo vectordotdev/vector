@@ -606,6 +606,14 @@ impl ConsumerStateInner<Consuming> {
 
             let mut status = PartitionConsumerStatus::NormalExit;
 
+            // Tracks the highest contiguous delivered offset for this partition.
+            // When acknowledgements are enabled, this prevents committing past a
+            // failed message (at-least-once semantics). When acknowledgements are
+            // disabled, every batch resolves as Delivered immediately, so the
+            // watermark always advances and behavior is equivalent to the
+            // unconditional store_offset that existed before this change.
+            let mut offset_tracker: Option<TopicOffsetTracker> = None;
+
             loop {
                 tokio::select!(
                     // Make sure to handle the acknowledgement stream before new messages to prevent
@@ -620,10 +628,52 @@ impl ConsumerStateInner<Consuming> {
 
                     ack = ack_stream.next() => match ack {
                         Some((status, entry)) => {
-                            if status == BatchStatus::Delivered
-                                && let Err(error) =  consumer.store_offset(&entry.topic, entry.partition, entry.offset) {
-                                    emit!(KafkaOffsetUpdateError { error });
+                            // Lazy initialization on first acknowledgement (regardless of status)
+                            // The first message offset tells us where librdkafka positioned the consumer
+                            let tracker = offset_tracker.get_or_insert_with(|| {
+                                info!(
+                                    message = "Initializing high watermark from first acknowledgement.",
+                                    topic = %entry.topic,
+                                    partition = entry.partition,
+                                    first_ack_offset = entry.offset,
+                                    high_watermark = entry.offset - 1,
+                                );
+                                TopicOffsetTracker::new(entry.offset - 1)
+                            });
+
+                            if status != BatchStatus::Delivered {
+                                tracker.record_failure();
+                                warn!(
+                                    message = "Batch not delivered, watermark frozen.",
+                                    topic = %entry.topic,
+                                    partition = entry.partition,
+                                    offset = entry.offset,
+                                    batch_status = ?status,
+                                );
+                            } else {
+                                let high_watermark = tracker.advance_watermark(entry.offset);
+                                if high_watermark != entry.offset {
+                                    warn!(
+                                        message = "Unable to advance watermark.",
+                                        topic = %entry.topic,
+                                        partition = entry.partition,
+                                        offset = entry.offset,
+                                        watermark = high_watermark,
+                                    );
                                 }
+
+                                if high_watermark >= 0 {
+                                    debug!(
+                                        message = "Committing high watermark.",
+                                        topic = %entry.topic,
+                                        partition = entry.partition,
+                                        high_watermark = high_watermark,
+                                    );
+                                    if let Err(error) = consumer.store_offset(&entry.topic, entry.partition, high_watermark) {
+                                        emit!(KafkaOffsetUpdateError { error });
+                                    }
+                                }
+                            }
                         }
                         None if finalizer.is_none() => {
                             debug!("Acknowledgement stream complete for partition {}:{}.", &tp.0, tp.1);
@@ -957,29 +1007,39 @@ async fn parse_message(
     finalizer: &Option<OrderedFinalizer<FinalizerEntry>>,
     log_namespace: LogNamespace,
 ) {
-    if let Some((count, stream)) = parse_stream(&msg, decoder, keys, log_namespace) {
-        let (batch, receiver) = BatchNotifier::new_with_receiver();
-        let mut stream = stream.map(|event| {
-            // All acknowledgements flow through the normal Finalizer stream so
-            // that they can be handled in one place, but are only tied to the
-            // batch when acknowledgements are enabled
-            if acknowledgements {
-                event.with_batch_notifier(&batch)
-            } else {
-                event
-            }
-        });
-        match out.send_event_stream(&mut stream).await {
-            Err(_) => {
-                emit!(StreamClosedError { count });
-            }
-            Ok(_) => {
-                // Drop stream to avoid borrowing `msg`: "[...] borrow might be used
-                // here, when `stream` is dropped and runs the destructor [...]".
-                drop(stream);
-                if let Some(f) = finalizer.as_ref() {
-                    f.add(msg.into(), receiver)
-                }
+    let Some((count, stream)) = parse_stream(&msg, decoder, keys, log_namespace) else {
+        // Empty/null payload — nothing to deliver downstream, but we still
+        // need to register the offset with the finalizer so the offset
+        // tracker sees a contiguous sequence. The BatchNotifier is not
+        // attached to any events, so it will resolve immediately as
+        // Delivered when dropped.
+        if let Some(f) = finalizer.as_ref() {
+            let (_batch, receiver) = BatchNotifier::new_with_receiver();
+            f.add(msg.into(), receiver);
+        }
+        return;
+    };
+    let (batch, receiver) = BatchNotifier::new_with_receiver();
+    let mut stream = stream.map(|event| {
+        // All acknowledgements flow through the normal Finalizer stream so
+        // that they can be handled in one place, but are only tied to the
+        // batch when acknowledgements are enabled
+        if acknowledgements {
+            event.with_batch_notifier(&batch)
+        } else {
+            event
+        }
+    });
+    match out.send_event_stream(&mut stream).await {
+        Err(_) => {
+            emit!(StreamClosedError { count });
+        }
+        Ok(_) => {
+            // Drop stream to avoid borrowing `msg`: "[...] borrow might be used
+            // here, when `stream` is dropped and runs the destructor [...]".
+            drop(stream);
+            if let Some(f) = finalizer.as_ref() {
+                f.add(msg.into(), receiver)
             }
         }
     }
@@ -1182,6 +1242,63 @@ impl<'a> From<BorrowedMessage<'a>> for FinalizerEntry {
             partition: msg.partition(),
             offset: msg.offset(),
         }
+    }
+}
+
+/// Tracks the highest contiguous delivered offset for a single partition.
+///
+/// When end-to-end acknowledgements are enabled, a downstream sink failure
+/// results in a `BatchStatus` other than `Delivered`. The tracker records
+/// the failure and refuses to advance the watermark past it, so
+/// `store_offset` is only called with offsets that represent a contiguous
+/// run of successfully delivered messages. This provides at-least-once
+/// delivery semantics: on restart, Kafka will replay from the last
+/// committed (contiguous) offset.
+///
+/// When acknowledgements are disabled, every batch immediately resolves as
+/// `Delivered`, so the watermark always advances and behavior is equivalent
+/// to committing every offset unconditionally.
+///
+/// Kafka offsets can be sparse (e.g. compacted topics), so the tracker
+/// uses `offset > high_watermark` rather than requiring strictly sequential
+/// offsets. Ordering is guaranteed by [`OrderedFinalizer`] (backed by
+/// `FuturesOrdered`), which yields acks in consumption order.
+#[derive(Debug)]
+struct TopicOffsetTracker {
+    /// The offset of the last contiguously delivered message.
+    high_watermark: i64,
+    /// Set to `true` after the first non-`Delivered` ack. Once set, the
+    /// watermark is frozen for the lifetime of this partition consumer.
+    failed: bool,
+}
+
+impl TopicOffsetTracker {
+    /// Create a tracker whose watermark is one *before* the first message
+    /// offset, so that `advance_watermark(first_offset)` will succeed.
+    const fn new(initial_watermark: i64) -> Self {
+        Self {
+            high_watermark: initial_watermark,
+            failed: false,
+        }
+    }
+
+    /// Record a non-`Delivered` ack. Once called, the watermark is frozen.
+    const fn record_failure(&mut self) {
+        self.failed = true;
+    }
+
+    /// Try to advance the watermark.
+    ///
+    /// Returns the current high watermark (the safe offset to commit).
+    /// The watermark advances when `offset > high_watermark` and no
+    /// failure has been recorded. Sparse offsets (from compacted topics)
+    /// are handled correctly because ordering is guaranteed by the
+    /// `OrderedFinalizer`.
+    const fn advance_watermark(&mut self, offset: i64) -> i64 {
+        if !self.failed && offset > self.high_watermark {
+            self.high_watermark = offset;
+        }
+        self.high_watermark
     }
 }
 
@@ -1529,6 +1646,141 @@ mod test {
         };
         assert!(create_consumer(&config, true).is_err());
     }
+
+    #[test]
+    fn test_topic_offset_tracker_initialization() {
+        let tracker = TopicOffsetTracker::new(-1);
+        assert_eq!(tracker.high_watermark, -1);
+        assert!(!tracker.failed);
+    }
+
+    #[test]
+    fn test_topic_offset_tracker_sequential_advancement() {
+        let mut tracker = TopicOffsetTracker::new(-1);
+
+        // First message at offset 0
+        let watermark = tracker.advance_watermark(0);
+        assert_eq!(watermark, 0);
+        assert_eq!(tracker.high_watermark, 0);
+
+        // Second message at offset 1
+        let watermark = tracker.advance_watermark(1);
+        assert_eq!(watermark, 1);
+        assert_eq!(tracker.high_watermark, 1);
+
+        // Third message at offset 2
+        let watermark = tracker.advance_watermark(2);
+        assert_eq!(watermark, 2);
+        assert_eq!(tracker.high_watermark, 2);
+    }
+
+    #[test]
+    fn test_topic_offset_tracker_sparse_offsets() {
+        // Compacted topics can have gaps in offsets (e.g. 100, 102, 105).
+        // The tracker should advance through them as long as no failure
+        // has been recorded, since OrderedFinalizer guarantees ack order.
+        let mut tracker = TopicOffsetTracker::new(99);
+
+        let watermark = tracker.advance_watermark(100);
+        assert_eq!(watermark, 100);
+
+        // Gap from compaction: offset 101 was deleted
+        let watermark = tracker.advance_watermark(102);
+        assert_eq!(watermark, 102);
+
+        // Another gap
+        let watermark = tracker.advance_watermark(105);
+        assert_eq!(watermark, 105);
+    }
+
+    #[test]
+    fn test_topic_offset_tracker_first_message_failure() {
+        let mut tracker = TopicOffsetTracker::new(-1);
+
+        // First message (offset 0) fails — record_failure freezes watermark
+        tracker.record_failure();
+
+        // Subsequent delivered messages cannot advance the watermark
+        let watermark = tracker.advance_watermark(1);
+        assert_eq!(watermark, -1, "Watermark should stay at -1 after failure");
+
+        let watermark = tracker.advance_watermark(2);
+        assert_eq!(watermark, -1);
+    }
+
+    #[test]
+    fn test_topic_offset_tracker_middle_message_failure() {
+        let mut tracker = TopicOffsetTracker::new(-1);
+
+        // Messages 0, 1, 2 succeed
+        tracker.advance_watermark(0);
+        tracker.advance_watermark(1);
+        tracker.advance_watermark(2);
+        assert_eq!(tracker.high_watermark, 2);
+
+        // Message 3 fails
+        tracker.record_failure();
+
+        // Messages 4, 5 delivered but watermark is frozen
+        let watermark = tracker.advance_watermark(4);
+        assert_eq!(watermark, 2, "Should stay stuck at 2");
+
+        let watermark = tracker.advance_watermark(5);
+        assert_eq!(watermark, 2, "Should remain stuck at 2");
+    }
+
+    #[test]
+    fn test_topic_offset_tracker_duplicate_offset() {
+        let mut tracker = TopicOffsetTracker::new(4);
+
+        let watermark = tracker.advance_watermark(5);
+        assert_eq!(watermark, 5);
+
+        // Receiving 5 again should not change state (not greater than watermark)
+        let watermark = tracker.advance_watermark(5);
+        assert_eq!(watermark, 5, "Should remain at 5 on duplicate");
+
+        // Can still advance to 6
+        let watermark = tracker.advance_watermark(6);
+        assert_eq!(watermark, 6);
+    }
+
+    #[test]
+    fn test_topic_offset_tracker_resume_from_nonzero_offset() {
+        // Simulates a consumer resuming from offset 500 (e.g. after restart)
+        let mut tracker = TopicOffsetTracker::new(499);
+
+        let watermark = tracker.advance_watermark(500);
+        assert_eq!(watermark, 500);
+
+        let watermark = tracker.advance_watermark(501);
+        assert_eq!(watermark, 501);
+
+        // Failure at 502 freezes watermark
+        tracker.record_failure();
+
+        let watermark = tracker.advance_watermark(503);
+        assert_eq!(watermark, 501, "Should stay stuck at 501");
+    }
+
+    #[test]
+    fn test_topic_offset_tracker_sparse_offsets_with_failure() {
+        // Compacted topic with a failure mid-stream
+        let mut tracker = TopicOffsetTracker::new(99);
+
+        let watermark = tracker.advance_watermark(100);
+        assert_eq!(watermark, 100);
+
+        let watermark = tracker.advance_watermark(103);
+        assert_eq!(watermark, 103);
+
+        // Failure at offset 107
+        tracker.record_failure();
+
+        // Offset 110 delivered but watermark is frozen
+        let watermark = tracker.advance_watermark(110);
+        assert_eq!(watermark, 103, "Should stay stuck at 103 after failure");
+    }
 }
 
 #[cfg(feature = "kafka-integration-tests")]
@@ -1650,12 +1902,16 @@ mod integration_test {
 
     #[tokio::test]
     async fn handles_one_negative_acknowledgement() {
-        send_receive(true, |n| n == 2, 10, LogNamespace::Legacy).await;
+        // Message at index 2 (offset 2) fails. The watermark stays at
+        // offset 1, so the committed offset should be 2 (store_offset(1)
+        // → committed = 1 + 1 = 2). This verifies that we do not commit
+        // past a failed message.
+        send_receive(true, |n| n == 2, 2, LogNamespace::Legacy).await;
     }
 
     #[tokio::test]
     async fn handles_one_negative_acknowledgement_vector_namespace() {
-        send_receive(true, |n| n == 2, 10, LogNamespace::Vector).await;
+        send_receive(true, |n| n == 2, 2, LogNamespace::Vector).await;
     }
 
     #[tokio::test]
