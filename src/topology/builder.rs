@@ -1244,7 +1244,6 @@ impl Runner {
                     self.send_outputs(&mut outputs_buf)
                         .await
                         .map_err(TaskError::wrapped)?;
-                    tokio::task::yield_now().await;
                 }
 
                 // Accept new input when the scheduler has capacity.
