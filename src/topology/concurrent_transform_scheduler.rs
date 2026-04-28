@@ -1,7 +1,12 @@
-use std::{collections::VecDeque, future::Future};
+use std::{
+    collections::VecDeque,
+    future::Future,
+    pin::Pin,
+    task::{Context, Poll},
+};
 
-use futures_util::stream::{FuturesUnordered, StreamExt};
-use tokio::task::{JoinError, JoinHandle};
+use futures_util::stream::{FuturesUnordered, Stream};
+use tokio::task::JoinHandle;
 
 use crate::transforms::TransformOutputsBuf;
 
@@ -80,7 +85,7 @@ use crate::transforms::TransformOutputsBuf;
 ///   reorder_buf:     [Some(r2)]  [Some(r3)]
 /// ```
 ///
-/// A `while let Some(r) = scheduler.try_pop_ready()` loop now drains:
+/// Polling the stream via `next()` now drains:
 /// - pops `Some(r2)` → `head = 3`, returns r2
 /// - pops `Some(r3)` → `head = 4`, returns r3
 ///
@@ -103,7 +108,7 @@ impl ConcurrentTransformScheduler {
     pub fn new(running_limit: usize, buffer_limit: usize) -> Self {
         Self {
             in_flight: FuturesUnordered::new(),
-            reorder_buf: VecDeque::new(),
+            reorder_buf: VecDeque::with_capacity(buffer_limit),
             head: 0,
             tail: 0,
             running_limit,
@@ -115,13 +120,6 @@ impl ConcurrentTransformScheduler {
     /// AND the reorder buffer has room.
     pub fn can_spawn(&self) -> bool {
         self.in_flight.len() < self.running_limit && self.reorder_buf.len() < self.buffer_limit
-    }
-
-    /// True if any task is still running. Used to gate the `await_drainable`
-    /// arm in `tokio::select!` since `await_drainable` on an empty scheduler
-    /// would hang
-    pub fn has_running(&self) -> bool {
-        !self.in_flight.is_empty()
     }
 
     /// True if no tasks are running and no results are buffered.
@@ -142,26 +140,7 @@ impl ConcurrentTransformScheduler {
             .push(tokio::spawn(async move { (pos, future.await) }));
     }
 
-    /// Wait for any task to complete and stash its result in the reorder
-    /// buffer. After this resolves, one or more results may be available via
-    /// `try_pop_ready`. Returns `Err` if a task panicked.
-    pub async fn await_drainable(&mut self) -> Result<(), JoinError> {
-        match self.in_flight.next().await {
-            Some(Ok((pos, result))) => {
-                // pos.wrapping_sub(head) is the index into reorder_buf. The
-                // entry was reserved as None in spawn, and we use wrapping_sub
-                // so it is always in bounds / a valid integer.
-                self.reorder_buf[pos.wrapping_sub(self.head)] = Some(result);
-                Ok(())
-            }
-            Some(Err(join_err)) => Err(join_err),
-            None => unreachable!("await_drainable called with no tasks in flight"),
-        }
-    }
-
-    /// Pop the next consecutive ready result. Returns `None` if the head slot
-    /// is still running or the buffer is empty. Non-blocking.
-    pub fn try_pop_ready(&mut self) -> Option<TransformOutputsBuf> {
+    fn try_pop_ready(&mut self) -> Option<TransformOutputsBuf> {
         if !self.reorder_buf.front().is_some_and(Option::is_some) {
             return None;
         }
@@ -172,10 +151,49 @@ impl ConcurrentTransformScheduler {
     }
 }
 
+impl Stream for ConcurrentTransformScheduler {
+    type Item = TransformOutputsBuf;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let this = self.get_mut();
+
+        // Deliver buffered head — handles cascades from prior stashes.
+        if let Some(buf) = this.try_pop_ready() {
+            return Poll::Ready(Some(buf));
+        }
+
+        // Drain all available completions, delivering as soon as head is ready.
+        while let Poll::Ready(item) = Pin::new(&mut this.in_flight).poll_next(cx) {
+            match item {
+                Some(Ok((pos, result))) => {
+                    let idx = pos.wrapping_sub(this.head);
+                    if idx == 0 {
+                        // Fast path: completed task IS the head — skip stash+pop.
+                        this.head = this.head.wrapping_add(1);
+                        this.reorder_buf.pop_front(); // remove None placeholder
+                        return Poll::Ready(Some(result));
+                    }
+                    this.reorder_buf[idx] = Some(result);
+                    // Check if this stash unblocked the head.
+                    if let Some(buf) = this.try_pop_ready() {
+                        return Poll::Ready(Some(buf));
+                    }
+                }
+                // Re-panic so the outer catch_unwind in handle_errors catches it.
+                Some(Err(e)) => std::panic::resume_unwind(e.into_panic()),
+                None => return Poll::Ready(None),
+            }
+        }
+
+        Poll::Pending
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::{collections::HashMap, time::Duration};
 
+    use futures_util::stream::StreamExt;
     use vector_lib::event::{Event, LogEvent};
 
     use super::*;
@@ -208,11 +226,8 @@ mod tests {
     /// Drive the scheduler to completion, returning markers in delivery order.
     async fn drain(mut scheduler: ConcurrentTransformScheduler) -> Vec<usize> {
         let mut out = Vec::new();
-        while scheduler.has_running() {
-            scheduler.await_drainable().await.unwrap();
-            while let Some(buf) = scheduler.try_pop_ready() {
-                out.push(read_marker(buf));
-            }
+        while let Some(buf) = scheduler.next().await {
+            out.push(read_marker(buf));
         }
         out
     }
@@ -273,37 +288,30 @@ mod tests {
     async fn is_empty_lifecycle() {
         let mut scheduler = ConcurrentTransformScheduler::new(2, 4);
         assert!(scheduler.is_empty());
-        assert!(!scheduler.has_running());
 
         scheduler.spawn(async move { marked_buf(7) });
         assert!(!scheduler.is_empty());
-        assert!(scheduler.has_running());
 
-        scheduler.await_drainable().await.unwrap();
-        // Still not empty: result is buffered, hasn't been popped.
-        assert!(!scheduler.is_empty());
-        assert!(!scheduler.has_running());
-
-        let buf = scheduler.try_pop_ready().expect("ready");
+        let buf = scheduler.next().await.expect("Some");
         assert_eq!(read_marker(buf), 7);
         assert!(scheduler.is_empty());
+        assert!(scheduler.next().await.is_none());
     }
 
     #[tokio::test]
-    async fn await_drainable_propagates_panic() {
-        let mut scheduler = ConcurrentTransformScheduler::new(2, 4);
-        scheduler.spawn(async { panic!("boom") });
-        let err = scheduler.await_drainable().await.unwrap_err();
-        assert!(err.is_panic());
+    async fn propagates_panic() {
+        let handle = tokio::spawn(async {
+            let mut scheduler = ConcurrentTransformScheduler::new(2, 4);
+            scheduler.spawn(async { panic!("boom") });
+            scheduler.next().await;
+        });
+        assert!(handle.await.unwrap_err().is_panic());
     }
 
     #[tokio::test]
     async fn complex_out_of_order_with_running_limit() {
-        // 9 tasks, running_limit = 4. Each task awaits its own oneshot before
-        // returning its position, so the test deterministically chooses the
-        // completion order by releasing channels in a specific sequence.
-        // Tracks delivery throughout to verify head-of-line cascades only fire
-        // when the head slot becomes ready.
+        // 9 tasks, running_limit = 4. Tasks complete out of order; verify that
+        // the stream always delivers in spawn order.
         let mut scheduler = ConcurrentTransformScheduler::new(4, 9);
 
         let (txs, rxs): (Vec<_>, Vec<_>) = (0..9)
@@ -313,7 +321,6 @@ mod tests {
             txs.into_iter().map(Some).collect();
         let mut rxs: Vec<Option<tokio::sync::oneshot::Receiver<()>>> =
             rxs.into_iter().map(Some).collect();
-        let mut delivered: Vec<usize> = Vec::new();
 
         macro_rules! spawn_task {
             ($i:expr) => {{
@@ -329,81 +336,52 @@ mod tests {
                 txs[$i].take().unwrap().send(()).unwrap();
             };
         }
-        macro_rules! recv_and_drain {
-            () => {{
-                scheduler.await_drainable().await.unwrap();
-                while let Some(buf) = scheduler.try_pop_ready() {
-                    delivered.push(read_marker(buf));
-                }
-            }};
+        macro_rules! next_marker {
+            () => {
+                read_marker(scheduler.next().await.expect("Some"))
+            };
         }
 
-        // Spawn 4 — running_limit reached.
+        // Fill running_limit.
         spawn_task!(0);
         spawn_task!(1);
         spawn_task!(2);
         spawn_task!(3);
         assert!(!scheduler.can_spawn());
 
-        // Task 2 finishes first — head (0) still running, no delivery.
+        // Tasks 2 and 1 finish out of order; head (0) still blocked.
         release!(2);
-        recv_and_drain!();
-        assert!(delivered.is_empty());
-
-        // Task 1 finishes — still no delivery.
         release!(1);
-        recv_and_drain!();
-        assert!(delivered.is_empty());
-
-        // in_flight has {0, 3}; refill with 4 and 5.
         spawn_task!(4);
         spawn_task!(5);
-        assert!(!scheduler.can_spawn());
 
-        // Head (0) finishes — cascade drains 0, 1, 2.
+        // Release head — cascade delivers 0, 1, 2 in order.
         release!(0);
-        recv_and_drain!();
-        assert_eq!(delivered, vec![0, 1, 2]);
+        assert_eq!(next_marker!(), 0);
+        assert_eq!(next_marker!(), 1);
+        assert_eq!(next_marker!(), 2);
 
-        // in_flight has {3, 4, 5}; spawn 6.
+        // Continue — release some tail tasks while head (3) is still running.
         spawn_task!(6);
-        assert!(!scheduler.can_spawn());
-
-        // Task 4 finishes — head (3) still running.
         release!(4);
-        recv_and_drain!();
-        assert_eq!(delivered, vec![0, 1, 2]);
-
-        spawn_task!(7);
-        assert!(!scheduler.can_spawn());
-
-        // Task 5 finishes — head (3) still running.
         release!(5);
-        recv_and_drain!();
-        assert_eq!(delivered, vec![0, 1, 2]);
-
-        spawn_task!(8);
-        assert!(!scheduler.can_spawn());
-
-        // Task 7 finishes — head (3) still running.
+        spawn_task!(7);
         release!(7);
-        recv_and_drain!();
-        assert_eq!(delivered, vec![0, 1, 2]);
+        spawn_task!(8);
 
-        // Release the head (3) — cascade drains 3, 4, 5.
+        // Release head (3) — cascade delivers 3, 4, 5.
         release!(3);
-        recv_and_drain!();
-        assert_eq!(delivered, vec![0, 1, 2, 3, 4, 5]);
+        assert_eq!(next_marker!(), 3);
+        assert_eq!(next_marker!(), 4);
+        assert_eq!(next_marker!(), 5);
 
-        // Release 6 (now head) — cascade drains 6, 7.
+        // Release 6 (now head) — cascade delivers 6, 7.
         release!(6);
-        recv_and_drain!();
-        assert_eq!(delivered, vec![0, 1, 2, 3, 4, 5, 6, 7]);
+        assert_eq!(next_marker!(), 6);
+        assert_eq!(next_marker!(), 7);
 
-        // Release 8.
         release!(8);
-        recv_and_drain!();
-        assert_eq!(delivered, vec![0, 1, 2, 3, 4, 5, 6, 7, 8]);
+        assert_eq!(next_marker!(), 8);
 
         assert!(scheduler.is_empty());
     }
@@ -436,29 +414,24 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn try_pop_ready_returns_none_when_head_not_ready() {
+    async fn stream_blocks_until_head_is_ready() {
+        // Task 0 waits for a signal; task 1 completes immediately.
+        // The stream must not deliver task 1 before task 0.
         let mut scheduler = ConcurrentTransformScheduler::new(4, 16);
         let (release0_tx, release0_rx) = tokio::sync::oneshot::channel::<()>();
 
-        // Task 0 waits for a signal; task 1 completes immediately.
         scheduler.spawn(async move {
             release0_rx.await.ok();
             marked_buf(0)
         });
         scheduler.spawn(async move { marked_buf(1) });
 
-        // Wait for task 1 to finish and be stashed.
-        scheduler.await_drainable().await.unwrap();
-        // Head (task 0) is still running — nothing ready to pop in order.
-        assert!(scheduler.try_pop_ready().is_none());
-
-        // Release task 0.
+        // Release task 0; both tasks are now complete.
         release0_tx.send(()).unwrap();
-        scheduler.await_drainable().await.unwrap();
-        let b0 = scheduler.try_pop_ready().expect("0 ready");
-        let b1 = scheduler.try_pop_ready().expect("1 ready");
-        assert_eq!(read_marker(b0), 0);
-        assert_eq!(read_marker(b1), 1);
-        assert!(scheduler.try_pop_ready().is_none());
+
+        // Despite task 1 completing first internally, delivery must be 0 then 1.
+        assert_eq!(read_marker(scheduler.next().await.expect("Some")), 0);
+        assert_eq!(read_marker(scheduler.next().await.expect("Some")), 1);
+        assert!(scheduler.next().await.is_none());
     }
 }
