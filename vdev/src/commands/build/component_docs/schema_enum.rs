@@ -347,8 +347,14 @@ impl SchemaContext {
                     let resolved_subschema = self.resolve_schema(subschema)?;
                     if let Some(Value::Object(resolved_properties)) =
                         resolved_subschema.pointer("/type/object/options")
-                        && resolved_properties.len() == 1
                     {
+                        if resolved_properties.len() != 1 {
+                            error!(
+                                "Expected exactly 1 property for externally-tagged non-unit enum variant, got {}. Schema: {}",
+                                resolved_properties.len(), subschema
+                            );
+                            std::process::exit(1);
+                        }
                         let description = self.get_rendered_description_from_schema(subschema);
                         for (property_name, property_schema) in resolved_properties {
                             let mut prop = property_schema.clone();
@@ -378,11 +384,13 @@ impl SchemaContext {
         debug!("Resolved as 'fallback mixed-mode' enum schema.");
         debug!("Tagging mode: {}", enum_tagging);
 
-        let resolved_subschemas: Vec<Value> = subschemas
-            .iter()
-            .filter_map(|subschema| self.resolve_schema(subschema).ok())
-            .filter(|v| !v.is_null())
-            .collect();
+        let mut resolved_subschemas: Vec<Value> = Vec::new();
+        for subschema in &subschemas {
+            let resolved = self.resolve_schema(subschema)?;
+            if !resolved.is_null() {
+                resolved_subschemas.push(resolved);
+            }
+        }
 
         if resolved_subschemas.is_empty() {
             return Ok(json!({ "_resolved": { "type": { "*": {} } } }));
