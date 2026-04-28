@@ -8,7 +8,7 @@ use std::{
 
 use futures::{FutureExt, StreamExt, TryStreamExt, stream::FuturesOrdered};
 use futures_util::stream::FuturesUnordered;
-use metrics::gauge;
+use metrics::{Counter, counter, gauge};
 use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
 use tokio::{
     select,
@@ -45,6 +45,7 @@ use crate::{
         ComponentKey, Config, DataType, EnrichmentTableConfig, Input, Inputs, OutputId,
         ProxyConfig, SinkContext, SourceContext, TransformContext, TransformOuter, TransformOutput,
     },
+    cpu_time::ThreadTime,
     event::{EventArray, EventContainer},
     extra_context::ExtraContext,
     internal_events::EventsReceived,
@@ -1144,6 +1145,7 @@ struct Runner {
     timer_tx: UtilizationComponentSender,
     latency_recorder: LatencyRecorder,
     events_received: Registered<EventsReceived>,
+    cpu_ns: Counter,
 }
 
 impl Runner {
@@ -1163,6 +1165,7 @@ impl Runner {
             timer_tx,
             latency_recorder,
             events_received: register!(EventsReceived),
+            cpu_ns: counter!("component_cpu_usage_ns_total"),
         }
     }
 
@@ -1198,7 +1201,9 @@ impl Runner {
         self.timer_tx.try_send_start_wait();
         while let Some(events) = input_rx.next().await {
             self.on_events_received(&events);
+            let t0 = ThreadTime::now();
             self.transform.transform_all(events, &mut outputs_buf);
+            self.cpu_ns.increment(t0.elapsed().as_nanos() as u64);
             self.send_outputs(&mut outputs_buf)
                 .await
                 .map_err(TaskError::wrapped)?;
@@ -1247,10 +1252,13 @@ impl Runner {
 
                             let mut t = self.transform.clone();
                             let mut outputs_buf = self.outputs.new_buf_with_capacity(len);
+                            let cpu_ns = self.cpu_ns.clone();
                             let task = tokio::spawn(async move {
+                                let t0 = ThreadTime::now();
                                 for events in input_arrays {
                                     t.transform_all(events, &mut outputs_buf);
                                 }
+                                cpu_ns.increment(t0.elapsed().as_nanos() as u64);
                                 outputs_buf
                             }.in_current_span());
                             in_flight.push_back(task);
