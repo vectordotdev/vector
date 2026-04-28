@@ -6,7 +6,6 @@ amqps
 amz
 amzn
 anchore
-andy
 apievent
 apipodspec
 apk
@@ -39,11 +38,8 @@ BADMODE
 BADSIG
 BADTIME
 BADTRUNC
-barfoo
-barieom
 basearch
 baseof
-bazqux
 benefritz
 bev
 bfb
@@ -61,8 +57,6 @@ bonzai
 bottlenecked
 Brandur
 breadcrumb
-bringustogether
-bruceg
 bsd
 btag
 btime
@@ -76,13 +70,10 @@ bufferpin
 bvalue
 bwsnrn
 bytesize
-califrag
-califragilistic
 CAROOT
 cddl
 cdylib
 cef
-centiseconds
 cernan
 CFFI
 CGP
@@ -91,10 +82,8 @@ chartmuseum
 chronosphere
 cicd
 Claranet
-CLF
 clickhouse
 clonable
-cmds
 CMK
 cnf
 CODEOWNERS
@@ -140,7 +129,6 @@ ddsktech
 ddsource
 ddtags
 debuggability
-deciseconds
 decommit
 dedot
 deduped
@@ -153,7 +141,6 @@ dereferenceable
 desync
 developerguide
 DFm
-dhost
 diffs
 disintermediate
 DNSKEY
@@ -161,26 +148,20 @@ dnsmsg
 dogstatsd
 downcasted
 dsl
-dstaddr
 dstat
-dstport
 dufs
 dummyhttp
-duser
 dynamicwireless
-dyno
 ebfcee
 ector
 edenhill
 edns
 eeyun
-efgh
 Elhage
 elopment
 emerg
 endianess
 endler
-eni
 enp
 EOL'ed
 errorf
@@ -193,7 +174,6 @@ eventstreamsink
 evictingpages
 evmap
 ewma
-Exabytes
 examplegroup
 exitcodes
 extendedstatus
@@ -217,7 +197,6 @@ flamegraph
 Flatbuffers
 flatmaps
 fns
-foobarfoobarfoo
 footgunning
 Forcepoint
 freelist
@@ -242,6 +221,7 @@ Gregorys
 groks
 groupedstats
 guenter
+gzip'd
 gzip'ed
 hashring
 hbb
@@ -253,7 +233,6 @@ hostagent
 hostcall
 hostpath
 hoverable
-hoverbear
 httpdeliveryrequestresponse
 httpevent
 hugepages
@@ -283,7 +262,6 @@ isdst
 issie
 iut
 ixm
-jamtur
 janky
 JINSPIRED
 jmxrmi
@@ -292,11 +270,9 @@ Jolokia
 JSONAs
 jsonify
 jsonlines
-jszwedko
 kebabcase
 kernelmode
 keyclock
-keyxxxxx
 Khal
 khvzak
 killall
@@ -325,8 +301,6 @@ logseverity
 logtypes
 lpop
 lpush
-lucperkins
-lukesteensen
 lvl
 maj
 majorly
@@ -347,9 +321,7 @@ memsw
 messagededuplicationid
 metamethod
 mezmo
-mfoo
 mgmt
-MIDP
 mingrammer
 mkto
 mlua
@@ -371,7 +343,6 @@ msv
 multitenant
 munging
 musleabihf
-muslueabihf
 mustprogress
 mutiple
 myannotation
@@ -393,7 +364,6 @@ nkey
 nocapture
 nofree
 nomac
-norc
 norecurse
 nosync
 noundef
@@ -403,7 +373,6 @@ npipe
 nsecs
 ntoa
 ntp
-nullishness
 NUMA
 numbackends
 NXRR
@@ -439,7 +408,6 @@ plds
 ple
 podspec
 Ponge
-POSINT
 preceeded
 precpu
 preds
@@ -500,6 +468,7 @@ RUSTSEC
 rustup
 sandboxing
 sccache
+schema'd
 schemaless
 schemars
 screamingsnakecase
@@ -515,14 +484,12 @@ servicebus
 sev
 shane
 shortcode
-shost
 shutsdown
 SIEM
 SIGHUPs
 sinkbuilder
 sinknetworkbytessent
 slideover
-smartphone
 Smol
 smtracking
 snakecase
@@ -537,13 +504,10 @@ spinlock
 SPOF
 spog
 sqlx
-srcaddr
-srcport
 SREs
 sret
 sse
 ssekms
-ssn
 stabilises
 stackdrive
 stackdriver
@@ -556,8 +520,6 @@ subfooter
 subsecond
 subtagline
 summ
-Supercalifragilisticexpialidocious
-suser
 sustainability
 Swich
 syscalls
@@ -569,7 +531,6 @@ Syu
 tagline
 tagset
 Takeaways
-targetgroup
 tarpit
 tcmalloc
 telecom
@@ -680,5 +641,4 @@ zieme
 zoog
 zork
 zorp
-zsherman
 zulip

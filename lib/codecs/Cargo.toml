@@ -63,6 +63,7 @@ vector-config-macros = { path = "../vector-config-macros", default-features = fa
 vector-core = { path = "../vector-core", default-features = false, features = ["vrl"] }
 vector-vrl-functions.workspace = true
 toml = { version = "0.9.8", optional = true }
+uuid.workspace = true
 
 [dev-dependencies]
 futures.workspace = true
@@ -73,7 +74,6 @@ similar-asserts = "1.7.0"
 vector-core = { path = "../vector-core", default-features = false, features = ["vrl", "test"] }
 rstest = "0.26.1"
 tracing-test = "0.2.6"
-uuid.workspace = true
 vrl.workspace = true
 
 [features]

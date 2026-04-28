@@ -93,11 +93,8 @@ generated: components: sources: gcp_pubsub: configuration: {
 						description: """
 																The Avro schema definition.
 																**Note**: The following [`apache_avro::types::Value`] variants are *not* supported:
-																* `Date`
 																* `Decimal`
 																* `Duration`
-																* `Fixed`
-																* `TimeMillis`
 																"""
 						required: true
 						type: string: examples: ["{ \"type\": \"record\", \"name\": \"log\", \"fields\": [{ \"name\": \"message\", \"type\": \"string\" }] }"]

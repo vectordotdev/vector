@@ -1,1 +1,1 @@
-{"name":"test","type":"record","fields":[{"name":"long_field","type":"long"}]}
+{"type":"record","name":"test","fields":[{"name":"long_field","type":"long","default":0}]}
