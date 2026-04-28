@@ -35,17 +35,20 @@ type EventsDroppedError = ComponentEventsDropped<'static, UNINTENTIONAL>;
 /// Compression algorithm and optional level for archive objects.
 #[configurable_component]
 #[derive(Default, Copy, Clone, Debug, PartialEq)]
+#[configurable(metadata(
+    docs::enum_tag_description = "Compression codec applied per column page inside the Parquet file."
+))]
 #[serde(tag = "algorithm", rename_all = "snake_case")]
 pub enum ParquetCompression {
     /// Zstd compression. Level must be between 1 and 21.
     Zstd {
-        /// Compression level (1–21). This is the range Vector currently supports; higher values compress more but are slower.
+        /// Compression level (1–21). This is the range Vector supports; higher values compress more but are slower.
         #[configurable(validation(range(min = 1, max = 21)))]
         level: u8,
     },
     /// Gzip compression. Level must be between 1 and 9.
     Gzip {
-        /// Compression level (1–9). This is the range Vector currently supports; higher values compress more but are slower.
+        /// Compression level (1–9). This is the range Vector supports; higher values compress more but are slower.
         #[configurable(validation(range(min = 1, max = 9)))]
         level: u8,
     },

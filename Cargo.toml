@@ -519,7 +519,7 @@ vendored = ["rdkafka?/gssapi-vendored"]
 
 # Default features for *-pc-windows-msvc
 # TODO: Enable SASL https://github.com/vectordotdev/vector/pull/3081#issuecomment-659298042
-base = ["api", "enrichment-tables", "sinks", "sources", "transforms", "secrets", "vrl/stdlib"]
+base = ["api", "enrichment-tables", "sinks", "sources", "transforms", "secrets", "vrl/stdlib", "codecs-parquet"]
 enable-api-client = ["base", "api-client"]
 enable-unix = ["enable-api-client", "sources-dnstap", "unix"]
 
