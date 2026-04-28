@@ -13,6 +13,8 @@ use vrl::{
     value::Kind,
 };
 
+use vector_core::event::Secrets;
+
 use crate::{BytesDeserializerConfig, decoding::format::Deserializer};
 
 /// Config used to build a `VrlDeserializer`.
@@ -109,10 +111,21 @@ impl Deserializer for VrlDeserializer {
         log_namespace: LogNamespace,
     ) -> vector_common::Result<SmallVec<[Event; 1]>> {
         let event = parse_bytes(bytes, log_namespace);
-        match self.run_vrl(event, log_namespace) {
-            Ok(events) => Ok(events),
-            Err(e) => Err(e),
-        }
+        self.run_vrl(event, log_namespace)
+    }
+
+    /// Overrides the default implementation so that `secrets` are injected into
+    /// the synthetic event *before* the VRL program executes, making them
+    /// readable via `%vector.secrets.*` from within the program.
+    fn parse_with_secrets(
+        &self,
+        bytes: Bytes,
+        log_namespace: LogNamespace,
+        secrets: &Secrets,
+    ) -> vector_common::Result<SmallVec<[Event; 1]>> {
+        let mut event = parse_bytes(bytes, log_namespace);
+        event.metadata_mut().secrets_mut().merge(secrets.clone());
+        self.run_vrl(event, log_namespace)
     }
 }
 
@@ -319,5 +332,80 @@ mod tests {
             .unwrap_err()
             .to_string();
         assert!(error.contains("aborted"));
+    }
+
+    // Tests for `parse_with_secrets` —————————————————————————————————————————
+
+    /// `parse_with_secrets` with a VRL program that reads a secret injected via
+    /// the template. The secret must be readable from within the program via
+    /// `get_secret!()`.
+    #[test]
+    fn test_parse_with_secrets_vrl_can_read_secret() {
+        // VRL program copies the injected secret into an event field so we can
+        // assert on its value. The input bytes become `.message` (Legacy namespace)
+        // and we add `.secret_value` alongside it.
+        let decoder = make_decoder(r#".secret_value = get_secret!("my_token")"#);
+
+        let mut secrets = Secrets::new();
+        secrets.insert("my_token", "super-secret");
+
+        let bytes = Bytes::from(r#"hello"#);
+        let events = decoder
+            .parse_with_secrets(bytes, LogNamespace::Legacy, &secrets)
+            .expect("parse should succeed");
+
+        assert_eq!(events.len(), 1);
+        assert_eq!(
+            *events[0].as_log().get("secret_value").unwrap(),
+            Value::from("super-secret")
+        );
+    }
+
+    /// Verify that `parse_with_secrets` without an override (i.e. the default
+    /// implementation, exercised here through a non-VRL deserializer) merges the
+    /// template secrets onto the emitted event without overwriting codec-produced
+    /// secrets.
+    #[test]
+    fn test_parse_with_secrets_default_impl_fills_gaps() {
+        use crate::BytesDeserializerConfig;
+
+        let decoder = BytesDeserializerConfig::new().build();
+
+        let mut template = Secrets::new();
+        template.insert("source_token", "from-source");
+
+        let bytes = Bytes::from(b"raw payload".as_ref());
+        let events = decoder
+            .parse_with_secrets(bytes, LogNamespace::Legacy, &template)
+            .expect("parse should succeed");
+
+        assert_eq!(events.len(), 1);
+        assert_eq!(
+            events[0].metadata().secrets().get("source_token").unwrap().as_ref(),
+            "from-source"
+        );
+    }
+
+    /// Secrets explicitly set by the VRL program must win over the template
+    /// (template only fills gaps, codec has priority).
+    #[test]
+    fn test_parse_with_secrets_codec_wins_on_collision() {
+        // VRL explicitly sets a secret. The template also supplies a value for
+        // the same key. Because `set_secret` is called during VRL execution
+        // (AFTER the template is merged in), the VRL-produced value wins.
+        let decoder = make_decoder(r#"set_secret!("my_token", "codec-wins")"#);
+
+        let mut template = Secrets::new();
+        template.insert("my_token", "template-loses");
+
+        let bytes = Bytes::from(r#"hello"#);
+        let events = decoder
+            .parse_with_secrets(bytes, LogNamespace::Legacy, &template)
+            .expect("parse should succeed");
+
+        assert_eq!(
+            events[0].metadata().secrets().get("my_token").unwrap().as_ref(),
+            "codec-wins"
+        );
     }
 }
