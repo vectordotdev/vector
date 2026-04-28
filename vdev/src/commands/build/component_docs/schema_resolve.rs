@@ -107,6 +107,18 @@ impl SchemaContext {
                 .insert("required".to_string(), req.clone());
         }
 
+        if let Some(warnings) = get_schema_metadata(&expanded, "docs::warnings") {
+            let warnings_array = if let Some(arr) = warnings.as_array() {
+                Value::Array(arr.clone())
+            } else {
+                Value::Array(vec![warnings.clone()])
+            };
+            resolved
+                .as_object_mut()
+                .unwrap()
+                .insert("warnings".to_string(), warnings_array);
+        }
+
         self.reconcile_resolved_schema(&mut resolved);
 
         Ok(resolved)
