@@ -84,6 +84,11 @@ macro_rules! register {
     };
 }
 
+// Re-export `inventory` so `register_extra_metric_label!` can resolve `submit!` through this
+// crate without forcing downstream callers to declare `inventory` as a direct dependency.
+#[doc(hidden)]
+pub use inventory as __inventory;
+
 /// Register an additional metric label that should be preserved on metric keys when it is present
 /// as a tracing-span field.
 ///
@@ -94,13 +99,14 @@ macro_rules! register {
 /// metric emitted from inside a span carrying that field will inherit it as a label.
 ///
 /// Registrations are collected at link time via the `inventory` crate, so the read path is
-/// lock-free. The caller's crate must have `inventory` (currently version 0.3) as a dependency
-/// since the expansion calls `inventory::submit!`.
+/// lock-free. The expansion goes through this crate's re-exports of `inventory` and
+/// [`ExtraMetricLabel`](crate::metrics::ExtraMetricLabel), so callers do not need a direct
+/// `inventory` dependency.
 #[macro_export]
 macro_rules! register_extra_metric_label {
     ($key:expr) => {
-        ::inventory::submit! {
-            vector_lib::metrics::ExtraMetricLabel($key)
+        $crate::__inventory::submit! {
+            $crate::metrics::ExtraMetricLabel($key)
         }
     };
 }
