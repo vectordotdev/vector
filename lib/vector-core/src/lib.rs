@@ -83,3 +83,24 @@ macro_rules! register {
         vector_lib::internal_event::register($event)
     };
 }
+
+/// Register an additional metric label that should be preserved on metric keys when it is present
+/// as a tracing-span field.
+///
+/// `VectorLabelFilter` only allows a fixed allowlist of span fields onto metric keys. Downstream
+/// crates can use this macro to extend that allowlist without modifying Vector — for example, an
+/// embedder that owns a "deployment-version" concept of its own can write
+/// `register_extra_metric_label!("deployment_version");` once at module scope and any internal
+/// metric emitted from inside a span carrying that field will inherit it as a label.
+///
+/// Registrations are collected at link time via the `inventory` crate, so the read path is
+/// lock-free. The caller's crate must have `inventory` (currently version 0.3) as a dependency
+/// since the expansion calls `inventory::submit!`.
+#[macro_export]
+macro_rules! register_extra_metric_label {
+    ($key:expr) => {
+        ::inventory::submit! {
+            vector_lib::metrics::ExtraMetricLabel($key)
+        }
+    };
+}
