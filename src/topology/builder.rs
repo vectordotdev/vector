@@ -733,15 +733,7 @@ impl<'a> Builder<'a> {
             // TODO: avoid the double boxing for function transforms here
             Transform::Function(t) => self.build_sync_transform(Box::new(t), node, input_rx),
             Transform::Synchronous(t) => self.build_sync_transform(t, node, input_rx),
-            Transform::Task(t) => self.build_task_transform(
-                t,
-                input_rx,
-                node.input_details.data_type(),
-                node.typetag,
-                &node.key,
-                &node.outputs,
-                node.cpu_ns.clone(),
-            ),
+            Transform::Task(t) => self.build_task_transform(t, node, input_rx),
         }
     }
 
@@ -802,13 +794,19 @@ impl<'a> Builder<'a> {
     fn build_task_transform(
         &self,
         t: Box<dyn TaskTransform<EventArray>>,
+        node: TransformNode,
         input_rx: BufferReceiver<EventArray>,
-        input_type: DataType,
-        typetag: &str,
-        key: &ComponentKey,
-        outputs: &[TransformOutput],
-        cpu_ns: Counter,
     ) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
+        let TransformNode {
+            key,
+            typetag,
+            input_details,
+            outputs,
+            cpu_ns,
+            ..
+        } = node;
+        let input_type = input_details.data_type();
+
         let (mut fanout, control) = Fanout::new();
 
         let sender = self
@@ -879,9 +877,9 @@ impl<'a> Builder<'a> {
         .boxed();
 
         let mut outputs = HashMap::new();
-        outputs.insert(OutputId::from(key), control);
+        outputs.insert(OutputId::from(&key), control);
 
-        let task = Task::new(key.clone(), typetag, transform);
+        let task = Task::new(key, typetag, transform);
 
         (task, outputs)
     }
