@@ -5,6 +5,7 @@
       "file_path": "./public/search.json",
       "synonyms": [],
       "schema": {
+        "token_separators": ["_", "-"],
         "fields": [
           {
             "facet": false,
@@ -142,8 +143,10 @@
         {
           "name": "vector_docs_search",
           "search_parameters": {
-            "sort_by": "level:desc,ranking:desc,_text_match:desc",
-            "query_by": "pageTitle,title,hierarchy,content,tags"
+            "sort_by": "_text_match:desc,ranking:desc,level:desc",
+            "query_by": "pageTitle,title,hierarchy,content,tags",
+            "query_by_weights": "4,3,2,1,2",
+            "text_match_type": "sum_score"
           }
         }
       ]
