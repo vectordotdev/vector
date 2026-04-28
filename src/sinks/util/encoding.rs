@@ -107,6 +107,7 @@ impl Encoder<Vec<Event>> for (Transformer, vector_lib::codecs::BatchEncoder) {
         writer: &mut dyn io::Write,
     ) -> io::Result<(usize, GroupedCountByteSize)> {
         use tokio_util::codec::Encoder as _;
+        use vector_lib::internal_event::{ComponentEventsDropped, UNINTENTIONAL};
 
         let mut encoder = self.1.clone();
         let mut byte_size = telemetry().create_request_count_byte_size();
@@ -122,7 +123,21 @@ impl Encoder<Vec<Event>> for (Transformer, vector_lib::codecs::BatchEncoder) {
         let mut bytes = BytesMut::new();
         encoder
             .encode(transformed_events, &mut bytes)
-            .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
+            .map_err(|error| {
+                // Most codec error paths already emit their own internal event
+                // (e.g. SchemaGenerationError, EncoderNullConstraintError) which
+                // logs the error and increments component_errors_total.
+                // We only emit the drop count here to avoid double-counting.
+                // n_events is the pre-filter count; Parquet filters non-log
+                // events before encoding, but that only happens if a sink is
+                // misconfigured to send non-log events into a log-only encoder,
+                // so the overcount is not a practical concern.
+                emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+                    count: n_events,
+                    reason: "Failed to batch encode events.",
+                });
+                io::Error::new(io::ErrorKind::InvalidData, error)
+            })?;
 
         write_all(writer, n_events, &bytes)?;
         Ok((bytes.len(), byte_size))

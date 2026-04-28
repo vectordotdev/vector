@@ -322,7 +322,6 @@ pub(crate) fn build_record_batch(
         });
         vector_common::internal_event::emit(crate::internal_events::EncoderNullConstraintError {
             error: &error,
-            count: values.len(),
         });
         return Err(ArrowEncodingError::NullConstraint {
             field_name: missing.join(", "),
