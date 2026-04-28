@@ -82,3 +82,7 @@ parquet = ["dep:parquet", "arrow"]
 opentelemetry = ["dep:opentelemetry-proto"]
 syslog = ["dep:syslog_loose", "dep:strum", "dep:derive_more", "dep:serde-aux", "dep:toml"]
 test = []
+
+[[test]]
+name = "otlp"
+required-features = ["opentelemetry"]
