@@ -19,7 +19,7 @@ jobs:
     steps:
       - name: Check member review state
         id: check
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const { data: reviews } = await github.rest.pulls.listReviews({
