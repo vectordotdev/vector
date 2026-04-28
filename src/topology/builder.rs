@@ -884,30 +884,44 @@ async fn run_source_output_pump(
 ) -> TaskResult {
     debug!("Source pump starting.");
 
-    while let Some(SourceSenderItem {
-        events: mut array,
-        send_reference,
-    }) = rx.next().await
-    {
-        // Even though we have a `send_reference` timestamp above, that reference time is when
-        // the events were enqueued in the `SourceSender`, not when they were pulled out of the
-        // `rx` stream on this end. Since those times can be quite different (due to blocking
-        // inherent to the fanout send operation), we set the `last_transform_timestamp` to the
-        // current time instead to get an accurate reference for when the events started waiting
-        // for the first transform.
-        let now = Instant::now();
-        array.for_each_metadata_mut(|metadata| {
-            metadata.set_source_id(Arc::clone(&source));
-            metadata.set_source_type(source_type);
-            metadata.set_last_transform_timestamp(now);
-        });
-        fanout
-            .send(array, Some(send_reference))
-            .await
-            .map_err(|e| {
-                debug!("Source pump finished with an error.");
-                TaskError::wrapped(e)
-            })?;
+    let mut control_channel_open = true;
+    loop {
+        tokio::select! {
+            biased;
+            // Process control messages (e.g. Remove/Pause) even when the source
+            // is idle, so that config reloads can proceed without waiting for the
+            // next event.
+            alive = fanout.recv_control_message(), if control_channel_open => {
+                control_channel_open = alive;
+            }
+            item = rx.next() => {
+                match item {
+                    Some(SourceSenderItem { events: mut array, send_reference }) => {
+                        // Even though we have a `send_reference` timestamp above, that reference
+                        // time is when the events were enqueued in the `SourceSender`, not when
+                        // they were pulled out of the `rx` stream on this end. Since those times
+                        // can be quite different (due to blocking inherent to the fanout send
+                        // operation), we set the `last_transform_timestamp` to the current time
+                        // instead to get an accurate reference for when the events started
+                        // waiting for the first transform.
+                        let now = Instant::now();
+                        array.for_each_metadata_mut(|metadata| {
+                            metadata.set_source_id(Arc::clone(&source));
+                            metadata.set_source_type(source_type);
+                            metadata.set_last_transform_timestamp(now);
+                        });
+                        fanout
+                            .send(array, Some(send_reference))
+                            .await
+                            .map_err(|e| {
+                                debug!("Source pump finished with an error.");
+                                TaskError::wrapped(e)
+                            })?;
+                    }
+                    None => break,
+                }
+            }
+        }
     }
 
     debug!("Source pump finished normally.");

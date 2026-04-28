@@ -108,6 +108,20 @@ impl Fanout {
         }
     }
 
+    /// Waits for the next control message and applies it.
+    ///
+    /// Returns `true` if a message was processed, `false` if the control
+    /// channel was closed.
+    pub async fn recv_control_message(&mut self) -> bool {
+        match self.control_channel.recv().await {
+            Some(msg) => {
+                self.apply_control_message(msg);
+                true
+            }
+            None => false,
+        }
+    }
+
     /// Apply a control message directly against this instance.
     ///
     /// This method should not be used if there is an active `SendGroup` being processed.
