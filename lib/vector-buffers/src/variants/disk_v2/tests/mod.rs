@@ -211,29 +211,6 @@ where
         .expect("should not fail to create buffer")
 }
 
-/// Creates a disk v2 buffer with all default values, but returns a handle to the buffer usage tracker.
-pub(crate) async fn create_default_buffer_v2_with_usage<P, R>(
-    data_dir: P,
-) -> (
-    BufferWriter<R, FilesystemUnderTest>,
-    BufferReader<R, FilesystemUnderTest>,
-    Arc<Ledger<FilesystemUnderTest>>,
-    BufferUsageHandle,
-)
-where
-    P: AsRef<Path>,
-    R: Bufferable,
-{
-    let config = DiskBufferConfigBuilder::from_path(data_dir)
-        .build()
-        .expect("creating buffer should not fail");
-    let usage_handle = BufferUsageHandle::noop();
-    let (writer, reader, ledger) = Buffer::from_config_inner(config, usage_handle.clone())
-        .await
-        .expect("should not fail to create buffer");
-    (writer, reader, ledger, usage_handle)
-}
-
 /// Creates a disk v2 buffer that is sized such that only a fixed number of data files are allowed.
 ///
 /// We do this based on limiting the maximum buffer size, knowing that if the maximum data file size is N, and we want

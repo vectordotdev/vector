@@ -9,8 +9,12 @@ use vector_common::finalization::Finalizable;
 use super::{create_default_buffer_v2, read_next, read_next_some};
 use crate::{
     EventCount, assert_buffer_is_empty, assert_buffer_records,
+    buffer_usage_data::BufferUsageHandle,
     test::{MultiEventRecord, SizedRecord, acknowledge, install_tracing_helpers, with_temp_dir},
-    variants::disk_v2::{tests::create_default_buffer_v2_with_usage, writer::RecordWriter},
+    variants::disk_v2::{
+        Buffer, BufferError, DiskBufferConfigBuilder, ledger::LedgerLoadCreateError,
+        writer::RecordWriter,
+    },
 };
 
 #[tokio::test]
@@ -210,9 +214,33 @@ async fn initial_size_correct_with_multievents() {
             writer.close();
 
             // Now drop our buffer and reopen it.
+            // The background finalizer task may still hold an Arc<Ledger> (and
+            // thus the lock file) after we drop the writer. Retry until the
+            // lock is released — the test framework's own timeout will catch
+            // truly stuck cases.
             drop(writer);
-            let (writer, mut reader, ledger, usage) =
-                create_default_buffer_v2_with_usage::<_, MultiEventRecord>(data_dir).await;
+            let (writer, mut reader, ledger, usage) = {
+                let config = DiskBufferConfigBuilder::from_path(&data_dir)
+                    .build()
+                    .expect("creating buffer config should not fail");
+                let usage_handle = BufferUsageHandle::noop();
+                loop {
+                    match Buffer::<MultiEventRecord>::from_config_inner(
+                        config.clone(),
+                        usage_handle.clone(),
+                    )
+                    .await
+                    {
+                        Ok((w, r, l)) => break (w, r, l, usage_handle),
+                        Err(BufferError::LedgerError {
+                            source: LedgerLoadCreateError::LedgerLockAlreadyHeld,
+                        }) => {
+                            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+                        }
+                        Err(e) => panic!("unexpected error reopening buffer: {e:?}"),
+                    }
+                }
+            };
             drop(writer);
 
             // Make sure our usage data agrees with our expected event count and byte size:
