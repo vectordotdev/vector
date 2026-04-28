@@ -75,6 +75,17 @@
             overlays = [ (import rust-overlay) ];
           };
 
+        # Standard ELF interpreter path on Debian/Ubuntu, per arch. Used to
+        # rewrite the .interp section of GNU binaries so they can be loaded
+        # outside a Nix store (where /nix/store/...glibc/ld-linux... lives).
+        # Musl targets are statically linked and have no interpreter to patch.
+        gnuInterpreterFor = target: {
+          "x86_64-unknown-linux-gnu"      = "/lib64/ld-linux-x86-64.so.2";
+          "aarch64-unknown-linux-gnu"     = "/lib/ld-linux-aarch64.so.1";
+          "armv7-unknown-linux-gnueabihf" = "/lib/ld-linux-armhf.so.3";
+          "arm-unknown-linux-gnueabi"     = "/lib/ld-linux.so.3";
+        }.${target} or null;
+
         targets = [
           "x86_64-unknown-linux-gnu"
           "x86_64-unknown-linux-musl"
@@ -159,6 +170,20 @@
             '';
 
             cargoExtraArgs = "--no-default-features --features ${cargoFeatures} --bin vector";
+
+            # GNU targets need the ELF interpreter rewritten to a standard
+            # FHS path (and the nix-store RPATH stripped) so the binary can
+            # run on any glibc system, not just inside this Nix store.
+            # Guarded by `-f` because crane reuses hook args for the
+            # cargoArtifacts (deps-only) derivation, which has no bin/vector.
+            postFixup = lib.optionalString (gnuInterpreterFor target != null) ''
+              if [ -f "$out/bin/vector" ]; then
+                patchelf \
+                  --set-interpreter ${gnuInterpreterFor target} \
+                  --remove-rpath \
+                  "$out/bin/vector"
+              fi
+            '';
 
             nativeBuildInputs = [
               gitShim
