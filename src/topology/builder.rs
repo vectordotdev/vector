@@ -79,7 +79,7 @@ static TRANSFORM_CONCURRENCY_LIMIT: LazyLock<usize> = LazyLock::new(|| {
 // Maximum number of completed-but-not-yet-emitted transform results that can be
 // buffered in memmory when running transforms concurrently. See run_concurrently
 // and ConcurrentTransformScheduler for more details
-static REORDER_BUFFER_CAP: LazyLock<usize> = LazyLock::new(|| *TRANSFORM_CONCURRENCY_LIMIT * 2);
+static REORDER_BUFFER_CAP: LazyLock<usize> = LazyLock::new(|| *TRANSFORM_CONCURRENCY_LIMIT);
 
 const INTERNAL_SOURCES: [&str; 2] = ["internal_logs", "internal_metrics"];
 
