@@ -462,19 +462,16 @@ impl SplunkSource {
                         // with the pre-decoder behavior.
                         let mut maybe_ack_id = None;
                         if !decoder_in_use {
-                            maybe_ack_id =
-                                match (idx_ack.clone(), receiver.take(), channel.clone()) {
-                                    (Some(idx_ack), Some(rx), Some(channel_id)) => {
-                                        match idx_ack
-                                            .get_ack_id_from_channel(channel_id, rx)
-                                            .await
-                                        {
-                                            Ok(ack_id) => Some(ack_id),
-                                            Err(rej) => return Err(rej),
-                                        }
+                            maybe_ack_id = match (idx_ack.clone(), receiver.take(), channel.clone())
+                            {
+                                (Some(idx_ack), Some(rx), Some(channel_id)) => {
+                                    match idx_ack.get_ack_id_from_channel(channel_id, rx).await {
+                                        Ok(ack_id) => Some(ack_id),
+                                        Err(rej) => return Err(rej),
                                     }
-                                    _ => None,
-                                };
+                                }
+                                _ => None,
+                            };
                         }
 
                         let mut error = None;
@@ -626,9 +623,7 @@ impl SplunkSource {
                                 "raw_event always produces a single event when no decoder is set",
                             );
                             if let Some(token) = token.filter(|_| store_hec_token) {
-                                event
-                                    .metadata_mut()
-                                    .set_splunk_hec_token(token.into());
+                                event.metadata_mut().set_splunk_hec_token(token.into());
                             }
                             let res = out.send_event(event).await;
                             return res
@@ -1157,9 +1152,7 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
             // `otlp` can emit metrics or traces, and those still need the HEC token
             // for downstream Splunk HEC sinks.
             if let Some(token) = &self.token {
-                event
-                    .metadata_mut()
-                    .set_splunk_hec_token(Arc::clone(token));
+                event.metadata_mut().set_splunk_hec_token(Arc::clone(token));
             }
             out.push(event);
         }
