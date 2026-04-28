@@ -108,20 +108,45 @@ This metric is always emitted for transforms; there is no configuration knob.
   thread it ran on. This isolates the timing concern from the transform body
   and keeps it robust if the body ever grows `.await` points (which task
   transforms have many of, by construction).
-- **Scope of the measurement.** For sync transforms (inline and concurrent),
-  the bracket covers exactly the synchronous transform call. For task
-  transforms, the bracket covers the entire task body, which additionally
-  includes input-channel polls, the `Utilization`/`OutputUtilization` stream
-  wrappers' overhead, and the fanout-send loop. In practice the channel/fanout
-  overhead is small relative to the transform's own work, so the metric remains
-  a meaningful comparator across transform kinds.
-- **Helper tasks are attributed too.** A few transforms spawn long-running
-  helper tokio tasks at construction time — `aws_ec2_metadata` (periodic IMDS
-  refresh) and `throttle` via `RateLimiterRunner` (periodic rate-limit-key
-  flush). The `cpu_ns` counter is plumbed through `TransformContext` so those
-  helpers can wrap their spawn with the same `.cpu_timed(counter)` and have
-  their CPU attributed to the same component, rather than being silently
-  excluded.
+- **Scope of the measurement, and isolation from upstream components.**
+  Vector components communicate only through `BufferReceiver` / `BufferSender`
+  channels — never through stream combinators chained across component
+  boundaries. Each component runs in its own tokio task with its own poll
+  cycles. So when our task polls its input, it dequeues items from a shared
+  channel buffer; it does **not** run the upstream component's code. The
+  upstream produced those items earlier, in its own task, and its CPU was
+  already charged to its own `cpu_ns` counter at that point. This holds even
+  in the "channel is always full when we poll" case: those items were produced
+  by upstream CPU that was already counted upstream; we're just dequeueing them.
+
+  The transform's `cpu_ns` therefore **includes**:
+
+  - **Sync transforms** (inline and concurrent): exactly the synchronous
+    `transform_all` call.
+  - **Task transforms**: the entire task body — input-channel dequeue,
+    `Utilization` / `OutputUtilization` stream-wrapper overhead, the
+    user-defined transform's `poll_next`, the schema/latency `map`, and the
+    fanout-send loop. A single poll may churn through many items before
+    tokio's cooperative budget (default 128 ops) forces a `Pending`; all of
+    that is genuinely this task's work.
+  - **Helper tokio tasks** the transform spawns at construction time
+    (`aws_ec2_metadata`'s IMDS-refresh worker, `throttle`'s
+    `RateLimiterRunner` flush loop): the `cpu_ns` counter is plumbed through
+    `TransformContext` so those helpers wrap their spawn with the same
+    `.cpu_timed(counter)`. Their CPU is attributed back to this component
+    rather than silently excluded.
+
+  And **does not** include:
+
+  - The upstream component's transform/source CPU (stays on upstream's
+    counter, runs in upstream's task).
+  - Time our task was parked in `Pending` waiting for input (no polls happen,
+    so no CPU ticks).
+  - Other tokio tasks running on other worker threads.
+
+  The channel-poll / fanout-send bookkeeping our wrapper does include is
+  small relative to the transform's own work, so the metric remains a
+  meaningful comparator across transform kinds.
 - **Low overhead.** Two `clock_gettime` calls per poll (~80ns total on Linux)
   is negligible relative to the work `transform_all` performs.
 - **No accumulation errors.** The counter stores `u64` nanoseconds; each
