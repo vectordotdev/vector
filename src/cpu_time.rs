@@ -1,4 +1,12 @@
-use std::time::Duration;
+use std::{
+    future::Future,
+    pin::Pin,
+    task::{Context, Poll},
+    time::Duration,
+};
+
+use metrics::Counter;
+use pin_project::pin_project;
 
 /// An opaque snapshot of thread CPU time.
 ///
@@ -155,6 +163,47 @@ impl Inner {
     #[inline]
     fn elapsed(&self) -> Duration {
         self.0.elapsed()
+    }
+}
+
+// ── CpuTimedFuture: per-poll CPU time accumulator ─────────────────────────
+
+/// A [`Future`] adapter that accumulates thread CPU time across every `poll`.
+///
+/// Each call to [`Future::poll`] is bracketed by a [`ThreadTime`] sample;
+/// the delta is added to `counter`. Tokio's executor cannot migrate a task
+/// to another worker thread or run another task on the current thread between
+/// the entry and exit of a single `poll`, so each delta is a clean per-thread
+/// CPU-time measurement of the wrapped future's work for that poll. Multiple
+/// polls (across `Pending` returns and wake-ups) accumulate into the same
+/// counter, with each poll independently sampling the thread it ran on.
+///
+/// This is the per-task analogue of tokio's unstable
+/// `on_before_task_poll` / `on_after_task_poll` runtime hooks: it hooks the
+/// same boundary, but on a single future rather than the whole runtime, and
+/// it works on stable Rust without `--cfg tokio_unstable`.
+#[pin_project]
+pub(crate) struct CpuTimedFuture<F> {
+    #[pin]
+    inner: F,
+    counter: Counter,
+}
+
+impl<F> CpuTimedFuture<F> {
+    pub(crate) const fn new(inner: F, counter: Counter) -> Self {
+        Self { inner, counter }
+    }
+}
+
+impl<F: Future> Future for CpuTimedFuture<F> {
+    type Output = F::Output;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<F::Output> {
+        let this = self.project();
+        let t0 = ThreadTime::now();
+        let result = this.inner.poll(cx);
+        this.counter.increment(t0.elapsed().as_nanos() as u64);
+        result
     }
 }
 

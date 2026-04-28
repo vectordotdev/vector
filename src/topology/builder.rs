@@ -45,7 +45,7 @@ use crate::{
         ComponentKey, Config, DataType, EnrichmentTableConfig, Input, Inputs, OutputId,
         ProxyConfig, SinkContext, SourceContext, TransformContext, TransformOuter, TransformOutput,
     },
-    cpu_time::ThreadTime,
+    cpu_time::{CpuTimedFuture, ThreadTime},
     event::{EventArray, EventContainer},
     extra_context::ExtraContext,
     internal_events::EventsReceived,
@@ -1238,15 +1238,24 @@ impl Runner {
 
                             let mut t = self.transform.clone();
                             let mut outputs_buf = self.outputs.new_buf_with_capacity(len);
-                            let cpu_ns = self.cpu_ns.clone();
-                            let task = tokio::spawn(async move {
-                                let t0 = ThreadTime::now();
-                                for events in input_arrays {
-                                    t.transform_all(events, &mut outputs_buf);
-                                }
-                                cpu_ns.increment(t0.elapsed().as_nanos() as u64);
-                                outputs_buf
-                            }.in_current_span());
+                            // Hook CPU-time accounting onto the spawned task at
+                            // the `Future::poll` boundary. The transform body
+                            // contains no `.await`, so a single poll runs to
+                            // completion on one worker thread; if a future
+                            // refactor adds awaits, accumulation across polls
+                            // remains correct.
+                            let task = tokio::spawn(
+                                CpuTimedFuture::new(
+                                    async move {
+                                        for events in input_arrays {
+                                            t.transform_all(events, &mut outputs_buf);
+                                        }
+                                        outputs_buf
+                                    },
+                                    self.cpu_ns.clone(),
+                                )
+                                .in_current_span(),
+                            );
                             in_flight.push_back(task);
                         }
                         None => {
