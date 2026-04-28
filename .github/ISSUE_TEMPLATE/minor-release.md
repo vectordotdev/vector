@@ -71,7 +71,8 @@ Automated steps include:
 # On the day of release
 
 - [ ] Make sure the release branch is in sync with origin/master and has only one squashed commit with all commits from the prepare branch. If you made a PR from the prepare branch into the release branch this should already be the case.
-  - [ ] `git checkout "${RELEASE_BRANCH}"`
+  - [ ] `git fetch origin`
+  - [ ] `git checkout "${RELEASE_BRANCH}" && git pull --ff-only origin "${RELEASE_BRANCH}"`
   - [ ] `git show --stat HEAD` - This should show the squashed prepare commit.
   - [ ] Ensure release date in `website/cue/reference/releases/0.XX.Y.cue` matches current date.
     - If this needs to be updated commit and squash it in the release branch.
@@ -88,7 +89,7 @@ Automated steps include:
 - [ ] Wait for release workflow to complete.
   - Discoverable via [release.yml](https://github.com/vectordotdev/vector/actions/workflows/release.yml)
 - [ ] Reset the `website` branch to the `HEAD` of the release branch to update https://vector.dev
-  - [ ] `git switch website && git reset --hard origin/"${RELEASE_BRANCH}" && git push`
+  - [ ] `git fetch origin && git switch website && git reset --hard origin/"${RELEASE_BRANCH}" && git push --force-with-lease`
   - [ ] Confirm that the release changelog was published to https://vector.dev/releases/
     - Refer to the internal releasing doc to monitor the deployment.
 - [ ] Release Linux packages. Refer to the internal releasing doc.
