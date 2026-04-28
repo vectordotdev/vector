@@ -326,9 +326,13 @@ impl SourceConfig for SplunkConfig {
             .with_meaning(OwnedTargetPath::event_root(), meaning::MESSAGE),
         };
 
+        // When only one endpoint has a decoder, the other endpoint still emits the
+        // legacy log shape - so the schema needs to express both possibilities.
         let base = match (&self.event.decoding, &self.raw.decoding) {
             (None, None) => legacy_base(),
-            (Some(d), None) | (None, Some(d)) => d.schema_definition(log_namespace),
+            (Some(d), None) | (None, Some(d)) => {
+                d.schema_definition(log_namespace).merge(legacy_base())
+            }
             (Some(de), Some(dr)) => de
                 .schema_definition(log_namespace)
                 .merge(dr.schema_definition(log_namespace)),
@@ -377,10 +381,11 @@ impl SourceConfig for SplunkConfig {
             );
 
         // Output type is the union of both endpoints' decoder output types
-        // (logs from a JSON codec, metrics from native, etc.). Defaults to logs.
+        // (logs from a JSON codec, metrics from native, etc.). The legacy path
+        // always emits logs, so when an endpoint has no decoder we OR `Log` in.
         let output_type = match (&self.event.decoding, &self.raw.decoding) {
             (None, None) => DataType::Log,
-            (Some(d), None) | (None, Some(d)) => d.output_type(),
+            (Some(d), None) | (None, Some(d)) => d.output_type() | DataType::Log,
             (Some(de), Some(dr)) => de.output_type() | dr.output_type(),
         };
         vec![SourceOutput::new_maybe_logs(output_type, schema_definition)]
@@ -3650,10 +3655,13 @@ mod tests {
             .remove(0)
             .schema_definition(true);
 
-        // The decoder's schema produces `Kind::json()` at the root, and the splunk_hec
-        // source layers its envelope metadata fields on top.
+        // The decoder's schema produces `Kind::json()` at the root, the source
+        // layers its envelope metadata fields on top, and the legacy log shape is
+        // unioned in (since /raw has no decoder and still emits legacy events) -
+        // contributing the `message` meaning at root.
         let expected_definition =
             Definition::new_with_default_metadata(Kind::json(), [LogNamespace::Vector])
+                .with_meaning(OwnedTargetPath::event_root(), meaning::MESSAGE)
                 .with_metadata_field(
                     &owned_value_path!("vector", "source_type"),
                     Kind::bytes(),
