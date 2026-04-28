@@ -24,6 +24,7 @@ use tower::ServiceBuilder;
 use tracing::Span;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
+    compile_vrl,
     config::{LegacyKey, LogNamespace},
     configurable::configurable_component,
     event::BatchNotifier,
@@ -35,6 +36,11 @@ use vector_lib::{
     tls::MaybeTlsIncomingStream,
 };
 use vrl::{
+    compiler::{
+        CompileConfig, Program, TimeZone as VrlTimeZone, TypeState, runtime::Runtime,
+        state::ExternalEnv,
+    },
+    diagnostic::Formatter,
     path::OwnedTargetPath,
     value::{Kind, kind::Collection},
 };
@@ -57,7 +63,7 @@ use self::{
 use crate::{
     SourceSender,
     config::{DataType, Resource, SourceConfig, SourceContext, SourceOutput, log_schema},
-    event::{Event, LogEvent, Value},
+    event::{Event, LogEvent, TargetEvents, Value, VrlTarget},
     http::{KeepaliveConfig, MaxConnectionAgeLayer, build_http_trace_layer},
     internal_events::{
         EventsReceived, HttpBytesReceived, SplunkHecRequestBodyInvalidError, SplunkHecRequestError,
@@ -105,6 +111,12 @@ pub struct SplunkConfig {
     #[configurable(metadata(docs::examples = "A94A8FE5CCB19BA61C4C08"))]
     valid_tokens: Option<Vec<SensitiveString>>,
 
+    /// Optional second-stage decoder applied to each event after HEC protocol parsing.
+    #[configurable(derived)]
+    #[configurable(metadata(docs::advanced))]
+    #[serde(default)]
+    decoding: Option<vector_lib::codecs::decoding::DeserializerConfig>,
+
     /// Whether or not to forward the Splunk HEC authentication token with events.
     ///
     /// If set to `true`, when incoming requests contain a Splunk HEC token, the token used is kept in the
@@ -136,6 +148,7 @@ impl Default for SplunkConfig {
             address: default_socket_address(),
             token: None,
             valid_tokens: None,
+            decoding: None,
             tls: None,
             acknowledgements: Default::default(),
             store_hec_token: false,
@@ -303,6 +316,8 @@ struct SplunkSource {
     store_hec_token: bool,
     log_namespace: LogNamespace,
     events_received: Registered<EventsReceived>,
+    /// Optional VRL program compiled from `config.decoding` for per-event enrichment.
+    vrl_program: Option<Arc<(Program, VrlTimeZone)>>,
 }
 
 impl SplunkSource {
@@ -310,11 +325,6 @@ impl SplunkSource {
         let log_namespace = cx.log_namespace(config.log_namespace);
         let acknowledgements = cx.do_acknowledgements(config.acknowledgements.enabled.into());
         let shutdown = cx.shutdown;
-        let valid_tokens = config
-            .valid_tokens
-            .iter()
-            .flatten()
-            .chain(config.token.iter());
 
         let idx_ack = acknowledgements.then(|| {
             Arc::new(IndexerAcknowledgement::new(
@@ -323,15 +333,51 @@ impl SplunkSource {
             ))
         });
 
+        let valid_credentials: Vec<String> = config
+            .valid_tokens
+            .iter()
+            .flatten()
+            .map(|t| format!("Splunk {}", t.inner()))
+            .chain(config.token.iter().map(|t| format!("Splunk {}", t.inner())))
+            .collect();
+
+        let vrl_program = config.decoding.as_ref().and_then(|d| {
+            use vector_lib::codecs::decoding::DeserializerConfig;
+            if let DeserializerConfig::Vrl(vrl_config) = d {
+                let state = TypeState {
+                    local: Default::default(),
+                    external: ExternalEnv::default(),
+                };
+                match compile_vrl(
+                    &vrl_config.vrl.source,
+                    &vector_vrl_functions::all(),
+                    &state,
+                    CompileConfig::default(),
+                ) {
+                    Ok(result) => Some(Arc::new((
+                        result.program,
+                        vrl_config.vrl.timezone.unwrap_or(VrlTimeZone::Local),
+                    ))),
+                    Err(diagnostics) => {
+                        let msg =
+                            Formatter::new(&vrl_config.vrl.source, diagnostics).to_string();
+                        warn!(error = %msg, "Failed to compile VRL enrichment program for Splunk HEC source.");
+                        None
+                    }
+                }
+            } else {
+                None
+            }
+        });
+
         SplunkSource {
-            valid_credentials: valid_tokens
-                .map(|token| format!("Splunk {}", token.inner()))
-                .collect(),
+            valid_credentials,
             protocol,
             idx_ack,
             store_hec_token: config.store_hec_token,
             log_namespace,
             events_received: register!(EventsReceived),
+            vrl_program,
         }
     }
 
@@ -349,6 +395,7 @@ impl SplunkSource {
         let store_hec_token = self.store_hec_token;
         let log_namespace = self.log_namespace;
         let events_received = self.events_received.clone();
+        let vrl_program = self.vrl_program.clone();
 
         warp::post()
             .and(
@@ -375,6 +422,7 @@ impl SplunkSource {
                     let mut out = out.clone();
                     let idx_ack = idx_ack.clone();
                     let events_received = events_received.clone();
+                    let vrl_program = vrl_program.clone();
 
                     async move {
                         if idx_ack.is_some() && channel.is_none() {
@@ -420,6 +468,7 @@ impl SplunkSource {
                             token: token.filter(|_| store_hec_token).map(Into::into),
                             log_namespace,
                             events_received,
+                            vrl_program,
                         }
                         .into();
 
@@ -463,6 +512,7 @@ impl SplunkSource {
         let store_hec_token = self.store_hec_token;
         let events_received = self.events_received.clone();
         let log_namespace = self.log_namespace;
+        let vrl_program = self.vrl_program.clone();
 
         warp::post()
             .and(path!("raw" / "1.0").or(path!("raw")))
@@ -485,6 +535,7 @@ impl SplunkSource {
                     let mut out = out.clone();
                     let idx_ack = idx_ack.clone();
                     let events_received = events_received.clone();
+                    let vrl_program = vrl_program.clone();
                     emit!(HttpBytesReceived {
                         byte_size: body.len(),
                         http_path: path.as_str(),
@@ -515,6 +566,28 @@ impl SplunkSource {
                         if let Some(token) = token.filter(|_| store_hec_token) {
                             event.metadata_mut().set_splunk_hec_token(token.into());
                         }
+
+                        event = if let Some(vrl) = &vrl_program {
+                            let (program, timezone) = vrl.as_ref();
+                            let mut runtime = Runtime::default();
+                            let mut target = VrlTarget::new(event, program.info(), false);
+                            let resolve_result =
+                                runtime.resolve(&mut target, program, timezone);
+                            if let Err(e) = resolve_result {
+                                warn!(error = %e, "VRL enrichment program failed; event forwarded without enrichment.");
+                            }
+                            match target.into_events(log_namespace) {
+                                TargetEvents::One(e) => e,
+                                TargetEvents::Logs(mut iter) => iter
+                                    .next()
+                                    .expect("VRL enrichment produced empty log iterator"),
+                                TargetEvents::Traces(_) => {
+                                    unreachable!("Splunk HEC only produces log events")
+                                }
+                            }
+                        } else {
+                            event
+                        };
 
                         let res = out.send_event(event).await;
                         res.map(|_| maybe_ack_id)
@@ -578,19 +651,23 @@ impl SplunkSource {
             .and(self.authorization())
             .and(SplunkSource::required_channel())
             .and(Self::lenient_json_content_type_check::<HecAckStatusRequest>())
-            .and_then(move |_, channel: String, req: HecAckStatusRequest| {
-                let idx_ack = idx_ack.clone();
-                async move {
-                    if let Some(idx_ack) = idx_ack {
-                        let acks = idx_ack
-                            .get_acks_status_from_channel(channel, &req.acks)
-                            .await?;
-                        Ok(warp::reply::json(&HecAckStatusResponse { acks }).into_response())
-                    } else {
-                        Err(warp::reject::custom(ApiError::AckIsDisabled))
+            .and_then(
+                move |_auth: Option<String>,
+                      channel: String,
+                      req: HecAckStatusRequest| {
+                    let idx_ack = idx_ack.clone();
+                    async move {
+                        if let Some(idx_ack) = idx_ack {
+                            let acks = idx_ack
+                                .get_acks_status_from_channel(channel, &req.acks)
+                                .await?;
+                            Ok(warp::reply::json(&HecAckStatusResponse { acks }).into_response())
+                        } else {
+                            Err(warp::reject::custom(ApiError::AckIsDisabled))
+                        }
                     }
-                }
-            })
+                },
+            )
             .boxed()
     }
 
@@ -611,7 +688,6 @@ impl SplunkSource {
         post.or(get).unify().boxed()
     }
 
-    /// Authorize request
     fn authorization(&self) -> BoxedFilter<(Option<String>,)> {
         let valid_credentials = self.valid_credentials.clone();
         warp::header::optional("Authorization")
@@ -619,18 +695,16 @@ impl SplunkSource {
                 let valid_credentials = valid_credentials.clone();
                 async move {
                     match (token, valid_credentials.is_empty()) {
-                        // Remove the "Splunk " prefix if present as it is not
-                        // part of the token itself
-                        (token, true) => {
-                            Ok(token
-                                .map(|t| t.strip_prefix("Splunk ").map(Into::into).unwrap_or(t)))
+                        (token, true) => Ok(token
+                            .map(|t| t.strip_prefix("Splunk ").map(Into::into).unwrap_or(t))),
+                        (Some(token), false) if valid_credentials.contains(&token) => {
+                            Ok(Some(
+                                token
+                                    .strip_prefix("Splunk ")
+                                    .map(Into::into)
+                                    .unwrap_or(token),
+                            ))
                         }
-                        (Some(token), false) if valid_credentials.contains(&token) => Ok(Some(
-                            token
-                                .strip_prefix("Splunk ")
-                                .map(Into::into)
-                                .unwrap_or(token),
-                        )),
                         (Some(_), false) => Err(Rejection::from(ApiError::InvalidAuthorization)),
                         (None, false) => Err(Rejection::from(ApiError::MissingAuthorization)),
                     }
@@ -688,6 +762,8 @@ struct EventIterator<'de, R: JsonRead<'de>> {
     log_namespace: LogNamespace,
     /// handle to EventsReceived registry
     events_received: Registered<EventsReceived>,
+    /// Optional compiled VRL program for per-event enrichment.
+    vrl_program: Option<Arc<(Program, VrlTimeZone)>>,
 }
 
 /// Intermediate struct to generate an `EventIterator`
@@ -700,6 +776,7 @@ struct EventIteratorGenerator<'de, R: JsonRead<'de>> {
     events_received: Registered<EventsReceived>,
     remote: Option<SocketAddr>,
     remote_addr: Option<String>,
+    vrl_program: Option<Arc<(Program, VrlTimeZone)>>,
 }
 
 impl<'de, R: JsonRead<'de>> From<EventIteratorGenerator<'de, R>> for EventIterator<'de, R> {
@@ -734,6 +811,7 @@ impl<'de, R: JsonRead<'de>> From<EventIteratorGenerator<'de, R>> for EventIterat
             token: f.token,
             log_namespace: f.log_namespace,
             events_received: f.events_received,
+            vrl_program: f.vrl_program,
         }
     }
 }
@@ -842,13 +920,34 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
             log.metadata_mut().set_splunk_hec_token(Arc::clone(token));
         }
 
+        let mut event: Event = if let Some(vrl) = &self.vrl_program {
+            let (program, timezone) = vrl.as_ref();
+            let mut runtime = Runtime::default();
+            let mut target = VrlTarget::new(log.into(), program.info(), false);
+            let resolve_result = runtime.resolve(&mut target, program, timezone);
+            if let Err(e) = resolve_result {
+                warn!(error = %e, "VRL enrichment program failed; event forwarded without enrichment.");
+            }
+            match target.into_events(self.log_namespace) {
+                TargetEvents::One(e) => e,
+                TargetEvents::Logs(mut iter) => iter
+                    .next()
+                    .expect("VRL enrichment produced empty log iterator"),
+                TargetEvents::Traces(_) => {
+                    unreachable!("Splunk HEC only produces log events")
+                }
+            }
+        } else {
+            log.into()
+        };
+
         if let Some(batch) = self.batch.clone() {
-            log = log.with_batch_notifier(&batch);
+            event = event.with_batch_notifier(&batch);
         }
 
         self.events += 1;
 
-        Ok(log.into())
+        Ok(event)
     }
 
     /// Build the log event for the vector namespace.
@@ -1370,8 +1469,8 @@ mod tests {
     ) {
         let (sender, recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
         let (_guard, address) = next_addr();
-        let valid_tokens =
-            valid_tokens.map(|tokens| tokens.iter().map(|v| v.to_string().into()).collect());
+        let valid_tokens = valid_tokens
+            .map(|tokens| tokens.iter().map(|v| v.to_string().into()).collect());
         let cx = SourceContext::new_test(sender, None);
         tokio::spawn(async move {
             SplunkConfig {
