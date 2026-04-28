@@ -1233,17 +1233,27 @@ impl Runner {
         let mut scheduler =
             ConcurrentTransformScheduler::new(*TRANSFORM_CONCURRENCY_LIMIT, *REORDER_BUFFER_CAP);
         let mut shutting_down = false;
+        // Counts deliveries in the current round. Once it reaches the concurrency
+        // limit the delivery arm is disabled so the else arm can fire and yield,
+        // giving downstream tasks (and the runtime at large) a chance to run.
+        // Reset to zero by the else arm each round.
+        let mut drain_count: usize = 0;
 
         self.timer_tx.try_send_start_wait();
         loop {
             tokio::select! {
-                // Deliver the next in-order result. One result per select!
-                // round; the Stream impl handles stashing internally.
-                result = scheduler.next(), if !scheduler.is_empty() => {
+                biased;
+
+                // Deliver the next in-order result, up to the concurrency limit
+                // per round before yielding.
+                result = scheduler.next(),
+                    if !scheduler.is_empty() && drain_count < *TRANSFORM_CONCURRENCY_LIMIT =>
+                {
                     let mut outputs_buf = result.expect("is_empty guard prevents None");
                     self.send_outputs(&mut outputs_buf)
                         .await
                         .map_err(TaskError::wrapped)?;
+                    drain_count += 1;
                 }
 
                 // Accept new input when the scheduler has capacity.
@@ -1278,6 +1288,8 @@ impl Runner {
                     if shutting_down && scheduler.is_empty() {
                         break;
                     }
+                    drain_count = 0;
+                    tokio::task::yield_now().await;
                 }
             }
         }
