@@ -603,13 +603,13 @@ impl ByteSizeOf for MetricTags {
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "generate-fixtures"))]
 mod test_support {
     use std::collections::HashSet;
 
     use quickcheck::{Arbitrary, Gen};
 
-    use super::*;
+    use super::{BTreeMap, MetricTags, TagValue, TagValueSet};
 
     impl Arbitrary for TagValue {
         fn arbitrary(g: &mut Gen) -> Self {
