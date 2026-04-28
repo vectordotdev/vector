@@ -33,7 +33,10 @@ use vector_lib::{
     configurable::configurable_component,
     event::BatchNotifier,
     internal_event::{CountByteSize, InternalEventHandle as _, Registered},
-    lookup::{self, event_path, lookup_v2::OptionalValuePath, metadata_path, owned_value_path},
+    lookup::{
+        self, OwnedValuePath, event_path, lookup_v2::OptionalValuePath, metadata_path,
+        owned_value_path,
+    },
     schema::meaning,
     sensitive_string::SensitiveString,
     source_sender::SendError,
@@ -338,6 +341,19 @@ impl SourceConfig for SplunkConfig {
                 .merge(dr.schema_definition(log_namespace)),
         };
 
+        // When a decoder is configured on either endpoint, the runtime uses
+        // `InsertIfEmpty` to write `splunk_*` legacy keys (so decoder-produced
+        // values win). Mirror that in the advertised schema so VRL/type checks
+        // and downstream schema consumers see the same behavior.
+        let any_decoder = self.event.decoding.is_some() || self.raw.decoding.is_some();
+        let splunk_legacy_key = |path: OwnedValuePath| {
+            if any_decoder {
+                LegacyKey::InsertIfEmpty(path)
+            } else {
+                LegacyKey::Overwrite(path)
+            }
+        };
+
         let schema_definition = base
             .with_standard_vector_source_metadata()
             .with_source_metadata(
@@ -352,21 +368,21 @@ impl SourceConfig for SplunkConfig {
             )
             .with_source_metadata(
                 SplunkConfig::NAME,
-                Some(LegacyKey::Overwrite(owned_value_path!(CHANNEL))),
+                Some(splunk_legacy_key(owned_value_path!(CHANNEL))),
                 &owned_value_path!("channel"),
                 Kind::bytes(),
                 None,
             )
             .with_source_metadata(
                 SplunkConfig::NAME,
-                Some(LegacyKey::Overwrite(owned_value_path!(INDEX))),
+                Some(splunk_legacy_key(owned_value_path!(INDEX))),
                 &owned_value_path!("index"),
                 Kind::bytes(),
                 None,
             )
             .with_source_metadata(
                 SplunkConfig::NAME,
-                Some(LegacyKey::Overwrite(owned_value_path!(SOURCE))),
+                Some(splunk_legacy_key(owned_value_path!(SOURCE))),
                 &owned_value_path!("source"),
                 Kind::bytes(),
                 Some(meaning::SERVICE),
@@ -374,7 +390,7 @@ impl SourceConfig for SplunkConfig {
             // Not to be confused with `source_type`.
             .with_source_metadata(
                 SplunkConfig::NAME,
-                Some(LegacyKey::Overwrite(owned_value_path!(SOURCETYPE))),
+                Some(splunk_legacy_key(owned_value_path!(SOURCETYPE))),
                 &owned_value_path!("sourcetype"),
                 Kind::bytes(),
                 None,
@@ -677,6 +693,7 @@ impl SplunkSource {
                                 log_namespace,
                                 &events_received,
                                 None,
+                                None,
                             )?;
                             // raw_event with no decoder always produces exactly one
                             // event.
@@ -692,10 +709,13 @@ impl SplunkSource {
                                 .map_err(|_| Rejection::from(ApiError::ServerShutdown));
                         };
 
-                        // Decoder path: build events first, then decide whether to
-                        // ack based on whether the codec produced anything and
-                        // whether it dropped any frames mid-stream.
-                        let (mut events, had_decode_errors) = raw_event(
+                        // Decoder path: pass the optional HEC token into raw_event so
+                        // it's stamped on each event the moment it leaves the codec
+                        // (rather than after the whole payload is decoded).
+                        let token: Option<Arc<str>> = token
+                            .filter(|_| store_hec_token)
+                            .map(Arc::from);
+                        let (events, had_decode_errors) = raw_event(
                             body,
                             gzip,
                             channel_id.clone(),
@@ -705,15 +725,8 @@ impl SplunkSource {
                             log_namespace,
                             &events_received,
                             Some(decoder),
+                            token,
                         )?;
-                        if let Some(token) = token.filter(|_| store_hec_token) {
-                            let token: Arc<str> = Arc::from(token);
-                            for event in &mut events {
-                                event
-                                    .metadata_mut()
-                                    .set_splunk_hec_token(Arc::clone(&token));
-                            }
-                        }
 
                         if events.is_empty() || had_decode_errors {
                             // With newline framing, `valid \n invalid \n valid`
@@ -1154,6 +1167,7 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
             &self.batch,
             self.log_namespace,
             &self.events_received,
+            self.token.as_ref(),
         );
 
         // Snapshot envelope metadata that has to apply uniformly to every decoded event.
@@ -1207,14 +1221,9 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
                     de.extract(log, &mut json);
                 }
             }
-
-            // The token lives on `EventMetadata`, which exists on every event type,
-            // so apply it outside the `Event::Log` branch - codecs like `native` or
-            // `otlp` can emit metrics or traces, and those still need the HEC token
-            // for downstream Splunk HEC sinks.
-            if let Some(token) = &self.token {
-                event.metadata_mut().set_splunk_hec_token(Arc::clone(token));
-            }
+            // `splunk_hec_token` is set inside `decode_payload` so the metadata is
+            // attached at the moment each event leaves the codec. Don't overwrite it
+            // here.
             out.push(event);
         }
 
@@ -1364,9 +1373,12 @@ impl<'de, R: JsonRead<'de>> Iterator for EventIterator<'de, R> {
 /// request that lost data mid-stream.
 ///
 /// On each decoded event this helper sets `source_type`, the `vector.ingest_timestamp`
-/// metadata (Vector namespace), and a fallback timestamp via `try_insert` (so a
-/// codec-supplied timestamp wins on conflict). It also attaches the per-request
-/// `BatchNotifier` so acknowledgements flow correctly.
+/// metadata (Vector namespace), a fallback timestamp via `try_insert` (so a
+/// codec-supplied timestamp wins on conflict), the optional Splunk HEC token, and
+/// the per-request `BatchNotifier` so acknowledgements flow correctly. The token is
+/// applied as soon as each event leaves the codec so it's the earliest visible
+/// metadata downstream of the decoder.
+#[allow(clippy::too_many_arguments)]
 fn decode_payload(
     mut decoder: Decoder,
     payload: &[u8],
@@ -1374,6 +1386,7 @@ fn decode_payload(
     batch: &Option<BatchNotifier>,
     log_namespace: LogNamespace,
     events_received: &Registered<EventsReceived>,
+    splunk_hec_token: Option<&Arc<str>>,
 ) -> (Vec<Event>, bool) {
     let mut buffer = BytesMut::with_capacity(payload.len());
     buffer.extend_from_slice(payload);
@@ -1410,6 +1423,9 @@ fn decode_payload(
                                 }
                             }
                         }
+                    }
+                    if let Some(token) = splunk_hec_token {
+                        event.metadata_mut().set_splunk_hec_token(Arc::clone(token));
                     }
                     events_received.emit(CountByteSize(1, event.estimated_json_encoded_size_of()));
                     events.push(event.with_batch_notifier_option(batch));
@@ -1570,6 +1586,7 @@ fn raw_event(
     log_namespace: LogNamespace,
     events_received: &Registered<EventsReceived>,
     decoder: Option<Decoder>,
+    splunk_hec_token: Option<Arc<str>>,
 ) -> Result<(Vec<Event>, bool), Rejection> {
     // Process gzip
     let body_bytes: Bytes = if gzip {
@@ -1608,6 +1625,7 @@ fn raw_event(
             &batch,
             log_namespace,
             events_received,
+            splunk_hec_token.as_ref(),
         )
     } else {
         let message: Value = body_bytes.into();
