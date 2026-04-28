@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::HashMap,
     future::ready,
     num::NonZeroUsize,
     sync::{Arc, LazyLock, Mutex},
@@ -35,6 +35,7 @@ use vector_vrl_metrics::MetricsStorage;
 
 use super::{
     BuiltBuffer, ConfigDiff,
+    concurrent_transform_scheduler::ConcurrentTransformScheduler,
     fanout::{self, Fanout},
     schema,
     task::{Task, TaskOutput, TaskResult},
@@ -75,14 +76,10 @@ static TRANSFORM_CONCURRENCY_LIMIT: LazyLock<usize> = LazyLock::new(|| {
         .unwrap_or_else(crate::num_threads)
 });
 
-// Maximum number of completed-but-not-yet-emitted results that may accumulate
-// in the reorder buffer while waiting for a slow head task. This decouples the
-// "keep CPUs busy" limit (TRANSFORM_CONCURRENCY_LIMIT, based on running tasks)
-// from the "prevent unbounded memory growth" limit. Set to 4× the concurrency
-// limit so that even in the worst case (head task very slow, all others fast)
-// we buffer at most this many TransformOutputsBufs before back-pressuring.
-static REORDER_BUFFER_CAP: LazyLock<usize> =
-    LazyLock::new(|| *TRANSFORM_CONCURRENCY_LIMIT * 4);
+// Maximum number of completed-but-not-yet-emitted transform results that can be
+// buffered in memmory when running transforms concurrently. See run_concurrently
+// and ConcurrentTransformScheduler for more details
+static REORDER_BUFFER_CAP: LazyLock<usize> = LazyLock::new(|| *TRANSFORM_CONCURRENCY_LIMIT * 3);
 
 const INTERNAL_SOURCES: [&str; 2] = ["internal_logs", "internal_metrics"];
 
@@ -1227,69 +1224,33 @@ impl Runner {
         let mut input_rx =
             super::ready_arrays::ReadyArrays::with_capacity(input_rx, READY_ARRAY_CAPACITY);
 
-        // Tasks run concurrently via FuturesUnordered and may finish out of order.
-        // Each task carries its index (pos) so its result lands in the right
-        // reorder_buf slot: reorder_buf[pos - head].
-        let mut in_flight: FuturesUnordered<
-            tokio::task::JoinHandle<(usize, TransformOutputsBuf)>,
-        > = FuturesUnordered::new();
-
-        // Ordered buffer of task results. Indexed by (pos - head).
-        // None = task still running; Some = result ready to forward downstream.
-        let mut reorder_buf: VecDeque<Option<TransformOutputsBuf>> = VecDeque::new();
-        let mut head: usize = 0; // index of the next result to forward downstream
-        let mut tail: usize = 0; // index to assign to the next spawned task
+        // Running limit gates CPU parallelism; buffer limit bounds worst-case
+        // memory use of results waiting behind a slow head task.
+        let mut scheduler =
+            ConcurrentTransformScheduler::new(*TRANSFORM_CONCURRENCY_LIMIT, *REORDER_BUFFER_CAP);
         let mut shutting_down = false;
 
         self.timer_tx.try_send_start_wait();
         loop {
-            if shutting_down && in_flight.is_empty() && reorder_buf.is_empty() {
-                break;
-            }
-
             tokio::select! {
                 biased;
 
-                // A task finished — place its result in the reorder buffer, then
-                // forward all consecutive ready results downstream in order.
-                result = in_flight.next(), if !in_flight.is_empty() => {
-                    match result {
-                        Some(Ok((pos, outputs_buf))) => {
-                            // pos - head is the index into reorder_buf. The entry
-                            // was reserved as None when the task was spawned, so
-                            // it is always in bounds.
-                            reorder_buf[pos - head] = Some(outputs_buf);
-                            while reorder_buf.front().is_some_and(Option::is_some) {
-                                let mut buf = reorder_buf.pop_front().unwrap().unwrap();
-                                head += 1;
-                                self.send_outputs(&mut buf)
-                                    .await
-                                    .map_err(TaskError::wrapped)?;
-                            }
-                        }
-                        Some(Err(join_err)) => {
-                            return Err(TaskError::from(join_err));
-                        }
-                        None => unreachable!("in_flight is non-empty per guard"),
+                // A task finished — drain all consecutive ready results in order.
+                ready = scheduler.await_drainable(), if scheduler.has_running() => {
+                    ready.map_err(TaskError::from)?;
+                    while let Some(mut outputs_buf) = scheduler.try_pop_ready() {
+                        self.send_outputs(&mut outputs_buf)
+                            .await
+                            .map_err(TaskError::wrapped)?;
                     }
                 }
 
-                // Accept new input when a CPU slot is free AND the reorder buffer
-                // hasn't grown too large. Gating on in_flight.len() (not
-                // reorder_buf.len()) keeps all CPU cores busy even when completed
-                // results are buffered waiting behind a slow head task.
-                // REORDER_BUFFER_CAP bounds the worst-case memory usage of the buffer.
+                // Accept new input when the scheduler has capacity.
                 input_arrays = input_rx.next(),
-                    if in_flight.len() < *TRANSFORM_CONCURRENCY_LIMIT
-                        && reorder_buf.len() < *REORDER_BUFFER_CAP
-                        && !shutting_down =>
+                    if scheduler.can_spawn() && !shutting_down =>
                 {
                     match input_arrays {
                         Some(input_arrays) => {
-                            let pos = tail;
-                            tail += 1;
-                            reorder_buf.push_back(None); // reserve the result slot
-
                             let mut len = 0;
                             for events in &input_arrays {
                                 self.on_events_received(events);
@@ -1298,25 +1259,25 @@ impl Runner {
 
                             let mut t = self.transform.clone();
                             let mut outputs_buf = self.outputs.new_buf_with_capacity(len);
-                            let task = tokio::spawn(
+                            scheduler.spawn(
                                 async move {
                                     for events in input_arrays {
                                         t.transform_all(events, &mut outputs_buf);
                                     }
-                                    (pos, outputs_buf)
+                                    outputs_buf
                                 }
                                 .in_current_span(),
                             );
-                            in_flight.push(task);
                         }
-                        None => {
-                            shutting_down = true;
-                            // fall through to top of loop to drain and check termination
-                        }
+                        None => shutting_down = true,
                     }
                 }
 
-                else => {}
+                else => {
+                    if shutting_down && scheduler.is_empty() {
+                        break;
+                    }
+                }
             }
         }
 
