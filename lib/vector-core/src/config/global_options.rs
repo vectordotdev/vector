@@ -190,6 +190,15 @@ pub struct GlobalOptions {
     /// `find_vector_metrics`, and `aggregate_vector_metrics` functions.
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub metrics_storage_refresh_period: Option<f64>,
+
+    /// Whether to preserve event ordering in stateless transforms that process events concurrently.
+    ///
+    /// When `true` (the default), output events are emitted in the same order they were received.
+    /// When `false`, output ordering is not guaranteed, which may improve throughput when
+    /// processing time varies across events.
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
+    #[configurable(metadata(docs::common = false, docs::required = false))]
+    pub preserve_ordering_stateless_transforms: Option<bool>,
 }
 
 impl_generate_config_from_default!(GlobalOptions);
@@ -295,6 +304,15 @@ impl GlobalOptions {
             errors.push("conflicting values for 'expire_metrics_secs' found".to_owned());
         }
 
+        if conflicts(
+            self.preserve_ordering_stateless_transforms.as_ref(),
+            with.preserve_ordering_stateless_transforms.as_ref(),
+        ) {
+            errors.push(
+                "conflicting values for 'preserve_ordering_stateless_transforms' found".to_owned(),
+            );
+        }
+
         let data_dir = if self.data_dir.is_none() || self.data_dir == default_data_dir() {
             with.data_dir
         } else if with.data_dir != default_data_dir() && self.data_dir != with.data_dir {
@@ -345,6 +363,9 @@ impl GlobalOptions {
                 metrics_storage_refresh_period: self
                     .metrics_storage_refresh_period
                     .or(with.metrics_storage_refresh_period),
+                preserve_ordering_stateless_transforms: self
+                    .preserve_ordering_stateless_transforms
+                    .or(with.preserve_ordering_stateless_transforms),
             })
         } else {
             Err(errors)

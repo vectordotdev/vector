@@ -12,6 +12,7 @@ pub mod schema;
 
 pub mod builder;
 mod controller;
+mod in_flight_queue;
 mod ready_arrays;
 mod running;
 mod task;
