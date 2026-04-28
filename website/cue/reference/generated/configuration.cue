@@ -216,6 +216,116 @@ generated: configuration: {
 						required:      false
 						relevant_when: "type = \"file\""
 					}
+					filter: {
+						type: object: options: {
+							bucket_size: {
+								type: uint: default: 4
+								description:   "Number of slots in each bucket"
+								required:      false
+								relevant_when: "type = \"cuckoo\""
+							}
+							counter_bits: {
+								type: uint: default: 8
+								description:   "Number of bits to use to track counter. This will limit the max value."
+								required:      false
+								relevant_when: "type = \"cuckoo\""
+							}
+							counter_enabled: {
+								type: bool: default: false
+								description:   "Can be set to true to track a count alongside hashes."
+								required:      false
+								relevant_when: "type = \"cuckoo\""
+							}
+							counter_field: {
+								type: string: default: ""
+								description:   "Field in the incoming value used as the counter override."
+								required:      false
+								relevant_when: "type = \"cuckoo\""
+							}
+							export_interval: {
+								type: uint: {}
+								description: """
+																		The interval used for exporting data.
+
+																		By default, export is only done on exit.
+																		"""
+								required:      false
+								relevant_when: "type = \"cuckoo\""
+							}
+							fingerprint_bits: {
+								type: uint: default: 8
+								description:   "Number of bits used for fingerprint."
+								required:      false
+								relevant_when: "type = \"cuckoo\""
+							}
+							lru_enabled: {
+								type: bool: default: false
+								description:   "Can be set to true to use LRU strategy for kicking."
+								required:      false
+								relevant_when: "type = \"cuckoo\""
+							}
+							max_entries: {
+								type: uint: {}
+								description: """
+																		Maximum number of entries that can be stored in the filter (actual capacity will usually be
+																		larger)
+																		"""
+								required: true
+							}
+							max_kicks: {
+								type: uint: default: 500
+								description:   "Max number of kicks when experiencing hash collisions."
+								required:      false
+								relevant_when: "type = \"cuckoo\""
+							}
+							persistence_path: {
+								type: string: {}
+								description: """
+																		Path to the file to export data to periodically and on exit.
+																		Data will be imported from this file on startup.
+																		"""
+								required:      false
+								relevant_when: "type = \"cuckoo\""
+							}
+							ttl_bits: {
+								type: uint: default: 8
+								description: """
+																		Number of bits to use to track TTL. Low bit count will reduce maximum TTL and also require a
+																		worse resolution to keep working.
+																		"""
+								required:      false
+								relevant_when: "type = \"cuckoo\""
+							}
+							ttl_enabled: {
+								type: bool: default: true
+								description:   "Can be set to true to also track TTL for entries."
+								required:      false
+								relevant_when: "type = \"cuckoo\""
+							}
+							type: {
+								required: true
+								type: string: enum: {
+									cuckoo: """
+																					Cuckoo filter
+
+																					Supports removal too, as well as TTL and LRU
+																					"""
+									bloom: """
+																					Bloom filter
+
+																					Only supports insertion and presence check, no TTL
+																					"""
+								}
+								description: "The probabilistic filter to use."
+							}
+						}
+						description: """
+														Set to make the table act as a probabilistic filter instead of storing original values. This
+														will prevent reading values from the table - found keys will have empty value.
+														"""
+						required:      false
+						relevant_when: "type = \"memory\""
+					}
 					flush_interval: {
 						type: uint: {}
 						description: """
