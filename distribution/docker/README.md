@@ -33,9 +33,18 @@ observability data with Vector.
 
 ## Configuring
 
-As shown above, you can pass a custom
-[Vector configuration file][docs.setup.configuration] via the `-c` flag. You'll want
-to do this since the
+You can pass a custom
+[Vector configuration file][docs.setup.configuration] to the container via the
+`-c` flag, mounting the file from the host:
+
+```bash
+docker run \
+  -v "$PWD/vector.yaml:/etc/vector/vector.yaml:ro" \
+  timberio/vector:latest-alpine \
+  -c /etc/vector/vector.yaml
+```
+
+You'll want to do this since the
 [default `/etc/vector/vector.yaml` configuration file][urls.default_configuration]
 doesn't do anything.
 
