@@ -41,7 +41,7 @@ permissions:
 env:
   SINGLE_MACHINE_PERFORMANCE_API: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_API }}
   SMP_WARMUP_SECONDS: 70 # default is 45 seconds
-  SMP_REPLICAS: 100 # default is 10
+  SMP_REPLICAS: 20 # default is 10
 
 jobs:
   resolve-inputs:

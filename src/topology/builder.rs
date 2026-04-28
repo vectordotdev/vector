@@ -6,7 +6,7 @@ use std::{
     time::Instant,
 };
 
-use futures::{FutureExt, StreamExt, TryStreamExt, stream::FuturesOrdered};
+use futures::{FutureExt, StreamExt, TryStreamExt};
 use futures_util::stream::FuturesUnordered;
 use metrics::gauge;
 use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
@@ -35,6 +35,7 @@ use vector_vrl_metrics::MetricsStorage;
 
 use super::{
     BuiltBuffer, ConfigDiff,
+    concurrent_transform_scheduler::ConcurrentTransformScheduler,
     fanout::{self, Fanout},
     schema,
     task::{Task, TaskOutput, TaskResult},
@@ -74,6 +75,11 @@ static TRANSFORM_CONCURRENCY_LIMIT: LazyLock<usize> = LazyLock::new(|| {
         .map(std::num::NonZeroUsize::get)
         .unwrap_or_else(crate::num_threads)
 });
+
+// Maximum number of completed-but-not-yet-emitted transform results that can be
+// buffered in memmory when running transforms concurrently. See run_concurrently
+// and ConcurrentTransformScheduler for more details
+static REORDER_BUFFER_CAP: LazyLock<usize> = LazyLock::new(|| *TRANSFORM_CONCURRENCY_LIMIT);
 
 const INTERNAL_SOURCES: [&str; 2] = ["internal_logs", "internal_metrics"];
 
@@ -1218,7 +1224,10 @@ impl Runner {
         let mut input_rx =
             super::ready_arrays::ReadyArrays::with_capacity(input_rx, READY_ARRAY_CAPACITY);
 
-        let mut in_flight = FuturesOrdered::new();
+        // Running limit gates CPU parallelism; buffer limit bounds worst-case
+        // memory use of results waiting behind a slow head task.
+        let mut scheduler =
+            ConcurrentTransformScheduler::new(*TRANSFORM_CONCURRENCY_LIMIT, *REORDER_BUFFER_CAP);
         let mut shutting_down = false;
 
         self.timer_tx.try_send_start_wait();
@@ -1226,17 +1235,20 @@ impl Runner {
             tokio::select! {
                 biased;
 
-                result = in_flight.next(), if !in_flight.is_empty() => {
-                    match result {
-                        Some(Ok(mut outputs_buf)) => {
-                            self.send_outputs(&mut outputs_buf).await
-                                .map_err(TaskError::wrapped)?;
-                        }
-                        _ => unreachable!("join error or bad poll"),
+                // A task finished — drain all consecutive ready results in order.
+                ready = scheduler.await_drainable(), if scheduler.has_running() => {
+                    ready.map_err(TaskError::from)?;
+                    while let Some(mut outputs_buf) = scheduler.try_pop_ready() {
+                        self.send_outputs(&mut outputs_buf)
+                            .await
+                            .map_err(TaskError::wrapped)?;
                     }
                 }
 
-                input_arrays = input_rx.next(), if in_flight.len() < *TRANSFORM_CONCURRENCY_LIMIT && !shutting_down => {
+                // Accept new input when the scheduler has capacity.
+                input_arrays = input_rx.next(),
+                    if scheduler.can_spawn() && !shutting_down =>
+                {
                     match input_arrays {
                         Some(input_arrays) => {
                             let mut len = 0;
@@ -1247,24 +1259,23 @@ impl Runner {
 
                             let mut t = self.transform.clone();
                             let mut outputs_buf = self.outputs.new_buf_with_capacity(len);
-                            let task = tokio::spawn(async move {
-                                for events in input_arrays {
-                                    t.transform_all(events, &mut outputs_buf);
+                            scheduler.spawn(
+                                async move {
+                                    for events in input_arrays {
+                                        t.transform_all(events, &mut outputs_buf);
+                                    }
+                                    outputs_buf
                                 }
-                                outputs_buf
-                            }.in_current_span());
-                            in_flight.push_back(task);
+                                .in_current_span(),
+                            );
                         }
-                        None => {
-                            shutting_down = true;
-                            continue
-                        }
+                        None => shutting_down = true,
                     }
                 }
 
                 else => {
-                    if shutting_down {
-                        break
+                    if shutting_down && scheduler.is_empty() {
+                        break;
                     }
                 }
             }

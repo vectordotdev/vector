@@ -11,6 +11,7 @@ pub(super) use vector_lib::fanout;
 pub mod schema;
 
 pub mod builder;
+mod concurrent_transform_scheduler;
 mod controller;
 mod ready_arrays;
 mod running;
