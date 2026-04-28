@@ -1,5 +1,7 @@
 # Static base config for the vector#24125 repro.
-# The repro script appends rendered http-sinks.yaml.tmpl to this file to form vector.yaml.
+# Bind-mounted directly into the container at /etc/vector/base.yaml; the rendered
+# sinks file lives next to it as /etc/vector/sinks.yaml and Vector merges both
+# via --config-dir.
 
 api:
   enabled: true

@@ -26,7 +26,12 @@
 #   http-sinks.yaml.tmpl   templated http sinks (rendered per-run)
 #
 # Usage:
-#   ./testing/github-24125/reproduce-reload-deadlock.sh <image>
+#   ./testing/github-24125/reproduce-reload-deadlock.sh [image]
+#
+# If [image] is omitted, builds a minimal Vector image from the current source tree
+# (host architecture, no cross-compile, only the features the repro needs). The
+# resulting image is tagged vector-pr24125-test:local. First build is ~10–15 min;
+# subsequent builds are fast thanks to BuildKit cache mounts.
 #
 # Exit codes:
 #   0 — bug reproduced (post-edit reload did not complete within the floor)
@@ -35,14 +40,9 @@
 
 set -euo pipefail
 
-if [ $# -lt 1 ]; then
-  echo "Usage: $0 <image>" >&2
-  echo "  e.g. $0 timberio/vector:0.50.0-debian" >&2
-  exit 64
-fi
-
-IMAGE="$1"
+IMAGE="${1:-}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 RECEIVER_PY="$SCRIPT_DIR/receiver.py"
 BASE_YAML="$SCRIPT_DIR/base-config.yaml"
 SINKS_TMPL="$SCRIPT_DIR/http-sinks.yaml.tmpl"
@@ -69,7 +69,7 @@ BASELINE_RELOAD_MAX_SEC="${BASELINE_RELOAD_MAX_SEC:-120}"
 # reload sink drain (which has no timeout), so this floor is a heuristic, not a
 # strict upper bound implied by Vector's code. See src/topology/running.rs.
 GRACEFUL_SHUTDOWN_LIMIT_SEC="${GRACEFUL_SHUTDOWN_LIMIT_SEC:-20}"
-POST_EDIT_RELOAD_FLOOR_SEC="${POST_EDIT_RELOAD_FLOOR_SEC:-30}"
+POST_EDIT_RELOAD_FLOOR_SEC="${POST_EDIT_RELOAD_FLOOR_SEC:-90}"
 # These ports are baked into vector-base.yaml; changing them here also requires editing the
 # static config. They're variables only so the docker port mappings stay in one place.
 API_PORT=8686
@@ -85,13 +85,40 @@ fi
 RESULTS=()  # each entry: STATUS|ID|LABEL|NOTE|DETAIL
 
 cleanup() {
-  for c in "$VECTOR_C" "$GOOD_C" "$BAD_C"; do
-    docker rm -f "$c" >/dev/null 2>&1 || true
-  done
-  docker network rm "$NETWORK" >/dev/null 2>&1 || true
-  rm -rf "$WORKDIR"
+  if [[ "${CLEANUP:=true}" == "true" ]]; then
+    echo "==> Cleaning up old images and networks"
+    for c in "$VECTOR_C" "$GOOD_C" "$BAD_C"; do
+      docker rm -f "$c" >/dev/null 2>&1 || true
+    done
+    docker network rm "$NETWORK" >/dev/null 2>&1 || true
+    if [[ "${ON_EXIT:=false}" == "true" ]]; then
+      rm -rf "$WORKDIR"
+    fi
+  fi
 }
-trap cleanup EXIT
+
+on_exit() {
+  ON_EXIT=true
+  CLEANUP=${EXIT_CLEANUP:=true}
+  cleanup
+}
+
+if [[ "${START_CLEANUP:=true}" == "true" ]]; then
+  cleanup
+fi
+
+trap on_exit EXIT
+
+if [ -z "$IMAGE" ]; then
+  IMAGE="vector-pr24125-test:local"
+  echo "==> no image provided; building $IMAGE from $REPO_ROOT"
+  echo "==> first build ~10–15 min; subsequent builds reuse cargo cache"
+  if [ "${CLEAN_BUILD:-0}" = 1 ]; then
+    echo "==> CLEAN_BUILD=1 set; pruning BuildKit cache mounts (cargo registry, target/)"
+    docker builder prune -af >/dev/null
+  fi
+  DOCKER_BUILDKIT=1 docker build --no-cache -t "$IMAGE" -f "$SCRIPT_DIR/Dockerfile" "$REPO_ROOT"
+fi
 
 # Render the http-sinks template with the current host names and except_fields list.
 # $1 = comma-separated except_fields (e.g. "garbage_initial,garbage_post_edit")
@@ -111,9 +138,34 @@ PYEOF
 }
 
 write_config() {
-  # $1 = comma-separated except_fields
-  cat "$BASE_YAML" > "$WORKDIR/vector.yaml"
-  render_sinks "$1" >> "$WORKDIR/vector.yaml"
+  # $1 = comma-separated except_fields. The sinks.yaml file is bind-mounted into
+  # the container, so the host write here is what Vector eventually sees.
+  # Truncate-then-write preserves the inode so the bind mount keeps tracking.
+  render_sinks "$1" > "$WORKDIR/sinks.yaml"
+}
+
+# Poll `vector validate` from inside the container until it succeeds or the
+# attempt budget is exhausted. Used after rewriting sinks.yaml to absorb the
+# bind-mount propagation lag on Docker for Mac (gRPC/virtiofs bridge can take
+# a few hundred ms to expose the new content to the Linux VM, during which a
+# SIGHUP would race and Vector would read a truncated file).
+#
+# Backoff: 1s wait first, then 5 attempts at 1s, 2s, 4s, 8s, 16s gaps -> ~32s
+# worst case. Returns 0 on success, non-zero if all attempts fail.
+wait_for_config_visible() {
+  sleep 1
+  local delay=1
+  for attempt in 1 2 3 4 5; do
+    if docker exec "$VECTOR_C" vector validate --no-environment /etc/vector/base.yaml /etc/vector/sinks.yaml >/dev/null 2>&1; then
+      return 0
+    fi
+    if [ "$attempt" -lt 5 ]; then
+      sleep "$delay"
+      delay=$((delay * 2))
+    fi
+  done
+  echo "${RED}WARN: vector validate never succeeded for the rewritten config${RESET}" >&2
+  return 1
 }
 
 count_log_marker() {
@@ -285,8 +337,9 @@ docker run -d --name "$VECTOR_C" --network "$NETWORK" \
   -p "${API_PORT}:${API_PORT}" \
   -p "${PROM_PORT}:${PROM_PORT}" \
   -e VECTOR_GRACEFUL_SHUTDOWN_LIMIT_SECS="$GRACEFUL_SHUTDOWN_LIMIT_SEC" \
-  -v "$WORKDIR:/etc/vector" \
-  "$IMAGE" >/dev/null
+  -v "$BASE_YAML:/etc/vector/base.yaml:ro" \
+  -v "$WORKDIR/sinks.yaml:/etc/vector/sinks.yaml:ro" \
+  "$IMAGE" --config /etc/vector/base.yaml --config /etc/vector/sinks.yaml >/dev/null
 
 started=false
 for _ in $(seq 1 60); do
@@ -348,6 +401,8 @@ probe_state T3 "after baseline SIGHUP (no config change)" healthy
 echo
 echo "==> editing config: adding 'garbage_post_edit' to encoding.except_fields on both sinks"
 write_config "garbage_initial,garbage_post_edit"
+echo "==> waiting for the rewritten config to be visible to Vector (vector validate poll)"
+wait_for_config_visible
 
 post_edit_max=$(awk -v b="$baseline_elapsed" -v floor="$POST_EDIT_RELOAD_FLOOR_SEC" \
   'BEGIN { v = int(b * 1.5 + 0.5); if (v < floor) v = floor; print v }')
