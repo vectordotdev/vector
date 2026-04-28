@@ -35,6 +35,9 @@ type EventsDroppedError = ComponentEventsDropped<'static, UNINTENTIONAL>;
 /// Compression algorithm and optional level for archive objects.
 #[configurable_component]
 #[derive(Default, Copy, Clone, Debug, PartialEq)]
+#[configurable(metadata(
+    docs::enum_tag_description = "Compression codec applied per column page inside the Parquet file."
+))]
 #[serde(tag = "algorithm", rename_all = "snake_case")]
 pub enum ParquetCompression {
     /// Zstd compression. Level must be between 1 and 21.
