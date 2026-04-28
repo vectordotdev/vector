@@ -167,16 +167,18 @@ on modern kernels. The higher precision is worth the identical cost.
     verify the returned duration is non-negative and monotone.
   - A `CpuTimedFuture<F>` adapter that wraps a future and, on every
     `Future::poll`, samples `ThreadTime` before and after the inner poll and
-    increments a `metrics::Counter` by the delta.
+    increments a `metrics::Counter` by the delta. A `CpuTimedExt` extension
+    trait exposes it as a chained `.cpu_timed(counter)` call, mirroring
+    `tracing::Instrument::in_current_span`.
 - Register `counter!("component_cpu_usage_ns_total")` in `Runner::new`.
 - For `run_inline`, bracket the synchronous `transform_all` call directly with
   `ThreadTime::now()` / `elapsed()`. The transform task itself owns this code
   and there is no `.await` between the brackets, so inline measurement is the
   simplest correct option.
-- For `run_concurrently`, wrap the spawned per-batch future in
-  `CpuTimedFuture::new(_, cpu_ns.clone())` rather than measuring inline. This
-  hooks the measurement onto the task's `Future::poll` boundary and makes the
-  pattern uniform for any future async work added inside the spawned body.
+- For `run_concurrently`, wrap the spawned per-batch future via
+  `.cpu_timed(cpu_ns.clone())` rather than measuring inline. This hooks the
+  measurement onto the task's `Future::poll` boundary and makes the pattern
+  uniform for any future async work added inside the spawned body.
 - Add integration test: run a CPU-intensive remap transform, verify
   `component_cpu_usage_ns_total` is within 10% of expected CPU time.
 - Add documentation for the new metric in the generated component docs.

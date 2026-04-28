@@ -182,17 +182,13 @@ impl Inner {
 /// `on_before_task_poll` / `on_after_task_poll` runtime hooks: it hooks the
 /// same boundary, but on a single future rather than the whole runtime, and
 /// it works on stable Rust without `--cfg tokio_unstable`.
+///
+/// Construct it via [`CpuTimedExt::cpu_timed`].
 #[pin_project]
 pub(crate) struct CpuTimedFuture<F> {
     #[pin]
     inner: F,
     counter: Counter,
-}
-
-impl<F> CpuTimedFuture<F> {
-    pub(crate) const fn new(inner: F, counter: Counter) -> Self {
-        Self { inner, counter }
-    }
 }
 
 impl<F: Future> Future for CpuTimedFuture<F> {
@@ -206,6 +202,25 @@ impl<F: Future> Future for CpuTimedFuture<F> {
         result
     }
 }
+
+/// Extension trait that wraps a future in [`CpuTimedFuture`] via a chained
+/// call:
+///
+/// ```ignore
+/// async move { /* work */ }.cpu_timed(counter)
+/// ```
+///
+/// Mirrors the style of [`tracing::Instrument::in_current_span`].
+pub(crate) trait CpuTimedExt: Future + Sized {
+    fn cpu_timed(self, counter: Counter) -> CpuTimedFuture<Self> {
+        CpuTimedFuture {
+            inner: self,
+            counter,
+        }
+    }
+}
+
+impl<F: Future> CpuTimedExt for F {}
 
 #[cfg(test)]
 mod tests {
