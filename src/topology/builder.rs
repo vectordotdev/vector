@@ -482,6 +482,11 @@ impl<'a> Builder<'a> {
                 })
                 .collect::<HashMap<_, _>>();
 
+            // Resolve the per-component CPU counter inside the transform span so it
+            // picks up component_id/component_kind/component_type tags. The same
+            // handle is shared between the main transform task and any helper
+            // tokio tasks the transform spawns at construction time.
+            let cpu_ns = counter!("component_cpu_usage_ns_total");
             let context = TransformContext {
                 key: Some(key.clone()),
                 globals: self.config.global.clone(),
@@ -491,6 +496,7 @@ impl<'a> Builder<'a> {
                 merged_schema_definition: merged_definition.clone(),
                 schema: self.config.schema,
                 extra_context: self.extra_context.clone(),
+                cpu_ns,
             };
 
             let node =
@@ -734,6 +740,7 @@ impl<'a> Builder<'a> {
                 node.typetag,
                 &node.key,
                 &node.outputs,
+                node.cpu_ns.clone(),
             ),
         }
     }
@@ -756,6 +763,7 @@ impl<'a> Builder<'a> {
             node.input_details.data_type(),
             outputs,
             LatencyRecorder::new(self.config.global.latency_ewma_alpha),
+            node.cpu_ns.clone(),
         );
         let transform = if node.enable_concurrency {
             runner.run_concurrently().boxed()
@@ -799,6 +807,7 @@ impl<'a> Builder<'a> {
         typetag: &str,
         key: &ComponentKey,
         outputs: &[TransformOutput],
+        cpu_ns: Counter,
     ) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
         let (mut fanout, control) = Fanout::new();
 
@@ -866,6 +875,7 @@ impl<'a> Builder<'a> {
                 }
             }
         }
+        .cpu_timed(cpu_ns)
         .boxed();
 
         let mut outputs = HashMap::new();
@@ -1103,6 +1113,7 @@ struct TransformNode {
     input_details: Input,
     outputs: Vec<TransformOutput>,
     enable_concurrency: bool,
+    cpu_ns: Counter,
 }
 
 impl TransformNode {
@@ -1119,6 +1130,7 @@ impl TransformNode {
             input_details: transform.inner.input(),
             outputs: transform.inner.outputs(context, schema_definition),
             enable_concurrency: transform.inner.enable_concurrency(),
+            cpu_ns: context.cpu_ns.clone(),
         }
     }
 }
@@ -1142,6 +1154,7 @@ impl Runner {
         input_type: DataType,
         outputs: TransformOutputs,
         latency_recorder: LatencyRecorder,
+        cpu_ns: Counter,
     ) -> Self {
         Self {
             transform,
@@ -1151,7 +1164,7 @@ impl Runner {
             timer_tx,
             latency_recorder,
             events_received: register!(EventsReceived),
-            cpu_ns: counter!("component_cpu_usage_ns_total"),
+            cpu_ns,
         }
     }
 

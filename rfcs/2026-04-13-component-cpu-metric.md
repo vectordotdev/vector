@@ -1,4 +1,4 @@
-# RFC 2026-04-13 - Per-component CPU time metric for sync transforms
+# RFC 2026-04-13 - Per-component CPU time metric for transforms
 
 The current `utilization` gauge measures the fraction of wall-clock time a
 component is not idle (i.e., not waiting on its input channel). Because sync
@@ -15,7 +15,9 @@ CPU clocks.
 - The existing `utilization` metric is implemented in `src/utilization.rs`.
 - Sync and function transforms are spawned in `src/topology/builder.rs`
   via the `Runner` struct (`run_inline` and `run_concurrently` methods).
-- The `enable_concurrency` trait method controls whether a transform is
+- Task transforms are built in `src/topology/builder.rs::build_task_transform`
+  and run as a single async task driving a stream-based pipeline.
+- The `enable_concurrency` trait method controls whether a sync transform is
   dispatched to parallel `tokio::spawn` tasks (up to
   `TRANSFORM_CONCURRENCY_LIMIT`, which defaults to the number of worker
   threads).
@@ -24,25 +26,21 @@ CPU clocks.
 
 - The `utilization` gauge remains as-is. This RFC adds a complementary metric;
   it does not replace the existing one.
-- Future work could extend this approach to task transforms and sinks.
+- Future work could extend this approach to sources and sinks.
 
 ## Scope
 
 ### In scope
 
-- A new `component_cpu_usage_ns_total` counter for **sync and function
-  transforms** (both inline and concurrent execution paths).
+- A new `component_cpu_usage_ns_total` counter for **all transforms** —
+  sync and function transforms (both inline and concurrent execution paths)
+  and task transforms.
 - Two implementation tiers: a wall-clock fallback that works everywhere, and a
   precise thread-CPU-time implementation using OS APIs.
 - Feasibility analysis of thread-level CPU time measurement.
 
 ### Out of scope
 
-- Task transforms (async stream-based). The poll-hook wrapper described below
-  could be applied to them, but they are currently single-threaded (they do not
-  parallelize work), so the `utilization` gauge is already a good indicator of
-  their actual usage. Extending coverage to task transforms is left as a
-  follow-up.
 - Sources and sinks.
 - Replacing or modifying the existing `utilization` gauge.
 
@@ -72,7 +70,7 @@ CPU clocks.
 
 ### User Experience
 
-A new counter metric is emitted for every sync/function transform:
+A new counter metric is emitted for every transform:
 
 ```prometheus
 component_cpu_usage_ns_total{component_id="my_remap",component_kind="transform",component_type="remap"} 14207
@@ -91,8 +89,7 @@ rate(component_cpu_usage_ns_total{component_id="my_remap"}[1m]) / 1e9
   utilization{component_id="my_remap"}
 ```
 
-This metric is always emitted for sync/function transforms; there is no
-configuration knob.
+This metric is always emitted for transforms; there is no configuration knob.
 
 ## Rationale
 
@@ -101,15 +98,30 @@ configuration knob.
 - **Composable with existing metrics.** `rate(component_cpu_usage_ns_total[1m]) / 1e9`
   gives CPU cores used; dividing by `utilization` separates CPU from pipeline effects.
 - **Measurement is hooked at the task's poll boundary.** For the concurrent
-  path, the spawned tokio task's future is wrapped in an adapter that samples
-  thread CPU time around every call to `Future::poll`. Tokio's cooperative
-  scheduler guarantees that within a single poll the task cannot be moved to
-  another worker thread and no other task can run on the current thread, so
-  each `(before_poll, after_poll)` pair is a clean per-thread measurement.
-  Multiple polls (across `Pending` returns and wake-ups) accumulate correctly,
-  with each poll independently sampling the thread it ran on. This isolates
-  the timing concern from the transform body and keeps it robust if the body
-  ever grows `.await` points.
+  sync path and for task transforms, the spawned tokio task's future is wrapped
+  in an adapter that samples thread CPU time around every call to
+  `Future::poll`. Tokio's cooperative scheduler guarantees that within a single
+  poll the task cannot be moved to another worker thread and no other task can
+  run on the current thread, so each `(before_poll, after_poll)` pair is a
+  clean per-thread measurement. Multiple polls (across `Pending` returns and
+  wake-ups) accumulate correctly, with each poll independently sampling the
+  thread it ran on. This isolates the timing concern from the transform body
+  and keeps it robust if the body ever grows `.await` points (which task
+  transforms have many of, by construction).
+- **Scope of the measurement.** For sync transforms (inline and concurrent),
+  the bracket covers exactly the synchronous transform call. For task
+  transforms, the bracket covers the entire task body, which additionally
+  includes input-channel polls, the `Utilization`/`OutputUtilization` stream
+  wrappers' overhead, and the fanout-send loop. In practice the channel/fanout
+  overhead is small relative to the transform's own work, so the metric remains
+  a meaningful comparator across transform kinds.
+- **Helper tasks are attributed too.** A few transforms spawn long-running
+  helper tokio tasks at construction time — `aws_ec2_metadata` (periodic IMDS
+  refresh) and `throttle` via `RateLimiterRunner` (periodic rate-limit-key
+  flush). The `cpu_ns` counter is plumbed through `TransformContext` so those
+  helpers can wrap their spawn with the same `.cpu_timed(counter)` and have
+  their CPU attributed to the same component, rather than being silently
+  excluded.
 - **Low overhead.** Two `clock_gettime` calls per poll (~80ns total on Linux)
   is negligible relative to the work `transform_all` performs.
 - **No accumulation errors.** The counter stores `u64` nanoseconds; each
@@ -170,7 +182,14 @@ on modern kernels. The higher precision is worth the identical cost.
     increments a `metrics::Counter` by the delta. A `CpuTimedExt` extension
     trait exposes it as a chained `.cpu_timed(counter)` call, mirroring
     `tracing::Instrument::in_current_span`.
-- Register `counter!("component_cpu_usage_ns_total")` in `Runner::new`.
+- Add a `cpu_ns: Counter` field to `TransformContext`, defaulting to
+  `Counter::noop()`. In `build_transforms`, register the counter inside the
+  transform `error_span!` so it is tagged with `component_id`,
+  `component_kind`, and `component_type`, then store it on the context. This
+  is the single resolved handle every transform path consumes — sync, task,
+  and any helper tokio tasks — so labels and recorder lookup are paid once,
+  not on every poll. Also propagate the same handle through `TransformNode`
+  for the topology builder's own use.
 - For `run_inline`, bracket the synchronous `transform_all` call directly with
   `ThreadTime::now()` / `elapsed()`. The transform task itself owns this code
   and there is no `.await` between the brackets, so inline measurement is the
@@ -179,6 +198,15 @@ on modern kernels. The higher precision is worth the identical cost.
   `.cpu_timed(cpu_ns.clone())` rather than measuring inline. This hooks the
   measurement onto the task's `Future::poll` boundary and makes the pattern
   uniform for any future async work added inside the spawned body.
+- For `build_task_transform`, take the counter from `TransformNode` (which
+  receives it from the context) and wrap the outer task future with
+  `.cpu_timed(counter)` before `.boxed()`. CPU time accumulates across every
+  poll of the task, naturally excluding time the task is parked in `Pending`.
+- For transforms that spawn helper tokio tasks at construction time
+  (`aws_ec2_metadata`, `throttle`'s `RateLimiterRunner`), read
+  `context.cpu_ns.clone()` in `build()` and `.cpu_timed(...)` the spawned
+  helper future. For `RateLimiterRunner::start`, plumb the counter through as
+  a parameter so it stays the throttle config's responsibility to provide it.
 - Add integration test: run a CPU-intensive remap transform, verify
   `component_cpu_usage_ns_total` is within 10% of expected CPU time.
 - Add documentation for the new metric in the generated component docs.
@@ -186,11 +214,6 @@ on modern kernels. The higher precision is worth the identical cost.
 
 ## Future Improvements
 
-- Extend `component_cpu_usage_ns_total` to **task transforms** by wrapping the
-  task transform's stream future in `CpuTimedFuture`. Time spent in the tokio
-  runtime between polls is naturally excluded: thread CPU time only ticks
-  while the thread is running poll, and the wrapper only samples around poll
-  calls.
 - Extend to **sources and sinks** where the component owns a synchronous
   processing step (e.g., codec encoding in sinks).
 - Expose a derived **`cpu_utilization` gauge** (CPU seconds / wall seconds)
