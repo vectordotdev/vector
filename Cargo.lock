@@ -6099,6 +6099,7 @@ dependencies = [
 name = "k8s-e2e-tests"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "env_logger",
  "futures",
  "indoc",
