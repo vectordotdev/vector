@@ -1,1 +1,3 @@
 Added `authoritative` field to sink acknowledgements configuration. The field defaults to `false`; the feature only activates when at least one sink explicitly sets `authoritative: true`. When active, only **authoritative** sinks block source acknowledgements -- non-authoritative sinks have their event finalizers stripped so the source can acknowledge events as soon as all authoritative sinks have processed them. This prevents non-critical sinks (console, metrics, etc.) from blocking acknowledgement of critical sinks. When no sink sets `authoritative: true`, there is zero behavioral change from previous versions.
+
+authors: connoryy
