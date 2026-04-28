@@ -21,7 +21,7 @@ pub struct RegionOrEndpoint {
     /// Whether to use [FIPS-compliant endpoints][fips] when communicating with AWS services.
     ///
     /// When enabled, the SDK resolves FIPS-compliant endpoints for the target service.
-    /// This is required for FedRAMP and other compliance environments. When omitted, the
+    /// Using FIPS-compliant endpoints is required for FedRAMP and other compliance environments. When omitted, the
     /// SDK falls back to its default provider chain (the `AWS_USE_FIPS_ENDPOINT` environment
     /// variable and AWS config files).
     ///
