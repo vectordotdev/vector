@@ -1237,8 +1237,6 @@ impl Runner {
         self.timer_tx.try_send_start_wait();
         loop {
             tokio::select! {
-                biased;
-
                 // Deliver the next in-order result. One result per select!
                 // round; the Stream impl handles stashing internally.
                 result = scheduler.next(), if !scheduler.is_empty() => {
