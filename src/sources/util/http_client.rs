@@ -11,12 +11,13 @@
 // Okta source only imports defaults but doesn't use the rest of the client
 #![cfg_attr(feature = "sources-okta", allow(dead_code))]
 
-use std::{collections::HashMap, future::ready, time::Duration};
+use std::{collections::HashMap, future::ready, io, time::Duration};
 
 use bytes::Bytes;
 use futures_util::{FutureExt, StreamExt, TryFutureExt, stream};
-use http::{Uri, response::Parts};
+use http::{StatusCode, Uri, header::LOCATION, response::Parts};
 use hyper::{Body, Request};
+use tokio::time::Instant;
 use tokio_stream::wrappers::IntervalStream;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf, config::proxy::ProxyConfig, event::Event, json_size::JsonSize,
@@ -24,7 +25,7 @@ use vector_lib::{
 };
 
 use crate::{
-    SourceSender,
+    Error, SourceSender,
     http::{Auth, HttpClient, QueryParameterValue, QueryParameters},
     internal_events::{
         EndpointBytesReceived, HttpClientEventsReceived, HttpClientHttpError,
@@ -35,6 +36,7 @@ use crate::{
 };
 
 /// Contains the inputs generic to any http client.
+#[derive(Clone)]
 pub(crate) struct GenericHttpClientInputs {
     /// Array of URLs to call.
     pub urls: Vec<Uri>,
@@ -44,6 +46,10 @@ pub(crate) struct GenericHttpClientInputs {
     pub timeout: Duration,
     /// Map of Header+Value to apply to HTTP request.
     pub headers: HashMap<String, Vec<String>>,
+    /// Whether HTTP redirects should be followed automatically.
+    pub follow_redirects: bool,
+    /// Maximum number of redirects to follow when enabled.
+    pub max_redirects: usize,
     /// Content type of the HTTP request, determined by the source.
     pub content_type: String,
     pub auth: Option<Auth>,
@@ -60,6 +66,11 @@ pub(crate) const fn default_interval() -> Duration {
 /// The default timeout for the HTTP request if none is configured.
 pub(crate) const fn default_timeout() -> Duration {
     Duration::from_secs(5)
+}
+
+/// The default maximum number of redirects to follow.
+pub(crate) const fn default_max_redirects() -> usize {
+    5
 }
 
 /// Builds the context, allowing the source-specific implementation to leverage data from the
@@ -143,6 +154,150 @@ pub(crate) fn warn_if_interval_too_low(timeout: Duration, interval: Duration) {
     }
 }
 
+fn build_request_for_url(
+    url: &Uri,
+    http_method: HttpMethod,
+    inputs: &GenericHttpClientInputs,
+    body: Option<&Bytes>,
+) -> Result<Request<Body>, http::Error> {
+    let mut builder = match http_method {
+        HttpMethod::Head => Request::head(url),
+        HttpMethod::Get => Request::get(url),
+        HttpMethod::Post => Request::post(url),
+        HttpMethod::Put => Request::put(url),
+        HttpMethod::Patch => Request::patch(url),
+        HttpMethod::Delete => Request::delete(url),
+        HttpMethod::Options => Request::options(url),
+    };
+
+    for (header, values) in &inputs.headers {
+        for value in values {
+            builder = builder.header(header, value);
+        }
+    }
+
+    if !inputs.headers.contains_key(http::header::ACCEPT.as_str()) {
+        builder = builder.header(http::header::ACCEPT, &inputs.content_type);
+    }
+
+    let body = match body {
+        Some(body) => {
+            if !inputs
+                .headers
+                .contains_key(http::header::CONTENT_TYPE.as_str())
+            {
+                builder = builder.header(http::header::CONTENT_TYPE, "application/json");
+            }
+            Body::from(body.clone())
+        }
+        None => Body::empty(),
+    };
+
+    let mut request = builder.body(body)?;
+
+    if let Some(auth) = &inputs.auth {
+        auth.apply(&mut request);
+    }
+
+    Ok(request)
+}
+
+fn resolve_redirect_uri(base: &Uri, location: &str) -> Result<Uri, Error> {
+    let base_url = url::Url::parse(&base.to_string()).map_err(Error::from)?;
+    let redirected = match url::Url::parse(location) {
+        Ok(url) => url,
+        Err(_) => base_url.join(location).map_err(Error::from)?,
+    };
+    redirected.as_str().parse::<Uri>().map_err(Error::from)
+}
+
+async fn send_request_with_redirects(
+    client: HttpClient,
+    inputs: &GenericHttpClientInputs,
+    http_method: HttpMethod,
+    body: Option<Bytes>,
+    mut url: Uri,
+) -> Result<(Uri, http::Response<Body>), Error> {
+    let deadline = Instant::now() + inputs.timeout;
+    let mut redirects = 0;
+    let mut method = http_method;
+    let mut body = body;
+
+    loop {
+        let request = build_request_for_url(&url, method, inputs, body.as_ref())?;
+
+        let remaining_timeout = deadline.saturating_duration_since(Instant::now());
+        if remaining_timeout.is_zero() {
+            return Err(io::Error::new(
+                io::ErrorKind::TimedOut,
+                format!(
+                    "Timeout error: request exceeded {}s",
+                    inputs.timeout.as_secs_f64()
+                ),
+            )
+            .into());
+        }
+
+        let response = tokio::time::timeout(remaining_timeout, client.send(request))
+            .await
+            .map_err(|_| {
+                io::Error::new(
+                    io::ErrorKind::TimedOut,
+                    format!(
+                        "Timeout error: request exceeded {}s",
+                        inputs.timeout.as_secs_f64()
+                    ),
+                )
+            })??;
+
+        let status = response.status();
+        if !inputs.follow_redirects
+            || !matches!(
+                status,
+                StatusCode::MOVED_PERMANENTLY
+                    | StatusCode::FOUND
+                    | StatusCode::SEE_OTHER
+                    | StatusCode::TEMPORARY_REDIRECT
+                    | StatusCode::PERMANENT_REDIRECT
+            )
+        {
+            return Ok((url, response));
+        }
+
+        if redirects >= inputs.max_redirects {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("Exceeded maximum redirects ({})", inputs.max_redirects),
+            )
+            .into());
+        }
+
+        let location = response
+            .headers()
+            .get(LOCATION)
+            .ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "Redirect missing Location header",
+                )
+            })?
+            .to_str()
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
+
+        if matches!(
+            status,
+            StatusCode::MOVED_PERMANENTLY | StatusCode::FOUND | StatusCode::SEE_OTHER
+        ) && method != HttpMethod::Head
+        {
+            method = HttpMethod::Get;
+            body = None;
+        }
+
+        url = resolve_redirect_uri(&url, location)?;
+        redirects += 1;
+    }
+}
+
 /// Calls one or more urls at an interval.
 ///   - The HTTP request is built per the options in provided generic inputs.
 ///   - The HTTP response is decoded/parsed into events by the specific context.
@@ -160,91 +315,54 @@ pub(crate) async fn call<
     // proxy and tls settings.
     let client =
         HttpClient::new(inputs.tls.clone(), &inputs.proxy).expect("Building HTTP client failed");
-    let mut stream = IntervalStream::new(tokio::time::interval(inputs.interval))
-        .take_until(inputs.shutdown)
-        .map(move |_| stream::iter(inputs.urls.clone()))
+
+    // Clone URLs out so we don't move inputs in the first closure
+    let urls = inputs.urls.clone();
+    let interval = inputs.interval;
+    let shutdown = inputs.shutdown.clone();
+
+    let mut stream = IntervalStream::new(tokio::time::interval(interval))
+        .take_until(shutdown)
+        .map(move |_| stream::iter(urls.clone()))
         .flatten()
         .map(move |base_url| {
             let client = client.clone();
-            let endpoint = base_url.to_string();
+            let inputs = inputs.clone();
 
             let context_builder = context_builder.clone();
             let mut context = context_builder.build(&base_url);
 
             // Check if we need to process the URL dynamically (for updating VRL expressions)
             let url = context.process_url(&base_url).unwrap_or(base_url);
+            let request_url = url.clone();
+            let request_url_string = request_url.to_string();
 
-            let mut builder = match http_method {
-                HttpMethod::Head => Request::head(&url),
-                HttpMethod::Get => Request::get(&url),
-                HttpMethod::Post => Request::post(&url),
-                HttpMethod::Put => Request::put(&url),
-                HttpMethod::Patch => Request::patch(&url),
-                HttpMethod::Delete => Request::delete(&url),
-                HttpMethod::Options => Request::options(&url),
-            };
+            let body = context.get_request_body().map(Bytes::from);
 
-            // add user specified headers
-            for (header, values) in &inputs.headers {
-                for value in values {
-                    builder = builder.header(header, value);
-                }
+            async move {
+                send_request_with_redirects(client, &inputs, http_method, body, url).await
             }
-
-            // set ACCEPT header if not user specified
-            if !inputs.headers.contains_key(http::header::ACCEPT.as_str()) {
-                builder = builder.header(http::header::ACCEPT, &inputs.content_type);
-            }
-
-            // Get the request body from the context (if any)
-            let body = match context.get_request_body() {
-                Some(body_str) => {
-                    // Set Content-Type header if not already set
-                    if !inputs
-                        .headers
-                        .contains_key(http::header::CONTENT_TYPE.as_str())
-                    {
-                        builder = builder.header(http::header::CONTENT_TYPE, "application/json");
-                    }
-                    Body::from(body_str)
-                }
-                None => Body::empty(),
-            };
-
-            // building the request should be infallible
-            let mut request = builder.body(body).expect("error creating request");
-
-            if let Some(auth) = &inputs.auth {
-                auth.apply(&mut request);
-            }
-
-            tokio::time::timeout(inputs.timeout, client.send(request))
-                .then(move |result| async move {
-                    match result {
-                        Ok(Ok(response)) => Ok(response),
-                        Ok(Err(error)) => Err(error.into()),
-                        Err(_) => Err(format!(
-                            "Timeout error: request exceeded {}s",
-                            inputs.timeout.as_secs_f64()
-                        )
-                        .into()),
-                    }
-                })
-                .and_then(|response| async move {
+                .and_then(move |(_final_url, response)| {
+                    let request_url = request_url.clone();
+                    async move {
                     let (header, body) = response.into_parts();
                     let body = http_body::Body::collect(body).await?.to_bytes();
+                    let endpoint = request_url.to_string();
                     emit!(EndpointBytesReceived {
                         byte_size: body.len(),
                         protocol: "http",
                         endpoint: endpoint.as_str(),
                     });
-                    Ok((header, body))
+                    Ok((request_url, header, body))
+                }
                 })
                 .into_stream()
                 .filter_map(move |response| {
                     ready(match response {
-                        Ok((header, body)) if header.status == hyper::StatusCode::OK => {
-                            context.on_response(&url, &header, &body).map(|mut events| {
+                        Ok((request_url, header, body))
+                            if header.status == hyper::StatusCode::OK =>
+                        {
+                            context.on_response(&request_url, &header, &body).map(|mut events| {
                                 let byte_size = if events.is_empty() {
                                     // We need to explicitly set the byte size
                                     // to 0 since
@@ -262,7 +380,7 @@ pub(crate) async fn call<
                                 emit!(HttpClientEventsReceived {
                                     byte_size,
                                     count: events.len(),
-                                    url: url.to_string()
+                                    url: request_url.to_string()
                                 });
 
                                 // We'll enrich after receiving the events so
@@ -272,18 +390,18 @@ pub(crate) async fn call<
                                 stream::iter(events)
                             })
                         }
-                        Ok((header, _)) => {
-                            context.on_http_response_error(&url, &header);
+                        Ok((request_url, header, _)) => {
+                            context.on_http_response_error(&request_url, &header);
                             emit!(HttpClientHttpResponseError {
                                 code: header.status,
-                                url: url.to_string(),
+                                url: request_url.to_string(),
                             });
                             None
                         }
                         Err(error) => {
                             emit!(HttpClientHttpError {
                                 error,
-                                url: url.to_string()
+                                url: request_url_string.clone()
                             });
                             None
                         }

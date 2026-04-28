@@ -123,6 +123,16 @@ pub struct HttpClientConfig {
     #[serde(default)]
     pub body: Option<ParameterValue>,
 
+    /// Whether to follow HTTP redirects.
+    #[serde(default)]
+    #[configurable(metadata(docs::advanced))]
+    pub follow_redirects: bool,
+
+    /// Maximum number of redirects to follow when enabled.
+    #[serde(default = "http_client::default_max_redirects")]
+    #[configurable(metadata(docs::advanced))]
+    pub max_redirects: usize,
+
     /// TLS configuration.
     #[configurable(derived)]
     pub tls: Option<TlsConfig>,
@@ -224,6 +234,8 @@ impl Default for HttpClientConfig {
             headers: HashMap::new(),
             method: default_http_method(),
             body: None,
+            follow_redirects: false,
+            max_redirects: http_client::default_max_redirects(),
             tls: None,
             auth: None,
             log_namespace: None,
@@ -376,6 +388,8 @@ impl SourceConfig for HttpClientConfig {
             interval: self.interval,
             timeout: self.timeout,
             headers: self.headers.clone(),
+            follow_redirects: self.follow_redirects,
+            max_redirects: self.max_redirects,
             content_type,
             auth: self.auth.clone(),
             tls,
