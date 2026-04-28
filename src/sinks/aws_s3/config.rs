@@ -111,7 +111,7 @@ pub struct S3SinkConfig {
 
     /// Batch encoding configuration for columnar formats.
     ///
-    /// When set, events are encoded together as a batch in a columnar format (e.g., Parquet)
+    /// When set, events are encoded together as a batch in a columnar format (for example, Parquet)
     /// instead of the standard per-event framing-based encoding. The columnar format handles
     /// its own internal compression, so the top-level `compression` setting is bypassed.
     #[cfg(feature = "codecs-parquet")]

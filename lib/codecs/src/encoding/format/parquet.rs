@@ -42,13 +42,13 @@ type EventsDroppedError = ComponentEventsDropped<'static, UNINTENTIONAL>;
 pub enum ParquetCompression {
     /// Zstd compression. Level must be between 1 and 21.
     Zstd {
-        /// Compression level (1–21). This is the range Vector currently supports; higher values compress more but are slower.
+        /// Compression level (1–21). This is the range Vector supports; higher values compress more but are slower.
         #[configurable(validation(range(min = 1, max = 21)))]
         level: u8,
     },
     /// Gzip compression. Level must be between 1 and 9.
     Gzip {
-        /// Compression level (1–9). This is the range Vector currently supports; higher values compress more but are slower.
+        /// Compression level (1–9). This is the range Vector supports; higher values compress more but are slower.
         #[configurable(validation(range(min = 1, max = 9)))]
         level: u8,
     },

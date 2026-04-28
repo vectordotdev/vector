@@ -260,7 +260,7 @@ generated: components: sinks: aws_s3: configuration: {
 		description: """
 			Batch encoding configuration for columnar formats.
 
-			When set, events are encoded together as a batch in a columnar format (e.g., Parquet)
+			When set, events are encoded together as a batch in a columnar format (for example, Parquet)
 			instead of the standard per-event framing-based encoding. The columnar format handles
 			its own internal compression, so the top-level `compression` setting is bypassed.
 			"""
@@ -270,12 +270,12 @@ generated: components: sinks: aws_s3: configuration: {
 				description: """
 					Allow null values for non-nullable fields in the schema.
 
-					When enabled, missing or incompatible values will be encoded as null even for fields
+					When enabled, missing or incompatible values are encoded as null, even for fields
 					marked as non-nullable in the Arrow schema. This is useful when working with downstream
 					systems that can handle null values through defaults, computed columns, or other mechanisms.
 
-					When disabled (default), missing values for non-nullable fields will cause encoding errors,
-					ensuring all required data is present before sending to the sink.
+					When disabled (default), missing values for non-nullable fields results in encoding errors. This is to
+					help ensure all required data is present before sending it to the sink.
 					"""
 				relevant_when: "codec = \"arrow_stream\""
 				required:      false
@@ -320,7 +320,7 @@ generated: components: sinks: aws_s3: configuration: {
 						}
 					}
 					level: {
-						description:   "Compression level (1–21). This is the range Vector currently supports; higher values compress more but are slower."
+						description:   "Compression level (1–21). This is the range Vector supports; higher values compress more but are slower."
 						relevant_when: "algorithm = \"zstd\" or algorithm = \"gzip\""
 						required:      true
 						type: uint: {}
