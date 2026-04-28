@@ -76,11 +76,8 @@ impl PathsProvider for K8sPathsProvider {
             })
             .flat_map(|pod| {
                 trace!(message = "Providing log paths for pod.", pod = ?pod.metadata.name);
-                let paths_iter = list_pod_log_paths(
-                    real_glob,
-                    pod.as_ref(),
-                    self.logs_dir_override.as_deref(),
-                );
+                let paths_iter =
+                    list_pod_log_paths(real_glob, pod.as_ref(), self.logs_dir_override.as_deref());
                 filter_paths(
                     filter_paths(paths_iter, &self.include_paths, true),
                     &self.exclude_paths,

@@ -487,7 +487,11 @@ mod tests {
             .await;
 
             let lines = extract_messages_string(received);
-            assert_eq!(lines, vec!["first line"], "checkpoint should not have advanced when events were rejected");
+            assert_eq!(
+                lines,
+                vec!["first line"],
+                "checkpoint should not have advanced when events were rejected"
+            );
         }
 
         fs::remove_dir_all(dir_path).unwrap();
@@ -898,26 +902,16 @@ mod tests {
             let key = ComponentKey::from("default");
             let log_namespace = LogNamespace::Legacy;
 
-            let source_inner = Source::new_test(
-                config,
-                &globals,
-                &key,
-                acks,
-                client,
-                logs_dir.to_owned(),
-            )
-            .await
-            .unwrap();
+            let source_inner =
+                Source::new_test(config, &globals, &key, acks, client, logs_dir.to_owned())
+                    .await
+                    .unwrap();
 
-            let source = Box::pin(
-                source_inner
-                    .run(tx, shutdown, log_namespace)
-                    .map(|result| {
-                        result.map_err(|error| {
-                            error!(message = "Source future failed.", %error);
-                        })
-                    }),
-            );
+            let source = Box::pin(source_inner.run(tx, shutdown, log_namespace).map(|result| {
+                result.map_err(|error| {
+                    error!(message = "Source future failed.", %error);
+                })
+            }));
 
             tokio::spawn(source);
 
@@ -986,15 +980,11 @@ mod tests {
             .await
             .unwrap();
 
-            let source = Box::pin(
-                source_inner
-                    .run(tx, shutdown, log_namespace)
-                    .map(|result| {
-                        result.map_err(|error| {
-                            error!(message = "Source future failed.", %error);
-                        })
-                    }),
-            );
+            let source = Box::pin(source_inner.run(tx, shutdown, log_namespace).map(|result| {
+                result.map_err(|error| {
+                    error!(message = "Source future failed.", %error);
+                })
+            }));
 
             tokio::spawn(source);
 

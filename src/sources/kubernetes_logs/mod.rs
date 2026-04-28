@@ -32,8 +32,7 @@ use vector_lib::{
         FileServer, Line, Shutdown as FileServerShutdown, calculate_ignore_before,
     },
     file_source_common::{
-        Checkpointer, FileFingerprint, FingerprintStrategy, Fingerprinter, ReadFrom,
-        ReadFromConfig,
+        Checkpointer, FileFingerprint, FingerprintStrategy, Fingerprinter, ReadFrom, ReadFromConfig,
     },
     finalizer::OrderedFinalizer,
     internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol},
