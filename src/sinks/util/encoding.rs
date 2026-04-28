@@ -218,6 +218,7 @@ mod tests {
     use std::{collections::BTreeMap, env, path::PathBuf};
 
     use bytes::{BufMut, Bytes};
+    use cfg_if::cfg_if;
     use vector_lib::{
         codecs::{
             CharacterDelimitedEncoder, JsonSerializerConfig, LengthDelimitedEncoder,
@@ -229,6 +230,17 @@ mod tests {
         json_size::JsonSize,
     };
     use vrl::value::{KeyString, Value};
+
+    cfg_if! {
+        if #[cfg(feature = "codecs-arrow")] {
+            use arrow::datatypes::{DataType, Field, Schema as ArrowSchema};
+            use vector_lib::codecs::{
+                BatchEncoder,
+                encoding::{ArrowStreamSerializer, ArrowStreamSerializerConfig, BatchSerializer},
+            };
+            use vector_lib::event_test_util::{clear_recorded_events, contains_name_once};
+        }
+    }
 
     use super::*;
 
@@ -573,5 +585,36 @@ mod tests {
         assert_eq!(written, total_input_proto_size + 8);
         assert_eq!(CountByteSize(2, input_json_size), size.size().unwrap());
         assert_eq!(Bytes::copy_from_slice(&writer), expected_bytes);
+    }
+
+    #[cfg(feature = "codecs-arrow")]
+    #[test]
+    fn test_encode_batch_arrow_emits_record_batch_error_on_type_mismatch() {
+        clear_recorded_events();
+
+        // Schema declares `message` as Int64, but the event below carries a string,
+        // so `build_record_batch` returns `ArrowEncodingError::ArrowJsonDecode`.
+        let schema = ArrowSchema::new(vec![Field::new("message", DataType::Int64, false)]);
+        let serializer = ArrowStreamSerializer::new(ArrowStreamSerializerConfig::new(schema))
+            .expect("failed to build ArrowStreamSerializer");
+        let encoder = BatchEncoder::new(BatchSerializer::Arrow(serializer));
+        let encoding = (Transformer::default(), encoder);
+
+        let event = Event::Log(LogEvent::from(BTreeMap::from([(
+            KeyString::from("message"),
+            Value::from("not_an_integer"),
+        )])));
+
+        let mut writer = Vec::new();
+        let result = encoding.encode_input(vec![event], &mut writer);
+        assert!(
+            result.is_err(),
+            "type mismatch should fail batch encoding, got {result:?}"
+        );
+
+        contains_name_once("EncoderRecordBatchError")
+            .expect("EncoderRecordBatchError should be emitted on ArrowJsonDecode failure");
+        contains_name_once("ComponentEventsDropped")
+            .expect("ComponentEventsDropped should be emitted by the wrapper");
     }
 }
