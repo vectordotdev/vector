@@ -179,6 +179,37 @@ impl InternalEvent for EncoderNullConstraintError<'_> {
     }
 }
 
+#[cfg(feature = "arrow")]
+#[derive(Debug, NamedInternalEvent)]
+/// Emitted when Arrow record batch construction fails (e.g. schema decoder build,
+/// JSON-to-Arrow decoding such as type mismatches).
+pub struct EncoderRecordBatchError<'a, E> {
+    /// The encoding error that occurred.
+    pub error: &'a E,
+    /// Stable error code identifying the failure mode.
+    pub error_code: &'static str,
+}
+
+#[cfg(feature = "arrow")]
+impl<E: std::fmt::Display> InternalEvent for EncoderRecordBatchError<'_, E> {
+    fn emit(self) {
+        error!(
+            message = "Failed to build Arrow record batch.",
+            error = %self.error,
+            error_code = self.error_code,
+            error_type = error_type::ENCODER_FAILED,
+            stage = error_stage::SENDING,
+        );
+        counter!(
+            "component_errors_total",
+            "error_code" => self.error_code,
+            "error_type" => error_type::ENCODER_FAILED,
+            "stage" => error_stage::SENDING,
+        )
+        .increment(1);
+    }
+}
+
 #[cfg(feature = "parquet")]
 #[derive(NamedInternalEvent)]
 pub(crate) struct SchemaGenerationError<'a> {

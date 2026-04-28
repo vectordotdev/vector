@@ -330,12 +330,32 @@ pub(crate) fn build_record_batch(
 
     let mut decoder = ReaderBuilder::new(schema)
         .build_decoder()
+        .inspect_err(|e| {
+            vector_common::internal_event::emit(crate::internal_events::EncoderRecordBatchError {
+                error: e,
+                error_code: "arrow_record_batch_creation",
+            });
+        })
         .context(RecordBatchCreationSnafu)?;
 
-    decoder.serialize(values).context(ArrowJsonDecodeSnafu)?;
+    decoder
+        .serialize(values)
+        .inspect_err(|e| {
+            vector_common::internal_event::emit(crate::internal_events::EncoderRecordBatchError {
+                error: e,
+                error_code: "arrow_json_decode",
+            });
+        })
+        .context(ArrowJsonDecodeSnafu)?;
 
     decoder
         .flush()
+        .inspect_err(|e| {
+            vector_common::internal_event::emit(crate::internal_events::EncoderRecordBatchError {
+                error: e,
+                error_code: "arrow_json_decode",
+            });
+        })
         .context(ArrowJsonDecodeSnafu)?
         .ok_or(ArrowEncodingError::NoEvents)
 }

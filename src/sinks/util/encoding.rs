@@ -124,10 +124,11 @@ impl Encoder<Vec<Event>> for (Transformer, vector_lib::codecs::BatchEncoder) {
         encoder
             .encode(transformed_events, &mut bytes)
             .map_err(|error| {
-                // Most codec error paths already emit their own internal event
-                // (e.g. SchemaGenerationError, EncoderNullConstraintError) which
-                // logs the error and increments component_errors_total.
-                // We only emit the drop count here to avoid double-counting.
+                // Codec error paths emit their own internal event
+                // (e.g. SchemaGenerationError, EncoderNullConstraintError,
+                // EncoderRecordBatchError) which logs the error and increments
+                // component_errors_total. We only emit the drop count here to
+                // avoid double-counting.
                 // n_events is the pre-filter count; Parquet filters non-log
                 // events before encoding, but that only happens if a sink is
                 // misconfigured to send non-log events into a log-only encoder,
