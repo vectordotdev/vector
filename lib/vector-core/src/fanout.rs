@@ -38,7 +38,11 @@ impl fmt::Debug for ControlMessage {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "ControlMessage::")?;
         match self {
-            Self::Add { id, strip_finalizers, .. } => {
+            Self::Add {
+                id,
+                strip_finalizers,
+                ..
+            } => {
                 write!(f, "Add({id:?}, strip={strip_finalizers})")
             }
             Self::Remove(id) => write!(f, "Remove({id:?})"),
@@ -84,7 +88,12 @@ impl Fanout {
     /// # Panics
     ///
     /// Function will panic if a sink with the same ID is already present.
-    pub fn add(&mut self, id: ComponentKey, sink: BufferSender<EventArray>, strip_finalizers: bool) {
+    pub fn add(
+        &mut self,
+        id: ComponentKey,
+        sink: BufferSender<EventArray>,
+        strip_finalizers: bool,
+    ) {
         assert!(
             !self.senders.contains_key(&id),
             "Adding duplicate output id to fanout: {id}"
@@ -156,7 +165,11 @@ impl Fanout {
         trace!("Processing control message outside of send: {:?}", message);
 
         match message {
-            ControlMessage::Add { id, sender, strip_finalizers } => {
+            ControlMessage::Add {
+                id,
+                sender,
+                strip_finalizers,
+            } => {
                 self.add(id, sender, strip_finalizers);
             }
             ControlMessage::Remove(id) => self.remove(&id),
@@ -981,11 +994,7 @@ mod tests {
 
         // Add one sender with strip=false (authoritative path), one with strip=true
         fanout.add(ComponentKey::from("auth_sink"), sender_auth, false);
-        fanout.add(
-            ComponentKey::from("non_auth_sink"),
-            sender_non_auth,
-            true,
-        );
+        fanout.add(ComponentKey::from("non_auth_sink"), sender_non_auth, true);
 
         // Create events with a batch notifier (finalizer)
         let (batch, mut batch_receiver) = BatchNotifier::new_with_receiver();
@@ -1048,10 +1057,7 @@ mod tests {
             .send(ControlMessage::Pause(ComponentKey::from("0")))
             .expect("sending control message should not fail");
         control
-            .send(ControlMessage::Replace(
-                ComponentKey::from("0"),
-                new_sender,
-            ))
+            .send(ControlMessage::Replace(ComponentKey::from("0"), new_sender))
             .expect("sending control message should not fail");
 
         // Create events with a batch notifier

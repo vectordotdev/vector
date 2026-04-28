@@ -48,7 +48,11 @@ impl NoAckSinkConfig {
     /// and the shared held-finalizers storage.
     pub fn new(
         acks: AcknowledgementsConfig,
-    ) -> (Self, oneshot::Receiver<()>, Arc<Mutex<Vec<EventFinalizers>>>) {
+    ) -> (
+        Self,
+        oneshot::Receiver<()>,
+        Arc<Mutex<Vec<EventFinalizers>>>,
+    ) {
         let held_finalizers = Arc::new(Mutex::new(Vec::new()));
         let (tx, rx) = oneshot::channel();
         let config = Self {
@@ -82,10 +86,7 @@ impl SinkConfig for NoAckSinkConfig {
 
         let healthcheck = async move { rx.await.unwrap() };
 
-        Ok((
-            VectorSink::from_event_streamsink(sink),
-            healthcheck.boxed(),
-        ))
+        Ok((VectorSink::from_event_streamsink(sink), healthcheck.boxed()))
     }
 
     fn input(&self) -> Input {

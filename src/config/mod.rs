@@ -1546,7 +1546,10 @@ mod authoritative_tests {
 
         let config = config.build().unwrap();
         let result = config.compute_authoritative_components();
-        assert!(result.is_some(), "Should return Some when authoritative sink exists");
+        assert!(
+            result.is_some(),
+            "Should return Some when authoritative sink exists"
+        );
 
         let components = result.unwrap();
         let expected: HashSet<ComponentKey> = [
