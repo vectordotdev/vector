@@ -263,6 +263,8 @@ generated: components: sinks: aws_s3: configuration: {
 			When set, events are encoded together as a batch in a columnar format (for example, Parquet)
 			instead of the standard per-event framing-based encoding. The columnar format handles
 			its own internal compression, so the top-level `compression` setting is bypassed.
+
+			Only the `parquet` codec is supported by the AWS S3 sink.
 			"""
 		required: false
 		type: object: options: {
