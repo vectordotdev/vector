@@ -24,12 +24,7 @@ where
     K: Hash + Eq + Clone + Send + Sync + 'static,
     C: clock::Clock + Clone + Send + Sync + 'static,
 {
-    pub fn start(
-        quota: Quota,
-        clock: C,
-        flush_keys_interval: Duration,
-        cpu_ns: Counter,
-    ) -> Self {
+    pub fn start(quota: Quota, clock: C, flush_keys_interval: Duration, cpu_ns: Counter) -> Self {
         let rate_limiter = Arc::new(RateLimiter::dashmap_with_clock(quota, clock));
 
         let rate_limiter_clone = Arc::clone(&rate_limiter);
