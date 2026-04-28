@@ -57,6 +57,26 @@ impl InternalEvent for MemoryEnrichmentTableInserted<'_> {
 }
 
 #[derive(Debug, NamedInternalEvent)]
+pub(crate) struct MemoryEnrichmentTableRemoved<'a> {
+    pub key: &'a str,
+    pub include_key_metric_tag: bool,
+}
+
+impl InternalEvent for MemoryEnrichmentTableRemoved<'_> {
+    fn emit(self) {
+        if self.include_key_metric_tag {
+            counter!(
+                "memory_enrichment_table_removed_total",
+                "key" => self.key.to_owned()
+            )
+            .increment(1);
+        } else {
+            counter!("memory_enrichment_table_removed_total",).increment(1);
+        }
+    }
+}
+
+#[derive(Debug, NamedInternalEvent)]
 pub(crate) struct MemoryEnrichmentTableFlushed {
     pub new_objects_count: usize,
     pub new_byte_size: usize,
@@ -87,6 +107,17 @@ impl InternalEvent for MemoryEnrichmentTableTtlExpired<'_> {
         } else {
             counter!("memory_enrichment_table_ttl_expirations",).increment(1);
         }
+    }
+}
+
+#[derive(Debug, NamedInternalEvent)]
+pub(crate) struct MemoryEnrichmentTableTtlExpiredCount {
+    pub count: u64,
+}
+
+impl InternalEvent for MemoryEnrichmentTableTtlExpiredCount {
+    fn emit(self) {
+        counter!("memory_enrichment_table_ttl_expirations",).increment(self.count);
     }
 }
 
