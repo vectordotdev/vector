@@ -46,7 +46,7 @@ pub struct Config {
 
 /// Configuration for the `tag_cardinality_limit` transform for a specific group of metrics.
 #[configurable_component]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Inner {
     /// How many distinct values to accept for any given key.
     #[serde(default = "default_value_limit")]
@@ -62,6 +62,22 @@ pub struct Inner {
     #[configurable(derived)]
     #[serde(default)]
     pub internal_metrics: InternalMetricsConfig,
+
+    /// Tag keys that bypass cardinality limiting entirely.
+    ///
+    /// Listed tag keys are passed through unchanged on every event, are not counted against
+    /// `value_limit`, and never enter the cache. Useful for tags whose high cardinality is
+    /// intentional, such as `kube_pod_name` or `tenant_id`.
+    ///
+    /// When set on a per-metric configuration, the effective exclusion list is the union of the
+    /// global `exclude_tags` and the per-metric `exclude_tags`.
+    #[serde(default)]
+    #[configurable(metadata(
+        docs::human_name = "Excluded Tag Keys",
+        docs::examples = "kube_pod_name",
+        docs::examples = "tenant_id",
+    ))]
+    pub exclude_tags: Vec<String>,
 }
 
 /// Controls the approach taken for tracking tag cardinality.
@@ -149,6 +165,7 @@ impl GenerateConfig for Config {
                 value_limit: default_value_limit(),
                 limit_exceeded_action: default_limit_exceeded_action(),
                 internal_metrics: InternalMetricsConfig::default(),
+                exclude_tags: Vec::new(),
             },
             per_metric_limits: HashMap::default(),
         })
