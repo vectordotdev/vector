@@ -1,0 +1,44 @@
+name: throttle-transform-e2e
+services:
+  generator:
+    container_name: throttle-generator
+    image: alpine:3.19
+    init: true
+    depends_on:
+      vector:
+        condition: service_started
+    volumes:
+      - type: bind
+        source: ../data/generator.sh
+        target: /generator.sh
+        read_only: true
+    command:
+      - /bin/sh
+      - /generator.sh
+
+  vector:
+    container_name: vector-throttle-e2e
+    image: ${CONFIG_VECTOR_IMAGE}
+    init: true
+    volumes:
+      - type: bind
+        source: ../data/${CONFIG_VECTOR_CONFIG}
+        target: /etc/vector/vector.yaml
+        read_only: true
+      - type: volume
+        source: vector_output
+        target: /output
+    environment:
+      - VECTOR_LOG=${VECTOR_LOG:-info}
+    ports:
+      - "${VECTOR_HTTP_PORT:-9090}:9090"
+    command: ["vector", "-c", "/etc/vector/vector.yaml"]
+
+volumes:
+  vector_output:
+    external: true
+
+networks:
+  default:
+    name: ${VECTOR_NETWORK}
+    external: true
