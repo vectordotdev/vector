@@ -1,0 +1,3 @@
+Downstream crates can now extend `VectorLabelFilter`'s allowlist of tracing-span fields without modifying Vector. Use the `register_extra_metric_label!("my_label")` macro from `vector-core` (re-exported as `vector_lib::register_extra_metric_label!`) at module scope; any internal metric emitted from inside a tracing span carrying that field will pick it up as a metric label. Vector's own built-in global labels (`component_id`, `component_type`, `component_kind`, `buffer_type`) now go through the same `MetricLabel` registry, snapshotted once into a `HashSet` on first use, so the hot path stays a single set lookup.
+
+authors: gwenaskell

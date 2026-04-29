@@ -92,21 +92,22 @@ pub use inventory as __inventory;
 /// Register an additional metric label that should be preserved on metric keys when it is present
 /// as a tracing-span field.
 ///
-/// `VectorLabelFilter` only allows a fixed allowlist of span fields onto metric keys. Downstream
-/// crates can use this macro to extend that allowlist without modifying Vector — for example, an
-/// embedder that owns a "deployment-version" concept of its own can write
-/// `register_extra_metric_label!("deployment_version");` once at module scope and any internal
-/// metric emitted from inside a span carrying that field will inherit it as a label.
+/// `VectorLabelFilter` consults a single registry of label keys — Vector's own built-in global
+/// labels (`component_id`, `component_type`, `component_kind`, `buffer_type`) plus any registered
+/// through this macro. Downstream crates use it to extend the allowlist without modifying
+/// Vector — for example, an embedder that owns a "deployment-version" concept of its own can
+/// write `register_extra_metric_label!("deployment_version");` once at module scope and any
+/// internal metric emitted from inside a span carrying that field will inherit it as a label.
 ///
 /// Registrations are collected at link time via the `inventory` crate, so the read path is
 /// lock-free. The expansion goes through this crate's re-exports of `inventory` and
-/// [`ExtraMetricLabel`](crate::metrics::ExtraMetricLabel), so callers do not need a direct
-/// `inventory` dependency.
+/// [`MetricLabel`](crate::metrics::MetricLabel), so callers do not need a direct `inventory`
+/// dependency.
 #[macro_export]
 macro_rules! register_extra_metric_label {
     ($key:expr) => {
         $crate::__inventory::submit! {
-            $crate::metrics::ExtraMetricLabel($key)
+            $crate::metrics::MetricLabel($key)
         }
     };
 }

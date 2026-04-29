@@ -1,16 +1,35 @@
+use std::collections::HashSet;
+use std::sync::LazyLock;
+
 use metrics::{KeyName, Label};
 use metrics_tracing_context::LabelFilter;
 
-/// Extra label name that downstream crates can register so it is preserved on metric keys when
-/// it is present as a tracing-span field.
+/// A label name that should be preserved on metric keys when present as a tracing-span field.
 ///
-/// Registration is collected at link time via [`inventory`], so reads are lock-free.
-/// Use the [`register_extra_metric_label!`](crate::register_extra_metric_label) macro to
-/// register a label.
+/// Both Vector's own built-in global labels and downstream-registered labels go through this
+/// type — it is the single source of truth that [`VectorLabelFilter`] consults. Registrations
+/// are collected at link time via [`inventory`]. Downstream crates use the
+/// [`register_extra_metric_label!`](crate::register_extra_metric_label) macro to add one.
 #[derive(Debug)]
-pub struct ExtraMetricLabel(pub &'static str);
+pub struct MetricLabel(pub &'static str);
 
-inventory::collect!(ExtraMetricLabel);
+inventory::collect!(MetricLabel);
+
+// Vector's own global labels are registered through the same mechanism so the filter only has
+// one allowlist to consult.
+inventory::submit!(MetricLabel("component_id"));
+inventory::submit!(MetricLabel("component_type"));
+inventory::submit!(MetricLabel("component_kind"));
+inventory::submit!(MetricLabel("buffer_type"));
+
+/// Snapshot of every registered [`MetricLabel`], built on first access. `inventory` populates
+/// all submissions before `main`, so the snapshot is guaranteed to capture every entry — the
+/// hot path is then a single set lookup against this static.
+static LABELS: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
+    inventory::iter::<MetricLabel>()
+        .map(|label| label.0)
+        .collect()
+});
 
 #[derive(Debug, Clone)]
 pub(crate) struct VectorLabelFilter;
@@ -30,18 +49,9 @@ impl LabelFilter for VectorLabelFilter {
         {
             return true;
         }
-        // Global labels
-        if label_key == "component_id"
-            || label_key == "component_type"
-            || label_key == "component_kind"
-            || label_key == "buffer_type"
-        {
-            return true;
-        }
-        // Extra labels registered by downstream crates.
-        inventory::iter::<ExtraMetricLabel>
-            .into_iter()
-            .any(|extra| extra.0 == label_key)
+        // Globally-registered labels: Vector's own built-ins plus any registered by downstream
+        // crates via `register_extra_metric_label!`.
+        LABELS.contains(label_key)
     }
 }
 
@@ -50,16 +60,16 @@ mod tests {
     use metrics::{KeyName, Label};
     use metrics_tracing_context::LabelFilter;
 
-    use super::{ExtraMetricLabel, VectorLabelFilter};
+    use super::{MetricLabel, VectorLabelFilter};
 
-    inventory::submit!(ExtraMetricLabel("test_extra_label"));
+    inventory::submit!(MetricLabel("test_extra_label"));
 
     fn key(name: &'static str) -> KeyName {
         KeyName::from_const_str(name)
     }
 
     #[test]
-    fn includes_globally_registered_extra_label() {
+    fn includes_globally_registered_label() {
         let filter = VectorLabelFilter;
         let label = Label::new("test_extra_label", "value");
         assert!(filter.should_include_label(&key("any_metric"), &label));
@@ -73,7 +83,7 @@ mod tests {
     }
 
     #[test]
-    fn still_includes_built_in_global_labels() {
+    fn includes_built_in_global_labels() {
         let filter = VectorLabelFilter;
         for builtin in [
             "component_id",

@@ -15,7 +15,7 @@ use metrics_util::layers::Layer;
 use snafu::Snafu;
 
 pub use self::ddsketch::{AgentDDSketch, BinMap, Config};
-pub use self::label_filter::ExtraMetricLabel;
+pub use self::label_filter::MetricLabel;
 use self::{
     label_filter::VectorLabelFilter,
     recorder::{Registry, VectorRecorder},
