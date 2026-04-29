@@ -71,7 +71,7 @@ quickcheck = { workspace = true, optional = true }
 security-framework = "3.6.0"
 
 [target.'cfg(windows)'.dependencies]
-schannel = "0.1.28"
+schannel = "0.1.29"
 
 [build-dependencies]
 prost-build.workspace = true

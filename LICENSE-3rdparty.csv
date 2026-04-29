@@ -336,6 +336,7 @@ heim-net,https://github.com/heim-rs/heim,Apache-2.0 OR MIT,svartalf <self@svarta
 heim-runtime,https://github.com/heim-rs/heim,Apache-2.0 OR MIT,svartalf <self@svartalf.info>
 hermit-abi,https://github.com/hermit-os/hermit-rs,MIT OR Apache-2.0,Stefan Lankes
 hex,https://github.com/KokaKiwi/rust-hex,MIT OR Apache-2.0,KokaKiwi <kokakiwi@kokakiwi.net>
+hickory-net,https://github.com/hickory-dns/hickory-dns,MIT OR Apache-2.0,The contributors to Hickory DNS
 hickory-proto,https://github.com/hickory-dns/hickory-dns,MIT OR Apache-2.0,The contributors to Hickory DNS
 hickory-resolver,https://github.com/hickory-dns/hickory-dns,MIT OR Apache-2.0,The contributors to Hickory DNS
 hkdf,https://github.com/RustCrypto/KDFs,MIT OR Apache-2.0,RustCrypto Developers
@@ -398,7 +399,11 @@ itoa,https://github.com/dtolnay/itoa,MIT OR Apache-2.0,David Tolnay <dtolnay@gma
 jiff,https://github.com/BurntSushi/jiff,Unlicense OR MIT,Andrew Gallant <jamslam@gmail.com>
 jiff-static,https://github.com/BurntSushi/jiff,Unlicense OR MIT,Andrew Gallant <jamslam@gmail.com>
 jni,https://github.com/jni-rs/jni-rs,MIT OR Apache-2.0,Josh Chase <josh@prevoty.com>
+jni,https://github.com/jni-rs/jni-rs,MIT OR Apache-2.0,jni team
+jni-macros,https://github.com/jni-rs/jni-rs,MIT OR Apache-2.0,The jni-macros Authors
+jni-sys,https://github.com/jni-rs/jni-sys,MIT OR Apache-2.0,"Steven Fackler <sfackler@gmail.com>, Robert Bragg <robert@sixbynine.org>"
 jni-sys,https://github.com/sfackler/rust-jni-sys,MIT OR Apache-2.0,Steven Fackler <sfackler@gmail.com>
+jni-sys-macros,https://github.com/jni-rs/jni-sys,MIT OR Apache-2.0,Robert Bragg <robert@sixbynine.org>
 js-sys,https://github.com/wasm-bindgen/wasm-bindgen/tree/master/crates/js-sys,MIT OR Apache-2.0,The wasm-bindgen Developers
 json-patch,https://github.com/idubrov/json-patch,MIT OR Apache-2.0,Ivan Dubrov <dubrov.ivan@gmail.com>
 jsonpath-rust,https://github.com/besok/jsonpath-rust,MIT,BorisZhguchev <zhguchev@gmail.com>
@@ -568,6 +573,7 @@ postgres-protocol,https://github.com/rust-postgres/rust-postgres,MIT OR Apache-2
 postgres-types,https://github.com/rust-postgres/rust-postgres,MIT OR Apache-2.0,Steven Fackler <sfackler@gmail.com>
 powerfmt,https://github.com/jhpratt/powerfmt,MIT OR Apache-2.0,Jacob Pratt <jacob@jhpratt.dev>
 ppv-lite86,https://github.com/cryptocorrosion/cryptocorrosion,MIT OR Apache-2.0,The CryptoCorrosion Contributors
+prefix-trie,https://github.com/tiborschneider/prefix-trie,MIT OR Apache-2.0,The prefix-trie Authors
 prettydiff,https://github.com/romankoblov/prettydiff,MIT,Roman Koblov <penpen938@me.com>
 prettyplease,https://github.com/dtolnay/prettyplease,MIT OR Apache-2.0,David Tolnay <dtolnay@gmail.com>
 prettytable-rs,https://github.com/phsym/prettytable-rs,BSD-3-Clause,Pierre-Henri Symoneaux
@@ -709,6 +715,7 @@ signal-hook-registry,https://github.com/vorner/signal-hook,Apache-2.0 OR MIT,"Mi
 signatory,https://github.com/iqlusioninc/crates/tree/main/signatory,Apache-2.0 OR MIT,Tony Arcieri <tony@iqlusion.io>
 signature,https://github.com/RustCrypto/traits/tree/master/signature,Apache-2.0 OR MIT,RustCrypto Developers
 simd-adler32,https://github.com/mcountryman/simd-adler32,MIT,Marvin Countryman <me@maar.vin>
+simd_cesu8,https://github.com/seancroach/simd_cesu8,Apache-2.0 OR MIT,Sean C. Roach <me@seancroach.dev>
 simdutf8,https://github.com/rusticstuff/simdutf8,MIT OR Apache-2.0,Hans Kratz <hans@appfour.com>
 simpl,https://github.com/durch/simplerr,MIT,Drazen Urch <drazen@urch.eu>
 siphasher,https://github.com/jedisct1/rust-siphash,MIT OR Apache-2.0,Frank Denis <github@pureftpd.org>
