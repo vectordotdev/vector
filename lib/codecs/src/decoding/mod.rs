@@ -426,6 +426,12 @@ impl DeserializerConfig {
         }
     }
 
+    /// Returns `true` if this is a VRL deserializer with `inject_metadata: true`.
+    /// Sources use this to decide whether to call `Decoder::with_metadata_template`.
+    pub fn inject_metadata_enabled(&self) -> bool {
+        matches!(self, DeserializerConfig::Vrl(c) if c.vrl.inject_metadata)
+    }
+
     /// Return the type of event build by this deserializer.
     pub fn output_type(&self) -> DataType {
         match self {
