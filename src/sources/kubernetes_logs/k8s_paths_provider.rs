@@ -30,7 +30,7 @@ impl K8sPathsProvider {
     ///
     /// If `logs_dir_override` is `Some`, the given path is used as the pod logs
     /// root instead of the default `/var/log/pods`. Pass `None` for production use.
-    pub fn new(
+    pub const fn new(
         pod_state: Store<Pod>,
         namespace_state: Store<Namespace>,
         include_paths: Vec<glob::Pattern>,

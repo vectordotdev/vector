@@ -989,7 +989,7 @@ impl Source {
                         checkpoints.update(entry.file_id, entry.offset);
                     }
                 }
-                send_shutdown.send(())
+                let _ = send_shutdown.send(());
             });
             (Some(finalizer), shutdown2.map(|_| ()).boxed())
         } else {
