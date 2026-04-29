@@ -583,11 +583,12 @@ impl SplunkSource {
 
                         // With a decoder, defer ack registration until we know whether
                         // the codec emitted anything *and* whether it dropped any
-                        // frames. Returning an ack id when the decoder silently lost
-                        // data would let `/services/collector/ack` report success for
-                        // a request that lost rows mid-stream.
+                        // frames. Also skip ack registration when a later envelope
+                        // errored even if earlier ones produced events: the client
+                        // gets a 400 and never sees the ack id, so registering it
+                        // only leaks pending-ack capacity.
                         if decoder_in_use {
-                            maybe_ack_id = if events.is_empty() || had_decode_errors {
+                            maybe_ack_id = if events.is_empty() || had_decode_errors || error.is_some() {
                                 drop(receiver);
                                 None
                             } else {
@@ -1191,6 +1192,12 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
         let payload: Vec<u8> = match json.get_mut("event").map(JsonValue::take) {
             Some(JsonValue::Null) | None => {
                 return Err(ApiError::MissingEventField {
+                    event: self.envelopes_processed.saturating_sub(1),
+                }
+                .into());
+            }
+            Some(JsonValue::String(s)) if s.is_empty() => {
+                return Err(ApiError::EmptyEventField {
                     event: self.envelopes_processed.saturating_sub(1),
                 }
                 .into());
