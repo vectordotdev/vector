@@ -97,13 +97,10 @@ async function indexHTMLFiles(
     const pageTagsString = $("meta[name='keywords']").attr("content") || "";
     const pageTags: string[] = pageTagsString === "" ? [] : pageTagsString.split(",");
     const pageUrl = getPageUrl(file);
-    const componentKindMatch = pageUrl.match(/\/docs\/reference\/configuration\/(sources|sinks|transforms)\//);
+    const componentMatch = pageUrl.match(/\/docs\/reference\/configuration\/(sources|sinks|transforms)\/([^/]+)/);
     const componentKindMap: Record<string, string> = { sources: "source", sinks: "sink", transforms: "transform" };
-    const componentName = componentKindMatch ? (pageUrl.split("/").filter(Boolean).pop() || "") : "";
-    const pageComponentWithType = componentKindMatch
-      ? `${componentName} ${componentKindMap[componentKindMatch[1]]}`
-      : "";
-    const pageComponent = componentName;
+    const pageComponent = componentMatch ? componentMatch[2] : "";
+    const pageComponentWithType = componentMatch ? `${componentMatch[2]} ${componentKindMap[componentMatch[1]]}` : "";
 
     // @ts-ignore
     $(".algolia-no-index").each((_, d) => $(d).remove());
