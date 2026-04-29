@@ -57,7 +57,6 @@ pub trait Deserializer: DynClone + Send + Sync {
         bytes: Bytes,
         log_namespace: LogNamespace,
     ) -> vector_common::Result<SmallVec<[Event; 1]>>;
-
 }
 
 dyn_clone::clone_trait_object!(Deserializer);

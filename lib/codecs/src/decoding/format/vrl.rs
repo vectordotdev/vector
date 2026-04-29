@@ -392,8 +392,9 @@ mod tests {
         // VRL program copies the injected secret into an event field so we can
         // assert on its value. The input bytes become `.message` (Legacy namespace)
         // and we add `.secret_value` alongside it.
-        let decoder = make_decoder_with_inject_metadata(r#".secret_value = get_secret!("my_token")"#)
-            .with_metadata_template(metadata_with_secret("my_token", "super-secret"));
+        let decoder =
+            make_decoder_with_inject_metadata(r#".secret_value = get_secret!("my_token")"#)
+                .with_metadata_template(metadata_with_secret("my_token", "super-secret"));
 
         let bytes = Bytes::from(r#"hello"#);
         let events = decoder
@@ -411,9 +412,8 @@ mod tests {
     /// `set_secret!` runs after the template is pre-populated.
     #[test]
     fn test_with_metadata_template_codec_wins_on_collision() {
-        let decoder =
-            make_decoder_with_inject_metadata(r#"set_secret!("my_token", "codec-wins")"#)
-                .with_metadata_template(metadata_with_secret("my_token", "template-loses"));
+        let decoder = make_decoder_with_inject_metadata(r#"set_secret!("my_token", "codec-wins")"#)
+            .with_metadata_template(metadata_with_secret("my_token", "template-loses"));
 
         let bytes = Bytes::from(r#"hello"#);
         let events = decoder
@@ -421,7 +421,12 @@ mod tests {
             .expect("parse should succeed");
 
         assert_eq!(
-            events[0].metadata().secrets().get("my_token").unwrap().as_ref(),
+            events[0]
+                .metadata()
+                .secrets()
+                .get("my_token")
+                .unwrap()
+                .as_ref(),
             "codec-wins"
         );
     }

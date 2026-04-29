@@ -241,7 +241,6 @@ impl ExecConfig {
             Some(config) => config.respawn_interval_secs,
         }
     }
-
 }
 
 #[async_trait::async_trait]

@@ -1,7 +1,10 @@
 use bytes::{Bytes, BytesMut};
 use smallvec::SmallVec;
 use vector_common::internal_event::emit;
-use vector_core::{config::LogNamespace, event::{Event, EventMetadata}};
+use vector_core::{
+    config::LogNamespace,
+    event::{Event, EventMetadata},
+};
 
 use crate::{
     decoding::format::Deserializer as _,
