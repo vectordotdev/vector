@@ -278,12 +278,15 @@ impl Config {
     /// meaning the feature is inactive and all sinks participate in acks
     /// (preserving backwards compatibility).
     pub fn compute_authoritative_components(&self) -> Option<HashSet<ComponentKey>> {
-        // Step 1: Check if ANY sink is explicitly authoritative.
+        // Step 1: Check if ANY sink is explicitly authoritative AND has acks enabled.
+        // Both conditions are required: `authoritative` without `enabled` is a
+        // misconfiguration that should not activate the stripping feature.
         let any_explicitly_authoritative = self.sinks.iter().any(|(_, sink)| {
-            sink.inner
+            let acks = sink
+                .inner
                 .acknowledgements()
-                .merge_default(&self.global.acknowledgements)
-                .is_explicitly_authoritative()
+                .merge_default(&self.global.acknowledgements);
+            acks.is_explicitly_authoritative() && acks.enabled()
         });
 
         if !any_explicitly_authoritative {
@@ -291,14 +294,19 @@ impl Config {
         }
 
         // Step 2: Collect all authoritative sinks.
+        // A sink must have both `enabled` AND `authoritative` to be included.
+        // `enabled` gates source-level ack propagation via propagate_acks_rec;
+        // a sink with `authoritative: true` but `enabled: false` would activate
+        // stripping for other sinks without actually participating in acks.
         let authoritative_sinks: HashSet<ComponentKey> = self
             .sinks
             .iter()
             .filter(|(_, sink)| {
-                sink.inner
+                let acks = sink
+                    .inner
                     .acknowledgements()
-                    .merge_default(&self.global.acknowledgements)
-                    .authoritative()
+                    .merge_default(&self.global.acknowledgements);
+                acks.enabled() && acks.authoritative()
             })
             .map(|(key, _)| key.clone())
             .collect();
@@ -1764,6 +1772,67 @@ mod authoritative_tests {
         assert_eq!(
             components, expected,
             "Entire chain from source through transforms to auth_sink should be authoritative"
+        );
+    }
+
+    #[test]
+    fn authoritative_without_enabled_returns_none() {
+        // A sink with authoritative: true but enabled: false should NOT activate the
+        // authoritative stripping feature. This is a misconfiguration: marking a sink
+        // as authoritative while opting out of e2e acks would strip finalizers from
+        // other ack-enabled sinks without this sink actually participating in acks.
+        let mut config = ConfigBuilder::default();
+        config.add_source("src", basic_source().1);
+        config.add_sink(
+            "auth_no_acks",
+            &["src"],
+            basic_sink_with_acks(10, ack_config(false, true)).1,
+        );
+        // A second sink with acks enabled but NOT authoritative (normal path)
+        config.add_sink(
+            "normal_sink",
+            &["src"],
+            basic_sink_with_acks(10, AcknowledgementsConfig::from(true)).1,
+        );
+
+        let config = config.build().unwrap();
+        assert!(
+            config.compute_authoritative_components().is_none(),
+            "A sink with authoritative: true but enabled: false should not activate \
+             the authoritative stripping feature; compute_authoritative_components \
+             should return None"
+        );
+    }
+
+    #[test]
+    fn authoritative_with_enabled_false_excluded_from_set() {
+        // When one sink has both authoritative + enabled, and another has authoritative
+        // but NOT enabled, only the first should appear in the authoritative set.
+        let mut config = ConfigBuilder::default();
+        config.add_source("src", basic_source().1);
+        config.add_sink(
+            "auth_enabled",
+            &["src"],
+            basic_sink_with_acks(10, ack_config(true, true)).1,
+        );
+        config.add_sink(
+            "auth_disabled",
+            &["src"],
+            basic_sink_with_acks(10, ack_config(false, true)).1,
+        );
+
+        let config = config.build().unwrap();
+        let components = config
+            .compute_authoritative_components()
+            .expect("Should return Some because auth_enabled qualifies");
+
+        assert!(
+            components.contains(&ComponentKey::from("auth_enabled")),
+            "Sink with both authoritative and enabled should be in the set"
+        );
+        assert!(
+            !components.contains(&ComponentKey::from("auth_disabled")),
+            "Sink with authoritative but NOT enabled should NOT be in the set"
         );
     }
 
