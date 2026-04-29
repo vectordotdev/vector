@@ -5,7 +5,7 @@ use crate::sinks::util::retries::RetryLogic;
 use databricks_zerobus_ingest_sdk::{ConnectorFactory, ProxyConnector, ZerobusSdk, ZerobusStream};
 use futures::future::BoxFuture;
 use std::sync::Arc;
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, RwLock};
 use tower::Service;
 use tracing::warn;
 use vector_lib::finalization::{EventFinalizers, Finalizable};
@@ -112,21 +112,44 @@ pub enum StreamMode {
 }
 
 /// The active stream.
+///
+/// The SDK's `ZerobusStream::close()` requires `&mut self`, but ingests need
+/// shared access to call `&self` methods concurrently. We resolve this with an
+/// `RwLock`: ingests hold a read guard across `ingest_records_offset`, and
+/// `close()` takes the write guard, pulls the stream out of the `Option`, and
+/// awaits its SDK-level close on the owned value. Any holder of an `Arc` can
+/// invoke `close()`, so the graceful path always runs — there is no
+/// `try_unwrap`/`get_mut` race.
 enum ActiveStream {
-    Proto(Box<ZerobusStream>),
+    Proto(RwLock<Option<Box<ZerobusStream>>>),
     /// Test-only variant that returns a pre-configured error on ingest.
     #[cfg(test)]
     Mock(MockStream),
 }
 
 impl ActiveStream {
+    fn proto(stream: ZerobusStream) -> Self {
+        ActiveStream::Proto(RwLock::new(Some(Box::new(stream))))
+    }
+
     /// Gracefully flush and close the underlying SDK stream.
     ///
-    /// Safe to call before the value is dropped — the SDK's own `Drop`
-    /// implementation is a no-op on already-closed streams.
-    async fn close(&mut self) {
+    /// Waits for any in-flight ingests (read-lock holders) to complete, then
+    /// pulls the stream out of the slot and runs the SDK's awaitable `close()`
+    /// on the owned value (released-lock so further ingests fail fast with
+    /// `StreamClosed` rather than blocking).
+    ///
+    /// Idempotent: a second call after the stream has been taken is a no-op.
+    /// The SDK's own `Drop` is also a no-op once close has run.
+    async fn close(&self) {
         let result = match self {
-            ActiveStream::Proto(s) => s.close().await,
+            ActiveStream::Proto(lock) => {
+                let taken = lock.write().await.take();
+                match taken {
+                    Some(mut stream) => stream.close().await,
+                    None => return,
+                }
+            }
             #[cfg(test)]
             ActiveStream::Mock(m) => {
                 m.closed.store(true, std::sync::atomic::Ordering::Relaxed);
@@ -146,6 +169,38 @@ pub struct MockStream {
     next_error: std::sync::Mutex<Option<databricks_zerobus_ingest_sdk::ZerobusError>>,
     /// Shared flag set to `true` when `ActiveStream::close()` is called.
     closed: Arc<std::sync::atomic::AtomicBool>,
+    /// Optional gate: when set, each ingest call signals `started` and then
+    /// waits to acquire a `release` permit before returning. Lets tests
+    /// deterministically force two ingests to overlap (each holding an `Arc`
+    /// clone of the `ActiveStream`) before they fail.
+    gate: Option<MockGate>,
+}
+
+#[cfg(test)]
+struct MockGate {
+    started: Arc<tokio::sync::Semaphore>,
+    release: Arc<tokio::sync::Semaphore>,
+}
+
+#[cfg(test)]
+#[derive(Clone)]
+pub struct MockGateHandle {
+    started: Arc<tokio::sync::Semaphore>,
+    release: Arc<tokio::sync::Semaphore>,
+}
+
+#[cfg(test)]
+impl MockGateHandle {
+    /// Wait until `n` ingests have entered the gated region.
+    pub async fn wait_for_started(&self, n: u32) {
+        let permit = self.started.acquire_many(n).await.unwrap();
+        permit.forget();
+    }
+
+    /// Release `n` queued ingests so they can return their result.
+    pub fn release(&self, n: u32) {
+        self.release.add_permits(n as usize);
+    }
 }
 
 #[cfg(test)]
@@ -154,6 +209,7 @@ impl MockStream {
         Self {
             next_error: std::sync::Mutex::new(None),
             closed: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            gate: None,
         }
     }
 
@@ -161,7 +217,20 @@ impl MockStream {
         Self {
             next_error: std::sync::Mutex::new(Some(error)),
             closed: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            gate: None,
         }
+    }
+
+    /// Install a gate so ingests block until the test releases them.
+    /// Returns a handle the test uses to coordinate.
+    pub fn with_gate(mut self) -> (Self, MockGateHandle) {
+        let started = Arc::new(tokio::sync::Semaphore::new(0));
+        let release = Arc::new(tokio::sync::Semaphore::new(0));
+        self.gate = Some(MockGate {
+            started: Arc::clone(&started),
+            release: Arc::clone(&release),
+        });
+        (self, MockGateHandle { started, release })
     }
 
     /// Returns a shared handle to the closed flag for test assertions.
@@ -174,7 +243,13 @@ impl MockStream {
         *self.next_error.lock().unwrap() = Some(error);
     }
 
-    fn try_ingest(&self) -> Result<(), databricks_zerobus_ingest_sdk::ZerobusError> {
+    async fn try_ingest(&self) -> Result<(), databricks_zerobus_ingest_sdk::ZerobusError> {
+        if let Some(gate) = &self.gate {
+            gate.started.add_permits(1);
+            // Acquire and immediately forget — we don't need to release the
+            // permit on drop, the test's `release()` call hands them out.
+            gate.release.acquire().await.unwrap().forget();
+        }
         match self.next_error.lock().unwrap().take() {
             Some(e) => Err(e),
             None => Ok(()),
@@ -269,7 +344,7 @@ impl ZerobusService {
                         .build()
                         .await
                         .map_err(|e| ZerobusSinkError::StreamInitError { source: e })?;
-                    ActiveStream::Proto(Box::new(stream))
+                    ActiveStream::proto(stream)
                 }
             };
 
@@ -281,20 +356,16 @@ impl ZerobusService {
 
     /// Gracefully close and remove the active stream.
     ///
-    /// Should be called after all in-flight ingests have completed (e.g.,
-    /// after the driver returns) so that the slot holds the sole `Arc`
-    /// reference to the stream.
+    /// `ActiveStream::close()` takes `&self`, so this works regardless of how
+    /// many `Arc` clones are still in flight: the inner write lock waits for
+    /// any concurrent ingests to release their read guards before the SDK
+    /// flush + close runs. The slot lock is released before close starts so
+    /// concurrent `get_or_create_stream` calls aren't blocked on the SDK
+    /// shutdown path.
     pub async fn close_stream(&self) {
-        if let Some(stream) = self.stream.lock().await.take() {
-            match Arc::try_unwrap(stream) {
-                Ok(mut stream) => stream.close().await,
-                Err(_) => {
-                    warn!(
-                        message =
-                            "Zerobus stream has outstanding references, skipping graceful close."
-                    );
-                }
-            }
+        let stream = self.stream.lock().await.take();
+        if let Some(stream) = stream {
+            stream.close().await;
         }
     }
 
@@ -311,14 +382,19 @@ impl ZerobusService {
         payload: ZerobusPayload,
         events_byte_size: GroupedCountByteSize,
     ) -> Result<ZerobusResponse, ZerobusSinkError> {
-        let mut stream = self.get_or_create_stream().await?;
+        let stream = self.get_or_create_stream().await?;
 
-        // Lock is not held here — other tasks can ingest concurrently.
+        // Slot lock is not held here — concurrent ingests acquire read guards
+        // on the inner `RwLock` and run truly in parallel.
         let result = match (payload, stream.as_ref()) {
-            (ZerobusPayload::Records(records), ActiveStream::Proto(stream)) => {
-                match stream.ingest_records_offset(records).await {
+            (ZerobusPayload::Records(records), ActiveStream::Proto(lock)) => {
+                let guard = lock.read().await;
+                let Some(s) = guard.as_ref() else {
+                    return Err(ZerobusSinkError::StreamClosed);
+                };
+                match s.ingest_records_offset(records).await {
                     Ok(Some(offset)) if self.require_acknowledgements => {
-                        stream.wait_for_offset(offset).await.map(|_| ())
+                        s.wait_for_offset(offset).await.map(|_| ())
                     }
                     Ok(None) if self.require_acknowledgements => {
                         return Err(ZerobusSinkError::MissingAckOffset);
@@ -328,25 +404,27 @@ impl ZerobusService {
                 }
             }
             #[cfg(test)]
-            (ZerobusPayload::Records(_), ActiveStream::Mock(mock)) => mock.try_ingest(),
+            (ZerobusPayload::Records(_), ActiveStream::Mock(mock)) => mock.try_ingest().await,
         };
 
         match result {
             Ok(()) => Ok(ZerobusResponse { events_byte_size }),
             Err(e) => {
                 if e.is_retryable() {
-                    // Only clear the slot if it still points to the same stream that
-                    // failed. Another concurrent task may have already replaced it
-                    // with a fresh stream after recovering from its own error.
+                    // Clear the slot so the next attempt creates a fresh stream,
+                    // but only if it still points to the same stream that failed —
+                    // a concurrent task may have already replaced it.
                     {
                         let mut guard = self.stream.lock().await;
                         if guard.as_ref().is_some_and(|s| Arc::ptr_eq(s, &stream)) {
                             guard.take();
                         }
                     }
-                    if let Some(active) = Arc::get_mut(&mut stream) {
-                        active.close().await;
-                    }
+                    // `close()` takes `&self`, so we can always run the graceful
+                    // path here regardless of how many other `Arc` clones are in
+                    // flight. The write lock will wait for any concurrent ingests
+                    // holding read guards to drain before flushing.
+                    stream.close().await;
                 }
                 Err(ZerobusSinkError::IngestionError { source: e })
             }
@@ -441,6 +519,7 @@ impl RetryLogic for ZerobusRetryLogic {
             ZerobusSinkError::ZerobusError { source }
             | ZerobusSinkError::StreamInitError { source }
             | ZerobusSinkError::IngestionError { source } => source.is_retryable(),
+            ZerobusSinkError::StreamClosed => true,
             ZerobusSinkError::ConfigError { .. }
             | ZerobusSinkError::EncodingError { .. }
             | ZerobusSinkError::MissingAckOffset => false,
@@ -598,5 +677,60 @@ mod tests {
 
         assert!(!service.has_active_stream().await);
         assert!(closed.load(std::sync::atomic::Ordering::Relaxed));
+    }
+
+    /// Regression test for the "silent abort-only Drop" issue: when two
+    /// ingests are in flight (each holding an `Arc<ActiveStream>`) and one
+    /// fails retryably, the failing task must still run the graceful close
+    /// path. Under the previous design `Arc::get_mut` returned `None` here
+    /// because the second task held a clone, so close was skipped and the
+    /// stream fell to abort-only Drop.
+    #[tokio::test]
+    async fn retryable_failure_with_concurrent_ingest_still_closes() {
+        let (mock, gate) = MockStream::failing(ZerobusError::ChannelCreationError(
+            "connection reset".to_string(),
+        ))
+        .with_gate();
+        let closed = mock.closed_flag();
+
+        let service = ZerobusService::new_with_mock(test_config(), mock, false)
+            .await
+            .unwrap();
+
+        // Spawn two concurrent ingests. Each will obtain its own `Arc` clone
+        // from `get_or_create_stream`, then block in the gate.
+        let s1 = service.clone();
+        let t1 = tokio::spawn(async move {
+            s1.ingest(dummy_payload(), GroupedCountByteSize::new_untagged())
+                .await
+        });
+        let s2 = service.clone();
+        let t2 = tokio::spawn(async move {
+            s2.ingest(dummy_payload(), GroupedCountByteSize::new_untagged())
+                .await
+        });
+
+        // Wait until both ingests are inside the gate (both `Arc`s alive).
+        gate.wait_for_started(2).await;
+
+        // Release both. The failing one will go through the retry-cleanup
+        // path while the other still holds an `Arc`. Under the old design
+        // `Arc::get_mut` would return `None` and close would be skipped.
+        gate.release(2);
+
+        let r1 = t1.await.unwrap();
+        let r2 = t2.await.unwrap();
+
+        // At least one task observed the retryable error (the mock only
+        // produces a single error, but ordering between tasks is undefined).
+        assert!(r1.is_err() || r2.is_err());
+
+        // The graceful close path must have run despite concurrent `Arc`s.
+        assert!(
+            closed.load(std::sync::atomic::Ordering::Relaxed),
+            "graceful close did not run; stream would have leaked under old design"
+        );
+        // And the slot was cleared so the next ingest creates a fresh stream.
+        assert!(!service.has_active_stream().await);
     }
 }

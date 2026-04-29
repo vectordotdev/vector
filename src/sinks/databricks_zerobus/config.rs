@@ -266,11 +266,11 @@ impl ZerobusSinkConfig {
         }
 
         if let Some(max_bytes) = self.batch.max_bytes {
-            // Zerobus SDK limits max bytes to 10MB.
-            // NOTE: The size of the batch in Vector is not exactly the same as the size of the
-            // batch in the SDK since they are encoded differently. Though it is expected that
-            // Vector encoded data will be larger than the SDK encoded data since SDK encodes the
-            // data in protobuf format.
+            // Zerobus SDK limits max bytes to 10MB. This cap is a conservative safety limit:
+            // it's measured against Vector's pre-serialization sizing, not the protobuf bytes
+            // the SDK actually sends. Vector's pre-serialization size is generally larger than
+            // the SDK's protobuf-encoded size, so enforcing the 10MB cap here ensures the SDK's
+            // 10MB limit cannot be exceeded at runtime.
             if max_bytes > 10_000_000 {
                 return Err(ZerobusSinkError::ConfigError {
                     message: "max_bytes must be less than or equal to 10MB".to_string(),

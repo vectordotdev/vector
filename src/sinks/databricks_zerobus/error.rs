@@ -32,6 +32,12 @@ pub enum ZerobusSinkError {
     /// so durability cannot be confirmed. Treated as non-retryable.
     #[snafu(display("Zerobus ingest returned no offset in acknowledgement mode"))]
     MissingAckOffset,
+
+    /// The shared stream was closed concurrently (by shutdown or retry-driven
+    /// replacement) before this ingest could run. Retryable: the next attempt
+    /// will create a fresh stream via `get_or_create_stream`.
+    #[snafu(display("Zerobus stream was closed concurrently"))]
+    StreamClosed,
 }
 
 impl From<ZerobusError> for ZerobusSinkError {
@@ -47,6 +53,7 @@ impl From<ZerobusSinkError> for EventStatus {
             ZerobusSinkError::ConfigError { .. }
             | ZerobusSinkError::EncodingError { .. }
             | ZerobusSinkError::MissingAckOffset => EventStatus::Rejected,
+            ZerobusSinkError::StreamClosed => EventStatus::Errored,
             ZerobusSinkError::ZerobusError { source }
             | ZerobusSinkError::StreamInitError { source }
             | ZerobusSinkError::IngestionError { source } => {
