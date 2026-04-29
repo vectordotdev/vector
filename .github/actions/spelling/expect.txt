@@ -350,6 +350,7 @@ mezmo
 mfoo
 mgmt
 MIDP
+mij
 mingrammer
 mkto
 mlua
@@ -604,6 +605,7 @@ transitioning
 Trauring
 Treemap
 trialled
+Trino
 Trivago
 trivy
 trl

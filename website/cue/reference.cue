@@ -68,6 +68,7 @@ _values: {
 #Endpoints: [Path=string]: {
 	DELETE?: #Endpoint
 	GET?:    #Endpoint
+	HEAD?:   #Endpoint
 	POST?:   #Endpoint
 	PUT?:    #Endpoint
 }

@@ -39,7 +39,7 @@ CARGO_LLVM_COV_VERSION="0.8.4"
 WASM_PACK_VERSION="0.13.1"
 # npm tool versions are defined in scripts/environment/npm-tools/package.json
 # and pinned (including transitive deps) in npm-tools/package-lock.json.
-VDEV_VERSION="0.3.0"
+VDEV_VERSION="0.3.2"
 
 ALL_MODULES=(
   rustup
