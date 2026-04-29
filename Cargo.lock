@@ -3518,7 +3518,7 @@ dependencies = [
 [[package]]
 name = "databricks-zerobus-ingest-sdk"
 version = "1.2.0"
-source = "git+https://github.com/databricks/zerobus-sdk-rs?rev=9d69bcf6660d257f8317ec2947feaf7954b77c45#9d69bcf6660d257f8317ec2947feaf7954b77c45"
+source = "git+https://github.com/databricks/zerobus-sdk-rs?rev=7f36c079962fbb80cd4c7c5d4bfd0d204860e90d#7f36c079962fbb80cd4c7c5d4bfd0d204860e90d"
 dependencies = [
  "async-trait",
  "bytes",
