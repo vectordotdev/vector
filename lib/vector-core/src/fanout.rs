@@ -305,8 +305,7 @@ impl Fanout {
                         Some(ControlMessage::Replace(id, sink)) => {
                             let strip = send_group.senders
                                 .get(&id)
-                                .map(|slot| slot.strip_finalizers)
-                                .unwrap_or(false);
+                                .is_some_and(|slot| slot.strip_finalizers);
                             send_group.replace(&id, Sender::new(sink, strip));
                         },
                         None => {
