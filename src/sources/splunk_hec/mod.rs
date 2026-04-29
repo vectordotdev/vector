@@ -31,7 +31,7 @@ use vector_lib::{
     },
     config::{LegacyKey, LogNamespace},
     configurable::configurable_component,
-    event::BatchNotifier,
+    event::{BatchNotifier, EventMetadata},
     internal_event::{CountByteSize, InternalEventHandle as _, Registered},
     lookup::{
         self, OwnedValuePath, event_path, lookup_v2::OptionalValuePath, metadata_path,
@@ -712,9 +712,8 @@ impl SplunkSource {
                         // Decoder path: pass the optional HEC token into raw_event so
                         // it's stamped on each event the moment it leaves the codec
                         // (rather than after the whole payload is decoded).
-                        let token: Option<Arc<str>> = token
-                            .filter(|_| store_hec_token)
-                            .map(Arc::from);
+                        let token: Option<Arc<str>> =
+                            token.filter(|_| store_hec_token).map(Arc::from);
                         let (events, had_decode_errors) = raw_event(
                             body,
                             gzip,
@@ -1122,6 +1121,58 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
         Ok(log.into())
     }
 
+    /// Build an `EventMetadata` template from the current envelope context so
+    /// that VRL decoders can read source-supplied values via `%`-prefixed paths
+    /// before the decoder program executes.
+    ///
+    /// Peeks at the envelope `json` without consuming any fields (consumption
+    /// happens later in `build_events_decoded`). Falls back to sticky extractor
+    /// state for fields not present in the current envelope.
+    fn build_vrl_metadata(&self, json: &JsonValue) -> EventMetadata {
+        let mut metadata = EventMetadata::default();
+
+        // Splunk HEC token as a secret so VRL can read it via get_secret!()
+        if let Some(token) = &self.token {
+            metadata.set_splunk_hec_token(Arc::clone(token));
+        }
+
+        // Envelope host/source/sourcetype/index: peek current value; fall back
+        // to sticky extractor state.
+        let fields: &[(&str, &str)] = &[
+            ("host", "splunk_hec.host"),
+            ("source", "splunk_hec.source"),
+            ("sourcetype", "splunk_hec.sourcetype"),
+            ("index", "splunk_hec.index"),
+        ];
+        for (json_key, meta_path) in fields {
+            let val = json
+                .get(json_key)
+                .and_then(|v| v.as_str())
+                .map(|s| Value::from(s.to_string()))
+                .or_else(|| {
+                    self.extractors
+                        .iter()
+                        .find(|e| e.field == *json_key)
+                        .and_then(|e| e.value.clone())
+                });
+            if let Some(v) = val {
+                metadata.value_mut().insert(*meta_path, v);
+            }
+        }
+
+        // Channel: envelope field or header default
+        let channel = json
+            .get("channel")
+            .and_then(|v| v.as_str())
+            .map(|s| Value::from(s.to_string()))
+            .or_else(|| self.channel.clone());
+        if let Some(ch) = channel {
+            metadata.value_mut().insert("splunk_hec.channel", ch);
+        }
+
+        metadata
+    }
+
     /// Decoded path: extract the envelope's `event` field as bytes (preserving shape),
     /// run it through the second-stage decoder, and overlay envelope metadata so that
     /// decoder-produced fields win on conflict. Returns the events along with a flag
@@ -1159,6 +1210,11 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
         let fallback_time = match self.time {
             Time::Provided(t) | Time::Now(t) => t,
         };
+
+        // Build a metadata template so VRL decoders can read envelope context
+        // via `%`-prefixed paths (e.g. `%splunk_hec.host`, `%vector.secrets.*`).
+        // For non-VRL decoders `with_metadata_template` is a no-op.
+        let decoder = decoder.with_metadata_template(self.build_vrl_metadata(&json));
 
         let (decoded, had_decode_errors) = decode_payload(
             decoder,
@@ -1614,6 +1670,21 @@ fn raw_event(
 
     let decoder_in_use = decoder.is_some();
     let (mut events, had_decode_errors): (Vec<Event>, bool) = if let Some(decoder) = decoder {
+        // Build a metadata template so VRL decoders can read raw-endpoint context
+        // via `%`-prefixed paths (e.g. `%splunk_hec.channel`, `%splunk_hec.host`,
+        // `%vector.secrets.splunk_hec_token`). No-op for non-VRL decoders.
+        let decoder = {
+            let mut meta = EventMetadata::default();
+            if let Some(token) = splunk_hec_token.as_ref() {
+                meta.set_splunk_hec_token(Arc::clone(token));
+            }
+            if let Some(ref h) = host {
+                meta.value_mut().insert("splunk_hec.host", h.clone());
+            }
+            meta.value_mut().insert("splunk_hec.channel", channel.clone());
+            decoder.with_metadata_template(meta)
+        };
+
         // Pass ingest time as the fallback timestamp so decoded events always have
         // one - matches `insert_standard_vector_source_metadata` in the legacy raw
         // path. `decode_payload` uses `try_insert`, so a decoder-supplied timestamp
