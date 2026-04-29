@@ -1628,16 +1628,13 @@ impl DefaultExtractor {
             if matches!(self.log_namespace, LogNamespace::Vector)
                 && matches!(self.legacy_key_strategy, LegacyKeyStrategy::InsertIfEmpty)
             {
-                let meta = log.metadata_mut().value_mut();
-                if meta
-                    .get(lookup::path!(SplunkConfig::NAME).concat(metadata_key))
-                    .is_none()
-                {
-                    meta.insert(
+                log.try_insert(
+                    (
+                        PathPrefix::Metadata,
                         lookup::path!(SplunkConfig::NAME).concat(metadata_key),
-                        index.clone(),
-                    );
-                }
+                    ),
+                    index.clone(),
+                );
             } else {
                 let legacy_key = match self.legacy_key_strategy {
                     LegacyKeyStrategy::Overwrite => LegacyKey::Overwrite(metadata_key),
