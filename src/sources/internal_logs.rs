@@ -367,7 +367,7 @@ mod tests {
                 some_other_field = "dropped",
             );
             let _enter = span.enter();
-            error!(message = "with extra field", %test_id);
+            error!(message = "With extra field.", %test_id);
         }
 
         sleep(Duration::from_millis(1)).await;

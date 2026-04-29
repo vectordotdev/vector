@@ -9,7 +9,7 @@ use metrics_tracing_context::LabelFilter;
 /// Both Vector's own built-in global labels and downstream-registered labels go through this
 /// type — it is the single source of truth that [`VectorLabelFilter`] consults. Registrations
 /// are collected at link time via [`inventory`]. Downstream crates use the
-/// [`register_extra_metric_label!`](crate::register_extra_metric_label) macro to add one.
+/// [`register_extra_span_field!`](crate::register_extra_span_field) macro to add one.
 #[derive(Debug)]
 pub struct MetricLabel(pub &'static str);
 
@@ -50,7 +50,7 @@ impl LabelFilter for VectorLabelFilter {
             return true;
         }
         // Globally-registered labels: Vector's own built-ins plus any registered by downstream
-        // crates via `register_extra_metric_label!`.
+        // crates via `register_extra_span_field!`.
         LABELS.contains(label_key)
     }
 }
