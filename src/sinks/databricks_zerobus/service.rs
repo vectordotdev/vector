@@ -3,7 +3,7 @@
 use crate::config::ProxyConfig;
 use crate::sinks::util::retries::RetryLogic;
 use databricks_zerobus_ingest_sdk::{
-    ConnectorFactory, ProxyConnector, TableProperties, ZerobusSdk, ZerobusStream,
+    ConnectorFactory, ProxyConnector, ZerobusSdk, ZerobusStream,
 };
 use futures::future::BoxFuture;
 use std::sync::Arc;
@@ -259,14 +259,16 @@ impl ZerobusService {
 
             let active_stream = match &self.stream_mode {
                 StreamMode::Proto { descriptor_proto } => {
-                    let table_properties = TableProperties {
-                        table_name: self.config.table_name.clone(),
-                        descriptor_proto: Some((**descriptor_proto).clone()),
-                    };
-                    let stream_options = Some(self.config.stream_options.clone().into());
+                    let stream_options = &self.config.stream_options;
                     let stream = self
                         .sdk
-                        .create_stream(table_properties, client_id, client_secret, stream_options)
+                        .stream_builder()
+                        .table(self.config.table_name.clone())
+                        .oauth(client_id, client_secret)
+                        .compiled_proto((**descriptor_proto).clone())
+                        .server_lack_of_ack_timeout_ms(stream_options.server_lack_of_ack_timeout_ms)
+                        .flush_timeout_ms(stream_options.flush_timeout_ms)
+                        .build()
                         .await
                         .map_err(|e| ZerobusSinkError::StreamInitError { source: e })?;
                     ActiveStream::Proto(Box::new(stream))

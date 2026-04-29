@@ -82,18 +82,6 @@ impl Default for ZerobusStreamOptions {
     }
 }
 
-impl From<ZerobusStreamOptions> for databricks_zerobus_ingest_sdk::StreamConfigurationOptions {
-    fn from(options: ZerobusStreamOptions) -> Self {
-        Self {
-            recovery: true,
-            recovery_retries: 4,
-            server_lack_of_ack_timeout_ms: options.server_lack_of_ack_timeout_ms,
-            flush_timeout_ms: options.flush_timeout_ms,
-            ..Default::default()
-        }
-    }
-}
-
 /// Configuration for the Databricks Zerobus sink.
 #[configurable_component(sink(
     "databricks_zerobus",
@@ -465,17 +453,4 @@ mod tests {
         assert_eq!(settings.size_limit, 10_000_000);
     }
 
-    #[test]
-    fn test_stream_options_conversion() {
-        let options = ZerobusStreamOptions {
-            flush_timeout_ms: 45000,
-            server_lack_of_ack_timeout_ms: 90000,
-        };
-
-        let sdk_options: databricks_zerobus_ingest_sdk::StreamConfigurationOptions = options.into();
-        assert_eq!(sdk_options.flush_timeout_ms, 45000);
-        assert_eq!(sdk_options.server_lack_of_ack_timeout_ms, 90000);
-        assert!(sdk_options.recovery);
-        assert_eq!(sdk_options.recovery_retries, 4);
-    }
 }
