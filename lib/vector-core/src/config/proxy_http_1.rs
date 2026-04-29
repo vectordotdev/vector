@@ -1,6 +1,6 @@
 use headers_04::Authorization;
 use http_1::uri::InvalidUri;
-use hyper_proxy2::{Custom, Intercept, Proxy, ProxyConnector};
+use hyper_http_proxy::{Custom, Intercept, Proxy, ProxyConnector};
 use no_proxy::NoProxy;
 use url::Url;
 use vector_config::configurable_component;

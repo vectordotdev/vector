@@ -131,6 +131,16 @@ pub enum TlsError {
     NewCaStack { source: ErrorStack },
     #[snafu(display("Could not push intermediate certificate onto stack"))]
     CaStackPush { source: ErrorStack },
+    #[snafu(display("Failed to export certificate to DER: {}", source))]
+    CertificateDerExport { source: ErrorStack },
+    #[snafu(display("Failed to export private key to PKCS#8: {}", source))]
+    PrivateKeyDerExport { source: ErrorStack },
+    #[snafu(display("Failed to load native TLS root certificates: {}", source))]
+    LoadNativeCerts { source: std::io::Error },
+    #[snafu(display("Failed to add certificate to rustls root store: {}", message))]
+    BuildRustlsCertStore { message: String },
+    #[snafu(display("Failed to build rustls client config: {}", source))]
+    BuildRustlsClientConfig { source: rustls::Error },
 }
 
 impl MaybeTlsStream<TcpStream> {

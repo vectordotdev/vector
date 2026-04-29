@@ -26,7 +26,7 @@ headers_04 = { package = "headers", version = "0.4", default-features = false }
 http = { version = "0.2.9", default-features = false }
 http-1 = { package = "http", version = "1.0", default-features = false, features = ["std"] }
 hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
-hyper-proxy2 = { version = "0.1", default-features = false, features = ["openssl-tls"] }
+hyper-http-proxy = { version = "1", default-features = false, features = ["rustls-tls-native-roots"] }
 indexmap.workspace = true
 inventory.workspace = true
 ipnet = { version = "2", default-features = false, features = ["serde", "std"] }
@@ -54,6 +54,9 @@ snafu.workspace = true
 socket2.workspace = true
 tokio = { workspace = true, features = ["net"] }
 tokio-openssl = { version = "0.6.5", default-features = false }
+tokio-rustls = { version = "0.26", default-features = false }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+rustls-native-certs = "0.7"
 tokio-stream = { workspace = true, features = ["time"], optional = true }
 tokio-util = { version = "0.7.0", default-features = false, features = ["time"] }
 toml.workspace = true

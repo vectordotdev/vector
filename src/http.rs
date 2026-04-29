@@ -51,7 +51,7 @@ pub mod http_1 {
     use http_1::{Request, Response, header::HeaderValue, uri::InvalidUri};
     use hyper_1::{body::Incoming, service::Service};
     use hyper_openssl_10::client::legacy::HttpsConnector;
-    use hyper_proxy2::ProxyConnector;
+    use hyper_http_proxy::ProxyConnector;
     use hyper_util::{
         client::legacy::{Client, connect::HttpConnector},
         rt::TokioExecutor,
@@ -62,7 +62,7 @@ pub mod http_1 {
     use crate::{
         config::http_1::ProxyConfig,
         internal_events::http_client::http_1 as http_client,
-        tls::{MaybeTlsSettings, TlsError, tls_connector_builder},
+        tls::{MaybeTls, MaybeTlsSettings, TlsError, TlsSettings, tls_connector_builder},
     };
     use std::fmt;
 
@@ -75,6 +75,8 @@ pub mod http_1 {
         MakeHttpsConnector { source: openssl::error::ErrorStack },
         #[snafu(display("Failed to build Proxy connector: {}", source))]
         MakeProxyConnector { source: InvalidUri },
+        #[snafu(display("Failed to build Proxy TLS connector: {}", source))]
+        MakeProxyTlsConnector { source: TlsError },
         #[snafu(display("Failed to make HTTP(S) request: {}", source))]
         CallRequest {
             source: hyper_util::client::legacy::Error,
@@ -88,7 +90,9 @@ pub mod http_1 {
     impl HttpError {
         pub const fn is_retriable(&self) -> bool {
             match self {
-                HttpError::BuildRequest { .. } | HttpError::MakeProxyConnector { .. } => false,
+                HttpError::BuildRequest { .. }
+                | HttpError::MakeProxyConnector { .. }
+                | HttpError::MakeProxyTlsConnector { .. } => false,
                 HttpError::CallRequest { .. }
                 | HttpError::BuildTlsConnector { .. }
                 | HttpError::MakeHttpsConnector { .. }
@@ -205,15 +209,17 @@ pub mod http_1 {
         tls_settings: MaybeTlsSettings,
         proxy_config: &ProxyConfig,
     ) -> Result<ProxyConnector<HttpsConnector<HttpConnector>>, HttpError> {
-        // Create dedicated TLS connector for the proxied connection with user TLS settings.
-        let tls = tls_connector_builder(&tls_settings)
-            .context(BuildTlsConnectorSnafu)?
-            .build();
+        let rustls_connector = match &tls_settings {
+            MaybeTls::Tls(s) => s.build_rustls_connector(),
+            MaybeTls::Raw(()) => TlsSettings::from_options(None)
+                .context(MakeProxyTlsConnectorSnafu)?
+                .build_rustls_connector(),
+        }
+        .context(MakeProxyTlsConnectorSnafu)?;
+
         let https = build_tls_connector(tls_settings)?;
-        let mut proxy = ProxyConnector::new(https).unwrap();
-        // Make proxy connector aware of user TLS settings by setting the TLS connector:
-        // https://github.com/vectordotdev/vector/issues/13683
-        proxy.set_tls(Some(tls));
+        let mut proxy = ProxyConnector::unsecured(https);
+        proxy.set_tls(Some(rustls_connector));
         proxy_config
             .configure(&mut proxy)
             .context(MakeProxyConnectorSnafu)?;

@@ -6,10 +6,11 @@ use std::{
 };
 
 use super::{
-    AddCertToStoreSnafu, AddExtraChainCertSnafu, CaStackPushSnafu, EncodeAlpnProtocolsSnafu,
-    FileOpenFailedSnafu, FileReadFailedSnafu, MaybeTls, NewCaStackSnafu, NewStoreBuilderSnafu,
-    ParsePkcs12Snafu, PrivateKeyParseSnafu, Result, SetAlpnProtocolsSnafu, SetCertificateSnafu,
-    SetPrivateKeySnafu, SetVerifyCertSnafu, TlsError, X509ParseSnafu,
+    AddCertToStoreSnafu, AddExtraChainCertSnafu, BuildRustlsClientConfigSnafu, CaStackPushSnafu,
+    CertificateDerExportSnafu, EncodeAlpnProtocolsSnafu, FileOpenFailedSnafu, FileReadFailedSnafu,
+    LoadNativeCertsSnafu, MaybeTls, NewCaStackSnafu, NewStoreBuilderSnafu, ParsePkcs12Snafu,
+    PrivateKeyDerExportSnafu, PrivateKeyParseSnafu, Result, SetAlpnProtocolsSnafu,
+    SetCertificateSnafu, SetPrivateKeySnafu, SetVerifyCertSnafu, TlsError, X509ParseSnafu,
 };
 use cfg_if::cfg_if;
 use lookup::lookup_v2::OptionalValuePath;
@@ -260,6 +261,125 @@ impl TlsSettings {
                 .to_pem()
                 .expect("Invalid stored authority certificate")
         })
+    }
+
+    pub fn build_rustls_connector(&self) -> Result<tokio_rustls::TlsConnector> {
+        use std::sync::Arc;
+        use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer};
+
+        let provider = Arc::new(rustls::crypto::ring::default_provider());
+
+        // Build the verifier half of the config, producing a WantsClientCert builder
+        // regardless of path so that client auth can be applied uniformly below.
+        let wants_client_cert = if !self.verify_certificate {
+            #[derive(Debug)]
+            struct NoVerifier;
+
+            impl rustls::client::danger::ServerCertVerifier for NoVerifier {
+                fn verify_server_cert(
+                    &self,
+                    _end_entity: &CertificateDer<'_>,
+                    _intermediates: &[CertificateDer<'_>],
+                    _server_name: &rustls::pki_types::ServerName<'_>,
+                    _ocsp_response: &[u8],
+                    _now: rustls::pki_types::UnixTime,
+                ) -> std::result::Result<
+                    rustls::client::danger::ServerCertVerified,
+                    rustls::Error,
+                > {
+                    Ok(rustls::client::danger::ServerCertVerified::assertion())
+                }
+
+                fn verify_tls12_signature(
+                    &self,
+                    _message: &[u8],
+                    _cert: &CertificateDer<'_>,
+                    _dss: &rustls::DigitallySignedStruct,
+                ) -> std::result::Result<
+                    rustls::client::danger::HandshakeSignatureValid,
+                    rustls::Error,
+                > {
+                    Ok(rustls::client::danger::HandshakeSignatureValid::assertion())
+                }
+
+                fn verify_tls13_signature(
+                    &self,
+                    _message: &[u8],
+                    _cert: &CertificateDer<'_>,
+                    _dss: &rustls::DigitallySignedStruct,
+                ) -> std::result::Result<
+                    rustls::client::danger::HandshakeSignatureValid,
+                    rustls::Error,
+                > {
+                    Ok(rustls::client::danger::HandshakeSignatureValid::assertion())
+                }
+
+                fn supported_verify_schemes(&self) -> Vec<rustls::SignatureScheme> {
+                    rustls::crypto::ring::default_provider()
+                        .signature_verification_algorithms
+                        .supported_schemes()
+                }
+            }
+
+            rustls::ClientConfig::builder_with_provider(provider)
+                .with_safe_default_protocol_versions()
+                .context(BuildRustlsClientConfigSnafu)?
+                .dangerous()
+                .with_custom_certificate_verifier(Arc::new(NoVerifier))
+        } else {
+            let mut root_store = rustls::RootCertStore::empty();
+
+            if self.authorities.is_empty() {
+                let certs =
+                    rustls_native_certs::load_native_certs().context(LoadNativeCertsSnafu)?;
+                for cert in certs {
+                    root_store.add(cert).map_err(|e| TlsError::BuildRustlsCertStore {
+                        message: e.to_string(),
+                    })?;
+                }
+            } else {
+                for authority in &self.authorities {
+                    let der = authority.to_der().context(CertificateDerExportSnafu)?;
+                    root_store
+                        .add(CertificateDer::from(der))
+                        .map_err(|e| TlsError::BuildRustlsCertStore {
+                            message: e.to_string(),
+                        })?;
+                }
+            }
+
+            rustls::ClientConfig::builder_with_provider(provider)
+                .with_safe_default_protocol_versions()
+                .context(BuildRustlsClientConfigSnafu)?
+                .with_root_certificates(root_store)
+        };
+
+        let config = match &self.identity {
+            None => wants_client_cert.with_no_client_auth(),
+            Some(identity) => {
+                let cert_der = identity.cert.to_der().context(CertificateDerExportSnafu)?;
+                let key_der = identity
+                    .key
+                    .private_key_to_pkcs8()
+                    .context(PrivateKeyDerExportSnafu)?;
+                let mut certs = vec![CertificateDer::from(cert_der)];
+                if let Some(chain) = &identity.ca {
+                    for ca in chain {
+                        certs.push(CertificateDer::from(
+                            ca.to_der().context(CertificateDerExportSnafu)?,
+                        ));
+                    }
+                }
+                wants_client_cert
+                    .with_client_auth_cert(
+                        certs,
+                        PrivateKeyDer::Pkcs8(PrivatePkcs8KeyDer::from(key_der)),
+                    )
+                    .context(BuildRustlsClientConfigSnafu)?
+            }
+        };
+
+        Ok(tokio_rustls::TlsConnector::from(Arc::new(config)))
     }
 
     pub(super) fn apply_context(&self, context: &mut SslContextBuilder) -> Result<()> {

@@ -445,7 +445,7 @@ hyper-openssl = { version = "0.9.2", default-features = false }
 hyper_1 = { package = "hyper", version = "1.0", default-features = false, features = ["client", "http1", "http2", "server"] }
 hyper-util = { version = "0.1", features = ["tokio"] }
 hyper-openssl_10 = { package = "hyper-openssl", version = "0.10", default-features = false, features = ["client-legacy"] }
-hyper-proxy2 = { version = "0.1", default-features = false, features = ["openssl-tls"] }
+hyper-http-proxy = { version = "1", default-features = false, features = ["rustls-tls-native-roots"] }
 http-body = { version = "0.4.6", default-features = false }
 
 http-1 = { package = "http", version = "1.0", default-features = false, features = ["std"] }
