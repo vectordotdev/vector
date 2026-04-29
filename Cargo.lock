@@ -12203,7 +12203,7 @@ dependencies = [
  "proc-macro2 1.0.106",
  "prost-build 0.13.5",
  "prost-types 0.13.5",
- "quote 1.0.44",
+ "quote 1.0.45",
  "syn 2.0.117",
 ]
 
