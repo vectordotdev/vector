@@ -290,19 +290,6 @@ generated: components: sources: stdin: configuration: {
 				relevant_when: "codec = \"vrl\""
 				required:      true
 				type: object: options: {
-					inject_metadata: {
-						description: """
-																When `true`, the source may inject per-request metadata into the VRL
-																runtime before the program executes. Injected metadata is accessible
-																via `%`-prefixed paths (e.g. `%exec.host`, `%vector.secrets.*`).
-
-																Each source controls which metadata it injects; see the source
-																documentation for details. If the source does not support metadata
-																injection, this option has no effect.
-																"""
-						required: false
-						type: bool: default: false
-					}
 					source: {
 						description: """
 																The [Vector Remap Language][vrl] (VRL) program to execute for each event.

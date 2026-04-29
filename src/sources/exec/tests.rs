@@ -28,7 +28,6 @@ fn test_scheduled_handle_event() {
         pid,
         &mut event,
         LogNamespace::Legacy,
-        false,
     );
     let log = event.as_log();
 
@@ -58,7 +57,6 @@ fn test_scheduled_handle_event_vector_namespace() {
         pid,
         &mut event,
         LogNamespace::Vector,
-        false,
     );
 
     let log = event.as_log();
@@ -107,7 +105,6 @@ fn test_streaming_create_event() {
         pid,
         &mut event,
         LogNamespace::Legacy,
-        false,
     );
     let log = event.as_log();
 
@@ -137,7 +134,6 @@ fn test_streaming_create_event_vector_namespace() {
         pid,
         &mut event,
         LogNamespace::Vector,
-        false,
     );
 
     let log = event.as_log();

@@ -19,9 +19,8 @@ use vector_lib::{
     },
     config::{LegacyKey, LogNamespace, log_schema},
     configurable::configurable_component,
-    event::EventMetadata,
     internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol},
-    lookup::{metadata_path, owned_value_path, path},
+    lookup::{owned_value_path, path},
 };
 use vrl::{path::OwnedValuePath, value::Kind};
 
@@ -255,24 +254,7 @@ impl SourceConfig for ExecConfig {
             .framing
             .clone()
             .unwrap_or_else(|| self.decoding.default_stream_framing());
-        let mut decoder =
-            DecodingConfig::new(framing, self.decoding.clone(), log_namespace).build()?;
-
-        // If the VRL decoder has `inject_metadata: true`, build a metadata
-        // template with per-source context (hostname, command) so VRL programs
-        // can read `%exec.host`, `%exec.command`, etc. during decoding.
-        // `with_metadata_template` is a no-op for non-VRL deserializers and for
-        // VRL deserializers with `inject_metadata: false`.
-        let mut source_metadata = EventMetadata::default();
-        if let Some(ref hostname) = hostname {
-            source_metadata
-                .value_mut()
-                .insert("exec.host", hostname.clone());
-        }
-        source_metadata
-            .value_mut()
-            .insert("exec.command", self.command.clone());
-        decoder = decoder.with_metadata_template(source_metadata);
+        let decoder = DecodingConfig::new(framing, self.decoding.clone(), log_namespace).build()?;
 
         match &self.mode {
             Mode::Scheduled => {
@@ -537,9 +519,8 @@ async fn run_command(
                             byte_size: events.estimated_json_encoded_size_of(),
                         });
 
-                        let vrl_inject_metadata = config.decoding.inject_metadata_enabled();
                         for event in &mut events {
-                            handle_event(&config, &hostname, &Some(stream.to_string()), pid, event, log_namespace, vrl_inject_metadata);
+                            handle_event(&config, &hostname, &Some(stream.to_string()), pid, event, log_namespace);
                         }
                         if (out.send_batch(events).await).is_err() {
                             emit!(StreamClosedError { count });
@@ -688,7 +669,6 @@ fn handle_event(
     pid: Option<u32>,
     event: &mut Event,
     log_namespace: LogNamespace,
-    vrl_inject_metadata: bool,
 ) {
     if let Event::Log(log) = event {
         log_namespace.insert_standard_vector_source_metadata(log, ExecConfig::NAME, Utc::now());
@@ -715,38 +695,25 @@ fn handle_event(
             );
         }
 
-        // Add hostname (if needed). When the VRL decoder has inject_metadata enabled,
-        // use try_insert for the vector metadata path so any value the VRL program
-        // wrote to %exec.host is not overwritten here.
+        // Add hostname (if needed)
         if let Some(hostname) = hostname {
-            if vrl_inject_metadata && matches!(log_namespace, LogNamespace::Vector) {
-                log.try_insert(metadata_path!(ExecConfig::NAME, "host"), hostname.clone());
-            } else {
-                log_namespace.insert_source_metadata(
-                    ExecConfig::NAME,
-                    log,
-                    log_schema().host_key().map(LegacyKey::InsertIfEmpty),
-                    path!("host"),
-                    hostname.clone(),
-                );
-            }
-        }
-
-        // Add command. Same try_insert guard as hostname above.
-        if vrl_inject_metadata && matches!(log_namespace, LogNamespace::Vector) {
-            log.try_insert(
-                metadata_path!(ExecConfig::NAME, COMMAND_KEY),
-                config.command.clone(),
-            );
-        } else {
             log_namespace.insert_source_metadata(
                 ExecConfig::NAME,
                 log,
-                Some(LegacyKey::InsertIfEmpty(path!(COMMAND_KEY))),
-                path!(COMMAND_KEY),
-                config.command.clone(),
+                log_schema().host_key().map(LegacyKey::InsertIfEmpty),
+                path!("host"),
+                hostname.clone(),
             );
         }
+
+        // Add command
+        log_namespace.insert_source_metadata(
+            ExecConfig::NAME,
+            log,
+            Some(LegacyKey::InsertIfEmpty(path!(COMMAND_KEY))),
+            path!(COMMAND_KEY),
+            config.command.clone(),
+        );
     }
 }
 

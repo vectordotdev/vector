@@ -47,16 +47,6 @@ pub struct VrlDeserializerOptions {
     #[serde(default)]
     #[configurable(metadata(docs::advanced))]
     pub timezone: Option<TimeZone>,
-
-    /// When `true`, the source may inject per-request metadata into the VRL
-    /// runtime before the program executes. Injected metadata is accessible
-    /// via `%`-prefixed paths (e.g. `%exec.host`, `%vector.secrets.*`).
-    ///
-    /// Each source controls which metadata it injects; see the source
-    /// documentation for details. If the source does not support metadata
-    /// injection, this option has no effect.
-    #[serde(default)]
-    pub inject_metadata: bool,
 }
 
 impl VrlDeserializerConfig {
@@ -76,7 +66,6 @@ impl VrlDeserializerConfig {
             Ok(result) => Ok(VrlDeserializer {
                 program: result.program,
                 timezone: self.vrl.timezone.unwrap_or(TimeZone::Local),
-                inject_metadata_enabled: self.vrl.inject_metadata,
                 metadata_template: None,
             }),
             Err(diagnostics) => Err(Formatter::new(&self.vrl.source, diagnostics)
@@ -108,28 +97,22 @@ impl VrlDeserializerConfig {
 pub struct VrlDeserializer {
     program: Program,
     timezone: TimeZone,
-    /// Whether this deserializer accepts a metadata template from its source.
-    /// Set from [`VrlDeserializerOptions::inject_metadata`] at build time.
-    inject_metadata_enabled: bool,
-    /// Per-call metadata template. Only populated when `inject_metadata_enabled`
-    /// is true and the source calls [`VrlDeserializer::with_metadata_template`].
+    /// Per-call metadata template set by the source before decoding. When
+    /// present, every `%`-prefixed path in the template is accessible from
+    /// within the VRL program (e.g. `%splunk_hec.host`, `%vector.secrets.*`).
     metadata_template: Option<EventMetadata>,
 }
 
 impl VrlDeserializer {
     /// Attach a metadata template that will be pre-populated on each synthetic
-    /// event before the VRL program runs. This is a no-op unless
-    /// `inject_metadata: true` was set in the VRL decoder config.
+    /// event before the VRL program runs.
     ///
-    /// Sources call this once per request/frame with the metadata they have
-    /// assembled (e.g. envelope fields, auth tokens). VRL can then read those
-    /// values via `%`-prefixed paths such as `%exec.host` or
-    /// `%vector.secrets.*`.
+    /// Sources call this once per decode call with the per-request context they
+    /// have assembled (envelope fields, auth tokens, etc.). VRL can then read
+    /// those values via `%`-prefixed paths.
     #[must_use]
     pub fn with_metadata_template(mut self, metadata: EventMetadata) -> Self {
-        if self.inject_metadata_enabled {
-            self.metadata_template = Some(metadata);
-        }
+        self.metadata_template = Some(metadata);
         self
     }
 }
@@ -190,19 +173,6 @@ mod tests {
             vrl: VrlDeserializerOptions {
                 source: source.to_string(),
                 timezone: None,
-                inject_metadata: false,
-            },
-        }
-        .build()
-        .expect("Failed to build VrlDeserializer")
-    }
-
-    fn make_decoder_with_inject_metadata(source: &str) -> VrlDeserializer {
-        VrlDeserializerConfig {
-            vrl: VrlDeserializerOptions {
-                source: source.to_string(),
-                timezone: None,
-                inject_metadata: true,
             },
         }
         .build()
@@ -357,7 +327,6 @@ mod tests {
             vrl: VrlDeserializerOptions {
                 source: ". ?".to_string(),
                 timezone: None,
-                inject_metadata: false,
             },
         }
         .build()
@@ -377,8 +346,6 @@ mod tests {
         assert!(error.contains("aborted"));
     }
 
-    // Tests for `with_metadata_template` —————————————————————————————————————
-
     fn metadata_with_secret(key: &str, value: &str) -> EventMetadata {
         let mut metadata = EventMetadata::default();
         metadata.secrets_mut().insert(key, value);
@@ -392,9 +359,8 @@ mod tests {
         // VRL program copies the injected secret into an event field so we can
         // assert on its value. The input bytes become `.message` (Legacy namespace)
         // and we add `.secret_value` alongside it.
-        let decoder =
-            make_decoder_with_inject_metadata(r#".secret_value = get_secret!("my_token")"#)
-                .with_metadata_template(metadata_with_secret("my_token", "super-secret"));
+        let decoder = make_decoder(r#".secret_value = get_secret!("my_token")"#)
+            .with_metadata_template(metadata_with_secret("my_token", "super-secret"));
 
         let bytes = Bytes::from(r#"hello"#);
         let events = decoder
@@ -412,7 +378,7 @@ mod tests {
     /// `set_secret!` runs after the template is pre-populated.
     #[test]
     fn test_with_metadata_template_codec_wins_on_collision() {
-        let decoder = make_decoder_with_inject_metadata(r#"set_secret!("my_token", "codec-wins")"#)
+        let decoder = make_decoder(r#"set_secret!("my_token", "codec-wins")"#)
             .with_metadata_template(metadata_with_secret("my_token", "template-loses"));
 
         let bytes = Bytes::from(r#"hello"#);
