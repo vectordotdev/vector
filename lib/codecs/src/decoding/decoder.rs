@@ -1,7 +1,10 @@
 use bytes::{Bytes, BytesMut};
 use smallvec::SmallVec;
 use vector_common::internal_event::emit;
-use vector_core::{config::LogNamespace, event::Event};
+use vector_core::{
+    config::LogNamespace,
+    event::{Event, EventMetadata},
+};
 
 use crate::{
     decoding::format::Deserializer as _,
@@ -50,6 +53,17 @@ impl Decoder {
     /// Sets the log namespace that will be used when decoding.
     pub const fn with_log_namespace(mut self, log_namespace: LogNamespace) -> Self {
         self.log_namespace = log_namespace;
+        self
+    }
+
+    /// Attaches a per-decode-call metadata template to the inner deserializer.
+    ///
+    /// For deserializers that support it (currently only `VrlDeserializer`) the
+    /// template is pre-populated on the synthetic event before any user program
+    /// executes, making every `%`-prefixed path readable (e.g. `%splunk_hec.host`,
+    /// `%vector.secrets.*`). For all other deserializers this is a no-op.
+    pub fn with_metadata_template(mut self, metadata: EventMetadata) -> Self {
+        self.deserializer = self.deserializer.with_metadata_template(metadata);
         self
     }
 
