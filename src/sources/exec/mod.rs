@@ -19,6 +19,7 @@ use vector_lib::{
     },
     config::{LegacyKey, LogNamespace, log_schema},
     configurable::configurable_component,
+    event::EventMetadata,
     internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol},
     lookup::{owned_value_path, path},
 };
@@ -254,7 +255,24 @@ impl SourceConfig for ExecConfig {
             .framing
             .clone()
             .unwrap_or_else(|| self.decoding.default_stream_framing());
-        let decoder = DecodingConfig::new(framing, self.decoding.clone(), log_namespace).build()?;
+        let mut decoder =
+            DecodingConfig::new(framing, self.decoding.clone(), log_namespace).build()?;
+
+        // If the VRL decoder has `inject_metadata: true`, build a metadata
+        // template with per-source context (hostname, command) so VRL programs
+        // can read `%exec.host`, `%exec.command`, etc. during decoding.
+        // `with_metadata_template` is a no-op for non-VRL deserializers and for
+        // VRL deserializers with `inject_metadata: false`.
+        let mut source_metadata = EventMetadata::default();
+        if let Some(ref hostname) = hostname {
+            source_metadata
+                .value_mut()
+                .insert("exec.host", hostname.clone());
+        }
+        source_metadata
+            .value_mut()
+            .insert("exec.command", self.command.clone());
+        decoder = decoder.with_metadata_template(source_metadata);
 
         match &self.mode {
             Mode::Scheduled => {
