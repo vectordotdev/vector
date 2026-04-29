@@ -588,23 +588,24 @@ impl SplunkSource {
                         // gets a 400 and never sees the ack id, so registering it
                         // only leaks pending-ack capacity.
                         if decoder_in_use {
-                            maybe_ack_id = if events.is_empty() || had_decode_errors || error.is_some() {
-                                drop(receiver);
-                                None
-                            } else {
-                                match (idx_ack, receiver, channel) {
-                                    (Some(idx_ack), Some(receiver), Some(channel_id)) => {
-                                        match idx_ack
-                                            .get_ack_id_from_channel(channel_id, receiver)
-                                            .await
-                                        {
-                                            Ok(ack_id) => Some(ack_id),
-                                            Err(rej) => return Err(rej),
+                            maybe_ack_id =
+                                if events.is_empty() || had_decode_errors || error.is_some() {
+                                    drop(receiver);
+                                    None
+                                } else {
+                                    match (idx_ack, receiver, channel) {
+                                        (Some(idx_ack), Some(receiver), Some(channel_id)) => {
+                                            match idx_ack
+                                                .get_ack_id_from_channel(channel_id, receiver)
+                                                .await
+                                            {
+                                                Ok(ack_id) => Some(ack_id),
+                                                Err(rej) => return Err(rej),
+                                            }
                                         }
+                                        _ => None,
                                     }
-                                    _ => None,
-                                }
-                            };
+                                };
                         }
 
                         if !events.is_empty() {
@@ -1496,13 +1497,13 @@ fn decode_payload(
                                 // endpoint, which has a real HEC envelope timestamp.
                                 // /raw has no envelope time and should only get the
                                 // standard %vector.ingest_timestamp below.
-                                if set_source_timestamp {
-                                    if let Some(timestamp) = fallback_timestamp {
-                                        log.try_insert(
-                                            metadata_path!(SplunkConfig::NAME, "timestamp"),
-                                            timestamp,
-                                        );
-                                    }
+                                if set_source_timestamp
+                                    && let Some(timestamp) = fallback_timestamp
+                                {
+                                    log.try_insert(
+                                        metadata_path!(SplunkConfig::NAME, "timestamp"),
+                                        timestamp,
+                                    );
                                 }
                                 log.insert(metadata_path!("vector", "ingest_timestamp"), now);
                             }
