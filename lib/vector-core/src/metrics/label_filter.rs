@@ -7,8 +7,7 @@ use metrics_tracing_context::LabelFilter;
 /// A label name that should be preserved on metric keys when present as a tracing-span field.
 ///
 /// Both Vector's own built-in global labels and downstream-registered labels go through this
-/// type — it is the single source of truth that [`VectorLabelFilter`] consults. Registrations
-/// are collected at link time via [`inventory`]. Downstream crates use the
+/// type. Registrations are collected at link time via [`inventory`]. Downstream crates use the
 /// [`register_extra_span_field!`](crate::register_extra_span_field) macro to add one.
 #[derive(Debug)]
 pub struct MetricLabel(pub &'static str);
