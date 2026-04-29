@@ -57,13 +57,18 @@ impl BatchEncoder {
     }
 
     /// Get the HTTP content type.
+    ///
+    /// Returns `None` for serializers that do not produce a single HTTP body
+    /// (e.g. `ProtoBatch`, which emits one record per event for an out-of-band
+    /// transport rather than an HTTP payload).
     #[cfg(any(feature = "arrow", feature = "parquet"))]
-    pub const fn content_type(&self) -> &'static str {
+    pub const fn content_type(&self) -> Option<&'static str> {
         match &self.serializer {
-            BatchSerializer::Arrow(_) => "application/vnd.apache.arrow.stream",
+            #[cfg(feature = "arrow")]
+            BatchSerializer::Arrow(_) => Some("application/vnd.apache.arrow.stream"),
             #[cfg(feature = "parquet")]
-            BatchSerializer::Parquet(_) => "application/vnd.apache.parquet",
-            _ => unreachable!(),
+            BatchSerializer::Parquet(_) => Some("application/vnd.apache.parquet"),
+            BatchSerializer::ProtoBatch(_) => None,
         }
     }
 
@@ -89,8 +94,10 @@ impl BatchEncoder {
                     .map_err(|err| Error::SerializingError(Box::new(err)))?;
                 Ok(BatchOutput::Records(records))
             }
-            #[allow(unreachable_patterns)]
-            _ => unreachable!("encode_batch not supported for this serializer"),
+            #[cfg(feature = "parquet")]
+            BatchSerializer::Parquet(_) => Err(Error::SerializingError(Box::from(
+                "Parquet serializer does not support encode_batch; use the tokio Encoder interface instead",
+            ))),
         }
     }
 }
@@ -100,7 +107,6 @@ impl tokio_util::codec::Encoder<Vec<Event>> for BatchEncoder {
 
     #[allow(unused_variables)]
     fn encode(&mut self, events: Vec<Event>, buffer: &mut BytesMut) -> Result<(), Self::Error> {
-        #[allow(unreachable_patterns)]
         match &mut self.serializer {
             #[cfg(feature = "arrow")]
             BatchSerializer::Arrow(serializer) => {
@@ -118,9 +124,9 @@ impl tokio_util::codec::Encoder<Vec<Event>> for BatchEncoder {
             BatchSerializer::Parquet(serializer) => serializer
                 .encode(events, buffer)
                 .map_err(Error::SerializingError),
-            _ => unreachable!(
-                "tokio Encoder trait is only used for Arrow/Parquet; other batch serializers use encode_batch()"
-            ),
+            BatchSerializer::ProtoBatch(_) => Err(Error::SerializingError(Box::from(
+                "ProtoBatch serializer does not support the tokio Encoder interface; use BatchEncoder::encode_batch() instead",
+            ))),
         }
     }
 }

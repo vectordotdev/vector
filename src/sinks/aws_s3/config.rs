@@ -298,7 +298,7 @@ impl S3SinkConfig {
             // override via `options.content_type`; we only set it when unset.
             let mut api_options = self.options.clone();
             if api_options.content_type.is_none() {
-                api_options.content_type = Some(batch_encoder.content_type().to_string());
+                api_options.content_type = batch_encoder.content_type().map(|s| s.to_string());
             }
 
             let encoder = EncoderKind::Batch(batch_encoder);
@@ -456,7 +456,7 @@ mod tests {
 
         let mut api_options = config.options.clone();
         if api_options.content_type.is_none() {
-            api_options.content_type = Some(batch_encoder.content_type().to_string());
+            api_options.content_type = batch_encoder.content_type().map(|s| s.to_string());
         }
 
         assert_eq!(
@@ -497,7 +497,7 @@ mod tests {
 
         let mut api_options = config.options.clone();
         if api_options.content_type.is_none() {
-            api_options.content_type = Some(batch_encoder.content_type().to_string());
+            api_options.content_type = batch_encoder.content_type().map(|s| s.to_string());
         }
 
         assert_eq!(

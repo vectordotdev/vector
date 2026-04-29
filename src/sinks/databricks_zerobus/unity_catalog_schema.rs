@@ -360,14 +360,14 @@ fn sanitize_package_name(name: &str) -> String {
             let mut s: String = segment
                 .chars()
                 .map(|c| {
-                    if c.is_alphanumeric() || c == '_' {
+                    if c.is_ascii_alphanumeric() || c == '_' {
                         c
                     } else {
                         '_'
                     }
                 })
                 .collect();
-            if s.is_empty() || !s.starts_with(|c: char| c.is_alphabetic()) {
+            if s.is_empty() || !s.starts_with(|c: char| c.is_ascii_alphabetic()) {
                 s.insert(0, PACKAGE_SEGMENT_PREFIX);
             }
             s
@@ -457,5 +457,22 @@ mod tests {
             proto_text.contains("message Field008"),
             "Proto should have Field008 nested message"
         );
+    }
+
+    #[test]
+    fn test_sanitize_package_name_non_ascii() {
+        // Non-ASCII alphanumeric characters (e.g. accented letters, CJK) are
+        // valid for `char::is_alphanumeric` but not for protobuf identifiers,
+        // so they must be replaced with `_`.
+        assert_eq!(sanitize_package_name("café"), "caf_");
+        assert_eq!(sanitize_package_name("日本.tbl"), "p__.tbl");
+        assert_eq!(sanitize_package_name("naïve.schema"), "na_ve.schema");
+    }
+
+    #[test]
+    fn test_sanitize_package_name_ascii_preserved() {
+        assert_eq!(sanitize_package_name("main.default_v2"), "main.default_v2");
+        assert_eq!(sanitize_package_name("1abc"), "p1abc");
+        assert_eq!(sanitize_package_name("_x"), "p_x");
     }
 }

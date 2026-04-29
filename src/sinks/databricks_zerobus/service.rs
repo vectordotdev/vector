@@ -2,9 +2,7 @@
 
 use crate::config::ProxyConfig;
 use crate::sinks::util::retries::RetryLogic;
-use databricks_zerobus_ingest_sdk::{
-    ConnectorFactory, ProxyConnector, ZerobusSdk, ZerobusStream,
-};
+use databricks_zerobus_ingest_sdk::{ConnectorFactory, ProxyConnector, ZerobusSdk, ZerobusStream};
 use futures::future::BoxFuture;
 use std::sync::Arc;
 use tokio::sync::Mutex;
