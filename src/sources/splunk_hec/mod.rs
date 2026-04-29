@@ -1681,7 +1681,8 @@ fn raw_event(
             if let Some(ref h) = host {
                 meta.value_mut().insert("splunk_hec.host", h.clone());
             }
-            meta.value_mut().insert("splunk_hec.channel", channel.clone());
+            meta.value_mut()
+                .insert("splunk_hec.channel", channel.clone());
             decoder.with_metadata_template(meta)
         };
 
