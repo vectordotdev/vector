@@ -142,7 +142,6 @@ fn generate_avro_test_case_string() -> Result<()> {
     generate_test_case(schema, value, "string")
 }
 
-#[allow(unused)]
 fn generate_avro_test_case_fixed() -> Result<()> {
     let schema = r#"
     {
@@ -280,7 +279,6 @@ fn generate_avro_test_case_record() -> Result<()> {
     generate_test_case(schema, value, "record")
 }
 
-#[allow(unused)]
 fn generate_avro_test_case_date() -> Result<()> {
     let schema = r#"
     {
@@ -320,7 +318,6 @@ fn generate_avro_test_case_decimal_var() -> Result<()> {
     generate_test_case_from_value(schema, record, "decimal_var")
 }
 
-#[allow(unused)]
 fn generate_avro_test_case_time_millis() -> Result<()> {
     let schema = r#"
     {
@@ -441,6 +438,46 @@ fn generate_avro_test_case_local_timestamp_micros() -> Result<()> {
     generate_test_case(schema, value, "local-timestamp_micros")
 }
 
+fn generate_avro_test_case_timestamp_nanos() -> Result<()> {
+    let schema = r#"
+    {
+        "type": "record",
+        "name": "test",
+        "fields": [
+            {"name": "timestamp_nanos_field", "type": "long", "logicalType": "timestamp-nanos"}
+        ]
+    }
+    "#;
+    #[derive(Debug, Serialize, Deserialize, Clone)]
+    struct Test {
+        timestamp_nanos_field: i64,
+    }
+    let value = Test {
+        timestamp_nanos_field: 1697445291056567890i64,
+    };
+    generate_test_case(schema, value, "timestamp_nanos")
+}
+
+fn generate_avro_test_case_local_timestamp_nanos() -> Result<()> {
+    let schema = r#"
+    {
+        "type": "record",
+        "name": "test",
+        "fields": [
+            {"name": "local_timestamp_nanos_field", "type": "long", "logicalType": "local-timestamp-nanos"}
+        ]
+    }
+    "#;
+    #[derive(Debug, Serialize, Deserialize, Clone)]
+    struct Test {
+        local_timestamp_nanos_field: i64,
+    }
+    let value = Test {
+        local_timestamp_nanos_field: 1697445291056567890i64,
+    };
+    generate_test_case(schema, value, "local-timestamp_nanos")
+}
+
 fn generate_avro_test_case_uuid() -> Result<()> {
     let schema = r#"
     {
@@ -476,7 +513,7 @@ fn generate_test_case_from_value(schema: &str, value: Value, filename: &str) -> 
 
     let mut schema_file = File::create(format!("{FIXTURES_PATH}/{filename}.avsc"))?;
     let mut avro_file = File::create(format!("{FIXTURES_PATH}/{filename}.avro"))?;
-    schema_file.write_all(schema.canonical_form().as_bytes())?;
+    schema_file.write_all(serde_json::to_string(&schema)?.as_bytes())?;
     avro_file.write_all(&bytes)?;
     Ok(())
 }
@@ -488,8 +525,10 @@ fn main() -> Result<()> {
     generate_avro_test_case_array()?;
     generate_avro_test_case_boolean()?;
     generate_avro_test_case_bytes()?;
+    generate_avro_test_case_date()?;
     generate_avro_test_case_double()?;
     generate_avro_test_case_enum()?;
+    generate_avro_test_case_fixed()?;
     generate_avro_test_case_float()?;
     generate_avro_test_case_int()?;
     generate_avro_test_case_long()?;
@@ -497,10 +536,13 @@ fn main() -> Result<()> {
     generate_avro_test_case_record()?;
     generate_avro_test_case_string()?;
     generate_avro_test_case_time_micros()?;
+    generate_avro_test_case_time_millis()?;
     generate_avro_test_case_timestamp_micros()?;
     generate_avro_test_case_timestamp_millis()?;
+    generate_avro_test_case_timestamp_nanos()?;
     generate_avro_test_case_local_timestamp_micros()?;
     generate_avro_test_case_local_timestamp_millis()?;
+    generate_avro_test_case_local_timestamp_nanos()?;
     generate_avro_test_case_union()?;
     generate_avro_test_case_uuid()?;
     Ok(())
