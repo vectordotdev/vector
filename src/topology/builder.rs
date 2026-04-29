@@ -1239,12 +1239,17 @@ impl Runner {
             tokio::select! {
                 biased;
 
-                // Deliver the next in-order result.
+                // Deliver the next in-order result. Yield after delivery only when
+                // burst-delivering stashed results (HoL stall just cleared), so
+                // downstream TaskTransforms get CPU between each event in the burst.
                 result = scheduler.next(), if !scheduler.is_empty() => {
                     let mut outputs_buf = result.expect("is_empty guard prevents None");
                     self.send_outputs(&mut outputs_buf)
                         .await
                         .map_err(TaskError::wrapped)?;
+                    if scheduler.has_ready() {
+                        tokio::task::yield_now().await;
+                    }
                 }
 
                 // Accept new input when the scheduler has capacity.

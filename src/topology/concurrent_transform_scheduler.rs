@@ -122,6 +122,13 @@ impl ConcurrentTransformScheduler {
         self.in_flight.len() < self.running_limit && self.reorder_buf.len() < self.buffer_limit
     }
 
+    /// True if the head slot is already stashed — burst delivery mode after a HoL stall.
+    /// Used to gate yield_now in the delivery arm: false in normal steady-state (next
+    /// slot is None = task still running), so yield fires only during burst delivery.
+    pub fn has_ready(&self) -> bool {
+        self.reorder_buf.front().is_some_and(Option::is_some)
+    }
+
     /// True if no tasks are running and no results are buffered.
     pub fn is_empty(&self) -> bool {
         self.in_flight.is_empty() && self.reorder_buf.is_empty()
