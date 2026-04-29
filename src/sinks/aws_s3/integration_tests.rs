@@ -440,7 +440,7 @@ async fn s3_flush_on_exhaustion() {
             auth: Default::default(),
             acknowledgements: Default::default(),
             timezone: Default::default(),
-            force_path_style: true,
+            force_path_style: Some(true),
             retry_strategy: Default::default(),
         }
     };
