@@ -83,8 +83,7 @@ static TRANSFORM_CONCURRENCY_LIMIT: LazyLock<usize> = LazyLock::new(|| {
 // memory growth. Burst drainage (emitting many results at once) is avoided by
 // the Stream impl on ConcurrentTransformScheduler, which delivers one result per
 // select! round. See run_concurrently and ConcurrentTransformScheduler.
-static REORDER_BUFFER_CAP: LazyLock<usize> =
-    LazyLock::new(|| (2 * *TRANSFORM_CONCURRENCY_LIMIT) - 1);
+static REORDER_BUFFER_CAP: LazyLock<usize> = LazyLock::new(|| *TRANSFORM_CONCURRENCY_LIMIT * 2);
 
 const INTERNAL_SOURCES: [&str; 2] = ["internal_logs", "internal_metrics"];
 
