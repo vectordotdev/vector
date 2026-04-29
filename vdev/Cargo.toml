@@ -1,6 +1,6 @@
 [package]
 name = "vdev"
-version = "0.3.0"
+version = "0.3.2"
 edition = "2024"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 license = "MPL-2.0"
@@ -46,8 +46,6 @@ strum.workspace = true
 indoc.workspace = true
 git2 = { version = "0.20.4" }
 cfg-if.workspace = true
-vector-vrl-functions = { path = "../lib/vector-vrl/functions", features = ["dnstap", "vrl-metrics"] }
-vrl = { workspace = true, features = ["docs"] }
 
 [package.metadata.binstall]
 pkg-url = "{ repo }/releases/download/vdev-v{ version }/{ name }-{ target }-v{ version }.tgz"

@@ -1,0 +1,33 @@
+name: "Datadog Short-Lived Token"
+description: "Federate a short-lived Datadog token via dd-sts-action and export DD_API_KEY (and DD_APP_KEY when available) to the job environment."
+
+inputs:
+  policy:
+    required: false
+    default: public-vectordotdev-vector
+    description: "dd-sts policy to federate against."
+
+runs:
+  using: "composite"
+  steps:
+    # Fork PRs don't get `id-token: write`, so federation cannot succeed.
+    # Allow the step to fail and let downstream steps run without DD credentials.
+    - name: Federate Datadog token
+      id: dd-sts
+      continue-on-error: true
+      uses: DataDog/dd-sts-action@2e8187910199bd93129520183c093e19aa585c75
+      with:
+        policy: ${{ inputs.policy }}
+
+    - name: Export Datadog credentials to environment
+      shell: bash
+      env:
+        DD_STS_API_KEY: ${{ steps.dd-sts.outputs.api_key }}
+        DD_STS_APP_KEY: ${{ steps.dd-sts.outputs.app_key }}
+      run: |
+        if [ -n "${DD_STS_API_KEY}" ]; then
+          echo "DD_API_KEY=${DD_STS_API_KEY}" >> "$GITHUB_ENV"
+        fi
+        if [ -n "${DD_STS_APP_KEY}" ]; then
+          echo "DD_APP_KEY=${DD_STS_APP_KEY}" >> "$GITHUB_ENV"
+        fi

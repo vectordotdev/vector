@@ -31,12 +31,12 @@ There are three types of hooks: `init`, `process`, and `shutdown`.
 
 The most important of them is `process`, which is called on each incoming events. It can be defined like this:
 
-```toml
-hooks.process = """
-function (event, emit)
-  -- do something
-end
-"""
+```yaml
+hooks:
+  process: |
+    function (event, emit)
+      -- do something
+    end
 ```
 
 It takes a single event and can output one or many of them using the `emit` function provided as the second argument.
@@ -76,54 +76,54 @@ variables.
 
 Using the knowledge from the previous section, it is possible to write down the following transform definition:
 
-```toml title="vector.toml"
-[transforms.aggregator]
-type = "lua"
-version = "2"
-inputs = [] # add IDs of the input components here
+```yaml title="vector.yaml"
+transforms:
+  aggregator:
+    type: "lua"
+    version: "2"
+    inputs: [] # add IDs of the input components here
 
-hooks.init = """
-  function (emit)
-    count = 0 -- initialize state by setting a global variable
-  end
-"""
+    hooks:
+      init: |
+        function (emit)
+          count = 0 -- initialize state by setting a global variable
+        end
 
-hooks.process = """
-  function (event, emit)
-    count = count + 1 -- increment the counter and exit
-  end
-"""
+      process: |
+        function (event, emit)
+          count = count + 1 -- increment the counter and exit
+        end
 
-timers = [{interval_seconds = 5, handler = """
-  function (emit)
-    emit {
-      metric = {
-        name = "event_counter",
-        kind = "incremental",
-        timestamp = os.date("!*t"),
-        counter = {
-          value = counter
-        }
-      }
-    }
-    counter = 0
-  end
-"""}]
+      shutdown: |
+        function (emit)
+          emit {
+            metric = {
+              name = "event_counter",
+              kind = "incremental",
+              timestamp = os.date("!*t"),
+              counter = {
+                value = counter
+              }
+            }
+          }
+        end
 
-hooks.shutdown = """
-  function (emit)
-    emit {
-      metric = {
-        name = "event_counter",
-        kind = "incremental",
-        timestamp = os.date("!*t"),
-        counter = {
-          value = counter
-        }
-      }
-    }
-  end
-"""
+    timers:
+      - interval_seconds: 5
+        handler: |
+          function (emit)
+            emit {
+              metric = {
+                name = "event_counter",
+                kind = "incremental",
+                timestamp = os.date("!*t"),
+                counter = {
+                  value = counter
+                }
+              }
+            }
+            counter = 0
+          end
 ```
 
 One could plug it into a [pipeline][docs.about.concepts#pipelines] and it would work!
@@ -137,8 +137,8 @@ identical. It is possible make the config more [DRY][urls.dry_code] by extractin
 a dedicated function. Such a function can be placed into the [source][docs.transforms.lua#source]
 section of the config:
 
-```toml
-source = """
+```yaml
+source: |
   function make_counter(value)
     return metric = {
       name = "event_counter",
@@ -149,28 +149,28 @@ source = """
       }
     }
   end
-"""
 ```
 
 and then adjusting the timer handler
 
-```toml
-timers = [{interval_seconds = 5, handler = """
-  function (emit)
-    emit(make_counter(counter))
-    counter = 0
-  end
-"""}]
+```yaml
+timers:
+  - interval_seconds: 5
+    handler: |
+      function (emit)
+        emit(make_counter(counter))
+        counter = 0
+      end
 ```
 
 and the `shutdown` hook:
 
-```toml
-hooks.shutdown = """
-  function (emit)
-    emit(make_counter(counter))
-  end
-"""
+```yaml
+hooks:
+  shutdown: |
+    function (emit)
+      emit(make_counter(counter))
+    end
 ```
 
 ## Keep All Code Together
@@ -178,45 +178,48 @@ hooks.shutdown = """
 The new config looks tidier, but in order to make it more readable, it is also possible to gather implementations of
 all functions into the `source` section, resulting in the following component declaration:
 
-```toml title="vector.toml"
-[transforms.aggregator]
-type = "lua"
-version = "2"
-inputs = [] # add IDs of the input components here
-hooks.init = "init"
-hooks.process = "process"
-hooks.shutdown = "shutdown"
-timers = [{interval_seconds = 5, handler = "timer_handler"}]
+```yaml title="vector.yaml"
+transforms:
+  aggregator:
+    type: "lua"
+    version: "2"
+    inputs: [] # add IDs of the input components here
+    hooks:
+      init: "init"
+      process: "process"
+      shutdown: "shutdown"
+    timers:
+      - interval_seconds: 5
+        handler: "timer_handler"
 
-source = """
-  function init()
-    count = 0
-  end
+    source: |
+      function init()
+        count = 0
+      end
 
-  function process()
-    count = count + 1
-  end
+      function process()
+        count = count + 1
+      end
 
-  function timer_handler(emit)
-    emit(make_counter(counter))
-    counter = 0
-  end
+      function timer_handler(emit)
+        emit(make_counter(counter))
+        counter = 0
+      end
 
-  function shutdown(emit)
-    emit(make_counter(counter))
-  end
+      function shutdown(emit)
+        emit(make_counter(counter))
+      end
 
-  function make_counter(value)
-    return metric = {
-      name = "event_counter",
-      kind = "incremental",
-      timestamp = os.date("!*t"),
-      counter = {
-        value = value
-      }
-    }
-  end
-"""
+      function make_counter(value)
+        return metric = {
+          name = "event_counter",
+          kind = "incremental",
+          timestamp = os.date("!*t"),
+          counter = {
+            value = value
+          }
+        }
+      end
 ```
 
 ## A Loadable Module
@@ -262,16 +265,20 @@ end
 
 and
 
-```toml title="vector.toml"
-[transforms.aggregator]
-type = "lua"
-version = "2"
-inputs = [] # add IDs of the input components here
-hooks.init = "init"
-hooks.process = "process"
-hooks.shutdown = "shutdown"
-timers = [{interval_seconds = 5, handler = "timer_handler"}]
-source = "require('aggregator')"
+```yaml title="vector.yaml"
+transforms:
+  aggregator:
+    type: "lua"
+    version: "2"
+    inputs: [] # add IDs of the input components here
+    hooks:
+      init: "init"
+      process: "process"
+      shutdown: "shutdown"
+    timers:
+      - interval_seconds: 5
+        handler: "timer_handler"
+    source: "require('aggregator')"
 ```
 
 There are also [other possibilities][urls.lua_modules_tutorial] to define Lua modules which do not require to use

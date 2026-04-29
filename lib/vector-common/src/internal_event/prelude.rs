@@ -15,6 +15,8 @@ pub mod error_type {
     // When a condition for the event to be valid failed.
     // This is used for example when a field is missing or should be a string.
     pub const CONDITION_FAILED: &str = "condition_failed";
+    // When the component received a request with missing or invalid authentication credentials.
+    pub const AUTHENTICATION_FAILED: &str = "authentication_failed";
     // When the component or the service on which it depends is not configured properly.
     pub const CONFIGURATION_FAILED: &str = "configuration_failed";
     // When the component failed to connect to an external service.

@@ -162,9 +162,8 @@ pub struct EncoderNullConstraintError<'a> {
 #[cfg(feature = "arrow")]
 impl InternalEvent for EncoderNullConstraintError<'_> {
     fn emit(self) {
-        const CONSTRAINT_REASON: &str = "Schema constraint violation.";
         error!(
-            message = CONSTRAINT_REASON,
+            message = "Schema constraint violation.",
             error = %self.error,
             error_code = "encoding_null_constraint",
             error_type = error_type::ENCODER_FAILED,
@@ -177,9 +176,115 @@ impl InternalEvent for EncoderNullConstraintError<'_> {
             "stage" => error_stage::SENDING,
         )
         .increment(1);
-        emit(ComponentEventsDropped::<UNINTENTIONAL> {
-            count: 1,
-            reason: CONSTRAINT_REASON,
-        });
+    }
+}
+
+#[cfg(feature = "arrow")]
+#[derive(Debug, NamedInternalEvent)]
+/// Emitted when Arrow record batch construction fails (e.g. schema decoder build,
+/// JSON-to-Arrow decoding such as type mismatches).
+pub struct EncoderRecordBatchError<'a, E> {
+    /// The encoding error that occurred.
+    pub error: &'a E,
+    /// Stable error code identifying the failure mode.
+    pub error_code: &'static str,
+}
+
+#[cfg(feature = "arrow")]
+impl<E: std::fmt::Display> InternalEvent for EncoderRecordBatchError<'_, E> {
+    fn emit(self) {
+        error!(
+            message = "Failed to build Arrow record batch.",
+            error = %self.error,
+            error_code = self.error_code,
+            error_type = error_type::ENCODER_FAILED,
+            stage = error_stage::SENDING,
+        );
+        counter!(
+            "component_errors_total",
+            "error_code" => self.error_code,
+            "error_type" => error_type::ENCODER_FAILED,
+            "stage" => error_stage::SENDING,
+        )
+        .increment(1);
+    }
+}
+
+#[cfg(feature = "parquet")]
+#[derive(NamedInternalEvent)]
+pub(crate) struct SchemaGenerationError<'a> {
+    pub error: &'a arrow::error::ArrowError,
+}
+
+#[cfg(feature = "parquet")]
+impl InternalEvent for SchemaGenerationError<'_> {
+    fn emit(self) {
+        error!(
+            message = "Could not generate schema for batched events",
+            error = %self.error,
+            error_code = "parquet_schema_generation_failed",
+            error_type = error_type::ENCODER_FAILED,
+            stage = error_stage::SENDING,
+            internal_log_rate_limit = false,
+        );
+        counter!(
+            "component_errors_total",
+            "error_code" => "parquet_schema_generation_failed",
+            "error_type" => error_type::ENCODER_FAILED,
+            "stage" => error_stage::SENDING,
+        )
+        .increment(1);
+    }
+}
+
+#[cfg(feature = "parquet")]
+#[derive(NamedInternalEvent)]
+pub(crate) struct ArrowWriterError<'a> {
+    pub error: &'a parquet::errors::ParquetError,
+}
+
+#[cfg(feature = "parquet")]
+impl InternalEvent for ArrowWriterError<'_> {
+    fn emit(self) {
+        error!(
+            message = "Failed to write record batch with ArrowWriter.",
+            error = %self.error,
+            error_code = "parquet_arrow_writer_failed",
+            error_type = error_type::ENCODER_FAILED,
+            stage = error_stage::SENDING,
+            internal_log_rate_limit = false,
+        );
+        counter!(
+            "component_errors_total",
+            "error_code" => "parquet_arrow_writer_failed",
+            "error_type" => error_type::ENCODER_FAILED,
+            "stage" => error_stage::SENDING,
+        )
+        .increment(1);
+    }
+}
+
+#[cfg(feature = "parquet")]
+#[derive(NamedInternalEvent)]
+pub(crate) struct JsonSerializationError<'a> {
+    pub error: &'a serde_json::Error,
+}
+
+#[cfg(feature = "parquet")]
+impl InternalEvent for JsonSerializationError<'_> {
+    fn emit(self) {
+        error!(
+            message = "Could not serialize event to JSON.",
+            error = %self.error,
+            error_type = error_type::ENCODER_FAILED,
+            stage = error_stage::SENDING,
+            internal_log_rate_limit = true,
+        );
+        counter!(
+            "component_errors_total",
+            "error_type" => error_type::ENCODER_FAILED,
+            "stage" => error_stage::SENDING,
+        )
+        .increment(1);
     }
 }
