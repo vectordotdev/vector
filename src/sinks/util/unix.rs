@@ -39,7 +39,7 @@ use crate::{
         util::{
             EncodedEvent, StreamSink,
             service::net::UnixMode,
-            socket_bytes_sink::{BytesSink, MAX_PENDING_ITEMS, ShutdownCheck},
+            socket_bytes_sink::{BytesSink, MAX_PENDING_ITEMS, PendingBatch, ShutdownCheck},
         },
     },
 };
@@ -261,7 +261,7 @@ where
 
         // Keep a full batch in memory until a flush succeeds. If the connection fails after
         // partially writing bytes, we resend the whole batch on reconnect (at-least-once).
-        let mut pending_batch: Vec<EncodedEvent<Bytes>> = Vec::new();
+        let mut pending_batch = PendingBatch::new();
         let mut connection: Option<(BytesSink<UnixStream>, OpenToken<fn(usize)>)> = None;
         let mut send_failure_backoff = Self::fresh_send_failure_backoff();
 
@@ -322,7 +322,7 @@ where
                 let (sink, _open_token) = connection
                     .as_mut()
                     .expect("connection should be initialized before send");
-                for enc in &pending_batch {
+                for enc in pending_batch.iter() {
                     let wire = EncodedEvent {
                         item: enc.item.clone(),
                         finalizers: Default::default(),

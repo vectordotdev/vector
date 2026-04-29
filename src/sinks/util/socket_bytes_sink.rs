@@ -2,6 +2,7 @@ use std::{
     fmt,
     io::Error as IoError,
     marker::Unpin,
+    ops::{Deref, DerefMut},
     pin::Pin,
     task::{Context, Poll, ready},
 };
@@ -103,6 +104,41 @@ struct State {
     event_bytes: JsonSize,
     bytes_total: usize,
     finalizers: Vec<EventFinalizers>,
+}
+
+/// In-memory resend queue for socket stream sinks.
+///
+/// If a sink task is cancelled while events are buffered here, we mark them
+/// `Errored` so batch-level acks do not default to `Delivered`.
+#[derive(Default)]
+pub(crate) struct PendingBatch(Vec<EncodedEvent<Bytes>>);
+
+impl PendingBatch {
+    pub(crate) fn new() -> Self {
+        Self(Vec::new())
+    }
+}
+
+impl Deref for PendingBatch {
+    type Target = Vec<EncodedEvent<Bytes>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for PendingBatch {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl Drop for PendingBatch {
+    fn drop(&mut self) {
+        for encoded in self.0.drain(..) {
+            encoded.finalizers.update_status(EventStatus::Errored);
+        }
+    }
 }
 
 impl State {
@@ -240,7 +276,12 @@ where
 mod tests {
     use std::io;
 
-    use super::{is_peer_shutdown_error, peer_shutdown_io_error};
+    use bytes::Bytes;
+    use vector_lib::event::{BatchNotifier, BatchStatus, EventFinalizer};
+    use vector_lib::json_size::JsonSize;
+
+    use super::{PendingBatch, is_peer_shutdown_error, peer_shutdown_io_error};
+    use crate::sinks::util::EncodedEvent;
 
     #[test]
     fn detects_typed_peer_shutdown_error() {
@@ -252,5 +293,23 @@ mod tests {
     fn ignores_non_peer_shutdown_error() {
         let error = io::Error::other("not peer shutdown");
         assert!(!is_peer_shutdown_error(&error));
+    }
+
+    #[test]
+    fn pending_batch_drop_marks_finalizers_errored() {
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let finalizers = super::EventFinalizers::new(EventFinalizer::new(batch));
+
+        {
+            let mut pending = PendingBatch::new();
+            pending.push(EncodedEvent {
+                item: Bytes::from_static(b"test"),
+                finalizers,
+                byte_size: 0,
+                json_byte_size: JsonSize::zero(),
+            });
+        }
+
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Errored));
     }
 }
