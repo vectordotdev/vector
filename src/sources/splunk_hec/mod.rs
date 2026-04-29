@@ -297,10 +297,10 @@ impl SourceConfig for SplunkConfig {
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
 
-        // Build the base schema as the union of the per-endpoint decoder schemas.
-        // When an endpoint has no decoder, fall back to the legacy hardcoded shape -
-        // since events from BOTH endpoints flow through the same SourceOutput, the
-        // schema needs to express the union of every shape Vector might emit.
+        // Build schemas per endpoint, then merge them. Each endpoint decides at
+        // runtime whether source metadata overwrites event fields or defers to a
+        // decoder-produced value, so applying one global strategy would make mixed
+        // decoder/no-decoder configurations advertise the wrong contract.
         let legacy_base = || match log_namespace {
             LogNamespace::Legacy => {
                 let definition = vector_lib::schema::Definition::empty_legacy_namespace()
@@ -329,72 +329,96 @@ impl SourceConfig for SplunkConfig {
             .with_meaning(OwnedTargetPath::event_root(), meaning::MESSAGE),
         };
 
-        // When only one endpoint has a decoder, the other endpoint still emits the
-        // legacy log shape - so the schema needs to express both possibilities.
-        let base = match (&self.event.decoding, &self.raw.decoding) {
-            (None, None) => legacy_base(),
-            (Some(d), None) | (None, Some(d)) => {
-                d.schema_definition(log_namespace).merge(legacy_base())
-            }
-            (Some(de), Some(dr)) => de
-                .schema_definition(log_namespace)
-                .merge(dr.schema_definition(log_namespace)),
+        let endpoint_base = |decoding: &Option<DeserializerConfig>| match decoding {
+            Some(decoding) => decoding.schema_definition(log_namespace),
+            None => legacy_base(),
         };
 
-        // When a decoder is configured on either endpoint, the runtime uses
-        // `InsertIfEmpty` to write `splunk_*` legacy keys (so decoder-produced
-        // values win). Mirror that in the advertised schema so VRL/type checks
-        // and downstream schema consumers see the same behavior.
-        let any_decoder = self.event.decoding.is_some() || self.raw.decoding.is_some();
-        let splunk_legacy_key = |path: OwnedValuePath| {
-            if any_decoder {
+        let splunk_legacy_key = |path: OwnedValuePath, has_decoder: bool| {
+            if has_decoder {
                 LegacyKey::InsertIfEmpty(path)
             } else {
                 LegacyKey::Overwrite(path)
             }
         };
 
-        let schema_definition = base
-            .with_standard_vector_source_metadata()
-            .with_source_metadata(
+        let add_common_metadata = |definition: vector_lib::schema::Definition| {
+            definition
+                .with_standard_vector_source_metadata()
+                .with_source_metadata(
+                    SplunkConfig::NAME,
+                    log_schema()
+                        .host_key()
+                        .cloned()
+                        .map(LegacyKey::InsertIfEmpty),
+                    &owned_value_path!("host"),
+                    Kind::bytes(),
+                    Some(meaning::HOST),
+                )
+        };
+
+        let add_channel_metadata = |definition: vector_lib::schema::Definition,
+                                    has_decoder: bool| {
+            definition.with_source_metadata(
                 SplunkConfig::NAME,
-                log_schema()
-                    .host_key()
-                    .cloned()
-                    .map(LegacyKey::InsertIfEmpty),
-                &owned_value_path!("host"),
-                Kind::bytes(),
-                Some(meaning::HOST),
-            )
-            .with_source_metadata(
-                SplunkConfig::NAME,
-                Some(splunk_legacy_key(owned_value_path!(CHANNEL))),
+                Some(splunk_legacy_key(owned_value_path!(CHANNEL), has_decoder)),
                 &owned_value_path!("channel"),
                 Kind::bytes(),
                 None,
             )
-            .with_source_metadata(
-                SplunkConfig::NAME,
-                Some(splunk_legacy_key(owned_value_path!(INDEX))),
-                &owned_value_path!("index"),
-                Kind::bytes(),
-                None,
-            )
-            .with_source_metadata(
-                SplunkConfig::NAME,
-                Some(splunk_legacy_key(owned_value_path!(SOURCE))),
-                &owned_value_path!("source"),
-                Kind::bytes(),
-                Some(meaning::SERVICE),
-            )
-            // Not to be confused with `source_type`.
-            .with_source_metadata(
-                SplunkConfig::NAME,
-                Some(splunk_legacy_key(owned_value_path!(SOURCETYPE))),
-                &owned_value_path!("sourcetype"),
-                Kind::bytes(),
-                None,
-            );
+        };
+
+        let event_has_decoder = self.event.decoding.is_some();
+        let raw_has_decoder = self.raw.decoding.is_some();
+
+        // Merge the per-endpoint base schemas (event root kind + standard Vector
+        // metadata). Splunk-specific fields are added once afterward with
+        // per-field decoder flags, avoiding the widening that occurs when the
+        // raw schema's open `metadata_kind.unknown` overrides specific fields
+        // from the event schema during merge.
+        let merged_base = add_common_metadata(
+            endpoint_base(&self.event.decoding).merge(endpoint_base(&self.raw.decoding)),
+        );
+
+        // `index`, `source`, `sourcetype` are only written by the /event endpoint.
+        // `channel` is written by both; use Overwrite if either endpoint has no
+        // decoder (some events still overwrite it).
+        let channel_has_decoder = event_has_decoder && raw_has_decoder;
+        let schema_definition = add_channel_metadata(
+            merged_base
+                .with_source_metadata(
+                    SplunkConfig::NAME,
+                    Some(splunk_legacy_key(
+                        owned_value_path!(INDEX),
+                        event_has_decoder,
+                    )),
+                    &owned_value_path!("index"),
+                    Kind::bytes(),
+                    None,
+                )
+                .with_source_metadata(
+                    SplunkConfig::NAME,
+                    Some(splunk_legacy_key(
+                        owned_value_path!(SOURCE),
+                        event_has_decoder,
+                    )),
+                    &owned_value_path!("source"),
+                    Kind::bytes(),
+                    Some(meaning::SERVICE),
+                )
+                // Not to be confused with `source_type`.
+                .with_source_metadata(
+                    SplunkConfig::NAME,
+                    Some(splunk_legacy_key(
+                        owned_value_path!(SOURCETYPE),
+                        event_has_decoder,
+                    )),
+                    &owned_value_path!("sourcetype"),
+                    Kind::bytes(),
+                    None,
+                ),
+            channel_has_decoder,
+        );
 
         // Output type is the union of both endpoints' decoder output types
         // (logs from a JSON codec, metrics from native, etc.). The legacy path
