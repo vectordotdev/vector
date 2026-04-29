@@ -43,7 +43,7 @@ use vector_lib::{
     tls::MaybeTlsIncomingStream,
 };
 use vrl::{
-    path::{OwnedTargetPath, PathPrefix},
+    path::{OwnedTargetPath, PathPrefix, ValuePath as _},
     value::{Kind, kind::Collection},
 };
 use warp::{
@@ -1242,31 +1242,52 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
         for mut event in decoded {
             if let Event::Log(log) = &mut event {
                 // channel: envelope value beats header default. Use `InsertIfEmpty`
-                // so a decoder-produced field at `splunk_channel` (legacy ns) wins on
-                // conflict - matches the "decoder wins" rule applied to the rest of
-                // the envelope metadata.
+                // for legacy event fields, and `try_insert` for the Vector metadata
+                // path so a decoder-produced `%splunk_hec.channel` survives.
                 if let Some(channel_val) = envelope_channel.clone().or_else(|| self.channel.clone())
                 {
-                    self.log_namespace.insert_source_metadata(
-                        SplunkConfig::NAME,
-                        log,
-                        Some(LegacyKey::InsertIfEmpty(&channel_path)),
-                        lookup::path!(CHANNEL),
-                        channel_val,
-                    );
+                    match self.log_namespace {
+                        LogNamespace::Legacy => {
+                            self.log_namespace.insert_source_metadata(
+                                SplunkConfig::NAME,
+                                log,
+                                Some(LegacyKey::InsertIfEmpty(&channel_path)),
+                                lookup::path!(CHANNEL),
+                                channel_val,
+                            );
+                        }
+                        LogNamespace::Vector => {
+                            log.try_insert(
+                                metadata_path!(SplunkConfig::NAME, CHANNEL),
+                                channel_val,
+                            );
+                        }
+                    }
                 }
 
-                // fields: legacy keys land at bare paths that may conflict with decoder
-                // output, so use `InsertIfEmpty` to preserve decoder-wins semantics.
+                // fields: use `InsertIfEmpty` / `try_insert` to preserve decoder-wins
+                // semantics in both legacy (bare field paths) and vector (%splunk_hec.*).
                 if let Some(ref fields) = envelope_fields {
                     for (key, value) in fields {
-                        self.log_namespace.insert_source_metadata(
-                            SplunkConfig::NAME,
-                            log,
-                            Some(LegacyKey::InsertIfEmpty(&owned_value_path!(key.as_str()))),
-                            lookup::path!(key.as_str()),
-                            value.clone(),
-                        );
+                        match self.log_namespace {
+                            LogNamespace::Legacy => {
+                                self.log_namespace.insert_source_metadata(
+                                    SplunkConfig::NAME,
+                                    log,
+                                    Some(LegacyKey::InsertIfEmpty(&owned_value_path!(
+                                        key.as_str()
+                                    ))),
+                                    lookup::path!(key.as_str()),
+                                    value.clone(),
+                                );
+                            }
+                            LogNamespace::Vector => {
+                                log.try_insert(
+                                    metadata_path!(SplunkConfig::NAME, key.as_str()),
+                                    value.clone(),
+                                );
+                            }
+                        }
                     }
                 }
 
@@ -1600,17 +1621,36 @@ impl DefaultExtractor {
         if let Some(index) = self.value.as_ref()
             && let Some(metadata_key) = self.to_field.path.as_ref()
         {
-            let legacy_key = match self.legacy_key_strategy {
-                LegacyKeyStrategy::Overwrite => LegacyKey::Overwrite(metadata_key),
-                LegacyKeyStrategy::InsertIfEmpty => LegacyKey::InsertIfEmpty(metadata_key),
-            };
-            self.log_namespace.insert_source_metadata(
-                SplunkConfig::NAME,
-                log,
-                Some(legacy_key),
-                &self.to_field.path.clone().unwrap_or(owned_value_path!("")),
-                index.clone(),
-            )
+            // For Vector namespace + InsertIfEmpty (decoder mode): check the metadata
+            // value tree before inserting so VRL-produced values aren't overwritten.
+            // `insert_source_metadata` for Vector ns always calls `insert`, not
+            // `try_insert`, so we replicate its path construction here.
+            if matches!(self.log_namespace, LogNamespace::Vector)
+                && matches!(self.legacy_key_strategy, LegacyKeyStrategy::InsertIfEmpty)
+            {
+                let meta = log.metadata_mut().value_mut();
+                if meta
+                    .get(lookup::path!(SplunkConfig::NAME).concat(metadata_key))
+                    .is_none()
+                {
+                    meta.insert(
+                        lookup::path!(SplunkConfig::NAME).concat(metadata_key),
+                        index.clone(),
+                    );
+                }
+            } else {
+                let legacy_key = match self.legacy_key_strategy {
+                    LegacyKeyStrategy::Overwrite => LegacyKey::Overwrite(metadata_key),
+                    LegacyKeyStrategy::InsertIfEmpty => LegacyKey::InsertIfEmpty(metadata_key),
+                };
+                self.log_namespace.insert_source_metadata(
+                    SplunkConfig::NAME,
+                    log,
+                    Some(legacy_key),
+                    &self.to_field.path.clone().unwrap_or(owned_value_path!("")),
+                    index.clone(),
+                );
+            }
         }
     }
 }
@@ -1728,29 +1768,37 @@ fn raw_event(
     for event in &mut events {
         if let Event::Log(log) = event {
             // With a decoder configured, defer to anything it produced at the legacy
-            // `splunk_channel` path so "decoder wins" stays true. Without a decoder,
-            // the log was just constructed and overwriting matches today's behavior.
-            let channel_legacy_key = if decoder_in_use {
-                LegacyKey::InsertIfEmpty(&channel_path)
+            // When a decoder is in use, preserve decoder-wins semantics for Vector ns
+            // by using `try_insert` on the metadata path (insert_source_metadata for
+            // Vector ns always overwrites). Without a decoder the log is freshly
+            // constructed so overwriting is correct.
+            if decoder_in_use && matches!(log_namespace, LogNamespace::Vector) {
+                log.try_insert(metadata_path!(SplunkConfig::NAME, CHANNEL), channel.clone());
+                if let Some(ref h) = host {
+                    log.try_insert(metadata_path!(SplunkConfig::NAME, "host"), h.clone());
+                }
             } else {
-                LegacyKey::Overwrite(&channel_path)
-            };
-            log_namespace.insert_source_metadata(
-                SplunkConfig::NAME,
-                log,
-                Some(channel_legacy_key),
-                lookup::path!(CHANNEL),
-                channel.clone(),
-            );
-
-            if let Some(ref host) = host {
+                let channel_legacy_key = if decoder_in_use {
+                    LegacyKey::InsertIfEmpty(&channel_path)
+                } else {
+                    LegacyKey::Overwrite(&channel_path)
+                };
                 log_namespace.insert_source_metadata(
                     SplunkConfig::NAME,
                     log,
-                    log_schema().host_key().map(LegacyKey::InsertIfEmpty),
-                    lookup::path!("host"),
-                    host.clone(),
+                    Some(channel_legacy_key),
+                    lookup::path!(CHANNEL),
+                    channel.clone(),
                 );
+                if let Some(ref host) = host {
+                    log_namespace.insert_source_metadata(
+                        SplunkConfig::NAME,
+                        log,
+                        log_schema().host_key().map(LegacyKey::InsertIfEmpty),
+                        lookup::path!("host"),
+                        host.clone(),
+                    );
+                }
             }
         }
     }
