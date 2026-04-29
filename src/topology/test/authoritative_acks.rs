@@ -194,3 +194,94 @@ async fn authoritative_sink_blocks_ack_when_not_drained() {
 
     topology.stop().await;
 }
+
+/// Proves that an isolated pipeline (source -> sink) without any authoritative
+/// sinks preserves legacy wait-for-all acking when another pipeline in the
+/// same topology DOES have an authoritative sink.
+///
+/// This is the key regression test for the per-edge stripping fix. Before
+/// the fix, the strip decision was per-component: any component not in the
+/// authoritative set had finalizers stripped. This meant an isolated
+/// non-authoritative pipeline's sink would have finalizers stripped just
+/// because an unrelated authoritative sink existed elsewhere, causing the
+/// isolated source to ack events before its sink processed them.
+///
+/// Topology:
+///   source_auth -> auth_sink     (authoritative: true, drains events)
+///   source_iso  -> iso_sink      (authoritative: false, holds finalizers)
+///
+/// Expected behavior:
+///   - source_iso does NOT receive an ack because iso_sink holds finalizers.
+///   - The authoritative pipeline does not affect iso's ack chain.
+#[tokio::test]
+async fn isolated_pipeline_preserves_legacy_acking() {
+    trace_init();
+
+    // Create the authoritative pipeline: ack_source -> auth_sink.
+    let (mut auth_source_tx, auth_source_config) = ack_source();
+    let (auth_out, auth_sink_config) = basic_sink_with_acks(10, ack_config(true, true));
+
+    // Create the isolated non-authoritative pipeline: iso_source -> iso_sink.
+    // iso_sink holds finalizers indefinitely (via no_ack_sink), simulating a
+    // slow/blocked sink that hasn't processed events yet.
+    let (mut iso_source_tx, iso_source_config) = ack_source();
+    let (iso_sink_config, iso_event_rx, _iso_held_finalizers) =
+        no_ack_sink(ack_config(true, false));
+
+    // Build the topology with both pipelines.
+    let mut config = Config::builder();
+    config.add_source("source_auth", auth_source_config);
+    config.add_source("source_iso", iso_source_config);
+    config.add_sink("auth_sink", &["source_auth"], auth_sink_config);
+    config.add_sink("iso_sink", &["source_iso"], iso_sink_config);
+
+    let (topology, _) = start_topology(config.build().unwrap(), false).await;
+
+    // --- Send an event through the isolated pipeline ---
+    let (iso_batch, iso_batch_status_rx) = BatchNotifier::new_with_receiver();
+    let mut iso_event = Event::Log(LogEvent::from("test_isolated_pipeline"));
+    iso_event.add_batch_notifier(iso_batch.clone());
+    drop(iso_batch);
+
+    iso_source_tx.send_event(iso_event).await.unwrap();
+
+    // Wait for iso_sink to receive the event (it holds finalizers).
+    timeout(Duration::from_secs(5), iso_event_rx)
+        .await
+        .expect("Timed out waiting for iso_sink to receive event")
+        .expect("iso_sink event notification channel closed");
+
+    // Also send an event through the auth pipeline and drain it, to prove
+    // the auth pipeline's ack doesn't interfere.
+    let (auth_batch, _auth_batch_status_rx) = BatchNotifier::new_with_receiver();
+    let mut auth_event = Event::Log(LogEvent::from("test_auth_pipeline"));
+    auth_event.add_batch_notifier(auth_batch.clone());
+    drop(auth_batch);
+
+    auth_source_tx.send_event(auth_event).await.unwrap();
+
+    let auth_handle = tokio::spawn(async move {
+        let mut auth_out = auth_out;
+        auth_out.next().await
+    });
+    timeout(Duration::from_secs(5), auth_handle)
+        .await
+        .expect("Timed out waiting for auth sink")
+        .expect("Auth sink task panicked");
+
+    // The isolated pipeline's sink holds finalizers. If per-edge stripping
+    // works correctly, iso_sink's finalizers are NOT stripped (because
+    // source_iso is not on any authoritative path), so the ack should be
+    // blocked. If the old per-component stripping was used, iso_sink's
+    // finalizers would be stripped and the ack would arrive immediately.
+    let iso_ack_result = timeout(Duration::from_millis(500), iso_batch_status_rx).await;
+
+    assert!(
+        iso_ack_result.is_err(),
+        "Isolated pipeline source should NOT receive an ack when its sink holds finalizers. \
+         If this fails, per-edge stripping is broken: the authoritative pipeline elsewhere \
+         in the topology is incorrectly causing the isolated pipeline's finalizers to be stripped."
+    );
+
+    topology.stop().await;
+}

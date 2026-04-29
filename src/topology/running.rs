@@ -969,19 +969,20 @@ impl RunningTopology {
         let new_inputs = inputs.iter().cloned().collect::<HashSet<_>>();
         let inputs_to_add = &new_inputs - &old_inputs;
 
-        // Determine whether events flowing into this component should have
-        // finalizers stripped. Strip when authoritative mode is active AND
-        // this component is NOT on an authoritative path.
-        let strip_finalizers = self
-            .authoritative_components
-            .as_ref()
-            .map(|auth| !auth.contains(key))
-            .unwrap_or(false);
-
         for input in inputs {
             let output = self.outputs.get_mut(&input).expect("unknown output");
 
             if diff.contains(&input.component) || inputs_to_add.contains(&input) {
+                // Per-edge strip: only strip finalizers when the edge crosses from an
+                // authoritative-path component to a non-authoritative one. This preserves
+                // legacy wait-for-all acking for pipelines whose sources have no
+                // authoritative sinks downstream.
+                let strip_finalizers = self
+                    .authoritative_components
+                    .as_ref()
+                    .map(|auth| !auth.contains(key) && auth.contains(&input.component))
+                    .unwrap_or(false);
+
                 // If the input we're connecting to is changing, that means its outputs will have been
                 // recreated, so instead of replacing a paused sink, we have to add it to this new
                 // output for the first time, since there's nothing to actually replace at this point.
@@ -1064,13 +1065,16 @@ impl RunningTopology {
         for (transform_key, transform) in unchanged_transforms {
             let changed_outputs = get_changed_outputs(diff, transform.inputs.clone());
 
-            let strip_finalizers = self
-                .authoritative_components
-                .as_ref()
-                .map(|auth| !auth.contains(transform_key))
-                .unwrap_or(false);
-
             for output_id in changed_outputs {
+                // Per-edge strip: only strip when crossing from authoritative to non-authoritative.
+                let strip_finalizers = self
+                    .authoritative_components
+                    .as_ref()
+                    .map(|auth| {
+                        !auth.contains(transform_key) && auth.contains(&output_id.component)
+                    })
+                    .unwrap_or(false);
+
                 debug!(component_id = %transform_key, fanout_id = %output_id.component, "Reattaching component input to fanout.");
 
                 let input = self.inputs.get(transform_key).cloned().unwrap();
@@ -1090,13 +1094,14 @@ impl RunningTopology {
         for (sink_key, sink) in unchanged_sinks {
             let changed_outputs = get_changed_outputs(diff, sink.inputs.clone());
 
-            let strip_finalizers = self
-                .authoritative_components
-                .as_ref()
-                .map(|auth| !auth.contains(sink_key))
-                .unwrap_or(false);
-
             for output_id in changed_outputs {
+                // Per-edge strip: only strip when crossing from authoritative to non-authoritative.
+                let strip_finalizers = self
+                    .authoritative_components
+                    .as_ref()
+                    .map(|auth| !auth.contains(sink_key) && auth.contains(&output_id.component))
+                    .unwrap_or(false);
+
                 debug!(component_id = %sink_key, fanout_id = %output_id.component, "Reattaching component input to fanout.");
 
                 let input = self.inputs.get(sink_key).cloned().unwrap();

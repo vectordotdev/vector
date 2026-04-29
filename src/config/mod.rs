@@ -332,6 +332,12 @@ impl Config {
             }
         }
 
+        // NOTE: We intentionally do NOT do a forward sweep to add components
+        // from non-authoritative sources. Instead, the runtime uses per-edge
+        // strip decisions: strip only when the upstream IS in this set and the
+        // downstream is NOT. This naturally preserves legacy behavior for
+        // pipelines whose sources have no authoritative sinks downstream.
+
         Some(on_authoritative_path)
     }
 }
@@ -1867,6 +1873,48 @@ mod authoritative_tests {
         assert_eq!(
             components, expected,
             "Diamond topology: all components feeding auth_sink should be authoritative"
+        );
+    }
+
+    #[test]
+    fn separate_pipelines_not_in_authoritative_set() {
+        // Two independent pipelines: one with authoritative, one without.
+        // The non-authoritative pipeline components should NOT be in the authoritative
+        // set. Legacy behavior is preserved at runtime by per-edge stripping: the
+        // strip decision checks both upstream and downstream, and only strips when the
+        // upstream IS in the set and the downstream is NOT. Since source_legacy is NOT
+        // in the set, its edges to legacy_sink will never be stripped.
+        let mut config = ConfigBuilder::default();
+        config.add_source("src_auth", basic_source().1);
+        config.add_source("src_legacy", basic_source().1);
+        config.add_sink(
+            "auth_sink",
+            &["src_auth"],
+            basic_sink_with_acks(10, ack_config(true, true)).1,
+        );
+        config.add_sink(
+            "legacy_sink",
+            &["src_legacy"],
+            basic_sink_with_acks(10, AcknowledgementsConfig::from(true)).1,
+        );
+
+        let config = config.build().unwrap();
+        let components = config
+            .compute_authoritative_components()
+            .expect("Should return Some because auth_sink qualifies");
+
+        // The authoritative pipeline components should be in the set
+        assert!(components.contains(&ComponentKey::from("src_auth")));
+        assert!(components.contains(&ComponentKey::from("auth_sink")));
+
+        // The legacy pipeline components should NOT be in the set
+        assert!(
+            !components.contains(&ComponentKey::from("src_legacy")),
+            "Source with no authoritative downstream should NOT be in the authoritative set"
+        );
+        assert!(
+            !components.contains(&ComponentKey::from("legacy_sink")),
+            "Sink on non-authoritative source path should NOT be in the authoritative set"
         );
     }
 }
