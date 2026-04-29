@@ -13,9 +13,9 @@ use vrl::{
     value::Kind,
 };
 
-use vector_core::event::Secrets;
+use vector_core::event::EventMetadata;
 
-use crate::{BytesDeserializerConfig, decoding::format::Deserializer};
+use crate::decoding::format::Deserializer;
 
 /// Config used to build a `VrlDeserializer`.
 #[configurable_component]
@@ -66,6 +66,7 @@ impl VrlDeserializerConfig {
             Ok(result) => Ok(VrlDeserializer {
                 program: result.program,
                 timezone: self.vrl.timezone.unwrap_or(TimeZone::Local),
+                metadata_template: None,
             }),
             Err(diagnostics) => Err(Formatter::new(&self.vrl.source, diagnostics)
                 .to_string()
@@ -96,9 +97,26 @@ impl VrlDeserializerConfig {
 pub struct VrlDeserializer {
     program: Program,
     timezone: TimeZone,
+    /// When set, this metadata is injected into the synthetic event *before* the
+    /// VRL program executes, making every `%`-prefixed path in the template readable
+    /// from within the program (e.g. `%splunk_hec.host`, `%vector.secrets.*`).
+    metadata_template: Option<EventMetadata>,
+}
+
+impl VrlDeserializer {
+    /// Set a metadata template that will be pre-populated on each synthetic event
+    /// before the VRL program runs. This allows sources to expose per-request
+    /// context (authentication tokens, envelope fields, etc.) to VRL via the
+    /// `%` path namespace.
+    #[must_use]
+    pub fn with_metadata_template(mut self, metadata: EventMetadata) -> Self {
+        self.metadata_template = Some(metadata);
+        self
+    }
 }
 
 fn parse_bytes(bytes: Bytes, log_namespace: LogNamespace) -> Event {
+    use crate::BytesDeserializerConfig;
     let bytes_deserializer = BytesDeserializerConfig::new().build();
     let log_event = bytes_deserializer.parse_single(bytes, log_namespace);
     Event::from(log_event)
@@ -110,21 +128,13 @@ impl Deserializer for VrlDeserializer {
         bytes: Bytes,
         log_namespace: LogNamespace,
     ) -> vector_common::Result<SmallVec<[Event; 1]>> {
-        let event = parse_bytes(bytes, log_namespace);
-        self.run_vrl(event, log_namespace)
-    }
-
-    /// Overrides the default implementation so that `secrets` are injected into
-    /// the synthetic event *before* the VRL program executes, making them
-    /// readable via `%vector.secrets.*` from within the program.
-    fn parse_with_secrets(
-        &self,
-        bytes: Bytes,
-        log_namespace: LogNamespace,
-        secrets: &Secrets,
-    ) -> vector_common::Result<SmallVec<[Event; 1]>> {
         let mut event = parse_bytes(bytes, log_namespace);
-        event.metadata_mut().secrets_mut().merge(secrets.clone());
+        if let Some(template) = &self.metadata_template {
+            // Pre-populate the synthetic event with the source-assembled metadata so
+            // every `%`-prefixed path is in scope when VRL executes. This lets
+            // user programs read `%splunk_hec.host`, `%vector.secrets.*`, etc.
+            *event.metadata_mut() = template.clone();
+        }
         self.run_vrl(event, log_namespace)
     }
 }
@@ -334,24 +344,29 @@ mod tests {
         assert!(error.contains("aborted"));
     }
 
-    // Tests for `parse_with_secrets` —————————————————————————————————————————
+    // Tests for `with_metadata_template` —————————————————————————————————————
 
-    /// `parse_with_secrets` with a VRL program that reads a secret injected via
-    /// the template. The secret must be readable from within the program via
-    /// `get_secret!()`.
+    fn metadata_with_secret(key: &str, value: &str) -> EventMetadata {
+        let mut metadata = EventMetadata::default();
+        metadata.secrets_mut().insert(key, value);
+        metadata
+    }
+
+    /// A VRL program that uses `get_secret!()` can read a secret injected via
+    /// `with_metadata_template`.
     #[test]
-    fn test_parse_with_secrets_vrl_can_read_secret() {
+    fn test_with_metadata_template_vrl_can_read_secret() {
         // VRL program copies the injected secret into an event field so we can
         // assert on its value. The input bytes become `.message` (Legacy namespace)
         // and we add `.secret_value` alongside it.
-        let decoder = make_decoder(r#".secret_value = get_secret!("my_token")"#);
-
-        let mut secrets = Secrets::new();
-        secrets.insert("my_token", "super-secret");
+        let decoder =
+            make_decoder(r#".secret_value = get_secret!("my_token")"#).with_metadata_template(
+                metadata_with_secret("my_token", "super-secret"),
+            );
 
         let bytes = Bytes::from(r#"hello"#);
         let events = decoder
-            .parse_with_secrets(bytes, LogNamespace::Legacy, &secrets)
+            .parse(bytes, LogNamespace::Legacy)
             .expect("parse should succeed");
 
         assert_eq!(events.len(), 1);
@@ -361,46 +376,16 @@ mod tests {
         );
     }
 
-    /// Verify that `parse_with_secrets` without an override (i.e. the default
-    /// implementation, exercised here through a non-VRL deserializer) merges the
-    /// template secrets onto the emitted event without overwriting codec-produced
-    /// secrets.
+    /// Secrets explicitly set by the VRL program win over the template because
+    /// `set_secret!` runs after the template is pre-populated.
     #[test]
-    fn test_parse_with_secrets_default_impl_fills_gaps() {
-        use crate::BytesDeserializerConfig;
-
-        let decoder = BytesDeserializerConfig::new().build();
-
-        let mut template = Secrets::new();
-        template.insert("source_token", "from-source");
-
-        let bytes = Bytes::from(b"raw payload".as_ref());
-        let events = decoder
-            .parse_with_secrets(bytes, LogNamespace::Legacy, &template)
-            .expect("parse should succeed");
-
-        assert_eq!(events.len(), 1);
-        assert_eq!(
-            events[0].metadata().secrets().get("source_token").unwrap().as_ref(),
-            "from-source"
-        );
-    }
-
-    /// Secrets explicitly set by the VRL program must win over the template
-    /// (template only fills gaps, codec has priority).
-    #[test]
-    fn test_parse_with_secrets_codec_wins_on_collision() {
-        // VRL explicitly sets a secret. The template also supplies a value for
-        // the same key. Because `set_secret` is called during VRL execution
-        // (AFTER the template is merged in), the VRL-produced value wins.
-        let decoder = make_decoder(r#"set_secret!("my_token", "codec-wins")"#);
-
-        let mut template = Secrets::new();
-        template.insert("my_token", "template-loses");
+    fn test_with_metadata_template_codec_wins_on_collision() {
+        let decoder = make_decoder(r#"set_secret!("my_token", "codec-wins")"#)
+            .with_metadata_template(metadata_with_secret("my_token", "template-loses"));
 
         let bytes = Bytes::from(r#"hello"#);
         let events = decoder
-            .parse_with_secrets(bytes, LogNamespace::Legacy, &template)
+            .parse(bytes, LogNamespace::Legacy)
             .expect("parse should succeed");
 
         assert_eq!(

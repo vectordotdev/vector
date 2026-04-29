@@ -37,7 +37,7 @@ use smallvec::SmallVec;
 use vector_config::configurable_component;
 use vector_core::{
     config::{DataType, LogNamespace},
-    event::Event,
+    event::{Event, EventMetadata},
     schema,
 };
 
@@ -540,6 +540,18 @@ pub enum Deserializer {
     Influxdb(InfluxdbDeserializer),
     /// Uses a `VrlDeserializer` for deserialization.
     Vrl(VrlDeserializer),
+}
+
+impl Deserializer {
+    /// Attaches a metadata template to the inner deserializer, if it supports
+    /// one. Currently only [`VrlDeserializer`] uses this; for all other variants
+    /// this is a no-op and `self` is returned unchanged.
+    pub fn with_metadata_template(self, metadata: EventMetadata) -> Self {
+        match self {
+            Deserializer::Vrl(d) => Deserializer::Vrl(d.with_metadata_template(metadata)),
+            other => other,
+        }
+    }
 }
 
 impl format::Deserializer for Deserializer {

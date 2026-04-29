@@ -1,7 +1,7 @@
 use bytes::{Bytes, BytesMut};
 use smallvec::SmallVec;
 use vector_common::internal_event::emit;
-use vector_core::{config::LogNamespace, event::{Event, Secrets}};
+use vector_core::{config::LogNamespace, event::{Event, EventMetadata}};
 
 use crate::{
     decoding::format::Deserializer as _,
@@ -23,10 +23,6 @@ pub struct Decoder {
     pub deserializer: Deserializer,
     /// The `log_namespace` being used.
     pub log_namespace: LogNamespace,
-    /// Per-decode-call secrets template. When set, the secrets are forwarded to
-    /// [`Deserializer::parse_with_secrets`] so user-authored programs (e.g. VRL)
-    /// that run inside the deserializer can read them via `%vector.secrets.*`.
-    secrets_template: Option<Secrets>,
 }
 
 impl Default for Decoder {
@@ -35,7 +31,6 @@ impl Default for Decoder {
             framer: Framer::NewlineDelimited(NewlineDelimitedDecoder::new()),
             deserializer: Deserializer::Bytes(BytesDeserializer),
             log_namespace: LogNamespace::Legacy,
-            secrets_template: None,
         }
     }
 }
@@ -44,32 +39,28 @@ impl Decoder {
     /// Creates a new `Decoder` with the specified `Framer` to produce byte
     /// frames from the byte stream / byte messages and `Deserializer` to parse
     /// structured events from a byte frame.
-    pub fn new(framer: Framer, deserializer: Deserializer) -> Self {
+    pub const fn new(framer: Framer, deserializer: Deserializer) -> Self {
         Self {
             framer,
             deserializer,
             log_namespace: LogNamespace::Legacy,
-            secrets_template: None,
         }
     }
 
     /// Sets the log namespace that will be used when decoding.
-    pub fn with_log_namespace(mut self, log_namespace: LogNamespace) -> Self {
+    pub const fn with_log_namespace(mut self, log_namespace: LogNamespace) -> Self {
         self.log_namespace = log_namespace;
         self
     }
 
-    /// Attaches a per-decode-call secrets template. When set, the secrets are
-    /// forwarded to [`Deserializer::parse_with_secrets`] so that deserializers
-    /// like the VRL codec can expose them to user-authored programs via
-    /// `%vector.secrets.*` during decoding.
+    /// Attaches a per-decode-call metadata template to the inner deserializer.
     ///
-    /// For the VRL deserializer, secrets are injected into the synthetic event
-    /// *before* the VRL program executes. For all other deserializers they are
-    /// merged into each emitted event's secret store after parsing, filling gaps
-    /// without overwriting anything the codec set itself.
-    pub fn with_secrets_template(mut self, secrets: Secrets) -> Self {
-        self.secrets_template = Some(secrets);
+    /// For deserializers that support it (currently only `VrlDeserializer`) the
+    /// template is pre-populated on the synthetic event before any user program
+    /// executes, making every `%`-prefixed path readable (e.g. `%splunk_hec.host`,
+    /// `%vector.secrets.*`). For all other deserializers this is a no-op.
+    pub fn with_metadata_template(mut self, metadata: EventMetadata) -> Self {
+        self.deserializer = self.deserializer.with_metadata_template(metadata);
         self
     }
 
@@ -95,17 +86,9 @@ impl Decoder {
     pub fn deserializer_parse(&self, frame: Bytes) -> Result<DecodedFrame, Error> {
         let byte_size = frame.len();
 
-        // Parse structured events from the byte frame, forwarding any secrets
-        // template so that deserializers that run user programs (e.g. VRL) can
-        // make them available during execution.
-        let result = match &self.secrets_template {
-            Some(secrets) => self
-                .deserializer
-                .parse_with_secrets(frame, self.log_namespace, secrets),
-            None => self.deserializer.parse(frame, self.log_namespace),
-        };
-
-        result
+        // Parse structured events from the byte frame.
+        self.deserializer
+            .parse(frame, self.log_namespace)
             .map(|events| (events, byte_size))
             .map_err(|error| {
                 emit(DecoderDeserializeError { error: &error });

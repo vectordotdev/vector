@@ -33,7 +33,7 @@ pub use protobuf::{ProtobufDeserializer, ProtobufDeserializerConfig, ProtobufDes
 use smallvec::SmallVec;
 #[cfg(feature = "syslog")]
 pub use syslog::{SyslogDeserializer, SyslogDeserializerConfig, SyslogDeserializerOptions};
-use vector_core::{config::LogNamespace, event::{Event, Secrets}};
+use vector_core::{config::LogNamespace, event::Event};
 
 pub use self::{
     bytes::{BytesDeserializer, BytesDeserializerConfig},
@@ -58,29 +58,6 @@ pub trait Deserializer: DynClone + Send + Sync {
         log_namespace: LogNamespace,
     ) -> vector_common::Result<SmallVec<[Event; 1]>>;
 
-    /// Parses structured events from bytes, making per-request `secrets` available
-    /// to any user-authored program (e.g. VRL) that runs during decoding.
-    ///
-    /// The default implementation calls [`Self::parse`] and then merges the
-    /// template secrets into each emitted event's secret store. Because the merge
-    /// uses the event's own secrets as the authoritative source, codec-produced
-    /// secrets take priority and the template only fills gaps.
-    ///
-    /// Override this method when the deserializer needs the secrets to be visible
-    /// *during* parsing rather than after — for example so that a VRL program can
-    /// read `%vector.secrets.*` as it executes.
-    fn parse_with_secrets(
-        &self,
-        bytes: Bytes,
-        log_namespace: LogNamespace,
-        secrets: &Secrets,
-    ) -> vector_common::Result<SmallVec<[Event; 1]>> {
-        let mut events = self.parse(bytes, log_namespace)?;
-        for event in &mut events {
-            event.metadata_mut().secrets_mut().merge(secrets.clone());
-        }
-        Ok(events)
-    }
 }
 
 dyn_clone::clone_trait_object!(Deserializer);
