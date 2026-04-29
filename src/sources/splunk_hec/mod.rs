@@ -1227,6 +1227,7 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
             decoder,
             &payload,
             Some(fallback_time),
+            true, // /event: write %splunk_hec.timestamp
             &self.batch,
             self.log_namespace,
             &self.events_received,
@@ -1456,17 +1457,17 @@ impl<'de, R: JsonRead<'de>> Iterator for EventIterator<'de, R> {
 /// `splunk_hec` we need to know about errors so we can refuse to acknowledge a
 /// request that lost data mid-stream.
 ///
-/// On each decoded event this helper sets `source_type`, the `vector.ingest_timestamp`
-/// metadata (Vector namespace), a fallback timestamp via `try_insert` (so a
-/// codec-supplied timestamp wins on conflict), the optional Splunk HEC token, and
-/// the per-request `BatchNotifier` so acknowledgements flow correctly. The token is
-/// applied as soon as each event leaves the codec so it's the earliest visible
-/// metadata downstream of the decoder.
+/// On each decoded event this helper sets `source_type`, `vector.ingest_timestamp`,
+/// the optional `splunk_hec.timestamp` (only when `set_source_timestamp` is `true`,
+/// i.e. for the `/event` endpoint which carries an HEC envelope `time` field), and
+/// the optional Splunk HEC token. Pass `set_source_timestamp = false` for `/raw`,
+/// which has no envelope timestamp and should only receive `%vector.ingest_timestamp`.
 #[allow(clippy::too_many_arguments)]
 fn decode_payload(
     mut decoder: Decoder,
     payload: &[u8],
     fallback_timestamp: Option<DateTime<Utc>>,
+    set_source_timestamp: bool,
     batch: &Option<BatchNotifier>,
     log_namespace: LogNamespace,
     events_received: &Registered<EventsReceived>,
@@ -1491,11 +1492,17 @@ fn decode_payload(
                         );
                         match log_namespace {
                             LogNamespace::Vector => {
-                                if let Some(timestamp) = fallback_timestamp {
-                                    log.try_insert(
-                                        metadata_path!(SplunkConfig::NAME, "timestamp"),
-                                        timestamp,
-                                    );
+                                // Only write %splunk_hec.timestamp for the /event
+                                // endpoint, which has a real HEC envelope timestamp.
+                                // /raw has no envelope time and should only get the
+                                // standard %vector.ingest_timestamp below.
+                                if set_source_timestamp {
+                                    if let Some(timestamp) = fallback_timestamp {
+                                        log.try_insert(
+                                            metadata_path!(SplunkConfig::NAME, "timestamp"),
+                                            timestamp,
+                                        );
+                                    }
                                 }
                                 log.insert(metadata_path!("vector", "ingest_timestamp"), now);
                             }
@@ -1738,6 +1745,7 @@ fn raw_event(
             decoder,
             &body_bytes,
             Some(Utc::now()),
+            false, // /raw: no HEC envelope timestamp; only %vector.ingest_timestamp
             &batch,
             log_namespace,
             events_received,
