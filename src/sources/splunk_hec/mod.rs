@@ -2001,7 +2001,10 @@ mod tests {
     use vector_lib::{
         codecs::{
             BytesDecoderConfig, JsonSerializerConfig, TextSerializerConfig,
-            decoding::DeserializerConfig,
+            decoding::{
+                DeserializerConfig,
+                format::{VrlDeserializerConfig, VrlDeserializerOptions},
+            },
         },
         event::EventStatus,
         schema::Definition,
@@ -3621,6 +3624,64 @@ mod tests {
             assert!(raw_messages.contains(&"a".to_string()));
             assert!(raw_messages.contains(&"b".to_string()));
             assert!(raw_messages.contains(&"c".to_string()));
+        })
+        .await;
+    }
+
+    /// End-to-end test for the second-stage VRL decoder on `/services/collector/event`.
+    ///
+    /// Validates the core use case from PR #25312: a VRL program decodes the
+    /// inner `event` payload *and* reads HEC envelope metadata injected before
+    /// decoding via `%splunk_hec.*` paths.
+    #[tokio::test]
+    async fn decoder_vrl_reads_envelope_metadata() {
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let vrl_source = r#"
+                # Read envelope metadata injected before this VRL program runs.
+                .envelope_host = string!(%splunk_hec.host)
+                .envelope_sourcetype = string!(%splunk_hec.sourcetype)
+
+                # Decode the inner JSON payload (the bytes of the `event` string).
+                . = merge!(parse_json!(string!(.message)), .)
+            "#;
+
+            let event_codec = codec_decoding(
+                DeserializerConfig::Vrl(VrlDeserializerConfig {
+                    vrl: VrlDeserializerOptions {
+                        source: vrl_source.into(),
+                        timezone: None,
+                    },
+                }),
+            );
+
+            let (source, address, _guard) =
+                source_with_codec(event_codec, EndpointCodecConfig::default()).await;
+
+            // Send a HEC event whose `event` field is a JSON-encoded string.
+            // The VRL decoder should parse it and also read the envelope host/sourcetype.
+            let payload = r#"{"event":"{\"level\":\"info\",\"msg\":\"hello\"}","host":"splunk-host","sourcetype":"my-app"}"#;
+            assert_eq!(
+                200,
+                post(address, "services/collector/event", payload).await
+            );
+
+            let event = collect_n(source, 1).await.remove(0);
+            let log = event.as_log();
+
+            // Inner JSON decoded correctly.
+            assert_eq!(log["level"], "info".into());
+            assert_eq!(log["msg"], "hello".into());
+
+            // VRL read envelope metadata via %splunk_hec.* and wrote it to event fields.
+            assert_eq!(log["envelope_host"], "splunk-host".into());
+            assert_eq!(log["envelope_sourcetype"], "my-app".into());
+
+            // Post-decode splunk_hec metadata still applied (host, sourcetype).
+            assert_eq!(
+                log[log_schema().host_key().unwrap().to_string().as_str()],
+                "splunk-host".into()
+            );
+            assert_eq!(log[&super::SOURCETYPE], "my-app".into());
         })
         .await;
     }
