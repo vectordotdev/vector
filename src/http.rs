@@ -362,6 +362,335 @@ pub mod http_1 {
                 .expect("conversion from http::Uri to http_1::Uri failed")
         }
     }
+
+    #[cfg(test)]
+    mod tests {
+        use std::{
+            convert::Infallible,
+            net::SocketAddr,
+            pin::Pin,
+            sync::{Arc, Mutex},
+        };
+
+        use bytes::Bytes;
+        use http_1::{Request, Response};
+        use http_body_util::{BodyExt as _, Full};
+        use hyper_1::body::Incoming;
+        use hyper_util::rt::TokioIo;
+        use openssl::ssl::Ssl;
+        use tokio::{
+            io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
+            net::{TcpListener, TcpStream},
+        };
+        use tokio_openssl::SslStream;
+
+        use crate::{
+            config::http_1::ProxyConfig,
+            tls::{MaybeTlsSettings, TlsConfig, TlsSettings, TEST_PEM_CRT_PATH, TEST_PEM_KEY_PATH},
+        };
+
+        async fn start_http_upstream() -> SocketAddr {
+            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let addr = listener.local_addr().unwrap();
+            tokio::spawn(async move {
+                loop {
+                    let Ok((stream, _)) = listener.accept().await else {
+                        break;
+                    };
+                    let io = TokioIo::new(stream);
+                    tokio::spawn(async move {
+                        let _ = hyper_1::server::conn::http1::Builder::new()
+                            .serve_connection(
+                                io,
+                                hyper_1::service::service_fn(
+                                    |_req: Request<Incoming>| async {
+                                        Ok::<Response<Full<Bytes>>, Infallible>(
+                                            Response::builder()
+                                                .status(200)
+                                                .body(Full::new(Bytes::from("hello")))
+                                                .unwrap(),
+                                        )
+                                    },
+                                ),
+                            )
+                            .await;
+                    });
+                }
+            });
+            addr
+        }
+
+        async fn start_https_upstream() -> SocketAddr {
+            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let addr = listener.local_addr().unwrap();
+
+            // verify_certificate=false: don't require a client certificate from connecting peers.
+            let tls_settings = TlsSettings::from_options(Some(&TlsConfig {
+                crt_file: Some(TEST_PEM_CRT_PATH.into()),
+                key_file: Some(TEST_PEM_KEY_PATH.into()),
+                verify_certificate: Some(false),
+                ..Default::default()
+            }))
+            .unwrap();
+            let acceptor = tls_settings.acceptor().unwrap();
+
+            tokio::spawn(async move {
+                loop {
+                    let Ok((stream, _)) = listener.accept().await else {
+                        break;
+                    };
+                    let acceptor = acceptor.clone();
+                    tokio::spawn(async move {
+                        let ssl = Ssl::new(acceptor.context()).unwrap();
+                        let mut tls_stream = SslStream::new(ssl, stream).unwrap();
+                        if Pin::new(&mut tls_stream).accept().await.is_err() {
+                            return;
+                        }
+                        let io = TokioIo::new(tls_stream);
+                        let _ = hyper_1::server::conn::http1::Builder::new()
+                            .serve_connection(
+                                io,
+                                hyper_1::service::service_fn(
+                                    |_req: Request<Incoming>| async {
+                                        Ok::<Response<Full<Bytes>>, Infallible>(
+                                            Response::builder()
+                                                .status(200)
+                                                .body(Full::new(Bytes::from("hello")))
+                                                .unwrap(),
+                                        )
+                                    },
+                                ),
+                            )
+                            .await;
+                    });
+                }
+            });
+            addr
+        }
+
+        // A minimal TCP proxy that handles both plain HTTP forwarding and CONNECT tunnelling.
+        // Returns the bound address and an Arc holding the last captured Proxy-Authorization value.
+        async fn start_proxy() -> (SocketAddr, Arc<Mutex<Option<String>>>) {
+            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let addr = listener.local_addr().unwrap();
+            let captured_auth: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
+            let captured = Arc::clone(&captured_auth);
+
+            tokio::spawn(async move {
+                loop {
+                    let Ok((stream, _)) = listener.accept().await else {
+                        break;
+                    };
+                    let cap = Arc::clone(&captured);
+                    tokio::spawn(async move {
+                        handle_proxy_connection(stream, cap).await;
+                    });
+                }
+            });
+
+            (addr, captured_auth)
+        }
+
+        async fn handle_proxy_connection(stream: TcpStream, captured_auth: Arc<Mutex<Option<String>>>) {
+            let mut reader = BufReader::new(stream);
+
+            let mut request_line = String::new();
+            if reader.read_line(&mut request_line).await.unwrap_or(0) == 0 {
+                return;
+            }
+            let request_line = request_line.trim_end_matches(['\r', '\n']).to_string();
+
+            // Read headers until blank line, collecting them for forwarding.
+            let mut headers: Vec<String> = Vec::new();
+            loop {
+                let mut line = String::new();
+                reader.read_line(&mut line).await.unwrap_or(0);
+                if line.trim().is_empty() {
+                    break;
+                }
+                headers.push(line.trim_end_matches(['\r', '\n']).to_string());
+            }
+
+            for header in &headers {
+                if header.to_ascii_lowercase().starts_with("proxy-authorization:") {
+                    let value = header[header.find(':').unwrap() + 1..].trim().to_string();
+                    *captured_auth.lock().unwrap() = Some(value);
+                }
+            }
+
+            let mut stream = reader.into_inner();
+
+            if let Some(rest) = request_line.strip_prefix("CONNECT ") {
+                // CONNECT tunnel: respond 200 then bridge the two TCP streams.
+                let target = rest.split_whitespace().next().unwrap_or("").to_string();
+                stream
+                    .write_all(b"HTTP/1.1 200 Connection established\r\n\r\n")
+                    .await
+                    .unwrap();
+                let mut upstream = TcpStream::connect(&target).await.unwrap();
+                let _ = tokio::io::copy_bidirectional(&mut stream, &mut upstream).await;
+            } else {
+                // Plain HTTP: parse target from the absolute-form URI in the request line and
+                // forward the raw request bytes followed by bidirectional copy for the response.
+                // NOTE: assumes GET (no request body follows the headers).
+                let url = request_line.split_whitespace().nth(1).unwrap_or("/");
+                let uri: http_1::Uri = url.parse().unwrap();
+                let host = uri.host().unwrap_or("localhost");
+                let port = uri.port_u16().unwrap_or(80);
+                let target = format!("{host}:{port}");
+
+                let mut upstream = TcpStream::connect(&target).await.unwrap();
+
+                let mut req_bytes = format!("{}\r\n", request_line);
+                for h in &headers {
+                    req_bytes.push_str(h);
+                    req_bytes.push_str("\r\n");
+                }
+                req_bytes.push_str("\r\n");
+                upstream.write_all(req_bytes.as_bytes()).await.unwrap();
+
+                let _ = tokio::io::copy_bidirectional(&mut stream, &mut upstream).await;
+            }
+        }
+
+        #[tokio::test]
+        async fn http_through_http_proxy() {
+            let upstream_addr = start_http_upstream().await;
+            let (proxy_addr, _) = start_proxy().await;
+
+            let proxy_config = ProxyConfig {
+                http: Some(format!("http://127.0.0.1:{}", proxy_addr.port())),
+                ..Default::default()
+            };
+
+            let client: super::HttpClient<Full<Bytes>> =
+                super::HttpClient::new(MaybeTlsSettings::Raw(()), &proxy_config).unwrap();
+
+            let request = Request::builder()
+                .uri(format!("http://127.0.0.1:{}/", upstream_addr.port()))
+                .body(Full::new(Bytes::new()))
+                .unwrap();
+
+            let response = client.send(request).await.unwrap();
+            assert_eq!(response.status(), 200);
+
+            let body = response.into_body().collect().await.unwrap().to_bytes();
+            assert_eq!(body.as_ref(), b"hello");
+        }
+
+        #[tokio::test]
+        async fn https_through_http_proxy() {
+            let upstream_addr = start_https_upstream().await;
+            let (proxy_addr, _) = start_proxy().await;
+
+            // Route HTTPS traffic through the proxy; the proxy uses CONNECT tunnelling.
+            let proxy_config = ProxyConfig {
+                https: Some(format!("http://127.0.0.1:{}", proxy_addr.port())),
+                ..Default::default()
+            };
+
+            // The test cert has CN=localhost but no SAN extension. rustls (via webpki) requires
+            // SANs for hostname verification and does not fall back to CN. Disable certificate
+            // verification so the CONNECT tunnel and TLS handshake can complete in tests.
+            let tls_settings = TlsSettings::from_options(Some(&TlsConfig {
+                verify_certificate: Some(false),
+                ..Default::default()
+            }))
+            .unwrap();
+
+            let client: super::HttpClient<Full<Bytes>> =
+                super::HttpClient::new(MaybeTlsSettings::Tls(tls_settings), &proxy_config)
+                    .unwrap();
+
+            let request = Request::builder()
+                .uri(format!("https://127.0.0.1:{}/", upstream_addr.port()))
+                .body(Full::new(Bytes::new()))
+                .unwrap();
+
+            let response = client.send(request).await.unwrap();
+            assert_eq!(response.status(), 200);
+
+            let body = response.into_body().collect().await.unwrap().to_bytes();
+            assert_eq!(body.as_ref(), b"hello");
+        }
+
+        #[tokio::test]
+        async fn http_proxy_basic_auth_forwarded() {
+            let upstream_addr = start_http_upstream().await;
+            let (proxy_addr, captured_auth) = start_proxy().await;
+
+            let proxy_config = ProxyConfig {
+                http: Some(format!(
+                    "http://user:s3cr3t@127.0.0.1:{}",
+                    proxy_addr.port()
+                )),
+                ..Default::default()
+            };
+
+            let client: super::HttpClient<Full<Bytes>> =
+                super::HttpClient::new(MaybeTlsSettings::Raw(()), &proxy_config).unwrap();
+
+            let request = Request::builder()
+                .uri(format!("http://127.0.0.1:{}/", upstream_addr.port()))
+                .body(Full::new(Bytes::new()))
+                .unwrap();
+
+            client.send(request).await.unwrap();
+
+            let auth = captured_auth.lock().unwrap().clone();
+            assert!(
+                auth.is_some(),
+                "Proxy-Authorization header was not forwarded"
+            );
+            let auth = auth.unwrap();
+            assert!(
+                auth.to_ascii_lowercase().starts_with("basic "),
+                "expected Basic scheme, got: {auth}"
+            );
+        }
+
+        #[tokio::test]
+        async fn https_proxy_basic_auth_forwarded_in_connect() {
+            let upstream_addr = start_https_upstream().await;
+            let (proxy_addr, captured_auth) = start_proxy().await;
+
+            let proxy_config = ProxyConfig {
+                https: Some(format!(
+                    "http://user:s3cr3t@127.0.0.1:{}",
+                    proxy_addr.port()
+                )),
+                ..Default::default()
+            };
+
+            let tls_settings = TlsSettings::from_options(Some(&TlsConfig {
+                verify_certificate: Some(false),
+                ..Default::default()
+            }))
+            .unwrap();
+
+            let client: super::HttpClient<Full<Bytes>> =
+                super::HttpClient::new(MaybeTlsSettings::Tls(tls_settings), &proxy_config)
+                    .unwrap();
+
+            let request = Request::builder()
+                .uri(format!("https://127.0.0.1:{}/", upstream_addr.port()))
+                .body(Full::new(Bytes::new()))
+                .unwrap();
+
+            client.send(request).await.unwrap();
+
+            let auth = captured_auth.lock().unwrap().clone();
+            assert!(
+                auth.is_some(),
+                "Proxy-Authorization was not forwarded in CONNECT request"
+            );
+            let auth = auth.unwrap();
+            assert!(
+                auth.to_ascii_lowercase().starts_with("basic "),
+                "expected Basic scheme in CONNECT, got: {auth}"
+            );
+        }
+    }
 }
 
 #[derive(Debug, Snafu)]
