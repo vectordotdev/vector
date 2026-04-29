@@ -1237,7 +1237,7 @@ impl Runner {
         self.timer_tx.try_send_start_wait();
         loop {
             tokio::select! {
-                biased;
+                // biased;
 
                 // Deliver the next in-order result. Yield after delivery only when
                 // burst-delivering stashed results (HoL stall just cleared), so
@@ -1247,9 +1247,9 @@ impl Runner {
                     self.send_outputs(&mut outputs_buf)
                         .await
                         .map_err(TaskError::wrapped)?;
-                    if scheduler.has_ready() {
-                        tokio::task::yield_now().await;
-                    }
+                    // if scheduler.has_ready() {
+                    //     tokio::task::yield_now().await;
+                    // }
                 }
 
                 // Accept new input when the scheduler has capacity.

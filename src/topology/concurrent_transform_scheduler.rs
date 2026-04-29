@@ -125,6 +125,7 @@ impl ConcurrentTransformScheduler {
     /// True if the head slot is already stashed — burst delivery mode after a HoL stall.
     /// Used to gate yield_now in the delivery arm: false in normal steady-state (next
     /// slot is None = task still running), so yield fires only during burst delivery.
+    #[allow(dead_code)]
     pub fn has_ready(&self) -> bool {
         self.reorder_buf.front().is_some_and(Option::is_some)
     }
