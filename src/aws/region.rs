@@ -65,6 +65,38 @@ impl RegionOrEndpoint {
     }
 }
 
+/// AWS configuration used solely to sign requests sent to a user-supplied URL.
+///
+/// This is for components (e.g. `elasticsearch`, `prometheus_remote_write`) that
+/// POST to a user-supplied endpoint and only need an AWS region for SigV4
+/// signing. It intentionally exposes only `region` — it omits `endpoint` and
+/// `use_fips_endpoint` because the AWS SDK does not resolve the endpoint on
+/// these paths, so neither applies.
+#[configurable_component]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[serde(default, deny_unknown_fields)]
+pub struct AwsAuthRegion {
+    /// The [AWS region][aws_region] of the target service, used for SigV4 signing.
+    ///
+    /// [aws_region]: https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints
+    #[configurable(metadata(docs::examples = "us-east-1"))]
+    pub region: Option<String>,
+}
+
+impl AwsAuthRegion {
+    /// Creates an `AwsAuthRegion` with the given region.
+    pub fn with_region(region: impl Into<String>) -> Self {
+        Self {
+            region: Some(region.into()),
+        }
+    }
+
+    /// Returns the configured region.
+    pub fn region(&self) -> Option<Region> {
+        self.region.clone().map(Region::new)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use indoc::indoc;

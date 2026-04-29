@@ -192,37 +192,24 @@ generated: components: sinks: prometheus_remote_write: configuration: {
 		}
 	}
 	aws: {
-		description: "Configuration of the region/endpoint to use when interacting with an AWS service."
-		required:    false
-		type: object: options: {
-			endpoint: {
-				description: "Custom endpoint for use with AWS-compatible services."
-				required:    false
-				type: string: examples: ["http://127.0.0.0:5000/path/to/service"]
-			}
-			region: {
-				description: """
-					The [AWS region][aws_region] of the target service.
+		description: """
+			AWS configuration used solely to sign requests sent to a user-supplied URL.
 
-					[aws_region]: https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints
-					"""
-				required: false
-				type: string: examples: ["us-east-1"]
-			}
-			use_fips_endpoint: {
-				description: """
-					Whether to use [FIPS-compliant endpoints][fips] when communicating with AWS services.
+			This is for components (e.g. `elasticsearch`, `prometheus_remote_write`) that
+			POST to a user-supplied endpoint and only need an AWS region for SigV4
+			signing. It intentionally exposes only `region` — it omits `endpoint` and
+			`use_fips_endpoint` because the AWS SDK does not resolve the endpoint on
+			these paths, so neither applies.
+			"""
+		required: false
+		type: object: options: region: {
+			description: """
+				The [AWS region][aws_region] of the target service, used for SigV4 signing.
 
-					When enabled, the SDK resolves FIPS-compliant endpoints for the target service.
-					This is required for FedRAMP and other compliance environments. When omitted, the
-					SDK falls back to its default provider chain (the `AWS_USE_FIPS_ENDPOINT` environment
-					variable and AWS config files).
-
-					[fips]: https://docs.aws.amazon.com/sdkref/latest/guide/setting-global-aws_use_fips_endpoint.html
-					"""
-				required: false
-				type: bool: {}
-			}
+				[aws_region]: https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints
+				"""
+			required: false
+			type: string: examples: ["us-east-1"]
 		}
 	}
 	batch: {

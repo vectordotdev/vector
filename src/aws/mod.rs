@@ -42,7 +42,7 @@ use http::HeaderMap;
 use http_body::{Body, combinators::BoxBody};
 use pin_project::pin_project;
 use regex::RegexSet;
-pub use region::RegionOrEndpoint;
+pub use region::{AwsAuthRegion, RegionOrEndpoint};
 use snafu::Snafu;
 pub use timeout::AwsTimeout;
 
