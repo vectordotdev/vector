@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.55.0"
+version = "0.56.0"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2024"
 description = "A lightweight and ultra-fast tool for building observability pipelines"
@@ -187,7 +187,7 @@ rdkafka = { version = "0.39.0", default-features = false }
 regex = { version = "1.12.3", default-features = false, features = ["std", "perf"] }
 reqwest = { version = "0.11", features = ["json"] }
 rust_decimal = { version = "1.40.0", default-features = false, features = ["std"] }
-semver = { version = "1.0.27", default-features = false, features = ["serde", "std"] }
+semver = { version = "1.0.28", default-features = false, features = ["serde", "std"] }
 serde = { version = "1.0.219", default-features = false, features = ["alloc", "derive", "rc"] }
 serde_json = { version = "1.0.149", default-features = false, features = ["preserve_order", "raw_value", "std"] }
 serde_with = { version = "3.18.0", default-features = false, features = ["std", "macros", "chrono_0_4"] }
@@ -346,7 +346,7 @@ deadpool = { version = "0.13.0", default-features = false, features = ["managed"
 hex = { version = "0.4.3", default-features = false, optional = true }
 
 # GreptimeDB
-greptimedb-ingester = { git = "https://github.com/GreptimeTeam/greptimedb-ingester-rust", rev = "f7243393808640f5123b0d5b7b798da591a4df6e", optional = true }
+greptimedb-ingester = { version = "0.17.0", default-features = false, optional = true }
 
 # External libs
 arc-swap = { workspace = true, default-features = false, optional = true }
@@ -520,7 +520,7 @@ vendored = ["rdkafka?/gssapi-vendored"]
 
 # Default features for *-pc-windows-msvc
 # TODO: Enable SASL https://github.com/vectordotdev/vector/pull/3081#issuecomment-659298042
-base = ["api", "enrichment-tables", "sinks", "sources", "transforms", "secrets", "vrl/stdlib"]
+base = ["api", "enrichment-tables", "sinks", "sources", "transforms", "secrets", "vrl/stdlib", "codecs-parquet"]
 enable-api-client = ["base", "api-client"]
 enable-unix = ["enable-api-client", "sources-dnstap", "unix"]
 

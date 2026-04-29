@@ -40,12 +40,12 @@ pub struct ArrowStreamSerializerConfig {
 
     /// Allow null values for non-nullable fields in the schema.
     ///
-    /// When enabled, missing or incompatible values will be encoded as null even for fields
+    /// When enabled, missing or incompatible values are encoded as null, even for fields
     /// marked as non-nullable in the Arrow schema. This is useful when working with downstream
     /// systems that can handle null values through defaults, computed columns, or other mechanisms.
     ///
-    /// When disabled (default), missing values for non-nullable fields will cause encoding errors,
-    /// ensuring all required data is present before sending to the sink.
+    /// When disabled (default), missing values for non-nullable fields results in encoding errors. This is to
+    /// help ensure all required data is present before sending it to the sink.
     #[serde(default)]
     #[configurable(derived)]
     pub allow_nullable_fields: bool,
@@ -322,7 +322,6 @@ pub(crate) fn build_record_batch(
         });
         vector_common::internal_event::emit(crate::internal_events::EncoderNullConstraintError {
             error: &error,
-            count: values.len(),
         });
         return Err(ArrowEncodingError::NullConstraint {
             field_name: missing.join(", "),
@@ -331,12 +330,32 @@ pub(crate) fn build_record_batch(
 
     let mut decoder = ReaderBuilder::new(schema)
         .build_decoder()
+        .inspect_err(|e| {
+            vector_common::internal_event::emit(crate::internal_events::EncoderRecordBatchError {
+                error: e,
+                error_code: "arrow_record_batch_creation",
+            });
+        })
         .context(RecordBatchCreationSnafu)?;
 
-    decoder.serialize(values).context(ArrowJsonDecodeSnafu)?;
+    decoder
+        .serialize(values)
+        .inspect_err(|e| {
+            vector_common::internal_event::emit(crate::internal_events::EncoderRecordBatchError {
+                error: e,
+                error_code: "arrow_json_decode",
+            });
+        })
+        .context(ArrowJsonDecodeSnafu)?;
 
     decoder
         .flush()
+        .inspect_err(|e| {
+            vector_common::internal_event::emit(crate::internal_events::EncoderRecordBatchError {
+                error: e,
+                error_code: "arrow_json_decode",
+            });
+        })
         .context(ArrowJsonDecodeSnafu)?
         .ok_or(ArrowEncodingError::NoEvents)
 }

@@ -136,6 +136,30 @@ This builds all the necessary [prereqs](#prerequisites) for the site and starts 
 
 When you make changes to the Markdown sources, Sass/CSS, or JavaScript, the site re-builds and Hugo automatically reloads the page that you're on. If you make changes to the [structured data](#structured-data) sources, however, you need to stop the server and run `make serve` again.
 
+### Run the site with Docker
+
+If you don't want to install Hugo, CUE, or Node.js locally, you can use Docker instead. You still need Rust and [vdev] on the host for one step.
+
+> **Note:** This Docker setup is experimental and not currently enforced by CI. It may break as dependencies or the build process evolve.
+
+**Step 1:** Generate VRL function docs (required once; only re-run when VRL function signatures change):
+
+```shell
+make generate-vrl-docs
+```
+
+This generates CUE files into `cue/reference/remap/functions/` from the Rust source. These files are gitignored and must exist before the site can build.
+
+**Step 2:** Build and start the site:
+
+```shell
+cd website
+docker compose build
+docker compose up
+```
+
+Navigate to http://localhost:1313. The site source is mounted as a volume so Hugo's live-reload works for Markdown, CSS, and JavaScript changes. If you modify [structured data](#structured-data) sources, restart the container.
+
 ### Add a new version of Vector
 
 1. Add the new version to the `versions` list in [`cue/reference/versions.cue`](./cue/reference/versions.cue). Make sure to preserve reverse ordering.

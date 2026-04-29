@@ -1,7 +1,7 @@
 use std::{
     collections::HashSet,
     net::{SocketAddr, TcpListener},
-    num::NonZeroU64,
+    num::{NonZeroU64, NonZeroUsize},
     time::Duration,
 };
 
@@ -9,7 +9,7 @@ use futures::StreamExt;
 use tokio::time::sleep;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use vector_lib::{
-    buffers::{BufferConfig, BufferType, WhenFull},
+    buffers::{BufferConfig, BufferType, MemoryBufferSize, WhenFull},
     config::ComponentKey,
 };
 
@@ -293,7 +293,6 @@ async fn topology_readd_input() {
 #[tokio::test]
 async fn topology_reload_component() {
     test_util::trace_init();
-
     let (_guard, address_0) = next_addr();
 
     let mut old_config = Config::builder();
@@ -317,6 +316,138 @@ async fn topology_reload_component() {
     tokio::select! {
         _ = wait_for_tcp(address_0) => {},
         _ = crash_stream.next() => panic!(),
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn topology_disk_buffer_config_change_does_not_stall() {
+    // Changing a disk buffer's configuration on a running sink (e.g. via in-situ
+    // config edit) must not stall the reload. Previously, the detach trigger was
+    // only cancelled for sinks whose buffers were being reused, so sinks with
+    // changed disk buffer configs would never have their input stream terminated,
+    // causing the reload to hang indefinitely.
+    test_util::trace_init();
+
+    let (_guard, address) = next_addr();
+
+    let data_dir = temp_dir();
+    std::fs::create_dir(&data_dir).unwrap();
+
+    let mut old_config = Config::builder();
+    old_config.global.data_dir = Some(data_dir);
+    old_config.add_source("in", internal_metrics_source());
+    old_config.add_sink("out", &["in"], prom_exporter_sink(address, 1));
+
+    let sink_key = ComponentKey::from("out");
+    old_config.sinks[&sink_key].buffer = BufferConfig::Single(BufferType::DiskV2 {
+        max_size: NonZeroU64::new(268435488).unwrap(),
+        when_full: WhenFull::Block,
+    });
+
+    // Change only the disk buffer's max_size.
+    let mut new_config = old_config.clone();
+    new_config.sinks[&sink_key].buffer = BufferConfig::Single(BufferType::DiskV2 {
+        max_size: NonZeroU64::new(536870912).unwrap(),
+        when_full: WhenFull::Block,
+    });
+
+    let (mut topology, crash) = start_topology(old_config.build().unwrap(), true).await;
+    let mut crash_stream = UnboundedReceiverStream::new(crash);
+
+    tokio::select! {
+        _ = wait_for_tcp(address) => {},
+        _ = crash_stream.next() => panic!("topology crashed before reload"),
+    }
+
+    // Simulate an in-situ config edit: the config watcher would put the changed
+    // sink into components_to_reload, which excludes it from reuse_buffers.
+    topology.extend_reload_set(HashSet::from_iter(vec![sink_key]));
+
+    let reload_result = tokio::time::timeout(
+        Duration::from_secs(5),
+        topology.reload_config_and_respawn(new_config.build().unwrap(), Default::default()),
+    )
+    .await;
+
+    assert!(
+        reload_result.is_ok(),
+        "Reload stalled: changing a disk buffer config should not cause the reload to hang"
+    );
+    reload_result.unwrap().unwrap();
+
+    // Verify the new sink is running.
+    tokio::select! {
+        _ = wait_for_tcp(address) => {},
+        _ = crash_stream.next() => panic!("topology crashed after reload"),
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn topology_disk_buffer_config_change_chained_does_not_stall() {
+    // Same as above but with a chained memory → disk overflow buffer to verify
+    // that the writer-drop notification is collected from overflow stages too.
+    test_util::trace_init();
+
+    let (_guard, address) = next_addr();
+
+    let data_dir = temp_dir();
+    std::fs::create_dir(&data_dir).unwrap();
+
+    let memory_stage = BufferType::Memory {
+        size: MemoryBufferSize::MaxEvents(NonZeroUsize::new(100).unwrap()),
+        when_full: WhenFull::Overflow,
+    };
+
+    let mut old_config = Config::builder();
+    old_config.global.data_dir = Some(data_dir);
+    old_config.add_source("in", internal_metrics_source());
+    old_config.add_sink("out", &["in"], prom_exporter_sink(address, 1));
+
+    let sink_key = ComponentKey::from("out");
+    old_config.sinks[&sink_key].buffer = BufferConfig::Chained(vec![
+        memory_stage,
+        BufferType::DiskV2 {
+            max_size: NonZeroU64::new(268435488).unwrap(),
+            when_full: WhenFull::Block,
+        },
+    ]);
+
+    // Change only the disk overflow stage's max_size.
+    let mut new_config = old_config.clone();
+    new_config.sinks[&sink_key].buffer = BufferConfig::Chained(vec![
+        memory_stage,
+        BufferType::DiskV2 {
+            max_size: NonZeroU64::new(536870912).unwrap(),
+            when_full: WhenFull::Block,
+        },
+    ]);
+
+    let (mut topology, crash) = start_topology(old_config.build().unwrap(), true).await;
+    let mut crash_stream = UnboundedReceiverStream::new(crash);
+
+    tokio::select! {
+        _ = wait_for_tcp(address) => {},
+        _ = crash_stream.next() => panic!("topology crashed before reload"),
+    }
+
+    topology.extend_reload_set(HashSet::from_iter(vec![sink_key]));
+
+    let reload_result = tokio::time::timeout(
+        Duration::from_secs(5),
+        topology.reload_config_and_respawn(new_config.build().unwrap(), Default::default()),
+    )
+    .await;
+
+    assert!(
+        reload_result.is_ok(),
+        "Reload stalled: changing a chained disk buffer config should not cause the reload to hang"
+    );
+    reload_result.unwrap().unwrap();
+
+    // Verify the new sink is running.
+    tokio::select! {
+        _ = wait_for_tcp(address) => {},
+        _ = crash_stream.next() => panic!("topology crashed after reload"),
     }
 }
 
