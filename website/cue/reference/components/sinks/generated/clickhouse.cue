@@ -249,6 +249,8 @@ generated: components: sinks: clickhouse: configuration: {
 
 			When specified, events are encoded together as a single batch.
 			This is mutually exclusive with per-event encoding based on the `format` field.
+
+			Only the `arrow_stream` codec is supported by the ClickHouse sink.
 			"""
 		required: false
 		type: object: options: {
@@ -256,34 +258,86 @@ generated: components: sinks: clickhouse: configuration: {
 				description: """
 					Allow null values for non-nullable fields in the schema.
 
-					When enabled, missing or incompatible values will be encoded as null even for fields
+					When enabled, missing or incompatible values are encoded as null, even for fields
 					marked as non-nullable in the Arrow schema. This is useful when working with downstream
 					systems that can handle null values through defaults, computed columns, or other mechanisms.
 
-					When disabled (default), missing values for non-nullable fields will cause encoding errors,
-					ensuring all required data is present before sending to the sink.
+					When disabled (default), missing values for non-nullable fields results in encoding errors. This is to
+					help ensure all required data is present before sending it to the sink.
 					"""
-				required: false
+				relevant_when: "codec = \"arrow_stream\""
+				required:      false
 				type: bool: default: false
 			}
 			codec: {
+				description: "The codec to use for batch encoding events."
+				required:    true
+				type: string: enum: {
+					arrow_stream: """
+						Encodes events in [Apache Arrow][apache_arrow] IPC streaming format.
+
+						This is the streaming variant of the Arrow IPC format, which writes
+						a continuous stream of record batches.
+
+						[apache_arrow]: https://arrow.apache.org/
+						"""
+					parquet: """
+						Encodes events in [Apache Parquet][apache_parquet] columnar format.
+
+						[apache_parquet]: https://parquet.apache.org/
+						"""
+				}
+			}
+			compression: {
+				description:   "Compression codec applied per column page inside the Parquet file."
+				relevant_when: "codec = \"parquet\""
+				required:      false
+				type: object: options: {
+					algorithm: {
+						description: "Compression codec applied per column page inside the Parquet file."
+						required:    false
+						type: string: {
+							default: "snappy"
+							enum: {
+								gzip:   "Gzip compression. Level must be between 1 and 9."
+								lz4:    "LZ4 raw compression"
+								none:   "No compression"
+								snappy: "Snappy compression (no level)."
+								zstd:   "Zstd compression. Level must be between 1 and 21."
+							}
+						}
+					}
+					level: {
+						description:   "Compression level (1–21). This is the range Vector supports; higher values compress more but are slower."
+						relevant_when: "algorithm = \"zstd\" or algorithm = \"gzip\""
+						required:      true
+						type: uint: {}
+					}
+				}
+			}
+			schema_file: {
 				description: """
-					Encodes events in [Apache Arrow][apache_arrow] IPC streaming format.
+					Path to a native Parquet schema file (`.schema`).
 
-					This is the streaming variant of the Arrow IPC format, which writes
-					a continuous stream of record batches.
-
-					[apache_arrow]: https://arrow.apache.org/
+					Required unless `schema_mode` is `auto_infer`. The file must contain a valid
+					Parquet message type definition.
 					"""
-				required: true
-				type: string: enum: arrow_stream: """
-					Encodes events in [Apache Arrow][apache_arrow] IPC streaming format.
-
-					This is the streaming variant of the Arrow IPC format, which writes
-					a continuous stream of record batches.
-
-					[apache_arrow]: https://arrow.apache.org/
-					"""
+				relevant_when: "codec = \"parquet\""
+				required:      false
+				type: string: {}
+			}
+			schema_mode: {
+				description:   "Controls how events with fields not present in the schema are handled."
+				relevant_when: "codec = \"parquet\""
+				required:      false
+				type: string: {
+					default: "relaxed"
+					enum: {
+						auto_infer: "Auto infer schema based on the batch. No schema file needed."
+						relaxed:    "Missing fields become null. Extra fields are silently dropped."
+						strict:     "Missing fields become null. Extra fields cause an error."
+					}
+				}
 			}
 		}
 	}
