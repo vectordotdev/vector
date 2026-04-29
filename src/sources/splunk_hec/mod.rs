@@ -1497,8 +1497,7 @@ fn decode_payload(
                                 // endpoint, which has a real HEC envelope timestamp.
                                 // /raw has no envelope time and should only get the
                                 // standard %vector.ingest_timestamp below.
-                                if set_source_timestamp
-                                    && let Some(timestamp) = fallback_timestamp
+                                if set_source_timestamp && let Some(timestamp) = fallback_timestamp
                                 {
                                     log.try_insert(
                                         metadata_path!(SplunkConfig::NAME, "timestamp"),
