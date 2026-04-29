@@ -23,6 +23,7 @@ clap.workspace = true
 clap-verbosity-flag = "3.0.4"
 clap_complete.workspace = true
 directories = "6.0.0"
+flate2.workspace = true
 glob.workspace = true
 hex = "0.4.3"
 indexmap.workspace = true

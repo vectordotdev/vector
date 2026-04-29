@@ -12585,6 +12585,7 @@ dependencies = [
  "clap-verbosity-flag",
  "clap_complete",
  "directories",
+ "flate2",
  "git2",
  "glob",
  "hex",

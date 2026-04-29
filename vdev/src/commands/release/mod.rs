@@ -3,6 +3,7 @@ mod github;
 mod homebrew;
 mod prepare;
 mod push;
+mod verify;
 
 crate::cli_subcommands! {
     "Manage the release process..."
@@ -15,6 +16,7 @@ crate::cli_subcommands! {
     prepare,
     push,
     s3,
+    verify,
 }
 
 crate::script_wrapper! {
