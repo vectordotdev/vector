@@ -17,10 +17,10 @@ pub use bytes_sent::BytesSent;
 #[allow(clippy::module_name_repetitions)]
 pub use cached_event::{RegisterTaggedInternalEvent, RegisteredEventCache};
 pub use component_events_dropped::{ComponentEventsDropped, INTENTIONAL, UNINTENTIONAL};
-pub use metric_name::MetricName;
 pub use component_events_timed_out::ComponentEventsTimedOut;
 pub use events_received::{EventsReceived, EventsReceivedHandle};
 pub use events_sent::{DEFAULT_OUTPUT, EventsSent, TaggedEventsSent};
+pub use metric_name::MetricName;
 pub use metrics::SharedString;
 pub use optional_tag::OptionalTag;
 pub use prelude::{error_stage, error_type};

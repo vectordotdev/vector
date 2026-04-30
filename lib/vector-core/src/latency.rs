@@ -1,8 +1,8 @@
 use std::time::Instant;
 
 use metrics::Histogram;
-use vector_common::{gauge, histogram, internal_event::MetricName};
 use vector_common::stats::EwmaGauge;
+use vector_common::{gauge, histogram, internal_event::MetricName};
 
 use crate::event::EventArray;
 
