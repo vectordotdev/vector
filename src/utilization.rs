@@ -342,6 +342,7 @@ impl<S> OutputUtilization<S> {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::disallowed_macros)]
     use mock_instant::global::MockClock;
     use serial_test::serial;
 

@@ -133,6 +133,18 @@ pub enum MetricName {
     S3ObjectProcessingSucceededDurationSeconds,
     S3ObjectProcessingFailedDurationSeconds,
     SqsS3EventRecordIgnoredTotal,
+    ComponentAllocatedBytesTotal,
+    ComponentDeallocatedBytesTotal,
+    ComponentAllocatedBytes,
+    Utilization,
+    MemoryEnrichmentTableByteSize,
+    MemoryEnrichmentTableFailedInsertions,
+    MemoryEnrichmentTableFailedReads,
+    MemoryEnrichmentTableFlushesTotal,
+    MemoryEnrichmentTableInsertionsTotal,
+    MemoryEnrichmentTableObjectsCount,
+    MemoryEnrichmentTableReadsTotal,
+    MemoryEnrichmentTableTtlExpirations,
 }
 
 impl MetricName {
@@ -272,6 +284,18 @@ impl MetricName {
             Self::S3ObjectProcessingSucceededDurationSeconds => "s3_object_processing_succeeded_duration_seconds",
             Self::S3ObjectProcessingFailedDurationSeconds => "s3_object_processing_failed_duration_seconds",
             Self::SqsS3EventRecordIgnoredTotal => "sqs_s3_event_record_ignored_total",
+            Self::ComponentAllocatedBytesTotal => "component_allocated_bytes_total",
+            Self::ComponentDeallocatedBytesTotal => "component_deallocated_bytes_total",
+            Self::ComponentAllocatedBytes => "component_allocated_bytes",
+            Self::Utilization => "utilization",
+            Self::MemoryEnrichmentTableByteSize => "memory_enrichment_table_byte_size",
+            Self::MemoryEnrichmentTableFailedInsertions => "memory_enrichment_table_failed_insertions",
+            Self::MemoryEnrichmentTableFailedReads => "memory_enrichment_table_failed_reads",
+            Self::MemoryEnrichmentTableFlushesTotal => "memory_enrichment_table_flushes_total",
+            Self::MemoryEnrichmentTableInsertionsTotal => "memory_enrichment_table_insertions_total",
+            Self::MemoryEnrichmentTableObjectsCount => "memory_enrichment_table_objects_count",
+            Self::MemoryEnrichmentTableReadsTotal => "memory_enrichment_table_reads_total",
+            Self::MemoryEnrichmentTableTtlExpirations => "memory_enrichment_table_ttl_expirations",
         }
     }
 }

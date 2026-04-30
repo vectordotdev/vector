@@ -17,6 +17,7 @@ fn benchmark(c: &mut Criterion) {
     group.finish();
 }
 
+#[allow(clippy::disallowed_macros)]
 fn prepare_metrics(cardinality: usize) -> &'static vector::metrics::Controller {
     vector::metrics::init_test();
     let controller = vector::metrics::Controller::get().unwrap();
