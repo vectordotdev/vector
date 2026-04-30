@@ -210,7 +210,7 @@ async fn run(
 mod tests {
     use futures::Stream;
     use tokio::time::{Duration, sleep};
-    use vector_lib::{event::Value, lookup::OwnedTargetPath};
+    use vector_lib::{SpanField, event::Value, lookup::OwnedTargetPath};
     use vrl::value::kind::Collection;
 
     use serial_test::serial;
@@ -243,6 +243,10 @@ mod tests {
 
         assert_source_compliance(&SOURCE_TAGS, run_test()).await;
     }
+
+    // Register test-specific span fields so they appear in the SPAN_FIELDS allowlist.
+    inventory::submit!(SpanField("component_new_field"));
+    inventory::submit!(SpanField("component_numerical_field"));
 
     async fn run_test() {
         let test_id: u8 = rand::random();
