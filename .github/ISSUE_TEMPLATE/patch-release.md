@@ -62,5 +62,5 @@ export PREP_BRANCH=prepare-v-0-"${CURRENT_MINOR_VERSION}"-"${NEW_PATCH_VERSION}"
   - Follow the [instructions at the top of the mirror.yaml file](https://github.com/DataDog/images/blob/fbf12868e90d52e513ebca0389610dea8a3c7e1a/mirror.yaml#L33-L49).
 - [ ] Cherry-pick any release commits from the release branch that are not on `master`, to `master`
 - [ ] Reset the `website` branch to the `HEAD` of the release branch to update https://vector.dev
-  - [ ] `git checkout website && git reset --hard origin/"${RELEASE_BRANCH}" && git push`
+  - [ ] `git fetch origin && git checkout website && git reset --hard origin/"${RELEASE_BRANCH}" && git push --force-with-lease`
 - [ ] Kick-off post-mortems for any regressions resolved by the release
