@@ -1,6 +1,8 @@
-use metrics::{Counter, counter};
+use metrics::Counter;
 
-use super::{Count, InternalEvent, InternalEventHandle, RegisterInternalEvent};
+use crate::counter;
+
+use super::{Count, InternalEvent, InternalEventHandle, MetricName, RegisterInternalEvent};
 use crate::NamedInternalEvent;
 
 pub const INTENTIONAL: bool = true;
@@ -32,7 +34,7 @@ impl<'a, const INTENTIONAL: bool> RegisterInternalEvent
     fn register(self) -> Self::Handle {
         Self::Handle {
             discarded_events: counter!(
-                "component_discarded_events_total",
+                MetricName::ComponentDiscardedEventsTotal,
                 "intentional" => if INTENTIONAL { "true" } else { "false" },
             ),
             reason: self.reason,

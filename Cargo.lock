@@ -13064,6 +13064,7 @@ dependencies = [
  "serde_json",
  "smallvec",
  "stream-cancel",
+ "strum 0.28.0",
  "tokio",
  "tracing 0.1.44",
  "vector-common-macros",

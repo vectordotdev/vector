@@ -5,6 +5,7 @@ pub mod component_events_dropped;
 pub mod component_events_timed_out;
 mod events_received;
 mod events_sent;
+pub mod metric_name;
 mod optional_tag;
 mod prelude;
 pub mod service;
@@ -16,6 +17,7 @@ pub use bytes_sent::BytesSent;
 #[allow(clippy::module_name_repetitions)]
 pub use cached_event::{RegisterTaggedInternalEvent, RegisteredEventCache};
 pub use component_events_dropped::{ComponentEventsDropped, INTENTIONAL, UNINTENTIONAL};
+pub use metric_name::MetricName;
 pub use component_events_timed_out::ComponentEventsTimedOut;
 pub use events_received::{EventsReceived, EventsReceivedHandle};
 pub use events_sent::{DEFAULT_OUTPUT, EventsSent, TaggedEventsSent};

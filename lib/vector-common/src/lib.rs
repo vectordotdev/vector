@@ -66,6 +66,67 @@ pub mod trigger;
 #[macro_use]
 extern crate tracing;
 
+/// Typed wrapper around `metrics::counter!` that only accepts [`internal_event::MetricName`].
+///
+/// Prevents raw string literals from being used as metric names — all metric
+/// names must go through the `MetricName` enum so they are discoverable and
+/// exposable via the API.
+#[macro_export]
+macro_rules! counter {
+    ($name:expr) => {{
+        let _name: $crate::internal_event::MetricName = $name;
+        #[allow(clippy::disallowed_macros)]
+        {
+            metrics::counter!(_name.as_str())
+        }
+    }};
+    ($name:expr, $($rest:tt)*) => {{
+        let _name: $crate::internal_event::MetricName = $name;
+        #[allow(clippy::disallowed_macros)]
+        {
+            metrics::counter!(_name.as_str(), $($rest)*)
+        }
+    }};
+}
+
+/// Typed wrapper around `metrics::histogram!` that only accepts [`internal_event::MetricName`].
+#[macro_export]
+macro_rules! histogram {
+    ($name:expr) => {{
+        let _name: $crate::internal_event::MetricName = $name;
+        #[allow(clippy::disallowed_macros)]
+        {
+            metrics::histogram!(_name.as_str())
+        }
+    }};
+    ($name:expr, $($rest:tt)*) => {{
+        let _name: $crate::internal_event::MetricName = $name;
+        #[allow(clippy::disallowed_macros)]
+        {
+            metrics::histogram!(_name.as_str(), $($rest)*)
+        }
+    }};
+}
+
+/// Typed wrapper around `metrics::gauge!` that only accepts [`internal_event::MetricName`].
+#[macro_export]
+macro_rules! gauge {
+    ($name:expr) => {{
+        let _name: $crate::internal_event::MetricName = $name;
+        #[allow(clippy::disallowed_macros)]
+        {
+            metrics::gauge!(_name.as_str())
+        }
+    }};
+    ($name:expr, $($rest:tt)*) => {{
+        let _name: $crate::internal_event::MetricName = $name;
+        #[allow(clippy::disallowed_macros)]
+        {
+            metrics::gauge!(_name.as_str(), $($rest)*)
+        }
+    }};
+}
+
 /// Vector's basic error type, dynamically dispatched and safe to send across
 /// threads.
 pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;

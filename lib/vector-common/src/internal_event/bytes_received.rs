@@ -1,12 +1,14 @@
-use metrics::{Counter, counter};
+use metrics::Counter;
 
-use super::{ByteSize, Protocol, SharedString};
+use crate::counter;
+
+use super::{ByteSize, MetricName, Protocol, SharedString};
 
 crate::registered_event!(
     BytesReceived {
         protocol: SharedString,
     } => {
-        received_bytes: Counter = counter!("component_received_bytes_total", "protocol" => self.protocol.clone()),
+        received_bytes: Counter = counter!(MetricName::ComponentReceivedBytesTotal, "protocol" => self.protocol.clone()),
         protocol: SharedString = self.protocol,
     }
 
