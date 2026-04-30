@@ -7,6 +7,8 @@ use std::{
     time::Duration,
 };
 
+#[cfg(feature = "codecs-parquet")]
+use super::config::S3BatchEncoding;
 use aws_sdk_s3::{
     Client as S3Client,
     operation::{create_bucket::CreateBucketError, get_object::GetObjectOutput},
@@ -22,8 +24,6 @@ use futures::{Stream, stream};
 use similar_asserts::assert_eq;
 use tempfile::TempDir;
 use tokio_stream::StreamExt;
-#[cfg(feature = "codecs-parquet")]
-use super::config::S3BatchEncoding;
 use vector_lib::{
     buffers::{BufferConfig, BufferType, WhenFull},
     codecs::{TextSerializerConfig, encoding::FramingConfig},
