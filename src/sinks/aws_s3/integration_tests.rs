@@ -23,7 +23,7 @@ use similar_asserts::assert_eq;
 use tempfile::TempDir;
 use tokio_stream::StreamExt;
 #[cfg(feature = "codecs-parquet")]
-use vector_lib::codecs::encoding::BatchSerializerConfig;
+use super::config::S3BatchEncoding;
 use vector_lib::{
     buffers::{BufferConfig, BufferType, WhenFull},
     codecs::{TextSerializerConfig, encoding::FramingConfig},
@@ -502,7 +502,7 @@ async fn s3_parquet_insert_message() {
     };
 
     let config = S3SinkConfig {
-        batch_encoding: Some(BatchSerializerConfig::Parquet(parquet_config)),
+        batch_encoding: Some(S3BatchEncoding::Parquet(parquet_config)),
         ..config(&bucket, 100, 5.0)
     };
 
