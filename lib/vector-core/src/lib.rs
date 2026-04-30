@@ -99,10 +99,6 @@ pub struct SpanField(pub &'static str); // name of the span field
 
 inventory::collect!(SpanField); // collect the span field names
 
-inventory::submit!(SpanField("component_id"));
-inventory::submit!(SpanField("component_type"));
-inventory::submit!(SpanField("component_kind"));
-
 /// Register a tracing-span field name that downstream crates want preserved on Vector's
 /// internal observability output.
 ///

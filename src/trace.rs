@@ -340,6 +340,10 @@ where
 #[derive(Default, Debug)]
 struct SpanFields(HashMap<&'static str, Value>);
 
+inventory::submit!(SpanField("component_id"));
+inventory::submit!(SpanField("component_type"));
+inventory::submit!(SpanField("component_kind"));
+
 /// Snapshot of every registered [`SpanField`],
 /// materialized once on first access. `inventory` populates submissions before `main`, so the
 /// snapshot is guaranteed to capture every entry; the read path on every traced span event is
