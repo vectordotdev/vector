@@ -1,4 +1,4 @@
-use metrics::counter;
+use vector_common::counter;
 use vector_lib::NamedInternalEvent;
 use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
 
@@ -16,7 +16,7 @@ impl InternalEvent for HostMetricsScrapeError {
         );
 
         counter!(
-            "component_errors_total",
+            MetricName::ComponentErrorsTotal,
             "error_type" => error_type::READER_FAILED,
             "stage" => error_stage::RECEIVING,
         )
@@ -40,7 +40,7 @@ impl<E: std::fmt::Display> InternalEvent for HostMetricsScrapeDetailError<E> {
         );
 
         counter!(
-            "component_errors_total",
+            MetricName::ComponentErrorsTotal,
             "error_type" => error_type::READER_FAILED,
             "stage" => error_stage::RECEIVING,
         )
@@ -66,7 +66,7 @@ impl InternalEvent for HostMetricsScrapeFilesystemError {
         );
 
         counter!(
-            "component_errors_total",
+            MetricName::ComponentErrorsTotal,
             "error_type" => error_type::READER_FAILED,
             "stage" => error_stage::RECEIVING,
         )

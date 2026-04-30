@@ -1,4 +1,4 @@
-use metrics::counter;
+use vector_common::counter;
 use vector_lib::{NamedInternalEvent, internal_event::InternalEvent};
 
 /// Emitted when rows are successfully loaded into Doris.
@@ -17,10 +17,10 @@ impl InternalEvent for DorisRowsLoaded {
         );
 
         // Record the number of rows loaded
-        counter!("doris_rows_loaded_total").increment(self.loaded_rows as u64);
+        counter!(MetricName::DorisRowsLoadedTotal).increment(self.loaded_rows as u64);
 
         // Record the number of bytes loaded
-        counter!("doris_bytes_loaded_total").increment(self.load_bytes as u64);
+        counter!(MetricName::DorisBytesLoadedTotal).increment(self.load_bytes as u64);
     }
 }
 
@@ -37,6 +37,6 @@ impl InternalEvent for DorisRowsFiltered {
             filtered_rows = %self.filtered_rows
         );
 
-        counter!("doris_rows_filtered_total").increment(self.filtered_rows as u64);
+        counter!(MetricName::DorisRowsFilteredTotal).increment(self.filtered_rows as u64);
     }
 }

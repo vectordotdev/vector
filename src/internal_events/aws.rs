@@ -1,4 +1,4 @@
-use metrics::counter;
+use vector_common::counter;
 use vector_lib::NamedInternalEvent;
 use vector_lib::internal_event::InternalEvent;
 
@@ -21,7 +21,7 @@ impl InternalEvent for AwsBytesSent {
             region = ?self.region,
         );
         counter!(
-            "component_sent_bytes_total",
+            MetricName::ComponentSentBytesTotal,
             "protocol" => "https",
             "region" => region,
         )

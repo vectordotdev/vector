@@ -1,4 +1,4 @@
-use metrics::counter;
+use vector_common::counter;
 use vector_lib::NamedInternalEvent;
 use vector_lib::internal_event::{ComponentEventsDropped, INTENTIONAL, InternalEvent};
 
@@ -20,13 +20,13 @@ impl InternalEvent for TagCardinalityLimitRejectingEvent<'_> {
         );
         if self.include_extended_tags {
             counter!(
-                "tag_value_limit_exceeded_total",
+                MetricName::TagValueLimitExceededTotal,
                 "metric_name" => self.metric_name.to_string(),
                 "tag_key" => self.tag_key.to_string(),
             )
             .increment(1);
         } else {
-            counter!("tag_value_limit_exceeded_total").increment(1);
+            counter!(MetricName::TagValueLimitExceededTotal).increment(1);
         }
 
         emit!(ComponentEventsDropped::<INTENTIONAL> {
@@ -54,13 +54,13 @@ impl InternalEvent for TagCardinalityLimitRejectingTag<'_> {
         );
         if self.include_extended_tags {
             counter!(
-                "tag_value_limit_exceeded_total",
+                MetricName::TagValueLimitExceededTotal,
                 "metric_name" => self.metric_name.to_string(),
                 "tag_key" => self.tag_key.to_string(),
             )
             .increment(1);
         } else {
-            counter!("tag_value_limit_exceeded_total").increment(1);
+            counter!(MetricName::TagValueLimitExceededTotal).increment(1);
         }
     }
 }
@@ -76,6 +76,6 @@ impl InternalEvent for TagCardinalityValueLimitReached<'_> {
             message = "Value_limit reached for key. New values for this key will be rejected.",
             key = %self.key,
         );
-        counter!("value_limit_reached_total").increment(1);
+        counter!(MetricName::ValueLimitReachedTotal).increment(1);
     }
 }

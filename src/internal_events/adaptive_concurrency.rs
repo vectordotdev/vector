@@ -1,6 +1,7 @@
 use std::time::Duration;
 
-use metrics::{Histogram, histogram};
+use metrics::Histogram;
+use vector_common::histogram;
 
 #[derive(Clone, Copy)]
 pub struct AdaptiveConcurrencyLimitData {
@@ -17,10 +18,10 @@ registered_event! {
         // These are histograms, as they may have a number of different
         // values over each reporting interval, and each of those values
         // is valuable for diagnosis.
-        limit: Histogram = histogram!("adaptive_concurrency_limit"),
-        reached_limit: Histogram = histogram!("adaptive_concurrency_reached_limit"),
-        back_pressure: Histogram = histogram!("adaptive_concurrency_back_pressure"),
-        past_rtt_mean: Histogram = histogram!("adaptive_concurrency_past_rtt_mean"),
+        limit: Histogram = histogram!(MetricName::AdaptiveConcurrencyLimit),
+        reached_limit: Histogram = histogram!(MetricName::AdaptiveConcurrencyReachedLimit),
+        back_pressure: Histogram = histogram!(MetricName::AdaptiveConcurrencyBackPressure),
+        past_rtt_mean: Histogram = histogram!(MetricName::AdaptiveConcurrencyPastRttMean),
     }
 
     fn emit(&self, data: AdaptiveConcurrencyLimitData) {
@@ -36,7 +37,7 @@ registered_event! {
 
 registered_event! {
     AdaptiveConcurrencyInFlight => {
-        in_flight: Histogram = histogram!("adaptive_concurrency_in_flight"),
+        in_flight: Histogram = histogram!(MetricName::AdaptiveConcurrencyInFlight),
     }
 
     fn emit(&self, in_flight: u64) {
@@ -46,7 +47,7 @@ registered_event! {
 
 registered_event! {
     AdaptiveConcurrencyObservedRtt => {
-        observed_rtt: Histogram = histogram!("adaptive_concurrency_observed_rtt"),
+        observed_rtt: Histogram = histogram!(MetricName::AdaptiveConcurrencyObservedRtt),
     }
 
     fn emit(&self, rtt: Duration) {
@@ -56,7 +57,7 @@ registered_event! {
 
 registered_event! {
     AdaptiveConcurrencyAveragedRtt => {
-        averaged_rtt: Histogram = histogram!("adaptive_concurrency_averaged_rtt"),
+        averaged_rtt: Histogram = histogram!(MetricName::AdaptiveConcurrencyAveragedRtt),
     }
 
     fn emit(&self, rtt: Duration) {

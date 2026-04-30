@@ -6,7 +6,7 @@ use std::{
     },
 };
 
-use metrics::gauge;
+use vector_common::gauge;
 use vector_lib::NamedInternalEvent;
 use vector_lib::internal_event::InternalEvent;
 
@@ -17,7 +17,7 @@ pub struct ConnectionOpen {
 
 impl InternalEvent for ConnectionOpen {
     fn emit(self) {
-        gauge!("open_connections").set(self.count as f64);
+        gauge!(MetricName::OpenConnections).set(self.count as f64);
     }
 }
 
@@ -28,7 +28,7 @@ pub struct EndpointsActive {
 
 impl InternalEvent for EndpointsActive {
     fn emit(self) {
-        gauge!("active_endpoints").set(self.count as f64);
+        gauge!(MetricName::ActiveEndpoints).set(self.count as f64);
     }
 }
 

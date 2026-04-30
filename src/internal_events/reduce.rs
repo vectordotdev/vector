@@ -1,4 +1,4 @@
-use metrics::counter;
+use vector_common::counter;
 use vector_lib::NamedInternalEvent;
 use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
 use vrl::{path::PathParseError, value::KeyString};
@@ -8,7 +8,7 @@ pub struct ReduceStaleEventFlushed;
 
 impl InternalEvent for ReduceStaleEventFlushed {
     fn emit(self) {
-        counter!("stale_events_flushed_total").increment(1);
+        counter!(MetricName::StaleEventsFlushedTotal).increment(1);
     }
 }
 
@@ -28,7 +28,7 @@ impl InternalEvent for ReduceAddEventError {
             stage = error_stage::PROCESSING,
         );
         counter!(
-            "component_errors_total",
+            MetricName::ComponentErrorsTotal,
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
         )

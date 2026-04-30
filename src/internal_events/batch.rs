@@ -1,4 +1,4 @@
-use metrics::counter;
+use vector_common::counter;
 use vector_lib::NamedInternalEvent;
 use vector_lib::internal_event::{
     ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
@@ -21,7 +21,7 @@ impl InternalEvent for LargeEventDroppedError {
             stage = error_stage::SENDING,
         );
         counter!(
-            "component_errors_total",
+            MetricName::ComponentErrorsTotal,
             "error_code" => "oversized",
             "error_type" => error_type::CONDITION_FAILED,
             "stage" => error_stage::SENDING,

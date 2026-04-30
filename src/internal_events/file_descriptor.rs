@@ -1,4 +1,4 @@
-use metrics::counter;
+use vector_common::counter;
 use vector_lib::NamedInternalEvent;
 use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
 
@@ -19,7 +19,7 @@ where
             stage = error_stage::RECEIVING
         );
         counter!(
-            "component_errors_total",
+            MetricName::ComponentErrorsTotal,
             "error_type" => error_type::CONNECTION_FAILED,
             "stage" => error_stage::RECEIVING,
         )

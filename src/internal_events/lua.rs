@@ -1,4 +1,4 @@
-use metrics::{counter, gauge};
+use vector_common::{counter, gauge};
 use vector_lib::NamedInternalEvent;
 use vector_lib::internal_event::{
     ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
@@ -13,7 +13,7 @@ pub struct LuaGcTriggered {
 
 impl InternalEvent for LuaGcTriggered {
     fn emit(self) {
-        gauge!("lua_memory_used_bytes").set(self.used_memory as f64);
+        gauge!(MetricName::LuaMemoryUsedBytes).set(self.used_memory as f64);
     }
 }
 
@@ -32,7 +32,7 @@ impl InternalEvent for LuaScriptError {
             stage = error_stage::PROCESSING,
         );
         counter!(
-            "component_errors_total",
+            MetricName::ComponentErrorsTotal,
             "error_code" => mlua_error_code(&self.error),
             "error_type" => error_type::SCRIPT_FAILED,
             "stage" => error_stage::PROCESSING,
@@ -62,7 +62,7 @@ impl InternalEvent for LuaBuildError {
             internal_log_rate_limit = false,
         );
         counter!(
-            "component_errors_total",
+            MetricName::ComponentErrorsTotal,
             "error_code" => lua_build_error_code(&self.error),
             "error_type" => error_type::SCRIPT_FAILED,
             "stage" => error_stage:: PROCESSING,

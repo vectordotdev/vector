@@ -1,6 +1,6 @@
 use std::net::SocketAddr;
 
-use metrics::counter;
+use vector_common::counter;
 use vector_lib::NamedInternalEvent;
 use vector_lib::internal_event::InternalEvent;
 
@@ -15,6 +15,6 @@ impl InternalEvent for ApiStarted {
             message = "API server running.",
             address = %self.addr,
         );
-        counter!("api_started_total").increment(1);
+        counter!(MetricName::ApiStartedTotal).increment(1);
     }
 }

@@ -1,5 +1,5 @@
-use metrics::counter;
 use serde_json::Error;
+use vector_common::counter;
 use vector_lib::NamedInternalEvent;
 use vector_lib::internal_event::{
     ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
@@ -20,7 +20,7 @@ impl InternalEvent for MetricToLogSerializeError {
             stage = error_stage::PROCESSING
         );
         counter!(
-            "component_errors_total",
+            MetricName::ComponentErrorsTotal,
             "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::PROCESSING,
         )

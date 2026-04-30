@@ -1,4 +1,4 @@
-use metrics::counter;
+use vector_common::counter;
 use vector_lib::NamedInternalEvent;
 use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
 
@@ -16,7 +16,7 @@ impl InternalEvent for VrlConditionExecutionError<'_> {
             stage = error_stage::PROCESSING,
         );
         counter!(
-            "component_errors_total",
+            MetricName::ComponentErrorsTotal,
             "error_type" => error_type::SCRIPT_FAILED,
             "stage" => error_stage::PROCESSING,
         )

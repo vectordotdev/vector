@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 
-use metrics::counter;
 use rumqttc::ConnectionError;
+use vector_common::counter;
 use vector_lib::NamedInternalEvent;
 use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
 
@@ -20,7 +20,7 @@ impl InternalEvent for MqttConnectionError {
             stage = error_stage::SENDING,
         );
         counter!(
-            "component_errors_total",
+            MetricName::ComponentErrorsTotal,
             "error_code" => "mqtt_connection_error",
             "error_type" => error_type::WRITER_FAILED,
             "stage" => error_stage::SENDING,

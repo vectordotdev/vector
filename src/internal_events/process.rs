@@ -1,4 +1,4 @@
-use metrics::counter;
+use vector_common::counter;
 use vector_lib::NamedInternalEvent;
 use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
 
@@ -17,7 +17,7 @@ impl InternalEvent for VectorStarted {
             arch = built_info::TARGET_ARCH,
             revision = built_info::VECTOR_BUILD_DESC.unwrap_or(""),
         );
-        counter!("started_total").increment(1);
+        counter!(MetricName::StartedTotal).increment(1);
     }
 }
 
@@ -34,7 +34,7 @@ impl InternalEvent for VectorReloaded<'_> {
             path = ?self.config_paths,
             internal_log_rate_limit = false,
         );
-        counter!("reloaded_total").increment(1);
+        counter!(MetricName::ReloadedTotal).increment(1);
     }
 }
 
@@ -59,7 +59,7 @@ impl InternalEvent for VectorStopped {
             target: "vector",
             message = "Vector has stopped.",
         );
-        counter!("stopped_total").increment(1);
+        counter!(MetricName::StoppedTotal).increment(1);
     }
 }
 
@@ -72,7 +72,7 @@ impl InternalEvent for VectorQuit {
             target: "vector",
             message = "Vector has quit.",
         );
-        counter!("quit_total").increment(1);
+        counter!(MetricName::QuitTotal).increment(1);
     }
 }
 
@@ -92,7 +92,7 @@ impl InternalEvent for VectorReloadError {
             internal_log_rate_limit = false,
         );
         counter!(
-            "component_errors_total",
+            MetricName::ComponentErrorsTotal,
             "error_code" => "reload",
             "error_type" => error_type::CONFIGURATION_FAILED,
             "stage" => error_stage::PROCESSING,
@@ -115,7 +115,7 @@ impl InternalEvent for VectorConfigLoadError {
             internal_log_rate_limit = false,
         );
         counter!(
-            "component_errors_total",
+            MetricName::ComponentErrorsTotal,
             "error_code" => "config_load",
             "error_type" => error_type::CONFIGURATION_FAILED,
             "stage" => error_stage::PROCESSING,
@@ -137,7 +137,7 @@ impl InternalEvent for VectorRecoveryError {
             internal_log_rate_limit = false,
         );
         counter!(
-            "component_errors_total",
+            MetricName::ComponentErrorsTotal,
             "error_code" => "recovery",
             "error_type" => error_type::CONFIGURATION_FAILED,
             "stage" => error_stage::PROCESSING,

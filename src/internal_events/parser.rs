@@ -2,7 +2,7 @@
 
 use std::borrow::Cow;
 
-use metrics::counter;
+use vector_common::counter;
 use vector_lib::NamedInternalEvent;
 use vector_lib::internal_event::{
     ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
@@ -36,7 +36,7 @@ impl InternalEvent for ParserMatchError<'_> {
             field = &truncate_string_at(&String::from_utf8_lossy(self.value), 60)[..]
         );
         counter!(
-            "component_errors_total",
+            MetricName::ComponentErrorsTotal,
             "error_code" => "no_match_found",
             "error_type" => error_type::CONDITION_FAILED,
             "stage" => error_stage::PROCESSING,
@@ -66,7 +66,7 @@ impl<const DROP_EVENT: bool> InternalEvent for ParserMissingFieldError<'_, DROP_
             stage = error_stage::PROCESSING
         );
         counter!(
-            "component_errors_total",
+            MetricName::ComponentErrorsTotal,
             "error_code" => "field_not_found",
             "error_type" => error_type::CONDITION_FAILED,
             "stage" => error_stage::PROCESSING,
@@ -97,7 +97,7 @@ impl InternalEvent for ParserConversionError<'_> {
             stage = error_stage::PROCESSING
         );
         counter!(
-            "component_errors_total",
+            MetricName::ComponentErrorsTotal,
             "error_code" => "type_conversion",
             "error_type" => error_type::CONVERSION_FAILED,
             "stage" => error_stage::PROCESSING,

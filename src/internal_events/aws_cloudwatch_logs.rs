@@ -1,4 +1,4 @@
-use metrics::counter;
+use vector_common::counter;
 use vector_lib::NamedInternalEvent;
 use vector_lib::internal_event::{
     ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
@@ -22,7 +22,7 @@ impl InternalEvent for AwsCloudwatchLogsMessageSizeError {
             stage = error_stage::PROCESSING,
         );
         counter!(
-            "component_errors_total",
+            MetricName::ComponentErrorsTotal,
             "error_code" => "message_too_long",
             "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::PROCESSING,

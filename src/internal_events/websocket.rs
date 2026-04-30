@@ -5,8 +5,8 @@ use std::{
     fmt::{Debug, Display, Formatter, Result},
 };
 
-use metrics::{counter, histogram};
 use tokio_tungstenite::tungstenite::error::Error as TungsteniteError;
+use vector_common::{counter, histogram};
 use vector_common::{
     internal_event::{error_stage, error_type},
     json_size::JsonSize,
@@ -22,7 +22,7 @@ pub struct WebSocketConnectionEstablished;
 impl InternalEvent for WebSocketConnectionEstablished {
     fn emit(self) {
         debug!(message = "Connected.");
-        counter!("connection_established_total").increment(1);
+        counter!(MetricName::ConnectionEstablishedTotal).increment(1);
     }
 }
 
@@ -41,7 +41,7 @@ impl InternalEvent for WebSocketConnectionFailedError {
             stage = error_stage::SENDING,
         );
         counter!(
-            "component_errors_total",
+            MetricName::ComponentErrorsTotal,
             "protocol" => PROTOCOL,
             "error_code" => "websocket_connection_failed",
             "error_type" => error_type::CONNECTION_FAILED,
@@ -57,7 +57,7 @@ pub struct WebSocketConnectionShutdown;
 impl InternalEvent for WebSocketConnectionShutdown {
     fn emit(self) {
         warn!(message = "Closed by the server.");
-        counter!("connection_shutdown_total").increment(1);
+        counter!(MetricName::ConnectionShutdownTotal).increment(1);
     }
 }
 
@@ -76,7 +76,7 @@ impl InternalEvent for WebSocketConnectionError {
             stage = error_stage::SENDING,
         );
         counter!(
-            "component_errors_total",
+            MetricName::ComponentErrorsTotal,
             "protocol" => PROTOCOL,
             "error_code" => "websocket_connection_error",
             "error_type" => error_type::WRITER_FAILED,
@@ -121,7 +121,7 @@ impl InternalEvent for WebSocketBytesReceived<'_> {
             kind = %self.kind
         );
         let counter = counter!(
-            "component_received_bytes_total",
+            MetricName::ComponentReceivedBytesTotal,
             "url" => self.url.to_string(),
             "protocol" => self.protocol,
             "kind" => self.kind.to_string()
@@ -150,17 +150,17 @@ impl InternalEvent for WebSocketMessageReceived<'_> {
             kind = %self.kind
         );
 
-        let histogram = histogram!("component_received_events_count");
+        let histogram = histogram!(MetricName::ComponentReceivedEventsCount);
         histogram.record(self.count as f64);
         let counter = counter!(
-            "component_received_events_total",
+            MetricName::ComponentReceivedEventsTotal,
             "uri" => self.url.to_string(),
             "protocol" => PROTOCOL,
             "kind" => self.kind.to_string()
         );
         counter.increment(self.count as u64);
         let counter = counter!(
-            "component_received_event_bytes_total",
+            MetricName::ComponentReceivedEventBytesTotal,
             "url" => self.url.to_string(),
             "protocol" => PROTOCOL,
             "kind" => self.kind.to_string()
@@ -184,7 +184,7 @@ impl InternalEvent for WebSocketReceiveError<'_> {
             stage = error_stage::PROCESSING,
         );
         counter!(
-            "component_errors_total",
+            MetricName::ComponentErrorsTotal,
             "protocol" => PROTOCOL,
             "error_code" => "websocket_receive_error",
             "error_type" => error_type::CONNECTION_FAILED,
@@ -209,7 +209,7 @@ impl InternalEvent for WebSocketSendError<'_> {
             stage = error_stage::PROCESSING,
         );
         counter!(
-            "component_errors_total",
+            MetricName::ComponentErrorsTotal,
             "protocol" => PROTOCOL,
             "error_code" => "websocket_send_error",
             "error_type" => error_type::CONNECTION_FAILED,

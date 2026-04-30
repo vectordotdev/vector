@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use metrics::{counter, histogram};
+use vector_common::{counter, histogram};
 use vector_lib::NamedInternalEvent;
 pub use vector_lib::internal_event::EventsReceived;
 use vector_lib::internal_event::{
@@ -23,7 +23,7 @@ impl InternalEvent for EndpointBytesReceived<'_> {
             endpoint = %self.endpoint,
         );
         counter!(
-            "component_received_bytes_total",
+            MetricName::ComponentReceivedBytesTotal,
             "protocol" => self.protocol.to_owned(),
             "endpoint" => self.endpoint.to_owned(),
         )
@@ -47,7 +47,7 @@ impl InternalEvent for EndpointBytesSent<'_> {
             endpoint = %self.endpoint
         );
         counter!(
-            "component_sent_bytes_total",
+            MetricName::ComponentSentBytesTotal,
             "protocol" => self.protocol.to_string(),
             "endpoint" => self.endpoint.to_string()
         )
@@ -70,7 +70,7 @@ impl<E: std::error::Error> InternalEvent for SocketOutgoingConnectionError<E> {
             stage = error_stage::SENDING,
         );
         counter!(
-            "component_errors_total",
+            MetricName::ComponentErrorsTotal,
             "error_code" => "failed_connecting",
             "error_type" => error_type::CONNECTION_FAILED,
             "stage" => error_stage::SENDING,
@@ -95,7 +95,7 @@ impl InternalEvent for StreamClosedError {
             stage = error_stage::SENDING,
         );
         counter!(
-            "component_errors_total",
+            MetricName::ComponentErrorsTotal,
             "error_code" => STREAM_CLOSED,
             "error_type" => error_type::WRITER_FAILED,
             "stage" => error_stage::SENDING,
@@ -117,8 +117,8 @@ pub struct CollectionCompleted {
 impl InternalEvent for CollectionCompleted {
     fn emit(self) {
         debug!(message = "Collection completed.");
-        counter!("collect_completed_total").increment(1);
-        histogram!("collect_duration_seconds").record(self.end - self.start);
+        counter!(MetricName::CollectCompletedTotal).increment(1);
+        histogram!(MetricName::CollectDurationSeconds).record(self.end - self.start);
     }
 }
 
@@ -139,7 +139,7 @@ impl<E: std::fmt::Display> InternalEvent for SinkRequestBuildError<E> {
             stage = error_stage::PROCESSING,
         );
         counter!(
-            "component_errors_total",
+            MetricName::ComponentErrorsTotal,
             "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::PROCESSING,
         )

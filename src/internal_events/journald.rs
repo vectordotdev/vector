@@ -1,4 +1,4 @@
-use metrics::counter;
+use vector_common::counter;
 use vector_lib::{
     NamedInternalEvent,
     codecs::decoding::BoxedFramingError,
@@ -21,7 +21,7 @@ impl InternalEvent for JournaldInvalidRecordError {
             stage = error_stage::PROCESSING,
         );
         counter!(
-            "component_errors_total",
+            MetricName::ComponentErrorsTotal,
             "stage" => error_stage::PROCESSING,
             "error_type" => error_type::PARSER_FAILED,
         )
@@ -43,7 +43,7 @@ impl InternalEvent for JournaldStartJournalctlError {
             stage = error_stage::RECEIVING,
         );
         counter!(
-            "component_errors_total",
+            MetricName::ComponentErrorsTotal,
             "stage" => error_stage::RECEIVING,
             "error_type" => error_type::COMMAND_FAILED,
         )
@@ -65,7 +65,7 @@ impl InternalEvent for JournaldReadError {
             stage = error_stage::PROCESSING,
         );
         counter!(
-            "component_errors_total",
+            MetricName::ComponentErrorsTotal,
             "stage" => error_stage::PROCESSING,
             "error_type" => error_type::READER_FAILED,
         )
@@ -89,7 +89,7 @@ impl InternalEvent for JournaldCheckpointSetError {
             stage = error_stage::PROCESSING,
         );
         counter!(
-            "component_errors_total",
+            MetricName::ComponentErrorsTotal,
             "stage" => error_stage::PROCESSING,
             "error_type" => error_type::IO_FAILED,
         )
@@ -113,7 +113,7 @@ impl InternalEvent for JournaldCheckpointFileOpenError {
             stage = error_stage::RECEIVING,
         );
         counter!(
-            "component_errors_total",
+            MetricName::ComponentErrorsTotal,
             "stage" => error_stage::RECEIVING,
             "error_type" => error_type::IO_FAILED,
         )

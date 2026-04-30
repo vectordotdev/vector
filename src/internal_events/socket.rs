@@ -1,6 +1,6 @@
 use std::net::Ipv4Addr;
 
-use metrics::{counter, histogram};
+use vector_common::{counter, histogram};
 use vector_lib::{
     NamedInternalEvent,
     internal_event::{
@@ -42,11 +42,11 @@ impl InternalEvent for SocketBytesReceived {
             %protocol,
         );
         counter!(
-            "component_received_bytes_total",
+            MetricName::ComponentReceivedBytesTotal,
             "protocol" => protocol,
         )
         .increment(self.byte_size as u64);
-        histogram!("component_received_bytes").record(self.byte_size as f64);
+        histogram!(MetricName::ComponentReceivedBytes).record(self.byte_size as f64);
     }
 }
 
@@ -66,10 +66,12 @@ impl InternalEvent for SocketEventsReceived {
             byte_size = self.byte_size.get(),
             %mode,
         );
-        counter!("component_received_events_total", "mode" => mode).increment(self.count as u64);
-        counter!("component_received_event_bytes_total", "mode" => mode)
+        counter!(MetricName::ComponentReceivedEventsTotal, "mode" => mode)
+            .increment(self.count as u64);
+        counter!(MetricName::ComponentReceivedEventBytesTotal, "mode" => mode)
             .increment(self.byte_size.get() as u64);
-        histogram!("component_received_bytes", "mode" => mode).record(self.byte_size.get() as f64);
+        histogram!(MetricName::ComponentReceivedBytes, "mode" => mode)
+            .record(self.byte_size.get() as f64);
     }
 }
 
@@ -88,7 +90,7 @@ impl InternalEvent for SocketBytesSent {
             %protocol,
         );
         counter!(
-            "component_sent_bytes_total",
+            MetricName::ComponentSentBytesTotal,
             "protocol" => protocol,
         )
         .increment(self.byte_size as u64);
@@ -105,8 +107,9 @@ pub struct SocketEventsSent {
 impl InternalEvent for SocketEventsSent {
     fn emit(self) {
         trace!(message = "Events sent.", count = %self.count, byte_size = %self.byte_size.get());
-        counter!("component_sent_events_total", "mode" => self.mode.as_str()).increment(self.count);
-        counter!("component_sent_event_bytes_total", "mode" => self.mode.as_str())
+        counter!(MetricName::ComponentSentEventsTotal, "mode" => self.mode.as_str())
+            .increment(self.count);
+        counter!(MetricName::ComponentSentEventBytesTotal, "mode" => self.mode.as_str())
             .increment(self.byte_size.get() as u64);
     }
 }
@@ -129,7 +132,7 @@ impl<E: std::fmt::Display> InternalEvent for SocketBindError<E> {
             %mode,
         );
         counter!(
-            "component_errors_total",
+            MetricName::ComponentErrorsTotal,
             "error_code" => "socket_bind",
             "error_type" => error_type::IO_FAILED,
             "stage" => error_stage::INITIALIZING,
@@ -164,7 +167,7 @@ impl<E: std::fmt::Display> InternalEvent for SocketMulticastGroupJoinError<E> {
             %interface,
         );
         counter!(
-            "component_errors_total",
+            MetricName::ComponentErrorsTotal,
             "error_code" => "socket_multicast_group_join",
             "error_type" => error_type::IO_FAILED,
             "stage" => error_stage::INITIALIZING,
@@ -194,7 +197,7 @@ impl<E: std::fmt::Display> InternalEvent for SocketReceiveError<E> {
             %mode,
         );
         counter!(
-            "component_errors_total",
+            MetricName::ComponentErrorsTotal,
             "error_code" => "socket_receive",
             "error_type" => error_type::READER_FAILED,
             "stage" => error_stage::RECEIVING,
@@ -223,7 +226,7 @@ impl<E: std::fmt::Display> InternalEvent for SocketSendError<E> {
             %mode,
         );
         counter!(
-            "component_errors_total",
+            MetricName::ComponentErrorsTotal,
             "error_code" => "socket_send",
             "error_type" => error_type::WRITER_FAILED,
             "stage" => error_stage::SENDING,

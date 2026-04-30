@@ -35,7 +35,7 @@ mod sink {
                 stage = error_stage::PROCESSING,
             );
             counter!(
-                "component_errors_total",
+                MetricName::ComponentErrorsTotal,
                 "error_code" => "serializing_json",
                 "error_type" => error_type::ENCODER_FAILED,
                 "stage" => error_stage::PROCESSING,
@@ -63,13 +63,13 @@ mod sink {
                 kind = ?self.kind,
             );
             counter!(
-                "component_errors_total",
+                MetricName::ComponentErrorsTotal,
                 "error_type" => error_type::INVALID_METRIC,
                 "stage" => error_stage::PROCESSING,
             )
             .increment(1);
             counter!(
-                "component_discarded_events_total",
+                MetricName::ComponentDiscardedEventsTotal,
                 "error_type" => error_type::INVALID_METRIC,
                 "stage" => error_stage::PROCESSING,
             )
@@ -92,7 +92,7 @@ mod sink {
                 stage = error_stage::SENDING,
             );
             counter!(
-                "component_errors_total",
+                MetricName::ComponentErrorsTotal,
                 "error_code" => "invalid_response",
                 "error_type" => error_type::PARSER_FAILED,
                 "stage" => error_stage::SENDING,
@@ -117,7 +117,7 @@ mod sink {
                 stage = error_stage::SENDING,
             );
             counter!(
-                "component_errors_total",
+                MetricName::ComponentErrorsTotal,
                 "error_code" => "indexer_ack_failed",
                 "error_type" => error_type::ACKNOWLEDGMENT_FAILED,
                 "stage" => error_stage::SENDING,
@@ -141,7 +141,7 @@ mod sink {
                 stage = error_stage::SENDING,
             );
             counter!(
-                "component_errors_total",
+                MetricName::ComponentErrorsTotal,
                 "error_code" => "indexer_ack_unavailable",
                 "error_type" => error_type::ACKNOWLEDGMENT_FAILED,
                 "stage" => error_stage::SENDING,
@@ -155,7 +155,7 @@ mod sink {
 
     impl InternalEvent for SplunkIndexerAcknowledgementAckAdded {
         fn emit(self) {
-            gauge!("splunk_pending_acks").increment(1.0);
+            gauge!(MetricName::SplunkPendingAcks).increment(1.0);
         }
     }
 
@@ -166,7 +166,7 @@ mod sink {
 
     impl InternalEvent for SplunkIndexerAcknowledgementAcksRemoved {
         fn emit(self) {
-            gauge!("splunk_pending_acks").decrement(self.count);
+            gauge!(MetricName::SplunkPendingAcks).decrement(self.count);
         }
     }
 
@@ -197,7 +197,7 @@ mod sink {
 
 #[cfg(feature = "sources-splunk_hec")]
 mod source {
-    use metrics::counter;
+    use vector_common::counter;
     use vector_lib::NamedInternalEvent;
     use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
 
@@ -218,7 +218,7 @@ mod source {
                 stage = error_stage::PROCESSING
             );
             counter!(
-                "component_errors_total",
+                MetricName::ComponentErrorsTotal,
                 "error_code" => "invalid_request_body",
                 "error_type" => error_type::PARSER_FAILED,
                 "stage" => error_stage::PROCESSING,
@@ -243,7 +243,7 @@ mod source {
                         stage = error_stage::RECEIVING
                     );
                     counter!(
-                        "component_errors_total",
+                        MetricName::ComponentErrorsTotal,
                         "error_type" => error_type::AUTHENTICATION_FAILED,
                         "stage" => error_stage::RECEIVING,
                     )
@@ -257,7 +257,7 @@ mod source {
                         stage = error_stage::RECEIVING
                     );
                     counter!(
-                        "component_errors_total",
+                        MetricName::ComponentErrorsTotal,
                         "error_type" => error_type::REQUEST_FAILED,
                         "stage" => error_stage::RECEIVING,
                     )

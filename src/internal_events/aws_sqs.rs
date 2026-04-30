@@ -1,8 +1,8 @@
 #![allow(dead_code)] // TODO requires optional feature compilation
 
-use metrics::counter;
 #[cfg(feature = "sources-aws_s3")]
 pub use s3::*;
+use vector_common::counter;
 #[cfg(any(feature = "sources-aws_s3", feature = "sources-aws_sqs"))]
 use vector_lib::internal_event::{error_stage, error_type};
 use vector_lib::{NamedInternalEvent, internal_event::InternalEvent};
@@ -15,7 +15,7 @@ mod s3 {
         BatchResultErrorEntry, DeleteMessageBatchRequestEntry, DeleteMessageBatchResultEntry,
         SendMessageBatchRequestEntry, SendMessageBatchResultEntry,
     };
-    use metrics::histogram;
+    use vector_common::histogram;
 
     use super::*;
     use crate::sources::aws_s3::sqs::ProcessingError;
@@ -79,7 +79,7 @@ mod s3 {
                 stage = error_stage::PROCESSING,
             );
             counter!(
-                "component_errors_total",
+                MetricName::ComponentErrorsTotal,
                 "error_code" => "failed_processing_sqs_message",
                 "error_type" => error_type::PARSER_FAILED,
                 "stage" => error_stage::PROCESSING,
@@ -100,7 +100,8 @@ mod s3 {
                 .map(|x| x.id.as_str())
                 .collect::<Vec<_>>()
                 .join(", "));
-            counter!("sqs_message_delete_succeeded_total").increment(self.message_ids.len() as u64);
+            counter!(MetricName::SqsMessageDeleteSucceededTotal)
+                .increment(self.message_ids.len() as u64);
         }
     }
 
@@ -122,7 +123,7 @@ mod s3 {
                 stage = error_stage::PROCESSING,
             );
             counter!(
-                "component_errors_total",
+                MetricName::ComponentErrorsTotal,
                 "error_code" => "failed_deleting_some_sqs_messages",
                 "error_type" => error_type::ACKNOWLEDGMENT_FAILED,
                 "stage" => error_stage::PROCESSING,
@@ -151,7 +152,7 @@ mod s3 {
                 stage = error_stage::PROCESSING,
             );
             counter!(
-                "component_errors_total",
+                MetricName::ComponentErrorsTotal,
                 "error_code" => "failed_deleting_all_sqs_messages",
                 "error_type" => error_type::ACKNOWLEDGMENT_FAILED,
                 "stage" => error_stage::PROCESSING,
@@ -172,7 +173,8 @@ mod s3 {
                 .map(|x| x.id.as_str())
                 .collect::<Vec<_>>()
                 .join(", "));
-            counter!("sqs_message_defer_succeeded_total").increment(self.message_ids.len() as u64);
+            counter!(MetricName::SqsMessageDeferSucceededTotal)
+                .increment(self.message_ids.len() as u64);
         }
     }
 
@@ -194,7 +196,7 @@ mod s3 {
                 stage = error_stage::PROCESSING,
             );
             counter!(
-                "component_errors_total",
+                MetricName::ComponentErrorsTotal,
                 "error_code" => "failed_deferring_some_sqs_messages",
                 "error_type" => error_type::ACKNOWLEDGMENT_FAILED,
                 "stage" => error_stage::PROCESSING,
@@ -223,7 +225,7 @@ mod s3 {
                 stage = error_stage::PROCESSING,
             );
             counter!(
-                "component_errors_total",
+                MetricName::ComponentErrorsTotal,
                 "error_code" => "failed_deferring_all_sqs_messages",
                 "error_type" => error_type::ACKNOWLEDGMENT_FAILED,
                 "stage" => error_stage::PROCESSING,
@@ -248,7 +250,7 @@ impl<E: std::fmt::Display> InternalEvent for SqsMessageReceiveError<'_, E> {
             stage = error_stage::RECEIVING,
         );
         counter!(
-            "component_errors_total",
+            MetricName::ComponentErrorsTotal,
             "error_code" => "failed_fetching_sqs_events",
             "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::RECEIVING,
@@ -265,8 +267,8 @@ pub struct SqsMessageReceiveSucceeded {
 impl InternalEvent for SqsMessageReceiveSucceeded {
     fn emit(self) {
         trace!(message = "Received SQS messages.", count = %self.count);
-        counter!("sqs_message_receive_succeeded_total").increment(1);
-        counter!("sqs_message_received_messages_total").increment(self.count as u64);
+        counter!(MetricName::SqsMessageReceiveSucceededTotal).increment(1);
+        counter!(MetricName::SqsMessageReceivedMessagesTotal).increment(self.count as u64);
     }
 }
 
@@ -278,7 +280,7 @@ pub struct SqsMessageProcessingSucceeded<'a> {
 impl InternalEvent for SqsMessageProcessingSucceeded<'_> {
     fn emit(self) {
         trace!(message = "Processed SQS message successfully.", message_id = %self.message_id);
-        counter!("sqs_message_processing_succeeded_total").increment(1);
+        counter!(MetricName::SqsMessageProcessingSucceededTotal).increment(1);
     }
 }
 
@@ -300,7 +302,7 @@ impl<E: std::fmt::Display> InternalEvent for SqsMessageDeleteError<'_, E> {
             stage = error_stage::PROCESSING,
         );
         counter!(
-            "component_errors_total",
+            MetricName::ComponentErrorsTotal,
             "error_type" => error_type::WRITER_FAILED,
             "stage" => error_stage::PROCESSING,
         )

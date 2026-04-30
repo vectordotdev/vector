@@ -1,4 +1,4 @@
-use metrics::counter;
+use vector_common::counter;
 use vector_lib::NamedInternalEvent;
 use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
 
@@ -16,7 +16,7 @@ impl<E: std::fmt::Display> InternalEvent for DnstapParseError<E> {
             error_type = error_type::PARSER_FAILED,
         );
         counter!(
-            "component_errors_total",
+            MetricName::ComponentErrorsTotal,
             "stage" => error_stage::PROCESSING,
             "error_type" => error_type::PARSER_FAILED,
         )

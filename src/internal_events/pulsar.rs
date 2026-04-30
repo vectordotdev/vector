@@ -2,7 +2,7 @@
 
 #[cfg(feature = "sources-pulsar")]
 use metrics::Counter;
-use metrics::counter;
+use vector_common::counter;
 use vector_lib::NamedInternalEvent;
 use vector_lib::internal_event::{
     ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
@@ -24,7 +24,7 @@ impl InternalEvent for PulsarSendingError {
             stage = error_stage::SENDING,
         );
         counter!(
-            "component_errors_total",
+            MetricName::ComponentErrorsTotal,
             "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::SENDING,
         )
@@ -51,7 +51,7 @@ impl<F: std::fmt::Display> InternalEvent for PulsarPropertyExtractionError<F> {
             property_field = %self.property_field,
         );
         counter!(
-            "component_errors_total",
+            MetricName::ComponentErrorsTotal,
             "error_code" => "extracting_property",
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
@@ -77,21 +77,21 @@ pub struct PulsarErrorEventData {
 registered_event!(
     PulsarErrorEvent => {
         ack_errors: Counter = counter!(
-            "component_errors_total",
+            MetricName::ComponentErrorsTotal,
             "error_code" => "acknowledge_message",
             "error_type" => error_type::ACKNOWLEDGMENT_FAILED,
             "stage" => error_stage::RECEIVING,
         ),
 
         nack_errors: Counter = counter!(
-            "component_errors_total",
+            MetricName::ComponentErrorsTotal,
             "error_code" => "negative_acknowledge_message",
             "error_type" => error_type::ACKNOWLEDGMENT_FAILED,
             "stage" => error_stage::RECEIVING,
         ),
 
         read_errors: Counter = counter!(
-            "component_errors_total",
+            MetricName::ComponentErrorsTotal,
             "error_code" => "reading_message",
             "error_type" => error_type::READER_FAILED,
             "stage" => error_stage::RECEIVING,

@@ -1,4 +1,4 @@
-use metrics::counter;
+use vector_common::counter;
 use vector_lib::NamedInternalEvent;
 use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
 
@@ -25,7 +25,7 @@ impl InternalEvent for RedisReceiveEventError {
             stage = error_stage::SENDING,
         );
         counter!(
-            "component_errors_total",
+            MetricName::ComponentErrorsTotal,
             "error_code" => self.error_code,
             "error_type" => error_type::READER_FAILED,
             "stage" => error_stage::RECEIVING,

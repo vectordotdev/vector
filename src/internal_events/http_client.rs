@@ -5,7 +5,7 @@ use http::{
     header::{self, HeaderMap, HeaderValue},
 };
 use hyper::{Error, body::HttpBody};
-use metrics::{counter, histogram};
+use vector_common::{counter, histogram};
 use vector_lib::NamedInternalEvent;
 use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
 
@@ -39,7 +39,7 @@ impl<T: HttpBody> InternalEvent for AboutToSendHttpRequest<'_, T> {
             headers = ?remove_sensitive(self.request.headers()),
             body = %FormatBody(self.request.body()),
         );
-        counter!("http_client_requests_sent_total", "method" => self.request.method().to_string())
+        counter!(MetricName::HttpClientRequestsSentTotal, "method" => self.request.method().to_string())
             .increment(1);
     }
 }
@@ -60,13 +60,13 @@ impl<T: HttpBody> InternalEvent for GotHttpResponse<'_, T> {
             body = %FormatBody(self.response.body()),
         );
         counter!(
-            "http_client_responses_total",
+            MetricName::HttpClientResponsesTotal,
             "status" => self.response.status().as_u16().to_string(),
         )
         .increment(1);
-        histogram!("http_client_rtt_seconds").record(self.roundtrip);
+        histogram!(MetricName::HttpClientRttSeconds).record(self.roundtrip);
         histogram!(
-            "http_client_response_rtt_seconds",
+            MetricName::HttpClientResponseRttSeconds,
             "status" => self.response.status().as_u16().to_string(),
         )
         .record(self.roundtrip);
@@ -87,9 +87,10 @@ impl InternalEvent for GotHttpWarning<'_> {
             error_type = error_type::REQUEST_FAILED,
             stage = error_stage::PROCESSING,
         );
-        counter!("http_client_errors_total", "error_kind" => self.error.to_string()).increment(1);
-        histogram!("http_client_rtt_seconds").record(self.roundtrip);
-        histogram!("http_client_error_rtt_seconds", "error_kind" => self.error.to_string())
+        counter!(MetricName::HttpClientErrorsTotal, "error_kind" => self.error.to_string())
+            .increment(1);
+        histogram!(MetricName::HttpClientRttSeconds).record(self.roundtrip);
+        histogram!(MetricName::HttpClientErrorRttSeconds, "error_kind" => self.error.to_string())
             .record(self.roundtrip);
     }
 }

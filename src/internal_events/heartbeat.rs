@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use metrics::gauge;
+use vector_common::gauge;
 use vector_lib::NamedInternalEvent;
 use vector_lib::internal_event::InternalEvent;
 
@@ -14,9 +14,9 @@ pub struct Heartbeat {
 impl InternalEvent for Heartbeat {
     fn emit(self) {
         trace!(target: "vector", message = "Beep.");
-        gauge!("uptime_seconds").set(self.since.elapsed().as_secs() as f64);
+        gauge!(MetricName::UptimeSeconds).set(self.since.elapsed().as_secs() as f64);
         gauge!(
-            "build_info",
+            MetricName::BuildInfo,
             "debug" => built_info::DEBUG,
             "version" => built_info::PKG_VERSION,
             "rust_version" => built_info::RUST_VERSION,
