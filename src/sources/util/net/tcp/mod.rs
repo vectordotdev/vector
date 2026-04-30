@@ -20,6 +20,7 @@ use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::{ReadyFrames, StreamDecodingError, internal_events::DecoderFramingError},
     config::{LegacyKey, LogNamespace, SourceAcknowledgementsConfig},
+    configurable::configurable_component,
     event::{BatchNotifier, BatchStatus, Event},
     finalization::AddBatchNotifier,
     lookup::{OwnedValuePath, path},
@@ -62,6 +63,18 @@ pub async fn try_bind_tcp_listener(
         },
     }
     .map(|listener| listener.with_allowlist(allowlist))
+}
+
+/// Controls how Vector closes TCP connections during shutdown or connection expiry.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum DisconnectMode {
+    /// Gracefully signal the end of the connection and wait for the client to close.
+    #[default]
+    Drain,
+    /// Immediately terminate the connection, without waiting for the client.
+    Abort,
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -117,6 +130,7 @@ where
         tls_client_metadata_key: Option<OwnedValuePath>,
         receive_buffer_bytes: Option<usize>,
         max_connection_duration_secs: Option<u64>,
+        disconnect_mode: DisconnectMode,
         cx: SourceContext,
         acknowledgements: SourceAcknowledgementsConfig,
         max_connections: Option<u32>,
@@ -206,6 +220,7 @@ where
                                 keepalive,
                                 receive_buffer_bytes,
                                 max_connection_duration_secs,
+                                disconnect_mode,
                                 source,
                                 tripwire,
                                 peer_addr,
@@ -240,6 +255,7 @@ async fn handle_stream<T>(
     keepalive: Option<TcpKeepaliveConfig>,
     receive_buffer_bytes: Option<usize>,
     max_connection_duration_secs: Option<u64>,
+    disconnect_mode: DisconnectMode,
     source: T,
     mut tripwire: BoxFuture<'static, ()>,
     peer_addr: SocketAddr,
@@ -304,14 +320,15 @@ async fn handle_stream<T>(
     loop {
         let mut permit = tokio::select! {
             _ = &mut tripwire => break,
-            Some(_) = &mut connection_close_timeout  => {
-                if close_socket(reader.get_ref().get_ref().get_ref()) {
+            Some(_) = &mut connection_close_timeout => {
+                connection_close_timeout.set(OptionFuture::from(None::<tokio::time::Sleep>));
+                if close_socket(reader.get_ref().get_ref().get_ref(), disconnect_mode) {
                     break;
                 }
                 None
             },
             _ = &mut shutdown_signal => {
-                if close_socket(reader.get_ref().get_ref().get_ref()) {
+                if close_socket(reader.get_ref().get_ref().get_ref(), disconnect_mode) {
                     break;
                 }
                 None
@@ -328,7 +345,7 @@ async fn handle_stream<T>(
         tokio::select! {
             _ = &mut tripwire => break,
             _ = &mut shutdown_signal => {
-                if close_socket(reader.get_ref().get_ref().get_ref()) {
+                if close_socket(reader.get_ref().get_ref().get_ref(), disconnect_mode) {
                     break;
                 }
             },
@@ -434,12 +451,26 @@ async fn handle_stream<T>(
     }
 }
 
-fn close_socket(socket: &MaybeTlsIncomingStream<TcpStream>) -> bool {
-    debug!("Start graceful shutdown.");
-    // Close our write part of TCP socket to signal the other side
-    // that it should stop writing and close the channel.
+fn close_socket(
+    socket: &MaybeTlsIncomingStream<TcpStream>,
+    disconnect_mode: DisconnectMode,
+) -> bool {
+    // Signal to the client that we are done with this connection
+    // according to the configured disconnect mode.
     if let Some(stream) = socket.get_ref() {
         let socket = SockRef::from(stream);
+        match disconnect_mode {
+            DisconnectMode::Drain => {
+                debug!("Closing connection gracefully.");
+            }
+            DisconnectMode::Abort => {
+                debug!("Terminating connection.");
+                if let Err(error) = socket.set_linger(Some(std::time::Duration::ZERO)) {
+                    warn!(message = "Failed to set SO_LINGER=0 on TCP socket.", %error);
+                }
+                return true;
+            }
+        }
         if let Err(error) = socket.shutdown(std::net::Shutdown::Write) {
             warn!(message = "Failed in signalling to the other side to close the TCP channel.", %error);
         }
