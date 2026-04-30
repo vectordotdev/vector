@@ -105,7 +105,7 @@ impl InternalEvent for KubernetesLogsEventNamespaceAnnotationError<'_> {
             "stage" => error_stage::PROCESSING,
         )
         .increment(1);
-        counter!("k8s_event_namespace_annotation_failures_total").increment(1);
+        counter!(MetricName::K8sEventNamespaceAnnotationFailuresTotal).increment(1);
     }
 }
 
@@ -130,7 +130,7 @@ impl InternalEvent for KubernetesLogsEventNodeAnnotationError<'_> {
             "stage" => error_stage::PROCESSING,
         )
         .increment(1);
-        counter!("k8s_event_node_annotation_failures_total").increment(1);
+        counter!(MetricName::K8sEventNodeAnnotationFailuresTotal).increment(1);
     }
 }
 
@@ -145,7 +145,7 @@ impl InternalEvent for KubernetesLogsFormatPickerEdgeCase {
             message = "Encountered format picker edge case.",
             what = %self.what,
         );
-        counter!("k8s_format_picker_edge_cases_total").increment(1);
+        counter!(MetricName::K8sFormatPickerEdgeCasesTotal).increment(1);
     }
 }
 
@@ -168,7 +168,7 @@ impl InternalEvent for KubernetesLogsDockerFormatParseError<'_> {
             "stage" => error_stage::PROCESSING,
         )
         .increment(1);
-        counter!("k8s_docker_format_parse_failures_total").increment(1);
+        counter!(MetricName::K8sDockerFormatParseFailuresTotal).increment(1);
     }
 }
 

@@ -126,6 +126,10 @@ pub enum MetricName {
     WindowsServiceStartTotal,
     WindowsServiceStopTotal,
     WindowsServiceUninstallTotal,
+    K8sEventNamespaceAnnotationFailuresTotal,
+    K8sEventNodeAnnotationFailuresTotal,
+    K8sFormatPickerEdgeCasesTotal,
+    K8sDockerFormatParseFailuresTotal,
 }
 
 impl MetricName {
@@ -257,6 +261,10 @@ impl MetricName {
             Self::WindowsServiceStartTotal => "windows_service_start_total",
             Self::WindowsServiceStopTotal => "windows_service_stop_total",
             Self::WindowsServiceUninstallTotal => "windows_service_uninstall_total",
+            Self::K8sEventNamespaceAnnotationFailuresTotal => "k8s_event_namespace_annotation_failures_total",
+            Self::K8sEventNodeAnnotationFailuresTotal => "k8s_event_node_annotation_failures_total",
+            Self::K8sFormatPickerEdgeCasesTotal => "k8s_format_picker_edge_cases_total",
+            Self::K8sDockerFormatParseFailuresTotal => "k8s_docker_format_parse_failures_total",
         }
     }
 }
