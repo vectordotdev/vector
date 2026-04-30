@@ -34,7 +34,7 @@ mod s3 {
                 duration_ms = %self.duration.as_millis(),
             );
             histogram!(
-                "s3_object_processing_succeeded_duration_seconds",
+                MetricName::S3ObjectProcessingSucceededDurationSeconds,
                 "bucket" => self.bucket.to_owned(),
             )
             .record(self.duration);
@@ -55,7 +55,7 @@ mod s3 {
                 duration_ms = %self.duration.as_millis(),
             );
             histogram!(
-                "s3_object_processing_failed_duration_seconds",
+                MetricName::S3ObjectProcessingFailedDurationSeconds,
                 "bucket" => self.bucket.to_owned(),
             )
             .record(self.duration);
@@ -324,7 +324,7 @@ impl InternalEvent for SqsS3EventRecordInvalidEventIgnored<'_> {
     fn emit(self) {
         warn!(message = "Ignored S3 record in SQS message for an event that was not ObjectCreated.",
             bucket = %self.bucket, key = %self.key, kind = %self.kind, name = %self.name);
-        counter!("sqs_s3_event_record_ignored_total", "ignore_type" => "invalid_event_kind")
+        counter!(MetricName::SqsS3EventRecordIgnoredTotal, "ignore_type" => "invalid_event_kind")
             .increment(1);
     }
 }

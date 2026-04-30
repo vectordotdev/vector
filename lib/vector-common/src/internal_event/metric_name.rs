@@ -130,9 +130,13 @@ pub enum MetricName {
     K8sEventNodeAnnotationFailuresTotal,
     K8sFormatPickerEdgeCasesTotal,
     K8sDockerFormatParseFailuresTotal,
+    S3ObjectProcessingSucceededDurationSeconds,
+    S3ObjectProcessingFailedDurationSeconds,
+    SqsS3EventRecordIgnoredTotal,
 }
 
 impl MetricName {
+    #[allow(clippy::too_many_lines)]
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
@@ -265,6 +269,9 @@ impl MetricName {
             Self::K8sEventNodeAnnotationFailuresTotal => "k8s_event_node_annotation_failures_total",
             Self::K8sFormatPickerEdgeCasesTotal => "k8s_format_picker_edge_cases_total",
             Self::K8sDockerFormatParseFailuresTotal => "k8s_docker_format_parse_failures_total",
+            Self::S3ObjectProcessingSucceededDurationSeconds => "s3_object_processing_succeeded_duration_seconds",
+            Self::S3ObjectProcessingFailedDurationSeconds => "s3_object_processing_failed_duration_seconds",
+            Self::SqsS3EventRecordIgnoredTotal => "sqs_s3_event_record_ignored_total",
         }
     }
 }
