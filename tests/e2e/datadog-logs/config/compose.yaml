@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   # Generates random log data for consumption by the custom Agent check
@@ -28,11 +28,11 @@ services:
     depends_on:
       - fakeintake-agent
     environment:
-    - DD_API_KEY=${TEST_DATADOG_API_KEY:?TEST_DATADOG_API_KEY required}
-    - DD_HOSTNAME=datadog-agent
-    - DD_ENABLE_PAYLOADS_EVENTS=false
-    - DD_ENABLE_PAYLOADS_SERVICE_CHECKS=false
-    - DD_CONTAINER_EXCLUDE="name:.*"
+      - DD_API_KEY=${TEST_DATADOG_API_KEY:?TEST_DATADOG_API_KEY required}
+      - DD_HOSTNAME=datadog-agent
+      - DD_ENABLE_PAYLOADS_EVENTS=false
+      - DD_ENABLE_PAYLOADS_SERVICE_CHECKS=false
+      - DD_CONTAINER_EXCLUDE="name:.*"
     volumes:
       # The Agent config file
       - type: bind
@@ -58,11 +58,11 @@ services:
     depends_on:
       - vector
     environment:
-    - DD_API_KEY=${TEST_DATADOG_API_KEY:?TEST_DATADOG_API_KEY required}
-    - DD_HOSTNAME=datadog-agent-vector
-    - DD_ENABLE_PAYLOADS_EVENTS=false
-    - DD_ENABLE_PAYLOADS_SERVICE_CHECKS=false
-    - DD_CONTAINER_EXCLUDE="name:.*"
+      - DD_API_KEY=${TEST_DATADOG_API_KEY:?TEST_DATADOG_API_KEY required}
+      - DD_HOSTNAME=datadog-agent-vector
+      - DD_ENABLE_PAYLOADS_EVENTS=false
+      - DD_ENABLE_PAYLOADS_SERVICE_CHECKS=false
+      - DD_CONTAINER_EXCLUDE="name:.*"
     volumes:
       # The Agent config file
       - type: bind

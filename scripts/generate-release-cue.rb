@@ -217,11 +217,14 @@ def generate_changelog!(new_version)
 
     # Note: `pr_numbers`, `scopes` and `breaking` are being omitted from the entries.
     #       These are currently not required for rendering in the website.
+    # Use CUE raw multi-line strings (#"""..."""#) so backslashes in the
+    # fragment (e.g. shell line continuations) are not interpreted as
+    # escape sequences.
     entry = "{\n" +
       "type: #{type.to_json}\n" +
-      "description: \"\"\"\n" +
+      "description: #\"\"\"\n" +
       "#{description}\n" +
-      "\"\"\"\n"
+      "\"\"\"#\n"
 
     if contributors.length() > 0
       entry += "contributors: #{contributors.to_json}\n"

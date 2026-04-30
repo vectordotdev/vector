@@ -117,7 +117,10 @@ impl SourceConfig for UnitTestStreamSourceConfig {
 #[derive(Clone, Default)]
 pub enum UnitTestSinkCheck {
     /// Check all events that are received against the list of conditions.
-    Checks(Vec<Vec<Condition>>),
+    Checks {
+        conditions: Vec<Vec<Condition>>,
+        expected_event_count: Option<usize>,
+    },
 
     /// Check that no events were received.
     NoOutputs,
@@ -203,8 +206,21 @@ impl StreamSink<Event> for UnitTestSink {
         }
 
         match self.check {
-            UnitTestSinkCheck::Checks(checks) => {
-                if output_events.is_empty() {
+            UnitTestSinkCheck::Checks {
+                conditions: checks,
+                expected_event_count,
+            } => {
+                if let Some(expected) = expected_event_count {
+                    let actual = output_events.len();
+                    if actual != expected {
+                        result.test_errors.push(format!(
+                            "expected {} events from transforms {:?}, but received {}",
+                            expected, self.transform_ids, actual
+                        ));
+                    }
+                }
+
+                if output_events.is_empty() && expected_event_count != Some(0) {
                     result
                         .test_errors
                         .push(format!("checks for transforms {:?} failed: no events received. Topology may be disconnected or transform is missing inputs.", self.transform_ids));

@@ -25,11 +25,12 @@ metrics data model and tested our interoperability between metrics sources.
 To use it simply add the source config and point it towards the hosts you wish
 to scrape:
 
-```toml
-[sources.my_source_id]
-  type = "prometheus_scrape"
-  hosts = ["http://localhost:9090"]
-  scrape_interval_secs = 1
+```yaml
+sources:
+  my_source_id:
+    type: "prometheus_scrape"
+    hosts: ["http://localhost:9090"]
+    scrape_interval_secs: 1
 ```
 
 For more guidance get on the [reference page][docs.sources.prometheus].

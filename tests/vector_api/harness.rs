@@ -133,6 +133,11 @@ impl TestHarness {
         &mut self.api_client
     }
 
+    /// Returns the TCP port the API server is bound to
+    pub fn api_port(&self) -> u16 {
+        self.api_port
+    }
+
     /// Reloads Vector configuration by sending SIGHUP or using watch mode
     ///
     /// Polls Vector to detect crashes early and succeed fast when reload completes.

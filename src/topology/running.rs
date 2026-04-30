@@ -1,9 +1,6 @@
 use std::{
     collections::{HashMap, HashSet},
-    sync::{
-        Arc, Mutex,
-        atomic::{AtomicBool, Ordering},
-    },
+    sync::{Arc, Mutex},
 };
 
 use futures::{Future, FutureExt, future};
@@ -66,7 +63,6 @@ pub struct RunningTopology {
     pub(crate) config: Config,
     pub(crate) abort_tx: mpsc::UnboundedSender<ShutdownError>,
     watch: (WatchTx, WatchRx),
-    pub(crate) running: Arc<AtomicBool>,
     graceful_shutdown_duration: Option<Duration>,
     utilization_registry: Option<UtilizationRegistry>,
     utilization_task: Option<TaskHandle>,
@@ -90,7 +86,6 @@ impl RunningTopology {
             tasks: HashMap::new(),
             abort_tx,
             watch: watch::channel(TapResource::default()),
-            running: Arc::new(AtomicBool::new(true)),
             graceful_shutdown_duration: config.graceful_shutdown_duration,
             config,
             utilization_registry: None,
@@ -148,8 +143,6 @@ impl RunningTopology {
     /// dropped then everything from this RunningTopology instance is fully
     /// dropped.
     pub fn stop(self) -> impl Future<Output = ()> {
-        // Update the API's health endpoint to signal shutdown
-        self.running.store(false, Ordering::Relaxed);
         // Create handy handles collections of all tasks for the subsequent
         // operations.
         let mut wait_handles = Vec::new();
@@ -590,10 +583,26 @@ impl RunningTopology {
             .collect::<HashSet<_>>();
 
         // For any existing sink that has a conflicting resource dependency with a changed/added
-        // sink, or for any sink that we want to reuse their buffer, we need to explicit wait for
-        // them to finish processing so we can reclaim ownership of those resources/buffers.
+        // sink, for any sink that we want to reuse their buffer, or for any changed sink with
+        // a disk buffer that is not being reused, we need to explicitly wait for them to finish
+        // processing so we can reclaim ownership of those resources/buffers.
+        let changed_disk_buffer_sinks = diff
+            .sinks
+            .to_change
+            .iter()
+            .filter(|key| {
+                !reuse_buffers.contains(*key)
+                    && self
+                        .config
+                        .sink(key)
+                        .is_some_and(|s| s.buffer.has_disk_stage())
+            })
+            .cloned()
+            .collect::<HashSet<_>>();
+
         let wait_for_sinks = conflicting_sinks
             .chain(reuse_buffers.iter().cloned())
+            .chain(changed_disk_buffer_sinks.iter().cloned())
             .collect::<HashSet<_>>();
 
         // First, we remove any inputs to removed sinks so they can naturally shut down.
@@ -635,24 +644,26 @@ impl RunningTopology {
 
         for key in &sinks_to_change {
             debug!(component_id = %key, "Changing sink.");
-            if reuse_buffers.contains(key) {
+            if reuse_buffers.contains(key) || changed_disk_buffer_sinks.contains(key) {
                 self.detach_triggers
                     .remove(key)
                     .unwrap()
                     .into_inner()
                     .cancel();
 
-                // We explicitly clone the input side of the buffer and store it so we don't lose
-                // it when we remove the inputs below.
-                //
-                // We clone instead of removing here because otherwise the input will be missing for
-                // the rest of the reload process, which violates the assumption that all previous
-                // inputs for components not being removed are still available. It's simpler to
-                // allow the "old" input to stick around and be replaced (even though that's
-                // basically a no-op since we're reusing the same buffer) than it is to pass around
-                // info about which sinks are having their buffers reused and treat them differently
-                // at other stages.
-                buffer_tx.insert((*key).clone(), self.inputs.get(key).unwrap().clone());
+                if reuse_buffers.contains(key) {
+                    // We explicitly clone the input side of the buffer and store it so we don't lose
+                    // it when we remove the inputs below.
+                    //
+                    // We clone instead of removing here because otherwise the input will be missing for
+                    // the rest of the reload process, which violates the assumption that all previous
+                    // inputs for components not being removed are still available. It's simpler to
+                    // allow the "old" input to stick around and be replaced (even though that's
+                    // basically a no-op since we're reusing the same buffer) than it is to pass around
+                    // info about which sinks are having their buffers reused and treat them differently
+                    // at other stages.
+                    buffer_tx.insert((*key).clone(), self.inputs.get(key).unwrap().clone());
+                }
             }
             self.remove_inputs(key, diff, new_config).await;
         }
