@@ -6,7 +6,7 @@ use futures::Stream;
 #[cfg(any(test, feature = "test"))]
 use futures::StreamExt as _;
 #[cfg(any(test, feature = "test"))]
-use metrics::histogram;
+use vector_common::histogram;
 use vector_buffers::EventCount;
 #[cfg(any(test, feature = "test"))]
 use vector_buffers::topology::channel::LimitedReceiver;

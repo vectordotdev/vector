@@ -1,6 +1,6 @@
 use std::{collections::HashMap, time::Duration};
 
-use metrics::histogram;
+use vector_common::histogram;
 use vector_buffers::topology::channel::LimitedReceiver;
 use vector_common::internal_event::DEFAULT_OUTPUT;
 

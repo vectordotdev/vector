@@ -95,30 +95,31 @@ mod tests {
 
     use super::*;
 
-    crate::registered_event!(
-        TestEvent {
-            fixed: String,
-            dynamic: String,
-        } => {
-            event: Counter = {
-                counter!("test_event_total", "fixed" => self.fixed, "dynamic" => self.dynamic)
-            },
-        }
-
-        fn emit(&self, count: u64) {
-            self.event.increment(count);
-        }
-
-        fn register(fixed: String, dynamic: String) {
-            crate::internal_event::register(TestEvent {
-                fixed,
-                dynamic,
-            })
-        }
-    );
-
     #[test]
+    #[allow(clippy::disallowed_macros)]
     fn test_fixed_tag() {
+        crate::registered_event!(
+            TestEvent {
+                fixed: String,
+                dynamic: String,
+            } => {
+                event: Counter = {
+                    counter!("test_event_total", "fixed" => self.fixed, "dynamic" => self.dynamic)
+                },
+            }
+
+            fn emit(&self, count: u64) {
+                self.event.increment(count);
+            }
+
+            fn register(fixed: String, dynamic: String) {
+                crate::internal_event::register(TestEvent {
+                    fixed,
+                    dynamic,
+                })
+            }
+        );
+
         let event: RegisteredEventCache<String, TestEvent> =
             RegisteredEventCache::new("fixed".to_string());
 
