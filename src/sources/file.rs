@@ -25,7 +25,7 @@ use vector_lib::{
 };
 use vrl::value::Kind;
 
-use super::util::{EncodingConfig, MultilineConfig};
+use super::util::{EncodingConfig, MultilineConfig, default_max_open_files};
 use crate::{
     SourceSender,
     config::{
@@ -243,6 +243,22 @@ pub struct FileConfig {
     #[configurable(metadata(docs::type_unit = "seconds"))]
     #[serde(default = "default_rotate_wait", rename = "rotate_wait_secs")]
     pub rotate_wait: Duration,
+
+    /// The maximum number of files that can be open simultaneously.
+    ///
+    /// When this limit is reached and a new file is discovered, the least recently
+    /// read file is closed to make room. The closed file's checkpoint is preserved,
+    /// so reading resumes from where it left off when the file is re-discovered.
+    ///
+    /// This helps prevent "Too many open files" (os error 24) errors when monitoring
+    /// directories with a large number of log files.
+    ///
+    /// If not set, there is no limit on the number of open files.
+    #[serde(default)]
+    #[configurable(metadata(docs::examples = 512))]
+    #[configurable(metadata(docs::examples = 1024))]
+    #[configurable(metadata(docs::human_name = "Maximum Open Files"))]
+    pub max_open_files: Option<usize>,
 }
 
 fn default_max_line_bytes() -> usize {
@@ -383,6 +399,7 @@ impl Default for FileConfig {
             log_namespace: None,
             internal_metrics: Default::default(),
             rotate_wait: default_rotate_wait(),
+            max_open_files: None,
         }
     }
 }
@@ -549,6 +566,7 @@ pub fn file_source(
         remove_after: config.remove_after_secs.map(Duration::from_secs),
         emitter,
         rotate_wait: config.rotate_wait,
+        max_open_files: config.max_open_files.or_else(default_max_open_files),
     };
 
     let event_metadata = EventMetadata {
@@ -2532,5 +2550,131 @@ mod tests {
             .map(Event::into_log)
             .map(|log| log.get_message().unwrap().clone())
             .collect()
+    }
+
+    #[tokio::test]
+    async fn test_max_open_files_eviction() {
+        let dir = tempdir().unwrap();
+        let config = file::FileConfig {
+            include: vec![dir.path().join("*")],
+            max_open_files: Some(2),
+            ..test_default_file_config(&dir)
+        };
+
+        let path1 = dir.path().join("file1");
+        let path2 = dir.path().join("file2");
+        let path3 = dir.path().join("file3");
+
+        let received = run_file_source(&config, false, NoAcks, LogNamespace::Legacy, async {
+            // Create and write to 2 files (at the limit)
+            let mut file1 = File::create(&path1).unwrap();
+            writeln!(&mut file1, "file1 first").unwrap();
+            file1.flush().unwrap();
+            sleep_500_millis().await;
+
+            let mut file2 = File::create(&path2).unwrap();
+            writeln!(&mut file2, "file2 first").unwrap();
+            file2.flush().unwrap();
+            sleep_500_millis().await;
+
+            // Write more to file2 so file1 becomes the least recently read
+            writeln!(&mut file2, "file2 second").unwrap();
+            file2.flush().unwrap();
+            sleep_500_millis().await;
+
+            // Create a 3rd file — should evict file1 (least recently read)
+            let mut file3 = File::create(&path3).unwrap();
+            writeln!(&mut file3, "file3 first").unwrap();
+            file3.flush().unwrap();
+            sleep_500_millis().await;
+
+            // Write more to file1 — it should be re-opened from checkpoint
+            writeln!(&mut file1, "file1 second").unwrap();
+            file1.flush().unwrap();
+            sleep_500_millis().await;
+        })
+        .await;
+
+        let lines = extract_messages_string(received);
+
+        // All lines from all files should be received — no data loss
+        assert!(
+            lines.contains(&"file1 first".to_string()),
+            "missing 'file1 first' in {lines:?}"
+        );
+        assert!(
+            lines.contains(&"file2 first".to_string()),
+            "missing 'file2 first' in {lines:?}"
+        );
+        assert!(
+            lines.contains(&"file2 second".to_string()),
+            "missing 'file2 second' in {lines:?}"
+        );
+        assert!(
+            lines.contains(&"file3 first".to_string()),
+            "missing 'file3 first' in {lines:?}"
+        );
+        assert!(
+            lines.contains(&"file1 second".to_string()),
+            "missing 'file1 second' in {lines:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_max_open_files_no_eviction_under_limit() {
+        let dir = tempdir().unwrap();
+        let config = file::FileConfig {
+            include: vec![dir.path().join("*")],
+            max_open_files: Some(5),
+            ..test_default_file_config(&dir)
+        };
+
+        let path1 = dir.path().join("file1");
+        let path2 = dir.path().join("file2");
+        let path3 = dir.path().join("file3");
+
+        let received = run_file_source(&config, false, NoAcks, LogNamespace::Legacy, async {
+            let mut file1 = File::create(&path1).unwrap();
+            let mut file2 = File::create(&path2).unwrap();
+            let mut file3 = File::create(&path3).unwrap();
+
+            writeln!(&mut file1, "hello from 1").unwrap();
+            writeln!(&mut file2, "hello from 2").unwrap();
+            writeln!(&mut file3, "hello from 3").unwrap();
+
+            file1.flush().unwrap();
+            file2.flush().unwrap();
+            file3.flush().unwrap();
+
+            sleep_500_millis().await;
+        })
+        .await;
+
+        // Under the limit — all files read normally, same as without max_open_files
+        let lines = extract_messages_string(received);
+        assert_eq!(lines.len(), 3);
+        assert!(lines.contains(&"hello from 1".to_string()));
+        assert!(lines.contains(&"hello from 2".to_string()));
+        assert!(lines.contains(&"hello from 3".to_string()));
+    }
+
+    #[test]
+    fn test_max_open_files_config_parsing() {
+        let config: FileConfig = toml::from_str(
+            r#"
+            include = [ "/var/log/**/*.log" ]
+            max_open_files = 512
+            "#,
+        )
+        .unwrap();
+        assert_eq!(config.max_open_files, Some(512));
+
+        let config: FileConfig = toml::from_str(
+            r#"
+            include = [ "/var/log/**/*.log" ]
+            "#,
+        )
+        .unwrap();
+        assert_eq!(config.max_open_files, None);
     }
 }

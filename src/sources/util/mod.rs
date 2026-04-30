@@ -76,6 +76,34 @@ pub use self::http::decompress_body;
 ))]
 pub use self::message_decoding::decode_message;
 
+/// Derive the default `max_open_files` limit from the current OS file descriptor limit.
+///
+/// Returns 80% of the current soft RLIMIT_NOFILE, leaving headroom for sinks,
+/// network connections, fingerprinting, and other non-file-source FD usage.
+/// Returns `None` on non-Unix platforms or if querying the limit fails.
+#[cfg(unix)]
+pub fn default_max_open_files() -> Option<usize> {
+    use nix::sys::resource::{Resource, getrlimit};
+
+    if let Ok((soft, _hard)) = getrlimit(Resource::RLIMIT_NOFILE) {
+        let limit = (soft as usize).saturating_mul(80) / 100;
+        if limit > 0 {
+            tracing::info!(
+                message = "Auto-configured max_open_files from OS file descriptor limit.",
+                rlimit_nofile = soft,
+                max_open_files = limit,
+            );
+            return Some(limit);
+        }
+    }
+    None
+}
+
+#[cfg(not(unix))]
+pub fn default_max_open_files() -> Option<usize> {
+    None
+}
+
 /// Extract a tag and it's value from input string delimited by a colon character.
 ///
 /// Note: the behavior of StatsD if more than one colon is found (which would presumably
@@ -96,5 +124,29 @@ pub fn extract_tag_key_and_value<S: AsRef<str>>(
         // the notation `tag:` is valid for StatsD. The effect is an empty string value.
         Some((prefix, suffix)) => (prefix.to_string(), TagValue::Value(suffix.to_string())),
         None => (tag_chunk.to_string(), TagValue::Bare),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[cfg(unix)]
+    fn test_default_max_open_files_returns_eighty_percent() {
+        use nix::sys::resource::{Resource, getrlimit};
+
+        let result = default_max_open_files();
+        let (soft, _hard) = getrlimit(Resource::RLIMIT_NOFILE).unwrap();
+        let expected = (soft as usize).saturating_mul(80) / 100;
+
+        assert_eq!(result, Some(expected));
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn test_default_max_open_files_is_some() {
+        // On any Unix system with a positive FD limit, this should return Some
+        assert!(default_max_open_files().is_some());
     }
 }
