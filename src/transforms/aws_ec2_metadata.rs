@@ -30,6 +30,7 @@ use crate::{
     config::{
         DataType, Input, OutputId, ProxyConfig, TransformConfig, TransformContext, TransformOutput,
     },
+    cpu_time::CpuTimedExt,
     event::Event,
     http::HttpClient,
     internal_events::{AwsEc2MetadataRefreshError, AwsEc2MetadataRefreshSuccessful},
@@ -237,10 +238,15 @@ impl TransformConfig for Ec2Metadata {
             }
         }
 
+        // The metadata-refresh loop runs as its own tokio task, so the main
+        // transform task's `.cpu_timed` wrapper does not see it. Wrap the
+        // background task with the same component-tagged counter so its CPU
+        // is attributed to this transform.
         tokio::spawn(
             async move {
                 client.run().await;
             }
+            .cpu_timed(context.cpu_ns.clone())
             // TODO: Once #1338 is done we can fetch the current span
             .instrument(info_span!("aws_ec2_metadata: worker").or_current()),
         );
