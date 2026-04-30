@@ -1,5 +1,4 @@
-use vector_common::counter;
-use vector_lib::{NamedInternalEvent, internal_event::InternalEvent};
+use vector_lib::{NamedInternalEvent, counter, internal_event::{InternalEvent, MetricName}};
 
 /// Emitted when rows are successfully loaded into Doris.
 #[derive(Debug, NamedInternalEvent)]

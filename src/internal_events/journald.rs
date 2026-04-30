@@ -1,8 +1,8 @@
-use vector_common::counter;
+use vector_lib::counter;
 use vector_lib::{
     NamedInternalEvent,
     codecs::decoding::BoxedFramingError,
-    internal_event::{InternalEvent, error_stage, error_type},
+    internal_event::{InternalEvent, MetricName, error_stage, error_type},
 };
 
 #[derive(Debug, NamedInternalEvent)]

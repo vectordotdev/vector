@@ -1,6 +1,5 @@
-use vector_common::counter;
-use vector_lib::NamedInternalEvent;
-use vector_lib::internal_event::InternalEvent;
+use vector_lib::{NamedInternalEvent, counter};
+use vector_lib::internal_event::{InternalEvent, MetricName};
 
 #[derive(Debug, NamedInternalEvent)]
 pub struct DecoderBomRemoval {

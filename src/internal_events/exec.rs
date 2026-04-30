@@ -1,14 +1,14 @@
 use std::time::Duration;
 
 use tokio::time::error::Elapsed;
-use vector_common::{counter, histogram};
 use vector_lib::{
     NamedInternalEvent,
     internal_event::{
-        ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+        ComponentEventsDropped, InternalEvent, MetricName, UNINTENTIONAL, error_stage, error_type,
     },
     json_size::JsonSize,
 };
+use vector_lib::{counter, histogram};
 
 use super::prelude::io_error_code;
 

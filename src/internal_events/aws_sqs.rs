@@ -2,9 +2,9 @@
 
 #[cfg(feature = "sources-aws_s3")]
 pub use s3::*;
-use vector_common::counter;
+use vector_lib::counter;
 #[cfg(any(feature = "sources-aws_s3", feature = "sources-aws_sqs"))]
-use vector_lib::internal_event::{error_stage, error_type};
+use vector_lib::internal_event::{MetricName, error_stage, error_type};
 use vector_lib::{NamedInternalEvent, internal_event::InternalEvent};
 
 #[cfg(feature = "sources-aws_s3")]
@@ -15,7 +15,7 @@ mod s3 {
         BatchResultErrorEntry, DeleteMessageBatchRequestEntry, DeleteMessageBatchResultEntry,
         SendMessageBatchRequestEntry, SendMessageBatchResultEntry,
     };
-    use vector_common::histogram;
+    use vector_lib::histogram;
 
     use super::*;
     use crate::sources::aws_s3::sqs::ProcessingError;

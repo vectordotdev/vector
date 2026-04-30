@@ -1,8 +1,8 @@
-use vector_common::counter;
+use vector_lib::counter;
 use vector_lib::{
     NamedInternalEvent,
     internal_event::{
-        ComponentEventsDropped, INTENTIONAL, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+        ComponentEventsDropped, INTENTIONAL, InternalEvent, MetricName, UNINTENTIONAL, error_stage, error_type,
     },
     json_size::JsonSize,
 };

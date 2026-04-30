@@ -1,11 +1,11 @@
 use std::time::Instant;
 
-use vector_common::{counter, histogram};
 use vector_lib::NamedInternalEvent;
 pub use vector_lib::internal_event::EventsReceived;
 use vector_lib::internal_event::{
-    ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+    ComponentEventsDropped, InternalEvent, MetricName, UNINTENTIONAL, error_stage, error_type,
 };
+use vector_lib::{counter, histogram};
 
 #[derive(Debug, NamedInternalEvent)]
 pub struct EndpointBytesReceived<'a> {

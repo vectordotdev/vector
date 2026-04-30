@@ -2,10 +2,9 @@
 
 use std::borrow::Cow;
 
-use vector_common::counter;
-use vector_lib::NamedInternalEvent;
+use vector_lib::{NamedInternalEvent, counter};
 use vector_lib::internal_event::{
-    ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+    ComponentEventsDropped, InternalEvent, MetricName, UNINTENTIONAL, error_stage, error_type,
 };
 
 fn truncate_string_at(s: &str, maxlen: usize) -> Cow<'_, str> {

@@ -1,12 +1,12 @@
 use std::{error::Error, time::Duration};
 
 use http::Response;
-use vector_common::{counter, histogram};
 use vector_lib::{
     NamedInternalEvent,
-    internal_event::{InternalEvent, error_stage, error_type},
+    internal_event::{InternalEvent, MetricName, error_stage, error_type},
     json_size::JsonSize,
 };
+use vector_lib::{counter, histogram};
 
 const HTTP_STATUS_LABEL: &str = "status";
 

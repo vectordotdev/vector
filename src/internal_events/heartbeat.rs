@@ -1,8 +1,7 @@
 use std::time::Instant;
 
-use vector_common::gauge;
-use vector_lib::NamedInternalEvent;
-use vector_lib::internal_event::InternalEvent;
+use vector_lib::{NamedInternalEvent, gauge};
+use vector_lib::internal_event::{InternalEvent, MetricName};
 
 use crate::built_info;
 

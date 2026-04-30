@@ -1,8 +1,8 @@
-/// Used in both `aws_kinesis_streams` and `aws_kinesis_firehose` sinks
-use vector_common::counter;
 use vector_lib::NamedInternalEvent;
+/// Used in both `aws_kinesis_streams` and `aws_kinesis_firehose` sinks
+use vector_lib::counter;
 use vector_lib::internal_event::{
-    ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+    ComponentEventsDropped, InternalEvent, MetricName, UNINTENTIONAL, error_stage, error_type,
 };
 
 #[derive(Debug, NamedInternalEvent)]

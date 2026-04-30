@@ -1,8 +1,8 @@
 use tracing::error;
-use vector_common::counter;
+use vector_lib::counter;
 use vector_lib::{
     NamedInternalEvent,
-    internal_event::{InternalEvent, error_stage, error_type},
+    internal_event::{InternalEvent, MetricName, error_stage, error_type},
 };
 
 #[derive(Debug, NamedInternalEvent)]

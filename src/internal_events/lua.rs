@@ -1,8 +1,8 @@
-use vector_common::{counter, gauge};
 use vector_lib::NamedInternalEvent;
 use vector_lib::internal_event::{
-    ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+    ComponentEventsDropped, InternalEvent, MetricName, UNINTENTIONAL, error_stage, error_type,
 };
+use vector_lib::{counter, gauge};
 
 use crate::transforms::lua::v2::BuildError;
 
