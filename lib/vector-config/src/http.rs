@@ -28,7 +28,6 @@ impl Configurable for StatusCode {
     fn metadata() -> Metadata {
         let mut metadata = Metadata::default();
         metadata.set_description("HTTP response status code");
-        metadata.set_default_value(StatusCode::OK);
         metadata.add_custom_attribute(CustomAttribute::kv(
             constants::DOCS_META_NUMERIC_TYPE,
             NumberClass::Unsigned,
