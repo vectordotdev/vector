@@ -1,0 +1,22 @@
+# E2E test: events-only throttle (per-service, threshold=20 per 60s window)
+sources:
+  http_in:
+    type: http_server
+    address: "0.0.0.0:9090"
+    encoding: json
+
+transforms:
+  throttle:
+    type: throttle
+    inputs: ["http_in"]
+    threshold: 20
+    window_secs: 60
+    key_field: "{{ service }}"
+
+sinks:
+  primary:
+    type: file
+    inputs: ["throttle"]
+    path: "/output/primary.log"
+    encoding:
+      codec: json

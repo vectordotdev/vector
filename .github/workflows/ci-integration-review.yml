@@ -198,7 +198,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        service: ["datadog-logs", "datadog-metrics", "opentelemetry-logs", "opentelemetry-metrics"]
+        service: ["datadog-logs", "datadog-metrics", "opentelemetry-logs", "opentelemetry-metrics", "throttle-transform"]
     steps:
       - name: Evaluate run condition
         id: run_condition
