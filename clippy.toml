@@ -9,9 +9,9 @@ disallowed-methods = [
 ]
 
 disallowed-macros = [
-  { path = "metrics::counter", reason = "Use the `counter!` macro from `vector_common` with a `MetricName` variant instead of a raw string." },
-  { path = "metrics::histogram", reason = "Use the `histogram!` macro from `vector_common` with a `MetricName` variant instead of a raw string." },
-  { path = "metrics::gauge", reason = "Use the `gauge!` macro from `vector_common` with a `MetricName` variant instead of a raw string." },
+  { path = "metrics::counter", reason = "Use the `counter!` macro from `vector_common` with a `CounterName` variant instead of a raw string." },
+  { path = "metrics::histogram", reason = "Use the `histogram!` macro from `vector_common` with a `HistogramName` variant instead of a raw string." },
+  { path = "metrics::gauge", reason = "Use the `gauge!` macro from `vector_common` with a `GaugeName` variant instead of a raw string." },
 ]
 
 disallowed-types = [
