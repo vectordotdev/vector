@@ -431,21 +431,20 @@ impl EventLogSubscription {
     /// Wait for events to become available on any channel, or for shutdown.
     ///
     /// Uses `WaitForMultipleObjects` via `spawn_blocking` to avoid blocking the
-    /// Tokio runtime. The wait array includes all channel signal events plus the
-    /// shutdown event.
+    /// Tokio runtime. The wait array puts shutdown first so a stop request wins
+    /// over any channel that is already signaled.
     pub fn wait_for_events_blocking(&self, timeout_ms: u32) -> WaitResult {
-        // Build wait handle array: [channel0_signal, channel1_signal, ..., shutdown_event]
-        let mut handles: Vec<HANDLE> = self.channels.iter().map(|c| c.signal_event).collect();
+        // Build wait handle array: [shutdown_event, channel0_signal, channel1_signal, ...]
+        let mut handles = Vec::with_capacity(self.channels.len() + 1);
         handles.push(self.shutdown_event);
+        handles.extend(self.channels.iter().map(|c| c.signal_event));
 
         let result = unsafe { WaitForMultipleObjects(&handles, false, timeout_ms) };
 
-        let shutdown_index = (self.channels.len()) as u32;
-
         match result {
             r if r == WAIT_TIMEOUT => WaitResult::Timeout,
-            r if r.0 < WAIT_OBJECT_0.0 + shutdown_index => WaitResult::EventsAvailable,
-            r if r.0 == WAIT_OBJECT_0.0 + shutdown_index => WaitResult::Shutdown,
+            r if r == WAIT_OBJECT_0 => WaitResult::Shutdown,
+            r if r.0 <= WAIT_OBJECT_0.0 + self.channels.len() as u32 => WaitResult::EventsAvailable,
             _ => {
                 // WAIT_FAILED or unexpected - treat as timeout to avoid tight loop
                 warn!(
@@ -1209,6 +1208,31 @@ mod tests {
         }
 
         drop(subscription);
+    }
+
+    /// Test that shutdown wins when both shutdown and channel handles are signaled.
+    #[tokio::test]
+    async fn test_shutdown_signal_takes_priority_over_channel_signal() {
+        let mut config = WindowsEventLogConfig::default();
+        config.channels = vec!["Application".to_string()];
+        config.event_timeout_ms = 500;
+
+        let (checkpointer, _temp_dir) = create_test_checkpointer().await;
+
+        let subscription = EventLogSubscription::new(&config, checkpointer, false)
+            .await
+            .expect("Subscription creation should succeed");
+
+        unsafe {
+            let handle = HANDLE(subscription.shutdown_event_raw());
+            let _ = SetEvent(handle);
+        }
+
+        let result = subscription.wait_for_events_blocking(0);
+        assert!(
+            matches!(result, WaitResult::Shutdown),
+            "shutdown should take priority over already-signaled channels"
+        );
     }
 
     /// Test pull_events with read_existing_events=true
