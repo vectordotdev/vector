@@ -441,6 +441,27 @@ mod tests {
         );
     }
 
+    /// Codecs other than `arrow_stream` must be rejected at parse time, since
+    /// `ClickhouseBatchEncoding` only exposes the `arrow_stream` variant.
+    #[cfg(feature = "codecs-parquet")]
+    #[test]
+    fn batch_encoding_rejects_unsupported_codec() {
+        let err = serde_yaml::from_str::<ClickhouseConfig>(
+            r#"
+            endpoint: http://localhost:8123
+            table: test_table
+            batch_encoding:
+              codec: parquet
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(
+            err.to_string().contains("parquet"),
+            "expected error to mention the offending codec, got: {err}"
+        );
+    }
+
     /// Helper to create a minimal ClickhouseConfig for testing
     fn create_test_config(
         format: Format,

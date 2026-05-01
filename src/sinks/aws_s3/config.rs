@@ -507,37 +507,27 @@ mod tests {
         );
     }
 
-    /// Parquet filename extension defaults to `.parquet` when not explicitly set.
+    /// Codecs other than `parquet` must be rejected at parse time, since
+    /// `S3BatchEncoding` only exposes the `parquet` variant.
     #[cfg(feature = "codecs-parquet")]
     #[test]
-    fn parquet_filename_extension_defaults_to_parquet() {
-        let config: S3SinkConfig = toml::from_str(
+    fn parquet_batch_encoding_rejects_unsupported_codec() {
+        let err = serde_yaml::from_str::<S3SinkConfig>(
             r#"
-            bucket = "test-bucket"
-            compression = "none"
-
-            [encoding]
-            codec = "text"
-
-            [batch_encoding]
-            codec = "parquet"
-            schema_mode = "auto_infer"
+            bucket: test-bucket
+            compression: none
+            encoding:
+              codec: text
+            batch_encoding:
+              codec: arrow_stream
             "#,
         )
-        .unwrap();
+        .unwrap_err();
 
         assert!(
-            config.filename_extension.is_none(),
-            "fixture must not set filename_extension"
+            err.to_string().contains("arrow_stream"),
+            "expected error to mention the offending codec, got: {err}"
         );
-
-        assert!(config.batch_encoding.is_some());
-        let extension = config
-            .filename_extension
-            .clone()
-            .or_else(|| Some("parquet".to_string()));
-
-        assert_eq!(extension.as_deref(), Some("parquet"));
     }
 
     /// Explicit filename_extension overrides the `.parquet` default.
