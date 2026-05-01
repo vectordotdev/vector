@@ -6,6 +6,7 @@ use dyn_clone::DynClone;
 use ordered_float::NotNan;
 use vector_lib::configurable::configurable_component;
 use vrl::path::OwnedTargetPath;
+use vrl::prelude::{Collection, Kind};
 
 use crate::event::{LogEvent, Value};
 
@@ -52,6 +53,74 @@ pub enum MergeStrategy {
 
     /// Create a flattened array of all unique values.
     FlatUnique,
+}
+
+impl MergeStrategy {
+    /// Returns the output [`Kind`] produced by applying this strategy to a field of `input_kind`.
+    ///
+    /// Undefined propagation from `input_kind` is handled internally: callers do not need to
+    /// apply it separately. If the input may be undefined, the output will also be undefined.
+    pub fn output_kind(&self, input_kind: &Kind) -> Kind {
+        let new_kind = match self {
+            // Does not change the type.
+            MergeStrategy::Discard | MergeStrategy::Retain => input_kind.clone(),
+            // Only produces a value if the field is numeric; non-numeric fields yield undefined.
+            MergeStrategy::Sum | MergeStrategy::Max | MergeStrategy::Min => {
+                match (input_kind.contains_integer(), input_kind.contains_float()) {
+                    (true, true) => Kind::float().or_integer(),
+                    (true, false) => Kind::integer(),
+                    (false, true) => Kind::float(),
+                    (false, false) => Kind::undefined(),
+                }
+            }
+            MergeStrategy::Array => {
+                Kind::array(Collection::empty().with_unknown(input_kind.clone()))
+            }
+            MergeStrategy::Concat => {
+                let mut new_kind = Kind::never();
+                if input_kind.contains_bytes() {
+                    new_kind.add_bytes();
+                }
+                if let Some(array) = input_kind.as_array() {
+                    let array_elements = array.reduced_kind().union(input_kind.without_array());
+                    new_kind.add_array(Collection::empty().with_unknown(array_elements));
+                }
+                new_kind
+            }
+            // Can only produce bytes; non-bytes fields yield undefined.
+            MergeStrategy::ConcatNewline | MergeStrategy::ConcatRaw => {
+                if input_kind.contains_bytes() {
+                    Kind::bytes()
+                } else {
+                    Kind::undefined()
+                }
+            }
+            MergeStrategy::ShortestArray | MergeStrategy::LongestArray => {
+                if let Some(array) = input_kind.as_array() {
+                    Kind::array(array.clone())
+                } else {
+                    Kind::undefined()
+                }
+            }
+            MergeStrategy::FlatUnique => {
+                let mut array_elements = input_kind.without_array().without_object();
+                if let Some(array) = input_kind.as_array() {
+                    array_elements = array_elements.union(array.reduced_kind());
+                }
+                if let Some(object) = input_kind.as_object() {
+                    array_elements = array_elements.union(object.reduced_kind());
+                }
+                Kind::array(Collection::empty().with_unknown(array_elements))
+            }
+        };
+
+        // All strategies are optional: they won't produce a value unless a value actually exists.
+        if input_kind.contains_undefined() {
+            new_kind.or_undefined()
+        } else {
+            new_kind
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -937,5 +1006,127 @@ mod test {
         let out_path = owned_event_path!("out");
         merger.insert_into(&out_path, &mut output)?;
         Ok(output.remove(&out_path).unwrap())
+    }
+
+    // output_kind tests — one per logical group of strategies
+
+    #[test]
+    fn output_kind_discard_retain_passthrough() {
+        for strategy in [MergeStrategy::Discard, MergeStrategy::Retain] {
+            assert_eq!(strategy.output_kind(&Kind::bytes()), Kind::bytes());
+            assert_eq!(strategy.output_kind(&Kind::integer()), Kind::integer());
+            assert_eq!(
+                strategy.output_kind(&Kind::bytes().or_integer()),
+                Kind::bytes().or_integer()
+            );
+        }
+    }
+
+    #[test]
+    fn output_kind_numeric_strategies() {
+        for strategy in [MergeStrategy::Sum, MergeStrategy::Max, MergeStrategy::Min] {
+            assert_eq!(strategy.output_kind(&Kind::integer()), Kind::integer());
+            assert_eq!(strategy.output_kind(&Kind::float()), Kind::float());
+            assert_eq!(
+                strategy.output_kind(&Kind::integer().or_float()),
+                Kind::float().or_integer()
+            );
+            assert_eq!(strategy.output_kind(&Kind::bytes()), Kind::undefined());
+        }
+    }
+
+    #[test]
+    fn output_kind_array_wraps_input() {
+        let result = MergeStrategy::Array.output_kind(&Kind::bytes());
+        let array = result
+            .as_array()
+            .expect("Array strategy should produce an array");
+        assert_eq!(array.reduced_kind(), Kind::bytes());
+    }
+
+    #[test]
+    fn output_kind_concat() {
+        let bytes_result = MergeStrategy::Concat.output_kind(&Kind::bytes());
+        assert!(bytes_result.contains_bytes());
+
+        let array_kind = Kind::array(Collection::empty().with_unknown(Kind::bytes()));
+        let array_result = MergeStrategy::Concat.output_kind(&array_kind);
+        assert!(array_result.as_array().is_some());
+
+        // mixed bytes + array: both branches execute and both are present in the output
+        let mut mixed_kind = Kind::bytes();
+        mixed_kind.add_array(Collection::empty().with_unknown(Kind::integer()));
+        let mixed_result = MergeStrategy::Concat.output_kind(&mixed_kind);
+        assert!(
+            mixed_result.contains_bytes(),
+            "Concat with bytes|array input should contain bytes"
+        );
+        assert!(
+            mixed_result.as_array().is_some(),
+            "Concat with bytes|array input should contain an array"
+        );
+    }
+
+    #[test]
+    fn output_kind_concat_newline_raw() {
+        for strategy in [MergeStrategy::ConcatNewline, MergeStrategy::ConcatRaw] {
+            assert_eq!(strategy.output_kind(&Kind::bytes()), Kind::bytes());
+            assert_eq!(strategy.output_kind(&Kind::integer()), Kind::undefined());
+            // non-bytes input that also carries undefined still collapses to undefined
+            assert_eq!(
+                strategy.output_kind(&Kind::integer().or_undefined()),
+                Kind::undefined()
+            );
+        }
+    }
+
+    #[test]
+    fn output_kind_shortest_longest_array() {
+        for strategy in [MergeStrategy::ShortestArray, MergeStrategy::LongestArray] {
+            let array_kind = Kind::array(Collection::empty().with_unknown(Kind::integer()));
+            assert!(strategy.output_kind(&array_kind).as_array().is_some());
+            assert_eq!(strategy.output_kind(&Kind::bytes()), Kind::undefined());
+        }
+    }
+
+    #[test]
+    fn output_kind_flat_unique_produces_array() {
+        // bare scalar: elements drawn from the scalar type
+        let result = MergeStrategy::FlatUnique.output_kind(&Kind::integer());
+        assert!(result.as_array().is_some());
+
+        // array input: elements include the array's element kind
+        let array_kind = Kind::array(Collection::empty().with_unknown(Kind::bytes()));
+        let result = MergeStrategy::FlatUnique.output_kind(&array_kind);
+        assert!(result.as_array().is_some());
+
+        // object input: elements include the object's value kind
+        let object_kind = Kind::object(Collection::empty().with_unknown(Kind::float()));
+        let result = MergeStrategy::FlatUnique.output_kind(&object_kind);
+        assert!(result.as_array().is_some());
+    }
+
+    #[test]
+    fn output_kind_preserves_undefined() {
+        let input = Kind::bytes().or_undefined();
+        for strategy in [
+            MergeStrategy::Discard,
+            MergeStrategy::Retain,
+            MergeStrategy::Sum,
+            MergeStrategy::Max,
+            MergeStrategy::Min,
+            MergeStrategy::Array,
+            MergeStrategy::Concat,
+            MergeStrategy::ConcatNewline,
+            MergeStrategy::ConcatRaw,
+            MergeStrategy::ShortestArray,
+            MergeStrategy::LongestArray,
+            MergeStrategy::FlatUnique,
+        ] {
+            assert!(
+                strategy.output_kind(&input).contains_undefined(),
+                "{strategy:?} should preserve undefined in output"
+            );
+        }
     }
 }

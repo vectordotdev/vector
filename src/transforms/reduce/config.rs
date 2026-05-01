@@ -5,7 +5,7 @@ use serde_with::serde_as;
 use vector_lib::configurable::configurable_component;
 use vrl::{
     path::{PathPrefix, parse_target_path},
-    prelude::{Collection, KeyString, Kind},
+    prelude::KeyString,
 };
 
 use crate::{
@@ -154,71 +154,7 @@ impl TransformConfig for ReduceConfig {
                 PathPrefix::Metadata => schema_definition.metadata_kind().at_path(&key.path),
             };
 
-            let new_kind = match merge_strategy {
-                MergeStrategy::Discard | MergeStrategy::Retain => {
-                    /* does not change the type */
-                    input_kind.clone()
-                }
-                MergeStrategy::Sum | MergeStrategy::Max | MergeStrategy::Min => {
-                    // only keeps integer / float values
-                    match (input_kind.contains_integer(), input_kind.contains_float()) {
-                        (true, true) => Kind::float().or_integer(),
-                        (true, false) => Kind::integer(),
-                        (false, true) => Kind::float(),
-                        (false, false) => Kind::undefined(),
-                    }
-                }
-                MergeStrategy::Array => {
-                    let unknown_kind = input_kind.clone();
-                    Kind::array(Collection::empty().with_unknown(unknown_kind))
-                }
-                MergeStrategy::Concat => {
-                    let mut new_kind = Kind::never();
-
-                    if input_kind.contains_bytes() {
-                        new_kind.add_bytes();
-                    }
-                    if let Some(array) = input_kind.as_array() {
-                        // array elements can be either any type that the field can be, or any
-                        // element of the array
-                        let array_elements = array.reduced_kind().union(input_kind.without_array());
-                        new_kind.add_array(Collection::empty().with_unknown(array_elements));
-                    }
-                    new_kind
-                }
-                MergeStrategy::ConcatNewline | MergeStrategy::ConcatRaw => {
-                    // can only produce bytes (or undefined)
-                    if input_kind.contains_bytes() {
-                        Kind::bytes()
-                    } else {
-                        Kind::undefined()
-                    }
-                }
-                MergeStrategy::ShortestArray | MergeStrategy::LongestArray => {
-                    if let Some(array) = input_kind.as_array() {
-                        Kind::array(array.clone())
-                    } else {
-                        Kind::undefined()
-                    }
-                }
-                MergeStrategy::FlatUnique => {
-                    let mut array_elements = input_kind.without_array().without_object();
-                    if let Some(array) = input_kind.as_array() {
-                        array_elements = array_elements.union(array.reduced_kind());
-                    }
-                    if let Some(object) = input_kind.as_object() {
-                        array_elements = array_elements.union(object.reduced_kind());
-                    }
-                    Kind::array(Collection::empty().with_unknown(array_elements))
-                }
-            };
-
-            // all of the merge strategies are optional. They won't produce a value unless a value actually exists
-            let new_kind = if input_kind.contains_undefined() {
-                new_kind.or_undefined()
-            } else {
-                new_kind
-            };
+            let new_kind = merge_strategy.output_kind(&input_kind);
 
             schema_definition = schema_definition.with_field(&key, new_kind, None);
         }
