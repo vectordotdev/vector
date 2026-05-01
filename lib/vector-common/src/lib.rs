@@ -67,10 +67,6 @@ pub mod trigger;
 extern crate tracing;
 
 /// Typed wrapper around `metrics::counter!` that only accepts [`internal_event::CounterName`].
-///
-/// Prevents raw string literals from being used as metric names — all metric
-/// names must go through the typed enums so they are discoverable and
-/// exposable via the API.
 #[macro_export]
 macro_rules! counter {
     ($name:expr) => {{
