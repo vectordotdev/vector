@@ -449,9 +449,8 @@ mod tests {
             retry_strategy: Default::default(),
         };
 
-        let super::S3BatchEncoding::Parquet(parquet_config) =
-            config.batch_encoding.as_ref().unwrap();
-        let batch_config = BatchSerializerConfig::Parquet(parquet_config.clone());
+        let super::S3BatchEncoding::Parquet(p) = config.batch_encoding.as_ref().unwrap();
+        let batch_config = BatchSerializerConfig::Parquet(p.clone());
         let batch_serializer = batch_config.build_batch_serializer().unwrap();
         let batch_encoder = vector_lib::codecs::BatchEncoder::new(batch_serializer);
 
@@ -491,10 +490,8 @@ mod tests {
         )
         .unwrap();
 
-        let super::S3BatchEncoding::Parquet(parquet_config) =
-            config.batch_encoding.as_ref().unwrap();
-        let batch_config =
-            vector_lib::codecs::encoding::BatchSerializerConfig::Parquet(parquet_config.clone());
+        let super::S3BatchEncoding::Parquet(p) = config.batch_encoding.as_ref().unwrap();
+        let batch_config = vector_lib::codecs::encoding::BatchSerializerConfig::Parquet(p.clone());
         let batch_serializer = batch_config.build_batch_serializer().unwrap();
         let batch_encoder = vector_lib::codecs::BatchEncoder::new(batch_serializer);
 
