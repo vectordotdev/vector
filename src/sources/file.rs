@@ -25,7 +25,7 @@ use vector_lib::{
 };
 use vrl::value::Kind;
 
-use super::util::{EncodingConfig, MultilineConfig};
+use super::util::{EncodingConfig, MultilineConfig, default_max_open_files};
 use crate::{
     SourceSender,
     config::{
@@ -243,6 +243,18 @@ pub struct FileConfig {
     #[configurable(metadata(docs::type_unit = "seconds"))]
     #[serde(default = "default_rotate_wait", rename = "rotate_wait_secs")]
     pub rotate_wait: Duration,
+
+    /// Maximum number of files to keep open simultaneously.
+    ///
+    /// When the limit is reached, the least recently read file is closed with its
+    /// checkpoint preserved, so no data is lost when the file is re-discovered later.
+    ///
+    /// If not set, Vector auto-derives a default from the OS file descriptor limit
+    /// (80% of RLIMIT_NOFILE on Unix). Set to `0` to disable the limit entirely.
+    #[serde(default)]
+    #[configurable(metadata(docs::examples = 512))]
+    #[configurable(metadata(docs::examples = 8192))]
+    pub max_open_files: Option<usize>,
 }
 
 fn default_max_line_bytes() -> usize {
@@ -383,6 +395,7 @@ impl Default for FileConfig {
             log_namespace: None,
             internal_metrics: Default::default(),
             rotate_wait: default_rotate_wait(),
+            max_open_files: None,
         }
     }
 }
@@ -549,6 +562,7 @@ pub fn file_source(
         remove_after: config.remove_after_secs.map(Duration::from_secs),
         emitter,
         rotate_wait: config.rotate_wait,
+        max_open_files: config.max_open_files.or_else(default_max_open_files),
     };
 
     let event_metadata = EventMetadata {

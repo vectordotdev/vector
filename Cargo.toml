@@ -465,7 +465,7 @@ quick-xml = { version = "0.31", default-features = false, features = ["serialize
 rdkafka = { workspace = true, features = ["cmake_build"], optional = true }
 
 [target.'cfg(unix)'.dependencies]
-nix = { version = "0.31", default-features = false, features = ["socket", "signal", "fs"] }
+nix = { version = "0.31", default-features = false, features = ["socket", "signal", "fs", "resource"] }
 tikv-jemallocator = { version = "0.6.0", default-features = false, features = ["unprefixed_malloc_on_supported_platforms"], optional = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
