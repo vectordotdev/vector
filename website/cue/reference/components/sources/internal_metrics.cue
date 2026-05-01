@@ -559,37 +559,73 @@ components: sources: internal_metrics: {
 			description:       "Total number of messages transmitted (produced) to Kafka brokers."
 			type:              "counter"
 			default_namespace: "vector"
-			tags:              _component_tags
+			tags: _component_tags & {
+				topic: {
+					description: "The Kafka topic."
+					required:    true
+				}
+				partition: {
+					description: "The Kafka partition."
+					required:    true
+				}
+			}
 		}
 		kafka_produced_messages_bytes_total: {
 			description:       "Total number of message bytes (including framing, such as per-Message framing and MessageSet/batch framing) transmitted to Kafka brokers."
 			type:              "counter"
 			default_namespace: "vector"
-			tags:              _component_tags
+			tags: _component_tags & {
+				topic: {
+					description: "The Kafka topic."
+					required:    true
+				}
+				partition: {
+					description: "The Kafka partition."
+					required:    true
+				}
+			}
 		}
 		kafka_consumed_messages_total: {
 			description:       "Total number of messages consumed, not including ignored messages (due to offset, etc), from Kafka brokers."
 			type:              "counter"
 			default_namespace: "vector"
-			tags:              _component_tags
+			tags: _component_tags & {
+				topic: {
+					description: "The Kafka topic."
+					required:    true
+				}
+				partition: {
+					description: "The Kafka partition."
+					required:    true
+				}
+			}
 		}
 		kafka_consumed_messages_bytes_total: {
 			description:       "Total number of message bytes (including framing) received from Kafka brokers."
 			type:              "counter"
 			default_namespace: "vector"
-			tags:              _component_tags
+			tags: _component_tags & {
+				topic: {
+					description: "The Kafka topic."
+					required:    true
+				}
+				partition: {
+					description: "The Kafka partition."
+					required:    true
+				}
+			}
 		}
 		kafka_consumer_lag: {
 			description:       "The Kafka consumer lag."
 			type:              "gauge"
 			default_namespace: "vector"
 			tags: _component_tags & {
-				topic_id: {
-					description: "The Kafka topic id."
+				topic: {
+					description: "The Kafka topic."
 					required:    true
 				}
-				partition_id: {
-					description: "The Kafka partition id."
+				partition: {
+					description: "The Kafka partition."
 					required:    true
 				}
 			}
