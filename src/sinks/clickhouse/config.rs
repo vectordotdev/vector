@@ -46,8 +46,6 @@ pub enum Format {
 }
 
 /// Batch encoding configuration for the `clickhouse` sink.
-///
-/// ClickHouse only supports the `arrow_stream` codec for batch encoding.
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(tag = "codec", rename_all = "snake_case")]
@@ -123,8 +121,6 @@ pub struct ClickhouseConfig {
     ///
     /// When specified, events are encoded together as a single batch.
     /// This is mutually exclusive with per-event encoding based on the `format` field.
-    ///
-    /// Only the `arrow_stream` codec is supported by the ClickHouse sink.
     #[configurable(derived)]
     #[serde(default)]
     pub batch_encoding: Option<ClickhouseBatchEncoding>,
