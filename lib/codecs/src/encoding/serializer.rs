@@ -6,6 +6,8 @@ use vector_core::{config::DataType, event::Event, schema};
 
 #[cfg(feature = "arrow")]
 use super::format::{ArrowStreamSerializer, ArrowStreamSerializerConfig};
+#[cfg(feature = "avro")]
+use super::format::{AvroSerializer, AvroSerializerConfig, AvroSerializerOptions};
 #[cfg(feature = "opentelemetry")]
 use super::format::{OtlpSerializer, OtlpSerializerConfig};
 #[cfg(feature = "parquet")]
@@ -15,8 +17,7 @@ use super::format::{SyslogSerializer, SyslogSerializerConfig};
 use super::{
     chunking::Chunker,
     format::{
-        AvroSerializer, AvroSerializerConfig, AvroSerializerOptions, CefSerializer,
-        CefSerializerConfig, CsvSerializer, CsvSerializerConfig, GelfSerializer,
+        CefSerializer, CefSerializerConfig, CsvSerializer, CsvSerializerConfig, GelfSerializer,
         GelfSerializerConfig, JsonSerializer, JsonSerializerConfig, LogfmtSerializer,
         LogfmtSerializerConfig, NativeJsonSerializer, NativeJsonSerializerConfig, NativeSerializer,
         NativeSerializerConfig, ProtobufSerializer, ProtobufSerializerConfig, RawMessageSerializer,
@@ -37,6 +38,7 @@ pub enum SerializerConfig {
     /// Encodes an event as an [Apache Avro][apache_avro] message.
     ///
     /// [apache_avro]: https://avro.apache.org/
+    #[cfg(feature = "avro")]
     Avro {
         /// Apache Avro-specific encoder options.
         avro: AvroSerializerOptions,
@@ -210,6 +212,7 @@ impl BatchSerializerConfig {
     }
 }
 
+#[cfg(feature = "avro")]
 impl From<AvroSerializerConfig> for SerializerConfig {
     fn from(config: AvroSerializerConfig) -> Self {
         Self::Avro { avro: config.avro }
@@ -287,6 +290,7 @@ impl SerializerConfig {
     /// Build the `Serializer` from this configuration.
     pub fn build(&self) -> Result<Serializer, Box<dyn std::error::Error + Send + Sync + 'static>> {
         match self {
+            #[cfg(feature = "avro")]
             SerializerConfig::Avro { avro } => Ok(Serializer::Avro(
                 AvroSerializerConfig::new(avro.schema.clone()).build()?,
             )),
@@ -327,7 +331,11 @@ impl SerializerConfig {
             // we should do so accurately, even if practically it doesn't need to be.
             //
             // [1]: https://avro.apache.org/docs/1.11.1/specification/_print/#message-framing
-            SerializerConfig::Avro { .. } | SerializerConfig::Native => {
+            #[cfg(feature = "avro")]
+            SerializerConfig::Avro { .. } => {
+                FramingConfig::LengthDelimited(LengthDelimitedEncoderConfig::default())
+            }
+            SerializerConfig::Native => {
                 FramingConfig::LengthDelimited(LengthDelimitedEncoderConfig::default())
             }
             #[cfg(feature = "opentelemetry")]
@@ -353,6 +361,7 @@ impl SerializerConfig {
     /// The data type of events that are accepted by this `Serializer`.
     pub fn input_type(&self) -> DataType {
         match self {
+            #[cfg(feature = "avro")]
             SerializerConfig::Avro { avro } => {
                 AvroSerializerConfig::new(avro.schema.clone()).input_type()
             }
@@ -376,6 +385,7 @@ impl SerializerConfig {
     /// The schema required by the serializer.
     pub fn schema_requirement(&self) -> schema::Requirement {
         match self {
+            #[cfg(feature = "avro")]
             SerializerConfig::Avro { avro } => {
                 AvroSerializerConfig::new(avro.schema.clone()).schema_requirement()
             }
@@ -401,6 +411,7 @@ impl SerializerConfig {
 #[derive(Debug, Clone)]
 pub enum Serializer {
     /// Uses an `AvroSerializer` for serialization.
+    #[cfg(feature = "avro")]
     Avro(AvroSerializer),
     /// Uses a `CefSerializer` for serialization.
     Cef(CefSerializer),
@@ -435,14 +446,15 @@ impl Serializer {
     pub fn supports_json(&self) -> bool {
         match self {
             Serializer::Json(_) | Serializer::NativeJson(_) | Serializer::Gelf(_) => true,
-            Serializer::Avro(_)
-            | Serializer::Cef(_)
+            Serializer::Cef(_)
             | Serializer::Csv(_)
             | Serializer::Logfmt(_)
             | Serializer::Text(_)
             | Serializer::Native(_)
             | Serializer::Protobuf(_)
             | Serializer::RawMessage(_) => false,
+            #[cfg(feature = "avro")]
+            Serializer::Avro(_) => false,
             #[cfg(feature = "syslog")]
             Serializer::Syslog(_) => false,
             #[cfg(feature = "opentelemetry")]
@@ -461,14 +473,17 @@ impl Serializer {
             Serializer::Gelf(serializer) => serializer.to_json_value(event),
             Serializer::Json(serializer) => serializer.to_json_value(event),
             Serializer::NativeJson(serializer) => serializer.to_json_value(event),
-            Serializer::Avro(_)
-            | Serializer::Cef(_)
+            Serializer::Cef(_)
             | Serializer::Csv(_)
             | Serializer::Logfmt(_)
             | Serializer::Text(_)
             | Serializer::Native(_)
             | Serializer::Protobuf(_)
             | Serializer::RawMessage(_) => {
+                panic!("Serializer does not support JSON")
+            }
+            #[cfg(feature = "avro")]
+            Serializer::Avro(_) => {
                 panic!("Serializer does not support JSON")
             }
             #[cfg(feature = "syslog")]
@@ -496,10 +511,9 @@ impl Serializer {
     /// while text serializers produce UTF-8 encoded strings.
     pub const fn is_binary(&self) -> bool {
         match self {
-            Serializer::RawMessage(_)
-            | Serializer::Avro(_)
-            | Serializer::Native(_)
-            | Serializer::Protobuf(_) => true,
+            Serializer::RawMessage(_) | Serializer::Native(_) | Serializer::Protobuf(_) => true,
+            #[cfg(feature = "avro")]
+            Serializer::Avro(_) => true,
             #[cfg(feature = "opentelemetry")]
             Serializer::Otlp(_) => true,
             #[cfg(feature = "syslog")]
@@ -515,6 +529,7 @@ impl Serializer {
     }
 }
 
+#[cfg(feature = "avro")]
 impl From<AvroSerializer> for Serializer {
     fn from(serializer: AvroSerializer) -> Self {
         Self::Avro(serializer)
@@ -599,6 +614,7 @@ impl tokio_util::codec::Encoder<Event> for Serializer {
 
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         match self {
+            #[cfg(feature = "avro")]
             Serializer::Avro(serializer) => serializer.encode(event, buffer),
             Serializer::Cef(serializer) => serializer.encode(event, buffer),
             Serializer::Csv(serializer) => serializer.encode(event, buffer),

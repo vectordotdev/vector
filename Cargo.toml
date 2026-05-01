@@ -520,7 +520,7 @@ vendored = ["rdkafka?/gssapi-vendored"]
 
 # Default features for *-pc-windows-msvc
 # TODO: Enable SASL https://github.com/vectordotdev/vector/pull/3081#issuecomment-659298042
-base = ["api", "enrichment-tables", "sinks", "sources", "transforms", "secrets", "vrl/stdlib", "codecs-parquet"]
+base = ["api", "enrichment-tables", "sinks", "sources", "transforms", "secrets", "vrl/stdlib", "codecs-avro", "codecs-parquet"]
 enable-api-client = ["base", "api-client"]
 enable-unix = ["enable-api-client", "sources-dnstap", "unix"]
 
@@ -618,6 +618,7 @@ enrichment-tables-memory = ["dep:evmap", "dep:evmap-derive", "dep:thread_local"]
 
 # Codecs
 codecs-arrow = ["dep:arrow", "dep:arrow-schema", "vector-lib/arrow"]
+codecs-avro = ["vector-lib/avro"]
 codecs-parquet = ["dep:parquet", "codecs-arrow", "vector-lib/parquet"]
 codecs-opentelemetry = ["vector-lib/opentelemetry"]
 codecs-syslog = ["vector-lib/syslog"]
@@ -729,7 +730,7 @@ sources-prometheus = ["sources-prometheus-scrape", "sources-prometheus-remote-wr
 sources-prometheus-scrape = ["sinks-prometheus", "sources-utils-http-client", "vector-lib/prometheus"]
 sources-prometheus-remote-write = ["sinks-prometheus", "sources-utils-http", "vector-lib/prometheus"]
 sources-prometheus-pushgateway = ["sinks-prometheus", "sources-utils-http", "vector-lib/prometheus"]
-sources-pulsar = ["dep:apache-avro", "dep:pulsar"]
+sources-pulsar = ["dep:apache-avro", "dep:pulsar", "codecs-avro"]
 sources-redis = ["dep:redis"]
 sources-socket = ["sources-utils-net", "tokio-util/net"]
 sources-splunk_hec = ["dep:roaring"]
@@ -922,7 +923,7 @@ sinks-opentelemetry = ["sinks-http", "codecs-opentelemetry"]
 sinks-papertrail = ["dep:syslog"]
 sinks-prometheus = ["dep:base64", "dep:prost", "vector-lib/prometheus"]
 sinks-postgres = ["dep:sqlx"]
-sinks-pulsar = ["dep:apache-avro", "dep:pulsar"]
+sinks-pulsar = ["dep:apache-avro", "dep:pulsar", "codecs-avro"]
 sinks-redis = ["dep:redis"]
 sinks-sematext = ["sinks-elasticsearch", "sinks-influxdb"]
 sinks-socket = ["sinks-utils-udp"]
