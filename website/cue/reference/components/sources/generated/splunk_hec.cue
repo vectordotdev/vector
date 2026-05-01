@@ -77,12 +77,10 @@ generated: components: sources: splunk_hec: configuration: {
 			Codec configuration applied to events received on `/services/collector/event`.
 
 			When `decoding` is set, Vector applies a second decoding pass after the HEC
-			envelope is parsed: the envelope's `event` field is fed through the codec
-			(string contents are passed as raw bytes; objects, arrays, and other JSON
-			values are JSON-serialized first to preserve shape), and a single envelope
-			can fan out to multiple events. Decode failures are swallowed and do not
-			return an error to the Splunk client. When unset, the endpoint preserves its
-			existing behavior.
+			envelope is parsed: the envelope's `event` field is fed through the codec,
+			and a single envelope can fan out to multiple events. Decode failures are
+			swallowed and do not return an error to the Splunk client. When unset, the
+			endpoint preserves its existing behavior.
 
 			The VRL codec has access to HEC envelope metadata
 			(host, sourcetype, channel, etc.) and the authentication token via
