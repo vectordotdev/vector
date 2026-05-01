@@ -2,6 +2,7 @@ use std::{
     collections::HashMap,
     convert::TryFrom,
     future::ready,
+    path::PathBuf,
     pin::Pin,
     sync::{Arc, LazyLock},
     time::Duration,
@@ -46,17 +47,21 @@ use crate::{
     docker::{DockerTlsConfig, docker},
     event::{self, EstimatedJsonEncodedSizeOf, LogEvent, Value, merge_state::LogEventMergeState},
     internal_events::{
-        DockerLogsCommunicationError, DockerLogsContainerEventReceived,
-        DockerLogsContainerMetadataFetchError, DockerLogsContainerUnwatch,
-        DockerLogsContainerWatch, DockerLogsEventsReceived,
+        DockerLogsCheckpointWriteError, DockerLogsCommunicationError,
+        DockerLogsContainerEventReceived, DockerLogsContainerMetadataFetchError,
+        DockerLogsContainerUnwatch, DockerLogsContainerWatch, DockerLogsEventsReceived,
         DockerLogsLoggingDriverUnsupportedError, DockerLogsTimestampParseError, StreamClosedError,
     },
     line_agg::{self, LineAgg},
     shutdown::ShutdownSignal,
 };
 
+mod checkpointer;
+
 #[cfg(test)]
 mod tests;
+
+use checkpointer::{Checkpointer, CheckpointsView};
 
 const IMAGE: &str = "image";
 const CREATED_AT: &str = "container_created_at";
@@ -65,6 +70,7 @@ const STREAM: &str = "stream";
 const CONTAINER: &str = "container_id";
 // Prevent short hostname from being wrongly recognized as a container's short ID.
 const MIN_HOSTNAME_LENGTH: usize = 6;
+const CHECKPOINT_FLUSH_INTERVAL: Duration = Duration::from_secs(5);
 
 static STDERR: LazyLock<Bytes> = LazyLock::new(|| "stderr".into());
 static STDOUT: LazyLock<Bytes> = LazyLock::new(|| "stdout".into());
@@ -172,6 +178,26 @@ pub struct DockerLogsConfig {
     #[configurable(derived)]
     tls: Option<DockerTlsConfig>,
 
+    /// Only include entries that appended to the journal after the entries have been read.
+    ///
+    /// When `false` (the default), Vector reads all available historical logs from Docker
+    /// on first start (when no checkpoint exists). When `true`, Vector only captures logs
+    /// produced after it starts. On subsequent restarts, Vector always resumes from its
+    /// last checkpoint regardless of this setting.
+    #[serde(default)]
+    since_now: bool,
+
+    /// The directory used to persist file checkpoint positions.
+    ///
+    /// By default, the [global `data_dir` option][global_data_dir] is used.
+    /// Make sure the running user has write permissions to this directory.
+    ///
+    /// [global_data_dir]: https://vector.dev/docs/reference/configuration/global-options/#data_dir
+    #[serde(default)]
+    #[configurable(metadata(docs::examples = "/var/lib/vector"))]
+    #[configurable(metadata(docs::human_name = "Data Directory"))]
+    data_dir: Option<PathBuf>,
+
     /// The namespace to use for logs. This overrides the global setting.
     #[serde(default)]
     #[configurable(metadata(docs::hidden))]
@@ -192,6 +218,8 @@ impl Default for DockerLogsConfig {
             auto_partial_merge: true,
             multiline: None,
             retry_backoff_secs: default_retry_backoff_secs(),
+            since_now: false,
+            data_dir: None,
             log_namespace: None,
         }
     }
@@ -248,11 +276,21 @@ impl_generate_config_from_default!(DockerLogsConfig);
 impl SourceConfig for DockerLogsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
+
+        let data_dir = cx
+            .globals
+            .resolve_and_make_data_subdir(self.data_dir.as_ref(), cx.key.id())?;
+
+        let checkpointer = Checkpointer::new(&data_dir);
+        checkpointer.read_checkpoints();
+        let checkpoint_view = checkpointer.view();
+
         let source = DockerLogsSource::new(
             self.clone().with_empty_partial_event_marker_field_as_none(),
             cx.out,
             cx.shutdown.clone(),
             log_namespace,
+            Arc::clone(&checkpoint_view),
         )?;
 
         // Capture currently running containers, and do main future(run)
@@ -271,10 +309,33 @@ impl SourceConfig for DockerLogsConfig {
         let shutdown = cx.shutdown;
         // Once this ShutdownSignal resolves it will drop DockerLogsSource and by extension it's ShutdownSignal.
         Ok(Box::pin(async move {
-            Ok(tokio::select! {
+            // Write checkpoint at regular interval to not start from scratch in case of improper
+            // shutdown.
+            let checkpoint_shutdown = shutdown.clone();
+            let checkpoint_task = tokio::spawn(async move {
+                let mut interval = tokio::time::interval(CHECKPOINT_FLUSH_INTERVAL);
+                loop {
+                    let done = tokio::select! {
+                        _ = interval.tick() => false,
+                        _ = checkpoint_shutdown.clone() => true,
+                    };
+                    if let Err(error) = checkpointer.write_checkpoints().await {
+                        emit!(DockerLogsCheckpointWriteError { error });
+                    }
+                    if done {
+                        break;
+                    }
+                }
+            });
+
+            tokio::select! {
                 _ = fut => {}
                 _ = shutdown => {}
-            })
+            };
+
+            // Wait for checkpoint task to finish its final flush.
+            _ = checkpoint_task.await;
+            Ok(())
         }))
     }
 
@@ -385,12 +446,15 @@ impl DockerLogsSourceCore {
         // ?      Otherwise connects to unix socket which requires sudo privileges, or docker group membership.
         let docker = docker(config.docker_host.clone(), config.tls.clone())?;
 
-        // Only log events created at-or-after this moment are logged.
         let now = Local::now();
-        info!(
-            message = "Capturing logs from now on.",
-            now = %now.to_rfc3339()
-        );
+        if config.since_now {
+            info!(
+                message = "Capturing logs from now on.",
+                now = %now.to_rfc3339()
+            );
+        } else {
+            info!(message = "Capturing all available logs.");
+        }
 
         let line_agg_config = if let Some(ref multiline_config) = config.multiline {
             Some(line_agg::Config::try_from(multiline_config)?)
@@ -479,6 +543,7 @@ impl DockerLogsSource {
         out: SourceSender,
         shutdown: ShutdownSignal,
         log_namespace: LogNamespace,
+        checkpoints: Arc<CheckpointsView>,
     ) -> crate::Result<DockerLogsSource> {
         let backoff_secs = config.retry_backoff_secs;
 
@@ -515,6 +580,7 @@ impl DockerLogsSource {
             main_send,
             shutdown,
             log_namespace,
+            checkpoints,
         };
 
         Ok(DockerLogsSource {
@@ -592,6 +658,9 @@ impl DockerLogsSource {
                 value = self.main_recv.recv() => {
                     match value {
                         Some(Ok(info)) => {
+                            if let Some((timestamp, _)) = info.last_log.as_ref() {
+                                self.esb.checkpoints.update(info.id.as_str(), *timestamp);
+                            }
                             let state = self
                                 .containers
                                 .get_mut(&info.id)
@@ -734,6 +803,8 @@ struct EventStreamBuilder {
     /// Self and event streams will end on this.
     shutdown: ShutdownSignal,
     log_namespace: LogNamespace,
+    /// Checkpoint view for persisting log positions
+    checkpoints: Arc<CheckpointsView>,
 }
 
 impl EventStreamBuilder {
@@ -754,7 +825,14 @@ impl EventStreamBuilder {
                 {
                     Ok(details) => match ContainerMetadata::from_details(details) {
                         Ok(metadata) => {
-                            let info = ContainerLogInfo::new(id, metadata, this.core.now_timestamp);
+                            let created = if let Some(ts) = this.checkpoints.get(id.as_str()) {
+                                ts.with_timezone(&Utc)
+                            } else if this.core.config.since_now {
+                                this.core.now_timestamp
+                            } else {
+                                DateTime::<Utc>::default()
+                            };
+                            let info = ContainerLogInfo::new(id, metadata, created);
                             this.run_event_stream(info).await;
                             return;
                         }
@@ -877,6 +955,11 @@ impl EventStreamBuilder {
         emit!(DockerLogsContainerUnwatch {
             container_id: info.id.as_str()
         });
+
+        // Update checkpoint before returning info to main loop
+        if let Some((timestamp, _)) = info.last_log.as_ref() {
+            self.checkpoints.update(info.id.as_str(), *timestamp);
+        }
 
         let result = match (result, error) {
             (Ok(()), None) => Ok(info),

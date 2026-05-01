@@ -12828,6 +12828,7 @@ dependencies = [
  "console-subscriber",
  "criterion",
  "csv",
+ "dashmap",
  "databend-client",
  "deadpool 0.13.0",
  "derivative",

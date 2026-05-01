@@ -8,6 +8,30 @@ use vector_lib::{
 };
 
 #[derive(Debug, NamedInternalEvent)]
+pub struct DockerLogsCheckpointWriteError {
+    pub error: std::io::Error,
+}
+
+impl InternalEvent for DockerLogsCheckpointWriteError {
+    fn emit(self) {
+        error!(
+            message = "Failed writing docker_logs checkpoints.",
+            error = %self.error,
+            error_code = "writing_checkpoints",
+            error_type = error_type::WRITER_FAILED,
+            stage = error_stage::RECEIVING,
+        );
+        counter!(
+            "component_errors_total",
+            "error_code" => "writing_checkpoints",
+            "error_type" => error_type::WRITER_FAILED,
+            "stage" => error_stage::RECEIVING,
+        )
+        .increment(1);
+    }
+}
+
+#[derive(Debug, NamedInternalEvent)]
 pub struct DockerLogsEventsReceived<'a> {
     pub byte_size: JsonSize,
     pub container_id: &'a str,
