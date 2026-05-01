@@ -25,6 +25,13 @@ impl AvroSerializerConfig {
     pub fn build(&self) -> Result<AvroSerializer, BuildError> {
         let schema = apache_avro::Schema::parse_str(&self.avro.schema)
             .map_err(|error| format!("Failed building Avro serializer: {error}"))?;
+
+        if let Some(schema_id) = self.avro.schema_id
+            && schema_id < 0
+        {
+            return Err("Confluent Avro schema id must be a positive i32 number".into());
+        }
+
         Ok(AvroSerializer {
             schema,
             schema_id: self.avro.schema_id,
