@@ -12,7 +12,7 @@ use vector_common::{
 };
 use vector_lib::{
     NamedInternalEvent, counter, histogram,
-    internal_event::{CounterName, InternalEvent},
+    internal_event::{CounterName, HistogramName, InternalEvent},
 };
 
 pub const PROTOCOL: &str = "websocket";
@@ -151,7 +151,7 @@ impl InternalEvent for WebSocketMessageReceived<'_> {
             kind = %self.kind
         );
 
-        let histogram = histogram!(CounterName::ComponentReceivedEventsCount);
+        let histogram = histogram!(HistogramName::ComponentReceivedEventsCount);
         histogram.record(self.count as f64);
         let counter = counter!(
             CounterName::ComponentReceivedEventsTotal,

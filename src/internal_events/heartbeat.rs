@@ -2,7 +2,7 @@ use std::time::Instant;
 
 use vector_lib::{
     NamedInternalEvent, gauge,
-    internal_event::{CounterName, InternalEvent},
+    internal_event::{GaugeName, InternalEvent},
 };
 
 use crate::built_info;
@@ -15,9 +15,9 @@ pub struct Heartbeat {
 impl InternalEvent for Heartbeat {
     fn emit(self) {
         trace!(target: "vector", message = "Beep.");
-        gauge!(CounterName::UptimeSeconds).set(self.since.elapsed().as_secs() as f64);
+        gauge!(GaugeName::UptimeSeconds).set(self.since.elapsed().as_secs() as f64);
         gauge!(
-            CounterName::BuildInfo,
+            GaugeName::BuildInfo,
             "debug" => built_info::DEBUG,
             "version" => built_info::PKG_VERSION,
             "rust_version" => built_info::RUST_VERSION,

@@ -2,7 +2,7 @@
 
 use vector_lib::{
     NamedInternalEvent, counter, gauge,
-    internal_event::{CounterName, InternalEvent, error_stage, error_type},
+    internal_event::{CounterName, GaugeName, InternalEvent, error_stage, error_type},
     json_size::JsonSize,
 };
 use vrl::path::OwnedTargetPath;
@@ -122,8 +122,8 @@ pub struct KafkaStatisticsReceived<'a> {
 
 impl InternalEvent for KafkaStatisticsReceived<'_> {
     fn emit(self) {
-        gauge!(CounterName::KafkaQueueMessages).set(self.statistics.msg_cnt as f64);
-        gauge!(CounterName::KafkaQueueMessagesBytes).set(self.statistics.msg_size as f64);
+        gauge!(GaugeName::KafkaQueueMessages).set(self.statistics.msg_cnt as f64);
+        gauge!(GaugeName::KafkaQueueMessagesBytes).set(self.statistics.msg_size as f64);
         counter!(CounterName::KafkaRequestsTotal).absolute(self.statistics.tx as u64);
         counter!(CounterName::KafkaRequestsBytesTotal).absolute(self.statistics.tx_bytes as u64);
         counter!(CounterName::KafkaResponsesTotal).absolute(self.statistics.rx as u64);
@@ -139,7 +139,7 @@ impl InternalEvent for KafkaStatisticsReceived<'_> {
             for (topic_id, topic) in &self.statistics.topics {
                 for (partition_id, partition) in &topic.partitions {
                     gauge!(
-                        CounterName::KafkaConsumerLag,
+                        GaugeName::KafkaConsumerLag,
                         "topic_id" => topic_id.clone(),
                         "partition_id" => partition_id.to_string(),
                     )

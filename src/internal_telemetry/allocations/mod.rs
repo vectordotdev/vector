@@ -12,7 +12,7 @@ use std::{
 
 use arr_macro::arr;
 use rand_distr::num_traits::ToPrimitive;
-use vector_common::{counter, gauge, internal_event::CounterName};
+use vector_common::{counter, gauge, internal_event::{CounterName, GaugeName}};
 
 use self::allocator::Tracer;
 pub(crate) use self::allocator::{
@@ -156,14 +156,14 @@ pub fn init_allocation_tracing() {
                     }
                     if mem_used_diff > 0 {
                         gauge!(
-                            CounterName::ComponentAllocatedBytes, "component_type" => group_info.component_type.clone(),
+                            GaugeName::ComponentAllocatedBytes, "component_type" => group_info.component_type.clone(),
                             "component_id" => group_info.component_id.clone(),
                             "component_kind" => group_info.component_kind.clone())
                             .increment(mem_used_diff.to_f64().expect("failed to convert mem_used from int to float"));
                     }
                     if mem_used_diff < 0 {
                         gauge!(
-                            CounterName::ComponentAllocatedBytes, "component_type" => group_info.component_type.clone(),
+                            GaugeName::ComponentAllocatedBytes, "component_type" => group_info.component_type.clone(),
                             "component_id" => group_info.component_id.clone(),
                             "component_kind" => group_info.component_kind.clone())
                             .decrement(-mem_used_diff.to_f64().expect("failed to convert mem_used from int to float"));

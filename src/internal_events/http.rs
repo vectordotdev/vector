@@ -3,7 +3,7 @@ use std::{error::Error, time::Duration};
 use http::Response;
 use vector_lib::{
     NamedInternalEvent, counter, histogram,
-    internal_event::{CounterName, InternalEvent, error_stage, error_type},
+    internal_event::{CounterName, HistogramName, InternalEvent, error_stage, error_type},
     json_size::JsonSize,
 };
 
@@ -32,7 +32,7 @@ impl<B> InternalEvent for HttpServerResponseSent<'_, B> {
             self.response.status().as_u16().to_string(),
         )];
         counter!(CounterName::HttpServerResponsesSentTotal, labels).increment(1);
-        histogram!(CounterName::HttpServerHandlerDurationSeconds, labels).record(self.latency);
+        histogram!(HistogramName::HttpServerHandlerDurationSeconds, labels).record(self.latency);
     }
 }
 
@@ -78,7 +78,7 @@ impl InternalEvent for HttpEventsReceived<'_> {
             protocol = %self.protocol,
         );
 
-        histogram!(CounterName::ComponentReceivedEventsCount).record(self.count as f64);
+        histogram!(HistogramName::ComponentReceivedEventsCount).record(self.count as f64);
         counter!(
             CounterName::ComponentReceivedEventsTotal,
             "http_path" => self.http_path.to_string(),

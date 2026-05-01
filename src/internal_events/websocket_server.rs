@@ -2,7 +2,7 @@ use std::{error::Error, fmt::Debug};
 
 use vector_lib::{
     NamedInternalEvent, counter, gauge,
-    internal_event::{CounterName, InternalEvent, error_stage, error_type},
+    internal_event::{CounterName, GaugeName, InternalEvent, error_stage, error_type},
 };
 
 #[derive(Debug, NamedInternalEvent)]
@@ -20,7 +20,7 @@ impl InternalEvent for WebSocketListenerConnectionEstablished {
             )
         );
         counter!(CounterName::ConnectionEstablishedTotal, &self.extra_tags).increment(1);
-        gauge!(CounterName::ActiveClients, &self.extra_tags).set(self.client_count as f64);
+        gauge!(GaugeName::ActiveClients, &self.extra_tags).set(self.client_count as f64);
     }
 }
 
@@ -69,7 +69,7 @@ impl InternalEvent for WebSocketListenerConnectionShutdown {
             )
         );
         counter!(CounterName::ConnectionShutdownTotal, &self.extra_tags).increment(1);
-        gauge!(CounterName::ActiveClients, &self.extra_tags).set(self.client_count as f64);
+        gauge!(GaugeName::ActiveClients, &self.extra_tags).set(self.client_count as f64);
     }
 }
 

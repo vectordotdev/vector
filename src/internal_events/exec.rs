@@ -4,7 +4,7 @@ use tokio::time::error::Elapsed;
 use vector_lib::{
     NamedInternalEvent, counter, histogram,
     internal_event::{
-        ComponentEventsDropped, CounterName, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+        ComponentEventsDropped, CounterName, HistogramName, InternalEvent, UNINTENTIONAL, error_stage, error_type,
     },
     json_size::JsonSize,
 };
@@ -126,7 +126,7 @@ impl InternalEvent for ExecCommandExecuted<'_> {
         .increment(1);
 
         histogram!(
-            CounterName::CommandExecutionDurationSeconds,
+            HistogramName::CommandExecutionDurationSeconds,
             "exit_status" => exit_status,
             "command" => self.command.to_owned(),
         )

@@ -6,7 +6,7 @@ use vector_lib::counter;
 #[cfg(any(feature = "sources-aws_s3", feature = "sources-aws_sqs"))]
 use vector_lib::{
     NamedInternalEvent,
-    internal_event::{CounterName, InternalEvent, error_stage, error_type},
+    internal_event::{CounterName, HistogramName, InternalEvent, error_stage, error_type},
 };
 
 #[cfg(feature = "sources-aws_s3")]
@@ -36,7 +36,7 @@ mod s3 {
                 duration_ms = %self.duration.as_millis(),
             );
             histogram!(
-                CounterName::S3ObjectProcessingSucceededDurationSeconds,
+                HistogramName::S3ObjectProcessingSucceededDurationSeconds,
                 "bucket" => self.bucket.to_owned(),
             )
             .record(self.duration);
@@ -57,7 +57,7 @@ mod s3 {
                 duration_ms = %self.duration.as_millis(),
             );
             histogram!(
-                CounterName::S3ObjectProcessingFailedDurationSeconds,
+                HistogramName::S3ObjectProcessingFailedDurationSeconds,
                 "bucket" => self.bucket.to_owned(),
             )
             .record(self.duration);

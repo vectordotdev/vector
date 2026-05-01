@@ -7,7 +7,7 @@ use vector_lib::{
     configurable::configurable_component,
     counter, gauge,
     internal_event::{
-        ComponentEventsDropped, CounterName, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+        ComponentEventsDropped, CounterName, GaugeName, InternalEvent, UNINTENTIONAL, error_stage, error_type,
     },
 };
 
@@ -34,7 +34,7 @@ pub struct FileOpen {
 
 impl InternalEvent for FileOpen {
     fn emit(self) {
-        gauge!(CounterName::OpenFiles).set(self.count as f64);
+        gauge!(GaugeName::OpenFiles).set(self.count as f64);
     }
 }
 

@@ -11,7 +11,7 @@ mod sink {
     use vector_lib::{
         NamedInternalEvent, counter, gauge,
         internal_event::{
-            ComponentEventsDropped, CounterName, InternalEvent, UNINTENTIONAL, error_stage,
+            ComponentEventsDropped, CounterName, GaugeName, InternalEvent, UNINTENTIONAL, error_stage,
             error_type,
         },
     };
@@ -157,7 +157,7 @@ mod sink {
 
     impl InternalEvent for SplunkIndexerAcknowledgementAckAdded {
         fn emit(self) {
-            gauge!(CounterName::SplunkPendingAcks).increment(1.0);
+            gauge!(GaugeName::SplunkPendingAcks).increment(1.0);
         }
     }
 
@@ -168,7 +168,7 @@ mod sink {
 
     impl InternalEvent for SplunkIndexerAcknowledgementAcksRemoved {
         fn emit(self) {
-            gauge!(CounterName::SplunkPendingAcks).decrement(self.count);
+            gauge!(GaugeName::SplunkPendingAcks).decrement(self.count);
         }
     }
 

@@ -1,6 +1,6 @@
 use vector_lib::NamedInternalEvent;
 use vector_lib::internal_event::{
-    ComponentEventsDropped, CounterName, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+    ComponentEventsDropped, CounterName, GaugeName, InternalEvent, UNINTENTIONAL, error_stage, error_type,
 };
 use vector_lib::{counter, gauge};
 
@@ -13,7 +13,7 @@ pub struct LuaGcTriggered {
 
 impl InternalEvent for LuaGcTriggered {
     fn emit(self) {
-        gauge!(CounterName::LuaMemoryUsedBytes).set(self.used_memory as f64);
+        gauge!(GaugeName::LuaMemoryUsedBytes).set(self.used_memory as f64);
     }
 }
 

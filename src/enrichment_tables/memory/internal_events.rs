@@ -2,7 +2,7 @@ use vector_lib::{
     NamedInternalEvent,
     configurable::configurable_component,
     counter, gauge,
-    internal_event::{CounterName, InternalEvent},
+    internal_event::{CounterName, GaugeName, InternalEvent},
 };
 
 /// Configuration of internal metrics for enrichment memory table.
@@ -67,8 +67,8 @@ pub(crate) struct MemoryEnrichmentTableFlushed {
 impl InternalEvent for MemoryEnrichmentTableFlushed {
     fn emit(self) {
         counter!(CounterName::MemoryEnrichmentTableFlushesTotal,).increment(1);
-        gauge!(CounterName::MemoryEnrichmentTableObjectsCount,).set(self.new_objects_count as f64);
-        gauge!(CounterName::MemoryEnrichmentTableByteSize,).set(self.new_byte_size as f64);
+        gauge!(GaugeName::MemoryEnrichmentTableObjectsCount,).set(self.new_objects_count as f64);
+        gauge!(GaugeName::MemoryEnrichmentTableByteSize,).set(self.new_byte_size as f64);
     }
 }
 

@@ -7,7 +7,7 @@ use http::{
 use hyper::{Error, body::HttpBody};
 use vector_lib::{
     NamedInternalEvent, counter, histogram,
-    internal_event::{CounterName, InternalEvent, error_stage, error_type},
+    internal_event::{CounterName, HistogramName, InternalEvent, error_stage, error_type},
 };
 
 #[derive(Debug, NamedInternalEvent)]
@@ -65,9 +65,9 @@ impl<T: HttpBody> InternalEvent for GotHttpResponse<'_, T> {
             "status" => self.response.status().as_u16().to_string(),
         )
         .increment(1);
-        histogram!(CounterName::HttpClientRttSeconds).record(self.roundtrip);
+        histogram!(HistogramName::HttpClientRttSeconds).record(self.roundtrip);
         histogram!(
-            CounterName::HttpClientResponseRttSeconds,
+            HistogramName::HttpClientResponseRttSeconds,
             "status" => self.response.status().as_u16().to_string(),
         )
         .record(self.roundtrip);
@@ -90,8 +90,8 @@ impl InternalEvent for GotHttpWarning<'_> {
         );
         counter!(CounterName::HttpClientErrorsTotal, "error_kind" => self.error.to_string())
             .increment(1);
-        histogram!(CounterName::HttpClientRttSeconds).record(self.roundtrip);
-        histogram!(CounterName::HttpClientErrorRttSeconds, "error_kind" => self.error.to_string())
+        histogram!(HistogramName::HttpClientRttSeconds).record(self.roundtrip);
+        histogram!(HistogramName::HttpClientErrorRttSeconds, "error_kind" => self.error.to_string())
             .record(self.roundtrip);
     }
 }

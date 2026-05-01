@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use metrics::Histogram;
-use vector_lib::{histogram, internal_event::CounterName};
+use vector_lib::{histogram, internal_event::HistogramName};
 
 #[derive(Clone, Copy)]
 pub struct AdaptiveConcurrencyLimitData {
@@ -18,10 +18,10 @@ registered_event! {
         // These are histograms, as they may have a number of different
         // values over each reporting interval, and each of those values
         // is valuable for diagnosis.
-        limit: Histogram = histogram!(CounterName::AdaptiveConcurrencyLimit),
-        reached_limit: Histogram = histogram!(CounterName::AdaptiveConcurrencyReachedLimit),
-        back_pressure: Histogram = histogram!(CounterName::AdaptiveConcurrencyBackPressure),
-        past_rtt_mean: Histogram = histogram!(CounterName::AdaptiveConcurrencyPastRttMean),
+        limit: Histogram = histogram!(HistogramName::AdaptiveConcurrencyLimit),
+        reached_limit: Histogram = histogram!(HistogramName::AdaptiveConcurrencyReachedLimit),
+        back_pressure: Histogram = histogram!(HistogramName::AdaptiveConcurrencyBackPressure),
+        past_rtt_mean: Histogram = histogram!(HistogramName::AdaptiveConcurrencyPastRttMean),
     }
 
     fn emit(&self, data: AdaptiveConcurrencyLimitData) {
@@ -37,7 +37,7 @@ registered_event! {
 
 registered_event! {
     AdaptiveConcurrencyInFlight => {
-        in_flight: Histogram = histogram!(CounterName::AdaptiveConcurrencyInFlight),
+        in_flight: Histogram = histogram!(HistogramName::AdaptiveConcurrencyInFlight),
     }
 
     fn emit(&self, in_flight: u64) {
@@ -47,7 +47,7 @@ registered_event! {
 
 registered_event! {
     AdaptiveConcurrencyObservedRtt => {
-        observed_rtt: Histogram = histogram!(CounterName::AdaptiveConcurrencyObservedRtt),
+        observed_rtt: Histogram = histogram!(HistogramName::AdaptiveConcurrencyObservedRtt),
     }
 
     fn emit(&self, rtt: Duration) {
@@ -57,7 +57,7 @@ registered_event! {
 
 registered_event! {
     AdaptiveConcurrencyAveragedRtt => {
-        averaged_rtt: Histogram = histogram!(CounterName::AdaptiveConcurrencyAveragedRtt),
+        averaged_rtt: Histogram = histogram!(HistogramName::AdaptiveConcurrencyAveragedRtt),
     }
 
     fn emit(&self, rtt: Duration) {

@@ -4,7 +4,7 @@ use http::response::Response;
 use tonic::Code;
 use vector_lib::{
     NamedInternalEvent, counter, histogram,
-    internal_event::{CounterName, InternalEvent, error_stage, error_type},
+    internal_event::{CounterName, HistogramName, InternalEvent, error_stage, error_type},
 };
 
 const GRPC_STATUS_LABEL: &str = "grpc_status";
@@ -36,7 +36,7 @@ impl<B> InternalEvent for GrpcServerResponseSent<'_, B> {
 
         let labels = &[(GRPC_STATUS_LABEL, grpc_code)];
         counter!(CounterName::GrpcServerMessagesSentTotal, labels).increment(1);
-        histogram!(CounterName::GrpcServerHandlerDurationSeconds, labels).record(self.latency);
+        histogram!(HistogramName::GrpcServerHandlerDurationSeconds, labels).record(self.latency);
     }
 }
 

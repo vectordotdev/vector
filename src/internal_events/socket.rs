@@ -3,7 +3,7 @@ use std::net::Ipv4Addr;
 use vector_lib::{
     NamedInternalEvent, counter, histogram,
     internal_event::{
-        ComponentEventsDropped, CounterName, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+        ComponentEventsDropped, CounterName, HistogramName, InternalEvent, UNINTENTIONAL, error_stage, error_type,
     },
     json_size::JsonSize,
 };
@@ -45,7 +45,7 @@ impl InternalEvent for SocketBytesReceived {
             "protocol" => protocol,
         )
         .increment(self.byte_size as u64);
-        histogram!(CounterName::ComponentReceivedBytes).record(self.byte_size as f64);
+        histogram!(HistogramName::ComponentReceivedBytes).record(self.byte_size as f64);
     }
 }
 
@@ -69,7 +69,7 @@ impl InternalEvent for SocketEventsReceived {
             .increment(self.count as u64);
         counter!(CounterName::ComponentReceivedEventBytesTotal, "mode" => mode)
             .increment(self.byte_size.get() as u64);
-        histogram!(CounterName::ComponentReceivedBytes, "mode" => mode)
+        histogram!(HistogramName::ComponentReceivedBytes, "mode" => mode)
             .record(self.byte_size.get() as f64);
     }
 }

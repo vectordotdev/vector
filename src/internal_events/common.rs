@@ -3,7 +3,7 @@ use std::time::Instant;
 use vector_lib::NamedInternalEvent;
 pub use vector_lib::internal_event::EventsReceived;
 use vector_lib::internal_event::{
-    ComponentEventsDropped, CounterName, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+    ComponentEventsDropped, CounterName, HistogramName, InternalEvent, UNINTENTIONAL, error_stage, error_type,
 };
 use vector_lib::{counter, histogram};
 
@@ -118,7 +118,7 @@ impl InternalEvent for CollectionCompleted {
     fn emit(self) {
         debug!(message = "Collection completed.");
         counter!(CounterName::CollectCompletedTotal).increment(1);
-        histogram!(CounterName::CollectDurationSeconds).record(self.end - self.start);
+        histogram!(HistogramName::CollectDurationSeconds).record(self.end - self.start);
     }
 }
 
