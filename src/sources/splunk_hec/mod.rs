@@ -1298,8 +1298,18 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
                     }
                 }
 
+                // Top-level envelope fields (host/index/source/sourcetype) must be
+                // applied before `fields.*` so top-level beats `fields.*` when both
+                // are present — matching the non-decoder runtime precedence. Both
+                // still use InsertIfEmpty so the decoder's output wins over all
+                // envelope metadata. Order: decoder > top-level > fields.
+                for de in self.extractors.iter_mut() {
+                    de.extract(log, &mut json);
+                }
+
                 // fields: use `InsertIfEmpty` / `try_insert` to preserve decoder-wins
-                // semantics in both legacy (bare field paths) and vector (%splunk_hec.*).
+                // and extractor-wins semantics (fields fill only what neither the
+                // decoder nor the top-level envelope keys have already set).
                 if let Some(ref fields) = envelope_fields {
                     for (key, value) in fields {
                         match self.log_namespace {
@@ -1322,13 +1332,6 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
                             }
                         }
                     }
-                }
-
-                // Default extractors (host/index/source/sourcetype). These take from
-                // `json` on first call and stay sticky on subsequent calls within the
-                // same envelope, so per-event invocation works correctly.
-                for de in self.extractors.iter_mut() {
-                    de.extract(log, &mut json);
                 }
             }
             // `splunk_hec_token` is set inside `decode_payload` so the metadata is
