@@ -1039,7 +1039,7 @@ generated: components: sinks: opentelemetry: configuration: protocol: {
 					description:   "Retry on these specific HTTP status codes"
 					relevant_when: "type = \"custom\""
 					required:      true
-					type: array: items: type: uint: default: 200
+					type: array: items: type: uint: {}
 				}
 				type: {
 					description: "The retry strategy enum."
