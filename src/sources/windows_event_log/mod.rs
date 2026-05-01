@@ -488,11 +488,12 @@ impl WindowsEventLogSource {
                     // regardless of root cause. If the OS signal was lost through any
                     // mechanism (not just the pre-drain race fixed in #25194), this
                     // ensures the source recovers within one timeout period.
-                    // EvtNext returns ERROR_NO_MORE_ITEMS on an empty channel, which
-                    // is near-zero cost, so it is safe to attempt every cycle.
+                    // Use the speculative pull variant so idle timeout cycles don't
+                    // refresh per-channel record-count gauges via EvtOpenLog /
+                    // EvtGetLogInfo on every configured channel.
                     let (returned_sub, speculative_result) =
                         with_subscription_blocking(subscription, move |mut sub| {
-                            let result = sub.pull_events(batch_size);
+                            let result = sub.pull_events_speculative(batch_size);
                             (sub, result)
                         })
                         .await?;

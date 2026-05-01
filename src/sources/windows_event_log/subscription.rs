@@ -475,6 +475,28 @@ impl EventLogSubscription {
         &mut self,
         max_events: usize,
     ) -> Result<Vec<xml_parser::WindowsEvent>, WindowsEventLogError> {
+        self.pull_events_inner(max_events, true)
+    }
+
+    /// Pull events for timeout-based speculative recovery.
+    ///
+    /// This keeps the same event-drain behavior as `pull_events`, but avoids
+    /// refreshing per-channel record-count gauges for channels that were empty.
+    /// Timeout pulls can run repeatedly while the host is idle, so skipping
+    /// those metadata queries prevents steady `EvtOpenLog`/`EvtGetLogInfo`
+    /// churn without changing event recovery behavior.
+    pub fn pull_events_speculative(
+        &mut self,
+        max_events: usize,
+    ) -> Result<Vec<xml_parser::WindowsEvent>, WindowsEventLogError> {
+        self.pull_events_inner(max_events, false)
+    }
+
+    fn pull_events_inner(
+        &mut self,
+        max_events: usize,
+        update_records_for_empty_channels: bool,
+    ) -> Result<Vec<xml_parser::WindowsEvent>, WindowsEventLogError> {
         let mut all_events = Vec::with_capacity(max_events.min(1000));
         let num_channels = self.channels.len().max(1);
         let per_channel_budget = (max_events / num_channels).max(1);
@@ -757,10 +779,12 @@ impl EventLogSubscription {
 
             if channel_drained && !bookmark_failed {
                 // Update channel record count gauge for lag detection.
-                super::render::update_channel_records(
-                    &channel_sub.channel,
-                    &channel_sub.channel_records_gauge,
-                );
+                if update_records_for_empty_channels || channel_count > 0 {
+                    super::render::update_channel_records(
+                        &channel_sub.channel,
+                        &channel_sub.channel_records_gauge,
+                    );
+                }
             } else {
                 // Drain exited early (budget exhausted or bookmark_failed
                 // mid-batch). Re-arm the signal so the next pull_events
