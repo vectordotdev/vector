@@ -1,5 +1,6 @@
 #![allow(missing_docs)]
 use std::collections::HashMap;
+use std::fs;
 use std::path::{Path, PathBuf};
 
 use rdkafka::{
@@ -28,6 +29,9 @@ pub(crate) struct KafkaOAuthBearerConfig {
     pub(crate) scope: Option<String>,
     pub(crate) principal_name: String,
     pub(crate) extra_params: Vec<(String, String)>,
+    /// Resolved PEM content for the token endpoint CA, sourced from
+    /// `https.ca.pem` or `https.ca.location` in librdkafka_options.
+    pub(crate) https_ca_pem: Option<String>,
 }
 
 /// Parses space-separated `name=value` pairs from `sasl.oauthbearer.config`.
@@ -81,6 +85,24 @@ pub(crate) fn extract_oauthbearer_config(
         principal_name = client_id.as_deref().unwrap_or_default().to_owned();
     }
 
+    let https_ca_pem = if let Some(pem) = options.get("https.ca.pem") {
+        Some(pem.clone())
+    } else if let Some(path) = options.get("https.ca.location") {
+        match fs::read_to_string(path) {
+            Ok(pem) => Some(pem),
+            Err(e) => {
+                warn!(
+                    message = "Failed to read https.ca.location for OAUTHBEARER token endpoint; using system CA bundle.",
+                    path = %path,
+                    error = %e,
+                );
+                None
+            }
+        }
+    } else {
+        None
+    };
+
     Some(KafkaOAuthBearerConfig {
         token_url,
         client_id,
@@ -88,6 +110,7 @@ pub(crate) fn extract_oauthbearer_config(
         scope,
         principal_name,
         extra_params,
+        https_ca_pem,
     })
 }
 
@@ -298,10 +321,19 @@ impl ClientContext for KafkaStatisticsContext {
 
         let url = config.token_url.clone();
 
+        let http_client = {
+            let mut builder = reqwest::Client::builder();
+            if let Some(pem) = &config.https_ca_pem {
+                let cert = reqwest::Certificate::from_pem(pem.as_bytes())?;
+                builder = builder.add_root_certificate(cert);
+            }
+            builder.build()?
+        };
+
         let resp: serde_json::Value = match tokio::runtime::Handle::try_current() {
             Ok(handle) => tokio::task::block_in_place(|| {
                 handle.block_on(async move {
-                    reqwest::Client::new()
+                    http_client
                         .post(&url)
                         .form(&params)
                         .send()
@@ -314,7 +346,7 @@ impl ClientContext for KafkaStatisticsContext {
                 .enable_all()
                 .build()?
                 .block_on(async move {
-                    reqwest::Client::new()
+                    http_client
                         .post(&url)
                         .form(&params)
                         .send()
@@ -546,6 +578,7 @@ mod tests {
                 scope: None,
                 principal_name: "my-client".into(),
                 extra_params: vec![],
+                https_ca_pem: None,
             }),
         };
 
@@ -582,6 +615,7 @@ mod tests {
                     ("grant_type".into(), "authorization_code".into()),
                     ("code".into(), "PAC123".into()),
                 ],
+                https_ca_pem: None,
             }),
         };
 
@@ -610,6 +644,7 @@ mod tests {
                 scope: None,
                 principal_name: "svc-account".into(),
                 extra_params: vec![],
+                https_ca_pem: None,
             }),
         };
 
@@ -645,6 +680,7 @@ mod tests {
                 scope: None,
                 principal_name: "".into(),
                 extra_params: vec![],
+                https_ca_pem: None,
             }),
         };
         let result = ctx.generate_oauth_token(None);
