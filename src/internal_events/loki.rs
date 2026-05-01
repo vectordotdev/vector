@@ -1,7 +1,7 @@
-use vector_lib::{NamedInternalEvent, counter};
 use vector_lib::internal_event::{
-    ComponentEventsDropped, INTENTIONAL, InternalEvent, CounterName, error_stage, error_type,
+    ComponentEventsDropped, CounterName, INTENTIONAL, InternalEvent, error_stage, error_type,
 };
+use vector_lib::{NamedInternalEvent, counter};
 
 #[derive(Debug, NamedInternalEvent)]
 pub struct LokiEventUnlabeledError;

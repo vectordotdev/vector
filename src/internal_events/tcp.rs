@@ -1,7 +1,9 @@
 use std::net::SocketAddr;
 
-use vector_lib::{NamedInternalEvent, counter};
-use vector_lib::internal_event::{InternalEvent, CounterName, error_stage, error_type};
+use vector_lib::{
+    NamedInternalEvent, counter,
+    internal_event::{CounterName, InternalEvent, error_stage, error_type},
+};
 
 use crate::{internal_events::SocketOutgoingConnectionError, tls::TlsError};
 

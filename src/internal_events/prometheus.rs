@@ -3,12 +3,14 @@
 #[cfg(feature = "sources-prometheus-scrape")]
 use std::borrow::Cow;
 
-use vector_lib::{NamedInternalEvent, counter};
-use vector_lib::internal_event::{
-    ComponentEventsDropped, InternalEvent, CounterName, UNINTENTIONAL, error_stage, error_type,
-};
 #[cfg(feature = "sources-prometheus-scrape")]
 use vector_lib::prometheus::parser::ParserError;
+use vector_lib::{
+    NamedInternalEvent, counter,
+    internal_event::{
+        ComponentEventsDropped, CounterName, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+    },
+};
 
 #[cfg(feature = "sources-prometheus-scrape")]
 #[derive(Debug, NamedInternalEvent)]

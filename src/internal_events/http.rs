@@ -2,11 +2,10 @@ use std::{error::Error, time::Duration};
 
 use http::Response;
 use vector_lib::{
-    NamedInternalEvent,
+    NamedInternalEvent, counter, histogram,
     internal_event::{CounterName, InternalEvent, error_stage, error_type},
     json_size::JsonSize,
 };
-use vector_lib::{counter, histogram};
 
 const HTTP_STATUS_LABEL: &str = "status";
 

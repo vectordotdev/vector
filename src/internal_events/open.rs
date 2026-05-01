@@ -6,8 +6,10 @@ use std::{
     },
 };
 
-use vector_lib::internal_event::{CounterName, InternalEvent};
-use vector_lib::{NamedInternalEvent, gauge};
+use vector_lib::{
+    NamedInternalEvent, gauge,
+    internal_event::{CounterName, InternalEvent},
+};
 
 #[derive(Debug, NamedInternalEvent)]
 pub struct ConnectionOpen {

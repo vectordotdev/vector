@@ -1,7 +1,6 @@
 use tracing::error;
-use vector_lib::counter;
 use vector_lib::{
-    NamedInternalEvent,
+    NamedInternalEvent, counter,
     internal_event::{InternalEvent, MetricName, error_stage, error_type},
 };
 

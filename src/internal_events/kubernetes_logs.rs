@@ -1,6 +1,5 @@
-use vector_lib::counter;
 use vector_lib::{
-    NamedInternalEvent,
+    NamedInternalEvent, counter,
     internal_event::{
         ComponentEventsDropped, CounterName, INTENTIONAL, InternalEvent, UNINTENTIONAL,
         error_stage, error_type,

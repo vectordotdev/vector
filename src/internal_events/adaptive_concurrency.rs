@@ -1,8 +1,7 @@
 use std::time::Duration;
 
 use metrics::Histogram;
-use vector_lib::histogram;
-use vector_lib::internal_event::CounterName;
+use vector_lib::{histogram, internal_event::CounterName};
 
 #[derive(Clone, Copy)]
 pub struct AdaptiveConcurrencyLimitData {

@@ -1,5 +1,7 @@
-use vector_lib::internal_event::{ComponentEventsDropped, CounterName, INTENTIONAL, InternalEvent};
-use vector_lib::{NamedInternalEvent, counter};
+use vector_lib::{
+    NamedInternalEvent, counter,
+    internal_event::{ComponentEventsDropped, CounterName, INTENTIONAL, InternalEvent},
+};
 
 #[derive(NamedInternalEvent)]
 pub struct TagCardinalityLimitRejectingEvent<'a> {

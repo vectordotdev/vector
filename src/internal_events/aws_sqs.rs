@@ -4,8 +4,10 @@
 pub use s3::*;
 use vector_lib::counter;
 #[cfg(any(feature = "sources-aws_s3", feature = "sources-aws_sqs"))]
-use vector_lib::internal_event::{CounterName, error_stage, error_type};
-use vector_lib::{NamedInternalEvent, internal_event::InternalEvent};
+use vector_lib::{
+    NamedInternalEvent,
+    internal_event::{CounterName, InternalEvent, error_stage, error_type},
+};
 
 #[cfg(feature = "sources-aws_s3")]
 mod s3 {

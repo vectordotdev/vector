@@ -2,7 +2,10 @@ use std::time::Instant;
 
 use metrics::Histogram;
 use vector_common::stats::EwmaGauge;
-use vector_common::{gauge, histogram, internal_event::{GaugeName, HistogramName}};
+use vector_common::{
+    gauge, histogram,
+    internal_event::{GaugeName, HistogramName},
+};
 
 use crate::event::EventArray;
 

@@ -1,9 +1,8 @@
 use bollard::errors::Error;
 use chrono::ParseError;
-use vector_lib::counter;
 use vector_lib::{
-    NamedInternalEvent,
-    internal_event::{InternalEvent, CounterName, error_stage, error_type},
+    NamedInternalEvent, counter,
+    internal_event::{CounterName, InternalEvent, error_stage, error_type},
     json_size::JsonSize,
 };
 

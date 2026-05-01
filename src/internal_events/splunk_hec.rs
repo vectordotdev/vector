@@ -8,9 +8,12 @@ pub use self::source::*;
 #[cfg(feature = "sinks-splunk_hec")]
 mod sink {
     use serde_json::Error;
-    use vector_lib::{NamedInternalEvent, counter, gauge};
-    use vector_lib::internal_event::{
-        ComponentEventsDropped, InternalEvent, CounterName, UNINTENTIONAL, error_stage, error_type,
+    use vector_lib::{
+        NamedInternalEvent, counter, gauge,
+        internal_event::{
+            ComponentEventsDropped, CounterName, InternalEvent, UNINTENTIONAL, error_stage,
+            error_type,
+        },
     };
 
     use crate::{
@@ -196,8 +199,10 @@ mod sink {
 
 #[cfg(feature = "sources-splunk_hec")]
 mod source {
-    use vector_lib::{NamedInternalEvent, counter};
-    use vector_lib::internal_event::{InternalEvent, CounterName, error_stage, error_type};
+    use vector_lib::{
+        NamedInternalEvent, counter,
+        internal_event::{CounterName, InternalEvent, error_stage, error_type},
+    };
 
     use crate::sources::splunk_hec::ApiError;
 

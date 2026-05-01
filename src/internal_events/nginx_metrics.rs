@@ -1,6 +1,5 @@
-use vector_lib::counter;
 use vector_lib::{
-    NamedInternalEvent,
+    NamedInternalEvent, counter,
     internal_event::{CounterName, InternalEvent, error_stage, error_type},
     json_size::JsonSize,
 };

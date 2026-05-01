@@ -11,8 +11,8 @@ use std::{
 };
 
 use arr_macro::arr;
-use vector_common::{counter, gauge, internal_event::CounterName};
 use rand_distr::num_traits::ToPrimitive;
+use vector_common::{counter, gauge, internal_event::CounterName};
 
 use self::allocator::Tracer;
 pub(crate) use self::allocator::{

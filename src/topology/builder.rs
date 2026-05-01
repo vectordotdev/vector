@@ -8,7 +8,6 @@ use std::{
 
 use futures::{FutureExt, StreamExt, TryStreamExt, stream::FuturesOrdered};
 use futures_util::stream::FuturesUnordered;
-use vector_lib::{gauge, internal_event::CounterName};
 use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
 use tokio::{
     select,
@@ -31,6 +30,7 @@ use vector_lib::{
     source_sender::{CHUNK_SIZE, SourceSenderItem},
     transform::update_runtime_schema_definition,
 };
+use vector_lib::{gauge, internal_event::CounterName};
 use vector_vrl_metrics::MetricsStorage;
 
 use super::{

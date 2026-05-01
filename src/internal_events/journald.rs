@@ -1,7 +1,7 @@
-use vector_lib::counter;
 use vector_lib::{
     NamedInternalEvent,
     codecs::decoding::BoxedFramingError,
+    counter,
     internal_event::{CounterName, InternalEvent, error_stage, error_type},
 };
 

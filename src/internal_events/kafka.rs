@@ -1,11 +1,10 @@
 #![allow(dead_code)] // TODO requires optional feature compilation
 
 use vector_lib::{
-    NamedInternalEvent,
+    NamedInternalEvent, counter, gauge,
     internal_event::{CounterName, InternalEvent, error_stage, error_type},
     json_size::JsonSize,
 };
-use vector_lib::{counter, gauge};
 use vrl::path::OwnedTargetPath;
 
 #[derive(Debug, NamedInternalEvent)]

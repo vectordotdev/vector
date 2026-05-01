@@ -1,7 +1,9 @@
 use std::net::SocketAddr;
 
-use vector_lib::internal_event::{CounterName, InternalEvent};
-use vector_lib::{NamedInternalEvent, counter};
+use vector_lib::{
+    NamedInternalEvent, counter,
+    internal_event::{CounterName, InternalEvent},
+};
 
 #[derive(Debug, NamedInternalEvent)]
 pub struct ApiStarted {

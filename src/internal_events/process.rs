@@ -1,5 +1,7 @@
-use vector_lib::internal_event::{CounterName, InternalEvent, error_stage, error_type};
-use vector_lib::{NamedInternalEvent, counter};
+use vector_lib::{
+    NamedInternalEvent, counter,
+    internal_event::{CounterName, InternalEvent, error_stage, error_type},
+};
 
 use crate::{built_info, config};
 

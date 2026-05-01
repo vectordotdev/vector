@@ -10,9 +10,10 @@ use vector_common::{
     internal_event::{error_stage, error_type},
     json_size::JsonSize,
 };
-use vector_lib::NamedInternalEvent;
-use vector_lib::internal_event::{CounterName, InternalEvent};
-use vector_lib::{counter, histogram};
+use vector_lib::{
+    NamedInternalEvent, counter, histogram,
+    internal_event::{CounterName, InternalEvent},
+};
 
 pub const PROTOCOL: &str = "websocket";
 

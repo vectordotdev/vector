@@ -5,11 +5,11 @@ use std::borrow::Cow;
 use vector_lib::{
     NamedInternalEvent,
     configurable::configurable_component,
+    counter, gauge,
     internal_event::{
         ComponentEventsDropped, CounterName, InternalEvent, UNINTENTIONAL, error_stage, error_type,
     },
 };
-use vector_lib::{counter, gauge};
 
 #[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
 pub use self::source::*;
@@ -110,9 +110,8 @@ mod source {
     use std::{io::Error, path::Path, time::Duration};
 
     use bytes::BytesMut;
-    use vector_lib::counter;
     use vector_lib::{
-        NamedInternalEvent, emit,
+        NamedInternalEvent, counter, emit,
         file_source_common::internal_events::FileSourceInternalEvents,
         internal_event::{
             ComponentEventsDropped, CounterName, INTENTIONAL, error_stage, error_type,

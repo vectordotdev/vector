@@ -1,13 +1,12 @@
 use std::net::Ipv4Addr;
 
 use vector_lib::{
-    NamedInternalEvent,
+    NamedInternalEvent, counter, histogram,
     internal_event::{
-        ComponentEventsDropped, InternalEvent, CounterName, UNINTENTIONAL, error_stage, error_type,
+        ComponentEventsDropped, CounterName, InternalEvent, UNINTENTIONAL, error_stage, error_type,
     },
     json_size::JsonSize,
 };
-use vector_lib::{counter, histogram};
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 #[allow(dead_code)] // some features only use some variants

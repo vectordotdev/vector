@@ -1,5 +1,7 @@
-use vector_lib::{NamedInternalEvent, counter};
-use vector_lib::internal_event::{InternalEvent, MetricName, error_stage, error_type};
+use vector_lib::{
+    NamedInternalEvent, counter,
+    internal_event::{InternalEvent, MetricName, error_stage, error_type},
+};
 
 #[derive(Debug, NamedInternalEvent)]
 pub struct WindowsServiceStart<'a> {

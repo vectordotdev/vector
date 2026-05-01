@@ -1,8 +1,10 @@
 use std::num::ParseFloatError;
 
-use vector_lib::{NamedInternalEvent, counter};
-use vector_lib::internal_event::{
-    ComponentEventsDropped, InternalEvent, CounterName, UNINTENTIONAL, error_stage, error_type,
+use vector_lib::{
+    NamedInternalEvent, counter,
+    internal_event::{
+        ComponentEventsDropped, CounterName, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+    },
 };
 
 #[derive(NamedInternalEvent)]

@@ -5,9 +5,10 @@ use http::{
     header::{self, HeaderMap, HeaderValue},
 };
 use hyper::{Error, body::HttpBody};
-use vector_lib::NamedInternalEvent;
-use vector_lib::internal_event::{CounterName, InternalEvent, error_stage, error_type};
-use vector_lib::{counter, histogram};
+use vector_lib::{
+    NamedInternalEvent, counter, histogram,
+    internal_event::{CounterName, InternalEvent, error_stage, error_type},
+};
 
 #[derive(Debug, NamedInternalEvent)]
 pub struct AboutToSendHttpRequest<'a, T> {
