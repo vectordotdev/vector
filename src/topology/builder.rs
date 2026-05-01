@@ -2,13 +2,16 @@ use std::{
     collections::HashMap,
     future::ready,
     num::NonZeroUsize,
-    sync::{Arc, LazyLock, Mutex},
+    sync::{
+        Arc, LazyLock, Mutex,
+        atomic::{AtomicU64, Ordering},
+    },
     time::Instant,
 };
 
-use futures::{FutureExt, StreamExt, TryStreamExt, stream::FuturesOrdered};
+use futures::{FutureExt, StreamExt, TryStreamExt};
 use futures_util::stream::FuturesUnordered;
-use metrics::gauge;
+use metrics::{gauge, histogram};
 use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
 use tokio::{
     select,
@@ -748,14 +751,21 @@ impl<'a> Builder<'a> {
         let sender = self
             .utilization_registry
             .add_component(node.key.clone(), gauge!("utilization"));
-        let runner = Runner::new(
+        let preserve_ordering = self
+            .config
+            .global
+            .preserve_ordering_stateless_transforms
+            .unwrap_or(true);
+        let mut runner = Runner::new(
             t,
             input_rx,
             sender,
             node.input_details.data_type(),
             outputs,
             LatencyRecorder::new(self.config.global.latency_ewma_alpha),
+            preserve_ordering,
         );
+        runner.component_id = node.key.id().to_owned();
         let transform = if node.enable_concurrency {
             runner.run_concurrently().boxed()
         } else {
@@ -1144,6 +1154,8 @@ struct Runner {
     timer_tx: UtilizationComponentSender,
     latency_recorder: LatencyRecorder,
     events_received: Registered<EventsReceived>,
+    preserve_ordering: bool,
+    component_id: String,
 }
 
 impl Runner {
@@ -1154,6 +1166,7 @@ impl Runner {
         input_type: DataType,
         outputs: TransformOutputs,
         latency_recorder: LatencyRecorder,
+        preserve_ordering: bool,
     ) -> Self {
         Self {
             transform,
@@ -1163,6 +1176,8 @@ impl Runner {
             timer_tx,
             latency_recorder,
             events_received: register!(EventsReceived),
+            preserve_ordering,
+            component_id: String::new(),
         }
     }
 
@@ -1218,8 +1233,10 @@ impl Runner {
         let mut input_rx =
             super::ready_arrays::ReadyArrays::with_capacity(input_rx, READY_ARRAY_CAPACITY);
 
-        let mut in_flight = FuturesOrdered::new();
+        let mut in_flight = super::in_flight_queue::InFlightQueue::new(self.preserve_ordering);
         let mut shutting_down = false;
+        let completed_count = Arc::new(AtomicU64::new(0));
+        let mut yielded_since_last_record: u64 = 0;
 
         self.timer_tx.try_send_start_wait();
         loop {
@@ -1227,6 +1244,7 @@ impl Runner {
                 biased;
 
                 result = in_flight.next(), if !in_flight.is_empty() => {
+                    yielded_since_last_record += 1;
                     match result {
                         Some(Ok(mut outputs_buf)) => {
                             self.send_outputs(&mut outputs_buf).await
@@ -1237,6 +1255,13 @@ impl Runner {
                 }
 
                 input_arrays = input_rx.next(), if in_flight.len() < *TRANSFORM_CONCURRENCY_LIMIT && !shutting_down => {
+                    let blocked_completions = completed_count.fetch_sub(yielded_since_last_record, Ordering::Relaxed);
+                    yielded_since_last_record = 0;
+                    histogram!(
+                        "estimated_concurrent_transform_scheduling_pressure",
+                        "component_id" => self.component_id.clone()
+                    )
+                    .record((blocked_completions as f64 / *TRANSFORM_CONCURRENCY_LIMIT as f64).min(1.0));
                     match input_arrays {
                         Some(input_arrays) => {
                             let mut len = 0;
@@ -1247,13 +1272,15 @@ impl Runner {
 
                             let mut t = self.transform.clone();
                             let mut outputs_buf = self.outputs.new_buf_with_capacity(len);
+                            let completed = Arc::clone(&completed_count);
                             let task = tokio::spawn(async move {
                                 for events in input_arrays {
                                     t.transform_all(events, &mut outputs_buf);
                                 }
+                                completed.fetch_add(1, Ordering::Relaxed);
                                 outputs_buf
                             }.in_current_span());
-                            in_flight.push_back(task);
+                            in_flight.push(task);
                         }
                         None => {
                             shutting_down = true;
