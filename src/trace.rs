@@ -1,10 +1,10 @@
 #![allow(missing_docs)]
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     marker::PhantomData,
     str::FromStr,
     sync::{
-        Mutex, MutexGuard, OnceLock,
+        LazyLock, Mutex, MutexGuard, OnceLock,
         atomic::{AtomicBool, Ordering},
     },
 };
@@ -26,6 +26,7 @@ use tracing_subscriber::{
     util::SubscriberInitExt,
 };
 pub use tracing_tower::{InstrumentableService, InstrumentedService};
+use vector_lib::SpanField;
 use vector_lib::lookup::event_path;
 use vrl::value::Value;
 
@@ -339,6 +340,17 @@ where
 #[derive(Default, Debug)]
 struct SpanFields(HashMap<&'static str, Value>);
 
+inventory::submit!(SpanField("component_id"));
+inventory::submit!(SpanField("component_type"));
+inventory::submit!(SpanField("component_kind"));
+
+/// Snapshot of every registered [`SpanField`],
+/// materialized once on first access. `inventory` populates submissions before `main`, so the
+/// snapshot is guaranteed to capture every entry; the read path on every traced span event is
+/// then a single set lookup against this static.
+static SPAN_FIELDS: LazyLock<HashSet<&'static str>> =
+    LazyLock::new(|| inventory::iter::<SpanField>().map(|f| f.0).collect());
+
 impl SpanFields {
     fn record(&mut self, field: &tracing_core::Field, value: impl Into<Value>) {
         let name = field.name();
@@ -347,8 +359,10 @@ impl SpanFields {
         // This captures all the basic component information provided in the
         // span that each component is spawned with. We don't capture all fields
         // to avoid adding unintentional noise and to prevent accidental
-        // security/privacy issues (e.g. leaking sensitive data).
-        if name.starts_with("component_") {
+        // security/privacy issues (e.g. leaking sensitive data). Downstream
+        // crates can extend the allowlist by name through
+        // `register_extra_span_field!` (see `vector_lib::SpanField`).
+        if SPAN_FIELDS.contains(name) {
             self.0.insert(name, value.into());
         }
     }
