@@ -63,6 +63,7 @@ fn benchmark_http(c: &mut Criterion) {
                                 request: Default::default(),
                                 tls: Default::default(),
                                 acknowledgements: Default::default(),
+                                retry_strategy: Default::default(),
                             },
                         );
 
