@@ -55,6 +55,13 @@ pub struct ReduceConfig {
     /// The maximum number of events to group together.
     pub max_events: Option<NonZeroUsize>,
 
+    /// The maximum size of a reduced event, in bytes.
+    ///
+    /// If adding an event would cause the reduced event to exceed this size,
+    /// the current reduced event is flushed first.
+    #[configurable(metadata(docs::type_unit = "bytes"))]
+    pub max_bytes: Option<NonZeroUsize>,
+
     /// An ordered list of fields by which to group events.
     ///
     /// Each group with matching values for the specified keys is reduced independently, allowing
