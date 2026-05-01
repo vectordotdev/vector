@@ -17,7 +17,10 @@ For example:
 - `v0.50.0` | `http-server-encoding` | The `encoding` field will be removed. Use `decoding` and `framing` instead.
 - `v0.53.0` | `buffer-bytes-events-metrics` | The `buffer_byte_size` and `buffer_events` gauges are deprecated in favor of the `buffer_size_bytes`/`buffer_size_events` metrics described in `docs/specs/buffer.md`.
 - `v0.58.0` | `azure-monitor-logs-sink` | The `azure_monitor_logs` sink is deprecated in favor of the new `azure_logs_ingestion` sink, which uses the Azure Monitor Logs Ingestion API. Users should migrate before Microsoft ends support for the old Data Collector API (scheduled for September 2026).
+- `v0.58.0` | `datadog-metrics-series-v1` | The `series_api_version: v1` option on the `datadog_metrics` sink is deprecated in favor of `v2` (the default). The v1 series endpoint (`/api/v1/series`) is a legacy endpoint; users should remove `series_api_version: v1` from their configuration or set it to `v2`.
 
 ## To be migrated
 
 ## To be removed
+
+- `v0.56.0` | `greptimedb-v0-support` | The `greptimedb_metrics` and `greptimedb_logs` sinks drop support for GreptimeDB v0.x. Users must upgrade their GreptimeDB instance to v1.x before upgrading Vector.

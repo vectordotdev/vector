@@ -4,7 +4,7 @@ use chrono::{DateTime, Utc};
 use quickcheck::{Arbitrary, Gen, empty_shrinker};
 use vrl::value::{ObjectMap, Value};
 
-use super::super::{
+use super::{
     Event, EventMetadata, LogEvent, Metric, MetricKind, MetricValue, StatisticKind, TraceEvent,
     metric::{
         Bucket, MetricData, MetricName, MetricSeries, MetricSketch, MetricTags, MetricTime,
@@ -21,6 +21,27 @@ const ALPHABET: [&str; 27] = [
     "t", "u", "v", "w", "x", "y", "z", "_",
 ];
 
+// When generating fixtures we need f64 values that survive a JSON round-trip
+// without any loss of precision or serialization ambiguity (NaN, -0.0).
+// Under the `generate-fixtures` feature the helper produces clean values;
+// otherwise it falls back to the standard quickcheck approach.
+fn f64_for_arbitrary(g: &mut Gen) -> f64 {
+    #[cfg(feature = "generate-fixtures")]
+    {
+        let mut value = f64::arbitrary(g) % MAX_F64_SIZE;
+        while value.is_nan() || value == -0.0 {
+            value = f64::arbitrary(g) % MAX_F64_SIZE;
+        }
+        let rounded = (value * 10_000.0).round() / 10_000.0;
+        // Rounding can produce -0.0 from small negatives; normalize to +0.0.
+        if rounded == -0.0_f64 { 0.0 } else { rounded }
+    }
+    #[cfg(not(feature = "generate-fixtures"))]
+    {
+        f64::arbitrary(g) % MAX_F64_SIZE
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Name {
     inner: String,
@@ -29,7 +50,11 @@ pub struct Name {
 impl Arbitrary for Name {
     fn arbitrary(g: &mut Gen) -> Self {
         let mut name = String::with_capacity(MAX_STR_SIZE);
-        for _ in 0..(g.size() % MAX_STR_SIZE) {
+        #[cfg(feature = "generate-fixtures")]
+        let len = usize::max(1, g.size() % MAX_STR_SIZE);
+        #[cfg(not(feature = "generate-fixtures"))]
+        let len = g.size() % MAX_STR_SIZE;
+        for _ in 0..len {
             let idx: usize = usize::arbitrary(g) % ALPHABET.len();
             name.push_str(ALPHABET[idx]);
         }
@@ -76,6 +101,9 @@ impl Arbitrary for Event {
 
 impl Arbitrary for LogEvent {
     fn arbitrary(g: &mut Gen) -> Self {
+        #[cfg(feature = "generate-fixtures")]
+        let mut generator = Gen::from_size_and_seed(MAX_MAP_SIZE, u64::arbitrary(g));
+        #[cfg(not(feature = "generate-fixtures"))]
         let mut generator = Gen::new(MAX_MAP_SIZE);
         let map: ObjectMap = ObjectMap::arbitrary(&mut generator);
         let metadata: EventMetadata = EventMetadata::arbitrary(g);
@@ -175,10 +203,10 @@ impl Arbitrary for MetricValue {
         // here toward `MetricValue::Counter` and `MetricValue::Gauge`.
         match u8::arbitrary(g) % 7 {
             0 => MetricValue::Counter {
-                value: f64::arbitrary(g) % MAX_F64_SIZE,
+                value: f64_for_arbitrary(g),
             },
             1 => MetricValue::Gauge {
-                value: f64::arbitrary(g) % MAX_F64_SIZE,
+                value: f64_for_arbitrary(g),
             },
             2 => MetricValue::Set {
                 values: BTreeSet::arbitrary(g),
@@ -190,12 +218,12 @@ impl Arbitrary for MetricValue {
             4 => MetricValue::AggregatedHistogram {
                 buckets: Vec::arbitrary(g),
                 count: u64::arbitrary(g),
-                sum: f64::arbitrary(g) % MAX_F64_SIZE,
+                sum: f64_for_arbitrary(g),
             },
             5 => MetricValue::AggregatedSummary {
                 quantiles: Vec::arbitrary(g),
                 count: u64::arbitrary(g),
-                sum: f64::arbitrary(g) % MAX_F64_SIZE,
+                sum: f64_for_arbitrary(g),
             },
             6 => {
                 // We're working around quickcheck's limitations here, and
@@ -203,7 +231,7 @@ impl Arbitrary for MetricValue {
                 let num_samples = u8::arbitrary(g);
                 let samples = std::iter::repeat_with(|| {
                     loop {
-                        let f = f64::arbitrary(g);
+                        let f = f64_for_arbitrary(g);
                         if f.is_normal() {
                             return f;
                         }
@@ -214,6 +242,8 @@ impl Arbitrary for MetricValue {
 
                 let mut sketch = AgentDDSketch::with_agent_defaults();
                 sketch.insert_many(&samples);
+                #[cfg(feature = "generate-fixtures")]
+                sketch.set_sum_avg(f64_for_arbitrary(g), f64_for_arbitrary(g));
 
                 MetricValue::Sketch {
                     sketch: MetricSketch::AgentDDSketch(sketch),
@@ -363,7 +393,7 @@ impl Arbitrary for MetricValue {
 impl Arbitrary for Sample {
     fn arbitrary(g: &mut Gen) -> Self {
         Sample {
-            value: f64::arbitrary(g) % MAX_F64_SIZE,
+            value: f64_for_arbitrary(g),
             rate: u32::arbitrary(g),
         }
     }
@@ -393,8 +423,8 @@ impl Arbitrary for Sample {
 impl Arbitrary for Quantile {
     fn arbitrary(g: &mut Gen) -> Self {
         Quantile {
-            quantile: f64::arbitrary(g) % MAX_F64_SIZE,
-            value: f64::arbitrary(g) % MAX_F64_SIZE,
+            quantile: f64_for_arbitrary(g),
+            value: f64_for_arbitrary(g),
         }
     }
 
@@ -423,7 +453,7 @@ impl Arbitrary for Quantile {
 impl Arbitrary for Bucket {
     fn arbitrary(g: &mut Gen) -> Self {
         Bucket {
-            upper_limit: f64::arbitrary(g) % MAX_F64_SIZE,
+            upper_limit: f64_for_arbitrary(g),
             count: u64::arbitrary(g),
         }
     }

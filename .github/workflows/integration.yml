@@ -23,7 +23,6 @@ permissions:
 env:
   CONTAINER_TOOL: "docker"
   DD_ENV: "ci"
-  DD_API_KEY: ${{ secrets.DD_API_KEY }}
   TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}
   TEST_APPSIGNAL_PUSH_API_KEY: ${{ secrets.TEST_APPSIGNAL_PUSH_API_KEY }}
   AXIOM_TOKEN: ${{ secrets.AXIOM_TOKEN }}
@@ -65,6 +64,9 @@ jobs:
 
   integration-tests:
     runs-on: ubuntu-24.04-8core
+    permissions:
+      contents: read
+      id-token: write
     needs:
       - changes
       - build-test-runner
@@ -141,6 +143,9 @@ jobs:
         with:
           submodules: "recursive"
 
+      - uses: ./.github/actions/dd-token
+        if: steps.check.outputs.should_run == 'true'
+
       - uses: ./.github/actions/setup
         if: steps.check.outputs.should_run == 'true'
         with:
@@ -167,6 +172,9 @@ jobs:
 
   e2e-tests:
     runs-on: ubuntu-24.04-8core
+    permissions:
+      contents: read
+      id-token: write
     needs:
       - changes
       - build-test-runner
@@ -204,6 +212,9 @@ jobs:
         if: steps.check.outputs.should_run == 'true'
         with:
           submodules: "recursive"
+
+      - uses: ./.github/actions/dd-token
+        if: steps.check.outputs.should_run == 'true'
 
       - uses: ./.github/actions/setup
         if: steps.check.outputs.should_run == 'true'
