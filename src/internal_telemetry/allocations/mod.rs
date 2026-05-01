@@ -12,7 +12,10 @@ use std::{
 
 use arr_macro::arr;
 use rand_distr::num_traits::ToPrimitive;
-use vector_common::{counter, gauge, internal_event::{CounterName, GaugeName}};
+use vector_common::{
+    counter, gauge,
+    internal_event::{CounterName, GaugeName},
+};
 
 use self::allocator::Tracer;
 pub(crate) use self::allocator::{

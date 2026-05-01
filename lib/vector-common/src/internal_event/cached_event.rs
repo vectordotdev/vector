@@ -91,12 +91,13 @@ where
 #[cfg(test)]
 mod tests {
     #![allow(unreachable_pub)]
-    use metrics::{Counter, counter};
+    use metrics::Counter;
+    use strum::IntoEnumIterator;
 
     use super::*;
+    use crate::internal_event::CounterName;
 
     #[test]
-    #[allow(clippy::disallowed_macros)]
     fn test_fixed_tag() {
         crate::registered_event!(
             TestEvent {
@@ -104,7 +105,7 @@ mod tests {
                 dynamic: String,
             } => {
                 event: Counter = {
-                    counter!("test_event_total", "fixed" => self.fixed, "dynamic" => self.dynamic)
+                    crate::counter!(CounterName::iter().next().unwrap(), "fixed" => self.fixed, "dynamic" => self.dynamic)
                 },
             }
 

@@ -342,9 +342,11 @@ impl<S> OutputUtilization<S> {
 
 #[cfg(test)]
 mod tests {
-    #![allow(clippy::disallowed_macros)]
     use mock_instant::global::MockClock;
     use serial_test::serial;
+    use strum::IntoEnumIterator;
+    use vector_lib::gauge;
+    use vector_lib::internal_event::GaugeName;
 
     use super::*;
 
@@ -354,7 +356,7 @@ mod tests {
         MockClock::set_time(Duration::from_secs(100));
 
         Timer::new(
-            metrics::gauge!("test_utilization"),
+            gauge!(GaugeName::iter().next().unwrap()),
             #[cfg(debug_assertions)]
             "test_component".into(),
         )
@@ -523,7 +525,7 @@ mod tests {
         let (mut emitter, registry) = UtilizationEmitter::new();
         let key = ComponentKey::from("test_transform");
 
-        let sender = registry.add_component(key.clone(), metrics::gauge!("utilization"));
+        let sender = registry.add_component(key.clone(), gauge!(GaugeName::Utilization));
         let output_sender = sender.clone();
 
         // Upstream channel carrying EventArrays.

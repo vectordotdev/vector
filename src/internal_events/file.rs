@@ -7,7 +7,8 @@ use vector_lib::{
     configurable::configurable_component,
     counter, gauge,
     internal_event::{
-        ComponentEventsDropped, CounterName, GaugeName, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+        ComponentEventsDropped, CounterName, GaugeName, InternalEvent, UNINTENTIONAL, error_stage,
+        error_type,
     },
 };
 

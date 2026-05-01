@@ -11,8 +11,8 @@ mod sink {
     use vector_lib::{
         NamedInternalEvent, counter, gauge,
         internal_event::{
-            ComponentEventsDropped, CounterName, GaugeName, InternalEvent, UNINTENTIONAL, error_stage,
-            error_type,
+            ComponentEventsDropped, CounterName, GaugeName, InternalEvent, UNINTENTIONAL,
+            error_stage, error_type,
         },
     };
 
