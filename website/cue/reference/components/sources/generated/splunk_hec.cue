@@ -80,8 +80,14 @@ generated: components: sources: splunk_hec: configuration: {
 			envelope is parsed: the envelope's `event` field is fed through the codec
 			(string contents are passed as raw bytes; objects, arrays, and other JSON
 			values are JSON-serialized first to preserve shape), and a single envelope
-			can fan out to multiple events. When unset, the endpoint preserves its
+			can fan out to multiple events. Decode failures are swallowed and do not
+			return an error to the Splunk client. When unset, the endpoint preserves its
 			existing behavior.
+
+			The VRL codec has access to HEC envelope metadata
+			(host, sourcetype, channel, etc.) and the authentication token via
+			`%splunk_hec.*` paths and `get_secret!("splunk_hec_token")` before the
+			program executes.
 			"""
 		required: false
 		type: object: options: {
@@ -625,8 +631,9 @@ generated: components: sources: splunk_hec: configuration: {
 			Codec configuration applied to events received on `/services/collector/raw`.
 
 			When `decoding` is set, the (decompressed) request body is fed through the
-			codec instead of being emitted as a single event. When unset, the endpoint
-			preserves its existing behavior of one event per request body.
+			codec instead of being emitted as a single event. Decode failures are
+			swallowed and do not return an error to the Splunk client. When unset, the
+			endpoint preserves its existing behavior of one event per request body.
 			"""
 		required: false
 		type: object: options: {

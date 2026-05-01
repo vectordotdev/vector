@@ -32,7 +32,7 @@ use vector_lib::{
     config::{LegacyKey, LogNamespace},
     configurable::configurable_component,
     event::{BatchNotifier, EventMetadata},
-    internal_event::{CountByteSize, InternalEventHandle as _, Registered},
+    internal_event::{ComponentEventsDropped, CountByteSize, InternalEventHandle as _, Registered, UNINTENTIONAL},
     lookup::{
         self, OwnedValuePath, event_path, lookup_v2::OptionalValuePath, metadata_path,
         owned_value_path,
@@ -142,8 +142,14 @@ pub struct SplunkConfig {
     /// envelope is parsed: the envelope's `event` field is fed through the codec
     /// (string contents are passed as raw bytes; objects, arrays, and other JSON
     /// values are JSON-serialized first to preserve shape), and a single envelope
-    /// can fan out to multiple events. When unset, the endpoint preserves its
+    /// can fan out to multiple events. Decode failures are swallowed and do not
+    /// return an error to the Splunk client. When unset, the endpoint preserves its
     /// existing behavior.
+    ///
+    /// The VRL codec has access to HEC envelope metadata
+    /// (host, sourcetype, channel, etc.) and the authentication token via
+    /// `%splunk_hec.*` paths and `get_secret!("splunk_hec_token")` before the
+    /// program executes.
     #[configurable(derived)]
     #[configurable(metadata(docs::advanced))]
     #[serde(default)]
@@ -152,8 +158,9 @@ pub struct SplunkConfig {
     /// Codec configuration applied to events received on `/services/collector/raw`.
     ///
     /// When `decoding` is set, the (decompressed) request body is fed through the
-    /// codec instead of being emitted as a single event. When unset, the endpoint
-    /// preserves its existing behavior of one event per request body.
+    /// codec instead of being emitted as a single event. Decode failures are
+    /// swallowed and do not return an error to the Splunk client. When unset, the
+    /// endpoint preserves its existing behavior of one event per request body.
     #[configurable(derived)]
     #[configurable(metadata(docs::advanced))]
     #[serde(default)]
@@ -1210,27 +1217,19 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
         decoder: Decoder,
     ) -> Result<(Vec<Event>, bool), Rejection> {
         self.envelopes_processed += 1;
-        // Extract `event` field while preserving its original JSON shape.
-        // Strings go in as raw UTF-8 bytes (so non-JSON decoders see bare content);
-        // objects, arrays, numbers, and bools are JSON-serialized so a JSON decoder
-        // round-trips them back to the same shape.
-        let payload: Vec<u8> = match json.get_mut("event").map(JsonValue::take) {
-            Some(JsonValue::Null) | None => {
-                return Err(ApiError::MissingEventField {
-                    event: self.envelopes_processed.saturating_sub(1),
-                }
-                .into());
+        let payload = match serde_json::to_vec(&json["event"]) {
+            Ok(bytes) => bytes,
+            Err(error) => {
+                let error: vector_lib::Error = Box::new(error);
+                emit!(vector_lib::codecs::internal_events::DecoderDeserializeError {
+                    error: &error
+                });
+                emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+                    count: 1,
+                    reason: "Failed to serialize event field to bytes.",
+                });
+                return Ok((vec![], true));
             }
-            Some(JsonValue::String(s)) if s.is_empty() => {
-                return Err(ApiError::EmptyEventField {
-                    event: self.envelopes_processed.saturating_sub(1),
-                }
-                .into());
-            }
-            Some(JsonValue::String(s)) => s.into_bytes(),
-            Some(other) => serde_json::to_vec(&other).map_err(|_| ApiError::InvalidDataFormat {
-                event: self.envelopes_processed.saturating_sub(1),
-            })?,
         };
 
         self.process_time(&mut json)?;
