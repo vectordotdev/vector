@@ -25,6 +25,7 @@ cfg_if::cfg_if! {
         use std::path::PathBuf;
         use std::sync::Arc;
 
+        use chrono::Utc;
         use futures::StreamExt;
         use vector_lib::EstimatedJsonEncodedSizeOf;
         use vector_lib::finalizer::OrderedFinalizer;
@@ -166,6 +167,7 @@ impl Finalizer {
 async fn process_event_batch(
     events: Vec<WindowsEvent>,
     parser: &EventLogParser,
+    log_namespace: LogNamespace,
     acknowledgements: bool,
     subscription: &EventLogSubscription,
     out: &mut SourceSender,
@@ -189,6 +191,12 @@ async fn process_event_batch(
         let event_id = event.event_id;
         match parser.parse_event(event) {
             Ok(mut log_event) => {
+                log_namespace.insert_standard_vector_source_metadata(
+                    &mut log_event,
+                    WindowsEventLogConfig::NAME,
+                    Utc::now(),
+                );
+
                 let byte_size = log_event.estimated_json_encoded_size_of();
                 total_byte_size += byte_size.get();
                 if let Some(ref batch) = batch {
@@ -416,6 +424,7 @@ impl WindowsEventLogSource {
                             if process_event_batch(
                                 events,
                                 &parser,
+                                self.log_namespace,
                                 acknowledgements,
                                 &subscription,
                                 &mut out,
@@ -516,6 +525,7 @@ impl WindowsEventLogSource {
                             if process_event_batch(
                                 events,
                                 &parser,
+                                self.log_namespace,
                                 acknowledgements,
                                 &subscription,
                                 &mut out,
@@ -664,8 +674,11 @@ impl SourceConfig for WindowsEventLogConfig {
                     ),
                 ])),
                 [LogNamespace::Vector],
-            ),
-            LogNamespace::Legacy => vector_lib::schema::Definition::any(),
+            )
+            .with_standard_vector_source_metadata(),
+            LogNamespace::Legacy => {
+                vector_lib::schema::Definition::any().with_standard_vector_source_metadata()
+            }
         };
 
         vec![SourceOutput::new_maybe_logs(
