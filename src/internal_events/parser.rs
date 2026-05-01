@@ -4,7 +4,7 @@ use std::borrow::Cow;
 
 use vector_lib::{NamedInternalEvent, counter};
 use vector_lib::internal_event::{
-    ComponentEventsDropped, InternalEvent, MetricName, UNINTENTIONAL, error_stage, error_type,
+    ComponentEventsDropped, InternalEvent, CounterName, UNINTENTIONAL, error_stage, error_type,
 };
 
 fn truncate_string_at(s: &str, maxlen: usize) -> Cow<'_, str> {
@@ -35,7 +35,7 @@ impl InternalEvent for ParserMatchError<'_> {
             field = &truncate_string_at(&String::from_utf8_lossy(self.value), 60)[..]
         );
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "error_code" => "no_match_found",
             "error_type" => error_type::CONDITION_FAILED,
             "stage" => error_stage::PROCESSING,
@@ -65,7 +65,7 @@ impl<const DROP_EVENT: bool> InternalEvent for ParserMissingFieldError<'_, DROP_
             stage = error_stage::PROCESSING
         );
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "error_code" => "field_not_found",
             "error_type" => error_type::CONDITION_FAILED,
             "stage" => error_stage::PROCESSING,
@@ -96,7 +96,7 @@ impl InternalEvent for ParserConversionError<'_> {
             stage = error_stage::PROCESSING
         );
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "error_code" => "type_conversion",
             "error_type" => error_type::CONVERSION_FAILED,
             "stage" => error_stage::PROCESSING,

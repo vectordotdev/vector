@@ -1,5 +1,5 @@
+use vector_lib::internal_event::{ComponentEventsDropped, CounterName, INTENTIONAL, InternalEvent};
 use vector_lib::{NamedInternalEvent, counter};
-use vector_lib::internal_event::{ComponentEventsDropped, INTENTIONAL, InternalEvent, MetricName};
 
 #[derive(NamedInternalEvent)]
 pub struct TagCardinalityLimitRejectingEvent<'a> {
@@ -19,13 +19,13 @@ impl InternalEvent for TagCardinalityLimitRejectingEvent<'_> {
         );
         if self.include_extended_tags {
             counter!(
-                MetricName::TagValueLimitExceededTotal,
+                CounterName::TagValueLimitExceededTotal,
                 "metric_name" => self.metric_name.to_string(),
                 "tag_key" => self.tag_key.to_string(),
             )
             .increment(1);
         } else {
-            counter!(MetricName::TagValueLimitExceededTotal).increment(1);
+            counter!(CounterName::TagValueLimitExceededTotal).increment(1);
         }
 
         emit!(ComponentEventsDropped::<INTENTIONAL> {
@@ -53,13 +53,13 @@ impl InternalEvent for TagCardinalityLimitRejectingTag<'_> {
         );
         if self.include_extended_tags {
             counter!(
-                MetricName::TagValueLimitExceededTotal,
+                CounterName::TagValueLimitExceededTotal,
                 "metric_name" => self.metric_name.to_string(),
                 "tag_key" => self.tag_key.to_string(),
             )
             .increment(1);
         } else {
-            counter!(MetricName::TagValueLimitExceededTotal).increment(1);
+            counter!(CounterName::TagValueLimitExceededTotal).increment(1);
         }
     }
 }
@@ -75,6 +75,6 @@ impl InternalEvent for TagCardinalityValueLimitReached<'_> {
             message = "Value_limit reached for key. New values for this key will be rejected.",
             key = %self.key,
         );
-        counter!(MetricName::ValueLimitReachedTotal).increment(1);
+        counter!(CounterName::ValueLimitReachedTotal).increment(1);
     }
 }

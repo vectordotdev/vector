@@ -6,7 +6,7 @@ use vector_lib::{
     NamedInternalEvent,
     configurable::configurable_component,
     internal_event::{
-        ComponentEventsDropped, InternalEvent, MetricName, UNINTENTIONAL, error_stage, error_type,
+        ComponentEventsDropped, CounterName, InternalEvent, UNINTENTIONAL, error_stage, error_type,
     },
 };
 use vector_lib::{counter, gauge};
@@ -34,7 +34,7 @@ pub struct FileOpen {
 
 impl InternalEvent for FileOpen {
     fn emit(self) {
-        gauge!(MetricName::OpenFiles).set(self.count as f64);
+        gauge!(CounterName::OpenFiles).set(self.count as f64);
     }
 }
 
@@ -55,13 +55,13 @@ impl InternalEvent for FileBytesSent<'_> {
         );
         if self.include_file_metric_tag {
             counter!(
-                MetricName::ComponentSentBytesTotal,
+                CounterName::ComponentSentBytesTotal,
                 "protocol" => "file",
                 "file" => self.file.clone().into_owned(),
             )
         } else {
             counter!(
-                MetricName::ComponentSentBytesTotal,
+                CounterName::ComponentSentBytesTotal,
                 "protocol" => "file",
             )
         }
@@ -89,7 +89,7 @@ impl<P: std::fmt::Debug> InternalEvent for FileIoError<'_, P> {
             stage = error_stage::SENDING,
         );
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "error_code" => self.code,
             "error_type" => error_type::IO_FAILED,
             "stage" => error_stage::SENDING,
@@ -114,7 +114,9 @@ mod source {
     use vector_lib::{
         NamedInternalEvent, emit,
         file_source_common::internal_events::FileSourceInternalEvents,
-        internal_event::{ComponentEventsDropped, INTENTIONAL, MetricName, error_stage, error_type},
+        internal_event::{
+            ComponentEventsDropped, CounterName, INTENTIONAL, error_stage, error_type,
+        },
         json_size::JsonSize,
     };
 
@@ -137,13 +139,13 @@ mod source {
             );
             if self.include_file_metric_tag {
                 counter!(
-                    MetricName::ComponentReceivedBytesTotal,
+                    CounterName::ComponentReceivedBytesTotal,
                     "protocol" => "file",
                     "file" => self.file.to_owned()
                 )
             } else {
                 counter!(
-                    MetricName::ComponentReceivedBytesTotal,
+                    CounterName::ComponentReceivedBytesTotal,
                     "protocol" => "file",
                 )
             }
@@ -169,18 +171,18 @@ mod source {
             );
             if self.include_file_metric_tag {
                 counter!(
-                    MetricName::ComponentReceivedEventsTotal,
+                    CounterName::ComponentReceivedEventsTotal,
                     "file" => self.file.to_owned(),
                 )
                 .increment(self.count as u64);
                 counter!(
-                    MetricName::ComponentReceivedEventBytesTotal,
+                    CounterName::ComponentReceivedEventBytesTotal,
                     "file" => self.file.to_owned(),
                 )
                 .increment(self.byte_size.get() as u64);
             } else {
-                counter!(MetricName::ComponentReceivedEventsTotal).increment(self.count as u64);
-                counter!(MetricName::ComponentReceivedEventBytesTotal)
+                counter!(CounterName::ComponentReceivedEventsTotal).increment(self.count as u64);
+                counter!(CounterName::ComponentReceivedEventBytesTotal)
                     .increment(self.byte_size.get() as u64);
             }
         }
@@ -200,11 +202,11 @@ mod source {
             );
             if self.include_file_metric_tag {
                 counter!(
-                    MetricName::ChecksumErrorsTotal,
+                    CounterName::ChecksumErrorsTotal,
                     "file" => self.file.to_string_lossy().into_owned(),
                 )
             } else {
-                counter!(MetricName::ChecksumErrorsTotal)
+                counter!(CounterName::ChecksumErrorsTotal)
             }
             .increment(1);
         }
@@ -229,7 +231,7 @@ mod source {
             );
             if self.include_file_metric_tag {
                 counter!(
-                    MetricName::ComponentErrorsTotal,
+                    CounterName::ComponentErrorsTotal,
                     "error_code" => "reading_fingerprint",
                     "error_type" => error_type::READER_FAILED,
                     "stage" => error_stage::RECEIVING,
@@ -237,7 +239,7 @@ mod source {
                 )
             } else {
                 counter!(
-                    MetricName::ComponentErrorsTotal,
+                    CounterName::ComponentErrorsTotal,
                     "error_code" => "reading_fingerprint",
                     "error_type" => error_type::READER_FAILED,
                     "stage" => error_stage::RECEIVING,
@@ -268,7 +270,7 @@ mod source {
             );
             if self.include_file_metric_tag {
                 counter!(
-                    MetricName::ComponentErrorsTotal,
+                    CounterName::ComponentErrorsTotal,
                     "file" => self.file.to_string_lossy().into_owned(),
                     "error_code" => DELETION_FAILED,
                     "error_type" => error_type::COMMAND_FAILED,
@@ -276,7 +278,7 @@ mod source {
                 )
             } else {
                 counter!(
-                    MetricName::ComponentErrorsTotal,
+                    CounterName::ComponentErrorsTotal,
                     "error_code" => DELETION_FAILED,
                     "error_type" => error_type::COMMAND_FAILED,
                     "stage" => error_stage::RECEIVING,
@@ -300,11 +302,11 @@ mod source {
             );
             if self.include_file_metric_tag {
                 counter!(
-                    MetricName::FilesDeletedTotal,
+                    CounterName::FilesDeletedTotal,
                     "file" => self.file.to_string_lossy().into_owned(),
                 )
             } else {
-                counter!(MetricName::FilesDeletedTotal)
+                counter!(CounterName::FilesDeletedTotal)
             }
             .increment(1);
         }
@@ -327,13 +329,13 @@ mod source {
             );
             if self.include_file_metric_tag {
                 counter!(
-                    MetricName::FilesUnwatchedTotal,
+                    CounterName::FilesUnwatchedTotal,
                     "file" => self.file.to_string_lossy().into_owned(),
                     "reached_eof" => reached_eof,
                 )
             } else {
                 counter!(
-                    MetricName::FilesUnwatchedTotal,
+                    CounterName::FilesUnwatchedTotal,
                     "reached_eof" => reached_eof,
                 )
             }
@@ -360,7 +362,7 @@ mod source {
             );
             if self.include_file_metric_tag {
                 counter!(
-                    MetricName::ComponentErrorsTotal,
+                    CounterName::ComponentErrorsTotal,
                     "error_code" => "watching",
                     "error_type" => error_type::COMMAND_FAILED,
                     "stage" => error_stage::RECEIVING,
@@ -368,7 +370,7 @@ mod source {
                 )
             } else {
                 counter!(
-                    MetricName::ComponentErrorsTotal,
+                    CounterName::ComponentErrorsTotal,
                     "error_code" => "watching",
                     "error_type" => error_type::COMMAND_FAILED,
                     "stage" => error_stage::RECEIVING,
@@ -394,11 +396,11 @@ mod source {
             );
             if self.include_file_metric_tag {
                 counter!(
-                    MetricName::FilesResumedTotal,
+                    CounterName::FilesResumedTotal,
                     "file" => self.file.to_string_lossy().into_owned(),
                 )
             } else {
-                counter!(MetricName::FilesResumedTotal)
+                counter!(CounterName::FilesResumedTotal)
             }
             .increment(1);
         }
@@ -418,11 +420,11 @@ mod source {
             );
             if self.include_file_metric_tag {
                 counter!(
-                    MetricName::FilesAddedTotal,
+                    CounterName::FilesAddedTotal,
                     "file" => self.file.to_string_lossy().into_owned(),
                 )
             } else {
-                counter!(MetricName::FilesAddedTotal)
+                counter!(CounterName::FilesAddedTotal)
             }
             .increment(1);
         }
@@ -441,7 +443,7 @@ mod source {
                 count = %self.count,
                 duration_ms = self.duration.as_millis() as u64,
             );
-            counter!(MetricName::CheckpointsTotal).increment(self.count as u64);
+            counter!(CounterName::CheckpointsTotal).increment(self.count as u64);
         }
     }
 
@@ -460,7 +462,7 @@ mod source {
                 stage = error_stage::RECEIVING,
             );
             counter!(
-                MetricName::ComponentErrorsTotal,
+                CounterName::ComponentErrorsTotal,
                 "error_code" => "writing_checkpoints",
                 "error_type" => error_type::WRITER_FAILED,
                 "stage" => error_stage::RECEIVING,
@@ -486,7 +488,7 @@ mod source {
                 path = %self.path.display(),
             );
             counter!(
-                MetricName::ComponentErrorsTotal,
+                CounterName::ComponentErrorsTotal,
                 "error_code" => "globbing",
                 "error_type" => error_type::READER_FAILED,
                 "stage" => error_stage::RECEIVING,
@@ -513,7 +515,7 @@ mod source {
                 stage = error_stage::RECEIVING,
             );
             counter!(
-                MetricName::ComponentErrorsTotal,
+                CounterName::ComponentErrorsTotal,
                 "error_code" => "reading_line_from_file",
                 "error_type" => error_type::CONDITION_FAILED,
                 "stage" => error_stage::RECEIVING,

@@ -2,7 +2,7 @@ use mongodb::{bson, error::Error as MongoError};
 use vector_lib::counter;
 use vector_lib::{
     NamedInternalEvent,
-    internal_event::{InternalEvent, MetricName, error_stage, error_type},
+    internal_event::{CounterName, InternalEvent, error_stage, error_type},
     json_size::JsonSize,
 };
 
@@ -23,12 +23,12 @@ impl InternalEvent for MongoDbMetricsEventsReceived<'_> {
             endpoint = self.endpoint,
         );
         counter!(
-            MetricName::ComponentReceivedEventsTotal,
+            CounterName::ComponentReceivedEventsTotal,
             "endpoint" => self.endpoint.to_owned(),
         )
         .increment(self.count as u64);
         counter!(
-            MetricName::ComponentReceivedEventBytesTotal,
+            CounterName::ComponentReceivedEventBytesTotal,
             "endpoint" => self.endpoint.to_owned(),
         )
         .increment(self.byte_size.get() as u64);
@@ -51,7 +51,7 @@ impl InternalEvent for MongoDbMetricsRequestError<'_> {
             stage = error_stage::RECEIVING,
         );
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::RECEIVING,
         )
@@ -75,7 +75,7 @@ impl InternalEvent for MongoDbMetricsBsonParseError<'_> {
             stage = error_stage::RECEIVING,
         );
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::RECEIVING,
             "endpoint" => self.endpoint.to_owned(),

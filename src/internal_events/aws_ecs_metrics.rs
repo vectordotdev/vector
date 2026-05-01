@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use vector_lib::counter;
 use vector_lib::{
     NamedInternalEvent,
-    internal_event::{InternalEvent, MetricName, error_stage, error_type},
+    internal_event::{CounterName, InternalEvent, error_stage, error_type},
     json_size::JsonSize,
 };
 
@@ -24,12 +24,12 @@ impl InternalEvent for AwsEcsMetricsEventsReceived<'_> {
             endpoint = %self.endpoint,
         );
         counter!(
-            MetricName::ComponentReceivedEventsTotal,
+            CounterName::ComponentReceivedEventsTotal,
             "endpoint" => self.endpoint.to_string(),
         )
         .increment(self.count as u64);
         counter!(
-            MetricName::ComponentReceivedEventBytesTotal,
+            CounterName::ComponentReceivedEventBytesTotal,
             "endpoint" => self.endpoint.to_string(),
         )
         .increment(self.byte_size.get() as u64);
@@ -57,9 +57,9 @@ impl InternalEvent for AwsEcsMetricsParseError<'_> {
             endpoint = %self.endpoint,
             "Failed to parse response.",
         );
-        counter!(MetricName::ParseErrorsTotal).increment(1);
+        counter!(CounterName::ParseErrorsTotal).increment(1);
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "stage" => error_stage::PROCESSING,
             "error_type" => error_type::PARSER_FAILED,
             "endpoint" => self.endpoint.to_string(),

@@ -1,7 +1,7 @@
-use vector_lib::{NamedInternalEvent, counter};
 use vector_lib::internal_event::{
-    ComponentEventsDropped, InternalEvent, MetricName, UNINTENTIONAL, error_stage, error_type,
+    ComponentEventsDropped, CounterName, InternalEvent, UNINTENTIONAL, error_stage, error_type,
 };
+use vector_lib::{NamedInternalEvent, counter};
 
 #[derive(Debug, NamedInternalEvent)]
 pub struct AwsCloudwatchLogsMessageSizeError {
@@ -21,7 +21,7 @@ impl InternalEvent for AwsCloudwatchLogsMessageSizeError {
             stage = error_stage::PROCESSING,
         );
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "error_code" => "message_too_long",
             "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::PROCESSING,

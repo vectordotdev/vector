@@ -3,13 +3,13 @@ use metrics::{Counter, Histogram};
 use crate::{counter, histogram};
 use tracing::trace;
 
-use super::{CountByteSize, MetricName};
+use super::{CountByteSize, CounterName, HistogramName};
 
 crate::registered_event!(
     EventsReceived => {
-        events_count: Histogram = histogram!(MetricName::ComponentReceivedEventsCount),
-        events: Counter = counter!(MetricName::ComponentReceivedEventsTotal),
-        event_bytes: Counter = counter!(MetricName::ComponentReceivedEventBytesTotal),
+        events_count: Histogram = histogram!(HistogramName::ComponentReceivedEventsCount),
+        events: Counter = counter!(CounterName::ComponentReceivedEventsTotal),
+        event_bytes: Counter = counter!(CounterName::ComponentReceivedEventBytesTotal),
     }
 
     fn emit(&self, data: CountByteSize) {

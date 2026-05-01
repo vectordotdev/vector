@@ -1,7 +1,7 @@
 use std::net::SocketAddr;
 
 use vector_lib::{NamedInternalEvent, counter};
-use vector_lib::internal_event::{InternalEvent, MetricName, error_stage, error_type};
+use vector_lib::internal_event::{InternalEvent, CounterName, error_stage, error_type};
 
 use crate::{internal_events::SocketOutgoingConnectionError, tls::TlsError};
 
@@ -17,7 +17,7 @@ impl InternalEvent for TcpSocketConnectionEstablished {
         } else {
             debug!(message = "Connected.", peer_addr = "unknown");
         }
-        counter!(MetricName::ConnectionEstablishedTotal, "mode" => "tcp").increment(1);
+        counter!(CounterName::ConnectionEstablishedTotal, "mode" => "tcp").increment(1);
     }
 }
 
@@ -40,7 +40,7 @@ pub struct TcpSocketConnectionShutdown;
 impl InternalEvent for TcpSocketConnectionShutdown {
     fn emit(self) {
         warn!(message = "Received EOF from the server, shutdown.");
-        counter!(MetricName::ConnectionShutdownTotal, "mode" => "tcp").increment(1);
+        counter!(CounterName::ConnectionShutdownTotal, "mode" => "tcp").increment(1);
     }
 }
 
@@ -62,7 +62,7 @@ impl<E: std::fmt::Display> InternalEvent for TcpSocketError<'_, E> {
             stage = error_stage::PROCESSING,
         );
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "error_type" => error_type::CONNECTION_FAILED,
             "stage" => error_stage::PROCESSING,
         )
@@ -99,7 +99,7 @@ impl InternalEvent for TcpSocketTlsConnectionError {
                     stage = error_stage::SENDING,
                 );
                 counter!(
-                    MetricName::ComponentErrorsTotal,
+                    CounterName::ComponentErrorsTotal,
                     "error_code" => "connection_failed",
                     "error_type" => error_type::WRITER_FAILED,
                     "stage" => error_stage::SENDING,
@@ -126,7 +126,7 @@ impl InternalEvent for TcpSendAckError {
             stage = error_stage::SENDING,
         );
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "error_code" => "ack_failed",
             "error_type" => error_type::WRITER_FAILED,
             "stage" => error_stage::SENDING,
@@ -151,7 +151,7 @@ impl InternalEvent for TcpBytesReceived {
             peer_addr = %self.peer_addr,
         );
         counter!(
-            MetricName::ComponentReceivedBytesTotal, "protocol" => "tcp"
+            CounterName::ComponentReceivedBytesTotal, "protocol" => "tcp"
         )
         .increment(self.byte_size as u64);
     }

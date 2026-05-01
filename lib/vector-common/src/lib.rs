@@ -74,14 +74,14 @@ extern crate tracing;
 #[macro_export]
 macro_rules! counter {
     ($name:expr) => {{
-        let _name: $crate::internal_event::MetricName = $name;
+        let _name: $crate::internal_event::CounterName = $name;
         #[allow(clippy::disallowed_macros)]
         {
             metrics::counter!(_name.as_str())
         }
     }};
     ($name:expr, $($rest:tt)*) => {{
-        let _name: $crate::internal_event::MetricName = $name;
+        let _name: $crate::internal_event::CounterName = $name;
         #[allow(clippy::disallowed_macros)]
         {
             metrics::counter!(_name.as_str(), $($rest)*)
@@ -93,14 +93,14 @@ macro_rules! counter {
 #[macro_export]
 macro_rules! histogram {
     ($name:expr) => {{
-        let _name: $crate::internal_event::MetricName = $name;
+        let _name: $crate::internal_event::HistogramName = $name;
         #[allow(clippy::disallowed_macros)]
         {
             metrics::histogram!(_name.as_str())
         }
     }};
     ($name:expr, $($rest:tt)*) => {{
-        let _name: $crate::internal_event::MetricName = $name;
+        let _name: $crate::internal_event::HistogramName = $name;
         #[allow(clippy::disallowed_macros)]
         {
             metrics::histogram!(_name.as_str(), $($rest)*)
@@ -112,14 +112,14 @@ macro_rules! histogram {
 #[macro_export]
 macro_rules! gauge {
     ($name:expr) => {{
-        let _name: $crate::internal_event::MetricName = $name;
+        let _name: $crate::internal_event::GaugeName = $name;
         #[allow(clippy::disallowed_macros)]
         {
             metrics::gauge!(_name.as_str())
         }
     }};
     ($name:expr, $($rest:tt)*) => {{
-        let _name: $crate::internal_event::MetricName = $name;
+        let _name: $crate::internal_event::GaugeName = $name;
         #[allow(clippy::disallowed_macros)]
         {
             metrics::gauge!(_name.as_str(), $($rest)*)

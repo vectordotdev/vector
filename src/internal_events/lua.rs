@@ -1,6 +1,6 @@
 use vector_lib::NamedInternalEvent;
 use vector_lib::internal_event::{
-    ComponentEventsDropped, InternalEvent, MetricName, UNINTENTIONAL, error_stage, error_type,
+    ComponentEventsDropped, CounterName, InternalEvent, UNINTENTIONAL, error_stage, error_type,
 };
 use vector_lib::{counter, gauge};
 
@@ -13,7 +13,7 @@ pub struct LuaGcTriggered {
 
 impl InternalEvent for LuaGcTriggered {
     fn emit(self) {
-        gauge!(MetricName::LuaMemoryUsedBytes).set(self.used_memory as f64);
+        gauge!(CounterName::LuaMemoryUsedBytes).set(self.used_memory as f64);
     }
 }
 
@@ -32,7 +32,7 @@ impl InternalEvent for LuaScriptError {
             stage = error_stage::PROCESSING,
         );
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "error_code" => mlua_error_code(&self.error),
             "error_type" => error_type::SCRIPT_FAILED,
             "stage" => error_stage::PROCESSING,
@@ -62,7 +62,7 @@ impl InternalEvent for LuaBuildError {
             internal_log_rate_limit = false,
         );
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "error_code" => lua_build_error_code(&self.error),
             "error_type" => error_type::SCRIPT_FAILED,
             "stage" => error_stage:: PROCESSING,

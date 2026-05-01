@@ -1,7 +1,7 @@
 use std::{error::Error, fmt::Debug};
 
 use vector_lib::NamedInternalEvent;
-use vector_lib::internal_event::{InternalEvent, MetricName, error_stage, error_type};
+use vector_lib::internal_event::{InternalEvent, CounterName, error_stage, error_type};
 use vector_lib::{counter, gauge};
 
 #[derive(Debug, NamedInternalEvent)]
@@ -18,8 +18,8 @@ impl InternalEvent for WebSocketListenerConnectionEstablished {
                 self.client_count
             )
         );
-        counter!(MetricName::ConnectionEstablishedTotal, &self.extra_tags).increment(1);
-        gauge!(MetricName::ActiveClients, &self.extra_tags).set(self.client_count as f64);
+        counter!(CounterName::ConnectionEstablishedTotal, &self.extra_tags).increment(1);
+        gauge!(CounterName::ActiveClients, &self.extra_tags).set(self.client_count as f64);
     }
 }
 
@@ -49,7 +49,7 @@ impl InternalEvent for WebSocketListenerConnectionFailedError {
         ]);
         // Tags required by `component_errors_total` are dynamically added above.
         // ## skip check-validity-events ##
-        counter!(MetricName::ComponentErrorsTotal, &all_tags).increment(1);
+        counter!(CounterName::ComponentErrorsTotal, &all_tags).increment(1);
     }
 }
 
@@ -67,8 +67,8 @@ impl InternalEvent for WebSocketListenerConnectionShutdown {
                 self.client_count
             )
         );
-        counter!(MetricName::ConnectionShutdownTotal, &self.extra_tags).increment(1);
-        gauge!(MetricName::ActiveClients, &self.extra_tags).set(self.client_count as f64);
+        counter!(CounterName::ConnectionShutdownTotal, &self.extra_tags).increment(1);
+        gauge!(CounterName::ActiveClients, &self.extra_tags).set(self.client_count as f64);
     }
 }
 
@@ -87,7 +87,7 @@ impl InternalEvent for WebSocketListenerSendError {
             stage = error_stage::SENDING,
         );
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "error_code" => "ws_server_connection_error",
             "error_type" => error_type::WRITER_FAILED,
             "stage" => error_stage::SENDING,
@@ -104,8 +104,8 @@ pub struct WebSocketListenerMessageSent {
 
 impl InternalEvent for WebSocketListenerMessageSent {
     fn emit(self) {
-        counter!(MetricName::WebsocketMessagesSentTotal, &self.extra_tags).increment(1);
-        counter!(MetricName::WebsocketBytesSentTotal, &self.extra_tags)
+        counter!(CounterName::WebsocketMessagesSentTotal, &self.extra_tags).increment(1);
+        counter!(CounterName::WebsocketBytesSentTotal, &self.extra_tags)
             .increment(self.message_size as u64);
     }
 }

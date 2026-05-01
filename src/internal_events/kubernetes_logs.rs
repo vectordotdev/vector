@@ -2,7 +2,8 @@ use vector_lib::counter;
 use vector_lib::{
     NamedInternalEvent,
     internal_event::{
-        ComponentEventsDropped, INTENTIONAL, InternalEvent, MetricName, UNINTENTIONAL, error_stage, error_type,
+        ComponentEventsDropped, CounterName, INTENTIONAL, InternalEvent, UNINTENTIONAL,
+        error_stage, error_type,
     },
     json_size::JsonSize,
 };
@@ -37,21 +38,21 @@ impl InternalEvent for KubernetesLogsEventsReceived<'_> {
                 let pod_namespace = pod_info.namespace;
 
                 counter!(
-                    MetricName::ComponentReceivedEventsTotal,
+                    CounterName::ComponentReceivedEventsTotal,
                     "pod_name" => pod_name.clone(),
                     "pod_namespace" => pod_namespace.clone(),
                 )
                 .increment(1);
                 counter!(
-                    MetricName::ComponentReceivedEventBytesTotal,
+                    CounterName::ComponentReceivedEventBytesTotal,
                     "pod_name" => pod_name,
                     "pod_namespace" => pod_namespace,
                 )
                 .increment(self.byte_size.get() as u64);
             }
             None => {
-                counter!(MetricName::ComponentReceivedEventsTotal).increment(1);
-                counter!(MetricName::ComponentReceivedEventBytesTotal)
+                counter!(CounterName::ComponentReceivedEventsTotal).increment(1);
+                counter!(CounterName::ComponentReceivedEventBytesTotal)
                     .increment(self.byte_size.get() as u64);
             }
         }
@@ -75,7 +76,7 @@ impl InternalEvent for KubernetesLogsEventAnnotationError<'_> {
             stage = error_stage::PROCESSING,
         );
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "error_code" => ANNOTATION_FAILED,
             "error_type" => error_type::READER_FAILED,
             "stage" => error_stage::PROCESSING,
@@ -99,13 +100,13 @@ impl InternalEvent for KubernetesLogsEventNamespaceAnnotationError<'_> {
             stage = error_stage::PROCESSING,
         );
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "error_code" => ANNOTATION_FAILED,
             "error_type" => error_type::READER_FAILED,
             "stage" => error_stage::PROCESSING,
         )
         .increment(1);
-        counter!(MetricName::K8sEventNamespaceAnnotationFailuresTotal).increment(1);
+        counter!(CounterName::K8sEventNamespaceAnnotationFailuresTotal).increment(1);
     }
 }
 
@@ -124,13 +125,13 @@ impl InternalEvent for KubernetesLogsEventNodeAnnotationError<'_> {
             stage = error_stage::PROCESSING,
         );
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "error_code" => ANNOTATION_FAILED,
             "error_type" => error_type::READER_FAILED,
             "stage" => error_stage::PROCESSING,
         )
         .increment(1);
-        counter!(MetricName::K8sEventNodeAnnotationFailuresTotal).increment(1);
+        counter!(CounterName::K8sEventNodeAnnotationFailuresTotal).increment(1);
     }
 }
 
@@ -145,7 +146,7 @@ impl InternalEvent for KubernetesLogsFormatPickerEdgeCase {
             message = "Encountered format picker edge case.",
             what = %self.what,
         );
-        counter!(MetricName::K8sFormatPickerEdgeCasesTotal).increment(1);
+        counter!(CounterName::K8sFormatPickerEdgeCasesTotal).increment(1);
     }
 }
 
@@ -163,12 +164,12 @@ impl InternalEvent for KubernetesLogsDockerFormatParseError<'_> {
             stage = error_stage::PROCESSING,
         );
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
         )
         .increment(1);
-        counter!(MetricName::K8sDockerFormatParseFailuresTotal).increment(1);
+        counter!(CounterName::K8sDockerFormatParseFailuresTotal).increment(1);
     }
 }
 
@@ -191,7 +192,7 @@ impl<E: std::fmt::Display> InternalEvent for KubernetesLifecycleError<E> {
             stage = error_stage::PROCESSING,
         );
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "error_code" => KUBERNETES_LIFECYCLE,
             "error_type" => error_type::READER_FAILED,
             "stage" => error_stage::PROCESSING,
@@ -222,7 +223,7 @@ impl InternalEvent for KubernetesMergedLineTooBigError<'_> {
             stage = error_stage::RECEIVING,
         );
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "error_code" => "reading_line_from_kubernetes_log",
             "error_type" => error_type::CONDITION_FAILED,
             "stage" => error_stage::RECEIVING,

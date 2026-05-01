@@ -2,10 +2,10 @@
 
 #[cfg(feature = "sources-pulsar")]
 use metrics::Counter;
-use vector_lib::{NamedInternalEvent, counter};
 use vector_lib::internal_event::{
-    ComponentEventsDropped, InternalEvent, MetricName, UNINTENTIONAL, error_stage, error_type,
+    ComponentEventsDropped, CounterName, InternalEvent, UNINTENTIONAL, error_stage, error_type,
 };
+use vector_lib::{NamedInternalEvent, counter};
 
 #[derive(Debug, NamedInternalEvent)]
 pub struct PulsarSendingError {
@@ -23,7 +23,7 @@ impl InternalEvent for PulsarSendingError {
             stage = error_stage::SENDING,
         );
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::SENDING,
         )
@@ -50,7 +50,7 @@ impl<F: std::fmt::Display> InternalEvent for PulsarPropertyExtractionError<F> {
             property_field = %self.property_field,
         );
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "error_code" => "extracting_property",
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
@@ -76,21 +76,21 @@ pub struct PulsarErrorEventData {
 registered_event!(
     PulsarErrorEvent => {
         ack_errors: Counter = counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "error_code" => "acknowledge_message",
             "error_type" => error_type::ACKNOWLEDGMENT_FAILED,
             "stage" => error_stage::RECEIVING,
         ),
 
         nack_errors: Counter = counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "error_code" => "negative_acknowledge_message",
             "error_type" => error_type::ACKNOWLEDGMENT_FAILED,
             "stage" => error_stage::RECEIVING,
         ),
 
         read_errors: Counter = counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "error_code" => "reading_message",
             "error_type" => error_type::READER_FAILED,
             "stage" => error_stage::RECEIVING,

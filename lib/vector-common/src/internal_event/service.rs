@@ -1,4 +1,4 @@
-use super::MetricName;
+use super::CounterName;
 
 use crate::counter;
 
@@ -19,7 +19,7 @@ impl<E: std::fmt::Debug> InternalEvent for PollReadyError<E> {
             stage = error_stage::SENDING,
         );
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::SENDING,
         )
@@ -45,7 +45,7 @@ impl<E: std::fmt::Debug> InternalEvent for CallError<E> {
             stage = error_stage::SENDING,
         );
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::SENDING,
         )

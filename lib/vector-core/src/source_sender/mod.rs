@@ -22,8 +22,8 @@ pub const CHUNK_SIZE: usize = 1000;
 #[cfg(any(test, feature = "test"))]
 const TEST_BUFFER_SIZE: usize = 100;
 
-use vector_common::internal_event::MetricName;
+use vector_common::internal_event::HistogramName;
 
-const LAG_TIME_NAME: MetricName = MetricName::SourceLagTimeSeconds;
-const SEND_LATENCY_NAME: MetricName = MetricName::SourceSendLatencySeconds;
-const SEND_BATCH_LATENCY_NAME: MetricName = MetricName::SourceSendBatchLatencySeconds;
+const LAG_TIME_NAME: HistogramName = HistogramName::SourceLagTimeSeconds;
+const SEND_LATENCY_NAME: HistogramName = HistogramName::SourceSendLatencySeconds;
+const SEND_BATCH_LATENCY_NAME: HistogramName = HistogramName::SourceSendBatchLatencySeconds;

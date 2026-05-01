@@ -1,7 +1,7 @@
 #[cfg(feature = "sources-amqp")]
 pub mod source {
+    use vector_lib::internal_event::{CounterName, InternalEvent, error_stage, error_type};
     use vector_lib::{NamedInternalEvent, counter};
-    use vector_lib::internal_event::{InternalEvent, MetricName, error_stage, error_type};
 
     #[derive(Debug, NamedInternalEvent)]
     pub struct AmqpBytesReceived {
@@ -17,7 +17,7 @@ pub mod source {
                 protocol = %self.protocol,
             );
             counter!(
-                MetricName::ComponentReceivedBytesTotal,
+                CounterName::ComponentReceivedBytesTotal,
                 "protocol" => self.protocol,
             )
             .increment(self.byte_size as u64);
@@ -37,7 +37,7 @@ pub mod source {
                    stage = error_stage::RECEIVING,
             );
             counter!(
-                MetricName::ComponentErrorsTotal,
+                CounterName::ComponentErrorsTotal,
                 "error_type" => error_type::REQUEST_FAILED,
                 "stage" => error_stage::RECEIVING,
             )
@@ -58,7 +58,7 @@ pub mod source {
                    stage = error_stage::RECEIVING,
             );
             counter!(
-                MetricName::ComponentErrorsTotal,
+                CounterName::ComponentErrorsTotal,
                 "error_type" => error_type::ACKNOWLEDGMENT_FAILED,
                 "stage" => error_stage::RECEIVING,
             )
@@ -79,7 +79,7 @@ pub mod source {
                    stage = error_stage::RECEIVING,
             );
             counter!(
-                MetricName::ComponentErrorsTotal,
+                CounterName::ComponentErrorsTotal,
                 "error_type" => error_type::COMMAND_FAILED,
                 "stage" => error_stage::RECEIVING,
             )

@@ -1,5 +1,5 @@
+use vector_lib::internal_event::{CounterName, InternalEvent, error_stage, error_type};
 use vector_lib::{NamedInternalEvent, counter};
-use vector_lib::internal_event::{InternalEvent, MetricName, error_stage, error_type};
 
 #[derive(NamedInternalEvent)]
 pub struct GcpPubsubConnectError {
@@ -17,7 +17,7 @@ impl InternalEvent for GcpPubsubConnectError {
         );
 
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "error_code" => "failed_connecting",
             "error_type" => error_type::CONNECTION_FAILED,
             "stage" => error_stage::RECEIVING,
@@ -42,7 +42,7 @@ impl InternalEvent for GcpPubsubStreamingPullError {
         );
 
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "error_code" => "failed_streaming_pull",
             "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::RECEIVING,
@@ -67,7 +67,7 @@ impl InternalEvent for GcpPubsubReceiveError {
         );
 
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "error_code" => "failed_fetching_events",
             "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::RECEIVING,

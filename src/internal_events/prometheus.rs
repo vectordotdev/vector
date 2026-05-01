@@ -5,7 +5,7 @@ use std::borrow::Cow;
 
 use vector_lib::{NamedInternalEvent, counter};
 use vector_lib::internal_event::{
-    ComponentEventsDropped, InternalEvent, MetricName, UNINTENTIONAL, error_stage, error_type,
+    ComponentEventsDropped, InternalEvent, CounterName, UNINTENTIONAL, error_stage, error_type,
 };
 #[cfg(feature = "sources-prometheus-scrape")]
 use vector_lib::prometheus::parser::ParserError;
@@ -33,7 +33,7 @@ impl InternalEvent for PrometheusParseError<'_> {
             url = %self.url
         );
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
             "url" => self.url.to_string(),
@@ -56,7 +56,7 @@ impl InternalEvent for PrometheusRemoteWriteParseError {
             stage = error_stage::PROCESSING,
         );
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
         )
@@ -76,7 +76,7 @@ impl InternalEvent for PrometheusNormalizationError {
             stage = error_stage::PROCESSING,
         );
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "error_type" => error_type::CONVERSION_FAILED,
             "stage" => error_stage::PROCESSING,
         )

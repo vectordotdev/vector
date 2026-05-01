@@ -1,6 +1,6 @@
 use vector_lib::{NamedInternalEvent, counter};
 use vector_lib::internal_event::{
-    ComponentEventsDropped, INTENTIONAL, InternalEvent, MetricName, error_stage, error_type,
+    ComponentEventsDropped, INTENTIONAL, InternalEvent, CounterName, error_stage, error_type,
 };
 
 #[derive(Debug, NamedInternalEvent)]
@@ -16,7 +16,7 @@ impl InternalEvent for LokiEventUnlabeledError {
         );
 
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "error_code" => "unlabeled_event",
             "error_type" => error_type::CONDITION_FAILED,
             "stage" => error_stage::PROCESSING,
@@ -47,7 +47,7 @@ impl InternalEvent for LokiOutOfOrderEventDroppedError {
         });
 
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "error_code" => "out_of_order",
             "error_type" => error_type::CONDITION_FAILED,
             "stage" => error_stage::PROCESSING,
@@ -68,7 +68,7 @@ impl InternalEvent for LokiOutOfOrderEventRewritten {
             count = self.count,
             reason = "out_of_order",
         );
-        counter!(MetricName::RewrittenTimestampEventsTotal).increment(self.count as u64);
+        counter!(CounterName::RewrittenTimestampEventsTotal).increment(self.count as u64);
     }
 }
 
@@ -89,7 +89,7 @@ impl InternalEvent for LokiTimestampNonParsableEventsDropped {
         emit!(ComponentEventsDropped::<INTENTIONAL> { count: 1, reason });
 
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "error_code" => "non-parsable_timestamp",
             "error_type" => error_type::CONDITION_FAILED,
             "stage" => error_stage::PROCESSING,

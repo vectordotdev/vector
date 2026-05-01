@@ -1,5 +1,5 @@
+use vector_lib::internal_event::{CounterName, InternalEvent, error_stage, error_type};
 use vector_lib::{NamedInternalEvent, counter};
-use vector_lib::internal_event::{InternalEvent, MetricName, error_stage, error_type};
 
 use super::prelude::io_error_code;
 
@@ -36,7 +36,7 @@ impl InternalEvent for HerokuLogplexRequestReadError {
             stage = error_stage::PROCESSING,
         );
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "error_type" => error_type::READER_FAILED,
             "error_code" => io_error_code(&self.error),
             "stage" => error_stage::PROCESSING,

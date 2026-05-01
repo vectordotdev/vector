@@ -3,7 +3,7 @@ use chrono::ParseError;
 use vector_lib::counter;
 use vector_lib::{
     NamedInternalEvent,
-    internal_event::{InternalEvent, MetricName, error_stage, error_type},
+    internal_event::{InternalEvent, CounterName, error_stage, error_type},
     json_size::JsonSize,
 };
 
@@ -23,11 +23,11 @@ impl InternalEvent for DockerLogsEventsReceived<'_> {
             container_id = %self.container_id
         );
         counter!(
-            MetricName::ComponentReceivedEventsTotal, "container_name" => self.container_name.to_owned()
+            CounterName::ComponentReceivedEventsTotal, "container_name" => self.container_name.to_owned()
         )
         .increment(1);
         counter!(
-            MetricName::ComponentReceivedEventBytesTotal, "container_name" => self.container_name.to_owned()
+            CounterName::ComponentReceivedEventBytesTotal, "container_name" => self.container_name.to_owned()
         ).increment(self.byte_size.get() as u64);
     }
 }
@@ -45,7 +45,7 @@ impl InternalEvent for DockerLogsContainerEventReceived<'_> {
             container_id = %self.container_id,
             action = %self.action,
         );
-        counter!(MetricName::ContainerProcessedEventsTotal).increment(1);
+        counter!(CounterName::ContainerProcessedEventsTotal).increment(1);
     }
 }
 
@@ -60,7 +60,7 @@ impl InternalEvent for DockerLogsContainerWatch<'_> {
             message = "Started watching for container logs.",
             container_id = %self.container_id,
         );
-        counter!(MetricName::ContainersWatchedTotal).increment(1);
+        counter!(CounterName::ContainersWatchedTotal).increment(1);
     }
 }
 
@@ -75,7 +75,7 @@ impl InternalEvent for DockerLogsContainerUnwatch<'_> {
             message = "Stopped watching for container logs.",
             container_id = %self.container_id,
         );
-        counter!(MetricName::ContainersUnwatchedTotal).increment(1);
+        counter!(CounterName::ContainersUnwatchedTotal).increment(1);
     }
 }
 
@@ -95,7 +95,7 @@ impl InternalEvent for DockerLogsCommunicationError<'_> {
             container_id = ?self.container_id
         );
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "error_type" => error_type::CONNECTION_FAILED,
             "stage" => error_stage::RECEIVING,
         )
@@ -119,7 +119,7 @@ impl InternalEvent for DockerLogsContainerMetadataFetchError<'_> {
             container_id = ?self.container_id
         );
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::RECEIVING,
             "container_id" => self.container_id.to_owned(),
@@ -144,7 +144,7 @@ impl InternalEvent for DockerLogsTimestampParseError<'_> {
             container_id = ?self.container_id
         );
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
             "container_id" => self.container_id.to_owned(),
@@ -169,7 +169,7 @@ impl InternalEvent for DockerLogsLoggingDriverUnsupportedError<'_> {
             container_id = ?self.container_id,
         );
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "error_type" => error_type::CONFIGURATION_FAILED,
             "stage" => error_stage::RECEIVING,
             "container_id" => self.container_id.to_owned(),

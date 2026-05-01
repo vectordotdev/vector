@@ -3,13 +3,13 @@ use metrics::Counter;
 use crate::counter;
 use tracing::trace;
 
-use super::{ByteSize, MetricName, Protocol, SharedString};
+use super::{ByteSize, CounterName, Protocol, SharedString};
 
 crate::registered_event!(
     BytesSent {
         protocol: SharedString,
     } => {
-        bytes_sent: Counter = counter!(MetricName::ComponentSentBytesTotal, "protocol" => self.protocol.clone()),
+        bytes_sent: Counter = counter!(CounterName::ComponentSentBytesTotal, "protocol" => self.protocol.clone()),
         protocol: SharedString = self.protocol,
     }
 

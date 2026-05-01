@@ -1,7 +1,7 @@
-use vector_lib::{NamedInternalEvent, counter};
 use vector_lib::internal_event::{
-    ComponentEventsDropped, InternalEvent, MetricName, UNINTENTIONAL, error_stage, error_type,
+    ComponentEventsDropped, CounterName, InternalEvent, UNINTENTIONAL, error_stage, error_type,
 };
+use vector_lib::{NamedInternalEvent, counter};
 
 use crate::event::metric::{MetricKind, MetricValue};
 
@@ -23,7 +23,7 @@ impl InternalEvent for StatsdInvalidMetricError<'_> {
             kind = ?self.kind,
         );
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "error_code" => "invalid_metric",
             "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::PROCESSING,

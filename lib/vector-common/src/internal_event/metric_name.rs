@@ -3,10 +3,9 @@ use strum::{AsRefStr, Display, EnumIter};
 /// Canonical list of all per-component internal metric names emitted by Vector.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Display, AsRefStr, EnumIter)]
 #[strum(serialize_all = "snake_case")]
-pub enum MetricName {
+pub enum CounterName {
     ComponentReceivedEventsTotal,
     ComponentReceivedEventBytesTotal,
-    ComponentReceivedEventsCount,
     ComponentReceivedBytesTotal,
     ComponentSentEventsTotal,
     ComponentSentEventBytesTotal,
@@ -15,10 +14,6 @@ pub enum MetricName {
     ComponentErrorsTotal,
     ComponentTimedOutEventsTotal,
     ComponentTimedOutRequestsTotal,
-    BufferMaxSizeEvents,
-    BufferMaxEventSize,
-    BufferMaxSizeBytes,
-    BufferMaxByteSize,
     BufferReceivedEventsTotal,
     BufferReceivedBytesTotal,
     BufferSentEventsTotal,
@@ -26,16 +21,6 @@ pub enum MetricName {
     BufferDiscardedEventsTotal,
     BufferDiscardedBytesTotal,
     BufferErrorsTotal,
-    BufferSendDurationSeconds,
-    BufferEvents,
-    BufferSizeEvents,
-    BufferSizeBytes,
-    BufferByteSize,
-    ComponentLatencySeconds,
-    ComponentLatencyMeanSeconds,
-    SourceLagTimeSeconds,
-    SourceSendLatencySeconds,
-    SourceSendBatchLatencySeconds,
     // Internal events from src/internal_events/
     ActiveClients,
     ActiveEndpoints,
@@ -147,14 +132,69 @@ pub enum MetricName {
     MemoryEnrichmentTableTtlExpirations,
 }
 
-impl MetricName {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Display, AsRefStr, EnumIter)]
+#[strum(serialize_all = "snake_case")]
+pub enum HistogramName {
+    ComponentReceivedEventsCount,
+    BufferSendDurationSeconds,
+    ComponentLatencySeconds,
+    SourceLagTimeSeconds,
+    SourceSendLatencySeconds,
+    SourceSendBatchLatencySeconds,
+}
+
+impl HistogramName {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::ComponentReceivedEventsCount => "component_received_events_count",
+            Self::BufferSendDurationSeconds => "buffer_send_duration_seconds",
+            Self::ComponentLatencySeconds => "component_latency_seconds",
+            Self::SourceLagTimeSeconds => "source_lag_time_seconds",
+            Self::SourceSendLatencySeconds => "source_send_latency_seconds",
+            Self::SourceSendBatchLatencySeconds => "source_send_batch_latency_seconds",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Display, AsRefStr, EnumIter)]
+#[strum(serialize_all = "snake_case")]
+pub enum GaugeName {
+    ComponentLatencyMeanSeconds,
+    BufferMaxSizeEvents,
+    BufferMaxEventSize,
+    BufferMaxSizeBytes,
+    BufferMaxByteSize,
+    BufferEvents,
+    BufferSizeEvents,
+    BufferSizeBytes,
+    BufferByteSize,
+}
+
+impl GaugeName {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::ComponentLatencyMeanSeconds => "component_latency_mean_seconds",
+            Self::BufferMaxSizeEvents => "buffer_max_size_events",
+            Self::BufferMaxEventSize => "buffer_max_event_size",
+            Self::BufferMaxSizeBytes => "buffer_max_size_bytes",
+            Self::BufferMaxByteSize => "buffer_max_byte_size",
+            Self::BufferEvents => "buffer_events",
+            Self::BufferSizeEvents => "buffer_size_events",
+            Self::BufferSizeBytes => "buffer_size_bytes",
+            Self::BufferByteSize => "buffer_byte_size",
+        }
+    }
+}
+
+impl CounterName {
     #[allow(clippy::too_many_lines)]
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::ComponentReceivedEventsTotal => "component_received_events_total",
             Self::ComponentReceivedEventBytesTotal => "component_received_event_bytes_total",
-            Self::ComponentReceivedEventsCount => "component_received_events_count",
             Self::ComponentReceivedBytesTotal => "component_received_bytes_total",
             Self::ComponentSentEventsTotal => "component_sent_events_total",
             Self::ComponentSentEventBytesTotal => "component_sent_event_bytes_total",
@@ -163,10 +203,6 @@ impl MetricName {
             Self::ComponentErrorsTotal => "component_errors_total",
             Self::ComponentTimedOutEventsTotal => "component_timed_out_events_total",
             Self::ComponentTimedOutRequestsTotal => "component_timed_out_requests_total",
-            Self::BufferMaxSizeEvents => "buffer_max_size_events",
-            Self::BufferMaxEventSize => "buffer_max_event_size",
-            Self::BufferMaxSizeBytes => "buffer_max_size_bytes",
-            Self::BufferMaxByteSize => "buffer_max_byte_size",
             Self::BufferReceivedEventsTotal => "buffer_received_events_total",
             Self::BufferReceivedBytesTotal => "buffer_received_bytes_total",
             Self::BufferSentEventsTotal => "buffer_sent_events_total",
@@ -174,16 +210,6 @@ impl MetricName {
             Self::BufferDiscardedEventsTotal => "buffer_discarded_events_total",
             Self::BufferDiscardedBytesTotal => "buffer_discarded_bytes_total",
             Self::BufferErrorsTotal => "buffer_errors_total",
-            Self::BufferSendDurationSeconds => "buffer_send_duration_seconds",
-            Self::BufferEvents => "buffer_events",
-            Self::BufferSizeEvents => "buffer_size_events",
-            Self::BufferSizeBytes => "buffer_size_bytes",
-            Self::BufferByteSize => "buffer_byte_size",
-            Self::ComponentLatencySeconds => "component_latency_seconds",
-            Self::ComponentLatencyMeanSeconds => "component_latency_mean_seconds",
-            Self::SourceLagTimeSeconds => "source_lag_time_seconds",
-            Self::SourceSendLatencySeconds => "source_send_latency_seconds",
-            Self::SourceSendBatchLatencySeconds => "source_send_batch_latency_seconds",
             Self::ActiveClients => "active_clients",
             Self::ActiveEndpoints => "active_endpoints",
             Self::AdaptiveConcurrencyAveragedRtt => "adaptive_concurrency_averaged_rtt",
@@ -277,22 +303,32 @@ impl MetricName {
             Self::WindowsServiceStartTotal => "windows_service_start_total",
             Self::WindowsServiceStopTotal => "windows_service_stop_total",
             Self::WindowsServiceUninstallTotal => "windows_service_uninstall_total",
-            Self::K8sEventNamespaceAnnotationFailuresTotal => "k8s_event_namespace_annotation_failures_total",
+            Self::K8sEventNamespaceAnnotationFailuresTotal => {
+                "k8s_event_namespace_annotation_failures_total"
+            }
             Self::K8sEventNodeAnnotationFailuresTotal => "k8s_event_node_annotation_failures_total",
             Self::K8sFormatPickerEdgeCasesTotal => "k8s_format_picker_edge_cases_total",
             Self::K8sDockerFormatParseFailuresTotal => "k8s_docker_format_parse_failures_total",
-            Self::S3ObjectProcessingSucceededDurationSeconds => "s3_object_processing_succeeded_duration_seconds",
-            Self::S3ObjectProcessingFailedDurationSeconds => "s3_object_processing_failed_duration_seconds",
+            Self::S3ObjectProcessingSucceededDurationSeconds => {
+                "s3_object_processing_succeeded_duration_seconds"
+            }
+            Self::S3ObjectProcessingFailedDurationSeconds => {
+                "s3_object_processing_failed_duration_seconds"
+            }
             Self::SqsS3EventRecordIgnoredTotal => "sqs_s3_event_record_ignored_total",
             Self::ComponentAllocatedBytesTotal => "component_allocated_bytes_total",
             Self::ComponentDeallocatedBytesTotal => "component_deallocated_bytes_total",
             Self::ComponentAllocatedBytes => "component_allocated_bytes",
             Self::Utilization => "utilization",
             Self::MemoryEnrichmentTableByteSize => "memory_enrichment_table_byte_size",
-            Self::MemoryEnrichmentTableFailedInsertions => "memory_enrichment_table_failed_insertions",
+            Self::MemoryEnrichmentTableFailedInsertions => {
+                "memory_enrichment_table_failed_insertions"
+            }
             Self::MemoryEnrichmentTableFailedReads => "memory_enrichment_table_failed_reads",
             Self::MemoryEnrichmentTableFlushesTotal => "memory_enrichment_table_flushes_total",
-            Self::MemoryEnrichmentTableInsertionsTotal => "memory_enrichment_table_insertions_total",
+            Self::MemoryEnrichmentTableInsertionsTotal => {
+                "memory_enrichment_table_insertions_total"
+            }
             Self::MemoryEnrichmentTableObjectsCount => "memory_enrichment_table_objects_count",
             Self::MemoryEnrichmentTableReadsTotal => "memory_enrichment_table_reads_total",
             Self::MemoryEnrichmentTableTtlExpirations => "memory_enrichment_table_ttl_expirations",

@@ -3,7 +3,7 @@
 use vector_lib::counter;
 use vector_lib::{
     NamedInternalEvent,
-    internal_event::{InternalEvent, MetricName, error_stage, error_type},
+    internal_event::{CounterName, InternalEvent, error_stage, error_type},
     json_size::JsonSize,
 };
 
@@ -25,12 +25,12 @@ impl InternalEvent for HttpClientEventsReceived {
             url = %self.url,
         );
         counter!(
-            MetricName::ComponentReceivedEventsTotal,
+            CounterName::ComponentReceivedEventsTotal,
             "uri" => self.url.clone(),
         )
         .increment(self.count as u64);
         counter!(
-            MetricName::ComponentReceivedEventBytesTotal,
+            CounterName::ComponentReceivedEventBytesTotal,
             "uri" => self.url.clone(),
         )
         .increment(self.byte_size.get() as u64);
@@ -53,7 +53,7 @@ impl InternalEvent for HttpClientHttpResponseError {
             error_code = %http_error_code(self.code.as_u16()),
         );
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "url" => self.url,
             "stage" => error_stage::RECEIVING,
             "error_type" => error_type::REQUEST_FAILED,
@@ -79,7 +79,7 @@ impl InternalEvent for HttpClientHttpError {
             stage = error_stage::RECEIVING,
         );
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "url" => self.url,
             "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::RECEIVING,

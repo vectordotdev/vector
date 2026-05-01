@@ -1,5 +1,5 @@
+use vector_lib::internal_event::{CounterName, InternalEvent, error_stage, error_type};
 use vector_lib::{NamedInternalEvent, counter};
-use vector_lib::internal_event::{InternalEvent, MetricName, error_stage, error_type};
 
 #[derive(Debug, NamedInternalEvent)]
 pub struct HostMetricsScrapeError {
@@ -15,7 +15,7 @@ impl InternalEvent for HostMetricsScrapeError {
         );
 
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "error_type" => error_type::READER_FAILED,
             "stage" => error_stage::RECEIVING,
         )
@@ -39,7 +39,7 @@ impl<E: std::fmt::Display> InternalEvent for HostMetricsScrapeDetailError<E> {
         );
 
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "error_type" => error_type::READER_FAILED,
             "stage" => error_stage::RECEIVING,
         )
@@ -65,7 +65,7 @@ impl InternalEvent for HostMetricsScrapeFilesystemError {
         );
 
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "error_type" => error_type::READER_FAILED,
             "stage" => error_stage::RECEIVING,
         )

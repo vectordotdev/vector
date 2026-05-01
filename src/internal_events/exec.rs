@@ -4,7 +4,7 @@ use tokio::time::error::Elapsed;
 use vector_lib::{
     NamedInternalEvent,
     internal_event::{
-        ComponentEventsDropped, InternalEvent, MetricName, UNINTENTIONAL, error_stage, error_type,
+        ComponentEventsDropped, InternalEvent, CounterName, UNINTENTIONAL, error_stage, error_type,
     },
     json_size::JsonSize,
 };
@@ -28,12 +28,12 @@ impl InternalEvent for ExecEventsReceived<'_> {
             command = %self.command,
         );
         counter!(
-            MetricName::ComponentReceivedEventsTotal,
+            CounterName::ComponentReceivedEventsTotal,
             "command" => self.command.to_owned(),
         )
         .increment(self.count as u64);
         counter!(
-            MetricName::ComponentReceivedEventBytesTotal,
+            CounterName::ComponentReceivedEventBytesTotal,
             "command" => self.command.to_owned(),
         )
         .increment(self.byte_size.get() as u64);
@@ -57,7 +57,7 @@ impl InternalEvent for ExecFailedError<'_> {
             stage = error_stage::RECEIVING,
         );
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "command" => self.command.to_owned(),
             "error_type" => error_type::COMMAND_FAILED,
             "error_code" => io_error_code(&self.error),
@@ -85,7 +85,7 @@ impl InternalEvent for ExecTimeoutError<'_> {
             stage = error_stage::RECEIVING,
         );
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "command" => self.command.to_owned(),
             "error_type" => error_type::TIMED_OUT,
             "stage" => error_stage::RECEIVING,
@@ -120,14 +120,14 @@ impl InternalEvent for ExecCommandExecuted<'_> {
             elapsed_millis = %self.exec_duration.as_millis(),
         );
         counter!(
-            MetricName::CommandExecutedTotal,
+            CounterName::CommandExecutedTotal,
             "command" => self.command.to_owned(),
             "exit_status" => exit_status.clone(),
         )
         .increment(1);
 
         histogram!(
-            MetricName::CommandExecutionDurationSeconds,
+            CounterName::CommandExecutionDurationSeconds,
             "exit_status" => exit_status,
             "command" => self.command.to_owned(),
         )
@@ -196,7 +196,7 @@ impl InternalEvent for ExecFailedToSignalChildError<'_> {
             stage = error_stage::RECEIVING,
         );
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "command" => format!("{:?}", self.command.as_std()),
             "error_code" => self.error.to_error_code(),
             "error_type" => error_type::COMMAND_FAILED,
@@ -218,7 +218,7 @@ impl InternalEvent for ExecChannelClosedError {
             stage = error_stage::RECEIVING,
         );
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "error_type" => error_type::COMMAND_FAILED,
             "stage" => error_stage::RECEIVING,
         )

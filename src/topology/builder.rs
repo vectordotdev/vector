@@ -8,7 +8,7 @@ use std::{
 
 use futures::{FutureExt, StreamExt, TryStreamExt, stream::FuturesOrdered};
 use futures_util::stream::FuturesUnordered;
-use vector_lib::{gauge, internal_event::MetricName};
+use vector_lib::{gauge, internal_event::CounterName};
 use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
 use tokio::{
     select,
@@ -627,7 +627,7 @@ impl<'a> Builder<'a> {
 
             let utilization_sender = self
                 .utilization_registry
-                .add_component(key.clone(), gauge!(MetricName::Utilization));
+                .add_component(key.clone(), gauge!(CounterName::Utilization));
             let component_key = key.clone();
             let sink = async move {
                 debug!("Sink starting.");
@@ -747,7 +747,7 @@ impl<'a> Builder<'a> {
 
         let sender = self
             .utilization_registry
-            .add_component(node.key.clone(), gauge!(MetricName::Utilization));
+            .add_component(node.key.clone(), gauge!(CounterName::Utilization));
         let runner = Runner::new(
             t,
             input_rx,
@@ -803,7 +803,7 @@ impl<'a> Builder<'a> {
 
         let sender = self
             .utilization_registry
-            .add_component(key.clone(), gauge!(MetricName::Utilization));
+            .add_component(key.clone(), gauge!(CounterName::Utilization));
         let output_sender = sender.clone();
         let input_rx = Utilization::new(sender, key.clone(), input_rx.into_stream());
 

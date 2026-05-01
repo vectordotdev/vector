@@ -1,7 +1,7 @@
 use std::net::SocketAddr;
 
+use vector_lib::internal_event::{CounterName, InternalEvent};
 use vector_lib::{NamedInternalEvent, counter};
-use vector_lib::internal_event::{InternalEvent, MetricName};
 
 #[derive(Debug, NamedInternalEvent)]
 pub struct ApiStarted {
@@ -14,6 +14,6 @@ impl InternalEvent for ApiStarted {
             message = "API server running.",
             address = %self.addr,
         );
-        counter!(MetricName::ApiStartedTotal).increment(1);
+        counter!(CounterName::ApiStartedTotal).increment(1);
     }
 }

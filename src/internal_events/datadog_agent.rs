@@ -1,5 +1,5 @@
+use vector_lib::internal_event::{CounterName, InternalEvent, error_stage, error_type};
 use vector_lib::{NamedInternalEvent, counter};
-use vector_lib::internal_event::{InternalEvent, MetricName, error_stage, error_type};
 
 #[derive(Debug, NamedInternalEvent)]
 pub struct DatadogAgentJsonParseError<'a> {
@@ -15,7 +15,7 @@ impl InternalEvent for DatadogAgentJsonParseError<'_> {
             stage = error_stage::PROCESSING,
         );
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
         )

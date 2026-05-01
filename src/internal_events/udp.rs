@@ -1,6 +1,6 @@
 use vector_lib::{NamedInternalEvent, counter};
 use vector_lib::internal_event::{
-    ComponentEventsDropped, InternalEvent, MetricName, UNINTENTIONAL, error_stage, error_type,
+    ComponentEventsDropped, InternalEvent, CounterName, UNINTENTIONAL, error_stage, error_type,
 };
 
 use crate::internal_events::SocketOutgoingConnectionError;
@@ -13,7 +13,7 @@ pub struct UdpSocketConnectionEstablished;
 impl InternalEvent for UdpSocketConnectionEstablished {
     fn emit(self) {
         debug!(message = "Connected.");
-        counter!(MetricName::ConnectionEstablishedTotal, "mode" => "udp").increment(1);
+        counter!(CounterName::ConnectionEstablishedTotal, "mode" => "udp").increment(1);
     }
 }
 
@@ -50,13 +50,13 @@ impl InternalEvent for UdpSendIncompleteError {
             stage = error_stage::SENDING,
         );
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "error_type" => error_type::WRITER_FAILED,
             "stage" => error_stage::SENDING,
         )
         .increment(1);
         // deprecated
-        counter!(MetricName::ConnectionSendErrorsTotal, "mode" => "udp").increment(1);
+        counter!(CounterName::ConnectionSendErrorsTotal, "mode" => "udp").increment(1);
 
         emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }
@@ -79,7 +79,7 @@ impl InternalEvent for UdpChunkingError {
             stage = error_stage::SENDING,
         );
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "error_type" => error_type::WRITER_FAILED,
             "stage" => error_stage::SENDING,
         )

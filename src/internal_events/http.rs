@@ -3,7 +3,7 @@ use std::{error::Error, time::Duration};
 use http::Response;
 use vector_lib::{
     NamedInternalEvent,
-    internal_event::{InternalEvent, MetricName, error_stage, error_type},
+    internal_event::{CounterName, InternalEvent, error_stage, error_type},
     json_size::JsonSize,
 };
 use vector_lib::{counter, histogram};
@@ -16,7 +16,7 @@ pub struct HttpServerRequestReceived;
 impl InternalEvent for HttpServerRequestReceived {
     fn emit(self) {
         debug!(message = "Received HTTP request.");
-        counter!(MetricName::HttpServerRequestsReceivedTotal).increment(1);
+        counter!(CounterName::HttpServerRequestsReceivedTotal).increment(1);
     }
 }
 
@@ -32,8 +32,8 @@ impl<B> InternalEvent for HttpServerResponseSent<'_, B> {
             HTTP_STATUS_LABEL,
             self.response.status().as_u16().to_string(),
         )];
-        counter!(MetricName::HttpServerResponsesSentTotal, labels).increment(1);
-        histogram!(MetricName::HttpServerHandlerDurationSeconds, labels).record(self.latency);
+        counter!(CounterName::HttpServerResponsesSentTotal, labels).increment(1);
+        histogram!(CounterName::HttpServerHandlerDurationSeconds, labels).record(self.latency);
     }
 }
 
@@ -53,7 +53,7 @@ impl InternalEvent for HttpBytesReceived<'_> {
             protocol = %self.protocol
         );
         counter!(
-            MetricName::ComponentReceivedBytesTotal,
+            CounterName::ComponentReceivedBytesTotal,
             "http_path" => self.http_path.to_string(),
             "protocol" => self.protocol,
         )
@@ -79,15 +79,15 @@ impl InternalEvent for HttpEventsReceived<'_> {
             protocol = %self.protocol,
         );
 
-        histogram!(MetricName::ComponentReceivedEventsCount).record(self.count as f64);
+        histogram!(CounterName::ComponentReceivedEventsCount).record(self.count as f64);
         counter!(
-            MetricName::ComponentReceivedEventsTotal,
+            CounterName::ComponentReceivedEventsTotal,
             "http_path" => self.http_path.to_string(),
             "protocol" => self.protocol,
         )
         .increment(self.count as u64);
         counter!(
-            MetricName::ComponentReceivedEventBytesTotal,
+            CounterName::ComponentReceivedEventBytesTotal,
             "http_path" => self.http_path.to_string(),
             "protocol" => self.protocol,
         )
@@ -126,7 +126,7 @@ impl InternalEvent for HttpBadRequest<'_> {
             http_code = %self.code,
         );
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "error_code" => self.error_code,
             "error_type" => error_type::REQUEST_FAILED,
             "error_stage" => error_stage::RECEIVING,
@@ -152,7 +152,7 @@ impl InternalEvent for HttpDecompressError<'_> {
             encoding = %self.encoding
         );
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "error_code" => "failed_decompressing_payload",
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::RECEIVING,
@@ -174,7 +174,7 @@ impl InternalEvent for HttpInternalError<'_> {
             stage = error_stage::RECEIVING
         );
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "error_type" => error_type::CONNECTION_FAILED,
             "stage" => error_stage::RECEIVING,
         )

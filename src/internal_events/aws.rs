@@ -1,5 +1,5 @@
+use vector_lib::internal_event::{CounterName, InternalEvent};
 use vector_lib::{NamedInternalEvent, counter};
-use vector_lib::internal_event::{InternalEvent, MetricName};
 
 #[derive(NamedInternalEvent)]
 pub struct AwsBytesSent {
@@ -20,7 +20,7 @@ impl InternalEvent for AwsBytesSent {
             region = ?self.region,
         );
         counter!(
-            MetricName::ComponentSentBytesTotal,
+            CounterName::ComponentSentBytesTotal,
             "protocol" => "https",
             "region" => region,
         )

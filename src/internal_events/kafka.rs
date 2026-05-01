@@ -2,7 +2,7 @@
 
 use vector_lib::{
     NamedInternalEvent,
-    internal_event::{InternalEvent, MetricName, error_stage, error_type},
+    internal_event::{CounterName, InternalEvent, error_stage, error_type},
     json_size::JsonSize,
 };
 use vector_lib::{counter, gauge};
@@ -26,7 +26,7 @@ impl InternalEvent for KafkaBytesReceived<'_> {
             partition = %self.partition,
         );
         counter!(
-            MetricName::ComponentReceivedBytesTotal,
+            CounterName::ComponentReceivedBytesTotal,
             "protocol" => self.protocol,
             "topic" => self.topic.to_string(),
             "partition" => self.partition.to_string(),
@@ -53,13 +53,13 @@ impl InternalEvent for KafkaEventsReceived<'_> {
             partition = %self.partition,
         );
         counter!(
-            MetricName::ComponentReceivedEventsTotal,
+            CounterName::ComponentReceivedEventsTotal,
             "topic" => self.topic.to_string(),
             "partition" => self.partition.to_string(),
         )
         .increment(self.count as u64);
         counter!(
-            MetricName::ComponentReceivedEventBytesTotal,
+            CounterName::ComponentReceivedEventBytesTotal,
             "topic" => self.topic.to_string(),
             "partition" => self.partition.to_string(),
         )
@@ -82,7 +82,7 @@ impl InternalEvent for KafkaOffsetUpdateError {
             stage = error_stage::SENDING,
         );
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "error_code" => "kafka_offset_update",
             "error_type" => error_type::READER_FAILED,
             "stage" => error_stage::SENDING,
@@ -106,7 +106,7 @@ impl InternalEvent for KafkaReadError {
             stage = error_stage::RECEIVING,
         );
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "error_code" => "reading_message",
             "error_type" => error_type::READER_FAILED,
             "stage" => error_stage::RECEIVING,
@@ -123,24 +123,24 @@ pub struct KafkaStatisticsReceived<'a> {
 
 impl InternalEvent for KafkaStatisticsReceived<'_> {
     fn emit(self) {
-        gauge!(MetricName::KafkaQueueMessages).set(self.statistics.msg_cnt as f64);
-        gauge!(MetricName::KafkaQueueMessagesBytes).set(self.statistics.msg_size as f64);
-        counter!(MetricName::KafkaRequestsTotal).absolute(self.statistics.tx as u64);
-        counter!(MetricName::KafkaRequestsBytesTotal).absolute(self.statistics.tx_bytes as u64);
-        counter!(MetricName::KafkaResponsesTotal).absolute(self.statistics.rx as u64);
-        counter!(MetricName::KafkaResponsesBytesTotal).absolute(self.statistics.rx_bytes as u64);
-        counter!(MetricName::KafkaProducedMessagesTotal).absolute(self.statistics.txmsgs as u64);
-        counter!(MetricName::KafkaProducedMessagesBytesTotal)
+        gauge!(CounterName::KafkaQueueMessages).set(self.statistics.msg_cnt as f64);
+        gauge!(CounterName::KafkaQueueMessagesBytes).set(self.statistics.msg_size as f64);
+        counter!(CounterName::KafkaRequestsTotal).absolute(self.statistics.tx as u64);
+        counter!(CounterName::KafkaRequestsBytesTotal).absolute(self.statistics.tx_bytes as u64);
+        counter!(CounterName::KafkaResponsesTotal).absolute(self.statistics.rx as u64);
+        counter!(CounterName::KafkaResponsesBytesTotal).absolute(self.statistics.rx_bytes as u64);
+        counter!(CounterName::KafkaProducedMessagesTotal).absolute(self.statistics.txmsgs as u64);
+        counter!(CounterName::KafkaProducedMessagesBytesTotal)
             .absolute(self.statistics.txmsg_bytes as u64);
-        counter!(MetricName::KafkaConsumedMessagesTotal).absolute(self.statistics.rxmsgs as u64);
-        counter!(MetricName::KafkaConsumedMessagesBytesTotal)
+        counter!(CounterName::KafkaConsumedMessagesTotal).absolute(self.statistics.rxmsgs as u64);
+        counter!(CounterName::KafkaConsumedMessagesBytesTotal)
             .absolute(self.statistics.rxmsg_bytes as u64);
 
         if self.expose_lag_metrics {
             for (topic_id, topic) in &self.statistics.topics {
                 for (partition_id, partition) in &topic.partitions {
                     gauge!(
-                        MetricName::KafkaConsumerLag,
+                        CounterName::KafkaConsumerLag,
                         "topic_id" => topic_id.clone(),
                         "partition_id" => partition_id.to_string(),
                     )
@@ -166,7 +166,7 @@ impl InternalEvent for KafkaHeaderExtractionError<'_> {
             header_field = self.header_field.to_string(),
         );
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "error_code" => "extracting_header",
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::RECEIVING,
