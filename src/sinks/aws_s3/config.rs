@@ -303,10 +303,14 @@ impl S3SinkConfig {
 
             let encoder = EncoderKind::Batch(batch_encoder);
 
-            let filename_extension = self
-                .filename_extension
-                .clone()
-                .or_else(|| Some("parquet".to_string()));
+            let filename_extension = self.filename_extension.clone().or_else(|| {
+                Some(
+                    match batch_encoding {
+                        S3BatchEncoding::Parquet(_) => "parquet",
+                    }
+                    .to_string(),
+                )
+            });
 
             if self.compression != Compression::None {
                 warn!("Top level compression setting ignored when batch_encoding set to parquet.")
