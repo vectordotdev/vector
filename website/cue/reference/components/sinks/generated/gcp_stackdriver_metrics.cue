@@ -348,7 +348,7 @@ generated: components: sinks: gcp_stackdriver_metrics: configuration: {
 				description:   "Retry on these specific HTTP status codes"
 				relevant_when: "type = \"custom\""
 				required:      true
-				type: array: items: type: uint: default: 200
+				type: array: items: type: uint: {}
 			}
 			type: {
 				description: "The retry strategy enum."
