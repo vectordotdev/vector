@@ -88,15 +88,24 @@ pub(crate) fn extract_oauthbearer_config(
     let https_ca_pem = if let Some(pem) = options.get("https.ca.pem") {
         Some(pem.clone())
     } else if let Some(path) = options.get("https.ca.location") {
-        match fs::read_to_string(path) {
-            Ok(pem) => Some(pem),
-            Err(e) => {
-                warn!(
-                    message = "Failed to read https.ca.location for OAUTHBEARER token endpoint; using system CA bundle.",
-                    path = %path,
-                    error = %e,
-                );
-                None
+        let p = std::path::Path::new(path);
+        if p.is_dir() {
+            warn!(
+                message = "https.ca.location is a directory, which is not supported; provide a PEM bundle file instead. Using system CA bundle.",
+                path = %path,
+            );
+            None
+        } else {
+            match fs::read_to_string(p) {
+                Ok(pem) => Some(pem),
+                Err(e) => {
+                    warn!(
+                        message = "Failed to read https.ca.location for OAUTHBEARER token endpoint; using system CA bundle.",
+                        path = %path,
+                        error = %e,
+                    );
+                    None
+                }
             }
         }
     } else {
