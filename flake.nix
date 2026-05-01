@@ -43,6 +43,28 @@
           exec ${pkgs.git}/bin/git "$@"
         '';
 
+        # GNU `cp -R` (without `-p`) restores the destination directory's
+        # mode to match the source on completion. When the source lives in
+        # /nix/store (read-only, 0555), the dest dir ends up 0555 too — and
+        # autoconf scripts copied this way can't write `config.log`.
+        # sasl2-sys 0.1.22+2.1.28 hits this. Wrapping `cp` to chmod the
+        # destination writable after any recursive copy fixes it without
+        # patching upstream source.
+        cpWrapper = pkgs.writeShellScriptBin "cp" ''
+          ${pkgs.coreutils}/bin/cp "$@"
+          status=$?
+          case " $* " in
+            *" -R "*|*" -r "*|*" -a "*|*"-R"*|*"-r"*|*"-a"*)
+              last=
+              for a in "$@"; do
+                case "$a" in -*) ;; *) last="$a";; esac
+              done
+              [ -d "$last" ] && chmod -R u+w "$last" 2>/dev/null
+              ;;
+          esac
+          exit $status
+        '';
+
         # Only include files tracked by git. Excludes anything in .gitignore
         # plus any untracked workspace debris (logs, scratch dirs) that would
         # otherwise leak into the source hash and break reproducibility.
@@ -120,22 +142,6 @@
                     done
                   '';
                 });
-              # sasl2-sys 0.1.22+2.1.28 build.rs does `cp -R sasl2 $OUT_DIR/sasl2`
-              # but the copy lands read-only in a Nix sandbox, breaking
-              # autoconf's config.log write. Patch the build.rs to chmod +w
-              # after the copy. No matching upstream issue yet; closest is
-              # MaterializeInc/rust-sasl#54 (cross-compile toolchain detection).
-              overrideVendorCargoPackage = package: drv:
-                if package.name == "sasl2-sys" then
-                  drv.overrideAttrs (old: {
-                    postPatch = (old.postPatch or "") + ''
-                      substituteInPlace build.rs \
-                        --replace-fail \
-                          'cmd!("cp", "-R", "sasl2", &src_dir)' \
-                          'cmd!("cp", "-R", "sasl2", &src_dir).run().expect("cp failed"); cmd!("chmod", "-R", "u+w", &src_dir)'
-                    '';
-                  })
-                else drv;
             };
 
             crossPkgs = crossPkgsForTarget target;
@@ -169,6 +175,14 @@
                 --replace-quiet '"-Lnative=/lib/native-libs"' '""'
             '';
 
+            # The cross toolchain (targetCc) propagates its own coreutils into
+            # PATH ahead of cpWrapper despite cpWrapper being listed first in
+            # nativeBuildInputs. Force-prepend here so cargo build scripts
+            # (including sasl2-sys) find the wrapper first.
+            preBuild = ''
+              export PATH=${cpWrapper}/bin:$PATH
+            '';
+
             cargoExtraArgs = "--no-default-features --features ${cargoFeatures} --bin vector";
 
             # GNU targets need the ELF interpreter rewritten to a standard
@@ -185,7 +199,9 @@
               fi
             '';
 
+            # cpWrapper before targetCc/coreutils so PATH lookup finds it first.
             nativeBuildInputs = [
+              cpWrapper
               gitShim
               targetCc
               pkgs.protobuf
