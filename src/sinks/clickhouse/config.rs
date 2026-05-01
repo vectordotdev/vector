@@ -4,8 +4,8 @@ use std::fmt;
 
 use http::{Request, StatusCode, Uri};
 use hyper::Body;
-use vector_lib::codecs::encoding::format::SchemaProvider;
 use vector_lib::codecs::encoding::ArrowStreamSerializerConfig;
+use vector_lib::codecs::encoding::format::SchemaProvider;
 
 use super::{
     request_builder::ClickhouseRequestBuilder,
