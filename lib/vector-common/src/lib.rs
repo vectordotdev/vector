@@ -66,10 +66,10 @@ pub mod trigger;
 #[macro_use]
 extern crate tracing;
 
-/// Typed wrapper around `metrics::counter!` that only accepts [`internal_event::MetricName`].
+/// Typed wrapper around `metrics::counter!` that only accepts [`internal_event::CounterName`].
 ///
 /// Prevents raw string literals from being used as metric names — all metric
-/// names must go through the `MetricName` enum so they are discoverable and
+/// names must go through the typed enums so they are discoverable and
 /// exposable via the API.
 #[macro_export]
 macro_rules! counter {
@@ -89,7 +89,7 @@ macro_rules! counter {
     }};
 }
 
-/// Typed wrapper around `metrics::histogram!` that only accepts [`internal_event::MetricName`].
+/// Typed wrapper around `metrics::histogram!` that only accepts [`internal_event::HistogramName`].
 #[macro_export]
 macro_rules! histogram {
     ($name:expr) => {{
@@ -108,7 +108,7 @@ macro_rules! histogram {
     }};
 }
 
-/// Typed wrapper around `metrics::gauge!` that only accepts [`internal_event::MetricName`].
+/// Typed wrapper around `metrics::gauge!` that only accepts [`internal_event::GaugeName`].
 #[macro_export]
 macro_rules! gauge {
     ($name:expr) => {{
