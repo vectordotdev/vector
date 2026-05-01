@@ -1,7 +1,7 @@
 use tracing::error;
 use vector_lib::{
     NamedInternalEvent, counter,
-    internal_event::{InternalEvent, MetricName, error_stage, error_type},
+    internal_event::{CounterName, InternalEvent, error_stage, error_type},
 };
 
 #[derive(Debug, NamedInternalEvent)]
@@ -24,7 +24,7 @@ impl InternalEvent for WindowsEventLogParseError {
             internal_log_rate_limit = true,
         );
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "error_code" => "parse_failed",
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
@@ -53,7 +53,7 @@ impl InternalEvent for WindowsEventLogQueryError {
             internal_log_rate_limit = true,
         );
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "error_code" => "query_failed",
             "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::RECEIVING,
@@ -80,7 +80,7 @@ impl InternalEvent for WindowsEventLogBookmarkError {
             internal_log_rate_limit = true,
         );
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "error_code" => "bookmark_failed",
             "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::PROCESSING,

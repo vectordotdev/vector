@@ -1,6 +1,6 @@
 use vector_lib::{
     NamedInternalEvent, counter,
-    internal_event::{InternalEvent, MetricName, error_stage, error_type},
+    internal_event::{CounterName, InternalEvent, error_stage, error_type},
 };
 
 #[derive(Debug, NamedInternalEvent)]
@@ -17,7 +17,7 @@ impl InternalEvent for WindowsServiceStart<'_> {
             "Started Windows Service.",
         );
         counter!(
-            MetricName::WindowsServiceStartTotal,
+            CounterName::WindowsServiceStartTotal,
             "already_started" => self.already_started.to_string(),
         )
         .increment(1);
@@ -38,7 +38,7 @@ impl InternalEvent for WindowsServiceStop<'_> {
             "Stopped Windows Service.",
         );
         counter!(
-            MetricName::WindowsServiceStopTotal,
+            CounterName::WindowsServiceStopTotal,
             "already_stopped" => self.already_stopped.to_string(),
         )
         .increment(1);
@@ -56,7 +56,7 @@ impl InternalEvent for WindowsServiceRestart<'_> {
             name = ?self.name,
             "Restarted Windows Service."
         );
-        counter!(MetricName::WindowsServiceRestartTotal).increment(1)
+        counter!(CounterName::WindowsServiceRestartTotal).increment(1)
     }
 }
 
@@ -71,7 +71,7 @@ impl InternalEvent for WindowsServiceInstall<'_> {
             name = ?self.name,
             "Installed Windows Service.",
         );
-        counter!(MetricName::WindowsServiceInstallTotal).increment(1);
+        counter!(CounterName::WindowsServiceInstallTotal).increment(1);
     }
 }
 
@@ -86,7 +86,7 @@ impl InternalEvent for WindowsServiceUninstall<'_> {
             name = ?self.name,
             "Uninstalled Windows Service.",
         );
-        counter!(MetricName::WindowsServiceUninstallTotal).increment(1);
+        counter!(CounterName::WindowsServiceUninstallTotal).increment(1);
     }
 }
 
@@ -105,7 +105,7 @@ impl InternalEvent for WindowsServiceDoesNotExistError<'_> {
             stage = error_stage::PROCESSING,
         );
         counter!(
-            MetricName::ComponentErrorsTotal,
+            CounterName::ComponentErrorsTotal,
             "error_code" => "service_missing",
             "error_type" => error_type::CONDITION_FAILED,
             "stage" => error_stage::PROCESSING,
