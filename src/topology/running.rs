@@ -70,6 +70,9 @@ pub struct RunningTopology {
     metrics_task: Option<TaskHandle>,
     metrics_task_shutdown_trigger: Option<Trigger>,
     pending_reload: Option<HashSet<ComponentKey>>,
+    /// Components on authoritative acknowledgement paths. None means the feature
+    /// is inactive (no sink has authoritative: true), so all sinks participate.
+    authoritative_components: Option<HashSet<ComponentKey>>,
 }
 
 impl RunningTopology {
@@ -94,6 +97,7 @@ impl RunningTopology {
             metrics_task: None,
             metrics_task_shutdown_trigger: None,
             pending_reload: None,
+            authoritative_components: None,
         }
     }
 
@@ -719,6 +723,9 @@ impl RunningTopology {
         diff: &ConfigDiff,
         new_pieces: &mut TopologyPieces,
     ) {
+        // Recompute authoritative component set from the current config.
+        self.authoritative_components = new_pieces.authoritative_components.take();
+
         debug!("Connecting changed/added component(s).");
 
         // Update tap metadata
@@ -966,12 +973,26 @@ impl RunningTopology {
             let output = self.outputs.get_mut(&input).expect("unknown output");
 
             if diff.contains(&input.component) || inputs_to_add.contains(&input) {
+                // Per-edge strip: only strip finalizers when the edge crosses from an
+                // authoritative-path component to a non-authoritative one. This preserves
+                // legacy wait-for-all acking for pipelines whose sources have no
+                // authoritative sinks downstream.
+                let strip_finalizers = self
+                    .authoritative_components
+                    .as_ref()
+                    .map(|auth| !auth.contains(key) && auth.contains(&input.component))
+                    .unwrap_or(false);
+
                 // If the input we're connecting to is changing, that means its outputs will have been
                 // recreated, so instead of replacing a paused sink, we have to add it to this new
                 // output for the first time, since there's nothing to actually replace at this point.
                 debug!(component_id = %key, fanout_id = %input, "Adding component input to fanout.");
 
-                _ = output.send(ControlMessage::Add(key.clone(), tx.clone()));
+                _ = output.send(ControlMessage::Add {
+                    id: key.clone(),
+                    sender: tx.clone(),
+                    strip_finalizers,
+                });
             } else {
                 // We know that if this component is connected to a given input, and neither
                 // components were changed, then the output must still exist, which means we paused
@@ -1043,12 +1064,26 @@ impl RunningTopology {
             .filter(|(key, _)| !diff.transforms.contains(key));
         for (transform_key, transform) in unchanged_transforms {
             let changed_outputs = get_changed_outputs(diff, transform.inputs.clone());
+
             for output_id in changed_outputs {
+                // Per-edge strip: only strip when crossing from authoritative to non-authoritative.
+                let strip_finalizers = self
+                    .authoritative_components
+                    .as_ref()
+                    .map(|auth| {
+                        !auth.contains(transform_key) && auth.contains(&output_id.component)
+                    })
+                    .unwrap_or(false);
+
                 debug!(component_id = %transform_key, fanout_id = %output_id.component, "Reattaching component input to fanout.");
 
                 let input = self.inputs.get(transform_key).cloned().unwrap();
                 let output = self.outputs.get_mut(&output_id).unwrap();
-                _ = output.send(ControlMessage::Add(transform_key.clone(), input));
+                _ = output.send(ControlMessage::Add {
+                    id: transform_key.clone(),
+                    sender: input,
+                    strip_finalizers,
+                });
             }
         }
 
@@ -1058,12 +1093,24 @@ impl RunningTopology {
             .filter(|(key, _)| !diff.sinks.contains(key));
         for (sink_key, sink) in unchanged_sinks {
             let changed_outputs = get_changed_outputs(diff, sink.inputs.clone());
+
             for output_id in changed_outputs {
+                // Per-edge strip: only strip when crossing from authoritative to non-authoritative.
+                let strip_finalizers = self
+                    .authoritative_components
+                    .as_ref()
+                    .map(|auth| !auth.contains(sink_key) && auth.contains(&output_id.component))
+                    .unwrap_or(false);
+
                 debug!(component_id = %sink_key, fanout_id = %output_id.component, "Reattaching component input to fanout.");
 
                 let input = self.inputs.get(sink_key).cloned().unwrap();
                 let output = self.outputs.get_mut(&output_id).unwrap();
-                _ = output.send(ControlMessage::Add(sink_key.clone(), input));
+                _ = output.send(ControlMessage::Add {
+                    id: sink_key.clone(),
+                    sender: input,
+                    strip_finalizers,
+                });
             }
         }
     }

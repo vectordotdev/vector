@@ -379,7 +379,11 @@ async fn tap_handler(
                             // this point.
                             let sink_id = Uuid::new_v4().to_string();
                             match control_tx
-                                .send(fanout::ControlMessage::Add(ComponentKey::from(sink_id.as_str()), tap_buffer_tx))
+                                .send(fanout::ControlMessage::Add {
+                                    id: ComponentKey::from(sink_id.as_str()),
+                                    sender: tap_buffer_tx,
+                                    strip_finalizers: false,
+                                })
                             {
                                 Ok(_) => {
                                     debug!(
