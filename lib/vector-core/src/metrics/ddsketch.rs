@@ -795,6 +795,7 @@ impl AgentDDSketch {
                 count,
             } => {
                 let delta_buckets = mem::take(buckets);
+                let has_buckets = !delta_buckets.is_empty();
                 let mut sketch = AgentDDSketch::with_agent_defaults();
                 sketch.insert_interpolate_buckets(delta_buckets)?;
 
@@ -813,7 +814,7 @@ impl AgentDDSketch {
                 // accuracy when a non-zero sum is available.
                 match u32::try_from(*count) {
                     Ok(c) => {
-                        if c > 0 && *sum != 0.0 {
+                        if c > 0 && *sum != 0.0 && has_buckets {
                             sketch.count = c;
                             sketch.sum = *sum;
                             sketch.avg = *sum / f64::from(c);
