@@ -814,7 +814,6 @@ impl AgentDDSketch {
                 match u32::try_from(*count) {
                     Ok(c) => {
                         if c > 0 && *sum != 0.0 && sketch.count() > 0{
-                            sketch.count = c;
                             sketch.sum = *sum;
                             sketch.avg = *sum / f64::from(c);
                         }
