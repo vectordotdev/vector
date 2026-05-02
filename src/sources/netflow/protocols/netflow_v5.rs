@@ -1,8 +1,7 @@
-//! NetFlow v5 protocol parser.
+//! Parser for NetFlow version 5 export datagrams (Cisco NetFlow Services Export).
 //!
-//! NetFlow v5 is a fixed-format flow export protocol that defines a standard
-//! structure for flow records. Unlike template-based protocols (v9/IPFIX),
-//! NetFlow v5 has a rigid 48-byte record format that contains predefined fields.
+//! A UDP payload starts with a 24-byte header followed by zero or more fixed-width,
+//! 48-byte IPv4 flow records.
 
 use crate::sources::netflow::fields::FieldParser;
 
@@ -12,13 +11,13 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use tracing::{debug, warn};
 use vector_lib::event::{Event, LogEvent};
 
-/// NetFlow v5 protocol constants
+/// Constants for NetFlow v5 datagram layout.
 const NETFLOW_V5_VERSION: u16 = 5;
 const NETFLOW_V5_HEADER_SIZE: usize = 24;
 const NETFLOW_V5_RECORD_SIZE: usize = 48;
 const MAX_FLOW_COUNT: u16 = 1000; // Sanity check for flow count
 
-/// NetFlow v5 packet header structure
+/// Parsed NetFlow v5 packet header.
 #[derive(Debug, Clone)]
 pub struct NetflowV5Header {
     pub version: u16,
@@ -33,7 +32,7 @@ pub struct NetflowV5Header {
 }
 
 impl NetflowV5Header {
-    /// Parse NetFlow v5 header from packet data
+    /// Builds a header from the start of `data`.
     pub fn from_bytes(data: &[u8]) -> Result<Self, String> {
         if data.len() < NETFLOW_V5_HEADER_SIZE {
             return Err(format!(
@@ -83,7 +82,7 @@ impl NetflowV5Header {
         })
     }
 
-    /// Create base log event with header information
+    /// Builds a diagnostic log event containing header fields only.
     pub fn to_log_event(&self) -> LogEvent {
         let mut log_event = LogEvent::default();
         log_event.insert("flow_type", "netflow_v5");
@@ -99,8 +98,9 @@ impl NetflowV5Header {
         log_event
     }
 
-    /// Get sampling rate from sampling interval.
-    /// Upper 2 bits are sampling mode (deterministic/random), lower 14 bits are the interval.
+    /// Effective sampling divisor from the header (`sampling_interval` field).
+    ///
+    /// Bits 15–14 encode mode; bits 13–0 encode the interval (RFC 3954, section 8.2).
     pub fn sampling_rate(&self) -> u32 {
         if self.sampling_interval == 0 {
             1 // No sampling
@@ -114,13 +114,13 @@ impl NetflowV5Header {
         }
     }
 
-    /// Check if sampling is enabled (RFC 3954 §8.2: mode is encoded in bits 15–14 of `sampling_interval`).
+    /// Returns whether sampling mode bits are non-zero (RFC 3954, section 8.2).
     pub fn is_sampled(&self) -> bool {
         (self.sampling_interval >> 14) != 0
     }
 }
 
-/// NetFlow v5 flow record structure
+/// Parsed NetFlow v5 flow record (48-byte wire layout).
 #[derive(Debug, Clone)]
 pub struct NetflowV5Record {
     pub src_addr: u32,
@@ -146,7 +146,7 @@ pub struct NetflowV5Record {
 }
 
 impl NetflowV5Record {
-    /// Parse NetFlow v5 record from packet data
+    /// Builds a record from exactly one 48-byte slice.
     pub fn from_bytes(data: &[u8]) -> Result<Self, String> {
         if data.len() < NETFLOW_V5_RECORD_SIZE {
             return Err(format!(
@@ -180,7 +180,7 @@ impl NetflowV5Record {
         })
     }
 
-    /// Convert IPv4 address to string
+    /// Formats a NetFlow v5 IPv4 field as dotted decimal.
     fn ipv4_to_string(addr: u32) -> String {
         format!(
             "{}.{}.{}.{}",
@@ -191,7 +191,7 @@ impl NetflowV5Record {
         )
     }
 
-    /// Get protocol name from protocol number
+    /// Maps an IP protocol number to a short display name.
     fn get_protocol_name(protocol: u8) -> &'static str {
         match protocol {
             1 => "ICMP",
@@ -206,7 +206,7 @@ impl NetflowV5Record {
         }
     }
 
-    /// Convert record to log event
+    /// Converts this record into a log event with optional protocol/port enrichment.
     pub fn to_log_event(&self, record_number: usize, resolve_protocols: bool) -> LogEvent {
         let mut log_event = LogEvent::default();
 
@@ -396,7 +396,7 @@ impl NetflowV5Record {
         }
     }
 
-    /// Validate record data for reasonableness
+    /// Validates counters and sizes when strict mode is enabled upstream.
     pub fn validate(&self) -> Result<(), String> {
         // Check for obviously invalid data
         if self.d_pkts == 0 && self.d_octets > 0 {
@@ -422,15 +422,15 @@ impl NetflowV5Record {
     }
 }
 
-/// NetFlow v5 protocol parser.
+/// Stateful NetFlow v5 packet parser (sequence tracking per exporter IP).
 pub struct NetflowV5Parser {
     strict_validation: bool,
-    /// Last (flow_sequence, flow_count) per exporter IP for gap detection. Keyed by IP only so exporter port changes don't fragment state.
+    /// Latest `(flow_sequence, record_count)` per exporter IP for gap detection (keyed by IP only).
     last_sequence_by_peer: DashMap<IpAddr, (u32, u16)>,
 }
 
 impl NetflowV5Parser {
-    /// Create a new NetFlow v5 parser. `field_parser` is reserved for future v9/IPFIX template-based field resolution.
+    /// Creates a parser. `_field_parser` is unused for NetFlow v5 but keeps the constructor stable.
     pub fn new(_field_parser: FieldParser, strict_validation: bool) -> Self {
         Self {
             strict_validation,
@@ -438,7 +438,7 @@ impl NetflowV5Parser {
         }
     }
 
-    /// Check if packet data looks like NetFlow v5.
+    /// Returns true when `data` begins with version 5 and is long enough for the claimed records.
     pub fn can_parse(data: &[u8]) -> bool {
         if data.len() < 2 {
             return false;
@@ -447,7 +447,7 @@ impl NetflowV5Parser {
         Self::can_parse_with_version(data, version)
     }
 
-    /// Check if packet is valid NetFlow v5 given an already-read version (avoids double-reading version in hot path).
+    /// Like [`Self::can_parse`], but uses a caller-supplied version word (avoids re-reading bytes).
     pub(crate) fn can_parse_with_version(data: &[u8], version: u16) -> bool {
         if version != NETFLOW_V5_VERSION {
             return false;
@@ -463,7 +463,7 @@ impl NetflowV5Parser {
         data.len() >= expected_length
     }
 
-    /// Parse NetFlow v5 packet and return events
+    /// Parses a single UDP payload into log events (one per flow record when possible).
     pub fn parse(
         &self,
         data: &[u8],

@@ -1,19 +1,18 @@
-//! Template cache stub for NetFlow v5.
+//! Shared cache object carried by the NetFlow source.
 //!
-//! NetFlow v5 uses a fixed record format and does not use templates. Full cache behavior for
-//! NetFlow v9 / IPFIX will be added in a follow-up PR. `max_templates` / `template_timeout` in
-//! config are reserved until then.
+//! NetFlow v5 does not exchange templates; this type stores no data but keeps the listener wiring
+//! simple and leaves room for expansion without reshaping public structs.
 
-/// Minimal template cache for NetFlow v5: no storage; API preserved for the next protocol PR.
+/// Empty cache (NetFlow v5 has no template sets).
 #[derive(Clone, Debug)]
 pub struct TemplateCache;
 
 impl TemplateCache {
-    /// Creates a no-op cache. `max_size` is reserved for NetFlow v9 / IPFIX template limits.
+    /// Builds an empty cache; `max_size` is accepted for configuration symmetry only.
     pub fn new(_max_size: usize) -> Self {
         Self
     }
 
-    /// Clears expired templates (no-op for NetFlow v5).
+    /// Cache maintenance hook invoked by the worker loop (no-op for NetFlow v5).
     pub fn cleanup_expired(&self, _timeout_seconds: u64) {}
 }

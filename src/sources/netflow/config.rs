@@ -28,13 +28,13 @@ pub struct NetflowConfig {
     #[serde(default = "default_max_packet_size")]
     pub max_packet_size: usize,
 
-    /// Reserved for NetFlow v9 / IPFIX: maximum templates per peer (stub until template support lands).
+    /// Maximum templates per exporter; unused while only NetFlow v5 is implemented (kept for stable config keys).
     #[configurable(metadata(docs::examples = 1000))]
     #[configurable(metadata(docs::examples = 5000))]
     #[serde(default = "default_max_templates")]
     pub max_templates: usize,
 
-    /// Reserved for NetFlow v9 / IPFIX: template cache entry timeout in seconds (used by cleanup stub).
+    /// Template cache sweep interval in seconds; unused for NetFlow v5 but drives the periodic cleanup hook.
     #[configurable(metadata(docs::type_unit = "seconds"))]
     #[configurable(metadata(docs::examples = 3600))]
     #[configurable(metadata(docs::examples = 7200))]

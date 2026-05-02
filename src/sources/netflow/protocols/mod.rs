@@ -1,6 +1,6 @@
-//! Protocol parsing for NetFlow v5.
+//! NetFlow packet decoding for this source.
 //!
-//! This module provides parsing for NetFlow v5 flow records.
+//! Currently implements NetFlow version 5 only.
 
 use std::{collections::HashSet, net::SocketAddr};
 
@@ -16,7 +16,7 @@ pub mod netflow_v5;
 
 pub use netflow_v5::NetflowV5Parser;
 
-/// Detected protocol type from packet analysis.
+/// Protocol discriminator based on the datagram version word.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DetectedProtocol {
     NetflowV5,
@@ -24,7 +24,7 @@ pub enum DetectedProtocol {
 }
 
 impl DetectedProtocol {
-    /// Get the protocol name as a string.
+    /// Stable name used in metrics and diagnostic logs.
     pub fn as_str(&self) -> &'static str {
         match self {
             DetectedProtocol::NetflowV5 => "netflow_v5",
@@ -33,7 +33,7 @@ impl DetectedProtocol {
     }
 }
 
-/// Protocol parser for NetFlow v5.
+/// Dispatches UDP payloads to the NetFlow v5 parser.
 pub struct ProtocolParser {
     netflow_v5: NetflowV5Parser,
     enabled_protocols: HashSet<String>,
@@ -41,8 +41,9 @@ pub struct ProtocolParser {
 }
 
 impl ProtocolParser {
-    /// Create a new protocol parser with the given configuration.
-    /// `template_cache` is used by v9/IPFIX; for v5-only it is not used but kept for API consistency.
+    /// Builds a parser from configuration.
+    ///
+    /// `_template_cache` is unused for NetFlow v5 but threaded through from the source for a stable API.
     pub fn new(config: &NetflowConfig, _template_cache: TemplateCache) -> Self {
         let field_parser = FieldParser::new(config);
         let enabled_protocols = config.protocols.iter().cloned().collect();
@@ -53,12 +54,12 @@ impl ProtocolParser {
         }
     }
 
-    /// Returns true if the given protocol name is enabled in configuration.
+    /// True when `name` appears in [`NetflowConfig::protocols`].
     fn protocol_enabled(&self, name: &str) -> bool {
         self.enabled_protocols.contains(name)
     }
 
-    /// Parse a packet and return flow events.
+    /// Decodes one datagram into zero or more [`Event`] values.
     pub fn parse(
         &self,
         data: &[u8],
@@ -197,7 +198,7 @@ impl ProtocolParser {
         Event::Log(log_event)
     }
 
-    /// Get statistics about supported protocols.
+    /// Lists enabled protocol names from configuration.
     pub fn get_protocol_stats(&self) -> ProtocolStats {
         ProtocolStats {
             enabled_protocols: self.enabled_protocols.iter().cloned().collect(),
@@ -206,14 +207,14 @@ impl ProtocolParser {
     }
 }
 
-/// Statistics about protocol support.
+/// Enabled protocol names derived from configuration.
 #[derive(Debug, Clone)]
 pub struct ProtocolStats {
     pub enabled_protocols: Vec<String>,
     pub total_enabled: usize,
 }
 
-/// Parse flow data using the protocol parser.
+/// Parses non-empty `data` through `parser`, or returns an error for empty input.
 pub fn parse_flow_data(
     parser: &ProtocolParser,
     data: &[u8],

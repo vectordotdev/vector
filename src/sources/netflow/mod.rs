@@ -1,6 +1,6 @@
-//! NetFlow source for Vector.
+//! Ingests NetFlow version 5 flow exports over UDP.
 //!
-//! This source listens for NetFlow v5 packets over UDP and parses them into structured log events.
+//! Each datagram is decoded into structured log events.
 
 use std::sync::Arc;
 
@@ -50,7 +50,7 @@ async fn create_bind_socket(address: std::net::SocketAddr) -> Result<UdpSocket, 
     UdpSocket::from_std(std_socket)
 }
 
-/// NetFlow source with multi-socket support using SO_REUSEPORT.
+/// Runs the NetFlow listener with optional multi-socket fan-out (`SO_REUSEPORT` where supported).
 async fn netflow_source(
     config: NetflowConfig,
     shutdown: ShutdownSignal,
@@ -75,7 +75,7 @@ async fn netflow_source(
         message = "Starting NetFlow source with multi-socket support.",
     );
 
-    // Create shared template cache and protocol parser
+    // Shared parser state (cache is a no-op for NetFlow v5).
     let template_cache = Arc::new(templates::TemplateCache::new(config.max_templates));
     let protocol_parser = Arc::new(protocols::ProtocolParser::new(
         &config,
@@ -149,10 +149,9 @@ async fn netflow_source(
     Ok(())
 }
 
-/// Individual NetFlow worker task that processes packets from a single UDP socket.
+/// One UDP receive loop for an accepted worker slot.
 ///
-/// Each worker runs in its own task and processes packets independently,
-/// sharing the template cache and protocol parser with other workers.
+/// Workers share the same [`templates::TemplateCache`] and [`protocols::ProtocolParser`] instances.
 async fn netflow_worker(
     worker_id: usize,
     socket: UdpSocket,
@@ -206,7 +205,7 @@ async fn netflow_worker(
                             }
                         }
 
-                        // Periodic template cleanup (only one worker should do this)
+                        // Periodic cache sweep (worker 0 only; no-op for NetFlow v5).
                         let cleanup_period_secs = config.template_timeout.min(300);
                         if worker_id == 0
                             && last_cleanup.elapsed() > Duration::from_secs(cleanup_period_secs)

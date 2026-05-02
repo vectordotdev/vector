@@ -1,16 +1,16 @@
-//! Field parsing stub for NetFlow v5.
+//! Field decoding helpers for the NetFlow source.
 //!
-//! NetFlow v5 uses a fixed record layout; template-based field resolution is reserved for a
-//! future NetFlow v9 / IPFIX change. `FieldParser` exists so `NetflowV5Parser::new` stays stable.
+//! NetFlow v5 records use a fixed layout; the parser reads bytes directly. `FieldParser` is a
+//! zero-sized handle passed into the v5 parser constructor so call sites stay uniform.
 
 use crate::sources::netflow::config::NetflowConfig;
 
-/// Placeholder for future template-based field parsing (v9/IPFIX).
+/// Zero-sized parser handle (no runtime state for NetFlow v5).
 #[derive(Clone, Copy, Debug, Default)]
 pub struct FieldParser;
 
 impl FieldParser {
-    /// Creates a parser; `config` is unused for v5-only builds but keeps the API stable.
+    /// Constructs a handle; `config` is currently unused.
     pub fn new(_config: &NetflowConfig) -> Self {
         Self
     }
