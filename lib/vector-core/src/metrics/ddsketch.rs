@@ -811,6 +811,16 @@ impl AgentDDSketch {
                 //
                 // This preserves existing behavior for ambiguous cases while improving
                 // accuracy when a non-zero sum is available.
+                //
+                // Do not override sketch.count here.
+                // The interpolated bins define the sketch's sample mass, and count must
+                // remain consistent with those bins to preserve DDSketch invariants.
+                //
+                // We do override sum/avg to improve accuracy when upstream provides them.
+                // Note that this can result in avg != sum / sketch.count if upstream
+                // count differs from bucket totals (e.g. Prometheus +Inf bucket drop).
+                // This tradeoff favors more accurate summary stats while preserving
+                // correct quantile behavior.
                 match u32::try_from(*count) {
                     Ok(c) => {
                         if c > 0 && *sum != 0.0 && sketch.count() > 0{
