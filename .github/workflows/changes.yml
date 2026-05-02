@@ -138,6 +138,8 @@ on:
         value: ${{ jobs.int_tests.outputs.splunk }}
       webhdfs:
         value: ${{ jobs.int_tests.outputs.webhdfs }}
+      ydb:
+        value: ${{ jobs.int_tests.outputs.ydb }}
       # e2e tests
       e2e-datadog-logs:
         value: ${{ jobs.e2e_tests.outputs.datadog-logs }}
@@ -345,6 +347,7 @@ jobs:
       redis: ${{ steps.filter.outputs.redis }}
       splunk: ${{ steps.filter.outputs.splunk }}
       webhdfs: ${{ steps.filter.outputs.webhdfs }}
+      ydb: ${{ steps.filter.outputs.ydb }}
       any: ${{ steps.detect-changes.outputs.any }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -410,7 +413,8 @@ jobs:
             "pulsar": ${{ steps.filter.outputs.pulsar }},
             "redis": ${{ steps.filter.outputs.redis }},
             "splunk": ${{ steps.filter.outputs.splunk }},
-            "webhdfs": ${{ steps.filter.outputs.webhdfs }}
+            "webhdfs": ${{ steps.filter.outputs.webhdfs }},
+            "ydb": ${{ steps.filter.outputs.ydb }}
           }
           EOF
           )
