@@ -3782,7 +3782,7 @@ version = "0.1.0"
 dependencies = [
  "criterion",
  "data-encoding",
- "hickory-proto 0.25.2",
+ "hickory-proto 0.26.0",
  "snafu 0.9.0",
 ]
 
@@ -3796,7 +3796,7 @@ dependencies = [
  "chrono",
  "chrono-tz",
  "dnsmsg-parser",
- "hickory-proto 0.25.2",
+ "hickory-proto 0.26.0",
  "pastey",
  "prost 0.12.6",
  "prost-build 0.12.6",
@@ -5172,37 +5172,11 @@ dependencies = [
 
 [[package]]
 name = "hickory-proto"
-version = "0.25.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f8a6fe56c0038198998a6f217ca4e7ef3a5e51f46163bd6dd60b5c71ca6c6502"
-dependencies = [
- "async-trait",
- "bitflags 2.10.0",
- "cfg-if",
- "data-encoding",
- "enum-as-inner",
- "futures-channel",
- "futures-io",
- "futures-util",
- "idna",
- "ipnet",
- "once_cell",
- "rand 0.9.4",
- "ring",
- "rustls-pki-types",
- "thiserror 2.0.17",
- "time",
- "tinyvec",
- "tracing 0.1.44",
- "url",
-]
-
-[[package]]
-name = "hickory-proto"
 version = "0.26.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a916d0494600d99ecb15aadfab677ad97c4de559e8f1af0c129353a733ac1fcc"
 dependencies = [
+ "bitflags 2.10.0",
  "data-encoding",
  "idna",
  "ipnet",
@@ -5211,7 +5185,9 @@ dependencies = [
  "prefix-trie",
  "rand 0.10.1",
  "ring",
+ "rustls-pki-types",
  "thiserror 2.0.17",
+ "time",
  "tinyvec",
  "tracing 0.1.44",
  "url",
@@ -12854,7 +12830,7 @@ dependencies = [
  "headers",
  "heim",
  "hex",
- "hickory-proto 0.25.2",
+ "hickory-proto 0.26.0",
  "hostname 0.4.2",
  "http 0.2.12",
  "http 1.3.1",
