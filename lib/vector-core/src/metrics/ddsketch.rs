@@ -823,9 +823,11 @@ impl AgentDDSketch {
                 // correct quantile behavior.
                 match u32::try_from(*count) {
                     Ok(c) => {
-                        if c > 0 && *sum != 0.0 && sketch.count() > 0{
+                        let sc = sketch.count();
+
+                        if c > 0 && *sum != 0.0 && sc > 0 {
                             sketch.sum = *sum;
-                            sketch.avg = *sum / f64::from(c);
+                            sketch.avg = *sum / sc as f64;
                         }
                     }
                     Err(_) => {
