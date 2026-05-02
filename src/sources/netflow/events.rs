@@ -3,7 +3,7 @@
 use metrics::counter;
 use std::net::SocketAddr;
 use tracing::{debug, error};
-use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
+use vector_lib::internal_event::{error_stage, error_type, InternalEvent};
 
 /// NetFlow packet received successfully.
 #[derive(Debug)]
@@ -122,5 +122,43 @@ impl InternalEvent for NetflowReceiveError {
             "stage" => error_stage::RECEIVING,
         )
         .increment(1);
+    }
+}
+
+/// Emitted when the configured protocol list rejects a packet (disabled name or unknown version).
+#[derive(Debug)]
+pub struct ProtocolDisabled {
+    pub protocol: &'static str,
+    pub peer_addr: SocketAddr,
+}
+
+impl InternalEvent for ProtocolDisabled {
+    fn emit(self) {
+        debug!(
+            message = "Protocol disabled, ignoring packet.",
+            protocol = self.protocol,
+            peer_addr = %self.peer_addr,
+        );
+    }
+}
+
+/// Emitted after a successful parse of at least one event from a datagram.
+#[derive(Debug)]
+pub struct ProtocolParseSuccess {
+    pub protocol: &'static str,
+    pub peer_addr: SocketAddr,
+    pub event_count: usize,
+    pub byte_size: usize,
+}
+
+impl InternalEvent for ProtocolParseSuccess {
+    fn emit(self) {
+        debug!(
+            message = "Protocol parsed successfully.",
+            protocol = self.protocol,
+            peer_addr = %self.peer_addr,
+            event_count = self.event_count,
+            byte_size = self.byte_size,
+        );
     }
 }

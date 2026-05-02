@@ -2,8 +2,7 @@
 //!
 //! This module provides parsing for NetFlow v5 flow records.
 
-use std::collections::HashSet;
-use std::net::SocketAddr;
+use std::{collections::HashSet, net::SocketAddr};
 
 use tracing::debug;
 use vector_lib::event::Event;
@@ -98,7 +97,7 @@ impl ProtocolParser {
                     .parse(data, peer_addr, self.include_raw_data)
             }
             DetectedProtocol::Unknown(version) => Ok(vec![
-                self.create_unknown_protocol_event(data, peer_addr, version),
+                self.create_unknown_protocol_event(data, peer_addr, version)
             ]),
         };
 
@@ -225,42 +224,6 @@ pub fn parse_flow_data(
         return Err("Empty packet received".to_string());
     }
     Ok(parser.parse(data, peer_addr, template_cache))
-}
-
-#[derive(Debug)]
-pub struct ProtocolDisabled {
-    pub protocol: &'static str,
-    pub peer_addr: SocketAddr,
-}
-
-impl vector_lib::internal_event::InternalEvent for ProtocolDisabled {
-    fn emit(self) {
-        debug!(
-            message = "Protocol disabled, ignoring packet.",
-            protocol = self.protocol,
-            peer_addr = %self.peer_addr,
-        );
-    }
-}
-
-#[derive(Debug)]
-pub struct ProtocolParseSuccess {
-    pub protocol: &'static str,
-    pub peer_addr: SocketAddr,
-    pub event_count: usize,
-    pub byte_size: usize,
-}
-
-impl vector_lib::internal_event::InternalEvent for ProtocolParseSuccess {
-    fn emit(self) {
-        debug!(
-            message = "Protocol parsed successfully.",
-            protocol = self.protocol,
-            peer_addr = %self.peer_addr,
-            event_count = self.event_count,
-            byte_size = self.byte_size,
-        );
-    }
 }
 
 #[cfg(test)]

@@ -11860,6 +11860,7 @@ dependencies = [
  "criterion",
  "crossterm 0.29.0",
  "csv",
+ "dashmap",
  "databend-client",
  "deadpool 0.12.2",
  "derivative",

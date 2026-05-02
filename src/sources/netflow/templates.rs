@@ -9,9 +9,11 @@
 pub struct TemplateCache;
 
 impl TemplateCache {
+    /// Creates a no-op cache. `max_size` is reserved for NetFlow v9 / IPFIX template limits.
     pub fn new(_max_size: usize) -> Self {
         Self
     }
 
+    /// Clears expired templates (no-op for NetFlow v5).
     pub fn cleanup_expired(&self, _timeout_seconds: u64) {}
 }

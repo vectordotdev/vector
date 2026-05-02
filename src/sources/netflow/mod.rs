@@ -9,11 +9,11 @@ use tokio::net::UdpSocket;
 use tokio::time::Duration;
 use tracing::{debug, error, info, warn};
 
-use crate::SourceSender;
 use crate::config::{DataType, Resource, SourceConfig, SourceContext, SourceOutput};
 use crate::shutdown::ShutdownSignal;
-use crate::sources::Source;
 use crate::sources::netflow::events::*;
+use crate::sources::Source;
+use crate::SourceSender;
 
 pub mod config;
 pub mod events;
@@ -60,7 +60,8 @@ async fn netflow_source(
         config.workers
     } else if config.workers > 1 {
         warn!(
-            message = "NetFlow `workers` > 1 requires SO_REUSEPORT; using one worker on this platform.",
+            message =
+                "NetFlow `workers` > 1 requires SO_REUSEPORT; using one worker on this platform.",
             configured_workers = config.workers,
         );
         1
@@ -78,7 +79,7 @@ async fn netflow_source(
     let template_cache = Arc::new(templates::TemplateCache::new(config.max_templates));
     let protocol_parser = Arc::new(protocols::ProtocolParser::new(
         &config,
-        (*template_cache).clone(),
+        template_cache.as_ref().clone(),
     ));
 
     // Spawn worker tasks
@@ -238,13 +239,11 @@ async fn netflow_worker(
 impl SourceConfig for NetflowConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
         if let Err(errors) = self.validate() {
-            return Err(
-                format!(
-                    "Invalid NetFlow source configuration: {}",
-                    errors.join("; ")
-                )
-                .into(),
-            );
+            return Err(format!(
+                "Invalid NetFlow source configuration: {}",
+                errors.join("; ")
+            )
+            .into());
         }
 
         let config = self.clone();
@@ -278,7 +277,9 @@ mod tests {
     use super::*;
     use crate::test_util::{collect_ready, next_addr};
     use std::net::UdpSocket as StdUdpSocket;
+
     use vector_lib::event::Event;
+
     #[test]
     fn test_netflow_v5_parsing() {
         use crate::sources::netflow::protocols::ProtocolParser;

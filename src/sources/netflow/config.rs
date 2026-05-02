@@ -6,7 +6,7 @@ use vector_lib::configurable::configurable_component;
 
 /// Configuration for the NetFlow source.
 #[derive(Clone, Debug)]
-#[configurable_component(source("netflow"))]
+#[configurable_component(source("netflow", "Receive NetFlow v5 flow records over UDP."))]
 #[serde(deny_unknown_fields)]
 pub struct NetflowConfig {
     /// The address to listen for NetFlow packets on.
@@ -181,11 +181,9 @@ mod tests {
         config.max_packet_size = 0;
 
         let errors = config.validate().unwrap_err();
-        assert!(
-            errors
-                .iter()
-                .any(|e| e.contains("max_packet_size must be greater than 0"))
-        );
+        assert!(errors
+            .iter()
+            .any(|e| e.contains("max_packet_size must be greater than 0")));
     }
 
     #[test]

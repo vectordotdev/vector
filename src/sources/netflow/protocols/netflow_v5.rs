@@ -106,7 +106,11 @@ impl NetflowV5Header {
             1 // No sampling
         } else {
             let interval = self.sampling_interval & 0x3FFF;
-            if interval == 0 { 1 } else { interval as u32 }
+            if interval == 0 {
+                1
+            } else {
+                interval as u32
+            }
         }
     }
 
