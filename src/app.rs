@@ -101,7 +101,15 @@ impl ApplicationConfig {
         extra_context: ExtraContext,
     ) -> Result<Self, ExitCode> {
         #[cfg(feature = "api")]
-        let api = config.api;
+        let api = {
+            if let Err(errors) = config.api.check_deprecated_fields() {
+                for e in &errors {
+                    error!(message = %e, internal_log_rate_limit = false);
+                }
+                return Err(exitcode::CONFIG);
+            }
+            config.api
+        };
 
         let (topology, graceful_crash_receiver) =
             RunningTopology::start_init_validated(config, extra_context.clone())
