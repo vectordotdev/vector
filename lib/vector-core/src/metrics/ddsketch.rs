@@ -798,9 +798,22 @@ impl AgentDDSketch {
                 let mut sketch = AgentDDSketch::with_agent_defaults();
                 sketch.insert_interpolate_buckets(delta_buckets)?;
 
+                // Prefer exact avg from sum/count when available.
+                //
+                // NOTE:
+                // AggregatedHistogram -> DDSketch conversion historically relies entirely
+                // on bucket interpolation, which is approximate.
+                //
+                // Some upstream sources (e.g. OTLP) encode missing sums as 0.0, so we
+                // cannot distinguish between "unknown sum" and "actual zero sum" here.
+                // As a result, we only override when sum != 0.0 and fall back to
+                // interpolation otherwise.
+                //
+                // This preserves existing behavior for ambiguous cases while improving
+                // accuracy when a non-zero sum is available.
                 match u32::try_from(*count) {
                     Ok(c) => {
-                        if c > 0 {
+                        if c > 0 && *sum != 0.0 {
                             sketch.count = c;
                             sketch.sum = *sum;
                             sketch.avg = *sum / f64::from(c);
