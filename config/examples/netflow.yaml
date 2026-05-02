@@ -1,0 +1,58 @@
+# NetFlow Source Example
+# ------------------------------------------------------------------------------
+# This example demonstrates how to collect NetFlow v5 data from network
+# devices and export it to various destinations.
+#
+# Docs: https://vector.dev/docs/reference/configuration/sources/netflow
+
+data_dir: "/var/lib/vector"
+
+# Collect NetFlow v5 data from network devices (routers, switches, etc.)
+# Docs: https://vector.dev/docs/reference/configuration/sources/netflow
+sources:
+  netflow_data:
+    type: "netflow"
+    address: "0.0.0.0:2055"
+    protocols: ["netflow_v5"]
+
+# Parse and enrich the flow data
+# Docs: https://vector.dev/docs/reference/configuration/transforms/remap
+transforms:
+  flow_parser:
+    inputs: ["netflow_data"]
+    type: "remap"
+    source: |
+      # Add timestamp if missing
+      if !exists(.timestamp) {
+        .timestamp = now()
+      }
+      
+      # Add source information
+      .source = "netflow"
+      
+      # Parse IP addresses for better visualization
+      if exists(.src_addr) {
+        .src_ip = parse_ip!(.src_addr)
+      }
+      if exists(.dst_addr) {
+        .dst_ip = parse_ip!(.dst_addr)
+      }
+
+# Send to Elasticsearch for analysis
+# Docs: https://vector.dev/docs/reference/configuration/sinks/elasticsearch
+sinks:
+  elasticsearch:
+    inputs: ["flow_parser"]
+    type: "elasticsearch"
+    endpoint: "http://localhost:9200"
+    index: "netflow-%Y-%m-%d"
+    encoding:
+      codec: "json"
+
+  # Also send to console for debugging
+  # Docs: https://vector.dev/docs/reference/configuration/sinks/console
+  console:
+    inputs: ["flow_parser"]
+    type: "console"
+    encoding:
+      codec: "json"

@@ -62,6 +62,8 @@ pub mod mongodb_metrics;
 pub mod mqtt;
 #[cfg(feature = "sources-nats")]
 pub mod nats;
+#[cfg(feature = "sources-netflow")]
+pub mod netflow;
 #[cfg(feature = "sources-nginx_metrics")]
 pub mod nginx_metrics;
 #[cfg(feature = "sources-opentelemetry")]

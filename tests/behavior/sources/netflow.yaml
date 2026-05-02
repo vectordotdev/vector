@@ -1,0 +1,21 @@
+- name: netflow_v5_basic
+  expectation: success
+  events:
+    - log_builder:
+        flow_type: "netflow_v5"
+        src_addr: "192.168.1.1"
+        dst_addr: "10.0.0.1"
+        src_port: 80
+        dst_port: 443
+        protocol: 6
+        octets: 1500
+        packets: 10
+        version: 5
+
+- name: unknown_protocol_short_packet
+  expectation: partial_success
+  events:
+    - log_builder:
+        flow_type: "unknown"
+        peer_addr: "127.0.0.1:12345"
+        packet_length: 4
