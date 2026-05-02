@@ -236,6 +236,7 @@ Instacart
 Intenso
 INTERLAKEN
 ionik
+IPFIX
 ipallowlist
 ipod
 ircd
@@ -340,6 +341,7 @@ Nabi
 namenode
 netcat
 netdata
+netflow
 Netflix
 netlify
 Neue
