@@ -15,7 +15,7 @@ pub struct NetflowConfig {
     pub address: SocketAddr,
 
     /// Number of worker tasks to spawn. Each worker binds to the same address when `SO_REUSEPORT`
-    /// is supported (Linux, macOS, FreeBSD). Defaults to 1.
+    /// is supported (Linux, macOS, FreeBSD). Defaults to the reported CPU parallelism (falls back to 4).
     #[configurable(metadata(docs::examples = 1))]
     #[configurable(metadata(docs::examples = 4))]
     #[serde(default = "default_workers")]
@@ -54,8 +54,8 @@ pub struct NetflowConfig {
     #[serde(default = "default_strict_validation")]
     pub strict_validation: bool,
 
-    /// Whether to include raw packet bytes (base64-encoded) in each event.
-    /// Disabled by default to keep payload size small; enable for debugging or forensics.
+    /// Include raw packet bytes (base64-encoded) in the first flow record of each packet.
+    /// Disabled by default. Enable for debugging or packet capture forensics.
     #[configurable(metadata(docs::examples = false))]
     #[configurable(metadata(docs::examples = true))]
     #[serde(default = "default_include_raw_data")]
@@ -75,8 +75,10 @@ const fn default_template_timeout() -> u64 {
     1800 // 30 minutes - matches typical resend intervals
 }
 
-const fn default_workers() -> usize {
-    1
+fn default_workers() -> usize {
+    std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(4)
 }
 
 fn default_protocols() -> Vec<String> {

@@ -4,7 +4,7 @@
 
 use std::sync::Arc;
 
-use socket2::{Domain, Protocol, Socket, Type};
+use socket2::{Domain, Protocol, SockRef, Socket, Type};
 use tokio::net::UdpSocket;
 use tokio::time::Duration;
 use tracing::{debug, error, info, warn};
@@ -43,6 +43,19 @@ async fn create_bind_socket(address: std::net::SocketAddr) -> Result<UdpSocket, 
     #[cfg(any(target_os = "linux", target_os = "macos", target_os = "freebsd"))]
     socket.set_reuse_port(true)?;
     socket.set_reuse_address(true)?;
+
+    let requested = 25 * 1024 * 1024usize;
+    let _ = SockRef::from(&socket).set_recv_buffer_size(requested);
+    let actual = SockRef::from(&socket).recv_buffer_size().unwrap_or(0);
+    if actual < requested {
+        warn!(
+            message = "UDP receive buffer smaller than requested; packet loss possible under sustained load.",
+            requested_bytes = requested,
+            actual_bytes = actual,
+            hint = "sudo sysctl -w net.core.rmem_max=26214400",
+        );
+    }
+
     socket.bind(&address.into())?;
     socket.set_nonblocking(true)?;
 
@@ -343,17 +356,13 @@ mod tests {
 
         let log = events[0].as_log();
         assert_eq!(
-            log.get("flow_type").unwrap().as_str().unwrap(),
-            "netflow_v5"
-        );
-        assert_eq!(
-            log.get("src_addr").unwrap().as_str().unwrap(),
+            log.get("srcaddr").unwrap().as_str().unwrap(),
             "192.168.1.1"
         );
-        assert_eq!(log.get("dst_addr").unwrap().as_str().unwrap(), "10.0.0.1");
-        assert_eq!(log.get("protocol").unwrap().as_integer().unwrap(), 6);
-        assert_eq!(log.get("src_port").unwrap().as_integer().unwrap(), 80);
-        assert_eq!(log.get("dst_port").unwrap().as_integer().unwrap(), 443);
+        assert_eq!(log.get("dstaddr").unwrap().as_str().unwrap(), "10.0.0.1");
+        assert_eq!(log.get("prot").unwrap().as_integer().unwrap(), 6);
+        assert_eq!(log.get("srcport").unwrap().as_integer().unwrap(), 80);
+        assert_eq!(log.get("dstport").unwrap().as_integer().unwrap(), 443);
     }
 
     #[tokio::test]

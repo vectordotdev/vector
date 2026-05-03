@@ -7,7 +7,6 @@ use crate::sources::netflow::fields::FieldParser;
 
 use dashmap::DashMap;
 use std::net::{IpAddr, SocketAddr};
-use std::time::{SystemTime, UNIX_EPOCH};
 use tracing::{debug, warn};
 use vector_lib::event::{Event, LogEvent};
 
@@ -82,10 +81,9 @@ impl NetflowV5Header {
         })
     }
 
-    /// Builds a diagnostic log event containing header fields only.
+    /// Header fields only (e.g. zero-flow datagrams or parse failure fallback).
     pub fn to_log_event(&self) -> LogEvent {
         let mut log_event = LogEvent::default();
-        log_event.insert("flow_type", "netflow_v5");
         log_event.insert("version", self.version);
         log_event.insert("count", self.count);
         log_event.insert("sys_uptime", self.sys_uptime);
@@ -96,27 +94,6 @@ impl NetflowV5Header {
         log_event.insert("engine_id", self.engine_id);
         log_event.insert("sampling_interval", self.sampling_interval);
         log_event
-    }
-
-    /// Effective sampling divisor from the header (`sampling_interval` field).
-    ///
-    /// Bits 15–14 encode mode; bits 13–0 encode the interval (RFC 3954, section 8.2).
-    pub fn sampling_rate(&self) -> u32 {
-        if self.sampling_interval == 0 {
-            1 // No sampling
-        } else {
-            let interval = self.sampling_interval & 0x3FFF;
-            if interval == 0 {
-                1
-            } else {
-                interval as u32
-            }
-        }
-    }
-
-    /// Returns whether sampling mode bits are non-zero (RFC 3954, section 8.2).
-    pub fn is_sampled(&self) -> bool {
-        (self.sampling_interval >> 14) != 0
     }
 }
 
@@ -191,209 +168,40 @@ impl NetflowV5Record {
         )
     }
 
-    /// Maps an IP protocol number to a short display name.
-    fn get_protocol_name(protocol: u8) -> &'static str {
-        match protocol {
-            1 => "ICMP",
-            6 => "TCP",
-            17 => "UDP",
-            47 => "GRE",
-            50 => "ESP",
-            51 => "AH",
-            89 => "OSPF",
-            132 => "SCTP",
-            _ => "Other",
-        }
-    }
-
-    /// Converts this record into a log event with optional protocol/port enrichment.
-    pub fn to_log_event(&self, record_number: usize, resolve_protocols: bool) -> LogEvent {
+    /// Cisco NetFlow v5 export field names (single pass: record + datagram header).
+    pub fn to_log_event(&self, header: &NetflowV5Header) -> LogEvent {
         let mut log_event = LogEvent::default();
 
-        log_event.insert("flow_type", "netflow_v5");
-        log_event.insert("record_number", record_number);
-
-        log_event.insert("src_addr", Self::ipv4_to_string(self.src_addr));
-        log_event.insert("dst_addr", Self::ipv4_to_string(self.dst_addr));
-        log_event.insert("next_hop", Self::ipv4_to_string(self.next_hop));
-
-        log_event.insert("input_interface", self.input);
-        log_event.insert("output_interface", self.output);
-
-        log_event.insert("packets", self.d_pkts);
-        log_event.insert("octets", self.d_octets);
-
-        log_event.insert("first_switched", self.first);
-        log_event.insert("last_switched", self.last);
-
-        log_event.insert("src_port", self.src_port);
-        log_event.insert("dst_port", self.dst_port);
-        if resolve_protocols {
-            if let Some(name) = Self::well_known_port_name(self.src_port) {
-                log_event.insert("src_port_name", name);
-            }
-            if let Some(name) = Self::well_known_port_name(self.dst_port) {
-                log_event.insert("dst_port_name", name);
-            }
-        }
-
-        log_event.insert("protocol", self.prot);
-        if resolve_protocols {
-            log_event.insert("protocol_name", Self::get_protocol_name(self.prot));
-        }
-
+        log_event.insert("srcaddr", Self::ipv4_to_string(self.src_addr));
+        log_event.insert("dstaddr", Self::ipv4_to_string(self.dst_addr));
+        log_event.insert("nexthop", Self::ipv4_to_string(self.next_hop));
+        log_event.insert("input", self.input);
+        log_event.insert("output", self.output);
+        log_event.insert("dpkts", self.d_pkts);
+        log_event.insert("doctets", self.d_octets);
+        log_event.insert("first", self.first);
+        log_event.insert("last", self.last);
+        log_event.insert("srcport", self.src_port);
+        log_event.insert("dstport", self.dst_port);
         log_event.insert("tcp_flags", self.tcp_flags);
-        if self.prot == 6 {
-            log_event.insert("tcp_flags_urg", (self.tcp_flags & 0x20) != 0);
-            log_event.insert("tcp_flags_ack", (self.tcp_flags & 0x10) != 0);
-            log_event.insert("tcp_flags_psh", (self.tcp_flags & 0x08) != 0);
-            log_event.insert("tcp_flags_rst", (self.tcp_flags & 0x04) != 0);
-            log_event.insert("tcp_flags_syn", (self.tcp_flags & 0x02) != 0);
-            log_event.insert("tcp_flags_fin", (self.tcp_flags & 0x01) != 0);
-            log_event.insert(
-                "tcp_flags_string",
-                Self::tcp_flags_to_string(self.tcp_flags),
-            );
-        }
-
+        log_event.insert("prot", self.prot);
         log_event.insert("tos", self.tos);
-        log_event.insert("dscp", (self.tos >> 2) & 0x3F);
-        log_event.insert("ecn", self.tos & 0x03);
-
         log_event.insert("src_as", self.src_as);
         log_event.insert("dst_as", self.dst_as);
-
         log_event.insert("src_mask", self.src_mask);
         log_event.insert("dst_mask", self.dst_mask);
-        log_event.insert(
-            "src_net",
-            Self::addr_mask_to_cidr(self.src_addr, self.src_mask),
-        );
-        log_event.insert(
-            "dst_net",
-            Self::addr_mask_to_cidr(self.dst_addr, self.dst_mask),
-        );
 
-        log_event.insert(
-            "is_private_src",
-            Self::is_private_ipv4_static(self.src_addr),
-        );
-        log_event.insert(
-            "is_private_dst",
-            Self::is_private_ipv4_static(self.dst_addr),
-        );
-
-        let duration_ms = if self.last > self.first {
-            self.last - self.first
-        } else {
-            0
-        };
-        if duration_ms > 0 {
-            log_event.insert("flow_duration_ms", duration_ms);
-            let duration_secs = duration_ms as f64 / 1000.0;
-            log_event.insert(
-                "bits_per_second",
-                self.d_octets as f64 * 8.0 / duration_secs,
-            );
-            log_event.insert("packets_per_second", self.d_pkts as f64 / duration_secs);
-        }
-
-        if self.d_pkts > 0 {
-            log_event.insert("bytes_per_packet", self.d_octets / self.d_pkts);
-        }
-
-        let flow_direction = self.determine_flow_direction();
-        log_event.insert("flow_direction", flow_direction);
+        log_event.insert("count", header.count);
+        log_event.insert("sys_uptime", header.sys_uptime);
+        log_event.insert("unix_secs", header.unix_secs);
+        log_event.insert("unix_nsecs", header.unix_nsecs);
+        log_event.insert("flow_sequence", header.flow_sequence);
+        log_event.insert("engine_type", header.engine_type);
+        log_event.insert("engine_id", header.engine_id);
+        log_event.insert("sampling_interval", header.sampling_interval);
+        log_event.insert("version", header.version);
 
         log_event
-    }
-
-    fn tcp_flags_to_string(flags: u8) -> String {
-        let mut parts = Vec::with_capacity(6);
-        if (flags & 0x01) != 0 {
-            parts.push("FIN");
-        }
-        if (flags & 0x02) != 0 {
-            parts.push("SYN");
-        }
-        if (flags & 0x04) != 0 {
-            parts.push("RST");
-        }
-        if (flags & 0x08) != 0 {
-            parts.push("PSH");
-        }
-        if (flags & 0x10) != 0 {
-            parts.push("ACK");
-        }
-        if (flags & 0x20) != 0 {
-            parts.push("URG");
-        }
-        if parts.is_empty() {
-            "none".to_string()
-        } else {
-            parts.join(",")
-        }
-    }
-
-    fn well_known_port_name(port: u16) -> Option<&'static str> {
-        match port {
-            20 => Some("ftp-data"),
-            21 => Some("ftp"),
-            22 => Some("ssh"),
-            23 => Some("telnet"),
-            25 => Some("smtp"),
-            53 => Some("dns"),
-            80 => Some("http"),
-            110 => Some("pop3"),
-            143 => Some("imap"),
-            443 => Some("https"),
-            993 => Some("imaps"),
-            995 => Some("pop3s"),
-            1812 => Some("radius"),
-            3306 => Some("mysql"),
-            5432 => Some("postgresql"),
-            6379 => Some("redis"),
-            27017 => Some("mongodb"),
-            _ => None,
-        }
-    }
-
-    fn addr_mask_to_cidr(addr: u32, mask_bits: u8) -> String {
-        let mask_bits = mask_bits.min(32);
-        if mask_bits == 0 {
-            return "0.0.0.0/0".to_string();
-        }
-        let network = addr & (!0u32 << (32 - mask_bits));
-        format!("{}/{}", Self::ipv4_to_string(network), mask_bits)
-    }
-
-    pub(crate) fn is_private_ipv4_static(addr: u32) -> bool {
-        let a = (addr >> 24) & 0xFF;
-        let b = (addr >> 16) & 0xFF;
-        a == 10 || (a == 172 && b >= 16 && b <= 31) || (a == 192 && b == 168)
-    }
-
-    /// Heuristic: client_to_server when dst is a common server port; server_to_client when src is.
-    /// "inbound"/"outbound" are from the exporter's perspective (traffic toward exporter vs away).
-    fn determine_flow_direction(&self) -> &'static str {
-        let server_ports = [
-            21, 22, 23, 25, 53, 80, 110, 143, 443, 993, 995, 1433, 3306, 5432, 6379, 27017,
-        ];
-        let src_is_server = server_ports.contains(&self.src_port);
-        let dst_is_server = server_ports.contains(&self.dst_port);
-        match (src_is_server, dst_is_server) {
-            (true, false) => "server_to_client",
-            (false, true) => "client_to_server",
-            _ => {
-                if self.src_port < self.dst_port {
-                    "server_to_client"
-                } else if self.dst_port < self.src_port {
-                    "client_to_server"
-                } else {
-                    "unknown"
-                }
-            }
-        }
     }
 
     /// Validates counters and sizes when strict mode is enabled upstream.
@@ -470,10 +278,9 @@ impl NetflowV5Parser {
         peer_addr: SocketAddr,
         include_raw_data: bool,
     ) -> Result<Vec<Event>, String> {
-        let mut events = Vec::new();
-
         // Parse header
         let header = NetflowV5Header::from_bytes(data)?;
+        let mut events = Vec::with_capacity(header.count as usize);
 
         debug!(
             message = "Parsing NetFlow v5 packet.",
@@ -505,6 +312,7 @@ impl NetflowV5Parser {
         let mut record_offset = NETFLOW_V5_HEADER_SIZE;
         let mut valid_records = 0;
         let mut invalid_records = 0;
+        let mut raw_data_attached = false;
 
         for i in 0..header.count {
             let record_end = record_offset + NETFLOW_V5_RECORD_SIZE;
@@ -532,38 +340,21 @@ impl NetflowV5Parser {
                             record_offset = record_end;
                             continue;
                         }
-                    } else {
-                        if let Err(validation_error) = record.validate() {
-                            debug!(
-                                message = "NetFlow v5 record validation warning.",
-                                record_index = i,
-                                error = %validation_error,
-                            );
-                        }
+                    } else if let Err(validation_error) = record.validate() {
+                        debug!(
+                            message = "NetFlow v5 record validation warning.",
+                            record_index = i,
+                            error = %validation_error,
+                        );
                     }
 
-                    let mut record_event = record.to_log_event(i as usize, true);
-
-                    record_event.insert("exporter", peer_addr.ip().to_string());
-                    record_event.insert("version", 5u16);
-                    record_event.insert("header_flow_count", header.count);
-                    record_event.insert(
-                        "time_received",
-                        SystemTime::now()
-                            .duration_since(UNIX_EPOCH)
-                            .unwrap_or_default()
-                            .as_secs(),
-                    );
-                    record_event.insert("unix_nsecs", header.unix_nsecs);
-                    record_event.insert("packet_sequence", header.flow_sequence);
-                    record_event.insert("engine_type", header.engine_type);
-                    record_event.insert("engine_id", header.engine_id);
-                    record_event.insert("sys_uptime", header.sys_uptime);
-                    record_event.insert("unix_secs", header.unix_secs);
-                    record_event.insert("sampling_rate", header.sampling_rate());
+                    let mut record_event = record.to_log_event(&header);
 
                     if let Some(ref encoded) = raw_data_encoded {
-                        record_event.insert("raw_data", encoded.clone());
+                        if !raw_data_attached {
+                            record_event.insert("raw_data", encoded.clone());
+                            raw_data_attached = true;
+                        }
                     }
 
                     events.push(Event::Log(record_event));
@@ -584,10 +375,6 @@ impl NetflowV5Parser {
 
         if events.is_empty() {
             let mut base_event = header.to_log_event();
-            base_event.insert("sampling_rate", header.sampling_rate());
-            base_event.insert("is_sampled", header.is_sampled());
-            base_event.insert("valid_records", valid_records);
-            base_event.insert("invalid_records", invalid_records);
             if let Some(ref encoded) = raw_data_encoded {
                 base_event.insert("raw_data", encoded.clone());
             }
@@ -757,136 +544,34 @@ mod tests {
 
     #[test]
     fn test_record_to_log_event() {
-        let record_data = vec![
-            192, 168, 1, 1, // src_addr
-            10, 0, 0, 1, // dst_addr
-            0, 0, 0, 0, // next_hop
-            0, 1, // input
-            0, 2, // output
-            0, 0, 0, 10, // d_pkts
-            0, 0, 5, 220, // d_octets (1500)
-            0, 0, 0, 100, // first
-            0, 0, 0, 200, // last
-            0, 80, // src_port
-            1, 187, // dst_port (443)
-            0,   // pad1
-            24,  // tcp_flags (ACK+PSH)
-            6,   // protocol (TCP)
-            0,   // tos
-            0, 100, // src_as
-            0, 200, // dst_as
-            24,  // src_mask
-            8,   // dst_mask
-            0, 0, // pad2
-        ];
-
-        let record = NetflowV5Record::from_bytes(&record_data).unwrap();
-        let log_event = record.to_log_event(0, true);
+        let packet = create_netflow_v5_packet(1);
+        let header = NetflowV5Header::from_bytes(&packet).unwrap();
+        let record = NetflowV5Record::from_bytes(&packet[NETFLOW_V5_HEADER_SIZE..]).unwrap();
+        let log_event = record.to_log_event(&header);
 
         assert_eq!(
-            log_event.get("flow_type").unwrap().as_str().unwrap(),
-            "netflow_v5"
-        );
-        assert_eq!(
-            log_event.get("src_addr").unwrap().as_str().unwrap(),
+            log_event.get("srcaddr").unwrap().as_str().unwrap(),
             "192.168.1.1"
         );
         assert_eq!(
-            log_event.get("dst_addr").unwrap().as_str().unwrap(),
+            log_event.get("dstaddr").unwrap().as_str().unwrap(),
             "10.0.0.1"
         );
-        assert_eq!(log_event.get("src_port").unwrap().as_integer().unwrap(), 80);
+        assert_eq!(log_event.get("srcport").unwrap().as_integer().unwrap(), 80);
         assert_eq!(
-            log_event.get("dst_port").unwrap().as_integer().unwrap(),
+            log_event.get("dstport").unwrap().as_integer().unwrap(),
             443
         );
-        assert_eq!(log_event.get("protocol").unwrap().as_integer().unwrap(), 6);
+        assert_eq!(log_event.get("prot").unwrap().as_integer().unwrap(), 6);
+        assert_eq!(log_event.get("dpkts").unwrap().as_integer().unwrap(), 10);
+        assert_eq!(log_event.get("doctets").unwrap().as_integer().unwrap(), 1500);
+        assert_eq!(log_event.get("tcp_flags").unwrap().as_integer().unwrap(), 0);
         assert_eq!(
-            log_event.get("protocol_name").unwrap().as_str().unwrap(),
-            "TCP"
-        );
-        assert_eq!(log_event.get("packets").unwrap().as_integer().unwrap(), 10);
-        assert_eq!(log_event.get("octets").unwrap().as_integer().unwrap(), 1500);
-        assert_eq!(
-            log_event
-                .get("flow_duration_ms")
-                .unwrap()
-                .as_integer()
-                .unwrap(),
+            log_event.get("flow_sequence").unwrap().as_integer().unwrap(),
             100
         );
-        assert_eq!(
-            log_event
-                .get("bytes_per_packet")
-                .unwrap()
-                .as_integer()
-                .unwrap(),
-            150
-        );
-
-        // Check TCP flags
-        assert_eq!(
-            log_event
-                .get("tcp_flags_ack")
-                .unwrap()
-                .as_boolean()
-                .unwrap(),
-            true
-        );
-        assert_eq!(
-            log_event
-                .get("tcp_flags_psh")
-                .unwrap()
-                .as_boolean()
-                .unwrap(),
-            true
-        );
-        assert_eq!(
-            log_event
-                .get("tcp_flags_syn")
-                .unwrap()
-                .as_boolean()
-                .unwrap(),
-            false
-        );
-
-        // Check DSCP/ECN
-        assert_eq!(log_event.get("dscp").unwrap().as_integer().unwrap(), 0);
-        assert_eq!(log_event.get("ecn").unwrap().as_integer().unwrap(), 0);
-    }
-
-    #[test]
-    fn test_sampling_rate_calculation() {
-        let mut packet = create_netflow_v5_packet(1);
-
-        // Test no sampling
-        packet[22..24].copy_from_slice(&0u16.to_be_bytes());
-        let header = NetflowV5Header::from_bytes(&packet).unwrap();
-        assert_eq!(header.sampling_rate(), 1);
-        assert!(!header.is_sampled());
-
-        // Deterministic sampling mode (bits 15:14 = 1) with interval 100 (RFC 3954 §8.2)
-        packet[22..24].copy_from_slice(&(1u16 << 14 | 100u16).to_be_bytes());
-        let header = NetflowV5Header::from_bytes(&packet).unwrap();
-        assert_eq!(header.sampling_rate(), 100);
-        assert!(header.is_sampled());
-    }
-
-    #[test]
-    fn test_flow_direction_detection() {
-        let mut record_data = vec![0u8; NETFLOW_V5_RECORD_SIZE];
-
-        // Client to server (high port to low port)
-        record_data[32..34].copy_from_slice(&50000u16.to_be_bytes()); // src_port
-        record_data[34..36].copy_from_slice(&80u16.to_be_bytes()); // dst_port (HTTP)
-        let record = NetflowV5Record::from_bytes(&record_data).unwrap();
-        assert_eq!(record.determine_flow_direction(), "client_to_server");
-
-        // Server to client (low port to high port)
-        record_data[32..34].copy_from_slice(&80u16.to_be_bytes()); // src_port (HTTP)
-        record_data[34..36].copy_from_slice(&50000u16.to_be_bytes()); // dst_port
-        let record = NetflowV5Record::from_bytes(&record_data).unwrap();
-        assert_eq!(record.determine_flow_direction(), "server_to_client");
+        assert_eq!(log_event.get("count").unwrap().as_integer().unwrap(), 1);
+        assert_eq!(log_event.get("version").unwrap().as_integer().unwrap(), 5);
     }
 
     #[test]
@@ -917,41 +602,6 @@ mod tests {
     }
 
     #[test]
-    fn test_private_ip_detection() {
-        let _record = NetflowV5Record {
-            src_addr: 0,
-            dst_addr: 0,
-            next_hop: 0,
-            input: 0,
-            output: 0,
-            d_pkts: 0,
-            d_octets: 0,
-            first: 0,
-            last: 0,
-            src_port: 0,
-            dst_port: 0,
-            pad1: 0,
-            tcp_flags: 0,
-            prot: 0,
-            tos: 0,
-            src_as: 0,
-            dst_as: 0,
-            src_mask: 0,
-            dst_mask: 0,
-            pad2: 0,
-        };
-
-        // 10.0.0.1
-        assert!(NetflowV5Record::is_private_ipv4_static(0x0A000001));
-        // 172.16.0.1
-        assert!(NetflowV5Record::is_private_ipv4_static(0xAC100001));
-        // 192.168.1.1
-        assert!(NetflowV5Record::is_private_ipv4_static(0xC0A80101));
-        // 8.8.8.8 (public)
-        assert!(!NetflowV5Record::is_private_ipv4_static(0x08080808));
-    }
-
-    #[test]
     fn test_full_packet_parsing() {
         let config = NetflowConfig::default();
         let field_parser = FieldParser::new(&config);
@@ -963,23 +613,15 @@ mod tests {
         // Should get 2 record events
         assert_eq!(events.len(), 2);
 
-        for (i, event) in events.iter().enumerate() {
+        for event in &events {
             if let Event::Log(log) = event {
                 assert_eq!(
-                    log.get("flow_type").unwrap().as_str().unwrap(),
-                    "netflow_v5"
-                );
-                assert_eq!(
-                    log.get("record_number").unwrap().as_integer().unwrap(),
-                    i as i64
-                );
-                assert_eq!(
-                    log.get("src_addr").unwrap().as_str().unwrap(),
+                    log.get("srcaddr").unwrap().as_str().unwrap(),
                     "192.168.1.1"
                 );
-                assert_eq!(log.get("dst_addr").unwrap().as_str().unwrap(), "10.0.0.1");
+                assert_eq!(log.get("dstaddr").unwrap().as_str().unwrap(), "10.0.0.1");
                 assert_eq!(
-                    log.get("packet_sequence").unwrap().as_integer().unwrap(),
+                    log.get("flow_sequence").unwrap().as_integer().unwrap(),
                     100
                 );
             }
@@ -998,16 +640,7 @@ mod tests {
         let events = parser.parse(&packet, test_peer_addr(), true).unwrap();
         assert!(!events.is_empty());
 
-        // Raw data should be included in individual records when requested
-        for event in &events {
-            if let Event::Log(log) = event {
-                let flow_type = log.get("flow_type").unwrap().as_str().unwrap();
-                if flow_type == "netflow_v5" {
-                    // Records should include raw data when requested
-                    assert!(log.get("raw_data").is_some());
-                }
-            }
-        }
+        assert!(events[0].as_log().get("raw_data").is_some());
     }
 
     #[test]
@@ -1023,11 +656,8 @@ mod tests {
         assert_eq!(events.len(), 1);
 
         if let Event::Log(log) = &events[0] {
-            assert_eq!(
-                log.get("flow_type").unwrap().as_str().unwrap(),
-                "netflow_v5"
-            );
             assert_eq!(log.get("count").unwrap().as_integer().unwrap(), 0);
+            assert_eq!(log.get("version").unwrap().as_integer().unwrap(), 5);
         }
     }
 
@@ -1067,85 +697,6 @@ mod tests {
     }
 
     #[test]
-    fn test_tcp_flags_parsing() {
-        let mut record_data = vec![0u8; NETFLOW_V5_RECORD_SIZE];
-
-        // Set TCP protocol and flags
-        record_data[38] = 6; // protocol = TCP
-        record_data[37] = 0b00010010; // SYN + ACK flags
-
-        let record = NetflowV5Record::from_bytes(&record_data).unwrap();
-        let log_event = record.to_log_event(0, true);
-
-        assert_eq!(
-            log_event
-                .get("tcp_flags_syn")
-                .unwrap()
-                .as_boolean()
-                .unwrap(),
-            true
-        );
-        assert_eq!(
-            log_event
-                .get("tcp_flags_ack")
-                .unwrap()
-                .as_boolean()
-                .unwrap(),
-            true
-        );
-        assert_eq!(
-            log_event
-                .get("tcp_flags_fin")
-                .unwrap()
-                .as_boolean()
-                .unwrap(),
-            false
-        );
-        assert_eq!(
-            log_event
-                .get("tcp_flags_rst")
-                .unwrap()
-                .as_boolean()
-                .unwrap(),
-            false
-        );
-        assert_eq!(
-            log_event
-                .get("tcp_flags_psh")
-                .unwrap()
-                .as_boolean()
-                .unwrap(),
-            false
-        );
-        assert_eq!(
-            log_event
-                .get("tcp_flags_urg")
-                .unwrap()
-                .as_boolean()
-                .unwrap(),
-            false
-        );
-    }
-
-    #[test]
-    fn test_dscp_ecn_parsing() {
-        let mut record_data = vec![0u8; NETFLOW_V5_RECORD_SIZE];
-
-        // Set TOS field: DSCP=26 (AF31), ECN=1
-        record_data[39] = (26 << 2) | 1; // DSCP in upper 6 bits, ECN in lower 2
-
-        let record = NetflowV5Record::from_bytes(&record_data).unwrap();
-        let log_event = record.to_log_event(0, true);
-
-        assert_eq!(
-            log_event.get("tos").unwrap().as_integer().unwrap(),
-            (26 << 2) | 1
-        );
-        assert_eq!(log_event.get("dscp").unwrap().as_integer().unwrap(), 26);
-        assert_eq!(log_event.get("ecn").unwrap().as_integer().unwrap(), 1);
-    }
-
-    #[test]
     fn test_multiple_records_with_validation() {
         let config = NetflowConfig::default();
         let field_parser = FieldParser::new(&config);
@@ -1166,43 +717,16 @@ mod tests {
         // Should get 2 valid records (first and third)
         assert_eq!(events.len(), 2);
 
-        // Check record numbers
         if let Event::Log(log) = &events[0] {
-            assert_eq!(log.get("record_number").unwrap().as_integer().unwrap(), 0);
+            assert_eq!(
+                log.get("flow_sequence").unwrap().as_integer().unwrap(),
+                100
+            );
         }
         if let Event::Log(log) = &events[1] {
-            assert_eq!(log.get("record_number").unwrap().as_integer().unwrap(), 2);
-        }
-    }
-
-    #[test]
-    fn test_protocol_name_resolution() {
-        let mut record_data = vec![0u8; NETFLOW_V5_RECORD_SIZE];
-
-        // Test various protocols
-        let protocols = vec![
-            (1, "ICMP"),
-            (6, "TCP"),
-            (17, "UDP"),
-            (47, "GRE"),
-            (50, "ESP"),
-            (89, "OSPF"),
-            (132, "SCTP"),
-            (255, "Other"),
-        ];
-
-        for (proto_num, proto_name) in protocols {
-            record_data[38] = proto_num;
-            let record = NetflowV5Record::from_bytes(&record_data).unwrap();
-            let log_event = record.to_log_event(0, true);
-
             assert_eq!(
-                log_event.get("protocol").unwrap().as_integer().unwrap(),
-                proto_num as i64
-            );
-            assert_eq!(
-                log_event.get("protocol_name").unwrap().as_str().unwrap(),
-                proto_name
+                log.get("flow_sequence").unwrap().as_integer().unwrap(),
+                100
             );
         }
     }
@@ -1213,10 +737,6 @@ mod tests {
         let header = NetflowV5Header::from_bytes(&packet).unwrap();
         let log_event = header.to_log_event();
 
-        assert_eq!(
-            log_event.get("flow_type").unwrap().as_str().unwrap(),
-            "netflow_v5"
-        );
         assert_eq!(log_event.get("version").unwrap().as_integer().unwrap(), 5);
         assert_eq!(log_event.get("count").unwrap().as_integer().unwrap(), 1);
         assert_eq!(

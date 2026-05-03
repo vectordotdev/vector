@@ -30,12 +30,12 @@ transforms:
       # Add source information
       .source = "netflow"
       
-      # Parse IP addresses for better visualization
-      if exists(.src_addr) {
-        .src_ip = parse_ip!(.src_addr)
+      # Typed IPs for tools that expect IP values (optional)
+      if exists(.srcaddr) {
+        .src_ip = parse_ip!(.srcaddr)
       }
-      if exists(.dst_addr) {
-        .dst_ip = parse_ip!(.dst_addr)
+      if exists(.dstaddr) {
+        .dst_ip = parse_ip!(.dstaddr)
       }
 
 # Send to Elasticsearch for analysis

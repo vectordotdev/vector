@@ -3,13 +3,13 @@
   events:
     - log_builder:
         flow_type: "netflow_v5"
-        src_addr: "192.168.1.1"
-        dst_addr: "10.0.0.1"
-        src_port: 80
-        dst_port: 443
-        protocol: 6
-        octets: 1500
-        packets: 10
+        srcaddr: "192.168.1.1"
+        dstaddr: "10.0.0.1"
+        srcport: 80
+        dstport: 443
+        prot: 6
+        doctets: 1500
+        dpkts: 10
         version: 5
 
 - name: unknown_protocol_short_packet
