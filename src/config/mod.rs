@@ -113,9 +113,24 @@ impl ComponentConfig {
         &self,
         config_paths: &HashSet<PathBuf>,
     ) -> Option<(ComponentKey, ComponentType)> {
+        // Check if any file path matches exactly
         if config_paths.iter().any(|p| self.config_paths.contains(p)) {
             return Some((self.component_key.clone(), self.component_type.clone()));
         }
+
+        // If the path is a directory (e.g., `--config-dir ./path/to/dir/`), check whether
+        // the parent directory of any file in `config_paths` matches this directory
+        for path in &self.config_paths {
+            if path.is_dir()
+                && config_paths
+                    .iter()
+                    .filter(|p| Format::from_path(p).is_ok())
+                    .any(|p| p.parent() == Some(path.as_path()))
+            {
+                return Some((self.component_key.clone(), self.component_type.clone()));
+            }
+        }
+
         None
     }
 }
