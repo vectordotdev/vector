@@ -2,6 +2,9 @@
 //!
 //! Each datagram is decoded into structured log events.
 
+use std::collections::HashMap;
+use std::io::ErrorKind;
+use std::net::IpAddr;
 use std::sync::Arc;
 
 use socket2::{Domain, Protocol, SockRef, Socket, Type};
@@ -14,6 +17,7 @@ use crate::shutdown::ShutdownSignal;
 use crate::sources::netflow::events::*;
 use crate::sources::Source;
 use crate::SourceSender;
+use vector_lib::event::Event;
 
 pub mod config;
 pub mod events;
@@ -22,6 +26,36 @@ pub mod protocols;
 pub mod templates;
 
 pub use config::NetflowConfig;
+
+/// Flush outbound batches when this many events have accumulated (amortizes channel overhead).
+const NETFLOW_BATCH_SEND_THRESHOLD: usize = 500;
+/// Initial capacity for the reusable per-worker event batch.
+const NETFLOW_BATCH_VEC_CAPACITY: usize = 1024;
+/// Limit non-blocking `try_recv_from` iterations per outer loop so shutdown and other tasks cannot starve.
+const MAX_DRAIN_PER_CYCLE: usize = 64;
+
+async fn netflow_flush_batch(
+    out: &mut SourceSender,
+    worker_id: usize,
+    batch: &mut Vec<Event>,
+) -> Result<(), ()> {
+    if batch.is_empty() {
+        return Ok(());
+    }
+    let taken = std::mem::take(batch);
+    *batch = Vec::with_capacity(NETFLOW_BATCH_VEC_CAPACITY);
+    match out.send_batch(taken).await {
+        Ok(()) => Ok(()),
+        Err(error) => {
+            error!(
+                worker_id = worker_id,
+                message = "Error sending events.",
+                %error,
+            );
+            Err(())
+        }
+    }
+}
 
 fn reuseport_supported() -> bool {
     cfg!(any(
@@ -183,9 +217,78 @@ async fn netflow_worker(
     // Buffer one byte larger than max to detect truncated UDP datagrams (OS truncates when recv buffer is full).
     let mut buffer = vec![0u8; config.max_packet_size + 1];
     let mut last_cleanup = std::time::Instant::now();
+    let mut sequence_tracker: HashMap<IpAddr, (u32, u16)> = HashMap::new();
+    let mut batch: Vec<Event> = Vec::with_capacity(NETFLOW_BATCH_VEC_CAPACITY);
 
     loop {
+        // Drain budget resets each outer-loop turn (after flush + select!), never carries across a blocking wait.
+        let mut drained = 0;
+        // Drain the kernel queue without awaiting; capped per cycle so we yield back to `select!`.
+        loop {
+            if drained >= MAX_DRAIN_PER_CYCLE {
+                break;
+            }
+            match socket.try_recv_from(&mut buffer) {
+                Ok((len, peer_addr)) => {
+                    drained += 1;
+                    if len > config.max_packet_size {
+                        emit!(NetflowParseError {
+                            error: "Packet too large (truncated)",
+                            protocol: "unknown",
+                            peer_addr,
+                        });
+                        continue;
+                    }
+
+                    let data = &buffer[..len];
+                    let added = protocol_parser.parse_into(
+                        data,
+                        peer_addr,
+                        &template_cache,
+                        &mut sequence_tracker,
+                        &mut batch,
+                    );
+
+                    if added > 0 {
+                        emit!(NetflowEventsReceived {
+                            count: added,
+                            byte_size: len,
+                            peer_addr,
+                        });
+                    }
+
+                    let cleanup_period_secs = config.template_timeout.min(300);
+                    if worker_id == 0
+                        && last_cleanup.elapsed() > Duration::from_secs(cleanup_period_secs)
+                    {
+                        template_cache.cleanup_expired(config.template_timeout);
+                        last_cleanup = std::time::Instant::now();
+                    }
+
+                    if batch.len() >= NETFLOW_BATCH_SEND_THRESHOLD {
+                        netflow_flush_batch(&mut out, worker_id, &mut batch).await?;
+                    }
+                }
+                Err(ref e) if e.kind() == ErrorKind::WouldBlock => break,
+                Err(error) => {
+                    emit!(NetflowReceiveError { error });
+                }
+            }
+        }
+
+        if !batch.is_empty() {
+            netflow_flush_batch(&mut out, worker_id, &mut batch).await?;
+        }
+
         tokio::select! {
+            biased;
+            _ = &mut shutdown => {
+                debug!(
+                    worker_id = worker_id,
+                    message = "NetFlow worker shutting down.",
+                );
+                break;
+            }
             recv_result = socket.recv_from(&mut buffer) => {
                 match recv_result {
                     Ok((len, peer_addr)) => {
@@ -199,26 +302,22 @@ async fn netflow_worker(
                         }
 
                         let data = &buffer[..len];
-                        let events = protocol_parser.parse(data, peer_addr, &template_cache);
+                        let added = protocol_parser.parse_into(
+                            data,
+                            peer_addr,
+                            &template_cache,
+                            &mut sequence_tracker,
+                            &mut batch,
+                        );
 
-                        if !events.is_empty() {
+                        if added > 0 {
                             emit!(NetflowEventsReceived {
-                                count: events.len(),
+                                count: added,
                                 byte_size: len,
                                 peer_addr,
                             });
-
-                            if let Err(error) = out.send_batch(events).await {
-                                error!(
-                                    worker_id = worker_id,
-                                    message = "Error sending events.",
-                                    %error,
-                                );
-                                return Err(());
-                            }
                         }
 
-                        // Periodic cache sweep (worker 0 only; no-op for NetFlow v5).
                         let cleanup_period_secs = config.template_timeout.min(300);
                         if worker_id == 0
                             && last_cleanup.elapsed() > Duration::from_secs(cleanup_period_secs)
@@ -226,20 +325,21 @@ async fn netflow_worker(
                             template_cache.cleanup_expired(config.template_timeout);
                             last_cleanup = std::time::Instant::now();
                         }
+
+                        if batch.len() >= NETFLOW_BATCH_SEND_THRESHOLD {
+                            netflow_flush_batch(&mut out, worker_id, &mut batch).await?;
+                        }
                     }
                     Err(error) => {
                         emit!(NetflowReceiveError { error });
                     }
                 }
             }
-            _ = &mut shutdown => {
-                debug!(
-                    worker_id = worker_id,
-                    message = "NetFlow worker shutting down.",
-                );
-                break;
-            }
         }
+    }
+
+    if !batch.is_empty() {
+        let _ = netflow_flush_batch(&mut out, worker_id, &mut batch).await;
     }
 
     debug!(worker_id = worker_id, message = "NetFlow worker completed.",);
@@ -288,6 +388,7 @@ impl SourceConfig for NetflowConfig {
 mod tests {
     use super::*;
     use crate::test_util::{collect_ready, next_addr};
+    use std::collections::HashMap;
     use std::net::UdpSocket as StdUdpSocket;
 
     use vector_lib::event::Event;
@@ -350,7 +451,8 @@ mod tests {
         packet[70..72].copy_from_slice(&0u16.to_be_bytes()); // pad2
 
         // Parse packet directly
-        let events = parser.parse(&packet, peer_addr, &template_cache);
+        let mut seq = HashMap::new();
+        let events = parser.parse(&packet, peer_addr, &template_cache, &mut seq);
 
         assert!(!events.is_empty(), "No events received");
 

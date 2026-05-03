@@ -5,7 +5,7 @@
 
 use crate::sources::netflow::fields::FieldParser;
 
-use dashmap::DashMap;
+use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use tracing::{debug, warn};
 use vector_lib::event::{Event, LogEvent};
@@ -14,7 +14,8 @@ use vector_lib::event::{Event, LogEvent};
 const NETFLOW_V5_VERSION: u16 = 5;
 const NETFLOW_V5_HEADER_SIZE: usize = 24;
 const NETFLOW_V5_RECORD_SIZE: usize = 48;
-const MAX_FLOW_COUNT: u16 = 1000; // Sanity check for flow count
+/// NetFlow v5 datagrams carry at most 30 flow records (Cisco export format).
+const MAX_FLOW_COUNT: u16 = 30;
 
 /// Parsed NetFlow v5 packet header.
 #[derive(Debug, Clone)]
@@ -224,20 +225,17 @@ impl NetflowV5Record {
     }
 }
 
-/// Stateful NetFlow v5 packet parser (sequence tracking per exporter IP).
+/// NetFlow v5 packet parser.
+///
+/// Sequence-gap detection uses a [`HashMap`] owned by each UDP worker (see source); not shared across workers.
 pub struct NetflowV5Parser {
     strict_validation: bool,
-    /// Latest `(flow_sequence, record_count)` per exporter IP for gap detection (keyed by IP only).
-    last_sequence_by_peer: DashMap<IpAddr, (u32, u16)>,
 }
 
 impl NetflowV5Parser {
     /// Creates a parser. `_field_parser` is unused for NetFlow v5 but keeps the constructor stable.
     pub fn new(_field_parser: FieldParser, strict_validation: bool) -> Self {
-        Self {
-            strict_validation,
-            last_sequence_by_peer: DashMap::new(),
-        }
+        Self { strict_validation }
     }
 
     /// Returns true when `data` begins with version 5 and is long enough for the claimed records.
@@ -265,16 +263,17 @@ impl NetflowV5Parser {
         data.len() >= expected_length
     }
 
-    /// Parses a single UDP payload into log events (one per flow record when possible).
-    pub fn parse(
+    /// Parses one UDP payload and appends events to `out`. Sequence state lives in `sequence_tracker` (per worker).
+    pub fn parse_into(
         &self,
         data: &[u8],
         peer_addr: SocketAddr,
         include_raw_data: bool,
-    ) -> Result<Vec<Event>, String> {
-        // Parse header
+        sequence_tracker: &mut HashMap<IpAddr, (u32, u16)>,
+        out: &mut Vec<Event>,
+    ) -> Result<(), String> {
         let header = NetflowV5Header::from_bytes(data)?;
-        let mut events = Vec::with_capacity(header.count as usize);
+        out.reserve(header.count as usize);
 
         debug!(
             message = "Parsing NetFlow v5 packet.",
@@ -284,8 +283,7 @@ impl NetflowV5Parser {
         );
 
         let peer_ip = peer_addr.ip();
-        if let Some(pair) = self.last_sequence_by_peer.get(&peer_ip) {
-            let (last_seq, last_count) = *pair;
+        if let Some((last_seq, last_count)) = sequence_tracker.get(&peer_ip).copied() {
             let expected = last_seq.wrapping_add(last_count as u32);
             if expected != header.flow_sequence {
                 debug!(
@@ -296,17 +294,16 @@ impl NetflowV5Parser {
                 );
             }
         }
-        self.last_sequence_by_peer
-            .insert(peer_ip, (header.flow_sequence, header.count));
+        sequence_tracker.insert(peer_ip, (header.flow_sequence, header.count));
 
         let raw_data_encoded = include_raw_data
             .then(|| base64::Engine::encode(&base64::engine::general_purpose::STANDARD, data));
 
-        // Parse flow records
         let mut record_offset = NETFLOW_V5_HEADER_SIZE;
         let mut valid_records = 0;
         let mut invalid_records = 0;
         let mut raw_data_attached = false;
+        let start_len = out.len();
 
         for i in 0..header.count {
             let record_end = record_offset + NETFLOW_V5_RECORD_SIZE;
@@ -336,7 +333,7 @@ impl NetflowV5Parser {
                         }
                     } else if let Err(validation_error) = record.validate() {
                         debug!(
-                            message = "NetFlow v5 record validation warning.",
+                            message = "NetFlow v5 record validation warning (strict_validation=false).",
                             record_index = i,
                             error = %validation_error,
                         );
@@ -351,7 +348,7 @@ impl NetflowV5Parser {
                         }
                     }
 
-                    events.push(Event::Log(record_event));
+                    out.push(Event::Log(record_event));
                     valid_records += 1;
                 }
                 Err(e) => {
@@ -367,12 +364,12 @@ impl NetflowV5Parser {
             record_offset = record_end;
         }
 
-        if events.is_empty() {
+        if out.len() == start_len {
             let mut base_event = header.to_log_event();
             if let Some(ref encoded) = raw_data_encoded {
                 base_event.insert("raw_data", encoded.clone());
             }
-            events.push(Event::Log(base_event));
+            out.push(Event::Log(base_event));
         }
 
         debug!(
@@ -381,7 +378,7 @@ impl NetflowV5Parser {
             total_records = header.count as usize,
             valid_records = valid_records,
             invalid_records = invalid_records,
-            event_count = events.len(),
+            event_count = out.len() - start_len,
         );
         if invalid_records > 0 {
             warn!(
@@ -392,7 +389,26 @@ impl NetflowV5Parser {
             );
         }
 
-        Ok(events)
+        Ok(())
+    }
+
+    /// Allocates a new vector per call; prefer [`Self::parse_into`] on hot paths.
+    pub fn parse(
+        &self,
+        data: &[u8],
+        peer_addr: SocketAddr,
+        include_raw_data: bool,
+        sequence_tracker: &mut HashMap<IpAddr, (u32, u16)>,
+    ) -> Result<Vec<Event>, String> {
+        let mut out = Vec::new();
+        self.parse_into(
+            data,
+            peer_addr,
+            include_raw_data,
+            sequence_tracker,
+            &mut out,
+        )?;
+        Ok(out)
     }
 }
 
@@ -401,6 +417,7 @@ mod tests {
     use super::*;
     use crate::sources::netflow::config::NetflowConfig;
     use crate::sources::netflow::fields::FieldParser;
+    use std::collections::HashMap;
     use std::net::{IpAddr, Ipv4Addr};
 
     fn test_peer_addr() -> SocketAddr {
@@ -466,9 +483,9 @@ mod tests {
         wrong_version[0..2].copy_from_slice(&9u16.to_be_bytes());
         assert!(NetflowV5Header::from_bytes(&wrong_version).is_err());
 
-        // Too many flows
+        // More than 30 flows (spec maximum)
         let mut too_many = create_netflow_v5_packet(1);
-        too_many[2..4].copy_from_slice(&2000u16.to_be_bytes());
+        too_many[2..4].copy_from_slice(&31u16.to_be_bytes());
         assert!(NetflowV5Header::from_bytes(&too_many).is_err());
 
         // Packet too short for claimed record count
@@ -602,7 +619,10 @@ mod tests {
         let parser = NetflowV5Parser::new(field_parser, true);
 
         let packet = create_netflow_v5_packet(2);
-        let events = parser.parse(&packet, test_peer_addr(), false).unwrap();
+        let mut seq = HashMap::new();
+        let events = parser
+            .parse(&packet, test_peer_addr(), false, &mut seq)
+            .unwrap();
 
         // Should get 2 record events
         assert_eq!(events.len(), 2);
@@ -631,7 +651,10 @@ mod tests {
         let packet = create_netflow_v5_packet(1);
 
         // Test with raw data inclusion
-        let events = parser.parse(&packet, test_peer_addr(), true).unwrap();
+        let mut seq = HashMap::new();
+        let events = parser
+            .parse(&packet, test_peer_addr(), true, &mut seq)
+            .unwrap();
         assert!(!events.is_empty());
 
         assert!(events[0].as_log().get("raw_data").is_some());
@@ -644,7 +667,10 @@ mod tests {
         let parser = NetflowV5Parser::new(field_parser, true);
 
         let packet = create_netflow_v5_packet(0);
-        let events = parser.parse(&packet, test_peer_addr(), false).unwrap();
+        let mut seq = HashMap::new();
+        let events = parser
+            .parse(&packet, test_peer_addr(), false, &mut seq)
+            .unwrap();
 
         // Should get header event only
         assert_eq!(events.len(), 1);
@@ -668,7 +694,10 @@ mod tests {
         packet[record_offset + 16..record_offset + 20].copy_from_slice(&0u32.to_be_bytes()); // packets = 0
         packet[record_offset + 20..record_offset + 24].copy_from_slice(&1000u32.to_be_bytes()); // octets = 1000
 
-        let events = parser.parse(&packet, test_peer_addr(), false).unwrap();
+        let mut seq = HashMap::new();
+        let events = parser
+            .parse(&packet, test_peer_addr(), false, &mut seq)
+            .unwrap();
 
         // Should handle gracefully, likely with header event
         assert!(!events.is_empty());
@@ -706,7 +735,10 @@ mod tests {
         packet[second_record_offset + 20..second_record_offset + 24]
             .copy_from_slice(&1500u32.to_be_bytes()); // octets = 1500
 
-        let events = parser.parse(&packet, test_peer_addr(), false).unwrap();
+        let mut seq = HashMap::new();
+        let events = parser
+            .parse(&packet, test_peer_addr(), false, &mut seq)
+            .unwrap();
 
         // Should get 2 valid records (first and third)
         assert_eq!(events.len(), 2);
