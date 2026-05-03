@@ -6,7 +6,7 @@
 use crate::sources::netflow::fields::FieldParser;
 
 use dashmap::DashMap;
-use std::net::{IpAddr, SocketAddr};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use tracing::{debug, warn};
 use vector_lib::event::{Event, LogEvent};
 
@@ -157,15 +157,9 @@ impl NetflowV5Record {
         })
     }
 
-    /// Formats a NetFlow v5 IPv4 field as dotted decimal.
+    /// Formats a NetFlow v5 IPv4 field as dotted decimal (`u32` is big-endian / wire order).
     fn ipv4_to_string(addr: u32) -> String {
-        format!(
-            "{}.{}.{}.{}",
-            (addr >> 24) & 0xFF,
-            (addr >> 16) & 0xFF,
-            (addr >> 8) & 0xFF,
-            addr & 0xFF
-        )
+        Ipv4Addr::from(addr).to_string()
     }
 
     /// Cisco NetFlow v5 export field names (single pass: record + datagram header).
