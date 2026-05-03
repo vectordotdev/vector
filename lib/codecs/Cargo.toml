@@ -43,6 +43,7 @@ pin-project.workspace = true
 prost.workspace = true
 prost-reflect.workspace = true
 rand.workspace = true
+reqwest.workspace = true
 regex.workspace = true
 serde.workspace = true
 serde_with.workspace = true
@@ -75,6 +76,7 @@ rstest = "0.26.1"
 tracing-test = "0.2.6"
 uuid.workspace = true
 vrl.workspace = true
+wiremock = "0.6.4"
 
 [features]
 arrow = ["dep:arrow", "arrow/chrono-tz"]

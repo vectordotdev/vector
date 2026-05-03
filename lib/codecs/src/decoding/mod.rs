@@ -14,12 +14,12 @@ pub use config::DecodingConfig;
 pub use decoder::Decoder;
 pub use error::StreamDecodingError;
 pub use format::{
-    BoxedDeserializer, BytesDeserializer, BytesDeserializerConfig, GelfDeserializer,
-    GelfDeserializerConfig, GelfDeserializerOptions, InfluxdbDeserializer,
+    AvroDeserializerOptions, BoxedDeserializer, BytesDeserializer, BytesDeserializerConfig,
+    GelfDeserializer, GelfDeserializerConfig, GelfDeserializerOptions, InfluxdbDeserializer,
     InfluxdbDeserializerConfig, JsonDeserializer, JsonDeserializerConfig, JsonDeserializerOptions,
     NativeDeserializer, NativeDeserializerConfig, NativeJsonDeserializer,
     NativeJsonDeserializerConfig, NativeJsonDeserializerOptions, ProtobufDeserializer,
-    ProtobufDeserializerConfig, ProtobufDeserializerOptions,
+    ProtobufDeserializerConfig, ProtobufDeserializerOptions, SchemaRegistryConfig,
 };
 #[cfg(feature = "opentelemetry")]
 pub use format::{OtlpDeserializer, OtlpDeserializerConfig, OtlpSignalType};
@@ -41,7 +41,7 @@ use vector_core::{
     schema,
 };
 
-use self::format::{AvroDeserializer, AvroDeserializerConfig, AvroDeserializerOptions};
+use self::format::{AvroDeserializer, AvroDeserializerConfig};
 use crate::decoding::format::{VrlDeserializer, VrlDeserializerConfig};
 
 /// An error that occurred while decoding structured events from a byte stream /

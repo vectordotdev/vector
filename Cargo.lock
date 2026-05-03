@@ -2734,6 +2734,7 @@ dependencies = [
  "prost-reflect",
  "rand 0.9.4",
  "regex",
+ "reqwest 0.11.26",
  "rstest",
  "rust_decimal",
  "serde",
@@ -2759,6 +2760,7 @@ dependencies = [
  "vector-lookup",
  "vector-vrl-functions",
  "vrl",
+ "wiremock",
 ]
 
 [[package]]
