@@ -22,5 +22,5 @@ try {
 }
 
 export default {
-  plugins: [tailwindcss],
+  plugins: [tailwindcss]
 };
