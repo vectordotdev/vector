@@ -1250,10 +1250,12 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
             &payload,
             Some(fallback_time),
             true, // /event: write %splunk_hec.timestamp
-            &self.batch,
-            self.log_namespace,
-            &self.events_received,
-            self.token.as_ref(),
+            DecodePayloadContext {
+                batch: &self.batch,
+                log_namespace: self.log_namespace,
+                events_received: &self.events_received,
+                splunk_hec_token: self.token.as_ref(),
+            },
         );
 
         // Snapshot envelope metadata that has to apply uniformly to every decoded event.
@@ -1474,6 +1476,13 @@ impl<'de, R: JsonRead<'de>> Iterator for EventIterator<'de, R> {
     }
 }
 
+struct DecodePayloadContext<'a> {
+    batch: &'a Option<BatchNotifier>,
+    log_namespace: LogNamespace,
+    events_received: &'a Registered<EventsReceived>,
+    splunk_hec_token: Option<&'a Arc<str>>,
+}
+
 /// Run a payload through the configured second-stage `framing` + `decoding` codec.
 ///
 /// Returns the decoded events along with a flag indicating whether any decode error
@@ -1487,17 +1496,19 @@ impl<'de, R: JsonRead<'de>> Iterator for EventIterator<'de, R> {
 /// i.e. for the `/event` endpoint which carries an HEC envelope `time` field), and
 /// the optional Splunk HEC token. Pass `set_source_timestamp = false` for `/raw`,
 /// which has no envelope timestamp and should only receive `%vector.ingest_timestamp`.
-#[allow(clippy::too_many_arguments)]
 fn decode_payload(
     mut decoder: Decoder,
     payload: &[u8],
     fallback_timestamp: Option<DateTime<Utc>>,
     set_source_timestamp: bool,
-    batch: &Option<BatchNotifier>,
-    log_namespace: LogNamespace,
-    events_received: &Registered<EventsReceived>,
-    splunk_hec_token: Option<&Arc<str>>,
+    ctx: DecodePayloadContext<'_>,
 ) -> (Vec<Event>, bool) {
+    let DecodePayloadContext {
+        batch,
+        log_namespace,
+        events_received,
+        splunk_hec_token,
+    } = ctx;
     let mut buffer = BytesMut::with_capacity(payload.len());
     buffer.extend_from_slice(payload);
     let now = Utc::now();
@@ -1770,10 +1781,12 @@ fn raw_event(
             &body_bytes,
             Some(Utc::now()),
             false, // /raw: no HEC envelope timestamp; only %vector.ingest_timestamp
-            &batch,
-            log_namespace,
-            events_received,
-            splunk_hec_token.as_ref(),
+            DecodePayloadContext {
+                batch: &batch,
+                log_namespace,
+                events_received,
+                splunk_hec_token: splunk_hec_token.as_ref(),
+            },
         )
     } else {
         let message: Value = body_bytes.into();
