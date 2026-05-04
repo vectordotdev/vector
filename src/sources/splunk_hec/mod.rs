@@ -141,10 +141,9 @@ pub struct SplunkConfig {
     /// Codec configuration applied to events received on `/services/collector/event`.
     ///
     /// When `decoding` is set, Vector applies a second decoding pass after the HEC
-    /// envelope is parsed: the envelope's `event` field is fed through the codec,
+    /// envelope is parsed. The envelope's `event` value is fed through the codec,
     /// and a single envelope can fan out to multiple events. Decode failures are
-    /// swallowed and do not return an error to the Splunk client. When unset, the
-    /// endpoint preserves its existing behavior.
+    /// swallowed and do not return an error to the Splunk client.
     ///
     /// The VRL codec has access to HEC envelope metadata
     /// (host, sourcetype, channel, etc.) and the authentication token via
@@ -184,8 +183,9 @@ pub struct EndpointCodecConfig {
     /// Decoding configuration applied to the payload.
     ///
     /// When unset, the endpoint preserves its existing per-endpoint default
-    /// behavior. When set, the inner payload is run through `framing` + `decoding`
-    /// and a single payload can fan out to multiple events.
+    /// behavior. When set, the endpoint-selected payload is run through
+    /// `framing` + `decoding` and a single payload can fan out to multiple
+    /// events.
     #[configurable(derived)]
     #[configurable(metadata(docs::advanced))]
     #[serde(default)]
@@ -961,7 +961,8 @@ struct EventIterator<'de, R: JsonRead<'de>> {
     log_namespace: LogNamespace,
     /// handle to EventsReceived registry
     events_received: Registered<EventsReceived>,
-    /// Optional second-stage decoder applied to the envelope payload.
+    /// Optional second-stage decoder applied to the envelope payload after HEC
+    /// envelope parsing.
     decoder: Option<Decoder>,
 }
 
@@ -1483,7 +1484,7 @@ struct DecodePayloadContext<'a> {
     splunk_hec_token: Option<&'a Arc<str>>,
 }
 
-/// Run a payload through the configured second-stage `framing` + `decoding` codec.
+/// Run a payload through the configured `framing` + `decoding` codec.
 ///
 /// Returns the decoded events along with a flag indicating whether any decode error
 /// occurred. The shared `crate::sources::util::decode_message` helper swallows

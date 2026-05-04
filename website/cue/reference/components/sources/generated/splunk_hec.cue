@@ -77,10 +77,9 @@ generated: components: sources: splunk_hec: configuration: {
 			Codec configuration applied to events received on `/services/collector/event`.
 
 			When `decoding` is set, Vector applies a second decoding pass after the HEC
-			envelope is parsed: the envelope's `event` field is fed through the codec,
+			envelope is parsed. The envelope's `event` value is fed through the codec,
 			and a single envelope can fan out to multiple events. Decode failures are
-			swallowed and do not return an error to the Splunk client. When unset, the
-			endpoint preserves its existing behavior.
+			swallowed and do not return an error to the Splunk client.
 
 			The VRL codec has access to HEC envelope metadata
 			(host, sourcetype, channel, etc.) and the authentication token via
@@ -94,8 +93,9 @@ generated: components: sources: splunk_hec: configuration: {
 					Decoding configuration applied to the payload.
 
 					When unset, the endpoint preserves its existing per-endpoint default
-					behavior. When set, the inner payload is run through `framing` + `decoding`
-					and a single payload can fan out to multiple events.
+					behavior. When set, the endpoint-selected payload is run through
+					`framing` + `decoding` and a single payload can fan out to multiple
+					events.
 					"""
 				required: false
 				type: object: options: {
@@ -640,8 +640,9 @@ generated: components: sources: splunk_hec: configuration: {
 					Decoding configuration applied to the payload.
 
 					When unset, the endpoint preserves its existing per-endpoint default
-					behavior. When set, the inner payload is run through `framing` + `decoding`
-					and a single payload can fan out to multiple events.
+					behavior. When set, the endpoint-selected payload is run through
+					`framing` + `decoding` and a single payload can fan out to multiple
+					events.
 					"""
 				required: false
 				type: object: options: {
