@@ -39,6 +39,75 @@ generated: components: sinks: socket: configuration: {
 		required:      true
 		type: string: examples: ["92.12.333.224:5000", "https://somehost:5000"]
 	}
+	framing: {
+		description:   "Framing configuration."
+		relevant_when: "mode = \"tcp\" or mode = \"unix_stream\" or mode = \"unix_datagram\""
+		required:      false
+		type: object: options: {
+			character_delimited: {
+				description:   "Options for the character delimited encoder."
+				relevant_when: "method = \"character_delimited\""
+				required:      true
+				type: object: options: delimiter: {
+					description: "The ASCII (7-bit) character that delimits byte sequences."
+					required:    true
+					type: ascii_char: {}
+				}
+			}
+			length_delimited: {
+				description:   "Options for the length delimited decoder."
+				relevant_when: "method = \"length_delimited\""
+				required:      true
+				type: object: options: {
+					length_field_is_big_endian: {
+						description: "Length field byte order (little or big endian)"
+						required:    false
+						type: bool: default: true
+					}
+					length_field_length: {
+						description: "Number of bytes representing the field length"
+						required:    false
+						type: uint: default: 4
+					}
+					length_field_offset: {
+						description: "Number of bytes in the header before the length field"
+						required:    false
+						type: uint: default: 0
+					}
+					max_frame_length: {
+						description: "Maximum frame length"
+						required:    false
+						type: uint: default: 8388608
+					}
+				}
+			}
+			max_frame_length: {
+				description:   "Maximum frame length"
+				relevant_when: "method = \"varint_length_delimited\""
+				required:      false
+				type: uint: default: 8388608
+			}
+			method: {
+				description: "The framing method."
+				required:    true
+				type: string: enum: {
+					bytes:               "Event data is not delimited at all."
+					character_delimited: "Event data is delimited by a single ASCII (7-bit) character."
+					length_delimited: """
+						Event data is prefixed with its length in bytes.
+
+						The prefix is a 32-bit unsigned integer, little endian.
+						"""
+					newline_delimited: "Event data is delimited by a newline (LF) character."
+					varint_length_delimited: """
+						Event data is prefixed with its length in bytes as a varint.
+
+						This is compatible with protobuf's length-delimited encoding.
+						"""
+				}
+			}
+		}
+	}
 	keepalive: {
 		description:   "TCP keepalive settings for socket-based components."
 		relevant_when: "mode = \"tcp\""
@@ -197,7 +266,4 @@ generated: components: sinks: socket: configuration: {
 
 generated: components: sinks: socket: configuration: encoding: encodingBase & {
 	type: object: options: codec: required: true
-}
-generated: components: sinks: socket: configuration: framing: framingEncoderBase & {
-	type: object: options: method: required: true
 }

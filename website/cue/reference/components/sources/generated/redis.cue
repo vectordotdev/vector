@@ -23,6 +23,18 @@ generated: components: sources: redis: configuration: {
 			"vector",
 		]
 	}
+	list: {
+		description: "Options for the Redis `list` data type."
+		required:    false
+		type: object: options: method: {
+			description: "Method for getting events from the `list` data type."
+			required:    true
+			type: string: enum: {
+				lpop: "Pop messages from the head of the list."
+				rpop: "Pop messages from the tail of the list."
+			}
+		}
+	}
 	redis_key: {
 		description: """
 			Sets the name of the log field to use to add the key to each event.
@@ -56,7 +68,4 @@ generated: components: sources: redis: configuration: framing: framingDecoderBas
 		required: false
 		type: string: default: "bytes"
 	}
-}
-generated: components: sources: redis: configuration: list: framingEncoderBase & {
-	type: object: options: method: required: true
 }

@@ -1715,7 +1715,11 @@ def decoding_ref(resolved)
   return nil unless codec
   base = deep_copy(resolved)
   strip_tag_field_variation!(base, 'codec')
-  @shared_decoding_base ||= base
+  if @shared_decoding_base.nil?
+    @shared_decoding_base = base
+  elsif @shared_decoding_base != base
+    return nil
+  end
   tag_conjunction_cue('decodingBase', 'codec', codec)
 end
 
@@ -1724,7 +1728,11 @@ def framing_decoder_ref(resolved)
   return nil unless method_field
   base = deep_copy(resolved)
   strip_tag_field_variation!(base, 'method')
-  @shared_framing_decoder_base ||= base
+  if @shared_framing_decoder_base.nil?
+    @shared_framing_decoder_base = base
+  elsif @shared_framing_decoder_base != base
+    return nil
+  end
   tag_conjunction_cue('framingDecoderBase', 'method', method_field)
 end
 
@@ -1733,7 +1741,13 @@ def encoding_ref(resolved)
   return nil unless codec
   base = deep_copy(resolved)
   strip_tag_field_variation!(base, 'codec')
-  @shared_encoding_base ||= base
+  if @shared_encoding_base.nil?
+    @shared_encoding_base = base
+  elsif @shared_encoding_base != base
+    # Different codec type (e.g. a component-specific serializer enum with a different
+    # set of variants). Leave it inline rather than incorrectly aliasing to encodingBase.
+    return nil
+  end
   tag_conjunction_cue('encodingBase', 'codec', codec)
 end
 
@@ -1747,7 +1761,11 @@ def framing_encoder_ref(resolved)
   return nil unless method_field
   base = deep_copy(resolved)
   strip_tag_field_variation!(base, 'method')
-  @shared_framing_encoder_base ||= base
+  if @shared_framing_encoder_base.nil?
+    @shared_framing_encoder_base = base
+  elsif @shared_framing_encoder_base != base
+    return nil
+  end
   tag_conjunction_cue('framingEncoderBase', 'method', method_field)
 end
 

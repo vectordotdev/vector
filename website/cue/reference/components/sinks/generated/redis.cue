@@ -104,6 +104,28 @@ generated: components: sinks: redis: configuration: {
 			syntax: "template"
 		}
 	}
+	list_option: {
+		description: "List-specific options."
+		required:    false
+		type: object: options: method: {
+			description: "The method to use for pushing messages into a `list`."
+			required:    true
+			type: string: enum: {
+				lpush: """
+					Use the `lpush` method.
+
+					This pushes messages onto the head of the list.
+					"""
+				rpush: """
+					Use the `rpush` method.
+
+					This pushes messages onto the tail of the list.
+
+					This is the default.
+					"""
+			}
+		}
+	}
 	request: {
 		description: """
 			Middleware settings for outbound requests.
@@ -358,14 +380,39 @@ generated: components: sinks: redis: configuration: {
 		required: false
 		type: string: {}
 	}
+	sorted_set_option: {
+		description: "Sorted Set-specific options"
+		required:    false
+		type: object: options: {
+			method: {
+				description: "The method to use for pushing messages into a `sorted set`."
+				required:    false
+				type: string: enum: zadd: """
+					Use the `zadd` method.
+
+					This adds messages onto a queue with a score.
+
+					This is the default.
+					"""
+			}
+			score: {
+				description: """
+					The score to publish a message with to a `sorted set`.
+
+					Examples:
+					- `%s`
+					- `%Y%m%d%H%M%S`
+					"""
+				required: false
+				type: {
+					string: syntax: "template"
+					uint: {}
+				}
+			}
+		}
+	}
 }
 
 generated: components: sinks: redis: configuration: encoding: encodingBase & {
 	type: object: options: codec: required: true
-}
-generated: components: sinks: redis: configuration: list_option: framingEncoderBase & {
-	type: object: options: method: required: true
-}
-generated: components: sinks: redis: configuration: sorted_set_option: framingEncoderBase & {
-	type: object: options: method: required: false
 }
