@@ -142,6 +142,7 @@ emojis
 emqx
 enableable
 Enot
+Entra
 envsubst
 EPC
 esbuild
@@ -299,6 +300,7 @@ kubeval
 Kurio
 kustomization
 kustomize
+Kusto
 kyocera
 Kyros
 Lenco
