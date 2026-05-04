@@ -1,6 +1,7 @@
 name: Remove Work In Progress Label
 
 permissions:
+  issues: write
   pull-requests: write
 
 on:
