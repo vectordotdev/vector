@@ -241,10 +241,17 @@ impl SinkConfig for SyslogSinkConfig {
 mod tests {
     use std::{future::ready, net::SocketAddr, time::Duration};
 
-    use futures::stream;
+    use futures::{StreamExt, stream};
     use serde::Deserialize;
-    use tokio::{io::AsyncReadExt, net::TcpListener, task::JoinHandle, time::timeout};
-    use vector_lib::event::{Event, LogEvent};
+    use tokio::{
+        io::AsyncReadExt,
+        net::TcpListener,
+        task::JoinHandle,
+        time::{sleep, timeout},
+    };
+    use tokio_stream::wrappers::TcpListenerStream;
+    use tokio_util::codec::{FramedRead, LinesCodec};
+    use vector_lib::event::{BatchNotifier, BatchStatus, Event, LogEvent};
 
     use super::*;
     use crate::{
@@ -669,6 +676,156 @@ mod tests {
             line.contains("unix syslog test"),
             "Message not found in output: {line}"
         );
+    }
+
+    /// Verifies that batch finalizers are marked `Delivered` after a successful
+    /// TCP send so downstream acknowledgement chains complete correctly.
+    #[tokio::test]
+    async fn tcp_finalizers_delivered_on_success() {
+        trace_init();
+
+        let (_guard, addr) = next_addr();
+        let _receiver = CountReceiver::receive_lines(addr);
+
+        let config = SyslogSinkConfig {
+            mode: Mode::Tcp(TcpMode {
+                config: TcpSinkConfig::from_address(addr.to_string()),
+                framing: Default::default(),
+            }),
+            syslog: Default::default(),
+            acknowledgements: Default::default(),
+        };
+
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let event = Event::Log(
+            LogEvent::from("ack-tcp-test").with_batch_notifier(&batch),
+        );
+        drop(batch);
+
+        assert_sink_compliance(&SINK_TAGS, async move {
+            let context = SinkContext::default();
+            let (sink, _healthcheck) = config.build(context).await.unwrap();
+            sink.run(stream::once(ready(event.into()))).await
+        })
+        .await
+        .expect("Running sink failed");
+
+        assert_eq!(
+            receiver.try_recv(),
+            Ok(BatchStatus::Delivered),
+            "TCP sink should mark batch finalizer Delivered"
+        );
+    }
+
+    /// Verifies that batch finalizers are marked `Delivered` after a successful
+    /// UDP send. This guards the connectionless datagram path in
+    /// `src/sinks/util/datagram.rs::send_and_emit`.
+    #[tokio::test]
+    async fn udp_finalizers_delivered_on_success() {
+        trace_init();
+
+        let (_guard, addr) = next_addr();
+        let receiver = std::net::UdpSocket::bind(addr).expect("Failed to bind UDP socket");
+
+        let config = SyslogSinkConfig {
+            mode: Mode::Udp(UdpMode {
+                config: UdpSinkConfig::from_address(addr.to_string()),
+            }),
+            syslog: Default::default(),
+            acknowledgements: Default::default(),
+        };
+
+        let (batch, mut ack_receiver) = BatchNotifier::new_with_receiver();
+        let event = Event::Log(
+            LogEvent::from("ack-udp-test").with_batch_notifier(&batch),
+        );
+        drop(batch);
+
+        let context = SinkContext::default();
+        assert_sink_compliance(&SINK_TAGS, async move {
+            let (sink, _healthcheck) = config.build(context).await.unwrap();
+            sink.run(stream::once(ready(event.into()))).await
+        })
+        .await
+        .expect("Running sink failed");
+
+        // Drain the datagram so the receiver socket is properly cleaned up.
+        let mut buf = [0; 1024];
+        receiver
+            .recv_from(&mut buf)
+            .expect("Did not receive message");
+
+        assert_eq!(
+            ack_receiver.try_recv(),
+            Ok(BatchStatus::Delivered),
+            "UDP sink should mark batch finalizer Delivered"
+        );
+    }
+
+    /// Forces a hard TCP disconnect mid-stream and verifies the sink reconnects
+    /// to a freshly-bound listener and continues delivering events. Mirrors
+    /// `src/sinks/socket.rs::tests::reconnect`.
+    #[tokio::test]
+    async fn tcp_reconnect_after_server_close() {
+        trace_init();
+
+        let (_guard, addr) = next_addr();
+        let config = SyslogSinkConfig {
+            mode: Mode::Tcp(TcpMode {
+                config: TcpSinkConfig::from_address(addr.to_string()),
+                framing: Default::default(),
+            }),
+            syslog: Default::default(),
+            acknowledgements: Default::default(),
+        };
+
+        let context = SinkContext::default();
+        let (sink, _healthcheck) = config.build(context).await.unwrap();
+
+        let (_, events) = random_lines_with_stream(1000, 10000, None);
+        let sink_handle = tokio::spawn(run_and_assert_sink_compliance(
+            sink,
+            events,
+            &SINK_TAGS,
+        ));
+
+        // First listener: drain a handful of events then drop the connection.
+        let mut count = 20usize;
+        TcpListenerStream::new(TcpListener::bind(addr).await.unwrap())
+            .next()
+            .await
+            .unwrap()
+            .map(|socket| FramedRead::new(socket, LinesCodec::new()))
+            .unwrap()
+            .map(|x| x.unwrap())
+            .take_while(|_| {
+                ready(if count > 0 {
+                    count -= 1;
+                    true
+                } else {
+                    false
+                })
+            })
+            .collect::<Vec<_>>()
+            .await;
+
+        if cfg!(windows) {
+            sleep(Duration::from_secs(1)).await;
+        }
+
+        // Second listener: if the sink failed to reconnect this never connects
+        // and the test hangs out to its tokio timeout.
+        assert!(
+            timeout(
+                Duration::from_secs(5),
+                CountReceiver::receive_lines(addr).connected()
+            )
+            .await
+            .is_ok(),
+            "syslog sink did not reconnect after the TCP peer closed"
+        );
+
+        sink_handle.await.unwrap();
     }
 
     #[cfg(unix)]
