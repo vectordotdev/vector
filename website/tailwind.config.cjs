@@ -1,13 +1,20 @@
 const colors = require('tailwindcss/colors');
 
 module.exports = {
-  content: [
-    './layouts/**/*.html',
-    './content/**/*.{html,md}',
-    './assets/js/**/*.{js,ts}',
-    './data/**/*.{yaml,json,toml}',
-  ],
+  content: {
+    // Hugo renders templates first and writes all used classes/tags to hugo_stats.json.
+    // Using this as the JIT content source captures dynamically-constructed class names
+    // (e.g. `text-{{ $color }}`) that static file globs would miss.
+    files: ['./hugo_stats.json'],
+    transform: {
+      json: (content) => {
+        const { htmlElements: { tags = [], classes = [], ids = [] } = {} } = JSON.parse(content);
+        return [...tags, ...classes, ...ids].join('\n');
+      },
+    },
+  },
   safelist: [
+    // Classes added by JS at runtime, absent from hugo_stats.json
     'search-input',
     'search-results-list',
     'search-result',
