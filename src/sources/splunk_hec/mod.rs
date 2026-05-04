@@ -32,7 +32,9 @@ use vector_lib::{
     config::{LegacyKey, LogNamespace},
     configurable::configurable_component,
     event::{BatchNotifier, EventMetadata},
-    internal_event::{ComponentEventsDropped, CountByteSize, InternalEventHandle as _, Registered, UNINTENTIONAL},
+    internal_event::{
+        ComponentEventsDropped, CountByteSize, InternalEventHandle as _, Registered, UNINTENTIONAL,
+    },
     lookup::{
         self, OwnedValuePath, event_path, lookup_v2::OptionalValuePath, metadata_path,
         owned_value_path,
@@ -1215,13 +1217,14 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
         decoder: Decoder,
     ) -> Result<(Vec<Event>, bool), Rejection> {
         self.envelopes_processed += 1;
-        let payload = match serde_json::to_vec(&json["event"]) {
+        let event = self.validate_event_field(&json)?;
+        let payload = match serde_json::to_vec(event) {
             Ok(bytes) => bytes,
             Err(error) => {
                 let error: vector_lib::Error = Box::new(error);
-                emit!(vector_lib::codecs::internal_events::DecoderDeserializeError {
-                    error: &error
-                });
+                emit!(
+                    vector_lib::codecs::internal_events::DecoderDeserializeError { error: &error }
+                );
                 emit!(ComponentEventsDropped::<UNINTENTIONAL> {
                     count: 1,
                     reason: "Failed to serialize event field to bytes.",
@@ -1342,34 +1345,43 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
         Ok((out, had_decode_errors))
     }
 
+    /// Validate the `event` field of a HEC envelope, returning a reference to the
+    /// validated value or an error if it is missing, null, or (for string values)
+    /// empty. Shared between the decoder path and the legacy/vector construction
+    /// paths so they all enforce the same HEC protocol contract.
+    fn validate_event_field<'a>(&self, json: &'a JsonValue) -> Result<&'a JsonValue, Rejection> {
+        let event_idx = self.envelopes_processed.saturating_sub(1);
+        match json.get("event") {
+            None | Some(JsonValue::Null) => {
+                Err(ApiError::MissingEventField { event: event_idx }.into())
+            }
+            Some(JsonValue::String(s)) if s.is_empty() => {
+                Err(ApiError::EmptyEventField { event: event_idx }.into())
+            }
+            Some(event) => Ok(event),
+        }
+    }
+
     /// Build the log event for the vector namespace.
     /// In this namespace the log event is created entirely from the event field.
     /// No renaming of the `line` field is done.
     fn build_log_vector(&mut self, json: &mut JsonValue) -> Result<LogEvent, Rejection> {
-        match json.get("event") {
-            Some(event) => {
-                let event: Value = event.into();
-                let mut log = LogEvent::from(event);
+        let event: Value = self.validate_event_field(json)?.into();
+        let mut log = LogEvent::from(event);
 
-                // EstimatedJsonSizeOf must be calculated before enrichment
-                self.events_received
-                    .emit(CountByteSize(1, log.estimated_json_encoded_size_of()));
+        // EstimatedJsonSizeOf must be calculated before enrichment
+        self.events_received
+            .emit(CountByteSize(1, log.estimated_json_encoded_size_of()));
 
-                // The timestamp is extracted from the message for the Legacy namespace.
-                self.log_namespace.insert_vector_metadata(
-                    &mut log,
-                    log_schema().timestamp_key(),
-                    lookup::path!("ingest_timestamp"),
-                    chrono::Utc::now(),
-                );
+        // The timestamp is extracted from the message for the Legacy namespace.
+        self.log_namespace.insert_vector_metadata(
+            &mut log,
+            log_schema().timestamp_key(),
+            lookup::path!("ingest_timestamp"),
+            chrono::Utc::now(),
+        );
 
-                Ok(log)
-            }
-            None => Err(ApiError::MissingEventField {
-                event: self.envelopes_processed.saturating_sub(1),
-            }
-            .into()),
-        }
+        Ok(log)
     }
 
     /// Build the log event for the legacy namespace.
@@ -1377,57 +1389,45 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
     /// (the docker splunk logger places the message in the event.line field) that string
     /// is placed in the message field.
     fn build_log_legacy(&mut self, json: &mut JsonValue) -> Result<LogEvent, Rejection> {
+        // validate_event_field checks for missing/null/empty-string
+        self.validate_event_field(json)?;
         let mut log = LogEvent::default();
-        match json.get_mut("event") {
-            Some(event) => match event.take() {
-                JsonValue::String(string) => {
-                    if string.is_empty() {
-                        return Err(ApiError::EmptyEventField {
-                            event: self.envelopes_processed.saturating_sub(1),
-                        }
-                        .into());
-                    }
-                    log.maybe_insert(log_schema().message_key_target_path(), string);
-                }
-                JsonValue::Object(mut object) => {
-                    if object.is_empty() {
-                        return Err(ApiError::EmptyEventField {
-                            event: self.envelopes_processed.saturating_sub(1),
-                        }
-                        .into());
-                    }
-
-                    // Add 'line' value as 'event::schema().message_key'
-                    if let Some(line) = object.remove("line") {
-                        match line {
-                            // This don't quite fit the meaning of a event::schema().message_key
-                            JsonValue::Array(_) | JsonValue::Object(_) => {
-                                log.insert(event_path!("line"), line);
-                            }
-                            _ => {
-                                log.maybe_insert(log_schema().message_key_target_path(), line);
-                            }
-                        }
-                    }
-
-                    for (key, value) in object {
-                        log.insert(event_path!(key.as_str()), value);
-                    }
-                }
-                _ => {
-                    return Err(ApiError::InvalidDataFormat {
+        match json["event"].take() {
+            JsonValue::String(string) => {
+                log.maybe_insert(log_schema().message_key_target_path(), string);
+            }
+            JsonValue::Object(mut object) => {
+                if object.is_empty() {
+                    return Err(ApiError::EmptyEventField {
                         event: self.envelopes_processed.saturating_sub(1),
                     }
                     .into());
                 }
-            },
-            None => {
-                return Err(ApiError::MissingEventField {
+
+                // Add 'line' value as 'event::schema().message_key'
+                if let Some(line) = object.remove("line") {
+                    match line {
+                        // This don't quite fit the meaning of a event::schema().message_key
+                        JsonValue::Array(_) | JsonValue::Object(_) => {
+                            log.insert(event_path!("line"), line);
+                        }
+                        _ => {
+                            log.maybe_insert(log_schema().message_key_target_path(), line);
+                        }
+                    }
+                }
+
+                for (key, value) in object {
+                    log.insert(event_path!(key.as_str()), value);
+                }
+            }
+            _ => {
+                return Err(ApiError::InvalidDataFormat {
                     event: self.envelopes_processed.saturating_sub(1),
                 }
                 .into());
             }
-        };
+        }
 
         // EstimatedJsonSizeOf must be calculated before enrichment
         self.events_received
