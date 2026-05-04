@@ -62,7 +62,7 @@ pub async fn fetch_table_schema(
         .collect::<Vec<_>>()
         .join(".");
     let url = format!(
-        "{}/api/2.0/unity-catalog/tables/{}",
+        "{}/api/2.1/unity-catalog/tables/{}",
         unity_catalog_endpoint.trim_end_matches('/'),
         encoded_table_name
     );
