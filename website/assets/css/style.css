@@ -18,10 +18,11 @@
 @theme {
   /* Pin color palette to Tailwind v3 sRGB values.
      v4 defaults use OKLCH which differs visually from v3's hex palette. */
-  --color-gray-50:  #f9fafb; --color-gray-100: #f3f4f6; --color-gray-200: #e5e7eb;
-  --color-gray-300: #d1d5db; --color-gray-400: #9ca3af; --color-gray-500: #6b7280;
-  --color-gray-600: #4b5563; --color-gray-700: #374151; --color-gray-800: #1f2937;
-  --color-gray-900: #111827;
+  /* v2's colors.gray was neutral/zinc — not coolGray */
+  --color-gray-50:  #fafafa; --color-gray-100: #f4f4f5; --color-gray-200: #e4e4e7;
+  --color-gray-300: #d4d4d8; --color-gray-400: #a1a1aa; --color-gray-500: #71717a;
+  --color-gray-600: #52525b; --color-gray-700: #3f3f46; --color-gray-800: #27272a;
+  --color-gray-900: #18181b;
 
   --color-red-50:  #fef2f2; --color-red-100: #fee2e2; --color-red-200: #fecaca;
   --color-red-300: #fca5a5; --color-red-400: #f87171; --color-red-500: #ef4444;
