@@ -11,10 +11,11 @@
  *   tsx scripts/compare-pages.ts [options]
  *
  * Options:
- *   --sample N       Minimum total pages (default: 80; pinned pages always included)
+ *   --sample N       Cap total pages (default: unlimited — all sitemap pages)
+ *   --concurrency N  Parallel fetches (default: 10)
  *   --local URL      Local server base URL (default: http://localhost:1313)
  *   --prod URL       Production base URL (default: https://vector.dev)
- *   --seed N         Random seed for reproducible sampling (default: random)
+ *   --seed N         Random seed for reproducible page order (default: random)
  *   --verbose        Print per-class diffs even for passing pages
  */
 
@@ -38,7 +39,8 @@ const flag = (name: string, fallback: string) => {
 };
 const hasFlag = (name: string) => args.includes(name);
 
-const SAMPLE_SIZE = parseInt(flag("--sample", "80"), 10);
+const SAMPLE_SIZE = args.includes("--sample") ? parseInt(flag("--sample", "80"), 10) : Infinity;
+const CONCURRENCY = parseInt(flag("--concurrency", "10"), 10);
 const LOCAL_BASE = flag("--local", "http://localhost:1313");
 const PROD_BASE = flag("--prod", "https://vector.dev");
 const SEED = parseInt(flag("--seed", String(Date.now())), 10);
@@ -219,7 +221,8 @@ function extractHeadings(html: string): string[] {
   const $ = cheerio.load(html);
   const headings: string[] = [];
   $("h1, h2, h3").each((_, el) => {
-    headings.push(`${el.tagName}: ${$(el).text().trim().slice(0, 60)}`);
+    const text = $(el).text().replace(/\s+/g, " ").trim().slice(0, 60);
+    headings.push(`${el.tagName}: ${text}`);
   });
   return headings;
 }
@@ -295,7 +298,7 @@ async function main() {
   for (const [sc, url] of shortcodePages) add(url, `shortcode:${sc}`);
   for (const [layout, url] of layoutPages) add(url, `layout:${layout}`);
 
-  // Random fill from sitemap to reach SAMPLE_SIZE
+  // Add all remaining sitemap pages (shuffled for variety), up to SAMPLE_SIZE cap
   const rng = seededRandom(SEED);
   for (const p of shuffle(sitemapPaths, rng)) {
     if (labeled.length >= SAMPLE_SIZE) break;
@@ -303,20 +306,21 @@ async function main() {
   }
 
   const pinnedCount = shortcodePages.size + layoutPages.size;
+  const randomCount = labeled.length - pinnedCount;
   console.log(
-    `\nTotal pages: ${labeled.length}  (${pinnedCount} pinned + ${labeled.length - pinnedCount} random)\n`
+    `\nTotal pages: ${labeled.length}  (${pinnedCount} pinned + ${randomCount} from sitemap)  concurrency: ${CONCURRENCY}\n`
   );
 
-  // 4. Compare
-  const results: PageResult[] = [];
+  // 4. Compare (concurrent pool)
+  const results: PageResult[] = new Array(labeled.length);
   let passed = 0;
   let failed = 0;
+  let completed = 0;
   const labelWidth = Math.max(...labeled.map((l) => l.label.length));
+  const indexWidth = String(labeled.length).length;
 
-  for (let i = 0; i < labeled.length; i++) {
+  async function comparePage(i: number): Promise<void> {
     const { path, label } = labeled[i];
-    const prefix = `[${String(i + 1).padStart(2)}/${labeled.length}] ${label.padEnd(labelWidth)}  ${path}`;
-    process.stdout.write(`${prefix} … `);
 
     const [prod, local] = await Promise.all([
       fetchText(`${PROD_BASE}${path}`),
@@ -365,10 +369,12 @@ async function main() {
     }
 
     const ok = issues.length === 0;
+    completed++;
     if (ok) passed++;
     else failed++;
 
-    console.log(ok ? "✓" : `✗  [${issues.join(", ")}]`);
+    const prefix = `[${String(completed).padStart(indexWidth)}/${labeled.length}] ${label.padEnd(labelWidth)}  ${path}`;
+    console.log(ok ? `${prefix} ✓` : `${prefix} ✗  [${issues.join(", ")}]`);
 
     if (missingLocally.length > 0) {
       console.log(
@@ -379,8 +385,18 @@ async function main() {
       console.log(`      Only local (${onlyLocal.length}): ${onlyLocal.slice(0, 6).join("  ")}`);
     }
 
-    results.push({ path, label, issues, classesMissingLocally: missingLocally, classesOnlyLocal: onlyLocal });
+    results[i] = { path, label, issues, classesMissingLocally: missingLocally, classesOnlyLocal: onlyLocal };
   }
+
+  // Run with bounded concurrency
+  const queue = labeled.map((_, i) => i);
+  const workers = Array.from({ length: Math.min(CONCURRENCY, labeled.length) }, async () => {
+    while (queue.length > 0) {
+      const i = queue.shift()!;
+      await comparePage(i);
+    }
+  });
+  await Promise.all(workers);
 
   // 5. Summary
   console.log(`\n${"─".repeat(70)}`);
