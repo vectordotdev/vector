@@ -19,7 +19,7 @@
       </div>
 
       {{ with .Description }}
-      <div class="mt-3.5 prose-sm dark:prose-dark leading-snug text-gray-600 dark:text-gray-300">
+      <div class="mt-3.5 prose-sm dark:prose-invert leading-snug text-gray-600 dark:text-gray-300">
         {{ . | markdownify | plainify | safeHTML }}
       </div>
       {{ end }}
