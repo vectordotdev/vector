@@ -746,19 +746,43 @@ impl Aggregate {
 
         for bucket_key in buckets_to_flush {
             if let Some(bucket_map) = self.event_time_buckets.remove(&bucket_key) {
-                for (series, entry) in bucket_map.clone().into_iter() {
-                    let mut metric = Metric::from_parts(series, entry.0, entry.1);
+                // Diff mode must retain `bucket_map` to subtract against the
+                // next flush, so it iterates by reference and per-entry clones
+                // only what `Metric::from_parts` consumes. Other modes never
+                // touch the map again, so they consume it directly — avoiding
+                // the full `HashMap` allocation and per-entry copy that the
+                // previous unconditional `bucket_map.clone()` performed on
+                // every flush (significant under high-cardinality event-time
+                // workloads).
+                if matches!(self.config.mode, AggregationMode::Diff) {
                     let prev_bucket_key = bucket_key.saturating_sub(interval_ms);
-                    if matches!(self.config.mode, AggregationMode::Diff)
-                        && let Some(prev_bucket) =
+                    for (series, entry) in &bucket_map {
+                        let mut metric = Metric::from_parts(
+                            series.clone(),
+                            entry.0.clone(),
+                            entry.1.clone(),
+                        );
+                        if let Some(prev_bucket) =
                             self.event_time_prev_buckets.get(&prev_bucket_key)
-                        && let Some(prev_entry) = prev_bucket.get(metric.series())
-                        && metric.data().kind == prev_entry.0.kind
-                        && !metric.subtract(&prev_entry.0)
-                    {
-                        emit!(AggregateUpdateFailed);
+                            && let Some(prev_entry) = prev_bucket.get(metric.series())
+                            && metric.data().kind == prev_entry.0.kind
+                            && !metric.subtract(&prev_entry.0)
+                        {
+                            emit!(AggregateUpdateFailed);
+                        }
+                        output.push(Event::Metric(metric));
                     }
-                    output.push(Event::Metric(metric));
+
+                    self.event_time_prev_buckets.insert(bucket_key, bucket_map);
+                    // Keep only a small rolling window for diffing against the
+                    // immediately preceding bucket.
+                    let min_keep = bucket_key.saturating_sub(interval_ms);
+                    self.event_time_prev_buckets.retain(|&k, _| k >= min_keep);
+                } else {
+                    for (series, entry) in bucket_map {
+                        let metric = Metric::from_parts(series, entry.0, entry.1);
+                        output.push(Event::Metric(metric));
+                    }
                 }
 
                 if let Some(multi_bucket) = self.event_time_multi_buckets.remove(&bucket_key) {
@@ -814,18 +838,6 @@ impl Aggregate {
                             _ => (),
                         }
                     }
-                }
-
-                // `event_time_prev_buckets` is read only by `Diff` mode (see the
-                // flush branch above), so it is also populated only in `Diff`
-                // mode. Other modes never need a previous bucket and would
-                // accumulate entries unboundedly if it were populated here.
-                if matches!(self.config.mode, AggregationMode::Diff) {
-                    self.event_time_prev_buckets.insert(bucket_key, bucket_map);
-                    // Keep only a small rolling window for diffing against the
-                    // immediately preceding bucket.
-                    let min_keep = bucket_key.saturating_sub(interval_ms);
-                    self.event_time_prev_buckets.retain(|&k, _| k >= min_keep);
                 }
             }
 
