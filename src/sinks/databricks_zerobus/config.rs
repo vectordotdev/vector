@@ -178,18 +178,7 @@ impl SinkConfig for ZerobusSinkConfig {
             .map_err(|e| format!("Failed to build batch serializer: {}", e))?;
         let encoder = BatchEncoder::new(batch_serializer);
 
-        let acknowledgements_enabled = self
-            .acknowledgements
-            .merge_default(&cx.globals.acknowledgements)
-            .enabled();
-
-        let service = ZerobusService::new(
-            self.clone(),
-            stream_mode,
-            acknowledgements_enabled,
-            cx.proxy(),
-        )
-        .await?;
+        let service = ZerobusService::new(self.clone(), stream_mode, cx.proxy()).await?;
         let healthcheck_service = service.clone();
 
         let request_limits = self.request.into_settings();

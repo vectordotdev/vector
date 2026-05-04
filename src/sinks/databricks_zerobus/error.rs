@@ -28,9 +28,9 @@ pub enum ZerobusSinkError {
     #[snafu(display("Record ingestion failed: {}", source))]
     IngestionError { source: ZerobusError },
 
-    /// Acknowledgement was requested but the SDK returned no offset to wait on,
-    /// so durability cannot be confirmed. Treated as non-retryable.
-    #[snafu(display("Zerobus ingest returned no offset in acknowledgement mode"))]
+    /// The SDK returned no offset to wait on, so server acceptance of the
+    /// batch cannot be confirmed. Treated as non-retryable.
+    #[snafu(display("Zerobus ingest returned no offset; cannot confirm server acceptance"))]
     MissingAckOffset,
 
     /// The shared stream was closed concurrently (by shutdown or retry-driven

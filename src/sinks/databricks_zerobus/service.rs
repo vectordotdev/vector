@@ -263,16 +263,12 @@ pub struct ZerobusService {
     config: Arc<ZerobusSinkConfig>,
     stream: Arc<Mutex<Option<Arc<ActiveStream>>>>,
     stream_mode: StreamMode,
-    /// When true, the service waits for server-side acknowledgment after each
-    /// ingest call. Derived from `AcknowledgementsConfig`.
-    require_acknowledgements: bool,
 }
 
 impl ZerobusService {
     pub async fn new(
         config: ZerobusSinkConfig,
         stream_mode: StreamMode,
-        require_acknowledgements: bool,
         proxy: &ProxyConfig,
     ) -> Result<Self, ZerobusSinkError> {
         let mut builder = ZerobusSdk::builder()
@@ -288,7 +284,6 @@ impl ZerobusService {
             config: Arc::new(config),
             stream: Arc::new(Mutex::new(None)),
             stream_mode,
-            require_acknowledgements,
         })
     }
 
@@ -393,13 +388,10 @@ impl ZerobusService {
                     return Err(ZerobusSinkError::StreamClosed);
                 };
                 match s.ingest_records_offset(records).await {
-                    Ok(Some(offset)) if self.require_acknowledgements => {
-                        s.wait_for_offset(offset).await.map(|_| ())
-                    }
-                    Ok(None) if self.require_acknowledgements => {
+                    Ok(Some(offset)) => s.wait_for_offset(offset).await.map(|_| ()),
+                    Ok(None) => {
                         return Err(ZerobusSinkError::MissingAckOffset);
                     }
-                    Ok(_) => Ok(()),
                     Err(e) => Err(e),
                 }
             }
@@ -460,7 +452,6 @@ impl Clone for ZerobusService {
             config: Arc::clone(&self.config),
             stream: Arc::clone(&self.stream),
             stream_mode: self.stream_mode.clone(),
-            require_acknowledgements: self.require_acknowledgements,
         }
     }
 }
@@ -480,7 +471,6 @@ impl ZerobusService {
     pub async fn new_with_mock(
         config: ZerobusSinkConfig,
         mock: MockStream,
-        require_acknowledgements: bool,
     ) -> Result<Self, ZerobusSinkError> {
         config.validate()?;
 
@@ -499,7 +489,6 @@ impl ZerobusService {
             stream_mode: StreamMode::Proto {
                 descriptor_proto: Arc::new(Default::default()),
             },
-            require_acknowledgements,
         })
     }
 
@@ -558,7 +547,7 @@ mod tests {
 
     #[tokio::test]
     async fn ingest_succeeds_with_mock_stream() {
-        let service = ZerobusService::new_with_mock(test_config(), MockStream::succeeding(), false)
+        let service = ZerobusService::new_with_mock(test_config(), MockStream::succeeding())
             .await
             .unwrap();
 
@@ -575,7 +564,7 @@ mod tests {
         let mock = MockStream::failing(ZerobusError::ChannelCreationError(
             "connection reset".to_string(),
         ));
-        let service = ZerobusService::new_with_mock(test_config(), mock, false)
+        let service = ZerobusService::new_with_mock(test_config(), mock)
             .await
             .unwrap();
 
@@ -595,7 +584,7 @@ mod tests {
     #[tokio::test]
     async fn non_retryable_error_keeps_stream() {
         let mock = MockStream::failing(ZerobusError::InvalidArgument("bad field".to_string()));
-        let service = ZerobusService::new_with_mock(test_config(), mock, false)
+        let service = ZerobusService::new_with_mock(test_config(), mock)
             .await
             .unwrap();
 
@@ -616,7 +605,7 @@ mod tests {
     async fn stream_recovers_after_retryable_failure() {
         // Simulate: success → retryable failure → success again.
         let mock = MockStream::succeeding();
-        let service = ZerobusService::new_with_mock(test_config(), mock, false)
+        let service = ZerobusService::new_with_mock(test_config(), mock)
             .await
             .unwrap();
 
@@ -666,7 +655,7 @@ mod tests {
         let mock = MockStream::succeeding();
         let closed = mock.closed_flag();
 
-        let service = ZerobusService::new_with_mock(test_config(), mock, false)
+        let service = ZerobusService::new_with_mock(test_config(), mock)
             .await
             .unwrap();
 
@@ -693,7 +682,7 @@ mod tests {
         .with_gate();
         let closed = mock.closed_flag();
 
-        let service = ZerobusService::new_with_mock(test_config(), mock, false)
+        let service = ZerobusService::new_with_mock(test_config(), mock)
             .await
             .unwrap();
 
