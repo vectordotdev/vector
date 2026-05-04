@@ -52,26 +52,34 @@ pub struct AggregateConfig {
 
     /// Grace period for late-arriving events when using event-time aggregation.
     ///
-    /// Events with timestamps older than the watermark but within this grace period will still be accepted.
-    /// Set to 0 for strict ordering (no late events allowed).
-    /// Only applies when `time_source` is set to `EventTime`.
+    /// Each bucket is held open for this many milliseconds past the end of its window so late
+    /// events still land in the correct bucket. Once a bucket is emitted it is closed
+    /// permanently; any later events whose timestamp falls inside it are dropped and counted
+    /// via `component_discarded_events_total`.
+    ///
+    /// Set to 0 for strict ordering (no late events allowed). Only applies when `time_source`
+    /// is set to `event_time`.
     #[serde(default)]
     #[configurable(metadata(docs::examples = 0, docs::examples = 5000, docs::examples = 30000))]
     pub allowed_lateness_ms: u64,
 
     /// How to handle events with missing timestamps in event-time mode.
     ///
-    /// When `true`, events without timestamps will use the current system time as a fallback.
-    /// When `false`, events without timestamps will be dropped.
-    /// Only applies when `time_source` is set to `EventTime`.
+    /// When `true`, events without a timestamp use the current system time as a fallback.
+    /// When `false`, such events are dropped and counted via `component_discarded_events_total`.
+    ///
+    /// Only applies when `time_source` is set to `event_time`.
     #[serde(default)]
     pub use_system_time_for_missing_timestamps: bool,
 
     /// Maximum allowed time drift for future events in event-time mode.
     ///
-    /// Events with timestamps further in the future than this value will be dropped.
-    /// Set to 0 to allow events at any future time.
-    /// Only applies when `time_source` is set to `EventTime`.
+    /// Acts as a clock-skew guard: events whose timestamp is further in the future than this
+    /// many milliseconds (relative to the current system time) are dropped and counted via
+    /// `component_discarded_events_total`. Defaults to 10 seconds.
+    ///
+    /// Set to 0 to allow events at any future time. Only applies when `time_source` is set
+    /// to `event_time`.
     #[serde(default = "default_max_future_ms")]
     #[configurable(metadata(docs::examples = 0, docs::examples = 60000, docs::examples = 300000))]
     pub max_future_ms: u64,
@@ -263,7 +271,7 @@ impl Aggregate {
     /// rounds toward zero, so timestamps just before the epoch (negative
     /// millis) would incorrectly map into the non-negative bucket `[0, interval)`
     /// instead of `[-interval, 0)`.
-    fn bucket_key(&self, timestamp: DateTime<Utc>) -> BucketKey {
+    const fn bucket_key(&self, timestamp: DateTime<Utc>) -> BucketKey {
         let timestamp_ms = timestamp.timestamp_millis();
         let interval_ms = self.interval.as_millis() as i64;
         timestamp_ms.div_euclid(interval_ms).saturating_mul(interval_ms)

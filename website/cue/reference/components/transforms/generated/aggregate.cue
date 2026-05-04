@@ -5,9 +5,13 @@ generated: components: transforms: aggregate: configuration: {
 		description: """
 			Grace period for late-arriving events when using event-time aggregation.
 
-			Events with timestamps older than the watermark but within this grace period will still be accepted.
-			Set to 0 for strict ordering (no late events allowed).
-			Only applies when `time_source` is set to `EventTime`.
+			Each bucket is held open for this many milliseconds past the end of its window so late
+			events still land in the correct bucket. Once a bucket is emitted it is closed
+			permanently; any later events whose timestamp falls inside it are dropped and counted
+			via `component_discarded_events_total`.
+
+			Set to 0 for strict ordering (no late events allowed). Only applies when `time_source`
+			is set to `event_time`.
 			"""
 		required: false
 		type: uint: {
@@ -28,9 +32,12 @@ generated: components: transforms: aggregate: configuration: {
 		description: """
 			Maximum allowed time drift for future events in event-time mode.
 
-			Events with timestamps further in the future than this value will be dropped.
-			Set to 0 to allow events at any future time.
-			Only applies when `time_source` is set to `EventTime`.
+			Acts as a clock-skew guard: events whose timestamp is further in the future than this
+			many milliseconds (relative to the current system time) are dropped and counted via
+			`component_discarded_events_total`. Defaults to 10 seconds.
+
+			Set to 0 to allow events at any future time. Only applies when `time_source` is set
+			to `event_time`.
 			"""
 		required: false
 		type: uint: {
@@ -89,9 +96,10 @@ generated: components: transforms: aggregate: configuration: {
 		description: """
 			How to handle events with missing timestamps in event-time mode.
 
-			When `true`, events without timestamps will use the current system time as a fallback.
-			When `false`, events without timestamps will be dropped.
-			Only applies when `time_source` is set to `EventTime`.
+			When `true`, events without a timestamp use the current system time as a fallback.
+			When `false`, such events are dropped and counted via `component_discarded_events_total`.
+
+			Only applies when `time_source` is set to `event_time`.
 			"""
 		required: false
 		type: bool: default: false
