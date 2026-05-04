@@ -125,6 +125,14 @@ jobs:
         env:
           TARGET: "${{ matrix.architecture }}-apple-darwin"
           NATIVE_BUILD: true
+          # Pre-PR `default` included `rdkafka?/gssapi`, dynamically linking
+          # against the system libsasl2 on the macOS runner. With `default`
+          # now dev-only, opt into Vector's `gssapi` feature here to keep the
+          # darwin archives shipping with Kerberos/GSSAPI SASL support. Vector's
+          # `gssapi` uses the same dynamic linkage as pre-PR; it's not the
+          # `vendored`/`gssapi-vendored` path, which doesn't currently link on
+          # macOS arm64.
+          FEATURES: "default,gssapi"
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
           make package
