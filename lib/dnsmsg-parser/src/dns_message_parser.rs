@@ -977,7 +977,7 @@ fn parse_dns_query_message_header(dns_message: &TrustDnsMessage) -> QueryHeader 
         question_count: dns_message.queries.len() as u16,
         answer_count: dns_message.answers.len() as u16,
         authority_count: dns_message.authorities.len() as u16,
-        additional_count: dns_message.additionals.len() as u16,
+        additional_count: dns_message.additionals.len() as u16 + dns_message.edns.is_some() as u16,
     }
 }
 
@@ -990,7 +990,7 @@ fn parse_dns_update_message_header(dns_message: &TrustDnsMessage) -> UpdateHeade
         zone_count: dns_message.queries.len() as u16,
         prerequisite_count: dns_message.answers.len() as u16,
         update_count: dns_message.authorities.len() as u16,
-        additional_count: dns_message.additionals.len() as u16,
+        additional_count: dns_message.additionals.len() as u16 + dns_message.edns.is_some() as u16,
     }
 }
 
