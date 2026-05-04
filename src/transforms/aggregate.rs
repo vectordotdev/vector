@@ -293,7 +293,7 @@ impl Aggregate {
         }
     }
 
-    fn record(&mut self, event: Event) {
+    pub fn record(&mut self, event: Event) {
         let metric = event.into_metric();
         let timestamp = metric.timestamp();
         let (series, mut data, metadata) = metric.into_parts();
@@ -620,7 +620,7 @@ impl Aggregate {
         }
     }
 
-    fn flush_into(&mut self, output: &mut Vec<Event>) {
+    pub fn flush_into(&mut self, output: &mut Vec<Event>) {
         if self.time_source == TimeSource::EventTime {
             self.flush_event_time_buckets(output, false);
         } else {
