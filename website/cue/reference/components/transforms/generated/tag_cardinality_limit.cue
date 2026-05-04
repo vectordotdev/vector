@@ -22,6 +22,10 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 
 			When set on a per-metric configuration, the effective exclusion list is the union of the
 			global `exclude_tags` and the per-metric `exclude_tags`.
+
+			Excluded tags do not contribute to `tag_value_limit_exceeded_total` and do not produce
+			`TagCardinalityLimitRejectingTag` or `TagCardinalityLimitRejectingEvent` internal events,
+			so they are invisible to cardinality-pressure dashboards by design.
 			"""
 		required: false
 		type: array: {
@@ -105,6 +109,10 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 
 						When set on a per-metric configuration, the effective exclusion list is the union of the
 						global `exclude_tags` and the per-metric `exclude_tags`.
+
+						Excluded tags do not contribute to `tag_value_limit_exceeded_total` and do not produce
+						`TagCardinalityLimitRejectingTag` or `TagCardinalityLimitRejectingEvent` internal events,
+						so they are invisible to cardinality-pressure dashboards by design.
 						"""
 					required: false
 					type: array: {

@@ -53,6 +53,7 @@ impl TagCardinalityLimit {
 
     /// Returns the union of the global `exclude_tags` and the matching per-metric
     /// `exclude_tags`, so global exclusions still apply when a per-metric config matches.
+    /// Deduped so that a key listed in both lists is only checked once per tag in the hot path.
     fn effective_exclude_tags(&self, metric_key: Option<&MetricId>) -> Vec<&str> {
         let global = self.config.global.exclude_tags.iter().map(String::as_str);
         let per_metric = metric_key
@@ -64,7 +65,13 @@ impl TagCardinalityLimit {
             .into_iter()
             .flat_map(|(_, c)| c.config.exclude_tags.iter().map(String::as_str));
 
-        global.chain(per_metric).collect()
+        let mut out: Vec<&str> = Vec::new();
+        for k in global.chain(per_metric) {
+            if !out.contains(&k) {
+                out.push(k);
+            }
+        }
+        out
     }
 
     /// Takes in key and a value corresponding to a tag on an incoming Metric

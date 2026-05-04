@@ -709,16 +709,26 @@ fn exclude_tags_drop_event_passthrough(mode: Mode) {
     assert_eq!(transform.transform_one(event4.clone()), Some(event4));
 }
 
-/// Global `exclude_tags` still applies to metrics that match a per-metric configuration —
-/// the effective list is the union of global and per-metric exclusions.
 #[test]
-fn exclude_tags_merge_global_and_per_metric() {
+fn exclude_tags_merge_global_and_per_metric_hashset() {
+    exclude_tags_merge_global_and_per_metric(Mode::Exact);
+}
+
+#[test]
+fn exclude_tags_merge_global_and_per_metric_bloom() {
+    exclude_tags_merge_global_and_per_metric(bloom_mode());
+}
+
+/// Global `exclude_tags` still applies to metrics that match a per-metric configuration —
+/// the effective list is the union of global and per-metric exclusions. Parameterised over
+/// `Mode` so the contract is pinned for both the exact and probabilistic backends.
+fn exclude_tags_merge_global_and_per_metric(mode: Mode) {
     let per_metric = PerMetricConfig {
         namespace: None,
         config: Inner {
             value_limit: 1,
             limit_exceeded_action: LimitExceededAction::DropTag,
-            mode: Mode::Exact,
+            mode,
             internal_metrics: InternalMetricsConfig::default(),
             exclude_tags: vec!["tenant_id".to_string()],
         },
@@ -728,7 +738,7 @@ fn exclude_tags_merge_global_and_per_metric() {
         global: Inner {
             value_limit: 1,
             limit_exceeded_action: LimitExceededAction::DropTag,
-            mode: Mode::Exact,
+            mode,
             internal_metrics: InternalMetricsConfig::default(),
             exclude_tags: vec!["kube_pod_name".to_string()],
         },
@@ -775,5 +785,41 @@ fn exclude_tags_merge_global_and_per_metric() {
     assert!(
         !tags2.contains_key("tag1"),
         "non-excluded tag1 should be dropped after exceeding per-metric value_limit"
+    );
+}
+
+/// Pins the "never enter the cache" contract from the `exclude_tags` documentation by
+/// asserting directly on `accepted_tags` rather than going through the public emission
+/// surface. If this invariant breaks, excluded tags would silently start consuming memory
+/// and producing the very internal events the docs promise they suppress.
+#[test]
+fn exclude_tags_never_populate_cache() {
+    let config = make_transform_with_exclude_tags(
+        2,
+        LimitExceededAction::DropTag,
+        Mode::Exact,
+        vec!["kube_pod_name".to_string()],
+    );
+    let mut transform = TagCardinalityLimit::new(config);
+
+    // Send well past `value_limit` distinct values for the excluded key.
+    for i in 0..10 {
+        let event = make_metric(metric_tags!(
+            "kube_pod_name" => format!("pod-{i}").as_str(),
+            "tag1" => "val1"
+        ));
+        transform.transform_one(event).unwrap();
+    }
+
+    let global_metric_entry = transform.accepted_tags.get(&None).expect(
+        "non-excluded tag1 should still create an entry under the no-per-metric-key bucket",
+    );
+    assert!(
+        global_metric_entry.contains_key("tag1"),
+        "non-excluded tag must still be tracked"
+    );
+    assert!(
+        !global_metric_entry.contains_key("kube_pod_name"),
+        "excluded tag key must never enter the cache"
     );
 }
