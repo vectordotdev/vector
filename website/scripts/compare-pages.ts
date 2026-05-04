@@ -243,6 +243,32 @@ function isTailwindClass(cls: string): boolean {
 }
 
 // ---------------------------------------------------------------------------
+// Known v4 migration differences — expected changes, not regressions
+// ---------------------------------------------------------------------------
+
+// Classes that were renamed between v3 and v4.
+const V4_RENAMED: Record<string, string> = {
+  "dark:prose-dark": "dark:prose-invert",
+};
+
+// Patterns for utilities removed in v4 (replaced by color/opacity modifier syntax).
+const V4_REMOVED: Array<{ pattern: RegExp; note: string }> = [
+  { pattern: /^(dark:)?bg-opacity-\d+$/, note: "removed in v4 — use bg-{color}/{opacity}" },
+  { pattern: /^(dark:)?text-opacity-\d+$/, note: "removed in v4 — use text-{color}/{opacity}" },
+  { pattern: /^(dark:)?border-opacity-\d+$/, note: "removed in v4 — use border-{color}/{opacity}" },
+  { pattern: /^(dark:)?ring-opacity-\d+$/, note: "removed in v4 — use ring-{color}/{opacity}" },
+  { pattern: /^(dark:)?placeholder-opacity-\d+$/, note: "removed in v4 — use placeholder-{color}/{opacity}" },
+];
+
+function v4MigrationNote(cls: string): string | null {
+  if (V4_RENAMED[cls]) return `renamed to ${V4_RENAMED[cls]}`;
+  for (const { pattern, note } of V4_REMOVED) {
+    if (pattern.test(cls)) return note;
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Report types
 // ---------------------------------------------------------------------------
 
@@ -250,6 +276,7 @@ interface PageResult {
   path: string;
   label: string; // e.g. "shortcode:tabs", "layout:blog", "random"
   issues: string[];
+  v4diffs: string[];
   classesMissingLocally: string[];
   classesOnlyLocal: string[];
 }
@@ -357,27 +384,39 @@ async function main() {
     const prodClasses = extractClasses(prod.body);
     const localClasses = extractClasses(local.body);
 
-    const missingLocally = [...prodClasses].filter(
+    const allMissingLocally = [...prodClasses].filter(
       (c) => !localClasses.has(c) && isTailwindClass(c)
     );
     const onlyLocal = [...localClasses].filter(
       (c) => !prodClasses.has(c) && isTailwindClass(c)
     );
 
+    // Split into true regressions vs known v4 migration differences.
+    const missingLocally = allMissingLocally.filter((c) => !v4MigrationNote(c));
+    const missingLocallyV4 = allMissingLocally.filter((c) => v4MigrationNote(c));
+
     if (missingLocally.length > 0) {
       issues.push(`${missingLocally.length} Tailwind class(es) missing locally`);
     }
 
     // Check for classes that have rules in prod CSS but are missing from local CSS.
-    // This catches dynamically-constructed class names (e.g. `text-{{ $color }}`) that
-    // JIT misses when scanning template files statically, while ignoring custom classes
+    // This catches dynamically-constructed class names (e.g. `text-[color]`) that JIT
+    // misses when scanning template files statically, while ignoring custom classes
     // defined outside Tailwind (SASS, etc.) which won't appear in either CSS file.
-    const classesWithoutRules = [...localClasses].filter(
+    const allWithoutRules = [...localClasses].filter(
       (c) => isTailwindClass(c) && classInCss(c, prodCssText) && !classInCss(c, localCssText)
     );
+    const classesWithoutRules = allWithoutRules.filter((c) => !v4MigrationNote(c));
+    const classesWithoutRulesV4 = allWithoutRules.filter((c) => v4MigrationNote(c));
+
     if (classesWithoutRules.length > 0) {
       issues.push(`${classesWithoutRules.length} class(es) in prod CSS but missing from local CSS`);
     }
+
+    // Collect all distinct v4 migration notes for this page.
+    const v4diffs = [...new Set([...missingLocallyV4, ...classesWithoutRulesV4].map(
+      (c) => `${c} → ${v4MigrationNote(c)}`
+    ))];
 
     const prodTitle = extractTitle(prod.body);
     const localTitle = extractTitle(local.body);
@@ -402,29 +441,41 @@ async function main() {
     }
 
     const ok = issues.length === 0;
+    const hasV4Diffs = v4diffs.length > 0;
     completed++;
     if (ok) passed++;
     else failed++;
 
     const prefix = `[${String(completed).padStart(indexWidth)}/${labeled.length}] ${label.padEnd(labelWidth)}  ${path}`;
-    console.log(ok ? `${prefix} ✓` : `${prefix} ✗  [${issues.join(", ")}]`);
+    if (ok && !hasV4Diffs) {
+      console.log(`${prefix} ✓`);
+    } else if (ok && hasV4Diffs) {
+      console.log(`${prefix} ✓  (v4 diff)`);
+    } else {
+      console.log(`${prefix} ✗  [${issues.join(", ")}]`);
+    }
 
     if (missingLocally.length > 0) {
       console.log(
         `      Missing: ${missingLocally.slice(0, 8).join("  ")}${missingLocally.length > 8 ? ` …+${missingLocally.length - 8}` : ""}`
       );
     }
+    if (hasV4Diffs) {
+      for (const note of v4diffs.slice(0, 4)) {
+        console.log(`      v4 diff: ${note}`);
+      }
+      if (v4diffs.length > 4) console.log(`      v4 diff: …+${v4diffs.length - 4} more`);
+    }
     if (VERBOSE && onlyLocal.length > 0) {
       console.log(`      Only local (${onlyLocal.length}): ${onlyLocal.slice(0, 6).join("  ")}`);
     }
-
     if (classesWithoutRules.length > 0) {
       console.log(
         `      Missing rule: ${classesWithoutRules.slice(0, 8).join("  ")}${classesWithoutRules.length > 8 ? ` …+${classesWithoutRules.length - 8}` : ""}`
       );
     }
 
-    results[i] = { path, label, issues, classesMissingLocally: missingLocally, classesOnlyLocal: onlyLocal };
+    results[i] = { path, label, issues, v4diffs, classesMissingLocally: missingLocally, classesOnlyLocal: onlyLocal };
   }
 
   // Run with bounded concurrency
@@ -438,8 +489,9 @@ async function main() {
   await Promise.all(workers);
 
   // 5. Summary
+  const v4DiffPages = results.filter((r) => r.issues.length === 0 && r.v4diffs.length > 0);
   console.log(`\n${"─".repeat(70)}`);
-  console.log(`Results: ${passed}/${labeled.length} passed, ${failed} failed`);
+  console.log(`Results: ${passed}/${labeled.length} passed, ${failed} failed, ${v4DiffPages.length} with v4 diffs`);
 
   if (failed > 0) {
     console.log(`\nFailed pages:`);
@@ -449,6 +501,20 @@ async function main() {
       if (r.classesMissingLocally.length > 0) {
         console.log(`    · Missing: ${r.classesMissingLocally.join(", ")}`);
       }
+    }
+  }
+
+  if (v4DiffPages.length > 0) {
+    // Summarise the distinct v4 diffs across all pages (not per-page, to avoid noise).
+    const allV4Notes = new Map<string, number>();
+    for (const r of v4DiffPages) {
+      for (const note of r.v4diffs) {
+        allV4Notes.set(note, (allV4Notes.get(note) ?? 0) + 1);
+      }
+    }
+    console.log(`\nKnown v4 migration diffs (expected, not regressions):`);
+    for (const [note, count] of [...allV4Notes.entries()].sort((a, b) => b[1] - a[1])) {
+      console.log(`  ${String(count).padStart(3)}x  ${note}`);
     }
   }
 
