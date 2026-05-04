@@ -249,15 +249,22 @@ function isTailwindClass(cls: string): boolean {
 // Classes that were renamed between v3 and v4.
 const V4_RENAMED: Record<string, string> = {
   "dark:prose-dark": "dark:prose-invert",
+  // Standalone color classes that were merged into the /opacity modifier form.
+  // e.g. `bg-black bg-opacity-50` → `bg-black/50`, so `bg-black` disappears from local HTML.
+  "bg-black": "bg-black/50 (opacity merged)",
+  "dark:bg-white": "dark:bg-white/50 (opacity merged)",
+  "ring-black": "ring-black/5 (opacity merged)",
 };
 
 // Patterns for utilities removed in v4 (replaced by color/opacity modifier syntax).
+// These appear in prod HTML/CSS (v3) but are absent from local (v4) because templates
+// were updated to use the new `/opacity` modifier syntax (e.g. bg-black/50).
 const V4_REMOVED: Array<{ pattern: RegExp; note: string }> = [
-  { pattern: /^(dark:)?bg-opacity-\d+$/, note: "removed in v4 — use bg-{color}/{opacity}" },
-  { pattern: /^(dark:)?text-opacity-\d+$/, note: "removed in v4 — use text-{color}/{opacity}" },
-  { pattern: /^(dark:)?border-opacity-\d+$/, note: "removed in v4 — use border-{color}/{opacity}" },
-  { pattern: /^(dark:)?ring-opacity-\d+$/, note: "removed in v4 — use ring-{color}/{opacity}" },
-  { pattern: /^(dark:)?placeholder-opacity-\d+$/, note: "removed in v4 — use placeholder-{color}/{opacity}" },
+  { pattern: /^([\w:-]+:)?bg-opacity-\d+$/, note: "removed in v4 — consolidated into bg-{color}/{opacity}" },
+  { pattern: /^([\w:-]+:)?text-opacity-\d+$/, note: "removed in v4 — consolidated into text-{color}/{opacity}" },
+  { pattern: /^([\w:-]+:)?border-opacity-\d+$/, note: "removed in v4 — consolidated into border-{color}/{opacity}" },
+  { pattern: /^([\w:-]+:)?ring-opacity-\d+$/, note: "removed in v4 — consolidated into ring-{color}/{opacity}" },
+  { pattern: /^([\w:-]+:)?placeholder-opacity-\d+$/, note: "removed in v4 — consolidated into placeholder-{color}/{opacity}" },
 ];
 
 function v4MigrationNote(cls: string): string | null {
