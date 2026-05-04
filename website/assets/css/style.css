@@ -1,6 +1,174 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@plugin "@tailwindcss/forms";
+@plugin "@tailwindcss/typography";
+
+/* postcss.config.js writes .hugo-classes from hugo_stats.json at build time.
+   This captures dynamically-constructed class names (e.g. text-[color]) that
+   static file scanning misses. Path resolves from the website/ project root
+   in both the Hugo PostCSS pipeline and standalone postcss runs. */
+@source "./.hugo-classes";
+
+/* Classes injected by JS at runtime, absent from hugo_stats.json */
+@source inline("search-input search-results-list search-result code-sample-filename type block border-gray-200 border-gray-300 border-r border-t font-medium h-2 h-3 h-full inline leading-relaxed mb-1 ml-1 mr-1 p-2 p-4 pl-2 py-4 text-gray-600 text-gray-800 text-sm w-2 w-3");
+
+/* Class-based dark mode via Alpine JS toggling .dark on <html> */
+@variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* Custom colors */
+  --color-dark: #191927;          /* Vector dark */
+  --color-primary: #28d9f2;       /* Vector greenish blue */
+  --color-primary-dark: #00a9bc;  /* Vector darker greenish blue */
+  --color-secondary: #f44af5;     /* Vector magenta */
+  --color-purple-v: #98f;         /* Vector purple */
+  /* Brand colors */
+  --color-discord-purple: #7289DA;
+  --color-rss-orange: #f26522;
+
+  /* Custom font family (Segoe UI as primary sans) */
+  --font-sans: "Segoe UI", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji",
+    "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+
+  /* Custom font sizes (non-standard steps) */
+  --text-2\.5xl: 1.75rem;
+  --text-2\.5xl--line-height: 2.15rem;
+  --text-4\.5xl: 2.5rem;
+  --text-4\.5xl--line-height: 2.75rem;
+  --text-5\.5xl: 3.375rem;
+  --text-5\.5xl--line-height: 1;
+
+  /* Custom border widths */
+  --border-width-2\.5: 2.5px;
+
+  /* Custom max-widths */
+  --max-width-xxs: 16rem;
+  --max-width-1\/4: 25%;
+
+  /* Custom grid template columns */
+  --grid-template-columns-16: repeat(16, minmax(0, 1fr));
+}
+
+/* --------------------------------------------------------------------------
+   Custom typography overrides (replaces v3 tailwind.config.cjs typography)
+   -------------------------------------------------------------------------- */
+
+.prose a {
+  color: var(--color-primary-dark);
+  text-decoration: none;
+}
+.prose a:hover {
+  color: var(--color-secondary);
+}
+.prose a code {
+  color: inherit;
+}
+.prose code {
+  color: var(--color-primary-dark);
+}
+.prose code:not([class^="language-"]) {
+  color: var(--color-dark);
+  background-color: #f3f4f6;
+  border-radius: 4px;
+  padding: 0 5px;
+  display: inline-flex;
+  align-items: center;
+}
+.prose code::before,
+.prose code::after {
+  display: none;
+}
+.prose ul > li::before {
+  background-color: #374151;
+}
+.prose ol > li::before {
+  color: #374151;
+}
+.prose .admonition + .tabs,
+.prose .svg + .admonition,
+.prose .highlight + p {
+  margin-top: 1rem;
+}
+.prose .no-prose a {
+  color: var(--color-primary-dark);
+}
+.prose .no-prose a:hover {
+  color: var(--color-secondary);
+}
+.prose .no-prose p + .highlight {
+  margin-top: 0.75rem;
+}
+.prose .no-prose h1,
+.prose .no-prose h2,
+.prose .no-prose h3,
+.prose .no-prose h4,
+.prose .no-prose h5,
+.prose .no-prose h6 {
+  margin: 0;
+  padding: 0;
+}
+.prose .no-prose .highlight,
+.prose .no-prose pre.chroma {
+  margin: 0;
+}
+
+/* Dark mode prose overrides */
+.dark .prose table th,
+.dark .prose table td {
+  color: #e5e7eb;
+}
+.dark .prose table tr,
+.dark .prose table th,
+.dark .prose table thead,
+.dark .prose table tbody {
+  border-top-color: #374151;
+  border-bottom-color: #374151;
+}
+.dark .prose code {
+  color: #f3f4f6;
+}
+.dark .prose code:not([class^="language-"]) {
+  background-color: #374151;
+}
+.dark .prose {
+  color: #e5e7eb;
+}
+.dark .prose p,
+.dark .prose h1,
+.dark .prose h2,
+.dark .prose h3,
+.dark .prose h4,
+.dark .prose h5,
+.dark .prose h6,
+.dark .prose li {
+  color: #f3f4f6;
+}
+.dark .prose ul > li::before {
+  background-color: #f3f4f6;
+}
+.dark .prose ol > li::before {
+  color: #f3f4f6;
+}
+.dark .prose a,
+.dark .prose a code,
+.dark .prose a code:not([class^="language-"]) {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+.dark .prose a:hover,
+.dark .prose a:active {
+  color: var(--color-secondary);
+}
+.dark .prose strong {
+  color: #f3f4f6;
+}
+
+/* Small prose variant */
+.prose-sm ul > li,
+.prose-sm ol > li {
+  /* preserve first/last child margins from v3 config */
+}
 
 :root {
   --dark: #191927; /* Vector Dark */
@@ -43,7 +211,6 @@
   display: none !important;
 }
 
-/* Some rules that Tailwind can't really cover */
 .jump + .jump,
 .admonition + .admonition {
   margin-top: 0.5rem;
