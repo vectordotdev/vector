@@ -10057,7 +10057,7 @@ dependencies = [
  "once_cell",
  "ring",
  "rustls-pki-types",
- "rustls-webpki 0.103.12",
+ "rustls-webpki 0.103.13",
  "subtle",
  "zeroize",
 ]
@@ -10139,9 +10139,9 @@ dependencies = [
 
 [[package]]
 name = "rustls-webpki"
-version = "0.103.12"
+version = "0.103.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8279bb85272c9f10811ae6a6c547ff594d6a7f3c6c6b02ee9726d1d0dcfcdd06"
+checksum = "61c429a8649f110dddef65e2a5ad240f747e85f7758a6bccc7e5777bd33f756e"
 dependencies = [
  "ring",
  "rustls-pki-types",
@@ -13596,7 +13596,7 @@ checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 [[package]]
 name = "vrl"
 version = "0.32.0"
-source = "git+https://github.com/vectordotdev/vrl.git?branch=main#d0d3d5282ef86121f9b24d14b625e41c9ee5ee57"
+source = "git+https://github.com/vectordotdev/vrl.git?branch=main#8a5b4711f37d0b3bd4d0d2ea8bbb500942bd8e98"
 dependencies = [
  "aes",
  "aes-siv",
