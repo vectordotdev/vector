@@ -12,7 +12,7 @@ use super::SyslogSinkConfig;
 use crate::{
     config::{SinkConfig, SinkContext},
     test_util::{
-        components::{SINK_TAGS, run_and_assert_sink_compliance},
+        components::{SINK_TAGS, assert_sink_compliance},
         random_string, trace_init, wait_for_tcp,
     },
 };
@@ -51,10 +51,18 @@ fn log_event(message: &str, facility: &str, severity: &str) -> Event {
 }
 
 async fn run_sink(config: SyslogSinkConfig, event: Event) {
-    let context = SinkContext::default();
-    let (sink, healthcheck) = config.build(context).await.expect("sink should build");
-    healthcheck.await.expect("healthcheck should pass");
-    run_and_assert_sink_compliance(sink, stream::once(ready(event)), &SINK_TAGS).await;
+    // Build the sink inside `assert_sink_compliance` so the registered-event
+    // names from `register!(BytesSent::from(Protocol::UDP))` are captured
+    // after `init_test` clears the event recorder.
+    assert_sink_compliance(&SINK_TAGS, async move {
+        let context = SinkContext::default();
+        let (sink, healthcheck) = config.build(context).await.expect("sink should build");
+        healthcheck.await.expect("healthcheck should pass");
+        sink.run(stream::once(ready(event.into())))
+            .await
+            .expect("sink should run");
+    })
+    .await;
 }
 
 async fn wait_for_log_contains(file_name: &str, needle: &str) -> String {
