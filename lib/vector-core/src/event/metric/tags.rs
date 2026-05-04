@@ -528,6 +528,17 @@ impl MetricTags {
         self.0.remove(name).and_then(TagValueSet::into_single)
     }
 
+    /// Rename a tag from `old_name` to `new_name`, overwriting `new_name` if it already exists.
+    /// Returns `true` if the rename was performed.
+    pub fn rename_with_replacement(&mut self, old_name: &str, new_name: String) -> bool {
+        if let Some(values) = self.0.remove(old_name) {
+            self.0.insert(new_name, values);
+            true
+        } else {
+            false
+        }
+    }
+
     pub fn keys(&self) -> impl Iterator<Item = &str> {
         self.0.keys().map(String::as_str)
     }
@@ -639,6 +650,36 @@ mod tests {
     use proptest::prelude::*;
 
     use super::*;
+
+    fn make_tags(pairs: &[(&str, &str)]) -> MetricTags {
+        pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect()
+    }
+
+    #[test]
+    fn rename_basic() {
+        let mut tags = make_tags(&[("old", "v1")]);
+        assert!(tags.rename_with_replacement("old", "new".to_string()));
+        assert_eq!(tags.get("new"), Some("v1"));
+        assert!(!tags.contains_key("old"));
+    }
+
+    #[test]
+    fn rename_missing_old_returns_false() {
+        let mut tags = make_tags(&[("a", "1")]);
+        assert!(!tags.rename_with_replacement("missing", "b".to_string()));
+        assert!(tags.contains_key("a"));
+    }
+
+    #[test]
+    fn rename_overwrites_existing_destination() {
+        let mut tags = make_tags(&[("old", "v1"), ("new", "v2")]);
+        assert!(tags.rename_with_replacement("old", "new".to_string()));
+        assert_eq!(tags.get("new"), Some("v1"));
+        assert!(!tags.contains_key("old"));
+    }
 
     proptest! {
         #[test]
