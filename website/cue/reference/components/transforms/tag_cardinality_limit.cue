@@ -22,9 +22,7 @@ components: transforms: tag_cardinality_limit: {
 		stateful:      true
 	}
 
-	features: {
-		filter: {}
-	}
+	features: filter: {}
 
 	support: {
 		requirements: []
@@ -51,11 +49,7 @@ components: transforms: tag_cardinality_limit: {
 		traces: false
 	}
 
-	output: {
-		metrics: "": {
-			description: "The modified input `metric` event."
-		}
-	}
+	output: metrics: "": description: "The modified input `metric` event."
 
 	examples: [
 		{
@@ -74,41 +68,27 @@ components: transforms: tag_cardinality_limit: {
 				{metric: {
 					kind: "incremental"
 					name: "logins"
-					counter: {
-						value: 2.0
-					}
-					tags: {
-						user_id: "user_id_1"
-					}
+					counter: value: 2.0
+					tags: user_id:  "user_id_1"
 				}},
 				{metric: {
 					kind: "incremental"
 					name: "logins"
-					counter: {
-						value: 2.0
-					}
-					tags: {
-						user_id: "user_id_2"
-					}
+					counter: value: 2.0
+					tags: user_id:  "user_id_2"
 				}},
 			]
 			output: [
 				{metric: {
 					kind: "incremental"
 					name: "logins"
-					counter: {
-						value: 2.0
-					}
-					tags: {
-						user_id: "user_id_1"
-					}
+					counter: value: 2.0
+					tags: user_id:  "user_id_1"
 				}},
 				{metric: {
 					kind: "incremental"
 					name: "logins"
-					counter: {
-						value: 2.0
-					}
+					counter: value: 2.0
 					tags: {}
 				}},
 			]
