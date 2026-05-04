@@ -256,12 +256,12 @@ generated: components: sinks: clickhouse: configuration: {
 				description: """
 					Allow null values for non-nullable fields in the schema.
 
-					When enabled, missing or incompatible values will be encoded as null even for fields
+					When enabled, missing or incompatible values are encoded as null, even for fields
 					marked as non-nullable in the Arrow schema. This is useful when working with downstream
 					systems that can handle null values through defaults, computed columns, or other mechanisms.
 
-					When disabled (default), missing values for non-nullable fields will cause encoding errors,
-					ensuring all required data is present before sending to the sink.
+					When disabled (default), missing values for non-nullable fields results in encoding errors. This is to
+					help ensure all required data is present before sending it to the sink.
 					"""
 				required: false
 				type: bool: default: false
