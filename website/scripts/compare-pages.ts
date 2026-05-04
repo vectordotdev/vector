@@ -273,7 +273,29 @@ async function main() {
   const layoutPages = discoverLayoutPages();
   console.log(`${layoutPages.size} layout types`);
 
-  // 2. Fetch sitemap
+  // 2. Fetch both CSS files — used to detect classes that have rules in prod but not locally.
+  // This catches dynamically-constructed class names (e.g. `text-{{ $color }}`) that JIT
+  // misses when scanning template files statically.
+  process.stdout.write("Fetching CSS files… ");
+  const { body: localCssBody } = await fetchText(`${LOCAL_BASE}/css/style.css`);
+  const localCssText = localCssBody.replace(/\\/g, "");
+
+  // Prod CSS is hash-named; find the URL from the prod home page HTML.
+  const { body: prodHomeHtml } = await fetchText(`${PROD_BASE}/`);
+  const prodCssPath = prodHomeHtml.match(/\/css\/style\.[a-f0-9]+\.css/)?.[0] ?? null;
+  let prodCssText = "";
+  if (prodCssPath) {
+    const { body } = await fetchText(`${PROD_BASE}${prodCssPath}`);
+    prodCssText = body.replace(/\\/g, "");
+  }
+
+  function classInCss(cls: string, css: string): boolean {
+    const bare = cls.replace(/\\/g, "");
+    return css.includes(bare);
+  }
+  console.log(`local ${Math.round(localCssBody.length / 1024)} KB  prod ${Math.round(prodCssText.length / 1024)} KB`);
+
+  // 3. Fetch sitemap
   process.stdout.write("Fetching sitemap… ");
   const { body: sitemapXml, status: sitemapStatus } = await fetchText(`${PROD_BASE}/sitemap.xml`);
   if (sitemapStatus !== 200) {
@@ -346,6 +368,17 @@ async function main() {
       issues.push(`${missingLocally.length} Tailwind class(es) missing locally`);
     }
 
+    // Check for classes that have rules in prod CSS but are missing from local CSS.
+    // This catches dynamically-constructed class names (e.g. `text-{{ $color }}`) that
+    // JIT misses when scanning template files statically, while ignoring custom classes
+    // defined outside Tailwind (SASS, etc.) which won't appear in either CSS file.
+    const classesWithoutRules = [...localClasses].filter(
+      (c) => isTailwindClass(c) && classInCss(c, prodCssText) && !classInCss(c, localCssText)
+    );
+    if (classesWithoutRules.length > 0) {
+      issues.push(`${classesWithoutRules.length} class(es) in prod CSS but missing from local CSS`);
+    }
+
     const prodTitle = extractTitle(prod.body);
     const localTitle = extractTitle(local.body);
     if (prodTitle !== localTitle && prod.status === 200 && local.status === 200) {
@@ -383,6 +416,12 @@ async function main() {
     }
     if (VERBOSE && onlyLocal.length > 0) {
       console.log(`      Only local (${onlyLocal.length}): ${onlyLocal.slice(0, 6).join("  ")}`);
+    }
+
+    if (classesWithoutRules.length > 0) {
+      console.log(
+        `      Missing rule: ${classesWithoutRules.slice(0, 8).join("  ")}${classesWithoutRules.length > 8 ? ` …+${classesWithoutRules.length - 8}` : ""}`
+      );
     }
 
     results[i] = { path, label, issues, classesMissingLocally: missingLocally, classesOnlyLocal: onlyLocal };
