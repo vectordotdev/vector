@@ -152,7 +152,7 @@ impl TagCardinalityLimit {
             .insert(value.clone());
     }
 
-    fn transform_one(&mut self, mut event: Event) -> Option<Event> {
+    pub fn transform_one(&mut self, mut event: Event) -> Option<Event> {
         let metric = event.as_mut_metric();
         let metric_name = metric.name().to_string();
         let metric_namespace = metric.namespace().map(|n| n.to_string());
