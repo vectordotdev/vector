@@ -327,7 +327,106 @@ async function main() {
     const bare = cls.replace(/\\/g, "");
     return css.includes(bare);
   }
-  console.log(`local ${Math.round(localCssBody.length / 1024)} KB  prod ${Math.round(prodCssText.length / 1024)} KB`);
+
+  // Compare resolved color values for Tailwind utility classes.
+  //
+  // v3 inlines hex values directly: `.bg-gray-800 { background-color: rgba(39,39,42,...) }`
+  // v4 uses CSS vars:               `.bg-gray-800 { background-color: var(--color-gray-800) }`
+  //                              + `:root { --color-gray-800: #27272a }`
+  //
+  // We resolve v4 vars and convert both sides to comparable hex triplets.
+
+  // Extract --color-* vars defined in :root / :host from the local CSS.
+  function extractRootColorVars(css: string): Map<string, string> {
+    const vars = new Map<string, string>();
+    // Find :root { ... } or :root, :host { ... } blocks
+    for (const block of css.matchAll(/:(?:root|host)[^{]*\{([^}]+)\}/g)) {
+      for (const decl of block[1].matchAll(/--(color-[a-zA-Z0-9_-]+)\s*:\s*([^;]+);/g)) {
+        vars.set(`--${decl[1]}`, decl[2].trim());
+      }
+    }
+    return vars;
+  }
+
+  // Resolve a CSS value to a normalised RGB triplet for comparison.
+  // Handles: #rrggbb, rgb(...), rgba(...), oklch(...), var(--color-*).
+  function resolveToRgb(value: string, vars: Map<string, string>): string | null {
+    const v = value.trim();
+    // Resolve var(--color-*) references
+    const varMatch = v.match(/^var\((--color-[a-zA-Z0-9_-]+)\)$/);
+    if (varMatch) {
+      const resolved = vars.get(varMatch[1]);
+      return resolved ? resolveToRgb(resolved, vars) : null;
+    }
+    // Hex #rrggbb or #rrggbbaa
+    const hex = v.match(/^#([0-9a-fA-F]{6})/);
+    if (hex) {
+      const n = parseInt(hex[1], 16);
+      return `${(n >> 16) & 255},${(n >> 8) & 255},${n & 255}`;
+    }
+    // rgb(r,g,b) or rgba(r,g,b,a) — extract r,g,b
+    const rgb = v.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+    if (rgb) return `${rgb[1]},${rgb[2]},${rgb[3]}`;
+    return null; // can't resolve (oklch, named colors, etc.)
+  }
+
+  // Extract the colour value from a CSS rule body for a given property.
+  // Uses a negative lookbehind so `color` doesn't match inside `background-color`.
+  // e.g. `background-color: rgba(39,39,42,var(--tw-bg-opacity))` → `rgba(39,39,42,...)`
+  function extractPropertyValue(ruleBody: string, property: string): string | null {
+    const escaped = property.replace(/-/g, "\\-");
+    const m = ruleBody.match(new RegExp(`(?<![\\w-])${escaped}\\s*:\\s*([^;]+)`));
+    if (!m) return null;
+    // Strip trailing var(--tw-*) fragments like `rgba(r,g,b,var(--tw-bg-opacity))`
+    return m[1].trim().replace(/,\s*var\(--tw-[^)]+\)/, "");
+  }
+
+  // Compare resolved colors for a set of representative utility classes.
+  const localRootVars = extractRootColorVars(localCssText);
+
+  // Build selector → rule-body maps for both CSS files.
+  function extractRules(css: string): Map<string, string> {
+    const rules = new Map<string, string>();
+    for (const m of css.matchAll(/\.([\w\\:./-]+)\s*\{([^}]+)\}/g)) {
+      rules.set(m[1], m[2]);
+    }
+    return rules;
+  }
+
+  const prodRules = extractRules(prodCssText);
+  const localRules = extractRules(localCssText);
+
+  const COLOR_PROPS = ["background-color", "color", "border-color", "fill", "stroke"];
+
+  const cssColorDiffs: Array<{ selector: string; property: string; prod: string; local: string }> = [];
+
+  for (const [selector, prodBody] of prodRules) {
+    const localBody = localRules.get(selector);
+    if (!localBody) continue;
+    for (const prop of COLOR_PROPS) {
+      const prodVal = extractPropertyValue(prodBody, prop);
+      const localVal = extractPropertyValue(localBody, prop);
+      if (!prodVal || !localVal) continue;
+      const prodRgb = resolveToRgb(prodVal, new Map());
+      const localRgb = resolveToRgb(localVal, localRootVars);
+      if (prodRgb && localRgb && prodRgb !== localRgb) {
+        cssColorDiffs.push({ selector, property: prop, prod: prodVal, local: localVal });
+      }
+    }
+  }
+
+  if (cssColorDiffs.length > 0) {
+    console.log(`\nCSS color value mismatches (${cssColorDiffs.length}):`);
+    for (const { selector, property, prod, local } of cssColorDiffs.slice(0, 20)) {
+      console.log(`  .${selector} { ${property} }`);
+      console.log(`    prod:  ${prod}`);
+      console.log(`    local: ${local}`);
+    }
+    if (cssColorDiffs.length > 20) console.log(`  …and ${cssColorDiffs.length - 20} more`);
+    console.log();
+  }
+
+  console.log(`local ${Math.round(localCssBody.length / 1024)} KB  prod ${Math.round(prodCssText.length / 1024)} KB  color-diffs: ${cssColorDiffs.length}`);
 
   // 3. Fetch sitemap
   process.stdout.write("Fetching sitemap… ");
@@ -541,7 +640,7 @@ async function main() {
   }
 
   console.log();
-  process.exit(failed > 0 ? 1 : 0);
+  process.exit(failed > 0 || cssColorDiffs.length > 0 ? 1 : 0);
 }
 
 main().catch((err) => {
