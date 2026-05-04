@@ -66,7 +66,7 @@ pub enum TrackingScope {
     PerMetric,
 }
 
-/// Configuration for the `tag_cardinality_limit` transform for a specific group of metrics.
+/// Configuration block used at the global level.
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Inner {
@@ -86,7 +86,45 @@ pub struct Inner {
     pub internal_metrics: InternalMetricsConfig,
 }
 
-/// Controls the approach taken for tracking tag cardinality.
+/// Configuration block used at per-metric level. Same shape as the global configuration but
+/// with `OverrideMode`, which adds `excluded` for opting that metric out of cardinality
+/// control entirely.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct OverrideInner {
+    /// How many distinct values to accept for any given key. Ignored when `mode: excluded`.
+    #[serde(default = "default_value_limit")]
+    pub value_limit: usize,
+
+    #[configurable(derived)]
+    #[serde(default = "default_limit_exceeded_action")]
+    pub limit_exceeded_action: LimitExceededAction,
+
+    #[serde(flatten)]
+    pub mode: OverrideMode,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    pub internal_metrics: InternalMetricsConfig,
+}
+
+/// Configuration block used at the per-tag level. Same as `OverrideInner` minus
+/// `limit_exceeded_action` (inherited from the enclosing per-metric config) and
+/// `internal_metrics` (inherited from the enclosing per-metric or global config).
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct PerTagInner {
+    /// How many distinct values to accept for this tag key. If unset, inherits
+    /// the `value_limit` from the enclosing per-metric (or global) configuration.
+    /// Ignored when `mode: excluded`.
+    #[serde(default)]
+    pub value_limit: Option<usize>,
+
+    #[serde(flatten)]
+    pub mode: OverrideMode,
+}
+
+/// Controls the approach taken for tracking tag cardinality at the global level.
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[serde(tag = "mode", rename_all = "snake_case", deny_unknown_fields)]
@@ -107,6 +145,41 @@ pub enum Mode {
     /// configured limit. The rate at which this happens can be controlled by changing the value of
     /// `cache_size_per_key`.
     Probabilistic(BloomFilterConfig),
+}
+
+/// Controls the approach taken for tracking tag cardinality at the per-metric or per-tag level.
+/// Adds `excluded` to the global `Mode` variants.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[serde(tag = "mode", rename_all = "snake_case", deny_unknown_fields)]
+#[configurable(metadata(
+    docs::enum_tag_description = "Controls the approach taken for tracking tag cardinality."
+))]
+pub enum OverrideMode {
+    /// Tracks cardinality exactly. See `Mode::Exact` for details.
+    Exact,
+
+    /// Tracks cardinality probabilistically. See `Mode::Probabilistic` for details.
+    Probabilistic(BloomFilterConfig),
+
+    /// Skip cardinality tracking for this scope. All tag values pass through and nothing is
+    /// recorded. Other tracking fields on the entry (`value_limit`, `limit_exceeded_action`,
+    /// `internal_metrics`) are ignored when this is selected.
+    ///
+    /// Only valid in `per_metric_limits` and `per_tag_limits` entries; using it as the global
+    /// `mode` is a configuration error.
+    Excluded,
+}
+
+impl OverrideMode {
+    /// Returns the equivalent global `Mode` if this scope is tracked, or `None` if excluded.
+    pub const fn as_mode(&self) -> Option<Mode> {
+        match self {
+            OverrideMode::Exact => Some(Mode::Exact),
+            OverrideMode::Probabilistic(b) => Some(Mode::Probabilistic(*b)),
+            OverrideMode::Excluded => None,
+        }
+    }
 }
 
 /// Bloom filter configuration in probabilistic mode.
@@ -143,8 +216,29 @@ pub struct PerMetricConfig {
     #[serde(default)]
     pub namespace: Option<String>,
 
+    /// Per-tag-key overrides scoped to this metric.
+    ///
+    /// Each entry may override `value_limit` and `mode` for a specific tag key.
+    /// `limit_exceeded_action` and `internal_metrics` are always inherited from the enclosing
+    /// per-metric (or global) configuration and cannot be set per-tag.
+    /// Tags not listed here use the per-metric configuration.
+    #[configurable(
+        derived,
+        metadata(docs::additional_props_description = "An individual tag configuration.")
+    )]
+    #[serde(default)]
+    pub per_tag_limits: HashMap<String, PerTagConfig>,
+
     #[serde(flatten)]
-    pub config: Inner,
+    pub config: OverrideInner,
+}
+
+/// Tag cardinality limit configuration for a specific tag key, scoped under a per-metric override.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct PerTagConfig {
+    #[serde(flatten)]
+    pub config: PerTagInner,
 }
 
 const fn default_limit_exceeded_action() -> LimitExceededAction {
