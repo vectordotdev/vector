@@ -76,15 +76,14 @@ generated: components: sources: splunk_hec: configuration: {
 		description: """
 			Codec configuration applied to events received on `/services/collector/event`.
 
-			When `decoding` is set, Vector applies a second decoding pass after the HEC
-			envelope is parsed. The envelope's `event` value is fed through the codec,
+			When `decoding` is set, Vector applies a second decoding pass after parsing the
+			HEC envelope. The envelope's `event` field is passed through the codec,
 			and a single envelope can fan out to multiple events. Decode failures are
 			swallowed and do not return an error to the Splunk client.
 
-			The VRL codec has access to HEC envelope metadata
-			(host, sourcetype, channel, etc.) and the authentication token via
-			`%splunk_hec.*` paths and `get_secret!("splunk_hec_token")` before the
-			program executes.
+			The VRL codec can access HEC envelope metadata, such as host, sourcetype, and,
+			channel, and the authentication token via `%splunk_hec.*` paths and
+			`get_secret!("splunk_hec_token")` before the program executes.
 			"""
 		required: false
 		type: object: options: {
@@ -93,8 +92,8 @@ generated: components: sources: splunk_hec: configuration: {
 					Decoding configuration applied to the payload.
 
 					When unset, the endpoint preserves its existing per-endpoint default
-					behavior. When set, the endpoint-selected payload is run through
-					`framing` + `decoding` and a single payload can fan out to multiple
+					behavior. When set, the endpoint-selected payload is processed through
+					`framing` and `decoding`, and a single payload can fan out to multiple
 					events.
 					"""
 				required: false
@@ -640,8 +639,8 @@ generated: components: sources: splunk_hec: configuration: {
 					Decoding configuration applied to the payload.
 
 					When unset, the endpoint preserves its existing per-endpoint default
-					behavior. When set, the endpoint-selected payload is run through
-					`framing` + `decoding` and a single payload can fan out to multiple
+					behavior. When set, the endpoint-selected payload is processed through
+					`framing` and `decoding`, and a single payload can fan out to multiple
 					events.
 					"""
 				required: false
