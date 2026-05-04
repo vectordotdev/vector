@@ -89,6 +89,15 @@ end
 @resolved_schema_cache = {}
 @expanded_schema_cache = {}
 
+# Shared codec base schemas. Each stores a single representative resolved schema with the
+# tag field's per-component variation (required, default) stripped out so it can be
+# defined once and referenced from every component via a small Cue conjunction.
+@shared_decoding_base = nil         # source decoding  (DeserializerConfig, tag: codec)
+@shared_framing_decoder_base = nil  # source framing   (decoder FramingConfig, tag: method)
+@shared_encoding_base = nil         # sink encoding    (SerializerConfig, tag: codec)
+@shared_encoding_no_codec = nil     # sink encoding without a codec choice
+@shared_framing_encoder_base = nil  # sink framing     (encoder FramingConfig, tag: method)
+
 # Gets the schema of the given `name` from the resolved schema cache, if it exists.
 def get_cached_resolved_schema(schema_name)
   @resolved_schema_cache[schema_name]
@@ -1676,6 +1685,210 @@ def unwrap_resolved_schema(root_schema, schema_name, friendly_name)
   return sort_hash_nested(unwrapped_resolved_schema)
 end
 
+# Strips the per-component variation fields (required, default) from a codec/method tag
+# field so the result can be used as a shared base that all components reference.
+def strip_tag_field_variation!(schema, tag_field)
+  tag = schema.dig('type', 'object', 'options', tag_field)
+  return schema unless tag
+  tag.delete('required')
+  tag.dig('type', 'string')&.delete('default')
+  schema
+end
+
+# Generates the Cue right-hand-side expression for a field that references a shared base
+# and adds only the per-component variation (required, default) via a Cue conjunction (&).
+def tag_conjunction_cue(base_ref, tag_field, resolved_tag)
+  required  = resolved_tag.fetch('required', false)
+  default_v = resolved_tag.dig('type', 'string', 'default')
+
+  if default_v
+    "#{base_ref} & {\n\ttype: object: options: #{tag_field}: {\n\t\trequired: #{required}\n\t\ttype: string: default: #{default_v.to_json}\n\t}\n}"
+  else
+    "#{base_ref} & {\n\ttype: object: options: #{tag_field}: required: #{required}\n}"
+  end
+end
+
+# --- per-type caching and ref generation ---
+
+def decoding_ref(resolved)
+  codec = resolved.dig('type', 'object', 'options', 'codec')
+  return nil unless codec
+  base = deep_copy(resolved)
+  strip_tag_field_variation!(base, 'codec')
+  @shared_decoding_base ||= base
+  tag_conjunction_cue('decodingBase', 'codec', codec)
+end
+
+def framing_decoder_ref(resolved)
+  method_field = resolved.dig('type', 'object', 'options', 'method')
+  return nil unless method_field
+  base = deep_copy(resolved)
+  strip_tag_field_variation!(base, 'method')
+  @shared_framing_decoder_base ||= base
+  tag_conjunction_cue('framingDecoderBase', 'method', method_field)
+end
+
+def encoding_ref(resolved)
+  codec = resolved.dig('type', 'object', 'options', 'codec')
+  return nil unless codec
+  base = deep_copy(resolved)
+  strip_tag_field_variation!(base, 'codec')
+  @shared_encoding_base ||= base
+  tag_conjunction_cue('encodingBase', 'codec', codec)
+end
+
+def encoding_no_codec_ref(resolved)
+  @shared_encoding_no_codec ||= resolved
+  'encodingNoCodec'
+end
+
+def framing_encoder_ref(resolved)
+  method_field = resolved.dig('type', 'object', 'options', 'method')
+  return nil unless method_field
+  base = deep_copy(resolved)
+  strip_tag_field_variation!(base, 'method')
+  @shared_framing_encoder_base ||= base
+  tag_conjunction_cue('framingEncoderBase', 'method', method_field)
+end
+
+# Fields present in the no-codec encoding schema (EncodingConfig). Detection relies on
+# all options being a subset of these names, which is unique to this type.
+ENCODING_NO_CODEC_FIELDS = %w[except_fields only_fields timestamp_format].freeze
+
+# Detects whether a resolved schema is one of the shared codec/framing types, returning
+# a symbol or nil.
+#
+# Codec direction: determined by the tag field's description text ("decoding"/"encoding").
+# Framing direction: determined by decoder-only enum variants (octet_counting, chunked_gelf).
+# No-codec encoding: all options are a subset of the encoding transform fields.
+def detect_shared_codec_type(resolved_schema)
+  options = resolved_schema.dig('type', 'object', 'options')
+  return nil unless options.is_a?(Hash)
+
+  codec = options['codec']
+  if codec
+    desc = codec['description'].to_s
+    return :decoding if desc.include?('decoding')
+    return :encoding if desc.include?('encoding')
+    return nil
+  end
+
+  method_field = options['method']
+  if method_field
+    method_enum = method_field.dig('type', 'string', 'enum') || {}
+    return :framing_decoder if method_enum.key?('octet_counting') || method_enum.key?('chunked_gelf')
+    return :framing_encoder
+  end
+
+  # EncodingConfig (no codec choice): options are a non-empty subset of the encoding
+  # transform fields. This is structurally unique to that type.
+  option_keys = options.keys
+  if !option_keys.empty? && option_keys.all? { |k| ENCODING_NO_CODEC_FIELDS.include?(k) }
+    return :encoding_no_codec
+  end
+
+  nil
+end
+
+# Generates a Cue reference expression for a detected shared codec schema.
+def ref_for_shared_codec(resolved_schema, codec_type)
+  case codec_type
+  when :decoding          then decoding_ref(resolved_schema)
+  when :encoding          then encoding_ref(resolved_schema)
+  when :encoding_no_codec then encoding_no_codec_ref(resolved_schema)
+  when :framing_decoder   then framing_decoder_ref(resolved_schema)
+  when :framing_encoder   then framing_encoder_ref(resolved_schema)
+  end
+end
+
+# Recursively walks a resolved options hash, detects shared codec/framing schemas at any
+# depth, replaces them with references, and returns a map of full-Cue-path => Cue-expression.
+# Detected schemas are deleted from the options hash in place so they are not inlined.
+def extract_shared_codec_schemas!(options_hash, cue_path, refs = {})
+  return refs unless options_hash.is_a?(Hash)
+
+  options_hash.each_key.to_a.each do |field_name|
+    field_schema = options_hash[field_name]
+    next unless field_schema.is_a?(Hash)
+
+    full_path = "#{cue_path}: #{field_name}"
+    codec_type = detect_shared_codec_type(field_schema)
+
+    if codec_type
+      ref = ref_for_shared_codec(field_schema, codec_type)
+      if ref
+        refs[full_path] = ref
+        options_hash.delete(field_name)
+      end
+    else
+      nested_options = field_schema.dig('type', 'object', 'options')
+      if nested_options.is_a?(Hash)
+        extract_shared_codec_schemas!(nested_options, "#{full_path}: type: object: options", refs)
+      end
+    end
+  end
+
+  refs
+end
+
+# Appends Cue path-expressions to a generated component file so that extracted codec
+# fields reference the shared base definitions rather than inlining their full content.
+def append_shared_field_refs!(cue_output_file, refs_map)
+  return if refs_map.empty?
+
+  append_content = refs_map.map { |path, ref| "\n#{path}: #{ref}" }.join
+  File.open(cue_output_file, 'a') { |f| f.write(append_content) }
+  @logger.info "[✓]   Appended #{refs_map.size} shared codec reference(s) to '#{cue_output_file}'."
+end
+
+# Imports a name => resolved-schema hash as a Cue file.
+def import_schemas_as_cue(schemas, friendly_name, cue_output_file)
+  final_json = to_pretty_json(schemas)
+  json_output_file = write_to_temp_file(["#{friendly_name}-", '.json'], final_json)
+  @logger.info "[✓]   Wrote #{friendly_name} schema (#{final_json.length} bytes)."
+  @logger.info "[*] Importing #{friendly_name} schema as Cue file..."
+  unless system(@cue_binary_path, 'import', '-f', '-o', cue_output_file, '-p', 'metadata', json_output_file)
+    @logger.error "[!]   Failed to import #{friendly_name} schema as valid Cue."
+    exit 1
+  end
+  @logger.info "[✓]   Imported #{friendly_name} schema to '#{cue_output_file}'."
+end
+
+# Generates the three shared Cue files. Each base schema contains the full codec/method
+# content minus the per-component tag-field variation (required, default), so adding a
+# new codec/framer variant only updates these files, not every component file.
+def generate_shared_codec_files
+  if @shared_decoding_base
+    import_schemas_as_cue(
+      { 'decodingBase' => @shared_decoding_base },
+      'decoders',
+      'website/cue/reference/components/generated/decoders.cue'
+    )
+  end
+
+  encoder_schemas = {}
+  encoder_schemas['encodingBase']    = @shared_encoding_base    if @shared_encoding_base
+  encoder_schemas['encodingNoCodec'] = @shared_encoding_no_codec if @shared_encoding_no_codec
+  unless encoder_schemas.empty?
+    import_schemas_as_cue(
+      encoder_schemas,
+      'encoders',
+      'website/cue/reference/components/generated/encoders.cue'
+    )
+  end
+
+  framing_schemas = {}
+  framing_schemas['framingDecoderBase'] = @shared_framing_decoder_base if @shared_framing_decoder_base
+  framing_schemas['framingEncoderBase'] = @shared_framing_encoder_base if @shared_framing_encoder_base
+  unless framing_schemas.empty?
+    import_schemas_as_cue(
+      framing_schemas,
+      'framing',
+      'website/cue/reference/components/generated/framing.cue'
+    )
+  end
+end
+
 def render_and_import_schema(unwrapped_resolved_schema, friendly_name, config_map_path, cue_relative_path)
 
   # Set up the appropriate structure for the value based on the configuration map path. It defines
@@ -1724,12 +1937,23 @@ end
 def render_and_import_component_schema(root_schema, schema_name, component_type, component_name)
   friendly_name = "'#{component_name}' #{component_type} configuration"
   unwrapped_resolved_schema = unwrap_resolved_schema(root_schema, schema_name, friendly_name)
+
+  # Recursively detect and extract all shared codec/framing schemas from this component's
+  # resolved schema, at any nesting depth. Detected schemas are removed from the resolved
+  # schema in place and replaced with Cue references to the shared base definitions.
+  cue_config_path = "generated: components: #{component_type}s: #{component_name}: configuration"
+  shared_refs = extract_shared_codec_schemas!(unwrapped_resolved_schema, cue_config_path)
+
+  cue_output_file = "website/cue/reference/components/#{component_type}s/generated/#{component_name}.cue"
+
   render_and_import_schema(
     unwrapped_resolved_schema,
     friendly_name,
     ["generated", "components", "#{component_type}s", component_name],
     "components/#{component_type}s/generated/#{component_name}.cue"
   )
+
+  append_shared_field_refs!(cue_output_file, shared_refs)
 end
 
 def render_and_import_generated_top_level_config_schema(root_schema)
@@ -1907,6 +2131,11 @@ all_components.each do |component_type, components|
     render_and_import_component_schema(root_schema, schema_name, component_type, component_name)
   end
 end
+
+# Generate the shared codec/framing base files. Components reference these with a small
+# per-component conjunction rather than inlining hundreds of lines each. Must run after
+# all components so every schema encountered is captured.
+generate_shared_codec_files
 
 # Finally, generate the top-level Vector configuration schema. We extract ALL top-level config fields directly from the
 # ConfigBuilder struct (defined in src/config/builder.rs) by processing its allOf schemas. ConfigBuilder is the single
