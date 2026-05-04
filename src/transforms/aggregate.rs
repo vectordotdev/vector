@@ -181,7 +181,7 @@ impl Aggregate {
         })
     }
 
-    fn record(&mut self, event: Event) {
+    pub fn record(&mut self, event: Event) {
         let (series, data, metadata) = event.into_metric().into_parts();
 
         match &mut self.mode {
@@ -300,7 +300,7 @@ impl Aggregate {
         }
     }
 
-    fn flush_into(&mut self, output: &mut Vec<Event>) {
+    pub fn flush_into(&mut self, output: &mut Vec<Event>) {
         let map = std::mem::take(&mut self.map);
         for (series, entry) in map.clone().into_iter() {
             let mut metric = Metric::from_parts(series, entry.0, entry.1);
