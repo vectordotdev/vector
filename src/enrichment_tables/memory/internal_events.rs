@@ -1,6 +1,8 @@
-use metrics::{counter, gauge};
 use vector_lib::{
-    NamedInternalEvent, configurable::configurable_component, internal_event::InternalEvent,
+    NamedInternalEvent,
+    configurable::configurable_component,
+    counter, gauge,
+    internal_event::{CounterName, GaugeName, InternalEvent},
 };
 
 /// Configuration of internal metrics for enrichment memory table.
@@ -26,12 +28,12 @@ impl InternalEvent for MemoryEnrichmentTableRead<'_> {
     fn emit(self) {
         if self.include_key_metric_tag {
             counter!(
-                "memory_enrichment_table_reads_total",
+                CounterName::MemoryEnrichmentTableReadsTotal,
                 "key" => self.key.to_owned()
             )
             .increment(1);
         } else {
-            counter!("memory_enrichment_table_reads_total",).increment(1);
+            counter!(CounterName::MemoryEnrichmentTableReadsTotal,).increment(1);
         }
     }
 }
@@ -46,12 +48,12 @@ impl InternalEvent for MemoryEnrichmentTableInserted<'_> {
     fn emit(self) {
         if self.include_key_metric_tag {
             counter!(
-                "memory_enrichment_table_insertions_total",
+                CounterName::MemoryEnrichmentTableInsertionsTotal,
                 "key" => self.key.to_owned()
             )
             .increment(1);
         } else {
-            counter!("memory_enrichment_table_insertions_total",).increment(1);
+            counter!(CounterName::MemoryEnrichmentTableInsertionsTotal,).increment(1);
         }
     }
 }
@@ -64,9 +66,9 @@ pub(crate) struct MemoryEnrichmentTableFlushed {
 
 impl InternalEvent for MemoryEnrichmentTableFlushed {
     fn emit(self) {
-        counter!("memory_enrichment_table_flushes_total",).increment(1);
-        gauge!("memory_enrichment_table_objects_count",).set(self.new_objects_count as f64);
-        gauge!("memory_enrichment_table_byte_size",).set(self.new_byte_size as f64);
+        counter!(CounterName::MemoryEnrichmentTableFlushesTotal,).increment(1);
+        gauge!(GaugeName::MemoryEnrichmentTableObjectsCount,).set(self.new_objects_count as f64);
+        gauge!(GaugeName::MemoryEnrichmentTableByteSize,).set(self.new_byte_size as f64);
     }
 }
 
@@ -80,12 +82,12 @@ impl InternalEvent for MemoryEnrichmentTableTtlExpired<'_> {
     fn emit(self) {
         if self.include_key_metric_tag {
             counter!(
-                "memory_enrichment_table_ttl_expirations",
+                CounterName::MemoryEnrichmentTableTtlExpirations,
                 "key" => self.key.to_owned()
             )
             .increment(1);
         } else {
-            counter!("memory_enrichment_table_ttl_expirations",).increment(1);
+            counter!(CounterName::MemoryEnrichmentTableTtlExpirations,).increment(1);
         }
     }
 }
@@ -100,12 +102,12 @@ impl InternalEvent for MemoryEnrichmentTableReadFailed<'_> {
     fn emit(self) {
         if self.include_key_metric_tag {
             counter!(
-                "memory_enrichment_table_failed_reads",
+                CounterName::MemoryEnrichmentTableFailedReads,
                 "key" => self.key.to_owned()
             )
             .increment(1);
         } else {
-            counter!("memory_enrichment_table_failed_reads",).increment(1);
+            counter!(CounterName::MemoryEnrichmentTableFailedReads,).increment(1);
         }
     }
 }
@@ -120,12 +122,12 @@ impl InternalEvent for MemoryEnrichmentTableInsertFailed<'_> {
     fn emit(self) {
         if self.include_key_metric_tag {
             counter!(
-                "memory_enrichment_table_failed_insertions",
+                CounterName::MemoryEnrichmentTableFailedInsertions,
                 "key" => self.key.to_owned()
             )
             .increment(1);
         } else {
-            counter!("memory_enrichment_table_failed_insertions",).increment(1);
+            counter!(CounterName::MemoryEnrichmentTableFailedInsertions,).increment(1);
         }
     }
 }
