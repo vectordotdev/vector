@@ -2560,6 +2560,91 @@ time_source = "EventTime"
         }
     }
 
+    /// Diff mode with several distinct series in the same bucket: every
+    /// series must be emitted on the first flush and every series must be
+    /// retained in `event_time_prev_buckets` so the next bucket's flush can
+    /// subtract per-series. Existing Diff tests only exercise one series per
+    /// bucket, so they would not catch a regression in the multi-series
+    /// `&bucket_map` iteration / move-into-prev-buckets path.
+    #[test]
+    fn event_time_diff_multiple_series_same_bucket() {
+        let mut agg = Aggregate::new(&AggregateConfig {
+            interval_ms: 10000_u64,
+            mode: AggregationMode::Diff,
+            time_source: TimeSource::EventTime,
+            allowed_lateness_ms: 0,
+            use_system_time_for_missing_timestamps: false,
+            max_future_ms: 10000,
+        })
+        .unwrap();
+
+        let base_time = DateTime::parse_from_rfc3339("2025-12-29T11:00:20Z")
+            .unwrap()
+            .with_timezone(&Utc);
+        let next_bucket_time = base_time + chrono::Duration::seconds(15);
+
+        let bucket1: Vec<(&str, f64)> = vec![("series_a", 10.0), ("series_b", 20.0), ("series_c", 5.0)];
+        let bucket2: Vec<(&str, f64)> = vec![("series_a", 25.0), ("series_b", 22.0), ("series_c", 5.0)];
+
+        for (name, value) in &bucket1 {
+            agg.record(make_metric_with_timestamp(
+                name,
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: *value },
+                base_time,
+            ));
+        }
+        for (name, value) in &bucket2 {
+            agg.record(make_metric_with_timestamp(
+                name,
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: *value },
+                next_bucket_time,
+            ));
+        }
+
+        let mut out = vec![];
+        agg.flush_into(&mut out);
+
+        // Three series x two buckets = six emitted metrics.
+        assert_eq!(6, out.len(), "every series in every flushed bucket should emit");
+
+        // Group emitted gauges by series name (preserving emission order).
+        // Per series we expect [bucket1_raw, bucket2_delta] -- the first flush
+        // emits the raw value (no prior bucket exists) and the second flush
+        // emits `current - prev`. If the multi-series Diff path failed to
+        // retain every series in `event_time_prev_buckets`, the second-bucket
+        // emission would be the raw value instead of the delta.
+        let mut by_series: std::collections::HashMap<String, Vec<f64>> = Default::default();
+        for event in out {
+            let metric = event.as_metric();
+            let name = metric.series().name.name.clone();
+            if let MetricValue::Gauge { value } = metric.value() {
+                by_series.entry(name).or_default().push(*value);
+            } else {
+                panic!("expected Gauge value");
+            }
+        }
+
+        let prev: std::collections::HashMap<&str, f64> = bucket1.iter().copied().collect();
+        for (name, raw2) in &bucket2 {
+            let raw1 = prev[name];
+            let expected_delta = raw2 - raw1;
+            let emissions = by_series
+                .get(*name)
+                .unwrap_or_else(|| panic!("no emissions for {name}"));
+            assert_eq!(2, emissions.len(), "{name}: expected one emission per bucket");
+            assert!(
+                emissions.iter().any(|v| (v - raw1).abs() < 1e-9),
+                "{name}: missing bucket1 raw={raw1}, got {emissions:?}"
+            );
+            assert!(
+                emissions.iter().any(|v| (v - expected_delta).abs() < 1e-9),
+                "{name}: missing bucket2 delta={expected_delta}, got {emissions:?}"
+            );
+        }
+    }
+
     #[test]
     fn event_time_count_mode() {
         let mut agg = Aggregate::new(&AggregateConfig {
