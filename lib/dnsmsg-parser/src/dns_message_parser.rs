@@ -1443,7 +1443,10 @@ mod tests {
             .expect_err("Expected TrustDnsError.");
         match err {
             DnsMessageParserError::TrustDnsError { source: e } => {
-                assert_eq!(e.to_string(), "decoding error: unexpected end of input reached")
+                assert_eq!(
+                    e.to_string(),
+                    "decoding error: unexpected end of input reached"
+                )
             }
             DnsMessageParserError::SimpleError { cause: e } => {
                 panic!("Expected TrustDnsError, got {}.", &e)
