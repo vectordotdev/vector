@@ -256,10 +256,17 @@ impl Aggregate {
         })
     }
 
-    const fn bucket_key(&self, timestamp: DateTime<Utc>) -> BucketKey {
+    /// Start of the half-open window `[bucket_key, bucket_key + interval_ms)` containing
+    /// `timestamp`, aligned to multiples of `interval_ms` from the Unix epoch.
+    ///
+    /// Euclidean division (`div_euclid`) is required: Rust's truncating `/`
+    /// rounds toward zero, so timestamps just before the epoch (negative
+    /// millis) would incorrectly map into the non-negative bucket `[0, interval)`
+    /// instead of `[-interval, 0)`.
+    fn bucket_key(&self, timestamp: DateTime<Utc>) -> BucketKey {
         let timestamp_ms = timestamp.timestamp_millis();
         let interval_ms = self.interval.as_millis() as i64;
-        (timestamp_ms / interval_ms) * interval_ms
+        timestamp_ms.div_euclid(interval_ms).saturating_mul(interval_ms)
     }
 
     /// Returns `true` if `bucket_key` belongs to a window that has already
@@ -1761,6 +1768,40 @@ interval_ms = 999999
         } else {
             panic!("Expected Counter value");
         }
+    }
+
+    /// Rust truncating `/` rounds toward zero, so `-1 / 10000 == 0` and the
+    /// bucket anchor would wrongly be `0`. Euclidean alignment places
+    /// `-1ms` in `[-interval_ms, 0)` anchored at `-interval_ms`.
+    #[test]
+    fn event_time_pre_epoch_buckets_use_floor_division() {
+        let mut agg = Aggregate::new(&AggregateConfig {
+            interval_ms: 10_000_u64,
+            mode: AggregationMode::Auto,
+            time_source: TimeSource::EventTime,
+            allowed_lateness_ms: 0,
+            use_system_time_for_missing_timestamps: false,
+            max_future_ms: 10_000,
+        })
+        .unwrap();
+
+        let ts = Utc
+            .timestamp_millis_opt(-1)
+            .latest()
+            .expect("valid millis near epoch");
+
+        agg.record(make_metric_with_timestamp(
+            "pre_epoch",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 1.0 },
+            ts,
+        ));
+
+        assert_eq!(
+            agg.event_time_buckets.keys().next().copied(),
+            Some(-10_000),
+            "-1 ms must bucket to [-10000, 0), not [0, 10000)"
+        );
     }
 
     #[test]
