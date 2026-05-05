@@ -1,7 +1,7 @@
 use super::schema::SchemaContext;
 use anyhow::{Context, Result};
 use indexmap::IndexMap;
-use serde_json::Value;
+use serde_json::{Value, json};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -85,24 +85,8 @@ pub fn run(schema_path: &Path) -> Result<()> {
     apis.sort_keys();
     render_and_import_generated_api_schema(&mut context, &apis)?;
 
-    // 4. Process Global Options (sorted by name for deterministic output)
-    let mut global_options: IndexMap<String, String> = IndexMap::new();
-    if let Some(definitions) = root_schema.get("definitions").and_then(|d| d.as_object()) {
-        for (key, definition) in definitions {
-            let comp_type = super::schema::get_schema_metadata(definition, "docs::component_type")
-                .and_then(|v| v.as_str());
-            let comp_name = super::schema::get_schema_metadata(definition, "docs::component_name")
-                .and_then(|v| v.as_str());
-
-            if comp_type == Some("global_option")
-                && let Some(n) = comp_name
-            {
-                global_options.insert(n.to_string(), key.clone());
-            }
-        }
-    }
-    global_options.sort_keys();
-    render_and_import_generated_global_option_schema(&mut context, &global_options)?;
+    // 4. Process top-level configuration fields (formerly "global options").
+    render_and_import_generated_top_level_config_schema(&mut context, &root_schema)?;
 
     Ok(())
 }
@@ -254,31 +238,152 @@ fn render_and_import_generated_api_schema(
     )
 }
 
-fn render_and_import_generated_global_option_schema(
+// Field-to-group mapping. Fields not listed default to "global_options".
+const TOP_LEVEL_FIELD_GROUPS: &[(&str, &str)] = &[
+    ("sources", "pipeline_components"),
+    ("transforms", "pipeline_components"),
+    ("sinks", "pipeline_components"),
+    ("enrichment_tables", "pipeline_components"),
+    ("api", "api"),
+    ("schema", "schema"),
+    ("log_schema", "schema"),
+    ("secret", "secrets"),
+];
+
+fn top_level_group_metadata() -> Value {
+    json!({
+        "global_options": {
+            "title": "Global Options",
+            "description": "Global configuration options that apply to Vector as a whole.",
+            "order": 1,
+        },
+        "pipeline_components": {
+            "title": "Pipeline Components",
+            "description": "Configure sources, transforms, sinks, and enrichment tables for your observability pipeline.",
+            "order": 2,
+        },
+        "api": {
+            "title": "API",
+            "description": "Configure Vector's observability API.",
+            "order": 3,
+        },
+        "schema": {
+            "title": "Schema",
+            "description": "Configure Vector's internal schema system for type tracking and validation.",
+            "order": 4,
+        },
+        "secrets": {
+            "title": "Secrets",
+            "description": "Configure secrets management for secure configuration.",
+            "order": 5,
+        },
+    })
+}
+
+fn resolve_top_level_config_fields(
     context: &mut SchemaContext,
-    global_options: &IndexMap<String, String>,
-) -> Result<()> {
-    let mut global_option_schema = serde_json::Map::new();
+    root_schema: &Value,
+) -> Result<serde_json::Map<String, Value>> {
+    // ConfigBuilder uses #[serde(flatten)] for GlobalOptions, so root_schema.allOf
+    // contains multiple subschemas whose properties together form the top-level config.
+    let all_of = root_schema
+        .get("allOf")
+        .and_then(Value::as_array)
+        .ok_or_else(|| anyhow::anyhow!("Could not find ConfigBuilder allOf schemas"))?;
 
-    for (component_name, schema_name) in global_options {
-        let friendly_name = format!("'{component_name}' global options configuration");
-
-        if component_name == "global_option" {
-            let flattened = context.unwrap_resolved_schema(schema_name, &friendly_name)?;
-            for (k, v) in flattened {
-                global_option_schema.insert(k, v);
+    let mut all_properties: IndexMap<String, Value> = IndexMap::new();
+    for subschema in all_of {
+        if let Some(props) = subschema.get("properties").and_then(Value::as_object) {
+            for (k, v) in props {
+                all_properties.insert(k.clone(), v.clone());
             }
-        } else {
-            let resolved = context.resolve_schema_by_name(schema_name)?;
-            global_option_schema.insert(component_name.clone(), resolved);
         }
     }
 
-    render_and_import_schema(
-        context,
-        Value::Object(global_option_schema),
-        "configuration",
-        &["generated", "configuration"],
-        "generated/configuration.cue",
-    )
+    let mut resolved_fields = serde_json::Map::new();
+    for (field_name, field_schema) in all_properties {
+        if super::schema::get_schema_metadata(&field_schema, "docs::hidden").is_some() {
+            debug!("Skipping '{field_name}' (marked as docs::hidden)");
+            continue;
+        }
+
+        let mut resolved = context.resolve_schema(&field_schema)?;
+        if !resolved.is_object() {
+            continue;
+        }
+
+        let group = TOP_LEVEL_FIELD_GROUPS
+            .iter()
+            .find(|(name, _)| *name == field_name)
+            .map_or("global_options", |(_, g)| *g);
+
+        resolved
+            .as_object_mut()
+            .unwrap()
+            .insert("group".to_string(), Value::String(group.to_string()));
+
+        resolved_fields.insert(field_name, resolved);
+    }
+    Ok(resolved_fields)
+}
+
+fn render_and_import_generated_top_level_config_schema(
+    context: &mut SchemaContext,
+    root_schema: &Value,
+) -> Result<()> {
+    let resolved_fields = resolve_top_level_config_fields(context, root_schema)?;
+
+    let data = json!({
+        "generated": {
+            "configuration": {
+                "configuration": Value::Object(resolved_fields),
+                "groups": top_level_group_metadata(),
+            }
+        }
+    });
+
+    let friendly_name = "configuration";
+    let prefix = "config-schema-base-generated-configuration-";
+
+    let final_json = serde_json::to_string_pretty(&data)?;
+    let json_output_file = write_to_temp_file(prefix, ".json", &final_json)?;
+
+    info!(
+        "[✓]   Wrote {} schema to '{}'. ({} bytes)",
+        friendly_name,
+        json_output_file.display(),
+        final_json.len()
+    );
+
+    info!("[*] Importing {} schema as Cue file...", friendly_name);
+    let cue_output_file =
+        PathBuf::from("website/cue/reference").join("generated/configuration.cue");
+
+    if let Some(parent) = cue_output_file.parent() {
+        fs::create_dir_all(parent)?;
+    }
+
+    let status = Command::new(&context.cue_binary_path)
+        .args([
+            "import",
+            "-f",
+            "-o",
+            cue_output_file.to_str().unwrap(),
+            "-p",
+            "metadata",
+            json_output_file.to_str().unwrap(),
+        ])
+        .status()?;
+
+    if !status.success() {
+        error!("[!]   Failed to import {friendly_name} schema as valid Cue.");
+        std::process::exit(1);
+    }
+
+    info!(
+        "[✓]   Imported {} schema to '{}'.",
+        friendly_name,
+        cue_output_file.display()
+    );
+    Ok(())
 }
