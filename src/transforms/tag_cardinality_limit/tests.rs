@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-use config::PerMetricConfig;
+use config::{PerMetricConfig, PerTagConfig};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use vector_lib::{
@@ -411,6 +411,26 @@ fn drop_event_checks_all_tags(make_tags: impl Fn(&str, &str) -> MetricTags) {
     assert_eq!(new_event4, Some(event4));
 }
 
+fn override_inner_hashset(value_limit: usize, action: LimitExceededAction) -> OverrideInner {
+    OverrideInner {
+        value_limit,
+        limit_exceeded_action: action,
+        mode: OverrideMode::Exact,
+        internal_metrics: InternalMetricsConfig::default(),
+    }
+}
+
+fn override_inner_bloom(value_limit: usize, action: LimitExceededAction) -> OverrideInner {
+    OverrideInner {
+        value_limit,
+        limit_exceeded_action: action,
+        mode: OverrideMode::Probabilistic(BloomFilterConfig {
+            cache_size_per_key: default_cache_size(),
+        }),
+        internal_metrics: InternalMetricsConfig::default(),
+    }
+}
+
 #[tokio::test]
 async fn tag_cardinality_limit_separate_value_limit_per_metric_name_hashset() {
     separate_value_limit_per_metric_name(make_transform_hashset_with_per_metric_limits(
@@ -421,14 +441,16 @@ async fn tag_cardinality_limit_separate_value_limit_per_metric_name_hashset() {
                 "metricA".to_string(),
                 PerMetricConfig {
                     namespace: None,
-                    config: make_transform_hashset(1, LimitExceededAction::DropTag).global,
+                    per_tag_limits: HashMap::new(),
+                    config: override_inner_hashset(1, LimitExceededAction::DropTag),
                 },
             ),
             (
                 "metricB".to_string(),
                 PerMetricConfig {
                     namespace: None,
-                    config: make_transform_hashset(5, LimitExceededAction::DropTag).global,
+                    per_tag_limits: HashMap::new(),
+                    config: override_inner_hashset(5, LimitExceededAction::DropTag),
                 },
             ),
         ]),
@@ -446,14 +468,16 @@ async fn tag_cardinality_limit_separate_value_limit_per_metric_name_bloom() {
                 "metricA".to_string(),
                 PerMetricConfig {
                     namespace: None,
-                    config: make_transform_bloom(1, LimitExceededAction::DropTag).global,
+                    per_tag_limits: HashMap::new(),
+                    config: override_inner_bloom(1, LimitExceededAction::DropTag),
                 },
             ),
             (
                 "metricB".to_string(),
                 PerMetricConfig {
                     namespace: None,
-                    config: make_transform_bloom(5, LimitExceededAction::DropTag).global,
+                    per_tag_limits: HashMap::new(),
+                    config: override_inner_bloom(5, LimitExceededAction::DropTag),
                 },
             ),
         ]),
@@ -641,4 +665,339 @@ fn tracking_scope_global_pools_metrics() {
     assert_eq!(transform.transform_one(a1.clone()), Some(a1));
     assert_eq!(transform.transform_one(b1.clone()), Some(b1));
     assert_eq!(transform.transform_one(a2), None);
+}
+
+fn make_per_tag(value_limit: usize, mode: Mode) -> PerTagConfig {
+    let mode = match mode {
+        Mode::Exact => OverrideMode::Exact,
+        Mode::Probabilistic(b) => OverrideMode::Probabilistic(b),
+    };
+    PerTagConfig {
+        config: PerTagInner {
+            value_limit: Some(value_limit),
+            mode,
+        },
+    }
+}
+
+fn make_per_metric(
+    value_limit: usize,
+    action: LimitExceededAction,
+    per_tag_limits: HashMap<String, PerTagConfig>,
+) -> PerMetricConfig {
+    PerMetricConfig {
+        namespace: None,
+        per_tag_limits,
+        config: OverrideInner {
+            value_limit,
+            limit_exceeded_action: action,
+            mode: OverrideMode::Exact,
+            internal_metrics: InternalMetricsConfig::default(),
+        },
+    }
+}
+
+fn make_per_metric_excluded(per_tag_limits: HashMap<String, PerTagConfig>) -> PerMetricConfig {
+    PerMetricConfig {
+        namespace: None,
+        per_tag_limits,
+        config: OverrideInner {
+            value_limit: 0,
+            limit_exceeded_action: LimitExceededAction::DropTag,
+            mode: OverrideMode::Excluded,
+            internal_metrics: InternalMetricsConfig::default(),
+        },
+    }
+}
+
+fn make_per_tag_excluded() -> PerTagConfig {
+    PerTagConfig {
+        config: PerTagInner {
+            value_limit: None,
+            mode: OverrideMode::Excluded,
+        },
+    }
+}
+
+/// A per-tag `value_limit` override caps that tag below the per-metric limit while sibling
+/// tags continue to use the per-metric limit.
+#[test]
+fn per_tag_value_limit() {
+    let config = make_transform_hashset_with_per_metric_limits(
+        500,
+        LimitExceededAction::DropTag,
+        HashMap::from([(
+            "metricA".to_string(),
+            make_per_metric(
+                5,
+                LimitExceededAction::DropTag,
+                HashMap::from([("tag1".to_string(), make_per_tag(2, Mode::Exact))]),
+            ),
+        )]),
+    );
+    let mut transform = TagCardinalityLimit::new(config);
+
+    // Fill tag1 to its per-tag limit of 2 and tag2 to 2 of its per-metric limit of 5.
+    let e1 = transform
+        .transform_one(make_metric_with_name(
+            metric_tags!("tag1" => "v1", "tag2" => "v1"),
+            "metricA",
+        ))
+        .unwrap();
+    assert!(e1.as_metric().tags().unwrap().contains_key("tag1"));
+    assert!(e1.as_metric().tags().unwrap().contains_key("tag2"));
+
+    let e2 = transform
+        .transform_one(make_metric_with_name(
+            metric_tags!("tag1" => "v2", "tag2" => "v2"),
+            "metricA",
+        ))
+        .unwrap();
+    assert!(e2.as_metric().tags().unwrap().contains_key("tag1"));
+    assert!(e2.as_metric().tags().unwrap().contains_key("tag2"));
+
+    // tag1 is at its per-tag limit; new value should be dropped. tag2 still has room.
+    let e3 = transform
+        .transform_one(make_metric_with_name(
+            metric_tags!("tag1" => "v3", "tag2" => "v3"),
+            "metricA",
+        ))
+        .unwrap();
+    assert!(!e3.as_metric().tags().unwrap().contains_key("tag1"));
+    assert_eq!("v3", e3.as_metric().tags().unwrap().get("tag2").unwrap());
+
+    // Fill tag2 to the per-metric limit of 5.
+    let e4 = transform
+        .transform_one(make_metric_with_name(
+            metric_tags!("tag2" => "v4"),
+            "metricA",
+        ))
+        .unwrap();
+    assert_eq!("v4", e4.as_metric().tags().unwrap().get("tag2").unwrap());
+
+    let e5 = transform
+        .transform_one(make_metric_with_name(
+            metric_tags!("tag2" => "v5"),
+            "metricA",
+        ))
+        .unwrap();
+    assert_eq!("v5", e5.as_metric().tags().unwrap().get("tag2").unwrap());
+
+    // tag2 is now at its per-metric limit; new value should be dropped.
+    let e6 = transform
+        .transform_one(make_metric_with_name(
+            metric_tags!("tag2" => "v6"),
+            "metricA",
+        ))
+        .unwrap();
+    assert!(!e6.as_metric().tags().unwrap().contains_key("tag2"));
+}
+
+/// Tags with no per-tag override fall back to the per-metric configuration; metrics with no
+/// per-metric override fall back to the global configuration.
+#[test]
+fn per_tag_falls_back_to_per_metric() {
+    let config = make_transform_hashset_with_per_metric_limits(
+        2,
+        LimitExceededAction::DropTag,
+        HashMap::from([(
+            "metricA".to_string(),
+            make_per_metric(
+                3,
+                LimitExceededAction::DropTag,
+                HashMap::from([("tag1".to_string(), make_per_tag(1, Mode::Exact))]),
+            ),
+        )]),
+    );
+    let mut transform = TagCardinalityLimit::new(config);
+
+    // metricA: tag1 capped at 1 (per-tag), tag2 capped at 3 (per-metric).
+    transform.transform_one(make_metric_with_name(
+        metric_tags!("tag1" => "v1", "tag2" => "v1"),
+        "metricA",
+    ));
+    let e2 = transform
+        .transform_one(make_metric_with_name(
+            metric_tags!("tag1" => "v2", "tag2" => "v2"),
+            "metricA",
+        ))
+        .unwrap();
+    // tag1 already at its per-tag limit of 1 → dropped. tag2 accepted (now 2/3).
+    assert!(!e2.as_metric().tags().unwrap().contains_key("tag1"));
+    assert_eq!("v2", e2.as_metric().tags().unwrap().get("tag2").unwrap());
+
+    let e3 = transform
+        .transform_one(make_metric_with_name(
+            metric_tags!("tag2" => "v3"),
+            "metricA",
+        ))
+        .unwrap();
+    assert_eq!("v3", e3.as_metric().tags().unwrap().get("tag2").unwrap());
+
+    // tag2 now at per-metric limit of 3 → dropped.
+    let e4 = transform
+        .transform_one(make_metric_with_name(
+            metric_tags!("tag2" => "v4"),
+            "metricA",
+        ))
+        .unwrap();
+    assert!(!e4.as_metric().tags().unwrap().contains_key("tag2"));
+
+    // metricB has no per-metric entry → uses global limit of 2.
+    transform.transform_one(make_metric_with_name(
+        metric_tags!("tag1" => "v1"),
+        "metricB",
+    ));
+    transform.transform_one(make_metric_with_name(
+        metric_tags!("tag1" => "v2"),
+        "metricB",
+    ));
+    let b3 = transform
+        .transform_one(make_metric_with_name(
+            metric_tags!("tag1" => "v3"),
+            "metricB",
+        ))
+        .unwrap();
+    assert!(!b3.as_metric().tags().unwrap().contains_key("tag1"));
+}
+
+/// An excluded metric passes all tag values through unbounded; storage is never allocated for
+/// it, and other metrics are unaffected.
+#[test]
+fn metric_excluded_passes_through_unbounded() {
+    let config = make_transform_hashset_with_per_metric_limits(
+        1,
+        LimitExceededAction::DropTag,
+        HashMap::from([(
+            "metricA".to_string(),
+            make_per_metric_excluded(HashMap::new()),
+        )]),
+    );
+    let mut transform = TagCardinalityLimit::new(config);
+
+    // Send 100 distinct values for metricA's tag — all should pass through.
+    for i in 0..100 {
+        let v = format!("v{i}");
+        let e = transform
+            .transform_one(make_metric_with_name(
+                metric_tags!("tag1" => v.clone()),
+                "metricA",
+            ))
+            .unwrap();
+        assert_eq!(
+            v.as_str(),
+            e.as_metric().tags().unwrap().get("tag1").unwrap()
+        );
+    }
+    // Excluded metric must not have allocated any storage.
+    assert!(
+        transform
+            .accepted_tags
+            .get(&Some((None, "metricA".to_string())))
+            .is_none()
+    );
+
+    // metricB has no per-metric override → uses global limit of 1.
+    transform.transform_one(make_metric_with_name(
+        metric_tags!("tag1" => "v1"),
+        "metricB",
+    ));
+    let e = transform
+        .transform_one(make_metric_with_name(
+            metric_tags!("tag1" => "v2"),
+            "metricB",
+        ))
+        .unwrap();
+    assert!(!e.as_metric().tags().unwrap().contains_key("tag1"));
+}
+
+/// An excluded tag is unbounded; sibling tags on the same metric remain limited.
+#[test]
+fn tag_excluded_unbounded_sibling_limited() {
+    let config = make_transform_hashset_with_per_metric_limits(
+        500,
+        LimitExceededAction::DropTag,
+        HashMap::from([(
+            "metricA".to_string(),
+            make_per_metric(
+                2,
+                LimitExceededAction::DropTag,
+                HashMap::from([("trace_id".to_string(), make_per_tag_excluded())]),
+            ),
+        )]),
+    );
+    let mut transform = TagCardinalityLimit::new(config);
+
+    // 100 distinct trace_id values pass; host capped at 2.
+    for i in 0..100 {
+        let trace = format!("t{i}");
+        let host = format!("h{}", i % 5);
+        let e = transform
+            .transform_one(make_metric_with_name(
+                metric_tags!("trace_id" => trace.clone(), "host" => host.clone()),
+                "metricA",
+            ))
+            .unwrap();
+        assert_eq!(
+            trace.as_str(),
+            e.as_metric().tags().unwrap().get("trace_id").unwrap(),
+            "trace_id should always be retained (excluded)"
+        );
+        if i >= 2 && (host != "h0" && host != "h1") {
+            assert!(
+                !e.as_metric().tags().unwrap().contains_key("host"),
+                "host {host} beyond limit should be dropped"
+            );
+        }
+    }
+}
+
+/// A per-tag entry with `value_limit` unset must inherit the per-metric `value_limit`
+/// rather than silently falling back to the serde default of 500.
+#[test]
+fn per_tag_value_limit_inherits_from_per_metric() {
+    let per_tag = PerTagConfig {
+        config: PerTagInner {
+            value_limit: None, // unset → should inherit from the per-metric (3)
+            mode: OverrideMode::Exact,
+        },
+    };
+    let config = make_transform_hashset_with_per_metric_limits(
+        500,
+        LimitExceededAction::DropTag,
+        HashMap::from([(
+            "metricA".to_string(),
+            make_per_metric(
+                3,
+                LimitExceededAction::DropTag,
+                HashMap::from([("tag1".to_string(), per_tag)]),
+            ),
+        )]),
+    );
+    let mut transform = TagCardinalityLimit::new(config);
+
+    // First 3 distinct values for tag1 are accepted (inherits per-metric limit of 3).
+    for i in 0..3 {
+        let v = format!("v{i}");
+        let e = transform
+            .transform_one(make_metric_with_name(
+                metric_tags!("tag1" => v.clone()),
+                "metricA",
+            ))
+            .unwrap();
+        assert_eq!(
+            v.as_str(),
+            e.as_metric().tags().unwrap().get("tag1").unwrap()
+        );
+    }
+
+    // 4th value should be rejected — proves the per-tag entry did NOT silently widen
+    // the limit to 500.
+    let e4 = transform
+        .transform_one(make_metric_with_name(
+            metric_tags!("tag1" => "v3"),
+            "metricA",
+        ))
+        .unwrap();
+    assert!(!e4.as_metric().tags().unwrap().contains_key("tag1"));
 }

@@ -110,20 +110,16 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 					description: "Controls the approach taken for tracking tag cardinality."
 					required:    true
 					type: string: enum: {
-						exact: """
-																			Tracks cardinality exactly.
+						exact: "Tracks cardinality exactly. See `Mode::Exact` for details."
+						excluded: """
+																			Skip cardinality tracking for this scope. All tag values pass through and nothing is
+																			recorded. Other tracking fields on the entry (`value_limit`, `limit_exceeded_action`,
+																			`internal_metrics`) are ignored when this is selected.
 
-																			This mode has higher memory requirements than `probabilistic`, but never falsely outputs
-																			metrics with new tags after the limit has been hit.
+																			Only valid in `per_metric_limits` and `per_tag_limits` entries; using it as the global
+																			`mode` is a configuration error.
 																			"""
-						probabilistic: """
-																			Tracks cardinality probabilistically.
-
-																			This mode has lower memory requirements than `exact`, but may occasionally allow metric
-																			events to pass through the transform even when they contain new tags that exceed the
-																			configured limit. The rate at which this happens can be controlled by changing the value of
-																			`cache_size_per_key`.
-																			"""
+						probabilistic: "Tracks cardinality probabilistically. See `Mode::Probabilistic` for details."
 					}
 				}
 				namespace: {
@@ -131,8 +127,61 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 					required:    false
 					type: string: {}
 				}
+				per_tag_limits: {
+					description: """
+						Per-tag-key overrides scoped to this metric.
+
+						Each entry may override `value_limit` and `mode` for a specific tag key.
+						`limit_exceeded_action` and `internal_metrics` are always inherited from the enclosing
+						per-metric (or global) configuration and cannot be set per-tag.
+						Tags not listed here use the per-metric configuration.
+						"""
+					required: false
+					type: object: options: "*": {
+						description: "An individual tag configuration."
+						required:    true
+						type: object: options: {
+							cache_size_per_key: {
+								description: """
+																								The size of the cache for detecting duplicate tags, in bytes.
+
+																								The larger the cache size, the less likely it is to have a false positive, or a case where
+																								we allow a new value for tag even after we have reached the configured limits.
+																								"""
+								relevant_when: "mode = \"probabilistic\""
+								required:      false
+								type: uint: default: 5120
+							}
+							mode: {
+								description: "Controls the approach taken for tracking tag cardinality."
+								required:    true
+								type: string: enum: {
+									exact: "Tracks cardinality exactly. See `Mode::Exact` for details."
+									excluded: """
+																											Skip cardinality tracking for this scope. All tag values pass through and nothing is
+																											recorded. Other tracking fields on the entry (`value_limit`, `limit_exceeded_action`,
+																											`internal_metrics`) are ignored when this is selected.
+
+																											Only valid in `per_metric_limits` and `per_tag_limits` entries; using it as the global
+																											`mode` is a configuration error.
+																											"""
+									probabilistic: "Tracks cardinality probabilistically. See `Mode::Probabilistic` for details."
+								}
+							}
+							value_limit: {
+								description: """
+																								How many distinct values to accept for this tag key. If unset, inherits
+																								the `value_limit` from the enclosing per-metric (or global) configuration.
+																								Ignored when `mode: excluded`.
+																								"""
+								required: false
+								type: uint: {}
+							}
+						}
+					}
+				}
 				value_limit: {
-					description: "How many distinct values to accept for any given key."
+					description: "How many distinct values to accept for any given key. Ignored when `mode: excluded`."
 					required:    false
 					type: uint: default: 500
 				}
