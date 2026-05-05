@@ -183,7 +183,7 @@ pub struct ElasticsearchConfig {
     #[serde(default)]
     #[configurable(derived)]
     #[cfg(feature = "aws-core")]
-    pub aws: Option<crate::aws::RegionOrEndpoint>,
+    pub aws: Option<crate::aws::AwsAuthRegion>,
 
     /// Amazon OpenSearch service type
     #[serde(default)]

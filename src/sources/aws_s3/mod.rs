@@ -133,10 +133,23 @@ pub struct AwsS3Config {
 
     /// Specifies which addressing style to use.
     ///
-    /// This controls whether the bucket name is in the hostname, or part of the URL.
-    #[serde(default = "default_true")]
-    #[derivative(Default(value = "default_true()"))]
-    pub force_path_style: bool,
+    /// This controls whether the bucket name is in the hostname (virtual-hosted-style,
+    /// `<bucket>.s3.<region>.amazonaws.com`) or part of the URL (path-style,
+    /// `s3.<region>.amazonaws.com/<bucket>`).
+    ///
+    /// When unset, the default is `true` (path-style), except when
+    /// `use_fips_endpoint = true` — in that case the default is `false`
+    /// (virtual-hosted-style). Per [AWS][aws-fips], **all** S3 FIPS endpoints
+    /// (commercial *and* GovCloud) require virtual-hosted-style addressing:
+    /// *"These Endpoints can only be used with Virtual Hosted-Style addressing."*
+    ///
+    /// If `force_path_style` is explicitly set to `true` together with
+    /// `use_fips_endpoint = true`, Vector overrides it back to `false` and logs
+    /// a warning at startup, since AWS does not support that combination.
+    ///
+    /// [aws-fips]: https://aws.amazon.com/compliance/fips/
+    #[serde(default)]
+    pub force_path_style: Option<bool>,
 }
 
 const fn default_framing() -> FramingConfig {
@@ -144,10 +157,6 @@ const fn default_framing() -> FramingConfig {
     FramingConfig::NewlineDelimited(NewlineDelimitedDecoderConfig {
         newline_delimited: NewlineDelimitedDecoderOptions { max_length: None },
     })
-}
-
-const fn default_true() -> bool {
-    true
 }
 
 impl_generate_config_from_default!(AwsS3Config);
@@ -241,10 +250,11 @@ impl AwsS3Config {
     ) -> crate::Result<sqs::Ingestor> {
         let region = self.region.region();
         let endpoint = self.region.endpoint();
+        let use_fips_endpoint = self.region.use_fips_endpoint();
 
         let s3_client = create_client::<S3ClientBuilder>(
             &S3ClientBuilder {
-                force_path_style: Some(self.force_path_style),
+                force_path_style: Some(self.resolved_force_path_style()),
             },
             &self.auth,
             region.clone(),
@@ -252,6 +262,7 @@ impl AwsS3Config {
             proxy,
             self.tls_options.as_ref(),
             None,
+            use_fips_endpoint,
         )
         .await?;
 
@@ -269,6 +280,7 @@ impl AwsS3Config {
                     proxy,
                     sqs.tls_options.as_ref(),
                     sqs.timeout.as_ref(),
+                    use_fips_endpoint,
                 )
                 .await?;
 
@@ -286,6 +298,45 @@ impl AwsS3Config {
                 Ok(ingestor)
             }
             None => Err(CreateSqsIngestorError::ConfigMissing {}.into()),
+        }
+    }
+
+    /// Resolve the effective `force_path_style` value.
+    ///
+    /// Per AWS, S3 FIPS endpoints (commercial *and* GovCloud) require
+    /// virtual-hosted-style addressing — see <https://aws.amazon.com/compliance/fips/>.
+    /// We therefore reject `force_path_style = true` when FIPS is enabled,
+    /// regardless of region.
+    ///
+    /// Rules:
+    ///   * Explicit `Some(false)`                    → `false`.
+    ///   * Explicit `Some(true)` + `use_fips=true`   → override to `false`,
+    ///     emit a warning. The combination is unsupported by AWS.
+    ///   * Explicit `Some(true)` (no FIPS)           → honored as `true`.
+    ///   * Unset + `use_fips=true`                   → `false` (auto-default
+    ///     to the only working addressing mode for FIPS).
+    ///   * Unset (no FIPS)                           → `true` (preserve
+    ///     historical default).
+    fn resolved_force_path_style(&self) -> bool {
+        let use_fips = self.region.use_fips_endpoint().unwrap_or(false);
+
+        match self.force_path_style {
+            Some(true) if use_fips => {
+                warn!(
+                    message = "force_path_style = true is incompatible with \
+                               use_fips_endpoint = true: AWS S3 FIPS endpoints \
+                               only support virtual-hosted-style addressing \
+                               (https://aws.amazon.com/compliance/fips/). \
+                               Overriding force_path_style to false. Remove \
+                               the explicit force_path_style setting (or set \
+                               it to false) to silence this warning.",
+                    internal_log_rate_limit = false,
+                );
+                false
+            }
+            Some(v) => v,
+            None if use_fips => false,
+            None => true,
         }
     }
 }
@@ -438,6 +489,55 @@ mod test {
         .unwrap();
 
         assert!(data.is_empty());
+    }
+
+    fn cfg(region: &str, fips: Option<bool>, force_path_style: Option<bool>) -> AwsS3Config {
+        let mut c = AwsS3Config::default();
+        c.region = RegionOrEndpoint {
+            region: Some(region.to_string()),
+            endpoint: None,
+            use_fips_endpoint: fips,
+        };
+        c.force_path_style = force_path_style;
+        c
+    }
+
+    #[test]
+    fn resolved_force_path_style_unset_non_fips_defaults_true() {
+        assert!(cfg("us-east-1", None, None).resolved_force_path_style());
+        assert!(cfg("eu-west-2", None, None).resolved_force_path_style());
+        assert!(cfg("us-gov-east-1", None, None).resolved_force_path_style());
+    }
+
+    #[test]
+    fn resolved_force_path_style_unset_fips_defaults_false_everywhere() {
+        // FIPS endpoints require virtual-hosted-style addressing per AWS,
+        // regardless of partition.
+        assert!(!cfg("us-east-1", Some(true), None).resolved_force_path_style());
+        assert!(!cfg("us-west-2", Some(true), None).resolved_force_path_style());
+        assert!(!cfg("us-gov-east-1", Some(true), None).resolved_force_path_style());
+        assert!(!cfg("us-gov-west-1", Some(true), None).resolved_force_path_style());
+    }
+
+    #[test]
+    fn resolved_force_path_style_explicit_true_with_fips_overridden_to_false() {
+        // The override warning is emitted as a tracing event; we only assert the
+        // returned value here. Run with VECTOR_LOG=warn to see the warning.
+        assert!(!cfg("us-east-1", Some(true), Some(true)).resolved_force_path_style());
+        assert!(!cfg("us-gov-west-1", Some(true), Some(true)).resolved_force_path_style());
+    }
+
+    #[test]
+    fn resolved_force_path_style_explicit_true_without_fips_honored() {
+        assert!(cfg("us-east-1", None, Some(true)).resolved_force_path_style());
+        assert!(cfg("us-east-1", Some(false), Some(true)).resolved_force_path_style());
+    }
+
+    #[test]
+    fn resolved_force_path_style_explicit_false_always_false() {
+        assert!(!cfg("us-east-1", None, Some(false)).resolved_force_path_style());
+        assert!(!cfg("us-east-1", Some(true), Some(false)).resolved_force_path_style());
+        assert!(!cfg("us-gov-east-1", Some(true), Some(false)).resolved_force_path_style());
     }
 }
 
@@ -1026,10 +1126,7 @@ mod integration_tests {
 
     async fn s3_client() -> S3Client {
         let auth = AwsAuthentication::test_auth();
-        let region_endpoint = RegionOrEndpoint {
-            region: Some("us-east-1".to_owned()),
-            endpoint: Some(s3_address()),
-        };
+        let region_endpoint = RegionOrEndpoint::with_both("us-east-1", s3_address());
         let proxy_config = ProxyConfig::default();
         let force_path_style_value: bool = true;
         create_client::<S3ClientBuilder>(
@@ -1042,6 +1139,7 @@ mod integration_tests {
             &proxy_config,
             None,
             None,
+            None,
         )
         .await
         .unwrap()
@@ -1049,10 +1147,7 @@ mod integration_tests {
 
     async fn sqs_client() -> SqsClient {
         let auth = AwsAuthentication::test_auth();
-        let region_endpoint = RegionOrEndpoint {
-            region: Some("us-east-1".to_owned()),
-            endpoint: Some(s3_address()),
-        };
+        let region_endpoint = RegionOrEndpoint::with_both("us-east-1", s3_address());
         let proxy_config = ProxyConfig::default();
         create_client::<SqsClientBuilder>(
             &SqsClientBuilder {},
@@ -1060,6 +1155,7 @@ mod integration_tests {
             region_endpoint.region(),
             region_endpoint.endpoint(),
             &proxy_config,
+            None,
             None,
             None,
         )

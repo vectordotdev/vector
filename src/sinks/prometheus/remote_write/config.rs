@@ -114,7 +114,7 @@ pub struct RemoteWriteConfig {
     #[cfg(feature = "aws-config")]
     #[configurable(derived)]
     #[configurable(metadata(docs::advanced))]
-    pub aws: Option<crate::aws::RegionOrEndpoint>,
+    pub aws: Option<crate::aws::AwsAuthRegion>,
 
     #[configurable(derived)]
     #[serde(

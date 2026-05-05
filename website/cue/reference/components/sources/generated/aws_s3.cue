@@ -490,10 +490,24 @@ generated: components: sources: aws_s3: configuration: {
 		description: """
 			Specifies which addressing style to use.
 
-			This controls whether the bucket name is in the hostname, or part of the URL.
+			This controls whether the bucket name is in the hostname (virtual-hosted-style,
+			`<bucket>.s3.<region>.amazonaws.com`) or part of the URL (path-style,
+			`s3.<region>.amazonaws.com/<bucket>`).
+
+			When unset, the default is `true` (path-style), except when
+			`use_fips_endpoint = true` — in that case the default is `false`
+			(virtual-hosted-style). Per [AWS][aws-fips], **all** S3 FIPS endpoints
+			(commercial *and* GovCloud) require virtual-hosted-style addressing:
+			*"These Endpoints can only be used with Virtual Hosted-Style addressing."*
+
+			If `force_path_style` is explicitly set to `true` together with
+			`use_fips_endpoint = true`, Vector overrides it back to `false` and logs
+			a warning at startup, since AWS does not support that combination.
+
+			[aws-fips]: https://aws.amazon.com/compliance/fips/
 			"""
 		required: false
-		type: bool: default: true
+		type: bool: {}
 	}
 	framing: {
 		description: """
@@ -1101,5 +1115,19 @@ generated: components: sources: aws_s3: configuration: {
 				type: bool: {}
 			}
 		}
+	}
+	use_fips_endpoint: {
+		description: """
+			Whether to use [FIPS-compliant endpoints][fips] when communicating with AWS services.
+
+			When enabled, the SDK resolves FIPS-compliant endpoints for the target service.
+			This is required for FedRAMP and other compliance environments. When omitted, the
+			SDK falls back to its default provider chain (the `AWS_USE_FIPS_ENDPOINT` environment
+			variable and AWS config files).
+
+			[fips]: https://docs.aws.amazon.com/sdkref/latest/guide/setting-global-aws_use_fips_endpoint.html
+			"""
+		required: false
+		type: bool: {}
 	}
 }
