@@ -223,7 +223,7 @@ strum = { version = "0.28", features = ["derive"] }
 [dependencies]
 cfg-if.workspace = true
 reqwest.workspace = true
-reqwest_13 = { package = "reqwest", version = "0.13", features = ["json"] }
+reqwest_13 = { package = "reqwest", version = "0.13", default-features = false, features = ["json", "rustls-no-provider"] }
 clap.workspace = true
 clap_complete.workspace = true
 indoc.workspace = true
