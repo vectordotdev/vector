@@ -1,4 +1,9 @@
-use std::{collections::HashMap, fmt};
+use std::{
+    collections::HashMap,
+    fmt,
+    hash::{Hash, Hasher},
+    num::NonZeroU64,
+};
 
 use vector_lib::{
     config::LegacyKey,
@@ -91,6 +96,26 @@ impl SampleMode {
     }
 }
 
+enum EventSampleMode {
+    Ratio(f64),
+    Rate(NonZeroU64),
+}
+
+impl EventSampleMode {
+    fn sample_rate_label(&self) -> String {
+        match self {
+            Self::Ratio(ratio) => ratio.to_string(),
+            Self::Rate(rate) => rate.to_string(),
+        }
+    }
+}
+
+#[derive(Clone, Default)]
+pub struct DynamicSampleFields {
+    pub ratio_field: Option<String>,
+    pub rate_field: Option<String>,
+}
+
 impl fmt::Display for SampleMode {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         // Avoids the print of an additional '.0' which was not performed in the previous
@@ -103,11 +128,23 @@ impl fmt::Display for SampleMode {
 }
 
 #[derive(Clone)]
+pub enum SampleKeySource {
+    Static {
+        key_field: Option<String>,
+        group_by: Option<Template>,
+    },
+    Dynamic {
+        fields: DynamicSampleFields,
+        group_by: Option<Template>,
+    },
+}
+
+#[derive(Clone)]
 pub struct Sample {
     name: String,
-    rate: SampleMode,
-    key_field: Option<String>,
-    group_by: Option<Template>,
+    static_mode: SampleMode,
+    key_source: SampleKeySource,
+    dynamic_event_counters: HashMap<Option<String>, u64>,
     exclude: Option<Condition>,
     sample_rate_key: OptionalValuePath,
 }
@@ -116,19 +153,55 @@ impl Sample {
     // This function is dead code when the feature flag `transforms-impl-sample` is specified but not
     // `transforms-sample`.
     #![allow(dead_code)]
-    pub const fn new(
+    pub fn new(
         name: String,
-        rate: SampleMode,
+        static_mode: SampleMode,
         key_field: Option<String>,
         group_by: Option<Template>,
         exclude: Option<Condition>,
         sample_rate_key: OptionalValuePath,
     ) -> Self {
+        Self::new_with_source(
+            name,
+            static_mode,
+            SampleKeySource::Static {
+                key_field,
+                group_by,
+            },
+            exclude,
+            sample_rate_key,
+        )
+    }
+
+    pub fn new_with_dynamic(
+        name: String,
+        static_mode: SampleMode,
+        fields: DynamicSampleFields,
+        group_by: Option<Template>,
+        exclude: Option<Condition>,
+        sample_rate_key: OptionalValuePath,
+    ) -> Self {
+        Self::new_with_source(
+            name,
+            static_mode,
+            SampleKeySource::Dynamic { fields, group_by },
+            exclude,
+            sample_rate_key,
+        )
+    }
+
+    fn new_with_source(
+        name: String,
+        static_mode: SampleMode,
+        key_source: SampleKeySource,
+        exclude: Option<Condition>,
+        sample_rate_key: OptionalValuePath,
+    ) -> Self {
         Self {
             name,
-            rate,
-            key_field,
-            group_by,
+            static_mode,
+            key_source,
+            dynamic_event_counters: HashMap::default(),
             exclude,
             sample_rate_key,
         }
@@ -136,10 +209,119 @@ impl Sample {
 
     #[cfg(test)]
     pub fn ratio(&self) -> f64 {
-        match self.rate {
-            SampleMode::Rate { rate, .. } => 1.0f64 / rate as f64,
-            SampleMode::Ratio { ratio, .. } => ratio,
+        match &self.static_mode {
+            SampleMode::Rate { rate, .. } => 1.0f64 / *rate as f64,
+            SampleMode::Ratio { ratio, .. } => *ratio,
         }
+    }
+
+    fn dynamic_sample_hash(group_by_key: Option<&str>, counter: u64) -> u64 {
+        let mut hasher = seahash::SeaHasher::new();
+        group_by_key.hash(&mut hasher);
+        counter.hash(&mut hasher);
+        hasher.finish()
+    }
+
+    fn sample_with_dynamic_ratio(&mut self, ratio: f64, group_by_key: Option<String>) -> bool {
+        let counter_value = self
+            .dynamic_event_counters
+            .entry(group_by_key.clone())
+            .or_default();
+        let old_counter_value = *counter_value;
+        *counter_value += 1;
+
+        let hash = Self::dynamic_sample_hash(group_by_key.as_deref(), old_counter_value);
+        let hash_ratio_threshold = (ratio * (u64::MAX as u128) as f64) as u64;
+        hash <= hash_ratio_threshold
+    }
+
+    fn event_ratio(&self, event: &Event) -> Option<f64> {
+        let ratio_field = match &self.key_source {
+            SampleKeySource::Dynamic { fields, .. } => fields.ratio_field.as_ref()?,
+            SampleKeySource::Static { .. } => return None,
+        };
+
+        let value = self.get_event_value(event, ratio_field.as_str())?;
+
+        let ratio = match value {
+            Value::Integer(value) => *value as f64,
+            Value::Float(value) => value.into_inner(),
+            Value::Bytes(bytes) => std::str::from_utf8(bytes).ok()?.parse::<f64>().ok()?,
+            _ => return None,
+        };
+
+        (ratio > 0.0 && ratio <= 1.0).then_some(ratio)
+    }
+
+    fn event_rate(&self, event: &Event) -> Option<NonZeroU64> {
+        let rate_field = match &self.key_source {
+            SampleKeySource::Dynamic { fields, .. } => fields.rate_field.as_ref()?,
+            SampleKeySource::Static { .. } => return None,
+        };
+
+        let value = self.get_event_value(event, rate_field.as_str())?;
+
+        match value {
+            Value::Integer(value) => u64::try_from(*value).ok().and_then(NonZeroU64::new),
+            Value::Bytes(bytes) => std::str::from_utf8(bytes).ok()?.parse::<NonZeroU64>().ok(),
+            _ => None,
+        }
+    }
+
+    fn get_event_value<'a>(&self, event: &'a Event, path: &str) -> Option<&'a Value> {
+        match event {
+            Event::Log(event) => event.parse_path_and_get_value(path).ok().flatten(),
+            Event::Trace(event) => event.parse_path_and_get_value(path).ok().flatten(),
+            Event::Metric(_) => panic!("component can never receive metric events"),
+        }
+    }
+
+    fn event_sample_mode(&self, event: &Event) -> Option<EventSampleMode> {
+        self.event_ratio(event)
+            .map(EventSampleMode::Ratio)
+            .or_else(|| self.event_rate(event).map(EventSampleMode::Rate))
+    }
+
+    fn sample_with_dynamic_rate(&mut self, rate: NonZeroU64, group_by_key: Option<String>) -> bool {
+        let counter_value = self
+            .dynamic_event_counters
+            .entry(group_by_key.clone())
+            .or_default();
+        let old_counter_value = *counter_value;
+        *counter_value += 1;
+        let hash = Self::dynamic_sample_hash(group_by_key.as_deref(), old_counter_value);
+
+        hash.is_multiple_of(rate.get())
+    }
+
+    fn group_by_key(&self, event: &Event) -> Option<String> {
+        let group_by = match &self.key_source {
+            SampleKeySource::Static { group_by, .. } => group_by.as_ref()?,
+            SampleKeySource::Dynamic { group_by, .. } => group_by.as_ref()?,
+        };
+
+        match event {
+            Event::Log(event) => group_by.render_string(event),
+            Event::Trace(event) => group_by.render_string(event),
+            Event::Metric(_) => panic!("component can never receive metric events"),
+        }
+        .map_err(|error| {
+            emit!(TemplateRenderingError {
+                error,
+                field: Some("group_by"),
+                drop_event: false,
+            })
+        })
+        .ok()
+    }
+
+    fn static_key_value<'a>(&self, event: &'a Event) -> Option<&'a Value> {
+        let key_field = match &self.key_source {
+            SampleKeySource::Static { key_field, .. } => key_field.as_ref()?,
+            SampleKeySource::Dynamic { .. } => return None,
+        };
+
+        self.get_event_value(event, key_field)
     }
 }
 
@@ -159,36 +341,24 @@ impl FunctionTransform for Sample {
             }
         };
 
-        let value = self.key_field.as_ref().and_then(|key_field| match &event {
-            Event::Log(event) => event
-                .parse_path_and_get_value(key_field.as_str())
-                .ok()
-                .flatten(),
-            Event::Trace(event) => event
-                .parse_path_and_get_value(key_field.as_str())
-                .ok()
-                .flatten(),
-            Event::Metric(_) => panic!("component can never receive metric events"),
-        });
+        let group_by_key = self.group_by_key(&event);
+        let value = self.static_key_value(&event);
 
-        // Fetch actual field value if group_by option is set.
-        let group_by_key = self.group_by.as_ref().and_then(|group_by| {
-            match &event {
-                Event::Log(event) => group_by.render_string(event),
-                Event::Trace(event) => group_by.render_string(event),
-                Event::Metric(_) => panic!("component can never receive metric events"),
+        let event_sample_mode = self.event_sample_mode(&event);
+        let sample_rate = event_sample_mode
+            .as_ref()
+            .map(EventSampleMode::sample_rate_label)
+            .unwrap_or_else(|| self.static_mode.to_string());
+
+        let should_sample = match event_sample_mode {
+            Some(EventSampleMode::Ratio(ratio)) => {
+                self.sample_with_dynamic_ratio(ratio, group_by_key)
             }
-            .map_err(|error| {
-                emit!(TemplateRenderingError {
-                    error,
-                    field: Some("group_by"),
-                    drop_event: false,
-                })
-            })
-            .ok()
-        });
+            Some(EventSampleMode::Rate(rate)) => self.sample_with_dynamic_rate(rate, group_by_key),
+            None => self.static_mode.increment(group_by_key, value),
+        };
 
-        if self.rate.increment(group_by_key, value) {
+        if should_sample {
             if let Some(path) = &self.sample_rate_key.path {
                 match event {
                     Event::Log(ref mut event) => {
@@ -197,11 +367,11 @@ impl FunctionTransform for Sample {
                             event,
                             Some(LegacyKey::Overwrite(path)),
                             path,
-                            self.rate.to_string(),
+                            sample_rate.clone(),
                         );
                     }
                     Event::Trace(ref mut event) => {
-                        event.insert(&OwnedTargetPath::event(path.clone()), self.rate.to_string());
+                        event.insert(&OwnedTargetPath::event(path.clone()), sample_rate);
                     }
                     Event::Metric(_) => panic!("component can never receive metric events"),
                 };
