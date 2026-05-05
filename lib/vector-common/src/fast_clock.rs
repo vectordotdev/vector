@@ -112,6 +112,9 @@ mod tests {
         let truth = unix_millis_now();
         let drift = (truth - cached).abs();
         // Worst case is roughly TICK + scheduling jitter; allow 200ms.
-        assert!(drift < 200, "drift too large: cached={cached} truth={truth}");
+        assert!(
+            drift < 200,
+            "drift too large: cached={cached} truth={truth}"
+        );
     }
 }
