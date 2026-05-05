@@ -375,12 +375,96 @@ impl SchemaContext {
         );
     }
 
+    #[allow(clippy::self_only_used_in_recursion)]
     pub fn reconcile_resolved_schema(&self, resolved: &mut Value) {
-        if let Some(Value::Object(type_obj)) = resolved.get_mut("type")
-            && type_obj.contains_key("object")
-            && type_obj.len() > 1
+        let Some(type_obj) = resolved.get("type").and_then(Value::as_object) else {
+            return;
+        };
+
+        if let Some(options) = type_obj
+            .get("object")
+            .and_then(|o| o.get("options"))
+            .and_then(Value::as_object)
         {
-            // Remove map from mixed modes, simplifying
+            let property_keys: Vec<String> = options.keys().cloned().collect();
+            for key in property_keys {
+                if let Some(prop) = resolved
+                    .pointer_mut(&format!("/type/object/options/{key}"))
+                    .filter(|v| v.is_object())
+                {
+                    self.reconcile_resolved_schema(prop);
+                }
+            }
+            return;
+        }
+
+        let is_required = resolved
+            .get("required")
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+        if is_required {
+            let type_field_keys: Vec<String> = type_obj.keys().cloned().collect();
+            for type_field in &type_field_keys {
+                let pointer = format!("/type/{type_field}");
+                if let Some(Value::Object(field)) = resolved.pointer_mut(&pointer)
+                    && let Some(Value::Null) = field.get("default")
+                {
+                    field.shift_remove("default");
+                }
+            }
+        }
+
+        let schema_description = resolved
+            .get("description")
+            .and_then(Value::as_str)
+            .map(str::to_owned);
+
+        let type_field_keys: Vec<String> = resolved
+            .get("type")
+            .and_then(Value::as_object)
+            .map(|o| o.keys().cloned().collect())
+            .unwrap_or_default();
+
+        for type_field in &type_field_keys {
+            let const_pointer = format!("/type/{type_field}/const");
+            let Some(const_value) = resolved.pointer(&const_pointer).cloned() else {
+                continue;
+            };
+
+            let mut enum_map = Map::new();
+            match const_value {
+                Value::Array(items) => {
+                    for item in items {
+                        let Some(value) = item.get("value").and_then(Value::as_str) else {
+                            continue;
+                        };
+                        let desc = item
+                            .get("description")
+                            .and_then(Value::as_str)
+                            .unwrap_or("")
+                            .to_string();
+                        enum_map.insert(value.to_string(), Value::String(desc));
+                    }
+                }
+                Value::Object(mut single) => {
+                    let Some(Value::String(value)) = single.shift_remove("value") else {
+                        continue;
+                    };
+                    let desc = single
+                        .shift_remove("description")
+                        .and_then(|d| d.as_str().map(str::to_owned))
+                        .or_else(|| schema_description.clone())
+                        .unwrap_or_default();
+                    enum_map.insert(value, Value::String(desc));
+                }
+                _ => continue,
+            }
+
+            if let Some(Value::Object(field)) = resolved.pointer_mut(&format!("/type/{type_field}"))
+            {
+                field.shift_remove("const");
+                field.insert("enum".to_string(), Value::Object(enum_map));
+            }
         }
     }
 
