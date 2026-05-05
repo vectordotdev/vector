@@ -950,6 +950,60 @@ event in dev/test rather than failing silently in production.
 After every source, sink, and transform has been migrated, the `Legacy` variant and the shims
 are deleted, leaving only the typed struct.
 
+#### Wire serialization
+
+The migration enum has two variants in memory; Vector's internal event-protobuf
+(`lib/vector-core/proto/event.proto`) needs corresponding wire shapes for both, since trace
+events cross internal-wire boundaries through disk buffers and the `vector` source/sink. The
+existing `Trace` message is renamed to `LegacyTrace` (keeping its field tags and sub-message
+shape) and a new sibling `TypedTrace` message is added. The `EventWrapper.event` and
+`EventArray.events` oneofs each gain a new variant for the typed shape:
+
+```protobuf
+message EventWrapper {
+  oneof event {
+    Log log = 1;
+    Metric metric = 2;
+    LegacyTrace legacy_trace = 3;  // was: Trace trace = 3
+    TypedTrace typed_trace = 4;    // new
+  }
+}
+
+message TypedTrace {
+  Resource resource = 1;
+  Scope scope = 2;
+  ChunkContext chunk = 3;
+  repeated Span spans = 4;
+  Metadata metadata_full = 5;
+}
+```
+
+Plus the typed sub-messages (`Resource`, `Scope`, `ChunkContext`, `Span`, `SpanEvent`,
+`SpanLink`, identifier and attribute types). `EventArray.events` gains an analogous
+`TypedTraceArray typed_traces` variant alongside the renamed `legacy_traces`.
+
+The discriminator is the oneof tag, mirroring the in-memory `enum TraceEvent { Legacy, Typed }`
+exactly: `Legacy` ↔ `legacy_trace`, `Typed` ↔ `typed_trace`. Encode dispatches on the variant;
+decode picks the variant from the oneof tag. An older Vector receiving a `TypedTrace`-tagged
+event sees an unknown oneof variant, decodes it as `event: None`, and surfaces a loud "unknown
+event type" error rather than silently materialising an empty Legacy event. The renamed
+`LegacyTrace` keeps field tag 3, so the wire encoding for legacy events is byte-identical to
+today's `Trace` and older Vector instances continue to decode them correctly.
+
+Removing the `Legacy` Rust variant does not immediately retire the proto: `LegacyTrace`,
+`LegacyTraceArray`, and the `legacy_trace` oneof variant are first marked `deprecated = true`
+for a release window so events written by older Vector instances -- disk buffers and inflight
+`vector`-source streams -- continue to decode. After the window passes, the messages are
+removed and field tag 3 is added to `reserved` in both oneofs so the tag cannot be silently
+reused by a future field.
+
+Verification of the encode/decode change covers both variants for byte-exact round-trip and
+explicitly exercises the older-Vector decode case: a `TypedTrace`-encoded message decoded
+against a proto schema in which the `typed_trace` variant is unknown must surface a loud
+"unknown event type" error from the consumer of `EventWrapper`/`EventArray`, not a silent drop
+or an empty-`Legacy` decode. This pins the failure-mode property that motivated the
+sibling-variant design over an in-`Trace` field-presence discriminator.
+
 ## Rationale
 
 ### Architectural choices
@@ -1136,6 +1190,12 @@ are deleted, leaving only the typed struct.
   collision occurs; the model treats keyset disjointness as a contract the source asserts.
   The `meta_struct` partition is preserved exactly under a reserved sub-object and is not
   subject to this convention.
+- The internal `event.proto` gains a new `TypedTrace` variant alongside the renamed `LegacyTrace`. A
+  Vector instance running a release line older than the typed-trace work, receiving a
+  `TypedTrace`-encoded event over `vector` source/sink, decodes it with `event: None` (the unknown
+  oneof variant) and surfaces a loud "unknown event type" error rather than silently emitting an
+  empty trace. `vector` source/sink chains spanning the typed migration must run a single release
+  line; this is documented in the release notes alongside the VRL-path migration.
 - Every trace source and sink must be rewritten to produce/consume the typed container. The
   Plan of Attack sequences this so each component migrates independently, but it is non-trivial
   work.
@@ -1434,6 +1494,9 @@ on which to base a `Typed -> Legacy` conversion.
   pointing at `to_typed()`. Every component still produces and consumes `Legacy`; nothing
   functionally changes. A `to_typed()` call on an event whose layout hint is absent or unrecognized
   returns an error and emits a rate-limited `warn!` log.
+- [ ] Extend Vector's internal event proto with the typed wire shape, per "Wire serialization"
+  under Implementation. Hard prerequisite for any source-flip step: without it, disk buffers
+  and the `vector` source/sink panic on the first `Typed` event.
 - [ ] Add VRL typed-path support for `.resource.*`, `.scope.*`, `.chunk.*`, and `.spans[*].*`
   on `VrlTarget`. Untyped VRL paths against `Typed` events return a deterministic error.
 - [ ] Migration guide for users:
@@ -1490,7 +1553,10 @@ on which to base a `Typed -> Legacy` conversion.
   trace-aware downstream component is `Typed`-capable.
 - [ ] Migrate the `datadog_agent` source to produce `Typed` natively.
 - [ ] Collapse the `TraceEvent` enum to a struct with only the typed variant's fields. Remove
-  the per-component shims.
+  the per-component shims. Mark the proto's `LegacyTrace`/`LegacyTraceArray` messages and the
+  `legacy_trace` oneof variants `deprecated = true` (per "Wire serialization"); a follow-up
+  PR after the deprecation release window removes them and adds field tag 3 to `reserved` in
+  `EventWrapper.event` and `EventArray.events`.
 
 ## Future Improvements
 
