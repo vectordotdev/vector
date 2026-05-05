@@ -77,34 +77,6 @@ generated: components: sinks: azure_monitor_logs: configuration: {
 		required: true
 		type: string: examples: ["5ce893d9-2c32-4b6c-91a9-b0887c2de2d6", "97ce69d9-b4be-4241-8dbd-d265edcf06c4"]
 	}
-	encoding: {
-		description: "Transformations to prepare an event for serialization."
-		required:    false
-		type: object: options: {
-			except_fields: {
-				description: "List of fields that are excluded from the encoded event."
-				required:    false
-				type: array: items: type: string: {}
-			}
-			only_fields: {
-				description: "List of fields that are included in the encoded event."
-				required:    false
-				type: array: items: type: string: {}
-			}
-			timestamp_format: {
-				description: "Format used for timestamp fields."
-				required:    false
-				type: string: enum: {
-					rfc3339:    "Represent the timestamp as a RFC 3339 timestamp."
-					unix:       "Represent the timestamp as a Unix timestamp."
-					unix_float: "Represent the timestamp as a Unix timestamp in floating point."
-					unix_ms:    "Represent the timestamp as a Unix timestamp in milliseconds."
-					unix_ns:    "Represent the timestamp as a Unix timestamp in nanoseconds."
-					unix_us:    "Represent the timestamp as a Unix timestamp in microseconds."
-				}
-			}
-		}
-	}
 	host: {
 		description: """
 			[Alternative host][alt_host] for dedicated Azure regions.
@@ -463,3 +435,5 @@ generated: components: sinks: azure_monitor_logs: configuration: {
 		}
 	}
 }
+
+generated: components: sinks: azure_monitor_logs: configuration: encoding: encodingNoCodec
