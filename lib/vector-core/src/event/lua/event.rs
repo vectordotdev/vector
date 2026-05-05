@@ -4,10 +4,11 @@ use super::{
     super::{Event, LogEvent, Metric},
     metric::LuaMetric,
 };
+use crate::event::vrl_target::MetricTagMode;
 
 pub struct LuaEvent {
     pub event: Event,
-    pub metric_multi_value_tags: bool,
+    pub metric_tag_mode: MetricTagMode,
 }
 
 impl IntoLua for LuaEvent {
@@ -20,7 +21,7 @@ impl IntoLua for LuaEvent {
                 "metric",
                 LuaMetric {
                     metric,
-                    multi_value_tags: self.metric_multi_value_tags,
+                    tag_mode: self.metric_tag_mode,
                 }
                 .into_lua(lua)?,
             )?,
@@ -80,7 +81,7 @@ mod test {
                 "event",
                 LuaEvent {
                     event,
-                    metric_multi_value_tags: false,
+                    metric_tag_mode: MetricTagMode::Single,
                 },
             )
             .unwrap();

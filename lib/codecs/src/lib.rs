@@ -51,4 +51,25 @@ pub enum MetricTagValues {
     Single,
     /// All tags are exposed as arrays of either string or null values.
     Full,
+    /// Tag values are exposed using the shape that matches their underlying storage:
+    /// single-value tags are exposed as strings and multi-value tags are exposed as
+    /// arrays of either string or null values.
+    ///
+    /// Writes follow the same convention -- assigning a string or null to a tag stores
+    /// it as a single tag; assigning an array stores it as a multi-value tag.
+    ///
+    /// This preserves the on-the-wire shape of metrics that mix single- and multi-value
+    /// tags. Programs that consume tags in this mode must handle both string and array
+    /// shapes (for example, with `is_array(.tags.foo)` or by normalizing with `flatten`).
+    Auto,
+}
+
+impl From<MetricTagValues> for vector_core::event::MetricTagMode {
+    fn from(value: MetricTagValues) -> Self {
+        match value {
+            MetricTagValues::Single => Self::Single,
+            MetricTagValues::Full => Self::Full,
+            MetricTagValues::Auto => Self::Auto,
+        }
+    }
 }

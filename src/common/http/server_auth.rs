@@ -11,7 +11,7 @@ use serde::{
 use vector_config::configurable_component;
 use vector_lib::{
     TimeZone, compile_vrl,
-    event::{Event, LogEvent, VrlTarget},
+    event::{Event, LogEvent, MetricTagMode, VrlTarget},
     sensitive_string::SensitiveString,
 };
 use vector_vrl_metrics::MetricsStorage;
@@ -254,7 +254,7 @@ impl HttpServerAuthMatcher {
                 Default::default(),
             )),
             program.info(),
-            false,
+            MetricTagMode::Single,
         );
         let timezone = TimeZone::default();
 

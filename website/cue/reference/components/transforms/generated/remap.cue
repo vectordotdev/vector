@@ -67,11 +67,28 @@ generated: components: transforms: remap: configuration: {
 
 			When set to `full`, all metric tags are exposed as arrays of either string or null
 			values.
+
+			When set to `auto`, single-value tags are exposed as strings and multi-value tags as
+			arrays. Writes follow the same convention -- assigning a string or null produces a
+			single tag, assigning an array produces a multi-value tag. This preserves the
+			underlying shape of metrics that mix single- and multi-value tags.
 			"""
 		required: false
 		type: string: {
 			default: "single"
 			enum: {
+				auto: """
+					Tag values are exposed using the shape that matches their underlying storage:
+					single-value tags are exposed as strings and multi-value tags are exposed as
+					arrays of either string or null values.
+
+					Writes follow the same convention -- assigning a string or null to a tag stores
+					it as a single tag; assigning an array stores it as a multi-value tag.
+
+					This preserves the on-the-wire shape of metrics that mix single- and multi-value
+					tags. Programs that consume tags in this mode must handle both string and array
+					shapes (for example, with `is_array(.tags.foo)` or by normalizing with `flatten`).
+					"""
 				full: "All tags are exposed as arrays of either string or null values."
 				single: """
 					Tag values are exposed as single strings, the same as they were before this config
