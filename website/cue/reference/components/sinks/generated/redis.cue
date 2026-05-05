@@ -825,7 +825,7 @@ generated: components: sinks: redis: configuration: {
 				type: string: enum: zadd: """
 					Use the `zadd` method.
 
-					This adds messages with a score into a queue.
+					This adds messages onto a queue with a score.
 
 					This is the default.
 					"""
