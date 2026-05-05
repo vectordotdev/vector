@@ -49,13 +49,13 @@
       {{ end }}
 
       {{ with $release.description }}
-      <div class="mt-8 prose dark:prose-dark max-w-none">
+      <div class="mt-8 prose dark:prose-invert max-w-none">
         {{ . | markdownify }}
       </div>
       {{ end }}
 
       <div class="mt-8">
-        <div class="admonition dark:prose-dark prose rounded-xl border-3 px-3 py-3.5 lg:px-5 lg:py-4 border-yellow-400">
+        <div class="admonition dark:prose-invert prose rounded-xl border-3 px-3 py-3.5 lg:px-5 lg:py-4 border-yellow-400">
           <div class="flex items-center">
             <div class="flex-shrink-0">
               <svg class="h-6 w-6 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -80,7 +80,7 @@
       {{ with $release.known_issues }}
       {{ if gt (len $release.known_issues) 0 }}
       <div class="mt-8">
-        <div class="prose dark:prose-dark max-w-none">
+        <div class="prose dark:prose-invert max-w-none">
           {{ partial "heading.html" (dict "text" "Known issues" "level" 2) }}
         </div>
 
@@ -89,7 +89,7 @@
             <ul class="list-disc">
               {{ range . }}
               <li>
-                  <span class="prose dark:prose-dark">
+                  <span class="prose dark:prose-invert">
                     {{ .| markdownify }}
                   </span>
               </li>
@@ -103,7 +103,7 @@
 
       {{ if gt (len $release.changelog) 0 }}
       <div class="mt-8">
-        <div class="prose dark:prose-dark max-w-none">
+        <div class="prose dark:prose-invert max-w-none">
           {{ partial "heading.html" (dict "text" "Vector Changelog" "level" 2) }}
         </div>
 
@@ -116,19 +116,19 @@
           {{ $numChanges := len $changes }}
           {{ $heading := printf "%d %s" $numChanges $value }}
           <div>
-            <div class="prose dark:prose-dark max-w-none">
+            <div class="prose dark:prose-invert max-w-none">
               {{ partial "heading.html" (dict "text" $heading "level" 3 "icon" false) }}
             </div>
 
-            <ul class="prose dark:prose-dark list-disc ml-6">
+            <ul class="prose dark:prose-invert list-disc ml-6">
               {{ range $changes }}
               <li>
-                  <span class="prose dark:prose-dark">
+                  <span class="prose dark:prose-invert">
                     {{ .description | markdownify }}
                   </span>
                 {{ if gt (len .contributors) 0 }}
                 <br>
-                <span class="prose dark:prose-dark italic">
+                <span class="prose dark:prose-invert italic">
                   Thanks to
                   {{ $len := len .contributors }}
                   {{ range $i, $contributor := .contributors }}
@@ -148,7 +148,7 @@
       {{ else }}
       {{ if gt (len $release.commits) 0 }}
       <div class="mt-8">
-        <div class="prose dark:prose-dark max-w-none">
+        <div class="prose dark:prose-invert max-w-none">
           {{ partial "heading.html" (dict "text" "Changelog" "level" 2) }}
         </div>
 
@@ -161,7 +161,7 @@
           {{ $numCommits := len $commits }}
           {{ $heading := printf "%d %s" $numCommits $value }}
           <div class="ml-6">
-            <div class="prose dark:prose-dark max-w-none">
+            <div class="prose dark:prose-invert max-w-none">
               {{ partial "heading.html" (dict "text" $heading "level" 3 "icon" false) }}
             </div>
 
@@ -181,11 +181,11 @@
       {{ with $release.vrl_changelog }}
       {{ if ne . "" }}
       <div class="mt-8">
-        <div class="prose dark:prose-dark max-w-none">
+        <div class="prose dark:prose-invert max-w-none">
           {{ partial "heading.html" (dict "text" "VRL Changelog" "level" 2) }}
         </div>
 
-        <div class="mt-6 prose dark:prose-dark max-w-none">
+        <div class="mt-6 prose dark:prose-invert max-w-none">
           {{ . | markdownify }}
         </div>
       </div>
@@ -194,7 +194,7 @@
 
       {{ with $release.whats_next }}
       <div class="mt-8">
-        <span class="prose dark:prose-dark max-w-none">
+        <span class="prose dark:prose-invert max-w-none">
           {{ partial "heading.html" (dict "text" "What's next" "level" 2) }}
         </span>
 
@@ -205,7 +205,7 @@
               {{ .title }}
             </span>
 
-            <div class="mt-2.5 prose dark:prose-dark max-w-none">
+            <div class="mt-2.5 prose dark:prose-invert max-w-none">
               {{ .description | markdownify }}
             </div>
           </div>
@@ -235,7 +235,7 @@
 <span class="flex items-center justify-between space-x-3">
   <span class="flex items-center space-x-3">
     {{/* Description */}}
-    <span class="prose dark:prose-dark leading-snug flex-shrink prose-sm">
+    <span class="prose dark:prose-invert leading-snug flex-shrink prose-sm">
       {{ .description | markdownify }}
     </span>
   </span>
@@ -253,7 +253,7 @@
     </span>
 
     {{/* Description */}}
-    <span class="prose dark:prose-dark leading-snug flex-shrink prose-sm">
+    <span class="prose dark:prose-invert leading-snug flex-shrink prose-sm">
       {{ .description | markdownify }}
     </span>
   </span>

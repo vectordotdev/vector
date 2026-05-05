@@ -12,7 +12,7 @@
   </span>
 
   {{ with $v.description }}
-  <div class="my-3 prose dark:prose-dark max-w-none">
+  <div class="my-3 prose dark:prose-invert max-w-none">
     {{ . | markdownify }}
   </div>
   {{ end }}
@@ -30,7 +30,7 @@
             d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
       </div>
-      <div class="prose dark:prose-dark max-w-none leading-snug">
+      <div class="prose dark:prose-invert max-w-none leading-snug">
         {{ if $v.deprecated_message }}
         {{ $v.deprecated_message | markdownify }}
         {{ else }}
@@ -59,7 +59,7 @@
         </span>
 
         {{ with $v.description }}
-        <div class="prose dark:prose-dark">
+        <div class="prose dark:prose-invert">
           {{ . | markdownify }}
         </div>
         {{ end }}

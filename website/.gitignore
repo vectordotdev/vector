@@ -22,3 +22,4 @@ yarn-error.log
 
 # Generated HTML reports for Lighthouse
 reports/lighthouse.html
+.hugo-classes

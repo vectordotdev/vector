@@ -1,6 +1,232 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@plugin "@tailwindcss/forms";
+@plugin "@tailwindcss/typography";
+
+/* postcss.config.js writes .hugo-classes from hugo_stats.json at build time.
+   This captures dynamically-constructed class names (e.g. text-[color]) that
+   static file scanning misses. Path resolves from the website/ project root
+   in both the Hugo PostCSS pipeline and standalone postcss runs. */
+@source "./.hugo-classes";
+
+/* Classes injected by JS at runtime, absent from hugo_stats.json */
+@source inline("search-input search-results-list search-result code-sample-filename type block border-gray-200 border-gray-300 border-r border-t font-medium h-2 h-3 h-full inline leading-relaxed mb-1 ml-1 mr-1 p-2 p-4 pl-2 py-4 text-gray-600 text-gray-800 text-sm w-2 w-3");
+
+/* Class-based dark mode via Alpine JS toggling .dark on <html> */
+@variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* Pin color palette to Tailwind v3 sRGB values.
+     v4 defaults use OKLCH which differs visually from v3's hex palette. */
+  /* v2's colors.gray was neutral/zinc — not coolGray */
+  --color-gray-50:  #fafafa; --color-gray-100: #f4f4f5; --color-gray-200: #e4e4e7;
+  --color-gray-300: #d4d4d8; --color-gray-400: #a1a1aa; --color-gray-500: #71717a;
+  --color-gray-600: #52525b; --color-gray-700: #3f3f46; --color-gray-800: #27272a;
+  --color-gray-900: #18181b;
+
+  --color-red-50:  #fef2f2; --color-red-100: #fee2e2; --color-red-200: #fecaca;
+  --color-red-300: #fca5a5; --color-red-400: #f87171; --color-red-500: #ef4444;
+  --color-red-600: #dc2626; --color-red-700: #b91c1c; --color-red-800: #991b1b;
+  --color-red-900: #7f1d1d;
+
+  --color-orange-50:  #fff7ed; --color-orange-100: #ffedd5; --color-orange-200: #fed7aa;
+  --color-orange-300: #fdba74; --color-orange-400: #fb923c; --color-orange-500: #f97316;
+  --color-orange-600: #ea580c; --color-orange-700: #c2410c; --color-orange-800: #9a3412;
+  --color-orange-900: #7c2d12;
+
+  --color-yellow-50:  #fefce8; --color-yellow-100: #fef9c3; --color-yellow-200: #fef08a;
+  --color-yellow-300: #fde047; --color-yellow-400: #facc15; --color-yellow-500: #eab308;
+  --color-yellow-600: #ca8a04; --color-yellow-700: #a16207; --color-yellow-800: #854d0e;
+  --color-yellow-900: #713f12;
+
+  --color-lime-50:  #f7fee7; --color-lime-100: #ecfccb; --color-lime-200: #d9f99d;
+  --color-lime-300: #bef264; --color-lime-400: #a3e635; --color-lime-500: #84cc16;
+  --color-lime-600: #65a30d; --color-lime-700: #4d7c0f; --color-lime-800: #3f6212;
+  --color-lime-900: #365314;
+
+  --color-green-50:  #f0fdf4; --color-green-100: #dcfce7; --color-green-200: #bbf7d0;
+  --color-green-300: #86efac; --color-green-400: #4ade80; --color-green-500: #22c55e;
+  --color-green-600: #16a34a; --color-green-700: #15803d; --color-green-800: #166534;
+  --color-green-900: #14532d;
+
+  --color-blue-50:  #eff6ff; --color-blue-100: #dbeafe; --color-blue-200: #bfdbfe;
+  --color-blue-300: #93c5fd; --color-blue-400: #60a5fa; --color-blue-500: #3b82f6;
+  --color-blue-600: #2563eb; --color-blue-700: #1d4ed8; --color-blue-800: #1e40af;
+  --color-blue-900: #1e3a8a;
+
+  --color-indigo-50:  #eef2ff; --color-indigo-100: #e0e7ff; --color-indigo-200: #c7d2fe;
+  --color-indigo-300: #a5b4fc; --color-indigo-400: #818cf8; --color-indigo-500: #6366f1;
+  --color-indigo-600: #4f46e5; --color-indigo-700: #4338ca; --color-indigo-800: #3730a3;
+  --color-indigo-900: #312e81;
+
+  --color-violet-50:  #f5f3ff; --color-violet-100: #ede9fe; --color-violet-200: #ddd6fe;
+  --color-violet-300: #c4b5fd; --color-violet-400: #a78bfa; --color-violet-500: #8b5cf6;
+  --color-violet-600: #7c3aed; --color-violet-700: #6d28d9; --color-violet-800: #5b21b6;
+  --color-violet-900: #4c1d95;
+
+  --color-purple-50:  #faf5ff; --color-purple-100: #f3e8ff; --color-purple-200: #e9d5ff;
+  --color-purple-300: #d8b4fe; --color-purple-400: #c084fc; --color-purple-500: #a855f7;
+  --color-purple-600: #9333ea; --color-purple-700: #7e22ce; --color-purple-800: #6b21a8;
+  --color-purple-900: #581c87;
+
+  --color-fuchsia-50:  #fdf4ff; --color-fuchsia-100: #fae8ff; --color-fuchsia-200: #f5d0fe;
+  --color-fuchsia-300: #f0abfc; --color-fuchsia-400: #e879f9; --color-fuchsia-500: #d946ef;
+  --color-fuchsia-600: #c026d3; --color-fuchsia-700: #a21caf; --color-fuchsia-800: #86198f;
+  --color-fuchsia-900: #701a75;
+
+  /* Custom colors */
+  --color-dark: #191927;          /* Vector dark */
+  --color-primary: #28d9f2;       /* Vector greenish blue */
+  --color-primary-dark: #00a9bc;  /* Vector darker greenish blue */
+  --color-secondary: #f44af5;     /* Vector magenta */
+  --color-purple-v: #98f;         /* Vector purple */
+  /* Brand colors */
+  --color-discord-purple: #7289DA;
+  --color-rss-orange: #f26522;
+
+  /* Custom font family (Segoe UI as primary sans) */
+  --font-sans: "Segoe UI", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji",
+    "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+
+  /* Custom font sizes (non-standard steps) */
+  --text-2\.5xl: 1.75rem;
+  --text-2\.5xl--line-height: 2.15rem;
+  --text-4\.5xl: 2.5rem;
+  --text-4\.5xl--line-height: 2.75rem;
+  --text-5\.5xl: 3.375rem;
+  --text-5\.5xl--line-height: 1;
+
+  /* Custom border widths */
+  --border-width-2\.5: 2.5px;
+
+  /* Custom max-widths */
+  --max-width-xxs: 16rem;
+  --max-width-1\/4: 25%;
+
+  /* Custom grid template columns */
+  --grid-template-columns-16: repeat(16, minmax(0, 1fr));
+}
+
+/* --------------------------------------------------------------------------
+   Custom typography overrides (replaces v3 tailwind.config.cjs typography)
+   -------------------------------------------------------------------------- */
+
+.prose a {
+  color: var(--color-primary-dark);
+  text-decoration: none;
+}
+.prose a:hover {
+  color: var(--color-secondary);
+}
+.prose a code {
+  color: inherit;
+}
+.prose code {
+  color: var(--color-primary-dark);
+}
+.prose code:not([class^="language-"]) {
+  color: var(--color-dark);
+  background-color: #f3f4f6;
+  border-radius: 4px;
+  padding: 0 5px;
+  display: inline-flex;
+  align-items: center;
+}
+.prose code::before,
+.prose code::after {
+  display: none;
+}
+.prose ul > li::before {
+  background-color: #374151;
+}
+.prose ol > li::before {
+  color: #374151;
+}
+.prose .admonition + .tabs,
+.prose .svg + .admonition,
+.prose .highlight + p {
+  margin-top: 1rem;
+}
+.prose .no-prose a {
+  color: var(--color-primary-dark);
+}
+.prose .no-prose a:hover {
+  color: var(--color-secondary);
+}
+.prose .no-prose p + .highlight {
+  margin-top: 0.75rem;
+}
+.prose .no-prose h1,
+.prose .no-prose h2,
+.prose .no-prose h3,
+.prose .no-prose h4,
+.prose .no-prose h5,
+.prose .no-prose h6 {
+  margin: 0;
+  padding: 0;
+}
+.prose .no-prose .highlight,
+.prose .no-prose pre.chroma {
+  margin: 0;
+}
+
+/* Dark mode prose overrides */
+.dark .prose table th,
+.dark .prose table td {
+  color: #e5e7eb;
+}
+.dark .prose table tr,
+.dark .prose table th,
+.dark .prose table thead,
+.dark .prose table tbody {
+  border-top-color: #374151;
+  border-bottom-color: #374151;
+}
+.dark .prose code {
+  color: #f3f4f6;
+}
+.dark .prose code:not([class^="language-"]) {
+  background-color: #374151;
+}
+.dark .prose {
+  color: #e5e7eb;
+}
+.dark .prose p,
+.dark .prose h1,
+.dark .prose h2,
+.dark .prose h3,
+.dark .prose h4,
+.dark .prose h5,
+.dark .prose h6,
+.dark .prose li {
+  color: #f3f4f6;
+}
+.dark .prose ul > li::before {
+  background-color: #f3f4f6;
+}
+.dark .prose ol > li::before {
+  color: #f3f4f6;
+}
+.dark .prose a,
+.dark .prose a code,
+.dark .prose a code:not([class^="language-"]) {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+.dark .prose a:hover,
+.dark .prose a:active {
+  color: var(--color-secondary);
+}
+.dark .prose strong {
+  color: #f3f4f6;
+}
+
+/* Small prose variant */
+.prose-sm ul > li,
+.prose-sm ol > li {
+  /* preserve first/last child margins from v3 config */
+}
 
 :root {
   --dark: #191927; /* Vector Dark */
@@ -34,18 +260,15 @@
   border-bottom: 1px solid transparent;
 }
 
-@variants hover {
-  .underline {
-    text-decoration: none;
-    border-bottom: 1px solid #f44af5;
-  }
+.hover\:underline:hover {
+  text-decoration: none;
+  border-bottom: 1px solid #f44af5;
 }
 
 [x-cloak] {
   display: none !important;
 }
 
-/* Some rules that Tailwind can't really cover */
 .jump + .jump,
 .admonition + .admonition {
   margin-top: 0.5rem;
