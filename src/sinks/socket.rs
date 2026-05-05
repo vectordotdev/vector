@@ -216,6 +216,8 @@ mod test {
     use futures::stream::StreamExt;
     use futures_util::stream;
     use serde_json::Value;
+    #[cfg(unix)]
+    use tokio::net::UnixListener;
     use tokio::{
         net::TcpListener,
         time::{Duration, sleep, timeout},
@@ -525,14 +527,18 @@ mod test {
                                 close_rx = None;
                             }
 
-                            let mut buf = [0u8; 11];
+                            // Count newlines per read so coalesced TLS/TCP reads still match one
+                            // increment per text line.
+                            let mut buf = [0u8; 256];
                             let mut buf = ReadBuf::new(&mut buf);
                             return match Pin::new(&mut stream).poll_read(cx, &mut buf) {
                                 Poll::Ready(Ok(())) => {
                                     if buf.filled().is_empty() {
                                         Poll::Ready(())
                                     } else {
-                                        msg_counter1.fetch_add(1, Ordering::SeqCst);
+                                        let lines =
+                                            buf.filled().iter().filter(|&&b| b == b'\n').count();
+                                        msg_counter1.fetch_add(lines, Ordering::SeqCst);
                                         continue;
                                     }
                                 }
@@ -599,7 +605,8 @@ mod test {
         let context = SinkContext::default();
         let (sink, _healthcheck) = config.build(context).await.unwrap();
 
-        let (_, events) = random_lines_with_stream(1000, 10000, None);
+        // Exceed stream sink pending batch cap to exercise split-batch retry path.
+        let (_, events) = random_lines_with_stream(2000, 10000, None);
         let sink_handle = tokio::spawn(run_and_assert_sink_compliance(sink, events, &SINK_TAGS));
 
         // First listener
@@ -640,6 +647,61 @@ mod test {
         );
 
         sink_handle.await.unwrap();
+    }
+
+    /// Tests whether Unix stream socket recovers from a hard disconnect.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn reconnect_unix_stream() {
+        trace_init();
+
+        let out_path = temp_uds_path("unix_stream_reconnect");
+        let config = SocketSinkConfig {
+            mode: Mode::UnixStream(UnixMode {
+                config: UnixSinkConfig::new(out_path.clone()),
+                encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
+            }),
+            acknowledgements: Default::default(),
+        };
+
+        let context = SinkContext::default();
+        let (sink, _healthcheck) = config.build(context).await.unwrap();
+
+        // Exceed stream sink pending batch cap to exercise split-batch retry path.
+        let (lines, events) = random_lines_with_stream(2000, 10000, None);
+        let sink_handle = tokio::spawn(run_and_assert_sink_compliance(sink, events, &SINK_TAGS));
+
+        // First listener.
+        let listener = UnixListener::bind(&out_path).unwrap();
+        let mut count = 20usize;
+        let socket = listener.accept().await.unwrap().0;
+        let first_batch = FramedRead::new(socket, LinesCodec::new())
+            .map(|x| x.unwrap())
+            .take_while(|_| {
+                ready(if count > 0 {
+                    count -= 1;
+                    true
+                } else {
+                    false
+                })
+            })
+            .collect::<Vec<_>>()
+            .await;
+        drop(listener);
+        std::fs::remove_file(&out_path).unwrap();
+
+        // Second listener. If this doesn't succeed then the sink hanged.
+        let mut receiver = CountReceiver::receive_lines_unix(out_path.clone());
+        assert!(
+            timeout(Duration::from_secs(5), receiver.connected())
+                .await
+                .is_ok()
+        );
+
+        sink_handle.await.unwrap();
+        let remaining = receiver.await;
+        // Stream reconnect retries are at-least-once, so duplicates are allowed; assert no loss.
+        assert!(first_batch.len() + remaining.len() >= lines.len());
     }
 
     #[cfg(unix)]
