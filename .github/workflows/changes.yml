@@ -136,6 +136,8 @@ on:
         value: ${{ jobs.int_tests.outputs.redis }}
       splunk:
         value: ${{ jobs.int_tests.outputs.splunk }}
+      syslog:
+        value: ${{ jobs.int_tests.outputs.syslog }}
       webhdfs:
         value: ${{ jobs.int_tests.outputs.webhdfs }}
       # e2e tests
@@ -344,6 +346,7 @@ jobs:
       pulsar: ${{ steps.filter.outputs.pulsar }}
       redis: ${{ steps.filter.outputs.redis }}
       splunk: ${{ steps.filter.outputs.splunk }}
+      syslog: ${{ steps.filter.outputs.syslog }}
       webhdfs: ${{ steps.filter.outputs.webhdfs }}
       any: ${{ steps.detect-changes.outputs.any }}
     steps:
@@ -410,6 +413,7 @@ jobs:
             "pulsar": ${{ steps.filter.outputs.pulsar }},
             "redis": ${{ steps.filter.outputs.redis }},
             "splunk": ${{ steps.filter.outputs.splunk }},
+            "syslog": ${{ steps.filter.outputs.syslog }},
             "webhdfs": ${{ steps.filter.outputs.webhdfs }}
           }
           EOF
