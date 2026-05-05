@@ -8,7 +8,6 @@ use std::{
 
 use futures::{FutureExt, StreamExt, TryStreamExt, stream::FuturesOrdered};
 use futures_util::stream::FuturesUnordered;
-use metrics::gauge;
 use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
 use tokio::{
     select,
@@ -31,6 +30,7 @@ use vector_lib::{
     source_sender::{CHUNK_SIZE, SourceSenderItem},
     transform::update_runtime_schema_definition,
 };
+use vector_lib::{gauge, internal_event::GaugeName};
 use vector_vrl_metrics::MetricsStorage;
 
 use super::{
@@ -627,7 +627,7 @@ impl<'a> Builder<'a> {
 
             let utilization_sender = self
                 .utilization_registry
-                .add_component(key.clone(), gauge!("utilization"));
+                .add_component(key.clone(), gauge!(GaugeName::Utilization));
             let component_key = key.clone();
             let sink = async move {
                 debug!("Sink starting.");
@@ -747,7 +747,7 @@ impl<'a> Builder<'a> {
 
         let sender = self
             .utilization_registry
-            .add_component(node.key.clone(), gauge!("utilization"));
+            .add_component(node.key.clone(), gauge!(GaugeName::Utilization));
         let runner = Runner::new(
             t,
             input_rx,
@@ -803,7 +803,7 @@ impl<'a> Builder<'a> {
 
         let sender = self
             .utilization_registry
-            .add_component(key.clone(), gauge!("utilization"));
+            .add_component(key.clone(), gauge!(GaugeName::Utilization));
         let output_sender = sender.clone();
         let input_rx = Utilization::new(sender, key.clone(), input_rx.into_stream());
 
