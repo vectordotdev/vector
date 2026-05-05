@@ -2,6 +2,18 @@ use super::{SchemaContext, docs_type_str, get_schema_metadata};
 use anyhow::Result;
 use serde_json::{Map, Value};
 
+/// Render a JSON Schema `const` scalar (string, number, or bool) as a CUE enum
+/// key. CUE enum keys are strings, so non-string scalars are stringified the
+/// same way `serde_json` would print them. Non-scalar values return `None`.
+fn scalar_const_key(value: &Value) -> Option<String> {
+    match value {
+        Value::String(s) => Some(s.clone()),
+        Value::Number(n) => Some(n.to_string()),
+        Value::Bool(b) => Some(b.to_string()),
+        _ => None,
+    }
+}
+
 impl SchemaContext {
     pub fn get_rendered_description_from_schema(&self, schema: &Value) -> String {
         let raw_description = schema
@@ -430,33 +442,37 @@ impl SchemaContext {
                 continue;
             };
 
-            let mut enum_map = Map::new();
-            match const_value {
-                Value::Array(items) => {
-                    for item in items {
-                        let Some(value) = item.get("value").and_then(Value::as_str) else {
-                            continue;
-                        };
+            let entries = match &const_value {
+                Value::Array(items) => items
+                    .iter()
+                    .filter_map(|item| {
+                        let key = scalar_const_key(item.get("value")?)?;
                         let desc = item
                             .get("description")
                             .and_then(Value::as_str)
                             .unwrap_or("")
                             .to_string();
-                        enum_map.insert(value.to_string(), Value::String(desc));
-                    }
-                }
-                Value::Object(mut single) => {
-                    let Some(Value::String(value)) = single.shift_remove("value") else {
+                        Some((key, desc))
+                    })
+                    .collect::<Vec<_>>(),
+                Value::Object(single) => {
+                    let Some(key) = single.get("value").and_then(scalar_const_key) else {
                         continue;
                     };
                     let desc = single
-                        .shift_remove("description")
-                        .and_then(|d| d.as_str().map(str::to_owned))
+                        .get("description")
+                        .and_then(Value::as_str)
+                        .map(str::to_owned)
                         .or_else(|| schema_description.clone())
                         .unwrap_or_default();
-                    enum_map.insert(value, Value::String(desc));
+                    vec![(key, desc)]
                 }
                 _ => continue,
+            };
+
+            let mut enum_map = Map::new();
+            for (key, desc) in entries {
+                enum_map.insert(key, Value::String(desc));
             }
 
             if let Some(Value::Object(field)) = resolved.pointer_mut(&format!("/type/{type_field}"))
