@@ -31,6 +31,7 @@ pub mod api;
 mod builder;
 mod cmd;
 mod compiler;
+pub mod deprecation;
 mod diff;
 pub mod dot_graph;
 mod enrichment_table;
