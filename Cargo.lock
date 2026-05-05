@@ -8899,16 +8899,6 @@ dependencies = [
 
 [[package]]
 name = "quick-xml"
-version = "0.31.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1004a344b30a54e2ee58d66a71b32d2db2feb0a31f9a2d302bf0536f15de2a33"
-dependencies = [
- "memchr",
- "serde",
-]
-
-[[package]]
-name = "quick-xml"
 version = "0.37.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a4ce8c88de324ff838700f36fb6ab86c96df0e3c4ab6ef3a9b2044465cce1369"
@@ -12882,7 +12872,7 @@ dependencies = [
  "prost-types 0.12.6",
  "pulsar",
  "quick-junit",
- "quick-xml 0.31.0",
+ "quick-xml 0.38.4",
  "quickcheck",
  "rand 0.9.4",
  "rand_distr",
