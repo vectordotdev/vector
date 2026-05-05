@@ -56,12 +56,8 @@ impl Decoder {
         self
     }
 
-    /// Attaches a per-decode-call metadata template to the inner deserializer.
-    ///
-    /// For deserializers that support it (currently only `VrlDeserializer`) the
-    /// template is pre-populated on the synthetic event before any user program
-    /// executes, making every `%`-prefixed path readable (e.g. `%splunk_hec.host`,
-    /// `%vector.secrets.*`). For all other deserializers this is a no-op.
+    /// Attaches a per-decode-call metadata template to the inner deserializer,
+    /// allowing deserializers to read from and write to event metadata.
     pub fn with_metadata_template(mut self, metadata: EventMetadata) -> Self {
         self.deserializer = self.deserializer.with_metadata_template(metadata);
         self
