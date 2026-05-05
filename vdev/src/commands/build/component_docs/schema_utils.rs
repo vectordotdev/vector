@@ -178,6 +178,11 @@ impl SchemaContext {
             return Some(prop);
         }
 
+        // Walk oneOf/anyOf/allOf and collect every subschema's matching property.
+        // We can only confidently apply a default through one of these branches if
+        // they all describe the same shape, so compare reduced forms and bail if
+        // they diverge.
+        let mut matches: Vec<&'a Value> = Vec::new();
         let mut unvisited: Vec<&'a Value> = Vec::new();
         for key in &["oneOf", "anyOf", "allOf"] {
             if let Some(Value::Array(arr)) = schema.get(*key) {
@@ -187,7 +192,8 @@ impl SchemaContext {
 
         while let Some(sub) = unvisited.pop() {
             if let Some(prop) = sub.get("properties").and_then(|p| p.get(property_name)) {
-                return Some(prop);
+                matches.push(prop);
+                continue;
             }
             for key in &["oneOf", "anyOf", "allOf"] {
                 if let Some(Value::Array(arr)) = sub.get(*key) {
@@ -196,7 +202,14 @@ impl SchemaContext {
             }
         }
 
-        None
+        let first = matches.first()?;
+        let reduced_first = self.get_reduced_schema(first);
+        for other in matches.iter().skip(1) {
+            if self.get_reduced_schema(other) != reduced_first {
+                return None;
+            }
+        }
+        Some(first)
     }
 
     pub fn apply_schema_default_value(
