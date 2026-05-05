@@ -24,6 +24,10 @@ pub struct Cli {
     #[arg(short = 'r', long)]
     retries: Option<u8>,
 
+    /// Collect code coverage using cargo-llvm-cov (outputs target/coverage/lcov.info)
+    #[arg(long)]
+    coverage: bool,
+
     /// Extra test command arguments
     args: Vec<String>,
 }
@@ -36,6 +40,7 @@ impl Cli {
             self.environment.as_ref(),
             self.retries.unwrap_or_default(),
             &self.args,
+            self.coverage,
         )
     }
 }

@@ -4,10 +4,13 @@
 # validation. Callers can enable additional suites (CLI, Vector API, behavior)
 # via boolean inputs.
 #
-# When `default` is true, all nextest-based suites run in a single `make test`
-# invocation with the relevant features enabled. When `default` is false, only
-# the explicitly enabled suites run, using a nextest filter expression to
-# select the matching tests.
+# With coverage: false (default), plain cargo-nextest; uploads test results to Datadog.
+# With coverage: true, cargo-llvm-cov (COVERAGE=true); uploads an lcov artifact named "coverage-unit".
+#
+# When `default` is true (the default), all nextest-based suites run in a
+# single `make test` invocation with the relevant features enabled. When
+# `default` is false, only the explicitly enabled suites run, using a nextest
+# filter expression to select the matching tests.
 
 name: Tests
 
@@ -18,6 +21,11 @@ on:
         description: "Git ref to checkout"
         required: false
         type: string
+      coverage:
+        description: "Collect code coverage (sets COVERAGE=true for make targets)"
+        required: false
+        type: boolean
+        default: false
       default:
         description: "Run the full default unit test suite (--workspace with default features)"
         required: true
@@ -38,7 +46,7 @@ on:
         type: boolean
         default: false
       behavior:
-        description: "Include behavior tests"
+        description: "Include behavior tests (cargo run based, no coverage)"
         required: false
         type: boolean
         default: false
@@ -69,7 +77,8 @@ jobs:
         with:
           rust: true
           cargo-nextest: true
-          datadog-ci: true
+          cargo-llvm-cov: ${{ inputs.coverage }}
+          datadog-ci: ${{ !inputs.coverage }}
           protoc: true
           libsasl2: true
 
@@ -112,11 +121,27 @@ jobs:
           else
             echo "No nextest suites selected; skipping 'make test'"
           fi
+        env:
+          COVERAGE: ${{ inputs.coverage }}
 
       - name: Behavior tests
         if: ${{ inputs.behavior }}
         run: make test-behavior
 
       - name: Upload test results to Datadog
-        if: ${{ always() }}
+        if: ${{ !inputs.coverage && always() }}
         run: scripts/upload-test-results.sh
+
+      - name: Generate lcov report
+        if: ${{ inputs.coverage }}
+        run: |
+          make coverage-report
+          # Normalize absolute source paths to relative so they merge cleanly with
+          # coverage from the containerized integration tests (which use SF:src/...).
+          sed -i "s|SF:$(pwd)/|SF:|g" lcov.info
+
+      - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        if: ${{ inputs.coverage }}
+        with:
+          name: coverage-unit
+          path: lcov.info
