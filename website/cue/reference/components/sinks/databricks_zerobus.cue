@@ -97,7 +97,16 @@ components: sinks: databricks_zerobus: {
 			body: """
 				Events are batched before being sent to Zerobus. Each event is individually
 				serialized as a protobuf message, and the batch is sent as a single request.
-				The maximum batch size is 10MB, which is enforced by the Zerobus SDK.
+				The maximum batch size is 10MB, enforced by the Zerobus SDK.
+
+				Vector sizes batches against `batch.max_bytes` using the *uncompressed,
+				pre-serialization* event size, while the SDK's 10MB cap applies to the
+				*encoded protobuf* size. For most schemas the protobuf encoding is smaller
+				than (or comparable to) the source event, but for numeric-heavy schemas
+				(many integer or float fields) the encoded form can be larger — so a batch
+				configured right at the 10MB boundary may exceed the SDK limit and the
+				ingest call will fail. If you see SDK-side size errors, lower
+				`batch.max_bytes` to leave headroom (for example, 8MB).
 				"""
 		}
 
@@ -142,13 +151,16 @@ components: sinks: databricks_zerobus: {
 		acknowledgements: {
 			title: "Acknowledgements"
 			body: """
-				When `acknowledgements` is enabled, the sink waits for a server-side
-				acknowledgement after each batch is ingested. This confirms that the Zerobus
-				service has received and accepted the data before marking events as delivered.
+				The sink always waits for a per-batch server-side offset acknowledgement
+				from Zerobus before considering a batch delivered, regardless of whether
+				Vector's end-to-end `acknowledgements` are enabled. This guarantees that
+				data has been durably accepted by the Zerobus service before the sink
+				reports success.
 
-				When disabled (the default), events are marked as delivered as soon as the
-				ingestion call completes without error, without waiting for an explicit
-				server acknowledgement.
+				Vector's `acknowledgements.enabled` setting only controls whether that
+				delivery confirmation is propagated back to upstream sources that support
+				end-to-end acknowledgements; it does not weaken the sink's own per-batch
+				durability guarantee.
 				"""
 		}
 	}

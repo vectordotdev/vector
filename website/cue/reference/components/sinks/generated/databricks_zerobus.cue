@@ -279,7 +279,8 @@ generated: components: sinks: databricks_zerobus: configuration: {
 		description: """
 			Zerobus stream configuration options.
 
-			Zerobus stream configuration options.
+			This is a thin wrapper around the SDK's `StreamConfigurationOptions` with Vector-specific
+			configuration attributes and custom defaults suitable for Vector's use case.
 			"""
 		required: false
 		type: object: options: {

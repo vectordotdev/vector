@@ -117,7 +117,7 @@ pub struct ZerobusSinkConfig {
     #[configurable(derived)]
     pub auth: DatabricksAuthentication,
 
-    /// Zerobus stream configuration options.
+    #[configurable(derived)]
     #[serde(default)]
     pub stream_options: ZerobusStreamOptions,
 
