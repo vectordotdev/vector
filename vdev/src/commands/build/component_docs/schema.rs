@@ -130,30 +130,14 @@ pub fn schema_aware_nested_merge(base: &mut Value, override_val: &Value) {
 
         for (k, v) in over_obj {
             if k == "const"
-                && base_obj
-                    .get("const")
-                    .and_then(|c| c.as_object())
-                    .is_some_and(|c| c.contains_key("value"))
-                && v.as_object().is_some_and(|o| o.contains_key("value"))
+                && is_const_variant(v)
+                && is_existing_const_variants(base_obj.get("const"))
             {
                 let base_vals = std::mem::take(base_obj.get_mut("const").unwrap());
                 let mut result = Vec::new();
 
-                if let Value::Array(arr) = base_vals {
-                    result.extend(arr);
-                } else {
-                    result.push(base_vals);
-                }
-
-                if let Value::Array(arr) = v {
-                    for i in arr {
-                        if !result.contains(i) {
-                            result.push(i.clone());
-                        }
-                    }
-                } else if !result.contains(v) {
-                    result.push(v.clone());
-                }
+                push_const_variants(&mut result, base_vals);
+                push_const_variants(&mut result, v.clone());
 
                 base_obj.insert("const".to_string(), Value::Array(result));
             } else {
@@ -171,5 +155,36 @@ pub fn schema_aware_nested_merge(base: &mut Value, override_val: &Value) {
         }
     } else {
         *base = override_val.clone();
+    }
+}
+
+/// True for a `{value, ...}` const variant, or an array of such variants.
+fn is_const_variant(value: &Value) -> bool {
+    match value {
+        Value::Object(o) => o.contains_key("value"),
+        Value::Array(arr) => arr.iter().all(is_const_variant),
+        _ => false,
+    }
+}
+
+fn is_existing_const_variants(existing: Option<&Value>) -> bool {
+    existing.is_some_and(is_const_variant)
+}
+
+fn push_const_variants(result: &mut Vec<Value>, value: Value) {
+    match value {
+        Value::Array(arr) => {
+            for item in arr {
+                if !result.contains(&item) {
+                    result.push(item);
+                }
+            }
+        }
+        obj @ Value::Object(_) => {
+            if !result.contains(&obj) {
+                result.push(obj);
+            }
+        }
+        _ => {}
     }
 }
