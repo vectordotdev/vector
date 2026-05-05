@@ -66,26 +66,9 @@ pub fn run(schema_path: &Path) -> Result<()> {
         }
     }
 
-    // 3. Process APIs (sorted by name for deterministic output)
-    let mut apis: IndexMap<String, String> = IndexMap::new();
-    if let Some(definitions) = root_schema.get("definitions").and_then(|d| d.as_object()) {
-        for (key, definition) in definitions {
-            let comp_type = super::schema::get_schema_metadata(definition, "docs::component_type")
-                .and_then(|v| v.as_str());
-            let comp_name = super::schema::get_schema_metadata(definition, "docs::component_name")
-                .and_then(|v| v.as_str());
-
-            if comp_type == Some("api")
-                && let Some(n) = comp_name
-            {
-                apis.insert(n.to_string(), key.clone());
-            }
-        }
-    }
-    apis.sort_keys();
-    render_and_import_generated_api_schema(&mut context, &apis)?;
-
-    // 4. Process top-level configuration fields (formerly "global options").
+    // 3. Process top-level configuration fields (formerly "global options").
+    // The standalone API schema (`generated/api.cue`) was retired in #24858; api
+    // is now rendered as a top-level field with `group: "api"`.
     render_and_import_generated_top_level_config_schema(&mut context, &root_schema)?;
 
     Ok(())
@@ -215,26 +198,6 @@ fn render_and_import_component_schema(
             component_name,
         ],
         &cue_path,
-    )
-}
-
-fn render_and_import_generated_api_schema(
-    context: &mut SchemaContext,
-    apis: &IndexMap<String, String>,
-) -> Result<()> {
-    let mut api_schema = serde_json::Map::new();
-    for (component_name, schema_name) in apis {
-        let friendly_name = format!("'{component_name}' api configuration");
-        let resolved = context.unwrap_resolved_schema(schema_name, &friendly_name)?;
-        api_schema.insert(component_name.clone(), Value::Object(resolved));
-    }
-
-    render_and_import_schema(
-        context,
-        Value::Object(api_schema),
-        "configuration",
-        &["generated", "api"],
-        "generated/api.cue",
     )
 }
 
