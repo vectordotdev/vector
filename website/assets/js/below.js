@@ -10,7 +10,7 @@ const tableOfContents = () => {
       scrollSmoothDuration: 400,
       headingsOffset: 80,
       scrollSmoothOffset: -80,
-      hasInnerContainers: true,
+      hasInnerContainers: true
     });
   }
 };
