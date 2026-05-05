@@ -381,6 +381,8 @@ nsupdate
 ntapi
 ntfs
 Odys
+oauthbearer
+oidc
 onig
 opendal
 Openpeak
