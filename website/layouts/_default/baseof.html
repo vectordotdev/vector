@@ -7,7 +7,7 @@
   x-data="{ dark: $store.global.dark{{ if $hasBottomNav }}, slideover: false {{ end }} }"
   x-on:toggle-dark="dark = !dark"
   :class="{ 'dark': dark, 'light': !dark }"
-  class="h-screen">
+  class="min-h-full">
 
   <head>
     {{/* Make sure the page is always visible if JS is disabled */}}
@@ -37,7 +37,7 @@
     {{/* JS that needs to load at the start */}}
     {{ partial "javascript/head.html" . }}
   </head>
-  <body class="dark:bg-dark font-sans antialiased flex flex-col min-h-full{{ if $hasBottomNav }} pb-16 lg:pb-0{{ end }}" onload="showBody()" style="visibility: hidden;">
+  <body class="dark:bg-dark font-sans antialiased flex flex-col min-h-screen{{ if $hasBottomNav }} pb-16 lg:pb-0{{ end }}" onload="showBody()" style="visibility: hidden;">
     <!-- Google Tag Manager (noscript) -->
     <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-M7MFKZ9" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     <!-- End Google Tag Manager (noscript) -->
