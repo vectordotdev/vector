@@ -1482,21 +1482,15 @@ sequencing rule is for trace-aware consumers (sinks, transforms, VRL programs) t
 shims are unidirectional (`Legacy -> Typed` only) and a `Typed` event has no source provenance
 on which to base a `Typed -> Legacy` conversion.
 
-- [ ] Land the legacy-layout hint as a precursor: the `opentelemetry` and `datadog_agent` sources
-  each set `EventMetadata.value`'s reserved sub-key `vector.trace_legacy_layout` to a static string
-  identifying themselves on every trace event they emit. Purely additive -- no consumer reads the
-  key yet. See "Migration: coexistence of `LogEvent` and typed representations" for the rationale.
-- [ ] Convert `TraceEvent` to the migration enum: `Legacy(LogEvent)` and `Typed { resource, scope,
-  chunk, spans, metadata }`, demonstrating the new structure and the supporting types. Add the
-  explicit `to_typed(&mut self)` converter that reads
-  `EventMetadata.value` sub-key `vector.trace_legacy_layout` and invokes the corresponding
-  `Legacy -> Typed` shim. Typed accessors (`resource()`, `spans()`, ...) panic on `Legacy` with a diagnostic
-  pointing at `to_typed()`. Every component still produces and consumes `Legacy`; nothing
-  functionally changes. A `to_typed()` call on an event whose layout hint is absent or unrecognized
-  returns an error and emits a rate-limited `warn!` log.
-- [ ] Extend Vector's internal event proto with the typed wire shape, per "Wire serialization"
-  under Implementation. Hard prerequisite for any source-flip step: without it, disk buffers
-  and the `vector` source/sink panic on the first `Typed` event.
+- [ ] Land the legacy-layout hint in the `opentelemetry` and `datadog_agent` sources as a
+  precursor. Purely additive -- no consumer reads the key yet. Carrier and sub-key are
+  specified in "Migration: coexistence of `LogEvent` and typed representations".
+- [ ] Convert `TraceEvent` to the migration enum and introduce the supporting types per
+  "Migration: coexistence of `LogEvent` and typed representations". Every component continues
+  to produce and consume `Legacy`; no functional change.
+- [ ] Extend Vector's internal event proto with the typed wire shape, per "Wire serialization".
+  Hard prerequisite for any source-flip step: without it, disk buffers and the `vector`
+  source/sink panic on the first `Typed` event.
 - [ ] Add VRL typed-path support for `.resource.*`, `.scope.*`, `.chunk.*`, and `.spans[*].*`
   on `VrlTarget`. Untyped VRL paths against `Typed` events return a deterministic error.
 - [ ] Migration guide for users:
@@ -1504,59 +1498,46 @@ on which to base a `Typed -> Legacy` conversion.
     legacy paths break against `Typed` events);
   - field-by-key VRL programs against the old `trace_to_log` output (must move to the
     new uniform layout);
-  - removal of the legacy `tracerPayloads`-empty Datadog ingest path. The shape has not
-    been emitted by any supported Datadog Agent for over five years; operators on any
-    currently supported Agent are unaffected. Payloads in the legacy shape now produce a
-    `component_errors_total{error_type="unsupported_payload_version"}` increment and a
-    rate-limited error log instead of being silently translated.
-- [ ] OTLP `Legacy -> Typed` shim and `Typed -> OTLP-wire` conversion in `lib/opentelemetry-proto`.
-  The shim dispatch infrastructure uses the `vector.trace_legacy_layout` hint in
-  `EventMetadata.value` to select the OTLP shim on demand. The `Typed -> wire` conversion is what
-  the eventual native source emission and any OTLP sink will use.
-- [ ] Remove the legacy `tracerPayloads`-empty ingest branch from
-  `src/sources/datadog_agent/traces.rs`: delete `handle_dd_trace_payload_v0`, drop the
-  `APITrace traces` and `Span transactions` fields from `proto/vector/dd_trace.proto`, and
-  replace the local proto file with the upstream
-  `proto/datadog/trace/{agent_payload,tracer_payload,span}.proto`. Payloads decoding into
-  the legacy shape (or carrying only `idxTracerPayloads`) emit a
+  - removal of the legacy `tracerPayloads`-empty Datadog ingest path (see [^dd-v0]).
+    Payloads in the legacy shape now emit
+    `component_errors_total{error_type="unsupported_payload_version"}` and a rate-limited
+    error log instead of being silently translated.
+  - cross-version `vector` source/sink chains spanning the typed migration must run a single
+    release line (see Drawbacks).
+- [ ] OTLP `Legacy -> Typed` shim and `Typed -> OTLP-wire` conversion in
+  `lib/opentelemetry-proto`. Registers under the OTLP layout hint; consumed by the eventual
+  native `opentelemetry` source emission and any OTLP sink.
+- [ ] Remove the legacy `tracerPayloads`-empty Datadog ingest branch (see [^dd-v0]): delete
+  `handle_dd_trace_payload_v0` from `src/sources/datadog_agent/traces.rs` and replace
+  `proto/vector/dd_trace.proto` with the upstream agent-payload/tracer-payload/span protos.
+  Payloads in the legacy shape emit
   `component_errors_total{error_type="unsupported_payload_version"}` and a rate-limited
-  error log so any operator running an unsupported Agent gets a loud signal rather than
-  silent data loss. Lands independently of the typed migration; ordering relative to the
-  other Datadog steps is unconstrained.
+  error log. Lands independently of the typed migration.
 - [ ] Datadog `Legacy -> Typed` shim and `Typed <-> Datadog-wire` conversions in
-  `src/sources/datadog_agent/traces.rs` and `src/sinks/datadog/traces/`. The dispatch infrastructure
-  selects the Datadog shim on demand, paralleling the OTLP step.
+  `src/sources/datadog_agent/traces.rs` and `src/sinks/datadog/traces/`. Parallels the OTLP
+  shim step.
 - [ ] Property-based round-trip unit tests for `OTLP -> Vector -> OTLP` and
-  `Datadog -> Vector -> Datadog`, asserting effective equivalence (per the "Scope" definition)
-  against generated payloads. The Datadog suite must cover the multi-service single-trace case
-  (split-on-ingest, merge-on-egress), a non-conforming multi-trace chunk, and span links to
-  128-bit trace IDs (`SpanLink.traceID` + `SpanLink.traceID_high`) to guard against the
-  link high-half being silently truncated.
-- [ ] Migrate the `datadog_traces` sink to consume `Typed` natively (converting `Legacy`
-  inputs via the shim); update APM stats aggregation to read typed fields.
-- [ ] Migrate the `sample` transform (and tests) to typed access. Note: for Datadog-sourced
-  events, the keep/drop unit shifts from `TraceChunk` to `(TraceChunk, Span.service)` because
-  the source splits multi-service chunks on ingest. This is a narrowing of an already
-  imperfect atomicity property (cross-process traces are split across chunks today regardless),
-  not a new class of fault. Trace-stable sampling is deferred to Future Improvements.
-- [ ] Migrate the `trace_to_log` transform to operate on `Typed` (converting `Legacy` inputs via
-  the shim) and emit a uniform, source-independent `LogEvent` layout. Document the new key
-  layout.
-- [ ] Remove the untyped forwarding methods (`get(path)`, `insert(path, value)`, `as_map()`,
-  `as_ref().get_timestamp()`, etc.) from `TraceEvent`. Every call site that reaches these methods
-  through the `TraceEvent` type -- including sinks such as Kafka that use `trace.get(...)` for
-  `key_field` or headers extraction and `trace.as_ref().get_timestamp()` for timestamps -- becomes
-  a compile error. Fix all resulting errors by migrating each call site to the equivalent typed
-  accessor or by pattern-matching into the `Legacy(LogEvent)` arm explicitly where the component
-  has not yet been fully migrated. The build must be green before either source step below.
+  `Datadog -> Vector -> Datadog`, asserting effective equivalence per Scope. Required Datadog
+  coverage: multi-service single-trace chunks, non-conforming multi-trace chunks, and 128-bit
+  `SpanLink` trace IDs.
+- [ ] Migrate the `datadog_traces` sink to consume `Typed` natively; update APM stats
+  aggregation to read typed fields.
+- [ ] Migrate the `sample` transform (and tests) to typed access. Behavioural change: for
+  Datadog-sourced events the keep/drop unit shifts from `TraceChunk` to
+  `(TraceChunk, Span.service)`. Trace-stable sampling is deferred to Future Improvements.
+- [ ] Migrate the `trace_to_log` transform to typed access; emit a uniform, source-independent
+  `LogEvent` layout. Document the new key layout in the migration guide.
+- [ ] Remove the untyped forwarding methods (`get`, `insert`, `as_map`, `as_ref` to
+  `LogEvent`, etc.) from `TraceEvent`. Call sites that still use them through `TraceEvent`
+  become compile errors; each migrates to the typed accessor API or pattern-matches into the
+  `Legacy(LogEvent)` arm explicitly. The build must be green before the source-flip steps.
 - [ ] Migrate the `opentelemetry` source to produce `Typed` natively. By this point every
   trace-aware downstream component is `Typed`-capable.
 - [ ] Migrate the `datadog_agent` source to produce `Typed` natively.
 - [ ] Collapse the `TraceEvent` enum to a struct with only the typed variant's fields. Remove
-  the per-component shims. Mark the proto's `LegacyTrace`/`LegacyTraceArray` messages and the
-  `legacy_trace` oneof variants `deprecated = true` (per "Wire serialization"); a follow-up
-  PR after the deprecation release window removes them and adds field tag 3 to `reserved` in
-  `EventWrapper.event` and `EventArray.events`.
+  the per-component shims. Mark the legacy proto messages `deprecated = true` per "Wire
+  serialization"; a follow-up PR after the deprecation window removes them and reserves the
+  field tags.
 
 ## Future Improvements
 
