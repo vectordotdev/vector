@@ -1,5 +1,5 @@
 use super::schema::SchemaContext;
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 use indexmap::IndexMap;
 use serde_json::{Value, json};
 use std::fs;
@@ -144,11 +144,10 @@ fn render_and_import_schema(
         .status()?;
 
     if !status.success() {
-        error!(
-            "[!]   Failed to import {} schema as valid Cue.",
-            friendly_name
+        bail!(
+            "Failed to import {friendly_name} schema as valid Cue (cue exit status {status}). JSON written to {json_path}.",
+            json_path = json_output_file.display()
         );
-        std::process::exit(1);
     }
 
     info!(
@@ -342,8 +341,10 @@ fn render_and_import_generated_top_level_config_schema(
         .status()?;
 
     if !status.success() {
-        error!("[!]   Failed to import {friendly_name} schema as valid Cue.");
-        std::process::exit(1);
+        bail!(
+            "Failed to import {friendly_name} schema as valid Cue (cue exit status {status}). JSON written to {json_path}.",
+            json_path = json_output_file.display()
+        );
     }
 
     info!(

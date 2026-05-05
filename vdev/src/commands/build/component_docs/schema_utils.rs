@@ -37,15 +37,17 @@ impl SchemaContext {
     ) -> Result<Map<String, Value>> {
         info!("[*] Resolving schema definition for {}...", friendly_name);
 
-        let mut resolved_schema = self.resolve_schema_by_name(schema_name)?;
+        let resolved_schema = self.resolve_schema_by_name(schema_name)?;
 
-        let unwrapped = resolved_schema.pointer_mut("/type/object/options");
-        if unwrapped.is_none() {
-            error!("Configuration types must always resolve to an object schema.");
-            std::process::exit(1);
-        }
-
-        let unwrapped_obj = unwrapped.unwrap().as_object().unwrap().clone();
+        let unwrapped_obj = resolved_schema
+            .pointer("/type/object/options")
+            .and_then(Value::as_object)
+            .cloned()
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "Configuration types must always resolve to an object schema; '{schema_name}' did not. Resolved: {resolved_schema}"
+                )
+            })?;
 
         // Recursively sort the entire schema to match Ruby's `sort_hash_nested` logic
         Ok(Self::sort_hash_nested(&unwrapped_obj))

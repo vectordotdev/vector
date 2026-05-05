@@ -1,5 +1,5 @@
 use super::{SchemaContext, get_schema_metadata, schema_aware_nested_merge};
-use anyhow::Result;
+use anyhow::{Result, bail};
 use indexmap::IndexMap;
 use serde_json::{Map, Value, json};
 use std::collections::HashSet;
@@ -7,16 +7,11 @@ use std::collections::HashSet;
 impl SchemaContext {
     #[allow(clippy::too_many_lines)]
     pub fn resolve_enum_schema(&mut self, schema: &Value) -> Result<Value> {
-        let mut subschemas = if let Some(one) = schema.get("oneOf") {
-            one.as_array().unwrap().clone()
-        } else if let Some(any) = schema.get("anyOf") {
-            any.as_array().unwrap().clone()
-        } else {
-            error!(
-                "Enum schema had both `oneOf` and `anyOf` specified (or neither). Schema: {}",
-                schema
-            );
-            std::process::exit(1);
+        let mut subschemas = match (schema.get("oneOf"), schema.get("anyOf")) {
+            (Some(Value::Array(arr)), None) | (None, Some(Value::Array(arr))) => arr.clone(),
+            _ => bail!(
+                "Enum schema had both `oneOf` and `anyOf` specified (or neither). Schema: {schema}"
+            ),
         };
 
         let is_optional = get_schema_metadata(schema, "docs::optional")
@@ -48,16 +43,13 @@ impl SchemaContext {
             return Ok(json!({ "_resolved": self.resolve_schema(&unwrapped)? }));
         }
 
-        let enum_tagging =
-            get_schema_metadata(schema, "docs::enum_tagging").and_then(|v| v.as_str());
-        if enum_tagging.is_none() {
-            error!(
-                "Enum schemas should never be missing the metadata for the enum tagging mode. Schema: {}",
-                schema
+        let Some(enum_tagging) =
+            get_schema_metadata(schema, "docs::enum_tagging").and_then(|v| v.as_str())
+        else {
+            bail!(
+                "Enum schemas should never be missing the metadata for the enum tagging mode. Schema: {schema}"
             );
-            std::process::exit(1);
-        }
-        let enum_tagging = enum_tagging.unwrap();
+        };
         let enum_tag_field =
             get_schema_metadata(schema, "docs::enum_tag_field").and_then(|v| v.as_str());
 
@@ -159,20 +151,16 @@ impl SchemaContext {
                         }
                     }
 
-                    if tag_value.is_none() {
-                        error!(
-                            "All enum subschemas representing an internally-tagged enum must have the tag field use a const value."
+                    let Some(tag_val_str) = tag_value else {
+                        bail!(
+                            "All enum subschemas representing an internally-tagged enum must have the tag field use a const value. Tag field: '{tag_field}', subschema: {tag_subschema}"
                         );
-                        std::process::exit(1);
-                    }
-                    let tag_val_str = tag_value.unwrap();
+                    };
 
                     if unique_tag_values.contains_key(&tag_val_str) {
-                        error!(
-                            "Found duplicate tag value '{}' when resolving enum subschemas.",
-                            tag_val_str
+                        bail!(
+                            "Found duplicate tag value '{tag_val_str}' when resolving enum subschemas. Tag field: '{tag_field}'."
                         );
-                        std::process::exit(1);
                     }
                     unique_tag_values.insert(tag_val_str.clone(), tag_subschema.clone());
 
@@ -181,11 +169,9 @@ impl SchemaContext {
                             let reduced_existing = self.get_reduced_resolved_schema(existing);
                             let reduced_new = self.get_reduced_resolved_schema(prop_schema);
                             if reduced_existing != reduced_new {
-                                error!(
-                                    "Had overlapping property '{}' from resolved enum subschema, but schemas differed.",
-                                    prop_name
+                                bail!(
+                                    "Had overlapping property '{prop_name}' from resolved enum subschema, but schemas differed. Existing: {reduced_existing}, new: {reduced_new}."
                                 );
-                                std::process::exit(1);
                             }
                             existing
                                 .get_mut("relevant_when")
@@ -240,15 +226,13 @@ impl SchemaContext {
                     json!({ "string": { "enum": enum_vals } }),
                 );
 
-                let tag_desc = get_schema_metadata(schema, "docs::enum_tag_description");
-                if tag_desc.is_none() {
-                    error!(
-                        "A unique tag description must be specified for enums which are internally tagged"
+                let Some(tag_desc) = get_schema_metadata(schema, "docs::enum_tag_description")
+                else {
+                    bail!(
+                        "A unique tag description must be specified for enums which are internally tagged. Schema: {schema}"
                     );
-                    std::process::exit(1);
-                }
-                resolved_tag_property_obj
-                    .insert("description".to_string(), tag_desc.unwrap().clone());
+                };
+                resolved_tag_property_obj.insert("description".to_string(), tag_desc.clone());
 
                 unique_resolved_properties.insert(
                     tag_field.to_string(),
@@ -349,12 +333,10 @@ impl SchemaContext {
                         resolved_subschema.pointer("/type/object/options")
                     {
                         if resolved_properties.len() != 1 {
-                            error!(
-                                "Expected exactly 1 property for externally-tagged non-unit enum variant, got {}. Schema: {}",
-                                resolved_properties.len(),
-                                subschema
+                            bail!(
+                                "Expected exactly 1 property for externally-tagged non-unit enum variant, got {len}. Schema: {subschema}",
+                                len = resolved_properties.len()
                             );
-                            std::process::exit(1);
                         }
                         let description = self.get_rendered_description_from_schema(subschema);
                         for (property_name, property_schema) in resolved_properties {

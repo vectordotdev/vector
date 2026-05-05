@@ -1,5 +1,5 @@
 use super::{SchemaContext, docs_type_str, get_schema_metadata, nested_merge};
-use anyhow::Result;
+use anyhow::{Result, bail};
 use serde_json::{Value, json};
 
 impl SchemaContext {
@@ -188,19 +188,18 @@ impl SchemaContext {
 
                 if let Some(addl_props) = schema.get("additionalProperties") {
                     debug!("Handling additional properties.");
-                    let sing_desc =
-                        get_schema_metadata(schema, "docs::additional_props_description");
-                    if sing_desc.is_none() {
-                        error!(
-                            "Missing 'docs::additional_props_description' metadata for a wildcard field."
+                    let Some(sing_desc) =
+                        get_schema_metadata(schema, "docs::additional_props_description")
+                    else {
+                        bail!(
+                            "Missing 'docs::additional_props_description' metadata for a wildcard field. Schema: {schema}"
                         );
-                        std::process::exit(1);
-                    }
+                    };
 
                     let mut resolved_addl = self.resolve_schema(addl_props)?;
                     if let Value::Object(ref mut map) = resolved_addl {
                         map.insert("required".to_string(), Value::Bool(true));
-                        map.insert("description".to_string(), sing_desc.unwrap().clone());
+                        map.insert("description".to_string(), sing_desc.clone());
                         options.insert("*".to_string(), Value::Object(map.clone()));
                     }
                 }
@@ -293,10 +292,7 @@ impl SchemaContext {
                 debug!("Resolving unconstrained schema.");
                 json!({ "*": {} })
             }
-            _ => {
-                error!("Failed to resolve schema: {:?}", schema);
-                std::process::exit(1);
-            }
+            _ => bail!("Failed to resolve schema: {schema:?}"),
         };
 
         Ok(json!({ "type": res }))
