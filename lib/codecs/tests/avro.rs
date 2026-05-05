@@ -38,7 +38,9 @@ fn roundtrip_avro(data_path: PathBuf, schema_path: PathBuf, reserialize: bool) {
     let deserializer = AvroDeserializerConfig::new(schema.clone(), false)
         .build()
         .unwrap();
-    let mut serializer = AvroSerializerConfig::new(schema.clone()).build().unwrap();
+    let mut serializer = AvroSerializerConfig::new(schema.clone(), None)
+        .build()
+        .unwrap();
 
     let (buf, event) = load_deserialize(&data_path, &deserializer);
 

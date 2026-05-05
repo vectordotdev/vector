@@ -139,10 +139,24 @@ generated: components: sinks: nats: configuration: {
 				description:   "Apache Avro-specific encoder options."
 				relevant_when: "codec = \"avro\""
 				required:      true
-				type: object: options: schema: {
-					description: "The Avro schema."
-					required:    true
-					type: string: examples: ["{ \"type\": \"record\", \"name\": \"log\", \"fields\": [{ \"name\": \"message\", \"type\": \"string\" }] }"]
+				type: object: options: {
+					schema: {
+						description: "The Avro schema."
+						required:    true
+						type: string: examples: ["{ \"type\": \"record\", \"name\": \"log\", \"fields\": [{ \"name\": \"message\", \"type\": \"string\" }] }"]
+					}
+					schema_id: {
+						description: """
+																Confluent Avro schema ID
+
+																When set, each message will use the [Confluent wire format][wire_format] (a 5-byte prefix
+																containing a magic byte and a 4-byte big-endian schema ID).
+
+																[wire_format]: https://docs.confluent.io/platform/current/schema-registry/fundamentals/serdes-develop/index.html#wire-format
+																"""
+						required: false
+						type: int: examples: ["42"]
+					}
 				}
 			}
 			cef: {

@@ -288,7 +288,7 @@ impl SerializerConfig {
     pub fn build(&self) -> Result<Serializer, Box<dyn std::error::Error + Send + Sync + 'static>> {
         match self {
             SerializerConfig::Avro { avro } => Ok(Serializer::Avro(
-                AvroSerializerConfig::new(avro.schema.clone()).build()?,
+                AvroSerializerConfig::new(avro.schema.clone(), avro.schema_id).build()?,
             )),
             SerializerConfig::Cef(config) => Ok(Serializer::Cef(config.build()?)),
             SerializerConfig::Csv(config) => Ok(Serializer::Csv(config.build()?)),
@@ -354,7 +354,7 @@ impl SerializerConfig {
     pub fn input_type(&self) -> DataType {
         match self {
             SerializerConfig::Avro { avro } => {
-                AvroSerializerConfig::new(avro.schema.clone()).input_type()
+                AvroSerializerConfig::new(avro.schema.clone(), avro.schema_id).input_type()
             }
             SerializerConfig::Cef(config) => config.input_type(),
             SerializerConfig::Csv(config) => config.input_type(),
@@ -377,7 +377,7 @@ impl SerializerConfig {
     pub fn schema_requirement(&self) -> schema::Requirement {
         match self {
             SerializerConfig::Avro { avro } => {
-                AvroSerializerConfig::new(avro.schema.clone()).schema_requirement()
+                AvroSerializerConfig::new(avro.schema.clone(), avro.schema_id).schema_requirement()
             }
             SerializerConfig::Cef(config) => config.schema_requirement(),
             SerializerConfig::Csv(config) => config.schema_requirement(),
