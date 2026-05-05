@@ -76,15 +76,15 @@ generated: components: transforms: aggregate: configuration: {
 			"""
 		required: false
 		type: string: {
-			default: "SystemTime"
+			default: "system_time"
 			enum: {
-				EventTime: """
+				event_time: """
 					Use event timestamps for aggregation windows.
 
 					Events are grouped into buckets based on their timestamps. Events arriving out of order
 					(after their bucket has been flushed) are rejected.
 					"""
-				SystemTime: """
+				system_time: """
 					Use system clock time for aggregation windows (default).
 
 					Events are aggregated based on when they are processed, not their timestamps.

@@ -88,6 +88,7 @@ pub struct AggregateConfig {
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[configurable(description = "The time source to use for aggregation windows.")]
+#[serde(rename_all = "snake_case")]
 pub enum TimeSource {
     /// Use system clock time for aggregation windows (default).
     ///
@@ -2411,6 +2412,20 @@ interval_ms = 999999
         );
     }
 
+    /// `time_source` parses the snake_case literals shown in the inline
+    /// schema docs. Prior to this fix the enum had no `rename_all` attribute,
+    /// so only the Rust variant names (`EventTime` / `SystemTime`) parsed --
+    /// any user copying the documented `event_time` / `system_time` form
+    /// hit a config validation error and the transform failed to start.
+    #[test]
+    fn time_source_parses_documented_snake_case_literals() {
+        let cfg: AggregateConfig = toml::from_str(r#"time_source = "event_time""#).unwrap();
+        assert_eq!(cfg.time_source, TimeSource::EventTime);
+
+        let cfg: AggregateConfig = toml::from_str(r#"time_source = "system_time""#).unwrap();
+        assert_eq!(cfg.time_source, TimeSource::SystemTime);
+    }
+
     /// When the input stream closes, every still-open event-time bucket must
     /// be drained so in-flight metrics are not silently dropped on shutdown
     /// or topology reload (matching system-time semantics, where
@@ -2424,7 +2439,7 @@ interval_ms = 999999
             r#"
 interval_ms = 600000
 allowed_lateness_ms = 600000
-time_source = "EventTime"
+time_source = "event_time"
 "#,
         )
         .unwrap()
