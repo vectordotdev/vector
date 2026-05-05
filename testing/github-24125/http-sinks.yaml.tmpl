@@ -1,0 +1,26 @@
+# Template for the two http sinks. The repro script renders this into a
+# standalone sinks.yaml and bind-mounts it alongside base-config.yaml so
+# vector --config-dir merges them. Placeholder tokens (in angle brackets here
+# so the token text doesn't get text-substituted by the renderer):
+#   <good-host>     hostname of the always-200 receiver
+#   <bad-host>      hostname of the receiver that flips to 429 after a delay
+#   <except-fields> rendered YAML list of strings, indented to fit under except_fields:
+sinks:
+  sink_good:
+    type: http
+    inputs: [router.all]
+    uri: http://@@GOOD_HOST@@:8001
+    method: post
+    encoding:
+      codec: json
+      except_fields:
+@@EXCEPT_FIELDS@@
+  sink_bad:
+    type: http
+    inputs: [router.all]
+    uri: http://@@BAD_HOST@@:8001
+    method: post
+    encoding:
+      codec: json
+      except_fields:
+@@EXCEPT_FIELDS@@

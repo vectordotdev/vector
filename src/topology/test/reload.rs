@@ -451,6 +451,111 @@ async fn topology_disk_buffer_config_change_chained_does_not_stall() {
     }
 }
 
+/// Regression test for https://github.com/vectordotdev/vector/issues/24125
+///
+/// When a sink with a conflicting resource (e.g., a bound port) is reloaded,
+/// the old sink must be waited on before the new one can start. Previously,
+/// `remove_inputs` sent `Pause` to the upstream fanout, which blocked the
+/// source pump in `wait_for_replacements` — creating a circular dependency
+/// with `shutdown_diff`. This test verifies that the reload completes
+/// within a reasonable time instead of stalling.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn topology_reload_conflicting_sink_does_not_stall() {
+    test_util::trace_init();
+
+    let (_guard, address) = next_addr();
+
+    let mut old_config = Config::builder();
+    old_config.add_source("in", internal_metrics_source());
+    old_config.add_sink("out", &["in"], prom_exporter_sink(address, 1));
+
+    // Change only the flush period so the sink config differs but the
+    // resource (bound address) stays the same, creating a conflict.
+    let mut new_config = Config::builder();
+    new_config.add_source("in", internal_metrics_source());
+    new_config.add_sink("out", &["in"], prom_exporter_sink(address, 2));
+
+    let (mut topology, crash) = start_topology(old_config.build().unwrap(), false).await;
+    let mut crash_stream = UnboundedReceiverStream::new(crash);
+
+    tokio::select! {
+        _ = wait_for_tcp(address) => {},
+        _ = crash_stream.next() => panic!("topology crashed before reload"),
+    }
+
+    // Let some events flow so the source pump is active.
+    sleep(Duration::from_secs(2)).await;
+
+    let reload_result = tokio::time::timeout(
+        Duration::from_secs(10),
+        topology.reload_config_and_respawn(new_config.build().unwrap(), Default::default()),
+    )
+    .await;
+
+    assert!(
+        reload_result.is_ok(),
+        "Reload stalled: reloading a sink with conflicting resources should not block the source pump"
+    );
+    reload_result.unwrap().unwrap();
+
+    // Verify the new sink is running.
+    tokio::select! {
+        _ = wait_for_tcp(address) => {},
+        _ = crash_stream.next() => panic!("topology crashed after reload"),
+    }
+}
+
+/// Similar regression test for the SIGHUP reload path where sinks end up in
+/// `reuse_buffers` (buffer config unchanged, no `components_to_reload`).
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn topology_reload_reuse_buffer_does_not_stall() {
+    test_util::trace_init();
+
+    let (_guard_0, address_0) = next_addr();
+    let (_guard_1, address_1) = next_addr();
+
+    let mut old_config = Config::builder();
+    old_config.add_source("in", internal_metrics_source());
+    old_config.add_sink("out", &["in"], prom_exporter_sink(address_0, 1));
+
+    // Change the address so the sink is in to_change, but don't change
+    // the buffer config so it lands in reuse_buffers. Also don't use
+    // extend_reload_set so the sink is NOT in components_to_reload
+    // (simulating a SIGHUP-style reload).
+    let mut new_config = Config::builder();
+    new_config.add_source("in", internal_metrics_source());
+    new_config.add_sink("out", &["in"], prom_exporter_sink(address_1, 1));
+
+    let (mut topology, crash) = start_topology(old_config.build().unwrap(), false).await;
+    let mut crash_stream = UnboundedReceiverStream::new(crash);
+
+    tokio::select! {
+        _ = wait_for_tcp(address_0) => {},
+        _ = crash_stream.next() => panic!("topology crashed before reload"),
+    }
+
+    // Let some events flow so the source pump is active.
+    sleep(Duration::from_secs(2)).await;
+
+    let reload_result = tokio::time::timeout(
+        Duration::from_secs(10),
+        topology.reload_config_and_respawn(new_config.build().unwrap(), Default::default()),
+    )
+    .await;
+
+    assert!(
+        reload_result.is_ok(),
+        "Reload stalled: reloading a sink with reused buffer should not block the source pump"
+    );
+    reload_result.unwrap().unwrap();
+
+    // Verify the new sink is running on the new address.
+    tokio::select! {
+        _ = wait_for_tcp(address_1) => {},
+        _ = crash_stream.next() => panic!("topology crashed after reload"),
+    }
+}
+
 async fn reload_sink_test(
     old_config: Config,
     new_config: Config,
