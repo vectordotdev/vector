@@ -1,14 +1,21 @@
-name: Remove Work In Progress Label
+# Removes the docs review label once a maintainer approves the PR.
+# Currently dedicated to the docs review flow. If a second use case appears, promote
+# this into a reusable workflow (`workflow_call`) with the label as an input.
+name: Remove Docs Review Label
 
 permissions:
+  issues: write
   pull-requests: write
 
 on:
   pull_request_review:
     types: [submitted]
 
+env:
+  LABEL_NAME: "docs review on hold"
+
 jobs:
-  remove_wip_label:
+  remove_label:
     if: github.event.review.state == 'approved'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -26,20 +33,21 @@ jobs:
               return;
             }
 
+            const labelName = process.env.LABEL_NAME;
             const { data: labels } = await github.rest.issues.listLabelsOnIssue({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.payload.pull_request.number,
             });
-            const hasLabel = labels.some(l => l.name === 'work in progress');
+            const hasLabel = labels.some(l => l.name === labelName);
             if (!hasLabel) {
-              core.info('Label "work in progress" not found, skipping');
+              core.info(`Label "${labelName}" not found, skipping`);
               return;
             }
             await github.rest.issues.removeLabel({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.payload.pull_request.number,
-              name: 'work in progress',
+              name: labelName,
             });
-            core.info('Removed "work in progress" label');
+            core.info(`Removed "${labelName}" label`);

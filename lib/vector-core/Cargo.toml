@@ -81,6 +81,7 @@ prost-build.workspace = true
 
 [dev-dependencies]
 base64 = "0.22.1"
+strum.workspace = true
 chrono-tz.workspace = true
 criterion = { workspace = true, features = ["html_reports"] }
 env-test-util = "1.0.1"

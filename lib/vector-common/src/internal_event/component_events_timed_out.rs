@@ -1,13 +1,15 @@
-use metrics::{Counter, counter};
+use metrics::Counter;
 
-use super::Count;
+use crate::counter;
+
+use super::{Count, CounterName};
 
 crate::registered_event! {
     ComponentEventsTimedOut {
         reason: &'static str,
     } => {
-        timed_out_events: Counter = counter!("component_timed_out_events_total"),
-        timed_out_requests: Counter = counter!("component_timed_out_requests_total"),
+        timed_out_events: Counter = counter!(CounterName::ComponentTimedOutEventsTotal),
+        timed_out_requests: Counter = counter!(CounterName::ComponentTimedOutRequestsTotal),
         reason: &'static str = self.reason,
     }
 
