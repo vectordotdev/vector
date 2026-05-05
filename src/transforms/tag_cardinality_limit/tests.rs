@@ -56,6 +56,7 @@ fn make_transform_hashset(
             limit_exceeded_action,
             mode: Mode::Exact,
             internal_metrics: InternalMetricsConfig::default(),
+            exclude_tags: Vec::new(),
         },
         per_metric_limits: HashMap::new(),
     }
@@ -70,6 +71,7 @@ fn make_transform_bloom(value_limit: usize, limit_exceeded_action: LimitExceeded
                 cache_size_per_key: default_cache_size(),
             }),
             internal_metrics: InternalMetricsConfig::default(),
+            exclude_tags: Vec::new(),
         },
         per_metric_limits: HashMap::new(),
     }
@@ -86,6 +88,7 @@ fn make_transform_hashset_with_per_metric_limits(
             limit_exceeded_action,
             mode: Mode::Exact,
             internal_metrics: InternalMetricsConfig::default(),
+            exclude_tags: Vec::new(),
         },
         per_metric_limits,
     }
@@ -104,6 +107,7 @@ fn make_transform_bloom_with_per_metric_limits(
                 cache_size_per_key: default_cache_size(),
             }),
             internal_metrics: InternalMetricsConfig::default(),
+            exclude_tags: Vec::new(),
         },
         per_metric_limits,
     }
@@ -594,4 +598,228 @@ async fn separate_value_limit_per_metric_name(config: Config) {
         );
     })
     .await;
+}
+
+fn bloom_mode() -> Mode {
+    Mode::Probabilistic(BloomFilterConfig {
+        cache_size_per_key: default_cache_size(),
+    })
+}
+
+fn make_transform_with_exclude_tags(
+    value_limit: usize,
+    limit_exceeded_action: LimitExceededAction,
+    mode: Mode,
+    exclude_tags: Vec<String>,
+) -> Config {
+    Config {
+        global: Inner {
+            value_limit,
+            limit_exceeded_action,
+            mode,
+            internal_metrics: InternalMetricsConfig::default(),
+            exclude_tags,
+        },
+        per_metric_limits: HashMap::new(),
+    }
+}
+
+#[test]
+fn exclude_tags_drop_tag_passthrough_hashset() {
+    exclude_tags_drop_tag_passthrough(Mode::Exact);
+}
+
+#[test]
+fn exclude_tags_drop_tag_passthrough_bloom() {
+    exclude_tags_drop_tag_passthrough(bloom_mode());
+}
+
+/// Excluded tag keys pass through even when their values would have exceeded `value_limit`,
+/// while non-excluded tags on the same metric still respect the limit.
+fn exclude_tags_drop_tag_passthrough(mode: Mode) {
+    let config = make_transform_with_exclude_tags(
+        2,
+        LimitExceededAction::DropTag,
+        mode,
+        vec!["kube_pod_name".to_string()],
+    );
+    let mut transform = TagCardinalityLimit::new(config);
+
+    let event1 = make_metric(metric_tags!("kube_pod_name" => "pod-a", "tag1" => "val1"));
+    let event2 = make_metric(metric_tags!("kube_pod_name" => "pod-b", "tag1" => "val2"));
+    // Third distinct value for both tags; only tag1 should be dropped.
+    let event3 = make_metric(metric_tags!("kube_pod_name" => "pod-c", "tag1" => "val3"));
+
+    let new_event1 = transform.transform_one(event1).unwrap();
+    let new_event2 = transform.transform_one(event2).unwrap();
+    let new_event3 = transform.transform_one(event3).unwrap();
+
+    for ev in [&new_event1, &new_event2, &new_event3] {
+        assert!(
+            ev.as_metric().tags().unwrap().contains_key("kube_pod_name"),
+            "excluded tag should always pass through"
+        );
+    }
+
+    assert_eq!(
+        "val1",
+        new_event1.as_metric().tags().unwrap().get("tag1").unwrap()
+    );
+    assert_eq!(
+        "val2",
+        new_event2.as_metric().tags().unwrap().get("tag1").unwrap()
+    );
+    assert!(
+        !new_event3.as_metric().tags().unwrap().contains_key("tag1"),
+        "non-excluded tag should still be subject to the limit"
+    );
+}
+
+#[test]
+fn exclude_tags_drop_event_passthrough_hashset() {
+    exclude_tags_drop_event_passthrough(Mode::Exact);
+}
+
+#[test]
+fn exclude_tags_drop_event_passthrough_bloom() {
+    exclude_tags_drop_event_passthrough(bloom_mode());
+}
+
+/// Excluded tag keys do not cause an event to be dropped under `DropEvent`, even when their
+/// values would have exceeded `value_limit`.
+fn exclude_tags_drop_event_passthrough(mode: Mode) {
+    let config = make_transform_with_exclude_tags(
+        2,
+        LimitExceededAction::DropEvent,
+        mode,
+        vec!["kube_pod_name".to_string()],
+    );
+    let mut transform = TagCardinalityLimit::new(config);
+
+    let event1 = make_metric(metric_tags!("kube_pod_name" => "pod-a", "tag1" => "val1"));
+    let event2 = make_metric(metric_tags!("kube_pod_name" => "pod-b", "tag1" => "val2"));
+    // val3 on a non-excluded tag still triggers DropEvent.
+    let event3 = make_metric(metric_tags!("kube_pod_name" => "pod-c", "tag1" => "val3"));
+    // tag1 reuses an accepted value, so a new pod name alone must not drop the event.
+    let event4 = make_metric(metric_tags!("kube_pod_name" => "pod-d", "tag1" => "val1"));
+
+    assert_eq!(transform.transform_one(event1.clone()), Some(event1));
+    assert_eq!(transform.transform_one(event2.clone()), Some(event2));
+    assert_eq!(transform.transform_one(event3), None);
+    assert_eq!(transform.transform_one(event4.clone()), Some(event4));
+}
+
+#[test]
+fn exclude_tags_merge_global_and_per_metric_hashset() {
+    exclude_tags_merge_global_and_per_metric(Mode::Exact);
+}
+
+#[test]
+fn exclude_tags_merge_global_and_per_metric_bloom() {
+    exclude_tags_merge_global_and_per_metric(bloom_mode());
+}
+
+/// Global `exclude_tags` still applies to metrics that match a per-metric configuration —
+/// the effective list is the union of global and per-metric exclusions. Parameterised over
+/// `Mode` so the contract is pinned for both the exact and probabilistic backends.
+fn exclude_tags_merge_global_and_per_metric(mode: Mode) {
+    let per_metric = PerMetricConfig {
+        namespace: None,
+        config: Inner {
+            value_limit: 1,
+            limit_exceeded_action: LimitExceededAction::DropTag,
+            mode,
+            internal_metrics: InternalMetricsConfig::default(),
+            exclude_tags: vec!["tenant_id".to_string()],
+        },
+    };
+
+    let config = Config {
+        global: Inner {
+            value_limit: 1,
+            limit_exceeded_action: LimitExceededAction::DropTag,
+            mode,
+            internal_metrics: InternalMetricsConfig::default(),
+            exclude_tags: vec!["kube_pod_name".to_string()],
+        },
+        per_metric_limits: HashMap::from([("metricA".to_string(), per_metric)]),
+    };
+    let mut transform = TagCardinalityLimit::new(config);
+
+    // value_limit=1 means tag1's first value consumes the only slot.
+    let event1 = make_metric_with_name(
+        metric_tags!(
+            "kube_pod_name" => "pod-a",
+            "tenant_id" => "tenant-a",
+            "tag1" => "val1"
+        ),
+        "metricA",
+    );
+    let event2 = make_metric_with_name(
+        metric_tags!(
+            "kube_pod_name" => "pod-b",
+            "tenant_id" => "tenant-b",
+            "tag1" => "val2"
+        ),
+        "metricA",
+    );
+
+    let tags1 = transform.transform_one(event1).unwrap();
+    let tags1 = tags1.as_metric().tags().unwrap();
+    assert_eq!("pod-a", tags1.get("kube_pod_name").unwrap());
+    assert_eq!("tenant-a", tags1.get("tenant_id").unwrap());
+    assert_eq!("val1", tags1.get("tag1").unwrap());
+
+    let tags2 = transform.transform_one(event2).unwrap();
+    let tags2 = tags2.as_metric().tags().unwrap();
+    assert_eq!(
+        "pod-b",
+        tags2.get("kube_pod_name").unwrap(),
+        "global exclusion must still apply to per-metric configs"
+    );
+    assert_eq!(
+        "tenant-b",
+        tags2.get("tenant_id").unwrap(),
+        "per-metric exclusion must apply"
+    );
+    assert!(
+        !tags2.contains_key("tag1"),
+        "non-excluded tag1 should be dropped after exceeding per-metric value_limit"
+    );
+}
+
+/// Pins the "never enter the cache" contract from the `exclude_tags` documentation by
+/// asserting directly on `accepted_tags` rather than going through the public emission
+/// surface. If this invariant breaks, excluded tags would silently start consuming memory
+/// and producing the very internal events the docs promise they suppress.
+#[test]
+fn exclude_tags_never_populate_cache() {
+    let config = make_transform_with_exclude_tags(
+        2,
+        LimitExceededAction::DropTag,
+        Mode::Exact,
+        vec!["kube_pod_name".to_string()],
+    );
+    let mut transform = TagCardinalityLimit::new(config);
+
+    // Send well past `value_limit` distinct values for the excluded key.
+    for i in 0..10 {
+        let event = make_metric(metric_tags!(
+            "kube_pod_name" => format!("pod-{i}").as_str(),
+            "tag1" => "val1"
+        ));
+        transform.transform_one(event).unwrap();
+    }
+
+    let global_metric_entry = transform.accepted_tags.get(&None).expect(
+        "non-excluded tag1 should still create an entry under the no-per-metric-key bucket",
+    );
+    assert!(
+        global_metric_entry.contains_key("tag1"),
+        "non-excluded tag must still be tracked"
+    );
+    assert!(
+        !global_metric_entry.contains_key("kube_pod_name"),
+        "excluded tag key must never enter the cache"
+    );
 }

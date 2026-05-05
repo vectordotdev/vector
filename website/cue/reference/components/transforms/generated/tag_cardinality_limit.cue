@@ -12,6 +12,27 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 		required:      false
 		type: uint: default: 5120
 	}
+	exclude_tags: {
+		description: """
+			Tag keys that bypass cardinality limiting entirely.
+
+			Listed tag keys are passed through unchanged on every event, are not counted against
+			`value_limit`, and never enter the cache. Useful for tags whose high cardinality is
+			intentional, such as `kube_pod_name` or `tenant_id`.
+
+			When set on a per-metric configuration, the effective exclusion list is the union of the
+			global `exclude_tags` and the per-metric `exclude_tags`.
+
+			Excluded tags do not contribute to `tag_value_limit_exceeded_total` and do not produce
+			`TagCardinalityLimitRejectingTag` or `TagCardinalityLimitRejectingEvent` internal events,
+			so they are invisible to cardinality-pressure dashboards by design.
+			"""
+		required: false
+		type: array: {
+			default: []
+			items: type: string: examples: ["kube_pod_name", "tenant_id"]
+		}
+	}
 	internal_metrics: {
 		description: "Configuration of internal metrics for the TagCardinalityLimit transform."
 		required:    false
@@ -77,6 +98,27 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 					relevant_when: "mode = \"probabilistic\""
 					required:      false
 					type: uint: default: 5120
+				}
+				exclude_tags: {
+					description: """
+						Tag keys that bypass cardinality limiting entirely.
+
+						Listed tag keys are passed through unchanged on every event, are not counted against
+						`value_limit`, and never enter the cache. Useful for tags whose high cardinality is
+						intentional, such as `kube_pod_name` or `tenant_id`.
+
+						When set on a per-metric configuration, the effective exclusion list is the union of the
+						global `exclude_tags` and the per-metric `exclude_tags`.
+
+						Excluded tags do not contribute to `tag_value_limit_exceeded_total` and do not produce
+						`TagCardinalityLimitRejectingTag` or `TagCardinalityLimitRejectingEvent` internal events,
+						so they are invisible to cardinality-pressure dashboards by design.
+						"""
+					required: false
+					type: array: {
+						default: []
+						items: type: string: examples: ["kube_pod_name", "tenant_id"]
+					}
 				}
 				internal_metrics: {
 					description: "Configuration of internal metrics for the TagCardinalityLimit transform."
