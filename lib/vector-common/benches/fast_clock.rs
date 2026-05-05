@@ -25,6 +25,10 @@ fn bench_clocks(c: &mut Criterion) {
         b.iter(|| black_box(fast_clock::recent_millis()))
     });
 
+    group.bench_function("fast_clock::recent_unix_millis", |b| {
+        b.iter(|| black_box(fast_clock::recent_unix_millis()))
+    });
+
     group.bench_function("Instant::now", |b| b.iter(|| black_box(Instant::now())));
 
     group.bench_function("Instant_elapsed_as_millis", |b| {
