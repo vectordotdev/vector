@@ -138,9 +138,6 @@ generated: components: sources: vector: configuration: {
 	version: {
 		description: "Version of the configuration."
 		required:    false
-		type: string: const: {
-			description: "Marker value for version two."
-			value:       "2"
-		}
+		type: string: enum: "2": "Marker value for version two."
 	}
 }

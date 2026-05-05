@@ -174,16 +174,13 @@ generated: components: transforms: lua: configuration: {
 			Specifying this version ensures that backward compatibility is not broken.
 			"""
 		required: true
-		type: string: {
-			const: {
-				description: """
-					Lua transform API version 1.
+		type: string: enum: {
+			"1": """
+				Lua transform API version 1.
 
-					This version is deprecated and will be removed in a future version.
-					"""
-				value: "1"
-			}
-			enum: "2": "Lua transform API version 2."
+				This version is deprecated and will be removed in a future version.
+				"""
+			"2": "Lua transform API version 2."
 		}
 	}
 }

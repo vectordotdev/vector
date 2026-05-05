@@ -276,17 +276,14 @@ generated: components: sinks: clickhouse: configuration: {
 					[apache_arrow]: https://arrow.apache.org/
 					"""
 				required: true
-				type: string: const: {
-					description: """
-						Encodes events in [Apache Arrow][apache_arrow] IPC streaming format.
+				type: string: enum: arrow_stream: """
+					Encodes events in [Apache Arrow][apache_arrow] IPC streaming format.
 
-						This is the streaming variant of the Arrow IPC format, which writes
-						a continuous stream of record batches.
+					This is the streaming variant of the Arrow IPC format, which writes
+					a continuous stream of record batches.
 
-						[apache_arrow]: https://arrow.apache.org/
-						"""
-					value: "arrow_stream"
-				}
+					[apache_arrow]: https://arrow.apache.org/
+					"""
 			}
 		}
 	}
