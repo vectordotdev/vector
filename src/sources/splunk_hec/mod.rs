@@ -31,7 +31,7 @@ use vector_lib::{
     },
     config::{LegacyKey, LogNamespace},
     configurable::configurable_component,
-    event::{BatchNotifier, EventMetadata},
+    event::{BatchNotifier, BatchStatusReceiver, EventMetadata},
     internal_event::{
         ComponentEventsDropped, CountByteSize, InternalEventHandle as _, Registered, UNINTENTIONAL,
     },
@@ -569,16 +569,9 @@ impl SplunkSource {
                         // with the pre-decoder behavior.
                         let mut maybe_ack_id = None;
                         if !decoder_in_use {
-                            maybe_ack_id = match (idx_ack.clone(), receiver.take(), channel.clone())
-                            {
-                                (Some(idx_ack), Some(rx), Some(channel_id)) => {
-                                    match idx_ack.get_ack_id_from_channel(channel_id, rx).await {
-                                        Ok(ack_id) => Some(ack_id),
-                                        Err(rej) => return Err(rej),
-                                    }
-                                }
-                                _ => None,
-                            };
+                            maybe_ack_id =
+                                register_ack(idx_ack.clone(), receiver.take(), channel.clone())
+                                    .await?;
                         }
 
                         let mut error = None;
@@ -623,18 +616,7 @@ impl SplunkSource {
                                     drop(receiver);
                                     None
                                 } else {
-                                    match (idx_ack, receiver, channel) {
-                                        (Some(idx_ack), Some(receiver), Some(channel_id)) => {
-                                            match idx_ack
-                                                .get_ack_id_from_channel(channel_id, receiver)
-                                                .await
-                                            {
-                                                Ok(ack_id) => Some(ack_id),
-                                                Err(rej) => return Err(rej),
-                                            }
-                                        }
-                                        _ => None,
-                                    }
+                                    register_ack(idx_ack, receiver, channel).await?
                                 };
                         }
 
@@ -707,14 +689,8 @@ impl SplunkSource {
                         // exhaustion), build a single event, send via `send_event`
                         // (avoids `send_batch_latency` emission).
                         let Some(decoder) = decoder else {
-                            let maybe_ack_id = match (idx_ack, receiver) {
-                                (Some(idx_ack), Some(receiver)) => Some(
-                                    idx_ack
-                                        .get_ack_id_from_channel(channel_id.clone(), receiver)
-                                        .await?,
-                                ),
-                                _ => None,
-                            };
+                            let maybe_ack_id =
+                                register_ack(idx_ack, receiver, Some(channel_id.clone())).await?;
                             let (mut events, _) = raw_event(
                                 body,
                                 gzip,
@@ -776,14 +752,8 @@ impl SplunkSource {
                                 .map_err(|_| Rejection::from(ApiError::ServerShutdown));
                         }
 
-                        let maybe_ack_id = match (idx_ack, receiver) {
-                            (Some(idx_ack), Some(receiver)) => Some(
-                                idx_ack
-                                    .get_ack_id_from_channel(channel_id, receiver)
-                                    .await?,
-                            ),
-                            _ => None,
-                        };
+                        let maybe_ack_id =
+                            register_ack(idx_ack, receiver, Some(channel_id)).await?;
 
                         let res = out.send_batch(events).await;
                         res.map(|_| maybe_ack_id)
@@ -1954,6 +1924,17 @@ mod splunk_response {
     pub const SERVER_IS_BUSY: HecResponse = HecResponse::new(HecStatusCode::ServerIsBusy);
     pub const NO_CHANNEL: HecResponse = HecResponse::new(HecStatusCode::DataChannelIsMissing);
     pub const ACK_IS_DISABLED: HecResponse = HecResponse::new(HecStatusCode::AckIsDisabled);
+}
+
+async fn register_ack(
+    idx_ack: Option<Arc<IndexerAcknowledgement>>,
+    receiver: Option<BatchStatusReceiver>,
+    channel: Option<String>,
+) -> Result<Option<u64>, Rejection> {
+    match (idx_ack, receiver, channel) {
+        (Some(ack), Some(rx), Some(ch)) => Ok(Some(ack.get_ack_id_from_channel(ch, rx).await?)),
+        _ => Ok(None),
+    }
 }
 
 fn finish_ok(maybe_ack_id: Option<u64>) -> Response {
