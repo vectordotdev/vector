@@ -190,6 +190,56 @@ components: transforms: aggregate: {
 				"""
 		}
 
+		event_time_aggregation: {
+			title: "Event-Time Aggregation"
+			body: """
+				When `time_source` is set to `event_time`, metrics are bucketed by the timestamp on each
+				event rather than by the moment Vector processes it. Bucket boundaries are aligned to
+				multiples of `interval_ms` from the Unix epoch, so the same source timestamp always maps
+				to the same bucket regardless of when Vector receives it.
+
+				This is useful when downstream sinks key on the metric timestamp. For example, the
+				Datadog Metrics sink overwrites earlier values for an identical timestamp; bucketing on
+				event time prevents distinct samples from collapsing into a single point.
+				"""
+			sub_sections: [
+				{
+					title: "Watermark and Late Events"
+					body: """
+						Vector tracks a *watermark* — the exclusive end of the most recently emitted bucket.
+						Events whose bucket has already been emitted are dropped and counted via
+						`component_discarded_events_total`. Use `allowed_lateness_ms` to delay closing each
+						bucket so late events still have a chance to land in the right window.
+
+						Events whose `(kind, value)` shape is incompatible with the configured `mode` (for
+						example an `incremental` event arriving at a `mean`-configured aggregator) are dropped
+						without affecting the watermark or other in-flight buckets, so a single stray event
+						cannot starve valid data for earlier windows.
+						"""
+				},
+				{
+					title: "Missing and Future Timestamps"
+					body: """
+						By default, events with no timestamp are dropped. Set
+						`use_system_time_for_missing_timestamps` to `true` to fall back to the current system
+						time instead. Events whose timestamp is more than `max_future_ms` ahead of the system
+						clock are also dropped as a clock-skew guard. All such drops surface in
+						`component_discarded_events_total` with a reason tag.
+						"""
+				},
+				{
+					title: "Shutdown and Reload"
+					body: """
+						When the input stream closes — during shutdown or topology reload — every remaining
+						event-time bucket is flushed before Vector exits, so in-flight metrics are not
+						silently dropped. In `diff` mode a small rolling window of previous buckets is also
+						retained to compute deltas across bucket boundaries; other modes do not retain
+						previous buckets.
+						"""
+				},
+			]
+		}
+
 	}
 
 	telemetry: metrics: {
