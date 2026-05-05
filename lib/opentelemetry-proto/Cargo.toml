@@ -18,5 +18,6 @@ lookup = { package = "vector-lookup", path = "../vector-lookup", default-feature
 ordered-float.workspace = true
 prost.workspace = true
 tonic.workspace = true
+tracing.workspace = true
 vrl.workspace = true
 vector-core = { path = "../vector-core", default-features = false }
