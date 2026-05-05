@@ -134,6 +134,8 @@ pub enum BuildError {
     SocketAddressError { source: std::io::Error },
     #[snafu(display("URI parse error: {}", source))]
     UriParseError { source: ::http::uri::InvalidUri },
+    #[snafu(display("URI parse error: {}", source))]
+    Http1UriParseError { source: ::http_1::uri::InvalidUri },
     #[snafu(display("HTTP request build error: {}", source))]
     HTTPRequestBuilderError { source: ::http::Error },
 }
@@ -143,4 +145,6 @@ pub enum BuildError {
 pub enum HealthcheckError {
     #[snafu(display("Unexpected status: {}", status))]
     UnexpectedStatus { status: ::http::StatusCode },
+    #[snafu(display("Unexpected status: {}", status))]
+    Http1UnexpectedStatus { status: ::http_1::StatusCode },
 }

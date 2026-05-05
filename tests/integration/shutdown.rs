@@ -688,7 +688,7 @@ async fn health_503_during_shutdown() {
 
     let response = reqwest::get("http://127.0.0.1:8686/health").await.unwrap();
 
-    assert_eq!(response.status(), http::StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(response.status(), http_1::StatusCode::SERVICE_UNAVAILABLE);
 
     kill(Pid::from_raw(vector.id() as i32), Signal::SIGKILL).unwrap();
 }
