@@ -1218,18 +1218,28 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
     ) -> Result<(Vec<Event>, bool), Rejection> {
         self.envelopes_processed += 1;
         let event = self.validate_event_field(&json)?;
-        let payload = match serde_json::to_vec(event) {
-            Ok(bytes) => bytes,
-            Err(error) => {
-                let error: vector_lib::Error = Box::new(error);
-                emit!(
-                    vector_lib::codecs::internal_events::DecoderDeserializeError { error: &error }
-                );
-                emit!(ComponentEventsDropped::<UNINTENTIONAL> {
-                    count: 1,
-                    reason: "Failed to serialize event field to bytes.",
-                });
-                return Ok((vec![], true));
+        // Strings are passed as raw bytes so decoders see the bare content
+        // (e.g. a JSON string event containing `{"foo":"bar"}` arrives at the
+        // decoder as `{"foo":"bar"}`, not `"{\"foo\":\"bar\"}"` ). All other
+        // JSON values (objects, arrays, numbers, bools) are serialized to JSON.
+        let payload = if let Some(s) = event.as_str() {
+            s.as_bytes().to_vec()
+        } else {
+            match serde_json::to_vec(event) {
+                Ok(bytes) => bytes,
+                Err(error) => {
+                    let error: vector_lib::Error = Box::new(error);
+                    emit!(
+                        vector_lib::codecs::internal_events::DecoderDeserializeError {
+                            error: &error
+                        }
+                    );
+                    emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+                        count: 1,
+                        reason: "Failed to serialize event field to bytes.",
+                    });
+                    return Ok((vec![], true));
+                }
             }
         };
 
