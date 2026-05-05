@@ -203,6 +203,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write
     uses: ./.github/workflows/coverage.yml
     with:
       ref: ${{ github.event.review.commit_id }}
