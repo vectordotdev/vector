@@ -1,47 +1,32 @@
 version: "3"
 
 services:
-  # Emits metrics to the Agent only path
-  dogstatsd-client-agent:
+  # Emits metrics to the Agent
+  dogstatsd-client:
     build: ../dogstatsd_client
     environment:
       - STATSD_HOST=datadog-agent
     depends_on:
       - datadog-agent
 
-  # Emits metrics to the Agent-Vector path
-  dogstatsd-client-vector:
-    build: ../dogstatsd_client
-    environment:
-      - STATSD_HOST=datadog-agent-vector
-    depends_on:
-      - datadog-agent-vector
-
-  # Sends metric data received from the Emitter to the `fakeintake-agent` service
+  # Receives DogStatsD metrics and forwards them to two destinations:
+  #   1. fakeintake-agent directly (dd_url) — the baseline
+  #   2. vector (additional_endpoints) — which then forwards to fakeintake-vector
+  # Using a single agent ensures both paths see the same computed values
+  # (same flush window, identical histogram statistics).
   datadog-agent:
     image: docker.io/datadog/agent:${CONFIG_AGENT_VERSION}
     depends_on:
       - fakeintake-agent
+      - vector
     environment:
       - DD_API_KEY=${TEST_DATADOG_API_KEY:?TEST_DATADOG_API_KEY required}
       - DD_HOSTNAME=datadog-agent
     volumes:
       # The Agent config file
-      - ../data/agent_only.yaml:/etc/datadog-agent/datadog.yaml
+      - ../data/agent.yaml:/etc/datadog-agent/datadog.yaml
 
-  # Sends metric data received from the Emitter to the `vector` service
-  datadog-agent-vector:
-    image: docker.io/datadog/agent:${CONFIG_AGENT_VERSION}
-    depends_on:
-      - vector
-    environment:
-      - DD_API_KEY=${TEST_DATADOG_API_KEY:?TEST_DATADOG_API_KEY required}
-      - DD_HOSTNAME=datadog-agent-vector
-    volumes:
-      # The Agent config file
-      - ../data/agent_vector.yaml:/etc/datadog-agent/datadog.yaml
-
-  # Receives metric data from the `datadog-agent-vector` service and sends
+  # Receives metric data from the `datadog-agent` via additional_endpoints and sends
   # to the `fakeintake-vector` service.
   vector:
     depends_on:
@@ -61,13 +46,13 @@ services:
     volumes:
       - ../../../..:/home/vector
 
-  # Receives metric data from the `datadog-agent` service. Is queried by the test runner
+  # Receives metric data from the `datadog-agent` directly. Is queried by the test runner
   # which does the validation of consistency with the other fakeintake service.
   fakeintake-agent:
     # TODO: temporarily pegging the image as latest results in failures
     image: docker.io/datadog/fakeintake:v77a06f2b
 
-  # Receives metric data from the `datadog-agent-vector` service. Is queried by the test runner
+  # Receives metric data from the `vector` service. Is queried by the test runner
   # which does the validation of consistency with the other fakeintake service.
   fakeintake-vector:
     # TODO: temporarily pegging the image as latest results in failures
