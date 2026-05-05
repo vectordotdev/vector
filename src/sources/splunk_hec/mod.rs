@@ -151,7 +151,7 @@ pub struct SplunkConfig {
     #[configurable(derived)]
     #[configurable(metadata(docs::advanced))]
     #[serde(default)]
-    pub event: EndpointCodecConfig,
+    pub event: CodecConfig,
 
     /// Codec configuration applied to events received on `/services/collector/raw`.
     ///
@@ -162,14 +162,14 @@ pub struct SplunkConfig {
     #[configurable(derived)]
     #[configurable(metadata(docs::advanced))]
     #[serde(default)]
-    pub raw: EndpointCodecConfig,
+    pub raw: CodecConfig,
 }
 
 /// Codec configuration applied to one of the `splunk_hec` endpoints.
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields, default)]
-pub struct EndpointCodecConfig {
+pub struct CodecConfig {
     /// Framing configuration applied to the payload.
     ///
     /// Only used when `decoding` is also set. Defaults to a per-codec choice
@@ -191,7 +191,7 @@ pub struct EndpointCodecConfig {
     pub decoding: Option<DeserializerConfig>,
 }
 
-impl EndpointCodecConfig {
+impl CodecConfig {
     fn build_decoder(&self, log_namespace: LogNamespace) -> crate::Result<Option<Decoder>> {
         match &self.decoding {
             Some(decoding) => {
@@ -221,8 +221,8 @@ impl Default for SplunkConfig {
             store_hec_token: false,
             log_namespace: None,
             keepalive: Default::default(),
-            event: EndpointCodecConfig::default(),
-            raw: EndpointCodecConfig::default(),
+            event: CodecConfig::default(),
+            raw: CodecConfig::default(),
         }
     }
 }
@@ -2104,8 +2104,8 @@ mod tests {
                 store_hec_token,
                 log_namespace: None,
                 keepalive: Default::default(),
-                event: EndpointCodecConfig::default(),
-                raw: EndpointCodecConfig::default(),
+                event: CodecConfig::default(),
+                raw: CodecConfig::default(),
             }
             .build(cx)
             .await
@@ -3353,8 +3353,8 @@ mod tests {
     }
 
     async fn source_with_codec(
-        event: EndpointCodecConfig,
-        raw: EndpointCodecConfig,
+        event: CodecConfig,
+        raw: CodecConfig,
     ) -> (
         impl Stream<Item = Event> + Unpin + use<>,
         SocketAddr,
@@ -3387,8 +3387,8 @@ mod tests {
     }
 
     /// Codec config that just sets `decoding` (default framing).
-    fn codec_decoding(decoding: DeserializerConfig) -> EndpointCodecConfig {
-        EndpointCodecConfig {
+    fn codec_decoding(decoding: DeserializerConfig) -> CodecConfig {
+        CodecConfig {
             framing: None,
             decoding: Some(decoding),
         }
@@ -3398,8 +3398,8 @@ mod tests {
     fn codec_full(
         framing: Option<FramingConfig>,
         decoding: Option<DeserializerConfig>,
-    ) -> EndpointCodecConfig {
-        EndpointCodecConfig { framing, decoding }
+    ) -> CodecConfig {
+        CodecConfig { framing, decoding }
     }
 
     #[tokio::test]
@@ -3407,7 +3407,7 @@ mod tests {
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let (source, address, _guard) = source_with_codec(
                 codec_decoding(vector_lib::codecs::JsonDeserializerConfig::default().into()),
-                EndpointCodecConfig::default(),
+                CodecConfig::default(),
             )
             .await;
             let envelope =
@@ -3435,7 +3435,7 @@ mod tests {
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let (source, address, _guard) = source_with_codec(
                 codec_decoding(vector_lib::codecs::JsonDeserializerConfig::default().into()),
-                EndpointCodecConfig::default(),
+                CodecConfig::default(),
             )
             .await;
             let envelope = r#"{"event":{"foo":"bar","nested":{"k":1}},"host":"h"}"#;
@@ -3465,7 +3465,7 @@ mod tests {
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let (source, address, _guard) = source_with_codec(
                 codec_decoding(vector_lib::codecs::JsonDeserializerConfig::default().into()),
-                EndpointCodecConfig::default(),
+                CodecConfig::default(),
             )
             .await;
             // The string `event` decodes to a JSON object that pre-populates each
@@ -3497,7 +3497,7 @@ mod tests {
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let (source, address, _guard) = source_with_codec(
                 codec_decoding(vector_lib::codecs::JsonDeserializerConfig::default().into()),
-                EndpointCodecConfig::default(),
+                CodecConfig::default(),
             )
             .await;
             // The string `event` decodes to {host: "decoder-host"}; the envelope sets
@@ -3525,7 +3525,7 @@ mod tests {
         // sources do.
         let (_source, address, _guard) = source_with_codec(
             codec_decoding(vector_lib::codecs::JsonDeserializerConfig::default().into()),
-            EndpointCodecConfig::default(),
+            CodecConfig::default(),
         )
         .await;
         let envelope = r#"{"event":"not valid json {","host":"h"}"#;
@@ -3539,7 +3539,7 @@ mod tests {
     async fn decoder_raw_endpoint_newline_delimited() {
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let (source, address, _guard) = source_with_codec(
-                EndpointCodecConfig::default(),
+                CodecConfig::default(),
                 codec_full(
                     Some(FramingConfig::NewlineDelimited(Default::default())),
                     Some(DeserializerConfig::Bytes),
@@ -3578,7 +3578,7 @@ mod tests {
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let (source, address, _guard) = source_with_codec(
                 codec_decoding(vector_lib::codecs::JsonDeserializerConfig::default().into()),
-                EndpointCodecConfig::default(),
+                CodecConfig::default(),
             )
             .await;
             let envelope = r#"{"event":"{\"foo\":\"bar\"}"}"#;
@@ -3683,7 +3683,7 @@ mod tests {
             );
 
             let (source, address, _guard) =
-                source_with_codec(event_codec, EndpointCodecConfig::default()).await;
+                source_with_codec(event_codec, CodecConfig::default()).await;
 
             // Send a HEC event whose `event` field is a JSON-encoded string.
             // The VRL decoder should parse it and also read the envelope host/sourcetype.
@@ -3720,7 +3720,7 @@ mod tests {
         // legacy raw_event path did via `insert_standard_vector_source_metadata`.
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let (source, address, _guard) = source_with_codec(
-                EndpointCodecConfig::default(),
+                CodecConfig::default(),
                 codec_full(None, Some(DeserializerConfig::Bytes)),
             )
             .await;
@@ -3759,7 +3759,7 @@ mod tests {
                 store_hec_token: false,
                 log_namespace: None,
                 keepalive: Default::default(),
-                event: EndpointCodecConfig::default(),
+                event: CodecConfig::default(),
                 raw: codec_decoding(vector_lib::codecs::JsonDeserializerConfig::default().into()),
             }
             .build(cx)
@@ -3812,7 +3812,7 @@ mod tests {
                 store_hec_token: false,
                 log_namespace: None,
                 keepalive: Default::default(),
-                event: EndpointCodecConfig::default(),
+                event: CodecConfig::default(),
                 raw: codec_full(
                     Some(FramingConfig::NewlineDelimited(Default::default())),
                     Some(vector_lib::codecs::JsonDeserializerConfig::default().into()),
@@ -3855,7 +3855,7 @@ mod tests {
                 Some(FramingConfig::NewlineDelimited(Default::default())),
                 Some(DeserializerConfig::Bytes),
             ),
-            EndpointCodecConfig::default(),
+            CodecConfig::default(),
         )
         .await;
         // Envelope 0 has an `event` string with three lines: with newline framing
