@@ -35,15 +35,15 @@ impl SchemaContext {
                 debug!("Detected optional all-of schema, unwrapping all-of schema to resolve...");
                 let mut unwrapped = schema.clone();
                 let obj = unwrapped.as_object_mut().unwrap();
-                obj.remove("oneOf");
-                obj.remove("anyOf");
+                obj.shift_remove("oneOf");
+                obj.shift_remove("anyOf");
                 obj.insert("allOf".to_string(), sub.get("allOf").unwrap().clone());
                 return Ok(json!({ "_resolved": self.resolve_schema(&unwrapped)? }));
             }
             let mut unwrapped = schema.clone();
             let obj = unwrapped.as_object_mut().unwrap();
-            obj.remove("oneOf");
-            obj.remove("anyOf");
+            obj.shift_remove("oneOf");
+            obj.shift_remove("anyOf");
             schema_aware_nested_merge(&mut unwrapped, sub);
             return Ok(json!({ "_resolved": self.resolve_schema(&unwrapped)? }));
         }
@@ -122,7 +122,7 @@ impl SchemaContext {
                         .unwrap()
                         .as_object_mut()
                         .unwrap();
-                    let mut tag_subschema = opts.remove(tag_field).unwrap();
+                    let mut tag_subschema = opts.shift_remove(tag_field).unwrap();
 
                     if let Some(t) = title {
                         tag_subschema
@@ -213,7 +213,7 @@ impl SchemaContext {
                             .map(|v| v.as_str().unwrap().to_string())
                             .collect();
                         if rel_set.len() == unique_tags.len() && rel_set == unique_tags {
-                            val_obj.remove("relevant_when");
+                            val_obj.shift_remove("relevant_when");
                         } else {
                             let mapped: Vec<String> = relevant
                                 .iter()
@@ -410,7 +410,7 @@ impl SchemaContext {
         if let Value::Object(type_map) = &mut merged_type {
             for (_, type_def) in type_map.iter_mut() {
                 if let Value::Object(def) = type_def
-                    && let Some(Value::Array(const_arr)) = def.remove("const")
+                    && let Some(Value::Array(const_arr)) = def.shift_remove("const")
                 {
                     let mut enum_map = Map::new();
                     for const_obj in &const_arr {

@@ -62,7 +62,7 @@ impl SchemaContext {
         if let Some(items_schema) = resolved.pointer_mut("/type/array/items")
             && let Value::Object(obj) = items_schema
         {
-            obj.remove("description");
+            obj.shift_remove("description");
         }
 
         self.apply_schema_default_value(&expanded, &mut resolved)?;

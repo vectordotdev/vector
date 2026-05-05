@@ -77,7 +77,7 @@ impl SchemaContext {
             };
 
             let obj = schema.as_object_mut().unwrap();
-            obj.remove("$ref");
+            obj.shift_remove("$ref");
 
             let mut new_schema = expanded_ref.clone();
             nested_merge(&mut new_schema, &Value::Object(obj.clone()));
@@ -89,7 +89,7 @@ impl SchemaContext {
         {
             let expanded_items = self.expand_schema_references(&items)?;
             let items_mut = schema.get_mut("items").unwrap().as_object_mut().unwrap();
-            items_mut.remove("$ref");
+            items_mut.shift_remove("$ref");
 
             let mut new_items = expanded_items;
             nested_merge(&mut new_items, &Value::Object(items_mut.clone()));
@@ -117,12 +117,12 @@ impl SchemaContext {
             if let Some(t) = original_title {
                 obj.insert("title".to_string(), t);
             } else {
-                obj.remove("title");
+                obj.shift_remove("title");
             }
             if let Some(d) = original_description {
                 obj.insert("description".to_string(), d);
             } else {
-                obj.remove("description");
+                obj.shift_remove("description");
             }
         }
 
