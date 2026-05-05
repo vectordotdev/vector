@@ -223,7 +223,7 @@ strum = { version = "0.28", features = ["derive"] }
 [dependencies]
 cfg-if.workspace = true
 reqwest.workspace = true
-reqwest_12 = { package = "reqwest", version = "0.12", features = ["json"] }
+reqwest_13 = { package = "reqwest", version = "0.13", default-features = false, features = ["json", "rustls-no-provider"] }
 clap.workspace = true
 clap_complete.workspace = true
 indoc.workspace = true
@@ -303,11 +303,11 @@ aws-smithy-runtime-api = { version = "1.7.3", default-features = false, optional
 aws-smithy-types = { version = "1.2.11", default-features = false, features = ["rt-tokio"], optional = true }
 
 # Azure
-azure_core = { version = "0.30", features = ["reqwest", "hmac_openssl"], optional = true }
-azure_identity = { version = "0.30", features = ["client_certificate"], optional = true }
+azure_core = { version = "0.33", features = ["reqwest", "hmac_openssl"], optional = true }
+azure_identity = { version = "0.33", features = ["client_certificate"], optional = true }
 
 # Azure Storage
-azure_storage_blob = { version = "0.7", optional = true }
+azure_storage_blob = { version = "0.10.1", optional = true }
 
 # OpenDAL
 opendal = { version = "0.54", default-features = false, features = ["services-webhdfs"], optional = true }
@@ -888,8 +888,8 @@ sinks-aws_s3 = ["dep:base64", "dep:md-5", "aws-core", "dep:aws-sdk-s3"]
 sinks-aws_sqs = ["aws-core", "dep:aws-sdk-sqs"]
 sinks-aws_sns = ["aws-core", "dep:aws-sdk-sns"]
 sinks-axiom = ["sinks-http"]
-sinks-azure_blob = ["dep:azure_core", "dep:azure_identity", "dep:azure_storage_blob", "dep:base64"]
-sinks-azure_logs_ingestion = ["dep:azure_core", "dep:azure_identity", "dep:azure_storage_blob", "dep:base64"]
+sinks-azure_blob = ["dep:azure_core", "dep:azure_identity", "dep:azure_storage_blob"]
+sinks-azure_logs_ingestion = ["dep:azure_core", "dep:azure_identity", "dep:azure_storage_blob"]
 sinks-azure_monitor_logs = []
 sinks-blackhole = []
 sinks-chronicle = []
