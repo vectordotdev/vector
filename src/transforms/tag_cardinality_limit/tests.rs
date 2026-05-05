@@ -57,6 +57,7 @@ fn make_transform_hashset(
             mode: Mode::Exact,
             internal_metrics: InternalMetricsConfig::default(),
         },
+        tracking_scope: TrackingScope::default(),
         per_metric_limits: HashMap::new(),
     }
 }
@@ -71,6 +72,7 @@ fn make_transform_bloom(value_limit: usize, limit_exceeded_action: LimitExceeded
             }),
             internal_metrics: InternalMetricsConfig::default(),
         },
+        tracking_scope: TrackingScope::default(),
         per_metric_limits: HashMap::new(),
     }
 }
@@ -87,6 +89,7 @@ fn make_transform_hashset_with_per_metric_limits(
             mode: Mode::Exact,
             internal_metrics: InternalMetricsConfig::default(),
         },
+        tracking_scope: TrackingScope::default(),
         per_metric_limits,
     }
 }
@@ -105,6 +108,7 @@ fn make_transform_bloom_with_per_metric_limits(
             }),
             internal_metrics: InternalMetricsConfig::default(),
         },
+        tracking_scope: TrackingScope::default(),
         per_metric_limits,
     }
 }
@@ -594,4 +598,47 @@ async fn separate_value_limit_per_metric_name(config: Config) {
         );
     })
     .await;
+}
+
+/// With `tracking_scope: per_metric`, two metrics without explicit `per_metric_limits` entries
+/// each get their own tracking bucket, so one hitting the limit does not affect the other.
+#[test]
+fn tracking_scope_per_metric_isolates_metrics() {
+    let mut config = make_transform_hashset(2, LimitExceededAction::DropEvent);
+    config.tracking_scope = TrackingScope::PerMetric;
+    let mut transform = TagCardinalityLimit::new(config);
+
+    // Fill metric_a's bucket to its limit (2 distinct values).
+    let a1 = make_metric_with_name(metric_tags!("tag" => "v1"), "metric_a");
+    let a2 = make_metric_with_name(metric_tags!("tag" => "v2"), "metric_a");
+    // metric_b should be tracked in its own bucket — not affected by metric_a.
+    let b1 = make_metric_with_name(metric_tags!("tag" => "v3"), "metric_b");
+    let b2 = make_metric_with_name(metric_tags!("tag" => "v4"), "metric_b");
+    // A 3rd unique value on metric_a should be rejected (its bucket is full).
+    let a3 = make_metric_with_name(metric_tags!("tag" => "v5"), "metric_a");
+
+    assert_eq!(transform.transform_one(a1.clone()), Some(a1));
+    assert_eq!(transform.transform_one(a2.clone()), Some(a2));
+    assert_eq!(transform.transform_one(b1.clone()), Some(b1));
+    assert_eq!(transform.transform_one(b2.clone()), Some(b2));
+    assert_eq!(transform.transform_one(a3), None);
+}
+
+/// With the default `tracking_scope: global`, metrics without explicit `per_metric_limits`
+/// entries share a single tracking bucket — so values from different metrics pool together.
+#[test]
+fn tracking_scope_global_pools_metrics() {
+    // Default `tracking_scope` is `Global`.
+    let config = make_transform_hashset(2, LimitExceededAction::DropEvent);
+    let mut transform = TagCardinalityLimit::new(config);
+
+    let a1 = make_metric_with_name(metric_tags!("tag" => "v1"), "metric_a");
+    // Different metric, but values pool into the shared bucket → 2/2 used.
+    let b1 = make_metric_with_name(metric_tags!("tag" => "v2"), "metric_b");
+    // 3rd unique value across the shared bucket → rejected.
+    let a2 = make_metric_with_name(metric_tags!("tag" => "v3"), "metric_a");
+
+    assert_eq!(transform.transform_one(a1.clone()), Some(a1));
+    assert_eq!(transform.transform_one(b1.clone()), Some(b1));
+    assert_eq!(transform.transform_one(a2), None);
 }

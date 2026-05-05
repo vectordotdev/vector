@@ -35,6 +35,11 @@ pub struct Config {
     #[serde(flatten)]
     pub global: Inner,
 
+    /// Controls how tag tracking state is partitioned across metrics.
+    #[configurable(derived)]
+    #[serde(default)]
+    pub tracking_scope: TrackingScope,
+
     /// Tag cardinality limits configuration per metric name.
     #[configurable(
         derived,
@@ -42,6 +47,23 @@ pub struct Config {
     )]
     #[serde(default)]
     pub per_metric_limits: HashMap<String, PerMetricConfig>,
+}
+
+/// Controls how tag tracking state is partitioned across metrics.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum TrackingScope {
+    /// All metrics share a single tracking bucket. Tag values pool across metrics,
+    /// and the global `value_limit` caps the combined set. Lower memory but
+    /// cross-metric pollution.
+    #[default]
+    Global,
+
+    /// Every distinct metric gets its own tracking bucket, providing tag
+    /// cardinality limiting for each metric in isolation at the cost of higher
+    /// memory.
+    PerMetric,
 }
 
 /// Configuration for the `tag_cardinality_limit` transform for a specific group of metrics.
@@ -150,6 +172,7 @@ impl GenerateConfig for Config {
                 limit_exceeded_action: default_limit_exceeded_action(),
                 internal_metrics: InternalMetricsConfig::default(),
             },
+            tracking_scope: TrackingScope::default(),
             per_metric_limits: HashMap::default(),
         })
         .unwrap()
