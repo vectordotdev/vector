@@ -99,7 +99,7 @@ pub struct SortedSetOption {
 pub enum SortedSetMethod {
     /// Use the `zadd` method.
     ///
-    /// This adds messages onto a queue with a score.
+    /// This adds messages with a score into a queue.
     ///
     /// This is the default.
     #[default]
