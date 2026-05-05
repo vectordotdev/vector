@@ -139,6 +139,25 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 			}
 		}
 	}
+	tracking_scope: {
+		description: "Controls how tag tracking state is partitioned across metrics."
+		required:    false
+		type: string: {
+			default: "global"
+			enum: {
+				global: """
+					All metrics share a single tracking bucket. Tag values pool across metrics,
+					and the global `value_limit` caps the combined set. Lower memory but
+					cross-metric pollution.
+					"""
+				per_metric: """
+					Every distinct metric gets its own tracking bucket, providing tag
+					cardinality limiting for each metric in isolation at the cost of higher
+					memory.
+					"""
+			}
+		}
+	}
 	value_limit: {
 		description: "How many distinct values to accept for any given key."
 		required:    false

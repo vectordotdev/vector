@@ -15,7 +15,9 @@ mod tag_value_set;
 #[cfg(test)]
 mod tests;
 
-pub use config::{BloomFilterConfig, Config, Inner, LimitExceededAction, Mode, PerMetricConfig};
+pub use config::{
+    BloomFilterConfig, Config, Inner, LimitExceededAction, Mode, PerMetricConfig, TrackingScope,
+};
 use tag_value_set::AcceptedTagValueSet;
 
 use crate::event::metric::TagValueSet;
@@ -125,14 +127,20 @@ impl TagCardinalityLimit {
         let metric = event.as_mut_metric();
         let metric_name = metric.name().to_string();
         let metric_namespace = metric.namespace().map(|n| n.to_string());
-        let has_per_metric_config = self.config.per_metric_limits.iter().any(|(name, config)| {
-            *name == metric_name
-                && (config.namespace.is_none() || config.namespace == metric_namespace)
-        });
-        let metric_key = if has_per_metric_config {
-            Some((metric_namespace, metric_name.clone()))
-        } else {
-            None
+        let metric_key = match self.config.tracking_scope {
+            TrackingScope::PerMetric => Some((metric_namespace, metric_name.clone())),
+            TrackingScope::Global => {
+                let has_per_metric_config =
+                    self.config.per_metric_limits.iter().any(|(name, config)| {
+                        *name == metric_name
+                            && (config.namespace.is_none() || config.namespace == metric_namespace)
+                    });
+                if has_per_metric_config {
+                    Some((metric_namespace, metric_name.clone()))
+                } else {
+                    None
+                }
+            }
         };
         if let Some(tags_map) = metric.tags_mut() {
             match self
