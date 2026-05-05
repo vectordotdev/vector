@@ -351,7 +351,8 @@ impl SchemaContext {
                         if resolved_properties.len() != 1 {
                             error!(
                                 "Expected exactly 1 property for externally-tagged non-unit enum variant, got {}. Schema: {}",
-                                resolved_properties.len(), subschema
+                                resolved_properties.len(),
+                                subschema
                             );
                             std::process::exit(1);
                         }
