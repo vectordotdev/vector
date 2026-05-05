@@ -121,6 +121,8 @@ jobs:
           rust: true
           cue: true
       - run: make check-docs
+      - name: Check Cue website build
+        run: cd website && make cue-build
 
   check-markdown:
     name: Check Markdown

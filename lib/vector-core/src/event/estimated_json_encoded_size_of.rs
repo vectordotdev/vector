@@ -120,13 +120,13 @@ impl EstimatedJsonEncodedSizeOf for bool {
 
 impl EstimatedJsonEncodedSizeOf for f64 {
     fn estimated_json_encoded_size_of(&self) -> JsonSize {
-        ryu::Buffer::new().format_finite(*self).len().into()
+        zmij::Buffer::new().format_finite(*self).len().into()
     }
 }
 
 impl EstimatedJsonEncodedSizeOf for f32 {
     fn estimated_json_encoded_size_of(&self) -> JsonSize {
-        ryu::Buffer::new().format_finite(*self).len().into()
+        zmij::Buffer::new().format_finite(*self).len().into()
     }
 }
 
