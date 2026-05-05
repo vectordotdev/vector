@@ -3,6 +3,7 @@
 
 #![deny(missing_docs)]
 
+#[cfg(feature = "avro")]
 mod avro;
 mod bytes;
 mod gelf;
@@ -18,6 +19,7 @@ mod syslog;
 mod vrl;
 
 use ::bytes::Bytes;
+#[cfg(feature = "avro")]
 pub use avro::{AvroDeserializer, AvroDeserializerConfig, AvroDeserializerOptions};
 use dyn_clone::DynClone;
 pub use gelf::{GelfDeserializer, GelfDeserializerConfig, GelfDeserializerOptions};

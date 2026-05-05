@@ -11,9 +11,10 @@ unwrap-used = "deny"
 [[bin]]
 name = "generate-avro-fixtures"
 path = "tests/bin/generate-avro-fixtures.rs"
+required-features = ["avro"]
 
 [dependencies]
-apache-avro = { version = "0.20.0", default-features = false }
+apache-avro = { version = "0.20.0", default-features = false, optional = true }
 arrow = { version = "56.2.0", default-features = false, features = ["ipc", "json"], optional = true }
 parquet = { version = "56.2.0", default-features = false, features = [
     "arrow",
@@ -78,6 +79,7 @@ vrl.workspace = true
 
 [features]
 arrow = ["dep:arrow", "arrow/chrono-tz"]
+avro = ["dep:apache-avro"]
 parquet = ["dep:parquet", "arrow"]
 opentelemetry = ["dep:opentelemetry-proto"]
 syslog = ["dep:syslog_loose", "dep:strum", "dep:derive_more", "dep:serde-aux", "dep:toml"]

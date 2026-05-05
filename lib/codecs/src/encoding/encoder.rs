@@ -207,8 +207,7 @@ impl Encoder<Framer> {
             ) => "application/json",
             (Serializer::Native(_), _) | (Serializer::Protobuf(_), _) => "application/octet-stream",
             (
-                Serializer::Avro(_)
-                | Serializer::Cef(_)
+                Serializer::Cef(_)
                 | Serializer::Csv(_)
                 | Serializer::Gelf(_)
                 | Serializer::Json(_)
@@ -218,6 +217,8 @@ impl Encoder<Framer> {
                 | Serializer::Text(_),
                 _,
             ) => "text/plain",
+            #[cfg(feature = "avro")]
+            (Serializer::Avro(_), _) => "text/plain",
             #[cfg(feature = "syslog")]
             (Serializer::Syslog(_), _) => "text/plain",
             #[cfg(feature = "opentelemetry")]

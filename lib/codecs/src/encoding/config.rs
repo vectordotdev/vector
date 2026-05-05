@@ -109,9 +109,9 @@ impl EncodingConfigWithFraming {
                 SinkType::StreamBased => NewlineDelimitedEncoder::default().into(),
                 SinkType::MessageBased => CharacterDelimitedEncoder::new(b',').into(),
             },
-            (None, Serializer::Avro(_) | Serializer::Native(_)) => {
-                LengthDelimitedEncoder::default().into()
-            }
+            (None, Serializer::Native(_)) => LengthDelimitedEncoder::default().into(),
+            #[cfg(feature = "avro")]
+            (None, Serializer::Avro(_)) => LengthDelimitedEncoder::default().into(),
             (None, Serializer::Gelf(_)) => {
                 // Graylog/GELF always uses null byte delimiter on TCP, see
                 // https://github.com/Graylog2/graylog2-server/issues/1240
