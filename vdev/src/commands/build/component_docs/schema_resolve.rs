@@ -119,7 +119,7 @@ impl SchemaContext {
                 .insert("warnings".to_string(), warnings_array);
         }
 
-        self.reconcile_resolved_schema(&mut resolved);
+        SchemaContext::reconcile_resolved_schema(&mut resolved);
 
         Ok(resolved)
     }

@@ -375,8 +375,7 @@ impl SchemaContext {
         );
     }
 
-    #[allow(clippy::self_only_used_in_recursion)]
-    pub fn reconcile_resolved_schema(&self, resolved: &mut Value) {
+    pub fn reconcile_resolved_schema(resolved: &mut Value) {
         let Some(type_obj) = resolved.get("type").and_then(Value::as_object) else {
             return;
         };
@@ -392,7 +391,7 @@ impl SchemaContext {
                     .pointer_mut(&format!("/type/object/options/{key}"))
                     .filter(|v| v.is_object())
                 {
-                    self.reconcile_resolved_schema(prop);
+                    Self::reconcile_resolved_schema(prop);
                 }
             }
             return;
