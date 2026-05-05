@@ -279,7 +279,9 @@ impl SchemaContext {
                             let key_str = item
                                 .as_str()
                                 .map_or_else(|| item.to_string(), std::string::ToString::to_string);
-                            enum_map.insert(key_str, json!({}));
+                            // Match the shape every other enum site emits: keys map to a
+                            // string description (empty when the schema doesn't carry one).
+                            enum_map.insert(key_str, Value::String(String::new()));
                         }
                         res.insert(k, json!({ "enum": enum_map }));
                     }
