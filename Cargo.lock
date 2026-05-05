@@ -13029,6 +13029,7 @@ dependencies = [
  "async-stream",
  "bytes",
  "chrono",
+ "criterion",
  "crossbeam-utils",
  "derivative",
  "futures",
