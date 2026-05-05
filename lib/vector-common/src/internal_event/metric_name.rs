@@ -76,6 +76,7 @@ pub enum CounterName {
     StaleEventsFlushedTotal,
     StartedTotal,
     StoppedTotal,
+    TagCardinalityUntrackedEventsTotal,
     TagValueLimitExceededTotal,
     ValueLimitReachedTotal,
     WebsocketBytesSentTotal,
@@ -190,6 +191,7 @@ pub enum GaugeName {
     ActiveClients,
     MemoryEnrichmentTableObjectsCount,
     MemoryEnrichmentTableByteSize,
+    TagCardinalityTrackedKeys,
 }
 
 impl GaugeName {
@@ -220,6 +222,7 @@ impl GaugeName {
             Self::ActiveClients => "active_clients",
             Self::MemoryEnrichmentTableObjectsCount => "memory_enrichment_table_objects_count",
             Self::MemoryEnrichmentTableByteSize => "memory_enrichment_table_byte_size",
+            Self::TagCardinalityTrackedKeys => "tag_cardinality_tracked_keys",
         }
     }
 }
@@ -304,6 +307,7 @@ impl CounterName {
             Self::StaleEventsFlushedTotal => "stale_events_flushed_total",
             Self::StartedTotal => "started_total",
             Self::StoppedTotal => "stopped_total",
+            Self::TagCardinalityUntrackedEventsTotal => "tag_cardinality_untracked_events_total",
             Self::TagValueLimitExceededTotal => "tag_value_limit_exceeded_total",
             Self::ValueLimitReachedTotal => "value_limit_reached_total",
             Self::WebsocketBytesSentTotal => "websocket_bytes_sent_total",

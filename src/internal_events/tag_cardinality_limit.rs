@@ -1,6 +1,6 @@
 use vector_lib::{
-    NamedInternalEvent, counter,
-    internal_event::{ComponentEventsDropped, CounterName, INTENTIONAL, InternalEvent},
+    NamedInternalEvent, counter, gauge,
+    internal_event::{ComponentEventsDropped, CounterName, GaugeName, INTENTIONAL, InternalEvent},
 };
 
 #[derive(NamedInternalEvent)]
@@ -78,5 +78,28 @@ impl InternalEvent for TagCardinalityValueLimitReached<'_> {
             key = %self.key,
         );
         counter!(CounterName::ValueLimitReachedTotal).increment(1);
+    }
+}
+
+#[derive(NamedInternalEvent)]
+pub struct TagCardinalityLimitUntracked;
+
+impl InternalEvent for TagCardinalityLimitUntracked {
+    fn emit(self) {
+        debug!(
+            message = "max_tracked_keys reached; one or more tags on this event are passing through untracked."
+        );
+        counter!(CounterName::TagCardinalityUntrackedEventsTotal).increment(1);
+    }
+}
+
+#[derive(NamedInternalEvent)]
+pub struct TagCardinalityTrackedKeys {
+    pub count: usize,
+}
+
+impl InternalEvent for TagCardinalityTrackedKeys {
+    fn emit(self) {
+        gauge!(GaugeName::TagCardinalityTrackedKeys).set(self.count as f64);
     }
 }
