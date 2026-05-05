@@ -5,7 +5,6 @@ use std::{
     time::{Duration, Instant},
 };
 
-use chrono::Utc;
 use futures::{Stream, StreamExt as _};
 use metrics::Histogram;
 use tracing::Span;
@@ -15,6 +14,7 @@ use vector_buffers::{
 };
 use vector_common::{
     byte_size_of::ByteSizeOf,
+    fast_clock,
     internal_event::{
         self, ComponentEventsDropped, ComponentEventsTimedOut, Count, CountByteSize, EventsSent,
         InternalEventHandle as _, RegisterInternalEvent as _, Registered, UNINTENTIONAL,
@@ -162,7 +162,7 @@ impl Output {
         events: EventArray,
         unsent_event_count: &mut UnsentEventCount,
     ) -> Result<(), SendError> {
-        let reference = Utc::now().timestamp_millis();
+        let reference = fast_clock::recent_unix_millis();
         self.send_inner(events, unsent_event_count, reference).await
     }
 
@@ -261,7 +261,7 @@ impl Output {
     {
         // Capture a single reference timestamp for the entire batch so that lag time
         // measurements are not inflated by channel-send latency for later chunks.
-        let reference = Utc::now().timestamp_millis();
+        let reference = fast_clock::recent_unix_millis();
 
         // It's possible that the caller stops polling this future while it is blocked waiting
         // on `self.send()`. When that happens, we use `UnsentEventCount` to correctly emit
