@@ -290,6 +290,9 @@ fn resolve_top_level_config_fields(
         .get("allOf")
         .and_then(Value::as_array)
         .ok_or_else(|| anyhow::anyhow!("Could not find ConfigBuilder allOf schemas"))?;
+    if all_of.is_empty() {
+        anyhow::bail!("ConfigBuilder allOf schemas are empty");
+    }
 
     let mut all_properties: IndexMap<String, Value> = IndexMap::new();
     for subschema in all_of {

@@ -1,4 +1,4 @@
-use super::{SchemaContext, docs_type_str, get_schema_metadata};
+use super::{SchemaContext, get_schema_metadata};
 use anyhow::Result;
 use serde_json::{Map, Value};
 
@@ -207,54 +207,78 @@ impl SchemaContext {
         debug!("Applying schema default values.");
 
         let default_value = match source_schema.get("default") {
-            Some(v) if !v.is_null() => v,
+            Some(v) if !v.is_null() => v.clone(),
             _ => return Ok(()),
         };
 
-        let default_value_type = docs_type_str(default_value);
+        let default_value_type = self.get_docs_type_for_value(Some(source_schema), &default_value);
+
+        // The resolved schema must declare a type definition matching the default
+        // value's type. Anything else is a schema generation bug, so surface it
+        // loudly rather than silently dropping the default.
+        if resolved_schema
+            .pointer(&format!("/type/{default_value_type}"))
+            .is_none()
+        {
+            anyhow::bail!(
+                "Schema has default value declared that does not match type of resolved schema:\n\
+                 Source schema: {}\n\
+                 Default value: {} (type: {})\n\
+                 Resolved schema: {}",
+                serde_json::to_string_pretty(source_schema)?,
+                serde_json::to_string_pretty(&default_value)?,
+                default_value_type,
+                serde_json::to_string_pretty(resolved_schema)?,
+            );
+        }
 
         if default_value_type == "object" {
-            if let Some(resolved_type_field) = resolved_schema.pointer_mut("/type/object")
-                && let Value::Object(type_field) = resolved_type_field
-                && let Some(Value::Object(props)) = type_field.get_mut("options")
-                && let Value::Object(def_obj) = default_value
-            {
-                for (prop_name, prop_default_value) in def_obj {
-                    if prop_default_value.is_null() {
-                        continue;
-                    }
-                    if let Some(resolved_prop) = props.get_mut(prop_name) {
-                        let source_property =
-                            self.find_nested_object_property_schema(source_schema, prop_name);
-                        if let Some(source_prop) = source_property {
-                            let mut source_with_default = source_prop.clone();
-                            source_with_default
-                                .as_object_mut()
-                                .unwrap()
-                                .insert("default".to_string(), prop_default_value.clone());
-                            self.apply_schema_default_value(&source_with_default, resolved_prop)?;
-                        } else {
-                            let value_type = self.get_docs_type_for_value(None, prop_default_value);
-                            if let Some(Value::Object(type_obj)) = resolved_prop.get_mut("type")
-                                && let Some(Value::Object(type_def)) = type_obj.get_mut(value_type)
-                            {
-                                type_def.insert("default".to_string(), prop_default_value.clone());
-                            }
-                        }
-                        resolved_prop
-                            .as_object_mut()
-                            .unwrap()
-                            .insert("required".to_string(), Value::Bool(false));
+            let Value::Object(def_obj) = default_value else {
+                anyhow::bail!("Default value typed 'object' was not a JSON object");
+            };
+            let props = resolved_schema
+                .pointer_mut("/type/object/options")
+                .and_then(Value::as_object_mut)
+                .ok_or_else(|| {
+                    anyhow::anyhow!("Resolved object schema is missing /type/object/options")
+                })?;
+
+            for (prop_name, prop_default_value) in def_obj {
+                if prop_default_value.is_null() {
+                    continue;
+                }
+                let Some(resolved_prop) = props.get_mut(&prop_name) else {
+                    continue;
+                };
+
+                if let Some(source_prop) =
+                    self.find_nested_object_property_schema(source_schema, &prop_name)
+                {
+                    let mut source_with_default = source_prop.clone();
+                    source_with_default
+                        .as_object_mut()
+                        .unwrap()
+                        .insert("default".to_string(), prop_default_value);
+                    self.apply_schema_default_value(&source_with_default, resolved_prop)?;
+                } else {
+                    let value_type = self.get_docs_type_for_value(None, &prop_default_value);
+                    if let Some(Value::Object(type_obj)) = resolved_prop.get_mut("type")
+                        && let Some(Value::Object(type_def)) = type_obj.get_mut(value_type)
+                    {
+                        type_def.insert("default".to_string(), prop_default_value);
                     }
                 }
+                resolved_prop
+                    .as_object_mut()
+                    .unwrap()
+                    .insert("required".to_string(), Value::Bool(false));
             }
         } else {
-            let value_type = self.get_docs_type_for_value(Some(source_schema), default_value);
-            if let Some(Value::Object(type_obj)) = resolved_schema.get_mut("type")
-                && let Some(Value::Object(type_def)) = type_obj.get_mut(value_type)
-            {
-                type_def.insert("default".to_string(), default_value.clone());
-            }
+            let type_def = resolved_schema
+                .pointer_mut(&format!("/type/{default_value_type}"))
+                .and_then(Value::as_object_mut)
+                .expect("/type/{default_value_type} existence verified above");
+            type_def.insert("default".to_string(), default_value);
         }
         Ok(())
     }
