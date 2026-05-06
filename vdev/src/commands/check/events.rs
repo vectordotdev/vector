@@ -1357,18 +1357,16 @@ mod tests {
     }
 
     fn check(message: &str) -> (bool, bool) {
-        // Replicates the gating in `format_check_log` for a literal message.
+        // Replicates the gating in `format_check_log_messages` for a literal message.
         let is_capitalized = message.starts_with('{')
             || !message
                 .chars()
                 .next()
-                .map(|c| c.is_ascii_alphabetic())
-                .unwrap_or(false)
+                .is_some_and(|c| c.is_ascii_alphabetic())
             || message
                 .chars()
                 .next()
-                .map(|c| c.is_ascii_uppercase())
-                .unwrap_or(false);
+                .is_some_and(|c| c.is_ascii_uppercase());
         let has_trailing_period = message.ends_with('}') || message.ends_with('.');
         (is_capitalized, has_trailing_period)
     }
