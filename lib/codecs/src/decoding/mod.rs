@@ -550,8 +550,7 @@ pub enum Deserializer {
 
 impl Deserializer {
     /// Attaches a metadata template to the inner deserializer, if it supports
-    /// one. Currently only [`VrlDeserializer`] uses this; for all other variants
-    /// this is a no-op and `self` is returned unchanged.
+    /// one.
     pub fn with_metadata_template(self, metadata: EventMetadata) -> Self {
         match self {
             Deserializer::Vrl(d) => Deserializer::Vrl(d.with_metadata_template(metadata)),
