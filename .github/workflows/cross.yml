@@ -57,5 +57,5 @@ jobs:
       - run: make cross-build-${{ matrix.target }}
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: "vector-debug-${{ matrix.target }}"
-          path: "./target/${{ matrix.target }}/debug/vector"
+          name: "vector-${{ matrix.target }}"
+          path: "./target/${{ matrix.target }}/release/vector"

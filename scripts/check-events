@@ -78,8 +78,19 @@ class Event
 
   # Scan for counter names and tags
   def scan_metrics(block)
+    # Match string literal names: counter!("metric_name", ...)
     block.scan(/ (counter|gauge|histogram)!\((?:\n\s+)?"([^"]+)",?(.+?)\)[;\n]/ms) \
     do |type, name, tags|
+      tags = Hash[tags.scan(/"([^"]+)" => (.+?)(?:,|$)/)]
+      add_metric(type, name, tags)
+    end
+    # Match typed enum names: counter!(CounterName::VariantName, ...)
+    block.scan(/ (counter|gauge|histogram)!\((?:\n\s+)?\w+Name::(\w+),?(.+?)\)[;\n]/ms) \
+    do |type, variant, tags|
+      # Convert CamelCase variant name to snake_case metric name
+      name = variant.gsub(/([A-Z]+)([A-Z][a-z])/, '\1_\2')
+                    .gsub(/([a-z\d])([A-Z])/, '\1_\2')
+                    .downcase
       tags = Hash[tags.scan(/"([^"]+)" => (.+?)(?:,|$)/)]
       add_metric(type, name, tags)
     end
