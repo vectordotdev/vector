@@ -6,11 +6,12 @@ use axum::{
     Router,
     body::Body,
     extract::Extension,
-    http::{Request, header::CONTENT_TYPE},
+    http::Request,
     routing::{get, post},
 };
 use chrono::Utc;
 use flate2::read::GzDecoder;
+use http::header::CONTENT_TYPE;
 use indoc::indoc;
 use rmp_serde;
 use serde::Serialize;
@@ -198,13 +199,13 @@ async fn send_agent_traces(urls: &Vec<String>, start: i64, duration: i64, span_i
         for url in urls {
             let res = client
                 .post(url)
-                .header(CONTENT_TYPE, "application/json")
+                .header(http_1::header::CONTENT_TYPE, "application/json")
                 .json(&traces_payload)
                 .send()
                 .await
                 .unwrap();
 
-            if res.status() != hyper::StatusCode::OK {
+            if res.status() != http_1::StatusCode::OK {
                 error!("Error sending traces to {}, res: {:?}.", url, res);
                 return false;
             }

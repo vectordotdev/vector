@@ -4,7 +4,8 @@ use aws_smithy_types::body::SdkBody;
 use bytes::Bytes;
 use chrono::Utc;
 use futures::{StreamExt, future::ready, stream};
-use http::{Request, StatusCode};
+use http::Request;
+use http_1::StatusCode;
 use serde_json::{Value, json};
 use vector_lib::{
     config::{Tags, Telemetry, init_telemetry, log_schema},
@@ -84,7 +85,7 @@ impl ElasticsearchCommon {
         let response = client.send(request.map(SdkBody::from)).await?;
 
         match response.status() {
-            StatusCode::OK => Ok(()),
+            http::StatusCode::OK => Ok(()),
             status => Err(HealthcheckError::UnexpectedStatus { status }.into()),
         }
     }

@@ -2,8 +2,8 @@ use std::{collections::HashMap, future::ready, task::Poll};
 
 use bytes::{Bytes, BytesMut};
 use futures::{FutureExt, SinkExt, future::BoxFuture, stream};
-use http::{StatusCode, Uri};
-use hyper::{Body, Request};
+use http_1::{Request, StatusCode, Uri};
+use http_body_util::Full;
 use indoc::indoc;
 use tower::Service;
 use vector_lib::{
@@ -19,7 +19,7 @@ use crate::{
         Event, KeyString,
         metric::{Metric, MetricValue},
     },
-    http::HttpClient,
+    http::http_1::HttpClient,
     internal_events::{SematextMetricsEncodeEventError, SematextMetricsInvalidMetricError},
     sinks::{
         Healthcheck, HealthcheckError, VectorSink,
@@ -27,7 +27,7 @@ use crate::{
         util::{
             BatchConfig, EncodedEvent, SinkBatchSettings, TowerRequestConfig,
             buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
-            http::{HttpBatchService, HttpRetryLogic},
+            http_1::{HttpBatchService, HttpRetryLogic},
         },
     },
     vector_version,
@@ -102,11 +102,11 @@ impl GenerateConfig for SematextMetricsConfig {
     }
 }
 
-async fn healthcheck(endpoint: String, client: HttpClient) -> Result<()> {
+async fn healthcheck(endpoint: String, client: HttpClient<Full<Bytes>>) -> Result<()> {
     let uri = format!("{endpoint}/health");
 
     let request = Request::get(uri)
-        .body(Body::empty())
+        .body(Full::new(Bytes::new()))
         .map_err(|e| e.to_string())?;
 
     let response = client.send(request).await?;
@@ -114,7 +114,7 @@ async fn healthcheck(endpoint: String, client: HttpClient) -> Result<()> {
     match response.status() {
         StatusCode::OK => Ok(()),
         StatusCode::NO_CONTENT => Ok(()),
-        other => Err(HealthcheckError::UnexpectedStatus { status: other }.into()),
+        other => Err(HealthcheckError::Http1UnexpectedStatus { status: other }.into()),
     }
 }
 
@@ -126,7 +126,7 @@ const EU_ENDPOINT: &str = "https://spm-receiver.eu.sematext.com";
 #[typetag::serde(name = "sematext_metrics")]
 impl SinkConfig for SematextMetricsConfig {
     async fn build(&self, cx: SinkContext) -> Result<(VectorSink, Healthcheck)> {
-        let client = HttpClient::new(None, cx.proxy())?;
+        let client: HttpClient<Full<Bytes>> = HttpClient::new(None, cx.http_1_proxy())?;
 
         let endpoint = match (&self.endpoint, &self.region) {
             (Some(endpoint), _) => endpoint.clone(),
@@ -164,8 +164,8 @@ fn write_uri(endpoint: &str) -> Result<Uri> {
 impl SematextMetricsService {
     pub fn new(
         config: SematextMetricsConfig,
-        endpoint: http::Uri,
-        client: HttpClient,
+        endpoint: http_1::Uri,
+        client: HttpClient<Full<Bytes>>,
     ) -> Result<VectorSink> {
         let batch = config.batch.into_batch_settings()?;
         let request = config.request.into_settings();
@@ -200,7 +200,7 @@ impl SematextMetricsService {
 }
 
 impl Service<Vec<Metric>> for SematextMetricsService {
-    type Response = http::Response<bytes::Bytes>;
+    type Response = http_1::Response<bytes::Bytes>;
     type Error = crate::Error;
     type Future = BoxFuture<'static, std::result::Result<Self::Response, Self::Error>>;
 
@@ -240,7 +240,7 @@ impl MetricNormalize for SematextMetricNormalize {
 }
 
 fn create_build_request(
-    uri: http::Uri,
+    uri: Uri,
 ) -> impl Fn(Bytes) -> BoxFuture<'static, Result<Request<Bytes>>> + Sync + Send + 'static {
     move |body| {
         Box::pin(ready(

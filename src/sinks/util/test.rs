@@ -8,6 +8,7 @@ use flate2::read::{MultiGzDecoder, ZlibDecoder};
 use futures::{FutureExt, SinkExt, TryFutureExt, channel::mpsc, stream};
 use futures_util::StreamExt;
 use http::request::Parts;
+use http_body_util::Empty;
 use hyper::{
     Body, Request, Response, Server, StatusCode,
     body::HttpBody,
@@ -64,6 +65,64 @@ pub fn build_test_server_status(
             .body(Body::empty())
             .unwrap_or_else(|_| unreachable!())
     })
+}
+
+pub fn build_test_http_1_server_status(
+    addr: SocketAddr,
+    status: http_1::StatusCode,
+) -> (
+    mpsc::Receiver<(http_1::request::Parts, Bytes)>,
+    Trigger,
+    impl std::future::Future<Output = Result<(), ()>>,
+) {
+    let (tx, rx) = mpsc::channel(100);
+    let (trigger, tripwire) = Tripwire::new();
+
+    let server = async move {
+        let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+        let mut tripwire = tripwire.fuse();
+
+        loop {
+            let (stream, _) = tokio::select! {
+                result = listener.accept() => result.unwrap(),
+                _ = &mut tripwire => break,
+            };
+            let io = hyper_util::rt::TokioIo::new(stream);
+            let tx = tx.clone();
+            let status = status;
+            tokio::spawn(async move {
+                let _ = hyper_1::server::conn::http1::Builder::new()
+                    .serve_connection(
+                        io,
+                        hyper_1::service::service_fn(
+                            move |req: http_1::Request<hyper_1::body::Incoming>| {
+                                let mut tx = tx.clone();
+                                async move {
+                                    let (parts, body) = req.into_parts();
+                                    if status.is_success() {
+                                        let bytes = http_body_util::BodyExt::collect(body)
+                                            .await
+                                            .unwrap()
+                                            .to_bytes();
+                                        tx.send((parts, bytes)).await.unwrap();
+                                    }
+                                    Ok::<_, std::convert::Infallible>(
+                                        http_1::Response::builder()
+                                            .status(status)
+                                            .body(Empty::<Bytes>::new())
+                                            .unwrap(),
+                                    )
+                                }
+                            },
+                        ),
+                    )
+                    .await;
+            });
+        }
+        Ok(())
+    };
+
+    (rx, trigger, server)
 }
 
 pub fn build_test_server_generic<B>(

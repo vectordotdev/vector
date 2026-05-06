@@ -7,6 +7,7 @@ use vector_config::{configurable_component, impl_generate_config_from_default};
 use super::{
     super::default_data_dir, AcknowledgementsConfig, LogSchema, Telemetry,
     metrics_expiration::PerMetricSetExpiration, proxy::ProxyConfig,
+    proxy_http_1::ProxyConfig as Http1ProxyConfig,
 };
 use crate::serde::bool_or_struct;
 
@@ -351,6 +352,13 @@ impl GlobalOptions {
         }
     }
 
+    /// Returns an `Http1ProxyConfig` derived from the `proxy` field.
+    ///
+    /// The HTTP/1 proxy is always kept in sync with the configured `proxy` settings.
+    pub fn http_1_proxy(&self) -> Http1ProxyConfig {
+        Http1ProxyConfig::from(&self.proxy)
+    }
+
     /// Get the configured time zone, using "local" time if none is set.
     pub fn timezone(&self) -> TimeZone {
         self.timezone.unwrap_or(TimeZone::Local)
@@ -447,6 +455,25 @@ mod tests {
         // We use the `.http` settings as a proxy for the other settings, as they are all compared
         // for equality above.
         let merge = |a, b| merge("proxy.http", a, b, |result| result.proxy.http);
+
+        assert_eq!(merge(None, None), Ok(None));
+        assert_eq!(merge(Some("test1"), None), Ok(Some("test1".into())));
+        assert_eq!(merge(None, Some("test2")), Ok(Some("test2".into())));
+        assert_eq!(
+            merge(Some("test3"), Some("test3")),
+            Ok(Some("test3".into()))
+        );
+        assert_eq!(
+            merge(Some("test4"), Some("test5")),
+            Err(vec!["conflicting values for 'proxy.http' found".into()])
+        );
+    }
+
+    #[test]
+    fn merges_http_1_proxy() {
+        // We use the `.http` settings as a proxy for the other settings, as they are all compared
+        // for equality above.
+        let merge = |a, b| merge("proxy.http", a, b, |result| result.http_1_proxy().http);
 
         assert_eq!(merge(None, None), Ok(None));
         assert_eq!(merge(Some("test1"), None), Ok(Some("test1".into())));

@@ -6,16 +6,17 @@ use std::collections::HashMap;
 use bytes::{BufMut, BytesMut};
 use chrono::{DateTime, Utc};
 use futures::FutureExt;
-use http::{StatusCode, Uri};
+use http_1::{Request, StatusCode, Uri};
+use http_body_util::Full;
+use hyper_1::body::Bytes;
 use snafu::{ResultExt, Snafu};
-use tower::Service;
 use vector_lib::{
     configurable::configurable_component,
     event::{KeyString, MetricTags},
     sensitive_string::SensitiveString,
 };
 
-use crate::http::HttpClient;
+use crate::http::http_1::HttpClient;
 
 pub(in crate::sinks) enum Field {
     /// string
@@ -207,23 +208,24 @@ fn healthcheck(
     endpoint: String,
     influxdb1_settings: Option<InfluxDb1Settings>,
     influxdb2_settings: Option<InfluxDb2Settings>,
-    mut client: HttpClient,
+    client: HttpClient<Full<Bytes>>,
 ) -> crate::Result<super::Healthcheck> {
     let settings = influxdb_settings(influxdb1_settings, influxdb2_settings)?;
 
     let uri = settings.healthcheck_uri(endpoint)?;
 
-    let request = hyper::Request::get(uri).body(hyper::Body::empty()).unwrap();
+    let request = Request::get(uri).body(Full::new(Bytes::new())).unwrap();
 
     Ok(async move {
-        client
-            .call(request)
+        hyper_1::service::Service::call(&client, request)
             .await
             .map_err(|error| error.into())
             .and_then(|response| match response.status() {
                 StatusCode::OK => Ok(()),
                 StatusCode::NO_CONTENT => Ok(()),
-                other => Err(super::HealthcheckError::UnexpectedStatus { status: other }.into()),
+                other => {
+                    Err(super::HealthcheckError::Http1UnexpectedStatus { status: other }.into())
+                }
             })
     }
     .boxed())
@@ -373,7 +375,7 @@ pub(in crate::sinks) fn encode_uri(
         url.pop();
     }
 
-    Ok(url.parse::<Uri>().context(super::UriParseSnafu)?)
+    Ok(url.parse::<Uri>().context(super::Http1UriParseSnafu)?)
 }
 
 #[cfg(test)]
@@ -483,7 +485,7 @@ pub mod test_util {
         let status = query_v1(endpoint, &format!("create database {database}"))
             .await
             .status();
-        assert_eq!(status, http::StatusCode::OK, "UnexpectedStatus: {status}");
+        assert_eq!(status, StatusCode::OK, "UnexpectedStatus: {status}");
         // Some times InfluxDB will return OK before it can actually
         // accept writes to the database, leading to test failures. Test
         // this with empty writes and loop if it reports the database
@@ -501,8 +503,8 @@ pub mod test_util {
                     .unwrap()
                     .status()
                 {
-                    http::StatusCode::NO_CONTENT => true,
-                    http::StatusCode::NOT_FOUND => false,
+                    StatusCode::NO_CONTENT => true,
+                    StatusCode::NOT_FOUND => false,
                     status => panic!("Unexpected status: {status}"),
                 }
             }
@@ -515,7 +517,7 @@ pub mod test_util {
         let status = query_v1(endpoint, &format!("drop database {database}"))
             .await
             .status();
-        assert_eq!(status, http::StatusCode::OK, "UnexpectedStatus: {status}");
+        assert_eq!(status, StatusCode::OK, "UnexpectedStatus: {status}");
     }
 
     pub(crate) async fn onboarding_v2(endpoint: &str) {
@@ -902,13 +904,15 @@ mod tests {
 #[cfg(test)]
 mod integration_tests {
     use crate::{
-        config::ProxyConfig,
-        http::HttpClient,
+        config::http_1::ProxyConfig,
+        http::http_1::HttpClient,
         sinks::influxdb::{
             InfluxDb1Settings, InfluxDb2Settings, healthcheck,
             test_util::{BUCKET, ORG, TOKEN, address_v1, address_v2, next_database, onboarding_v2},
         },
     };
+    use http_body_util::Full;
+    use hyper_1::body::Bytes;
 
     #[tokio::test]
     async fn influxdb2_healthchecks_ok() {
@@ -923,7 +927,7 @@ mod integration_tests {
             token: TOKEN.to_string().into(),
         });
         let proxy = ProxyConfig::default();
-        let client = HttpClient::new(None, &proxy).unwrap();
+        let client = HttpClient::<Full<Bytes>>::new(None, &proxy).unwrap();
 
         healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client)
             .unwrap()
@@ -944,7 +948,7 @@ mod integration_tests {
             token: TOKEN.to_string().into(),
         });
         let proxy = ProxyConfig::default();
-        let client = HttpClient::new(None, &proxy).unwrap();
+        let client = HttpClient::<Full<Bytes>>::new(None, &proxy).unwrap();
 
         healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client)
             .unwrap()
@@ -965,7 +969,7 @@ mod integration_tests {
         });
         let influxdb2_settings = None;
         let proxy = ProxyConfig::default();
-        let client = HttpClient::new(None, &proxy).unwrap();
+        let client = HttpClient::<Full<Bytes>>::new(None, &proxy).unwrap();
 
         healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client)
             .unwrap()

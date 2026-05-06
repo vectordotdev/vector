@@ -142,7 +142,7 @@ uri = "http://{address2}/"
         .await
         .expect("Timed out waiting to receive result from HTTP source")
         .expect("Error receiving result from tokio task");
-    assert_eq!(result.status(), response);
+    assert_eq!(result.status().as_u16(), response.as_u16());
 }
 
 #[tokio::test]
