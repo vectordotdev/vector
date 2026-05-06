@@ -9,7 +9,7 @@ use super::{
     },
     util::{table_to_timestamp, timestamp_to_table},
 };
-use crate::event::vrl_target::MetricTagMode;
+use crate::event::MetricTagMode;
 use crate::metrics::AgentDDSketch;
 
 pub struct LuaMetric {
@@ -121,20 +121,24 @@ impl IntoLua for LuaMetricTags {
                 lua.create_table_from(self.tags.iter_single())?,
             )),
             // `Auto` exposes single-value tags as scalars and multi-value tags
-            // as arrays. The discriminator must be `len()`, not `as_single()`
-            // -- the latter deliberately collapses multi-value sets to their
-            // last value to power `Single` mode, which is the opposite of what
-            // we want here.
+            // as arrays. Only a 1-element set scalarises -- empty sets keep
+            // the array shape so a noop Auto round-trip preserves them.
+            // (`as_single()` is unsuitable here because it deliberately
+            // collapses multi-value sets to their last value to power
+            // `Single` mode.)
             MetricTagMode::Auto => {
                 let table = lua.create_table()?;
                 for (key, value) in self.tags.0 {
-                    if value.len() <= 1 {
-                        let scalar = value.into_iter().next().and_then(TagValue::into_option);
+                    if value.len() == 1 {
+                        let scalar =
+                            value.into_iter().next().and_then(TagValue::into_option);
                         table.raw_set(key, scalar)?;
                     } else {
                         let arr: Vec<_> = value
                             .into_iter()
-                            .filter_map(|tag_value| tag_value.into_option().into_lua(lua).ok())
+                            .filter_map(|tag_value| {
+                                tag_value.into_option().into_lua(lua).ok()
+                            })
                             .collect();
                         table.raw_set(key, arr)?;
                     }
@@ -501,6 +505,32 @@ mod test {
                 "type(metric.tags['multi']) == 'table'",
                 "metric.tags['multi'][1] == 'a'",
                 "metric.tags['multi'][2] == 'b'",
+            ],
+        );
+    }
+
+    /// `Auto` keeps an empty tag set as an array (Lua table). Without this,
+    /// an empty multi-value tag would silently morph into `nil` (and a Lua
+    /// `tags['empty'] = ...` assignment would then need to know the original
+    /// shape to round-trip correctly).
+    #[test]
+    fn auto_mode_empty_set_stays_array() {
+        let mut tags = BTreeMap::new();
+        tags.insert("empty".to_string(), TagValueSet::default());
+        let metric = Metric::new(
+            "example counter",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 1.0 },
+        )
+        .with_tags(Some(MetricTags(tags)));
+
+        assert_metric(
+            metric,
+            MetricTagMode::Auto,
+            vec![
+                "type(metric.tags) == 'table'",
+                "type(metric.tags['empty']) == 'table'",
+                "#metric.tags['empty'] == 0",
             ],
         );
     }

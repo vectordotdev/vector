@@ -17,9 +17,10 @@ use vector_common::{
     EventDataEq, byte_size_of::ByteSizeOf, config::ComponentKey, finalization,
     internal_event::TaggedEventsSent, json_size::JsonSize, request_metadata::GetEventCountTags,
 };
+pub use metric_tag_mode::MetricTagMode;
 pub use vrl::value::{KeyString, ObjectMap, Value};
 #[cfg(feature = "vrl")]
-pub use vrl_target::{MetricTagMode, TargetEvents, VrlTarget};
+pub use vrl_target::{TargetEvents, VrlTarget};
 
 use crate::config::{LogNamespace, OutputId};
 
@@ -34,6 +35,7 @@ pub mod lua;
 pub mod merge_state;
 mod metadata;
 pub mod metric;
+mod metric_tag_mode;
 pub mod proto;
 mod r#ref;
 mod ser;

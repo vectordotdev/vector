@@ -4,7 +4,7 @@ use super::{
     super::{Event, LogEvent, Metric},
     metric::LuaMetric,
 };
-use crate::event::vrl_target::MetricTagMode;
+use crate::event::MetricTagMode;
 
 pub struct LuaEvent {
     pub event: Event,

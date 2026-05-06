@@ -32,26 +32,10 @@ const VALID_METRIC_PATHS_GET: &str =
 /// fields such as `.tags.host.thing`.
 const MAX_METRIC_PATH_DEPTH: usize = 3;
 
-/// How metric tags are exposed to and accepted from VRL.
-///
-/// Mirrors `codecs::MetricTagValues`, but lives in `vector-core` so that the
-/// crate dependency direction (`codecs -> vector-core`) is preserved. Callers
-/// at the `codecs::MetricTagValues` boundary translate using the
-/// `From<MetricTagValues>` impl on the codecs side.
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
-pub enum MetricTagMode {
-    /// Tags are exposed as single strings (last value wins for multi-value
-    /// tags); writes always produce single-value tags.
-    #[default]
-    Single,
-    /// Tags are always exposed as arrays; writes always produce multi-value
-    /// tags regardless of whether the assigned value is scalar or array.
-    Full,
-    /// Tags are exposed using their underlying shape: single-value tags as
-    /// strings, multi-value tags as arrays. Writes follow the same rule --
-    /// scalar values produce single tags, arrays produce multi-value tags.
-    Auto,
-}
+// `MetricTagMode` lives in its own always-compiled module so the `lua`
+// feature can use the same type without pulling in `vrl`. The canonical
+// public path is `crate::event::MetricTagMode`.
+use super::metric_tag_mode::MetricTagMode;
 
 /// An adapter to turn `Event`s into `vrl_lib::Target`s.
 #[allow(clippy::large_enum_variant)]
@@ -647,14 +631,16 @@ fn get_auto_value_tags(metric: &Metric) -> Option<Value> {
     metric.tags().cloned().map(|tags| {
         tags.iter_sets()
             .map(|(tag, tag_set)| {
-                let value = if tag_set.len() <= 1 {
-                    match tag_set.iter().next() {
+                // Only a 1-element set scalarises. Empty sets keep the
+                // array shape so a noop Auto round-trip preserves them
+                // (otherwise an empty multi-value tag would be silently
+                // converted to a bare single-value tag).
+                let value = match tag_set.len() {
+                    1 => match tag_set.iter().next() {
                         Some(Some(s)) => Value::Bytes(s.as_bytes().to_vec().into()),
-                        // 1-element bare set, or (defensively) empty set.
                         _ => Value::Null,
-                    }
-                } else {
-                    Value::Array(
+                    },
+                    _ => Value::Array(
                         tag_set
                             .iter()
                             .map(|v| match v {
@@ -662,7 +648,7 @@ fn get_auto_value_tags(metric: &Metric) -> Option<Value> {
                                 None => Value::Null,
                             })
                             .collect(),
-                    )
+                    ),
                 };
                 (tag.into(), value)
             })
@@ -1661,6 +1647,41 @@ mod test {
             collected,
             vec![Some("a"), Some("b"), Some("c")],
             "array assignment must preserve every element"
+        );
+    }
+
+    /// Auto read: an empty tag set (`len() == 0`) keeps its array shape so a
+    /// noop `.tags = .tags` round-trip preserves it. Without this guarantee
+    /// an empty multi-value tag would silently morph into a bare single-value
+    /// tag through one Auto round-trip.
+    #[test]
+    fn metric_auto_read_empty_tag_set_returns_array() {
+        use super::super::metric::{MetricTags, TagValueSet};
+        let mut tags = BTreeMap::new();
+        tags.insert("empty".to_string(), TagValueSet::default());
+        let metric = Metric::new(
+            "m",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.0 },
+        )
+        .with_tags(Some(MetricTags(tags)));
+
+        let info = auto_mode_program_info();
+        let target = VrlTarget::new(Event::Metric(metric), &info, MetricTagMode::Auto);
+
+        let tags = target
+            .target_get(&OwnedTargetPath::event(owned_value_path!("tags")))
+            .unwrap()
+            .unwrap()
+            .clone();
+
+        assert_eq!(
+            tags,
+            Value::Object(BTreeMap::from([(
+                "empty".into(),
+                Value::Array(vec![])
+            )])),
+            "empty tag set must surface as an empty array, not as null",
         );
     }
 
