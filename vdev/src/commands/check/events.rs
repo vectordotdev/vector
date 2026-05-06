@@ -387,9 +387,8 @@ static RE_USES: LazyLock<Regex> = LazyLock::new(|| {
 /// `warn!(`, `error!(`) in raw source text. Used by the format-check pass
 /// because the AST visitor cannot see log calls nested inside opaque outer
 /// macros like `tokio::select!`.
-static RE_LOG_CALL_OPEN: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?:^|[^A-Za-z0-9_])(trace|debug|info|warn|error)!\(").unwrap()
-});
+static RE_LOG_CALL_OPEN: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?:^|[^A-Za-z0-9_])(trace|debug|info|warn|error)!\(").unwrap());
 
 /// `"key" => value` tag-pair regex. Used inside `counter!(...)` arg lists.
 /// Note: syn's `TokenStream` rendering may produce `=>` as `= >`; the regex
@@ -789,7 +788,6 @@ impl<'ast> Visit<'ast> for Scanner<'_> {
 }
 
 impl Scanner<'_> {
-
     /// Parse a `registered_event!` invocation's tokens to extract the event
     /// name, members, handle metrics, and emit-block log calls.
     fn handle_registered_event(&mut self, mac: &syn::Macro) {
@@ -926,10 +924,7 @@ fn format_check_log_messages(text: &str, path_str: &str) -> Vec<String> {
         // The match ends with the literal `(`. Walk forward from there to
         // find the matching `)` accounting for nested parens / braces /
         // brackets and string literals; this is the inside of the macro.
-        let after_paren = caps
-            .get(0)
-            .expect("full match")
-            .end();
+        let after_paren = caps.get(0).expect("full match").end();
         if after_paren > text.len() {
             continue;
         }
@@ -1323,13 +1318,11 @@ mod tests {
         let reports = format_check_log_messages(src, "fixture.rs");
         let joined = reports.join("\n");
         assert!(
-            joined.contains("Message must end with a period.")
-                && joined.contains("`error` call"),
+            joined.contains("Message must end with a period.") && joined.contains("`error` call"),
             "expected period-violation report, got: {joined}"
         );
         assert!(
-            joined.contains("Message must start with a capital.")
-                && joined.contains("`info` call"),
+            joined.contains("Message must start with a capital.") && joined.contains("`info` call"),
             "expected capital-violation report on the nested info!, got: {joined}"
         );
     }
