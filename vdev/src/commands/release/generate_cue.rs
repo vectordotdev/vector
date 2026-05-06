@@ -54,6 +54,21 @@ pub(super) fn run(new_version: &Version) -> Result<PathBuf> {
         );
     }
 
+    // Drop any commits that have already been recorded in a previous
+    // release CUE file. `--cherry-pick --right-only` only catches
+    // patch-id-equivalent commits, so non-identical backports of the same
+    // change (different SHA, same PR number) can otherwise re-appear in the
+    // next release CUE.
+    let already_released = collect_released_identifiers(&repo_root.join(RELEASES_DIR))?;
+    let commits: Vec<Commit> = commits
+        .into_iter()
+        .filter(|c| {
+            !already_released.shas.contains(&c.sha)
+                && c.pr_number
+                    .is_none_or(|pr| !already_released.pr_numbers.contains(&pr))
+        })
+        .collect();
+
     if commits.is_empty() {
         bail!("No commits found since v{last_version}; nothing to release.");
     }
@@ -82,6 +97,49 @@ pub(super) fn run(new_version: &Version) -> Result<PathBuf> {
 }
 
 // ---------- Tag / version discovery ----------
+
+/// Set of commit identifiers already recorded in `website/cue/reference/releases/*.cue`.
+struct ReleasedIdentifiers {
+    shas: std::collections::HashSet<String>,
+    pr_numbers: std::collections::HashSet<u64>,
+}
+
+/// Scan every existing release CUE file for the `sha:` and `pr_number:`
+/// fields inside its `commits:` array and return the union as two sets.
+///
+/// We extract via simple regexes rather than running `cue export`. The shape
+/// of these files is well-defined (auto-generated and `cue fmt`-normalised
+/// against `urls.cue`) so this is the cheapest correct option, and avoids a
+/// runtime dependency on the `cue` binary just for de-duplication.
+fn collect_released_identifiers(releases_dir: &Path) -> Result<ReleasedIdentifiers> {
+    let mut out = ReleasedIdentifiers {
+        shas: std::collections::HashSet::new(),
+        pr_numbers: std::collections::HashSet::new(),
+    };
+    if !releases_dir.is_dir() {
+        return Ok(out);
+    }
+    let sha_re = Regex::new(r#"sha:[ \t]*"([0-9a-fA-F]{7,64})""#).unwrap();
+    let pr_re = Regex::new(r"pr_number:[ \t]*([0-9]+)").unwrap();
+    for entry in fs::read_dir(releases_dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.extension().is_none_or(|e| e != "cue") {
+            continue;
+        }
+        let text = fs::read_to_string(&path)
+            .with_context(|| format!("Failed to read {}", path.display()))?;
+        for caps in sha_re.captures_iter(&text) {
+            out.shas.insert(caps[1].to_string());
+        }
+        for caps in pr_re.captures_iter(&text) {
+            if let Ok(n) = caps[1].parse::<u64>() {
+                out.pr_numbers.insert(n);
+            }
+        }
+    }
+    Ok(out)
+}
 
 /// Find the latest semver release tag of the form `vX.Y.Z`, ignoring `vdev-v...` tags.
 pub(super) fn find_latest_release_tag() -> Result<Version> {
@@ -151,23 +209,35 @@ struct Commit {
 
 impl Commit {
     fn validate(&self) -> Result<()> {
-        if let Some(t) = self.r#type.as_deref() {
-            if !ALLOWED_TYPES.contains(&t) {
-                bail!(
-                    "Commit {} has invalid type '{}'. Allowed types: {:?}",
-                    self.sha,
-                    t,
-                    ALLOWED_TYPES
-                );
-            }
-            if TYPES_REQUIRING_SCOPES.contains(&t) && self.scopes.is_empty() {
-                bail!(
-                    "Commit {} of type '{}' requires a scope. Description: {}",
-                    self.sha,
-                    t,
-                    self.description
-                );
-            }
+        // The release path *must* refuse to write a release CUE that contains
+        // commits whose subject didn't match the conventional-commit format —
+        // otherwise a malformed PR title slips silently into the published
+        // release notes. The Ruby release flow used a strict (`!`-suffixed)
+        // parser at this point for the same reason.
+        let Some(t) = self.r#type.as_deref() else {
+            bail!(
+                "Commit {} ({}) does not match the conventional-commit format \
+                 (`type(scope): description (#pr)`); fix the PR title or amend \
+                 the commit subject before tagging the release.",
+                self.sha,
+                self.description
+            );
+        };
+        if !ALLOWED_TYPES.contains(&t) {
+            bail!(
+                "Commit {} has invalid type '{}'. Allowed types: {:?}",
+                self.sha,
+                t,
+                ALLOWED_TYPES
+            );
+        }
+        if TYPES_REQUIRING_SCOPES.contains(&t) && self.scopes.is_empty() {
+            bail!(
+                "Commit {} of type '{}' requires a scope. Description: {}",
+                self.sha,
+                t,
+                self.description
+            );
         }
         Ok(())
     }
@@ -681,5 +751,64 @@ mod tests {
             deletions_count: 0,
         };
         assert!(c.validate().is_err());
+    }
+
+    #[test]
+    fn commit_validate_rejects_unparseable_subject() {
+        // A non-conventional subject must abort the release path rather than
+        // silently land in the published CUE with type=null.
+        let c = Commit {
+            sha: "x".into(),
+            author: "a".into(),
+            date: "d".into(),
+            description: "Merge branch 'foo'".into(),
+            r#type: None,
+            scopes: Vec::new(),
+            breaking_change: false,
+            pr_number: None,
+            files_count: 0,
+            insertions_count: 0,
+            deletions_count: 0,
+        };
+        let err = c.validate().expect_err("must reject unparseable subject");
+        let msg = format!("{err}");
+        assert!(
+            msg.contains("conventional-commit format"),
+            "error should mention the rule: {msg}"
+        );
+    }
+
+    #[test]
+    fn collect_released_identifiers_extracts_shas_and_pr_numbers() {
+        let tmp = tempfile::tempdir().unwrap();
+        // A trimmed-down CUE file shaped like the real release cues.
+        fs::write(
+            tmp.path().join("0.55.0.cue"),
+            r#"package metadata
+
+releases: "0.55.0": {
+    commits: [
+        {sha: "deadbeefcafe", date: "2026-01-01 00:00:00 UTC", pr_number: 42, type: "fix"},
+        {sha: "abc1234567890abc", pr_number: 99},
+    ]
+}
+"#,
+        )
+        .unwrap();
+        // A non-cue file we should ignore.
+        fs::write(tmp.path().join("README.md"), "not a release").unwrap();
+
+        let ids = collect_released_identifiers(tmp.path()).unwrap();
+        assert!(ids.shas.contains("deadbeefcafe"));
+        assert!(ids.shas.contains("abc1234567890abc"));
+        assert!(ids.pr_numbers.contains(&42));
+        assert!(ids.pr_numbers.contains(&99));
+    }
+
+    #[test]
+    fn collect_released_identifiers_handles_missing_dir() {
+        let ids = collect_released_identifiers(Path::new("/nonexistent")).unwrap();
+        assert!(ids.shas.is_empty());
+        assert!(ids.pr_numbers.is_empty());
     }
 }

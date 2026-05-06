@@ -383,6 +383,14 @@ static RE_USES: LazyLock<Regex> = LazyLock::new(|| {
     .unwrap()
 });
 
+/// Locator for `tracing` log-macro calls (`trace!(`, `debug!(`, `info!(`,
+/// `warn!(`, `error!(`) in raw source text. Used by the format-check pass
+/// because the AST visitor cannot see log calls nested inside opaque outer
+/// macros like `tokio::select!`.
+static RE_LOG_CALL_OPEN: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?:^|[^A-Za-z0-9_])(trace|debug|info|warn|error)!\(").unwrap()
+});
+
 /// `"key" => value` tag-pair regex. Used inside `counter!(...)` arg lists.
 /// Note: syn's `TokenStream` rendering may produce `=>` as `= >`; the regex
 /// accepts either form via `=[ \t]*>`.
@@ -523,8 +531,15 @@ struct ParsedLog {
 /// `warn!(%error, "Failed to flush.")` would never have their message format
 /// checked because the bare `%error` would be claimed as the message first.
 fn parse_log_args(tokens: &TokenStream) -> ParsedLog {
-    let raw = tokens.to_string();
-    let args = split_comma_args(&raw);
+    parse_log_args_str(&tokens.to_string())
+}
+
+/// Variant of [`parse_log_args`] that operates on already-stringified macro
+/// arg text, used by the raw-source format-check pass that needs to look
+/// inside opaque outer macros (`tokio::select!`, `cfg_if!`, …) which `syn`
+/// does not descend into.
+fn parse_log_args_str(raw: &str) -> ParsedLog {
+    let args = split_comma_args(raw);
 
     let mut literal_message: Option<String> = None;
     let mut named_var_message: Option<String> = None;
@@ -650,11 +665,9 @@ struct Scanner<'a> {
     events: &'a mut HashMap<String, Event>,
     path_str: String,
     in_internal_events_dir: bool,
-    in_src_dir: bool,
     skip_dropped_for_file: bool,
     text: &'a str,
     impl_stack: Vec<ImplCtx>,
-    format_reports: Vec<String>,
 }
 
 impl<'ast> Visit<'ast> for Scanner<'_> {
@@ -744,15 +757,10 @@ impl<'ast> Visit<'ast> for Scanner<'_> {
             .map(|s| s.ident.to_string())
             .unwrap_or_default();
 
-        // Format-check log messages everywhere in `src/`.
-        // (Use-counting and ComponentEventsDropped detection happen via a
-        // separate raw-text pass because `syn` does not recurse into the
-        // bodies of arbitrary `tokio::select!` / `cfg_if!` / etc. macro
-        // invocations, so an AST-only walk misses nested `emit!` calls.)
-        if self.in_src_dir && matches!(name.as_str(), "trace" | "debug" | "info" | "warn" | "error")
-        {
-            self.format_check_log(node, &name);
-        }
+        // Use-counting, ComponentEventsDropped detection, and the
+        // log-message format check all run via a separate raw-source pass
+        // because `syn` does not descend into the bodies of arbitrary
+        // `tokio::select!` / `cfg_if!` / etc. macro invocations.
 
         // Inside an InternalEvent-family impl: capture logs / metrics /
         //    ComponentEventsDropped emissions for the active event.
@@ -781,45 +789,6 @@ impl<'ast> Visit<'ast> for Scanner<'_> {
 }
 
 impl Scanner<'_> {
-    fn format_check_log(&mut self, mac: &syn::Macro, level: &str) {
-        let parsed = parse_log_args(&mac.tokens);
-        // Format checks (capitalisation, trailing period) only apply to
-        // string-literal messages — variable-message expressions are opaque.
-        if !parsed.has_literal_message {
-            return;
-        }
-        let message = parsed.message;
-        if message.is_empty() {
-            return;
-        }
-        let is_capitalized = message.starts_with('{')
-            || !message
-                .chars()
-                .next()
-                .is_some_and(|c| c.is_ascii_alphabetic())
-            || message
-                .chars()
-                .next()
-                .is_some_and(|c| c.is_ascii_uppercase());
-        let has_trailing_period = message.ends_with('}') || message.ends_with('.');
-        if is_capitalized && has_trailing_period {
-            return;
-        }
-        let line_no = mac.span().start().line;
-        if !is_capitalized {
-            self.format_reports.push(format!(
-                "    Message must start with a capital. (`{level}` call on {}:{line_no})",
-                self.path_str
-            ));
-        }
-        if !has_trailing_period {
-            self.format_reports.push(format!(
-                "    Message must end with a period. (`{level}` call on {}:{line_no})",
-                self.path_str
-            ));
-        }
-        let _ = self.text;
-    }
 
     /// Parse a `registered_event!` invocation's tokens to extract the event
     /// name, members, handle metrics, and emit-block log calls.
@@ -943,6 +912,68 @@ impl Scanner<'_> {
     }
 }
 
+/// Format-check every `tracing` log macro invocation in `text` (a Rust
+/// source file's contents). Returns a list of human-readable report lines.
+///
+/// Operates on the raw source rather than via the AST so that log calls
+/// nested inside opaque outer macros (`tokio::select!`, `cfg_if!`, …) are
+/// also covered — those bodies are not visited by `syn`.
+fn format_check_log_messages(text: &str, path_str: &str) -> Vec<String> {
+    let mut reports = Vec::new();
+    for caps in RE_LOG_CALL_OPEN.captures_iter(text) {
+        let level_match = caps.get(1).expect("group 1 is the level");
+        let level = level_match.as_str();
+        // The match ends with the literal `(`. Walk forward from there to
+        // find the matching `)` accounting for nested parens / braces /
+        // brackets and string literals; this is the inside of the macro.
+        let after_paren = caps
+            .get(0)
+            .expect("full match")
+            .end();
+        if after_paren > text.len() {
+            continue;
+        }
+        let body_start = after_paren; // position right after `(`
+        let Some(close_offset) = match_paren_end(&text[body_start..]) else {
+            continue;
+        };
+        let inside = &text[body_start..body_start + close_offset];
+        let parsed = parse_log_args_str(inside);
+        if !parsed.has_literal_message {
+            continue;
+        }
+        let message = parsed.message;
+        if message.is_empty() {
+            continue;
+        }
+        let is_capitalized = message.starts_with('{')
+            || !message
+                .chars()
+                .next()
+                .is_some_and(|c| c.is_ascii_alphabetic())
+            || message
+                .chars()
+                .next()
+                .is_some_and(|c| c.is_ascii_uppercase());
+        let has_trailing_period = message.ends_with('}') || message.ends_with('.');
+        if is_capitalized && has_trailing_period {
+            continue;
+        }
+        let line_no = text[..level_match.start()].matches('\n').count() + 1;
+        if !is_capitalized {
+            reports.push(format!(
+                "    Message must start with a capital. (`{level}` call on {path_str}:{line_no})"
+            ));
+        }
+        if !has_trailing_period {
+            reports.push(format!(
+                "    Message must end with a period. (`{level}` call on {path_str}:{line_no})"
+            ));
+        }
+    }
+    reports
+}
+
 /// Extract the source slice covered by a `proc_macro2::Span`. Used to read
 /// line-comment skip markers (e.g. `## skip check-validity-events ##`) which
 /// `syn` discards from the AST.
@@ -1064,7 +1095,6 @@ impl Cli {
 
         let mut events: HashMap<String, Event> = HashMap::new();
         let mut error_count = 0usize;
-        let mut all_format_reports: Vec<String> = Vec::new();
 
         let mut paths: Vec<PathBuf> = Vec::new();
         for pattern in ["src/**/*.rs", "lib/**/*.rs"] {
@@ -1092,6 +1122,18 @@ impl Cli {
                 events.entry(name).or_default().uses += 1;
             }
 
+            // Log-message format check: same reason — the AST visitor would
+            // miss `info!` / `error!` calls nested inside opaque outer macros.
+            if in_src {
+                let format_reports = format_check_log_messages(&text, &path_str);
+                if !format_reports.is_empty() {
+                    for r in &format_reports {
+                        println!("{r}");
+                    }
+                    error_count += format_reports.len();
+                }
+            }
+
             let file = match syn::parse_file(&text) {
                 Ok(f) => f,
                 Err(e) => {
@@ -1104,21 +1146,11 @@ impl Cli {
                 events: &mut events,
                 path_str: path_str.clone(),
                 in_internal_events_dir: in_internal_events,
-                in_src_dir: in_src,
                 skip_dropped_for_file: skip_dropped,
                 text: &text,
                 impl_stack: Vec::new(),
-                format_reports: Vec::new(),
             };
             visit::visit_file(&mut scanner, &file);
-            let count = scanner.format_reports.len();
-            if count > 0 {
-                for r in &scanner.format_reports {
-                    println!("{r}");
-                }
-                error_count += count;
-            }
-            all_format_reports.extend(scanner.format_reports);
         }
 
         // Validation phase.
@@ -1273,12 +1305,49 @@ mod tests {
     }
 
     #[test]
+    fn format_check_finds_nested_log_calls() {
+        // `syn` does not descend into the bodies of opaque outer macros like
+        // `tokio::select!`, which is why this check runs over the raw source
+        // rather than via the AST visitor. Fixture covers both a top-level
+        // violation and one nested inside `tokio::select!`.
+        let src = r#"
+            fn _f() {
+                error!("missing period");
+                tokio::select! {
+                    _ = something() => {
+                        info!("lowercase first.");
+                    }
+                }
+            }
+        "#;
+        let reports = format_check_log_messages(src, "fixture.rs");
+        let joined = reports.join("\n");
+        assert!(
+            joined.contains("Message must end with a period.")
+                && joined.contains("`error` call"),
+            "expected period-violation report, got: {joined}"
+        );
+        assert!(
+            joined.contains("Message must start with a capital.")
+                && joined.contains("`info` call"),
+            "expected capital-violation report on the nested info!, got: {joined}"
+        );
+    }
+
+    #[test]
+    fn format_check_skips_non_literal_messages() {
+        // `error!(?err, "Plain text.")` — literal is fine, no report.
+        let src = r#"fn _f() { error!(?err, "Plain text."); }"#;
+        let reports = format_check_log_messages(src, "fixture.rs");
+        assert!(reports.is_empty(), "expected no reports, got: {reports:?}");
+    }
+
+    #[test]
     fn parse_log_args_bare_field_then_trailing_literal() {
         // `warn!(%error, "Message.")` — the bare field comes first but the
-        // string literal is the real message. Regression test for the codex
-        // P-finding: parse_log_args used to claim the bare expression as the
-        // message and never reach the literal, so the format check (capital,
-        // trailing period) silently never fired here.
+        // string literal is the real message. The parser must scan all args
+        // for a literal before falling back to the bare expression as the
+        // message, otherwise the format checks never fire here.
         let p = parse(r#"warn!(%error, "Failed to flush.")"#);
         assert_eq!(p.message, "Failed to flush.");
         assert!(p.has_literal_message);
