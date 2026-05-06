@@ -17,11 +17,14 @@
 # /ci-run-test-docs           : runs make test-docs
 # /ci-run-deny                : runs Deny - Linux
 # /ci-run-component-features  : runs Component Features - Linux
-# /ci-run-cross               : runs Cross
 # /ci-run-unit-mac            : runs Unit - Mac
 # /ci-run-unit-windows        : runs Unit - Windows
 # /ci-run-environment         : runs Environment Suite
 # /ci-run-k8s                 : runs K8s E2E Suite
+# /ci-run-packaging           : builds and verifies packages (without publishing to Docker/S3/GitHub)
+#
+# The following triggers are available but do NOT run as part of /ci-run-all:
+# /ci-run-cross               : runs Cross (covered by /ci-run-packaging)
 
 name: CI Review Trigger
 
@@ -68,6 +71,7 @@ jobs:
       || startsWith(github.event.review.body, '/ci-run-unit-windows')
       || startsWith(github.event.review.body, '/ci-run-environment')
       || startsWith(github.event.review.body, '/ci-run-k8s')
+      || startsWith(github.event.review.body, '/ci-run-packaging')
     steps:
       - name: Generate authentication token
         id: generate_token
@@ -157,7 +161,7 @@ jobs:
 
   cross:
     needs: validate
-    if: startsWith(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-cross')
+    if: contains(github.event.review.body, '/ci-run-cross')
     uses: ./.github/workflows/cross.yml
     with:
       ref: ${{ github.event.review.commit_id }}
@@ -193,4 +197,14 @@ jobs:
     uses: ./.github/workflows/k8s_e2e.yml
     with:
       ref: ${{ github.event.review.commit_id }}
+    secrets: inherit
+
+  packaging:
+    needs: validate
+    if: startsWith(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-packaging')
+    uses: ./.github/workflows/publish.yml
+    with:
+      git_ref: ${{ github.event.review.commit_id }}
+      channel: custom
+      skip_publish: true
     secrets: inherit
