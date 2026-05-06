@@ -333,7 +333,7 @@ prost-reflect = { workspace = true, optional = true }
 prost-types = { workspace = true, optional = true }
 
 # Databricks Zerobus
-databricks-zerobus-ingest-sdk = { git = "https://github.com/databricks/zerobus-sdk-rs", rev = "7f36c079962fbb80cd4c7c5d4bfd0d204860e90d", optional = true }
+databricks-zerobus-ingest-sdk = { git = "https://github.com/databricks/zerobus-sdk-rs", rev = "273efe09130a7554e6b34d20b95df50289e58524", optional = true }
 
 # GCP
 goauth = { version = "0.16.0", optional = true }
