@@ -516,62 +516,82 @@ struct ParsedLog {
 ///
 /// `tracing` allows the message in any position: leading positional literal,
 /// trailing positional literal, or `message = "..."` named field. We mirror
-/// the Ruby script: take the first arg that looks like a string literal (or
-/// `message = "literal"`) and treat it as the message.
+/// the Ruby script: take the first string-literal value across all args (be
+/// it a positional `"..."` or a `message = "..."` named field) and treat it
+/// as the message. Only when no literal is present do we fall back to the
+/// first bare positional expression — otherwise patterns like
+/// `warn!(%error, "Failed to flush.")` would never have their message format
+/// checked because the bare `%error` would be claimed as the message first.
 fn parse_log_args(tokens: &TokenStream) -> ParsedLog {
     let raw = tokens.to_string();
     let args = split_comma_args(&raw);
 
-    let mut message: Option<String> = None;
-    let mut has_literal_message = false;
-    let mut parameters = Vec::new();
+    let mut literal_message: Option<String> = None;
+    let mut named_var_message: Option<String> = None;
+    let mut bare_positional_message: Option<String> = None;
+    let mut parameters: Vec<String> = Vec::new();
 
     for arg in &args {
         let trimmed = arg.trim();
         if trimmed.starts_with("target :") || trimmed.starts_with("parent :") {
             continue;
         }
-        if message.is_none() {
-            // `message = ...` (named field; value may or may not be a literal).
-            if let Some(rest) = trimmed.strip_prefix("message") {
-                let rest = rest.trim_start();
-                if let Some(value) = rest.strip_prefix('=').map(str::trim_start) {
-                    let value = value.trim();
-                    if let Some(stripped) =
-                        value.strip_prefix('"').and_then(|s| s.strip_suffix('"'))
-                    {
-                        message = Some(stripped.to_string());
-                        has_literal_message = true;
-                    } else {
-                        message = Some(value.to_string());
-                    }
-                    continue;
+
+        // `message = ...` (named field). The value may or may not be a literal.
+        if let Some(rest) = trimmed.strip_prefix("message")
+            && let Some(value) = rest.trim_start().strip_prefix('=').map(str::trim_start)
+        {
+            let value = value.trim();
+            if let Some(stripped) = value.strip_prefix('"').and_then(|s| s.strip_suffix('"')) {
+                if literal_message.is_none() {
+                    literal_message = Some(stripped.to_string());
                 }
+            } else if named_var_message.is_none() {
+                named_var_message = Some(value.to_string());
             }
-            // Leading positional string literal.
-            if let Some(stripped) = trimmed.strip_prefix('"').and_then(|s| s.strip_suffix('"')) {
-                message = Some(stripped.to_string());
-                has_literal_message = true;
-                continue;
-            }
-            // Bare positional expression (variable). Take the first one as the
-            // message, *and* record it as a parameter (it serves both roles in
-            // tracing's API).
-            if !trimmed.contains('=') && message.is_none() {
-                message = Some(trimmed.to_string());
-                if let Some(name) = parameter_name(trimmed) {
-                    parameters.push(name);
-                }
-                continue;
-            }
+            continue;
         }
+
+        // Leading/trailing positional string literal (`"..."` standalone arg).
+        if let Some(stripped) = trimmed.strip_prefix('"').and_then(|s| s.strip_suffix('"')) {
+            if literal_message.is_none() {
+                literal_message = Some(stripped.to_string());
+            }
+            continue;
+        }
+
+        // Bare positional expression (no `=`). Track the first one as a
+        // candidate message in case no literal is found later, and *also*
+        // record it as a parameter — `tracing` lets the same expression
+        // serve both roles.
+        if !trimmed.contains('=') {
+            if bare_positional_message.is_none() {
+                bare_positional_message = Some(trimmed.to_string());
+            }
+            if let Some(name) = parameter_name(trimmed) {
+                parameters.push(name);
+            }
+            continue;
+        }
+
+        // Any other `key = value` named field: just a parameter.
         if let Some(name) = parameter_name(trimmed) {
             parameters.push(name);
         }
     }
 
+    let (message, has_literal_message) = if let Some(m) = literal_message {
+        (m, true)
+    } else if let Some(m) = named_var_message {
+        (m, false)
+    } else if let Some(m) = bare_positional_message {
+        (m, false)
+    } else {
+        (String::new(), false)
+    };
+
     ParsedLog {
-        message: message.unwrap_or_default(),
+        message,
         has_literal_message,
         parameters,
     }
@@ -1034,6 +1054,14 @@ pub(super) struct Cli {}
 
 impl Cli {
     pub(super) fn exec(self) -> Result<()> {
+        // Resolve all `src/**` / `lib/**` globs against the repo root rather
+        // than the caller's CWD. Without this, running the binary from
+        // anywhere outside the repo root silently scans nothing and reports
+        // `0 error(s)` — which the previous Ruby script wrapper avoided
+        // because it was always invoked with the repo as the working dir.
+        let repo_root = crate::utils::paths::find_repo_root()?;
+        std::env::set_current_dir(&repo_root)?;
+
         let mut events: HashMap<String, Event> = HashMap::new();
         let mut error_count = 0usize;
         let mut all_format_reports: Vec<String> = Vec::new();
@@ -1242,6 +1270,19 @@ mod tests {
         assert_eq!(p.message, "Bad request.");
         assert!(p.has_literal_message);
         assert!(p.parameters.contains(&"path".to_string()));
+    }
+
+    #[test]
+    fn parse_log_args_bare_field_then_trailing_literal() {
+        // `warn!(%error, "Message.")` — the bare field comes first but the
+        // string literal is the real message. Regression test for the codex
+        // P-finding: parse_log_args used to claim the bare expression as the
+        // message and never reach the literal, so the format check (capital,
+        // trailing period) silently never fired here.
+        let p = parse(r#"warn!(%error, "Failed to flush.")"#);
+        assert_eq!(p.message, "Failed to flush.");
+        assert!(p.has_literal_message);
+        assert!(p.parameters.contains(&"error".to_string()));
     }
 
     #[test]
