@@ -176,3 +176,19 @@ updates:
       npm_and_yarn:
         patterns:
           - "*"
+  - package-ecosystem: "npm"
+    directory: "/scripts/environment/npm-tools"
+    schedule:
+      interval: "monthly"
+      time: "05:00" # UTC
+    labels:
+      - "domain: deps"
+      - "no-changelog"
+    commit-message:
+      prefix: "chore(deps)"
+    # Disable version updates; security updates bypass this limit
+    open-pull-requests-limit: 0
+    groups:
+      npm_and_yarn:
+        patterns:
+          - "*"
