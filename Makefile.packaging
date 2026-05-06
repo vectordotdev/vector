@@ -14,6 +14,7 @@ VDEV := cargo vdev
 
 # Set version — only evaluated when this Makefile is loaded
 export VERSION ?= $(shell command -v cargo >/dev/null && $(VDEV) version || echo unknown)
+export VECTOR_VERSION := ${VERSION}
 
 # Delegate cross-compilation prerequisites to the main Makefile
 target/%/release/vector.tar.gz:
