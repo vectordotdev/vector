@@ -199,6 +199,13 @@ tokio = { version = "1.49.0", default-features = false }
 tokio-stream = { version = "0.1.18", default-features = false }
 tokio-test = "0.4.5"
 tokio-tungstenite = { version = "0.20.1", default-features = false }
+# `proc-macro2`, `quote`, and `syn` are also pulled in transitively by many
+# crates already; declaring them here lets vdev opt into extra `syn` features
+# (`full`, `visit`, `extra-traits`) without those features unifying into
+# Vector's production dep graph (vdev is not a dep of the `vector` package).
+proc-macro2 = { version = "1", default-features = false }
+quote = { version = "1", default-features = false }
+syn = { version = "2", default-features = false }
 toml = { version = "0.9.8", default-features = false, features = ["serde", "display", "parse"] }
 tonic = { version = "0.11", default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
 tonic-build = { version = "0.11", default-features = false, features = ["transport", "prost"] }
