@@ -202,6 +202,9 @@ jobs:
   packaging:
     needs: validate
     if: startsWith(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-packaging')
+    permissions:
+      contents: write
+      packages: write
     uses: ./.github/workflows/publish.yml
     with:
       git_ref: ${{ github.event.review.commit_id }}
