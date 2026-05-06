@@ -5,6 +5,7 @@
 
 #[cfg(feature = "arrow")]
 mod arrow;
+#[cfg(feature = "avro")]
 mod avro;
 mod cef;
 mod common;
@@ -35,6 +36,7 @@ pub use arrow::{
     ArrowEncodingError, ArrowStreamSerializer, ArrowStreamSerializerConfig, SchemaProvider,
     find_null_non_nullable_fields,
 };
+#[cfg(feature = "avro")]
 pub use avro::{AvroSerializer, AvroSerializerConfig, AvroSerializerOptions};
 pub use cef::{CefSerializer, CefSerializerConfig};
 use dyn_clone::DynClone;

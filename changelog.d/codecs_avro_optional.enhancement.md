@@ -1,0 +1,3 @@
+The `apache-avro` dependency and the `avro` codec (encoding and decoding) are now gated behind the new `codecs-avro` Cargo feature. The feature is enabled by default in all release builds, and is automatically pulled in by `sources-pulsar` and `sinks-pulsar`, so the default behavior is unchanged. Custom builds that exclude this feature (`--no-default-features --features "..."`) drop the `apache-avro` crate and the avro codec implementation, reducing the binary size by roughly 380 KB on x86_64. This mirrors the existing gating pattern for `arrow`, `parquet`, `opentelemetry`, and `syslog` codecs in `lib/codecs/Cargo.toml`. See [#20064](https://github.com/vectordotdev/vector/issues/20064) for the umbrella discussion of minimal builds.
+
+authors: ahachete

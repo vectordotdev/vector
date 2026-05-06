@@ -41,6 +41,7 @@ use vector_core::{
     schema,
 };
 
+#[cfg(feature = "avro")]
 use self::format::{AvroDeserializer, AvroDeserializerConfig, AvroDeserializerOptions};
 use crate::decoding::format::{VrlDeserializer, VrlDeserializerConfig};
 
@@ -314,6 +315,7 @@ pub enum DeserializerConfig {
     /// Decodes the raw bytes as as an [Apache Avro][apache_avro] message.
     ///
     /// [apache_avro]: https://avro.apache.org/
+    #[cfg(feature = "avro")]
     Avro {
         /// Apache Avro-specific encoder options.
         avro: AvroDeserializerOptions,
@@ -372,6 +374,7 @@ impl DeserializerConfig {
     /// Build the `Deserializer` from this configuration.
     pub fn build(&self) -> vector_common::Result<Deserializer> {
         match self {
+            #[cfg(feature = "avro")]
             DeserializerConfig::Avro { avro } => Ok(Deserializer::Avro(
                 AvroDeserializerConfig {
                     avro_options: avro.clone(),
@@ -398,6 +401,7 @@ impl DeserializerConfig {
     /// Return an appropriate default framer for the given deserializer
     pub fn default_stream_framing(&self) -> FramingConfig {
         match self {
+            #[cfg(feature = "avro")]
             DeserializerConfig::Avro { .. } => FramingConfig::Bytes,
             DeserializerConfig::Native => FramingConfig::LengthDelimited(Default::default()),
             DeserializerConfig::Bytes
@@ -429,6 +433,7 @@ impl DeserializerConfig {
     /// Return the type of event build by this deserializer.
     pub fn output_type(&self) -> DataType {
         match self {
+            #[cfg(feature = "avro")]
             DeserializerConfig::Avro { avro } => AvroDeserializerConfig {
                 avro_options: avro.clone(),
             }
@@ -451,6 +456,7 @@ impl DeserializerConfig {
     /// The schema produced by the deserializer.
     pub fn schema_definition(&self, log_namespace: LogNamespace) -> schema::Definition {
         match self {
+            #[cfg(feature = "avro")]
             DeserializerConfig::Avro { avro } => AvroDeserializerConfig {
                 avro_options: avro.clone(),
             }
@@ -489,9 +495,9 @@ impl DeserializerConfig {
                         },
                 }),
             ) => "application/json",
-            (DeserializerConfig::Native, _) | (DeserializerConfig::Avro { .. }, _) => {
-                "application/octet-stream"
-            }
+            (DeserializerConfig::Native, _) => "application/octet-stream",
+            #[cfg(feature = "avro")]
+            (DeserializerConfig::Avro { .. }, _) => "application/octet-stream",
             (DeserializerConfig::Protobuf(_), _) => "application/octet-stream",
             #[cfg(feature = "opentelemetry")]
             (DeserializerConfig::Otlp(_), _) => "application/x-protobuf",
@@ -515,6 +521,7 @@ impl DeserializerConfig {
 #[derive(Clone)]
 pub enum Deserializer {
     /// Uses a `AvroDeserializer` for deserialization.
+    #[cfg(feature = "avro")]
     Avro(AvroDeserializer),
     /// Uses a `BytesDeserializer` for deserialization.
     Bytes(BytesDeserializer),
@@ -549,6 +556,7 @@ impl format::Deserializer for Deserializer {
         log_namespace: LogNamespace,
     ) -> vector_common::Result<SmallVec<[Event; 1]>> {
         match self {
+            #[cfg(feature = "avro")]
             Deserializer::Avro(deserializer) => deserializer.parse(bytes, log_namespace),
             Deserializer::Bytes(deserializer) => deserializer.parse(bytes, log_namespace),
             Deserializer::Json(deserializer) => deserializer.parse(bytes, log_namespace),
