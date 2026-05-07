@@ -8,13 +8,13 @@
 //!
 //! This ensures no race window between port allocation and registration.
 
+#[cfg(windows)]
+use std::net::UdpSocket as StdUdpSocket;
 use std::{
     collections::HashSet,
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, TcpListener as StdTcpListener},
     sync::{LazyLock, Mutex},
 };
-#[cfg(windows)]
-use std::net::UdpSocket as StdUdpSocket;
 
 /// Maximum number of attempts to allocate a unique port before panicking.
 /// This should be far more than needed since port collisions are rare,
