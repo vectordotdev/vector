@@ -15,6 +15,7 @@ use std::{
 };
 
 use anyhow::Result;
+use convert_case::{Case, Casing};
 use glob::glob;
 use proc_macro2::TokenStream;
 use quote::ToTokens;
@@ -416,18 +417,6 @@ fn normalize_value(s: &str) -> String {
     collapsed.into_owned()
 }
 
-/// Convert `CamelCase` to `snake_case` to mirror the Ruby variant→metric name
-/// mapping (`CounterName::ComponentErrorsTotal` → `component_errors_total`).
-fn camel_to_snake(name: &str) -> String {
-    let pass1 = Regex::new(r"([A-Z]+)([A-Z][a-z])")
-        .unwrap()
-        .replace_all(name, "${1}_${2}");
-    let pass2 = Regex::new(r"([a-z0-9])([A-Z])")
-        .unwrap()
-        .replace_all(&pass1, "${1}_${2}");
-    pass2.to_lowercase()
-}
-
 /// Split a token stream that represents a comma-separated argument list into
 /// per-argument substrings, respecting bracket/paren/brace nesting and string
 /// literals. Operates on the (already-bounded) macro-arg token text.
@@ -510,7 +499,7 @@ fn parse_metric_name(arg: &str) -> Option<String> {
     }
     // path::Variant — Ruby matched `\w+Name::(\w+)` and snake-cased the variant.
     let re = Regex::new(r"^[A-Za-z0-9_]+Name[ \t]*::[ \t]*([A-Za-z0-9_]+)").unwrap();
-    re.captures(arg).map(|c| camel_to_snake(&c[1]))
+    re.captures(arg).map(|c| (&c[1]).to_case(Case::Snake))
 }
 
 #[derive(Debug)]
@@ -1226,13 +1215,6 @@ impl Cli {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn camel_to_snake_basic() {
-        assert_eq!(camel_to_snake("BytesReceived"), "bytes_received");
-        assert_eq!(camel_to_snake("HTTPRequest"), "http_request");
-        assert_eq!(camel_to_snake("ABCDef"), "abc_def");
-    }
 
     #[test]
     fn split_comma_args_respects_nesting() {

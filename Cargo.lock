@@ -12724,6 +12724,7 @@ dependencies = [
  "clap",
  "clap-verbosity-flag",
  "clap_complete",
+ "convert_case 0.8.0",
  "directories",
  "git2",
  "glob",
