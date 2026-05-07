@@ -9,7 +9,7 @@
 //! This ensures no race window between port allocation and registration.
 
 #[cfg(windows)]
-use std::net::UdpSocket as StdUdpSocket;
+use std::net::UdpSocket;
 use std::{
     collections::HashSet,
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, TcpListener as StdTcpListener},
@@ -85,7 +85,7 @@ pub fn next_addr_for_ip(ip: IpAddr) -> (PortGuard, SocketAddr) {
         // TCP bind(0) may return such a port, but UDP bind to the same port will fail with
         // WSAEACCES (10013). Probe with a UDP socket and retry if it is excluded.
         #[cfg(windows)]
-        if StdUdpSocket::bind(addr).is_err() {
+        if UdpSocket::bind(addr).is_err() {
             continue;
         }
 
