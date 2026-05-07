@@ -60,7 +60,7 @@ impl AdvertisedEncoding {
 
     // `identity` is the gRPC no-op encoding: the request body is already
     // uncompressed, so there's nothing to decompress.
-    fn to_scheme(self) -> Option<CompressionScheme> {
+    const fn to_scheme(self) -> Option<CompressionScheme> {
         match self {
             Self::Gzip => Some(CompressionScheme::Gzip),
             Self::Zstd => Some(CompressionScheme::Zstd),
