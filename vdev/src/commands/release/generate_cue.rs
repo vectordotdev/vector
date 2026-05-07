@@ -366,7 +366,7 @@ struct ConventionalParts {
 impl ConventionalParts {
     fn parse(message: &str) -> Self {
         let re = Regex::new(
-            r"^(?P<type>[a-z]*)(\((?P<scope>[a-z0-9_, ]*)\))?(?P<breaking>!)?: (?P<desc>.*?)( \(#(?P<pr>[0-9]+)\))?$",
+            r"^(?P<type>[a-z]*)(\((?P<scope>[a-zA-Z0-9_, ]*)\))?(?P<breaking>!)?: (?P<desc>.*?)( \(#(?P<pr>[0-9]+)\))?$",
         )
         .unwrap();
 
@@ -594,6 +594,17 @@ mod tests {
         let p = ConventionalParts::parse("fix(a, b): wip");
         assert_eq!(p.scopes, vec!["a".to_string(), "b".to_string()]);
         assert_eq!(p.pr_number, None);
+    }
+
+    #[test]
+    fn parse_conventional_uppercase_scope() {
+        // The semantic-PR workflow allows uppercase scopes like `ARC`, so the
+        // release-generation parser must accept them too.
+        let p = ConventionalParts::parse("fix(ARC): tweak retry policy (#456)");
+        assert_eq!(p.r#type.as_deref(), Some("fix"));
+        assert_eq!(p.scopes, vec!["ARC".to_string()]);
+        assert_eq!(p.description, "tweak retry policy");
+        assert_eq!(p.pr_number, Some(456));
     }
 
     #[test]
