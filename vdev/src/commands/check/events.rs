@@ -1,18 +1,10 @@
-//! Native Rust port of the Ruby `scripts/check-events` script.
-//!
 //! Walks `src/**/*.rs` and `lib/**/*.rs`, extracts internal-event definitions
 //! and `tracing` log calls via `syn`'s AST, and validates them against the
 //! rules in `docs/specs/instrumentation.md`. Macro argument scraping (the
 //! contents of `counter!(...)`, `trace!(...)`, etc.) uses small targeted
 //! regexes on the macro's already-tokenised input — never on raw source.
 
-#![allow(
-    clippy::print_stdout,
-    clippy::print_stderr,
-    clippy::struct_field_names,
-    clippy::struct_excessive_bools,
-    clippy::too_many_lines
-)]
+#![allow(clippy::print_stdout, clippy::print_stderr)]
 
 use std::{
     collections::{BTreeMap, HashMap},
@@ -83,19 +75,24 @@ const EVENT_CLASSES: &[(&str, EventClass)] = &[
 ];
 
 #[derive(Debug, Default, Clone)]
+struct SkipFlags {
+    dropped_events: bool,
+    duplicate_check: bool,
+    validity_check: bool,
+}
+
+#[derive(Debug, Default, Clone)]
 struct Event {
     path: Option<String>,
-    skip_dropped_events: bool,
-    skip_duplicate_check: bool,
-    skip_validity_check: bool,
+    skip: SkipFlags,
     emits_component_events_dropped: bool,
     members: BTreeMap<String, String>,
     counters: BTreeMap<String, BTreeMap<String, String>>,
     metrics: BTreeMap<String, BTreeMap<String, String>>,
     logs: Vec<LogCall>,
     uses: u32,
-    impl_internal_event: bool,
-    impl_register_event: Option<String>,
+    internal_impl: bool,
+    register_impl: Option<String>,
     impl_event_handle: bool,
     reports: Vec<String>,
 }
@@ -164,10 +161,6 @@ impl Event {
 
 // ---- Validation ------------------------------------------------------------
 
-fn name_ends_with(name: &str, suffix: &str) -> bool {
-    name.ends_with(suffix)
-}
-
 fn log_level_one_of(reports: &mut Vec<String>, logs: &[LogCall], levels: &[&str]) {
     if !logs.iter().any(|l| levels.contains(&l.level.as_str())) {
         reports.push(format!(
@@ -206,17 +199,9 @@ fn counters_must_include_exclude_tags(
     }
 }
 
-fn validate_event(events: &HashMap<String, Event>, name: &str, handle_name: &str) -> Vec<String> {
-    let event = events.get(name).expect("event present");
-    let handle = events.get(handle_name).expect("handle present");
-    let mut reports: Vec<String> = Vec::new();
-
-    if event.uses == 0 {
-        reports.push("Event has no uses.".to_string());
-    }
-
+fn check_event_class(reports: &mut Vec<String>, name: &str, event: &Event, handle: &Event) {
     for (suffix, class) in EVENT_CLASSES {
-        if !name_ends_with(name, suffix) {
+        if !name.ends_with(suffix) {
             continue;
         }
         for log in &handle.logs {
@@ -244,7 +229,7 @@ fn validate_event(events: &HashMap<String, Event>, name: &str, handle_name: &str
                 .filter(|t| !BYTE_SIZE_COUNT.contains(t))
                 .collect();
             counters_must_include_exclude_tags(
-                &mut reports,
+                reports,
                 &event.counters,
                 &counter_name,
                 &required,
@@ -252,94 +237,91 @@ fn validate_event(events: &HashMap<String, Event>, name: &str, handle_name: &str
             );
         }
     }
+}
 
-    let has_error_logs = handle.logs.iter().filter(|l| l.level == "error").count() == 1;
-    let is_events_dropped_event = name_ends_with(name, "EventsDropped")
-        || event.counters.contains_key(METRIC_NAME_EVENTS_DROPPED);
-
-    if (has_error_logs && !is_events_dropped_event) || name_ends_with(name, "Error") {
-        if !name_ends_with(name, "Error") {
-            reports.push("Error events MUST be named \"___Error\".".to_string());
-        }
-        log_level_one_of(&mut reports, &handle.logs, &["error"]);
-        counters_must_include_exclude_tags(
-            &mut reports,
-            &event.counters,
-            METRIC_NAME_ERROR,
-            &["error_type", "stage"],
-            &[],
-        );
-        for log in &handle.logs {
-            if log.level != "error" {
-                continue;
-            }
-            for parameter in ["error_type", "stage"] {
-                if !log.parameters.iter().any(|p| p == parameter) {
-                    reports.push(format!(
-                        "Error log for Error event MUST include parameter \"{parameter}\"."
-                    ));
-                }
-            }
-            for parameter in ["error_code", "error_type", "stage"] {
-                if log.parameters.iter().any(|p| p == parameter)
-                    && !event
-                        .counters
-                        .get(METRIC_NAME_ERROR)
-                        .is_some_and(|m| m.contains_key(parameter))
-                {
-                    reports.push(format!(
-                        "Counter \"{METRIC_NAME_ERROR}\" must include \"{parameter}\" to match error log."
-                    ));
-                }
-            }
-        }
+fn check_error_event(reports: &mut Vec<String>, name: &str, event: &Event, handle: &Event) {
+    if !name.ends_with("Error") {
+        reports.push("Error events MUST be named \"___Error\".".to_string());
     }
-
-    if is_events_dropped_event && !event.skip_dropped_events {
-        if event.emits_component_events_dropped {
-            if event.counters.contains_key(METRIC_NAME_EVENTS_DROPPED) {
+    log_level_one_of(reports, &handle.logs, &["error"]);
+    counters_must_include_exclude_tags(
+        reports,
+        &event.counters,
+        METRIC_NAME_ERROR,
+        &["error_type", "stage"],
+        &[],
+    );
+    for log in &handle.logs {
+        if log.level != "error" {
+            continue;
+        }
+        for parameter in ["error_type", "stage"] {
+            if !log.parameters.iter().any(|p| p == parameter) {
                 reports.push(format!(
-                    "Event emitting ComponentEventsDropped should not also increment counter `{METRIC_NAME_EVENTS_DROPPED}`"
+                    "Error log for Error event MUST include parameter \"{parameter}\"."
                 ));
             }
-        } else {
-            if !name_ends_with(name, "EventsDropped") {
-                reports
-                    .push("EventsDropped events MUST be named \"___EventsDropped\".".to_string());
-            }
-            log_level_one_of(&mut reports, &handle.logs, &["error", "debug"]);
-            counters_must_include_exclude_tags(
-                &mut reports,
-                &event.counters,
-                METRIC_NAME_EVENTS_DROPPED,
-                &["intentional"],
-                &["reason", "count"],
-            );
-            for log in &handle.logs {
-                if log.level != "error" {
-                    continue;
-                }
-                for parameter in ["count", "intentional", "reason"] {
-                    if !log.parameters.iter().any(|p| p == parameter) {
-                        reports.push(format!(
-                            "Error log for EventsDropped event MUST include parameter \"{parameter}\"."
-                        ));
-                    }
-                }
-                if log.parameters.iter().any(|p| p == "intentional")
-                    && !event
-                        .counters
-                        .get(METRIC_NAME_EVENTS_DROPPED)
-                        .is_some_and(|m| m.contains_key("intentional"))
-                {
-                    reports.push(format!(
-                        "Counter \"{METRIC_NAME_EVENTS_DROPPED}\" must include \"intentional\" to match error log."
-                    ));
-                }
+        }
+        for parameter in ["error_code", "error_type", "stage"] {
+            if log.parameters.iter().any(|p| p == parameter)
+                && !event
+                    .counters
+                    .get(METRIC_NAME_ERROR)
+                    .is_some_and(|m| m.contains_key(parameter))
+            {
+                reports.push(format!(
+                    "Counter \"{METRIC_NAME_ERROR}\" must include \"{parameter}\" to match error log."
+                ));
             }
         }
     }
+}
 
+fn check_events_dropped(reports: &mut Vec<String>, name: &str, event: &Event, handle: &Event) {
+    if event.emits_component_events_dropped {
+        if event.counters.contains_key(METRIC_NAME_EVENTS_DROPPED) {
+            reports.push(format!(
+                "Event emitting ComponentEventsDropped should not also increment counter `{METRIC_NAME_EVENTS_DROPPED}`"
+            ));
+        }
+        return;
+    }
+    if !name.ends_with("EventsDropped") {
+        reports.push("EventsDropped events MUST be named \"___EventsDropped\".".to_string());
+    }
+    log_level_one_of(reports, &handle.logs, &["error", "debug"]);
+    counters_must_include_exclude_tags(
+        reports,
+        &event.counters,
+        METRIC_NAME_EVENTS_DROPPED,
+        &["intentional"],
+        &["reason", "count"],
+    );
+    for log in &handle.logs {
+        if log.level != "error" {
+            continue;
+        }
+        for parameter in ["count", "intentional", "reason"] {
+            if !log.parameters.iter().any(|p| p == parameter) {
+                reports.push(format!(
+                    "Error log for EventsDropped event MUST include parameter \"{parameter}\"."
+                ));
+            }
+        }
+        if log.parameters.iter().any(|p| p == "intentional")
+            && !event
+                .counters
+                .get(METRIC_NAME_EVENTS_DROPPED)
+                .is_some_and(|m| m.contains_key("intentional"))
+        {
+            reports.push(format!(
+                "Counter \"{METRIC_NAME_EVENTS_DROPPED}\" must include \"intentional\" to match error log."
+            ));
+        }
+    }
+}
+
+fn check_error_counter_tag_constants(reports: &mut Vec<String>, event: &Event) {
     for (cname, tags) in &event.counters {
         if cname != METRIC_NAME_ERROR && cname != METRIC_NAME_EVENTS_DROPPED {
             continue;
@@ -356,6 +338,32 @@ fn validate_event(events: &HashMap<String, Event>, name: &str, handle_name: &str
             }
         }
     }
+}
+
+fn validate_event(events: &HashMap<String, Event>, name: &str, handle_name: &str) -> Vec<String> {
+    let event = events.get(name).expect("event present");
+    let handle = events.get(handle_name).expect("handle present");
+    let mut reports: Vec<String> = Vec::new();
+
+    if event.uses == 0 {
+        reports.push("Event has no uses.".to_string());
+    }
+
+    check_event_class(&mut reports, name, event, handle);
+
+    let has_error_logs = handle.logs.iter().filter(|l| l.level == "error").count() == 1;
+    let is_events_dropped_event =
+        name.ends_with("EventsDropped") || event.counters.contains_key(METRIC_NAME_EVENTS_DROPPED);
+
+    if (has_error_logs && !is_events_dropped_event) || name.ends_with("Error") {
+        check_error_event(&mut reports, name, event, handle);
+    }
+
+    if is_events_dropped_event && !event.skip.dropped_events {
+        check_events_dropped(&mut reports, name, event, handle);
+    }
+
+    check_error_counter_tag_constants(&mut reports, event);
 
     for r in &event.reports {
         reports.push(r.clone());
@@ -518,8 +526,8 @@ struct ParsedLog {
 }
 
 /// Parse a `trace!(...)` / `debug!(...)` / `info!(...)` / `warn!(...)` /
-/// `error!(...)` invocation's tokens into the message text and the list of
-/// parameter names it carries.
+/// `error!(...)` invocation's already-stringified args into the message text
+/// and the list of parameter names it carries.
 ///
 /// `tracing` allows the message in any position: leading positional literal,
 /// trailing positional literal, or `message = "..."` named field. We mirror
@@ -529,15 +537,7 @@ struct ParsedLog {
 /// first bare positional expression — otherwise patterns like
 /// `warn!(%error, "Failed to flush.")` would never have their message format
 /// checked because the bare `%error` would be claimed as the message first.
-fn parse_log_args(tokens: &TokenStream) -> ParsedLog {
-    parse_log_args_str(&tokens.to_string())
-}
-
-/// Variant of [`parse_log_args`] that operates on already-stringified macro
-/// arg text, used by the raw-source format-check pass that needs to look
-/// inside opaque outer macros (`tokio::select!`, `cfg_if!`, …) which `syn`
-/// does not descend into.
-fn parse_log_args_str(raw: &str) -> ParsedLog {
+fn parse_log_args(raw: &str) -> ParsedLog {
     let args = split_comma_args(raw);
 
     let mut literal_message: Option<String> = None;
@@ -675,7 +675,7 @@ impl<'ast> Visit<'ast> for Scanner<'_> {
             let name = node.ident.to_string();
             let event = self.events.entry(name).or_default();
             event.path = Some(self.path_str.clone());
-            event.skip_dropped_events = self.skip_dropped_for_file;
+            event.skip.dropped_events = self.skip_dropped_for_file;
             for field in &node.fields {
                 if let Some(ident) = &field.ident {
                     let ty = field.ty.to_token_stream().to_string();
@@ -714,18 +714,18 @@ impl<'ast> Visit<'ast> for Scanner<'_> {
 
                 let event = self.events.entry(event_name.clone()).or_default();
                 event.path = Some(self.path_str.clone());
-                event.skip_duplicate_check |=
+                event.skip.duplicate_check |=
                     raw_block.contains("## skip check-duplicate-events ##");
-                event.skip_validity_check |= raw_block.contains("## skip check-validity-events ##");
+                event.skip.validity_check |= raw_block.contains("## skip check-validity-events ##");
 
                 match trait_name {
                     "InternalEvent" => {
                         if !registers_inside {
-                            event.impl_internal_event = true;
+                            event.internal_impl = true;
                         }
                     }
                     "RegisterInternalEvent" => {
-                        event.impl_register_event = Some(event_name.clone());
+                        event.register_impl = Some(event_name.clone());
                         event.append(
                             "Do not implement RegisterInternalEvent manually. Use the registered_event! macro instead.",
                         );
@@ -766,7 +766,7 @@ impl<'ast> Visit<'ast> for Scanner<'_> {
         if let Some(ctx) = self.impl_stack.last().cloned() {
             match name.as_str() {
                 "trace" | "debug" | "info" | "warn" | "error" => {
-                    let parsed = parse_log_args(&node.tokens);
+                    let parsed = parse_log_args(&node.tokens.to_string());
                     let event = self.events.entry(ctx.event_name.clone()).or_default();
                     event.add_log(&name, &parsed.message, parsed.parameters);
                 }
@@ -897,8 +897,7 @@ impl Scanner<'_> {
                 let after = &raw[start + idx + needle.len()..];
                 if let Some(end) = match_paren_end(after) {
                     let inside = &after[..end];
-                    let toks: TokenStream = inside.parse().unwrap_or_default();
-                    let parsed = parse_log_args(&toks);
+                    let parsed = parse_log_args(inside);
                     let event = self.events.entry(event_name.clone()).or_default();
                     event.add_log(ty, &parsed.message, parsed.parameters);
                     start = start + idx + needle.len() + end;
@@ -933,7 +932,7 @@ fn format_check_log_messages(text: &str, path_str: &str) -> Vec<String> {
             continue;
         };
         let inside = &text[body_start..body_start + close_offset];
-        let parsed = parse_log_args_str(inside);
+        let parsed = parse_log_args(inside);
         if !parsed.has_literal_message {
             continue;
         }
@@ -1078,6 +1077,125 @@ fn first_ident(s: &str) -> Option<String> {
 #[command()]
 pub(super) struct Cli {}
 
+fn collect_source_paths() -> Result<Vec<PathBuf>> {
+    let mut paths: Vec<PathBuf> = Vec::new();
+    for pattern in ["src/**/*.rs", "lib/**/*.rs"] {
+        for entry in glob(pattern)? {
+            paths.push(entry?);
+        }
+    }
+    paths.sort();
+    Ok(paths)
+}
+
+fn scan_file(path: &PathBuf, events: &mut HashMap<String, Event>) -> Result<usize> {
+    let path_str = path.to_string_lossy().replace('\\', "/");
+    let text = fs::read_to_string(path)?;
+    let lower = text.to_ascii_lowercase();
+
+    let in_internal_events = path_str.starts_with("src/internal_events/")
+        || path_str.starts_with("lib/vector-common/src/internal_event/");
+    let in_src = path_str.starts_with("src/");
+    let skip_dropped = lower.contains("## skip check-dropped-events ##");
+
+    for caps in RE_USES.captures_iter(&text) {
+        let name = caps[1].to_string();
+        events.entry(name).or_default().uses += 1;
+    }
+
+    let mut errors = 0usize;
+    if in_src {
+        let format_reports = format_check_log_messages(&text, &path_str);
+        if !format_reports.is_empty() {
+            for r in &format_reports {
+                println!("{r}");
+            }
+            errors += format_reports.len();
+        }
+    }
+
+    let file = match syn::parse_file(&text) {
+        Ok(f) => f,
+        Err(e) => {
+            eprintln!("warning: failed to parse {path_str}: {e}");
+            return Ok(errors);
+        }
+    };
+
+    let mut scanner = Scanner {
+        events,
+        path_str: path_str.clone(),
+        in_internal_events_dir: in_internal_events,
+        skip_dropped_for_file: skip_dropped,
+        text: &text,
+        impl_stack: Vec::new(),
+    };
+    visit::visit_file(&mut scanner, &file);
+    Ok(errors)
+}
+
+fn report_event_errors(events: &HashMap<String, Event>, name: &str, handle_name: &str) -> bool {
+    let reports = validate_event(events, name, handle_name);
+    if reports.is_empty() {
+        return false;
+    }
+    let path = events
+        .get(name)
+        .and_then(|e| e.path.as_deref())
+        .unwrap_or("?");
+    println!("{path}: Errors in event {name}:");
+    for r in &reports {
+        println!("    {r}");
+    }
+    true
+}
+
+fn validate_all(events: &HashMap<String, Event>) -> usize {
+    let mut names: Vec<String> = events.keys().cloned().collect();
+    names.sort();
+    let mut duplicates: HashMap<String, Vec<String>> = HashMap::new();
+    let mut error_count = 0usize;
+
+    for name in &names {
+        let event = events.get(name).expect("present");
+        if !event.skip.duplicate_check
+            && (event.internal_impl || event.impl_event_handle)
+            && let Some(sig) = event.signature()
+        {
+            duplicates.entry(sig).or_default().push(name.clone());
+        }
+        if event.skip.validity_check {
+            continue;
+        }
+        if event.internal_impl {
+            if report_event_errors(events, name, name) {
+                error_count += 1;
+            }
+        } else if let Some(handle_name) = event.register_impl.as_deref() {
+            if events.contains_key(handle_name) {
+                if report_event_errors(events, name, handle_name) {
+                    error_count += 1;
+                }
+            } else {
+                println!("Registered event {name} references nonexistent handle {handle_name}");
+                error_count += 1;
+            }
+        }
+    }
+
+    let mut dup_keys: Vec<&String> = duplicates.keys().collect();
+    dup_keys.sort();
+    for sig in dup_keys {
+        let dupes = &duplicates[sig];
+        if dupes.len() > 1 {
+            println!("Duplicate events detected: {}", dupes.join(", "));
+            error_count += 1;
+        }
+    }
+
+    error_count
+}
+
 impl Cli {
     pub(super) fn exec(self) -> Result<()> {
         // Resolve all `src/**` / `lib/**` globs against the repo root rather
@@ -1091,122 +1209,11 @@ impl Cli {
         let mut events: HashMap<String, Event> = HashMap::new();
         let mut error_count = 0usize;
 
-        let mut paths: Vec<PathBuf> = Vec::new();
-        for pattern in ["src/**/*.rs", "lib/**/*.rs"] {
-            for entry in glob(pattern)? {
-                paths.push(entry?);
-            }
-        }
-        paths.sort();
-
-        for path in &paths {
-            let path_str = path.to_string_lossy().replace('\\', "/");
-            let text = fs::read_to_string(path)?;
-            let lower = text.to_ascii_lowercase();
-
-            let in_internal_events = path_str.starts_with("src/internal_events/")
-                || path_str.starts_with("lib/vector-common/src/internal_event/");
-            let in_src = path_str.starts_with("src/");
-            let skip_dropped = lower.contains("## skip check-dropped-events ##");
-
-            // Use-counting pass: scrape `emit!(EventName)` / `register!(Path::EventName)`
-            // anywhere in the file, including inside other macros (`tokio::select!`
-            // etc.), which `syn` does not descend into.
-            for caps in RE_USES.captures_iter(&text) {
-                let name = caps[1].to_string();
-                events.entry(name).or_default().uses += 1;
-            }
-
-            // Log-message format check: same reason — the AST visitor would
-            // miss `info!` / `error!` calls nested inside opaque outer macros.
-            if in_src {
-                let format_reports = format_check_log_messages(&text, &path_str);
-                if !format_reports.is_empty() {
-                    for r in &format_reports {
-                        println!("{r}");
-                    }
-                    error_count += format_reports.len();
-                }
-            }
-
-            let file = match syn::parse_file(&text) {
-                Ok(f) => f,
-                Err(e) => {
-                    eprintln!("warning: failed to parse {path_str}: {e}");
-                    continue;
-                }
-            };
-
-            let mut scanner = Scanner {
-                events: &mut events,
-                path_str: path_str.clone(),
-                in_internal_events_dir: in_internal_events,
-                skip_dropped_for_file: skip_dropped,
-                text: &text,
-                impl_stack: Vec::new(),
-            };
-            visit::visit_file(&mut scanner, &file);
+        for path in &collect_source_paths()? {
+            error_count += scan_file(path, &mut events)?;
         }
 
-        // Validation phase.
-        let mut names: Vec<String> = events.keys().cloned().collect();
-        names.sort();
-        let mut duplicates: HashMap<String, Vec<String>> = HashMap::new();
-
-        for name in &names {
-            let event = events.get(name).expect("present").clone();
-            if !event.skip_duplicate_check
-                && (event.impl_internal_event || event.impl_event_handle)
-                && let Some(sig) = event.signature()
-            {
-                duplicates.entry(sig).or_default().push(name.clone());
-            }
-            if event.skip_validity_check {
-                continue;
-            }
-            if event.impl_internal_event {
-                let reports = validate_event(&events, name, name);
-                if !reports.is_empty() {
-                    let path = events
-                        .get(name)
-                        .and_then(|e| e.path.as_deref())
-                        .unwrap_or("?");
-                    println!("{path}: Errors in event {name}:");
-                    for r in &reports {
-                        println!("    {r}");
-                    }
-                    error_count += 1;
-                }
-            } else if let Some(handle_name) = event.impl_register_event.as_deref() {
-                if events.contains_key(handle_name) {
-                    let reports = validate_event(&events, name, handle_name);
-                    if !reports.is_empty() {
-                        let path = events
-                            .get(name)
-                            .and_then(|e| e.path.as_deref())
-                            .unwrap_or("?");
-                        println!("{path}: Errors in event {name}:");
-                        for r in &reports {
-                            println!("    {r}");
-                        }
-                        error_count += 1;
-                    }
-                } else {
-                    println!("Registered event {name} references nonexistent handle {handle_name}");
-                    error_count += 1;
-                }
-            }
-        }
-
-        let mut dup_keys: Vec<&String> = duplicates.keys().collect();
-        dup_keys.sort();
-        for sig in dup_keys {
-            let dupes = &duplicates[sig];
-            if dupes.len() > 1 {
-                println!("Duplicate events detected: {}", dupes.join(", "));
-                error_count += 1;
-            }
-        }
+        error_count += validate_all(&events);
 
         println!("{error_count} error(s)");
         if error_count > 0 {
@@ -1259,7 +1266,7 @@ mod tests {
 
     fn parse(src: &str) -> ParsedLog {
         let mac: syn::Macro = syn::parse_str(src).expect("parse macro");
-        parse_log_args(&mac.tokens)
+        parse_log_args(&mac.tokens.to_string())
     }
 
     #[test]
@@ -1411,7 +1418,7 @@ mod tests {
     fn mk_event() -> Event {
         Event {
             uses: 1, // default to "has uses" so that branch isn't always firing
-            impl_internal_event: true,
+            internal_impl: true,
             ..Default::default()
         }
     }
