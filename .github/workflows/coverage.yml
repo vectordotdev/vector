@@ -1,43 +1,105 @@
-name: Code Coverage
+# Coverage
+#
+# Runs all test suites (unit, component validation, CLI, API, behavior,
+# integration) with code coverage instrumentation on a single commit. Results
+# are merged into one lcov report and uploaded to Datadog. Also runs on a
+# weekly schedule to ensure full baseline coverage is always fresh.
+#
+# Limitation: integration and E2E coverage only instruments the test runner
+# (cargo-nextest), not the separately-launched Vector binary inside compose
+# services. Instrumenting the service binary would require building it with
+# cargo-llvm-cov and merging its runtime profdata, which is out of scope here.
+
+name: Coverage
 
 on:
-  push:
-    branches:
-      - master
-  workflow_dispatch: # Allow manual trigger from GitHub UI
+  workflow_call:
+    inputs:
+      ref:
+        description: "Git ref to checkout"
+        required: false
+        type: string
+
+  schedule:
+    - cron: "0 2 * * 0" # 2 AM UTC every Sunday
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 env:
-  CI: true
   CARGO_INCREMENTAL: "0" # Disable incremental compilation for coverage
+  CI: true
 
 jobs:
-  coverage:
+  tests:
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/unit-tests.yml
+    with:
+      ref: ${{ inputs.ref }}
+      default: true
+      coverage: true
+      cli: true
+      vector-api: true
+
+  integration-tests:
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    uses: ./.github/workflows/integration.yml
+    with:
+      run_all: true
+      coverage: true
+      ref: ${{ inputs.ref }}
+    secrets: inherit
+
+  coverage-upload:
+    name: Merge and Upload Coverage
     runs-on: ubuntu-24.04
+    needs:
+      - tests
+      - integration-tests
+    if: ${{ !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
     permissions:
       contents: read
       id-token: write
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Download all coverage artifacts
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
+        with:
+          pattern: coverage-*
+          path: coverage-artifacts
+          merge-multiple: false
+
+      - name: Merge coverage reports
+        run: |
+          sudo apt-get install -y --no-install-recommends lcov
+
+          mapfile -t FILES < <(find coverage-artifacts -name '*.info')
+          echo "Merging ${#FILES[@]} coverage file(s)"
+
+          ARGS=()
+          for f in "${FILES[@]}"; do
+            ARGS+=("--add-tracefile" "$f")
+          done
+          lcov "${ARGS[@]}" --output-file merged-lcov.info
 
       - uses: ./.github/actions/setup
         with:
-          rust: true
-          libsasl2: true
-          protoc: true
-          cargo-llvm-cov: true
-          cargo-nextest: true
+          vdev: false
           datadog-ci: true
-
-      - name: "Generate code coverage"
-        run: cargo llvm-cov nextest --workspace --lcov --output-path lcov.info
 
       - uses: ./.github/actions/dd-token
 
-      - name: "Upload coverage to Datadog"
+      - name: Upload to Datadog
         env:
           DD_SITE: datadoghq.com
           DD_ENV: ci
-        run: datadog-ci coverage upload lcov.info
+        run: datadog-ci coverage upload merged-lcov.info

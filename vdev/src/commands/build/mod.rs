@@ -1,3 +1,4 @@
+mod component_docs;
 mod licenses;
 mod publish_metadata;
 mod vector;
@@ -16,10 +17,6 @@ crate::cli_subcommands! {
     vrl_wasm,
 }
 
-crate::script_wrapper! {
-    component_docs = "Build component documentation"
-        => "generate-component-docs.rb"
-}
 crate::script_wrapper! {
     manifests = "Build Kubernetes manifests from latest Helm chart"
         => "generate-manifests.sh"
