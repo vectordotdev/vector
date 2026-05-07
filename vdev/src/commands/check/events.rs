@@ -420,9 +420,16 @@ fn normalize_value(s: &str) -> String {
 /// Split a token stream that represents a comma-separated argument list into
 /// per-argument substrings, respecting bracket/paren/brace nesting and string
 /// literals. Operates on the (already-bounded) macro-arg token text.
+///
+/// Angle brackets are tracked as a separate depth so that generic-type commas
+/// like `Registered<ComponentEventsDropped<'static, INTENTIONAL>>` don't
+/// fragment a `registered_event!` field. `>` only decrements when there is a
+/// matching `<`, so the `>` in `key => value` tag pairs (used by `counter!`
+/// args) doesn't underflow.
 fn split_comma_args(s: &str) -> Vec<String> {
     let mut out = Vec::new();
     let mut depth: i32 = 0;
+    let mut angle_depth: i32 = 0;
     let mut in_str = false;
     let mut esc = false;
     let mut start = 0;
@@ -442,7 +449,9 @@ fn split_comma_args(s: &str) -> Vec<String> {
             b'"' => in_str = true,
             b'(' | b'[' | b'{' => depth += 1,
             b')' | b']' | b'}' => depth -= 1,
-            b',' if depth == 0 => {
+            b'<' => angle_depth += 1,
+            b'>' if angle_depth > 0 => angle_depth -= 1,
+            b',' if depth == 0 && angle_depth == 0 => {
                 out.push(s[start..i].trim().to_string());
                 start = i + 1;
             }
@@ -1226,6 +1235,14 @@ mod tests {
                 "e".to_string(),
             ]
         );
+    }
+
+    #[test]
+    fn split_comma_args_respects_angle_brackets() {
+        // A `registered_event!` handle field with a generic type containing a
+        // comma must not be split at the comma inside `<...>`.
+        let input = "events_dropped : Registered<ComponentEventsDropped<'static, INTENTIONAL>> = register!(X)";
+        assert_eq!(split_comma_args(input), vec![input.to_string()]);
     }
 
     #[test]
