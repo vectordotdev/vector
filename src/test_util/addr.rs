@@ -13,6 +13,8 @@ use std::{
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, TcpListener as StdTcpListener},
     sync::{LazyLock, Mutex},
 };
+#[cfg(windows)]
+use std::net::UdpSocket as StdUdpSocket;
 
 /// Maximum number of attempts to allocate a unique port before panicking.
 /// This should be far more than needed since port collisions are rare,
@@ -76,6 +78,14 @@ pub fn next_addr_for_ip(ip: IpAddr) -> (PortGuard, SocketAddr) {
         if reserved.contains(&port) {
             // OS recycled a port that's still reserved by another test.
             // Lock and listener will be dropped implicitly after continuing
+            continue;
+        }
+
+        // On Windows, certain ports are in OS-excluded ranges (e.g. set by Hyper-V/WSL).
+        // TCP bind(0) may return such a port, but UDP bind to the same port will fail with
+        // WSAEACCES (10013). Probe with a UDP socket and retry if it is excluded.
+        #[cfg(windows)]
+        if StdUdpSocket::bind(addr).is_err() {
             continue;
         }
 
