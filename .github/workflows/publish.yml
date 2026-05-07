@@ -21,8 +21,6 @@ env:
   DISABLE_MOLD: true
   DEBIAN_FRONTEND: noninteractive
   CONTAINER_TOOL: docker
-  CARGO_PROFILE_RELEASE_LTO: fat
-  CARGO_PROFILE_RELEASE_CODEGEN_UNITS: 1
   CHANNEL: ${{ inputs.channel }}
 
 jobs:
@@ -81,7 +79,7 @@ jobs:
       - name: Build Vector
         run: make package-${{ matrix.target }}-all
       - name: Stage package artifacts for publish
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: vector-${{ env.VECTOR_VERSION }}-${{ matrix.target }}
           path: target/artifacts/vector*
@@ -129,7 +127,7 @@ jobs:
           export PATH="$HOME/.cargo/bin:$PATH"
           make package
       - name: Stage package artifacts for publish
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: vector-${{ env.VECTOR_VERSION }}-${{ matrix.architecture }}-apple-darwin
           path: target/artifacts/vector*
@@ -176,7 +174,7 @@ jobs:
           export PATH="/c/wix:$PATH"
           ./scripts/package-msi.sh
       - name: Stage package artifacts for publish
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-pc-windows-msvc
           path: target/artifacts/vector*
@@ -204,8 +202,8 @@ jobs:
       image: ${{ matrix.container }}
     steps:
       - run: |
-          apt-get update && \
-          apt-get install -y \
+          apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 update && \
+          apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 install -y \
           ca-certificates \
           curl \
           git \
@@ -331,12 +329,12 @@ jobs:
         with:
           ref: ${{ inputs.git_ref }}
       - name: Login to DockerHub
-        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
         with:
           username: ${{ secrets.CI_DOCKER_USERNAME }}
           password: ${{ secrets.CI_DOCKER_PASSWORD }}
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -382,6 +380,7 @@ jobs:
       - deb-verify
       - rpm-verify
       - macos-verify
+      - generate-sha256sum
     env:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
       CHANNEL: ${{ needs.generate-publish-metadata.outputs.vector_release_channel }}
@@ -469,7 +468,7 @@ jobs:
       - name: Generate SHA256 checksums for artifacts
         run: make sha256sum
       - name: Stage checksum for publish
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: vector-${{ env.VECTOR_VERSION }}-SHA256SUMS
           path: target/artifacts/vector-${{ env.VECTOR_VERSION }}-SHA256SUMS

@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.55.0"
+version = "0.56.0"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2024"
 description = "A lightweight and ultra-fast tool for building observability pipelines"
@@ -39,11 +39,10 @@ name = "vector_api"
 path = "tests/vector_api/lib.rs"
 required-features = ["vector-api-tests"]
 
-# CI-based builds use full release optimization. See scripts/environment/release-flags.sh.
-# This results in roughly a 5% reduction in performance when compiling locally vs when
-# compiled via the CI pipeline.
 [profile.release]
 debug = false # Do not include debug symbols in the executable.
+codegen-units = 1
+lto = "fat"
 
 [profile.bench]
 debug = true
@@ -160,7 +159,7 @@ flate2 = { version = "1.1.2", default-features = false, features = ["zlib-rs"] }
 futures = { version = "0.3.31", default-features = false, features = ["std"] }
 futures-util = { version = "0.3.29", default-features = false }
 glob = { version = "0.3.3", default-features = false }
-hickory-proto = { version = "0.25.2", default-features = false, features = ["dnssec-ring"] }
+hickory-proto = { version = "0.26.1", default-features = false, features = ["dnssec-ring"] }
 humantime = { version = "2.3.0", default-features = false }
 indexmap = { version = "2.11.0", default-features = false, features = ["serde", "std"] }
 indoc = { version = "2.0.7" }
@@ -187,9 +186,10 @@ rdkafka = { version = "0.39.0", default-features = false }
 regex = { version = "1.12.3", default-features = false, features = ["std", "perf"] }
 reqwest = { version = "0.11", features = ["json"] }
 rust_decimal = { version = "1.40.0", default-features = false, features = ["std"] }
-semver = { version = "1.0.27", default-features = false, features = ["serde", "std"] }
+semver = { version = "1.0.28", default-features = false, features = ["serde", "std"] }
 serde = { version = "1.0.219", default-features = false, features = ["alloc", "derive", "rc"] }
-serde_json = { version = "1.0.143", default-features = false, features = ["preserve_order", "raw_value", "std"] }
+serde_json = { version = "1.0.149", default-features = false, features = ["preserve_order", "raw_value", "std"] }
+serde_with = { version = "3.18.0", default-features = false, features = ["std", "macros", "chrono_0_4"] }
 serde_yaml = { version = "0.9.34", default-features = false }
 snafu = { version = "0.9.0", default-features = false, features = ["futures", "std"] }
 socket2 = { version = "0.5.10", default-features = false }
@@ -204,7 +204,7 @@ tonic-build = { version = "0.11", default-features = false, features = ["transpo
 tonic-health = { version = "0.11", default-features = false }
 tonic-reflection = { version = "0.11", default-features = false, features = ["server"] }
 tracing = { version = "0.1.44", default-features = false }
-tracing-subscriber = { version = "0.3.22", default-features = false, features = ["fmt"]  }
+tracing-subscriber = { version = "0.3.22", default-features = false, features = ["fmt"] }
 url = { version = "2.5.4", default-features = false, features = ["serde"] }
 uuid = { version = "1.22.0", features = ["v4", "v7", "serde", "fast-rng"] }
 vector-config = { path = "lib/vector-config" }
@@ -331,6 +331,9 @@ prost = { workspace = true, optional = true }
 prost-reflect = { workspace = true, optional = true }
 prost-types = { workspace = true, optional = true }
 
+# Databricks Zerobus
+databricks-zerobus-ingest-sdk = { git = "https://github.com/databricks/zerobus-sdk-rs", rev = "273efe09130a7554e6b34d20b95df50289e58524", optional = true }
+
 # GCP
 goauth = { version = "0.16.0", optional = true }
 smpl_jwt = { version = "0.8.0", default-features = false, optional = true }
@@ -345,7 +348,7 @@ deadpool = { version = "0.13.0", default-features = false, features = ["managed"
 hex = { version = "0.4.3", default-features = false, optional = true }
 
 # GreptimeDB
-greptimedb-ingester = { git = "https://github.com/GreptimeTeam/greptimedb-ingester-rust", rev = "f7243393808640f5123b0d5b7b798da591a4df6e", optional = true }
+greptimedb-ingester = { version = "0.17.0", default-features = false, optional = true }
 
 # External libs
 arc-swap = { workspace = true, default-features = false, optional = true }
@@ -353,6 +356,13 @@ async-compression = { version = "0.4.27", default-features = false, features = [
 apache-avro = { version = "0.16.0", default-features = false, optional = true }
 arrow = { version = "56.2.0", default-features = false, features = ["ipc"], optional = true }
 arrow-schema = { version = "56.2.0", default-features = false, optional = true }
+parquet = { version = "56.2.0", default-features = false, features = [
+  "arrow",
+  "snap",
+  "zstd",
+  "lz4",
+  "flate2-rust_backened",
+], optional = true }
 axum = { version = "0.6.20", default-features = false }
 base64 = { workspace = true, optional = true }
 bloomy = { version = "1.2.0", default-features = false, optional = true }
@@ -471,6 +481,7 @@ openssl-src = { version = "300", default-features = false, features = ["force-en
 
 [dev-dependencies]
 approx = "0.5.1"
+strum.workspace = true
 assert_cmd = { version = "2.0.17", default-features = false }
 aws-smithy-runtime = { version = "1.8.3", default-features = false, features = ["tls-rustls"] }
 base64 = "0.22.1"
@@ -512,7 +523,7 @@ vendored = ["rdkafka?/gssapi-vendored"]
 
 # Default features for *-pc-windows-msvc
 # TODO: Enable SASL https://github.com/vectordotdev/vector/pull/3081#issuecomment-659298042
-base = ["api", "enrichment-tables", "sinks", "sources", "transforms", "secrets", "vrl/stdlib"]
+base = ["api", "enrichment-tables", "sinks", "sources", "transforms", "secrets", "vrl/stdlib", "codecs-parquet"]
 enable-api-client = ["base", "api-client"]
 enable-unix = ["enable-api-client", "sources-dnstap", "unix"]
 
@@ -526,6 +537,7 @@ tokio-console = ["dep:console-subscriber", "tokio/tracing"]
 vrl-functions-env = ["vrl/enable_env_functions"]
 vrl-functions-system = ["vrl/enable_system_functions"]
 vrl-functions-network = ["vrl/enable_network_functions"]
+vrl-functions-crypto = ["vrl/enable_crypto_functions"]
 
 # Enables the binary secret-backend-example
 secret-backend-example = ["transforms"]
@@ -609,6 +621,7 @@ enrichment-tables-memory = ["dep:evmap", "dep:evmap-derive", "dep:thread_local"]
 
 # Codecs
 codecs-arrow = ["dep:arrow", "dep:arrow-schema", "vector-lib/arrow"]
+codecs-parquet = ["dep:parquet", "codecs-arrow", "vector-lib/parquet"]
 codecs-opentelemetry = ["vector-lib/opentelemetry"]
 codecs-syslog = ["vector-lib/syslog"]
 
@@ -817,6 +830,7 @@ sinks-logs = [
   "sinks-clickhouse",
   "sinks-console",
   "sinks-databend",
+  "sinks-databricks-zerobus",
   "sinks-datadog_events",
   "sinks-datadog_logs",
   "sinks-datadog_traces",
@@ -885,6 +899,7 @@ sinks-chronicle = []
 sinks-clickhouse = ["dep:nom", "dep:rust_decimal", "codecs-arrow"]
 sinks-console = []
 sinks-databend = ["dep:databend-client"]
+sinks-databricks-zerobus = ["dep:databricks-zerobus-ingest-sdk", "dep:prost-reflect", "dep:base64"]
 sinks-datadog_events = []
 sinks-datadog_logs = []
 sinks-datadog_metrics = ["protobuf-build", "dep:prost", "dep:prost-reflect"]
@@ -1022,7 +1037,7 @@ gcp-integration-tests = ["sinks-gcp"]
 gcp-pubsub-integration-tests = ["sinks-gcp", "sources-gcp_pubsub"]
 greptimedb-integration-tests = ["sinks-greptimedb_metrics", "sinks-greptimedb_logs"]
 humio-integration-tests = ["sinks-humio"]
-http-client-integration-tests = ["sources-http_client"]
+http-client-integration-tests = ["sources-http_client", "vrl-functions-crypto"]
 influxdb-integration-tests = ["sinks-influxdb"]
 kafka-integration-tests = ["sinks-kafka", "sources-kafka"]
 logstash-integration-tests = ["docker", "sources-logstash"]
