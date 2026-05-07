@@ -9,7 +9,6 @@
 #
 # The available triggers are:
 #
-# /ci-run-coverage            : runs full coverage suite (unit + int + e2e) — NOT included in /ci-run-all (covered by others)
 # /ci-run-all                 : runs all of the below
 # /ci-run-cli                 : runs CLI - Linux
 # /ci-run-test-vector-api     : runs make test-vector-api
@@ -26,6 +25,7 @@
 #
 # The following triggers are available but do NOT run as part of /ci-run-all:
 # /ci-run-cross               : runs Cross (covered by /ci-run-packaging)
+# /ci-run-coverage            : runs full coverage suite (unit + int + e2e)
 
 name: CI Review Trigger
 
