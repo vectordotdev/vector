@@ -16,7 +16,7 @@ use vector_lib::{
     lookup::{lookup_v2::OptionalValuePath, owned_value_path, path},
     schema::Definition,
 };
-use vrl::value::{Kind, kind::Collection};
+use vrl::value::{Kind, ObjectMap, kind::Collection};
 use warp::http::HeaderMap;
 
 use crate::{
@@ -520,6 +520,25 @@ impl HttpSource for SimpleHttpSource {
 
     fn enable_source_ip(&self) -> bool {
         self.host_key.path.is_some()
+    }
+
+    /// Injects `%field` enrichment from a `custom` auth VRL program into events.
+    /// Legacy namespace: inserted into the event body (no-op if key already exists).
+    /// Vector namespace: inserted into event metadata under `http_server.<field>`.
+    fn inject_auth_enrichment(&self, events: &mut [Event], enrichment: ObjectMap) {
+        for event in events.iter_mut() {
+            if let Event::Log(log) = event {
+                for (key, value) in &enrichment {
+                    self.log_namespace.insert_source_metadata(
+                        SimpleHttpConfig::NAME,
+                        log,
+                        Some(LegacyKey::InsertIfEmpty(path!(key.as_str()))),
+                        path!(key.as_str()),
+                        value.clone(),
+                    );
+                }
+            }
+        }
     }
 }
 
