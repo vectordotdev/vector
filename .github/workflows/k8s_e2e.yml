@@ -73,6 +73,7 @@ jobs:
     # cargo-deb requires a release build, but we don't need optimizations for tests
     env:
       CARGO_PROFILE_RELEASE_OPT_LEVEL: 0
+      CARGO_PROFILE_RELEASE_LTO: thin # fat LTO OOMs/timeouts on standard 16GB runners; thin is sufficient to verify linking
       CARGO_PROFILE_RELEASE_CODEGEN_UNITS: 256
       CARGO_INCREMENTAL: 0
       DISABLE_MOLD: true
