@@ -43,12 +43,13 @@ pub struct Config {
     /// Maximum number of distinct (metric, tag-key) pairs to track across the entire
     /// transform. When this cap is reached, additional tag keys on new metrics or new
     /// tag keys on existing metrics are not tracked, and tag values for those pairs
-    /// pass through unchecked. Operators can detect this via the
+    /// pass through unchecked. Users can detect this via the
     /// `tag_cardinality_untracked_events_total` counter and the
     /// `tag_cardinality_tracked_keys` gauge.
     ///
     /// When unset (default), there is no cap and the transform tracks all pairs it
-    /// encounters.
+    /// encounters. In `global` tracking scope mode, this limit still applies (the
+    /// metric key is set to `None` unless there is a per-metric override).
     #[configurable(derived)]
     #[serde(default)]
     pub max_tracked_keys: Option<usize>,
@@ -68,8 +69,8 @@ pub struct Config {
 #[serde(rename_all = "snake_case")]
 pub enum TrackingScope {
     /// All metrics share a single tracking bucket. Tag values pool across metrics,
-    /// and the global `value_limit` caps the combined set. Lower memory but
-    /// cross-metric pollution.
+    /// and the global `value_limit` caps the combined set. Lower memory requirements
+    /// but cardinality per metric is not tracked unless a per-metric override is configured.
     #[default]
     Global,
 
