@@ -8,6 +8,7 @@ JEMALLOC_SYS_WITH_LG_PAGE = "16"
 
 [target.'cfg(all())']
 rustflags = [
+  "-D", "warnings",
   "-Dclippy::print_stdout",
   "-Dclippy::print_stderr",
   "-Dclippy::dbg_macro",
