@@ -541,4 +541,65 @@ mod tests {
 
         assert_eq!(definitions, Some(expected_definition))
     }
+
+    // Verify that broadcast lag is surfaced via `component_discarded_events_total` rather
+    // than being silently swallowed.
+    //
+    // Strategy: run inside a single-threaded tokio runtime (the default for `#[tokio::test]`).
+    // While the current task holds the CPU without yielding, no other tokio tasks are scheduled.
+    // We flood the broadcast channel (capacity 99) with more events than it can hold. The drain
+    // task hasn't polled yet, so the broadcast overflows and records a lag count. After we yield,
+    // the drain task observes `Lagged(n)` and the main task emits `ComponentEventsDropped`.
+    // We use a non-consuming downstream receiver to ensure `send_batch` eventually blocks,
+    // preventing any events from being silently drained before we check the metric.
+    #[tokio::test]
+    #[serial]
+    async fn broadcast_lag_increments_discarded_metric() {
+        trace::init(false, false, "error", 10);
+        vector_lib::metrics::init_test();
+        trace::reset_early_buffer();
+
+        // The downstream receiver is intentionally not polled; this means the source's
+        // send_batch will block once the output channel fills, creating backpressure that
+        // ensures the intermediate queue and broadcast stay full during the flood.
+        let (tx, _rx) = SourceSender::new_test();
+        let source = InternalLogsConfig::default()
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
+        tokio::spawn(source);
+
+        // Yield twice: once for the drain task to start polling the broadcast, once for the
+        // main task to start polling the queue. Both will block immediately (nothing to read).
+        tokio::task::yield_now().await;
+        trace::stop_early_buffering();
+        tokio::task::yield_now().await;
+
+        let controller = vector_lib::metrics::Controller::get()
+            .expect("metrics controller must be initialized");
+        controller.reset();
+
+        // Emit more events than the broadcast capacity (99) without yielding. In a
+        // single-threaded runtime this guarantees the drain task cannot poll between emits,
+        // so the broadcast overflows and accumulates a lag count.
+        for i in 0usize..200 {
+            error!(message = "broadcast lag test", i);
+        }
+
+        // Yield enough times for the drain task to observe the Lagged error and the main
+        // task to emit ComponentEventsDropped.
+        for _ in 0..20 {
+            tokio::task::yield_now().await;
+        }
+
+        let discarded_any = controller
+            .capture_metrics()
+            .into_iter()
+            .any(|m| m.name() == "component_discarded_events_total");
+
+        assert!(
+            discarded_any,
+            "expected component_discarded_events_total to be emitted when broadcast lags"
+        );
+    }
 }
