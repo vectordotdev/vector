@@ -1,14 +1,19 @@
 # Regression Detection Suite
 #
 # This workflow runs under the following conditions:
-#   - Once per day, based on a schedule
-#   - On demand, triggered from https://github.com/vectordotdev/vector/actions/workflows/regression_v2.yml
+#   - Once per week, based on a schedule
+#   - On demand, triggered from https://github.com/vectordotdev/vector/actions/workflows/regression.yml
+#   - On demand, via the `/ci-run-regression` (or `/ci-run-all`) PR review comment,
+#     which invokes this workflow via `workflow_call` from `ci-review-trigger.yml`.
 #
 # The workflow accepts two optional inputs:
-#   - The baseline SHA:
+#   - The baseline ref:
 #     - If not specified, the SHA from 7 days ago on origin/master is used.
-#   - The comparison SHA:
+#   - The comparison ref:
 #     - If not specified, the current HEAD of origin/master is used.
+#
+# Both inputs accept any git ref that `git rev-parse` can resolve: a full commit
+# SHA, a short SHA, a branch name (e.g. `origin/master`), or a tag.
 #
 # This workflow runs regression detection experiments, performing relative
 # evaluations of the baseline SHA and comparison SHA. The exact SHAs are determined
@@ -26,11 +31,21 @@ on:
   workflow_dispatch:
     inputs:
       baseline-sha:
-        description: "The SHA to use as the baseline (optional). If not provided, it defaults to the SHA from 7 days ago."
+        description: "Baseline git ref (full/short SHA, branch such as `origin/master`, or tag). Defaults to the SHA from 7 days ago."
         required: false
       comparison-sha:
-        description: "The SHA to use for comparison (optional). If not provided, it defaults to the current HEAD of the origin/master branch."
+        description: "Comparison git ref (full/short SHA, branch such as `origin/master`, or tag). Defaults to the current HEAD of origin/master."
         required: false
+  workflow_call:
+    inputs:
+      baseline-sha:
+        description: "Baseline git ref (full/short SHA, branch such as `origin/master`, or tag). Defaults to the SHA from 7 days ago."
+        required: false
+        type: string
+      comparison-sha:
+        description: "Comparison git ref (full/short SHA, branch such as `origin/master`, or tag). Defaults to the current HEAD of origin/master."
+        required: false
+        type: string
   schedule:
     - cron: "0 7 * * 1" # Runs at 7 AM UTC on Mondays
 
@@ -60,39 +75,32 @@ jobs:
 
       - name: Set and Validate SHAs
         id: set_and_validate_shas
+        env:
+          BASELINE_INPUT: ${{ inputs.baseline-sha }}
+          COMPARISON_INPUT: ${{ inputs.comparison-sha }}
         run: |
-          # Set baseline SHA
-          if [ -z "${{ github.event.inputs.baseline-sha }}" ]; then
+          # Resolve baseline ref to a full commit SHA
+          if [ -z "${BASELINE_INPUT}" ]; then
             BASELINE_SHA=$(git rev-list -n 1 --before="7 days ago" origin/master)
             echo "Using baseline SHA from 7 days ago: ${BASELINE_SHA}"
           else
-            BASELINE_SHA="${{ github.event.inputs.baseline-sha }}"
-            echo "Using provided baseline SHA: ${BASELINE_SHA}"
+            if ! BASELINE_SHA=$(git rev-parse --verify "${BASELINE_INPUT}^{commit}" 2>/dev/null); then
+              echo "Invalid baseline ref: '${BASELINE_INPUT}'. Expected a full/short SHA, branch (e.g. origin/master), or tag."
+              exit 1
+            fi
+            echo "Resolved baseline input '${BASELINE_INPUT}' to SHA: ${BASELINE_SHA}"
           fi
 
-          # Validate baseline SHA
-          if [ -n "${BASELINE_SHA}" ] && git cat-file -e "${BASELINE_SHA}^{commit}"; then
-            echo "Baseline SHA is valid."
-          else
-            echo "Invalid baseline SHA: ${BASELINE_SHA}."
-            exit 1
-          fi
-
-          # Set comparison SHA
-          if [ -z "${{ github.event.inputs.comparison-sha }}" ]; then
+          # Resolve comparison ref to a full commit SHA
+          if [ -z "${COMPARISON_INPUT}" ]; then
             COMPARISON_SHA=$(git rev-parse origin/master)
-            echo "Using current HEAD for comparison SHA: ${COMPARISON_SHA}"
+            echo "Using current HEAD of origin/master as comparison SHA: ${COMPARISON_SHA}"
           else
-            COMPARISON_SHA="${{ github.event.inputs.comparison-sha }}"
-            echo "Using provided comparison SHA: ${COMPARISON_SHA}"
-          fi
-
-          # Validate comparison SHA
-          if [ -n "${COMPARISON_SHA}" ] && git cat-file -e "${COMPARISON_SHA}^{commit}"; then
-            echo "Comparison SHA is valid."
-          else
-            echo "Invalid comparison SHA: ${COMPARISON_SHA}."
-            exit 1
+            if ! COMPARISON_SHA=$(git rev-parse --verify "${COMPARISON_INPUT}^{commit}" 2>/dev/null); then
+              echo "Invalid comparison ref: '${COMPARISON_INPUT}'. Expected a full/short SHA, branch (e.g. origin/master), or tag."
+              exit 1
+            fi
+            echo "Resolved comparison input '${COMPARISON_INPUT}' to SHA: ${COMPARISON_SHA}"
           fi
 
           # Set tags and export them
@@ -192,10 +200,6 @@ jobs:
     needs:
       - should-run-gate
       - resolve-inputs
-    # Job-level permissions for artifact upload
-    permissions:
-      contents: read # Required to checkout code
-      actions: write # Required to upload artifacts
     steps:
       - uses: colpal/actions-clean@36e6ca1abd35efe61cb60f912bd7837f67887c8a # v1.1.1
 
@@ -235,10 +239,6 @@ jobs:
     needs:
       - should-run-gate
       - resolve-inputs
-    # Job-level permissions for artifact upload
-    permissions:
-      contents: read # Required to checkout code
-      actions: write # Required to upload artifacts
     steps:
       - uses: colpal/actions-clean@36e6ca1abd35efe61cb60f912bd7837f67887c8a # v1.1.1
 
@@ -392,10 +392,8 @@ jobs:
       - resolve-inputs
       - upload-baseline-image-to-ecr
       - upload-comparison-image-to-ecr
-    # Job-level permissions for artifact upload
     permissions:
       contents: read # Required to checkout code
-      actions: write # Required to upload artifacts
       id-token: write # Required for GitHub OIDC token exchange
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -513,10 +511,8 @@ jobs:
       - should-run-gate
       - submit-job
       - resolve-inputs
-    # Job-level permissions for artifact upload
     permissions:
       contents: read # Required to checkout code
-      actions: write # Required to upload artifacts
       id-token: write # Required for GitHub OIDC token exchange
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
