@@ -127,6 +127,7 @@ struct Metrics {
 
 impl Metrics {
     #[expect(clippy::cast_precision_loss)] // We have to convert buffer sizes for a gauge, it's okay to lose precision here.
+    #[allow(clippy::disallowed_macros)] // Metric names are constructed dynamically from runtime prefixes.
     fn new(
         limit: MemoryBufferSize,
         metadata: ChannelMetricMetadata,

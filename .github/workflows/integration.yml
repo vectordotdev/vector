@@ -7,14 +7,31 @@
 name: Integration Test Suite
 
 on:
+  workflow_call:
+    inputs:
+      run_all:
+        description: "Run all integration and e2e tests regardless of changed files"
+        required: false
+        type: boolean
+        default: false
+      coverage:
+        description: "Collect code coverage (outputs target/coverage/lcov.info per service)"
+        required: false
+        type: boolean
+        default: false
+      ref:
+        description: "Git ref to checkout (defaults to github.sha)"
+        required: false
+        type: string
   workflow_dispatch:
   pull_request:
   merge_group:
     types: [checks_requested]
 
 concurrency:
-  # `github.event.number` exists for pull requests, otherwise fall back to SHA for merge queue
-  group: ${{ github.workflow }}-${{ github.event.number || github.event.merge_group.head_sha }}
+  # `github.event.number` exists for pull requests, otherwise fall back to SHA for merge queue.
+  # For workflow_call (e.g. weekly coverage), use run_id so each caller gets its own group.
+  group: ${{ github.workflow }}-${{ github.event.number || github.event.merge_group.head_sha || github.run_id }}
   cancel-in-progress: true
 
 permissions:
@@ -51,6 +68,8 @@ jobs:
     if: ${{
       always() &&
       (github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'workflow_call' ||
+      inputs.run_all == true ||
       (github.event_name == 'merge_group' &&
       needs.changes.result == 'success' &&
       (needs.changes.outputs.dependencies == 'true' ||
@@ -60,7 +79,8 @@ jobs:
       }}
     uses: ./.github/workflows/build-test-runner.yml
     with:
-      commit_sha: ${{ github.sha }}
+      commit_sha: ${{ inputs.ref || github.sha }}
+      checkout_ref: ${{ inputs.ref }}
 
   integration-tests:
     runs-on: ubuntu-24.04-8core
@@ -72,8 +92,9 @@ jobs:
       - build-test-runner
 
     if: ${{ always() && !failure() && !cancelled() && needs.build-test-runner.result == 'success' &&
-      (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch') }}
+      (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call' || inputs.run_all == true) }}
     strategy:
+      fail-fast: false
       matrix:
         # TODO: Add "splunk" back once https://github.com/vectordotdev/vector/issues/23474 is fixed.
         # If you modify this list, please also update the `int_tests` job in changes.yml.
@@ -126,6 +147,8 @@ jobs:
         id: check
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" || \
+                "${{ github.event_name }}" == "workflow_call" || \
+                "${{ inputs.run_all }}" == "true" || \
                 "${{ needs.changes.outputs.dependencies }}" == "true" || \
                 "${{ needs.changes.outputs.integration-yml }}" == "true" ]]; then
             echo "should_run=true" >> "$GITHUB_OUTPUT"
@@ -142,6 +165,7 @@ jobs:
         if: steps.check.outputs.should_run == 'true'
         with:
           submodules: "recursive"
+          ref: ${{ inputs.ref || github.sha }}
 
       - uses: ./.github/actions/dd-token
         if: steps.check.outputs.should_run == 'true'
@@ -159,7 +183,7 @@ jobs:
         uses: ./.github/actions/pull-test-runner
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          commit_sha: ${{ github.sha }}
+          commit_sha: ${{ inputs.ref || github.sha }}
 
       - name: Run Integration Tests for ${{ matrix.service }}
         if: steps.check.outputs.should_run == 'true'
@@ -168,7 +192,15 @@ jobs:
           timeout_minutes: 30
           max_attempts: 3
           command: |
-            bash scripts/run-integration-test.sh int ${{ matrix.service }}
+            bash scripts/run-integration-test.sh ${{ inputs.coverage && '-c' || '' }} int ${{ matrix.service }}
+
+      - name: Upload coverage artifact
+        if: inputs.coverage && always()
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: coverage-int-${{ matrix.service }}
+          path: target/coverage/lcov.info
+          if-no-files-found: ignore
 
   e2e-tests:
     runs-on: ubuntu-24.04-8core
@@ -179,8 +211,9 @@ jobs:
       - changes
       - build-test-runner
     if: ${{ always() && !failure() && !cancelled() && needs.build-test-runner.result == 'success' &&
-      (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch') }}
+      (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call' || inputs.run_all == true) }}
     strategy:
+      fail-fast: false
       matrix:
         service: ["datadog-logs", "datadog-metrics", "opentelemetry-logs", "opentelemetry-metrics"]
     timeout-minutes: 90
@@ -196,6 +229,8 @@ jobs:
         id: check
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" || \
+                "${{ github.event_name }}" == "workflow_call" || \
+                "${{ inputs.run_all }}" == "true" || \
                 "${{ needs.changes.outputs.dependencies }}" == "true" || \
                 "${{ needs.changes.outputs.integration-yml }}" == "true" ]]; then
             echo "should_run=true" >> "$GITHUB_OUTPUT"
@@ -212,6 +247,7 @@ jobs:
         if: steps.check.outputs.should_run == 'true'
         with:
           submodules: "recursive"
+          ref: ${{ inputs.ref || github.sha }}
 
       - uses: ./.github/actions/dd-token
         if: steps.check.outputs.should_run == 'true'
@@ -229,7 +265,7 @@ jobs:
         uses: ./.github/actions/pull-test-runner
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          commit_sha: ${{ github.sha }}
+          commit_sha: ${{ inputs.ref || github.sha }}
 
       - name: Run E2E Tests for ${{ matrix.service }}
         if: steps.check.outputs.should_run == 'true'
@@ -238,7 +274,15 @@ jobs:
           timeout_minutes: 30
           max_attempts: 3
           command: |
-            bash scripts/run-integration-test.sh e2e ${{ matrix.service }}
+            bash scripts/run-integration-test.sh ${{ inputs.coverage && '-c' || '' }} e2e ${{ matrix.service }}
+
+      - name: Upload coverage artifact
+        if: inputs.coverage && always()
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: coverage-e2e-${{ matrix.service }}
+          path: target/coverage/lcov.info
+          if-no-files-found: ignore
 
   integration-test-suite:
     name: Integration Test Suite

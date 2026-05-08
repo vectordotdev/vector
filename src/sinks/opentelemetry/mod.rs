@@ -56,6 +56,7 @@ impl Default for Protocol {
             request: Default::default(),
             tls: Default::default(),
             acknowledgements: Default::default(),
+            retry_strategy: Default::default(),
         })
     }
 }

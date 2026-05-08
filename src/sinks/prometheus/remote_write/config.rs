@@ -17,7 +17,7 @@ use crate::{
         prometheus::PrometheusRemoteWriteAuth,
         util::{
             auth::Auth,
-            http::{OrderedHeaderName, http_response_retry_logic},
+            http::{OrderedHeaderName, RetryStrategy, http_response_retry_logic},
             service::TowerRequestConfig,
         },
     },
@@ -129,6 +129,10 @@ pub struct RemoteWriteConfig {
     #[serde(default = "default_compression")]
     #[derivative(Default(value = "default_compression()"))]
     pub compression: Compression,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    pub retry_strategy: RetryStrategy,
 }
 
 const fn default_compression() -> Compression {
@@ -251,7 +255,10 @@ impl SinkConfig for RemoteWriteConfig {
             headers: validated_headers,
         };
         let service = ServiceBuilder::new()
-            .settings(request_settings, http_response_retry_logic())
+            .settings(
+                request_settings,
+                http_response_retry_logic(self.retry_strategy.clone()),
+            )
             .service(service);
 
         let sink = RemoteWriteSink {
