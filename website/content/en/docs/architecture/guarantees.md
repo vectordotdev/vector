@@ -61,12 +61,13 @@ delivery?](#faq-at-least-once) FAQ below).
 In order to achieve at-least-once delivery between restarts,
 your sink must be configured to use disk-based buffers:
 
-```toml title="vector.toml"
-[sinks.my_sink_id]
-  [sinks.my_sink_id.buffer]
-    type = "disk"
-    when_full = "block"
-    max_size = 104900000 # 100MiB
+```yaml title="vector.yaml"
+sinks:
+  my_sink_id:
+    buffer:
+      type: "disk"
+      when_full: "block"
+      max_size: 104900000 # 100MiB
 ```
 
 Refer to each [sink's][sinks] documentation for further guidance on its buffer options.

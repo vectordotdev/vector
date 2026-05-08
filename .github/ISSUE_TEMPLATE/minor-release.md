@@ -37,23 +37,24 @@ cargo vdev release prepare --version "${NEW_VECTOR_VERSION}" --vrl-version "${NE
 ```
 
 Automated steps include:
-- [ ] Create a new release branch from master to freeze commits
+
+- Create a new release branch from master to freeze commits
   - `git fetch && git checkout origin/master && git checkout -b "${RELEASE_BRANCH}" && git push -u`
-- [ ] Create a new release preparation branch from `master`
+- Create a new release preparation branch from `master`
   - `git checkout -b "${PREP_BRANCH}" && git push -u`
-- [ ] Pin VRL to latest released version rather than `main`
-- [ ] Check if there is a newer version of [Alpine](https://alpinelinux.org/releases/) or [Debian](https://www.debian.org/releases/) available to update the release images in
+- Pin VRL to latest released version rather than `main`
+- Check if there is a newer version of [Alpine](https://alpinelinux.org/releases/) or [Debian](https://www.debian.org/releases/) available to update the release images in
       `distribution/docker/`. Update if so.
-- [ ] Run `cargo vdev build release-cue` to generate a new cue file for the release
-  - [ ] Copy VRL changelogs from the VRL version in the last Vector release as a new changelog entry
+- Run `cargo vdev build release-cue` to generate a new cue file for the release
+  - Copy VRL changelogs from the VRL version in the last Vector release as a new changelog entry
         ([example](https://github.com/vectordotdev/vector/blob/9c67bba358195f5018febca2f228dfcb2be794b5/website/cue/reference/releases/0.41.0.cue#L33-L64))
-- [ ] Update version number in `website/cue/reference/administration/interfaces/kubectl.cue`
-- [ ] Update version number in `distribution/install.sh`
-- [ ] Add new version to `website/cue/reference/versions.cue`
-- [ ] Create new release md file by copying an existing one in `./website/content/en/releases/` and
+- Update version number in `website/cue/reference/administration/interfaces/kubectl.cue`
+- Update version number in `distribution/install.sh`
+- Add new version to `website/cue/reference/versions.cue`
+- Create new release md file by copying an existing one in `./website/content/en/releases/` and
       updating version number
-- [ ] Commit these changes
-- [ ] Open PR against the release branch (`"${RELEASE_BRANCH}"`) for review
+- Commit these changes
+- Open PR against the release branch (`"${RELEASE_BRANCH}"`) for review
 
 ## 3. Manual Steps
 
@@ -70,7 +71,8 @@ Automated steps include:
 # On the day of release
 
 - [ ] Make sure the release branch is in sync with origin/master and has only one squashed commit with all commits from the prepare branch. If you made a PR from the prepare branch into the release branch this should already be the case.
-  - [ ] `git checkout "${RELEASE_BRANCH}"`
+  - [ ] `git fetch origin`
+  - [ ] `git checkout "${RELEASE_BRANCH}" && git pull --ff-only origin "${RELEASE_BRANCH}"`
   - [ ] `git show --stat HEAD` - This should show the squashed prepare commit.
   - [ ] Ensure release date in `website/cue/reference/releases/0.XX.Y.cue` matches current date.
     - If this needs to be updated commit and squash it in the release branch.
@@ -79,7 +81,7 @@ Automated steps include:
       - [ ] Squash the release preparation commits (but not the cherry-picked commits!) to a single
           commit. This makes it easier to cherry-pick to master after the release.
     - [ ] Merge release preparation branch into the release branch.
-        - `git switch "${RELEASE_BRANCH}" && git merge --ff-only "${PREP_BRANCH}"`
+      - `git switch "${RELEASE_BRANCH}" && git merge --ff-only "${PREP_BRANCH}"`
 
 - [ ] Tag new release
   - [ ] `git tag v"${NEW_VECTOR_VERSION}" -a -m v"${NEW_VECTOR_VERSION}"`
@@ -87,14 +89,14 @@ Automated steps include:
 - [ ] Wait for release workflow to complete.
   - Discoverable via [release.yml](https://github.com/vectordotdev/vector/actions/workflows/release.yml)
 - [ ] Reset the `website` branch to the `HEAD` of the release branch to update https://vector.dev
-  - [ ] `git switch website && git reset --hard origin/"${RELEASE_BRANCH}" && git push`
+  - [ ] `git fetch origin && git switch website && git reset --hard origin/"${RELEASE_BRANCH}" && git push --force-with-lease`
   - [ ] Confirm that the release changelog was published to https://vector.dev/releases/
     - Refer to the internal releasing doc to monitor the deployment.
 - [ ] Release Linux packages. Refer to the internal releasing doc.
 - [ ] Release updated Helm chart. See [releasing Helm chart](https://github.com/vectordotdev/helm-charts/blob/develop/RELEASING.md).
 - [ ] Release Homebrew. Refer to the internal releasing doc.
 - [ ] Create internal Docker images. Refer to the internal releasing doc.
-- [ ] Update the latest [release tag](https://github.com/vectordotdev/vector/release) description with the release announcement.
+- [ ] Update the latest [release tag](https://github.com/vectordotdev/vector/releases) description with the release announcement.
 - [ ] Create a new PR with title starting as `chore(releasing):`
   - [ ] Cherry-pick any release commits from the release branch that are not on `master`, to `master`.
   - [ ] Run `cargo vdev build manifests` and commit changes.

@@ -49,7 +49,7 @@ where
                 let age_range = start..end;
                 future::ready(age_range.contains(&req.timestamp))
             })
-            .batched_partitioned(CloudwatchPartitioner, || {
+            .batched_partitioned(CloudwatchPartitioner, batcher_settings.timeout, |_| {
                 batcher_settings.as_byte_size_config()
             })
             .map(|(key, events)| {

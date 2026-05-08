@@ -58,7 +58,7 @@ pub enum WildcardMatching {
 //
 // If this is modified, make sure those changes are reflected in the `ConfigBuilder::append`
 // function!
-#[configurable_component(global_option("global_option"))]
+#[configurable_component]
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct GlobalOptions {
     /// The directory used for persisting Vector state data.

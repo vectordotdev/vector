@@ -33,9 +33,18 @@ observability data with Vector.
 
 ## Configuring
 
-As shown above, you can pass a custom
-[Vector configuration file][docs.setup.configuration] via the `-c` flag. You'll want
-to do this since the
+You can pass a custom
+[Vector configuration file][docs.setup.configuration] to the container via the
+`-c` flag, mounting the file from the host:
+
+```bash
+docker run \
+  -v "$PWD/vector.yaml:/etc/vector/vector.yaml:ro" \
+  timberio/vector:latest-alpine \
+  -c /etc/vector/vector.yaml
+```
+
+You'll want to do this since the
 [default `/etc/vector/vector.yaml` configuration file][urls.default_configuration]
 doesn't do anything.
 
@@ -105,12 +114,12 @@ Vector maintains special tags that are automatically updated whenever Vector is
 
 | Version          | URL                                                      |
 |:-----------------|:---------------------------------------------------------|
-| Latest major     | `timberio/vector:latest-alpine`               |
-| Latest minor     | `timberio/vector:<MAJOR>.X-alpine`            |
-| Latest patch     | `timberio/vector:<MAJOR.MINOR>.X-alpine`      |
-| Specific version | `timberio/vector:<MAJOR.MINOR.PATCH>-alpine`  |
-| Latest nightly   | `timberio/vector:nightly-alpine`              |
-| Specific nightly | `timberio/vector:nightly-<YYYY-MM-DD>-alpine` |
+| Latest major     | `timberio/vector:latest-alpine`                          |
+| Latest minor     | `timberio/vector:<MAJOR>.X-alpine`                       |
+| Latest patch     | `timberio/vector:<MAJOR.MINOR>.X-alpine`                 |
+| Specific version | `timberio/vector:<MAJOR.MINOR.PATCH>-alpine`             |
+| Latest nightly   | `timberio/vector:nightly-alpine`                         |
+| Specific nightly | `timberio/vector:nightly-<YYYY-MM-DD>-alpine`            |
 
 ### Source Files
 

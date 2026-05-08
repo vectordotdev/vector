@@ -42,6 +42,9 @@ pub enum ClickHouseType {
     String,
     FixedString(u32),
 
+    // UUID type
+    Uuid,
+
     // Date/time types
     Date,
     DateTime,
@@ -93,7 +96,13 @@ impl ClickHouseType {
             }),
 
             // String types
-            Self::String | Self::FixedString(_) => Ok(DataType::Utf8),
+            // Note: UUID is mapped to Utf8 for two reasons:
+            // 1. Vector has no native UUID type — UUIDs are represented as strings in the event model
+            // 2. ClickHouse does not support UUID in Arrow format:
+            //    https://github.com/ClickHouse/ClickHouse/blob/master/src/Processors/Formats/Impl/CHColumnToArrowColumn.cpp
+            //    https://github.com/ClickHouse/ClickHouse/blob/master/src/Processors/Formats/Impl/ArrowColumnToCHColumn.cpp
+            // ClickHouse handles the String → UUID cast implicitly on insert.
+            Self::String | Self::FixedString(_) | Self::Uuid => Ok(DataType::Utf8),
 
             // Date/time types
             Self::Date => Ok(DataType::Date32),
@@ -230,6 +239,7 @@ fn ch_type(input: &str) -> IResult<&str, ClickHouseType> {
 
         // String types
         "String" => Ok((rest, ClickHouseType::String)),
+        "UUID" => Ok((rest, ClickHouseType::Uuid)),
         "FixedString" => parens(parse_u32)
             .map(ClickHouseType::FixedString)
             .parse(rest),
@@ -463,6 +473,19 @@ mod tests {
         let (data_type, is_nullable) = convert_type("Map(String, Int64)").unwrap();
         assert!(!is_nullable);
         assert!(matches!(data_type, DataType::Map(_, _)));
+    }
+
+    #[test]
+    fn test_uuid_type_mapping() {
+        assert_eq!(convert_type("UUID").unwrap(), (DataType::Utf8, false));
+        assert_eq!(
+            convert_type("Nullable(UUID)").unwrap(),
+            (DataType::Utf8, true)
+        );
+        assert_eq!(
+            convert_type("LowCardinality(Nullable(UUID))").unwrap(),
+            (DataType::Utf8, true)
+        );
     }
 
     #[test]

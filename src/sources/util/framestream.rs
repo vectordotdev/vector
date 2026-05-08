@@ -1,5 +1,5 @@
 #[cfg(unix)]
-use std::os::unix::{fs::PermissionsExt, io::AsRawFd};
+use std::os::unix::fs::PermissionsExt;
 use std::{
     convert::TryInto,
     fs,
@@ -713,12 +713,12 @@ pub fn build_framestream_unix_source(
     // system's 'net.core.rmem_max' might have to be changed if socket receive buffer is not updated properly
     if let Some(socket_receive_buffer_size) = frame_handler.socket_receive_buffer_size() {
         _ = nix::sys::socket::setsockopt(
-            listener.as_raw_fd(),
+            &listener,
             nix::sys::socket::sockopt::RcvBuf,
             &(socket_receive_buffer_size),
         );
         let rcv_buf_size =
-            nix::sys::socket::getsockopt(listener.as_raw_fd(), nix::sys::socket::sockopt::RcvBuf);
+            nix::sys::socket::getsockopt(&listener, nix::sys::socket::sockopt::RcvBuf);
         info!(
             "Unix socket receive buffer size modified to {}.",
             rcv_buf_size.unwrap()
@@ -728,12 +728,12 @@ pub fn build_framestream_unix_source(
     // system's 'net.core.wmem_max' might have to be changed if socket send buffer is not updated properly
     if let Some(socket_send_buffer_size) = frame_handler.socket_send_buffer_size() {
         _ = nix::sys::socket::setsockopt(
-            listener.as_raw_fd(),
+            &listener,
             nix::sys::socket::sockopt::SndBuf,
             &(socket_send_buffer_size),
         );
         let snd_buf_size =
-            nix::sys::socket::getsockopt(listener.as_raw_fd(), nix::sys::socket::sockopt::SndBuf);
+            nix::sys::socket::getsockopt(&listener, nix::sys::socket::sockopt::SndBuf);
         info!(
             "Unix socket buffer send size modified to {}.",
             snd_buf_size.unwrap()

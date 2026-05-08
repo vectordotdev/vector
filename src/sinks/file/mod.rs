@@ -57,6 +57,9 @@ pub struct FileSinkConfig {
         docs::examples = "/tmp/application-{{ application_id }}-%Y-%m-%d.log"
     ))]
     #[configurable(metadata(docs::examples = "/tmp/vector-%Y-%m-%d.log.zst"))]
+    #[configurable(metadata(
+        docs::warnings = "The rendered path can resolve to any location on the filesystem. Vector will write to it if the process has permission."
+    ))]
     pub path: Template,
 
     /// The amount of time that a file can be idle and stay open.

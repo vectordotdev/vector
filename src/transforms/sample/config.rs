@@ -6,7 +6,7 @@ use vector_lib::{
 };
 use vrl::value::Kind;
 
-use super::transform::{Sample, SampleMode};
+use super::transform::{DynamicSampleFields, Sample, SampleMode};
 use crate::{
     conditions::AnyCondition,
     config::{
@@ -29,10 +29,23 @@ pub enum SampleError {
     #[snafu(display("Only non-zero numbers are allowed values for `rate`"))]
     InvalidRate,
 
+    #[snafu(display("Only one value can be provided for either 'rate' or 'ratio', but not both"))]
+    InvalidStaticConfiguration,
+
     #[snafu(display(
-        "Exactly one value must be provided for either 'rate' or 'ratio', but not both"
+        "Only one value can be provided for either 'ratio_field' or 'rate_field', but not both"
     ))]
-    InvalidConfiguration,
+    InvalidDynamicConfiguration,
+
+    #[snafu(display(
+        "Exactly one value must be provided for either 'rate' or 'ratio' to configure static sampling"
+    ))]
+    MissingStaticConfiguration,
+
+    #[snafu(display(
+        "'key_field' cannot be combined with 'ratio_field' or 'rate_field' because dynamic values can vary per event and break key-based coherence"
+    ))]
+    InvalidKeyFieldDynamicCombination,
 }
 
 /// Configuration for the `sample` transform.
@@ -61,6 +74,24 @@ pub struct SampleConfig {
     #[configurable(validation(range(min = 0.0, max = 1.0)))]
     pub ratio: Option<f64>,
 
+    /// The event field whose numeric value is used as the sampling ratio on a per-event basis.
+    ///
+    /// Accepts integer, floating point, or string values that parse as a number. The value must be
+    /// in `(0, 1]` to be considered valid (for example, `0.25` keeps 25%). If the field is missing
+    /// or invalid, static sampling settings (`rate` or `ratio`) are used as a fallback.
+    /// This option cannot be used together with `rate_field`.
+    #[configurable(metadata(docs::examples = "sample_rate"))]
+    pub ratio_field: Option<String>,
+
+    /// The event field whose integer value is used as the sampling rate on a per-event basis, expressed as `1/N`.
+    ///
+    /// Accepts an integer, or a string that parses as a positive integer; floating point values
+    /// are rejected. The value must be a positive integer to be considered valid. If the field is
+    /// missing or invalid, static sampling settings (`rate` or `ratio`) are used as a fallback.
+    /// This option cannot be used together with `ratio_field`.
+    #[configurable(metadata(docs::examples = "sample_rate_n"))]
+    pub rate_field: Option<String>,
+
     /// The name of the field whose value is hashed to determine if the event should be
     /// sampled.
     ///
@@ -72,6 +103,8 @@ pub struct SampleConfig {
     ///
     /// This can be useful to, for example, ensure that all logs for a given transaction are
     /// sampled together, but that overall `1/N` transactions are sampled.
+    ///
+    /// This option cannot be combined with `ratio_field` or `rate_field`.
     #[configurable(metadata(docs::examples = "message"))]
     pub key_field: Option<String>,
 
@@ -84,6 +117,9 @@ pub struct SampleConfig {
     ///
     /// If left unspecified, or if the event doesn't have `group_by`, then the event is not
     /// sampled separately.
+    ///
+    /// This can also be used with `ratio_field` or `rate_field` to apply dynamic sampling
+    /// independently per rendered group value.
     #[configurable(metadata(
         docs::examples = "{{ service }}",
         docs::examples = "{{ hostname }}-{{ service }}"
@@ -96,6 +132,18 @@ pub struct SampleConfig {
 
 impl SampleConfig {
     fn sample_rate(&self) -> Result<SampleMode, SampleError> {
+        if self.ratio_field.is_some() && self.rate_field.is_some() {
+            return Err(SampleError::InvalidDynamicConfiguration);
+        }
+
+        if self.key_field.is_some() && (self.ratio_field.is_some() || self.rate_field.is_some()) {
+            return Err(SampleError::InvalidKeyFieldDynamicCombination);
+        }
+
+        if self.rate.is_some() && self.ratio.is_some() {
+            return Err(SampleError::InvalidStaticConfiguration);
+        }
+
         match (self.rate, self.ratio) {
             (None, Some(ratio)) => {
                 if ratio <= 0.0 {
@@ -111,7 +159,8 @@ impl SampleConfig {
                     Ok(SampleMode::new_rate(rate))
                 }
             }
-            _ => Err(SampleError::InvalidConfiguration),
+            (None, None) => Err(SampleError::MissingStaticConfiguration),
+            _ => Err(SampleError::InvalidStaticConfiguration),
         }
     }
 }
@@ -121,6 +170,8 @@ impl GenerateConfig for SampleConfig {
         toml::Value::try_from(Self {
             rate: None,
             ratio: Some(0.1),
+            ratio_field: None,
+            rate_field: None,
             key_field: None,
             group_by: None,
             exclude: None::<AnyCondition>,
@@ -134,19 +185,37 @@ impl GenerateConfig for SampleConfig {
 #[typetag::serde(name = "sample")]
 impl TransformConfig for SampleConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
-        Ok(Transform::function(Sample::new(
-            Self::NAME.to_string(),
-            self.sample_rate()?,
-            self.key_field.clone(),
-            self.group_by.clone(),
-            self.exclude
-                .as_ref()
-                .map(|condition| {
-                    condition.build(&context.enrichment_tables, &context.metrics_storage)
-                })
-                .transpose()?,
-            self.sample_rate_key.clone(),
-        )))
+        let sample_mode = self.sample_rate()?;
+        let exclude = self
+            .exclude
+            .as_ref()
+            .map(|condition| condition.build(&context.enrichment_tables, &context.metrics_storage))
+            .transpose()?;
+
+        let sample = if self.ratio_field.is_some() || self.rate_field.is_some() {
+            Sample::new_with_dynamic(
+                Self::NAME.to_string(),
+                sample_mode,
+                DynamicSampleFields {
+                    ratio_field: self.ratio_field.clone(),
+                    rate_field: self.rate_field.clone(),
+                },
+                self.group_by.clone(),
+                exclude,
+                self.sample_rate_key.clone(),
+            )
+        } else {
+            Sample::new(
+                Self::NAME.to_string(),
+                sample_mode,
+                self.key_field.clone(),
+                self.group_by.clone(),
+                exclude,
+                self.sample_rate_key.clone(),
+            )
+        };
+
+        Ok(Transform::function(sample))
     }
 
     fn input(&self) -> Input {
@@ -191,10 +260,100 @@ pub fn default_sample_rate_key() -> OptionalValuePath {
 
 #[cfg(test)]
 mod tests {
-    use crate::transforms::sample::config::SampleConfig;
+    use crate::{
+        config::TransformConfig,
+        transforms::sample::config::{SampleConfig, SampleError},
+    };
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<SampleConfig>();
+    }
+
+    #[test]
+    fn rejects_dynamic_ratio_only_configuration() {
+        let config = SampleConfig {
+            rate: None,
+            ratio: None,
+            ratio_field: Some("sample_rate".to_string()),
+            rate_field: None,
+            key_field: None,
+            sample_rate_key: super::default_sample_rate_key(),
+            group_by: None,
+            exclude: None,
+        };
+
+        let err = config.sample_rate().unwrap_err();
+        assert!(matches!(err, SampleError::MissingStaticConfiguration));
+    }
+
+    #[test]
+    fn rejects_dynamic_rate_only_configuration() {
+        let config = SampleConfig {
+            rate: None,
+            ratio: None,
+            ratio_field: None,
+            rate_field: Some("sample_rate_n".to_string()),
+            key_field: None,
+            sample_rate_key: super::default_sample_rate_key(),
+            group_by: None,
+            exclude: None,
+        };
+
+        let err = config.sample_rate().unwrap_err();
+        assert!(matches!(err, SampleError::MissingStaticConfiguration));
+    }
+
+    #[test]
+    fn validates_static_with_dynamic_configuration() {
+        let config = SampleConfig {
+            rate: Some(10),
+            ratio: None,
+            ratio_field: None,
+            rate_field: Some("sample_rate_n".to_string()),
+            key_field: None,
+            sample_rate_key: super::default_sample_rate_key(),
+            group_by: None,
+            exclude: None,
+        };
+
+        assert!(config.validate(&crate::schema::Definition::any()).is_ok());
+    }
+
+    #[test]
+    fn rejects_both_dynamic_fields_configuration() {
+        let config = SampleConfig {
+            rate: Some(10),
+            ratio: None,
+            ratio_field: Some("sample_rate".to_string()),
+            rate_field: Some("sample_rate_n".to_string()),
+            key_field: None,
+            sample_rate_key: super::default_sample_rate_key(),
+            group_by: None,
+            exclude: None,
+        };
+
+        let err = config.sample_rate().unwrap_err();
+        assert!(matches!(err, SampleError::InvalidDynamicConfiguration));
+    }
+
+    #[test]
+    fn rejects_key_field_with_dynamic_configuration() {
+        let config = SampleConfig {
+            rate: Some(10),
+            ratio: None,
+            ratio_field: Some("sample_ratio".to_string()),
+            rate_field: None,
+            key_field: Some("trace_id".to_string()),
+            sample_rate_key: super::default_sample_rate_key(),
+            group_by: None,
+            exclude: None,
+        };
+
+        let err = config.sample_rate().unwrap_err();
+        assert!(matches!(
+            err,
+            SampleError::InvalidKeyFieldDynamicCombination
+        ));
     }
 }

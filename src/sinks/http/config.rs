@@ -30,7 +30,10 @@ use crate::{
         prelude::*,
         util::{
             RealtimeSizeBasedDefaultBatchSettings, UriSerde,
-            http::{HttpService, OrderedHeaderName, RequestConfig, http_response_retry_logic},
+            http::{
+                HttpService, OrderedHeaderName, RequestConfig, RetryStrategy,
+                http_response_retry_logic,
+            },
         },
     },
 };
@@ -56,13 +59,6 @@ pub struct HttpSinkConfig {
 
     #[configurable(derived)]
     pub auth: Option<Auth>,
-
-    /// A list of custom headers to add to each request.
-    #[configurable(deprecated = "This option has been deprecated, use `request.headers` instead.")]
-    #[configurable(metadata(
-        docs::additional_props_description = "An HTTP request header and it's value."
-    ))]
-    pub headers: Option<BTreeMap<String, String>>,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -107,6 +103,10 @@ pub struct HttpSinkConfig {
         skip_serializing_if = "crate::serde::is_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    pub retry_strategy: RetryStrategy,
 }
 
 /// HTTP method.
@@ -115,9 +115,8 @@ pub struct HttpSinkConfig {
 ///
 /// [rfc9110]: https://datatracker.ietf.org/doc/html/rfc9110#section-9.1
 #[configurable_component]
-#[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
-#[derivative(Default)]
 pub enum HttpMethod {
     /// GET.
     Get,
@@ -126,7 +125,7 @@ pub enum HttpMethod {
     Head,
 
     /// POST.
-    #[derivative(Default)]
+    #[default]
     Post,
 
     /// PUT.
@@ -243,8 +242,7 @@ impl SinkConfig for HttpSinkConfig {
         let encoder = self.build_encoder()?;
         let transformer = self.encoding.transformer();
 
-        let mut request = self.request.clone();
-        request.add_old_option(self.headers.clone());
+        let request = self.request.clone();
 
         validate_headers(&request.headers, self.auth.is_some())?;
         let (static_headers, template_headers) = request.split_headers();
@@ -339,7 +337,10 @@ impl SinkConfig for HttpSinkConfig {
         let request_limits = self.request.tower.into_settings();
 
         let service = ServiceBuilder::new()
-            .settings(request_limits, http_response_retry_logic())
+            .settings(
+                request_limits,
+                http_response_retry_logic(self.retry_strategy.clone()),
+            )
             .service(service);
 
         let sink = HttpSink::new(
@@ -407,7 +408,6 @@ mod tests {
                     Transformer::default(),
                 ),
                 auth: None,
-                headers: None,
                 compression: Compression::default(),
                 batch: BatchConfig::default(),
                 request: RequestConfig::default(),
@@ -415,6 +415,7 @@ mod tests {
                 acknowledgements: AcknowledgementsConfig::default(),
                 payload_prefix: String::new(),
                 payload_suffix: String::new(),
+                retry_strategy: RetryStrategy::default(),
             };
 
             let external_resource = ExternalResource::new(

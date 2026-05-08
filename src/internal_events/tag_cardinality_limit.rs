@@ -1,12 +1,14 @@
-use metrics::counter;
-use vector_lib::NamedInternalEvent;
-use vector_lib::internal_event::{ComponentEventsDropped, INTENTIONAL, InternalEvent};
+use vector_lib::{
+    NamedInternalEvent, counter,
+    internal_event::{ComponentEventsDropped, CounterName, INTENTIONAL, InternalEvent},
+};
 
 #[derive(NamedInternalEvent)]
 pub struct TagCardinalityLimitRejectingEvent<'a> {
     pub metric_name: &'a str,
     pub tag_key: &'a str,
     pub tag_value: &'a str,
+    pub include_extended_tags: bool,
 }
 
 impl InternalEvent for TagCardinalityLimitRejectingEvent<'_> {
@@ -17,7 +19,16 @@ impl InternalEvent for TagCardinalityLimitRejectingEvent<'_> {
             tag_key = self.tag_key,
             tag_value = self.tag_value,
         );
-        counter!("tag_value_limit_exceeded_total").increment(1);
+        if self.include_extended_tags {
+            counter!(
+                CounterName::TagValueLimitExceededTotal,
+                "metric_name" => self.metric_name.to_string(),
+                "tag_key" => self.tag_key.to_string(),
+            )
+            .increment(1);
+        } else {
+            counter!(CounterName::TagValueLimitExceededTotal).increment(1);
+        }
 
         emit!(ComponentEventsDropped::<INTENTIONAL> {
             count: 1,
@@ -31,6 +42,7 @@ pub struct TagCardinalityLimitRejectingTag<'a> {
     pub metric_name: &'a str,
     pub tag_key: &'a str,
     pub tag_value: &'a str,
+    pub include_extended_tags: bool,
 }
 
 impl InternalEvent for TagCardinalityLimitRejectingTag<'_> {
@@ -41,7 +53,16 @@ impl InternalEvent for TagCardinalityLimitRejectingTag<'_> {
             tag_key = self.tag_key,
             tag_value = self.tag_value,
         );
-        counter!("tag_value_limit_exceeded_total").increment(1);
+        if self.include_extended_tags {
+            counter!(
+                CounterName::TagValueLimitExceededTotal,
+                "metric_name" => self.metric_name.to_string(),
+                "tag_key" => self.tag_key.to_string(),
+            )
+            .increment(1);
+        } else {
+            counter!(CounterName::TagValueLimitExceededTotal).increment(1);
+        }
     }
 }
 
@@ -56,6 +77,6 @@ impl InternalEvent for TagCardinalityValueLimitReached<'_> {
             message = "Value_limit reached for key. New values for this key will be rejected.",
             key = %self.key,
         );
-        counter!("value_limit_reached_total").increment(1);
+        counter!(CounterName::ValueLimitReachedTotal).increment(1);
     }
 }

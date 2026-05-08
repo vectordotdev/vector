@@ -1,7 +1,7 @@
 features:
-- datadog-agent-integration-tests
+  - datadog-agent-integration-tests
 
-test_filter: 'sources::datadog_agent::integration_tests::'
+test_filter: "sources::datadog_agent::integration_tests::"
 
 env:
   AGENT_ADDRESS: datadog-agent:8181
@@ -11,12 +11,12 @@ env:
   TEST_DATADOG_API_KEY:
 
 matrix:
-  version: ['7']
+  version: ["7"]
 
 # changes to these files/paths will invoke the integration test in CI
 # expressions are evaluated using https://github.com/micromatch/picomatch
 paths:
-- "src/common/datadog.rs"
-- "src/internal_events/datadog_*"
-- "src/sources/datadog_agent/**"
-- "tests/integration/datadog-agent/**"
+  - "src/common/datadog.rs"
+  - "src/internal_events/datadog_*"
+  - "src/sources/datadog_agent/**"
+  - "tests/integration/datadog-agent/**"

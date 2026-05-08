@@ -35,12 +35,11 @@ enum BuildError {
 
 /// Data type to use for reading messages from Redis.
 #[configurable_component]
-#[derive(Copy, Clone, Debug, Derivative)]
-#[derivative(Default)]
+#[derive(Copy, Clone, Debug, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum DataTypeConfig {
     /// The `list` data type.
-    #[derivative(Default)]
+    #[default]
     List,
 
     /// The `channel` data type.
@@ -51,7 +50,7 @@ pub enum DataTypeConfig {
 
 /// Options for the Redis `list` data type.
 #[configurable_component]
-#[derive(Copy, Clone, Debug, Default, Derivative, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "lowercase")]
 pub struct ListOption {
     #[configurable(derived)]
@@ -60,12 +59,11 @@ pub struct ListOption {
 
 /// Method for getting events from the `list` data type.
 #[configurable_component]
-#[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
-#[derivative(Default)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum Method {
     /// Pop messages from the head of the list.
-    #[derivative(Default)]
+    #[default]
     Lpop,
 
     /// Pop messages from the tail of the list.

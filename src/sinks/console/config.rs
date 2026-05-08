@@ -18,14 +18,13 @@ use crate::{
 ///
 /// [standard_streams]: https://en.wikipedia.org/wiki/Standard_streams
 #[configurable_component]
-#[derive(Clone, Debug, Derivative)]
-#[derivative(Default)]
+#[derive(Clone, Debug, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum Target {
     /// Write output to [STDOUT][stdout].
     ///
     /// [stdout]: https://en.wikipedia.org/wiki/Standard_streams#Standard_output_(stdout)
-    #[derivative(Default)]
+    #[default]
     Stdout,
 
     /// Write output to [STDERR][stderr].

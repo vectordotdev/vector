@@ -20,13 +20,17 @@ use tokio::{
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
 #[cfg(feature = "api")]
-use crate::{api, internal_events::ApiStarted};
+use crate::api;
+#[cfg(feature = "api")]
+use crate::internal_events::ApiStarted;
 use crate::{
     cli::{LogFormat, Opts, RootOpts, WatchConfigMethod, handle_config_errors},
     config::{self, ComponentConfig, ComponentType, Config, ConfigPath},
     extra_context::ExtraContext,
     heartbeat,
-    internal_events::{VectorConfigLoadError, VectorQuit, VectorStarted, VectorStopped},
+    internal_events::{
+        VectorConfigLoadError, VectorQuit, VectorStarted, VectorStopped, VectorStopping,
+    },
     signal::{SignalHandler, SignalPair, SignalRx, SignalTo},
     topology::{
         ReloadOutcome, RunningTopology, SharedTopologyController, ShutdownErrorReceiver,
@@ -129,28 +133,31 @@ impl ApplicationConfig {
         Ok(())
     }
 
-    /// Configure the API server, if applicable
+    /// Configure the gRPC API server, if applicable
     #[cfg(feature = "api")]
-    pub fn setup_api(&self, handle: &Handle) -> Option<api::Server> {
+    pub fn setup_api(&self, handle: &Handle) -> Option<api::GrpcServer> {
         if self.api.enabled {
-            match api::Server::start(
+            // Start gRPC server
+            let api_server = handle.block_on(api::GrpcServer::start(
                 self.topology.config(),
                 self.topology.watch(),
-                std::sync::Arc::clone(&self.topology.running),
-                handle,
-            ) {
-                Ok(api_server) => {
+            ));
+            match api_server {
+                Ok(server) => {
                     emit!(ApiStarted {
-                        addr: self.api.address.unwrap(),
-                        playground: self.api.playground,
-                        graphql: self.api.graphql
+                        addr: server.addr()
                     });
-
-                    Some(api_server)
+                    Some(server)
                 }
                 Err(error) => {
                     let error = error.to_string();
-                    error!(message = "An error occurred that Vector couldn't handle.", %error, internal_log_rate_limit = false);
+                    error!(
+                        message = "An error occurred that Vector couldn't handle.",
+                        %error,
+                        internal_log_rate_limit = false
+                    );
+                    // Trigger shutdown because the API was explicitly enabled but failed to start
+                    // This ensures users don't run Vector thinking top/tap will work when they won't
                     _ = self
                         .topology
                         .abort_tx
@@ -256,9 +263,12 @@ impl Application {
             signals,
         } = self;
 
+        #[cfg(feature = "api")]
+        let api_server = config.setup_api(handle);
+
         let topology_controller = SharedTopologyController::new(TopologyController {
             #[cfg(feature = "api")]
-            api_server: config.setup_api(handle),
+            api_server,
             topology: config.topology,
             config_paths: config.config_paths.clone(),
             require_healthy: root_opts.require_healthy,
@@ -482,16 +492,19 @@ impl FinishedApplication {
     }
 
     async fn stop(topology_controller: TopologyController, mut signal_rx: SignalRx) -> ExitStatus {
-        emit!(VectorStopped);
+        emit!(VectorStopping);
         tokio::select! {
-            _ = topology_controller.stop() => ExitStatus::from_raw({
-                #[cfg(windows)]
-                {
-                    exitcode::OK as u32
-                }
-                #[cfg(unix)]
-                exitcode::OK
-            }), // Graceful shutdown finished
+            _ = topology_controller.stop() => {
+                emit!(VectorStopped);
+                ExitStatus::from_raw({
+                    #[cfg(windows)]
+                    {
+                        exitcode::OK as u32
+                    }
+                    #[cfg(unix)]
+                    exitcode::OK
+                })
+            }, // Graceful shutdown finished
             _ = signal_rx.recv() => Self::quit(),
         }
     }

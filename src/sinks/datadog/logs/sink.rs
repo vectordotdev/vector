@@ -386,7 +386,7 @@ where
             conforms_as_agent: self.conforms_as_agent,
         });
 
-        let input = input.batched_partitioned(partitioner, || {
+        let input = input.batched_partitioned(partitioner, batch_settings.timeout, |_| {
             batch_settings.as_item_size_config(HttpJsonBatchSizer)
         });
         input

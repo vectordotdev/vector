@@ -44,6 +44,7 @@ pub struct DatadogMetricsRequest {
     pub payload: Bytes,
     pub uri: Uri,
     pub content_type: &'static str,
+    pub content_encoding: &'static str,
     pub finalizers: EventFinalizers,
     pub metadata: RequestMetadata,
 }
@@ -63,11 +64,6 @@ impl DatadogMetricsRequest {
                 HeaderValue::from_str(&key).expect("API key should be only valid ASCII characters")
             },
         );
-        // Requests to the metrics endpoints can be compressed, and there's almost no reason to
-        // _not_ compress them given tha t metric data, when encoded, is very repetitive.  Thus,
-        // here and through the sink code, we always compress requests.  Datadog also only supports
-        // zlib (DEFLATE) compression, which is why it's hard-coded here vs being set via the common
-        // `Compression` value that most sinks utilize.
         let request = Request::post(self.uri)
             .header("DD-API-KEY", api_key)
             // TODO: The Datadog Agent sends this header to indicate the version of the Go library
@@ -82,7 +78,7 @@ impl DatadogMetricsRequest {
             // this header.
             .header("DD-Agent-Payload", "4.87.0")
             .header(CONTENT_TYPE, self.content_type)
-            .header(CONTENT_ENCODING, "deflate");
+            .header(CONTENT_ENCODING, self.content_encoding);
 
         request.body(Body::from(self.payload))
     }

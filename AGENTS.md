@@ -21,7 +21,7 @@ reduction and improved data quality for observability infrastructure.
   - `sinks/` - Data output destinations
   - `config/` - Configuration system and validation
   - `topology/` - Component graph management
-  - `api/` - GraphQL API for management and monitoring
+  - `api/` - gRPC API for management and monitoring
   - `cli.rs` - Command-line interface
 
 - `/lib/` - Modular library crates
@@ -44,6 +44,21 @@ reduction and improved data quality for observability infrastructure.
 - `/scripts/` - Build, test, and deployment automation
 - `/docs/` - Developer documentation
 - `/tests/` - Integration and E2E tests
+
+## Development Workflow
+
+### Iterative Development Process
+
+When working on Vector's Rust codebase, follow this iterative development cycle:
+
+1. Make code changes
+2. Run `make check-clippy` to check for linting issues
+3. Fix any issues found (use `make clippy-fix` for auto-fixes)
+4. Continue to next task or mark current task complete
+
+Run this cycle after any code modification.
+
+When editing markdown files (*.md), run `make check-markdown` after changes.
 
 ## Two Different Workflows
 
@@ -99,7 +114,8 @@ See [Integration Tests](#integration-tests) section below for more details.
 make fmt                      # Format code
 make check-fmt                # Verify formatting
 make check-clippy             # Run Clippy linter
-make check-component-docs     # Check component documentation
+make check-markdown           # Check markdown files
+make check-generated-docs     # Check generated documentation
 ./scripts/check_changelog_fragments.sh  # Verify changelog
 ```
 
@@ -131,101 +147,9 @@ make cue-build
 
 **Note:** Website changes use Hugo, CUE, Tailwind CSS, and TypeScript. See [website/README.md](website/README.md) for details.
 
-## Rust Coding Conventions
+## Configuration Format
 
-### Import Statements (`use`)
-
-All `use` statements must be at the **top of the file/module** or at the top of `mod tests`.
-This is for consistency.
-
-**Correct:**
-
-```rust
-use std::time::Duration;
-use governor::clock;
-use crate::config::TransformConfig;
-
-fn my_function() {
-    // function code
-}
-```
-
-**Incorrect:**
-
-```rust
-fn my_function() {
-    use std::time::Duration;  // WRONG; Do not insert `use` inside functions
-    // function code
-}
-```
-
-**Organization:**
-
-- Group imports: `std` → external crates → internal (`crate::`)
-- Use `rustfmt` to automatically organize them: `make fmt`
-
-### Logging Style
-
-Always use the [Tracing crate](https://tracing.rs/tracing/)'s key/value style:
-
-**Correct:**
-
-```rust
-warn!(message = "Failed to merge value.", %error);
-info!(message = "Processing batch.", batch_size, internal_log_rate_secs = 1);
-```
-
-**Incorrect:**
-
-```rust
-warn!("Failed to merge value: {}.", err);  // Don't do this
-```
-
-**Rules:**
-
-- Events should be capitalized and end with a period
-- Use `error` (not `e` or `err`) for error values
-- Prefer Display over Debug: `%error` not `?error`
-- Key/value pairs provide structured logging
-
-### String Formatting
-
-Prefer inline variable syntax in format strings (Rust 1.58+).
-
-**Correct:**
-
-```rust
-format!("Error: {err}");
-println!("Processing {count} items");
-```
-
-**Incorrect:**
-
-```rust
-format!("Error: {}", err);      // Unnecessary positional argument
-println!("Processing {} items", count);
-```
-
-**Why:** Inline syntax is more readable and reduces mistakes with argument ordering.
-
-### Panics
-
-Code in Vector should **NOT** panic under normal circumstances.
-
-- Panics are only acceptable when assumptions about internal state are violated (indicating a bug)
-- All potential panics **MUST** be documented in function documentation
-- Prefer `Result<T, E>` and proper error handling
-
-### Feature Flags
-
-New components (sources, sinks, transforms) must be behind feature flags:
-
-```bash
-# Build only specific component for faster iteration
-cargo test --lib --no-default-features --features sinks-console sinks::console
-```
-
-See `features` section in `Cargo.toml` for examples.
+Always generate Vector configuration examples in **YAML** unless the user explicitly asks for TOML or JSON. YAML is Vector's recommended and default configuration format.
 
 ## Common Patterns
 
@@ -258,21 +182,25 @@ echo "Running pre-push checks..."
 make check-licenses
 make check-fmt
 make check-clippy
-make check-component-docs
+make check-markdown
+make check-generated-docs
 
 ./scripts/check_changelog_fragments.sh
 ```
 
 Then: `chmod +x .git/hooks/pre-push`
 
-### Container Development
+## Detailed Documentation
 
-Vector supports development in Docker/Podman containers:
-
-```bash
-ENVIRONMENT=true make <target>
-# Example: ENVIRONMENT=true make test
-```
+| Topic | Document |
+| ----- | -------- |
+| Rust style patterns | [docs/RUST_STYLE.md](docs/RUST_STYLE.md) |
+| Code style rules (formatting, const strings, organization) | [STYLE.md](STYLE.md) |
+| System architecture (sources, transforms, sinks, topology) | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
+| Component specification (naming, configuration, health checks) | [docs/specs/component.md](docs/specs/component.md) |
+| Instrumentation requirements (event/metric naming) | [docs/specs/instrumentation.md](docs/specs/instrumentation.md) |
+| How to document code changes | [docs/DOCUMENTING.md](docs/DOCUMENTING.md) |
+| Adding changelog entries | [changelog.d/README.md](changelog.d/README.md) |
 
 ## Architecture Notes
 
@@ -282,7 +210,7 @@ ENVIRONMENT=true make <target>
 - **Transforms**: Modify, filter, or enrich event data
 - **Sinks**: Send data to external systems
 
-Component docs are auto-generated from code annotations. Run `make check-component-docs` after changes.
+Component docs are auto-generated from code annotations. Run `make check-generated-docs` after changes.
 
 ### Integration Tests
 
@@ -319,12 +247,12 @@ Run `make fmt` before committing. Formatting must be exact.
 
 Run `make clippy-fix` to auto-fix many issues. Manual fixes may be required.
 
-### Component Docs Out of Sync
+### Generated Docs Out of Sync
 
-Component documentation is generated from code. Run:
+Documentation is generated from code. Run:
 
 ```bash
-make check-component-docs
+make check-generated-docs
 ```
 
 ### License Check Fails
@@ -336,28 +264,19 @@ cargo install dd-rust-license-tool --locked
 make build-licenses
 ```
 
-## Reference Documentation
+## Creating Pull Requests
 
-These documents provide context that AI agents and developers need when working on Vector code.
+Before opening a PR, read [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md) and use it as the reference for the PR body structure and title.
 
-### Essential for Code Changes
+### PR Title Format
 
-- **[STYLE.md](STYLE.md)** - Code style rules (formatting, const strings, code organization)
-- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** - System architecture (sources, transforms, sinks, topology)
-- **[docs/DEVELOPING.md](docs/DEVELOPING.md)** - Development workflow and testing
+PR titles must follow the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) spec and are validated by `.github/workflows/semantic.yml`.
 
-### Component Development
+Examples:
 
-- **[docs/specs/component.md](docs/specs/component.md)** - Component specification (naming, configuration, health checks)
-- **[docs/specs/instrumentation.md](docs/specs/instrumentation.md)** - Instrumentation requirements (event/metric naming)
-- **[src/internal_events](src/internal_events)** - Internal event examples for telemetry
-
-### Adding Documentation
-
-- **[docs/DOCUMENTING.md](docs/DOCUMENTING.md)** - How to document code changes
-- **[changelog.d/README.md](changelog.d/README.md)** - Adding changelog entries
-
-### Full Guides
-
-- **[CONTRIBUTING.md](CONTRIBUTING.md)** - Complete contributing guide
-- **[website/README.md](website/README.md)** - Website development only (separate from Rust code)
+```text
+feat(kafka source): add consumer group lag metric
+fix(loki sink): handle empty label sets correctly
+docs(internal docs): update contributing guide
+chore(deps): bump tokio to X
+```
