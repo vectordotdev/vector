@@ -17,8 +17,9 @@ mod tests;
 
 pub use config::{
     BloomFilterConfig, Config, Inner, LimitExceededAction, Mode, OverrideInner, OverrideMode,
-    PerMetricConfig, PerTagConfig, PerTagInner, TrackingScope,
+    PerMetricConfig, PerTagConfig, PerTagMode, TrackingScope,
 };
+
 use tag_value_set::AcceptedTagValueSet;
 
 use crate::event::metric::TagValueSet;
@@ -83,15 +84,14 @@ impl TagCardinalityLimit {
 
     /// Resolve the configuration that applies to a specific (metric, tag) pair.
     ///
-    /// Lookup chain (per field):
-    /// - `value_limit`: per-tag override → per-metric → global.
-    /// - `mode`, `cache_size_per_key`, `limit_exceeded_action`, `internal_metrics`:
-    ///   per-metric → global. These fields cannot be overridden per-tag.
+    /// Per-tag entries support two modes:
+    /// - `mode: limit_override` — uses the per-tag `value_limit`; all other settings
+    ///   (`mode`, `cache_size_per_key`, `limit_exceeded_action`, `internal_metrics`)
+    ///   are inherited from the per-metric config.
+    /// - `mode: excluded` — opts the tag out entirely; all values pass through.
     ///
-    /// Per-tag exclusion: if the per-tag entry has `excluded: true`, the tag is opted out
-    /// regardless of the enclosing per-metric settings.
-    /// Per-metric exclusion is blanket: if the per-metric entry has `mode: excluded`,
-    /// every tag on the metric is excluded and `per_tag_limits` is ignored.
+    /// Per-metric exclusion is blanket: `mode: excluded` on a per-metric entry opts out
+    /// every tag on that metric and `per_tag_limits` is ignored.
     fn get_config_for_metric_tag(
         &self,
         metric_key: Option<&MetricId>,
@@ -115,20 +115,22 @@ impl TagCardinalityLimit {
         let metric_value_limit = per_metric.config.value_limit;
         let internal_metrics = per_metric.config.internal_metrics;
 
-        // Per-tag entry may exclude the tag or override `value_limit`.
-        // All other fields (mode, cache_size_per_key, etc.) are always inherited
-        // from the per-metric configuration.
+        // Per-tag entry: LimitOverride uses an explicit value_limit; Excluded opts
+        // the tag out. All other settings are always inherited from per-metric.
         if let Some(per_tag) = per_metric.per_tag_limits.get(tag_key) {
-            if per_tag.config.excluded {
-                return TagSettings::Excluded;
+            match per_tag.mode {
+                PerTagMode::Excluded => return TagSettings::Excluded,
+                PerTagMode::LimitOverride { value_limit } => {
+                    // Tracking algorithm and all other settings are always inherited
+                    // from the per-metric config.
+                    return TagSettings::Tracked(Inner {
+                        value_limit,
+                        limit_exceeded_action,
+                        mode: metric_mode,
+                        internal_metrics,
+                    });
+                }
             }
-            // Mode and cache_size_per_key are always inherited from the per-metric config.
-            return TagSettings::Tracked(Inner {
-                value_limit: per_tag.config.value_limit.unwrap_or(metric_value_limit),
-                limit_exceeded_action,
-                mode: metric_mode,
-                internal_metrics,
-            });
         }
         TagSettings::Tracked(Inner {
             value_limit: metric_value_limit,
@@ -156,7 +158,8 @@ impl TagCardinalityLimit {
     ///
     /// Returns:
     /// - `Tracked` if the value is already tracked, fits under the configured
-    ///   `value_limit` and is now recorded, or the tag is excluded (pass-through).
+    ///   `value_limit` and is now recorded, or the per-tag entry is `mode: excluded`
+    ///   (pass-through).
     /// - `Dropped` if the value would exceed `value_limit`; the caller should drop
     ///   the tag.
     /// - `Untracked` if a new (metric, tag-key) pair would have to be allocated but

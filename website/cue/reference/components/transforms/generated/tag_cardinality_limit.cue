@@ -128,12 +128,10 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 					type: string: enum: {
 						exact: "Tracks cardinality exactly. See `Mode::Exact` for details."
 						excluded: """
-																			Skip cardinality tracking for this scope. All tag values pass through and nothing is
-																			recorded. Other tracking fields on the entry (`value_limit`, `limit_exceeded_action`,
-																			`internal_metrics`) are ignored when this is selected.
-
-																			Only valid in `per_metric_limits` and `per_tag_limits` entries; using it as the global
-																			`mode` is a configuration error.
+																			Skip cardinality tracking for this metric. All tag values pass through and nothing is
+																			limited. Other tracking fields on the entry (`value_limit`, `limit_exceeded_action`,
+																			`internal_metrics`) are ignored when this is selected. Any `per_tag_limits` entries
+																			on this metric are also ignored.
 																			"""
 						probabilistic: "Tracks cardinality probabilistically. See `Mode::Probabilistic` for details."
 					}
@@ -145,11 +143,12 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 				}
 				per_tag_limits: {
 					description: """
-						Per-tag-key overrides scoped to this metric.
+						Per-tag-key overrides scoped to this metric. Each entry sets a `mode`:
+						- `mode: limit_override` + `value_limit: N` — track with a per-tag cap.
+						- `mode: excluded` — opt this tag out of tracking entirely.
 
-						Each entry may override `value_limit` and `mode` for a specific tag key.
-						`limit_exceeded_action` and `internal_metrics` are always inherited from the enclosing
-						per-metric (or global) configuration and cannot be set per-tag.
+						All other settings (tracking algorithm, `limit_exceeded_action`, etc.)
+						are inherited from the enclosing per-metric configuration.
 						Tags not listed here use the per-metric configuration.
 						"""
 					required: false
@@ -157,22 +156,24 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 						description: "An individual tag configuration."
 						required:    true
 						type: object: options: {
-							excluded: {
-								description: """
-																								When `true`, opts this tag out of cardinality tracking entirely. All values
-																								for this tag pass through without being recorded or checked against
-																								`value_limit`. Defaults to `false`.
-																								"""
-								required: false
-								type: bool: default: false
+							mode: {
+								description: "Controls how this tag key is handled."
+								required:    true
+								type: string: enum: {
+									excluded: """
+																											Opt this tag out of cardinality tracking entirely. All values pass through
+																											without being recorded or checked against any `value_limit`.
+																											"""
+									limit_override: """
+																											Track this tag with a per-tag value limit. The enclosing per-metric tracking
+																											algorithm and all other settings still apply.
+																											"""
+								}
 							}
 							value_limit: {
-								description: """
-																								How many distinct values to accept for this tag key. If unset, inherits
-																								the `value_limit` from the enclosing per-metric (or global) configuration.
-																								Ignored when `excluded: true`.
-																								"""
-								required: false
+								description:   "Maximum number of distinct values to accept for this tag key."
+								relevant_when: "mode = \"limit_override\""
+								required:      true
 								type: uint: {}
 							}
 						}

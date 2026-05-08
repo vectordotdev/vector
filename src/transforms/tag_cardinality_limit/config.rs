@@ -128,12 +128,12 @@ pub struct PerMetricConfig {
     #[serde(default)]
     pub namespace: Option<String>,
 
-    /// Per-tag-key overrides scoped to this metric.
+    /// Per-tag-key overrides scoped to this metric. Each entry sets a `mode`:
+    /// - `mode: limit_override` + `value_limit: N` — track with a per-tag cap.
+    /// - `mode: excluded` — opt this tag out of tracking entirely.
     ///
-    /// Each entry may override `value_limit` for a specific tag key or opt it out of
-    /// tracking entirely with `excluded: true`. The tracking mode, `cache_size_per_key`,
-    /// `limit_exceeded_action`, and `internal_metrics` are always inherited from the
-    /// enclosing per-metric configuration and cannot be set per-tag.
+    ///  All other settings (tracking algorithm, `limit_exceeded_action`, etc.)
+    /// are inherited from the enclosing per-metric configuration.
     /// Tags not listed here use the per-metric configuration.
     #[configurable(
         derived,
@@ -184,12 +184,9 @@ pub enum OverrideMode {
     Probabilistic(BloomFilterConfig),
 
     /// Skip cardinality tracking for this metric. All tag values pass through and nothing is
-    /// recorded. Other tracking fields on the entry (`value_limit`, `limit_exceeded_action`,
+    /// limited. Other tracking fields on the entry (`value_limit`, `limit_exceeded_action`,
     /// `internal_metrics`) are ignored when this is selected. Any `per_tag_limits` entries
     /// on this metric are also ignored.
-    ///
-    /// Only valid in `per_metric_limits` entries; using it as the global `mode` is a
-    /// configuration error.
     Excluded,
 }
 
@@ -208,33 +205,46 @@ impl OverrideMode {
 // Per-tag configuration block
 // =============================================================================
 
-/// Tag cardinality limit configuration for a specific tag key, scoped under a per-metric override.
+/// Per-tag cardinality configuration.
+///
+/// Specify `mode` to control how this tag is handled:
+///
+/// Example:
+/// ```yaml
+/// per_tag_limits:
+///   environment:
+///     mode: limit_override  # track with a per-tag cap
+///     value_limit: 3
+///   trace_id:
+///     mode: excluded        # opt out of tracking entirely
+/// ```
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct PerTagConfig {
+    #[configurable(derived)]
     #[serde(flatten)]
-    pub config: PerTagInner,
+    pub mode: PerTagMode,
 }
 
-/// Configuration block used at the per-tag level.
+/// Mode applied to a specific tag key within a per-metric override.
 ///
-/// The tracking mode (`exact` or `probabilistic`) and `cache_size_per_key` are always
-/// inherited from the enclosing per-metric configuration and cannot be overridden per-tag.
-/// A tag can be opted out of cardinality tracking entirely with `excluded: true`.
+/// The tracking algorithm (`exact`/`probabilistic`), `cache_size_per_key`,
+/// `limit_exceeded_action`, and `internal_metrics` are always inherited from the
+/// enclosing per-metric configuration regardless of the per-tag mode.
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct PerTagInner {
-    /// How many distinct values to accept for this tag key. If unset, inherits
-    /// the `value_limit` from the enclosing per-metric (or global) configuration.
-    /// Ignored when `excluded: true`.
-    #[serde(default)]
-    pub value_limit: Option<usize>,
-
-    /// When `true`, opts this tag out of cardinality tracking entirely. All values
-    /// for this tag pass through without being recorded or checked against
-    /// `value_limit`. Defaults to `false`.
-    #[serde(default)]
-    pub excluded: bool,
+#[serde(tag = "mode", rename_all = "snake_case", deny_unknown_fields)]
+#[configurable(metadata(docs::enum_tag_description = "Controls how this tag key is handled."))]
+pub enum PerTagMode {
+    /// Track this tag with a per-tag value limit. The enclosing per-metric tracking
+    /// algorithm and all other settings still apply.
+    LimitOverride {
+        /// Maximum number of distinct values to accept for this tag key.
+        value_limit: usize,
+    },
+    /// Opt this tag out of cardinality tracking entirely. All values pass through
+    /// without being recorded or checked against any `value_limit`.
+    Excluded,
 }
 
 // =============================================================================

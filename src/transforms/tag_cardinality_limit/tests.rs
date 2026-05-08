@@ -765,10 +765,7 @@ fn max_tracked_keys_caps_across_per_metric_buckets() {
 
 fn make_per_tag(value_limit: usize) -> PerTagConfig {
     PerTagConfig {
-        config: PerTagInner {
-            value_limit: Some(value_limit),
-            excluded: false,
-        },
+        mode: PerTagMode::LimitOverride { value_limit },
     }
 }
 
@@ -804,10 +801,7 @@ fn make_per_metric_excluded(per_tag_limits: HashMap<String, PerTagConfig>) -> Pe
 
 fn make_per_tag_excluded() -> PerTagConfig {
     PerTagConfig {
-        config: PerTagInner {
-            value_limit: None,
-            excluded: true,
-        },
+        mode: PerTagMode::Excluded,
     }
 }
 
@@ -1044,15 +1038,12 @@ fn tag_excluded_unbounded_sibling_limited() {
     }
 }
 
-/// A per-tag entry with `value_limit` unset must inherit the per-metric `value_limit`
-/// rather than silently falling back to the serde default of 500.
+/// A per-tag `LimitOverride` entry caps that tag at its explicit `value_limit`,
+/// independent of the per-metric limit.
 #[test]
-fn per_tag_value_limit_inherits_from_per_metric() {
+fn per_tag_limit_override_caps_at_explicit_value() {
     let per_tag = PerTagConfig {
-        config: PerTagInner {
-            value_limit: None, // unset → should inherit from the per-metric (3)
-            excluded: false,
-        },
+        mode: PerTagMode::LimitOverride { value_limit: 2 },
     };
     let config = make_transform_hashset_with_per_metric_limits(
         500,
@@ -1060,7 +1051,7 @@ fn per_tag_value_limit_inherits_from_per_metric() {
         HashMap::from([(
             "metricA".to_string(),
             make_per_metric(
-                3,
+                10,
                 LimitExceededAction::DropTag,
                 HashMap::from([("tag1".to_string(), per_tag)]),
             ),
@@ -1068,35 +1059,27 @@ fn per_tag_value_limit_inherits_from_per_metric() {
     );
     let mut transform = TagCardinalityLimit::new(config);
 
-    // First 3 distinct values for tag1 are accepted (inherits per-metric limit of 3).
-    for i in 0..3 {
-        let v = format!("v{i}");
+    // First 2 values pass (per-tag limit = 2).
+    for v in ["v0", "v1"] {
         let e = transform
-            .transform_one(make_metric_with_name(
-                metric_tags!("tag1" => v.clone()),
-                "metricA",
-            ))
+            .transform_one(make_metric_with_name(metric_tags!("tag1" => v), "metricA"))
             .unwrap();
-        assert_eq!(
-            v.as_str(),
-            e.as_metric().tags().unwrap().get("tag1").unwrap()
-        );
+        assert_eq!(v, e.as_metric().tags().unwrap().get("tag1").unwrap());
     }
 
-    // 4th value should be rejected — proves the per-tag entry did NOT silently widen
-    // the limit to 500.
-    let e4 = transform
+    // 3rd value dropped — proves the per-tag limit (2) applies, not the per-metric (10).
+    let e3 = transform
         .transform_one(make_metric_with_name(
-            metric_tags!("tag1" => "v3"),
+            metric_tags!("tag1" => "v2"),
             "metricA",
         ))
         .unwrap();
-    assert!(!e4.as_metric().tags().unwrap().contains_key("tag1"));
+    assert!(!e3.as_metric().tags().unwrap().contains_key("tag1"));
 }
 
-/// A per-tag entry like `{ value_limit: 10 }` must deserialize successfully.
+/// Per-tag YAML syntax: `mode: limit_override` with `value_limit`, and `mode: excluded`.
 #[test]
-fn per_tag_value_limit_only_deserializes() {
+fn per_tag_modes_deserialize() {
     let yaml = r#"
 value_limit: 5
 mode: exact
@@ -1104,20 +1087,18 @@ per_metric_limits:
   metric_a:
     mode: exact
     per_tag_limits:
-      tag_only_value_limit:
+      capped_tag:
+        mode: limit_override
         value_limit: 10
       excluded_tag:
-        excluded: true
+        mode: excluded
 "#;
     let parsed: Config = serde_yaml::from_str(yaml).expect("yaml should deserialize");
     let per_metric = parsed.per_metric_limits.get("metric_a").unwrap();
-    let only_limit = per_metric
-        .per_tag_limits
-        .get("tag_only_value_limit")
-        .unwrap();
-    assert_eq!(only_limit.config.value_limit, Some(10));
-    assert!(!only_limit.config.excluded);
+
+    let capped = per_metric.per_tag_limits.get("capped_tag").unwrap();
+    assert_eq!(capped.mode, PerTagMode::LimitOverride { value_limit: 10 });
 
     let excluded = per_metric.per_tag_limits.get("excluded_tag").unwrap();
-    assert!(excluded.config.excluded);
+    assert_eq!(excluded.mode, PerTagMode::Excluded);
 }
