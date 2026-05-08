@@ -595,13 +595,6 @@ package-%:
 
 ##@ Releasing
 
-.PHONY: release
-release: release-prepare generate release-commit ## Release a new Vector version
-
-.PHONY: release-commit
-release-commit: ## Commits release changes
-	@$(VDEV) release commit
-
 .PHONY: release-docker
 release-docker: ## Release to Docker Hub
 	@$(VDEV) release docker
@@ -617,10 +610,6 @@ release-homebrew: ## Release to vectordotdev Homebrew tap
 .PHONY: release-prepare
 release-prepare: ## Prepares the release with metadata and highlights
 	@$(VDEV) release prepare
-
-.PHONY: release-push
-release-push: ## Push new Vector version
-	@$(VDEV) release push
 
 .PHONY: release-s3
 release-s3: ## Release artifacts to S3
