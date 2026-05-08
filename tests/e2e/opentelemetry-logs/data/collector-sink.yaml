@@ -5,10 +5,10 @@ receivers:
         endpoint: "0.0.0.0:5318"
 
 processors:
-  batch: { }
+  batch: {}
 
 exporters:
-  debug: { }
+  debug: {}
   file:
     path: /output/opentelemetry-logs/collector-file-exporter.log
     rotation:
@@ -18,9 +18,9 @@ exporters:
 service:
   pipelines:
     logs:
-      receivers: [ otlp ]
-      processors: [ batch ]
-      exporters: [ debug, file ]
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug, file]
   telemetry:
     logs:
       level: "debug"

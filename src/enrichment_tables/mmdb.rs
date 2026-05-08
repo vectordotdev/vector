@@ -7,7 +7,7 @@ use std::{fs, net::IpAddr, path::PathBuf, sync::Arc, time::SystemTime};
 use maxminddb::Reader;
 use vector_lib::{
     configurable::configurable_component,
-    enrichment::{Case, Condition, IndexHandle, Table},
+    enrichment::{Case, Condition, Error, IndexHandle, Table},
 };
 use vrl::value::{ObjectMap, Value};
 
@@ -102,13 +102,13 @@ impl Table for Mmdb {
         select: Option<&[String]>,
         wildcard: Option<&Value>,
         index: Option<IndexHandle>,
-    ) -> Result<ObjectMap, String> {
+    ) -> Result<ObjectMap, Error> {
         let mut rows = self.find_table_rows(case, condition, select, wildcard, index)?;
 
         match rows.pop() {
             Some(row) if rows.is_empty() => Ok(row),
-            Some(_) => Err("More than 1 row found".to_string()),
-            None => Err("IP not found".to_string()),
+            Some(_) => Err(Error::MoreThanOneRowFound),
+            None => Err(Error::NoRowsFound),
         }
     }
 
@@ -122,21 +122,21 @@ impl Table for Mmdb {
         select: Option<&[String]>,
         _wildcard: Option<&Value>,
         _: Option<IndexHandle>,
-    ) -> Result<Vec<ObjectMap>, String> {
+    ) -> Result<Vec<ObjectMap>, Error> {
         match condition.first() {
-            Some(_) if condition.len() > 1 => Err("Only one condition is allowed".to_string()),
+            Some(_) if condition.len() > 1 => Err(Error::OnlyOneConditionAllowed),
             Some(Condition::Equals { value, .. }) => {
                 let ip = value
                     .to_string_lossy()
                     .parse::<IpAddr>()
-                    .map_err(|_| "Invalid IP address".to_string())?;
+                    .map_err(|source| Error::InvalidAddress { source })?;
                 Ok(self
                     .lookup(ip, select)
                     .map(|values| vec![values])
                     .unwrap_or_default())
             }
-            Some(_) => Err("Only equality condition is allowed".to_string()),
-            None => Err("IP condition must be specified".to_string()),
+            Some(_) => Err(Error::OnlyEqualityConditionAllowed),
+            None => Err(Error::MissingCondition { kind: "IP" }),
         }
     }
 
@@ -145,11 +145,11 @@ impl Table for Mmdb {
     ///
     /// # Errors
     /// Errors if the fields are not in the table.
-    fn add_index(&mut self, _: Case, fields: &[&str]) -> Result<IndexHandle, String> {
+    fn add_index(&mut self, _: Case, fields: &[&str]) -> Result<IndexHandle, Error> {
         match fields.len() {
-            0 => Err("IP field is required".to_string()),
+            0 => Err(Error::MissingRequiredField { field: "IP" }),
             1 => Ok(IndexHandle(0)),
-            _ => Err("Only one field is allowed".to_string()),
+            _ => Err(Error::OnlyOneFieldAllowed),
         }
     }
 

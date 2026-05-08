@@ -35,7 +35,7 @@ pub mod mmdb;
 /// condition. We don't recommend using a condition that uses only date range searches.
 ///
 ///
-#[configurable_component(global_option("enrichment_tables"))]
+#[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(tag = "type", rename_all = "snake_case")]
 #[enum_dispatch(EnrichmentTableConfig)]
@@ -65,6 +65,21 @@ pub enum EnrichmentTables {
     /// [maxmind]: https://www.maxmind.com/
     #[cfg(feature = "enrichment-tables-mmdb")]
     Mmdb(mmdb::MmdbConfig),
+}
+
+// Manual NamedComponent impl required because enum_dispatch doesn't support it yet.
+impl vector_lib::configurable::NamedComponent for EnrichmentTables {
+    fn get_component_name(&self) -> &'static str {
+        match self {
+            Self::File(config) => config.get_component_name(),
+            #[cfg(feature = "enrichment-tables-memory")]
+            Self::Memory(config) => config.get_component_name(),
+            #[cfg(feature = "enrichment-tables-geoip")]
+            Self::Geoip(config) => config.get_component_name(),
+            #[cfg(feature = "enrichment-tables-mmdb")]
+            Self::Mmdb(config) => config.get_component_name(),
+        }
+    }
 }
 
 impl GenerateConfig for EnrichmentTables {

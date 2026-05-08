@@ -1193,8 +1193,6 @@ impl ContainerLogInfo {
 
         // This handles the transition from the original timestamp logic. Originally the
         // `timestamp_key` was only populated when a timestamp was parsed from the event.
-        let now = Utc::now();
-        log.metadata_mut().set_ingest_timestamp(now);
         match log_namespace {
             LogNamespace::Vector => {
                 if let Some(timestamp) = timestamp {
@@ -1204,7 +1202,7 @@ impl ContainerLogInfo {
                     );
                 }
 
-                log.insert(metadata_path!("vector", "ingest_timestamp"), now);
+                log.insert(metadata_path!("vector", "ingest_timestamp"), Utc::now());
             }
             LogNamespace::Legacy => {
                 if let Some(timestamp) = timestamp

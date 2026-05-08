@@ -112,9 +112,7 @@ separate namespace to the event data.
 
 The actual value to be placed into the field.
 
-The ingest timestamp should be recorded once per batch (e.g. `let now =
-chrono::Utc::now();`) and passed into `insert_standard_vector_source_metadata`,
-which takes care of updating the event metadata. The source type will be
+For the ingest timestamp this will be `chrono::Utc::now()`. Source type will be
 the `NAME` property of the `Config` struct. `NAME` is provided by the
 `configurable_component` macro. You may need to include `use vector_config::NamedComponent;`.
 

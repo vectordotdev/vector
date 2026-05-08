@@ -75,7 +75,7 @@ generated: components: sinks: gcp_cloud_storage: configuration: {
 				This is the default.
 				"""
 			"public-read": """
-				Bucket/object can be read publically.
+				Bucket/object can be read publicly.
 
 				The bucket/object owner is granted the `OWNER` permission, and all other users, whether
 				authenticated or anonymous, are granted the `READER` permission.
@@ -135,6 +135,15 @@ generated: components: sinks: gcp_cloud_storage: configuration: {
 		required:    true
 		type: string: examples: ["my-bucket"]
 	}
+	cache_control: {
+		description: """
+			Sets the `Cache-Control` header for the created objects.
+
+			Directly comparable to the `Cache-Control` HTTP header.
+			"""
+		required: false
+		type: string: examples: ["no-transform"]
+	}
 	compression: {
 		description: """
 			Compression configuration.
@@ -171,6 +180,17 @@ generated: components: sinks: gcp_cloud_storage: configuration: {
 					"""
 			}
 		}
+	}
+	content_encoding: {
+		description: """
+			Overrides what content encoding has been applied to the object.
+
+			Directly comparable to the `Content-Encoding` HTTP header.
+
+			If not specified, the compression scheme used dictates this value.
+			"""
+		required: false
+		type: string: examples: ["gzip", "zstd"]
 	}
 	content_type: {
 		description: """

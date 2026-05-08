@@ -5,6 +5,7 @@
       "file_path": "./public/search.json",
       "synonyms": [],
       "schema": {
+        "token_separators": ["_", "-"],
         "fields": [
           {
             "facet": false,
@@ -15,7 +16,9 @@
             "optional": true,
             "sort": false,
             "stem": false,
-            "type": "string"
+            "type": "string",
+            "stem_dictionary": "",
+            "store": true
           },
           {
             "facet": false,
@@ -26,7 +29,9 @@
             "optional": true,
             "sort": false,
             "stem": false,
-            "type": "string"
+            "type": "string",
+            "stem_dictionary": "",
+            "store": true
           },
           {
             "facet": false,
@@ -37,7 +42,9 @@
             "optional": true,
             "sort": true,
             "stem": false,
-            "type": "int64"
+            "type": "int64",
+            "stem_dictionary": "",
+            "store": true
           },
           {
             "facet": false,
@@ -48,7 +55,9 @@
             "optional": true,
             "sort": false,
             "stem": false,
-            "type": "string"
+            "type": "string",
+            "stem_dictionary": "",
+            "store": true
           },
           {
             "facet": false,
@@ -59,7 +68,9 @@
             "optional": true,
             "sort": false,
             "stem": false,
-            "type": "string"
+            "type": "string",
+            "stem_dictionary": "",
+            "store": true
           },
           {
             "facet": false,
@@ -70,7 +81,9 @@
             "optional": true,
             "sort": true,
             "stem": false,
-            "type": "int64"
+            "type": "int64",
+            "stem_dictionary": "",
+            "store": true
           },
           {
             "facet": false,
@@ -81,7 +94,9 @@
             "optional": true,
             "sort": false,
             "stem": false,
-            "type": "string"
+            "type": "string",
+            "stem_dictionary": "",
+            "store": true
           },
           {
             "facet": false,
@@ -92,7 +107,9 @@
             "optional": true,
             "sort": false,
             "stem": false,
-            "type": "string[]"
+            "type": "string[]",
+            "stem_dictionary": "",
+            "store": true
           },
           {
             "facet": false,
@@ -103,7 +120,9 @@
             "optional": true,
             "sort": false,
             "stem": false,
-            "type": "string"
+            "type": "string",
+            "stem_dictionary": "",
+            "store": true
           },
           {
             "facet": false,
@@ -114,7 +133,35 @@
             "optional": true,
             "sort": false,
             "stem": false,
-            "type": "string[]"
+            "type": "string[]",
+            "stem_dictionary": "",
+            "store": true
+          },
+          {
+            "facet": false,
+            "index": true,
+            "infix": false,
+            "locale": "",
+            "name": "componentWithType",
+            "optional": true,
+            "sort": false,
+            "stem": false,
+            "type": "string",
+            "stem_dictionary": "",
+            "store": true
+          },
+          {
+            "facet": false,
+            "index": true,
+            "infix": false,
+            "locale": "",
+            "name": "component",
+            "optional": true,
+            "sort": false,
+            "stem": false,
+            "type": "string",
+            "stem_dictionary": "",
+            "store": true
           }
         ]
       },
@@ -122,8 +169,10 @@
         {
           "name": "vector_docs_search",
           "search_parameters": {
-            "sort_by": "level:desc,ranking:desc,_text_match:desc",
-            "query_by": "content,hierarchy,title,tags"
+            "sort_by": "_text_match:desc,ranking:desc,level:desc",
+            "query_by": "componentWithType,component,pageTitle,title,hierarchy,content,tags",
+            "query_by_weights": "5,4,4,3,2,1,2",
+            "text_match_type": "sum_score"
           }
         }
       ]

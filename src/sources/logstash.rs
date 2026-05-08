@@ -211,7 +211,6 @@ impl TcpSource for LogstashSource {
         let now = chrono::Utc::now();
         for event in events {
             let log = event.as_mut_log();
-            log.metadata_mut().set_ingest_timestamp(now);
 
             self.log_namespace.insert_vector_metadata(
                 log,

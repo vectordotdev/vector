@@ -23,6 +23,8 @@ pub use vrl_target::{TargetEvents, VrlTarget};
 
 use crate::config::{LogNamespace, OutputId};
 
+#[cfg(any(test, feature = "generate-fixtures"))]
+pub(crate) mod arbitrary_impl;
 pub mod array;
 pub mod discriminant;
 mod estimated_json_encoded_size_of;
@@ -35,6 +37,7 @@ pub mod metric;
 pub mod proto;
 mod r#ref;
 mod ser;
+
 #[cfg(test)]
 mod test;
 mod trace;

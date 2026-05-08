@@ -191,13 +191,13 @@ impl<T: Bufferable> TopologyBuilder<T> {
         when_full: WhenFull,
         receiver_span: &Span,
         metadata: Option<ChannelMetricMetadata>,
-        ewma_alpha: Option<f64>,
+        ewma_half_life_seconds: Option<f64>,
     ) -> (BufferSender<T>, BufferReceiver<T>) {
         let usage_handle = BufferUsageHandle::noop();
         usage_handle.set_buffer_limits(None, Some(max_events.get()));
 
         let limit = MemoryBufferSize::MaxEvents(max_events);
-        let (sender, receiver) = limited(limit, metadata, ewma_alpha);
+        let (sender, receiver) = limited(limit, metadata, ewma_half_life_seconds);
 
         let mode = match when_full {
             WhenFull::Overflow => WhenFull::Block,

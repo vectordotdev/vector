@@ -306,6 +306,7 @@ async fn tap_handler(
                     source_keys,
                     sink_keys,
                     removals,
+                    ..
                 } = watch_rx.borrow().clone();
 
                 // Remove tap sinks from components that have gone away/can no longer match.

@@ -1,0 +1,14 @@
+{
+  "private": true,
+  "description": "Pinned npm tools for CI. Run 'npm ci' to install with exact versions from package-lock.json.",
+  "overrides": {
+    "markdownlint-cli2": {
+      "smol-toml": "1.6.1"
+    }
+  },
+  "dependencies": {
+    "@datadog/datadog-ci": "5.13.0",
+    "markdownlint-cli2": "0.22.0",
+    "prettier": "3.8.1"
+  }
+}

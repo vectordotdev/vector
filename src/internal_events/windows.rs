@@ -1,6 +1,7 @@
-use metrics::counter;
-use vector_lib::NamedInternalEvent;
-use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
+use vector_lib::{
+    NamedInternalEvent, counter,
+    internal_event::{CounterName, InternalEvent, error_stage, error_type},
+};
 
 #[derive(Debug, NamedInternalEvent)]
 pub struct WindowsServiceStart<'a> {
@@ -16,7 +17,7 @@ impl InternalEvent for WindowsServiceStart<'_> {
             "Started Windows Service.",
         );
         counter!(
-            "windows_service_start_total",
+            CounterName::WindowsServiceStartTotal,
             "already_started" => self.already_started.to_string(),
         )
         .increment(1);
@@ -37,7 +38,7 @@ impl InternalEvent for WindowsServiceStop<'_> {
             "Stopped Windows Service.",
         );
         counter!(
-            "windows_service_stop_total",
+            CounterName::WindowsServiceStopTotal,
             "already_stopped" => self.already_stopped.to_string(),
         )
         .increment(1);
@@ -55,7 +56,7 @@ impl InternalEvent for WindowsServiceRestart<'_> {
             name = ?self.name,
             "Restarted Windows Service."
         );
-        counter!("windows_service_restart_total").increment(1)
+        counter!(CounterName::WindowsServiceRestartTotal).increment(1)
     }
 }
 
@@ -70,7 +71,7 @@ impl InternalEvent for WindowsServiceInstall<'_> {
             name = ?self.name,
             "Installed Windows Service.",
         );
-        counter!("windows_service_install_total").increment(1);
+        counter!(CounterName::WindowsServiceInstallTotal).increment(1);
     }
 }
 
@@ -85,7 +86,7 @@ impl InternalEvent for WindowsServiceUninstall<'_> {
             name = ?self.name,
             "Uninstalled Windows Service.",
         );
-        counter!("windows_service_uninstall_total").increment(1);
+        counter!(CounterName::WindowsServiceUninstallTotal).increment(1);
     }
 }
 
@@ -104,7 +105,7 @@ impl InternalEvent for WindowsServiceDoesNotExistError<'_> {
             stage = error_stage::PROCESSING,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_code" => "service_missing",
             "error_type" => error_type::CONDITION_FAILED,
             "stage" => error_stage::PROCESSING,

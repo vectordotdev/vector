@@ -14,10 +14,10 @@ badges:
 painlessly. If you have questions, [hop in our chat][chat] and we'll help you upgrade.
 
 1. [Breaking: The `encoding.codec` option is now required for all relevant sinks](#first)
-1. [Breaking: Vector `check_fields` conditions now require the `type` option](#second)
-1. [Breaking: The `generator` source requires a `format` option](#third)
-1. [Deprecation: Many transforms have been deprecated in favor of the new `remap` transform](#fourth)
-1. [Deprecation: The `file` source `start_at_beginning` has been deprecated](#fifth)
+2. [Breaking: Vector `check_fields` conditions now require the `type` option](#second)
+3. [Breaking: The `generator` source requires a `format` option](#third)
+4. [Deprecation: Many transforms have been deprecated in favor of the new `remap` transform](#fourth)
+5. [Deprecation: The `file` source `start_at_beginning` has been deprecated](#fifth)
 
 ## Upgrade Guide
 
@@ -117,12 +117,12 @@ The following transforms have been deprecated in favor of the new [`remap` trans
 Deprecation notices have been placed on each of these transforms with example VRL programs that demonstrate how to
 migrate to the new `remap` transform. For example, migrating from the `json_parser` transform is as simple as:
 
-```toml
-[transforms.remap]
-type = "remap"
-source = '''
-. = merge(., parse_json!(.message))
-'''
+```yaml
+transforms:
+  remap:
+    type: "remap"
+    source: |
+      . = merge(., parse_json!(.message))
 ```
 
 **You do not need to upgrade immediately. These transforms will not be removed until Vector hits 1.0, a milestone that

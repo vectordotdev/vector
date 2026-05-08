@@ -1,7 +1,7 @@
 features:
-- dnstap-integration-tests
+  - dnstap-integration-tests
 
-test_filter: '::dnstap::'
+test_filter: "::dnstap::"
 
 runner:
   env:
@@ -11,12 +11,12 @@ runner:
     dnstap_dnstap-sockets: /run/bind/socket
 
 matrix:
-  version: ['latest']
+  version: ["latest"]
 
 # changes to these files/paths will invoke the integration test in CI
 # expressions are evaluated using https://github.com/micromatch/picomatch
 paths:
-- "src/internal_events/dnstap.rs"
-- "src/sources/dnstap/**"
-- "src/sources/util/**"
-- "tests/integration/dnstap/**"
+  - "src/internal_events/dnstap.rs"
+  - "src/sources/dnstap/**"
+  - "src/sources/util/**"
+  - "tests/integration/dnstap/**"

@@ -56,10 +56,10 @@ apt-get install --yes \
 # Cue
 TEMP=$(mktemp -d)
 curl \
-    -L https://github.com/cue-lang/cue/releases/download/v0.10.0/cue_v0.10.0_linux_amd64.tar.gz \
-    -o "${TEMP}/cue_v0.10.0_linux_amd64.tar.gz"
+    -L https://github.com/cue-lang/cue/releases/download/v0.16.1/cue_v0.16.1_linux_amd64.tar.gz \
+    -o "${TEMP}/cue_v0.16.1_linux_amd64.tar.gz"
 tar \
-    -xvf "${TEMP}/cue_v0.10.0_linux_amd64.tar.gz" \
+    -xvf "${TEMP}/cue_v0.16.1_linux_amd64.tar.gz" \
     -C "${TEMP}"
 cp "${TEMP}/cue" /usr/bin/cue
 rm -rf "$TEMP"
@@ -145,7 +145,7 @@ if [ -z "${DISABLE_MOLD:-""}" ] ; then
     # We explicitly put `mold-wrapper.so` right beside `mold` itself because it's hard-coded to look in the same directory
     # first when trying to load the shared object, so we can dodge having to care about the "right" lib folder to put it in.
     TEMP=$(mktemp -d)
-    MOLD_VERSION=1.2.1
+    MOLD_VERSION=2.40.4
     MOLD_TARGET=mold-${MOLD_VERSION}-$(uname -m)-linux
     curl -fsSL "https://github.com/rui314/mold/releases/download/v${MOLD_VERSION}/${MOLD_TARGET}.tar.gz" \
         --output "$TEMP/${MOLD_TARGET}.tar.gz"

@@ -53,13 +53,12 @@ pub struct MqttSinkConfig {
 
 /// Supported Quality of Service types for MQTT.
 #[configurable_component]
-#[derive(Clone, Copy, Debug, Derivative)]
-#[derivative(Default)]
+#[derive(Clone, Copy, Debug, Default)]
 #[serde(rename_all = "lowercase")]
 #[allow(clippy::enum_variant_names)]
 pub enum MqttQoS {
     /// AtLeastOnce.
-    #[derivative(Default)]
+    #[default]
     AtLeastOnce,
 
     /// AtMostOnce.

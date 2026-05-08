@@ -1,0 +1,203 @@
+syntax = "proto3";
+package vector.observability.v1;
+
+import "google/protobuf/timestamp.proto";
+import "event.proto";
+
+// Observability service for monitoring Vector instances.
+service ObservabilityService {
+  // ========== Simple Queries ==========
+
+  // Get metadata about the Vector instance (version, hostname)
+  rpc GetMeta(GetMetaRequest) returns (GetMetaResponse);
+
+  // Get information about configured components (sources, transforms, sinks)
+  rpc GetComponents(GetComponentsRequest) returns (GetComponentsResponse);
+
+  // Check whether allocation tracing is active on this instance
+  rpc GetAllocationTracingStatus(GetAllocationTracingStatusRequest) returns (GetAllocationTracingStatusResponse);
+
+  // ========== Real-time Metric Streams ==========
+  // All streaming RPCs send periodic updates at the specified interval
+
+  // Stream periodic heartbeat timestamps
+  rpc StreamHeartbeat(StreamHeartbeatRequest) returns (stream StreamHeartbeatResponse);
+
+  // Stream uptime in seconds
+  rpc StreamUptime(StreamUptimeRequest) returns (stream StreamUptimeResponse);
+
+  // Stream memory allocated per component
+  rpc StreamComponentAllocatedBytes(StreamComponentAllocatedBytesRequest) returns (stream StreamComponentAllocatedBytesResponse);
+
+  // Stream per-component metrics (throughput or totals) for a chosen metric.
+  // Replaces the former 9 per-metric streaming RPCs with a single unified endpoint.
+  rpc StreamComponentMetrics(StreamComponentMetricsRequest) returns (stream StreamComponentMetricsResponse);
+
+  // ========== Event Tapping ==========
+
+  // Stream events from components matching the specified patterns (replaces vector tap)
+  rpc StreamOutputEvents(StreamOutputEventsRequest) returns (stream StreamOutputEventsResponse);
+}
+
+// ========== Meta Messages ==========
+
+message GetMetaRequest {}
+
+message GetMetaResponse {
+  string version = 1;
+  string hostname = 2;
+}
+
+message GetAllocationTracingStatusRequest {}
+
+message GetAllocationTracingStatusResponse {
+  bool enabled = 1;
+}
+
+// ========== Component Messages ==========
+
+message GetComponentsRequest {
+  // Maximum number of components to return (0 = no limit)
+  int32 limit = 1;
+}
+
+message GetComponentsResponse {
+  repeated Component components = 1;
+}
+
+message Component {
+  string component_id = 1;
+  ComponentType component_type = 2;
+  string on_type = 3; // The specific component type name (e.g., "file", "http")
+  repeated Output outputs = 4;
+  ComponentMetrics metrics = 5;
+}
+
+enum ComponentType {
+  COMPONENT_TYPE_UNSPECIFIED = 0;
+  COMPONENT_TYPE_SOURCE = 1;
+  COMPONENT_TYPE_TRANSFORM = 2;
+  COMPONENT_TYPE_SINK = 3;
+}
+
+message Output {
+  string output_id = 1;
+  int64 sent_events_total = 2;
+}
+
+message ComponentMetrics {
+  optional int64 received_bytes_total = 1;
+  optional int64 received_events_total = 2;
+  optional int64 sent_bytes_total = 3;
+  optional int64 sent_events_total = 4;
+}
+
+// ========== Streaming Metrics Messages ==========
+
+message StreamComponentAllocatedBytesRequest {
+  // Update interval in milliseconds
+  int32 interval_ms = 1;
+}
+
+// Identifies which per-component metric to stream via StreamComponentMetrics.
+enum MetricName {
+  METRIC_NAME_UNSPECIFIED = 0;
+  METRIC_NAME_RECEIVED_EVENTS_THROUGHPUT = 1;
+  METRIC_NAME_SENT_EVENTS_THROUGHPUT = 2;
+  METRIC_NAME_RECEIVED_BYTES_THROUGHPUT = 3;
+  METRIC_NAME_SENT_BYTES_THROUGHPUT = 4;
+  METRIC_NAME_RECEIVED_EVENTS_TOTAL = 5;
+  METRIC_NAME_SENT_EVENTS_TOTAL = 6;
+  METRIC_NAME_RECEIVED_BYTES_TOTAL = 7;
+  METRIC_NAME_SENT_BYTES_TOTAL = 8;
+  METRIC_NAME_ERRORS_TOTAL = 9;
+}
+
+message StreamComponentMetricsRequest {
+  // Update interval in milliseconds
+  int32 interval_ms = 1;
+  MetricName metric = 2;
+}
+
+// Cumulative total value for a component metric.
+// output_totals is only populated for METRIC_NAME_SENT_EVENTS_TOTAL.
+message TotalMetric {
+  int64 value = 1;
+  map<string, int64> output_totals = 2;
+}
+
+// Throughput value (per-second rate) for a component metric.
+// output_throughputs is only populated for METRIC_NAME_SENT_EVENTS_THROUGHPUT.
+message ThroughputMetric {
+  double value = 1;
+  map<string, double> output_throughputs = 2;
+}
+
+message StreamComponentMetricsResponse {
+  string component_id = 1;
+  oneof value {
+    TotalMetric total = 2;
+    ThroughputMetric throughput = 3;
+  }
+}
+
+message StreamHeartbeatRequest {
+  // Update interval in milliseconds
+  int32 interval_ms = 1;
+}
+
+message StreamHeartbeatResponse {
+  google.protobuf.Timestamp utc = 1;
+}
+
+message StreamUptimeRequest {
+  // Update interval in milliseconds
+  int32 interval_ms = 1;
+}
+
+message StreamUptimeResponse {
+  int64 uptime_seconds = 1;
+}
+
+message StreamComponentAllocatedBytesResponse {
+  string component_id = 1;
+  int64 allocated_bytes = 2;
+}
+
+// ========== Event Tapping Messages ==========
+
+message StreamOutputEventsRequest {
+  // Glob patterns for output component IDs to match
+  repeated string outputs_patterns = 1;
+
+  // Glob patterns for input component IDs to match (optional)
+  repeated string inputs_patterns = 2;
+
+  // Maximum number of events to sample per interval. Must be >= 1.
+  // Unlike GetComponents, 0 is not valid here: limit controls both the
+  // reservoir size and the internal channel capacity, which require a
+  // positive value.
+  int32 limit = 3;
+
+  // Sampling interval in milliseconds
+  int32 interval_ms = 4;
+}
+
+message StreamOutputEventsResponse {
+  oneof event {
+    TappedEvent tapped_event = 1;
+    EventNotification notification = 2;
+  }
+}
+
+// Event captured from a component with metadata about where it came from
+message TappedEvent {
+  string component_id = 1;
+  string component_type = 2;
+  string component_kind = 3;
+  event.EventWrapper event = 4;  // The actual event data (uses canonical proto definition)
+}
+
+message EventNotification {
+  string message = 1;
+}

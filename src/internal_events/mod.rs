@@ -40,7 +40,7 @@ mod datadog_traces;
 mod dedupe;
 #[cfg(feature = "sources-demo_logs")]
 mod demo_logs;
-#[cfg(feature = "sources-dnstap")]
+#[cfg(all(unix, feature = "sources-dnstap"))]
 mod dnstap;
 #[cfg(feature = "sources-docker_logs")]
 mod docker_logs;
@@ -51,6 +51,12 @@ mod encoding_transcode;
 mod eventstoredb_metrics;
 #[cfg(feature = "sources-exec")]
 mod exec;
+#[cfg(any(
+    feature = "sources-file",
+    feature = "sources-kubernetes_logs",
+    feature = "sinks-file",
+))]
+mod file;
 #[cfg(any(feature = "sources-file_descriptor", feature = "sources-stdin"))]
 mod file_descriptor;
 #[cfg(feature = "transforms-filter")]
@@ -142,13 +148,8 @@ mod websocket;
 mod websocket_server;
 #[cfg(feature = "transforms-window")]
 mod window;
-
-#[cfg(any(
-    feature = "sources-file",
-    feature = "sources-kubernetes_logs",
-    feature = "sinks-file",
-))]
-mod file;
+#[cfg(all(windows, feature = "sources-windows_event_log"))]
+mod windows_event_log;
 
 #[cfg(windows)]
 mod windows;
@@ -193,7 +194,7 @@ pub(crate) use self::datadog_traces::*;
 pub(crate) use self::dedupe::*;
 #[cfg(feature = "sources-demo_logs")]
 pub(crate) use self::demo_logs::*;
-#[cfg(feature = "sources-dnstap")]
+#[cfg(all(unix, feature = "sources-dnstap"))]
 pub(crate) use self::dnstap::*;
 #[cfg(feature = "sources-docker_logs")]
 pub(crate) use self::docker_logs::*;
@@ -293,6 +294,8 @@ pub(crate) use self::websocket_server::*;
 pub(crate) use self::window::*;
 #[cfg(windows)]
 pub(crate) use self::windows::*;
+#[cfg(all(windows, feature = "sources-windows_event_log"))]
+pub(crate) use self::windows_event_log::*;
 pub use self::{
     adaptive_concurrency::*, batch::*, common::*, conditions::*, encoding_transcode::*,
     heartbeat::*, http::*, open::*, process::*, socket::*, tcp::*, template::*, udp::*,

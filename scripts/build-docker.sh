@@ -10,8 +10,10 @@ set -euo pipefail
 
 set -x
 
-CHANNEL="${CHANNEL:-"$(cargo vdev release channel)"}"
-VERSION="${VECTOR_VERSION:-"$(cargo vdev version)"}"
+vdev_cmd="${VDEV:-cargo vdev}"
+
+CHANNEL="${CHANNEL:-"$($vdev_cmd release channel)"}"
+VERSION="${VECTOR_VERSION:-"$($vdev_cmd version)"}"
 DATE="${DATE:-"$(date -u +%Y-%m-%d)"}"
 PLATFORM="${PLATFORM:-}"
 PUSH="${PUSH:-"true"}"
@@ -122,7 +124,13 @@ elif [[ "$CHANNEL" == "custom" ]]; then
   build distroless-static "$VERSION"
   build distroless-libc "$VERSION"
 elif [[ "$CHANNEL" == "test" ]]; then
-  build "${BASE:-"alpine"}" "${TAG:-"test"}"
-  build "${BASE:-"distroless-libc"}" "${TAG:-"test"}"
-  build "${BASE:-"distroless-static"}" "${TAG:-"test"}"
+  # If BASE is specified, build only that base
+  if [[ -n "${BASE:-}" ]]; then
+    build "$BASE" "${TAG:-"test"}"
+  else
+    # If BASE is not specified, build all three bases
+    build "alpine" "${TAG:-"test"}"
+    build "distroless-libc" "${TAG:-"test"}"
+    build "distroless-static" "${TAG:-"test"}"
+  fi
 fi

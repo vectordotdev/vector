@@ -638,13 +638,13 @@ fn get_distribution_value(log: &LogEvent) -> Result<MetricValue, TransformError>
 
 fn get_histogram_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
     let event_buckets = log
-        .get(event_path!("histogram", "buckets"))
+        .get(event_path!("aggregated_histogram", "buckets"))
         .ok_or_else(|| TransformError::PathNotFound {
-            path: "histogram.buckets".to_string(),
+            path: "aggregated_histogram.buckets".to_string(),
         })?
         .as_array()
         .ok_or_else(|| TransformError::ParseError {
-            path: "histogram.buckets".to_string(),
+            path: "aggregated_histogram.buckets".to_string(),
             kind: TransformParseErrorKind::ArrayError,
         })?;
 
@@ -653,22 +653,22 @@ fn get_histogram_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
         let upper_limit = e_bucket
             .get(path!("upper_limit"))
             .ok_or_else(|| TransformError::PathNotFound {
-                path: "histogram.buckets.upper_limit".to_string(),
+                path: "aggregated_histogram.buckets.upper_limit".to_string(),
             })?
             .as_float()
             .ok_or_else(|| TransformError::ParseError {
-                path: "histogram.buckets.upper_limit".to_string(),
+                path: "aggregated_histogram.buckets.upper_limit".to_string(),
                 kind: TransformParseErrorKind::FloatError,
             })?;
 
         let count = e_bucket
             .get(path!("count"))
             .ok_or_else(|| TransformError::PathNotFound {
-                path: "histogram.buckets.count".to_string(),
+                path: "aggregated_histogram.buckets.count".to_string(),
             })?
             .as_integer()
             .ok_or_else(|| TransformError::ParseError {
-                path: "histogram.buckets.count".to_string(),
+                path: "aggregated_histogram.buckets.count".to_string(),
                 kind: TransformParseErrorKind::IntError,
             })?;
 
@@ -679,24 +679,24 @@ fn get_histogram_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
     }
 
     let count = log
-        .get(event_path!("histogram", "count"))
+        .get(event_path!("aggregated_histogram", "count"))
         .ok_or_else(|| TransformError::PathNotFound {
-            path: "histogram.count".to_string(),
+            path: "aggregated_histogram.count".to_string(),
         })?
         .as_integer()
         .ok_or_else(|| TransformError::ParseError {
-            path: "histogram.count".to_string(),
+            path: "aggregated_histogram.count".to_string(),
             kind: TransformParseErrorKind::IntError,
         })?;
 
     let sum = log
-        .get(event_path!("histogram", "sum"))
+        .get(event_path!("aggregated_histogram", "sum"))
         .ok_or_else(|| TransformError::PathNotFound {
-            path: "histogram.sum".to_string(),
+            path: "aggregated_histogram.sum".to_string(),
         })?
         .as_float()
         .ok_or_else(|| TransformError::ParseError {
-            path: "histogram.sum".to_string(),
+            path: "aggregated_histogram.sum".to_string(),
             kind: TransformParseErrorKind::FloatError,
         })?;
 
@@ -709,13 +709,13 @@ fn get_histogram_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
 
 fn get_summary_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
     let event_quantiles = log
-        .get(event_path!("summary", "quantiles"))
+        .get(event_path!("aggregated_summary", "quantiles"))
         .ok_or_else(|| TransformError::PathNotFound {
-            path: "summary.quantiles".to_string(),
+            path: "aggregated_summary.quantiles".to_string(),
         })?
         .as_array()
         .ok_or_else(|| TransformError::ParseError {
-            path: "summary.quantiles".to_string(),
+            path: "aggregated_summary.quantiles".to_string(),
             kind: TransformParseErrorKind::ArrayError,
         })?;
 
@@ -724,22 +724,22 @@ fn get_summary_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
         let quantile = e_quantile
             .get(path!("quantile"))
             .ok_or_else(|| TransformError::PathNotFound {
-                path: "summary.quantiles.quantile".to_string(),
+                path: "aggregated_summary.quantiles.quantile".to_string(),
             })?
             .as_float()
             .ok_or_else(|| TransformError::ParseError {
-                path: "summary.quantiles.quantile".to_string(),
+                path: "aggregated_summary.quantiles.quantile".to_string(),
                 kind: TransformParseErrorKind::FloatError,
             })?;
 
         let value = e_quantile
             .get(path!("value"))
             .ok_or_else(|| TransformError::PathNotFound {
-                path: "summary.quantiles.value".to_string(),
+                path: "aggregated_summary.quantiles.value".to_string(),
             })?
             .as_float()
             .ok_or_else(|| TransformError::ParseError {
-                path: "summary.quantiles.value".to_string(),
+                path: "aggregated_summary.quantiles.value".to_string(),
                 kind: TransformParseErrorKind::FloatError,
             })?;
 
@@ -750,24 +750,24 @@ fn get_summary_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
     }
 
     let count = log
-        .get(event_path!("summary", "count"))
+        .get(event_path!("aggregated_summary", "count"))
         .ok_or_else(|| TransformError::PathNotFound {
-            path: "summary.count".to_string(),
+            path: "aggregated_summary.count".to_string(),
         })?
         .as_integer()
         .ok_or_else(|| TransformError::ParseError {
-            path: "summary.count".to_string(),
+            path: "aggregated_summary.count".to_string(),
             kind: TransformParseErrorKind::IntError,
         })?;
 
     let sum = log
-        .get(event_path!("summary", "sum"))
+        .get(event_path!("aggregated_summary", "sum"))
         .ok_or_else(|| TransformError::PathNotFound {
-            path: "summary.sum".to_string(),
+            path: "aggregated_summary.sum".to_string(),
         })?
         .as_float()
         .ok_or_else(|| TransformError::ParseError {
-            path: "summary.sum".to_string(),
+            path: "aggregated_summary.sum".to_string(),
             kind: TransformParseErrorKind::FloatError,
         })?;
 
@@ -830,8 +830,8 @@ fn to_metrics(event: &Event) -> Result<Metric, TransformError> {
             value = match key.as_str() {
                 "gauge" => Some(get_gauge_value(log)?),
                 "distribution" => Some(get_distribution_value(log)?),
-                "histogram" => Some(get_histogram_value(log)?),
-                "summary" => Some(get_summary_value(log)?),
+                "aggregated_histogram" => Some(get_histogram_value(log)?),
+                "aggregated_summary" => Some(get_summary_value(log)?),
                 "counter" => Some(get_counter_value(log)?),
                 "set" => Some(get_set_value(log)?),
                 _ => None,
@@ -959,6 +959,7 @@ mod tests {
     use std::{sync::Arc, time::Duration};
 
     use chrono::{DateTime, Timelike, Utc, offset::TimeZone};
+    use similar_asserts::assert_eq;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
     use vector_lib::{
@@ -977,6 +978,11 @@ mod tests {
         test_util::components::assert_transform_compliance,
         transforms::test::create_topology,
     };
+
+    const TEST_SOURCE_COMPONENT_ID: &str = "in";
+    const TEST_UPSTREAM_COMPONENT_ID: &str = "transform";
+    const TEST_SOURCE_TYPE: &str = "unit_test_stream";
+    const TEST_NAMESPACE: &str = "test_namespace";
 
     #[test]
     fn generate_config() {
@@ -1004,6 +1010,12 @@ mod tests {
         log.as_mut_log()
             .insert(log_schema().timestamp_key_target_path().unwrap(), ts());
         log
+    }
+
+    fn set_test_source_metadata(metadata: &mut EventMetadata) {
+        metadata.set_upstream_id(Arc::new(OutputId::from(TEST_UPSTREAM_COMPONENT_ID)));
+        metadata.set_source_id(Arc::new(ComponentKey::from(TEST_SOURCE_COMPONENT_ID)));
+        metadata.set_source_type(TEST_SOURCE_TYPE);
     }
 
     async fn do_transform(config: LogToMetricConfig, event: Event) -> Option<Event> {
@@ -1072,8 +1084,7 @@ mod tests {
                 ));
         // definitions aren't valid for metrics yet, it's just set to the default (anything).
         metadata.set_schema_definition(&Arc::new(Definition::any()));
-        metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
-        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
+        set_test_source_metadata(&mut metadata);
         let metric = do_transform(config, event).await.unwrap();
 
         assert_eq!(
@@ -1115,8 +1126,7 @@ mod tests {
                 ));
         // definitions aren't valid for metrics yet, it's just set to the default (anything).
         metadata.set_schema_definition(&Arc::new(Definition::any()));
-        metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
-        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
+        set_test_source_metadata(&mut metadata);
 
         let metric = do_transform(config, event).await.unwrap();
 
@@ -1170,8 +1180,7 @@ mod tests {
                 ));
         // definitions aren't valid for metrics yet, it's just set to the default (anything).
         metadata.set_schema_definition(&Arc::new(Definition::any()));
-        metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
-        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
+        set_test_source_metadata(&mut metadata);
 
         let metric = do_transform(config, event).await.unwrap();
 
@@ -1226,8 +1235,7 @@ mod tests {
                 ));
         // definitions aren't valid for metrics yet, it's just set to the default (anything).
         metadata.set_schema_definition(&Arc::new(Definition::any()));
-        metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
-        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
+        set_test_source_metadata(&mut metadata);
 
         let metric = do_transform(config, event).await.unwrap().into_metric();
         let tags = metric.tags().expect("Metric should have tags");
@@ -1351,8 +1359,7 @@ mod tests {
                 ));
         // definitions aren't valid for metrics yet, it's just set to the default (anything).
         metadata.set_schema_definition(&Arc::new(Definition::any()));
-        metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
-        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
+        set_test_source_metadata(&mut metadata);
 
         let metric = do_transform(config, event).await.unwrap();
 
@@ -1407,8 +1414,7 @@ mod tests {
                 ));
         // definitions aren't valid for metrics yet, it's just set to the default (anything).
         metadata.set_schema_definition(&Arc::new(Definition::any()));
-        metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
-        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
+        set_test_source_metadata(&mut metadata);
         let metric = do_transform(config, event).await.unwrap();
 
         assert_eq!(
@@ -1448,8 +1454,7 @@ mod tests {
                 ));
         // definitions aren't valid for metrics yet, it's just set to the default (anything).
         metadata.set_schema_definition(&Arc::new(Definition::any()));
-        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
-        metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
+        set_test_source_metadata(&mut metadata);
 
         let metric = do_transform(config, event).await.unwrap();
 
@@ -1490,8 +1495,7 @@ mod tests {
         // definitions aren't valid for metrics yet, it's just set to the default (anything).
         metadata.set_schema_definition(&Arc::new(Definition::any()));
 
-        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
-        metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
+        set_test_source_metadata(&mut metadata);
 
         let metric = do_transform(config, event).await.unwrap();
 
@@ -1586,8 +1590,7 @@ mod tests {
 
         // definitions aren't valid for metrics yet, it's just set to the default (anything).
         metadata.set_schema_definition(&Arc::new(Definition::any()));
-        metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
-        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
+        set_test_source_metadata(&mut metadata);
 
         let output = do_transform_multiple_events(config, event, 2).await;
 
@@ -1652,8 +1655,7 @@ mod tests {
 
         // definitions aren't valid for metrics yet, it's just set to the default (anything).
         metadata.set_schema_definition(&Arc::new(Definition::any()));
-        metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
-        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
+        set_test_source_metadata(&mut metadata);
 
         let output = do_transform_multiple_events(config, event, 2).await;
 
@@ -1706,8 +1708,7 @@ mod tests {
                 ));
         // definitions aren't valid for metrics yet, it's just set to the default (anything).
         metadata.set_schema_definition(&Arc::new(Definition::any()));
-        metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
-        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
+        set_test_source_metadata(&mut metadata);
 
         let metric = do_transform(config, event).await.unwrap();
 
@@ -1748,8 +1749,7 @@ mod tests {
 
         // definitions aren't valid for metrics yet, it's just set to the default (anything).
         metadata.set_schema_definition(&Arc::new(Definition::any()));
-        metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
-        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
+        set_test_source_metadata(&mut metadata);
 
         let metric = do_transform(config, event).await.unwrap();
 
@@ -1791,8 +1791,7 @@ mod tests {
 
         // definitions aren't valid for metrics yet, it's just set to the default (anything).
         metadata.set_schema_definition(&Arc::new(Definition::any()));
-        metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
-        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
+        set_test_source_metadata(&mut metadata);
 
         let metric = do_transform(config, event).await.unwrap();
 
@@ -1814,7 +1813,7 @@ mod tests {
     //  Metric Metadata Tests
     //
     fn create_log_event(json_str: &str) -> Event {
-        create_log_event_with_namespace(json_str, Some("test_namespace"))
+        create_log_event_with_namespace(json_str, Some(TEST_NAMESPACE))
     }
 
     fn create_log_event_with_namespace(json_str: &str, namespace: Option<&str>) -> Event {
@@ -1827,8 +1826,7 @@ mod tests {
         }
 
         let mut metadata = EventMetadata::default();
-        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
-        metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
+        set_test_source_metadata(&mut metadata);
 
         Event::Log(LogEvent::from_parts(log_value, metadata.clone()))
     }
@@ -1861,7 +1859,7 @@ mod tests {
                 MetricValue::Gauge { value: 990.0 },
                 metric.metadata().clone(),
             )
-            .with_namespace(Some("test_namespace"))
+            .with_namespace(Some(TEST_NAMESPACE))
             .with_tags(Some(metric_tags!(
                 "env" => "test_env",
                 "host" => "localhost",
@@ -1878,7 +1876,7 @@ mod tests {
         };
 
         let json_str = r#"{
-          "histogram": {
+          "aggregated_histogram": {
             "sum": 18.0,
             "count": 5,
             "buckets": [
@@ -1938,7 +1936,7 @@ mod tests {
                 },
                 metric.metadata().clone(),
             )
-            .with_namespace(Some("test_namespace"))
+            .with_namespace(Some(TEST_NAMESPACE))
             .with_tags(Some(metric_tags!(
                 "env" => "test_env",
                 "host" => "localhost",
@@ -1997,7 +1995,7 @@ mod tests {
                 },
                 metric.metadata().clone(),
             )
-            .with_namespace(Some("test_namespace"))
+            .with_namespace(Some(TEST_NAMESPACE))
             .with_tags(Some(metric_tags!(
                 "env" => "test_env",
                 "host" => "localhost",
@@ -2056,7 +2054,7 @@ mod tests {
                 },
                 metric.metadata().clone(),
             )
-            .with_namespace(Some("test_namespace"))
+            .with_namespace(Some(TEST_NAMESPACE))
             .with_tags(Some(metric_tags!(
                 "env" => "test_env",
                 "host" => "localhost",
@@ -2073,7 +2071,7 @@ mod tests {
         };
 
         let json_str = r#"{
-          "summary": {
+          "aggregated_summary": {
             "sum": 100.0,
             "count": 7,
             "quantiles": [
@@ -2117,7 +2115,7 @@ mod tests {
                 },
                 metric.metadata().clone(),
             )
-            .with_namespace(Some("test_namespace"))
+            .with_namespace(Some(TEST_NAMESPACE))
             .with_tags(Some(metric_tags!(
                 "env" => "test_env",
                 "host" => "localhost",
@@ -2154,7 +2152,7 @@ mod tests {
                 MetricValue::Counter { value: 10.0 },
                 metric.metadata().clone(),
             )
-            .with_namespace(Some("test_namespace"))
+            .with_namespace(Some(TEST_NAMESPACE))
             .with_tags(Some(metric_tags!(
                 "env" => "test_env",
                 "host" => "localhost",
@@ -2193,7 +2191,7 @@ mod tests {
                 },
                 metric.metadata().clone(),
             )
-            .with_namespace(Some("test_namespace"))
+            .with_namespace(Some(TEST_NAMESPACE))
             .with_tags(Some(metric_tags!(
                 "env" => "test_env",
                 "host" => "localhost",

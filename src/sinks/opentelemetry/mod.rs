@@ -49,7 +49,6 @@ impl Default for Protocol {
             uri: Default::default(),
             method: HttpMethod::Post,
             auth: Default::default(),
-            headers: Default::default(),
             compression: Default::default(),
             payload_prefix: Default::default(),
             payload_suffix: Default::default(),
@@ -57,6 +56,7 @@ impl Default for Protocol {
             request: Default::default(),
             tls: Default::default(),
             acknowledgements: Default::default(),
+            retry_strategy: Default::default(),
         })
     }
 }

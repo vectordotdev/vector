@@ -958,19 +958,20 @@ fn handle_single_log(
     // This handles the transition from the original timestamp logic. Originally the
     // `timestamp_key` was populated by the `last_modified` time on the object, falling
     // back to calling `now()`.
-    let now = Utc::now();
-    log.metadata_mut().set_ingest_timestamp(now);
     match log_namespace {
         LogNamespace::Vector => {
             if let Some(timestamp) = timestamp {
                 log.insert(metadata_path!(AwsS3Config::NAME, "timestamp"), timestamp);
             }
 
-            log.insert(metadata_path!("vector", "ingest_timestamp"), now);
+            log.insert(metadata_path!("vector", "ingest_timestamp"), Utc::now());
         }
         LogNamespace::Legacy => {
             if let Some(timestamp_key) = log_schema().timestamp_key() {
-                log.try_insert((PathPrefix::Event, timestamp_key), timestamp.unwrap_or(now));
+                log.try_insert(
+                    (PathPrefix::Event, timestamp_key),
+                    timestamp.unwrap_or_else(Utc::now),
+                );
             }
         }
     };

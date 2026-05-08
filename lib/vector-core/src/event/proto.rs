@@ -677,19 +677,22 @@ impl From<Metadata> for EventMetadata {
             }
         };
 
-        EventMetadata(Arc::new(Inner {
-            value: metadata_value.unwrap_or_else(|| vrl::value::Value::Object(ObjectMap::new())),
-            secrets: secrets.unwrap_or_default(),
-            finalizers: EventFinalizers::default(),
-            source_id,
-            source_type: source_type.map(Into::into),
-            upstream_id,
-            schema_definition: default_schema_definition(),
-            dropped_fields: ObjectMap::new(),
-            datadog_origin_metadata,
-            source_event_id,
-            ingest_timestamp: None,
-        }))
+        EventMetadata {
+            inner: Arc::new(Inner {
+                value: metadata_value
+                    .unwrap_or_else(|| vrl::value::Value::Object(ObjectMap::new())),
+                secrets: secrets.unwrap_or_default(),
+                finalizers: EventFinalizers::default(),
+                source_id,
+                source_type: source_type.map(Into::into),
+                upstream_id,
+                schema_definition: default_schema_definition(),
+                dropped_fields: ObjectMap::new(),
+                datadog_origin_metadata,
+                source_event_id,
+            }),
+            last_transform_timestamp: None,
+        }
     }
 }
 

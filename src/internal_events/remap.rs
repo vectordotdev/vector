@@ -1,8 +1,8 @@
-use metrics::counter;
-use vector_lib::NamedInternalEvent;
 use vector_lib::internal_event::{
-    ComponentEventsDropped, INTENTIONAL, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+    ComponentEventsDropped, CounterName, INTENTIONAL, InternalEvent, UNINTENTIONAL, error_stage,
+    error_type,
 };
+use vector_lib::{NamedInternalEvent, counter};
 
 #[derive(Debug, NamedInternalEvent)]
 pub struct RemapMappingError {
@@ -21,7 +21,7 @@ impl InternalEvent for RemapMappingError {
             stage = error_stage::PROCESSING,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_type" => error_type::CONVERSION_FAILED,
             "stage" => error_stage::PROCESSING,
         )

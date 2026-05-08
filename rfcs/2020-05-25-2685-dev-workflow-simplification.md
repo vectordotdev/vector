@@ -183,7 +183,7 @@ There are tools like `hab` (from the Habitat project) and `packer` that can be u
 ## Outstanding Questions
 
 - Windows/Mac/FreeBSD builds via `make build` et all will produce native binaries natively, we should be review those docs.
-- This RFC does not scope in integration tests beyond letting the `environment` run them. We may find motivation to explore a more **_slick_** solution in the future.
+- This RFC does not scope in integration tests beyond letting the `environment` run them. We may find motivation to explore a more _**slick**_ solution in the future.
 
 ## Rationale & Alternatives
 
@@ -207,6 +207,6 @@ Alternatives:
 2. Get preliminary consensus this is good path forward
 3. Add `DOCKER_SOCKET` passing and support integration testing
 4. Cross-OS testing
-6. Explore handling `make environment-%` commands via wildcard
-7. Acceptance testing (Test including new contributor test)
-8. Merge preliminary support
+5. Explore handling `make environment-%` commands via wildcard
+6. Acceptance testing (Test including new contributor test)
+7. Merge preliminary support

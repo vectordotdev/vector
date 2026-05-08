@@ -338,14 +338,14 @@ individual use-cases, this list shows one available solution per use-case.
    . = map_keys(., recursive: true) -> |key| { trim_start(key, "_") }
    ```
 
-11. [add prefix to all keys](https://discord.com/channels/742820443487993987/764187584452493323/883274684576182302)
+1. [add prefix to all keys](https://discord.com/channels/742820443487993987/764187584452493323/883274684576182302)
 
    ```coffee
    . = map_keys(., recursive: true) -> |key| { "my_" + key }
    ```
 
 
-12. [parse message using list of Grok patterns until one matches](https://discord.com/channels/742820443487993987/764187584452493323/870353108692271104)
+2. [parse message using list of Grok patterns until one matches](https://discord.com/channels/742820443487993987/764187584452493323/870353108692271104)
 
    ```coffee
    patterns = []
@@ -359,7 +359,7 @@ individual use-cases, this list shows one available solution per use-case.
    }
    ```
 
-13. [find match against list of regular expressions](https://discord.com/channels/742820443487993987/764187584452493323/864496206947942400)
+3. [find match against list of regular expressions](https://discord.com/channels/742820443487993987/764187584452493323/864496206947942400)
 
    ```coffee
    matched = false
@@ -377,13 +377,13 @@ individual use-cases, this list shows one available solution per use-case.
    matched = any(patterns) -> |pattern| { match(.message, pattern) }
    ```
 
-14. [remove prefix from keys](https://discord.com/channels/742820443487993987/764187584452493323/864496206947942400)
+4. [remove prefix from keys](https://discord.com/channels/742820443487993987/764187584452493323/864496206947942400)
 
    ```coffee
    . = map_keys(. ,recursive: true) -> |key| { replace(key, "my_prefix_", "") }
    ```
 
-15. [run `encode_json` on all top-level object fields](https://discord.com/channels/742820443487993987/746070591097798688/841787442271879209)
+5. [run `encode_json` on all top-level object fields](https://discord.com/channels/742820443487993987/746070591097798688/841787442271879209)
 
    ```coffee
    . = map_values(.) -> |value| {
@@ -395,7 +395,7 @@ individual use-cases, this list shows one available solution per use-case.
    }
    ```
 
-16. [map key/value pairs to object with ”key” and ”value” fields](https://discord.com/channels/742820443487993987/746070591097798688/832684085771370587)
+6. [map key/value pairs to object with ”key” and ”value” fields](https://discord.com/channels/742820443487993987/746070591097798688/832684085771370587)
 
    ```coffee
    . = { "labels": { "key1": "value1", "key2": "value2" } }
@@ -405,7 +405,8 @@ individual use-cases, this list shows one available solution per use-case.
    }
 
    .labels = new_labels
-  ```
+
+  ```text
 
   **NOTE** this is similar to [Jq’s `to_entries`
   function](https://stedolan.github.io/jq/manual/#to_entries,from_entries,with_entries),
@@ -422,7 +423,7 @@ individual use-cases, this list shows one available solution per use-case.
   . = to_entries(.)
   ```
 
-17. [run `parse_json` on multiple strings in array, and emit as multiple
+1. [run `parse_json` on multiple strings in array, and emit as multiple
     events](https://discord.com/channels/742820443487993987/746070591097798688/832257215506415657)
 
    ```coffee
@@ -432,7 +433,7 @@ individual use-cases, this list shows one available solution per use-case.
    ```
 
 
-18. [convert object to specific string format](https://discord.com/channels/742820443487993987/764187584452493323/824574475495407639)
+2. [convert object to specific string format](https://discord.com/channels/742820443487993987/764187584452493323/824574475495407639)
 
    ```coffee
    . = { "key1": "value1", "key2": "value2" }
@@ -451,7 +452,7 @@ individual use-cases, this list shows one available solution per use-case.
    "{" + join(strings, ",") + "}"
    ```
 
-19. [re-introduce previous `only_fields` functionality using iteration](https://github.com/vectordotdev/vector/issues/7347)
+3. [re-introduce previous `only_fields` functionality using iteration](https://github.com/vectordotdev/vector/issues/7347)
 
 
    ```coffee
@@ -471,7 +472,7 @@ individual use-cases, this list shows one available solution per use-case.
    . = filter(.) -> |key, _| { includes(only_fields, key) }
    ```
 
-20. [map complex dynamic object based on conditionals](https://github.com/vectordotdev/vector/discussions/12387#discussioncomment-2639876)
+4. [map complex dynamic object based on conditionals](https://github.com/vectordotdev/vector/discussions/12387#discussioncomment-2639876)
 
    ```coffee
    .input = map_values(.input) -> |input| {
@@ -507,7 +508,7 @@ individual use-cases, this list shows one available solution per use-case.
    }
    ```
 
-21. merge array of objects into single object
+5. merge array of objects into single object
 
    ```coffee
    result = {}
