@@ -70,7 +70,6 @@ jobs:
     needs: changes
     # Run this job even if `changes` job is skipped
     if: ${{ !failure() && !cancelled() && github.event_name != 'pull_request' && needs.changes.outputs.website_only != 'true' && needs.changes.outputs.k8s != 'false' }}
-    # cargo-deb requires a release build, but we don't need optimizations for tests
     env:
       DISABLE_MOLD: true
     steps:
