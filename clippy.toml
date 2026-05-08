@@ -8,6 +8,12 @@ disallowed-methods = [
   { path = "vrl::stdlib::all", reason = "Use `vector_vrl_functions::all()` instead for consistency across all Vector VRL functions." },
 ]
 
+disallowed-macros = [
+  { path = "metrics::counter", reason = "Use the `counter!` macro from `vector_common` with a `CounterName` variant instead of a raw string." },
+  { path = "metrics::histogram", reason = "Use the `histogram!` macro from `vector_common` with a `HistogramName` variant instead of a raw string." },
+  { path = "metrics::gauge", reason = "Use the `gauge!` macro from `vector_common` with a `GaugeName` variant instead of a raw string." },
+]
+
 disallowed-types = [
   { path = "once_cell::sync::OnceCell", reason = "Use `std::sync::OnceLock` instead." },
   { path = "once_cell::unsync::OnceCell", reason = "Use `std::cell::OnceCell` instead." },

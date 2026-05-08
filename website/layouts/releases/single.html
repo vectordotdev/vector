@@ -18,6 +18,15 @@
       {{ partial "hero.html" . }}
     </div>
 
+    {{ with $release.date }}
+    {{ $date := . | dateFormat "January 2, 2006" }}
+    <div class="mt-3 flex items-center space-x-3 text-gray-500 dark:text-gray-300">
+      <time datetime="{{ $date }}" class="text-sm">
+        {{ $date }}
+      </time>
+    </div>
+    {{ end }}
+
     <div>
       {{ with $release.codename }}
       <p class="inline-flex space-x-4 border dark:border-gray-700 rounded-md py-2 px-3.5">
