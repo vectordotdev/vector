@@ -71,7 +71,6 @@ jobs:
     # Run this job even if `changes` job is skipped
     if: ${{ !failure() && !cancelled() && github.event_name != 'pull_request' && needs.changes.outputs.website_only != 'true' && needs.changes.outputs.k8s != 'false' }}
     env:
-      CARGO_INCREMENTAL: 0
       DISABLE_MOLD: true
     steps:
       - name: Checkout branch
@@ -207,7 +206,6 @@ jobs:
         env:
           USE_MINIKUBE_CACHE: "true"
           SKIP_PACKAGE_DEB: "true"
-          CARGO_INCREMENTAL: 0
           HELM_CHART_REPO: ${{ github.workspace }}/helm-charts/charts/vector
         with:
           timeout_minutes: 45
