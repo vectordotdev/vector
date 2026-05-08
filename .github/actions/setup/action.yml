@@ -142,7 +142,7 @@ runs:
           echo "RUST_BACKTRACE=full" >> "$GITHUB_ENV"
           # Set nice CI colors
           echo "CARGO_TERM_COLOR=always" >> "$GITHUB_ENV"
-          # Incremental compilation is useless in CI: no state is shared between runs
+          # Incremental compilation has no benefit because in our CI we always start from a clean state.
           echo "CARGO_INCREMENTAL=0" >> "$GITHUB_ENV"
         fi
 
