@@ -1735,25 +1735,34 @@ mod integration_test {
                 // Extract message index from the event
                 let message_text = item.events.iter_logs_mut().next().unwrap()
                     [log_schema().message_key().unwrap().to_string()]
-                    .to_string_lossy();
+                .to_string_lossy();
 
                 // Parse index from "my message XXX"
-                let index: usize = message_text.split_whitespace().last().unwrap().parse().unwrap();
+                let index: usize = message_text
+                    .split_whitespace()
+                    .last()
+                    .unwrap()
+                    .parse()
+                    .unwrap();
 
                 let mut received = received_clone.lock().unwrap();
                 let attempt_count = received.iter().filter(|&&i| i == index).count();
                 received.push(index);
 
-                eprintln!("TEST: Received message {} (attempt {})", index, attempt_count + 1);
+                eprintln!(
+                    "TEST: Received message {} (attempt {})",
+                    index,
+                    attempt_count + 1
+                );
 
                 // Determine status based on message index and attempt count
                 let status = match (index, attempt_count) {
-                    (0, _) => EventStatus::Delivered,  // A: always accept
-                    (1, 0) => EventStatus::Rejected,   // B: reject on first attempt
-                    (1, _) => EventStatus::Delivered,  // B: accept on retry
-                    (2, 0) => EventStatus::Rejected,   // C: reject on first attempt
-                    (2, _) => EventStatus::Delivered,  // C: accept on retry
-                    (3, _) => EventStatus::Delivered,  // D: always accept
+                    (0, _) => EventStatus::Delivered, // A: always accept
+                    (1, 0) => EventStatus::Rejected,  // B: reject on first attempt
+                    (1, _) => EventStatus::Delivered, // B: accept on retry
+                    (2, 0) => EventStatus::Rejected,  // C: reject on first attempt
+                    (2, _) => EventStatus::Delivered, // C: accept on retry
+                    (3, _) => EventStatus::Delivered, // D: always accept
                     _ => EventStatus::Delivered,
                 };
 
@@ -1775,7 +1784,10 @@ mod integration_test {
         // Use a timeout to prevent hanging if the fix is not present
         let events = tokio::time::timeout(
             Duration::from_secs(5),
-            collect_n(Box::pin(recv.flat_map(into_event_stream)), EXPECTED_EVENT_COUNT)
+            collect_n(
+                Box::pin(recv.flat_map(into_event_stream)),
+                EXPECTED_EVENT_COUNT,
+            ),
         )
         .await
         .expect("Test timed out waiting for events - messages were not retried!");
@@ -1806,8 +1818,14 @@ mod integration_test {
         let count_3 = received.iter().filter(|&&i| i == 3).count();
 
         assert_eq!(count_0, 1, "Message A should be received once");
-        assert_eq!(count_1, 2, "Message B should be received twice (rejected then retried)");
-        assert_eq!(count_2, 2, "Message C should be received twice (rejected then retried)");
+        assert_eq!(
+            count_1, 2,
+            "Message B should be received twice (rejected then retried)"
+        );
+        assert_eq!(
+            count_2, 2,
+            "Message C should be received twice (rejected then retried)"
+        );
         assert_eq!(count_3, 1, "Message D should be received once");
     }
 
