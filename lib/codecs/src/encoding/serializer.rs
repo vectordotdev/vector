@@ -10,13 +10,14 @@ use super::format::{ArrowStreamSerializer, ArrowStreamSerializerConfig};
 use super::format::{OtlpSerializer, OtlpSerializerConfig};
 #[cfg(feature = "parquet")]
 use super::format::{ParquetSerializer, ParquetSerializerConfig};
+use super::format::{ProtoBatchSerializer, ProtoBatchSerializerConfig};
 #[cfg(feature = "syslog")]
 use super::format::{SyslogSerializer, SyslogSerializerConfig};
 use super::{
     chunking::Chunker,
     format::{
-        AvroSerializer, AvroSerializerConfig, AvroSerializerOptions, CefSerializer,
-        CefSerializerConfig, CsvSerializer, CsvSerializerConfig, GelfSerializer,
+        AvroOcfSerializerConfig, AvroSerializer, AvroSerializerConfig, AvroSerializerOptions,
+        CefSerializer, CefSerializerConfig, CsvSerializer, CsvSerializerConfig, GelfSerializer,
         GelfSerializerConfig, JsonSerializer, JsonSerializerConfig, LogfmtSerializer,
         LogfmtSerializerConfig, NativeJsonSerializer, NativeJsonSerializerConfig, NativeSerializer,
         NativeSerializerConfig, ProtobufSerializer, ProtobufSerializerConfig, RawMessageSerializer,
@@ -146,10 +147,6 @@ impl Default for SerializerConfig {
 }
 
 /// Batch serializer configuration.
-///
-/// Only available when the `arrow` feature is enabled (the `parquet` feature
-/// implies `arrow`); all batch serializers produce columnar Arrow/Parquet output.
-#[cfg(feature = "arrow")]
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(tag = "codec", rename_all = "snake_case")]
@@ -157,12 +154,23 @@ impl Default for SerializerConfig {
     docs::enum_tag_description = "The codec to use for batch encoding events."
 ))]
 pub enum BatchSerializerConfig {
+    /// Encodes events as a complete [Apache Avro][apache_avro] Object Container File (OCF).
+    ///
+    /// Each batch of events is written as a single self-contained OCF file, with an embedded
+    /// schema and a randomly-generated sync marker. This format is suitable for file-based sinks
+    /// (e.g. S3, local file) where downstream tools such as Spark, Flink, or avro-tools expect
+    /// standard Avro files. For streaming Avro datum encoding, use the per-event `avro` codec.
+    ///
+    /// [apache_avro]: https://avro.apache.org/
+    #[serde(rename = "avro_ocf")]
+    AvroOcf(AvroOcfSerializerConfig),
     /// Encodes events in [Apache Arrow][apache_arrow] IPC streaming format.
     ///
     /// This is the streaming variant of the Arrow IPC format, which writes
     /// a continuous stream of record batches.
     ///
     /// [apache_arrow]: https://arrow.apache.org/
+    #[cfg(feature = "arrow")]
     #[serde(rename = "arrow_stream")]
     ArrowStream(ArrowStreamSerializerConfig),
     /// Encodes events in [Apache Parquet][apache_parquet] columnar format.
@@ -171,15 +179,28 @@ pub enum BatchSerializerConfig {
     #[cfg(feature = "parquet")]
     #[serde(rename = "parquet")]
     Parquet(ParquetSerializerConfig),
+
+    /// Encodes each event individually as a [Protocol Buffers][protobuf] message.
+    ///
+    /// Each event in the batch is serialized to protobuf bytes independently,
+    /// producing a list of byte buffers (one per event).
+    ///
+    /// [protobuf]: https://protobuf.dev/
+    #[serde(rename = "proto_batch")]
+    ProtoBatch(ProtoBatchSerializerConfig),
 }
 
-#[cfg(feature = "arrow")]
 impl BatchSerializerConfig {
     /// Build the batch serializer from this configuration.
     pub fn build_batch_serializer(
         &self,
     ) -> Result<super::BatchSerializer, Box<dyn std::error::Error + Send + Sync + 'static>> {
         match self {
+            BatchSerializerConfig::AvroOcf(avro_config) => {
+                let serializer = avro_config.build()?;
+                Ok(super::BatchSerializer::AvroOcf(serializer))
+            }
+            #[cfg(feature = "arrow")]
             BatchSerializerConfig::ArrowStream(arrow_config) => {
                 let serializer = ArrowStreamSerializer::new(arrow_config.clone())?;
                 Ok(super::BatchSerializer::Arrow(serializer))
@@ -189,24 +210,34 @@ impl BatchSerializerConfig {
                 let serializer = ParquetSerializer::new(parquet_config.clone())?;
                 Ok(super::BatchSerializer::Parquet(Box::new(serializer)))
             }
+            BatchSerializerConfig::ProtoBatch(proto_config) => {
+                let serializer = ProtoBatchSerializer::new(proto_config.clone())?;
+                Ok(super::BatchSerializer::ProtoBatch(serializer))
+            }
         }
     }
 
     /// The data type of events that are accepted by this batch serializer.
     pub fn input_type(&self) -> DataType {
         match self {
+            BatchSerializerConfig::AvroOcf(avro_config) => avro_config.input_type(),
+            #[cfg(feature = "arrow")]
             BatchSerializerConfig::ArrowStream(arrow_config) => arrow_config.input_type(),
             #[cfg(feature = "parquet")]
             BatchSerializerConfig::Parquet(parquet_config) => parquet_config.input_type(),
+            BatchSerializerConfig::ProtoBatch(proto_config) => proto_config.input_type(),
         }
     }
 
     /// The schema required by the batch serializer.
     pub fn schema_requirement(&self) -> schema::Requirement {
         match self {
+            BatchSerializerConfig::AvroOcf(avro_config) => avro_config.schema_requirement(),
+            #[cfg(feature = "arrow")]
             BatchSerializerConfig::ArrowStream(arrow_config) => arrow_config.schema_requirement(),
             #[cfg(feature = "parquet")]
             BatchSerializerConfig::Parquet(parquet_config) => parquet_config.schema_requirement(),
+            BatchSerializerConfig::ProtoBatch(proto_config) => proto_config.schema_requirement(),
         }
     }
 }
