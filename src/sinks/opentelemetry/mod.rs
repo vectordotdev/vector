@@ -1,3 +1,6 @@
+mod config;
+mod sink;
+
 use indoc::indoc;
 use vector_config::component::GenerateConfig;
 use vector_lib::{
@@ -16,6 +19,7 @@ use crate::{
         http::config::{HttpMethod, HttpSinkConfig},
     },
 };
+use config::OpenTelemetryOptions;
 
 /// Configuration for the `OpenTelemetry` sink.
 #[configurable_component(sink("opentelemetry", "Deliver OTLP data over HTTP."))]
@@ -24,6 +28,11 @@ pub struct OpenTelemetryConfig {
     /// Protocol configuration
     #[configurable(derived)]
     protocol: Protocol,
+
+    /// OpenTelemetry-specific options
+    #[serde(default)]
+    #[configurable(derived)]
+    opentelemetry: OpenTelemetryOptions,
 }
 
 /// The protocol used to send data to OpenTelemetry.
@@ -78,7 +87,9 @@ impl GenerateConfig for OpenTelemetryConfig {
 impl SinkConfig for OpenTelemetryConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         match &self.protocol {
-            Protocol::Http(config) => config.build(cx).await,
+            Protocol::Http(config) => {
+                config::build_opentelemetry_sink(config, &self.opentelemetry, cx).await
+            }
         }
     }
 
