@@ -10,10 +10,22 @@ inputs:
 runs:
   using: "composite"
   steps:
-    # Fork PRs don't get `id-token: write`, so federation cannot succeed.
-    # Allow the step to fail and let downstream steps run without DD credentials.
+    # Fork PRs don't get `id-token: write`, so ACTIONS_ID_TOKEN_REQUEST_URL is
+    # unset. Read it via shell (env context only covers YAML-declared vars) and
+    # skip federation when absent to avoid a hard failure.
+    - name: Check OIDC token availability
+      id: oidc
+      shell: bash
+      run: |
+        if [ -n "${ACTIONS_ID_TOKEN_REQUEST_URL}" ]; then
+          echo "available=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "available=false" >> "$GITHUB_OUTPUT"
+        fi
+
     - name: Federate Datadog token
       id: dd-sts
+      if: ${{ steps.oidc.outputs.available == 'true' }}
       continue-on-error: true
       uses: DataDog/dd-sts-action@2e8187910199bd93129520183c093e19aa585c75
       with:
