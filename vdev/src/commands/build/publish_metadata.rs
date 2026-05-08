@@ -20,7 +20,8 @@ pub struct Cli {}
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        // Generate the Vector version and build description.
+        // Use `app::version()` so the emitted `vector_version` matches archive filenames
+        // (which include `.custom.<sha>` on custom-channel runs).
         let version = app::version()?;
 
         let git_sha = git::get_git_sha()?;
