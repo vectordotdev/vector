@@ -444,7 +444,7 @@ test-component-validation: ## Runs component validation tests
 
 .PHONY: coverage-report
 coverage-report: ## Generate lcov report after running tests with COVERAGE=true (outputs lcov.info)
-	cargo llvm-cov report --workspace --lcov --output-path lcov.info
+	cargo llvm-cov report --lcov --output-path lcov.info
 
 ##@ Benching (Supports `ENVIRONMENT=true`)
 
