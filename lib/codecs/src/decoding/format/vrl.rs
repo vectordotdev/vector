@@ -30,8 +30,8 @@ pub struct VrlDeserializerConfig {
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct VrlDeserializerOptions {
     /// The [Vector Remap Language][vrl] (VRL) program to execute for each event.
-    /// Note that the final contents of the `.` target will be used as the decoding result.
-    /// Compilation error or use of 'abort' in a program will result in a decoding error.
+    /// The final contents of the `.` target are used as the decoding result.
+    /// Compilation errors or use of `abort` in the program result in a decoding error.
     ///
     ///
     /// [vrl]: https://vector.dev/docs/reference/vrl
