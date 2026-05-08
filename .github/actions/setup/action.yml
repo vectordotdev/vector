@@ -274,6 +274,10 @@ runs:
           ./scripts/environment/prepare.sh --modules="${csm}"
         fi
 
+        if [[ "$NEEDS_RUST" == "true" ]]; then
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+        fi
+
     - name: Set VDEV environment variable
       if: ${{ inputs.vdev == 'true' }}
       shell: bash

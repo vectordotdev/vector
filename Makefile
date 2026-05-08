@@ -274,9 +274,7 @@ CARGO_HANDLES_FRESHNESS:
 	${EMPTY}
 
 # Pinned digests for ghcr.io/cross-rs/<target>:edge.
-# Source: cross-rs/cross @ f86fd03bb70b4c6802847c18087e21391498b0b4, built 2026-04-10 (Ubuntu 20.04 focal).
 # Refresh with: crane digest ghcr.io/cross-rs/<target>:edge
-CROSS_DIGEST_x86_64-unknown-linux-gnu       := sha256:13f7a68e55cb05a19e840bce65834fc785dc069e0c2218d12b8fdb8f8a1519d5
 CROSS_DIGEST_aarch64-unknown-linux-gnu      := sha256:3bf094d22fc4f73c9bdce45ddd7a8bbae349efdbd51b4d4b5ee1bedd8454466b
 CROSS_DIGEST_x86_64-unknown-linux-musl      := sha256:c59deede3efcd7cb6f6a57641241ba1c63cfe35b7965be09a851242b4209639d
 CROSS_DIGEST_aarch64-unknown-linux-musl     := sha256:dad492e0f040c6e712d4be9b970c9de5f3b8ef9cde6b9a2b437d56d1dabeb808
@@ -290,13 +288,17 @@ CROSS_DIGEST_arm-unknown-linux-musleabi     := sha256:0ca8f4afcc29fb5964aa63e482
 .PHONY: cross-image-%
 cross-image-%: export TRIPLE =$($(strip @):cross-image-%=%)
 cross-image-%:
-	$(if $(CROSS_DIGEST_$*),,$(error No CROSS_DIGEST pinned for $*. Add it to the digest table in Makefile.))
-	$(CONTAINER_TOOL) build \
-		--build-arg TARGET=${TRIPLE} \
-		--build-arg CROSS_DIGEST=$(CROSS_DIGEST_$*) \
-		--file scripts/cross/Dockerfile \
-		--tag vector-cross-env:${TRIPLE} \
-		.
+	@if [ -n "$(CROSS_DIGEST_$*)" ]; then \
+		$(CONTAINER_TOOL) build \
+			--build-arg TARGET=$* \
+			--build-arg CROSS_DIGEST=$(CROSS_DIGEST_$*) \
+			--file scripts/cross/Dockerfile \
+			--tag vector-cross-env:$* \
+			. ; \
+	else \
+		echo "No image digest pinned for $*. Add it to the digest table in Makefile." >&2 ; \
+		exit 1 ; \
+	fi
 
 # This is basically a shorthand for folks.
 # `cross-anything-triple` will call `cross anything --target triple` with the right features.
@@ -318,6 +320,14 @@ target/%/vector: export PAIR =$(subst /, ,$(@:target/%/vector=%))
 target/%/vector: export TRIPLE ?=$(word 1,${PAIR})
 target/%/vector: export PROFILE ?=$(word 2,${PAIR})
 target/%/vector: export CFLAGS += -g0 -O3
+ifeq ($(NATIVE),true)
+target/%/vector: CARGO_HANDLES_FRESHNESS
+	cargo build \
+		$(if $(findstring release,$(PROFILE)),--release,) \
+		--target ${TRIPLE} \
+		--no-default-features \
+		--features target-${TRIPLE}
+else
 target/%/vector: cargo-install-cross CARGO_HANDLES_FRESHNESS
 	$(MAKE) -k cross-image-${TRIPLE}
 	cross build \
@@ -325,6 +335,7 @@ target/%/vector: cargo-install-cross CARGO_HANDLES_FRESHNESS
 		--target ${TRIPLE} \
 		--no-default-features \
 		--features target-${TRIPLE}
+endif
 
 target/%/vector.tar.gz: export PAIR =$(subst /, ,$(@:target/%/vector.tar.gz=%))
 target/%/vector.tar.gz: export TRIPLE ?=$(word 1,${PAIR})
