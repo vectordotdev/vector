@@ -46,7 +46,8 @@ enum FileReader {
     /// Plain file reader - we can access the File via get_ref() for metadata
     Plain(BufReader<File>),
     /// Gzipped file reader - no meaningful file position tracking
-    Gzipped(BufReader<GzipDecoder<BufReader<File>>>),
+    /// Boxed to reduce enum size (this variant is much larger than others)
+    Gzipped(Box<BufReader<GzipDecoder<BufReader<File>>>>),
     /// Null reader for skipped files
     Null(io::Cursor<Vec<u8>>),
 }
@@ -220,7 +221,7 @@ impl FileWatcher {
                     (FileReader::Null(io::Cursor::new(Vec::new())), 0)
                 }
                 (true, false, ReadFrom::Beginning) => (
-                    FileReader::Gzipped(BufReader::new(gzip_multiple_decoder(reader))),
+                    FileReader::Gzipped(Box::new(BufReader::new(gzip_multiple_decoder(reader)))),
                     0,
                 ),
                 (false, true, _) => {
@@ -287,7 +288,7 @@ impl FileWatcher {
                     if self.file_position != 0 {
                         FileReader::Null(io::Cursor::new(Vec::new()))
                     } else {
-                        FileReader::Gzipped(BufReader::new(gzip_multiple_decoder(reader)))
+                        FileReader::Gzipped(Box::new(BufReader::new(gzip_multiple_decoder(reader))))
                     }
                 } else {
                     reader.seek(io::SeekFrom::Start(self.file_position)).await?;
