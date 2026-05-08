@@ -263,6 +263,16 @@ pub struct RequestMetadata {
     ///
     /// This is akin to the bytes sent/received over the network, regardless of whether or not compression was used.
     request_wire_size: usize,
+    /// Accumulated successful event count from previous retry attempts.
+    ///
+    /// When partial retry occurs, successful events from intermediate attempts are counted here
+    /// so they're not lost when the Tower retry layer intercepts responses.
+    accumulated_successful_events: usize,
+    /// Accumulated successful bytes from previous retry attempts.
+    ///
+    /// When partial retry occurs, successful bytes from intermediate attempts are accumulated here
+    /// to ensure accurate byte size metrics across multiple retry attempts.
+    accumulated_successful_bytes: usize,
 }
 
 impl RequestMetadata {
@@ -280,7 +290,27 @@ impl RequestMetadata {
             events_estimated_json_encoded_byte_size,
             request_encoded_size,
             request_wire_size,
+            accumulated_successful_events: 0,
+            accumulated_successful_bytes: 0,
         }
+    }
+
+    /// Accumulate successful counts from a completed attempt before retrying.
+    pub fn accumulate_success(&mut self, successful_events: usize, successful_bytes: usize) {
+        self.accumulated_successful_events += successful_events;
+        self.accumulated_successful_bytes += successful_bytes;
+    }
+
+    /// Get the accumulated successful event count from previous retry attempts.
+    #[must_use]
+    pub const fn accumulated_successful_events(&self) -> usize {
+        self.accumulated_successful_events
+    }
+
+    /// Get the accumulated successful byte size from previous retry attempts.
+    #[must_use]
+    pub const fn accumulated_successful_bytes(&self) -> usize {
+        self.accumulated_successful_bytes
     }
 
     #[must_use]
@@ -339,6 +369,12 @@ impl<'a> Add<&'a RequestMetadata> for RequestMetadata {
                 + &other.events_estimated_json_encoded_byte_size,
             request_encoded_size: self.request_encoded_size + other.request_encoded_size,
             request_wire_size: self.request_wire_size + other.request_wire_size,
+            accumulated_successful_events: self
+                .accumulated_successful_events
+                .max(other.accumulated_successful_events),
+            accumulated_successful_bytes: self
+                .accumulated_successful_bytes
+                .max(other.accumulated_successful_bytes),
         }
     }
 }
