@@ -18,10 +18,11 @@ on:
 env:
   VERBOSE: true
   CI: true
-  DISABLE_MOLD: true
   DEBIAN_FRONTEND: noninteractive
   CONTAINER_TOOL: docker
   CHANNEL: ${{ inputs.channel }}
+  # Keep these build env vars in sync with the build job env in regression.yml.
+  DISABLE_MOLD: true
 
 jobs:
   generate-publish-metadata:
