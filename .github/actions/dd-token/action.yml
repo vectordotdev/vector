@@ -10,11 +10,11 @@ inputs:
 runs:
   using: "composite"
   steps:
-    # Fork PRs don't get `id-token: write`, so federation cannot succeed.
-    # Allow the step to fail and let downstream steps run without DD credentials.
+    # Fork PRs don't get `id-token: write`, so ACTIONS_ID_TOKEN_REQUEST_URL is
+    # unset and federation will fail. Skip the step entirely in that case.
     - name: Federate Datadog token
       id: dd-sts
-      continue-on-error: true
+      if: ${{ env.ACTIONS_ID_TOKEN_REQUEST_URL != '' }}
       uses: DataDog/dd-sts-action@2e8187910199bd93129520183c093e19aa585c75
       with:
         policy: ${{ inputs.policy }}
