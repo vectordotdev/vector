@@ -575,8 +575,8 @@ mod tests {
         trace::stop_early_buffering();
         tokio::task::yield_now().await;
 
-        let controller = vector_lib::metrics::Controller::get()
-            .expect("metrics controller must be initialized");
+        let controller =
+            vector_lib::metrics::Controller::get().expect("metrics controller must be initialized");
         controller.reset();
 
         // Emit more events than the broadcast capacity (99) without yielding. In a
