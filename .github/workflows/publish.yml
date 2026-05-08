@@ -165,7 +165,6 @@ jobs:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
       VECTOR_BUILD_DESC: ${{ needs.generate-publish-metadata.outputs.vector_build_desc }}
       CHANNEL: ${{ needs.generate-publish-metadata.outputs.vector_release_channel }}
-      RUSTFLAGS: "-D warnings -Ctarget-feature=+crt-static"
       RELEASE_BUILDER: "true"
     steps:
       - name: Checkout Vector
