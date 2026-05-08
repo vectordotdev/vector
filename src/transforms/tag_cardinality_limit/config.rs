@@ -68,15 +68,14 @@ pub struct Config {
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum TrackingScope {
-    /// All metrics share a single tracking bucket. Tag values pool across metrics,
-    /// and the global `value_limit` caps the combined set. Lower memory requirements
-    /// but cardinality per metric is not tracked unless a per-metric override is configured.
+    /// All metrics share a single tracking bucket. Tag values pool across metrics
+    /// and the global `value_limit` caps the combined set.
     #[default]
     Global,
 
     /// Every distinct metric gets its own tracking bucket, providing tag
     /// cardinality limiting for each metric in isolation at the cost of higher
-    /// memory.
+    /// memory usage.
     PerMetric,
 }
 

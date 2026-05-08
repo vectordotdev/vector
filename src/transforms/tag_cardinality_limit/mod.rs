@@ -24,15 +24,14 @@ use crate::event::metric::TagValueSet;
 
 type MetricId = (Option<String>, String);
 
-/// Outcome of attempting to accept a tag value.
+/// Outcome of applying tag cardinality tracking to a tag value.
 #[derive(Debug, Eq, PartialEq)]
 enum AcceptResult {
-    /// Tag value is tracked and accepted (under the configured `value_limit`).
-    Accepted,
-    /// Tag value is tracked but exceeds `value_limit`; caller should drop the tag.
-    Rejected,
-    /// `max_tracked_keys` was reached and the (metric, tag-key) pair could not be
-    /// allocated; caller should pass the tag through unchecked.
+    /// The tag value was tracked and is within the configured `value_limit`.
+    Tracked,
+    /// The tag value was tracked and exceeded the configured `value_limit`.
+    Dropped,
+    /// The tag value was not tracked because tracking capacity is exhausted.
     Untracked,
 }
 
@@ -90,9 +89,9 @@ impl TagCardinalityLimit {
     /// Attempts to accept a tag value for a (metric, tag-key) pair.
     ///
     /// Returns:
-    /// - `Accepted` if the value is already tracked, or fits under the configured
+    /// - `Tracked` if the value is already tracked, or fits under the configured
     ///   `value_limit` and is now recorded.
-    /// - `Rejected` if the value would exceed `value_limit`; the caller should drop
+    /// - `Dropped` if the value would exceed `value_limit`; the caller should drop
     ///   the tag.
     /// - `Untracked` if a new (metric, tag-key) pair would have to be allocated but
     ///   `max_tracked_keys` has been reached; the caller should pass the tag through
@@ -126,7 +125,7 @@ impl TagCardinalityLimit {
 
         if tag_value_set.contains(value) {
             // Tag value has already been accepted, nothing more to do.
-            return AcceptResult::Accepted;
+            return AcceptResult::Tracked;
         }
 
         // Tag value not yet part of the accepted set.
@@ -138,10 +137,10 @@ impl TagCardinalityLimit {
                 emit!(TagCardinalityValueLimitReached { key });
             }
 
-            AcceptResult::Accepted
+            AcceptResult::Tracked
         } else {
-            // New tag value is rejected.
-            AcceptResult::Rejected
+            // New tag value exceeds the configured limit.
+            AcceptResult::Dropped
         }
     }
 
@@ -251,8 +250,8 @@ impl TagCardinalityLimit {
                 LimitExceededAction::DropTag => {
                     tags_map.retain(|key, value| {
                         match self.try_accept_tag(metric_key.as_ref(), key, value) {
-                            AcceptResult::Accepted => true,
-                            AcceptResult::Rejected => {
+                            AcceptResult::Tracked => true,
+                            AcceptResult::Dropped => {
                                 emit!(TagCardinalityLimitRejectingTag {
                                     metric_name: &metric_name,
                                     tag_key: key,

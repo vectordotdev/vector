@@ -87,7 +87,7 @@ pub struct TagCardinalityLimitUntracked;
 impl InternalEvent for TagCardinalityLimitUntracked {
     fn emit(self) {
         debug!(
-            message = "Max tracked keys reached; one or more tags on this event are passing through untracked."
+            message = "Max tracked keys limit reached; forwarding one or more metric tags without cardinality checks."
         );
         counter!(CounterName::TagCardinalityUntrackedEventsTotal).increment(1);
     }
