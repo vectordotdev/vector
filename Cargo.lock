@@ -2745,6 +2745,7 @@ dependencies = [
  "snafu 0.9.0",
  "strum 0.28.0",
  "syslog_loose 0.23.0",
+ "tempfile",
  "tokio",
  "tokio-util",
  "toml",

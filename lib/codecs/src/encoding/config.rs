@@ -1,8 +1,10 @@
 use vector_config::configurable_component;
 
 use super::{Encoder, EncoderKind, Transformer};
+#[cfg(feature = "opentelemetry")]
+use crate::encoding::BytesEncoder;
 use crate::encoding::{
-    BytesEncoder, CharacterDelimitedEncoder, Framer, FramingConfig, LengthDelimitedEncoder,
+    CharacterDelimitedEncoder, Framer, FramingConfig, LengthDelimitedEncoder,
     NewlineDelimitedEncoder, Serializer, SerializerConfig,
 };
 
@@ -106,15 +108,12 @@ impl EncodingConfigWithFraming {
                 SinkType::StreamBased => NewlineDelimitedEncoder::default().into(),
                 SinkType::MessageBased => CharacterDelimitedEncoder::new(b',').into(),
             },
-            (None, Serializer::Avro(avro_serializer)) => {
-                // OCF (Object Container File) format is self-describing and includes its own
-                // framing/structure, so we must not add additional framing on top of it.
-                // For regular Datum encoding, we use length-delimited framing for compatibility.
-                if avro_serializer.is_ocf() {
-                    BytesEncoder.into()
-                } else {
-                    LengthDelimitedEncoder::default().into()
-                }
+            (None, Serializer::Avro(_)) => {
+                // Avro datum encoding uses length-delimited framing for compatibility.
+                // For Avro Object Container File (OCF) format, use the batch serializer
+                // (`BatchSerializerConfig::AvroOcf`) instead, which produces complete
+                // self-contained files without additional framing.
+                LengthDelimitedEncoder::default().into()
             }
             (None, Serializer::Native(_)) => LengthDelimitedEncoder::default().into(),
             (None, Serializer::Gelf(_)) => {

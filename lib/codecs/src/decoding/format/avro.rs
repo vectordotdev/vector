@@ -60,6 +60,19 @@ impl AvroDeserializerConfig {
 
     /// Build the `AvroDeserializer` from this configuration.
     pub fn build(&self) -> vector_common::Result<AvroDeserializer> {
+        // strip_schema_id_prefix is a Confluent Schema Registry concept that applies only to
+        // raw Avro datum encoding. OCF files have their own schema embedding mechanism and do
+        // not use the Confluent wire format prefix.
+        if self.avro_options.strip_schema_id_prefix
+            && self.avro_options.encoding == AvroEncoding::ObjectContainerFile
+        {
+            return Err(vector_common::Error::from(
+                "`strip_schema_id_prefix` is not compatible with `object_container_file` encoding. \
+                 OCF files embed the schema in the file header; they do not use the Confluent \
+                 Schema Registry wire format prefix.",
+            ));
+        }
+
         let schema = if self.avro_options.encoding == AvroEncoding::ObjectContainerFile
             && self.avro_options.schema_source == AvroSchemaSource::Embedded
         {
@@ -113,7 +126,6 @@ impl From<&AvroDeserializerOptions> for AvroSerializerOptions {
     fn from(value: &AvroDeserializerOptions) -> Self {
         Self {
             schema: value.schema.clone(),
-            encoding: value.encoding,
         }
     }
 }
@@ -151,6 +163,15 @@ pub struct AvroDeserializerOptions {
     #[serde(default)]
     pub schema_source: AvroSchemaSource,
 }
+
+// Note on framing for `object_container_file` encoding:
+// The OCF decoder (`parse_ocf`) requires that each call receives a complete, self-contained OCF
+// payload (header + all data blocks). Framers that split on newlines or other delimiters (the
+// default for most sources) will produce incomplete buffers and fail to parse.
+// Use a framer that delivers whole OCF files, such as:
+//   - `length_delimited` (if the upstream writes length-prefixed OCF blobs)
+//   - `bytes` (for sources that deliver one complete OCF per message, e.g. S3 objects)
+// Do NOT use `newline_delimited` framing with OCF encoding.
 
 /// Serializer that converts bytes to an `Event` using the Apache Avro format.
 #[derive(Debug, Clone)]
@@ -244,14 +265,20 @@ impl AvroDeserializer {
         let reader = apache_avro::Reader::new(binding)?;
         let embedded_schema = reader.writer_schema().clone();
 
-        // Validate schema if using provided
-        if self.schema_source == AvroSchemaSource::Provided {
-            if let Some(provided_schema) = &self.schema {
-                if provided_schema != &embedded_schema {
-                    return Err(vector_common::Error::from(
-                        "Embedded schema does not match provided schema",
-                    ));
-                }
+        // Validate schema using Rabin fingerprint comparison (per Avro spec).
+        // Using PartialEq on apache_avro::Schema is fragile because:
+        // - Fully-qualified names may differ between user-provided JSON and the OCF's stored form
+        // - Schema equality semantics have changed across apache-avro releases
+        if self.schema_source == AvroSchemaSource::Provided
+            && let Some(provided_schema) = &self.schema
+        {
+            use apache_avro::rabin::Rabin;
+            if provided_schema.fingerprint::<Rabin>().bytes
+                != embedded_schema.fingerprint::<Rabin>().bytes
+            {
+                return Err(vector_common::Error::from(
+                    "Embedded schema fingerprint does not match provided schema",
+                ));
             }
         }
 

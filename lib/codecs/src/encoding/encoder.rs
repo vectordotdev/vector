@@ -7,6 +7,7 @@ use vector_core::event::Event;
 use crate::encoding::ArrowStreamSerializer;
 #[cfg(feature = "parquet")]
 use crate::encoding::ParquetSerializer;
+use crate::encoding::format::AvroOcfSerializer;
 use crate::{
     encoding::{Error, Framer, ProtoBatchSerializer, Serializer},
     internal_events::{EncoderFramingError, EncoderSerializeError},
@@ -29,6 +30,11 @@ pub enum BatchOutput {
 /// Serializers that support batch encoding (encoding all events at once).
 #[derive(Debug, Clone)]
 pub enum BatchSerializer {
+    /// Avro Object Container File (OCF) format serializer.
+    ///
+    /// Encodes a batch of events as a single, self-contained OCF file with an embedded schema and
+    /// randomly generated sync marker.
+    AvroOcf(AvroOcfSerializer),
     /// Arrow IPC stream format serializer.
     #[cfg(feature = "arrow")]
     Arrow(ArrowStreamSerializer),
@@ -61,9 +67,9 @@ impl BatchEncoder {
     /// Returns `None` for serializers that do not produce a single HTTP body
     /// (e.g. `ProtoBatch`, which emits one record per event for an out-of-band
     /// transport rather than an HTTP payload).
-    #[cfg(any(feature = "arrow", feature = "parquet"))]
     pub const fn content_type(&self) -> Option<&'static str> {
         match &self.serializer {
+            BatchSerializer::AvroOcf(_) => Some("application/octet-stream"),
             #[cfg(feature = "arrow")]
             BatchSerializer::Arrow(_) => Some("application/vnd.apache.arrow.stream"),
             #[cfg(feature = "parquet")]
@@ -75,6 +81,9 @@ impl BatchEncoder {
     /// Encode a batch of events into a `BatchOutput`.
     pub fn encode_batch(&self, events: &[Event]) -> Result<BatchOutput, Error> {
         match &self.serializer {
+            BatchSerializer::AvroOcf(_) => Err(Error::SerializingError(Box::from(
+                "AvroOcf serializer does not support encode_batch; use the tokio Encoder interface instead",
+            ))),
             #[cfg(feature = "arrow")]
             BatchSerializer::Arrow(serializer) => {
                 let record_batch = serializer.encode_to_record_batch(events).map_err(|err| {
@@ -108,6 +117,9 @@ impl tokio_util::codec::Encoder<Vec<Event>> for BatchEncoder {
     #[allow(unused_variables)]
     fn encode(&mut self, events: Vec<Event>, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         match &mut self.serializer {
+            BatchSerializer::AvroOcf(serializer) => serializer
+                .encode(events, buffer)
+                .map_err(Error::SerializingError),
             #[cfg(feature = "arrow")]
             BatchSerializer::Arrow(serializer) => {
                 serializer.encode(events, buffer).map_err(|err| {
