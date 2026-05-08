@@ -648,16 +648,16 @@ impl ConsumerStateInner<Consuming> {
                     },
 
                     _ = tokio::time::sleep(fetch_wait_max_ms), if failed_msg_offset.is_some() => {
-                        let offset = failed_msg_offset.unwrap();
-                        match consumer.seek(&tp.0, tp.1, Offset::Offset(offset), socket_timeout) {
-                            Ok(_) => {
-                                debug!("Seeked back to offset {} for {}:{}", offset, &tp.0, tp.1);
-                            }
-                            Err(error) => {
-                                emit!(KafkaSeekError { error });
+                        if let Some(offset) = failed_msg_offset.take() {
+                            match consumer.seek(&tp.0, tp.1, Offset::Offset(offset), socket_timeout) {
+                                Ok(_) => {
+                                    debug!("Seeked back to offset {} for {}:{}", offset, &tp.0, tp.1);
+                                }
+                                Err(error) => {
+                                    emit!(KafkaSeekError { error });
+                                }
                             }
                         }
-                        failed_msg_offset = None;
                     },
 
                     message = messages.next(), if finalizer.is_some() => match message {
