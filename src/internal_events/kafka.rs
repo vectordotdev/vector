@@ -3,7 +3,9 @@
 use metrics::{counter, gauge};
 use vector_lib::{
     NamedInternalEvent,
-    internal_event::{ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type},
+    internal_event::{
+        ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+    },
     json_size::JsonSize,
 };
 use vrl::path::OwnedTargetPath;
