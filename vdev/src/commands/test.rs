@@ -53,6 +53,8 @@ impl Cli {
             None,
             &args,
             false, // Don't pre-build Vector for direct test runs
+            false,
+            None,
         )
     }
 }

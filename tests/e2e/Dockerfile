@@ -29,7 +29,7 @@ COPY scripts/environment/binstall.sh /
 WORKDIR /vector
 COPY rust-toolchain.toml .
 
-RUN bash /prepare.sh --modules=cargo-nextest
+RUN bash /prepare.sh --modules=cargo-nextest,cargo-llvm-cov
 RUN bash /install-protoc.sh
 
 COPY . .
