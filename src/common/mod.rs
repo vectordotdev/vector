@@ -21,6 +21,9 @@ pub(crate) mod s3;
 #[cfg(any(feature = "sources-websocket", feature = "sinks-websocket"))]
 pub(crate) mod websocket;
 
+#[cfg(any(feature = "sources-iggy", feature = "sinks-iggy"))]
+pub(crate) mod iggy;
+
 pub(crate) mod backoff;
 #[cfg(any(feature = "sources-mqtt", feature = "sinks-mqtt",))]
 /// Common MQTT configuration shared by MQTT components.
