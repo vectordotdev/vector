@@ -177,13 +177,16 @@ impl SourceConfig for VectorConfig {
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
         let log_namespace = cx.log_namespace(self.log_namespace);
 
-        // Create the custom Vector service (existing)
+        // Create the custom Vector service (existing).
+        //
+        // Compression negotiation (gzip, zstd) is handled centrally by
+        // `DecompressionAndMetricsLayer` in `sources::util::grpc`, so we
+        // deliberately do not call `.accept_compressed(..)` here.
         let vector_service = proto::Server::new(Service {
             pipeline: cx.out,
             acknowledgements,
             log_namespace,
         })
-        .accept_compressed(tonic::codec::CompressionEncoding::Gzip)
         // Tonic added a default of 4MB in 0.9. This replaces the old behavior.
         .max_decoding_message_size(usize::MAX);
 
@@ -303,9 +306,11 @@ mod tests {
         test_util,
     };
 
-    async fn run_test(vector_source_config_str: &str, addr: SocketAddr) {
-        let config = format!(r#"address = "{addr}""#);
-        let source: VectorConfig = toml::from_str(&config).unwrap();
+    async fn run_test(compression: Option<&str>) {
+        let (_guard, addr) = test_util::addr::next_addr();
+
+        let source_config = format!(r#"address = "{addr}""#);
+        let source: VectorConfig = toml::from_str(&source_config).unwrap();
 
         let (tx, rx) = SourceSender::new_test();
         let server = source
@@ -318,7 +323,16 @@ mod tests {
         // Ideally, this would be a fully custom agent to send the data,
         // but the sink side already does such a test and this is good
         // to ensure interoperability.
-        let sink: SinkConfig = toml::from_str(vector_source_config_str).unwrap();
+        let sink_config = match compression {
+            Some(c) => format!(
+                r#"
+                    address = "{addr}"
+                    compression = "{c}"
+                "#
+            ),
+            None => format!(r#"address = "{addr}""#),
+        };
+        let sink: SinkConfig = toml::from_str(&sink_config).unwrap();
         let cx = SinkContext::default();
         let (sink, _) = sink.build(cx).await.unwrap();
 
@@ -338,21 +352,17 @@ mod tests {
 
     #[tokio::test]
     async fn receive_message() {
-        let (_guard, addr) = test_util::addr::next_addr();
-
-        let config = format!(r#"address = "{addr}""#);
-        run_test(&config, addr).await;
+        run_test(None).await;
     }
 
     #[tokio::test]
-    async fn receive_compressed_message() {
-        let (_guard, addr) = test_util::addr::next_addr();
+    async fn receive_gzip_compressed_message() {
+        run_test(Some("gzip")).await;
+    }
 
-        let config = format!(
-            r#"address = "{addr}"
-            compression=true"#
-        );
-        run_test(&config, addr).await;
+    #[tokio::test]
+    async fn receive_zstd_compressed_message() {
+        run_test(Some("zstd")).await;
     }
 
     #[tokio::test]
