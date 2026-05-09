@@ -1,0 +1,7 @@
+sources:
+  my_source_id:
+    type: iggy
+    consumer_name: vector
+    stream: vector
+    topic: logs
+    url: iggy+tcp://iggy:iggy@127.0.0.1:8090

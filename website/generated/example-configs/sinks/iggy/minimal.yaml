@@ -1,0 +1,10 @@
+sinks:
+  my_sink_id:
+    type: iggy
+    inputs:
+      - my-source-or-transform-id
+    encoding:
+      codec: json
+    stream: vector
+    topic: logs
+    url: iggy+tcp://iggy:iggy@127.0.0.1:8090
