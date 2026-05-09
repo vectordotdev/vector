@@ -580,6 +580,44 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              internal_metrics_cardinality.tags
 		}
+		iggy_consumer_lag_messages: {
+			description:       "The number of messages between the last consumed offset and the partition's current high-water offset."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags: _component_tags & {
+				stream: {
+					description: "The Iggy stream name."
+					required:    true
+				}
+				topic: {
+					description: "The Iggy topic name."
+					required:    true
+				}
+				partition: {
+					description: "The Iggy partition ID."
+					required:    true
+				}
+			}
+		}
+		iggy_consumer_offset: {
+			description:       "The offset of the last message consumed by the source for a partition."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags: _component_tags & {
+				stream: {
+					description: "The Iggy stream name."
+					required:    true
+				}
+				topic: {
+					description: "The Iggy topic name."
+					required:    true
+				}
+				partition: {
+					description: "The Iggy partition ID."
+					required:    true
+				}
+			}
+		}
 		kafka_queue_messages: {
 			description:       "Current number of messages in producer queues."
 			type:              "gauge"
