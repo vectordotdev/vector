@@ -457,6 +457,7 @@ http-body = { version = "1", default-features = false }
 http-body-util = { version = "0.1", default-features = false }
 hyper = { version = "1", default-features = false, features = ["client", "http1", "http2", "server"] }
 hyper-util = { version = "0.1", default-features = false, features = ["client", "client-legacy", "http1", "http2", "server", "server-auto", "server-graceful", "service", "tokio"] }
+iggy = { version = "0.12.0", optional = true }
 indexmap.workspace = true
 inventory = { version = "0.3.20", default-features = false }
 ipnet = { version = "2", default-features = false, optional = true, features = ["serde", "std"] }
@@ -745,6 +746,7 @@ sources-logs = [
   "sources-heroku_logs",
   "sources-http_server",
   "sources-http_client",
+  "sources-iggy",
   "sources-internal_logs",
   "sources-journald",
   "sources-kafka",
@@ -802,6 +804,7 @@ sources-heroku_logs = ["sources-utils-http", "sources-utils-http-query", "source
 sources-host_metrics = ["heim/cpu", "heim/host", "heim/memory", "heim/net"]
 sources-http_client = ["sources-utils-http-client"]
 sources-http_server = ["sources-utils-http", "sources-utils-http-headers", "sources-utils-http-query"]
+sources-iggy = ["dep:iggy"]
 sources-internal_logs = []
 sources-internal_metrics = []
 sources-static_metrics = []
@@ -942,6 +945,7 @@ sinks-logs = [
   "sinks-honeycomb",
   "sinks-http",
   "sinks-humio",
+  "sinks-iggy",
   "sinks-influxdb",
   "sinks-kafka",
   "sinks-keep",
@@ -1014,6 +1018,7 @@ sinks-greptimedb_logs = ["dep:greptimedb-ingester"]
 sinks-honeycomb = []
 sinks-http = []
 sinks-humio = ["sinks-splunk_hec", "transforms-metric_to_log"]
+sinks-iggy = ["dep:iggy"]
 sinks-influxdb = []
 sinks-kafka = ["dep:rdkafka"]
 sinks-keep = []
@@ -1068,6 +1073,7 @@ all-integration-tests = [
   "greptimedb-integration-tests",
   "http-client-integration-tests",
   "humio-integration-tests",
+  "iggy-integration-tests",
   "influxdb-integration-tests",
   "kafka-integration-tests",
   "logstash-integration-tests",
@@ -1145,6 +1151,7 @@ logstash-integration-tests = ["docker", "sources-logstash"]
 loki-integration-tests = ["sinks-loki"]
 mongodb_metrics-integration-tests = ["sources-mongodb_metrics"]
 mqtt-integration-tests = ["sinks-mqtt", "sources-mqtt"]
+iggy-integration-tests = ["sinks-iggy", "sources-iggy"]
 nats-integration-tests = ["sinks-nats", "sources-nats"]
 nginx-integration-tests = ["sources-nginx_metrics"]
 opentelemetry-integration-tests = ["sources-opentelemetry", "dep:prost"]
