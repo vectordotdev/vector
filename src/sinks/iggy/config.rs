@@ -112,7 +112,9 @@ impl SinkConfig for IggySinkConfig {
 }
 
 impl IggySinkConfig {
-    async fn connect_and_init(&self) -> Result<(Arc<IggyClient>, Arc<IggyProducer>), IggyError> {
+    pub(super) async fn connect_and_init(
+        &self,
+    ) -> Result<(Arc<IggyClient>, Arc<IggyProducer>), IggyError> {
         use iggy::prelude::{Client, IggyClientBuilder, MaxTopicSize};
 
         let client =
