@@ -108,6 +108,8 @@ on:
         value: ${{ jobs.int_tests.outputs.humio }}
       http-client:
         value: ${{ jobs.int_tests.outputs.http-client }}
+      iggy:
+        value: ${{ jobs.int_tests.outputs.iggy }}
       influxdb:
         value: ${{ jobs.int_tests.outputs.influxdb }}
       kafka:
@@ -329,6 +331,7 @@ jobs:
       greptimedb: ${{ steps.filter.outputs.greptimedb }}
       humio: ${{ steps.filter.outputs.humio }}
       http-client: ${{ steps.filter.outputs.http-client }}
+      iggy: ${{ steps.filter.outputs.iggy }}
       influxdb: ${{ steps.filter.outputs.influxdb }}
       kafka: ${{ steps.filter.outputs.kafka }}
       logstash: ${{ steps.filter.outputs.logstash }}
@@ -395,6 +398,7 @@ jobs:
             "greptimedb": ${{ steps.filter.outputs.greptimedb }},
             "humio": ${{ steps.filter.outputs.humio }},
             "http-client": ${{ steps.filter.outputs.http-client }},
+            "iggy": ${{ steps.filter.outputs.iggy }},
             "influxdb": ${{ steps.filter.outputs.influxdb }},
             "kafka": ${{ steps.filter.outputs.kafka }},
             "logstash": ${{ steps.filter.outputs.logstash }},
