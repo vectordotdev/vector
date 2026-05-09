@@ -52,6 +52,16 @@ pub enum HttpServerAuthConfig {
         password: SensitiveString,
     },
 
+    /// Bearer authentication.
+    ///
+    /// The token is matched against the `Authorization` header using the `Bearer` scheme.
+    Bearer {
+        /// The bearer token to match against incoming requests.
+        #[configurable(metadata(docs::examples = "${TOKEN}"))]
+        #[configurable(metadata(docs::examples = "my-secret-token"))]
+        token: SensitiveString,
+    },
+
     /// Custom authentication using VRL code.
     ///
     /// Takes in request and validates it using VRL code.
@@ -69,13 +79,13 @@ impl<'de> Deserialize<'de> for HttpServerAuthConfig {
     {
         struct HttpServerAuthConfigVisitor;
 
-        const FIELD_KEYS: [&str; 4] = ["strategy", "username", "password", "source"];
+        const FIELD_KEYS: [&str; 5] = ["strategy", "username", "password", "token", "source"];
 
         impl<'de> Visitor<'de> for HttpServerAuthConfigVisitor {
             type Value = HttpServerAuthConfig;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("a valid authentication strategy (basic or custom)")
+                formatter.write_str("a valid authentication strategy (basic, bearer, or custom)")
             }
 
             fn visit_map<A>(self, mut map: A) -> Result<HttpServerAuthConfig, A::Error>
@@ -114,13 +124,24 @@ impl<'de> Deserialize<'de> for HttpServerAuthConfig {
                             password: SensitiveString::from(password),
                         })
                     }
+                    "bearer" => {
+                        let token = fields
+                            .remove("token")
+                            .ok_or_else(|| Error::missing_field("token"))?;
+                        Ok(HttpServerAuthConfig::Bearer {
+                            token: SensitiveString::from(token),
+                        })
+                    }
                     "custom" => {
                         let source = fields
                             .remove("source")
                             .ok_or_else(|| Error::missing_field("source"))?;
                         Ok(HttpServerAuthConfig::Custom { source })
                     }
-                    _ => Err(Error::unknown_variant(strategy, &["basic", "custom"])),
+                    _ => Err(Error::unknown_variant(
+                        strategy,
+                        &["basic", "bearer", "custom"],
+                    )),
                 }
             }
         }
@@ -143,6 +164,15 @@ impl HttpServerAuthConfig {
                 Ok(HttpServerAuthMatcher::AuthHeader(
                     Authorization::basic(username, password.inner()).0.encode(),
                     "Invalid username/password",
+                ))
+            }
+            HttpServerAuthConfig::Bearer { token } => {
+                let auth = Authorization::bearer(token.inner()).map_err(|e| {
+                    format!("Invalid bearer token: {e}")
+                })?;
+                Ok(HttpServerAuthMatcher::AuthHeader(
+                    auth.0.encode(),
+                    "Invalid token",
                 ))
             }
             HttpServerAuthConfig::Custom { source } => {
@@ -400,6 +430,112 @@ mod tests {
             Authorization::basic(&username, &password).0.encode(),
             header
         );
+    }
+
+    #[test]
+    fn config_should_support_bearer_strategy() {
+        let config: HttpServerAuthConfig = serde_yaml::from_str(indoc! { r#"
+            strategy: bearer
+            token: my-secret-token
+            "#
+        })
+        .unwrap();
+
+        if let HttpServerAuthConfig::Bearer { token } = config {
+            assert_eq!(token.inner(), "my-secret-token");
+        } else {
+            panic!("Expected HttpServerAuthConfig::Bearer");
+        }
+    }
+
+    #[test]
+    fn build_bearer_auth_should_always_work() {
+        let bearer_auth = HttpServerAuthConfig::Bearer {
+            token: random_string(16).into(),
+        };
+
+        let matcher = bearer_auth.build(&Default::default(), &Default::default());
+
+        assert!(matcher.is_ok());
+        assert!(matches!(
+            matcher.unwrap(),
+            HttpServerAuthMatcher::AuthHeader { .. }
+        ));
+    }
+
+    #[test]
+    fn build_bearer_auth_should_use_token_related_message() {
+        let bearer_auth = HttpServerAuthConfig::Bearer {
+            token: random_string(16).into(),
+        };
+
+        let (_, error_message) = bearer_auth
+            .build(&Default::default(), &Default::default())
+            .unwrap()
+            .auth_header();
+        assert_eq!("Invalid token", error_message);
+    }
+
+    #[test]
+    fn bearer_auth_matcher_should_return_401_when_missing_auth_header() {
+        let bearer_auth = HttpServerAuthConfig::Bearer {
+            token: "my-token".into(),
+        };
+
+        let matcher = bearer_auth
+            .build(&Default::default(), &Default::default())
+            .unwrap();
+
+        let (_guard, addr) = next_addr();
+        let result = matcher.handle_auth(Some(&addr), &HeaderMap::new(), "/");
+
+        assert!(result.is_err());
+        let error = result.unwrap_err();
+        assert_eq!(401, error.code());
+        assert_eq!("No authorization header", error.message());
+    }
+
+    #[test]
+    fn bearer_auth_matcher_should_return_401_with_wrong_token() {
+        let bearer_auth = HttpServerAuthConfig::Bearer {
+            token: "my-token".into(),
+        };
+
+        let matcher = bearer_auth
+            .build(&Default::default(), &Default::default())
+            .unwrap();
+
+        let mut headers = HeaderMap::new();
+        headers.insert(AUTHORIZATION, HeaderValue::from_static("Bearer wrong-token"));
+        let (_guard, addr) = next_addr();
+        let result = matcher.handle_auth(Some(&addr), &headers, "/");
+
+        assert!(result.is_err());
+        let error = result.unwrap_err();
+        assert_eq!(401, error.code());
+        assert_eq!("Invalid token", error.message());
+    }
+
+    #[test]
+    fn bearer_auth_matcher_should_return_ok_for_correct_token() {
+        let token = "my-secret-token";
+        let bearer_auth = HttpServerAuthConfig::Bearer {
+            token: token.into(),
+        };
+
+        let matcher = bearer_auth
+            .build(&Default::default(), &Default::default())
+            .unwrap();
+
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            AUTHORIZATION,
+            Authorization::bearer(token).unwrap().0.encode(),
+        );
+        let (_guard, addr) = next_addr();
+        let result = matcher.handle_auth(Some(&addr), &headers, "/");
+
+        assert!(result.is_ok());
     }
 
     #[test]

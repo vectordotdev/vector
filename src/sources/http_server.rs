@@ -1612,6 +1612,91 @@ mod tests {
         assert_eq!(200, send_with_headers(addr, "", headers).await);
     }
 
+    #[tokio::test]
+    async fn returns_401_when_required_bearer_auth_is_missing() {
+        components::init_test();
+        let (_rx, addr) = source(
+            vec![],
+            vec![],
+            "http_path",
+            "remote_ip",
+            "/",
+            "GET",
+            StatusCode::OK,
+            Some(HttpServerAuthConfig::Bearer {
+                token: "my-token".into(),
+            }),
+            true,
+            EventStatus::Delivered,
+            true,
+            None,
+            None,
+        )
+        .await;
+
+        assert_eq!(401, send_request(addr, "GET", "", "/").await);
+    }
+
+    #[tokio::test]
+    async fn returns_401_when_required_bearer_auth_is_wrong() {
+        components::init_test();
+        let (_rx, addr) = source(
+            vec![],
+            vec![],
+            "http_path",
+            "remote_ip",
+            "/",
+            "POST",
+            StatusCode::OK,
+            Some(HttpServerAuthConfig::Bearer {
+                token: "my-token".into(),
+            }),
+            true,
+            EventStatus::Delivered,
+            true,
+            None,
+            None,
+        )
+        .await;
+
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            AUTHORIZATION,
+            Authorization::bearer("wrong-token").unwrap().0.encode(),
+        );
+        assert_eq!(401, send_with_headers(addr, "", headers).await);
+    }
+
+    #[tokio::test]
+    async fn http_post_with_correct_bearer_auth() {
+        components::init_test();
+        let (_rx, addr) = source(
+            vec![],
+            vec![],
+            "http_path",
+            "remote_ip",
+            "/",
+            "POST",
+            StatusCode::OK,
+            Some(HttpServerAuthConfig::Bearer {
+                token: "my-token".into(),
+            }),
+            true,
+            EventStatus::Delivered,
+            true,
+            None,
+            None,
+        )
+        .await;
+
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            AUTHORIZATION,
+            Authorization::bearer("my-token").unwrap().0.encode(),
+        );
+        assert_eq!(200, send_with_headers(addr, "", headers).await);
+    }
+
     #[test]
     fn output_schema_definition_vector_namespace() {
         let config = SimpleHttpConfig {
