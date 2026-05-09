@@ -1,0 +1,12 @@
+version: "3"
+
+services:
+  iggy:
+    image: docker.io/apache/iggy:${CONFIG_VERSION}
+    ports:
+      - 8090:8090
+
+networks:
+  default:
+    name: ${VECTOR_NETWORK}
+    external: true
