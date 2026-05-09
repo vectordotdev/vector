@@ -132,6 +132,7 @@ jobs:
             "gcp",
             "greptimedb",
             "http-client",
+            "iggy",
             "influxdb",
             "kafka",
             "logstash",
