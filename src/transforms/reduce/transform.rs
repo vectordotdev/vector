@@ -272,13 +272,35 @@ impl Reduce {
         };
     }
 
+    // Like push_or_new_reduce_state but flushes immediately when the event alone exceeds
+    // max_bytes. This handles the case where the very first event for a discriminant is
+    // already over the limit and would otherwise sit in state until expiration.
+    fn push_or_new_reduce_state_flushing_oversize(
+        &mut self,
+        event: LogEvent,
+        discriminant: Discriminant,
+        emitter: &mut Emitter<Event>,
+    ) {
+        self.push_or_new_reduce_state(event, discriminant.clone());
+        if let Some(max_bytes) = self.max_bytes
+            && self
+                .reduce_merge_states
+                .get(&discriminant)
+                .is_some_and(|s| s.size_bytes > max_bytes)
+        {
+            let state = self.reduce_merge_states.remove(&discriminant).unwrap();
+            emit!(ReduceByteLimitFlushed);
+            emitter.emit(state.flush().into());
+        }
+    }
+
     pub fn transform_one(&mut self, emitter: &mut Emitter<Event>, event: Event) {
         let (starts_here, event) = match &self.starts_when {
             Some(condition) => condition.check(event),
             None => (false, event),
         };
 
-        let (mut ends_here, event) = match &self.ends_when {
+        let (ends_when_here, event) = match &self.ends_when {
             Some(condition) => condition.check(event),
             None => (false, event),
         };
@@ -286,6 +308,11 @@ impl Reduce {
         let event = event.into_log();
         let discriminant = Discriminant::from_log_event(&event, &self.group_by);
 
+        // ends_when_here tracks only the condition result; ends_here may also be set by
+        // max_events. The bytes_overflow branch uses ends_when_here so that a max_events
+        // limit evaluated against the old group does not cause the triggering event to be
+        // emitted alone instead of starting a new group.
+        let mut ends_here = ends_when_here;
         if let Some(max_events) = self.max_events {
             if max_events == 1 {
                 ends_here = true;
@@ -311,21 +338,22 @@ impl Reduce {
                 emitter.emit(state.flush().into());
             }
 
-            self.push_or_new_reduce_state(event, discriminant)
+            self.push_or_new_reduce_state_flushing_oversize(event, discriminant, emitter)
         } else if bytes_overflow {
             if let Some(state) = self.reduce_merge_states.remove(&discriminant) {
                 emit!(ReduceByteLimitFlushed);
                 emitter.emit(state.flush().into());
             }
 
-            // If the event that triggered the overflow is also an end event, flush it immediately
-            // as a group of one rather than holding it open waiting for a future end condition.
-            if ends_here {
+            // Only flush the triggering event as a group of one if ends_when fired — the
+            // max_events condition was evaluated against the old group and does not apply
+            // to the new group this event is about to start.
+            if ends_when_here {
                 let mut state = ReduceState::new();
                 state.add_event(event, &self.merge_strategies);
                 emitter.emit(state.flush().into());
             } else {
-                self.push_or_new_reduce_state(event, discriminant);
+                self.push_or_new_reduce_state_flushing_oversize(event, discriminant, emitter);
             }
         } else if ends_here {
             emitter.emit(match self.reduce_merge_states.remove(&discriminant) {
@@ -340,7 +368,7 @@ impl Reduce {
                 }
             });
         } else {
-            self.push_or_new_reduce_state(event, discriminant)
+            self.push_or_new_reduce_state_flushing_oversize(event, discriminant, emitter)
         }
     }
 }
