@@ -6,7 +6,10 @@ use std::{
 
 use futures::Stream;
 use indexmap::IndexMap;
-use vector_lib::stream::expiration_map::{Emitter, map_with_expiration};
+use vector_lib::{
+    ByteSizeOf,
+    stream::expiration_map::{Emitter, map_with_expiration},
+};
 use vector_vrl_metrics::MetricsStorage;
 use vrl::{
     path::{OwnedTargetPath, parse_target_path},
@@ -16,7 +19,7 @@ use vrl::{
 use crate::{
     conditions::Condition,
     event::{Event, EventMetadata, LogEvent, discriminant::Discriminant},
-    internal_events::{ReduceAddEventError, ReduceStaleEventFlushed},
+    internal_events::{ReduceAddEventError, ReduceByteLimitFlushed, ReduceStaleEventFlushed},
     transforms::{
         TaskTransform,
         reduce::{
@@ -29,6 +32,7 @@ use crate::{
 #[derive(Clone, Debug)]
 struct ReduceState {
     events: usize,
+    size_bytes: usize,
     fields: HashMap<OwnedTargetPath, Box<dyn ReduceValueMerger>>,
     stale_since: Instant,
     creation: Instant,
@@ -53,6 +57,7 @@ impl ReduceState {
     fn new() -> Self {
         Self {
             events: 0,
+            size_bytes: 0,
             stale_since: Instant::now(),
             creation: Instant::now(),
             fields: HashMap::new(),
@@ -61,6 +66,7 @@ impl ReduceState {
     }
 
     fn add_event(&mut self, e: LogEvent, strategies: &IndexMap<OwnedTargetPath, MergeStrategy>) {
+        self.size_bytes += e.size_of();
         self.metadata.merge(e.metadata().clone());
 
         for (path, strategy) in strategies {
@@ -150,6 +156,7 @@ pub struct Reduce {
     ends_when: Option<Condition>,
     starts_when: Option<Condition>,
     max_events: Option<usize>,
+    max_bytes: Option<usize>,
 }
 
 fn validate_merge_strategies(strategies: IndexMap<KeyString, MergeStrategy>) -> crate::Result<()> {
@@ -193,6 +200,7 @@ impl Reduce {
             .transpose()?;
         let group_by = config.group_by.clone().into_iter().collect();
         let max_events = config.max_events.map(|max| max.into());
+        let max_bytes = config.max_bytes.map(|max| max.into());
 
         validate_merge_strategies(config.merge_strategies.clone())?;
 
@@ -219,6 +227,7 @@ impl Reduce {
             ends_when,
             starts_when,
             max_events,
+            max_bytes,
         })
     }
 
@@ -288,12 +297,36 @@ impl Reduce {
             }
         }
 
+        // If the incoming event would push the current group over the byte limit, flush the
+        // current group first and begin a new group with this event. A single event that exceeds
+        // the limit on its own is permitted as a group of one.
+        let bytes_overflow = self.max_bytes.is_some_and(|max_bytes| {
+            self.reduce_merge_states
+                .get(&discriminant)
+                .is_some_and(|state| state.size_bytes + event.size_of() > max_bytes)
+        });
+
         if starts_here {
             if let Some(state) = self.reduce_merge_states.remove(&discriminant) {
                 emitter.emit(state.flush().into());
             }
 
             self.push_or_new_reduce_state(event, discriminant)
+        } else if bytes_overflow {
+            if let Some(state) = self.reduce_merge_states.remove(&discriminant) {
+                emit!(ReduceByteLimitFlushed);
+                emitter.emit(state.flush().into());
+            }
+
+            // If the event that triggered the overflow is also an end event, flush it immediately
+            // as a group of one rather than holding it open waiting for a future end condition.
+            if ends_here {
+                let mut state = ReduceState::new();
+                state.add_event(event, &self.merge_strategies);
+                emitter.emit(state.flush().into());
+            } else {
+                self.push_or_new_reduce_state(event, discriminant);
+            }
         } else if ends_here {
             emitter.emit(match self.reduce_merge_states.remove(&discriminant) {
                 Some(mut state) => {
@@ -361,7 +394,7 @@ mod test {
     use serde_json::json;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
-    use vector_lib::{enrichment::TableRegistry, lookup::owned_value_path};
+    use vector_lib::{ByteSizeOf, enrichment::TableRegistry, lookup::owned_value_path};
     use vrl::value::Kind;
 
     use super::*;
@@ -1046,5 +1079,177 @@ merge_strategies.bar = "concat"
             assert_eq!(out.recv().await, None);
         })
         .await
+    }
+
+    // Returns the in-memory size of a representative test event so we can set max_bytes limits.
+    fn test_event_size() -> usize {
+        let mut e = LogEvent::from("test 1");
+        e.insert("id", "1");
+        e.size_of()
+    }
+
+    #[tokio::test]
+    async fn max_bytes_basic() {
+        let event_size = test_event_size();
+        // Limit fits exactly 2 events; the 3rd triggers an overflow flush.
+        let max_bytes = event_size * 2 + 1;
+        // Match on message value so the end-event needs no extra fields and stays
+        // the same size as the others.
+        let config = toml::from_str::<ReduceConfig>(&format!(
+            r#"
+group_by = ["id"]
+max_bytes = {max_bytes}
+merge_strategies.id = "retain"
+merge_strategies.message = "array"
+
+[ends_when]
+  type = "vrl"
+  source = ".message == \"test 4\""
+"#
+        ))
+        .unwrap();
+
+        assert_transform_compliance(async move {
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
+
+            let mut e1 = LogEvent::from("test 1");
+            e1.insert("id", "1");
+            let mut e2 = LogEvent::from("test 2");
+            e2.insert("id", "1");
+            // e3 pushes the group over the limit, flushing {e1, e2} immediately.
+            let mut e3 = LogEvent::from("test 3");
+            e3.insert("id", "1");
+            // e4 closes the second group (containing e3) via ends_when.
+            let mut e4 = LogEvent::from("test 4");
+            e4.insert("id", "1");
+
+            for event in [e1.into(), e2.into(), e3.into(), e4.into()] {
+                tx.send(event).await.unwrap();
+            }
+
+            let output_1 = out.recv().await.unwrap().into_log();
+            assert_eq!(output_1["message"], vec!["test 1", "test 2"].into());
+
+            let output_2 = out.recv().await.unwrap().into_log();
+            assert_eq!(output_2["message"], vec!["test 3", "test 4"].into());
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn max_bytes_single_event_larger_than_limit() {
+        // max_bytes = 1 is smaller than any real event, so any second event arriving into an
+        // existing group always triggers an overflow. Single events are still accepted as their
+        // own group (no existing group to overflow).
+        let config = toml::from_str::<ReduceConfig>(indoc!(
+            r#"
+            group_by = ["id"]
+            max_bytes = 1
+            merge_strategies.id = "retain"
+            merge_strategies.message = "array"
+
+            [ends_when]
+              type = "vrl"
+              source = "exists(.is_end)"
+            "#
+        ))
+        .unwrap();
+
+        assert_transform_compliance(async move {
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
+
+            // e1: no existing group → pushed into a fresh group, no overflow.
+            let mut e1 = LogEvent::from("test 1");
+            e1.insert("id", "1");
+            // e2: overflows e1's group; e2 itself starts a new group.
+            let mut e2 = LogEvent::from("test 2");
+            e2.insert("id", "1");
+            // e3: overflows e2's group AND satisfies ends_when → emitted immediately as its own
+            // group of one (the bytes_overflow + ends_here special case).
+            let mut e3 = LogEvent::from("test 3");
+            e3.insert("id", "1");
+            e3.insert("is_end", true);
+
+            for event in [e1.into(), e2.into(), e3.into()] {
+                tx.send(event).await.unwrap();
+            }
+
+            // Each event was its own group, all flushed immediately.
+            let output_1 = out.recv().await.unwrap().into_log();
+            assert_eq!(output_1["message"], vec!["test 1"].into());
+
+            let output_2 = out.recv().await.unwrap().into_log();
+            assert_eq!(output_2["message"], vec!["test 2"].into());
+
+            let output_3 = out.recv().await.unwrap().into_log();
+            assert_eq!(output_3["message"], vec!["test 3"].into());
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn max_bytes_takes_priority_over_max_events() {
+        let event_size = test_event_size();
+        // max_bytes only fits 2 events; max_events = 5 would allow 5 without the byte limit.
+        // The byte limit should take priority and flush after every 2 events.
+        let max_bytes = event_size * 2 + 1;
+        // Match on message value so the end-event needs no extra fields and stays
+        // the same size as the others.
+        let config = toml::from_str::<ReduceConfig>(&format!(
+            r#"
+group_by = ["id"]
+max_bytes = {max_bytes}
+max_events = 5
+merge_strategies.id = "retain"
+merge_strategies.message = "array"
+
+[ends_when]
+  type = "vrl"
+  source = ".message == \"test 4\""
+"#
+        ))
+        .unwrap();
+
+        assert_transform_compliance(async move {
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
+
+            let mut e1 = LogEvent::from("test 1");
+            e1.insert("id", "1");
+            let mut e2 = LogEvent::from("test 2");
+            e2.insert("id", "1");
+            // e3 pushes the group over the byte limit, flushing {e1, e2} immediately.
+            let mut e3 = LogEvent::from("test 3");
+            e3.insert("id", "1");
+            // e4 closes the second group (containing e3) via ends_when.
+            let mut e4 = LogEvent::from("test 4");
+            e4.insert("id", "1");
+
+            for event in [e1.into(), e2.into(), e3.into(), e4.into()] {
+                tx.send(event).await.unwrap();
+            }
+
+            // Byte limit triggered the first flush (not max_events).
+            let output_1 = out.recv().await.unwrap().into_log();
+            assert_eq!(output_1["message"], vec!["test 1", "test 2"].into());
+
+            let output_2 = out.recv().await.unwrap().into_log();
+            assert_eq!(output_2["message"], vec!["test 3", "test 4"].into());
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        })
+        .await;
     }
 }
