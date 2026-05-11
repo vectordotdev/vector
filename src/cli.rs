@@ -524,10 +524,15 @@ pub fn handle_config_errors(errors: Vec<String>) -> exitcode::ExitCode {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(unix)]
+    static RLIMIT_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     #[test]
     #[cfg(unix)]
     fn test_raise_file_descriptor_limit() {
         use nix::sys::resource::{Resource, getrlimit, setrlimit};
+
+        let _lock = RLIMIT_MUTEX.lock().unwrap();
 
         // Save original limits
         let (original_soft, hard) = getrlimit(Resource::RLIMIT_NOFILE).unwrap();
@@ -560,6 +565,8 @@ mod tests {
     #[cfg(unix)]
     fn test_raise_file_descriptor_limit_already_at_max() {
         use nix::sys::resource::{Resource, getrlimit, setrlimit};
+
+        let _lock = RLIMIT_MUTEX.lock().unwrap();
 
         // Save original limits
         let (original_soft, hard) = getrlimit(Resource::RLIMIT_NOFILE).unwrap();
