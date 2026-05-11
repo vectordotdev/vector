@@ -33,6 +33,7 @@ const COVERAGE_COMMAND: &[&str] = &[
     "cargo",
     "llvm-cov",
     "nextest",
+    "--workspace",
     "--no-fail-fast",
     "--no-default-features",
 ];
