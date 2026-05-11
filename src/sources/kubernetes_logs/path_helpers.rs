@@ -20,8 +20,20 @@ pub(super) fn build_pod_logs_directory(
     pod_name: &str,
     pod_uid: &str,
 ) -> PathBuf {
+    build_pod_logs_directory_with_root(K8S_LOGS_DIR, pod_namespace, pod_name, pod_uid)
+}
+
+/// Like [`build_pod_logs_directory`] but with a configurable root directory.
+///
+/// Used to override the default `/var/log/pods` path in tests.
+pub(super) fn build_pod_logs_directory_with_root(
+    root: &str,
+    pod_namespace: &str,
+    pod_name: &str,
+    pod_uid: &str,
+) -> PathBuf {
     [
-        K8S_LOGS_DIR,
+        root,
         &[pod_namespace, pod_name, pod_uid].join(LOG_PATH_DELIMITER),
     ]
     .join("/")
