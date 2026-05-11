@@ -3,12 +3,10 @@
 use crate::config::ProxyConfig;
 use crate::event::Event;
 use crate::http::HttpClient;
-use crate::sinks::util::metadata::RequestMetadataBuilder;
 use crate::sinks::util::retries::RetryLogic;
 use crate::tls::TlsSettings;
 use databricks_zerobus_ingest_sdk::{ConnectorFactory, ProxyConnector, ZerobusSdk, ZerobusStream};
 use futures::future::BoxFuture;
-use std::num::NonZeroUsize;
 use std::sync::Arc;
 use tokio::sync::{Mutex, OnceCell, RwLock};
 use tower::Service;
@@ -16,7 +14,6 @@ use tracing::warn;
 use vector_lib::codecs::encoding::{
     BatchEncoder, BatchOutput, BatchSerializerConfig, ProtoBatchSerializerConfig,
 };
-use vector_lib::event::EventStatus;
 use vector_lib::finalization::{EventFinalizers, Finalizable};
 use vector_lib::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
 use vector_lib::stream::DriverResponse;
@@ -59,19 +56,15 @@ fn build_connector_factory(proxy: &ProxyConfig) -> Result<ConnectorFactory, Zero
     }))
 }
 
-/// The payload for a Zerobus request.
-///
-/// The zerobus sink only supports proto-encoded records.
-#[derive(Clone, Debug)]
-pub enum ZerobusPayload {
-    /// Pre-encoded protobuf records (one byte buffer per event).
-    Records(Vec<Vec<u8>>),
-}
-
 /// Request type for the Zerobus service.
-#[derive(Clone, Debug)]
+///
+/// Carries the *unencoded* batch — encoding happens inside `Service::call` so
+/// that schema-fetch failures (which are needed to build the encoder) flow
+/// through the Tower retry layer. The Tower retry policy requires `Clone` so
+/// the request can be re-issued on retry.
+#[derive(Clone)]
 pub struct ZerobusRequest {
-    pub payload: ZerobusPayload,
+    pub events: Vec<Event>,
     pub metadata: RequestMetadata,
     pub finalizers: EventFinalizers,
 }
@@ -340,47 +333,23 @@ impl ZerobusService {
             .await
     }
 
-    /// Encode a batch of events into a `ZerobusRequest`.
-    ///
-    /// Pure: the schema is assumed to already be resolved. Encoding failures
-    /// mark the batch's finalizers as `Rejected` before returning.
-    pub(super) fn encode_batch(
+    /// Encode a batch of events into protobuf records using a resolved schema.
+    pub(super) fn encode_records(
         schema: &ResolvedSchema,
-        mut events: Vec<Event>,
-    ) -> Result<ZerobusRequest, ZerobusSinkError> {
-        let finalizers = events.take_finalizers();
-        let metadata_builder = RequestMetadataBuilder::from_events(&events);
-
-        let batch_output = schema.encoder.encode_batch(&events).map_err(|e| {
-            finalizers.update_status(EventStatus::Rejected);
-            ZerobusSinkError::EncodingError {
+        events: &[Event],
+    ) -> Result<Vec<Vec<u8>>, ZerobusSinkError> {
+        match schema
+            .encoder
+            .encode_batch(events)
+            .map_err(|e| ZerobusSinkError::EncodingError {
                 message: format!("Failed to encode batch: {}", e),
-            }
-        })?;
-
-        let (payload, byte_size) = match batch_output {
-            BatchOutput::Records(records) => {
-                let size = records.iter().map(|r| r.len()).sum::<usize>();
-                (ZerobusPayload::Records(records), size)
-            }
+            })? {
+            BatchOutput::Records(records) => Ok(records),
             #[cfg(feature = "codecs-arrow")]
-            BatchOutput::Arrow(_) => {
-                finalizers.update_status(EventStatus::Rejected);
-                return Err(ZerobusSinkError::EncodingError {
-                    message: "The Databricks Zerobus sink only supports proto-batch output."
-                        .into(),
-                });
-            }
-        };
-
-        let request_size = NonZeroUsize::new(byte_size).unwrap_or(NonZeroUsize::MIN);
-        let metadata = metadata_builder.with_request_size(request_size);
-
-        Ok(ZerobusRequest {
-            payload,
-            metadata,
-            finalizers,
-        })
+            BatchOutput::Arrow(_) => Err(ZerobusSinkError::EncodingError {
+                message: "The Databricks Zerobus sink only supports proto-batch output.".into(),
+            }),
+        }
     }
 
     /// Ensure we have an active stream, creating one if necessary.
@@ -441,26 +410,20 @@ impl ZerobusService {
         }
     }
 
-    /// Ingest a payload (proto records or Arrow batch).
-    ///
-    /// Obtains an `Arc` handle to the stream (creating one if needed) and
-    /// then releases the lock before calling into the SDK so that concurrent
-    /// ingests are not serialized.
+    /// Send encoded records to an already-resolved stream.
     ///
     /// On retryable errors the active stream is removed from the slot so that
     /// the next attempt (driven by Tower retry) creates a fresh one.
-    pub async fn ingest(
+    async fn ingest(
         &self,
-        payload: ZerobusPayload,
+        stream: Arc<ActiveStream>,
+        records: Vec<Vec<u8>>,
         events_byte_size: GroupedCountByteSize,
     ) -> Result<ZerobusResponse, ZerobusSinkError> {
-        let schema = self.ensure_schema().await?;
-        let stream = self.get_or_create_stream(schema).await?;
-
         // Slot lock is not held here — concurrent ingests acquire read guards
         // on the inner `RwLock` and run truly in parallel.
-        let result = match (payload, stream.as_ref()) {
-            (ZerobusPayload::Records(records), ActiveStream::Proto(lock)) => {
+        let result = match stream.as_ref() {
+            ActiveStream::Proto(lock) => {
                 let guard = lock.read().await;
                 let Some(s) = guard.as_ref() else {
                     return Err(ZerobusSinkError::StreamClosed);
@@ -474,7 +437,7 @@ impl ZerobusService {
                 }
             }
             #[cfg(test)]
-            (ZerobusPayload::Records(_), ActiveStream::Mock(mock)) => mock.try_ingest().await,
+            ActiveStream::Mock(mock) => mock.try_ingest().await,
         };
 
         match result {
@@ -519,7 +482,12 @@ impl Service<ZerobusRequest> for ZerobusService {
         let events_byte_size =
             std::mem::take(request.metadata_mut()).into_events_estimated_json_encoded_byte_size();
 
-        Box::pin(async move { service.ingest(request.payload, events_byte_size).await })
+        Box::pin(async move {
+            let schema = service.ensure_schema().await?;
+            let records = Self::encode_records(schema, &request.events)?;
+            let stream = service.get_or_create_stream(schema).await?;
+            service.ingest(stream, records, events_byte_size).await
+        })
     }
 }
 
@@ -587,15 +555,7 @@ impl RetryLogic for ZerobusRetryLogic {
     type Response = ZerobusResponse;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
-        match error {
-            ZerobusSinkError::ZerobusError { source }
-            | ZerobusSinkError::StreamInitError { source }
-            | ZerobusSinkError::IngestionError { source } => source.is_retryable(),
-            ZerobusSinkError::StreamClosed => true,
-            ZerobusSinkError::ConfigError { .. }
-            | ZerobusSinkError::EncodingError { .. }
-            | ZerobusSinkError::MissingAckOffset => false,
-        }
+        error.is_retryable()
     }
 }
 
@@ -624,8 +584,12 @@ mod tests {
         }
     }
 
-    fn dummy_payload() -> ZerobusPayload {
-        ZerobusPayload::Records(vec![vec![1, 2, 3]])
+    fn dummy_records() -> Vec<Vec<u8>> {
+        vec![vec![1, 2, 3]]
+    }
+
+    async fn current_stream(service: &ZerobusService) -> Arc<ActiveStream> {
+        service.stream.lock().await.as_ref().unwrap().clone()
     }
 
     #[tokio::test]
@@ -634,8 +598,9 @@ mod tests {
             .await
             .unwrap();
 
+        let stream = current_stream(&service).await;
         let result = service
-            .ingest(dummy_payload(), GroupedCountByteSize::new_untagged())
+            .ingest(stream, dummy_records(), GroupedCountByteSize::new_untagged())
             .await;
 
         assert!(result.is_ok());
@@ -653,8 +618,9 @@ mod tests {
 
         assert!(service.has_active_stream().await);
 
+        let stream = current_stream(&service).await;
         let err = service
-            .ingest(dummy_payload(), GroupedCountByteSize::new_untagged())
+            .ingest(stream, dummy_records(), GroupedCountByteSize::new_untagged())
             .await
             .unwrap_err();
 
@@ -673,8 +639,9 @@ mod tests {
 
         assert!(service.has_active_stream().await);
 
+        let stream = current_stream(&service).await;
         let err = service
-            .ingest(dummy_payload(), GroupedCountByteSize::new_untagged())
+            .ingest(stream, dummy_records(), GroupedCountByteSize::new_untagged())
             .await
             .unwrap_err();
 
@@ -693,9 +660,10 @@ mod tests {
             .unwrap();
 
         // First ingest succeeds.
+        let stream = current_stream(&service).await;
         assert!(
             service
-                .ingest(dummy_payload(), GroupedCountByteSize::new_untagged())
+                .ingest(stream, dummy_records(), GroupedCountByteSize::new_untagged())
                 .await
                 .is_ok()
         );
@@ -712,8 +680,9 @@ mod tests {
         }
 
         // Second ingest fails and clears the stream.
+        let stream = current_stream(&service).await;
         let err = service
-            .ingest(dummy_payload(), GroupedCountByteSize::new_untagged())
+            .ingest(stream, dummy_records(), GroupedCountByteSize::new_untagged())
             .await
             .unwrap_err();
         assert!(ZerobusRetryLogic.is_retriable_error(&err));
@@ -724,9 +693,10 @@ mod tests {
         *service.stream.lock().await = Some(Arc::new(ActiveStream::Mock(MockStream::succeeding())));
 
         // Third ingest succeeds on the new stream.
+        let stream = current_stream(&service).await;
         assert!(
             service
-                .ingest(dummy_payload(), GroupedCountByteSize::new_untagged())
+                .ingest(stream, dummy_records(), GroupedCountByteSize::new_untagged())
                 .await
                 .is_ok()
         );
@@ -769,16 +739,18 @@ mod tests {
             .await
             .unwrap();
 
-        // Spawn two concurrent ingests. Each will obtain its own `Arc` clone
-        // from `get_or_create_stream`, then block in the gate.
+        // Spawn two concurrent ingests. Each clones the same stream `Arc`,
+        // then blocks in the gate.
         let s1 = service.clone();
         let t1 = tokio::spawn(async move {
-            s1.ingest(dummy_payload(), GroupedCountByteSize::new_untagged())
+            let stream = current_stream(&s1).await;
+            s1.ingest(stream, dummy_records(), GroupedCountByteSize::new_untagged())
                 .await
         });
         let s2 = service.clone();
         let t2 = tokio::spawn(async move {
-            s2.ingest(dummy_payload(), GroupedCountByteSize::new_untagged())
+            let stream = current_stream(&s2).await;
+            s2.ingest(stream, dummy_records(), GroupedCountByteSize::new_untagged())
                 .await
         });
 

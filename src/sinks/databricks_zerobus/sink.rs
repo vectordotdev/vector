@@ -1,15 +1,17 @@
 //! The main Zerobus sink implementation.
 
+use std::num::NonZeroUsize;
+
+use futures::StreamExt;
 use futures::stream::BoxStream;
 
-use vector_lib::event::EventStatus;
 use vector_lib::finalization::Finalizable;
 
 use crate::sinks::prelude::*;
-use crate::sinks::util::request_builder::default_request_builder_concurrency_limit;
+use crate::sinks::util::metadata::RequestMetadataBuilder;
 use crate::sinks::util::{RealtimeSizeBasedDefaultBatchSettings, TowerRequestSettings};
 
-use super::service::{ZerobusRetryLogic, ZerobusService};
+use super::service::{ZerobusRequest, ZerobusRetryLogic, ZerobusService};
 
 /// The main Zerobus sink.
 pub struct ZerobusSink {
@@ -39,28 +41,16 @@ impl ZerobusSink {
                 .settings(self.request_limits, ZerobusRetryLogic)
                 .service(self.service.clone());
 
-            let encoding_service = self.service.clone();
             input
                 .batched(self.batch_settings.as_byte_size_config())
-                .concurrent_map(default_request_builder_concurrency_limit(), move |mut events| {
-                    let service = encoding_service.clone();
-                    Box::pin(async move {
-                        match service.ensure_schema().await {
-                            Ok(schema) => ZerobusService::encode_batch(schema, events),
-                            Err(e) => {
-                                events.take_finalizers().update_status(EventStatus::Rejected);
-                                Err(e)
-                            }
-                        }
-                    })
-                })
-                .filter_map(|result| async move {
-                    match result {
-                        Err(error) => {
-                            emit!(SinkRequestBuildError { error });
-                            None
-                        }
-                        Ok(req) => Some(req),
+                .map(|mut events| {
+                    let finalizers = events.take_finalizers();
+                    let metadata =
+                        RequestMetadataBuilder::from_events(&events).with_request_size(NonZeroUsize::MIN);
+                    ZerobusRequest {
+                        events,
+                        metadata,
+                        finalizers,
                     }
                 })
                 .into_driver(tower_service)
