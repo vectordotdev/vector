@@ -14,9 +14,7 @@ use prost_reflect::prost_types;
 use serde::Deserialize;
 
 use super::error::ZerobusSinkError;
-use crate::config::ProxyConfig;
 use crate::http::HttpClient;
-use crate::tls::TlsSettings;
 
 // Alias the SDK types under the names the rest of the sink already uses.
 #[cfg(test)]
@@ -35,22 +33,10 @@ pub async fn fetch_table_schema(
     table_name: &str,
     client_id: &str,
     client_secret: &str,
-    proxy: &ProxyConfig,
+    http_client: &HttpClient,
 ) -> Result<UnityCatalogTableSchema, ZerobusSinkError> {
-    let http_client = HttpClient::new(TlsSettings::default(), proxy).map_err(|e| {
-        ZerobusSinkError::ConfigError {
-            message: format!("Failed to create HTTP client: {}", e),
-        }
-    })?;
-
-    // First, get OAuth token
-    let token = get_oauth_token(
-        &http_client,
-        unity_catalog_endpoint,
-        client_id,
-        client_secret,
-    )
-    .await?;
+    let token = get_oauth_token(http_client, unity_catalog_endpoint, client_id, client_secret)
+        .await?;
 
     // Fetch table schema.
     // Encode each segment of the fully-qualified table name (catalog.schema.table)
