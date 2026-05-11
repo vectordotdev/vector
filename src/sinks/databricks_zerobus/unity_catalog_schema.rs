@@ -46,8 +46,13 @@ pub async fn fetch_table_schema(
     client_secret: &str,
     http_client: &HttpClient,
 ) -> Result<UnityCatalogTableSchema, ZerobusSinkError> {
-    let token = get_oauth_token(http_client, unity_catalog_endpoint, client_id, client_secret)
-        .await?;
+    let token = get_oauth_token(
+        http_client,
+        unity_catalog_endpoint,
+        client_id,
+        client_secret,
+    )
+    .await?;
 
     // Fetch table schema.
     // Encode each segment of the fully-qualified table name (catalog.schema.table)

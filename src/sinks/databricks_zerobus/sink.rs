@@ -45,8 +45,8 @@ impl ZerobusSink {
                 .batched(self.batch_settings.as_byte_size_config())
                 .map(|mut events| {
                     let finalizers = events.take_finalizers();
-                    let metadata =
-                        RequestMetadataBuilder::from_events(&events).with_request_size(NonZeroUsize::MIN);
+                    let metadata = RequestMetadataBuilder::from_events(&events)
+                        .with_request_size(NonZeroUsize::MIN);
                     ZerobusRequest {
                         events,
                         metadata,

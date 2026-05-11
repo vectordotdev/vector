@@ -600,7 +600,11 @@ mod tests {
 
         let stream = current_stream(&service).await;
         let result = service
-            .ingest(stream, dummy_records(), GroupedCountByteSize::new_untagged())
+            .ingest(
+                stream,
+                dummy_records(),
+                GroupedCountByteSize::new_untagged(),
+            )
             .await;
 
         assert!(result.is_ok());
@@ -620,7 +624,11 @@ mod tests {
 
         let stream = current_stream(&service).await;
         let err = service
-            .ingest(stream, dummy_records(), GroupedCountByteSize::new_untagged())
+            .ingest(
+                stream,
+                dummy_records(),
+                GroupedCountByteSize::new_untagged(),
+            )
             .await
             .unwrap_err();
 
@@ -641,7 +649,11 @@ mod tests {
 
         let stream = current_stream(&service).await;
         let err = service
-            .ingest(stream, dummy_records(), GroupedCountByteSize::new_untagged())
+            .ingest(
+                stream,
+                dummy_records(),
+                GroupedCountByteSize::new_untagged(),
+            )
             .await
             .unwrap_err();
 
@@ -663,7 +675,11 @@ mod tests {
         let stream = current_stream(&service).await;
         assert!(
             service
-                .ingest(stream, dummy_records(), GroupedCountByteSize::new_untagged())
+                .ingest(
+                    stream,
+                    dummy_records(),
+                    GroupedCountByteSize::new_untagged()
+                )
                 .await
                 .is_ok()
         );
@@ -682,7 +698,11 @@ mod tests {
         // Second ingest fails and clears the stream.
         let stream = current_stream(&service).await;
         let err = service
-            .ingest(stream, dummy_records(), GroupedCountByteSize::new_untagged())
+            .ingest(
+                stream,
+                dummy_records(),
+                GroupedCountByteSize::new_untagged(),
+            )
             .await
             .unwrap_err();
         assert!(ZerobusRetryLogic.is_retriable_error(&err));
@@ -696,7 +716,11 @@ mod tests {
         let stream = current_stream(&service).await;
         assert!(
             service
-                .ingest(stream, dummy_records(), GroupedCountByteSize::new_untagged())
+                .ingest(
+                    stream,
+                    dummy_records(),
+                    GroupedCountByteSize::new_untagged()
+                )
                 .await
                 .is_ok()
         );
@@ -744,14 +768,22 @@ mod tests {
         let s1 = service.clone();
         let t1 = tokio::spawn(async move {
             let stream = current_stream(&s1).await;
-            s1.ingest(stream, dummy_records(), GroupedCountByteSize::new_untagged())
-                .await
+            s1.ingest(
+                stream,
+                dummy_records(),
+                GroupedCountByteSize::new_untagged(),
+            )
+            .await
         });
         let s2 = service.clone();
         let t2 = tokio::spawn(async move {
             let stream = current_stream(&s2).await;
-            s2.ingest(stream, dummy_records(), GroupedCountByteSize::new_untagged())
-                .await
+            s2.ingest(
+                stream,
+                dummy_records(),
+                GroupedCountByteSize::new_untagged(),
+            )
+            .await
         });
 
         // Wait until both ingests are inside the gate (both `Arc`s alive).
