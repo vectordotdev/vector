@@ -78,6 +78,7 @@ pub enum TrackingScope {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Inner {
     /// How many distinct values to accept for any given key.
+    #[configurable(validation(range(min = 1.0)))]
     #[serde(default = "default_value_limit")]
     pub value_limit: usize,
 
@@ -153,6 +154,7 @@ pub struct PerMetricConfig {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct OverrideInner {
     /// How many distinct values to accept for any given key. Ignored when `mode: excluded`.
+    #[configurable(validation(range(min = 1.0)))]
     #[serde(default = "default_value_limit")]
     pub value_limit: usize,
 
@@ -184,9 +186,7 @@ pub enum OverrideMode {
     Probabilistic(BloomFilterConfig),
 
     /// Skip cardinality tracking for this metric. All tag values pass through and nothing is
-    /// limited. Other tracking fields on the entry (`value_limit`, `limit_exceeded_action`,
-    /// `internal_metrics`) are ignored when this is selected. Any `per_tag_limits` entries
-    /// on this metric are also ignored.
+    /// limited. Other fields in this per-metric configuration are ignored when this is selected.
     Excluded,
 }
 
@@ -230,7 +230,7 @@ pub struct PerTagConfig {
 ///
 /// The tracking algorithm (`exact`/`probabilistic`), `cache_size_per_key`,
 /// `limit_exceeded_action`, and `internal_metrics` are always inherited from the
-/// enclosing per-metric configuration regardless of the per-tag mode.
+/// enclosing per-metric configuration.
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[serde(tag = "mode", rename_all = "snake_case", deny_unknown_fields)]
@@ -240,6 +240,7 @@ pub enum PerTagMode {
     /// algorithm and all other settings still apply.
     LimitOverride {
         /// Maximum number of distinct values to accept for this tag key.
+        #[configurable(validation(range(min = 1.0)))]
         value_limit: usize,
     },
     /// Opt this tag out of cardinality tracking entirely. All values pass through

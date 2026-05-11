@@ -129,9 +129,7 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 						exact: "Tracks cardinality exactly. See `Mode::Exact` for details."
 						excluded: """
 																			Skip cardinality tracking for this metric. All tag values pass through and nothing is
-																			limited. Other tracking fields on the entry (`value_limit`, `limit_exceeded_action`,
-																			`internal_metrics`) are ignored when this is selected. Any `per_tag_limits` entries
-																			on this metric are also ignored.
+																			limited. Other fields in this per-metric configuration are ignored when this is selected.
 																			"""
 						probabilistic: "Tracks cardinality probabilistically. See `Mode::Probabilistic` for details."
 					}

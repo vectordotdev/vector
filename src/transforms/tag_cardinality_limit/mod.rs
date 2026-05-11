@@ -56,7 +56,7 @@ pub struct TagCardinalityLimit {
 }
 
 impl TagCardinalityLimit {
-    fn new(config: Config) -> Self {
+    pub fn new(config: Config) -> Self {
         Self {
             config,
             accepted_tags: HashMap::new(),
