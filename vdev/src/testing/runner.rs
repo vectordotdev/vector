@@ -1,5 +1,5 @@
 use anyhow::Result;
-use std::{collections::HashSet, env, process::Command};
+use std::{collections::HashSet, process::Command};
 
 use super::config::{IntegrationRunnerConfig, RustToolchainConfig};
 use crate::{
@@ -41,8 +41,6 @@ const COVERAGE_COMMAND: &[&str] = &[
 const COVERAGE_OUTPUT_DIR: &str = "/coverage";
 /// Coverage output path on the host (relative to project root).
 pub(crate) const LOCAL_COVERAGE_OUTPUT_DIR: &str = "target/coverage";
-// The upstream container we publish artifacts to on a successful master build.
-const UPSTREAM_IMAGE: &str = "docker.io/timberio/vector-dev:latest";
 
 pub enum RunnerState {
     Running,
@@ -53,14 +51,6 @@ pub enum RunnerState {
     Dead,
     Missing,
     Unknown,
-}
-
-pub fn get_agent_test_runner(container: bool) -> Result<Box<dyn TestRunner>> {
-    if container {
-        Ok(Box::new(DockerTestRunner))
-    } else {
-        Ok(Box::new(LocalTestRunner))
-    }
 }
 
 pub trait TestRunner {
@@ -408,30 +398,6 @@ impl ContainerTestRunner for IntegrationTestRunner {
 
     fn volumes(&self) -> Vec<String> {
         self.volumes.clone()
-    }
-}
-
-pub struct DockerTestRunner;
-
-impl ContainerTestRunner for DockerTestRunner {
-    fn network_name(&self) -> Option<&str> {
-        None
-    }
-
-    fn container_name(&self) -> String {
-        format!("vector-test-runner-{}", RustToolchainConfig::rust_version())
-    }
-
-    fn image_name(&self) -> String {
-        env::var("ENVIRONMENT_UPSTREAM").unwrap_or_else(|_| UPSTREAM_IMAGE.to_string())
-    }
-
-    fn needs_docker_socket(&self) -> bool {
-        false
-    }
-
-    fn volumes(&self) -> Vec<String> {
-        Vec::default()
     }
 }
 
