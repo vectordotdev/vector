@@ -1,6 +1,7 @@
 //! The main Zerobus sink implementation.
 
 use std::num::NonZeroUsize;
+use std::sync::Arc;
 
 use futures::StreamExt;
 use futures::stream::BoxStream;
@@ -45,10 +46,14 @@ impl ZerobusSink {
                 .batched(self.batch_settings.as_byte_size_config())
                 .map(|mut events| {
                     let finalizers = events.take_finalizers();
+                    // The encoded request size isn't known until `Service::call`
+                    // encodes the batch, and nothing in the zerobus path reads
+                    // `RequestMetadata::request_encoded_size`, so a placeholder
+                    // is fine here.
                     let metadata = RequestMetadataBuilder::from_events(&events)
                         .with_request_size(NonZeroUsize::MIN);
                     ZerobusRequest {
-                        events,
+                        events: Arc::new(events),
                         metadata,
                         finalizers,
                     }

@@ -20,7 +20,9 @@ use crate::http::HttpClient;
 ///
 /// 5xx, 408 (Request Timeout), and 429 (Too Many Requests) are transient;
 /// other 4xx statuses (404, 401, 403, ...) indicate permanent configuration
-/// problems that won't fix themselves on retry.
+/// problems that won't fix themselves on retry. The canonical list of
+/// retryable statuses for HTTP-based sinks lives at
+/// [`crate::sinks::util::http::RetryStrategy::Default`].
 fn status_is_retryable(status: StatusCode) -> bool {
     status.is_server_error()
         || status == StatusCode::REQUEST_TIMEOUT

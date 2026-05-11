@@ -59,12 +59,13 @@ fn build_connector_factory(proxy: &ProxyConfig) -> Result<ConnectorFactory, Zero
 /// Request type for the Zerobus service.
 ///
 /// Carries the *unencoded* batch — encoding happens inside `Service::call` so
-/// that schema-fetch failures (which are needed to build the encoder) flow
-/// through the Tower retry layer. The Tower retry policy requires `Clone` so
-/// the request can be re-issued on retry.
+/// that schema-fetch failures flow through the Tower retry layer. Events live
+/// behind an `Arc` because Tower's retry policy clones the request before
+/// every call (not just on retry), and a deep clone of `Vec<Event>` per call
+/// would be wasteful.
 #[derive(Clone)]
 pub struct ZerobusRequest {
-    pub events: Vec<Event>,
+    pub events: Arc<Vec<Event>>,
     pub metadata: RequestMetadata,
     pub finalizers: EventFinalizers,
 }
@@ -333,7 +334,6 @@ impl ZerobusService {
             .await
     }
 
-    /// Encode a batch of events into protobuf records using a resolved schema.
     pub(super) fn encode_records(
         schema: &ResolvedSchema,
         events: &[Event],
