@@ -1,13 +1,22 @@
 //! Zerobus service wrapper for Vector sink integration.
 
 use crate::config::ProxyConfig;
+use crate::event::Event;
+use crate::http::HttpClient;
+use crate::sinks::util::metadata::RequestMetadataBuilder;
 use crate::sinks::util::retries::RetryLogic;
+use crate::tls::TlsSettings;
 use databricks_zerobus_ingest_sdk::{ConnectorFactory, ProxyConnector, ZerobusSdk, ZerobusStream};
 use futures::future::BoxFuture;
+use std::num::NonZeroUsize;
 use std::sync::Arc;
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::{Mutex, OnceCell, RwLock};
 use tower::Service;
 use tracing::warn;
+use vector_lib::codecs::encoding::{
+    BatchEncoder, BatchOutput, BatchSerializerConfig, ProtoBatchSerializerConfig,
+};
+use vector_lib::event::EventStatus;
 use vector_lib::finalization::{EventFinalizers, Finalizable};
 use vector_lib::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
 use vector_lib::stream::DriverResponse;
@@ -97,18 +106,6 @@ impl MetaDescriptive for ZerobusRequest {
     fn metadata_mut(&mut self) -> &mut RequestMetadata {
         &mut self.metadata
     }
-}
-
-/// Determines what kind of stream the service creates and how payloads are ingested.
-///
-/// The sink only supports proto streams today; this is kept as an enum to
-/// leave room for future stream modes without reshaping all the call sites.
-#[derive(Clone)]
-pub enum StreamMode {
-    /// Proto stream using `ZerobusStream::ingest_records_offset`.
-    Proto {
-        descriptor_proto: Arc<prost_reflect::prost_types::DescriptorProto>,
-    },
 }
 
 /// The active stream.
@@ -257,18 +254,24 @@ impl MockStream {
     }
 }
 
+/// Schema and encoding state derived from the Unity Catalog table.
+pub(super) struct ResolvedSchema {
+    encoder: BatchEncoder,
+    descriptor_proto: Arc<prost_reflect::prost_types::DescriptorProto>,
+}
+
 /// Service for handling Zerobus requests.
 pub struct ZerobusService {
     sdk: Arc<ZerobusSdk>,
     config: Arc<ZerobusSinkConfig>,
+    http_client: HttpClient,
     stream: Arc<Mutex<Option<Arc<ActiveStream>>>>,
-    stream_mode: StreamMode,
+    schema: Arc<OnceCell<ResolvedSchema>>,
 }
 
 impl ZerobusService {
     pub async fn new(
         config: ZerobusSinkConfig,
-        stream_mode: StreamMode,
         proxy: &ProxyConfig,
     ) -> Result<Self, ZerobusSinkError> {
         let mut builder = ZerobusSdk::builder()
@@ -279,18 +282,25 @@ impl ZerobusService {
             message: format!("Failed to create Zerobus SDK: {}", e),
         })?;
 
+        let http_client = HttpClient::new(TlsSettings::default(), proxy).map_err(|e| {
+            ZerobusSinkError::ConfigError {
+                message: format!("Failed to create HTTP client: {}", e),
+            }
+        })?;
+
         Ok(Self {
             sdk: Arc::new(sdk),
             config: Arc::new(config),
+            http_client,
             stream: Arc::new(Mutex::new(None)),
-            stream_mode,
+            schema: Arc::new(OnceCell::new()),
         })
     }
 
-    /// Resolve the protobuf message descriptor from the schema configuration.
-    pub async fn resolve_descriptor(
+    /// Resolve the protobuf message descriptor from Unity Catalog.
+    async fn resolve_descriptor(
         config: &ZerobusSinkConfig,
-        proxy: &crate::config::ProxyConfig,
+        http_client: &HttpClient,
     ) -> Result<prost_reflect::MessageDescriptor, ZerobusSinkError> {
         let (client_id, client_secret) = config.auth.credentials();
 
@@ -299,51 +309,118 @@ impl ZerobusService {
             &config.table_name,
             client_id,
             client_secret,
-            proxy,
+            http_client,
         )
         .await?;
 
         unity_catalog_schema::generate_descriptor_from_schema(&table_schema)
     }
 
+    /// Resolve the schema on first use; cache the result.
+    pub(super) async fn ensure_schema(&self) -> Result<&ResolvedSchema, ZerobusSinkError> {
+        self.schema
+            .get_or_try_init(|| async {
+                let descriptor = Self::resolve_descriptor(&self.config, &self.http_client).await?;
+                let descriptor_proto = Arc::new(descriptor.descriptor_proto().clone());
+
+                let batch_serializer =
+                    BatchSerializerConfig::ProtoBatch(ProtoBatchSerializerConfig {
+                        descriptor: Some(descriptor),
+                    })
+                    .build_batch_serializer()
+                    .map_err(|e| ZerobusSinkError::ConfigError {
+                        message: format!("Failed to build batch serializer: {}", e),
+                    })?;
+
+                Ok(ResolvedSchema {
+                    encoder: BatchEncoder::new(batch_serializer),
+                    descriptor_proto,
+                })
+            })
+            .await
+    }
+
+    /// Encode a batch of events into a `ZerobusRequest`.
+    ///
+    /// Pure: the schema is assumed to already be resolved. Encoding failures
+    /// mark the batch's finalizers as `Rejected` before returning.
+    pub(super) fn encode_batch(
+        schema: &ResolvedSchema,
+        mut events: Vec<Event>,
+    ) -> Result<ZerobusRequest, ZerobusSinkError> {
+        let finalizers = events.take_finalizers();
+        let metadata_builder = RequestMetadataBuilder::from_events(&events);
+
+        let batch_output = schema.encoder.encode_batch(&events).map_err(|e| {
+            finalizers.update_status(EventStatus::Rejected);
+            ZerobusSinkError::EncodingError {
+                message: format!("Failed to encode batch: {}", e),
+            }
+        })?;
+
+        let (payload, byte_size) = match batch_output {
+            BatchOutput::Records(records) => {
+                let size = records.iter().map(|r| r.len()).sum::<usize>();
+                (ZerobusPayload::Records(records), size)
+            }
+            #[cfg(feature = "codecs-arrow")]
+            BatchOutput::Arrow(_) => {
+                finalizers.update_status(EventStatus::Rejected);
+                return Err(ZerobusSinkError::EncodingError {
+                    message: "The Databricks Zerobus sink only supports proto-batch output."
+                        .into(),
+                });
+            }
+        };
+
+        let request_size = NonZeroUsize::new(byte_size).unwrap_or(NonZeroUsize::MIN);
+        let metadata = metadata_builder.with_request_size(request_size);
+
+        Ok(ZerobusRequest {
+            payload,
+            metadata,
+            finalizers,
+        })
+    }
+
     /// Ensure we have an active stream, creating one if necessary.
     ///
-    /// Also used as the healthcheck: eagerly creating a stream verifies
-    /// OAuth credentials, endpoint connectivity, and table validity.
+    /// Also used as the healthcheck: resolving the schema verifies the table
+    /// and credentials against Unity Catalog, and creating the stream verifies
+    /// connectivity to the Zerobus endpoint.
     pub async fn ensure_stream(&self) -> Result<(), ZerobusSinkError> {
-        self.get_or_create_stream().await.map(|_| ())
+        let schema = self.ensure_schema().await?;
+        self.get_or_create_stream(schema).await.map(|_| ())
     }
 
     /// Return an `Arc` handle to the active stream, creating one if needed.
     ///
     /// The lock is held only while checking/creating the stream; callers can
     /// then use the returned `Arc` without holding the lock.
-    async fn get_or_create_stream(&self) -> Result<Arc<ActiveStream>, ZerobusSinkError> {
+    async fn get_or_create_stream(
+        &self,
+        schema: &ResolvedSchema,
+    ) -> Result<Arc<ActiveStream>, ZerobusSinkError> {
         let mut stream_guard = self.stream.lock().await;
 
         if stream_guard.is_none() {
             let (client_id, client_secret) = self.config.auth.credentials();
             let (client_id, client_secret) = (client_id.to_string(), client_secret.to_string());
 
-            let active_stream = match &self.stream_mode {
-                StreamMode::Proto { descriptor_proto } => {
-                    let stream_options = &self.config.stream_options;
-                    let stream = self
-                        .sdk
-                        .stream_builder()
-                        .table(self.config.table_name.clone())
-                        .oauth(client_id, client_secret)
-                        .compiled_proto((**descriptor_proto).clone())
-                        .server_lack_of_ack_timeout_ms(stream_options.server_lack_of_ack_timeout_ms)
-                        .flush_timeout_ms(stream_options.flush_timeout_ms)
-                        .build()
-                        .await
-                        .map_err(|e| ZerobusSinkError::StreamInitError { source: e })?;
-                    ActiveStream::proto(stream)
-                }
-            };
+            let stream_options = &self.config.stream_options;
+            let stream = self
+                .sdk
+                .stream_builder()
+                .table(self.config.table_name.clone())
+                .oauth(client_id, client_secret)
+                .compiled_proto((*schema.descriptor_proto).clone())
+                .server_lack_of_ack_timeout_ms(stream_options.server_lack_of_ack_timeout_ms)
+                .flush_timeout_ms(stream_options.flush_timeout_ms)
+                .build()
+                .await
+                .map_err(|e| ZerobusSinkError::StreamInitError { source: e })?;
 
-            *stream_guard = Some(Arc::new(active_stream));
+            *stream_guard = Some(Arc::new(ActiveStream::proto(stream)));
         }
 
         Ok(Arc::clone(stream_guard.as_ref().unwrap()))
@@ -377,7 +454,8 @@ impl ZerobusService {
         payload: ZerobusPayload,
         events_byte_size: GroupedCountByteSize,
     ) -> Result<ZerobusResponse, ZerobusSinkError> {
-        let stream = self.get_or_create_stream().await?;
+        let schema = self.ensure_schema().await?;
+        let stream = self.get_or_create_stream(schema).await?;
 
         // Slot lock is not held here — concurrent ingests acquire read guards
         // on the inner `RwLock` and run truly in parallel.
@@ -450,8 +528,9 @@ impl Clone for ZerobusService {
         Self {
             sdk: Arc::clone(&self.sdk),
             config: Arc::clone(&self.config),
+            http_client: self.http_client.clone(),
             stream: Arc::clone(&self.stream),
-            stream_mode: self.stream_mode.clone(),
+            schema: Arc::clone(&self.schema),
         }
     }
 }
@@ -482,13 +561,17 @@ impl ZerobusService {
                 message: format!("Failed to create Zerobus SDK: {}", e),
             })?;
 
+        let http_client = HttpClient::new(TlsSettings::default(), &ProxyConfig::default())
+            .map_err(|e| ZerobusSinkError::ConfigError {
+                message: format!("Failed to create HTTP client: {}", e),
+            })?;
+
         Ok(Self {
             sdk: Arc::new(sdk),
             config: Arc::new(config),
+            http_client,
             stream: Arc::new(Mutex::new(Some(Arc::new(ActiveStream::Mock(mock))))),
-            stream_mode: StreamMode::Proto {
-                descriptor_proto: Arc::new(Default::default()),
-            },
+            schema: Arc::new(OnceCell::new()),
         })
     }
 
