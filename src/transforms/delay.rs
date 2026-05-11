@@ -78,7 +78,7 @@ impl TaskTransform<Event> for Delay {
             let mut done = false;
             loop {
                 tokio::select! {
-                    maybe_event = input_rx.next() => {
+                    maybe_event = input_rx.next(), if !done => {
                         match maybe_event {
                             None => {
                                 done = true;
