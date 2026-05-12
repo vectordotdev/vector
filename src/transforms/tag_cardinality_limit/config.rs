@@ -11,9 +11,7 @@ use crate::{
     transforms::{Transform, tag_cardinality_limit::TagCardinalityLimit},
 };
 
-// =============================================================================
 // Top-level configuration
-// =============================================================================
 
 /// Configuration for the `tag_cardinality_limit` transform.
 #[configurable_component(transform(
@@ -69,10 +67,6 @@ pub enum TrackingScope {
     PerMetric,
 }
 
-// =============================================================================
-// Global-level configuration block
-// =============================================================================
-
 /// Configuration block used at the global level.
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -117,11 +111,7 @@ pub enum Mode {
     Probabilistic(BloomFilterConfig),
 }
 
-// =============================================================================
-// Per-metric configuration block
-// =============================================================================
-
-/// Tag cardinality limit configuration per metric name.
+/// Per-metric name tag cardinality limit configuration.
 #[configurable_component]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PerMetricConfig {
@@ -200,10 +190,6 @@ impl OverrideMode {
         }
     }
 }
-
-// =============================================================================
-// Per-tag configuration block
-// =============================================================================
 
 /// Per-tag cardinality configuration.
 ///
