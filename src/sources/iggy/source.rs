@@ -165,7 +165,7 @@ pub async fn run_iggy_source(
                                         partition: partition_id,
                                     });
                                     let now = Utc::now();
-                                    let offset = received.current_offset;
+                                    let offset = received.message.header.offset;
 
                                     let events = events.into_iter().map(|mut event| {
                                         if let Event::Log(ref mut log) = event {
