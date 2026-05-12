@@ -33,6 +33,8 @@ type AlgoliaRecord = {
   ranking: number;
   section: string;
   content: string;
+  componentWithType: string;
+  component: string;
 };
 
 type Section = {
@@ -94,6 +96,11 @@ async function indexHTMLFiles(
     const pageTitle = $("meta[name='algolia:title']").attr("content") || "";
     const pageTagsString = $("meta[name='keywords']").attr("content") || "";
     const pageTags: string[] = pageTagsString === "" ? [] : pageTagsString.split(",");
+    const pageUrl = getPageUrl(file);
+    const componentMatch = pageUrl.match(/\/docs\/reference\/configuration\/(sources|sinks|transforms)\/([^/]+)/);
+    const componentKindMap: Record<string, string> = { sources: "source", sinks: "sink", transforms: "transform" };
+    const pageComponent = componentMatch ? componentMatch[2] : "";
+    const pageComponentWithType = componentMatch ? `${componentMatch[2]} ${componentKindMap[componentMatch[1]]}` : "";
 
     // @ts-ignore
     $(".algolia-no-index").each((_, d) => $(d).remove());
@@ -130,7 +137,6 @@ async function indexHTMLFiles(
     let activeRecord: AlgoliaRecord | null = null;
 
     for (const item of payload) {
-      const pageUrl = getPageUrl(file);
       const itemUrl = getItemUrl(file, item);
       const hashedId = hashString(itemUrl);
 
@@ -146,7 +152,9 @@ async function indexHTMLFiles(
           ranking,
           hierarchy: [],
           tags: pageTags,
-          content: ""
+          content: "",
+          componentWithType: pageComponentWithType,
+          component: pageComponent
         };
       } else if (item.level === 1) {
         // h1 logic
@@ -165,7 +173,9 @@ async function indexHTMLFiles(
           ranking,
           hierarchy: [...activeRecord.hierarchy, activeRecord.title.trim()],
           tags: pageTags,
-          content: ""
+          content: "",
+          componentWithType: pageComponentWithType,
+          component: pageComponent
         };
       } else {
         // h2-h6 logic
@@ -186,7 +196,9 @@ async function indexHTMLFiles(
           ranking,
           hierarchy: [...activeRecord.hierarchy.slice(0, lastIndex)],
           tags: pageTags,
-          content: ""
+          content: "",
+          componentWithType: pageComponentWithType,
+          component: pageComponent
         };
       }
 

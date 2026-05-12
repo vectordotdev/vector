@@ -1,3 +1,5 @@
+use super::*;
+use crate::config::log_schema;
 use bytes::{Buf, BufMut, BytesMut};
 use prost::Message;
 use quickcheck::{QuickCheck, TestResult};

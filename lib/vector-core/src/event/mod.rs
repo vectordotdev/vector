@@ -7,7 +7,7 @@ pub use finalization::{
     Finalizable,
 };
 pub use log_event::LogEvent;
-pub use metadata::{DatadogMetricOriginMetadata, EventMetadata, WithMetadata};
+pub use metadata::{DatadogMetricOriginMetadata, EventMetadata, Secrets, WithMetadata};
 pub use metric::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind};
 pub use r#ref::{EventMutRef, EventRef};
 pub use ser::{MAX_METADATA_NESTING_DEPTH, MAX_NESTING_DEPTH, event_exceeds_max_nesting_depth};
@@ -24,6 +24,8 @@ pub use vrl_target::{TargetEvents, VrlTarget};
 
 use crate::config::{LogNamespace, OutputId};
 
+#[cfg(any(test, feature = "generate-fixtures"))]
+pub(crate) mod arbitrary_impl;
 pub mod array;
 pub mod discriminant;
 mod estimated_json_encoded_size_of;
@@ -36,6 +38,7 @@ pub mod metric;
 pub mod proto;
 mod r#ref;
 mod ser;
+
 #[cfg(test)]
 mod test;
 mod trace;
