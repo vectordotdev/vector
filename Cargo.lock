@@ -594,7 +594,7 @@ dependencies = [
  "arrow-select 58.1.0",
  "flatbuffers 25.9.23",
  "lz4_flex 0.13.0",
- "zstd",
+ "zstd 0.13.2",
 ]
 
 [[package]]
@@ -2067,7 +2067,7 @@ dependencies = [
  "bitflags 2.10.0",
  "cexpr",
  "clang-sys",
- "itertools 0.13.0",
+ "itertools 0.10.5",
  "proc-macro2 1.0.106",
  "quote 1.0.45",
  "regex",
@@ -2849,8 +2849,8 @@ dependencies = [
  "compression-core",
  "flate2",
  "memchr",
- "zstd",
- "zstd-safe",
+ "zstd 0.13.2",
+ "zstd-safe 7.2.1",
 ]
 
 [[package]]
@@ -5174,9 +5174,9 @@ checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
 name = "hickory-net"
-version = "0.26.0"
+version = "0.26.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0c61c8db47fae51ba9f8f2a2748bd87542acfbe22f2ec9cf9c8ec72d1ee6e9a6"
+checksum = "e2295ed2f9c31e471e1428a8f88a3f0e1f4b27c15049592138d1eebe9c35b183"
 dependencies = [
  "async-trait",
  "cfg-if",
@@ -8109,7 +8109,7 @@ dependencies = [
  "snap",
  "thrift",
  "twox-hash",
- "zstd",
+ "zstd 0.13.2",
 ]
 
 [[package]]
@@ -8748,7 +8748,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "be769465445e8c1474e9c5dac2018218498557af32d9ed057325ec9a41ae81bf"
 dependencies = [
  "heck 0.5.0",
- "itertools 0.14.0",
+ "itertools 0.10.5",
  "log",
  "multimap",
  "once_cell",
@@ -8781,7 +8781,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a56d757972c98b346a9b766e3f02746cde6dd1cd1d1d563472929fdd74bec4d"
 dependencies = [
  "anyhow",
- "itertools 0.14.0",
+ "itertools 0.10.5",
  "proc-macro2 1.0.106",
  "quote 1.0.45",
  "syn 2.0.117",
@@ -8794,7 +8794,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "27c6023962132f4b30eb4c172c91ce92d933da334c59c23cddee82358ddafb0b"
 dependencies = [
  "anyhow",
- "itertools 0.14.0",
+ "itertools 0.10.5",
  "proc-macro2 1.0.106",
  "quote 1.0.45",
  "syn 2.0.117",
@@ -8985,7 +8985,7 @@ dependencies = [
  "tokio-util",
  "url",
  "uuid",
- "zstd",
+ "zstd 0.13.2",
 ]
 
 [[package]]
@@ -12060,6 +12060,7 @@ dependencies = [
  "tower-layer",
  "tower-service",
  "tracing 0.1.44",
+ "zstd 0.12.4",
 ]
 
 [[package]]
@@ -12152,7 +12153,7 @@ dependencies = [
  "tower-layer",
  "tower-service",
  "tracing 0.1.44",
- "zstd",
+ "zstd 0.13.2",
 ]
 
 [[package]]
@@ -12903,6 +12904,7 @@ dependencies = [
  "clap",
  "clap-verbosity-flag",
  "clap_complete",
+ "convert_case 0.8.0",
  "directories",
  "git2",
  "glob",
@@ -12914,6 +12916,8 @@ dependencies = [
  "log",
  "owo-colors",
  "pastey",
+ "proc-macro2 1.0.106",
+ "quote 1.0.45",
  "regex",
  "reqwest 0.11.26",
  "semver",
@@ -12922,6 +12926,7 @@ dependencies = [
  "serde_yaml",
  "sha2",
  "strum 0.28.0",
+ "syn 2.0.117",
  "tempfile",
  "toml",
  "toml_edit 0.23.9",
@@ -13138,7 +13143,7 @@ dependencies = [
  "windows 0.58.0",
  "windows-service",
  "wiremock",
- "zstd",
+ "zstd 0.13.2",
 ]
 
 [[package]]
@@ -13571,7 +13576,7 @@ checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 [[package]]
 name = "vrl"
 version = "0.32.0"
-source = "git+https://github.com/vectordotdev/vrl.git?branch=main#8a5b4711f37d0b3bd4d0d2ea8bbb500942bd8e98"
+source = "git+https://github.com/vectordotdev/vrl.git?branch=main#704351cc3fdec4415bbf89653b9ca2cd0dc20212"
 dependencies = [
  "aes",
  "aes-siv",
@@ -13681,7 +13686,7 @@ dependencies = [
  "webbrowser",
  "woothee",
  "xxhash-rust",
- "zstd",
+ "zstd 0.13.2",
 ]
 
 [[package]]
@@ -14856,11 +14861,30 @@ checksum = "b8848ee67ecc8aedbaf3e4122217aff892639231befc6a1b58d29fff4c2cabaa"
 
 [[package]]
 name = "zstd"
+version = "0.12.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1a27595e173641171fc74a1232b7b1c7a7cb6e18222c11e9dfb9888fa424c53c"
+dependencies = [
+ "zstd-safe 6.0.6",
+]
+
+[[package]]
+name = "zstd"
 version = "0.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fcf2b778a664581e31e389454a7072dab1647606d44f7feea22cd5abb9c9f3f9"
 dependencies = [
- "zstd-safe",
+ "zstd-safe 7.2.1",
+]
+
+[[package]]
+name = "zstd-safe"
+version = "6.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ee98ffd0b48ee95e6c5168188e44a54550b1564d9d530ee21d5f0eaed1069581"
+dependencies = [
+ "libc",
+ "zstd-sys",
 ]
 
 [[package]]

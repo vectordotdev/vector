@@ -40,6 +40,22 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 			}
 		}
 	}
+	max_tracked_keys: {
+		description: """
+			Maximum number of distinct (metric, tag-key) pairs to track across the entire
+			transform. When this cap is reached, additional tag keys on new metrics or new
+			tag keys on existing metrics are not tracked, and tag values for those pairs
+			pass through unchecked. Users can detect this via the
+			`tag_cardinality_untracked_events_total` counter and the
+			`tag_cardinality_tracked_keys` gauge.
+
+			When unset (default), there is no cap and the transform tracks all pairs it
+			encounters. In `global` tracking scope mode, this limit still applies (the
+			metric key is set to `None` unless there is a per-metric override).
+			"""
+		required: false
+		type: uint: {}
+	}
 	mode: {
 		description: "Controls the approach taken for tracking tag cardinality."
 		required:    true
@@ -136,6 +152,24 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 					required:    false
 					type: uint: default: 500
 				}
+			}
+		}
+	}
+	tracking_scope: {
+		description: "Controls how tag tracking state is partitioned across metrics."
+		required:    false
+		type: string: {
+			default: "global"
+			enum: {
+				global: """
+					All metrics share a single tracking bucket. Tag values pool across metrics
+					and the global `value_limit` caps the combined set.
+					"""
+				per_metric: """
+					Every distinct metric gets its own tracking bucket, providing tag
+					cardinality limiting for each metric in isolation at the cost of higher
+					memory usage.
+					"""
 			}
 		}
 	}
