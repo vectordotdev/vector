@@ -14,7 +14,10 @@ use crate::{
     sinks::{
         Healthcheck, VectorSink,
         datadog::{DatadogCommonConfig, LocalDatadogCommonConfig},
-        util::{ServiceBuilderExt, TowerRequestConfig, http::HttpStatusRetryLogic},
+        util::{
+            ServiceBuilderExt, TowerRequestConfig,
+            http::{HttpStatusRetryLogic, RetryStrategy},
+        },
     },
     tls::MaybeTlsSettings,
 };
@@ -33,6 +36,10 @@ pub struct DatadogEventsConfig {
     #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    pub retry_strategy: RetryStrategy,
 }
 
 impl GenerateConfig for DatadogEventsConfig {
@@ -64,7 +71,10 @@ impl DatadogEventsConfig {
 
         let request_opts = self.request;
         let request_settings = request_opts.into_settings();
-        let retry_logic = HttpStatusRetryLogic::new(|req: &DatadogEventsResponse| req.http_status);
+        let retry_logic = HttpStatusRetryLogic::new(
+            |req: &DatadogEventsResponse| req.http_status,
+            self.retry_strategy.clone(),
+        );
 
         let service = ServiceBuilder::new()
             .settings(request_settings, retry_logic)

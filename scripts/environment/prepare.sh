@@ -39,7 +39,7 @@ CARGO_LLVM_COV_VERSION="0.8.4"
 WASM_PACK_VERSION="0.13.1"
 # npm tool versions are defined in scripts/environment/npm-tools/package.json
 # and pinned (including transitive deps) in npm-tools/package-lock.json.
-VDEV_VERSION="0.3.0"
+VDEV_VERSION="0.3.2"
 
 ALL_MODULES=(
   rustup
@@ -55,7 +55,6 @@ ALL_MODULES=(
   markdownlint-cli2
   prettier
   datadog-ci
-  release-flags  # Not a tool - sources release-flags.sh to set CI env vars
   vdev
 )
 
@@ -230,9 +229,6 @@ fi
 
 install=(install)
 if contains_module rustup; then
-  # shellcheck source=scripts/environment/release-flags.sh
-  . "${SCRIPT_DIR}"/release-flags.sh
-
   ensure_active_toolchain_is_installed
 
   if [ "${require_binstall}" = "true" ]; then

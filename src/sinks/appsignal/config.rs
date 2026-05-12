@@ -21,7 +21,7 @@ use crate::{
         prelude::{SinkConfig, SinkContext},
         util::{
             BatchConfig, Compression, ServiceBuilderExt, SinkBatchSettings, TowerRequestConfig,
-            http::HttpStatusRetryLogic,
+            http::{HttpStatusRetryLogic, RetryStrategy},
         },
     },
 };
@@ -67,6 +67,10 @@ pub(super) struct AppsignalConfig {
         skip_serializing_if = "crate::serde::is_default"
     )]
     acknowledgements: AcknowledgementsConfig,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    retry_strategy: RetryStrategy,
 }
 
 pub(super) fn default_endpoint() -> String {
@@ -99,7 +103,10 @@ impl AppsignalConfig {
 
         let request_opts = self.request;
         let request_settings = request_opts.into_settings();
-        let retry_logic = HttpStatusRetryLogic::new(|req: &AppsignalResponse| req.http_status);
+        let retry_logic = HttpStatusRetryLogic::new(
+            |req: &AppsignalResponse| req.http_status,
+            self.retry_strategy.clone(),
+        );
 
         let service = ServiceBuilder::new()
             .settings(request_settings, retry_logic)

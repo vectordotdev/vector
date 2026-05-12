@@ -1,7 +1,8 @@
-use metrics::counter;
-use vector_lib::NamedInternalEvent;
-use vector_lib::internal_event::{
-    ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+use vector_lib::{
+    NamedInternalEvent, counter,
+    internal_event::{
+        ComponentEventsDropped, CounterName, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+    },
 };
 
 #[derive(NamedInternalEvent)]
@@ -29,7 +30,7 @@ impl InternalEvent for TemplateRenderingError<'_> {
             );
 
             counter!(
-                "component_errors_total",
+                CounterName::ComponentErrorsTotal,
                 "error_type" => error_type::TEMPLATE_FAILED,
                 "stage" => error_stage::PROCESSING,
             )

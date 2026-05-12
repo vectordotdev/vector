@@ -30,7 +30,10 @@ use crate::{
         prelude::*,
         util::{
             RealtimeSizeBasedDefaultBatchSettings, UriSerde,
-            http::{HttpService, OrderedHeaderName, RequestConfig, http_response_retry_logic},
+            http::{
+                HttpService, OrderedHeaderName, RequestConfig, RetryStrategy,
+                http_response_retry_logic,
+            },
         },
     },
 };
@@ -100,6 +103,10 @@ pub struct HttpSinkConfig {
         skip_serializing_if = "crate::serde::is_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    pub retry_strategy: RetryStrategy,
 }
 
 /// HTTP method.
@@ -330,7 +337,10 @@ impl SinkConfig for HttpSinkConfig {
         let request_limits = self.request.tower.into_settings();
 
         let service = ServiceBuilder::new()
-            .settings(request_limits, http_response_retry_logic())
+            .settings(
+                request_limits,
+                http_response_retry_logic(self.retry_strategy.clone()),
+            )
             .service(service);
 
         let sink = HttpSink::new(
@@ -405,6 +415,7 @@ mod tests {
                 acknowledgements: AcknowledgementsConfig::default(),
                 payload_prefix: String::new(),
                 payload_suffix: String::new(),
+                retry_strategy: RetryStrategy::default(),
             };
 
             let external_resource = ExternalResource::new(

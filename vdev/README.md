@@ -23,7 +23,6 @@ This assumes that you have the following tools installed:
 - [cargo](https://rustup.rs/)
 - [docker](https://www.docker.com/)
 - [npm](https://www.npmjs.com/)
-- [ruby](https://www.ruby-lang.org/en/)
 
 Some other tools may need to be installed depending on the command you are running. All other
 dependencies can be installed by running
