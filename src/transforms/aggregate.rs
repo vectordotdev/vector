@@ -250,8 +250,36 @@ pub struct Aggregate {
     config: AggregateConfig,
 }
 
+/// Upper bound for any millisecond-valued duration field that is later cast
+/// to `i64` for use with `chrono::Duration` and bucket arithmetic. Values
+/// above this would wrap when cast and silently produce negative durations,
+/// which corrupts watermark and future-skew checks.
+const MAX_DURATION_MS: u64 = i64::MAX as u64;
+
 impl Aggregate {
     pub fn new(config: &AggregateConfig) -> crate::Result<Self> {
+        if config.interval_ms > MAX_DURATION_MS {
+            return Err(format!(
+                "`interval_ms` ({}) exceeds the maximum supported value of {} ms",
+                config.interval_ms, MAX_DURATION_MS
+            )
+            .into());
+        }
+        if config.max_future_ms > MAX_DURATION_MS {
+            return Err(format!(
+                "`max_future_ms` ({}) exceeds the maximum supported value of {} ms",
+                config.max_future_ms, MAX_DURATION_MS
+            )
+            .into());
+        }
+        if config.allowed_lateness_ms > MAX_DURATION_MS {
+            return Err(format!(
+                "`allowed_lateness_ms` ({}) exceeds the maximum supported value of {} ms",
+                config.allowed_lateness_ms, MAX_DURATION_MS
+            )
+            .into());
+        }
+
         Ok(Self {
             interval: Duration::from_millis(config.interval_ms),
             map: Default::default(),
@@ -272,9 +300,11 @@ impl Aggregate {
     /// rounds toward zero, so timestamps just before the epoch (negative
     /// millis) would incorrectly map into the non-negative bucket `[0, interval)`
     /// instead of `[-interval, 0)`.
-    const fn bucket_key(&self, timestamp: DateTime<Utc>) -> BucketKey {
+    fn bucket_key(&self, timestamp: DateTime<Utc>) -> BucketKey {
         let timestamp_ms = timestamp.timestamp_millis();
-        let interval_ms = self.interval.as_millis() as i64;
+        // Range-validated in `Aggregate::new` to fit in i64.
+        let interval_ms = i64::try_from(self.config.interval_ms)
+            .expect("interval_ms validated to fit in i64 in Aggregate::new");
         timestamp_ms.div_euclid(interval_ms).saturating_mul(interval_ms)
     }
 
@@ -321,8 +351,12 @@ impl Aggregate {
             // Check for future timestamps
             if self.config.max_future_ms > 0 {
                 let now = Utc::now();
-                let max_future =
-                    now + chrono::Duration::milliseconds(self.config.max_future_ms as i64);
+                // Range-validated in `Aggregate::new` to fit in i64; `as`
+                // would silently wrap for misconfigured `u64` values above
+                // `i64::MAX` and make `max_future` land in the past.
+                let max_future_ms = i64::try_from(self.config.max_future_ms)
+                    .expect("max_future_ms validated to fit in i64 in Aggregate::new");
+                let max_future = now + chrono::Duration::milliseconds(max_future_ms);
                 if ts > max_future {
                     emit!(AggregateEventDropped {
                         reason: "Event timestamp too far in the future."
@@ -725,8 +759,11 @@ impl Aggregate {
     fn flush_event_time_buckets(&mut self, output: &mut Vec<Event>, force: bool) {
         let now = Utc::now();
         let now_ms = now.timestamp_millis();
-        let interval_ms = self.interval.as_millis() as i64;
-        let grace_ms = self.config.allowed_lateness_ms as i64;
+        // Range-validated in `Aggregate::new` to fit in i64.
+        let interval_ms = i64::try_from(self.config.interval_ms)
+            .expect("interval_ms validated to fit in i64 in Aggregate::new");
+        let grace_ms = i64::try_from(self.config.allowed_lateness_ms)
+            .expect("allowed_lateness_ms validated to fit in i64 in Aggregate::new");
 
         // A bucket [bucket_key, bucket_key + interval) is eligible to flush
         // when either:
@@ -921,6 +958,148 @@ mod tests {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<AggregateConfig>();
+    }
+
+    /// `interval_ms` is `u64` but is cast to `i64` for bucket-key arithmetic
+    /// (`div_euclid` / `saturating_mul`) and the flush eligibility predicate.
+    /// A value above `i64::MAX` wraps negative on cast and scrambles bucket
+    /// keys, so `Aggregate::new` must reject it up front.
+    #[test]
+    fn rejects_interval_ms_above_i64_max() {
+        let result = Aggregate::new(&AggregateConfig {
+            interval_ms: u64::MAX,
+            mode: AggregationMode::Auto,
+            time_source: TimeSource::EventTime,
+            allowed_lateness_ms: 0,
+            use_system_time_for_missing_timestamps: false,
+            max_future_ms: 10_000,
+        });
+
+        let err = result.expect_err("u64::MAX must not be accepted");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("interval_ms"),
+            "error should mention the offending field, got: {msg}",
+        );
+
+        let boundary = i64::MAX as u64 + 1;
+        let result = Aggregate::new(&AggregateConfig {
+            interval_ms: boundary,
+            mode: AggregationMode::Auto,
+            time_source: TimeSource::EventTime,
+            allowed_lateness_ms: 0,
+            use_system_time_for_missing_timestamps: false,
+            max_future_ms: 10_000,
+        });
+        assert!(
+            result.is_err(),
+            "i64::MAX + 1 (first wrapping value) must be rejected",
+        );
+
+        Aggregate::new(&AggregateConfig {
+            interval_ms: i64::MAX as u64,
+            mode: AggregationMode::Auto,
+            time_source: TimeSource::EventTime,
+            allowed_lateness_ms: 0,
+            use_system_time_for_missing_timestamps: false,
+            max_future_ms: 10_000,
+        })
+        .expect("i64::MAX (largest non-wrapping value) must be accepted");
+    }
+
+    /// `max_future_ms` is `u64` but is cast to `i64` for
+    /// `chrono::Duration::milliseconds`; a value above `i64::MAX` wraps
+    /// negative on cast and puts `max_future` in the past, making the
+    /// transform silently drop every event as "too far in the future".
+    #[test]
+    fn rejects_max_future_ms_above_i64_max() {
+        let result = Aggregate::new(&AggregateConfig {
+            interval_ms: 1000,
+            mode: AggregationMode::Auto,
+            time_source: TimeSource::EventTime,
+            allowed_lateness_ms: 0,
+            use_system_time_for_missing_timestamps: false,
+            max_future_ms: u64::MAX,
+        });
+
+        let err = result.expect_err("u64::MAX must not be accepted");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("max_future_ms"),
+            "error should mention the offending field, got: {msg}",
+        );
+
+        let boundary = i64::MAX as u64 + 1;
+        let result = Aggregate::new(&AggregateConfig {
+            interval_ms: 1000,
+            mode: AggregationMode::Auto,
+            time_source: TimeSource::EventTime,
+            allowed_lateness_ms: 0,
+            use_system_time_for_missing_timestamps: false,
+            max_future_ms: boundary,
+        });
+        assert!(
+            result.is_err(),
+            "i64::MAX + 1 (first wrapping value) must be rejected",
+        );
+
+        Aggregate::new(&AggregateConfig {
+            interval_ms: 1000,
+            mode: AggregationMode::Auto,
+            time_source: TimeSource::EventTime,
+            allowed_lateness_ms: 0,
+            use_system_time_for_missing_timestamps: false,
+            max_future_ms: i64::MAX as u64,
+        })
+        .expect("i64::MAX (largest non-wrapping value) must be accepted");
+    }
+
+    /// Same wrap concern as `max_future_ms`, but for `allowed_lateness_ms`.
+    /// A wrapped-negative `grace_ms` inverts the eligibility predicate in
+    /// `flush_event_time_buckets`, so buckets become flushable immediately
+    /// and the watermark advances before the grace period elapses, dropping
+    /// every late event that the configured lateness was meant to protect.
+    #[test]
+    fn rejects_allowed_lateness_ms_above_i64_max() {
+        let result = Aggregate::new(&AggregateConfig {
+            interval_ms: 1000,
+            mode: AggregationMode::Auto,
+            time_source: TimeSource::EventTime,
+            allowed_lateness_ms: u64::MAX,
+            use_system_time_for_missing_timestamps: false,
+            max_future_ms: 10_000,
+        });
+
+        let err = result.expect_err("u64::MAX must not be accepted");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("allowed_lateness_ms"),
+            "error should mention the offending field, got: {msg}",
+        );
+
+        let boundary = i64::MAX as u64 + 1;
+        let result = Aggregate::new(&AggregateConfig {
+            interval_ms: 1000,
+            mode: AggregationMode::Auto,
+            time_source: TimeSource::EventTime,
+            allowed_lateness_ms: boundary,
+            use_system_time_for_missing_timestamps: false,
+            max_future_ms: 10_000,
+        });
+        assert!(
+            result.is_err(),
+            "i64::MAX + 1 (first wrapping value) must be rejected",
+        );
+
+        Aggregate::new(&AggregateConfig {
+            interval_ms: 1000,
+            mode: AggregationMode::Auto,
+            time_source: TimeSource::EventTime,
+            allowed_lateness_ms: i64::MAX as u64,
+            use_system_time_for_missing_timestamps: false,
+            max_future_ms: 10_000,
+        })
+        .expect("i64::MAX (largest non-wrapping value) must be accepted");
     }
 
     fn make_metric(name: &'static str, kind: MetricKind, value: MetricValue) -> Event {
