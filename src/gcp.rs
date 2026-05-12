@@ -11,9 +11,7 @@ use google_cloud_auth::{
         AccessTokenCredentials, Builder as AdcBuilder,
         external_account::Builder as ExternalAccountBuilder,
         impersonated::Builder as ImpersonatedBuilder,
-        service_account::{
-            AccessSpecifier, Builder as ServiceAccountBuilder,
-        },
+        service_account::{AccessSpecifier, Builder as ServiceAccountBuilder},
         user_account::Builder as UserAccountBuilder,
     },
     errors::CredentialsError,
@@ -32,6 +30,7 @@ pub const SCOPE_DEVSTORAGE_READ_WRITE: &str =
 pub const SCOPE_LOGGING_WRITE: &str = "https://www.googleapis.com/auth/logging.write";
 pub const SCOPE_MONITORING_WRITE: &str = "https://www.googleapis.com/auth/monitoring.write";
 pub const SCOPE_MALACHITE_INGESTION: &str = "https://www.googleapis.com/auth/malachite-ingestion";
+#[cfg(test)]
 pub const SCOPE_COMPUTE: &str = "https://www.googleapis.com/auth/compute";
 
 // Fixed refresh interval. GCP access tokens are typically ~1h; refreshing
@@ -49,8 +48,6 @@ pub static PUBSUB_ADDRESS: LazyLock<String> = LazyLock::new(|| {
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub))]
 pub enum GcpError {
-    #[snafu(display("This requires one of api_key or credentials_path to be defined"))]
-    MissingAuth,
     #[snafu(display("Invalid GCP credentials: {}", source))]
     InvalidCredentials { source: BuildError },
     #[snafu(display("Invalid GCP API key: {}", source))]
@@ -114,14 +111,13 @@ pub struct GcpAuthConfig {
 
 impl GcpAuthConfig {
     pub async fn build(&self, scope: &str) -> crate::Result<GcpAuthenticator> {
+        let _ = rustls::crypto::ring::default_provider().install_default();
         Ok(if self.skip_authentication {
             GcpAuthenticator::None
         } else {
-            let gap = std::env::var("GOOGLE_APPLICATION_CREDENTIALS").ok();
-            let creds_path = self.credentials_path.as_ref().or(gap.as_ref());
-            match (&creds_path, &self.api_key) {
+            match (&self.credentials_path, &self.api_key) {
                 (Some(path), _) => GcpAuthenticator::from_file(path, scope).await?,
-                (None, Some(api_key)) => GcpAuthenticator::from_api_key(api_key.inner())?,
+                (_, Some(api_key)) => GcpAuthenticator::from_api_key(api_key.inner())?,
                 (None, None) => GcpAuthenticator::new_implicit(scope).await?,
             }
         })
@@ -138,23 +134,39 @@ pub enum GcpAuthenticator {
 pub struct InnerCreds {
     creds: AccessTokenCredentials,
     token: RwLock<String>,
+    cred_type: String,
+    project_id: Option<String>,
 }
 
 impl std::fmt::Debug for InnerCreds {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("InnerCreds").finish_non_exhaustive()
+        f.debug_struct("InnerCreds")
+            .field("cred_type", &self.cred_type)
+            .field("project_id", &self.project_id)
+            .finish_non_exhaustive()
     }
 }
 
 impl GcpAuthenticator {
     async fn from_file(path: &str, scope: &str) -> crate::Result<Self> {
-        let bytes = std::fs::read(path).context(ReadCredentialsFileSnafu {
-            path: path.to_string(),
-        })?;
+        let bytes = tokio::fs::read(path)
+            .await
+            .context(ReadCredentialsFileSnafu {
+                path: path.to_string(),
+            })?;
         let json: serde_json::Value =
             serde_json::from_slice(&bytes).context(ParseCredentialsJsonSnafu)?;
-        let creds = build_credentials_from_json(json, scope)?;
-        Self::from_credentials(creds).await
+        let cred_type = json
+            .get("type")
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown")
+            .to_string();
+        let project_id = json
+            .get("project_id")
+            .and_then(|v| v.as_str())
+            .map(str::to_string);
+        let creds = build_credentials_from_json(&json, scope)?;
+        Self::from_credentials(creds, cred_type, project_id).await
     }
 
     async fn new_implicit(scope: &str) -> crate::Result<Self> {
@@ -162,14 +174,20 @@ impl GcpAuthenticator {
             .with_scopes([scope])
             .build_access_token_credentials()
             .context(InvalidCredentialsSnafu)?;
-        Self::from_credentials(creds).await
+        Self::from_credentials(creds, "application_default".into(), None).await
     }
 
-    async fn from_credentials(creds: AccessTokenCredentials) -> crate::Result<Self> {
-        let initial = fetch_token(&creds).await?;
+    async fn from_credentials(
+        creds: AccessTokenCredentials,
+        cred_type: String,
+        project_id: Option<String>,
+    ) -> crate::Result<Self> {
+        let initial = fetch_token(&creds, &cred_type, project_id.as_deref()).await?;
         let inner = InnerCreds {
             creds,
             token: RwLock::new(initial),
+            cred_type,
+            project_id,
         };
         Ok(Self::Credentials(Arc::new(inner)))
     }
@@ -262,7 +280,7 @@ impl GcpAuthenticator {
 
 impl InnerCreds {
     async fn regenerate_token(&self) -> crate::Result<()> {
-        let token = fetch_token(&self.creds).await?;
+        let token = fetch_token(&self.creds, &self.cred_type, self.project_id.as_deref()).await?;
         *self.token.write().unwrap() = token;
         Ok(())
     }
@@ -273,33 +291,44 @@ impl InnerCreds {
     }
 }
 
-async fn fetch_token(creds: &AccessTokenCredentials) -> crate::Result<String> {
-    debug!("Fetching GCP authentication token.");
+async fn fetch_token(
+    creds: &AccessTokenCredentials,
+    cred_type: &str,
+    project_id: Option<&str>,
+) -> crate::Result<String> {
+    debug!(
+        cred_type = %cred_type,
+        project_id = ?project_id,
+        "Fetching GCP authentication token.",
+    );
     let token = creds.access_token().await.context(GetTokenSnafu)?;
     Ok(token.token)
 }
 
 fn build_credentials_from_json(
-    json: serde_json::Value,
+    json: &serde_json::Value,
     scope: &str,
 ) -> crate::Result<AccessTokenCredentials> {
     let ty = json
         .get("type")
         .and_then(|v| v.as_str())
-        .unwrap_or("")
+        .ok_or_else(|| GcpError::UnsupportedCredentialsType {
+            ty: "<missing>".into(),
+        })?
         .to_string();
     let scopes = [scope.to_string()];
+    let json_owned = json.clone();
     let creds = match ty.as_str() {
-        "service_account" => ServiceAccountBuilder::new(json)
+        "service_account" => ServiceAccountBuilder::new(json_owned)
             .with_access_specifier(AccessSpecifier::from_scopes(scopes))
             .build_access_token_credentials(),
-        "external_account" => ExternalAccountBuilder::new(json)
+        "external_account" => ExternalAccountBuilder::new(json_owned)
             .with_scopes(scopes)
             .build_access_token_credentials(),
-        "authorized_user" => UserAccountBuilder::new(json)
+        "authorized_user" => UserAccountBuilder::new(json_owned)
             .with_scopes(scopes)
             .build_access_token_credentials(),
-        "impersonated_service_account" => ImpersonatedBuilder::new(json)
+        "impersonated_service_account" => ImpersonatedBuilder::new(json_owned)
             .with_scopes(scopes)
             .build_access_token_credentials(),
         other => {
