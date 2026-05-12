@@ -304,6 +304,16 @@ generated: components: sources: iggy: configuration: {
 			}
 		}
 	}
+	drain_timeout_secs: {
+		description: """
+			The maximum time, in seconds, to wait for in-flight events to be
+			acknowledged downstream during shutdown before the final consumer
+			offsets are committed. Only used when end-to-end acknowledgements are
+			enabled.
+			"""
+		required: false
+		type: uint: default: 5
+	}
 	framing: {
 		description: """
 			Framing configuration.
