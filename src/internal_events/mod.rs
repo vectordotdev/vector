@@ -74,14 +74,14 @@ mod http;
 pub mod http_client;
 #[cfg(feature = "sources-utils-http-client")]
 mod http_client_source;
+#[cfg(any(feature = "sources-iggy", feature = "sinks-iggy"))]
+mod iggy;
 #[cfg(feature = "sinks-influxdb")]
 mod influxdb;
 #[cfg(feature = "sources-internal_logs")]
 mod internal_logs;
 #[cfg(all(unix, feature = "sources-journald"))]
 mod journald;
-#[cfg(any(feature = "sources-iggy", feature = "sinks-iggy"))]
-mod iggy;
 #[cfg(any(feature = "sources-kafka", feature = "sinks-kafka"))]
 mod kafka;
 #[cfg(feature = "sources-kubernetes_logs")]
@@ -228,14 +228,14 @@ pub(crate) use self::grpc::*;
 pub(crate) use self::host_metrics::*;
 #[cfg(feature = "sources-utils-http-client")]
 pub(crate) use self::http_client_source::*;
+#[cfg(any(feature = "sources-iggy", feature = "sinks-iggy"))]
+pub(crate) use self::iggy::*;
 #[cfg(feature = "sinks-influxdb")]
 pub(crate) use self::influxdb::*;
 #[cfg(feature = "sources-internal_logs")]
 pub(crate) use self::internal_logs::*;
 #[cfg(all(unix, feature = "sources-journald"))]
 pub(crate) use self::journald::*;
-#[cfg(any(feature = "sources-iggy", feature = "sinks-iggy"))]
-pub(crate) use self::iggy::*;
 #[cfg(any(feature = "sources-kafka", feature = "sinks-kafka"))]
 pub(crate) use self::kafka::*;
 #[cfg(feature = "sources-kubernetes_logs")]
