@@ -73,7 +73,7 @@ inputs:
   vdev:
     required: false
     default: true
-    description: "Install vdev CLI tool (cached by vdev/ directory changes)."
+    description: "Install vdev CLI tool via cargo binstall (uses VDEV_VERSION pinned in prepare.sh)."
 
   # prepare.sh - npm
   markdownlint-cli2:
@@ -92,25 +92,14 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - name: Check vdev cache status
-      id: check-vdev-cache
-      if: ${{ inputs.vdev == 'true' }}
-      uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
-      with:
-        path: ~/.cargo/bin/vdev
-        # WARNING: this key need to be in sync with the key in .github/actions/install-vdev/action.yml
-        key: ${{ runner.os }}-vdev-${{ hashFiles('vdev/**', 'lib/vector-vrl/**', 'Cargo.toml', 'Cargo.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-vdev-
-        lookup-only: true
-
     - id: needs
       name: Compute if rust is needed
       shell: bash
       run: |
         rust="false"
 
-        # If any rust-related inputs are true (excluding vdev), enable rust
+        # If any rust-related inputs are true, enable rust.
+        # vdev is installed via cargo binstall (no compilation), so it does not drive this.
         for val in "${{ inputs.mold }}" \
                    "${{ inputs.rust }}" \
                    "${{ inputs.cargo-deb }}" \
@@ -128,15 +117,7 @@ runs:
           fi
         done
 
-        # If vdev needs compilation (cache miss), enable rust
-        vdev_needs_compile="false"
-        if [[ "${{ inputs.vdev }}" == "true" && "${{ steps.check-vdev-cache.outputs.cache-hit }}" != "true" ]]; then
-          rust="true"
-          vdev_needs_compile="true"
-        fi
-
         echo "NEEDS_RUST=$rust" >> "$GITHUB_ENV"
-        echo "VDEV_NEEDS_COMPILE=$vdev_needs_compile" >> "$GITHUB_ENV"
 
         if [[ "$rust" == "true" ]]; then
           echo "RUST_BACKTRACE=full" >> "$GITHUB_ENV"
@@ -152,7 +133,7 @@ runs:
       shell: bash
 
     - name: Cache Cargo registry, index, and git DB
-      if: ${{ inputs.cargo-cache == 'true' || env.NEEDS_RUST == 'true' || env.VDEV_NEEDS_COMPILE == 'true' }}
+      if: ${{ inputs.cargo-cache == 'true' || env.NEEDS_RUST == 'true' }}
       uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
       with:
         path: |
@@ -164,7 +145,7 @@ runs:
           ${{ runner.os }}-cargo-
 
     - name: Install mold
-      if: ${{ runner.os == 'Linux' && env.DISABLE_MOLD != 'true' && (inputs.mold == 'true' || env.VDEV_NEEDS_COMPILE == 'true') }}
+      if: ${{ runner.os == 'Linux' && env.DISABLE_MOLD != 'true' && inputs.mold == 'true' }}
       shell: bash
       run: |
         echo "Installing mold"
@@ -211,7 +192,7 @@ runs:
         EOF
 
     - name: Install protoc
-      if: ${{ inputs.protoc == 'true' || env.VDEV_NEEDS_COMPILE == 'true' }}
+      if: ${{ inputs.protoc == 'true' }}
       shell: bash
       run: |
         echo "Installing protoc"
@@ -241,12 +222,6 @@ runs:
       shell: bash
       run: sudo apt-get update && sudo apt-get install -y libsasl2-dev
 
-    - name: Install vdev
-      if: ${{ inputs.vdev == 'true' }}
-      uses: ./.github/actions/install-vdev
-      with:
-        skip-cache: ${{ env.VDEV_NEEDS_COMPILE == 'true' }}
-
     - name: Cache cargo binaries
       id: cache-cargo-binaries
       uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
@@ -261,6 +236,7 @@ runs:
           ~/.cargo/bin/cargo-llvm-cov
           ~/.cargo/bin/dd-rust-license-tool
           ~/.cargo/bin/wasm-pack
+          ~/.cargo/bin/vdev
         key: ${{ runner.os }}-cargo-binaries-${{ hashFiles('scripts/environment/*.sh') }}
         restore-keys: |
           ${{ runner.os }}-cargo-binaries-
@@ -286,6 +262,7 @@ runs:
         [[ "${{ inputs.cargo-llvm-cov }}" == "true" ]] && mods+=("cargo-llvm-cov")
         [[ "${{ inputs.dd-rust-license-tool }}" == "true" ]] && mods+=("dd-rust-license-tool")
         [[ "${{ inputs.wasm-pack }}" == "true" ]] && mods+=("wasm-pack")
+        [[ "${{ inputs.vdev }}" == "true" ]] && mods+=("vdev")
         [[ "${{ inputs.markdownlint-cli2 }}" == "true" ]] && mods+=("markdownlint-cli2")
         [[ "${{ inputs.prettier }}" == "true" ]] && mods+=("prettier")
         [[ "${{ inputs.datadog-ci }}" == "true" ]] && mods+=("datadog-ci")
@@ -294,3 +271,8 @@ runs:
         if [[ "$csm" != "" ]]; then
           ./scripts/environment/prepare.sh --modules="${csm}"
         fi
+
+    - name: Set VDEV environment variable
+      if: ${{ inputs.vdev == 'true' }}
+      shell: bash
+      run: echo "VDEV=$(which vdev)" >> "$GITHUB_ENV"
