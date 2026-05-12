@@ -21,7 +21,13 @@ pub enum MetricTagMode {
     /// tags regardless of whether the assigned value is scalar or array.
     Full,
     /// Tags are exposed using their underlying shape: single-value tags as
-    /// strings, multi-value tags as arrays. Writes follow the same rule --
-    /// scalar values produce single tags, arrays produce multi-value tags.
+    /// strings, multi-value tags as arrays. Writes: scalar values produce
+    /// single-value tags; arrays of length >= 2 produce multi-value tags.
+    ///
+    /// A length-1 array is normalised to a single-value tag by the metric
+    /// storage layer (`TagValueSet::Set` is never reduced below 2 elements),
+    /// so an assignment like `.tags.region = ["us-east-1"]` round-trips as
+    /// a scalar on the next read. Use `Full` to force array shape regardless
+    /// of length.
     Auto,
 }

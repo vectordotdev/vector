@@ -509,6 +509,37 @@ mod test {
         );
     }
 
+    /// `Auto` round-trip: a 1-element multi-value tag is normalised to a
+    /// single-value tag by the metric storage layer (`TagValueSet::Set` is
+    /// never reduced below 2 elements), so it surfaces in Lua as a string
+    /// scalar rather than a 1-element table. This test pins that behaviour
+    /// as intentional -- a true array-shape preserving round-trip needs
+    /// `MetricTagMode::Full`.
+    #[test]
+    fn auto_mode_one_element_array_normalises_to_scalar() {
+        let mut tags = BTreeMap::new();
+        tags.insert(
+            "region".to_string(),
+            TagValueSet::from(vec!["us-east-1".to_string()]),
+        );
+        let metric = Metric::new(
+            "example counter",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 1.0 },
+        )
+        .with_tags(Some(MetricTags(tags)));
+
+        assert_metric(
+            metric,
+            MetricTagMode::Auto,
+            vec![
+                "type(metric.tags) == 'table'",
+                "type(metric.tags['region']) == 'string'",
+                "metric.tags['region'] == 'us-east-1'",
+            ],
+        );
+    }
+
     /// `Auto` keeps an empty tag set as an array (Lua table). Without this,
     /// an empty multi-value tag would silently morph into `nil` (and a Lua
     /// `tags['empty'] = ...` assignment would then need to know the original

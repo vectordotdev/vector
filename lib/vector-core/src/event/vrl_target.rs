@@ -1650,6 +1650,69 @@ mod test {
         );
     }
 
+    /// Auto round-trip across two passes: a length-1 array write reaches the
+    /// metric storage as `TagValueSet::Single` (the storage layer never holds
+    /// a `Set` with fewer than 2 elements), so when a *subsequent* VRL pass
+    /// constructs a new `VrlTarget` around that metric, the tag surfaces as a
+    /// scalar string rather than a 1-element array. This pins that behaviour
+    /// as intentional -- a true array-shape preserving round-trip needs
+    /// `MetricTagMode::Full`.
+    ///
+    /// Within a single pass, the `VrlTarget` caches writes verbatim in its
+    /// precomputed `Value`, so an intra-pass `.tags.region` read sees the
+    /// original array; the collapse is observable only across passes.
+    #[test]
+    fn metric_auto_one_element_array_normalises_to_scalar() {
+        let metric = Metric::new(
+            "m",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.0 },
+        );
+        let info = auto_mode_program_info();
+        let mut first_pass =
+            VrlTarget::new(Event::Metric(metric), &info, MetricTagMode::Auto);
+
+        first_pass
+            .target_insert(
+                &OwnedTargetPath::event(owned_value_path!("tags", "region")),
+                Value::Array(vec!["us-east-1".into()]),
+            )
+            .unwrap();
+
+        let VrlTarget::Metric { metric, .. } = first_pass else {
+            unreachable!()
+        };
+        let tag_set = metric
+            .tags()
+            .expect("tag should be set")
+            .iter_sets()
+            .find(|(k, _)| *k == "region")
+            .expect("region tag missing")
+            .1;
+        assert_eq!(
+            tag_set.len(),
+            1,
+            "storage layer must collapse a 1-element multi-value tag to a Single",
+        );
+
+        let second_pass = VrlTarget::new(Event::Metric(metric), &info, MetricTagMode::Auto);
+        let tags = second_pass
+            .target_get(&OwnedTargetPath::event(owned_value_path!("tags")))
+            .unwrap()
+            .unwrap()
+            .clone();
+
+        assert_eq!(
+            tags,
+            Value::Object(BTreeMap::from([(
+                "region".into(),
+                Value::from("us-east-1"),
+            )])),
+            "a length-1 array written in one Auto pass must read back as a \
+             scalar on the next pass",
+        );
+    }
+
     /// Auto read: an empty tag set (`len() == 0`) keeps its array shape so a
     /// noop `.tags = .tags` round-trip preserves it. Without this guarantee
     /// an empty multi-value tag would silently morph into a bare single-value
