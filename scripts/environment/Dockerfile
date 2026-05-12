@@ -20,8 +20,6 @@ COPY scripts/environment/npm-tools/ scripts/environment/npm-tools/
 RUN ./scripts/environment/bootstrap-ubuntu-24.04.sh
 
 # Setup the toolchain
-COPY scripts/Gemfile scripts/Gemfile.lock \
-    /git/vectordotdev/vector/scripts/
 COPY rust-toolchain.toml \
     /git/vectordotdev/vector/
 RUN ./scripts/environment/prepare.sh && ./scripts/environment/setup-helm.sh

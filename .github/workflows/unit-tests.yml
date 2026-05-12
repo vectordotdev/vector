@@ -55,7 +55,6 @@ permissions:
   contents: read
 
 env:
-  CARGO_INCREMENTAL: "0"
   CI: true
   DD_ENV: "ci"
 

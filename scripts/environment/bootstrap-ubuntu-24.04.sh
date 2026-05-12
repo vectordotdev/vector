@@ -47,7 +47,6 @@ apt-get install --yes \
     pkg-config \
     rename \
     rpm \
-    ruby-bundler \
     shellcheck \
     sudo \
     unzip \

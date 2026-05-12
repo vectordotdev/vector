@@ -94,6 +94,7 @@ impl ProtoBatchSerializer {
             descriptor: Arc::new(descriptor),
             options: Options {
                 use_json_names: false,
+                allow_lossy_string_coercion: true,
             },
         })
     }
