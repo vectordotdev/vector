@@ -33,26 +33,23 @@ dependencies can be installed by running
 
 ## Installation
 
-Note that installation is not required, since `cargo vdev` commands will invoke vdev from within the
-repository.
-
-Run the following command from the root of the Vector repository:
-
-```sh
-cargo install -f --path vdev
-```
-
-You can also install vdev from [crates.io](https://crates.io/crates/vdev)
-
-```sh
-cargo install vdev
-```
-
-Or using [binstall](https://github.com/cargo-bins/cargo-binstall), which will download a
-pre-compiled binary (fastest)
+The recommended install is [binstall](https://github.com/cargo-bins/cargo-binstall), which
+downloads a pre-compiled binary at the version pinned in `scripts/environment/prepare.sh`.
+This is also what CI and `./scripts/environment/prepare.sh` use.
 
 ```sh
 cargo binstall vdev
+```
+
+Installation is otherwise optional: from within the Vector repository, `cargo vdev` works via
+a cargo alias that compiles vdev from source on each invocation. That path is fine for
+occasional use but is slower than a binstalled binary.
+
+If you are actively developing vdev itself, install from your working tree so the binary on
+`PATH` reflects your local changes:
+
+```sh
+cargo install -f --path vdev
 ```
 
 
