@@ -775,10 +775,26 @@ impl Aggregate {
         //
         // The watermark advanced below gates late-event rejection via
         // `is_too_late()`.
+        //
+        // `bucket_key + interval_ms + grace_ms` is i64 arithmetic. With
+        // `max_future_ms = 0` (documented as accepting arbitrary future
+        // timestamps), a metric near `DateTime::<Utc>::MAX_UTC` can produce
+        // a `bucket_key` close to `i64::MAX` and plain `+` would either
+        // panic (overflow-checked builds) or wrap negative and flush the
+        // bucket immediately -- the wrap then advances the watermark to
+        // near `i64::MAX` and every subsequent normal event is rejected as
+        // late. Saturating addition keeps far-future buckets parked at
+        // `i64::MAX` (never eligible until `force`) instead.
         let buckets_to_flush: Vec<BucketKey> = self
             .event_time_buckets
             .keys()
-            .filter(|&&bucket_key| force || now_ms >= bucket_key + interval_ms + grace_ms)
+            .filter(|&&bucket_key| {
+                force
+                    || now_ms
+                        >= bucket_key
+                            .saturating_add(interval_ms)
+                            .saturating_add(grace_ms)
+            })
             .copied()
             .collect();
 
@@ -2678,6 +2694,69 @@ time_source = "event_time"
         let mut out = vec![];
         agg.flush_into(&mut out);
         assert_eq!(0, out.len(), "Far-future event must be dropped");
+    }
+
+    /// With `max_future_ms = 0` arbitrary future timestamps are accepted, so a
+    /// metric near `DateTime::<Utc>::MAX_UTC` can produce a `bucket_key` close
+    /// to `i64::MAX`. The flush eligibility predicate adds `bucket_key +
+    /// interval_ms + grace_ms` in i64; plain `+` would either panic
+    /// (overflow-checked builds) or wrap negative -- which makes the cutoff
+    /// `<= now_ms` so the bucket flushes immediately and the watermark
+    /// advances to ~`i64::MAX`, after which every normal event is rejected
+    /// as late. Saturating arithmetic must instead park the cutoff at
+    /// `i64::MAX`, leaving the far-future bucket open until `force`.
+    #[test]
+    fn event_time_far_future_bucket_does_not_overflow_flush_cutoff() {
+        let mut agg = Aggregate::new(&AggregateConfig {
+            interval_ms: 1000,
+            mode: AggregationMode::Auto,
+            time_source: TimeSource::EventTime,
+            // Largest grace period accepted by `Aggregate::new`; chosen so
+            // `bucket_key + grace_ms` is guaranteed to overflow when combined
+            // with a near-`MAX_UTC` timestamp.
+            allowed_lateness_ms: i64::MAX as u64,
+            use_system_time_for_missing_timestamps: false,
+            max_future_ms: 0,
+        })
+        .unwrap();
+
+        let far_future = DateTime::<Utc>::MAX_UTC;
+        let event = make_metric_with_timestamp(
+            "far_future_counter",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 1.0 },
+            far_future,
+        );
+        agg.record(event);
+
+        // Non-force flush: the bucket must stay parked because its saturated
+        // cutoff is `i64::MAX`, which `now_ms` never reaches.
+        let mut out = vec![];
+        agg.flush_event_time_buckets(&mut out, false);
+        assert!(
+            out.is_empty(),
+            "a far-future bucket must not be eligible for non-forced flush",
+        );
+        assert_eq!(
+            agg.event_time_buckets.len(),
+            1,
+            "the bucket must remain open after a non-forced flush",
+        );
+        assert!(
+            agg.watermark.is_none(),
+            "the watermark must not advance for a non-forced flush of an \
+             ineligible bucket (advancing it to i64::MAX would drop every \
+             subsequent normal event as late)",
+        );
+
+        // Force flush still drains it (shutdown / topology reload path).
+        agg.flush_event_time_buckets(&mut out, true);
+        assert_eq!(
+            out.len(),
+            1,
+            "force flush must drain the far-future bucket so in-flight \
+             events are not silently dropped on shutdown",
+        );
     }
 
     #[test]
