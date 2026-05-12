@@ -74,6 +74,13 @@ pub struct IggySourceConfig {
     #[serde(default = "default_commit_interval_secs")]
     pub commit_interval_secs: u64,
 
+    /// The maximum time, in seconds, to wait for in-flight events to be
+    /// acknowledged downstream during shutdown before the final consumer
+    /// offsets are committed. Only used when end-to-end acknowledgements are
+    /// enabled.
+    #[serde(default = "default_drain_timeout_secs")]
+    pub drain_timeout_secs: u64,
+
     #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
     #[derivative(Default(value = "default_framing_message_based()"))]
@@ -109,6 +116,10 @@ const fn default_batch_length() -> u32 {
 }
 
 const fn default_commit_interval_secs() -> u64 {
+    5
+}
+
+const fn default_drain_timeout_secs() -> u64 {
     5
 }
 

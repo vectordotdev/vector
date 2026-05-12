@@ -3,7 +3,7 @@ use std::{collections::HashMap, time::Duration};
 use chrono::Utc;
 use futures::StreamExt;
 use iggy::prelude::{IggyClient, IggyConsumer};
-use tokio::time::{MissedTickBehavior, interval};
+use tokio::time::{MissedTickBehavior, interval, sleep};
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::{DecoderFramedRead, decoding::StreamDecodingError},
@@ -45,7 +45,7 @@ async fn commit_offsets(
     pending: &mut HashMap<u32, u64>,
     committed: &mut HashMap<u32, u64>,
 ) {
-    for (partition_id, offset) in pending.drain() {
+    for (partition_id, offset) in std::mem::take(pending) {
         match consumer.store_offset(offset, Some(partition_id)).await {
             Ok(()) => {
                 committed.insert(partition_id, offset);
@@ -56,7 +56,13 @@ async fn commit_offsets(
                     offset,
                 });
             }
-            Err(error) => emit!(IggyOffsetUpdateError { error }),
+            Err(error) => {
+                emit!(IggyOffsetUpdateError { error });
+                // Keep the offset pending so a later timer tick or the
+                // shutdown drain retries it instead of losing the record.
+                let slot = pending.entry(partition_id).or_insert(offset);
+                *slot = (*slot).max(offset);
+            }
         }
     }
 }
@@ -117,7 +123,6 @@ pub async fn run_iggy_source(
 
             _ = &mut shutdown => {
                 info!("Shutdown signal received. Stopping Iggy consumer.");
-                commit_offsets(&mut consumer, config.stream.as_str(), config.topic.as_str(), &mut pending_offsets, &mut committed_offsets).await;
                 break;
             }
 
@@ -256,6 +261,40 @@ pub async fn run_iggy_source(
                 }
             }
         }
+    }
+
+    if acknowledgements {
+        // Stop accepting new pending entries, then wait (bounded by
+        // `drain_timeout_secs`) for the events already sent downstream to be
+        // acknowledged before committing the final offsets, so a graceful
+        // shutdown does not replay delivered messages on restart.
+        drop(finalizer);
+        let drain_deadline = sleep(Duration::from_secs(config.drain_timeout_secs));
+        tokio::pin!(drain_deadline);
+        loop {
+            tokio::select! {
+                biased;
+
+                ack = ack_stream.next() => match ack {
+                    Some((BatchStatus::Delivered, entry)) => {
+                        let slot = pending_offsets.entry(entry.partition_id).or_default();
+                        *slot = (*slot).max(entry.offset);
+                    }
+                    Some(_) => {}
+                    None => break,
+                },
+
+                _ = &mut drain_deadline => break,
+            }
+        }
+        commit_offsets(
+            &mut consumer,
+            config.stream.as_str(),
+            config.topic.as_str(),
+            &mut pending_offsets,
+            &mut committed_offsets,
+        )
+        .await;
     }
 
     info!("Iggy source shut down.");
