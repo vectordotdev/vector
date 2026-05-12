@@ -618,6 +618,25 @@ components: sources: internal_metrics: {
 				}
 			}
 		}
+		iggy_consumer_committed_offset: {
+			description:       "The offset most recently committed to the Iggy server for a partition. Only updated when end-to-end acknowledgements are enabled."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags: _component_tags & {
+				stream: {
+					description: "The Iggy stream name."
+					required:    true
+				}
+				topic: {
+					description: "The Iggy topic name."
+					required:    true
+				}
+				partition: {
+					description: "The Iggy partition ID."
+					required:    true
+				}
+			}
+		}
 		kafka_queue_messages: {
 			description:       "Current number of messages in producer queues."
 			type:              "gauge"

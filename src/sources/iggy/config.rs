@@ -1,4 +1,4 @@
-use iggy::prelude::{Client, IggyClient, IggyClientBuilder, IggyConsumer};
+use iggy::prelude::{AutoCommit, Client, IggyClient, IggyClientBuilder, IggyConsumer};
 use snafu::{ResultExt, Snafu};
 use vector_lib::{
     codecs::decoding::{DeserializerConfig, FramingConfig},
@@ -10,8 +10,10 @@ use vrl::value::Kind;
 
 use crate::{
     codecs::DecodingConfig,
-    config::{GenerateConfig, SourceConfig, SourceContext, SourceOutput},
-    serde::{default_decoding, default_framing_message_based},
+    config::{
+        GenerateConfig, SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput,
+    },
+    serde::{bool_or_struct, default_decoding, default_framing_message_based},
     sources::{Source, iggy::source::run_iggy_source},
 };
 
@@ -67,6 +69,11 @@ pub struct IggySourceConfig {
     #[serde(default = "default_batch_length")]
     pub batch_length: u32,
 
+    /// The interval, in seconds, at which consumer offsets are committed to the
+    /// Iggy server. Only used when end-to-end acknowledgements are enabled.
+    #[serde(default = "default_commit_interval_secs")]
+    pub commit_interval_secs: u64,
+
     #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
     #[derivative(Default(value = "default_framing_message_based()"))]
@@ -91,10 +98,18 @@ pub struct IggySourceConfig {
     #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     pub log_namespace: Option<bool>,
+
+    #[configurable(derived)]
+    #[serde(default, deserialize_with = "bool_or_struct")]
+    pub acknowledgements: SourceAcknowledgementsConfig,
 }
 
 const fn default_batch_length() -> u32 {
     1000
+}
+
+const fn default_commit_interval_secs() -> u64 {
+    5
 }
 
 pub fn default_stream_key_field() -> OptionalValuePath {
@@ -127,7 +142,8 @@ impl SourceConfig for IggySourceConfig {
             DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
                 .build()?;
 
-        let (client, consumer) = self.connect_and_init().await?;
+        let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
+        let (client, consumer) = self.connect_and_init(acknowledgements).await?;
 
         Ok(Box::pin(run_iggy_source(
             self.clone(),
@@ -135,6 +151,7 @@ impl SourceConfig for IggySourceConfig {
             consumer,
             decoder,
             log_namespace,
+            acknowledgements,
             cx.shutdown,
             cx.out,
         )))
@@ -198,7 +215,10 @@ impl SourceConfig for IggySourceConfig {
 }
 
 impl IggySourceConfig {
-    async fn connect_and_init(&self) -> Result<(IggyClient, IggyConsumer), BuildError> {
+    async fn connect_and_init(
+        &self,
+        acknowledgements: bool,
+    ) -> Result<(IggyClient, IggyConsumer), BuildError> {
         let client = IggyClientBuilder::from_connection_string(&self.url)
             .context(ConnectSnafu)?
             .build()
@@ -206,18 +226,27 @@ impl IggySourceConfig {
 
         client.connect().await.context(ConnectSnafu)?;
 
-        let mut consumer = match self.partition {
+        let builder = match self.partition {
             Some(partition) => client
                 .consumer(&self.consumer_name, &self.stream, &self.topic, partition)
-                .context(ConsumerSnafu)?
-                .batch_length(self.batch_length)
-                .build(),
+                .context(ConsumerSnafu)?,
             None => client
                 .consumer_group(&self.consumer_name, &self.stream, &self.topic)
-                .context(ConsumerSnafu)?
-                .batch_length(self.batch_length)
-                .build(),
+                .context(ConsumerSnafu)?,
+        }
+        .batch_length(self.batch_length);
+
+        // With end-to-end acknowledgements enabled, disable the SDK's automatic
+        // offset committing so that consumer offsets are only stored on the
+        // server once the events have been delivered downstream. See
+        // `run_iggy_source` for the acknowledgement handling.
+        let builder = if acknowledgements {
+            builder.auto_commit(AutoCommit::Disabled)
+        } else {
+            builder
         };
+
+        let mut consumer = builder.build();
 
         consumer.init().await.context(ConsumerSnafu)?;
 
