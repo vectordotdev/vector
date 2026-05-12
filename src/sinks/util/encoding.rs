@@ -99,7 +99,6 @@ impl Encoder<Event> for (Transformer, vector_lib::codecs::Encoder<()>) {
     }
 }
 
-#[cfg(feature = "codecs-arrow")]
 impl Encoder<Vec<Event>> for (Transformer, vector_lib::codecs::BatchEncoder) {
     fn encode_input(
         &self,
@@ -156,7 +155,6 @@ impl Encoder<Vec<Event>> for (Transformer, vector_lib::codecs::EncoderKind) {
             vector_lib::codecs::EncoderKind::Framed(encoder) => {
                 (self.0.clone(), *encoder.clone()).encode_input(events, writer)
             }
-            #[cfg(feature = "codecs-arrow")]
             vector_lib::codecs::EncoderKind::Batch(encoder) => {
                 (self.0.clone(), encoder.clone()).encode_input(events, writer)
             }

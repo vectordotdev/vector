@@ -4,6 +4,20 @@ permissions:
   contents: read
 
 on:
+  workflow_dispatch:
+    inputs:
+      git_ref:
+        description: "Git ref to build (branch, tag, or SHA)"
+        type: string
+        required: false
+      channel:
+        description: "Release channel (release/nightly/custom)"
+        type: string
+        default: custom
+      skip_publish:
+        description: "Build and verify only. Skip publishing to Docker, S3, and GitHub"
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       git_ref:
@@ -14,6 +28,10 @@ on:
       channel:
         type: string
         required: true
+      skip_publish:
+        description: "Build and verify only. Skip publishing to Docker, S3, and GitHub"
+        type: boolean
+        default: false
 
 env:
   VERBOSE: true
@@ -21,8 +39,6 @@ env:
   DISABLE_MOLD: true
   DEBIAN_FRONTEND: noninteractive
   CONTAINER_TOOL: docker
-  CARGO_PROFILE_RELEASE_LTO: fat
-  CARGO_PROFILE_RELEASE_CODEGEN_UNITS: 1
   CHANNEL: ${{ inputs.channel }}
 
 jobs:
@@ -72,12 +88,18 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ inputs.git_ref }}
-      - name: Bootstrap runner environment (Ubuntu-specific)
-        run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
-      - name: Bootstrap runner environment (generic)
-        run: bash scripts/environment/prepare.sh --modules=rustup,cross,cargo-deb
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
+          cross: true
+          cargo-deb: true
+          protoc: true
+          libsasl2: true
       - name: Install cross-compilation tools
-        run: sudo apt-get install -y binutils-arm-linux-gnueabihf binutils-aarch64-linux-gnu
+        run: sudo apt-get install -y binutils-arm-linux-gnueabihf binutils-aarch64-linux-gnu cmark-gfm
+      - name: Install rpm
+        if: endsWith(matrix.target, '-linux-gnu') || matrix.target == 'armv7-unknown-linux-gnueabihf'
+        run: sudo apt-get install -y rpm
       - name: Build Vector
         run: make package-${{ matrix.target }}-all
       - name: Stage package artifacts for publish
@@ -143,7 +165,6 @@ jobs:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
       VECTOR_BUILD_DESC: ${{ needs.generate-publish-metadata.outputs.vector_build_desc }}
       CHANNEL: ${{ needs.generate-publish-metadata.outputs.vector_release_channel }}
-      RUSTFLAGS: "-D warnings -Ctarget-feature=+crt-static"
       RELEASE_BUILDER: "true"
     steps:
       - name: Checkout Vector
@@ -312,6 +333,7 @@ jobs:
 
   publish-docker:
     name: Publish to Docker
+    if: ${{ !inputs.skip_publish }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     # Elevated permission required to push Docker images to GitHub Container Registry
@@ -331,12 +353,12 @@ jobs:
         with:
           ref: ${{ inputs.git_ref }}
       - name: Login to DockerHub
-        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
         with:
           username: ${{ secrets.CI_DOCKER_USERNAME }}
           password: ${{ secrets.CI_DOCKER_PASSWORD }}
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -372,6 +394,7 @@ jobs:
 
   publish-s3:
     name: Publish to S3
+    if: ${{ !inputs.skip_publish }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     needs:
@@ -409,7 +432,7 @@ jobs:
   publish-github:
     name: Publish release to GitHub
     # We only publish to GitHub for versioned releases, not nightlies.
-    if: inputs.channel == 'release'
+    if: ${{ !inputs.skip_publish && inputs.channel == 'release' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     # Elevated permission required to create GitHub releases and upload release assets

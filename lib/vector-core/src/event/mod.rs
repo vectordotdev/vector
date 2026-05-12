@@ -7,7 +7,7 @@ pub use finalization::{
     Finalizable,
 };
 pub use log_event::LogEvent;
-pub use metadata::{DatadogMetricOriginMetadata, EventMetadata, WithMetadata};
+pub use metadata::{DatadogMetricOriginMetadata, EventMetadata, Secrets, WithMetadata};
 pub use metric::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind};
 pub use r#ref::{EventMutRef, EventRef};
 use serde::{Deserialize, Serialize};
