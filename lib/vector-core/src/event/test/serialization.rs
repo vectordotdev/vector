@@ -7,8 +7,6 @@ use regex::Regex;
 use similar_asserts::assert_eq;
 use vector_buffers::encoding::Encodable;
 
-use super::*;
-use crate::config::log_schema;
 use crate::event::ser::check_value_depth;
 
 fn encode_value<T: Encodable, B: BufMut>(value: T, buffer: &mut B) {
