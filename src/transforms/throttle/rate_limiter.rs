@@ -1,11 +1,9 @@
-use std::{hash::Hash, sync::Arc, time::Duration};
+use std::{hash::Hash, sync::Arc};
 
-use governor::{
-    Quota, RateLimiter, clock, middleware::NoOpMiddleware, state::keyed::DashMapStateStore,
-};
-use metrics::Counter;
+use governor::{RateLimiter, clock, middleware::NoOpMiddleware, state::keyed::DashMapStateStore};
 use tokio;
 
+use super::transform::Throttle;
 use crate::cpu_time::CpuTimedExt;
 
 /// Re-usable wrapper around the structs/type from the governor crate.
@@ -24,8 +22,14 @@ where
     K: Hash + Eq + Clone + Send + Sync + 'static,
     C: clock::Clock + Clone + Send + Sync + 'static,
 {
-    pub fn start(quota: Quota, clock: C, flush_keys_interval: Duration, cpu_ns: Counter) -> Self {
-        let rate_limiter = Arc::new(RateLimiter::dashmap_with_clock(quota, clock));
+    pub fn start(throttle: &Throttle<C, C::Instant>) -> Self {
+        let rate_limiter = Arc::new(RateLimiter::dashmap_with_clock(
+            throttle.quota,
+            throttle.clock.clone(),
+        ));
+
+        let flush_keys_interval = throttle.flush_keys_interval;
+        let cpu_ns = throttle.cpu_ns.clone();
 
         let rate_limiter_clone = Arc::clone(&rate_limiter);
         // Hook the periodic key-flush task onto the component's CPU counter so

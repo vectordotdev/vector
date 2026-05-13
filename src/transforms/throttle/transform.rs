@@ -27,7 +27,7 @@ pub struct Throttle<C: clock::Clock<Instant = I>, I: clock::Reference> {
     exclude: Option<Condition>,
     pub clock: C,
     internal_metrics: ThrottleInternalMetricsConfig,
-    cpu_ns: Counter,
+    pub cpu_ns: Counter,
 }
 
 impl<C, I> Throttle<C, I>
@@ -75,12 +75,7 @@ where
     where
         K: Hash + Eq + Clone + Send + Sync + 'static,
     {
-        RateLimiterRunner::start(
-            self.quota,
-            self.clock.clone(),
-            self.flush_keys_interval,
-            self.cpu_ns.clone(),
-        )
+        RateLimiterRunner::start(self)
     }
 
     pub fn emit_event_discarded(&self, key: String) {
