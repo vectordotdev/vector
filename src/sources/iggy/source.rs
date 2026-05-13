@@ -18,7 +18,7 @@ use vector_lib::{
 use crate::{
     SourceSender,
     codecs::Decoder,
-    event::{BatchNotifier, BatchStatus, Event},
+    event::{BatchNotifier, BatchStatus, Event, EventFinalizer, EventStatus},
     internal_events::{
         IggyBytesReceived, IggyEventsReceived, IggyOffsetCommitted, IggyOffsetUpdateError,
         IggyOffsetUpdated, IggyReadError, StreamClosedError,
@@ -276,6 +276,7 @@ pub async fn run_iggy_source(
                         let (batch, receiver) = BatchNotifier::new_with_receiver();
                         let mut framed = DecoderFramedRead::new(payload.as_ref(), decoder.clone());
                         let mut channel_closed = false;
+                        let mut decode_failed = false;
 
                         while let Some(next) = framed.next().await {
                             match next {
@@ -346,6 +347,7 @@ pub async fn run_iggy_source(
                                 }
                                 Err(error) => {
                                     if !error.can_continue() {
+                                        decode_failed = true;
                                         break;
                                     }
                                 }
@@ -354,7 +356,17 @@ pub async fn run_iggy_source(
 
                         // Drop our handle so that the batch is finalized once the
                         // events that were attached to it are dropped downstream.
-                        drop(batch);
+                        // On a non-continuable decode error, wrap the batch in an
+                        // `EventFinalizer` set to `Rejected` so that the offset is
+                        // not committed; otherwise the default `Delivered` status
+                        // would let a malformed message advance the consumer.
+                        if decode_failed {
+                            let efin = EventFinalizer::new(batch);
+                            efin.update_status(EventStatus::Rejected);
+                            drop(efin);
+                        } else {
+                            drop(batch);
+                        }
 
                         if channel_closed {
                             return Err(());
