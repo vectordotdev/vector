@@ -70,7 +70,7 @@ async fn commit_offsets(
 #[allow(clippy::too_many_arguments)]
 pub async fn run_iggy_source(
     config: IggySourceConfig,
-    _client: IggyClient,
+    _keep_alive_client: IggyClient,
     mut consumer: IggyConsumer,
     decoder: Decoder,
     log_namespace: LogNamespace,
@@ -78,6 +78,14 @@ pub async fn run_iggy_source(
     mut shutdown: ShutdownSignal,
     mut out: SourceSender,
 ) -> Result<(), ()> {
+    let stream = config.stream.as_str();
+    let topic = config.topic.as_str();
+    let stream_key = config.stream_key_field.path.as_ref();
+    let topic_key = config.topic_key_field.path.as_ref();
+    let stream_path = owned_value_path!("stream");
+    let topic_path = owned_value_path!("topic");
+    let partition_id_path = owned_value_path!("partition_id");
+    let offset_path = owned_value_path!("offset");
     let (finalizer, mut ack_stream) = OrderedFinalizer::<FinalizerEntry>::new(None);
 
     // The highest acknowledged offset per partition that has not yet been
@@ -111,14 +119,14 @@ pub async fn run_iggy_source(
                         .copied()
                         .unwrap_or(0);
                     if pending.saturating_sub(committed) >= commit_after {
-                        commit_offsets(&mut consumer, config.stream.as_str(), config.topic.as_str(), &mut pending_offsets, &mut committed_offsets)
+                        commit_offsets(&mut consumer, stream, topic, &mut pending_offsets, &mut committed_offsets)
                             .await;
                     }
                 }
             }
 
             _ = commit_timer.tick() => {
-                commit_offsets(&mut consumer, config.stream.as_str(), config.topic.as_str(), &mut pending_offsets, &mut committed_offsets).await;
+                commit_offsets(&mut consumer, stream, topic, &mut pending_offsets, &mut committed_offsets).await;
             }
 
             _ = &mut shutdown => {
@@ -133,13 +141,13 @@ pub async fn run_iggy_source(
                         let partition_id = received.partition_id;
                         emit!(IggyBytesReceived {
                             byte_size: payload.len(),
-                            stream: config.stream.as_str(),
-                            topic: config.topic.as_str(),
+                            stream,
+                            topic,
                             partition: partition_id,
                         });
                         emit!(IggyOffsetUpdated {
-                            stream: config.stream.as_str(),
-                            topic: config.topic.as_str(),
+                            stream,
+                            topic,
                             partition: partition_id,
                             message_offset: received.message.header.offset,
                             current_offset: received.current_offset,
@@ -160,8 +168,8 @@ pub async fn run_iggy_source(
                                     emit!(IggyEventsReceived {
                                         count,
                                         byte_size,
-                                        stream: config.stream.as_str(),
-                                        topic: config.topic.as_str(),
+                                        stream,
+                                        topic,
                                         partition: partition_id,
                                     });
                                     let now = Utc::now();
@@ -174,42 +182,32 @@ pub async fn run_iggy_source(
                                                 IggySourceConfig::NAME,
                                                 now,
                                             );
-                                            let stream_key = config
-                                                .stream_key_field
-                                                .path
-                                                .as_ref()
-                                                .map(LegacyKey::InsertIfEmpty);
-                                            let topic_key = config
-                                                .topic_key_field
-                                                .path
-                                                .as_ref()
-                                                .map(LegacyKey::InsertIfEmpty);
                                             log_namespace.insert_source_metadata(
                                                 IggySourceConfig::NAME,
                                                 log,
-                                                stream_key,
-                                                &owned_value_path!("stream"),
-                                                config.stream.as_str(),
+                                                stream_key.map(LegacyKey::InsertIfEmpty),
+                                                &stream_path,
+                                                stream,
                                             );
                                             log_namespace.insert_source_metadata(
                                                 IggySourceConfig::NAME,
                                                 log,
-                                                topic_key,
-                                                &owned_value_path!("topic"),
-                                                config.topic.as_str(),
+                                                topic_key.map(LegacyKey::InsertIfEmpty),
+                                                &topic_path,
+                                                topic,
                                             );
                                             log_namespace.insert_source_metadata(
                                                 IggySourceConfig::NAME,
                                                 log,
                                                 None::<LegacyKey<&str>>,
-                                                &owned_value_path!("partition_id"),
+                                                &partition_id_path,
                                                 partition_id as i64,
                                             );
                                             log_namespace.insert_source_metadata(
                                                 IggySourceConfig::NAME,
                                                 log,
                                                 None::<LegacyKey<&str>>,
-                                                &owned_value_path!("offset"),
+                                                &offset_path,
                                                 offset as i64,
                                             );
                                         }
@@ -256,6 +254,7 @@ pub async fn run_iggy_source(
                         emit!(IggyReadError { error });
                     }
                     None => {
+                        warn!("Iggy consumer stream ended unexpectedly.");
                         break;
                     }
                 }
@@ -289,8 +288,8 @@ pub async fn run_iggy_source(
         }
         commit_offsets(
             &mut consumer,
-            config.stream.as_str(),
-            config.topic.as_str(),
+            stream,
+            topic,
             &mut pending_offsets,
             &mut committed_offsets,
         )
