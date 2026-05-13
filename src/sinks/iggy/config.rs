@@ -11,7 +11,7 @@ use crate::sinks::{prelude::*, util::service::TowerRequestConfigDefaults};
 pub struct IggyTowerRequestConfigDefaults;
 
 impl TowerRequestConfigDefaults for IggyTowerRequestConfigDefaults {
-    const CONCURRENCY: Concurrency = Concurrency::Adaptive;
+    const CONCURRENCY: Concurrency = Concurrency::None;
 }
 
 #[derive(Clone, Copy, Debug, Default)]
