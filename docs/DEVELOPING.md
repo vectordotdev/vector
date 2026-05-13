@@ -65,6 +65,14 @@ Loosely, you'll need the following:
 - **To run `make check-licenses` or `make build-licenses`:** Have `dd-rust-license-tool` [installed](https://github.com/DataDog/rust-license-tool).
 - **To run `make generate-docs`:** Have `cue` [installed](https://cuelang.org/docs/install/).
 
+**Tooling shortcut:** Once the system-level dependencies above are in place, you can install the Rust and npm tooling (`cargo-nextest`, `cargo-deny`, `dd-rust-license-tool`, `vdev`, `markdownlint-cli2`, `prettier`, and others) in one shot:
+
+```bash
+bash scripts/environment/prepare.sh
+```
+
+This is the same script CI uses to provision its toolchain, so what you get locally matches what CI installs.
+
 We're interested in reducing our dependencies if simple options exist. Got an idea? Try it out, we'd love to hear of your successes and failures!
 
 In order to do your development on Vector, you'll primarily use a few commands, such as `cargo` and `make` tasks you can use ordered from most to least frequently run:
