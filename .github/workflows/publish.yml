@@ -66,7 +66,7 @@ jobs:
   build-linux-gnu-native:
     name: Build Vector for ${{ matrix.target }} (native)
     runs-on: ${{ matrix.runner }}
-    container: almalinux:8
+    container: almalinux:8@sha256:ca871b110064fe81bff0250ed5cc56fbb0a9840715f09811c33bbf9d72cef56c
     timeout-minutes: 90
     needs: generate-publish-metadata
     env:
@@ -330,7 +330,7 @@ jobs:
       matrix:
         container:
           # Lowest supported glibc tier (EL8 family, glibc 2.28). Catches glibc-floor regressions.
-          - "almalinux:8"
+          - "almalinux:8@sha256:ca871b110064fe81bff0250ed5cc56fbb0a9840715f09811c33bbf9d72cef56c"
           - "quay.io/centos/centos:stream9"
           - "amazonlinux:2023"
           - "fedora:39"
