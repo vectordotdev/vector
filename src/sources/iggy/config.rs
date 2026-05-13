@@ -1,5 +1,5 @@
 use iggy::prelude::{
-    Client, IggyClient, IggyClientBuilder, IggyConsumer, NonZeroIggyDuration, PollOptions,
+    Client, CommitPolicy, IggyClient, IggyClientBuilder, IggyConsumer, PollOptions,
 };
 use snafu::{ResultExt, Snafu};
 use vector_lib::{
@@ -13,8 +13,10 @@ use vrl::value::Kind;
 use crate::{
     codecs::DecodingConfig,
     common::iggy::{login_if_http, secure_connection_string},
-    config::{GenerateConfig, SourceConfig, SourceContext, SourceOutput},
-    serde::{default_decoding, default_framing_message_based},
+    config::{
+        GenerateConfig, SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput,
+    },
+    serde::{bool_or_struct, default_decoding, default_framing_message_based},
     sources::{Source, iggy::source::run_iggy_source},
 };
 
@@ -71,6 +73,20 @@ pub struct IggySourceConfig {
     #[derivative(Default(value = "default_batch_length()"))]
     pub batch_length: u32,
 
+    /// The interval, in seconds, at which consumer offsets are committed to the
+    /// Iggy server. Only used when end-to-end acknowledgements are enabled.
+    #[serde(default = "default_commit_interval_secs")]
+    #[derivative(Default(value = "default_commit_interval_secs()"))]
+    pub commit_interval_secs: u64,
+
+    /// The maximum time, in seconds, to wait for in-flight events to be
+    /// acknowledged downstream during shutdown before the final consumer
+    /// offsets are committed. Only used when end-to-end acknowledgements are
+    /// enabled.
+    #[serde(default = "default_drain_timeout_secs")]
+    #[derivative(Default(value = "default_drain_timeout_secs()"))]
+    pub drain_timeout_secs: u64,
+
     #[serde(default = "default_framing_message_based")]
     #[derivative(Default(value = "default_framing_message_based()"))]
     pub framing: FramingConfig,
@@ -95,10 +111,21 @@ pub struct IggySourceConfig {
     #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     pub log_namespace: Option<bool>,
+
+    #[serde(default, deserialize_with = "bool_or_struct")]
+    pub acknowledgements: SourceAcknowledgementsConfig,
 }
 
 const fn default_batch_length() -> u32 {
     1000
+}
+
+const fn default_commit_interval_secs() -> u64 {
+    5
+}
+
+const fn default_drain_timeout_secs() -> u64 {
+    5
 }
 
 pub(crate) fn default_stream_key_field() -> OptionalValuePath {
@@ -129,7 +156,8 @@ impl SourceConfig for IggySourceConfig {
             DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
                 .build()?;
 
-        let (client, consumer) = self.connect_and_init().await?;
+        let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
+        let (client, consumer) = self.connect_and_init(acknowledgements).await?;
 
         Ok(crate::sources::opaque_source(run_iggy_source(
             self.clone(),
@@ -137,6 +165,7 @@ impl SourceConfig for IggySourceConfig {
             consumer,
             decoder,
             log_namespace,
+            acknowledgements,
             cx.shutdown,
             cx.out,
         )))
@@ -146,13 +175,13 @@ impl SourceConfig for IggySourceConfig {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
         let legacy_stream_key = self
             .stream_key_field
-            .clone()
             .path
+            .clone()
             .map(LegacyKey::InsertIfEmpty);
         let legacy_topic_key = self
             .topic_key_field
-            .clone()
             .path
+            .clone()
             .map(LegacyKey::InsertIfEmpty);
 
         let schema_definition = self
@@ -200,7 +229,26 @@ impl SourceConfig for IggySourceConfig {
 }
 
 impl IggySourceConfig {
-    async fn connect_and_init(&self) -> Result<(IggyClient, IggyConsumer), BuildError> {
+    /// With acknowledgements the source commits its own checkpoints. Without
+    /// them the server stores a read batch's offset in the same round trip, so
+    /// a restart replays at most the batch in flight instead of the SDK's
+    /// default 10,000-message auto-commit.
+    fn poll_options(&self, acknowledgements: bool) -> PollOptions {
+        PollOptions {
+            count: self.batch_length,
+            commit: if acknowledgements {
+                CommitPolicy::Manual
+            } else {
+                CommitPolicy::OnRead
+            },
+            ..Default::default()
+        }
+    }
+
+    async fn connect_and_init(
+        &self,
+        acknowledgements: bool,
+    ) -> Result<(IggyClient, IggyConsumer), BuildError> {
         let url = secure_connection_string(&self.url);
         let client = IggyClientBuilder::from_connection_string(&url)
             .context(ConnectSnafu)?
@@ -212,10 +260,7 @@ impl IggySourceConfig {
             .await
             .context(ConnectSnafu)?;
 
-        let poll_options = PollOptions {
-            count: self.batch_length,
-            ..Default::default()
-        };
+        let poll_options = self.poll_options(acknowledgements);
         let builder = match self.partition {
             Some(partition) => client
                 .consumer(&self.consumer_name, &self.stream, &self.topic)
@@ -225,14 +270,17 @@ impl IggySourceConfig {
                 .consumer_group(&self.consumer_name, &self.stream, &self.topic)
                 .context(ConsumerSnafu)?,
         }
-        .poll_options(poll_options)
-        // Two polls of read-ahead keeps the consumer busy while staying far
-        // below the SDK default of 16,000 buffered messages.
-        .prefetch_messages(self.batch_length.saturating_mul(2))
-        // A source in the same topology as its sink can start before the sink
-        // creates the topic. The SDK retries the lookup a few times instead of
-        // failing the build, which the topology would only retry with backoff.
-        .init_retries(3, NonZeroIggyDuration::ONE_SECOND);
+        .poll_options(poll_options);
+
+        // A partition reassigned to this consumer can hold offsets the previous
+        // owner yielded without committing. The SDK filters them unless replay
+        // is allowed, and the acknowledgement path cannot redeliver offsets it
+        // never sees.
+        let builder = if acknowledgements {
+            builder.allow_replay()
+        } else {
+            builder
+        };
 
         let mut consumer = builder.build();
 
@@ -249,5 +297,20 @@ mod tests {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<IggySourceConfig>();
+    }
+
+    #[test]
+    fn acknowledgements_choose_who_stores_offsets() {
+        let config = IggySourceConfig::default();
+        assert_eq!(
+            config.poll_options(true).commit,
+            CommitPolicy::Manual,
+            "the source commits its own checkpoints, so the SDK must not store"
+        );
+        assert_eq!(
+            config.poll_options(false).commit,
+            CommitPolicy::OnRead,
+            "without acknowledgements the server stores each read batch"
+        );
     }
 }
