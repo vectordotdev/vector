@@ -37,7 +37,6 @@ jobs:
       id-token: write
     timeout-minutes: 90
     env:
-      CARGO_INCREMENTAL: 0
       DD_ENV: "ci"
     steps:
       - name: Checkout branch
