@@ -304,6 +304,7 @@ killall
 kinesisfirehose
 kinit
 klog
+Kvlist
 labelmap
 lalrpop
 Lamport
