@@ -252,12 +252,12 @@ where
 /// zero values that would be misleading to compare against supported
 /// platforms.
 #[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
-pub(crate) fn register_counter(name: &'static str) -> Counter {
-    metrics::counter!(name)
+pub(crate) fn register_counter() -> Counter {
+    vector_lib::counter!(vector_lib::internal_event::CounterName::ComponentCpuUsageNsTotal)
 }
 
 #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
-pub(crate) fn register_counter(_name: &'static str) -> Counter {
+pub(crate) fn register_counter() -> Counter {
     Counter::noop()
 }
 
