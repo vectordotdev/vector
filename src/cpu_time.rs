@@ -195,8 +195,8 @@ impl<F: Future> Future for CpuTimedFuture<F> {
     type Output = F::Output;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<F::Output> {
-        let this = self.project();
         let t0 = ThreadTime::now();
+        let this = self.project();
         let result = this.inner.poll(cx);
         this.counter.increment(t0.elapsed().as_nanos() as u64);
         result
