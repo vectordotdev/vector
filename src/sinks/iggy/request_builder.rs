@@ -50,12 +50,15 @@ pub(super) fn request_builder(
     let builder = RequestMetadataBuilder::from_events(&events);
 
     let mut byte_size = telemetry().create_request_count_byte_size();
+    let mut uncompressed_byte_size = 0usize;
     let payloads: Vec<Bytes> = events
         .into_iter()
-        .filter_map(|event| encode_event(event, transformer, encoder, &mut byte_size))
+        .filter_map(|event| {
+            let bytes = encode_event(event, transformer, encoder, &mut byte_size)?;
+            uncompressed_byte_size += bytes.len();
+            Some(bytes)
+        })
         .collect();
-
-    let uncompressed_byte_size = payloads.iter().map(|p| p.len()).sum();
     let encoded = EncodeResult {
         payload: payloads,
         uncompressed_byte_size,
