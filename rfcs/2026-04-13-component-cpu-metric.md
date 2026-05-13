@@ -121,32 +121,43 @@ This metric is always emitted for transforms; there is no configuration knob.
 
   The transform's `cpu_ns` therefore **includes**:
 
-  - **Sync transforms** (inline and concurrent): exactly the synchronous
-    `transform_all` call.
-  - **Task transforms**: the entire task body — input-channel dequeue,
-    `Utilization` / `OutputUtilization` stream-wrapper overhead, the
-    user-defined transform's `poll_next`, the schema/latency `map`, and the
-    fanout-send loop. A single poll may churn through many items before
-    tokio's cooperative budget (default 128 ops) forces a `Pending`; all of
-    that is genuinely this task's work.
-  - **Helper tokio tasks** the transform spawns at construction time
-    (`aws_ec2_metadata`'s IMDS-refresh worker, `throttle`'s
-    `RateLimiterRunner` flush loop): the `cpu_ns` counter is plumbed through
-    `TransformContext` so those helpers wrap their spawn with the same
-    `.cpu_timed(counter)`. Their CPU is attributed back to this component
-    rather than silently excluded.
+  - **Sync transforms (inline)**: the entire `Runner::run_inline` future —
+    input dequeue, `on_events_received`, `transform_all`, `send_outputs`
+    (fanout) — captured by one `.cpu_timed(cpu_ns)` wrap at the call site.
+  - **Sync transforms (concurrent)**: the `run_concurrently` driver
+    (`.cpu_timed`) **plus** each per-batch transform task (`spawn_timed`),
+    both feeding the same counter. No double-counting: the spawned task's
+    polls run on a separate tokio task that the driver wrapper doesn't see.
+  - **Task transforms**: the entire task body — input dequeue, stream-wrapper
+    overhead, `poll_next`, schema/latency `map`, fanout-send. A single poll
+    can churn through many items before tokio's cooperative budget (default
+    128 ops) forces a `Pending`; all that work is the task's.
+  - **Helper tokio tasks** (`aws_ec2_metadata` IMDS refresh, `throttle`'s
+    `RateLimiterRunner` flush loop): spawned via `spawn_timed(future,
+    context.cpu_ns.clone())` so their CPU is attributed back to the
+    component rather than silently excluded.
 
   And **does not** include:
 
-  - The upstream component's transform/source CPU (stays on upstream's
-    counter, runs in upstream's task).
-  - Time our task was parked in `Pending` waiting for input (no polls happen,
-    so no CPU ticks).
-  - Other tokio tasks running on other worker threads.
+  - **Other components' CPU.** Each component runs in its own task with its
+    own counter; channel-isolation means our polls dequeue/enqueue items but
+    don't execute upstream or downstream code.
+  - **Parked time (`Pending`).** Suspended → no polls → no CPU. Back-pressure
+    and input starvation show up as flat CPU growth.
+  - **One-time build/registration** — outputs spec, metric handles, schema
+    setup. Runs synchronously before any task is spawned: startup cost, not
+    steady-state.
+  - **Drop after `Poll::Ready`.** `CpuTimedFuture::poll` times across the
+    inner `.poll()` only; tokio drops the inner future *after* the final
+    poll, so `Drop` impls there are missed. Once per task, at shutdown.
+  - **Tokio scheduler / waker overhead.** Executor work, not component work.
 
-  The channel-poll / fanout-send bookkeeping our wrapper does include is
-  small relative to the transform's own work, so the metric remains a
-  meaningful comparator across transform kinds.
+  The per-task bookkeeping we *do* count — fanout-send dispatch, per-event
+  schema/latency mapping, metric emits — is deliberate: it's CPU the task
+  synchronously spends moving data through. It is **not** wait-time for slow
+  downstreams — those park us in `Pending`, pulling the metric **down**, not
+  up. The metric will correctly catch e.g. a high-fan-out transform (many
+  outputs → more per-batch dispatch) or heavy per-event schema work.
 - **Low overhead.** Two `clock_gettime` calls per poll (~80ns total on Linux)
   is negligible relative to the work `transform_all` performs.
 - **No accumulation errors.** The counter stores `u64` nanoseconds; each
@@ -207,6 +218,10 @@ on modern kernels. The higher precision is worth the identical cost.
     increments a `metrics::Counter` by the delta. A `CpuTimedExt` extension
     trait exposes it as a chained `.cpu_timed(counter)` call, mirroring
     `tracing::Instrument::in_current_span`.
+  - A `spawn_timed(future, counter)` free function equivalent to
+    `tokio::spawn(future.cpu_timed(counter))`, used for any background task
+    whose CPU should be attributed to a component (transform housekeeping
+    loops, `run_concurrently` per-batch tasks).
 - Add a `cpu_ns: Counter` field to `TransformContext`, defaulting to
   `Counter::noop()`. In `build_transforms`, register the counter inside the
   transform `error_span!` so it is tagged with `component_id`,
@@ -215,23 +230,21 @@ on modern kernels. The higher precision is worth the identical cost.
   and any helper tokio tasks — so labels and recorder lookup are paid once,
   not on every poll. Also propagate the same handle through `TransformNode`
   for the topology builder's own use.
-- For `run_inline`, bracket the synchronous `transform_all` call directly with
-  `ThreadTime::now()` / `elapsed()`. The transform task itself owns this code
-  and there is no `.await` between the brackets, so inline measurement is the
-  simplest correct option.
-- For `run_concurrently`, wrap the spawned per-batch future via
-  `.cpu_timed(cpu_ns.clone())` rather than measuring inline. This hooks the
-  measurement onto the task's `Future::poll` boundary and makes the pattern
-  uniform for any future async work added inside the spawned body.
+- For sync transforms, wrap the `run_inline()` / `run_concurrently()` future
+  with `.cpu_timed(node.cpu_ns.clone())` at the `build_sync_transform` call
+  site. The concurrent variant additionally spawns each per-batch transform
+  via `spawn_timed(future, cpu_ns.clone())`; the spawned tasks' polls are
+  invisible to the driver wrapper, so both measurements compose additively
+  without double-counting.
 - For `build_task_transform`, take the counter from `TransformNode` (which
   receives it from the context) and wrap the outer task future with
   `.cpu_timed(counter)` before `.boxed()`. CPU time accumulates across every
   poll of the task, naturally excluding time the task is parked in `Pending`.
 - For transforms that spawn helper tokio tasks at construction time
-  (`aws_ec2_metadata`, `throttle`'s `RateLimiterRunner`), read
-  `context.cpu_ns.clone()` in `build()` and `.cpu_timed(...)` the spawned
-  helper future. For `RateLimiterRunner::start`, plumb the counter through as
-  a parameter so it stays the throttle config's responsibility to provide it.
+  (`aws_ec2_metadata`, `throttle`'s `RateLimiterRunner`), spawn the helper
+  via `spawn_timed(future, context.cpu_ns.clone())`. For
+  `RateLimiterRunner::start`, plumb the counter through as a parameter so
+  it stays the throttle config's responsibility to provide.
 - Add integration test: run a CPU-intensive remap transform, verify
   `component_cpu_usage_ns_total` is within 10% of expected CPU time.
 - Add documentation for the new metric in the generated component docs.
