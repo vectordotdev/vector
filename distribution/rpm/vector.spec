@@ -81,6 +81,10 @@ rm -rf %{buildroot}
 %{_bindir}/*
 %{_unitdir}/vector.service
 %config(noreplace) %{_sysconfdir}/default/vector
+# Older versions installed a demo config at this path; mark it as %ghost so
+# rpm preserves any existing on-disk file during upgrade instead of removing
+# it as orphaned.
+%ghost %config(noreplace) %{_sysconfdir}/%{_name}/vector.yaml
 %config %{_sysconfdir}/%{_name}/examples/*
 %dir %{_sharedstatedir}/%{_name}
 %doc README.md
