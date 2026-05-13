@@ -205,7 +205,6 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           rust: true
-          rustup: true
           protoc: true
       - name: Build Vector
         env:
