@@ -22,8 +22,10 @@ logs_enabled: false
 use_dogstatsd: true
 dogstatsd_non_local_traffic: true
 
-# send to vector
-vector:
-  metrics:
-    enabled: true
-    url: "http://vector:8181"
+# Send metrics directly to fakeintake-agent as the baseline, and also forward
+# the same payloads to Vector so both paths receive identical computed values
+# (same flush window, same histogram statistics).
+dd_url: http://fakeintake-agent:80
+additional_endpoints:
+  "http://vector:8181":
+    - DEADBEEF
