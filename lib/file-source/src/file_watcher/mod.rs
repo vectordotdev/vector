@@ -366,7 +366,7 @@ impl FileWatcher {
         let file_position = &mut self.file_position;
         let initial_position = *file_position;
         match read_until_with_max_size(
-            reader.as_mut(),
+            reader,
             file_position,
             self.line_delimiter.as_ref(),
             &mut self.buf,
