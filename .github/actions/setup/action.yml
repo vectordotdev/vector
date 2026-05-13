@@ -252,6 +252,8 @@ runs:
 
     - name: Run prepare.sh
       shell: bash
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
       run: |
         mods=()
         [[ "${{ inputs.rust == 'true' || env.NEEDS_RUST == 'true' }}" == "true" ]] && mods+=("rustup")
