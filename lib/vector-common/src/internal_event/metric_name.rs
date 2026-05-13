@@ -350,7 +350,7 @@ pub enum InternalMetricKind {
 /// Returns an iterator over every known Vector metric name paired with its kind.
 pub fn all_metrics() -> impl Iterator<Item = (&'static str, InternalMetricKind)> {
     CounterName::iter()
-        .map(|n| (n.as_ref(), InternalMetricKind::Counter))
-        .chain(GaugeName::iter().map(|n| (n.as_ref(), InternalMetricKind::Gauge)))
-        .chain(HistogramName::iter().map(|n| (n.as_ref(), InternalMetricKind::Histogram)))
+        .map(|n| (n.as_str(), InternalMetricKind::Counter))
+        .chain(GaugeName::iter().map(|n| (n.as_str(), InternalMetricKind::Gauge)))
+        .chain(HistogramName::iter().map(|n| (n.as_str(), InternalMetricKind::Histogram)))
 }
