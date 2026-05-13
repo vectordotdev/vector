@@ -4,9 +4,10 @@ use std::{
 };
 
 use chrono::Utc;
-use futures::StreamExt;
+use futures::{StreamExt, stream::BoxStream};
 use iggy::prelude::{IggyClient, IggyConsumer};
 use tokio::time::{MissedTickBehavior, interval, sleep};
+use tokio_stream::StreamMap;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::{DecoderFramedRead, decoding::StreamDecodingError},
@@ -174,7 +175,13 @@ pub async fn run_iggy_source(
     let topic_path = owned_value_path!("topic");
     let partition_id_path = owned_value_path!("partition_id");
     let offset_path = owned_value_path!("offset");
-    let (finalizer, mut ack_stream) = OrderedFinalizer::<FinalizerEntry>::new(None);
+    // Per-partition finalizers prevent head-of-line blocking: a stalled batch
+    // on partition A only delays its own acknowledgements, not partition B's.
+    // Within a partition, the queue stays ordered, which the
+    // `recompute_pending` fence logic depends on for safety.
+    let mut finalizers: HashMap<u32, OrderedFinalizer<FinalizerEntry>> = HashMap::new();
+    let mut ack_streams: StreamMap<u32, BoxStream<'static, (BatchStatus, FinalizerEntry)>> =
+        StreamMap::new();
 
     // The highest acknowledged offset per partition that has not yet been
     // committed to the server, and the offset most recently committed for each
@@ -204,10 +211,12 @@ pub async fn run_iggy_source(
             biased;
 
             // Handle acknowledgements before polling for new messages so that
-            // the finalizer queue cannot grow unbounded under high load.
-            ack = ack_stream.next() => {
+            // the finalizer queues cannot grow unbounded under high load. The
+            // `is_empty` guard prevents this branch from firing before any
+            // partition finalizer has been created.
+            Some((_, ack)) = ack_streams.next(), if !ack_streams.is_empty() => {
                 match ack {
-                    Some((BatchStatus::Delivered, entry)) => {
+                    (BatchStatus::Delivered, entry) => {
                         record_delivered(
                             &mut rejected_offsets,
                             &mut pending_offsets,
@@ -228,7 +237,7 @@ pub async fn run_iggy_source(
                                 .await;
                         }
                     }
-                    Some((status, entry)) => {
+                    (status, entry) => {
                         record_rejection(
                             &mut rejected_offsets,
                             &mut pending_offsets,
@@ -237,10 +246,6 @@ pub async fn run_iggy_source(
                             entry.offset,
                             status,
                         );
-                    }
-                    None => {
-                        error!("Iggy acknowledgement stream closed unexpectedly.");
-                        break;
                     }
                 }
             }
@@ -373,6 +378,14 @@ pub async fn run_iggy_source(
                         }
 
                         if acknowledgements {
+                            let finalizer = finalizers
+                                .entry(partition_id)
+                                .or_insert_with(|| {
+                                    let (finalizer, stream) =
+                                        OrderedFinalizer::<FinalizerEntry>::new(None);
+                                    ack_streams.insert(partition_id, stream);
+                                    finalizer
+                                });
                             finalizer.add(
                                 FinalizerEntry {
                                     partition_id,
@@ -398,16 +411,19 @@ pub async fn run_iggy_source(
         // Stop accepting new pending entries, then wait (bounded by
         // `drain_timeout_secs`) for the events already sent downstream to be
         // acknowledged before committing the final offsets, so a graceful
-        // shutdown does not replay delivered messages on restart.
-        drop(finalizer);
+        // shutdown does not replay delivered messages on restart. Dropping
+        // the finalizer map closes each per-partition sender; the streams
+        // remain in `ack_streams` until their pending entries finalize, then
+        // end and are removed from the map.
+        drop(finalizers);
         let drain_deadline = sleep(Duration::from_secs(config.drain_timeout_secs));
         tokio::pin!(drain_deadline);
-        loop {
+        while !ack_streams.is_empty() {
             tokio::select! {
                 biased;
 
-                ack = ack_stream.next() => match ack {
-                    Some((BatchStatus::Delivered, entry)) => {
+                Some((_, ack)) = ack_streams.next() => match ack {
+                    (BatchStatus::Delivered, entry) => {
                         record_delivered(
                             &mut rejected_offsets,
                             &mut pending_offsets,
@@ -416,7 +432,7 @@ pub async fn run_iggy_source(
                             entry.offset,
                         );
                     }
-                    Some((status, entry)) => {
+                    (status, entry) => {
                         record_rejection(
                             &mut rejected_offsets,
                             &mut pending_offsets,
@@ -426,7 +442,6 @@ pub async fn run_iggy_source(
                             status,
                         );
                     }
-                    None => break,
                 },
 
                 _ = &mut drain_deadline => break,
