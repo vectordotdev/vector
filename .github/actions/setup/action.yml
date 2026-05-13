@@ -99,7 +99,8 @@ runs:
         rust="false"
 
         # If any rust-related inputs are true, enable rust.
-        # vdev is installed via cargo binstall (no compilation), so it does not drive this.
+        # vdev itself does not compile, but cargo binstall is a cargo subcommand
+        # and needs the rust toolchain on PATH to install it.
         for val in "${{ inputs.mold }}" \
                    "${{ inputs.rust }}" \
                    "${{ inputs.cargo-deb }}" \
@@ -110,7 +111,8 @@ runs:
                    "${{ inputs.cargo-hack }}" \
                    "${{ inputs.cargo-llvm-cov }}" \
                    "${{ inputs.dd-rust-license-tool }}" \
-                   "${{ inputs.wasm-pack }}"; do
+                   "${{ inputs.wasm-pack }}" \
+                   "${{ inputs.vdev }}"; do
           if [[ "$val" == "true" ]]; then
             rust="true"
             break
