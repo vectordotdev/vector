@@ -35,8 +35,9 @@ CPU clocks.
 - A new `component_cpu_usage_ns_total` counter for **all transforms** —
   sync and function transforms (both inline and concurrent execution paths)
   and task transforms.
-- Two implementation tiers: a wall-clock fallback that works everywhere, and a
-  precise thread-CPU-time implementation using OS APIs.
+- A precise thread-CPU-time implementation on Linux, macOS, and Windows.
+  Other platforms simply do not emit the metric (no wall-clock fallback —
+  see Drawbacks).
 - Feasibility analysis of thread-level CPU time measurement.
 
 ### Out of scope
@@ -166,9 +167,12 @@ This metric is always emitted for transforms; there is no configuration knob.
 
 ## Drawbacks
 
-- **Platform-specific code.** The precise implementation uses `cfg`-gated FFI
-  for Linux, macOS, and Windows. Other platforms fall back to wall-clock time,
-  giving three maintained code paths plus one fallback.
+- **Platform-specific code.** The implementation uses `cfg`-gated FFI for
+  Linux, macOS, and Windows. Other platforms (e.g. FreeBSD, illumos, WASM)
+  do **not** emit the metric — `ThreadTime` becomes a no-op and
+  `register_counter` returns `Counter::noop()`, so the metric is silently
+  omitted rather than reported with misleading wall-clock numbers. Three
+  maintained code paths plus a no-op stub.
 
 ## Alternatives
 
@@ -211,8 +215,12 @@ on modern kernels. The higher precision is worth the identical cost.
 - Add `src/cpu_time.rs` module exposing:
   - A `ThreadTime` snapshot with platform-specific implementations behind
     `#[cfg]` gates (Linux/macOS `CLOCK_THREAD_CPUTIME_ID`, Windows
-    `GetThreadTimes`, wall-clock fallback elsewhere). Include unit tests that
-    verify the returned duration is non-negative and monotone.
+    `GetThreadTimes`, no-op `Duration::ZERO` elsewhere). Include unit tests
+    that verify the returned duration is non-negative and monotone.
+  - A `register_counter(name)` helper that returns `metrics::counter!(name)`
+    on supported platforms and `Counter::noop()` otherwise, so the metric is
+    silently omitted on platforms without thread CPU time rather than
+    emitted with misleading values.
   - A `CpuTimedFuture<F>` adapter that wraps a future and, on every
     `Future::poll`, samples `ThreadTime` before and after the inner poll and
     increments a `metrics::Counter` by the delta. A `CpuTimedExt` extension
@@ -223,13 +231,15 @@ on modern kernels. The higher precision is worth the identical cost.
     whose CPU should be attributed to a component (transform housekeeping
     loops, `run_concurrently` per-batch tasks).
 - Add a `cpu_ns: Counter` field to `TransformContext`, defaulting to
-  `Counter::noop()`. In `build_transforms`, register the counter inside the
+  `Counter::noop()`. In `build_transforms`, resolve the handle via
+  `cpu_time::register_counter("component_cpu_usage_ns_total")` inside the
   transform `error_span!` so it is tagged with `component_id`,
-  `component_kind`, and `component_type`, then store it on the context. This
-  is the single resolved handle every transform path consumes — sync, task,
-  and any helper tokio tasks — so labels and recorder lookup are paid once,
-  not on every poll. Also propagate the same handle through `TransformNode`
-  for the topology builder's own use.
+  `component_kind`, and `component_type` (and is automatically a noop on
+  unsupported platforms), then store it on the context. This is the single
+  resolved handle every transform path consumes — sync, task, and any helper
+  tokio tasks — so labels and recorder lookup are paid once, not on every
+  poll. Also propagate the same handle through `TransformNode` for the
+  topology builder's own use.
 - For sync transforms, wrap the `run_inline()` / `run_concurrently()` future
   with `.cpu_timed(node.cpu_ns.clone())` at the `build_sync_transform` call
   site. The concurrent variant additionally spawns each per-batch transform

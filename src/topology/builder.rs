@@ -8,7 +8,7 @@ use std::{
 
 use futures::{FutureExt, StreamExt, TryStreamExt, stream::FuturesOrdered};
 use futures_util::stream::FuturesUnordered;
-use metrics::{Counter, counter, gauge};
+use metrics::{Counter, gauge};
 use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
 use tokio::{
     select,
@@ -494,8 +494,10 @@ impl<'a> Builder<'a> {
                 // Resolve the per-component CPU counter inside the transform span so it
                 // picks up component_id/component_kind/component_type tags. The same
                 // handle is shared between the main transform task and any helper
-                // tokio tasks the transform spawns at construction time.
-                cpu_ns: counter!("component_cpu_usage_ns_total"),
+                // tokio tasks the transform spawns at construction time. On platforms
+                // without per-thread CPU time, `register_counter` returns a noop
+                // handle and the metric is silently omitted.
+                cpu_ns: crate::cpu_time::register_counter("component_cpu_usage_ns_total"),
             };
 
             let node =

@@ -17,8 +17,10 @@ use pin_project::pin_project;
 /// On Windows this uses `GetThreadTimes`, which provides the same guarantee
 /// with 100ns granularity.
 ///
-/// On other platforms this falls back to wall-clock time via
-/// [`std::time::Instant`].
+/// On other platforms thread CPU time is unavailable; [`ThreadTime`] is a
+/// no-op that always reports zero elapsed time. The per-component CPU metric
+/// is omitted on those platforms (see [`register_counter`]) rather than
+/// emitted with misleading wall-clock or zero values.
 ///
 /// # Usage
 ///
@@ -149,20 +151,21 @@ fn filetime_to_nanos(ft: windows_sys::Win32::Foundation::FILETIME) -> u64 {
     ticks * 100 // convert 100ns intervals to nanoseconds
 }
 
-// ── Other platforms: wall-clock fallback ──────────────────────────────────
+// ── Other platforms: no-op (metric is not emitted on these platforms) ─────
 
 #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
-struct Inner(std::time::Instant);
+struct Inner;
 
 #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
 impl Inner {
+    #[inline]
     fn now() -> Self {
-        Inner(std::time::Instant::now())
+        Inner
     }
 
     #[inline]
     fn elapsed(&self) -> Duration {
-        self.0.elapsed()
+        Duration::ZERO
     }
 }
 
@@ -240,6 +243,22 @@ where
     F::Output: Send + 'static,
 {
     tokio::spawn(future.cpu_timed(counter))
+}
+
+/// Registers the per-component CPU counter with the metrics recorder under
+/// `name` on platforms where thread CPU time is available (Linux, macOS,
+/// Windows). On other platforms it returns [`Counter::noop()`] — the metric
+/// is **not** emitted at all there, rather than reporting wall-clock or
+/// zero values that would be misleading to compare against supported
+/// platforms.
+#[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
+pub(crate) fn register_counter(name: &'static str) -> Counter {
+    metrics::counter!(name)
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
+pub(crate) fn register_counter(_name: &'static str) -> Counter {
+    Counter::noop()
 }
 
 #[cfg(test)]
