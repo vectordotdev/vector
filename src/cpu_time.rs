@@ -222,6 +222,26 @@ pub(crate) trait CpuTimedExt: Future + Sized {
 
 impl<F: Future> CpuTimedExt for F {}
 
+/// Spawns `future` on the current tokio runtime with CPU-time accounting
+/// attached, equivalent to:
+///
+/// ```ignore
+/// tokio::spawn(future.cpu_timed(counter))
+/// ```
+///
+/// Use this when spawning background tasks (e.g. a transform's housekeeping
+/// loop) whose CPU usage should be attributed back to a component. Wrap the
+/// future with [`tracing::Instrument`] (or similar adapters) before passing
+/// it in if you want those adapters' per-poll work included in the CPU-time
+/// measurement.
+pub(crate) fn spawn_timed<F>(future: F, counter: Counter) -> tokio::task::JoinHandle<F::Output>
+where
+    F: Future + Send + 'static,
+    F::Output: Send + 'static,
+{
+    tokio::spawn(future.cpu_timed(counter))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

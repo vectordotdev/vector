@@ -4,7 +4,7 @@ use governor::{RateLimiter, clock, middleware::NoOpMiddleware, state::keyed::Das
 use tokio;
 
 use super::transform::Throttle;
-use crate::cpu_time::CpuTimedExt;
+use crate::cpu_time::spawn_timed;
 
 /// Re-usable wrapper around the structs/type from the governor crate.
 /// Spawns a background task that periodically flushes keys that haven't been accessed recently.
@@ -34,15 +34,15 @@ where
         let rate_limiter_clone = Arc::clone(&rate_limiter);
         // Hook the periodic key-flush task onto the component's CPU counter so
         // its housekeeping work is attributed to this throttle transform.
-        let flush_handle = tokio::spawn(
+        let flush_handle = spawn_timed(
             async move {
                 let mut interval = tokio::time::interval(flush_keys_interval);
                 loop {
                     interval.tick().await;
                     rate_limiter_clone.retain_recent();
                 }
-            }
-            .cpu_timed(cpu_ns),
+            },
+            cpu_ns,
         );
 
         Self {

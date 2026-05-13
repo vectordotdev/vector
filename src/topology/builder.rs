@@ -45,7 +45,7 @@ use crate::{
         ComponentKey, Config, DataType, EnrichmentTableConfig, Input, Inputs, OutputId,
         ProxyConfig, SinkContext, SourceContext, TransformContext, TransformOuter, TransformOutput,
     },
-    cpu_time::{CpuTimedExt, ThreadTime},
+    cpu_time::{CpuTimedExt, ThreadTime, spawn_timed},
     event::{EventArray, EventContainer},
     extra_context::ExtraContext,
     internal_events::EventsReceived,
@@ -1254,15 +1254,15 @@ impl Runner {
                             // completion on one worker thread; if a future
                             // refactor adds awaits, accumulation across polls
                             // remains correct.
-                            let task = tokio::spawn(
+                            let task = spawn_timed(
                                 async move {
                                     for events in input_arrays {
                                         t.transform_all(events, &mut outputs_buf);
                                     }
                                     outputs_buf
                                 }
-                                .cpu_timed(self.cpu_ns.clone())
                                 .in_current_span(),
+                                self.cpu_ns.clone(),
                             );
                             in_flight.push_back(task);
                         }
