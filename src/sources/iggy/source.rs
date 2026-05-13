@@ -28,116 +28,103 @@ use crate::{
     sources::iggy::config::IggySourceConfig,
 };
 
-/// An entry tracked by the [`OrderedFinalizer`] until the corresponding batch
-/// of events has been acknowledged downstream, at which point the partition's
-/// consumer offset is advanced and later committed to the Iggy server.
-#[derive(Debug)]
-struct FinalizerEntry {
-    partition_id: u32,
-    offset: u64,
+/// Per-partition acknowledgement bookkeeping. The "fence" is the lowest
+/// rejected offset; `pending` is the highest offset that can be safely
+/// committed to the server without skipping a rejected message on restart.
+#[derive(Default)]
+struct PartitionState {
+    pending: Option<u64>,
+    committed: u64,
+    max_delivered: Option<u64>,
+    rejected: BTreeSet<u64>,
 }
 
-/// Recompute the committable offset for a partition given the highest
-/// delivered offset and the set of currently-rejected offsets. The "fence"
-/// is the lowest rejected offset; `pending` must never reach or exceed it
-/// so that a restart does not skip a message that was never delivered.
-fn recompute_pending(
-    pending: &mut HashMap<u32, u64>,
-    max_delivered: &HashMap<u32, u64>,
-    rejected: &HashMap<u32, BTreeSet<u64>>,
-    partition_id: u32,
-) {
-    let Some(&max) = max_delivered.get(&partition_id) else {
-        return;
-    };
-    let fence = rejected
-        .get(&partition_id)
-        .and_then(|set| set.iter().next().copied());
-    match fence {
-        // The very first message (offset 0) was rejected; nothing can be
-        // committed safely.
-        Some(0) => {
-            pending.remove(&partition_id);
+impl PartitionState {
+    /// Record a Delivered acknowledgement for `offset`. Returns `true` if
+    /// this cleared a previously fenced offset (i.e. a redelivery succeeded).
+    fn record_delivered(&mut self, offset: u64) -> bool {
+        let was_fenced = self.rejected.remove(&offset);
+        self.max_delivered = Some(self.max_delivered.map_or(offset, |m| m.max(offset)));
+        self.recompute_pending();
+        was_fenced
+    }
+
+    /// Record a non-Delivered acknowledgement for `offset`. Returns `true`
+    /// if the fence (the lowest rejected offset) moved as a result.
+    fn record_rejection(&mut self, offset: u64) -> bool {
+        let prev_fence = self.fence();
+        self.rejected.insert(offset);
+        let fence_changed = prev_fence != self.fence();
+        self.recompute_pending();
+        fence_changed
+    }
+
+    fn fence(&self) -> Option<u64> {
+        self.rejected.iter().next().copied()
+    }
+
+    fn recompute_pending(&mut self) {
+        let Some(max) = self.max_delivered else {
+            return;
+        };
+        self.pending = match self.fence() {
+            // The very first message (offset 0) was rejected; nothing can be
+            // committed safely.
+            Some(0) => None,
+            Some(f) => Some(max.min(f - 1)),
+            None => Some(max),
+        };
+    }
+
+    /// How far the highest safely-committable offset is ahead of what the
+    /// server already knows. Drives the eager-commit threshold.
+    fn lag(&self) -> u64 {
+        self.pending.map_or(0, |p| p.saturating_sub(self.committed))
+    }
+}
+
+/// Apply an acknowledgement to a partition's state and emit a log line
+/// when the fence changes.
+fn record_ack(state: &mut PartitionState, partition_id: u32, status: BatchStatus, offset: u64) {
+    match status {
+        BatchStatus::Delivered => {
+            if state.record_delivered(offset) {
+                debug!(
+                    message = "Previously rejected Iggy offset was redelivered; fence updated.",
+                    partition_id, offset,
+                );
+            }
         }
-        Some(f) => {
-            pending.insert(partition_id, max.min(f - 1));
-        }
-        None => {
-            pending.insert(partition_id, max);
+        status => {
+            if state.record_rejection(offset) {
+                warn!(
+                    message = "Message was not delivered downstream; consumer offset for this partition will not advance past it on restart.",
+                    partition_id,
+                    offset,
+                    ?status,
+                );
+            }
         }
     }
 }
 
-/// Record a non-Delivered acknowledgement, inserting the offset into the
-/// rejection set and recomputing the partition's pending offset. Emits a
-/// warning the first time the fence is lowered so operators can see why
-/// offset progress has stalled.
-fn record_rejection(
-    rejected: &mut HashMap<u32, BTreeSet<u64>>,
-    pending: &mut HashMap<u32, u64>,
-    max_delivered: &HashMap<u32, u64>,
-    partition_id: u32,
-    offset: u64,
-    status: BatchStatus,
-) {
-    let set = rejected.entry(partition_id).or_default();
-    let prev_fence = set.iter().next().copied();
-    set.insert(offset);
-    let new_fence = set.iter().next().copied();
-    if prev_fence != new_fence {
-        warn!(
-            message = "Message was not delivered downstream; consumer offset for this partition will not advance past it on restart.",
-            partition_id,
-            offset,
-            ?status,
-        );
-    }
-    recompute_pending(pending, max_delivered, rejected, partition_id);
-}
-
-/// Record a Delivered acknowledgement, removing the offset from the rejection
-/// set (in case of in-process redelivery), updating the highest delivered
-/// offset for the partition, and recomputing the partition's pending offset.
-fn record_delivered(
-    rejected: &mut HashMap<u32, BTreeSet<u64>>,
-    pending: &mut HashMap<u32, u64>,
-    max_delivered: &mut HashMap<u32, u64>,
-    partition_id: u32,
-    offset: u64,
-) {
-    if let Some(set) = rejected.get_mut(&partition_id) {
-        let was_fenced = set.remove(&offset);
-        if set.is_empty() {
-            rejected.remove(&partition_id);
-        }
-        if was_fenced {
-            debug!(
-                message = "Previously rejected Iggy offset was redelivered; fence updated.",
-                partition_id, offset,
-            );
-        }
-    }
-    let slot = max_delivered.entry(partition_id).or_insert(offset);
-    *slot = (*slot).max(offset);
-    recompute_pending(pending, max_delivered, rejected, partition_id);
-}
-
-/// Store the latest acknowledged offset for each partition on the Iggy server.
-///
-/// On success the committed offset is recorded so that the eager-commit
-/// threshold in the acknowledgement path is measured against what the server
-/// actually knows about.
+/// Store each partition's pending offset on the Iggy server. On success the
+/// committed offset is updated so the eager-commit threshold is measured
+/// against what the server actually knows. On error the pending offset is
+/// left in place for a later timer tick or the shutdown drain to retry.
 async fn commit_offsets(
     consumer: &mut IggyConsumer,
     stream: &str,
     topic: &str,
-    pending: &mut HashMap<u32, u64>,
-    committed: &mut HashMap<u32, u64>,
+    partitions: &mut HashMap<u32, PartitionState>,
 ) {
-    for (partition_id, offset) in std::mem::take(pending) {
+    for (&partition_id, state) in partitions.iter_mut() {
+        let Some(offset) = state.pending.take() else {
+            continue;
+        };
         match consumer.store_offset(offset, Some(partition_id)).await {
             Ok(()) => {
-                committed.insert(partition_id, offset);
+                state.committed = offset;
                 emit!(IggyOffsetCommitted {
                     stream,
                     topic,
@@ -147,10 +134,7 @@ async fn commit_offsets(
             }
             Err(error) => {
                 emit!(IggyOffsetUpdateError { error });
-                // Keep the offset pending so a later timer tick or the
-                // shutdown drain retries it instead of losing the record.
-                let slot = pending.entry(partition_id).or_insert(offset);
-                *slot = (*slot).max(offset);
+                state.pending = Some(offset);
             }
         }
     }
@@ -175,33 +159,36 @@ pub async fn run_iggy_source(
     let topic_path = owned_value_path!("topic");
     let partition_id_path = owned_value_path!("partition_id");
     let offset_path = owned_value_path!("offset");
-    // Per-partition finalizers prevent head-of-line blocking: a stalled batch
-    // on partition A only delays its own acknowledgements, not partition B's.
-    // Within a partition, the queue stays ordered, which the
-    // `recompute_pending` fence logic depends on for safety.
-    let mut finalizers: HashMap<u32, OrderedFinalizer<FinalizerEntry>> = HashMap::new();
-    let mut ack_streams: StreamMap<u32, BoxStream<'static, (BatchStatus, FinalizerEntry)>> =
-        StreamMap::new();
 
-    // The highest acknowledged offset per partition that has not yet been
-    // committed to the server, and the offset most recently committed for each
-    // partition. The Iggy SDK polls relative to the server-stored consumer
-    // offset, so the committed offset must stay close to the consumed position
-    // or every poll re-fetches the same window; we therefore commit eagerly
-    // once roughly half a batch has been acknowledged, with the timer below as
-    // a backstop for sparse traffic and shutdown.
-    let mut pending_offsets: HashMap<u32, u64> = HashMap::new();
-    let mut committed_offsets: HashMap<u32, u64> = HashMap::new();
-    // The highest offset per partition that has been observed as Delivered
-    // downstream, regardless of whether a lower offset is currently fenced.
-    // Tracking this separately from `pending_offsets` allows `pending_offsets`
-    // to jump forward correctly when a redelivery clears the fence.
-    let mut max_delivered_offsets: HashMap<u32, u64> = HashMap::new();
-    // The set of offsets per partition that were not delivered downstream and
-    // have not yet been redelivered. The smallest entry is the fence;
-    // `pending_offsets` must never advance to or past it so that a restart
-    // does not skip a message that was rejected or errored.
-    let mut rejected_offsets: HashMap<u32, BTreeSet<u64>> = HashMap::new();
+    // Build identifiers eagerly so that any parse failure surfaces before
+    // the source starts handling traffic. The consumer itself was already
+    // built from these same strings, so this should not fail in practice.
+    let (stream_id, topic_id, group_id) = match (
+        Identifier::from_str_value(stream),
+        Identifier::from_str_value(topic),
+        Identifier::from_str_value(config.consumer_name.as_str()),
+    ) {
+        (Ok(s), Ok(t), Ok(g)) => (s, t, g),
+        _ => {
+            error!(message = "Failed to build Iggy identifiers; cannot start source.");
+            return Err(());
+        }
+    };
+
+    // Per-partition acknowledgement bookkeeping. Each partition gets its
+    // own ordered finalizer so a stalled batch on partition A does not
+    // head-of-line-block partition B's deliveries from reaching the commit
+    // path. Within a partition the queue stays ordered, which the fence
+    // logic in `PartitionState` depends on for safety.
+    let mut partitions: HashMap<u32, PartitionState> = HashMap::new();
+    let mut finalizers: HashMap<u32, OrderedFinalizer<u64>> = HashMap::new();
+    let mut ack_streams: StreamMap<u32, BoxStream<'static, (BatchStatus, u64)>> = StreamMap::new();
+
+    // The Iggy SDK polls relative to the server-stored consumer offset, so
+    // the committed offset must stay close to the consumed position or
+    // every poll re-fetches the same window. Commit eagerly once roughly
+    // half a batch has been acknowledged, with the timer below as a
+    // backstop for sparse traffic and shutdown.
     let commit_after = u64::from((config.batch_length / 2).max(1));
     let mut commit_timer = interval(Duration::from_secs(config.commit_interval_secs.max(1)));
     commit_timer.set_missed_tick_behavior(MissedTickBehavior::Delay);
@@ -210,48 +197,27 @@ pub async fn run_iggy_source(
         tokio::select! {
             biased;
 
-            // Handle acknowledgements before polling for new messages so that
-            // the finalizer queues cannot grow unbounded under high load. The
+            // Handle acknowledgements before polling for new messages so
+            // the finalizer queues cannot grow unbounded under load. The
             // `is_empty` guard prevents this branch from firing before any
             // partition finalizer has been created.
-            Some((_, ack)) = ack_streams.next(), if !ack_streams.is_empty() => {
-                match ack {
-                    (BatchStatus::Delivered, entry) => {
-                        record_delivered(
-                            &mut rejected_offsets,
-                            &mut pending_offsets,
-                            &mut max_delivered_offsets,
-                            entry.partition_id,
-                            entry.offset,
-                        );
-                        let pending = pending_offsets
-                            .get(&entry.partition_id)
-                            .copied()
-                            .unwrap_or(0);
-                        let committed = committed_offsets
-                            .get(&entry.partition_id)
-                            .copied()
-                            .unwrap_or(0);
-                        if pending.saturating_sub(committed) >= commit_after {
-                            commit_offsets(&mut consumer, stream, topic, &mut pending_offsets, &mut committed_offsets)
-                                .await;
-                        }
+            Some((partition_id, (status, offset))) = ack_streams.next(),
+                if !ack_streams.is_empty() =>
+            {
+                let should_commit = match partitions.get_mut(&partition_id) {
+                    Some(state) => {
+                        record_ack(state, partition_id, status, offset);
+                        matches!(status, BatchStatus::Delivered) && state.lag() >= commit_after
                     }
-                    (status, entry) => {
-                        record_rejection(
-                            &mut rejected_offsets,
-                            &mut pending_offsets,
-                            &max_delivered_offsets,
-                            entry.partition_id,
-                            entry.offset,
-                            status,
-                        );
-                    }
+                    None => false,
+                };
+                if should_commit {
+                    commit_offsets(&mut consumer, stream, topic, &mut partitions).await;
                 }
             }
 
             _ = commit_timer.tick() => {
-                commit_offsets(&mut consumer, stream, topic, &mut pending_offsets, &mut committed_offsets).await;
+                commit_offsets(&mut consumer, stream, topic, &mut partitions).await;
             }
 
             _ = &mut shutdown => {
@@ -359,12 +325,13 @@ pub async fn run_iggy_source(
                             }
                         }
 
-                        // Drop our handle so that the batch is finalized once the
-                        // events that were attached to it are dropped downstream.
-                        // On a non-continuable decode error, wrap the batch in an
-                        // `EventFinalizer` set to `Rejected` so that the offset is
-                        // not committed; otherwise the default `Delivered` status
-                        // would let a malformed message advance the consumer.
+                        // Drop our handle so the batch is finalized once the
+                        // events that were attached to it are dropped
+                        // downstream. On a non-continuable decode error, wrap
+                        // the batch in an `EventFinalizer` set to `Rejected`
+                        // so the offset is not committed; otherwise the
+                        // default `Delivered` status would let a malformed
+                        // message advance the consumer.
                         if decode_failed {
                             let efin = EventFinalizer::new(batch);
                             efin.update_status(EventStatus::Rejected);
@@ -382,17 +349,12 @@ pub async fn run_iggy_source(
                                 .entry(partition_id)
                                 .or_insert_with(|| {
                                     let (finalizer, stream) =
-                                        OrderedFinalizer::<FinalizerEntry>::new(None);
+                                        OrderedFinalizer::<u64>::new(None);
                                     ack_streams.insert(partition_id, stream);
                                     finalizer
                                 });
-                            finalizer.add(
-                                FinalizerEntry {
-                                    partition_id,
-                                    offset: received.message.header.offset,
-                                },
-                                receiver,
-                            );
+                            partitions.entry(partition_id).or_default();
+                            finalizer.add(received.message.header.offset, receiver);
                         }
                     }
                     Some(Err(error)) => {
@@ -409,12 +371,12 @@ pub async fn run_iggy_source(
 
     if acknowledgements {
         // Stop accepting new pending entries, then wait (bounded by
-        // `drain_timeout_secs`) for the events already sent downstream to be
+        // `drain_timeout_secs`) for events already sent downstream to be
         // acknowledged before committing the final offsets, so a graceful
         // shutdown does not replay delivered messages on restart. Dropping
         // the finalizer map closes each per-partition sender; the streams
-        // remain in `ack_streams` until their pending entries finalize, then
-        // end and are removed from the map.
+        // remain in `ack_streams` until their pending entries finalize,
+        // then end and are removed from the map.
         drop(finalizers);
         let drain_deadline = sleep(Duration::from_secs(config.drain_timeout_secs));
         tokio::pin!(drain_deadline);
@@ -422,75 +384,37 @@ pub async fn run_iggy_source(
             tokio::select! {
                 biased;
 
-                Some((_, ack)) = ack_streams.next() => match ack {
-                    (BatchStatus::Delivered, entry) => {
-                        record_delivered(
-                            &mut rejected_offsets,
-                            &mut pending_offsets,
-                            &mut max_delivered_offsets,
-                            entry.partition_id,
-                            entry.offset,
-                        );
+                Some((partition_id, (status, offset))) = ack_streams.next() => {
+                    if let Some(state) = partitions.get_mut(&partition_id) {
+                        record_ack(state, partition_id, status, offset);
                     }
-                    (status, entry) => {
-                        record_rejection(
-                            &mut rejected_offsets,
-                            &mut pending_offsets,
-                            &max_delivered_offsets,
-                            entry.partition_id,
-                            entry.offset,
-                            status,
-                        );
-                    }
-                },
+                }
 
                 _ = &mut drain_deadline => break,
             }
         }
-        commit_offsets(
-            &mut consumer,
-            stream,
-            topic,
-            &mut pending_offsets,
-            &mut committed_offsets,
-        )
-        .await;
+        commit_offsets(&mut consumer, stream, topic, &mut partitions).await;
     }
 
     // Without acknowledgements, the SDK's `shutdown()` cleanly flushes its
     // own offset tracking and leaves the consumer group. With
-    // acknowledgements, that flush walks `last_consumed_offsets` (updated by
-    // every successful `consumer.next()`) and stores any offset higher than
-    // `last_stored_offsets`, which would commit polled-but-not-yet-delivered
-    // offsets to the broker and skip rejected or in-flight messages on
-    // restart. Bypass the SDK flush in that case and leave the consumer
-    // group directly via the keep-alive client (no-op when the consumer is
-    // pinned to a single partition).
+    // acknowledgements, that flush walks `last_consumed_offsets` (updated
+    // by every successful `consumer.next()`) and stores any offset higher
+    // than `last_stored_offsets`, which would commit polled-but-not-yet-
+    // delivered offsets to the broker and skip rejected or in-flight
+    // messages on restart. Bypass the SDK flush in that case and leave
+    // the consumer group directly via the keep-alive client (no-op when
+    // the consumer is pinned to a single partition).
     if acknowledgements {
-        if config.partition.is_none() {
-            match (
-                Identifier::from_str_value(stream),
-                Identifier::from_str_value(topic),
-                Identifier::from_str_value(config.consumer_name.as_str()),
-            ) {
-                (Ok(stream_id), Ok(topic_id), Ok(group_id)) => {
-                    if let Err(error) = keep_alive_client
-                        .leave_consumer_group(&stream_id, &topic_id, &group_id)
-                        .await
-                    {
-                        warn!(
-                            message = "Failed to leave Iggy consumer group on shutdown; rebalance may be delayed until the broker times out the connection.",
-                            %error,
-                        );
-                    }
-                }
-                _ => {
-                    warn!(
-                        message =
-                            "Could not build identifiers to leave Iggy consumer group on shutdown.",
-                    );
-                }
-            }
+        if config.partition.is_none()
+            && let Err(error) = keep_alive_client
+                .leave_consumer_group(&stream_id, &topic_id, &group_id)
+                .await
+        {
+            warn!(
+                message = "Failed to leave Iggy consumer group on shutdown; rebalance may be delayed until the broker times out the connection.",
+                %error,
+            );
         }
     } else if let Err(error) = consumer.shutdown().await {
         warn!(
