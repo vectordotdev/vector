@@ -172,13 +172,13 @@ impl SourceConfig for IggySourceConfig {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
         let legacy_stream_key = self
             .stream_key_field
-            .clone()
             .path
+            .clone()
             .map(LegacyKey::InsertIfEmpty);
         let legacy_topic_key = self
             .topic_key_field
-            .clone()
             .path
+            .clone()
             .map(LegacyKey::InsertIfEmpty);
 
         let schema_definition = self
