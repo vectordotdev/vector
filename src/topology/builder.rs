@@ -45,7 +45,7 @@ use crate::{
         ComponentKey, Config, DataType, EnrichmentTableConfig, Input, Inputs, OutputId,
         ProxyConfig, SinkContext, SourceContext, TransformContext, TransformOuter, TransformOutput,
     },
-    cpu_time::{CpuTimedExt, ThreadTime, spawn_timed},
+    cpu_time::{CpuTimedExt, spawn_timed},
     event::{EventArray, EventContainer},
     extra_context::ExtraContext,
     internal_events::EventsReceived,
@@ -756,10 +756,15 @@ impl<'a> Builder<'a> {
             LatencyRecorder::new(self.config.global.latency_ewma_alpha),
             node.cpu_ns.clone(),
         );
+        // Attribute the runner task's per-poll CPU time (driver loop +,
+        // for the inline variant, the transform body) to the component. The
+        // concurrent variant additionally spawns transform invocations onto
+        // their own tasks with `spawn_timed`, which feed the same counter.
+        let cpu_ns = node.cpu_ns.clone();
         let transform = if node.enable_concurrency {
-            runner.run_concurrently().boxed()
+            runner.run_concurrently().cpu_timed(cpu_ns).boxed()
         } else {
-            runner.run_inline().boxed()
+            runner.run_inline().cpu_timed(cpu_ns).boxed()
         };
 
         let transform = async move {
@@ -1197,9 +1202,7 @@ impl Runner {
         self.timer_tx.try_send_start_wait();
         while let Some(events) = input_rx.next().await {
             self.on_events_received(&events);
-            let t0 = ThreadTime::now();
             self.transform.transform_all(events, &mut outputs_buf);
-            self.cpu_ns.increment(t0.elapsed().as_nanos() as u64);
             self.send_outputs(&mut outputs_buf)
                 .await
                 .map_err(TaskError::wrapped)?;
