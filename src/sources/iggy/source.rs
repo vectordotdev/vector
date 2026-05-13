@@ -33,6 +33,41 @@ struct FinalizerEntry {
     offset: u64,
 }
 
+/// Update the rejection fence for a partition and trim `pending_offsets` to
+/// stay below it. The fence is the lowest offset that was not delivered
+/// downstream; `pending_offsets` must never reach or exceed it so that a
+/// restart does not skip a message that was never delivered.
+fn apply_fence(
+    rejected: &mut HashMap<u32, u64>,
+    pending: &mut HashMap<u32, u64>,
+    partition_id: u32,
+    offset: u64,
+    status: BatchStatus,
+) {
+    let prev = rejected.get(&partition_id).copied();
+    let fence = rejected.entry(partition_id).or_insert(offset);
+    *fence = (*fence).min(offset);
+    let fence_val = *fence;
+    if prev != Some(fence_val) {
+        warn!(
+            message = "Message was not delivered downstream; consumer offset for this partition will not advance past it on restart.",
+            partition_id,
+            offset,
+            ?status,
+        );
+    }
+    // fence_val == 0 means the very first message (offset 0) was rejected.
+    // Subtracting 1 would underflow u64, so remove the partition entry entirely;
+    // there is no safe offset below 0 to commit.
+    if fence_val == 0 {
+        pending.remove(&partition_id);
+    } else if let Some(p) = pending.get_mut(&partition_id)
+        && *p >= fence_val
+    {
+        *p = fence_val - 1;
+    }
+}
+
 /// Store the latest acknowledged offset for each partition on the Iggy server.
 ///
 /// On success the committed offset is recorded so that the eager-commit
@@ -97,6 +132,10 @@ pub async fn run_iggy_source(
     // a backstop for sparse traffic and shutdown.
     let mut pending_offsets: HashMap<u32, u64> = HashMap::new();
     let mut committed_offsets: HashMap<u32, u64> = HashMap::new();
+    // The lowest offset per partition that was not delivered downstream.
+    // pending_offsets must never advance to or past this fence so that a
+    // restart does not skip a message that was rejected or errored.
+    let mut rejected_offsets: HashMap<u32, u64> = HashMap::new();
     let commit_after = u64::from((config.batch_length / 2).max(1));
     let mut commit_timer = interval(Duration::from_secs(config.commit_interval_secs.max(1)));
     commit_timer.set_missed_tick_behavior(MissedTickBehavior::Delay);
@@ -108,19 +147,33 @@ pub async fn run_iggy_source(
             // Handle acknowledgements before polling for new messages so that
             // the finalizer queue cannot grow unbounded under high load.
             ack = ack_stream.next() => {
-                if let Some((BatchStatus::Delivered, entry)) = ack {
-                    let pending = {
-                        let offset = pending_offsets.entry(entry.partition_id).or_default();
-                        *offset = (*offset).max(entry.offset);
-                        *offset
-                    };
-                    let committed = committed_offsets
-                        .get(&entry.partition_id)
-                        .copied()
-                        .unwrap_or(0);
-                    if pending.saturating_sub(committed) >= commit_after {
-                        commit_offsets(&mut consumer, stream, topic, &mut pending_offsets, &mut committed_offsets)
-                            .await;
+                match ack {
+                    Some((BatchStatus::Delivered, entry)) => {
+                        let below_fence = rejected_offsets
+                            .get(&entry.partition_id)
+                            .is_none_or(|&fence| entry.offset < fence);
+                        if below_fence {
+                            let pending = {
+                                let offset = pending_offsets.entry(entry.partition_id).or_default();
+                                *offset = (*offset).max(entry.offset);
+                                *offset
+                            };
+                            let committed = committed_offsets
+                                .get(&entry.partition_id)
+                                .copied()
+                                .unwrap_or(0);
+                            if pending.saturating_sub(committed) >= commit_after {
+                                commit_offsets(&mut consumer, stream, topic, &mut pending_offsets, &mut committed_offsets)
+                                    .await;
+                            }
+                        }
+                    }
+                    Some((status, entry)) => {
+                        apply_fence(&mut rejected_offsets, &mut pending_offsets, entry.partition_id, entry.offset, status);
+                    }
+                    None => {
+                        error!("Iggy acknowledgement stream closed unexpectedly.");
+                        break;
                     }
                 }
             }
@@ -276,10 +329,17 @@ pub async fn run_iggy_source(
 
                 ack = ack_stream.next() => match ack {
                     Some((BatchStatus::Delivered, entry)) => {
-                        let slot = pending_offsets.entry(entry.partition_id).or_default();
-                        *slot = (*slot).max(entry.offset);
+                        let below_fence = rejected_offsets
+                            .get(&entry.partition_id)
+                            .is_none_or(|&fence| entry.offset < fence);
+                        if below_fence {
+                            let slot = pending_offsets.entry(entry.partition_id).or_default();
+                            *slot = (*slot).max(entry.offset);
+                        }
                     }
-                    Some(_) => {}
+                    Some((status, entry)) => {
+                        apply_fence(&mut rejected_offsets, &mut pending_offsets, entry.partition_id, entry.offset, status);
+                    }
                     None => break,
                 },
 
