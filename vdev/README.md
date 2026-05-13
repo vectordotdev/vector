@@ -33,24 +33,27 @@ dependencies can be installed by running
 
 ## Installation
 
-The recommended install is [binstall](https://github.com/cargo-bins/cargo-binstall), which
-downloads a pre-compiled binary at the version pinned in `scripts/environment/prepare.sh`.
-This is also what CI and `./scripts/environment/prepare.sh` use.
+For a pinned, reproducible install matching what CI uses:
+
+```sh
+./scripts/environment/prepare.sh --modules=vdev
+```
+
+This pins the vdev version defined in `prepare.sh` and uses [cargo-binstall](https://github.com/cargo-bins/cargo-binstall) under the hood to fetch a pre-compiled binary.
+
+For a quick install of the latest published vdev (not pinned):
 
 ```sh
 cargo binstall vdev
 ```
 
-Installation is otherwise optional: from within the Vector repository, `cargo vdev` works via
-a cargo alias that compiles vdev from source on each invocation. That path is fine for
-occasional use but is slower than a binstalled binary.
-
-If you are actively developing vdev itself, install from your working tree so the binary on
-`PATH` reflects your local changes:
+If binstall is unavailable, fall back to compiling from crates.io:
 
 ```sh
-cargo install -f --path vdev
+cargo install vdev
 ```
+
+Installation is otherwise optional: from within the Vector repository, `cargo vdev` works via a cargo alias that compiles vdev from source on each invocation. That path is fine for occasional use but is slower than a binstalled binary.
 
 
 ## Running Tests
@@ -67,6 +70,12 @@ You should use `./scripts/run-integration-test.sh`, which is the wrapper used by
 
 
 ## Developing vdev
+
+If you are actively developing vdev itself, install from your working tree so the binary on `PATH` reflects your local changes:
+
+```sh
+cargo install -f --path vdev
+```
 
 The CLI uses [Clap](https://github.com/clap-rs/clap) with the `derive` construction mechanism and is stored in the [commands](src/commands) directory.
 
