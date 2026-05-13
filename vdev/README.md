@@ -33,13 +33,13 @@ dependencies can be installed by running
 
 ## Installation
 
-For a pinned, reproducible install matching what CI uses:
+CI installs vdev from a published binary release via [cargo-binstall](https://github.com/cargo-bins/cargo-binstall) and never builds it from source. To match that locally:
 
 ```sh
 ./scripts/environment/prepare.sh --modules=vdev
 ```
 
-This pins the vdev version defined in `prepare.sh` and uses [cargo-binstall](https://github.com/cargo-bins/cargo-binstall) under the hood to fetch a pre-compiled binary.
+This pins the vdev version defined in `prepare.sh` and fetches the matching pre-compiled binary.
 
 For a quick install of the latest published vdev (not pinned):
 
