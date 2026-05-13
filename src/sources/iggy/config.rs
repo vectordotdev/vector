@@ -1,4 +1,8 @@
-use iggy::prelude::{AutoCommit, Client, IggyClient, IggyClientBuilder, IggyConsumer};
+use std::time::Duration;
+
+use iggy::prelude::{
+    AutoCommit, Client, IggyClient, IggyClientBuilder, IggyConsumer, IggyDuration,
+};
 use snafu::{ResultExt, Snafu};
 use vector_lib::{
     codecs::decoding::{DeserializerConfig, FramingConfig},
@@ -69,6 +73,10 @@ pub struct IggySourceConfig {
     #[serde(default = "default_batch_length")]
     pub batch_length: u32,
 
+    /// The minimum interval, in milliseconds, between consecutive polls.
+    #[serde(default = "default_poll_interval_ms")]
+    pub poll_interval_ms: u64,
+
     /// The interval, in seconds, at which consumer offsets are committed to the
     /// Iggy server. Only used when end-to-end acknowledgements are enabled.
     #[serde(default = "default_commit_interval_secs")]
@@ -113,6 +121,10 @@ pub struct IggySourceConfig {
 
 const fn default_batch_length() -> u32 {
     1000
+}
+
+const fn default_poll_interval_ms() -> u64 {
+    100
 }
 
 const fn default_commit_interval_secs() -> u64 {
@@ -245,7 +257,10 @@ impl IggySourceConfig {
                 .consumer_group(&self.consumer_name, &self.stream, &self.topic)
                 .context(ConsumerSnafu)?,
         }
-        .batch_length(self.batch_length);
+        .batch_length(self.batch_length)
+        .poll_interval(IggyDuration::from(Duration::from_millis(
+            self.poll_interval_ms,
+        )));
 
         // With end-to-end acknowledgements enabled, disable the SDK's automatic
         // offset committing so that consumer offsets are only stored on the
