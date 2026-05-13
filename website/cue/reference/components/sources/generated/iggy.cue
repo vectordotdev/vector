@@ -1,10 +1,39 @@
 package metadata
 
 generated: components: sources: iggy: configuration: {
+	acknowledgements: {
+		deprecated: true
+		description: """
+			Controls how acknowledgements are handled by this source.
+
+			This setting is **deprecated** in favor of enabling `acknowledgements` at the [global][global_acks] or sink level.
+
+			Enabling or disabling acknowledgements at the source level has **no effect** on acknowledgement behavior.
+
+			See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
+
+			[global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
+			[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
+			"""
+		required: false
+		type: object: options: enabled: {
+			description: "Whether or not end-to-end acknowledgements are enabled for this source."
+			required:    false
+			type: bool: {}
+		}
+	}
 	batch_length: {
 		description: "The maximum number of messages pulled per poll. Defaults to 1000."
 		required:    false
 		type: uint: default: 1000
+	}
+	commit_interval_secs: {
+		description: """
+			The interval, in seconds, at which consumer offsets are committed to the
+			Iggy server. Only used when end-to-end acknowledgements are enabled.
+			"""
+		required: false
+		type: uint: default: 5
 	}
 	consumer_name: {
 		description: """
@@ -274,6 +303,16 @@ generated: components: sources: iggy: configuration: {
 				}
 			}
 		}
+	}
+	drain_timeout_secs: {
+		description: """
+			The maximum time, in seconds, to wait for in-flight events to be
+			acknowledged downstream during shutdown before the final consumer
+			offsets are committed. Only used when end-to-end acknowledgements are
+			enabled.
+			"""
+		required: false
+		type: uint: default: 5
 	}
 	framing: {
 		description: """

@@ -5,6 +5,12 @@ services:
     image: docker.io/apache/iggy:${CONFIG_VERSION}
     ports:
       - 8090:8090
+    environment:
+      # Pin the root credentials so they match the `iggy:iggy` user/password
+      # in `test.yaml`; without these the server generates a random root
+      # password on first start and the tests fail authentication.
+      IGGY_ROOT_USERNAME: iggy
+      IGGY_ROOT_PASSWORD: iggy
 
 networks:
   default:

@@ -30,6 +30,7 @@ fn generate_sink_config(url: &str, stream: &str, topic: &str) -> IggySinkConfig 
         encoding: TextSerializerConfig::default().into(),
         acknowledgements: AcknowledgementsConfig::default(),
         request: TowerRequestConfig::<IggyTowerRequestConfigDefaults>::default(),
+        batch: Default::default(),
     }
 }
 

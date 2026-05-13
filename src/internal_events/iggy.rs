@@ -102,6 +102,26 @@ impl InternalEvent for IggyOffsetUpdated<'_> {
 }
 
 #[derive(Debug, NamedInternalEvent)]
+pub struct IggyOffsetCommitted<'a> {
+    pub stream: &'a str,
+    pub topic: &'a str,
+    pub partition: u32,
+    pub offset: u64,
+}
+
+impl InternalEvent for IggyOffsetCommitted<'_> {
+    fn emit(self) {
+        gauge!(
+            GaugeName::IggyConsumerCommittedOffset,
+            "stream" => self.stream.to_string(),
+            "topic" => self.topic.to_string(),
+            "partition" => self.partition.to_string(),
+        )
+        .set(self.offset as f64);
+    }
+}
+
+#[derive(Debug, NamedInternalEvent)]
 pub struct IggyReadError {
     pub error: iggy::prelude::IggyError,
 }
@@ -120,6 +140,30 @@ impl InternalEvent for IggyReadError {
             "error_code" => "reading_message",
             "error_type" => error_type::READER_FAILED,
             "stage" => error_stage::RECEIVING,
+        )
+        .increment(1);
+    }
+}
+
+#[derive(Debug, NamedInternalEvent)]
+pub struct IggyOffsetUpdateError {
+    pub error: iggy::prelude::IggyError,
+}
+
+impl InternalEvent for IggyOffsetUpdateError {
+    fn emit(self) {
+        error!(
+            message = "Unable to update consumer offset.",
+            error = %self.error,
+            error_code = "iggy_offset_update",
+            error_type = error_type::READER_FAILED,
+            stage = error_stage::SENDING,
+        );
+        counter!(
+            CounterName::ComponentErrorsTotal,
+            "error_code" => "iggy_offset_update",
+            "error_type" => error_type::READER_FAILED,
+            "stage" => error_stage::SENDING,
         )
         .increment(1);
     }

@@ -27,7 +27,7 @@ components: sources: iggy: {
 	classes: {
 		commonly_used: false
 		deployment_roles: ["aggregator"]
-		delivery:      "best_effort"
+		delivery:      "at_least_once"
 		development:   "beta"
 		egress_method: "stream"
 		stateful:      false
@@ -84,8 +84,9 @@ components: sources: iggy: {
 	}
 
 	telemetry: metrics: {
-		iggy_consumer_lag_messages: components.sources.internal_metrics.output.metrics.iggy_consumer_lag_messages
-		iggy_consumer_offset:       components.sources.internal_metrics.output.metrics.iggy_consumer_offset
+		iggy_consumer_committed_offset: components.sources.internal_metrics.output.metrics.iggy_consumer_committed_offset
+		iggy_consumer_lag_messages:     components.sources.internal_metrics.output.metrics.iggy_consumer_lag_messages
+		iggy_consumer_offset:           components.sources.internal_metrics.output.metrics.iggy_consumer_offset
 	}
 
 	how_it_works: components._iggy.how_it_works
