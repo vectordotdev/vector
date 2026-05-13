@@ -154,6 +154,7 @@ Evercoss
 exactlyonce
 Explay
 Fabro
+fakedata
 fakeintake
 FAQs
 fargate
@@ -210,6 +211,7 @@ greptimedb
 GSM
 gvisor
 gws
+gzip'd
 hadoop
 Haier
 Haipad
@@ -460,6 +462,7 @@ rumqttc
 Salesforce
 Samsung
 SBT
+schema'd
 scriptblock
 Sega
 Segoe
@@ -507,6 +510,7 @@ timeseries
 timespan
 timestamped
 Tizen
+TLDs
 Tmobile
 tobz
 Tomtec

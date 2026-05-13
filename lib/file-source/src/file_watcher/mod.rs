@@ -21,6 +21,9 @@ use file_source_common::{
     buffer::{ReadResult, read_until_with_max_size},
 };
 
+const EOF_READ_BACKOFF_MIN: Duration = Duration::from_millis(1);
+const EOF_READ_BACKOFF_MAX: Duration = Duration::from_millis(250);
+
 #[cfg(test)]
 mod tests;
 
@@ -143,6 +146,7 @@ pub struct FileWatcher {
     reached_eof: bool,
     last_read_attempt: Instant,
     last_read_success: Instant,
+    read_retry_delay: Duration,
     last_seen: Instant,
     max_line_bytes: usize,
     line_delimiter: Bytes,
@@ -255,6 +259,7 @@ impl FileWatcher {
             reached_eof: false,
             last_read_attempt: ts,
             last_read_success: ts,
+            read_retry_delay: EOF_READ_BACKOFF_MIN,
             last_seen: ts,
             max_line_bytes,
             line_delimiter,
@@ -361,7 +366,7 @@ impl FileWatcher {
         let file_position = &mut self.file_position;
         let initial_position = *file_position;
         match read_until_with_max_size(
-            Box::pin(reader),
+            reader.as_mut(),
             file_position,
             self.line_delimiter.as_ref(),
             &mut self.buf,
@@ -409,7 +414,7 @@ impl FileWatcher {
                         })
                     }
                 } else {
-                    self.reached_eof = true;
+                    self.track_read_eof();
                     Ok(RawLineResult {
                         raw_line: None,
                         discarded_for_size_and_truncated,
@@ -432,7 +437,22 @@ impl FileWatcher {
 
     #[inline]
     fn track_read_success(&mut self) {
+        self.reached_eof = false;
+        self.read_retry_delay = EOF_READ_BACKOFF_MIN;
         self.last_read_success = Instant::now();
+    }
+
+    #[inline]
+    fn track_read_eof(&mut self) {
+        self.read_retry_delay = if self.reached_eof {
+            std::cmp::min(
+                self.read_retry_delay.saturating_mul(2),
+                EOF_READ_BACKOFF_MAX,
+            )
+        } else {
+            EOF_READ_BACKOFF_MIN
+        };
+        self.reached_eof = true;
     }
 
     #[inline]
@@ -442,6 +462,10 @@ impl FileWatcher {
 
     #[inline]
     pub fn should_read(&self) -> bool {
+        if self.reached_eof && self.last_read_attempt.elapsed() < self.read_retry_delay {
+            return false;
+        }
+
         self.last_read_success.elapsed() < Duration::from_secs(10)
             || self.last_read_attempt.elapsed() > Duration::from_secs(10)
     }

@@ -1,0 +1,45 @@
+name: "Datadog Short-Lived Token"
+description: "Federate a short-lived Datadog token via dd-sts-action and export DD_API_KEY (and DD_APP_KEY when available) to the job environment."
+
+inputs:
+  policy:
+    required: false
+    default: public-vectordotdev-vector
+    description: "dd-sts policy to federate against."
+
+runs:
+  using: "composite"
+  steps:
+    # Fork PRs don't get `id-token: write`, so ACTIONS_ID_TOKEN_REQUEST_URL is
+    # unset. Read it via shell (env context only covers YAML-declared vars) and
+    # skip federation when absent to avoid a hard failure.
+    - name: Check OIDC token availability
+      id: oidc
+      shell: bash
+      run: |
+        if [ -n "${ACTIONS_ID_TOKEN_REQUEST_URL}" ]; then
+          echo "available=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "available=false" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Federate Datadog token
+      id: dd-sts
+      if: ${{ steps.oidc.outputs.available == 'true' }}
+      continue-on-error: true
+      uses: DataDog/dd-sts-action@2e8187910199bd93129520183c093e19aa585c75
+      with:
+        policy: ${{ inputs.policy }}
+
+    - name: Export Datadog credentials to environment
+      shell: bash
+      env:
+        DD_STS_API_KEY: ${{ steps.dd-sts.outputs.api_key }}
+        DD_STS_APP_KEY: ${{ steps.dd-sts.outputs.app_key }}
+      run: |
+        if [ -n "${DD_STS_API_KEY}" ]; then
+          echo "DD_API_KEY=${DD_STS_API_KEY}" >> "$GITHUB_ENV"
+        fi
+        if [ -n "${DD_STS_APP_KEY}" ]; then
+          echo "DD_APP_KEY=${DD_STS_APP_KEY}" >> "$GITHUB_ENV"
+        fi

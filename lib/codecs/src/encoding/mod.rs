@@ -10,7 +10,7 @@ pub mod serializer;
 mod transformer;
 pub use chunking::{Chunker, Chunking, GelfChunker};
 pub use config::{EncodingConfig, EncodingConfigWithFraming, SinkType};
-pub use encoder::{BatchEncoder, BatchSerializer, Encoder, EncoderKind};
+pub use encoder::{BatchEncoder, BatchOutput, BatchSerializer, Encoder, EncoderKind};
 #[cfg(feature = "arrow")]
 pub use format::{
     ArrowEncodingError, ArrowStreamSerializer, ArrowStreamSerializerConfig, SchemaProvider,
@@ -21,12 +21,17 @@ pub use format::{
     CefSerializerConfig, CsvSerializer, CsvSerializerConfig, GelfSerializer, GelfSerializerConfig,
     JsonSerializer, JsonSerializerConfig, JsonSerializerOptions, LogfmtSerializer,
     LogfmtSerializerConfig, NativeJsonSerializer, NativeJsonSerializerConfig, NativeSerializer,
-    NativeSerializerConfig, ProtobufSerializer, ProtobufSerializerConfig,
+    NativeSerializerConfig, ProtoBatchEncodingError, ProtoBatchSerializer,
+    ProtoBatchSerializerConfig, ProtobufSerializer, ProtobufSerializerConfig,
     ProtobufSerializerOptions, RawMessageSerializer, RawMessageSerializerConfig, TextSerializer,
     TextSerializerConfig,
 };
 #[cfg(feature = "opentelemetry")]
 pub use format::{OtlpSerializer, OtlpSerializerConfig};
+#[cfg(feature = "parquet")]
+pub use format::{
+    ParquetCompression, ParquetSchemaMode, ParquetSerializer, ParquetSerializerConfig,
+};
 #[cfg(feature = "syslog")]
 pub use format::{SyslogSerializer, SyslogSerializerConfig};
 pub use framing::{
@@ -36,9 +41,7 @@ pub use framing::{
     NewlineDelimitedEncoderConfig, VarintLengthDelimitedEncoder,
     VarintLengthDelimitedEncoderConfig,
 };
-#[cfg(feature = "arrow")]
-pub use serializer::BatchSerializerConfig;
-pub use serializer::{Serializer, SerializerConfig};
+pub use serializer::{BatchSerializerConfig, Serializer, SerializerConfig};
 pub use transformer::{TimestampFormat, Transformer};
 
 /// An error that occurred while building an encoder.
