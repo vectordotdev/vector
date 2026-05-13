@@ -10,8 +10,9 @@ use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
 use vector_api_client::{
     Client,
-    proto::{Component, ComponentType, MetricName, stream_component_metrics_response::Value},
+    proto::{Component, ComponentType, InternalMetricKind, MetricName, stream_component_metrics_response::Value},
 };
+use vector_common::internal_event::all_metrics;
 
 use crate::state::{self, OutputMetrics, SentEventsMetric};
 use vector_common::config::ComponentKey;
@@ -573,33 +574,40 @@ pub async fn init_components(
     // tracing status and the full set of registered metric names. Re-evaluated on every
     // reconnect via the retry loop in `subscription()`.
     // On older servers that don't implement GetCapabilities, fall back to the legacy
-    // GetAllocationTracingStatus RPC so the allocation tracing column still works.
-    let (allocation_tracing_enabled, capabilities_metrics) = match client.get_capabilities().await
-    {
-        Ok(caps) => (caps.allocation_tracing_enabled, caps.available_metrics),
+    // GetAllocationTracingStatus RPC for the allocation tracing flag and use the
+    // compiled-in metric names as the available metrics list.
+    let (allocation_tracing_enabled, available_metrics) = match client.get_capabilities().await {
+        Ok(caps) => {
+            let metrics = caps
+                .available_metrics
+                .into_iter()
+                .filter_map(|m| {
+                    let kind = match InternalMetricKind::try_from(m.kind) {
+                        Ok(InternalMetricKind::Counter) => state::InternalMetricKind::Counter,
+                        Ok(InternalMetricKind::Gauge) => state::InternalMetricKind::Gauge,
+                        Ok(InternalMetricKind::Histogram) => state::InternalMetricKind::Histogram,
+                        _ => return None,
+                    };
+                    Some(state::MetricInfo { name: m.name, kind })
+                })
+                .collect();
+            (caps.allocation_tracing_enabled, metrics)
+        }
         Err(_) => {
             let enabled = client
                 .get_allocation_tracing_status()
                 .await
                 .map(|r| r.enabled)
                 .unwrap_or(false);
-            (enabled, vec![])
+            let metrics = all_metrics()
+                .map(|(name, kind)| state::MetricInfo {
+                    name: name.to_string(),
+                    kind,
+                })
+                .collect();
+            (enabled, metrics)
         }
     };
-
-    use vector_api_client::proto::InternalMetricKind;
-    let available_metrics = capabilities_metrics
-        .into_iter()
-        .filter_map(|m| {
-            let kind = match InternalMetricKind::try_from(m.kind) {
-                Ok(InternalMetricKind::Counter) => state::InternalMetricKind::Counter,
-                Ok(InternalMetricKind::Gauge) => state::InternalMetricKind::Gauge,
-                Ok(InternalMetricKind::Histogram) => state::InternalMetricKind::Histogram,
-                _ => return None,
-            };
-            Some(state::MetricInfo { name: m.name, kind })
-        })
-        .collect();
 
     let mut state = state::State::new(rows);
     state.available_metrics = available_metrics;
