@@ -1,5 +1,6 @@
 pub mod logs;
 pub mod metrics;
+pub mod native;
 
 use std::{io, path::Path, process::Command};
 
