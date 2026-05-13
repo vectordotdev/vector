@@ -457,6 +457,17 @@ pub async fn run_iggy_source(
         .await;
     }
 
+    // Explicitly leave the consumer group and flush any SDK-tracked offsets;
+    // dropping the consumer only sets a local shutdown flag and waits for the
+    // broker to time out the connection, which delays rebalances and leaves
+    // partitions assigned to this member in the interim.
+    if let Err(error) = consumer.shutdown().await {
+        warn!(
+            message = "Failed to shut down Iggy consumer cleanly; the consumer-group rebalance may be delayed until the broker times out the connection.",
+            %error,
+        );
+    }
+
     info!("Iggy source shut down.");
     Ok(())
 }
