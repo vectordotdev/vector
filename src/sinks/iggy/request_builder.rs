@@ -42,21 +42,30 @@ fn encode_event(
 }
 
 pub(super) fn request_builder(
-    mut events: Vec<Event>,
+    events: Vec<Event>,
     transformer: &Transformer,
     encoder: &mut Encoder<()>,
 ) -> IggyRequest {
-    let finalizers = events.take_finalizers();
     let builder = RequestMetadataBuilder::from_events(&events);
 
     let mut byte_size = telemetry().create_request_count_byte_size();
     let mut uncompressed_byte_size = 0usize;
+    let mut finalizers = EventFinalizers::default();
     let payloads: Vec<Bytes> = events
         .into_iter()
-        .filter_map(|event| {
-            let bytes = encode_event(event, transformer, encoder, &mut byte_size)?;
-            uncompressed_byte_size += bytes.len();
-            Some(bytes)
+        .filter_map(|mut event| {
+            let event_finalizers = event.take_finalizers();
+            match encode_event(event, transformer, encoder, &mut byte_size) {
+                Some(bytes) => {
+                    uncompressed_byte_size += bytes.len();
+                    finalizers.merge(event_finalizers);
+                    Some(bytes)
+                }
+                None => {
+                    event_finalizers.update_status(EventStatus::Errored);
+                    None
+                }
+            }
         })
         .collect();
     let encoded = EncodeResult {
