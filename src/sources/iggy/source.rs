@@ -5,7 +5,7 @@ use std::{
 
 use chrono::Utc;
 use futures::{StreamExt, stream::BoxStream};
-use iggy::prelude::{IggyClient, IggyConsumer};
+use iggy::prelude::{ConsumerGroupClient, Identifier, IggyClient, IggyConsumer};
 use tokio::time::{MissedTickBehavior, interval, sleep};
 use tokio_stream::StreamMap;
 use vector_lib::{
@@ -159,7 +159,7 @@ async fn commit_offsets(
 #[allow(clippy::too_many_arguments)]
 pub async fn run_iggy_source(
     config: IggySourceConfig,
-    _keep_alive_client: IggyClient,
+    keep_alive_client: IggyClient,
     mut consumer: IggyConsumer,
     decoder: Decoder,
     log_namespace: LogNamespace,
@@ -457,11 +457,42 @@ pub async fn run_iggy_source(
         .await;
     }
 
-    // Explicitly leave the consumer group and flush any SDK-tracked offsets;
-    // dropping the consumer only sets a local shutdown flag and waits for the
-    // broker to time out the connection, which delays rebalances and leaves
-    // partitions assigned to this member in the interim.
-    if let Err(error) = consumer.shutdown().await {
+    // Without acknowledgements, the SDK's `shutdown()` cleanly flushes its
+    // own offset tracking and leaves the consumer group. With
+    // acknowledgements, that flush walks `last_consumed_offsets` (updated by
+    // every successful `consumer.next()`) and stores any offset higher than
+    // `last_stored_offsets`, which would commit polled-but-not-yet-delivered
+    // offsets to the broker and skip rejected or in-flight messages on
+    // restart. Bypass the SDK flush in that case and leave the consumer
+    // group directly via the keep-alive client (no-op when the consumer is
+    // pinned to a single partition).
+    if acknowledgements {
+        if config.partition.is_none() {
+            match (
+                Identifier::from_str_value(stream),
+                Identifier::from_str_value(topic),
+                Identifier::from_str_value(config.consumer_name.as_str()),
+            ) {
+                (Ok(stream_id), Ok(topic_id), Ok(group_id)) => {
+                    if let Err(error) = keep_alive_client
+                        .leave_consumer_group(&stream_id, &topic_id, &group_id)
+                        .await
+                    {
+                        warn!(
+                            message = "Failed to leave Iggy consumer group on shutdown; rebalance may be delayed until the broker times out the connection.",
+                            %error,
+                        );
+                    }
+                }
+                _ => {
+                    warn!(
+                        message =
+                            "Could not build identifiers to leave Iggy consumer group on shutdown.",
+                    );
+                }
+            }
+        }
+    } else if let Err(error) = consumer.shutdown().await {
         warn!(
             message = "Failed to shut down Iggy consumer cleanly; the consumer-group rebalance may be delayed until the broker times out the connection.",
             %error,
