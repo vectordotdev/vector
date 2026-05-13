@@ -56,7 +56,9 @@ impl IggySink {
 
         input
             .batched(batcher_settings)
-            .map(|events| request_builder(events, &transformer, &mut encoder))
+            .filter_map(|events| {
+                futures::future::ready(request_builder(events, &transformer, &mut encoder))
+            })
             .into_driver(service)
             .protocol("iggy")
             .run()
@@ -85,31 +87,25 @@ impl RetryLogic for IggyRetryLogic {
             IggyError::Encoding { .. } | IggyError::InvalidBatchSettings => return false,
             IggyError::Connect { source } | IggyError::Producer { source } => source,
         };
-        !matches!(
+        // Explicit allowlist of transient SDK errors. Defaulting unknown
+        // variants to non-retriable means a future SDK version that adds
+        // a fatal error (e.g. schema mismatch, payload-too-large) will
+        // not silently spin in a retry loop until someone audits the
+        // upgrade; any newly-classified transient errors must be added
+        // here when bumping the `iggy` dependency.
+        matches!(
             source,
-            Sdk::Unauthenticated
-                | Sdk::Unauthorized
-                | Sdk::InvalidCredentials
-                | Sdk::InvalidUsername
-                | Sdk::InvalidPassword
-                | Sdk::InvalidPersonalAccessToken
-                | Sdk::PersonalAccessTokenExpired(..)
-                | Sdk::AccessTokenMissing
-                | Sdk::InvalidAccessToken
-                | Sdk::JwtMissing
-                | Sdk::StreamIdNotFound(..)
-                | Sdk::StreamNameNotFound(..)
-                | Sdk::TopicIdNotFound(..)
-                | Sdk::TopicNameNotFound(..)
-                | Sdk::PartitionNotFound(..)
-                | Sdk::InvalidStreamName
-                | Sdk::InvalidStreamId
-                | Sdk::InvalidTopicName
-                | Sdk::InvalidTopicId
-                | Sdk::InvalidConfiguration
-                | Sdk::InvalidCommand
-                | Sdk::InvalidFormat
-                | Sdk::FeatureUnavailable
+            Sdk::Disconnected
+                | Sdk::CannotEstablishConnection
+                | Sdk::NotConnected
+                | Sdk::ConnectionClosed
+                | Sdk::StaleClient
+                | Sdk::TcpError
+                | Sdk::QuicError
+                | Sdk::CannotSendMessagesDueToClientDisconnection
+                | Sdk::BackgroundWorkerDisconnected
+                | Sdk::BackgroundSendTimeout
+                | Sdk::TaskTimeout
         )
     }
 }
