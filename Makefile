@@ -4,6 +4,11 @@
 mkfile_path := $(abspath $(lastword $(MAKEFILE_LIST)))
 mkfile_dir := $(dir $(mkfile_path))
 
+# Make project-local npm tools (installed by scripts/environment/prepare.sh on
+# laptops) discoverable to recipes without requiring contributors to edit PATH.
+# CI installs the same tools globally and is unaffected by the prefix.
+export PATH := $(mkfile_dir)scripts/environment/npm-tools/node_modules/.bin:$(PATH)
+
 # Begin OS detection
 ifeq ($(OS),Windows_NT) # is Windows_NT on XP, 2000, 7, Vista, 10...
     export OPERATING_SYSTEM := Windows
