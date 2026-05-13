@@ -12988,6 +12988,7 @@ dependencies = [
  "console-subscriber",
  "criterion",
  "csv",
+ "dashmap",
  "databend-client",
  "databricks-zerobus-ingest-sdk",
  "deadpool 0.13.0",
