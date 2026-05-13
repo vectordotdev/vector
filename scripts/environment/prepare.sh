@@ -233,7 +233,7 @@ if contains_module rustup; then
 
   if [ "${require_binstall}" = "true" ]; then
     if cargo binstall -V &>/dev/null || "${SCRIPT_DIR}"/binstall.sh; then
-      install=(binstall -y)
+      install=(binstall -y --disable-strategies compile)
     else
       echo "Failed to install cargo binstall, defaulting to cargo install"
     fi
