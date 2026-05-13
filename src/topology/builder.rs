@@ -482,11 +482,6 @@ impl<'a> Builder<'a> {
                 })
                 .collect::<HashMap<_, _>>();
 
-            // Resolve the per-component CPU counter inside the transform span so it
-            // picks up component_id/component_kind/component_type tags. The same
-            // handle is shared between the main transform task and any helper
-            // tokio tasks the transform spawns at construction time.
-            let cpu_ns = counter!("component_cpu_usage_ns_total");
             let context = TransformContext {
                 key: Some(key.clone()),
                 globals: self.config.global.clone(),
@@ -496,7 +491,11 @@ impl<'a> Builder<'a> {
                 merged_schema_definition: merged_definition.clone(),
                 schema: self.config.schema,
                 extra_context: self.extra_context.clone(),
-                cpu_ns,
+                // Resolve the per-component CPU counter inside the transform span so it
+                // picks up component_id/component_kind/component_type tags. The same
+                // handle is shared between the main transform task and any helper
+                // tokio tasks the transform spawns at construction time.
+                cpu_ns: counter!("component_cpu_usage_ns_total"),
             };
 
             let node =
