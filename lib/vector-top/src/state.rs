@@ -21,12 +21,12 @@ use crate::dashboard::columns;
 
 type IdentifiedMetric = (ComponentKey, i64);
 
-pub use vector_common::internal_event::MetricKind;
+pub use vector_common::internal_event::InternalMetricKind;
 
 #[derive(Debug, Clone)]
 pub struct MetricInfo {
     pub name: String,
-    pub kind: MetricKind,
+    pub kind: InternalMetricKind,
 }
 
 #[derive(Debug, Clone)]

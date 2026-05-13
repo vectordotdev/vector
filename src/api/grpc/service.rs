@@ -22,7 +22,8 @@ use vector_lib::tap::{
     topology::WatchRx,
 };
 
-use vector_common::internal_event::{MetricKind as CommonMetricKind, all_metrics};
+use vector_common::internal_event::{InternalMetricKind, all_metrics};
+use crate::proto::observability::InternalMetricKind as ProtoInternalMetricKind;
 
 use crate::event::{Metric, MetricValue};
 use crate::metrics::Controller;
@@ -450,9 +451,9 @@ impl observability::Service for ObservabilityService {
             .map(|(name, kind)| AvailableMetric {
                 name: name.to_string(),
                 kind: match kind {
-                    CommonMetricKind::Counter => MetricKind::Counter as i32,
-                    CommonMetricKind::Gauge => MetricKind::Gauge as i32,
-                    CommonMetricKind::Histogram => MetricKind::Histogram as i32,
+                    InternalMetricKind::Counter => ProtoInternalMetricKind::Counter as i32,
+                    InternalMetricKind::Gauge => ProtoInternalMetricKind::Gauge as i32,
+                    InternalMetricKind::Histogram => ProtoInternalMetricKind::Histogram as i32,
                 },
             })
             .collect();
