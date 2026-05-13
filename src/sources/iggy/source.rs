@@ -1,4 +1,7 @@
-use std::{collections::HashMap, time::Duration};
+use std::{
+    collections::{BTreeSet, HashMap},
+    time::Duration,
+};
 
 use chrono::Utc;
 use futures::StreamExt;
@@ -33,22 +36,54 @@ struct FinalizerEntry {
     offset: u64,
 }
 
-/// Update the rejection fence for a partition and trim `pending_offsets` to
-/// stay below it. The fence is the lowest offset that was not delivered
-/// downstream; `pending_offsets` must never reach or exceed it so that a
-/// restart does not skip a message that was never delivered.
-fn apply_fence(
-    rejected: &mut HashMap<u32, u64>,
+/// Recompute the committable offset for a partition given the highest
+/// delivered offset and the set of currently-rejected offsets. The "fence"
+/// is the lowest rejected offset; `pending` must never reach or exceed it
+/// so that a restart does not skip a message that was never delivered.
+fn recompute_pending(
     pending: &mut HashMap<u32, u64>,
+    max_delivered: &HashMap<u32, u64>,
+    rejected: &HashMap<u32, BTreeSet<u64>>,
+    partition_id: u32,
+) {
+    let Some(&max) = max_delivered.get(&partition_id) else {
+        return;
+    };
+    let fence = rejected
+        .get(&partition_id)
+        .and_then(|set| set.iter().next().copied());
+    match fence {
+        // The very first message (offset 0) was rejected; nothing can be
+        // committed safely.
+        Some(0) => {
+            pending.remove(&partition_id);
+        }
+        Some(f) => {
+            pending.insert(partition_id, max.min(f - 1));
+        }
+        None => {
+            pending.insert(partition_id, max);
+        }
+    }
+}
+
+/// Record a non-Delivered acknowledgement, inserting the offset into the
+/// rejection set and recomputing the partition's pending offset. Emits a
+/// warning the first time the fence is lowered so operators can see why
+/// offset progress has stalled.
+fn record_rejection(
+    rejected: &mut HashMap<u32, BTreeSet<u64>>,
+    pending: &mut HashMap<u32, u64>,
+    max_delivered: &HashMap<u32, u64>,
     partition_id: u32,
     offset: u64,
     status: BatchStatus,
 ) {
-    let prev = rejected.get(&partition_id).copied();
-    let fence = rejected.entry(partition_id).or_insert(offset);
-    *fence = (*fence).min(offset);
-    let fence_val = *fence;
-    if prev != Some(fence_val) {
+    let set = rejected.entry(partition_id).or_default();
+    let prev_fence = set.iter().next().copied();
+    set.insert(offset);
+    let new_fence = set.iter().next().copied();
+    if prev_fence != new_fence {
         warn!(
             message = "Message was not delivered downstream; consumer offset for this partition will not advance past it on restart.",
             partition_id,
@@ -56,16 +91,34 @@ fn apply_fence(
             ?status,
         );
     }
-    // fence_val == 0 means the very first message (offset 0) was rejected.
-    // Subtracting 1 would underflow u64, so remove the partition entry entirely;
-    // there is no safe offset below 0 to commit.
-    if fence_val == 0 {
-        pending.remove(&partition_id);
-    } else if let Some(p) = pending.get_mut(&partition_id)
-        && *p >= fence_val
-    {
-        *p = fence_val - 1;
+    recompute_pending(pending, max_delivered, rejected, partition_id);
+}
+
+/// Record a Delivered acknowledgement, removing the offset from the rejection
+/// set (in case of in-process redelivery), updating the highest delivered
+/// offset for the partition, and recomputing the partition's pending offset.
+fn record_delivered(
+    rejected: &mut HashMap<u32, BTreeSet<u64>>,
+    pending: &mut HashMap<u32, u64>,
+    max_delivered: &mut HashMap<u32, u64>,
+    partition_id: u32,
+    offset: u64,
+) {
+    if let Some(set) = rejected.get_mut(&partition_id) {
+        let was_fenced = set.remove(&offset);
+        if set.is_empty() {
+            rejected.remove(&partition_id);
+        }
+        if was_fenced {
+            debug!(
+                message = "Previously rejected Iggy offset was redelivered; fence updated.",
+                partition_id, offset,
+            );
+        }
     }
+    let slot = max_delivered.entry(partition_id).or_insert(offset);
+    *slot = (*slot).max(offset);
+    recompute_pending(pending, max_delivered, rejected, partition_id);
 }
 
 /// Store the latest acknowledged offset for each partition on the Iggy server.
@@ -132,10 +185,16 @@ pub async fn run_iggy_source(
     // a backstop for sparse traffic and shutdown.
     let mut pending_offsets: HashMap<u32, u64> = HashMap::new();
     let mut committed_offsets: HashMap<u32, u64> = HashMap::new();
-    // The lowest offset per partition that was not delivered downstream.
-    // pending_offsets must never advance to or past this fence so that a
-    // restart does not skip a message that was rejected or errored.
-    let mut rejected_offsets: HashMap<u32, u64> = HashMap::new();
+    // The highest offset per partition that has been observed as Delivered
+    // downstream, regardless of whether a lower offset is currently fenced.
+    // Tracking this separately from `pending_offsets` allows `pending_offsets`
+    // to jump forward correctly when a redelivery clears the fence.
+    let mut max_delivered_offsets: HashMap<u32, u64> = HashMap::new();
+    // The set of offsets per partition that were not delivered downstream and
+    // have not yet been redelivered. The smallest entry is the fence;
+    // `pending_offsets` must never advance to or past it so that a restart
+    // does not skip a message that was rejected or errored.
+    let mut rejected_offsets: HashMap<u32, BTreeSet<u64>> = HashMap::new();
     let commit_after = u64::from((config.batch_length / 2).max(1));
     let mut commit_timer = interval(Duration::from_secs(config.commit_interval_secs.max(1)));
     commit_timer.set_missed_tick_behavior(MissedTickBehavior::Delay);
@@ -149,27 +208,35 @@ pub async fn run_iggy_source(
             ack = ack_stream.next() => {
                 match ack {
                     Some((BatchStatus::Delivered, entry)) => {
-                        let below_fence = rejected_offsets
+                        record_delivered(
+                            &mut rejected_offsets,
+                            &mut pending_offsets,
+                            &mut max_delivered_offsets,
+                            entry.partition_id,
+                            entry.offset,
+                        );
+                        let pending = pending_offsets
                             .get(&entry.partition_id)
-                            .is_none_or(|&fence| entry.offset < fence);
-                        if below_fence {
-                            let pending = {
-                                let offset = pending_offsets.entry(entry.partition_id).or_default();
-                                *offset = (*offset).max(entry.offset);
-                                *offset
-                            };
-                            let committed = committed_offsets
-                                .get(&entry.partition_id)
-                                .copied()
-                                .unwrap_or(0);
-                            if pending.saturating_sub(committed) >= commit_after {
-                                commit_offsets(&mut consumer, stream, topic, &mut pending_offsets, &mut committed_offsets)
-                                    .await;
-                            }
+                            .copied()
+                            .unwrap_or(0);
+                        let committed = committed_offsets
+                            .get(&entry.partition_id)
+                            .copied()
+                            .unwrap_or(0);
+                        if pending.saturating_sub(committed) >= commit_after {
+                            commit_offsets(&mut consumer, stream, topic, &mut pending_offsets, &mut committed_offsets)
+                                .await;
                         }
                     }
                     Some((status, entry)) => {
-                        apply_fence(&mut rejected_offsets, &mut pending_offsets, entry.partition_id, entry.offset, status);
+                        record_rejection(
+                            &mut rejected_offsets,
+                            &mut pending_offsets,
+                            &max_delivered_offsets,
+                            entry.partition_id,
+                            entry.offset,
+                            status,
+                        );
                     }
                     None => {
                         error!("Iggy acknowledgement stream closed unexpectedly.");
@@ -329,16 +396,23 @@ pub async fn run_iggy_source(
 
                 ack = ack_stream.next() => match ack {
                     Some((BatchStatus::Delivered, entry)) => {
-                        let below_fence = rejected_offsets
-                            .get(&entry.partition_id)
-                            .is_none_or(|&fence| entry.offset < fence);
-                        if below_fence {
-                            let slot = pending_offsets.entry(entry.partition_id).or_default();
-                            *slot = (*slot).max(entry.offset);
-                        }
+                        record_delivered(
+                            &mut rejected_offsets,
+                            &mut pending_offsets,
+                            &mut max_delivered_offsets,
+                            entry.partition_id,
+                            entry.offset,
+                        );
                     }
                     Some((status, entry)) => {
-                        apply_fence(&mut rejected_offsets, &mut pending_offsets, entry.partition_id, entry.offset, status);
+                        record_rejection(
+                            &mut rejected_offsets,
+                            &mut pending_offsets,
+                            &max_delivered_offsets,
+                            entry.partition_id,
+                            entry.offset,
+                            status,
+                        );
                     }
                     None => break,
                 },
