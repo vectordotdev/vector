@@ -21,6 +21,20 @@ use crate::dashboard::columns;
 
 type IdentifiedMetric = (ComponentKey, i64);
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MetricKind {
+    Counter,
+    Gauge,
+    Histogram,
+    Unknown,
+}
+
+#[derive(Debug, Clone)]
+pub struct MetricInfo {
+    pub name: String,
+    pub kind: MetricKind,
+}
+
 #[derive(Debug, Clone)]
 pub struct SentEventsMetric {
     pub key: ComponentKey,
@@ -126,6 +140,9 @@ pub struct State {
     /// indicating the connected Vector instance has allocation tracing active.
     #[cfg(feature = "allocation-tracing")]
     pub allocation_tracing_active: bool,
+    /// All metrics registered on the connected Vector instance, populated once
+    /// per connection via `GetCapabilities`.
+    pub available_metrics: Vec<MetricInfo>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -349,6 +366,7 @@ impl State {
             filter_state: FilterState::default(),
             #[cfg(feature = "allocation-tracing")]
             allocation_tracing_active: false,
+            available_metrics: Vec::new(),
         }
     }
 

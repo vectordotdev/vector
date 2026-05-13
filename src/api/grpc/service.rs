@@ -22,6 +22,9 @@ use vector_lib::tap::{
     topology::WatchRx,
 };
 
+use strum::IntoEnumIterator as _;
+use vector_common::internal_event::{CounterName, GaugeName, HistogramName};
+
 use crate::event::{Metric, MetricValue};
 use crate::metrics::Controller;
 use crate::proto::observability::{
@@ -431,6 +434,37 @@ impl observability::Service for ObservabilityService {
         let enabled = false;
         Ok(Response::new(GetAllocationTracingStatusResponse {
             enabled,
+        }))
+    }
+
+    async fn get_capabilities(
+        &self,
+        _request: Request<GetCapabilitiesRequest>,
+    ) -> Result<Response<GetCapabilitiesResponse>, Status> {
+        #[cfg(feature = "allocation-tracing")]
+        let allocation_tracing_enabled =
+            crate::internal_telemetry::allocations::is_allocation_tracing_enabled();
+        #[cfg(not(feature = "allocation-tracing"))]
+        let allocation_tracing_enabled = false;
+
+        let available_metrics = CounterName::iter()
+            .map(|n| AvailableMetric {
+                name: n.as_ref().to_string(),
+                kind: MetricKind::Counter as i32,
+            })
+            .chain(GaugeName::iter().map(|n| AvailableMetric {
+                name: n.as_ref().to_string(),
+                kind: MetricKind::Gauge as i32,
+            }))
+            .chain(HistogramName::iter().map(|n| AvailableMetric {
+                name: n.as_ref().to_string(),
+                kind: MetricKind::Histogram as i32,
+            }))
+            .collect();
+
+        Ok(Response::new(GetCapabilitiesResponse {
+            allocation_tracing_enabled,
+            available_metrics,
         }))
     }
 
