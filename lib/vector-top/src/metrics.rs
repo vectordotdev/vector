@@ -570,15 +570,25 @@ pub async fn init_components(
         .collect::<BTreeMap<_, _>>();
 
     // GetCapabilities is a one-shot call made once per connection to learn allocation
-    // tracing status and the full set of registered metric names. On error (e.g. older
-    // server without this RPC) we fall back to an empty default. Re-evaluated on every
+    // tracing status and the full set of registered metric names. Re-evaluated on every
     // reconnect via the retry loop in `subscription()`.
-    let capabilities = client.get_capabilities().await.unwrap_or_default();
-    let allocation_tracing_enabled = capabilities.allocation_tracing_enabled;
+    // On older servers that don't implement GetCapabilities, fall back to the legacy
+    // GetAllocationTracingStatus RPC so the allocation tracing column still works.
+    let (allocation_tracing_enabled, capabilities_metrics) = match client.get_capabilities().await
+    {
+        Ok(caps) => (caps.allocation_tracing_enabled, caps.available_metrics),
+        Err(_) => {
+            let enabled = client
+                .get_allocation_tracing_status()
+                .await
+                .map(|r| r.enabled)
+                .unwrap_or(false);
+            (enabled, vec![])
+        }
+    };
 
     use vector_api_client::proto::InternalMetricKind;
-    let available_metrics = capabilities
-        .available_metrics
+    let available_metrics = capabilities_metrics
         .into_iter()
         .filter_map(|m| {
             let kind = match InternalMetricKind::try_from(m.kind) {
