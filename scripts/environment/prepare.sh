@@ -39,7 +39,7 @@ CARGO_LLVM_COV_VERSION="0.8.4"
 WASM_PACK_VERSION="0.13.1"
 # npm tool versions are defined in scripts/environment/npm-tools/package.json
 # and pinned (including transitive deps) in npm-tools/package-lock.json.
-VDEV_VERSION="0.3.2"
+VDEV_VERSION="0.3.3"
 
 ALL_MODULES=(
   rustup
@@ -139,8 +139,15 @@ maybe_install_cargo_tool() {
     version_cmd="cargo ${tool#cargo-}"
   fi
 
+  # vdev fails fast on missing prebuilts so a cache/asset miss can't
+  # reintroduce the source-compile path that previously stalled a release.
+  local installer=("${install[@]}")
+  if [[ "$tool" == "vdev" && "${installer[0]}" == "binstall" ]]; then
+    installer+=(--disable-strategies compile)
+  fi
+
   if ! $version_cmd --version 2>/dev/null | grep -q "^${version_pattern}"; then
-    cargo "${install[@]}" "$tool" --version "$version" --force --locked
+    cargo "${installer[@]}" "$tool" --version "$version" --force --locked
   fi
 
   # cargo-llvm-cov requires the llvm-tools-preview rustup component
