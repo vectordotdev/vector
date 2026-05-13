@@ -5,7 +5,7 @@ use std::{
 
 use chrono::Utc;
 use futures::{StreamExt, stream::BoxStream};
-use iggy::prelude::{ConsumerGroupClient, Identifier, IggyClient, IggyConsumer};
+use iggy::prelude::{ConsumerGroupClient, Identifier, IggyClient, IggyConsumer, ReceivedMessage};
 use tokio::time::{MissedTickBehavior, interval, sleep};
 use tokio_stream::StreamMap;
 use vector_lib::{
@@ -13,13 +13,13 @@ use vector_lib::{
     codecs::{DecoderFramedRead, decoding::StreamDecodingError},
     config::{LegacyKey, LogNamespace},
     finalizer::OrderedFinalizer,
-    lookup::owned_value_path,
+    lookup::{OwnedValuePath, owned_value_path},
 };
 
 use crate::{
     SourceSender,
     codecs::Decoder,
-    event::{BatchNotifier, BatchStatus, Event, EventFinalizer, EventStatus},
+    event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, EventFinalizer, EventStatus},
     internal_events::{
         IggyBytesReceived, IggyEventsReceived, IggyOffsetCommitted, IggyOffsetUpdateError,
         IggyOffsetUpdated, IggyReadError, StreamClosedError,
@@ -140,6 +140,184 @@ async fn commit_offsets(
     }
 }
 
+/// Configuration needed to enrich each log event with source metadata.
+/// Built once in `run_iggy_source` and reborrowed for every received
+/// message so the inner processing helper has a single-parameter view of
+/// the logging context.
+struct MessageMetadata<'a> {
+    log_namespace: LogNamespace,
+    stream: &'a str,
+    topic: &'a str,
+    stream_key: Option<&'a OwnedValuePath>,
+    topic_key: Option<&'a OwnedValuePath>,
+    stream_path: &'a OwnedValuePath,
+    topic_path: &'a OwnedValuePath,
+    partition_id_path: &'a OwnedValuePath,
+    offset_path: &'a OwnedValuePath,
+}
+
+/// Mutable references to the per-partition acknowledgement bookkeeping.
+/// Updated together when a new message is registered for finalization, so
+/// bundling them keeps the call sites focused on the high-level flow.
+struct AckTracker<'a> {
+    partitions: &'a mut HashMap<u32, PartitionState>,
+    finalizers: &'a mut HashMap<u32, OrderedFinalizer<u64>>,
+    ack_streams: &'a mut StreamMap<u32, BoxStream<'static, (BatchStatus, u64)>>,
+}
+
+impl AckTracker<'_> {
+    /// Register an in-flight message for acknowledgement tracking. A new
+    /// per-partition finalizer and ack stream are created lazily the first
+    /// time a partition is seen.
+    fn register(&mut self, partition_id: u32, offset: u64, receiver: BatchStatusReceiver) {
+        let finalizer = self.finalizers.entry(partition_id).or_insert_with(|| {
+            let (finalizer, stream) = OrderedFinalizer::<u64>::new(None);
+            self.ack_streams.insert(partition_id, stream);
+            finalizer
+        });
+        self.partitions.entry(partition_id).or_default();
+        finalizer.add(offset, receiver);
+    }
+}
+
+/// Decode one polled Iggy message, forward its events downstream, and
+/// register the message for acknowledgement when acks are enabled.
+///
+/// Returns `Err(())` when the downstream `SourceSender` has closed — the
+/// caller should bail out of the source loop. A non-continuable decode
+/// error is handled internally by marking the batch as `Rejected` so the
+/// fence logic refuses to commit past the malformed offset.
+async fn process_received_message(
+    received: ReceivedMessage,
+    decoder: &Decoder,
+    metadata: &MessageMetadata<'_>,
+    acknowledgements: bool,
+    tracker: &mut AckTracker<'_>,
+    out: &mut SourceSender,
+) -> Result<(), ()> {
+    let payload = &received.message.payload;
+    let partition_id = received.partition_id;
+    let offset = received.message.header.offset;
+    emit!(IggyBytesReceived {
+        byte_size: payload.len(),
+        stream: metadata.stream,
+        topic: metadata.topic,
+        partition: partition_id,
+    });
+    emit!(IggyOffsetUpdated {
+        stream: metadata.stream,
+        topic: metadata.topic,
+        partition: partition_id,
+        message_offset: offset,
+        current_offset: received.current_offset,
+    });
+
+    let (batch, receiver) = BatchNotifier::new_with_receiver();
+    let mut framed = DecoderFramedRead::new(payload.as_ref(), decoder.clone());
+    let mut channel_closed = false;
+    let mut decode_failed = false;
+
+    while let Some(next) = framed.next().await {
+        match next {
+            Ok((events, _byte_size)) => {
+                let count = events.len();
+                if count == 0 {
+                    continue;
+                }
+                let byte_size = events.estimated_json_encoded_size_of();
+                emit!(IggyEventsReceived {
+                    count,
+                    byte_size,
+                    stream: metadata.stream,
+                    topic: metadata.topic,
+                    partition: partition_id,
+                });
+                let now = Utc::now();
+
+                let events = events.into_iter().map(|mut event| {
+                    if let Event::Log(ref mut log) = event {
+                        metadata
+                            .log_namespace
+                            .insert_standard_vector_source_metadata(
+                                log,
+                                IggySourceConfig::NAME,
+                                now,
+                            );
+                        metadata.log_namespace.insert_source_metadata(
+                            IggySourceConfig::NAME,
+                            log,
+                            metadata.stream_key.map(LegacyKey::InsertIfEmpty),
+                            metadata.stream_path,
+                            metadata.stream,
+                        );
+                        metadata.log_namespace.insert_source_metadata(
+                            IggySourceConfig::NAME,
+                            log,
+                            metadata.topic_key.map(LegacyKey::InsertIfEmpty),
+                            metadata.topic_path,
+                            metadata.topic,
+                        );
+                        metadata.log_namespace.insert_source_metadata(
+                            IggySourceConfig::NAME,
+                            log,
+                            None::<LegacyKey<&str>>,
+                            metadata.partition_id_path,
+                            partition_id as i64,
+                        );
+                        metadata.log_namespace.insert_source_metadata(
+                            IggySourceConfig::NAME,
+                            log,
+                            None::<LegacyKey<&str>>,
+                            metadata.offset_path,
+                            offset as i64,
+                        );
+                    }
+                    if acknowledgements {
+                        event.with_batch_notifier(&batch)
+                    } else {
+                        event
+                    }
+                });
+
+                if out.send_batch(events).await.is_err() {
+                    emit!(StreamClosedError { count });
+                    channel_closed = true;
+                    break;
+                }
+            }
+            Err(error) => {
+                if !error.can_continue() {
+                    decode_failed = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    // Drop our handle so the batch is finalized once the events that were
+    // attached to it are dropped downstream. On a non-continuable decode
+    // error, wrap the batch in an `EventFinalizer` set to `Rejected` so the
+    // offset is not committed; otherwise the default `Delivered` status
+    // would let a malformed message advance the consumer.
+    if decode_failed {
+        let efin = EventFinalizer::new(batch);
+        efin.update_status(EventStatus::Rejected);
+        drop(efin);
+    } else {
+        drop(batch);
+    }
+
+    if channel_closed {
+        return Err(());
+    }
+
+    if acknowledgements {
+        tracker.register(partition_id, offset, receiver);
+    }
+
+    Ok(())
+}
+
 #[allow(clippy::too_many_arguments)]
 pub async fn run_iggy_source(
     config: IggySourceConfig,
@@ -153,12 +331,21 @@ pub async fn run_iggy_source(
 ) -> Result<(), ()> {
     let stream = config.stream.as_str();
     let topic = config.topic.as_str();
-    let stream_key = config.stream_key_field.path.as_ref();
-    let topic_key = config.topic_key_field.path.as_ref();
     let stream_path = owned_value_path!("stream");
     let topic_path = owned_value_path!("topic");
     let partition_id_path = owned_value_path!("partition_id");
     let offset_path = owned_value_path!("offset");
+    let metadata = MessageMetadata {
+        log_namespace,
+        stream,
+        topic,
+        stream_key: config.stream_key_field.path.as_ref(),
+        topic_key: config.topic_key_field.path.as_ref(),
+        stream_path: &stream_path,
+        topic_path: &topic_path,
+        partition_id_path: &partition_id_path,
+        offset_path: &offset_path,
+    };
 
     // Build identifiers eagerly so that any parse failure surfaces before
     // the source starts handling traffic. The consumer itself was already
@@ -228,133 +415,23 @@ pub async fn run_iggy_source(
             next = consumer.next() => {
                 match next {
                     Some(Ok(received)) => {
-                        let payload = &received.message.payload;
-                        let partition_id = received.partition_id;
-                        emit!(IggyBytesReceived {
-                            byte_size: payload.len(),
-                            stream,
-                            topic,
-                            partition: partition_id,
-                        });
-                        emit!(IggyOffsetUpdated {
-                            stream,
-                            topic,
-                            partition: partition_id,
-                            message_offset: received.message.header.offset,
-                            current_offset: received.current_offset,
-                        });
-
-                        let (batch, receiver) = BatchNotifier::new_with_receiver();
-                        let mut framed = DecoderFramedRead::new(payload.as_ref(), decoder.clone());
-                        let mut channel_closed = false;
-                        let mut decode_failed = false;
-
-                        while let Some(next) = framed.next().await {
-                            match next {
-                                Ok((events, _byte_size)) => {
-                                    let count = events.len();
-                                    if count == 0 {
-                                        continue;
-                                    }
-                                    let byte_size = events.estimated_json_encoded_size_of();
-                                    emit!(IggyEventsReceived {
-                                        count,
-                                        byte_size,
-                                        stream,
-                                        topic,
-                                        partition: partition_id,
-                                    });
-                                    let now = Utc::now();
-                                    let offset = received.message.header.offset;
-
-                                    let events = events.into_iter().map(|mut event| {
-                                        if let Event::Log(ref mut log) = event {
-                                            log_namespace.insert_standard_vector_source_metadata(
-                                                log,
-                                                IggySourceConfig::NAME,
-                                                now,
-                                            );
-                                            log_namespace.insert_source_metadata(
-                                                IggySourceConfig::NAME,
-                                                log,
-                                                stream_key.map(LegacyKey::InsertIfEmpty),
-                                                &stream_path,
-                                                stream,
-                                            );
-                                            log_namespace.insert_source_metadata(
-                                                IggySourceConfig::NAME,
-                                                log,
-                                                topic_key.map(LegacyKey::InsertIfEmpty),
-                                                &topic_path,
-                                                topic,
-                                            );
-                                            log_namespace.insert_source_metadata(
-                                                IggySourceConfig::NAME,
-                                                log,
-                                                None::<LegacyKey<&str>>,
-                                                &partition_id_path,
-                                                partition_id as i64,
-                                            );
-                                            log_namespace.insert_source_metadata(
-                                                IggySourceConfig::NAME,
-                                                log,
-                                                None::<LegacyKey<&str>>,
-                                                &offset_path,
-                                                offset as i64,
-                                            );
-                                        }
-                                        if acknowledgements {
-                                            event.with_batch_notifier(&batch)
-                                        } else {
-                                            event
-                                        }
-                                    });
-
-                                    if out.send_batch(events).await.is_err() {
-                                        emit!(StreamClosedError { count });
-                                        channel_closed = true;
-                                        break;
-                                    }
-                                }
-                                Err(error) => {
-                                    if !error.can_continue() {
-                                        decode_failed = true;
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-
-                        // Drop our handle so the batch is finalized once the
-                        // events that were attached to it are dropped
-                        // downstream. On a non-continuable decode error, wrap
-                        // the batch in an `EventFinalizer` set to `Rejected`
-                        // so the offset is not committed; otherwise the
-                        // default `Delivered` status would let a malformed
-                        // message advance the consumer.
-                        if decode_failed {
-                            let efin = EventFinalizer::new(batch);
-                            efin.update_status(EventStatus::Rejected);
-                            drop(efin);
-                        } else {
-                            drop(batch);
-                        }
-
-                        if channel_closed {
+                        let mut tracker = AckTracker {
+                            partitions: &mut partitions,
+                            finalizers: &mut finalizers,
+                            ack_streams: &mut ack_streams,
+                        };
+                        if process_received_message(
+                            received,
+                            &decoder,
+                            &metadata,
+                            acknowledgements,
+                            &mut tracker,
+                            &mut out,
+                        )
+                        .await
+                        .is_err()
+                        {
                             return Err(());
-                        }
-
-                        if acknowledgements {
-                            let finalizer = finalizers
-                                .entry(partition_id)
-                                .or_insert_with(|| {
-                                    let (finalizer, stream) =
-                                        OrderedFinalizer::<u64>::new(None);
-                                    ack_streams.insert(partition_id, stream);
-                                    finalizer
-                                });
-                            partitions.entry(partition_id).or_default();
-                            finalizer.add(received.message.header.offset, receiver);
                         }
                     }
                     Some(Err(error)) => {
