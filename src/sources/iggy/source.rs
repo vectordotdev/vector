@@ -426,3 +426,120 @@ pub async fn run_iggy_source(
     info!("Iggy source shut down.");
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::PartitionState;
+
+    #[test]
+    fn delivered_sets_pending_to_max() {
+        let mut s = PartitionState::default();
+        assert_eq!(s.pending, None);
+        s.record_delivered(5);
+        assert_eq!(s.pending, Some(5));
+        s.record_delivered(7);
+        assert_eq!(s.pending, Some(7));
+    }
+
+    #[test]
+    fn delivered_does_not_lower_max() {
+        let mut s = PartitionState::default();
+        s.record_delivered(10);
+        s.record_delivered(3);
+        assert_eq!(s.max_delivered, Some(10));
+        assert_eq!(s.pending, Some(10));
+    }
+
+    #[test]
+    fn delivered_returns_false_when_not_fenced() {
+        let mut s = PartitionState::default();
+        assert!(!s.record_delivered(5));
+    }
+
+    #[test]
+    fn rejection_fences_pending() {
+        let mut s = PartitionState::default();
+        s.record_delivered(10);
+        s.record_rejection(5);
+        assert_eq!(s.pending, Some(4));
+    }
+
+    #[test]
+    fn rejection_at_zero_blocks_all_commits() {
+        let mut s = PartitionState::default();
+        s.record_delivered(10);
+        s.record_rejection(0);
+        assert_eq!(s.pending, None);
+    }
+
+    #[test]
+    fn lowest_rejection_wins_as_fence() {
+        let mut s = PartitionState::default();
+        s.record_delivered(10);
+        s.record_rejection(7);
+        s.record_rejection(3);
+        s.record_rejection(8);
+        assert_eq!(s.pending, Some(2));
+    }
+
+    #[test]
+    fn rejection_returns_true_only_on_fence_change() {
+        let mut s = PartitionState::default();
+        s.record_delivered(10);
+        assert!(s.record_rejection(5));
+        assert!(!s.record_rejection(7));
+        assert!(s.record_rejection(3));
+    }
+
+    #[test]
+    fn rejection_before_any_delivery_leaves_pending_none() {
+        let mut s = PartitionState::default();
+        s.record_rejection(5);
+        assert_eq!(s.pending, None);
+    }
+
+    #[test]
+    fn redelivery_clears_fence_and_advances_pending() {
+        let mut s = PartitionState::default();
+        s.record_delivered(10);
+        s.record_rejection(5);
+        assert_eq!(s.pending, Some(4));
+        assert!(s.record_delivered(5));
+        assert_eq!(s.pending, Some(10));
+    }
+
+    #[test]
+    fn pending_advances_to_next_fence_after_partial_clear() {
+        let mut s = PartitionState::default();
+        s.record_delivered(10);
+        s.record_rejection(5);
+        s.record_rejection(7);
+        assert_eq!(s.pending, Some(4));
+        s.record_delivered(5);
+        assert_eq!(s.pending, Some(6));
+        s.record_delivered(7);
+        assert_eq!(s.pending, Some(10));
+    }
+
+    #[test]
+    fn lag_is_pending_minus_committed() {
+        let mut s = PartitionState::default();
+        assert_eq!(s.lag(), 0);
+        s.record_delivered(10);
+        assert_eq!(s.lag(), 10);
+        s.committed = 4;
+        assert_eq!(s.lag(), 6);
+    }
+
+    #[test]
+    fn lag_is_zero_when_caught_up_or_unfenced_to_none() {
+        let mut s = PartitionState::default();
+        assert_eq!(s.lag(), 0);
+        s.record_delivered(10);
+        s.committed = 10;
+        assert_eq!(s.lag(), 0);
+        s.record_rejection(0);
+        assert_eq!(s.pending, None);
+        assert_eq!(s.lag(), 0);
+    }
+}
