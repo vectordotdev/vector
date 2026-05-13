@@ -1,4 +1,4 @@
-use strum::{AsRefStr, Display, EnumIter};
+use strum::{AsRefStr, Display, EnumIter, IntoEnumIterator as _};
 
 /// Canonical list of all per-component internal metric names emitted by Vector.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Display, AsRefStr, EnumIter)]
@@ -338,4 +338,19 @@ impl CounterName {
             Self::MemoryEnrichmentTableTtlExpirations => "memory_enrichment_table_ttl_expirations",
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MetricKind {
+    Counter,
+    Gauge,
+    Histogram,
+}
+
+/// Returns an iterator over every known Vector metric name paired with its kind.
+pub fn all_metrics() -> impl Iterator<Item = (&'static str, MetricKind)> {
+    CounterName::iter()
+        .map(|n| (n.as_ref(), MetricKind::Counter))
+        .chain(GaugeName::iter().map(|n| (n.as_ref(), MetricKind::Gauge)))
+        .chain(HistogramName::iter().map(|n| (n.as_ref(), MetricKind::Histogram)))
 }

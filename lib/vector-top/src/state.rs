@@ -21,13 +21,7 @@ use crate::dashboard::columns;
 
 type IdentifiedMetric = (ComponentKey, i64);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MetricKind {
-    Counter,
-    Gauge,
-    Histogram,
-    Unknown,
-}
+pub use vector_common::internal_event::MetricKind;
 
 #[derive(Debug, Clone)]
 pub struct MetricInfo {

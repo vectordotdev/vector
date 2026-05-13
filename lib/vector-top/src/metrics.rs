@@ -576,20 +576,18 @@ pub async fn init_components(
     let capabilities = client.get_capabilities().await.unwrap_or_default();
     let allocation_tracing_enabled = capabilities.allocation_tracing_enabled;
 
+    use vector_api_client::proto::MetricKind as ProtoKind;
     let available_metrics = capabilities
         .available_metrics
         .into_iter()
-        .map(|m| {
-            use vector_api_client::proto::MetricKind as ProtoKind;
-            state::MetricInfo {
-                name: m.name,
-                kind: match ProtoKind::try_from(m.kind) {
-                    Ok(ProtoKind::Counter) => state::MetricKind::Counter,
-                    Ok(ProtoKind::Gauge) => state::MetricKind::Gauge,
-                    Ok(ProtoKind::Histogram) => state::MetricKind::Histogram,
-                    _ => state::MetricKind::Unknown,
-                },
-            }
+        .filter_map(|m| {
+            let kind = match ProtoKind::try_from(m.kind) {
+                Ok(ProtoKind::Counter) => state::MetricKind::Counter,
+                Ok(ProtoKind::Gauge) => state::MetricKind::Gauge,
+                Ok(ProtoKind::Histogram) => state::MetricKind::Histogram,
+                _ => return None,
+            };
+            Some(state::MetricInfo { name: m.name, kind })
         })
         .collect();
 

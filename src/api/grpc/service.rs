@@ -22,8 +22,7 @@ use vector_lib::tap::{
     topology::WatchRx,
 };
 
-use strum::IntoEnumIterator as _;
-use vector_common::internal_event::{CounterName, GaugeName, HistogramName};
+use vector_common::internal_event::{MetricKind as CommonMetricKind, all_metrics};
 
 use crate::event::{Metric, MetricValue};
 use crate::metrics::Controller;
@@ -447,19 +446,15 @@ impl observability::Service for ObservabilityService {
         #[cfg(not(feature = "allocation-tracing"))]
         let allocation_tracing_enabled = false;
 
-        let available_metrics = CounterName::iter()
-            .map(|n| AvailableMetric {
-                name: n.as_ref().to_string(),
-                kind: MetricKind::Counter as i32,
+        let available_metrics = all_metrics()
+            .map(|(name, kind)| AvailableMetric {
+                name: name.to_string(),
+                kind: match kind {
+                    CommonMetricKind::Counter => MetricKind::Counter as i32,
+                    CommonMetricKind::Gauge => MetricKind::Gauge as i32,
+                    CommonMetricKind::Histogram => MetricKind::Histogram as i32,
+                },
             })
-            .chain(GaugeName::iter().map(|n| AvailableMetric {
-                name: n.as_ref().to_string(),
-                kind: MetricKind::Gauge as i32,
-            }))
-            .chain(HistogramName::iter().map(|n| AvailableMetric {
-                name: n.as_ref().to_string(),
-                kind: MetricKind::Histogram as i32,
-            }))
             .collect();
 
         Ok(Response::new(GetCapabilitiesResponse {
