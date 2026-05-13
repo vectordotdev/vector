@@ -45,7 +45,7 @@ pub(super) fn request_builder(
     events: Vec<Event>,
     transformer: &Transformer,
     encoder: &mut Encoder<()>,
-) -> IggyRequest {
+) -> Option<IggyRequest> {
     let builder = RequestMetadataBuilder::from_events(&events);
 
     let mut byte_size = telemetry().create_request_count_byte_size();
@@ -68,6 +68,13 @@ pub(super) fn request_builder(
             }
         })
         .collect();
+    // Every event in the batch failed encoding; their finalizers were
+    // already marked Errored individually above. Drop the request rather
+    // than dispatching an empty one, which would still emit "Delivered"
+    // telemetry for the original event count even though nothing was sent.
+    if payloads.is_empty() {
+        return None;
+    }
     let encoded = EncodeResult {
         payload: payloads,
         uncompressed_byte_size,
@@ -76,9 +83,9 @@ pub(super) fn request_builder(
     };
     let metadata = builder.build(&encoded);
 
-    IggyRequest {
+    Some(IggyRequest {
         payloads: encoded.into_payload(),
         finalizers,
         metadata,
-    }
+    })
 }
