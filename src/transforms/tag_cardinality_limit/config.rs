@@ -72,7 +72,6 @@ pub enum TrackingScope {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Inner {
     /// How many distinct values to accept for any given key.
-    #[configurable(validation(range(min = 1.0)))]
     #[serde(default = "default_value_limit")]
     pub value_limit: usize,
 
@@ -144,7 +143,6 @@ pub struct PerMetricConfig {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct OverrideInner {
     /// How many distinct values to accept for any given key. Ignored when `mode: excluded`.
-    #[configurable(validation(range(min = 1.0)))]
     #[serde(default = "default_value_limit")]
     pub value_limit: usize,
 
@@ -226,7 +224,6 @@ pub enum PerTagMode {
     /// algorithm and all other settings still apply.
     LimitOverride {
         /// Maximum number of distinct values to accept for this tag key.
-        #[configurable(validation(range(min = 1.0)))]
         value_limit: usize,
     },
     /// Opt this tag out of cardinality tracking entirely. All values pass through

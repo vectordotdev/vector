@@ -228,14 +228,19 @@ impl TagCardinalityLimit {
             TagSettings::Excluded => return false,
             TagSettings::Tracked(inner) => inner,
         };
-        self.accepted_tags
+        match self
+            .accepted_tags
             .get(&metric_key.cloned())
-            .and_then(|metric_accepted_tags| {
-                metric_accepted_tags.get(key).map(|value_set| {
-                    !value_set.contains(value) && value_set.len() >= resolved.value_limit
-                })
-            })
-            .unwrap_or(false)
+            .and_then(|metric_accepted_tags| metric_accepted_tags.get(key))
+        {
+            // Already accepted — never exceeds.
+            Some(value_set) if value_set.contains(value) => false,
+            // Adding this value would push us at or past the configured cap. Treat a
+            // missing bucket as an empty set so `value_limit: 0` correctly rejects
+            // the first occurrence too.
+            Some(value_set) => value_set.len() >= resolved.value_limit,
+            None => resolved.value_limit == 0,
+        }
     }
 
     /// Record an accepted tag value (mutation-only, no limit check). Used by the `DropEvent`
