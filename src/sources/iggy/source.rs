@@ -23,8 +23,8 @@ use crate::{
     codecs::Decoder,
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
     internal_events::{
-        IggyBytesReceived, IggyEventsReceived, IggyOffsetCommitted, IggyOffsetUpdateError,
-        IggyOffsetUpdated, IggyReadError, StreamClosedError,
+        IggyBytesReceived, IggyEventsReceived, IggyOffsetCommitted, IggyOffsetPolled,
+        IggyOffsetUpdateError, IggyReadError, StreamClosedError,
     },
     shutdown::ShutdownSignal,
     sources::iggy::config::IggySourceConfig,
@@ -84,6 +84,14 @@ impl PartitionState {
 /// Apply an acknowledgement to a partition's state and emit a log line
 /// when the fence changes.
 fn record_ack(state: &mut PartitionState, partition_id: u32, status: BatchStatus, offset: u64) {
+    // OrderedFinalizer guarantees per-partition FIFO ordering; acks must
+    // arrive in offset order for the fence/pending monotonicity invariants
+    // in PartitionState to hold.
+    debug_assert!(
+        offset >= state.committed,
+        "ack for offset {offset} arrived out of order (partition {partition_id}, committed={})",
+        state.committed
+    );
     match status {
         BatchStatus::Delivered => {
             state.record_delivered(offset);
@@ -214,7 +222,7 @@ async fn process_received_message(
         topic: metadata.topic,
         partition: partition_id,
     });
-    emit!(IggyOffsetUpdated {
+    emit!(IggyOffsetPolled {
         stream: metadata.stream,
         topic: metadata.topic,
         partition: partition_id,
@@ -272,14 +280,14 @@ async fn process_received_message(
                             log,
                             None::<LegacyKey<&str>>,
                             metadata.partition_id_path,
-                            partition_id as i64,
+                            i64::from(partition_id),
                         );
                         metadata.log_namespace.insert_source_metadata(
                             IggySourceConfig::NAME,
                             log,
                             None::<LegacyKey<&str>>,
                             metadata.offset_path,
-                            offset as i64,
+                            i64::try_from(offset).unwrap_or(i64::MAX),
                         );
                     }
                     if acknowledgements {

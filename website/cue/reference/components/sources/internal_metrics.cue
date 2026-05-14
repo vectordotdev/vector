@@ -599,8 +599,8 @@ components: sources: internal_metrics: {
 				}
 			}
 		}
-		iggy_consumer_offset: {
-			description:       "The offset of the last message consumed by the source for a partition."
+		iggy_consumer_polled_offset: {
+			description:       "The offset of the last message polled from the broker for a partition. This advances as soon as a message is received from the SDK and does not imply downstream delivery; see `iggy_consumer_committed_offset` for the offset most recently stored on the server."
 			type:              "gauge"
 			default_namespace: "vector"
 			tags: _component_tags & {
