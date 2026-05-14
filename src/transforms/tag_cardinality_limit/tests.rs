@@ -1077,6 +1077,35 @@ fn per_tag_limit_override_caps_at_explicit_value() {
     assert!(!e3.as_metric().tags().unwrap().contains_key("tag1"));
 }
 
+#[test]
+fn per_tag_zero_limit_drop_event_drops_first_event() {
+    let config = make_transform_hashset_with_per_metric_limits(
+        500,
+        LimitExceededAction::DropTag,
+        HashMap::from([(
+            "metricA".to_string(),
+            make_per_metric(
+                10,
+                LimitExceededAction::DropEvent,
+                HashMap::from([("tag1".to_string(), make_per_tag(0))]),
+            ),
+        )]),
+    );
+    let mut transform = TagCardinalityLimit::new(config);
+
+    let dropped = transform.transform_one(make_metric_with_name(
+        metric_tags!("tag1" => "v0"),
+        "metricA",
+    ));
+    assert_eq!(dropped, None);
+
+    let passed = transform.transform_one(make_metric_with_name(
+        metric_tags!("tag1" => "v0"),
+        "metricB",
+    ));
+    assert!(passed.is_some());
+}
+
 /// Per-tag YAML syntax: `mode: limit_override` with `value_limit`, and `mode: excluded`.
 #[test]
 fn per_tag_modes_deserialize() {
