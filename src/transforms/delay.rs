@@ -1,4 +1,4 @@
-use std::{pin::Pin, time::Duration};
+use std::{num::NonZeroUsize, pin::Pin, time::Duration};
 
 use async_stream::stream;
 use futures::{Stream, StreamExt};
@@ -26,8 +26,40 @@ pub struct DelayConfig {
     #[configurable(metadata(docs::human_name = "Delay per event", docs::example = 0.2))]
     delay_per_event: Duration,
 
+    /// Optional limit for number of items in the delay queue.
+    queue_capacity: Option<NonZeroUsize>,
+
+    /// Strategy to handle full queue capacity.
+    #[serde(default)]
+    overflow_strategy: OverflowStrategy,
+
     /// Delay only events matched by this condition.
     condition: Option<AnyCondition>,
+}
+
+/// Event handling behavior when delay queue is full.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum OverflowStrategy {
+    /// Wait for free space in the queue.
+    ///
+    /// This applies backpressure up the topology, signalling that sources should slow down
+    /// the acceptance/consumption of events. This means that while no data is lost, data will pile
+    /// up at the edge.
+    #[default]
+    Block,
+
+    /// Drops the event instead of waiting for free space in the queue.
+    ///
+    /// The event will be intentionally dropped. This mode is typically used when performance is the
+    /// highest priority, and it is preferable to temporarily lose events rather than cause a
+    /// slowdown in the acceptance/consumption of events.
+    DropNewest,
+
+    /// Passes the event immediately instead of waiting for delay, to not take up the space in the
+    /// queue.
+    Pass,
 }
 
 impl_generate_config_from_default!(DelayConfig);
@@ -59,6 +91,8 @@ impl TransformConfig for DelayConfig {
 pub struct Delay {
     delay: Duration,
     queue: DelayQueue<Event>,
+    queue_capacity: Option<NonZeroUsize>,
+    overflow_strategy: OverflowStrategy,
     condition: Condition,
 }
 
@@ -66,7 +100,12 @@ impl Delay {
     pub fn new(config: &DelayConfig, context: &TransformContext) -> crate::Result<Self> {
         Ok(Self {
             delay: config.delay_per_event,
-            queue: DelayQueue::new(),
+            queue: config
+                .queue_capacity
+                .map(|c| DelayQueue::with_capacity(c.into()))
+                .unwrap_or_default(),
+            queue_capacity: config.queue_capacity,
+            overflow_strategy: config.overflow_strategy,
             condition: config
                 .condition
                 .as_ref()
@@ -97,6 +136,23 @@ impl TaskTransform<Event> for Delay {
                             Some(event) => {
                                 let (result, event) = self.condition.check(event);
                                 if result {
+                                    if let Some(capacity) = self.queue_capacity && capacity.get() <= self.queue.len() {
+                                        match self.overflow_strategy {
+                                            OverflowStrategy::Block => {
+                                                while capacity.get() <= self.queue.len() && let Some(next) = self.queue.next().await {
+                                                    yield next.into_inner();
+                                                }
+                                            },
+                                            OverflowStrategy::DropNewest => {
+                                                // Just ignore this event
+                                                continue;
+                                            }
+                                            OverflowStrategy::Pass => {
+                                                yield event;
+                                                continue;
+                                            }
+                                        }
+                                    }
                                     self.queue.insert(event, self.delay);
                                 } else {
                                     yield event;
@@ -196,5 +252,82 @@ condition.type = "is_log"
         if !matches!(futures::poll!(out_stream.next()), Poll::Ready(Some(_event))) {
             panic!("Unexpectedly received None or Pending in output stream");
         }
+    }
+
+    #[tokio::test]
+    async fn delay_events_at_capacity_drop_newest() {
+        let config = toml::from_str::<DelayConfig>(
+            r#"
+delay_per_event = 0.2
+queue_capacity = 1
+overflow_strategy = "drop_newest"
+"#,
+        )
+        .unwrap();
+
+        let delay =
+            Transform::event_task(Delay::new(&config, &TransformContext::default()).unwrap());
+
+        let delay = delay.into_task();
+
+        let (mut tx, rx) = futures::channel::mpsc::channel(10);
+        let mut out_stream = delay.transform_events(Box::pin(rx));
+
+        tx.send(LogEvent::default().into()).await.unwrap();
+        tx.send(TraceEvent::default().into()).await.unwrap();
+
+        // We should be pending, because we are now waiting for the delay
+        assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
+
+        // Wait long enough for delay to end
+        tokio::time::sleep(Duration::from_secs_f64(0.3)).await;
+
+        let Poll::Ready(Some(event)) = futures::poll!(out_stream.next()) else {
+            panic!("Unexpectedly received None or Pending in output stream");
+        };
+        assert!(event.try_into_log().is_some());
+
+        // We should be pending, because trace event should have been dropped
+        assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
+    }
+
+    #[tokio::test]
+    async fn delay_events_at_capacity_pass() {
+        let config = toml::from_str::<DelayConfig>(
+            r#"
+delay_per_event = 0.2
+queue_capacity = 1
+overflow_strategy = "pass"
+"#,
+        )
+        .unwrap();
+
+        let delay =
+            Transform::event_task(Delay::new(&config, &TransformContext::default()).unwrap());
+
+        let delay = delay.into_task();
+
+        let (mut tx, rx) = futures::channel::mpsc::channel(10);
+        let mut out_stream = delay.transform_events(Box::pin(rx));
+
+        tx.send(LogEvent::default().into()).await.unwrap();
+        tx.send(TraceEvent::default().into()).await.unwrap();
+
+        // First event should be trace, because it is passed right away before delay
+        let Poll::Ready(Some(event)) = futures::poll!(out_stream.next()) else {
+            panic!("Unexpectedly received None or Pending in output stream");
+        };
+        assert!(event.try_into_trace().is_some());
+
+        // We should be pending, because we are now waiting for the delay
+        assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
+
+        // Wait long enough for delay to end
+        tokio::time::sleep(Duration::from_secs_f64(0.3)).await;
+
+        let Poll::Ready(Some(event)) = futures::poll!(out_stream.next()) else {
+            panic!("Unexpectedly received None or Pending in output stream");
+        };
+        assert!(event.try_into_log().is_some());
     }
 }
