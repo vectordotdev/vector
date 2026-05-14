@@ -416,6 +416,13 @@ pub async fn run_iggy_source(
     let mut commit_timer = interval(Duration::from_secs(config.commit_interval_secs.max(1)));
     commit_timer.set_missed_tick_behavior(MissedTickBehavior::Delay);
 
+    // Set when the downstream `SourceSender` closes mid-stream so the
+    // post-loop cleanup (drain, final commit, leave-group, disconnect)
+    // still runs before the source returns an error. Returning directly
+    // from the select arm would leave the TCP session open until the
+    // broker times it out and delay any consumer-group rebalance.
+    let mut downstream_closed = false;
+
     loop {
         tokio::select! {
             biased;
@@ -466,7 +473,10 @@ pub async fn run_iggy_source(
                         )
                         .await
                         {
-                            Err(()) => return Err(()),
+                            Err(()) => {
+                                downstream_closed = true;
+                                break;
+                            }
                             Ok(ProcessOutcome::DecodeFailed { partition_id, offset }) => {
                                 match consumer.store_offset(offset, Some(partition_id)).await {
                                     Ok(()) => {
@@ -571,7 +581,7 @@ pub async fn run_iggy_source(
     }
 
     info!("Iggy source shut down.");
-    Ok(())
+    if downstream_closed { Err(()) } else { Ok(()) }
 }
 
 #[cfg(test)]
