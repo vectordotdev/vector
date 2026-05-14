@@ -126,20 +126,12 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 					description: "Controls the approach taken for tracking tag cardinality."
 					required:    true
 					type: string: enum: {
-						exact: """
-																			Tracks cardinality exactly.
-
-																			This mode has higher memory requirements than `probabilistic`, but never falsely outputs
-																			metrics with new tags after the limit has been hit.
+						exact: "Tracks cardinality exactly. See `Mode::Exact` for details."
+						excluded: """
+																			Skip cardinality tracking for this metric. All tag values pass through and nothing is
+																			limited. Other fields in this per-metric configuration are ignored when this is selected.
 																			"""
-						probabilistic: """
-																			Tracks cardinality probabilistically.
-
-																			This mode has lower memory requirements than `exact`, but may occasionally allow metric
-																			events to pass through the transform even when they contain new tags that exceed the
-																			configured limit. The rate at which this happens can be controlled by changing the value of
-																			`cache_size_per_key`.
-																			"""
+						probabilistic: "Tracks cardinality probabilistically. See `Mode::Probabilistic` for details."
 					}
 				}
 				namespace: {
@@ -147,8 +139,46 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 					required:    false
 					type: string: {}
 				}
+				per_tag_limits: {
+					description: """
+						Per-tag-key overrides scoped to this metric. Each entry sets a `mode`:
+						- `mode: limit_override` + `value_limit: N` — track with a per-tag cap.
+						- `mode: excluded` — opt this tag out of tracking entirely.
+
+						All other settings (tracking algorithm, `limit_exceeded_action`, etc.)
+						are inherited from the enclosing per-metric configuration.
+						Tags not listed here use the per-metric configuration.
+						"""
+					required: false
+					type: object: options: "*": {
+						description: "An individual tag configuration."
+						required:    true
+						type: object: options: {
+							mode: {
+								description: "Controls how this tag key is handled."
+								required:    true
+								type: string: enum: {
+									excluded: """
+																											Opt this tag out of cardinality tracking entirely. All values pass through
+																											without being recorded or checked against any `value_limit`.
+																											"""
+									limit_override: """
+																											Track this tag with a per-tag value limit. The enclosing per-metric tracking
+																											algorithm and all other settings still apply.
+																											"""
+								}
+							}
+							value_limit: {
+								description:   "Maximum number of distinct values to accept for this tag key."
+								relevant_when: "mode = \"limit_override\""
+								required:      true
+								type: uint: {}
+							}
+						}
+					}
+				}
 				value_limit: {
-					description: "How many distinct values to accept for any given key."
+					description: "How many distinct values to accept for any given key. Ignored when `mode: excluded`."
 					required:    false
 					type: uint: default: 500
 				}
