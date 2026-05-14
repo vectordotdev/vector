@@ -215,6 +215,7 @@ jobs:
         env:
           TARGET: "${{ matrix.architecture }}-apple-darwin"
           NATIVE_BUILD: true
+          FEATURES: "target-aarch64-apple-darwin"
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
           make package
