@@ -4,6 +4,7 @@ use hyper_openssl::HttpsConnector;
 use hyper_proxy::ProxyConnector;
 use tonic::body::BoxBody;
 use tower::ServiceBuilder;
+use tower::timeout::error::Elapsed;
 use vector_lib::configurable::configurable_component;
 
 use super::{
@@ -330,18 +331,24 @@ impl HealthLogic for VectorHealthLogic {
     fn is_healthy(&self, response: &Result<Self::Response, Self::Error>) -> Option<bool> {
         match response {
             Ok(_) => Some(true),
-            Err(error) => error
-                .downcast_ref::<VectorSinkError>()
-                .and_then(|err| match err {
-                    VectorSinkError::Request { source } => {
-                        if is_permanent_grpc_status(source.code()) {
-                            None
-                        } else {
-                            Some(false)
+            Err(error) => {
+                if error.downcast_ref::<Elapsed>().is_some() {
+                    return Some(false);
+                }
+
+                error
+                    .downcast_ref::<VectorSinkError>()
+                    .and_then(|err| match err {
+                        VectorSinkError::Request { source } => {
+                            if is_permanent_grpc_status(source.code()) {
+                                None
+                            } else {
+                                Some(false)
+                            }
                         }
-                    }
-                    _ => None,
-                }),
+                        _ => None,
+                    })
+            }
         }
     }
 }
@@ -378,6 +385,10 @@ mod tests {
             logic.is_healthy(&Err(Box::new(VectorSinkError::Request {
                 source: Status::new(Code::Unavailable, "temporarily unavailable"),
             }))),
+            Some(false)
+        );
+        assert_eq!(
+            logic.is_healthy(&Err(Box::new(Elapsed::new()))),
             Some(false)
         );
     }
