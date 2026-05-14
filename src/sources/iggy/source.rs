@@ -4,7 +4,7 @@ use std::{
 };
 
 use chrono::Utc;
-use futures::{StreamExt, stream::BoxStream};
+use futures::{StreamExt, future::join_all, stream::BoxStream};
 use iggy::prelude::{
     Client, ConsumerGroupClient, Identifier, IggyClient, IggyConsumer, ReceivedMessage,
 };
@@ -110,26 +110,46 @@ fn record_ack(state: &mut PartitionState, partition_id: u32, status: BatchStatus
     }
 }
 
-/// Store each partition's pending offset on the Iggy server. On success the
-/// committed offset is updated so the eager-commit threshold is measured
-/// against what the server actually knows. On transient error the pending
-/// offset is not re-queued; a later ack will set a fresh (higher) pending
-/// value, and the next commit tick will pick it up. Not re-queuing also
-/// prevents an infinite retry loop when the consumer no longer owns the
-/// partition (e.g. after a consumer-group rebalance revokes it).
+/// Store each partition's pending offset on the Iggy server. The per-
+/// partition `store_offset` calls run concurrently so a slow broker
+/// response on partition A does not block the `tokio::select!` for the
+/// duration of every other partition's commit (which would back up new
+/// polls in the SDK queue and delay shutdown observation).
+///
+/// On success the committed offset is updated so the eager-commit
+/// threshold is measured against what the server actually knows. On
+/// transient error the pending offset is not re-queued; a later ack
+/// will set a fresh (higher) pending value, and the next commit tick
+/// will pick it up. Not re-queuing also prevents an infinite retry
+/// loop when the consumer no longer owns the partition (e.g. after a
+/// consumer-group rebalance revokes it).
 async fn commit_offsets(
-    consumer: &mut IggyConsumer,
+    consumer: &IggyConsumer,
     stream: &str,
     topic: &str,
     partitions: &mut HashMap<u32, PartitionState>,
 ) {
-    for (&partition_id, state) in partitions.iter_mut() {
-        let Some(offset) = state.pending.take() else {
-            continue;
-        };
-        match consumer.store_offset(offset, Some(partition_id)).await {
+    let pending: Vec<(u32, u64)> = partitions
+        .iter_mut()
+        .filter_map(|(&partition_id, state)| state.pending.take().map(|o| (partition_id, o)))
+        .collect();
+
+    if pending.is_empty() {
+        return;
+    }
+
+    let results = join_all(pending.into_iter().map(|(partition_id, offset)| async move {
+        let result = consumer.store_offset(offset, Some(partition_id)).await;
+        (partition_id, offset, result)
+    }))
+    .await;
+
+    for (partition_id, offset, result) in results {
+        match result {
             Ok(()) => {
-                state.committed = offset;
+                if let Some(state) = partitions.get_mut(&partition_id) {
+                    state.committed = offset;
+                }
                 emit!(IggyOffsetCommitted {
                     stream,
                     topic,
@@ -451,12 +471,12 @@ pub async fn run_iggy_source(
                     None => false,
                 };
                 if should_commit {
-                    commit_offsets(&mut consumer, stream, topic, &mut partitions).await;
+                    commit_offsets(&consumer, stream, topic, &mut partitions).await;
                 }
             }
 
             _ = commit_timer.tick() => {
-                commit_offsets(&mut consumer, stream, topic, &mut partitions).await;
+                commit_offsets(&consumer, stream, topic, &mut partitions).await;
             }
 
             _ = &mut shutdown => {
@@ -560,7 +580,7 @@ pub async fn run_iggy_source(
                 }
             }
         }
-        commit_offsets(&mut consumer, stream, topic, &mut partitions).await;
+        commit_offsets(&consumer, stream, topic, &mut partitions).await;
     }
 
     // Without acknowledgements, the SDK's `shutdown()` cleanly flushes its
