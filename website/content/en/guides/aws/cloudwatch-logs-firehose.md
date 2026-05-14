@@ -79,33 +79,36 @@ export FIREHOSE_S3_BUCKET="firehose-${AWS_ACCOUNT_ID}" # a bucket to write event
 
 Let's take a look at the configuration we will be using:
 
-```toml title="vector.toml"
-[sources.firehose]
-  type = "aws_kinesis_firehose"
-  address = "0.0.0.0:8080" # the public URL will be set when configuring Firehose
-  access_key = "${FIREHOSE_ACCESS_KEY} # this will also be set when configuring Firehose
+```yaml title="vector.yaml"
+sources:
+  firehose:
+    type: "aws_kinesis_firehose"
+    address: "0.0.0.0:8080" # the public URL will be set when configuring Firehose
+    access_key: "${FIREHOSE_ACCESS_KEY}" # this will also be set when configuring Firehose
 
-[transforms.parse]
-  type = "remap"
-  inputs = ["firehose"]
-  drop_on_error = false
-  source = '''
-    parsed = parse_aws_cloudwatch_log_subscription_message!(.message)
-    . = unnest(parsed.log_events)
-    . = map_values(.) -> |value| {
-       event = del(value.log_events)
-       value |= event
-       message = del(.message)
-       . |= object!(parse_json!(message))
-    }
-  '''
+transforms:
+  parse:
+    type: "remap"
+    inputs: ["firehose"]
+    drop_on_error: false
+    source: |
+      parsed = parse_aws_cloudwatch_log_subscription_message!(.message)
+      . = unnest(parsed.log_events)
+      . = map_values(.) -> |value| {
+         event = del(value.log_events)
+         value |= event
+         message = del(.message)
+         . |= object!(parse_json!(message))
+      }
 
 # you may want to add more transforms here
 
-[sinks.console]
-  type = "console"
-  inputs = ["parse"]
-  encoding.codec = "json"
+sinks:
+  console:
+    type: "console"
+    inputs: ["parse"]
+    encoding:
+      codec: "json"
 ```
 
 This will configure `vector` to listen for Firehose messages on the configured
@@ -352,16 +355,19 @@ delivery stream.
 To make sure everything is wired up correctly, let's send some logs to the log
 group we've setup. We can use Vector for this too!
 
-```bash
-[sources.stdin]
-  type = "stdin"
-[sinks.cloudwatch]
-  type = "aws_cloudwatch_logs"
-  inputs = ["stdin"]
-  group_name = "${LOG_GROUP}"
-  stream_name = "test"
-  region = "us-east-1"
-  encoding.codec = "json"
+```yaml
+sources:
+  stdin:
+    type: "stdin"
+sinks:
+  cloudwatch:
+    type: "aws_cloudwatch_logs"
+    inputs: ["stdin"]
+    group_name: "${LOG_GROUP}"
+    stream_name: "test"
+    region: "us-east-1"
+    encoding:
+      codec: "json"
 ```
 
 This will read lines from `stdin` and write them to CloudWatch Logs. See the
@@ -377,7 +383,7 @@ Let's send some logs. For this, I'm using
 log data.
 
 ```bash
-flog -f json | vector --config config.toml
+flog -f json | vector --config config.yaml
 ```
 
 This will send some logs to your log group. Within 300 seconds (the default
@@ -450,11 +456,12 @@ send it as an HTTP request:
 
 The [`aws_kinesis_firehose`][aws_kinesis_firehose] source:
 
-```toml
-[sources.firehose]
-  type = "aws_kinesis_firehose"
-  address = "0.0.0.0:8080" # the public URL will be set in the Firehose config
-  access_key = "my secret key" # this will also be set in the Firehose config
+```yaml
+sources:
+  firehose:
+    type: "aws_kinesis_firehose"
+    address: "0.0.0.0:8080" # the public URL will be set in the Firehose config
+    access_key: "my secret key" # this will also be set in the Firehose config
 ```
 
 will accept this request, decode the record (which is gzip'ed and then base64 encoded), to produce an event that looks like:
@@ -479,21 +486,21 @@ can use a [`remap`][remap] transform and leverage the [`parse_aws_cloudwatch_log
 [`unnest`][unnest], [`map_values`][map_values], and [`parse_json`][parse_json]
 functions:
 
-```toml
-[transforms.parse]
-  type = "remap"
-  inputs = ["firehose"]
-  drop_on_error = false
-  source = '''
-    parsed = parse_aws_cloudwatch_log_subscription_message!(.message)
-    . = unnest(parsed.log_events)
-    . = map_values(.) -> |value| {
-       event = del(value.log_events)
-       value |= event
-       message = del(.message)
-       . |= object!(parse_json!(message))
-    }
-  '''
+```yaml
+transforms:
+  parse:
+    type: "remap"
+    inputs: ["firehose"]
+    drop_on_error: false
+    source: |
+      parsed = parse_aws_cloudwatch_log_subscription_message!(.message)
+      . = unnest(parsed.log_events)
+      . = map_values(.) -> |value| {
+         event = del(value.log_events)
+         value |= event
+         message = del(.message)
+         . |= object!(parse_json!(message))
+      }
 ```
 
 Let's step through this program one function at a time.

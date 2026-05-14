@@ -8,9 +8,6 @@ import "event.proto";
 service ObservabilityService {
   // ========== Simple Queries ==========
 
-  // Check if the API server is healthy and responding
-  rpc Health(HealthRequest) returns (HealthResponse);
-
   // Get metadata about the Vector instance (version, hostname)
   rpc GetMeta(GetMetaRequest) returns (GetMetaResponse);
 
@@ -42,13 +39,7 @@ service ObservabilityService {
   rpc StreamOutputEvents(StreamOutputEventsRequest) returns (stream StreamOutputEventsResponse);
 }
 
-// ========== Health & Meta Messages ==========
-
-message HealthRequest {}
-
-message HealthResponse {
-  bool healthy = 1;
-}
+// ========== Meta Messages ==========
 
 message GetMetaRequest {}
 

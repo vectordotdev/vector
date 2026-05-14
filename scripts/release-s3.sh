@@ -36,11 +36,27 @@ ls "$td_nightly"
 #
 # A helper function for verifying a published artifact.
 #
+# Retries a content mismatch as well as a 404, since packages.timber.io is
+# fronted by a CDN and an object we just overwrote via `aws s3 rm` + `cp` can
+# serve stale bytes at the edge for a while.
 verify_artifact() {
   local URL="$1"
   local FILENAME="$2"
+  local attempts=7
+  local delay=1
   echo "Verifying $URL"
-  cmp <(wget -qO- --retry-on-http-error=404 --wait 10 --tries "$VERIFY_RETRIES" "$URL") "$FILENAME"
+  for ((attempt = 1; attempt <= attempts; attempt++)); do
+    if cmp <(wget -qO- --retry-on-http-error=404 --wait 10 --tries "$VERIFY_RETRIES" "$URL") "$FILENAME"; then
+      return 0
+    fi
+    if (( attempt < attempts )); then
+      echo "Attempt $attempt/$attempts did not match (likely stale CDN cache); retrying in ${delay}s"
+      sleep "$delay"
+      delay=$((delay * 2))
+    fi
+  done
+  echo "Verification of $URL failed after $attempts attempts"
+  return 1
 }
 
 #
@@ -58,15 +74,6 @@ if [[ "$CHANNEL" == "nightly" ]]; then
   aws s3 rm --recursive "s3://packages.timber.io/vector/nightly/latest"
   aws s3 cp "$td_nightly" "s3://packages.timber.io/vector/nightly/latest" --recursive --sse --acl public-read
   echo "Uploaded archives"
-
-  echo "Redirecting old artifact names"
-  for file in $(aws s3api list-objects-v2 --bucket packages.timber.io --prefix "vector/$i/" --query 'Contents[*].Key' --output text  | tr "\t" "\n" | grep '\-nightly'); do
-    file=$(basename "$file")
-    # vector-nightly-amd64.deb -> vector-amd64.deb
-    echo -n "" | aws s3 cp - "s3://packages.timber.io/vector/nightly/$DATE/${file/-nightly/}" --website-redirect "/vector/nightly/$DATE/$file" --acl public-read
-    echo -n "" | aws s3 cp - "s3://packages.timber.io/vector/nightly/latest/${file/-nightly/}" --website-redirect "/vector/nightly/latest/$file" --acl public-read
-  done
-  echo "Redirected old artifact names"
 
   # Verify that the files exist and can be downloaded
   echo "Waiting for $VERIFY_TIMEOUT seconds before running the verifications"
