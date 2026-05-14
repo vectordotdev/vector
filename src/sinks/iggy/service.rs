@@ -7,7 +7,7 @@ use iggy::prelude::{IggyMessage, IggyProducer};
 use snafu::ResultExt;
 
 use super::{IggyError, ProducerSnafu, request_builder::IggyRequest};
-use crate::{internal_events::IggySendError, sinks::prelude::*};
+use crate::sinks::prelude::*;
 
 #[derive(Clone)]
 pub(super) struct IggyService {
@@ -45,30 +45,18 @@ impl Service<IggyRequest> for IggyService {
         let producer = Arc::clone(&self.producer);
 
         Box::pin(async move {
-            let event_count = req.metadata.event_count();
+            // Errors propagate to the Driver, which emits `CallError` (and
+            // `ComponentEventsDropped::<UNINTENTIONAL>`) on the terminal
+            // failure after Tower retries are exhausted. Emitting here would
+            // double-count every transient failure that succeeds on retry.
             let messages = req
                 .payloads
                 .into_iter()
                 .map(|payload| IggyMessage::builder().payload(payload).build())
                 .collect::<Result<Vec<_>, _>>()
-                .inspect_err(|source| {
-                    emit!(IggySendError {
-                        count: event_count,
-                        error: source,
-                    });
-                })
                 .context(ProducerSnafu)?;
 
-            producer
-                .send(messages)
-                .await
-                .inspect_err(|source| {
-                    emit!(IggySendError {
-                        count: event_count,
-                        error: source,
-                    });
-                })
-                .context(ProducerSnafu)?;
+            producer.send(messages).await.context(ProducerSnafu)?;
 
             Ok(IggyResponse {
                 metadata: req.metadata,
