@@ -17,6 +17,15 @@ else
     export DNSTAP_BENCHES := dnstap-benches
 endif
 
+# When COVERAGE=true, swap cargo-nextest for cargo-llvm-cov so test targets collect
+# coverage data. Run `make coverage-report` afterwards to emit the lcov file.
+export COVERAGE ?= false
+ifeq ($(COVERAGE), true)
+TEST_RUNNER := cargo llvm-cov nextest --no-report
+else
+TEST_RUNNER := cargo nextest run
+endif
+
 # Override this with any scopes for testing/benching.
 export SCOPE ?=
 # Override this with any extra flags for cargo bench
@@ -265,7 +274,6 @@ CARGO_HANDLES_FRESHNESS:
 	${EMPTY}
 
 # Pinned digests for ghcr.io/cross-rs/<target>:edge.
-# Source: cross-rs/cross @ f86fd03bb70b4c6802847c18087e21391498b0b4, built 2026-04-10 (Ubuntu 20.04 focal).
 # Refresh with: crane digest ghcr.io/cross-rs/<target>:edge
 CROSS_DIGEST_x86_64-unknown-linux-gnu       := sha256:13f7a68e55cb05a19e840bce65834fc785dc069e0c2218d12b8fdb8f8a1519d5
 CROSS_DIGEST_aarch64-unknown-linux-gnu      := sha256:3bf094d22fc4f73c9bdce45ddd7a8bbae349efdbd51b4d4b5ee1bedd8454466b
@@ -281,13 +289,17 @@ CROSS_DIGEST_arm-unknown-linux-musleabi     := sha256:0ca8f4afcc29fb5964aa63e482
 .PHONY: cross-image-%
 cross-image-%: export TRIPLE =$($(strip @):cross-image-%=%)
 cross-image-%:
-	$(if $(CROSS_DIGEST_$*),,$(error No CROSS_DIGEST pinned for $*. Add it to the digest table in Makefile.))
-	$(CONTAINER_TOOL) build \
-		--build-arg TARGET=${TRIPLE} \
-		--build-arg CROSS_DIGEST=$(CROSS_DIGEST_$*) \
-		--file scripts/cross/Dockerfile \
-		--tag vector-cross-env:${TRIPLE} \
-		.
+	@if [ -n "$(CROSS_DIGEST_$*)" ]; then \
+		$(CONTAINER_TOOL) build \
+			--build-arg TARGET=$* \
+			--build-arg CROSS_DIGEST=$(CROSS_DIGEST_$*) \
+			--file scripts/cross/Dockerfile \
+			--tag vector-cross-env:$* \
+			. ; \
+	else \
+		echo "No image digest pinned for $*. Add it to the digest table in Makefile." >&2 ; \
+		exit 1 ; \
+	fi
 
 # This is basically a shorthand for folks.
 # `cross-anything-triple` will call `cross anything --target triple` with the right features.
@@ -309,6 +321,14 @@ target/%/vector: export PAIR =$(subst /, ,$(@:target/%/vector=%))
 target/%/vector: export TRIPLE ?=$(word 1,${PAIR})
 target/%/vector: export PROFILE ?=$(word 2,${PAIR})
 target/%/vector: export CFLAGS += -g0 -O3
+ifeq ($(NATIVE),true)
+target/%/vector: CARGO_HANDLES_FRESHNESS
+	cargo build \
+		$(if $(findstring release,$(PROFILE)),--release,) \
+		--target ${TRIPLE} \
+		--no-default-features \
+		--features target-${TRIPLE}
+else
 target/%/vector: cargo-install-cross CARGO_HANDLES_FRESHNESS
 	$(MAKE) -k cross-image-${TRIPLE}
 	cross build \
@@ -316,6 +336,7 @@ target/%/vector: cargo-install-cross CARGO_HANDLES_FRESHNESS
 		--target ${TRIPLE} \
 		--no-default-features \
 		--features target-${TRIPLE}
+endif
 
 target/%/vector.tar.gz: export PAIR =$(subst /, ,$(@:target/%/vector.tar.gz=%))
 target/%/vector.tar.gz: export TRIPLE ?=$(word 1,${PAIR})
@@ -360,7 +381,7 @@ target/%/vector.tar.gz: target/%/vector CARGO_HANDLES_FRESHNESS
 # https://github.com/rust-lang/cargo/issues/6454
 .PHONY: test
 test: ## Run the unit test suite
-	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --workspace --no-fail-fast --no-default-features --features "${FEATURES}" ${SCOPE}
+	${MAYBE_ENVIRONMENT_EXEC} ${TEST_RUNNER} --workspace --no-fail-fast --no-default-features --features "${FEATURES}" ${SCOPE}
 
 .PHONY: test-docs
 test-docs: ## Run the docs test suite
@@ -423,15 +444,19 @@ test-e2e-kubernetes: ## Runs Kubernetes E2E tests (Sorry, no `ENVIRONMENT=true` 
 
 .PHONY: test-cli
 test-cli: ## Runs cli tests
-	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --no-fail-fast --no-default-features --features cli-tests --test integration --test-threads 4
+	${MAYBE_ENVIRONMENT_EXEC} ${TEST_RUNNER} --no-fail-fast --no-default-features --features cli-tests --test integration --test-threads 4
 
 .PHONY: test-vector-api
 test-vector-api: ## Runs vector API tests (top and tap)
-	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --no-fail-fast --no-default-features --features vector-api-tests --test vector_api
+	${MAYBE_ENVIRONMENT_EXEC} ${TEST_RUNNER} --no-fail-fast --no-default-features --features vector-api-tests --test vector_api
 
 .PHONY: test-component-validation
 test-component-validation: ## Runs component validation tests
-	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --no-fail-fast --no-default-features --features component-validation-tests --status-level pass --test-threads 4 --lib components::validation::tests
+	${MAYBE_ENVIRONMENT_EXEC} ${TEST_RUNNER} --no-fail-fast --no-default-features --features component-validation-tests --status-level pass --test-threads 4 --lib components::validation::tests
+
+.PHONY: coverage-report
+coverage-report: ## Generate lcov report after running tests with COVERAGE=true (outputs lcov.info)
+	cargo llvm-cov report --lcov --output-path lcov.info
 
 ##@ Benching (Supports `ENVIRONMENT=true`)
 
@@ -582,13 +607,6 @@ package-%:
 
 ##@ Releasing
 
-.PHONY: release
-release: release-prepare generate release-commit ## Release a new Vector version
-
-.PHONY: release-commit
-release-commit: ## Commits release changes
-	@$(VDEV) release commit
-
 .PHONY: release-docker
 release-docker: ## Release to Docker Hub
 	@$(VDEV) release docker
@@ -604,10 +622,6 @@ release-homebrew: ## Release to vectordotdev Homebrew tap
 .PHONY: release-prepare
 release-prepare: ## Prepares the release with metadata and highlights
 	@$(VDEV) release prepare
-
-.PHONY: release-push
-release-push: ## Push new Vector version
-	@$(VDEV) release push
 
 .PHONY: release-s3
 release-s3: ## Release artifacts to S3

@@ -1,0 +1,53 @@
+# Removes the docs review label once a maintainer approves the PR.
+# Currently dedicated to the docs review flow. If a second use case appears, promote
+# this into a reusable workflow (`workflow_call`) with the label as an input.
+name: Remove Docs Review Label
+
+permissions:
+  issues: write
+  pull-requests: write
+
+on:
+  pull_request_review:
+    types: [submitted]
+
+env:
+  LABEL_NAME: "docs review on hold"
+
+jobs:
+  remove_label:
+    if: github.event.review.state == 'approved'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check association, label, and remove
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const association = context.payload.review.author_association;
+            core.info(`Author association: ${association}`);
+
+            const allowed = ['MEMBER', 'OWNER'];
+            if (!allowed.includes(association)) {
+              core.info(`Association "${association}" not in allowed list, skipping`);
+              return;
+            }
+
+            const labelName = process.env.LABEL_NAME;
+            const { data: labels } = await github.rest.issues.listLabelsOnIssue({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+            });
+            const hasLabel = labels.some(l => l.name === labelName);
+            if (!hasLabel) {
+              core.info(`Label "${labelName}" not found, skipping`);
+              return;
+            }
+            await github.rest.issues.removeLabel({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              name: labelName,
+            });
+            core.info(`Removed "${labelName}" label`);

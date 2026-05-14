@@ -15,7 +15,8 @@ use crate::{
         Healthcheck, VectorSink,
         http::config::{HttpMethod, HttpSinkConfig},
         util::{
-            BatchConfig, Compression, RealtimeSizeBasedDefaultBatchSettings, http::RequestConfig,
+            BatchConfig, Compression, RealtimeSizeBasedDefaultBatchSettings,
+            http::{RequestConfig, RetryStrategy},
         },
     },
     tls::TlsConfig,
@@ -124,6 +125,10 @@ pub struct AxiomConfig {
         skip_serializing_if = "crate::serde::is_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    pub retry_strategy: RetryStrategy,
 }
 
 impl GenerateConfig for AxiomConfig {
@@ -180,6 +185,7 @@ impl SinkConfig for AxiomConfig {
             ),
             payload_prefix: "".into(), // Always newline delimited JSON
             payload_suffix: "".into(), // Always newline delimited JSON
+            retry_strategy: self.retry_strategy.clone(),
         };
 
         http_sink_config.build(cx).await

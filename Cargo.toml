@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.55.0"
+version = "0.56.0"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2024"
 description = "A lightweight and ultra-fast tool for building observability pipelines"
@@ -39,11 +39,10 @@ name = "vector_api"
 path = "tests/vector_api/lib.rs"
 required-features = ["vector-api-tests"]
 
-# CI-based builds use full release optimization. See scripts/environment/release-flags.sh.
-# This results in roughly a 5% reduction in performance when compiling locally vs when
-# compiled via the CI pipeline.
 [profile.release]
 debug = false # Do not include debug symbols in the executable.
+codegen-units = 1
+lto = "fat"
 
 [profile.bench]
 debug = true
@@ -55,10 +54,10 @@ unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tokio_unstable)'] }
 name = "vector"
 section = "admin"
 maintainer-scripts = "distribution/debian/scripts/"
-conf-files = ["/etc/vector/vector.yaml", "/etc/default/vector"]
+conf-files = ["/etc/default/vector"]
 assets = [
   ["target/release/vector", "/usr/bin/", "755"],
-  ["config/vector.yaml", "/etc/vector/vector.yaml", "644"],
+  ["config/vector.yaml", "/usr/share/vector/examples/vector.yaml", "644"],
   ["config/examples/*", "/etc/vector/examples/", "644"],
   ["distribution/systemd/vector.service", "/lib/systemd/system/vector.service", "644"],
   ["distribution/systemd/vector.default", "/etc/default/vector", "600"],
@@ -150,6 +149,7 @@ clap = { version = "4.5.60", default-features = false, features = ["derive", "er
 clap_complete = "4.5.66"
 colored = { version = "3.1.1", default-features = false }
 const-str = { version = "1.1.0", default-features = false }
+convert_case = { version = "0.8", default-features = false }
 criterion = "0.8"
 crossbeam-utils = { version = "0.8.21", default-features = false }
 darling = { version = "0.20.11", default-features = false, features = ["suggestions"] }
@@ -160,7 +160,7 @@ flate2 = { version = "1.1.2", default-features = false, features = ["zlib-rs"] }
 futures = { version = "0.3.31", default-features = false, features = ["std"] }
 futures-util = { version = "0.3.29", default-features = false }
 glob = { version = "0.3.3", default-features = false }
-hickory-proto = { version = "0.25.2", default-features = false, features = ["dnssec-ring"] }
+hickory-proto = { version = "0.26.1", default-features = false, features = ["dnssec-ring"] }
 humantime = { version = "2.3.0", default-features = false }
 indexmap = { version = "2.11.0", default-features = false, features = ["serde", "std"] }
 indoc = { version = "2.0.7" }
@@ -187,9 +187,10 @@ rdkafka = { version = "0.39.0", default-features = false }
 regex = { version = "1.12.3", default-features = false, features = ["std", "perf"] }
 reqwest = { version = "0.11", features = ["json"] }
 rust_decimal = { version = "1.40.0", default-features = false, features = ["std"] }
-semver = { version = "1.0.27", default-features = false, features = ["serde", "std"] }
+semver = { version = "1.0.28", default-features = false, features = ["serde", "std"] }
 serde = { version = "1.0.219", default-features = false, features = ["alloc", "derive", "rc"] }
-serde_json = { version = "1.0.143", default-features = false, features = ["preserve_order", "raw_value", "std"] }
+serde_json = { version = "1.0.149", default-features = false, features = ["preserve_order", "raw_value", "std"] }
+serde_with = { version = "3.18.0", default-features = false, features = ["std", "macros", "chrono_0_4"] }
 serde_yaml = { version = "0.9.34", default-features = false }
 snafu = { version = "0.9.0", default-features = false, features = ["futures", "std"] }
 socket2 = { version = "0.5.10", default-features = false }
@@ -198,8 +199,11 @@ tokio = { version = "1.49.0", default-features = false }
 tokio-stream = { version = "0.1.18", default-features = false }
 tokio-test = "0.4.5"
 tokio-tungstenite = { version = "0.20.1", default-features = false }
+proc-macro2 = { version = "1", default-features = false }
+quote = { version = "1", default-features = false }
+syn = { version = "2", default-features = false }
 toml = { version = "0.9.8", default-features = false, features = ["serde", "display", "parse"] }
-tonic = { version = "0.11", default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
+tonic = { version = "0.11", default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip", "zstd"] }
 tonic-build = { version = "0.11", default-features = false, features = ["transport", "prost"] }
 tonic-health = { version = "0.11", default-features = false }
 tonic-reflection = { version = "0.11", default-features = false, features = ["server"] }
@@ -331,6 +335,9 @@ prost = { workspace = true, optional = true }
 prost-reflect = { workspace = true, optional = true }
 prost-types = { workspace = true, optional = true }
 
+# Databricks Zerobus
+databricks-zerobus-ingest-sdk = { git = "https://github.com/databricks/zerobus-sdk-rs", rev = "273efe09130a7554e6b34d20b95df50289e58524", optional = true }
+
 # GCP
 goauth = { version = "0.16.0", optional = true }
 smpl_jwt = { version = "0.8.0", default-features = false, optional = true }
@@ -345,7 +352,7 @@ deadpool = { version = "0.13.0", default-features = false, features = ["managed"
 hex = { version = "0.4.3", default-features = false, optional = true }
 
 # GreptimeDB
-greptimedb-ingester = { git = "https://github.com/GreptimeTeam/greptimedb-ingester-rust", rev = "f7243393808640f5123b0d5b7b798da591a4df6e", optional = true }
+greptimedb-ingester = { version = "0.17.0", default-features = false, optional = true }
 
 # External libs
 arc-swap = { workspace = true, default-features = false, optional = true }
@@ -478,6 +485,7 @@ openssl-src = { version = "300", default-features = false, features = ["force-en
 
 [dev-dependencies]
 approx = "0.5.1"
+strum.workspace = true
 assert_cmd = { version = "2.0.17", default-features = false }
 aws-smithy-runtime = { version = "1.8.3", default-features = false, features = ["tls-rustls"] }
 base64 = "0.22.1"
@@ -519,7 +527,7 @@ vendored = ["rdkafka?/gssapi-vendored"]
 
 # Default features for *-pc-windows-msvc
 # TODO: Enable SASL https://github.com/vectordotdev/vector/pull/3081#issuecomment-659298042
-base = ["api", "enrichment-tables", "sinks", "sources", "transforms", "secrets", "vrl/stdlib"]
+base = ["api", "enrichment-tables", "sinks", "sources", "transforms", "secrets", "vrl/stdlib", "codecs-parquet"]
 enable-api-client = ["base", "api-client"]
 enable-unix = ["enable-api-client", "sources-dnstap", "unix"]
 
@@ -826,6 +834,7 @@ sinks-logs = [
   "sinks-clickhouse",
   "sinks-console",
   "sinks-databend",
+  "sinks-databricks-zerobus",
   "sinks-datadog_events",
   "sinks-datadog_logs",
   "sinks-datadog_traces",
@@ -894,6 +903,7 @@ sinks-chronicle = []
 sinks-clickhouse = ["dep:nom", "dep:rust_decimal", "codecs-arrow"]
 sinks-console = []
 sinks-databend = ["dep:databend-client"]
+sinks-databricks-zerobus = ["dep:databricks-zerobus-ingest-sdk", "dep:prost-reflect", "dep:base64"]
 sinks-datadog_events = []
 sinks-datadog_logs = []
 sinks-datadog_metrics = ["protobuf-build", "dep:prost", "dep:prost-reflect"]
