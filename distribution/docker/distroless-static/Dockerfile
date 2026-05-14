@@ -17,7 +17,7 @@ LABEL org.opencontainers.image.source="https://github.com/vectordotdev/vector"
 LABEL org.opencontainers.image.documentation="https://vector.dev/docs"
 
 COPY --from=builder /vector/bin/* /usr/local/bin/
-COPY --from=builder /vector/config/vector.yaml /etc/vector/vector.yaml
+COPY --from=builder /vector/config/vector.yaml /usr/share/vector/examples/vector.yaml
 COPY --from=builder /var/lib/vector /var/lib/vector
 
 # Smoke test

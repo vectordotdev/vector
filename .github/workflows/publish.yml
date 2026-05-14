@@ -4,6 +4,20 @@ permissions:
   contents: read
 
 on:
+  workflow_dispatch:
+    inputs:
+      git_ref:
+        description: "Git ref to build (branch, tag, or SHA)"
+        type: string
+        required: false
+      channel:
+        description: "Release channel (release/nightly/custom)"
+        type: string
+        default: custom
+      skip_publish:
+        description: "Build and verify only. Skip publishing to Docker, S3, and GitHub"
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       git_ref:
@@ -14,6 +28,10 @@ on:
       channel:
         type: string
         required: true
+      skip_publish:
+        description: "Build and verify only. Skip publishing to Docker, S3, and GitHub"
+        type: boolean
+        default: false
 
 env:
   VERBOSE: true
@@ -21,8 +39,6 @@ env:
   DISABLE_MOLD: true
   DEBIAN_FRONTEND: noninteractive
   CONTAINER_TOOL: docker
-  CARGO_PROFILE_RELEASE_LTO: fat
-  CARGO_PROFILE_RELEASE_CODEGEN_UNITS: 1
   CHANNEL: ${{ inputs.channel }}
 
 jobs:
@@ -47,7 +63,78 @@ jobs:
         id: generate-publish-metadata
         run: make ci-generate-publish-metadata
 
-  build-linux-packages:
+  build-linux-gnu-native:
+    name: Build Vector for ${{ matrix.target }} (native)
+    runs-on: ${{ matrix.runner }}
+    container:
+      image: almalinux:8@sha256:ca871b110064fe81bff0250ed5cc56fbb0a9840715f09811c33bbf9d72cef56c
+      # Align HOME with the container's root user so rustup/sudo don't warn
+      # about $HOME (/github/home) differing from the euid-obtained home (/root).
+      env:
+        HOME: /root
+    timeout-minutes: 90
+    needs: generate-publish-metadata
+    env:
+      VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
+      VECTOR_BUILD_DESC: ${{ needs.generate-publish-metadata.outputs.vector_build_desc }}
+      CHANNEL: ${{ needs.generate-publish-metadata.outputs.vector_release_channel }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            runner: ubuntu-24.04-8core
+          - target: aarch64-unknown-linux-gnu
+            runner: ubuntu-24.04-8core-arm
+    steps:
+      - name: Install system dependencies
+        run: |
+          dnf install -y --setopt=install_weak_deps=False \
+            gcc gcc-c++ make cmake perl perl-IPC-Cmd \
+            openssl-devel cyrus-sasl-devel \
+            pkgconfig clang \
+            rpm-build sudo \
+            git tar gzip xz which findutils \
+            curl unzip
+      # TODO: generate the .deb description once in generate-publish-metadata and consume as an artifact, so all builders share the same output and this source build can go away.
+      - name: Build cmark-gfm from source
+        env:
+          CMARK_GFM_TAG: "0.29.0.gfm.13"
+          CMARK_GFM_SHA: "587a12bb54d95ac37241377e6ddc93ea0e45439b"
+        run: |
+          git clone --depth 1 --branch "$CMARK_GFM_TAG" https://github.com/github/cmark-gfm.git /tmp/cmark-gfm
+          actual_sha="$(git -C /tmp/cmark-gfm rev-parse HEAD)"
+          if [ "$actual_sha" != "$CMARK_GFM_SHA" ]; then
+            echo "::error::cmark-gfm tag $CMARK_GFM_TAG resolved to $actual_sha, expected $CMARK_GFM_SHA"
+            exit 1
+          fi
+          cmake -S /tmp/cmark-gfm -B /tmp/cmark-gfm/build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX=/usr \
+            -DCMAKE_INSTALL_LIBDIR=lib64
+          cmake --build /tmp/cmark-gfm/build -j "$(nproc)"
+          cmake --install /tmp/cmark-gfm/build
+          ldconfig
+          rm -rf /tmp/cmark-gfm
+          cmark-gfm --version
+      - name: Checkout Vector
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.git_ref }}
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
+          cargo-deb: true
+          protoc: true
+      - name: Build Vector
+        run: make NATIVE=true package-${{ matrix.target }}-all
+      - name: Stage package artifacts for publish
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: vector-${{ env.VECTOR_VERSION }}-${{ matrix.target }}
+          path: target/artifacts/vector*
+
+  build-linux-cross:
     name: Build Vector for ${{ matrix.target }}
     runs-on: release-builder-linux
     timeout-minutes: 60
@@ -60,9 +147,7 @@ jobs:
       matrix:
         include:
           - target: x86_64-unknown-linux-musl # .tar.gz
-          - target: x86_64-unknown-linux-gnu # .tar.gz, .deb, .rpm
           - target: aarch64-unknown-linux-musl # .tar.gz
-          - target: aarch64-unknown-linux-gnu # .tar.gz, .deb, .rpm
           - target: armv7-unknown-linux-gnueabihf # .tar.gz, .deb, .rpm
           - target: armv7-unknown-linux-musleabihf # .tar.gz
           - target: arm-unknown-linux-gnueabi # .tar.gz, .deb
@@ -72,12 +157,18 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ inputs.git_ref }}
-      - name: Bootstrap runner environment (Ubuntu-specific)
-        run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
-      - name: Bootstrap runner environment (generic)
-        run: bash scripts/environment/prepare.sh --modules=rustup,cross,cargo-deb
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
+          cross: true
+          cargo-deb: true
+          protoc: true
+          libsasl2: true
       - name: Install cross-compilation tools
-        run: sudo apt-get install -y binutils-arm-linux-gnueabihf binutils-aarch64-linux-gnu
+        run: sudo apt-get install -y binutils-arm-linux-gnueabihf binutils-aarch64-linux-gnu cmark-gfm
+      - name: Install rpm
+        if: endsWith(matrix.target, '-linux-gnu') || matrix.target == 'armv7-unknown-linux-gnueabihf'
+        run: sudo apt-get install -y rpm
       - name: Build Vector
         run: make package-${{ matrix.target }}-all
       - name: Stage package artifacts for publish
@@ -119,7 +210,6 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           rust: true
-          rustup: true
           protoc: true
       - name: Build Vector
         env:
@@ -143,7 +233,6 @@ jobs:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
       VECTOR_BUILD_DESC: ${{ needs.generate-publish-metadata.outputs.vector_build_desc }}
       CHANNEL: ${{ needs.generate-publish-metadata.outputs.vector_release_channel }}
-      RUSTFLAGS: "-D warnings -Ctarget-feature=+crt-static"
       RELEASE_BUILDER: "true"
     steps:
       - name: Checkout Vector
@@ -187,7 +276,8 @@ jobs:
     timeout-minutes: 5
     needs:
       - generate-publish-metadata
-      - build-linux-packages
+      - build-linux-gnu-native
+      - build-linux-cross
     env:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
       DD_PKG_VERSION: "latest"
@@ -204,8 +294,8 @@ jobs:
       image: ${{ matrix.container }}
     steps:
       - run: |
-          apt-get update && \
-          apt-get install -y \
+          apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 update && \
+          apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 install -y \
           ca-certificates \
           curl \
           git \
@@ -235,13 +325,16 @@ jobs:
     timeout-minutes: 10
     needs:
       - generate-publish-metadata
-      - build-linux-packages
+      - build-linux-gnu-native
+      - build-linux-cross
     env:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
       DD_PKG_VERSION: "latest"
     strategy:
       matrix:
         container:
+          # Lowest supported glibc tier (EL8 family, glibc 2.28). Catches glibc-floor regressions.
+          - "almalinux:8@sha256:ca871b110064fe81bff0250ed5cc56fbb0a9840715f09811c33bbf9d72cef56c"
           - "quay.io/centos/centos:stream9"
           - "amazonlinux:2023"
           - "fedora:39"
@@ -312,6 +405,7 @@ jobs:
 
   publish-docker:
     name: Publish to Docker
+    if: ${{ !inputs.skip_publish }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     # Elevated permission required to push Docker images to GitHub Container Registry
@@ -319,7 +413,8 @@ jobs:
       packages: write
     needs:
       - generate-publish-metadata
-      - build-linux-packages
+      - build-linux-gnu-native
+      - build-linux-cross
       - deb-verify
     env:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
@@ -331,12 +426,12 @@ jobs:
         with:
           ref: ${{ inputs.git_ref }}
       - name: Login to DockerHub
-        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
         with:
           username: ${{ secrets.CI_DOCKER_USERNAME }}
           password: ${{ secrets.CI_DOCKER_PASSWORD }}
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -372,11 +467,13 @@ jobs:
 
   publish-s3:
     name: Publish to S3
+    if: ${{ !inputs.skip_publish }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     needs:
       - generate-publish-metadata
-      - build-linux-packages
+      - build-linux-gnu-native
+      - build-linux-cross
       - build-apple-darwin-packages
       - build-x86_64-pc-windows-msvc-packages
       - deb-verify
@@ -409,7 +506,7 @@ jobs:
   publish-github:
     name: Publish release to GitHub
     # We only publish to GitHub for versioned releases, not nightlies.
-    if: inputs.channel == 'release'
+    if: ${{ !inputs.skip_publish && inputs.channel == 'release' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     # Elevated permission required to create GitHub releases and upload release assets
@@ -417,7 +514,8 @@ jobs:
       contents: write
     needs:
       - generate-publish-metadata
-      - build-linux-packages
+      - build-linux-gnu-native
+      - build-linux-cross
       - build-apple-darwin-packages
       - build-x86_64-pc-windows-msvc-packages
       - deb-verify
@@ -451,7 +549,8 @@ jobs:
     timeout-minutes: 5
     needs:
       - generate-publish-metadata
-      - build-linux-packages
+      - build-linux-gnu-native
+      - build-linux-cross
       - build-apple-darwin-packages
       - build-x86_64-pc-windows-msvc-packages
     env:
