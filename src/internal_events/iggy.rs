@@ -91,14 +91,14 @@ impl InternalEvent for IggyOffsetPolled<'_> {
             "topic" => self.topic.to_string(),
             "partition" => self.partition.to_string(),
         )
-        .set(lag as f64);
+        .set(i64::try_from(lag).unwrap_or(i64::MAX) as f64);
         gauge!(
             GaugeName::IggyConsumerPolledOffset,
             "stream" => self.stream.to_string(),
             "topic" => self.topic.to_string(),
             "partition" => self.partition.to_string(),
         )
-        .set(self.message_offset as f64);
+        .set(i64::try_from(self.message_offset).unwrap_or(i64::MAX) as f64);
     }
 }
 
@@ -118,7 +118,7 @@ impl InternalEvent for IggyOffsetCommitted<'_> {
             "topic" => self.topic.to_string(),
             "partition" => self.partition.to_string(),
         )
-        .set(self.offset as f64);
+        .set(i64::try_from(self.offset).unwrap_or(i64::MAX) as f64);
     }
 }
 
