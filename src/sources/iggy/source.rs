@@ -474,6 +474,11 @@ pub async fn run_iggy_source(
                     }
                     Some(Err(error)) => {
                         emit!(IggyReadError { error });
+                        // Back off briefly before the next poll. Without this
+                        // sleep, SDK error variants that do not internally
+                        // sleep (e.g. transient non-connectivity errors) cause
+                        // a tight spin that pegs CPU and floods the log.
+                        sleep(Duration::from_millis(500)).await;
                     }
                     None => {
                         warn!("Iggy consumer stream ended unexpectedly.");
