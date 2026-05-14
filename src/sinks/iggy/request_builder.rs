@@ -48,35 +48,32 @@ pub(super) fn request_builder(
     let mut uncompressed_byte_size = 0usize;
     let mut finalizers = EventFinalizers::default();
 
-    let payloads: Vec<Bytes> = events
-        .into_iter()
-        .filter_map(|mut event| {
-            transformer.transform(&mut event);
-            // Capture telemetry metadata before encoding consumes the event.
-            let json_size = event.estimated_json_encoded_size_of();
-            let size_of = event.size_of();
-            let tags = TagsCapture(event.get_tags());
-            let event_finalizers = event.take_finalizers();
+    let mut buf = BytesMut::with_capacity(1024);
+    let mut payloads = Vec::with_capacity(events.len());
+    for mut event in events {
+        transformer.transform(&mut event);
+        // Capture telemetry metadata before encoding consumes the event.
+        let json_size = event.estimated_json_encoded_size_of();
+        let size_of = event.size_of();
+        let tags = TagsCapture(event.get_tags());
+        let event_finalizers = event.take_finalizers();
 
-            let mut bytes = BytesMut::new();
-            match encoder.encode(event, &mut bytes) {
-                Ok(()) => {
-                    let encoded = bytes.freeze();
-                    // Only count events that were successfully encoded.
-                    byte_size.add_event(&tags, json_size);
-                    event_count += 1;
-                    events_byte_size += size_of;
-                    uncompressed_byte_size += encoded.len();
-                    finalizers.merge(event_finalizers);
-                    Some(encoded)
-                }
-                Err(_) => {
-                    event_finalizers.update_status(EventStatus::Errored);
-                    None
-                }
+        match encoder.encode(event, &mut buf) {
+            Ok(()) => {
+                let encoded = buf.split().freeze();
+                // Only count events that were successfully encoded.
+                byte_size.add_event(&tags, json_size);
+                event_count += 1;
+                events_byte_size += size_of;
+                uncompressed_byte_size += encoded.len();
+                finalizers.merge(event_finalizers);
+                payloads.push(encoded);
             }
-        })
-        .collect();
+            Err(_) => {
+                event_finalizers.update_status(EventStatus::Errored);
+            }
+        }
+    }
 
     // Every event in the batch failed encoding; their finalizers were
     // already marked Errored individually above. Drop the request rather
