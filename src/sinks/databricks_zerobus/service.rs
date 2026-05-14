@@ -403,12 +403,22 @@ impl ZerobusService {
             let (client_id, client_secret) = (client_id.to_string(), client_secret.to_string());
 
             let stream_options = &self.config.stream_options;
+            // descriptor_proto is prost-types 0.13 (via prost-reflect); the SDK
+            // expects prost-types 0.14. Bridge through the protobuf wire format.
+            let encoded = <prost_reflect::prost_types::DescriptorProto as prost_reflect::prost::Message>::encode_to_vec(&*schema.descriptor_proto);
+            let sdk_descriptor =
+                <prost_types_014::DescriptorProto as prost_014::Message>::decode(
+                    encoded.as_slice(),
+                )
+                .map_err(|e| ZerobusSinkError::ConfigError {
+                    message: format!("Failed to re-encode DescriptorProto for SDK: {}", e),
+                })?;
             let stream = self
                 .sdk
                 .stream_builder()
                 .table(self.config.table_name.clone())
                 .oauth(client_id, client_secret)
-                .compiled_proto((*schema.descriptor_proto).clone())
+                .compiled_proto(sdk_descriptor)
                 .server_lack_of_ack_timeout_ms(stream_options.server_lack_of_ack_timeout_ms)
                 .flush_timeout_ms(stream_options.flush_timeout_ms)
                 .build()
