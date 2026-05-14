@@ -138,9 +138,7 @@ delay_per_event = 0.2
         // Wait long enough for delay to end
         tokio::time::sleep(Duration::from_secs_f64(0.3)).await;
 
-        if let Poll::Ready(Some(_event)) = futures::poll!(out_stream.next()) {
-            // Expected return
-        } else {
+        if !matches!(futures::poll!(out_stream.next()), Poll::Ready(Some(_event))) {
             panic!("Unexpectedly received None or Pending in output stream");
         }
     }
