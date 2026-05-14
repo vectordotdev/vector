@@ -1,4 +1,8 @@
-use iggy::prelude::{AutoCommit, Client, IggyClient, IggyClientBuilder, IggyConsumer};
+use std::time::Duration;
+
+use iggy::prelude::{
+    AutoCommit, Client, IggyClient, IggyClientBuilder, IggyConsumer, IggyDuration,
+};
 use snafu::{ResultExt, Snafu};
 use vector_lib::{
     codecs::decoding::{DeserializerConfig, FramingConfig},
@@ -70,6 +74,11 @@ pub struct IggySourceConfig {
     #[derivative(Default(value = "default_batch_length()"))]
     pub batch_length: u32,
 
+    /// The minimum interval, in milliseconds, between consecutive polls.
+    #[serde(default = "default_poll_interval_ms")]
+    #[derivative(Default(value = "default_poll_interval_ms()"))]
+    pub poll_interval_ms: u64,
+
     /// The interval, in seconds, at which consumer offsets are committed to the
     /// Iggy server. Only used when end-to-end acknowledgements are enabled.
     #[serde(default = "default_commit_interval_secs")]
@@ -120,6 +129,10 @@ const fn default_batch_length() -> u32 {
     1000
 }
 
+const fn default_poll_interval_ms() -> u64 {
+    100
+}
+
 const fn default_commit_interval_secs() -> u64 {
     5
 }
@@ -151,6 +164,16 @@ impl GenerateConfig for IggySourceConfig {
 #[typetag::serde(name = "iggy")]
 impl SourceConfig for IggySourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
+        if self.batch_length == 0 {
+            return Err("`batch_length` must be at least 1".into());
+        }
+        if self.commit_interval_secs == 0 {
+            return Err("`commit_interval_secs` must be at least 1".into());
+        }
+        if self.drain_timeout_secs == 0 {
+            return Err("`drain_timeout_secs` must be at least 1".into());
+        }
+
         let log_namespace = cx.log_namespace(self.log_namespace);
         let decoder =
             DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
@@ -248,7 +271,10 @@ impl IggySourceConfig {
                 .consumer_group(&self.consumer_name, &self.stream, &self.topic)
                 .context(ConsumerSnafu)?,
         }
-        .batch_length(self.batch_length);
+        .batch_length(self.batch_length)
+        .poll_interval(IggyDuration::from(Duration::from_millis(
+            self.poll_interval_ms,
+        )));
 
         // With end-to-end acknowledgements enabled, disable the SDK's automatic
         // offset committing so that consumer offsets are only stored on the

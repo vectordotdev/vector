@@ -2,10 +2,7 @@
 
 use vector_lib::{
     NamedInternalEvent, counter, gauge,
-    internal_event::{
-        ComponentEventsDropped, CounterName, GaugeName, InternalEvent, UNINTENTIONAL, error_stage,
-        error_type,
-    },
+    internal_event::{CounterName, GaugeName, InternalEvent, error_stage, error_type},
     json_size::JsonSize,
 };
 
@@ -72,8 +69,12 @@ impl InternalEvent for IggyEventsReceived<'_> {
     }
 }
 
+/// Emitted when an Iggy message is polled from the broker, before decoding
+/// or delivery. The `iggy_consumer_polled_offset` gauge tracks the polled
+/// offset, not the delivered or committed one; see `IggyOffsetCommitted`
+/// for the committed offset gauge (`iggy_consumer_committed_offset`).
 #[derive(Debug, NamedInternalEvent)]
-pub struct IggyOffsetUpdated<'a> {
+pub struct IggyOffsetPolled<'a> {
     pub stream: &'a str,
     pub topic: &'a str,
     pub partition: u32,
@@ -81,7 +82,7 @@ pub struct IggyOffsetUpdated<'a> {
     pub current_offset: u64,
 }
 
-impl InternalEvent for IggyOffsetUpdated<'_> {
+impl InternalEvent for IggyOffsetPolled<'_> {
     fn emit(self) {
         let lag = self.current_offset.saturating_sub(self.message_offset);
         gauge!(
@@ -92,7 +93,7 @@ impl InternalEvent for IggyOffsetUpdated<'_> {
         )
         .set(lag as f64);
         gauge!(
-            GaugeName::IggyConsumerOffset,
+            GaugeName::IggyConsumerPolledOffset,
             "stream" => self.stream.to_string(),
             "topic" => self.topic.to_string(),
             "partition" => self.partition.to_string(),
@@ -169,30 +170,3 @@ impl InternalEvent for IggyOffsetUpdateError {
     }
 }
 
-#[derive(Debug, NamedInternalEvent)]
-pub struct IggySendError<'a> {
-    pub count: usize,
-    pub error: &'a iggy::prelude::IggyError,
-}
-
-impl InternalEvent for IggySendError<'_> {
-    fn emit(self) {
-        let reason = "Failed to send messages to Iggy.";
-        error!(
-            message = reason,
-            error = %self.error,
-            error_type = error_type::REQUEST_FAILED,
-            stage = error_stage::SENDING,
-        );
-        counter!(
-            CounterName::ComponentErrorsTotal,
-            "error_type" => error_type::REQUEST_FAILED,
-            "stage" => error_stage::SENDING,
-        )
-        .increment(1);
-        emit!(ComponentEventsDropped::<UNINTENTIONAL> {
-            count: self.count,
-            reason,
-        });
-    }
-}

@@ -11,7 +11,7 @@ use crate::sinks::{prelude::*, util::service::TowerRequestConfigDefaults};
 pub struct IggyTowerRequestConfigDefaults;
 
 impl TowerRequestConfigDefaults for IggyTowerRequestConfigDefaults {
-    const CONCURRENCY: Concurrency = Concurrency::Adaptive;
+    const CONCURRENCY: Concurrency = Concurrency::None;
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -105,9 +105,12 @@ impl GenerateConfig for IggySinkConfig {
 #[typetag::serde(name = "iggy")]
 impl SinkConfig for IggySinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        if self.partitions == 0 {
+            return Err("`partitions` must be at least 1".into());
+        }
         let (client, producer) = self.connect_and_init().await?;
         let healthcheck = healthcheck(Arc::clone(&client)).boxed();
-        let sink = IggySink::new(self.clone(), producer)?;
+        let sink = IggySink::new(self.clone(), Arc::clone(&client), producer)?;
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 
@@ -144,6 +147,9 @@ impl IggySinkConfig {
                 iggy::prelude::IggyExpiry::ServerDefault,
                 MaxTopicSize::ServerDefault,
             )
+            // Disable SDK-level send retries so the Tower retry layer is the
+            // single policy for the sink (avoids double-retry amplification).
+            .send_retries(None, None)
             .build();
 
         producer.init().await.context(ConnectSnafu)?;

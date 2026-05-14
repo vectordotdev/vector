@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use iggy::prelude::IggyProducer;
+use iggy::prelude::{IggyClient, IggyProducer};
 use snafu::ResultExt;
 
 use super::{
@@ -15,6 +15,7 @@ pub(super) struct IggySink {
     request: TowerRequestConfig<IggyTowerRequestConfigDefaults>,
     transformer: Transformer,
     encoder: Encoder<()>,
+    client: Arc<IggyClient>,
     producer: Arc<IggyProducer>,
     batcher_settings: BatcherSettings,
 }
@@ -22,6 +23,7 @@ pub(super) struct IggySink {
 impl IggySink {
     pub(super) fn new(
         config: IggySinkConfig,
+        client: Arc<IggyClient>,
         producer: Arc<IggyProducer>,
     ) -> Result<Self, IggyError> {
         let transformer = config.encoding.transformer();
@@ -36,6 +38,7 @@ impl IggySink {
             request: config.request,
             transformer,
             encoder: Encoder::<()>::new(serializer),
+            client,
             producer,
             batcher_settings,
         })
@@ -43,6 +46,7 @@ impl IggySink {
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let request = self.request.into_settings();
+        let client = Arc::clone(&self.client);
 
         let service = ServiceBuilder::new()
             .settings(request, IggyRetryLogic)
@@ -54,13 +58,22 @@ impl IggySink {
         let transformer = self.transformer.clone();
         let batcher_settings = self.batcher_settings.as_byte_size_config();
 
-        input
+        let result = input
             .batched(batcher_settings)
-            .map(|events| request_builder(events, &transformer, &mut encoder))
+            .filter_map(|events| {
+                futures::future::ready(request_builder(events, &transformer, &mut encoder))
+            })
             .into_driver(service)
             .protocol("iggy")
             .run()
-            .await
+            .await;
+
+        use iggy::prelude::Client;
+        if let Err(error) = client.disconnect().await {
+            warn!(message = "Failed to disconnect Iggy client on sink shutdown.", %error);
+        }
+
+        result
     }
 }
 
@@ -85,31 +98,33 @@ impl RetryLogic for IggyRetryLogic {
             IggyError::Encoding { .. } | IggyError::InvalidBatchSettings => return false,
             IggyError::Connect { source } | IggyError::Producer { source } => source,
         };
-        !matches!(
+        // The SDK's producer wraps send failures from its background send
+        // path in `ProducerSendFailed`; unwrap the underlying cause so
+        // transient errors (e.g. `Disconnected`, `TcpError`) are still
+        // classified as retriable by the allowlist below.
+        let source = match source {
+            Sdk::ProducerSendFailed { cause, .. } => &**cause,
+            source => source,
+        };
+        // Explicit allowlist of transient SDK errors. Defaulting unknown
+        // variants to non-retriable means a future SDK version that adds
+        // a fatal error (e.g. schema mismatch, payload-too-large) will
+        // not silently spin in a retry loop until someone audits the
+        // upgrade; any newly-classified transient errors must be added
+        // here when bumping the `iggy` dependency.
+        matches!(
             source,
-            Sdk::Unauthenticated
-                | Sdk::Unauthorized
-                | Sdk::InvalidCredentials
-                | Sdk::InvalidUsername
-                | Sdk::InvalidPassword
-                | Sdk::InvalidPersonalAccessToken
-                | Sdk::PersonalAccessTokenExpired(..)
-                | Sdk::AccessTokenMissing
-                | Sdk::InvalidAccessToken
-                | Sdk::JwtMissing
-                | Sdk::StreamIdNotFound(..)
-                | Sdk::StreamNameNotFound(..)
-                | Sdk::TopicIdNotFound(..)
-                | Sdk::TopicNameNotFound(..)
-                | Sdk::PartitionNotFound(..)
-                | Sdk::InvalidStreamName
-                | Sdk::InvalidStreamId
-                | Sdk::InvalidTopicName
-                | Sdk::InvalidTopicId
-                | Sdk::InvalidConfiguration
-                | Sdk::InvalidCommand
-                | Sdk::InvalidFormat
-                | Sdk::FeatureUnavailable
+            Sdk::Disconnected
+                | Sdk::CannotEstablishConnection
+                | Sdk::NotConnected
+                | Sdk::ConnectionClosed
+                | Sdk::StaleClient
+                | Sdk::TcpError
+                | Sdk::QuicError
+                | Sdk::CannotSendMessagesDueToClientDisconnection
+                | Sdk::BackgroundWorkerDisconnected
+                | Sdk::BackgroundSendTimeout
+                | Sdk::TaskTimeout
         )
     }
 }

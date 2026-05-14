@@ -304,6 +304,11 @@ generated: components: sources: iggy: configuration: {
 			}
 		}
 	}
+	poll_interval_ms: {
+		description: "The minimum interval, in milliseconds, between consecutive polls."
+		required:    false
+		type: uint: default: 100
+	}
 	drain_timeout_secs: {
 		description: """
 			The maximum time, in seconds, to wait for in-flight events to be
