@@ -22,8 +22,8 @@ use vector_lib::tap::{
     topology::WatchRx,
 };
 
-use vector_common::internal_event::{InternalMetricKind, all_metrics};
 use crate::proto::observability::InternalMetricKind as ProtoInternalMetricKind;
+use vector_common::internal_event::{InternalMetricKind, all_metrics};
 
 use crate::event::{Metric, MetricValue};
 use crate::metrics::Controller;

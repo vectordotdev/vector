@@ -9,12 +9,12 @@ use crate::{
     error::{Error, Result},
     proto::{
         GetAllocationTracingStatusRequest, GetAllocationTracingStatusResponse,
-        GetCapabilitiesRequest, GetCapabilitiesResponse, GetComponentsRequest, GetComponentsResponse,
-        GetMetaRequest, GetMetaResponse, MetricName, StreamComponentAllocatedBytesRequest,
-        StreamComponentAllocatedBytesResponse, StreamComponentMetricsRequest,
-        StreamComponentMetricsResponse, StreamHeartbeatRequest, StreamHeartbeatResponse,
-        StreamOutputEventsRequest, StreamOutputEventsResponse, StreamUptimeRequest,
-        StreamUptimeResponse,
+        GetCapabilitiesRequest, GetCapabilitiesResponse, GetComponentsRequest,
+        GetComponentsResponse, GetMetaRequest, GetMetaResponse, MetricName,
+        StreamComponentAllocatedBytesRequest, StreamComponentAllocatedBytesResponse,
+        StreamComponentMetricsRequest, StreamComponentMetricsResponse, StreamHeartbeatRequest,
+        StreamHeartbeatResponse, StreamOutputEventsRequest, StreamOutputEventsResponse,
+        StreamUptimeRequest, StreamUptimeResponse,
         observability_service_client::ObservabilityServiceClient,
     },
 };

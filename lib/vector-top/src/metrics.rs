@@ -10,7 +10,10 @@ use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
 use vector_api_client::{
     Client,
-    proto::{Component, ComponentType, InternalMetricKind, MetricName, stream_component_metrics_response::Value},
+    proto::{
+        Component, ComponentType, InternalMetricKind, MetricName,
+        stream_component_metrics_response::Value,
+    },
 };
 use vector_common::internal_event::all_metrics;
 
