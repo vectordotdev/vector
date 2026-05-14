@@ -52,6 +52,7 @@ jobs:
           rust: true
           protoc: true
           libsasl2: true
+          librdkafka: true
       - run: make check-clippy
 
   test:
@@ -150,6 +151,7 @@ jobs:
           protoc: true
           cue: true
           libsasl2: true
+          librdkafka: true
       - run: make check-generated-docs
 
   check-rust-docs:

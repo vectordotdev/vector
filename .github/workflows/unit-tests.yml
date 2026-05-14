@@ -80,6 +80,7 @@ jobs:
           datadog-ci: ${{ !inputs.coverage }}
           protoc: true
           libsasl2: true
+          librdkafka: true
 
       - name: Run tests
         run: |

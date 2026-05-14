@@ -30,5 +30,6 @@ jobs:
           rust: true
           protoc: true
           libsasl2: true
+          librdkafka: true
           cargo-msrv: true
       - run: cargo msrv verify

@@ -28,6 +28,10 @@ inputs:
     required: false
     default: false
     description: "Install libsasl2." # Required to fully build Vector
+  librdkafka:
+    required: false
+    default: false
+    description: "Install librdkafka. Required when building with `rdkafka?/dynamic_linking` (e.g. the `default` feature)."
 
   # prepare.sh - rust
   rust: # rustup module
@@ -223,6 +227,37 @@ runs:
       if: ${{ inputs.libsasl2 == 'true' }}
       shell: bash
       run: sudo apt-get update && sudo apt-get install -y libsasl2-dev
+
+    # librdkafka is built from source and cached so subsequent CI runs skip the
+    # multi-minute compile. Ubuntu's apt librdkafka-dev is older than rdkafka-sys
+    # requires, so we can't just `apt-get install`.
+    - name: Cache librdkafka
+      if: ${{ inputs.librdkafka == 'true' && runner.os == 'Linux' }}
+      id: librdkafka-cache
+      uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+      with:
+        path: ~/.local/librdkafka-2.12.1
+        key: ${{ runner.os }}-${{ runner.arch }}-librdkafka-2.12.1
+
+    - name: Install librdkafka build deps
+      if: ${{ inputs.librdkafka == 'true' && runner.os == 'Linux' && steps.librdkafka-cache.outputs.cache-hit != 'true' }}
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libsasl2-dev zlib1g-dev libssl-dev libzstd-dev libcurl4-openssl-dev
+
+    - name: Build librdkafka
+      if: ${{ inputs.librdkafka == 'true' && runner.os == 'Linux' && steps.librdkafka-cache.outputs.cache-hit != 'true' }}
+      shell: bash
+      run: ./scripts/environment/install-librdkafka.sh
+
+    - name: Expose librdkafka via pkg-config
+      if: ${{ inputs.librdkafka == 'true' && runner.os == 'Linux' }}
+      shell: bash
+      run: |
+        PREFIX="$HOME/.local/librdkafka-2.12.1"
+        echo "PKG_CONFIG_PATH=$PREFIX/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}" >> "$GITHUB_ENV"
+        echo "LD_LIBRARY_PATH=$PREFIX/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" >> "$GITHUB_ENV"
 
     - name: Cache cargo binaries
       id: cache-cargo-binaries
