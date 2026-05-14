@@ -59,18 +59,16 @@ impl Service<IggyRequest> for IggyService {
                 })
                 .context(ProducerSnafu)?;
 
-            if !messages.is_empty() {
-                producer
-                    .send(messages)
-                    .await
-                    .inspect_err(|source| {
-                        emit!(IggySendError {
-                            count: event_count,
-                            error: source,
-                        });
-                    })
-                    .context(ProducerSnafu)?;
-            }
+            producer
+                .send(messages)
+                .await
+                .inspect_err(|source| {
+                    emit!(IggySendError {
+                        count: event_count,
+                        error: source,
+                    });
+                })
+                .context(ProducerSnafu)?;
 
             Ok(IggyResponse {
                 metadata: req.metadata,
