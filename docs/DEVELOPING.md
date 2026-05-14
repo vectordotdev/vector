@@ -46,10 +46,20 @@ To build Vector on your own host will require a fairly complete development envi
 Loosely, you'll need the following:
 
 - **To build Vector:** Have working Rustup, Protobuf tools, C++/C build tools (LLVM, GCC, or MSVC), Python, and Perl, `make` (the GNU one preferably), `bash`, `cmake`, `GNU coreutils`, and `autotools`.
-  - The `default` feature links Kafka dynamically against a system `librdkafka` (`>= 2.12.1`) so dev builds skip the multi-minute embedded `rdkafka-sys` compile:
-    - macOS: `brew install librdkafka`.
-    - Linux: Ubuntu's apt `librdkafka-dev` is too old. Run `scripts/environment/install-librdkafka.sh` to build and install a compatible version under `$HOME/.local/librdkafka-<version>` (set `PKG_CONFIG_PATH` to its `lib/pkgconfig`).
-  - The `default` feature does not enable Kerberos/GSSAPI SASL for kafka, so local dev builds (`cargo build`, `make build`) have no other system prerequisites beyond the C build tools above.
+  - The `default` feature links Kafka dynamically against a system `librdkafka` so dev builds skip the multi-minute embedded `rdkafka-sys` compile. You need `pkg-config` and `librdkafka` (`>= 2.12.1`, matching what `rdkafka-sys` vendors) installed before running `cargo build` / `make build`:
+    - macOS: `brew install pkg-config librdkafka`. Homebrew's stable formula tracks the latest 2.x release rather than the exact pinned version; that's fine for dev/CI but release artifacts always rebuild from the vendored sources.
+    - Ubuntu: the distro `librdkafka-dev` is too old. Use [Confluent's apt repo](https://docs.confluent.io/platform/current/installation/installing_cp/deb-ubuntu.html#get-the-software). Confluent's signing key fingerprint is `CBBB821E 8FAF364F 79835C43 8B1DA612 0C2BF624`; please verify before trusting:
+
+      ```bash
+      curl -fsSL https://packages.confluent.io/clients/deb/archive.key -o /tmp/confluent.key
+      gpg --show-keys --with-fingerprint /tmp/confluent.key  # verify fingerprint matches
+      sudo gpg --yes --dearmor -o /usr/share/keyrings/confluent-archive-keyring.gpg /tmp/confluent.key
+      echo "deb [signed-by=/usr/share/keyrings/confluent-archive-keyring.gpg] https://packages.confluent.io/clients/deb $(lsb_release -cs) main" \
+        | sudo tee /etc/apt/sources.list.d/confluent-clients.list
+      sudo apt-get update && sudo apt-get install -y pkg-config 'librdkafka-dev=2.12.1*'
+      ```
+
+  - The `default` feature does not enable Kerberos/GSSAPI SASL for kafka, so beyond `librdkafka` / `pkg-config` and the C build tools above, local dev builds (`cargo build`, `make build`) have no other system prerequisites.
   - To enable GSSAPI for kafka, choose one of:
     - `gssapi`: dynamically links against system `libsasl2`. Requires `libsasl2-dev` (Ubuntu: `sudo apt-get install -y libsasl2-dev`) or `cyrus-sasl` (macOS: `brew install cyrus-sasl`) installed.
     - `gssapi-vendored` (or `vendored`, which includes it): builds `libsasl2` and `krb5` from bundled source. No system install needed. Linux only; the bundled path does not currently link on macOS arm64.

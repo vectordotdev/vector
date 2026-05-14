@@ -526,9 +526,12 @@ ntapi = { git = "https://github.com/MSxDOS/ntapi.git", rev = "24fc1e47677fc9f6e3
 #   rdkafka's build script doesn't link GSSAPI.
 # - `rdkafka?/dynamic_linking` makes dev builds link against a system librdkafka via
 #   pkg-config instead of compiling rdkafka-sys' bundled C source on every clean build.
-#   Release feature sets (`default-cmake`, `default-musl`, `default-msvc`, `target-*`)
-#   don't inherit `default` and keep building librdkafka from source via `cmake_build`,
-#   so release binaries are unchanged.
+#   Release feature sets (`default-cmake`, `default-musl`, `default-msvc`, and the
+#   Linux `target-*` sets via `target-base`) don't inherit `default` and rebuild
+#   librdkafka from vendored source via `cmake_build`. macOS release builds
+#   (`target-aarch64-apple-darwin`) use rdkafka-sys's default `mk`-based source
+#   build (no cmake, no dynamic linking), matching prior behavior. Either way,
+#   release binaries are unchanged.
 default = ["enable-unix", "rdkafka?/dynamic_linking"]
 # Default features for `cargo docs`. We're not using `gssapi` which would require installing libsasl2 in our doc environment.
 docs = ["enable-unix"]

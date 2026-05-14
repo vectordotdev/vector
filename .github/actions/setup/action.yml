@@ -228,27 +228,43 @@ runs:
       shell: bash
       run: sudo apt-get update && sudo apt-get install -y libsasl2-dev
 
-    # librdkafka is built from source because Ubuntu's apt librdkafka-dev is
-    # older than rdkafka-sys requires.
-    - name: Install librdkafka build deps
+    # Ubuntu's apt librdkafka-dev is older than rdkafka-sys requires, so we
+    # pull it from Confluent's apt repo (upstream maintainers of librdkafka).
+    # Linux is pinned to the librdkafka version baked into rdkafka-sys
+    # (`4.10.0+2.12.1`); macOS uses Homebrew's current stable (a newer 2.x).
+    # `pkg-config` is required for `rdkafka-sys`'s dynamic discovery.
+    - name: Install librdkafka (Confluent apt repo)
       if: ${{ inputs.librdkafka == 'true' && runner.os == 'Linux' }}
       shell: bash
+      env:
+        CONFLUENT_GPG_FINGERPRINT: "CBBB821E8FAF364F79835C438B1DA6120C2BF624"
+        LIBRDKAFKA_VERSION: "2.12.1"
       run: |
+        set -euo pipefail
+        tmpkey="$(mktemp)"
+        curl -fsSL https://packages.confluent.io/clients/deb/archive.key -o "${tmpkey}"
+        fpr=$(gpg --show-keys --with-fingerprint --with-colons "${tmpkey}" \
+          | awk -F: '$1 == "fpr" { print $10; exit }')
+        if [ "${fpr}" != "${CONFLUENT_GPG_FINGERPRINT}" ]; then
+          echo "Confluent GPG fingerprint mismatch: got ${fpr}, expected ${CONFLUENT_GPG_FINGERPRINT}" >&2
+          exit 1
+        fi
+        sudo gpg --yes --dearmor -o /usr/share/keyrings/confluent-archive-keyring.gpg "${tmpkey}"
+        rm -f "${tmpkey}"
+        echo "deb [signed-by=/usr/share/keyrings/confluent-archive-keyring.gpg] https://packages.confluent.io/clients/deb $(lsb_release -cs) main" \
+          | sudo tee /etc/apt/sources.list.d/confluent-clients.list
         sudo apt-get update
-        sudo apt-get install -y libsasl2-dev zlib1g-dev libssl-dev libzstd-dev libcurl4-openssl-dev
+        sudo apt-get install -y pkg-config "librdkafka-dev=${LIBRDKAFKA_VERSION}*"
+        pkg-config --modversion rdkafka
 
-    - name: Build librdkafka
-      if: ${{ inputs.librdkafka == 'true' && runner.os == 'Linux' }}
-      shell: bash
-      run: ./scripts/environment/install-librdkafka.sh
-
-    - name: Expose librdkafka via pkg-config
-      if: ${{ inputs.librdkafka == 'true' && runner.os == 'Linux' }}
+    - name: Install librdkafka (Homebrew)
+      if: ${{ inputs.librdkafka == 'true' && runner.os == 'macOS' }}
       shell: bash
       run: |
-        PREFIX="$HOME/.local/librdkafka-2.12.1"
-        echo "PKG_CONFIG_PATH=$PREFIX/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}" >> "$GITHUB_ENV"
-        echo "LD_LIBRARY_PATH=$PREFIX/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" >> "$GITHUB_ENV"
+        set -euo pipefail
+        brew update
+        brew install pkg-config librdkafka
+        pkg-config --modversion rdkafka
 
     - name: Cache cargo binaries
       id: cache-cargo-binaries
