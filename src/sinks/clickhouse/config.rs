@@ -4,8 +4,8 @@ use std::fmt;
 
 use http::{Request, StatusCode, Uri};
 use hyper::Body;
+use vector_lib::codecs::encoding::ArrowStreamSerializerConfig;
 use vector_lib::codecs::encoding::format::SchemaProvider;
-use vector_lib::codecs::encoding::{ArrowStreamSerializerConfig, BatchSerializerConfig};
 
 use super::{
     request_builder::ClickhouseRequestBuilder,
@@ -26,12 +26,11 @@ use crate::{
 ///
 /// [formats]: https://clickhouse.com/docs/en/interfaces/formats
 #[configurable_component]
-#[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq, Hash)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Hash)]
 #[serde(rename_all = "snake_case")]
-#[derivative(Default)]
 #[allow(clippy::enum_variant_names)]
 pub enum Format {
-    #[derivative(Default)]
+    #[default]
     /// JSONEachRow.
     JsonEachRow,
 
@@ -44,6 +43,23 @@ pub enum Format {
     /// ArrowStream (beta).
     #[configurable(metadata(status = "beta"))]
     ArrowStream,
+}
+
+/// Batch encoding configuration for the `clickhouse` sink.
+#[configurable_component]
+#[derive(Clone, Debug)]
+#[serde(tag = "codec", rename_all = "snake_case")]
+#[configurable(metadata(
+    docs::enum_tag_description = "The codec to use for batch encoding events."
+))]
+pub enum ClickhouseBatchEncoding {
+    /// Encodes events in [Apache Arrow][apache_arrow] IPC streaming format.
+    ///
+    /// This is the streaming variant of the Arrow IPC format, which writes
+    /// a continuous stream of record batches.
+    ///
+    /// [apache_arrow]: https://arrow.apache.org/
+    ArrowStream(ArrowStreamSerializerConfig),
 }
 
 impl fmt::Display for Format {
@@ -107,7 +123,7 @@ pub struct ClickhouseConfig {
     /// This is mutually exclusive with per-event encoding based on the `format` field.
     #[configurable(derived)]
     #[serde(default)]
-    pub batch_encoding: Option<BatchSerializerConfig>,
+    pub batch_encoding: Option<ClickhouseBatchEncoding>,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -280,7 +296,8 @@ impl ClickhouseConfig {
         };
 
         if let Some(batch_encoding) = &self.batch_encoding {
-            use vector_lib::codecs::{BatchEncoder, BatchSerializer};
+            use vector_lib::codecs::BatchEncoder;
+            use vector_lib::codecs::encoding::BatchSerializerConfig;
 
             // Validate that batch_encoding is only compatible with ArrowStream format
             if self.format != Format::ArrowStream {
@@ -291,9 +308,8 @@ impl ClickhouseConfig {
                 .into());
             }
 
-            let mut arrow_config = match batch_encoding {
-                BatchSerializerConfig::ArrowStream(config) => config.clone(),
-            };
+            let ClickhouseBatchEncoding::ArrowStream(arrow_config) = batch_encoding;
+            let mut arrow_config = arrow_config.clone();
 
             self.resolve_arrow_schema(
                 client,
@@ -305,8 +321,7 @@ impl ClickhouseConfig {
             .await?;
 
             let resolved_batch_config = BatchSerializerConfig::ArrowStream(arrow_config);
-            let arrow_serializer = resolved_batch_config.build()?;
-            let batch_serializer = BatchSerializer::Arrow(arrow_serializer);
+            let batch_serializer = resolved_batch_config.build_batch_serializer()?;
             let encoder = EncoderKind::Batch(BatchEncoder::new(batch_serializer));
 
             return Ok((Format::ArrowStream, encoder));
@@ -426,10 +441,31 @@ mod tests {
         );
     }
 
+    /// Codecs other than `arrow_stream` must be rejected at parse time, since
+    /// `ClickhouseBatchEncoding` only exposes the `arrow_stream` variant.
+    #[cfg(feature = "codecs-parquet")]
+    #[test]
+    fn batch_encoding_rejects_unsupported_codec() {
+        let err = serde_yaml::from_str::<ClickhouseConfig>(
+            r#"
+            endpoint: http://localhost:8123
+            table: test_table
+            batch_encoding:
+              codec: parquet
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(
+            err.to_string().contains("parquet"),
+            "expected error to mention the offending codec, got: {err}"
+        );
+    }
+
     /// Helper to create a minimal ClickhouseConfig for testing
     fn create_test_config(
         format: Format,
-        batch_encoding: Option<BatchSerializerConfig>,
+        batch_encoding: Option<ClickhouseBatchEncoding>,
     ) -> ClickhouseConfig {
         ClickhouseConfig {
             endpoint: "http://localhost:8123".parse::<http::Uri>().unwrap().into(),
@@ -462,7 +498,7 @@ mod tests {
         for (format, format_name) in incompatible_formats {
             let config = create_test_config(
                 format,
-                Some(BatchSerializerConfig::ArrowStream(
+                Some(ClickhouseBatchEncoding::ArrowStream(
                     ArrowStreamSerializerConfig::default(),
                 )),
             );

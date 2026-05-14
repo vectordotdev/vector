@@ -21,9 +21,9 @@ task for software like Vector:
 
 1. It's relatively new and not as "battle tested" as more widely deployed
    software.
-1. The vast majority of its functionality lives at the edges, interfacing with
+2. The vast majority of its functionality lives at the edges, interfacing with
    various external systems.
-1. Instead of a monolithic application designed for a single task, it is
+3. Instead of a monolithic application designed for a single task, it is
    a collection of components that can be assembled into a near-infinite number
    of configurations.
 

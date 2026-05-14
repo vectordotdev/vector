@@ -2648,6 +2648,66 @@ async fn series_v2_split_metric_namespace_false() {
     .await;
 }
 
+#[tokio::test]
+async fn series_v2_device_resource_preserved_as_tag() {
+    assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+        let (rx, _, _, addr, _guard) =
+            source(EventStatus::Delivered, true, true, false, false).await;
+
+        let series = vec![ddmetric_proto::metric_payload::MetricSeries {
+            resources: vec![
+                ddmetric_proto::metric_payload::Resource {
+                    r#type: "host".to_string(),
+                    name: "test_host".to_string(),
+                },
+                ddmetric_proto::metric_payload::Resource {
+                    r#type: "device".to_string(),
+                    name: "sda".to_string(),
+                },
+            ],
+            metric: "system.disk.free".to_string(),
+            tags: vec!["env:prod".to_string()],
+            points: vec![ddmetric_proto::metric_payload::MetricPoint {
+                value: 100.0,
+                timestamp: 1542182950,
+            }],
+            r#type: ddmetric_proto::metric_payload::MetricType::Gauge as i32,
+            unit: "".to_string(),
+            source_type_name: "".to_string(),
+            interval: 0,
+            metadata: None,
+        }];
+
+        let series_payload = ddmetric_proto::MetricPayload { series };
+        let mut buf = Vec::new();
+        series_payload.encode(&mut buf).unwrap();
+        let body = unsafe { String::from_utf8_unchecked(buf) };
+
+        let events = send_and_collect(
+            addr,
+            body,
+            dd_api_key_headers(),
+            DD_API_SERIES_V2_PATH,
+            rx,
+            1,
+        )
+        .await;
+
+        let metric = events[0].as_metric();
+        let tags = metric.tags().unwrap();
+
+        // The `device` resource type must be preserved as a plain `device` tag,
+        // NOT as `resource.device`. This matches v1 series behavior.
+        assert_eq!(tags.get("device"), Some("sda"));
+        assert!(
+            tags.get("resource.device").is_none(),
+            "device should not be prefixed with 'resource.'"
+        );
+        assert_eq!(tags.get("env"), Some("prod"));
+    })
+    .await;
+}
+
 async fn test_sketches_split_metric_namespace_impl(
     split: bool,
     expected_name: &str,

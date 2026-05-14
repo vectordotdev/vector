@@ -86,7 +86,8 @@ where
                 } else {
                     EventPartitioner::new(None, None, None, None)
                 },
-                || batch_settings.as_byte_size_config(),
+                batch_settings.timeout,
+                |_| batch_settings.as_byte_size_config(),
             )
             .request_builder(
                 default_request_builder_concurrency_limit(),

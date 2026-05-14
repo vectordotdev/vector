@@ -18,7 +18,7 @@ use vector_lib::configurable::{
 ///
 /// This can be set either to one of the below enum values or to a positive integer, which denotes
 /// a fixed concurrency limit.
-#[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq, Default)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Default)]
 pub enum Concurrency {
     /// A fixed concurrency of 1.
     ///

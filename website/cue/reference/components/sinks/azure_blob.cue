@@ -37,6 +37,7 @@ components: sinks: azure_blob: {
 					enum: ["json", "text"]
 				}
 			}
+			proxy: enabled: true
 			request: {
 				enabled:        true
 				rate_limit_num: 250

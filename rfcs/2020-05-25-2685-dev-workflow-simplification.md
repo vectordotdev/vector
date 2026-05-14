@@ -1,5 +1,7 @@
 # RFC 2685 - 2020-05-28 - Dev Workflow Simplification
 
+> **Archived:** This RFC is kept for historical reference only. The Docker/Podman dev environment it proposed (`make environment`, `ENVIRONMENT=true`, the `timberio/vector-dev` image) is no longer maintained and the supporting Makefile targets, workflow, and image have been removed. For current contributor instructions, see [CONTRIBUTING.md](../CONTRIBUTING.md) and [docs/DEVELOPING.md](../docs/DEVELOPING.md).
+
 Vector's `Makefile` serves a variety of purposes, and this RFC attempts to tame the complexity of common dev tasks, improving contributor and team member experience.
 
 It proposes a practical base `environment` container that merges the functionality of our non-integration test containers into one. It then suggests making common dev `make` tasks to rely on the caller environment having all dependencies, done at the same time it suggests adding `make` tasks to run common `make` tasks inside the environment. Finally, it suggests updating documentation to suggest users can use their native toolchains, `docker`.
@@ -183,7 +185,7 @@ There are tools like `hab` (from the Habitat project) and `packer` that can be u
 ## Outstanding Questions
 
 - Windows/Mac/FreeBSD builds via `make build` et all will produce native binaries natively, we should be review those docs.
-- This RFC does not scope in integration tests beyond letting the `environment` run them. We may find motivation to explore a more **_slick_** solution in the future.
+- This RFC does not scope in integration tests beyond letting the `environment` run them. We may find motivation to explore a more _**slick**_ solution in the future.
 
 ## Rationale & Alternatives
 
@@ -207,6 +209,6 @@ Alternatives:
 2. Get preliminary consensus this is good path forward
 3. Add `DOCKER_SOCKET` passing and support integration testing
 4. Cross-OS testing
-6. Explore handling `make environment-%` commands via wildcard
-7. Acceptance testing (Test including new contributor test)
-8. Merge preliminary support
+5. Explore handling `make environment-%` commands via wildcard
+6. Acceptance testing (Test including new contributor test)
+7. Merge preliminary support

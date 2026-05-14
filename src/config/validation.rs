@@ -11,13 +11,52 @@ use super::{
 };
 use crate::config::schema;
 
-/// Minimum value (exclusive) for `utilization_ewma_alpha`.
+/// Minimum value (exclusive) for EWMA alpha options.
 /// The alpha value must be strictly greater than this value.
 const EWMA_ALPHA_MIN: f64 = 0.0;
 
-/// Maximum value (exclusive) for `utilization_ewma_alpha`.
+/// Maximum value (exclusive) for EWMA alpha options.
 /// The alpha value must be strictly less than this value.
 const EWMA_ALPHA_MAX: f64 = 1.0;
+
+/// Minimum value (exclusive) for EWMA half-life options.
+/// The half-life value must be strictly greater than this value.
+const EWMA_HALF_LIFE_SECONDS_MIN: f64 = 0.0;
+
+/// Validates an optional EWMA alpha value and returns an error message if invalid.
+/// Returns `None` if the value is `None` or valid, otherwise returns an error message.
+fn validate_ewma_alpha(alpha: Option<f64>, field_name: &str) -> Option<String> {
+    if let Some(alpha) = alpha
+        && !(alpha > EWMA_ALPHA_MIN && alpha < EWMA_ALPHA_MAX)
+    {
+        Some(format!(
+            "Global `{field_name}` must be between 0 and 1 exclusive (0 < alpha < 1), got {alpha}"
+        ))
+    } else {
+        None
+    }
+}
+
+/// Validates an optional EWMA half-life value and returns an error message if invalid.
+/// Returns `None` if the value is `None` or valid, otherwise returns an error message.
+#[expect(
+    clippy::neg_cmp_op_on_partial_ord,
+    reason = "!(x > 0) rejects NaN and non-positive values; (x <= 0) would incorrectly accept NaN"
+)]
+fn validate_ewma_half_life_seconds(
+    half_life_seconds: Option<f64>,
+    field_name: &str,
+) -> Option<String> {
+    if let Some(half_life_seconds) = half_life_seconds
+        && !(half_life_seconds > EWMA_HALF_LIFE_SECONDS_MIN)
+    {
+        Some(format!(
+            "Global `{field_name}` must be greater than 0, got {half_life_seconds}"
+        ))
+    } else {
+        None
+    }
+}
 
 /// Check that provide + topology config aren't present in the same builder, which is an error.
 pub fn check_provider(config: &ConfigBuilder) -> Result<(), Vec<String>> {
@@ -155,17 +194,25 @@ pub fn check_resources(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     }
 }
 
-/// Validates that `buffer_utilization_ewma_alpha` value is within the valid range (0 < alpha < 1)
-/// for the global configuration.
-pub fn check_buffer_utilization_ewma_alpha(config: &ConfigBuilder) -> Result<(), Vec<String>> {
-    if let Some(alpha) = config.global.buffer_utilization_ewma_alpha
-        && (alpha <= EWMA_ALPHA_MIN || alpha >= EWMA_ALPHA_MAX)
+/// Validates that `*_ewma_alpha` values are within the valid range (0 < alpha < 1).
+pub fn check_values(config: &ConfigBuilder) -> Result<(), Vec<String>> {
+    let mut errors = Vec::new();
+
+    if let Some(error) = validate_ewma_half_life_seconds(
+        config.global.buffer_utilization_ewma_half_life_seconds,
+        "buffer_utilization_ewma_half_life_seconds",
+    ) {
+        errors.push(error);
+    }
+    if let Some(error) = validate_ewma_alpha(config.global.latency_ewma_alpha, "latency_ewma_alpha")
     {
-        Err(vec![format!(
-            "Global `buffer_utilization_ewma_alpha` must be between 0 and 1 exclusive (0 < alpha < 1), got {alpha}"
-        )])
-    } else {
+        errors.push(error);
+    }
+
+    if errors.is_empty() {
         Ok(())
+    } else {
+        Err(errors)
     }
 }
 

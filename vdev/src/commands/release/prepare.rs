@@ -1,6 +1,7 @@
 #![allow(clippy::print_stdout)]
 #![allow(clippy::print_stderr)]
 
+use crate::commands::release::generate_cue;
 use crate::utils::{command::run_command, git, paths};
 use anyhow::{Context, Result, anyhow};
 use reqwest::blocking::Client;
@@ -19,7 +20,6 @@ const ALPINE_PREFIX: &str = "FROM docker.io/alpine:";
 const ALPINE_DOCKERFILE: &str = "distribution/docker/alpine/Dockerfile";
 const DEBIAN_PREFIX: &str = "FROM docker.io/debian:";
 const DEBIAN_DOCKERFILE: &str = "distribution/docker/debian/Dockerfile";
-const RELEASE_CUE_SCRIPT: &str = "scripts/generate-release-cue.rb";
 const KUBECLT_CUE_FILE: &str = "website/cue/reference/administration/interfaces/kubectl.cue";
 const INSTALL_SCRIPT: &str = "distribution/install.sh";
 
@@ -70,7 +70,7 @@ impl Cli {
             alpine_version: self.alpine_version,
             debian_version: self.debian_version,
             repo_root,
-            latest_vector_version: get_latest_version_from_vector_tags()?,
+            latest_vector_version: generate_cue::find_latest_release_tag()?,
             release_branch: format!("v{}.{}", self.version.major, self.version.minor),
             // Websites containing `website` will also generate website previews.
             // Caveat is these branches can only contain alphanumeric chars and dashes.
@@ -210,16 +210,7 @@ impl Prepare {
     // Step 6
     fn generate_release_cue(&self) -> Result<()> {
         debug!("generate_release_cue");
-        let script = self.repo_root.join(RELEASE_CUE_SCRIPT);
-        let new_vector_version = &self.new_vector_version;
-        if script.is_file() {
-            run_command(&format!(
-                "{} --new-version {new_vector_version} --no-interactive",
-                script.to_string_lossy().as_ref()
-            ));
-        } else {
-            return Err(anyhow!("Script not found: {}", script.display()));
-        }
+        generate_cue::run(&self.new_vector_version)?;
 
         self.append_vrl_changelog_to_release_cue()?;
         git::add_files_in_current_dir()?;
@@ -267,7 +258,7 @@ impl Prepare {
         let cure_reference_path = &self.repo_root.join("website").join("cue").join("reference");
         let versions_cue_path = cure_reference_path.join("versions.cue");
         if !versions_cue_path.is_file() {
-            return Err(anyhow!("{versions_cue_path:?} not found"));
+            return Err(anyhow!("{} not found", versions_cue_path.display()));
         }
 
         let vector_version = &self.new_vector_version;
@@ -327,7 +318,7 @@ impl Prepare {
                     .ok_or_else(|| anyhow!("Invalid weight format"))?;
                 let weight: i32 = weight_str
                     .parse()
-                    .map_err(|e| anyhow!("Failed to parse weight: {}", e))?;
+                    .map_err(|e| anyhow!("Failed to parse weight: {e}"))?;
                 // Increase by 1
                 let new_weight = weight + 1;
                 updated_lines.push(format!("weight: {new_weight}"));
@@ -388,7 +379,7 @@ impl Prepare {
         let version = &self.new_vector_version;
         let cue_path = releases_path.join(format!("{version}.cue"));
         if !cue_path.is_file() {
-            return Err(anyhow!("{cue_path:?} not found"));
+            return Err(anyhow!("{} not found", cue_path.display()));
         }
 
         let vrl_changelog = get_latest_vrl_tag_and_changelog()?;
@@ -427,18 +418,6 @@ fn update_vrl_to_version(cargo_toml_contents: &str, vrl_version: &str) -> Result
     vrl_table.insert("version", vrl_version.into());
 
     Ok(doc.to_string())
-}
-
-fn get_latest_version_from_vector_tags() -> Result<Version> {
-    let tags = run_command("git tag --list --sort=-v:refname");
-    let latest_tag = tags
-        .lines()
-        .find(|tag| tag.starts_with('v') && !tag.starts_with("vdev-v"))
-        .ok_or_else(|| anyhow::anyhow!("Could not find latest Vector release tag"))?;
-
-    let version_str = latest_tag.trim_start_matches('v');
-    Version::parse(version_str)
-        .map_err(|e| anyhow::anyhow!("Failed to parse version from tag '{latest_tag}': {e}"))
 }
 
 fn format_vrl_changelog_block(changelog: &str) -> String {

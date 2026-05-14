@@ -27,6 +27,20 @@ ensure_active_toolchain_is_installed() {
 
 SCRIPT_DIR=$(realpath "$(dirname "${BASH_SOURCE[0]}")")
 
+# Tool version definitions - update versions here
+CARGO_DEB_VERSION="2.9.3"
+CROSS_VERSION="0.2.5"
+CARGO_NEXTEST_VERSION="0.9.95"
+CARGO_DENY_VERSION="0.19.0"
+CARGO_MSRV_VERSION="0.18.4"
+CARGO_HACK_VERSION="0.6.43"
+DD_RUST_LICENSE_TOOL_VERSION="1.0.6"
+CARGO_LLVM_COV_VERSION="0.8.4"
+WASM_PACK_VERSION="0.13.1"
+# npm tool versions are defined in scripts/environment/npm-tools/package.json
+# and pinned (including transitive deps) in npm-tools/package-lock.json.
+VDEV_VERSION="0.3.3"
+
 ALL_MODULES=(
   rustup
   cargo-deb
@@ -34,11 +48,13 @@ ALL_MODULES=(
   cargo-nextest
   cargo-deny
   cargo-msrv
+  cargo-hack
+  cargo-llvm-cov
   dd-rust-license-tool
   wasm-pack
-  markdownlint
+  markdownlint-cli2
+  prettier
   datadog-ci
-  release-flags
   vdev
 )
 
@@ -72,9 +88,12 @@ Modules:
   cargo-nextest
   cargo-deny
   cargo-msrv
+  cargo-hack
+  cargo-llvm-cov
   dd-rust-license-tool
   wasm-pack
-  markdownlint
+  markdownlint-cli2
+  prettier
   datadog-ci
   vdev
 
@@ -102,13 +121,132 @@ contains_module() {
   return 1
 }
 
-# Always ensure git safe.directory is set
-git config --global --add safe.directory "$(pwd)"
+# Helper function to check version and install if needed
+# Usage: maybe_install_cargo_tool <tool-name> <version> [<version-check-pattern>]
+# Note: cargo-* tools are invoked as "cargo <subcommand>", not as direct binaries
+maybe_install_cargo_tool() {
+  local tool="$1"
+  local version="$2"
+  local version_pattern="${3:-${tool} ${version}}"  # Default to "tool version"
 
-REQUIRES_RUSTUP=(dd-rust-license-tool cargo-deb cross cargo-nextest cargo-deny cargo-msrv wasm-pack vdev)
+  if ! contains_module "$tool"; then
+    return 0
+  fi
 
-REQUIRES_BINSTALL=("${REQUIRES_RUSTUP[@]}")
-unset -v 'REQUIRES_BINSTALL[0]' # remove dd-rust-license-tool
+  # For cargo-* tools, invoke as "cargo <subcommand>" not "cargo-<subcommand>"
+  local version_cmd="$tool"
+  if [[ "$tool" == cargo-* ]]; then
+    version_cmd="cargo ${tool#cargo-}"
+  fi
+
+  # vdev fails fast on missing prebuilts so a cache/asset miss can't
+  # reintroduce the source-compile path that previously stalled a release.
+  local installer=("${install[@]}")
+  if [[ "$tool" == "vdev" && "${installer[0]}" == "binstall" ]]; then
+    installer+=(--disable-strategies compile)
+  fi
+
+  if ! $version_cmd --version 2>/dev/null | grep -q "^${version_pattern}"; then
+    local should_install=true
+    # Outside CI, preserve a newer-than-pin version the user already has.
+    # `cargo install --force` would otherwise silently downgrade them.
+    if [[ -z "${CI:-}" ]]; then
+      local current
+      current=$($version_cmd --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)
+      if [[ -n "$current" ]] && [[ "$current" != "$version" ]]; then
+        local newest
+        newest=$(printf '%s\n%s\n' "$current" "$version" | sort -V | tail -1)
+        if [[ "$newest" == "$current" ]]; then
+          echo "Keeping ${tool} ${current} (newer than pin ${version}). Set CI=1 to force the pin."
+          should_install=false
+        fi
+      fi
+    fi
+    if [[ "$should_install" == "true" ]]; then
+      cargo "${installer[@]}" "$tool" --version "$version" --force --locked
+    fi
+  fi
+
+  # cargo-llvm-cov requires the llvm-tools-preview rustup component
+  if [[ "$tool" == "cargo-llvm-cov" ]]; then
+    rustup component add llvm-tools-preview
+  fi
+}
+
+# Install npm tools from the committed package-lock.json so that every
+# transitive dependency version is pinned (no live registry resolution).
+# Versions are defined in npm-tools/package.json; npm ci ensures exact lockfile match.
+# Note: npm ci installs all packages in the lockfile even if only one tool
+# is requested, since it does not support selective installation.
+maybe_install_npm_tools() {
+  local npm_tools=(markdownlint-cli2 prettier datadog-ci)
+
+  # Early return when no npm tool is requested, so hosts without npm
+  # (e.g. tests/e2e/Dockerfile calling prepare.sh --modules=cargo-nextest)
+  # are not broken by the npm commands below.
+  local any_requested=false
+  for tool in "${npm_tools[@]}"; do
+    if contains_module "$tool"; then
+      any_requested=true
+      break
+    fi
+  done
+  if [[ "$any_requested" == "false" ]]; then
+    return 0
+  fi
+
+  local npm_tools_dir="${SCRIPT_DIR}/npm-tools"
+  local npm_bin_dir
+  npm_bin_dir="$(npm config get prefix -g)/bin"
+  local need_install=false
+
+  for tool in "${npm_tools[@]}"; do
+    if contains_module "$tool"; then
+      local expected="${npm_tools_dir}/node_modules/.bin/${tool}"
+      if [[ "$(readlink "${npm_bin_dir}/${tool}" 2>/dev/null)" != "$expected" ]] || [[ ! -x "$expected" ]]; then
+        need_install=true
+        break
+      fi
+    fi
+  done
+
+  if [[ "$need_install" == "false" ]]; then
+    return 0
+  fi
+
+  npm ci --prefix "${npm_tools_dir}"
+
+  # Outside CI, skip the global symlink to avoid a sudo write to /usr/local/bin
+  # (or equivalent). The Makefile prepends this directory to PATH, so `make`
+  # recipes find the tools automatically.
+  if [[ -z "${CI:-}" ]]; then
+    echo "npm tools installed under ${npm_tools_dir}/node_modules/.bin"
+    echo "Make recipes discover them automatically. To invoke directly from a"
+    echo "shell, add the directory to your PATH:"
+    echo "  export PATH=\"${npm_tools_dir}/node_modules/.bin:\$PATH\""
+    return 0
+  fi
+
+  # Use sudo only when the target directory is not writable (e.g. /usr/local/bin
+  # on Linux CI runners is root-owned, but Homebrew dirs on macOS are user-owned).
+  local ln_cmd=(ln -sf)
+  if [[ ! -w "${npm_bin_dir}" ]]; then
+    ln_cmd=(sudo ln -sf)
+  fi
+  for tool in "${npm_tools[@]}"; do
+    "${ln_cmd[@]}" "${npm_tools_dir}/node_modules/.bin/${tool}" "${npm_bin_dir}/${tool}"
+  done
+}
+
+# Set git safe.directory in CI where the repo may be checked out by a different
+# uid than the user running git. Skipped on workstations: the contributor owns
+# the checkout and a global config write is unnecessary.
+if [[ -n "${CI:-}" ]]; then
+  git config --global --add safe.directory "$(pwd)"
+fi
+
+REQUIRES_RUSTUP=(dd-rust-license-tool cargo-deb cross cargo-nextest cargo-deny cargo-msrv cargo-hack cargo-llvm-cov wasm-pack vdev)
+REQUIRES_BINSTALL=(cargo-deb cross cargo-nextest cargo-deny cargo-msrv cargo-hack cargo-llvm-cov wasm-pack vdev)
 require_binstall=false
 
 for tool in "${REQUIRES_BINSTALL[@]}"; do
@@ -130,9 +268,6 @@ fi
 
 install=(install)
 if contains_module rustup; then
-  # shellcheck source=scripts/environment/release-flags.sh
-  . "${SCRIPT_DIR}"/release-flags.sh
-
   ensure_active_toolchain_is_installed
 
   if [ "${require_binstall}" = "true" ]; then
@@ -144,62 +279,16 @@ if contains_module rustup; then
   fi
 fi
 set -e -o verbose
-if contains_module cargo-deb; then
-  if [[ "$(cargo-deb --version 2>/dev/null)" != "2.9.3" ]]; then
-    cargo "${install[@]}" cargo-deb --version 2.9.3 --force --locked
-  fi
-fi
 
-if contains_module cross; then
-  if ! cross --version 2>/dev/null | grep -q '^cross 0.2.5'; then
-    cargo "${install[@]}" cross --version 0.2.5 --force --locked
-  fi
-fi
+maybe_install_cargo_tool cargo-deb "${CARGO_DEB_VERSION}" "${CARGO_DEB_VERSION}"
+maybe_install_cargo_tool cross "${CROSS_VERSION}"
+maybe_install_cargo_tool cargo-nextest "${CARGO_NEXTEST_VERSION}"
+maybe_install_cargo_tool cargo-deny "${CARGO_DENY_VERSION}"
+maybe_install_cargo_tool cargo-msrv "${CARGO_MSRV_VERSION}"
+maybe_install_cargo_tool cargo-hack "${CARGO_HACK_VERSION}"
+maybe_install_cargo_tool cargo-llvm-cov "${CARGO_LLVM_COV_VERSION}"
+maybe_install_cargo_tool dd-rust-license-tool "${DD_RUST_LICENSE_TOOL_VERSION}"
+maybe_install_cargo_tool wasm-pack "${WASM_PACK_VERSION}"
+maybe_install_cargo_tool vdev "${VDEV_VERSION}"
 
-if contains_module cargo-nextest; then
-  if ! cargo-nextest --version 2>/dev/null | grep -q '^cargo-nextest 0.9.95'; then
-    cargo "${install[@]}" cargo-nextest --version 0.9.95 --force --locked
-  fi
-fi
-
-if contains_module cargo-deny; then
-  if ! cargo-deny --version 2>/dev/null | grep -q '^cargo-deny 0.18.9'; then
-    cargo "${install[@]}" cargo-deny --version 0.18.9 --force --locked
-  fi
-fi
-
-if contains_module cargo-msrv; then
-  if ! cargo-msrv --version 2>/dev/null | grep -q '^cargo-msrv 0.18.4'; then
-    cargo "${install[@]}" cargo-msrv --version 0.18.4 --force --locked
-  fi
-fi
-
-if contains_module dd-rust-license-tool; then
-  if ! dd-rust-license-tool --help &>/dev/null; then
-    cargo install dd-rust-license-tool --version 1.0.4 --force --locked
-  fi
-fi
-
-if contains_module wasm-pack; then
-  if ! wasm-pack --version | grep -q '^wasm-pack 0.13.1'; then
-    cargo "${install[@]}" --locked --version 0.13.1 wasm-pack
-  fi
-fi
-
-if contains_module markdownlint; then
-  if [[ "$(markdownlint --version 2>/dev/null)" != "0.45.0" ]]; then
-    sudo npm install -g markdownlint-cli@0.45.0
-  fi
-fi
-
-if contains_module datadog-ci; then
-  if [[ "$(datadog-ci version 2>/dev/null)" != "v3.16.0" ]]; then
-    sudo npm install -g @datadog/datadog-ci@3.16.0
-  fi
-fi
-
-if contains_module vdev; then
-  if [[ "$(vdev --version 2>/dev/null)" != "vdev 0.1.0" ]]; then
-    cargo "${install[@]}" vdev --version 0.1.0 --force --locked
-  fi
-fi
+maybe_install_npm_tools

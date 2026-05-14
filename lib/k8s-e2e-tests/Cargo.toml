@@ -9,7 +9,7 @@ license = "MPL-2.0"
 
 [dependencies]
 futures.workspace = true
-k8s-openapi = { version = "0.16.0", default-features = false, features = ["v1_19"] }
+k8s-openapi = { version = "0.27.0", default-features = false, features = ["v1_31"] }
 k8s-test-framework = { version = "0.1", path = "../k8s-test-framework" }
 regex = { workspace = true, default-features = true }
 reqwest.workspace = true

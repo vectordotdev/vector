@@ -1,6 +1,6 @@
 //! Git utilities
 
-use std::{collections::HashSet, process::Command};
+use std::{collections::HashSet, fs, path::Path, process::Command};
 
 use anyhow::{Context, Result, anyhow, bail};
 use git2::{BranchType, ErrorCode, Repository};
@@ -31,21 +31,6 @@ pub fn checkout_or_create_branch(branch_name: &str) -> Result<()> {
     } else {
         create_branch(branch_name)?;
     }
-    Ok(())
-}
-
-pub fn merge_branch(branch_name: &str) -> Result<()> {
-    let _output = run_and_check_output(&["merge", "--ff", branch_name])?;
-    Ok(())
-}
-
-pub fn tag_version(version: &str) -> Result<()> {
-    let _output = run_and_check_output(&["tag", "--annotate", version, "--message", version])?;
-    Ok(())
-}
-
-pub fn push_branch(branch_name: &str) -> Result<()> {
-    let _output = run_and_check_output(&["push", "origin", branch_name])?;
     Ok(())
 }
 
@@ -138,6 +123,11 @@ pub fn commit(commit_message: &str) -> Result<String> {
         .check_output()
 }
 
+/// Removes a file from the index (and working tree) using `git rm`.
+pub fn rm(path: &str) -> Result<String> {
+    Command::new("git").args(["rm", path]).check_output()
+}
+
 /// Pushes changes from the current repo
 pub fn push() -> Result<String> {
     Command::new("git").args(["push"]).check_output()
@@ -208,6 +198,32 @@ pub fn create_branch(branch_name: &str) -> Result<()> {
 
 pub fn run_and_check_output(args: &[&str]) -> Result<String> {
     Command::new("git").in_repo().args(args).check_output()
+}
+
+/// Sparse-checkout only `docs/generated` from a repo at the given commit.
+pub fn sparse_checkout_docs(sha: &str, repo_url: &str, clone_dir: &Path) -> Result<()> {
+    fs::create_dir_all(clone_dir)?;
+
+    let git = |args: &[&str]| -> Result<String> {
+        Command::new("git")
+            .current_dir(clone_dir)
+            .args(args)
+            .check_output()
+    };
+
+    git(&["init"])?;
+    git(&["remote", "add", "origin", repo_url])?;
+    git(&["config", "core.sparseCheckout", "true"])?;
+
+    let sparse_file = clone_dir.join(".git").join("info").join("sparse-checkout");
+    fs::create_dir_all(sparse_file.parent().unwrap())?;
+    fs::write(&sparse_file, "docs/generated\n")
+        .context("Failed to write sparse-checkout config")?;
+
+    git(&["fetch", "--depth", "1", "origin", sha])?;
+    git(&["checkout", "FETCH_HEAD"])?;
+
+    Ok(())
 }
 
 fn is_warning_line(line: &str) -> bool {

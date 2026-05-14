@@ -1,7 +1,10 @@
 use bytes::{Bytes, BytesMut};
 use smallvec::SmallVec;
 use vector_common::internal_event::emit;
-use vector_core::{config::LogNamespace, event::Event};
+use vector_core::{
+    config::LogNamespace,
+    event::{Event, EventMetadata},
+};
 
 use crate::{
     decoding::format::Deserializer as _,
@@ -50,6 +53,13 @@ impl Decoder {
     /// Sets the log namespace that will be used when decoding.
     pub const fn with_log_namespace(mut self, log_namespace: LogNamespace) -> Self {
         self.log_namespace = log_namespace;
+        self
+    }
+
+    /// Attaches a per-decode-call metadata template to the inner deserializer,
+    /// allowing deserializers to read from and write to event metadata.
+    pub fn with_metadata_template(mut self, metadata: EventMetadata) -> Self {
+        self.deserializer = self.deserializer.with_metadata_template(metadata);
         self
     }
 
@@ -105,12 +115,12 @@ impl tokio_util::codec::Decoder for Decoder {
 mod tests {
     use bytes::Bytes;
     use futures::{StreamExt, stream};
-    use tokio_util::{codec::FramedRead, io::StreamReader};
+    use tokio_util::io::StreamReader;
     use vrl::value::Value;
 
     use super::Decoder;
     use crate::{
-        JsonDeserializer, NewlineDelimitedDecoder, StreamDecodingError,
+        DecoderFramedRead, JsonDeserializer, NewlineDelimitedDecoder, StreamDecodingError,
         decoding::{Deserializer, Framer},
     };
 
@@ -127,7 +137,7 @@ mod tests {
             Framer::NewlineDelimited(NewlineDelimitedDecoder::new()),
             Deserializer::Json(JsonDeserializer::default()),
         );
-        let mut stream = FramedRead::new(reader, decoder);
+        let mut stream = DecoderFramedRead::new(reader, decoder);
 
         let next = stream.next().await.unwrap();
         let event = next.unwrap().0.pop().unwrap().into_log();

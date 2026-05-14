@@ -16,11 +16,10 @@ use vector_lib::configurable::{
 use crate::sinks::util::zstd::ZstdCompressionLevel;
 
 /// Compression configuration.
-#[derive(Copy, Clone, Debug, Derivative, Eq, PartialEq)]
-#[derivative(Default)]
+#[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
 pub enum Compression {
     /// No compression.
-    #[derivative(Default)]
+    #[default]
     None,
 
     /// [Gzip][gzip] compression.

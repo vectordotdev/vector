@@ -13,10 +13,10 @@ badges:
 Vector's 0.16.0 release includes three **breaking changes**:
 
 1. [Component name field renamed to ID](#name-to-id)
-1. [Datadog Log sink encoding option removed](#encoding)
-1. [Renaming of `memory_use_bytes` internal metric](#memory_use_bytes)
-1. [`datadog_logs` source renamed to `datadog_agent`](#datadog_logs_rename)
-1. [`kubernetes_logs` source's new RBAC](#kubernetes_logs_rbac)
+2. [Datadog Log sink encoding option removed](#encoding)
+3. [Renaming of `memory_use_bytes` internal metric](#memory_use_bytes)
+4. [`datadog_logs` source renamed to `datadog_agent`](#datadog_logs_rename)
+5. [`kubernetes_logs` source's new RBAC](#kubernetes_logs_rbac)
 
 We cover them below to help you upgrade quickly:
 
@@ -30,11 +30,12 @@ components.
 
 For example, with the component config:
 
-```toml
-[transforms.parse_nginx]
-type = "remap"
-inputs = []
-source = ""
+```yaml
+transforms:
+  parse_nginx:
+    type: "remap"
+    inputs: []
+    source: ""
 ```
 
 The `parse_nginx` part of the config is now only referred to as `ID` in the documentation.
@@ -57,19 +58,22 @@ limitations and is only useful for backward compatibility with older clients.
 We no longer allow you to set the encoding of the payloads in the Datadog logs
 sink. For instance, if your configuration looks like so:
 
-```toml
-[sinks.dd_logs_egress]
-type = "datadog_logs"
-inputs = ["datadog_agent"]
-encoding.codec = "json"
+```yaml
+sinks:
+  dd_logs_egress:
+    type: "datadog_logs"
+    inputs: ["datadog_agent"]
+    encoding:
+      codec: "json"
 ```
 
 You should remove `encoding.codec` entirely, leaving you with:
 
-```toml
-[sinks.dd_logs_egress]
-type = "datadog_logs"
-inputs = ["datadog_agent"]
+```yaml
+sinks:
+  dd_logs_egress:
+    type: "datadog_logs"
+    inputs: ["datadog_agent"]
 ```
 
 Encoding fields other than `codec` are still valid.

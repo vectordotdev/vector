@@ -170,13 +170,14 @@ generated: components: sources: opentelemetry: configuration: {
 				}
 				headers: {
 					description: """
-						A list of HTTP headers to include in the log event.
+						A list of HTTP headers to include in the event.
 
 						Accepts the wildcard (`*`) character for headers matching a specified pattern.
 
-						Specifying "*" results in all headers included in the log event.
+						Specifying "*" results in all headers included in the event.
 
-						These headers are not included in the JSON payload if a field with a conflicting name exists.
+						For log events in legacy namespace mode, headers are not included if a field with a conflicting name exists.
+						For metrics and traces, headers are always added to event metadata.
 						"""
 					required: false
 					type: array: {
@@ -327,13 +328,67 @@ generated: components: sources: opentelemetry: configuration: {
 	}
 	use_otlp_decoding: {
 		description: """
-			Setting this field will override the legacy mapping of OTEL protos to Vector events and use the proto directly.
+			Configuration for OTLP decoding behavior.
 
-			One major caveat here is that the incoming metrics will be parsed as logs but they will preserve the OTLP format.
-			This means that components that work on metrics, will not be compatible with this output.
-			However, these events can be forwarded directly to a downstream OTEL collector.
+			This configuration controls how OpenTelemetry Protocol (OTLP) data is decoded for each
+			signal type (logs, metrics, traces). When a signal is configured to use OTLP decoding, the raw OTLP format is
+			preserved, allowing the data to be forwarded to downstream OTLP collectors without transformation.
+			Otherwise, the signal is converted to Vector's native event format.
+
+			Simple boolean form:
+
+			```yaml
+			use_otlp_decoding: true  # All signals preserve OTLP format
+			# or
+			use_otlp_decoding: false # All signals use Vector native format (default)
+			```
+
+			Per-signal configuration:
+
+			```yaml
+			use_otlp_decoding:
+			  logs: false     # Convert to Vector native format
+			  metrics: false  # Convert to Vector native format
+			  traces: true    # Preserve OTLP format
+			```
+
+			**Note:** When OTLP decoding is enabled for metrics:
+			- Metrics are parsed as logs while preserving the OTLP format
+			- Vector's metric transforms will NOT be compatible with this output
+			- The events can be forwarded directly (passthrough) to a downstream OTLP collector
 			"""
 		required: false
-		type: bool: default: false
+		type: object: options: {
+			logs: {
+				description: """
+					Whether to use OTLP decoding for logs.
+
+					When `true`, logs preserve their OTLP format.
+					When `false` (default), logs are converted to Vector's native format.
+					"""
+				required: false
+				type: bool: default: false
+			}
+			metrics: {
+				description: """
+					Whether to use OTLP decoding for metrics.
+
+					When `true`, metrics preserve their OTLP format but are processed as logs.
+					When `false` (default), metrics are converted to Vector's native metric format.
+					"""
+				required: false
+				type: bool: default: false
+			}
+			traces: {
+				description: """
+					Whether to use OTLP decoding for traces.
+
+					When `true`, traces preserve their OTLP format.
+					When `false` (default), traces are converted to Vector's native format.
+					"""
+				required: false
+				type: bool: default: false
+			}
+		}
 	}
 }

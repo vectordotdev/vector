@@ -6,11 +6,13 @@ configuration: {
 			outputs: [components.#Output, ...components.#Output]
 		}
 	}
+	groups?:      _
 	how_it_works: #HowItWorks
 }
 
 configuration: {
 	configuration: generated.configuration.configuration
+	groups:        generated.configuration.groups
 
 	configuration: {
 		// expire_metrics's type is a little bit tricky, we could not generate `uint` from `docs::type_override` metadata macro easily.
@@ -25,6 +27,7 @@ configuration: {
 				"""
 			required: false
 			warnings: ["Deprecated, please use `expire_metrics_secs` instead."]
+			group: "global_options"
 			type: object: options: {
 				secs: {
 					common:      true

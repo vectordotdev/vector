@@ -14,4 +14,3 @@ type = "datadog_logs"
 default_api_key = "unused"
 endpoint = "http://fakeintake-vector:80"
 batch.timeout_secs = 1
-compression = "gzip"

@@ -783,17 +783,6 @@ generated: components: sinks: opentelemetry: configuration: protocol: {
 				}
 			}
 		}
-		headers: {
-			deprecated:         true
-			deprecated_message: "This option has been deprecated, use `request.headers` instead."
-			description:        "A list of custom headers to add to each request."
-			required:           false
-			type: object: options: "*": {
-				description: "An HTTP request header and it's value."
-				required:    true
-				type: string: {}
-			}
-		}
 		method: {
 			description: "The HTTP method to use when making the request."
 			required:    false
@@ -1032,6 +1021,37 @@ generated: components: sinks: opentelemetry: configuration: protocol: {
 					type: uint: {
 						default: 60
 						unit:    "seconds"
+					}
+				}
+			}
+		}
+		retry_strategy: {
+			description: """
+				Configurable retry strategy for `http` based sinks.
+
+				For more information about error responses, see [Client Error Responses][error_responses].
+
+				[error_responses]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status#client_error_responses
+				"""
+			required: false
+			type: object: options: {
+				status_codes: {
+					description:   "Retry on these specific HTTP status codes"
+					relevant_when: "type = \"custom\""
+					required:      true
+					type: array: items: type: uint: {}
+				}
+				type: {
+					description: "The retry strategy enum."
+					required:    false
+					type: string: {
+						default: "default"
+						enum: {
+							all:     "Retry on *all* HTTP status codes except for success codes (2xx)"
+							custom:  "Custom retry strategy"
+							default: "Default strategy. See [`RetryStrategy::retry_action`] for more details."
+							none:    "Don't retry any errors, including request timeouts."
+						}
 					}
 				}
 			}
