@@ -1021,9 +1021,9 @@
    inputs = []
    type = "remap"
    source = """
-     .a = floor(.num)
-     .b = floor(.num, precision: 1)
-     .c = floor(.num, precision: 2)
+     .a = floor!(.num)
+     .b = floor!(.num, precision: 1)
+     .c = floor!(.num, precision: 2)
    """
  [[tests]]
    name = "remap_function_floor"

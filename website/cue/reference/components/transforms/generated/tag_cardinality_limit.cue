@@ -12,6 +12,20 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 		required:      false
 		type: uint: default: 5120
 	}
+	internal_metrics: {
+		description: "Configuration of internal metrics for the TagCardinalityLimit transform."
+		required:    false
+		type: object: options: include_extended_tags: {
+			description: """
+				Whether to include extended tags (metric_name, tag_key) in the `tag_value_limit_exceeded_total` metric.
+
+				This helps identify which metrics and tag keys are hitting cardinality limits, but can significantly
+				increase metric cardinality. Defaults to `false` because these tags have potentially unbounded cardinality.
+				"""
+			required: false
+			type: bool: default: false
+		}
+	}
 	limit_exceeded_action: {
 		description: """
 			Possible actions to take when an event arrives that would exceed the cardinality limit for one
@@ -25,6 +39,22 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 				drop_tag:   "Drop the tag(s) that would exceed the configured limit."
 			}
 		}
+	}
+	max_tracked_keys: {
+		description: """
+			Maximum number of distinct (metric, tag-key) pairs to track across the entire
+			transform. When this cap is reached, additional tag keys on new metrics or new
+			tag keys on existing metrics are not tracked, and tag values for those pairs
+			pass through unchecked. Users can detect this via the
+			`tag_cardinality_untracked_events_total` counter and the
+			`tag_cardinality_tracked_keys` gauge.
+
+			When unset (default), there is no cap and the transform tracks all pairs it
+			encounters. In `global` tracking scope mode, this limit still applies (the
+			metric key is set to `None` unless there is a per-metric override).
+			"""
+		required: false
+		type: uint: {}
 	}
 	mode: {
 		description: "Controls the approach taken for tracking tag cardinality."
@@ -63,6 +93,20 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 					relevant_when: "mode = \"probabilistic\""
 					required:      false
 					type: uint: default: 5120
+				}
+				internal_metrics: {
+					description: "Configuration of internal metrics for the TagCardinalityLimit transform."
+					required:    false
+					type: object: options: include_extended_tags: {
+						description: """
+																				Whether to include extended tags (metric_name, tag_key) in the `tag_value_limit_exceeded_total` metric.
+
+																				This helps identify which metrics and tag keys are hitting cardinality limits, but can significantly
+																				increase metric cardinality. Defaults to `false` because these tags have potentially unbounded cardinality.
+																				"""
+						required: false
+						type: bool: default: false
+					}
 				}
 				limit_exceeded_action: {
 					description: """
@@ -108,6 +152,24 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 					required:    false
 					type: uint: default: 500
 				}
+			}
+		}
+	}
+	tracking_scope: {
+		description: "Controls how tag tracking state is partitioned across metrics."
+		required:    false
+		type: string: {
+			default: "global"
+			enum: {
+				global: """
+					All metrics share a single tracking bucket. Tag values pool across metrics
+					and the global `value_limit` caps the combined set.
+					"""
+				per_metric: """
+					Every distinct metric gets its own tracking bucket, providing tag
+					cardinality limiting for each metric in isolation at the cost of higher
+					memory usage.
+					"""
 			}
 		}
 	}

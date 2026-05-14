@@ -8,20 +8,14 @@ use vector_lib::{
 };
 
 use super::{
-    config::{DatadogMetricsEndpoint, DatadogMetricsEndpointConfiguration},
-    encoder::{CreateError, DatadogMetricsEncoder, EncoderError, FinishError},
+    config::{DatadogMetricsEndpoint, DatadogMetricsEndpointConfiguration, SeriesApiVersion},
+    encoder::{DatadogMetricsEncoder, EncoderError, FinishError},
     service::DatadogMetricsRequest,
 };
 use crate::sinks::util::{IncrementalRequestBuilder, metadata::RequestMetadataBuilder};
 
 #[derive(Debug, Snafu)]
 pub enum RequestBuilderError {
-    #[snafu(
-        context(false),
-        display("Failed to build the request builder: {source}")
-    )]
-    FailedToBuild { source: CreateError },
-
     #[snafu(context(false), display("Failed to encode metric: {source}"))]
     FailedToEncode { source: EncoderError },
 
@@ -40,7 +34,6 @@ impl RequestBuilderError {
     /// many events were dropped as a result.
     pub fn into_parts(self) -> (String, &'static str, u64) {
         match self {
-            Self::FailedToBuild { source } => (source.to_string(), source.as_error_type(), 0),
             // Encoding errors always happen at the per-metric level, so we could only ever drop a
             // single metric/event at a time.
             Self::FailedToEncode { source } => (source.to_string(), source.as_error_type(), 1),
@@ -80,18 +73,19 @@ impl DatadogMetricsRequestBuilder {
     pub fn new(
         endpoint_configuration: DatadogMetricsEndpointConfiguration,
         default_namespace: Option<String>,
-    ) -> Result<Self, RequestBuilderError> {
-        Ok(Self {
+        series_api_version: SeriesApiVersion,
+    ) -> Self {
+        Self {
             endpoint_configuration,
             series_encoder: DatadogMetricsEncoder::new(
-                DatadogMetricsEndpoint::series(),
+                DatadogMetricsEndpoint::Series(series_api_version),
                 default_namespace.clone(),
-            )?,
+            ),
             sketches_encoder: DatadogMetricsEncoder::new(
                 DatadogMetricsEndpoint::Sketches,
                 default_namespace,
-            )?,
-        })
+            ),
+        }
     }
 
     const fn get_encoder(
@@ -246,6 +240,7 @@ impl IncrementalRequestBuilder<((Option<Arc<str>>, DatadogMetricsEndpoint), Vec<
             payload,
             uri,
             content_type: ddmetrics_metadata.endpoint.content_type(),
+            content_encoding: ddmetrics_metadata.endpoint.compression().content_encoding(),
             finalizers: ddmetrics_metadata.finalizers,
             metadata: request_metadata,
         }

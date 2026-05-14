@@ -22,8 +22,7 @@ impl TowerRequestConfigDefaults for RedisTowerRequestConfigDefaults {
 
 /// Redis data type to store messages in.
 #[configurable_component]
-#[derive(Clone, Copy, Debug, Derivative)]
-#[derivative(Default)]
+#[derive(Clone, Copy, Debug, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum DataTypeConfig {
     /// The Redis `list` type.
@@ -31,7 +30,7 @@ pub enum DataTypeConfig {
     /// This resembles a deque, where messages can be popped and pushed from either end.
     ///
     /// This is the default.
-    #[derivative(Default)]
+    #[default]
     List,
 
     /// The Redis `sorted set` type.
@@ -48,7 +47,7 @@ pub enum DataTypeConfig {
 
 /// List-specific options.
 #[configurable_component]
-#[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub struct ListOption {
     /// The method to use for pushing messages into a `list`.
@@ -57,8 +56,7 @@ pub struct ListOption {
 
 /// Method for pushing messages into a `list`.
 #[configurable_component]
-#[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
-#[derivative(Default)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum ListMethod {
     /// Use the `rpush` method.
@@ -66,7 +64,7 @@ pub enum ListMethod {
     /// This pushes messages onto the tail of the list.
     ///
     /// This is the default.
-    #[derivative(Default)]
+    #[default]
     RPush,
 
     /// Use the `lpush` method.
@@ -77,7 +75,7 @@ pub enum ListMethod {
 
 /// Sorted Set-specific options
 #[configurable_component]
-#[derive(Clone, Debug, Derivative, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub struct SortedSetOption {
     /// The method to use for pushing messages into a `sorted set`.
@@ -96,8 +94,7 @@ pub struct SortedSetOption {
 
 /// Method for pushing messages into a `sorted set`.
 #[configurable_component]
-#[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
-#[derivative(Default)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum SortedSetMethod {
     /// Use the `zadd` method.
@@ -105,7 +102,7 @@ pub enum SortedSetMethod {
     /// This adds messages onto a queue with a score.
     ///
     /// This is the default.
-    #[derivative(Default)]
+    #[default]
     ZAdd,
 }
 
@@ -281,14 +278,13 @@ impl From<SentinelConnectionSettings> for SentinelNodeConnectionInfo {
 
 /// How/if TLS should be established.
 #[configurable_component]
-#[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
-#[derivative(Default)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum MaybeTlsMode {
     /// Don't use TLS.
     ///
     /// This is the default.
-    #[derivative(Default)]
+    #[default]
     None,
 
     /// Enable TLS with certificate verification.
@@ -311,8 +307,7 @@ impl From<MaybeTlsMode> for Option<TlsMode> {
 /// Connection independent information used to establish a connection
 /// to a redis instance sentinel owns.
 #[configurable_component]
-#[derive(Clone, Debug, Derivative)]
-#[derivative(Default)]
+#[derive(Clone, Debug, Default)]
 pub struct RedisConnectionSettings {
     /// The database number to use. Usually `0`.
     pub db: i64,
@@ -340,13 +335,12 @@ impl From<RedisConnectionSettings> for RedisConnectionInfo {
 
 /// The communication protocol to use with the redis server.
 #[configurable_component]
-#[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
-#[derivative(Default)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum RedisProtocolVersion {
     /// Use RESP2.
     ///
     /// This is the default.
-    #[derivative(Default)]
+    #[default]
     RESP2,
 
     /// Use RESP3.

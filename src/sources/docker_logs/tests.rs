@@ -30,12 +30,12 @@ mod integration_tests {
     }
 
     use bollard::{
+        models::ContainerCreateBody,
         query_parameters::{
             CreateContainerOptionsBuilder, CreateImageOptionsBuilder, KillContainerOptions,
             ListImagesOptionsBuilder, RemoveContainerOptions, StartContainerOptions,
             WaitContainerOptions,
         },
-        secret::ContainerCreateBody,
     };
     use futures::{FutureExt, stream::TryStreamExt};
     use itertools::Itertools as _;
@@ -182,7 +182,7 @@ mod integration_tests {
                 .create_image(options, None, None)
                 .for_each(|item| async move {
                     let info = item.unwrap();
-                    if let Some(error) = info.error {
+                    if let Some(error) = info.error_detail {
                         panic!("{error:?}");
                     }
                 })

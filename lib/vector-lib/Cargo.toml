@@ -7,7 +7,7 @@ publish = false
 
 [dependencies]
 codecs = { path = "../codecs", default-features = false }
-enrichment = { path = "../enrichment" }
+enrichment = { path = "../vector-vrl/enrichment" }
 file-source = { path = "../file-source", optional = true }
 file-source-common = { path = "../file-source-common", optional = true }
 opentelemetry-proto = { path = "../opentelemetry-proto", optional = true }
@@ -27,6 +27,7 @@ vrl = { workspace = true, optional = true }
 allocation-tracing = ["vector-top?/allocation-tracing"]
 api-client = ["dep:vector-api-client"]
 arrow = ["codecs/arrow"]
+parquet = ["codecs/parquet"]
 api = ["vector-tap/api"]
 file-source = ["dep:file-source", "dep:file-source-common"]
 lua = ["vector-core/lua"]

@@ -77,14 +77,14 @@ sinks:
 Vector logs at the `info` level by default. You can set a different level when [starting] up your instance using either
 command-line flags or the `VECTOR_LOG` environment variable. The table below details these options:
 
-Method | Description
-:------|:-----------
-`-v` flag | Drops the log level to `debug`
-`-vv` flag | Drops the log level to `trace`
-`-q` flag | Raises the log level to `warn`
-`-qq` flag | Raises the log level to `error`
-`-qqq` flag | Disables logging
-`VECTOR_LOG=<level>` environment variable | Set the log level. Must be one of `trace`, `debug`, `info`, `warn`, `error`, `off`.
+| Method | Description |
+| :------- | :----------- |
+| `-v` flag | Drops the log level to `debug` |
+| `-vv` flag | Drops the log level to `trace` |
+| `-q` flag | Raises the log level to `warn` |
+| `-qq` flag | Raises the log level to `error` |
+| `-qqq` flag | Disables logging |
+| `VECTOR_LOG=<level>` environment variable | Set the log level. Must be one of `trace`, `debug`, `info`, `warn`, `error`, `off`. |
 
 #### Stack traces
 

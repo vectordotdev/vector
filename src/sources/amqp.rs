@@ -7,12 +7,14 @@ use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use futures::{FutureExt, StreamExt};
 use futures_util::Stream;
-use lapin::{Channel, acker::Acker, message::Delivery, options::BasicQosOptions};
+use lapin::{Acker, Channel, message::Delivery, options::BasicQosOptions};
 use snafu::Snafu;
-use tokio_util::codec::FramedRead;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
-    codecs::decoding::{DeserializerConfig, FramingConfig},
+    codecs::{
+        DecoderFramedRead,
+        decoding::{DeserializerConfig, FramingConfig},
+    },
     config::{LegacyKey, LogNamespace, SourceAcknowledgementsConfig, log_schema},
     configurable::configurable_component,
     event::{Event, LogEvent},
@@ -322,7 +324,7 @@ async fn receive_event(
 ) -> Result<(), ()> {
     let payload = Cursor::new(Bytes::copy_from_slice(&msg.data));
     let decoder = config.decoder(log_namespace).map_err(|_e| ())?;
-    let mut stream = FramedRead::new(payload, decoder);
+    let mut stream = DecoderFramedRead::new(payload, decoder);
 
     // Extract timestamp from AMQP message
     let timestamp = msg
@@ -447,8 +449,8 @@ async fn run_amqp_source(
     debug!("Starting amqp source, listening to queue {}.", config.queue);
     let mut consumer = channel
         .basic_consume(
-            &config.queue,
-            &config.consumer,
+            config.queue.clone().into(),
+            config.consumer.clone().into(),
             lapin::options::BasicConsumeOptions::default(),
             lapin::types::FieldTable::default(),
         )
@@ -626,6 +628,7 @@ pub mod test {
 #[cfg(test)]
 mod integration_test {
     use chrono::Utc;
+    use lapin::types::ShortString;
     use lapin::{BasicProperties, options::*};
     use tokio::time::Duration;
     use vector_lib::config::log_schema;
@@ -689,8 +692,8 @@ mod integration_test {
 
         channel
             .basic_publish(
-                exchange,
-                routing_key,
+                exchange.into(),
+                routing_key.into(),
                 BasicPublishOptions::default(),
                 payload.as_ref(),
                 BasicProperties::default(),
@@ -706,6 +709,7 @@ mod integration_test {
         let queue = format!("test-{}-queue", random_string(10));
         let routing_key = "my_key";
         trace!("Test exchange name: {}.", exchange);
+        let exchange: ShortString = exchange.into();
         let consumer = format!("test-consumer-{}", random_string(10));
 
         config.consumer = consumer;
@@ -719,7 +723,7 @@ mod integration_test {
 
         channel
             .exchange_declare(
-                &exchange,
+                exchange.clone(),
                 lapin::ExchangeKind::Fanout,
                 exchange_opts,
                 lapin::types::FieldTable::default(),
@@ -731,9 +735,10 @@ mod integration_test {
             auto_delete: true,
             ..Default::default()
         };
+        let queue: ShortString = config.queue.clone().into();
         channel
             .queue_declare(
-                &config.queue,
+                queue.clone(),
                 queue_opts,
                 lapin::types::FieldTable::default(),
             )
@@ -742,9 +747,9 @@ mod integration_test {
 
         channel
             .queue_bind(
-                &config.queue,
-                &exchange,
-                "",
+                queue,
+                exchange.clone(),
+                "".into(),
                 lapin::options::QueueBindOptions::default(),
                 lapin::types::FieldTable::default(),
             )
@@ -755,7 +760,7 @@ mod integration_test {
         let now = Utc::now();
         send_event(
             &channel,
-            &exchange,
+            exchange.as_str(),
             routing_key,
             "my message",
             now.timestamp_millis(),
@@ -776,7 +781,7 @@ mod integration_test {
             .as_timestamp()
             .unwrap();
         assert!(log_ts.signed_duration_since(now) < chrono::Duration::seconds(1));
-        assert_eq!(log["exchange"], exchange.into());
+        assert_eq!(log["exchange"], exchange.as_str().into());
     }
 
     #[tokio::test]

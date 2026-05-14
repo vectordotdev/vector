@@ -4,12 +4,31 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
+use crate::{
+    SourceSender,
+    config::{OutputId, SourceConfig, SourceContext},
+    event::{
+        Event, EventStatus, LogEvent, Metric as MetricEvent, MetricKind, MetricTags, MetricValue,
+        ObjectMap, Value, into_event_stream,
+        metric::{Bucket, Quantile},
+    },
+    sources::opentelemetry::config::{
+        GrpcConfig, HttpConfig, LOGS, METRICS, OpentelemetryConfig, TRACES,
+    },
+    test_util::{
+        self,
+        addr::next_addr,
+        components::{SOURCE_TAGS, assert_source_compliance},
+    },
+};
 use chrono::{DateTime, TimeZone, Utc};
 use futures::Stream;
 use futures_util::StreamExt;
 use prost::Message;
 use similar_asserts::assert_eq;
 use tonic::Request;
+use vector_lib::opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest;
+use vector_lib::opentelemetry::proto::trace::v1::{ResourceSpans, ScopeSpans, Span};
 use vector_lib::{
     config::LogNamespace,
     lookup::path,
@@ -32,22 +51,6 @@ use vector_lib::{
     },
 };
 use vrl::value;
-
-use crate::{
-    SourceSender,
-    config::{OutputId, SourceConfig, SourceContext},
-    event::{
-        Event, EventStatus, LogEvent, Metric as MetricEvent, MetricKind, MetricTags, MetricValue,
-        ObjectMap, Value, into_event_stream,
-        metric::{Bucket, Quantile},
-    },
-    sources::opentelemetry::config::{GrpcConfig, HttpConfig, LOGS, METRICS, OpentelemetryConfig},
-    test_util::{
-        self,
-        addr::next_addr,
-        components::{SOURCE_TAGS, assert_source_compliance},
-    },
-};
 
 fn create_test_logs_request() -> Request<ExportLogsServiceRequest> {
     Request::new(ExportLogsServiceRequest {
@@ -98,6 +101,104 @@ fn create_test_logs_request() -> Request<ExportLogsServiceRequest> {
             schema_url: "v1".into(),
         }],
     })
+}
+
+fn create_test_metrics_request() -> ExportMetricsServiceRequest {
+    ExportMetricsServiceRequest {
+        resource_metrics: vec![ResourceMetrics {
+            resource: Some(Resource {
+                attributes: vec![KeyValue {
+                    key: "service.name".to_string(),
+                    value: Some(AnyValue {
+                        value: Some(StringValue("vector-collector".to_string())),
+                    }),
+                }],
+                dropped_attributes_count: 0,
+            }),
+            schema_url: "".to_string(),
+            scope_metrics: vec![ScopeMetrics {
+                scope: Some(InstrumentationScope {
+                    name: "vector-collector-instrumentation".to_string(),
+                    version: "0.111.0".to_string(),
+                    attributes: vec![],
+                    dropped_attributes_count: 0,
+                }),
+                schema_url: "".to_string(),
+                metrics: vec![Metric {
+                    name: "some.random.metric".to_string(),
+                    description: "Some random metric we use for test".to_string(),
+                    unit: "1".to_string(),
+                    data: Some(Data::Summary(Summary {
+                        data_points: vec![SummaryDataPoint {
+                            attributes: vec![
+                                KeyValue {
+                                    key: "host".to_string(),
+                                    value: Some(AnyValue {
+                                        value: Some(StringValue("localhost".to_string())),
+                                    }),
+                                },
+                                KeyValue {
+                                    key: "service".to_string(),
+                                    value: Some(AnyValue {
+                                        value: Some(StringValue("vector-collector".to_string())),
+                                    }),
+                                },
+                            ],
+                            start_time_unix_nano: 0,
+                            time_unix_nano: 0,
+                            count: 5,
+                            sum: 122.5,
+                            quantile_values: vec![
+                                ValueAtQuantile {
+                                    quantile: 0.5,
+                                    value: 24.5,
+                                },
+                                ValueAtQuantile {
+                                    quantile: 0.9,
+                                    value: 45.0,
+                                },
+                                ValueAtQuantile {
+                                    quantile: 1.0,
+                                    value: 60.0,
+                                },
+                            ],
+                            flags: 0,
+                        }],
+                    })),
+                }],
+            }],
+        }],
+    }
+}
+
+fn create_test_traces_request() -> ExportTraceServiceRequest {
+    ExportTraceServiceRequest {
+        resource_spans: vec![ResourceSpans {
+            resource: None,
+            scope_spans: vec![ScopeSpans {
+                scope: None,
+                spans: vec![Span {
+                    trace_id: (1..17).collect::<Vec<u8>>(),
+                    span_id: (1..9).collect::<Vec<u8>>(),
+                    parent_span_id: (1..9).collect::<Vec<u8>>(),
+                    name: "span".to_string(),
+                    kind: 1,
+                    start_time_unix_nano: 1713525203000000000,
+                    end_time_unix_nano: 1713525205000000000,
+                    attributes: vec![],
+                    dropped_attributes_count: 0,
+                    events: vec![],
+                    dropped_events_count: 0,
+                    links: vec![],
+                    dropped_links_count: 0,
+                    status: None,
+                    trace_state: "".to_string(),
+                }],
+                schema_url: "".to_string(),
+            }],
+            schema_url: "".to_string(),
+        }],
+    }
 }
 
 #[test]
@@ -1087,8 +1188,41 @@ fn get_source_config_with_headers(
         },
         acknowledgements: Default::default(),
         log_namespace: Default::default(),
-        use_otlp_decoding,
+        use_otlp_decoding: use_otlp_decoding.into(),
     }
+}
+
+async fn send_and_collect_otel_event(
+    use_otlp_decoding: bool,
+    output_port: &str,
+    endpoint: &str,
+    body: Vec<u8>,
+) -> Event {
+    let (_guard_0, grpc_addr) = next_addr();
+    let (_guard_1, http_addr) = next_addr();
+
+    let source = get_source_config_with_headers(grpc_addr, http_addr, use_otlp_decoding);
+
+    let (sender, output, _) = new_source(EventStatus::Delivered, output_port.to_string());
+    let server = source
+        .build(SourceContext::new_test(sender, None))
+        .await
+        .unwrap();
+    tokio::spawn(server);
+    test_util::wait_for_tcp(http_addr).await;
+
+    let _res = reqwest::Client::new()
+        .post(format!("http://{http_addr}/{endpoint}"))
+        .header("Content-Type", "application/x-protobuf")
+        .header("User-Agent", "Test")
+        .body(body)
+        .send()
+        .await
+        .expect("Failed to send request to OpenTelemetry source.");
+
+    let mut events = test_util::collect_ready(output).await;
+    assert_eq!(events.len(), 1);
+    events.pop().unwrap()
 }
 
 #[tokio::test]
@@ -1237,6 +1371,128 @@ async fn http_headers_logs_use_otlp_decoding_true() {
     .await;
 }
 
+#[tokio::test]
+async fn http_headers_metrics_use_otlp_decoding_false() {
+    assert_source_compliance(&SOURCE_TAGS, async {
+        let event = send_and_collect_otel_event(
+            false,
+            METRICS,
+            "v1/metrics",
+            create_test_metrics_request().encode_to_vec(),
+        )
+        .await;
+        let metric = event.as_metric();
+        assert_eq!(
+            metric
+                .metadata()
+                .value()
+                .get(path!("opentelemetry", "headers"))
+                .unwrap()
+                .get("AbsentHeader")
+                .unwrap(),
+            &Value::Null
+        );
+        assert_eq!(
+            metric
+                .metadata()
+                .value()
+                .get(path!("opentelemetry", "headers"))
+                .unwrap()
+                .get("User-Agent")
+                .unwrap(),
+            &value!("Test")
+        );
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn http_headers_metrics_use_otlp_decoding_true() {
+    assert_source_compliance(&SOURCE_TAGS, async {
+        let event = send_and_collect_otel_event(
+            true,
+            METRICS,
+            "v1/metrics",
+            create_test_metrics_request().encode_to_vec(),
+        )
+        .await;
+        let log = event.as_log();
+        assert_eq!(log["AbsentHeader"], Value::Null);
+        assert_eq!(log["User-Agent"], "Test".into());
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn http_headers_traces_use_otlp_decoding_false() {
+    assert_source_compliance(&SOURCE_TAGS, async {
+        let event = send_and_collect_otel_event(
+            false,
+            TRACES,
+            "v1/traces",
+            create_test_traces_request().encode_to_vec(),
+        )
+        .await;
+        let trace = event.as_trace();
+        assert_eq!(
+            trace
+                .metadata()
+                .value()
+                .get(path!("opentelemetry", "headers"))
+                .unwrap()
+                .get("AbsentHeader")
+                .unwrap(),
+            &Value::Null
+        );
+        assert_eq!(
+            trace
+                .metadata()
+                .value()
+                .get(path!("opentelemetry", "headers"))
+                .unwrap()
+                .get("User-Agent")
+                .unwrap(),
+            &value!("Test")
+        );
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn http_headers_traces_use_otlp_decoding_true() {
+    assert_source_compliance(&SOURCE_TAGS, async {
+        let event = send_and_collect_otel_event(
+            true,
+            TRACES,
+            "v1/traces",
+            create_test_traces_request().encode_to_vec(),
+        )
+        .await;
+        let trace = event.as_trace();
+        assert_eq!(
+            trace
+                .metadata()
+                .value()
+                .get(path!("opentelemetry", "headers"))
+                .unwrap()
+                .get("AbsentHeader")
+                .unwrap(),
+            &Value::Null
+        );
+        assert_eq!(
+            trace
+                .metadata()
+                .value()
+                .get(path!("opentelemetry", "headers"))
+                .unwrap()
+                .get("User-Agent")
+                .unwrap(),
+            &value!("Test")
+        );
+    })
+    .await;
+}
+
 pub struct OTelTestEnv {
     pub grpc_addr: String,
     pub config: OpentelemetryConfig,
@@ -1263,7 +1519,7 @@ pub async fn build_otlp_test_env(
         },
         acknowledgements: Default::default(),
         log_namespace,
-        use_otlp_decoding: false,
+        use_otlp_decoding: false.into(),
     };
 
     let (sender, output, _) = new_source(EventStatus::Delivered, event_name.to_string());
@@ -1342,7 +1598,7 @@ async fn http_logs_use_otlp_decoding_emits_metric() {
         },
         acknowledgements: Default::default(),
         log_namespace: None,
-        use_otlp_decoding: true,
+        use_otlp_decoding: true.into(),
     };
 
     let (sender, logs_output, _) = new_source(EventStatus::Delivered, LOGS.to_string());
@@ -1407,5 +1663,281 @@ async fn http_logs_use_otlp_decoding_emits_metric() {
             );
         }
         _ => panic!("component_received_events_total should be a counter"),
+    }
+}
+
+#[cfg(test)]
+mod otlp_decoding_config_tests {
+    use crate::config::{DataType, LogNamespace, SourceConfig};
+    use crate::sources::opentelemetry::config::{
+        GrpcConfig, HttpConfig, OpentelemetryConfig, OtlpDecodingConfig,
+    };
+    use vector_lib::codecs::decoding::OtlpSignalType;
+
+    #[test]
+    fn test_otlp_decoding_mixed_configurations() {
+        // Test single signal enabled
+        let config = OtlpDecodingConfig {
+            logs: false,
+            metrics: false,
+            traces: true,
+        };
+        assert!(config.any_enabled());
+        assert!(!config.all_enabled());
+        assert!(config.is_mixed());
+
+        // Test two signals enabled
+        let config = OtlpDecodingConfig {
+            logs: true,
+            metrics: false,
+            traces: true,
+        };
+        assert!(config.any_enabled());
+        assert!(!config.all_enabled());
+        assert!(config.is_mixed());
+
+        // Test different single signal
+        let config = OtlpDecodingConfig {
+            logs: true,
+            metrics: false,
+            traces: false,
+        };
+        assert!(config.any_enabled());
+        assert!(!config.all_enabled());
+        assert!(config.is_mixed());
+    }
+
+    #[test]
+    fn test_otlp_decoding_from_bool() {
+        // Test direct From<bool> trait implementation
+        let config_true = OtlpDecodingConfig::from(true);
+        assert!(config_true.logs);
+        assert!(config_true.metrics);
+        assert!(config_true.traces);
+        assert!(config_true.all_enabled());
+        assert!(!config_true.is_mixed());
+
+        let config_false = OtlpDecodingConfig::from(false);
+        assert!(!config_false.logs);
+        assert!(!config_false.metrics);
+        assert!(!config_false.traces);
+        assert!(!config_false.any_enabled());
+        assert!(!config_false.is_mixed());
+
+        // Test TOML deserialization (which uses From<bool> under the hood)
+        let config: OpentelemetryConfig = toml::from_str(
+            r#"
+            use_otlp_decoding = true
+
+            [grpc]
+            address = "0.0.0.0:4317"
+
+            [http]
+            address = "0.0.0.0:4318"
+            "#,
+        )
+        .unwrap();
+        assert!(config.use_otlp_decoding.logs);
+        assert!(config.use_otlp_decoding.metrics);
+        assert!(config.use_otlp_decoding.traces);
+
+        let config: OpentelemetryConfig = toml::from_str(
+            r#"
+            use_otlp_decoding = false
+
+            [grpc]
+            address = "0.0.0.0:4317"
+
+            [http]
+            address = "0.0.0.0:4318"
+            "#,
+        )
+        .unwrap();
+        assert!(!config.use_otlp_decoding.logs);
+        assert!(!config.use_otlp_decoding.metrics);
+        assert!(!config.use_otlp_decoding.traces);
+    }
+
+    #[test]
+    fn test_otlp_decoding_deserialization_from_struct() {
+        // Test deserializing from a struct with all fields
+        let config: OpentelemetryConfig = toml::from_str(
+            r#"
+            [grpc]
+            address = "0.0.0.0:4317"
+
+            [http]
+            address = "0.0.0.0:4318"
+
+            [use_otlp_decoding]
+            logs = false
+            metrics = false
+            traces = true
+            "#,
+        )
+        .unwrap();
+        assert!(!config.use_otlp_decoding.logs);
+        assert!(!config.use_otlp_decoding.metrics);
+        assert!(config.use_otlp_decoding.traces);
+
+        // Test deserializing from a struct with partial fields (using defaults)
+        let config: OpentelemetryConfig = toml::from_str(
+            r#"
+            [grpc]
+            address = "0.0.0.0:4317"
+
+            [http]
+            address = "0.0.0.0:4318"
+
+            [use_otlp_decoding]
+            traces = true
+            "#,
+        )
+        .unwrap();
+        assert!(!config.use_otlp_decoding.logs); // default false
+        assert!(!config.use_otlp_decoding.metrics); // default false
+        assert!(config.use_otlp_decoding.traces);
+    }
+
+    #[test]
+    fn test_otlp_decoding_default_when_not_specified() {
+        // Test that when use_otlp_decoding is not specified, it uses defaults (all false)
+        let config: OpentelemetryConfig = toml::from_str(
+            r#"
+            [grpc]
+            address = "0.0.0.0:4317"
+
+            [http]
+            address = "0.0.0.0:4318"
+            "#,
+        )
+        .unwrap();
+        assert!(!config.use_otlp_decoding.logs);
+        assert!(!config.use_otlp_decoding.metrics);
+        assert!(!config.use_otlp_decoding.traces);
+    }
+
+    #[tokio::test]
+    async fn test_get_signal_deserializer_per_signal() {
+        let config_all_true = OpentelemetryConfig {
+            grpc: GrpcConfig {
+                address: "0.0.0.0:4317".parse().unwrap(),
+                tls: None,
+            },
+            http: HttpConfig {
+                address: "0.0.0.0:4318".parse().unwrap(),
+                tls: None,
+                keepalive: Default::default(),
+                headers: vec![],
+            },
+            acknowledgements: Default::default(),
+            log_namespace: None,
+            use_otlp_decoding: OtlpDecodingConfig {
+                logs: true,
+                metrics: true,
+                traces: true,
+            },
+        };
+
+        // All should return Some deserializer
+        assert!(
+            config_all_true
+                .get_signal_deserializer(OtlpSignalType::Logs)
+                .unwrap()
+                .is_some()
+        );
+        assert!(
+            config_all_true
+                .get_signal_deserializer(OtlpSignalType::Metrics)
+                .unwrap()
+                .is_some()
+        );
+        assert!(
+            config_all_true
+                .get_signal_deserializer(OtlpSignalType::Traces)
+                .unwrap()
+                .is_some()
+        );
+
+        let config_mixed = OpentelemetryConfig {
+            grpc: GrpcConfig {
+                address: "0.0.0.0:4317".parse().unwrap(),
+                tls: None,
+            },
+            http: HttpConfig {
+                address: "0.0.0.0:4318".parse().unwrap(),
+                tls: None,
+                keepalive: Default::default(),
+                headers: vec![],
+            },
+            acknowledgements: Default::default(),
+            log_namespace: None,
+            use_otlp_decoding: OtlpDecodingConfig {
+                logs: false,
+                metrics: false,
+                traces: true,
+            },
+        };
+
+        // Only traces should return Some deserializer
+        assert!(
+            config_mixed
+                .get_signal_deserializer(OtlpSignalType::Logs)
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            config_mixed
+                .get_signal_deserializer(OtlpSignalType::Metrics)
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            config_mixed
+                .get_signal_deserializer(OtlpSignalType::Traces)
+                .unwrap()
+                .is_some()
+        );
+    }
+
+    #[test]
+    fn test_outputs_configuration_per_signal() {
+        let config_mixed = OpentelemetryConfig {
+            grpc: GrpcConfig {
+                address: "0.0.0.0:4317".parse().unwrap(),
+                tls: None,
+            },
+            http: HttpConfig {
+                address: "0.0.0.0:4318".parse().unwrap(),
+                tls: None,
+                keepalive: Default::default(),
+                headers: vec![],
+            },
+            acknowledgements: Default::default(),
+            log_namespace: None,
+            use_otlp_decoding: OtlpDecodingConfig {
+                logs: false,
+                metrics: true,
+                traces: true,
+            },
+        };
+
+        let outputs = config_mixed.outputs(LogNamespace::Legacy);
+        assert_eq!(outputs.len(), 3);
+
+        // Verify logs output (native format)
+        let logs_output = &outputs[0];
+        assert_eq!(logs_output.port.as_deref(), Some("logs"));
+        assert_eq!(logs_output.ty, DataType::Log);
+
+        // Verify metrics output (OTLP format, logs data type)
+        let metrics_output = &outputs[1];
+        assert_eq!(metrics_output.port.as_deref(), Some("metrics"));
+        assert_eq!(metrics_output.ty, DataType::Log); // Should be Log when OTLP decoding is enabled
+
+        // Verify traces output (OTLP format, traces data type)
+        let traces_output = &outputs[2];
+        assert_eq!(traces_output.port.as_deref(), Some("traces"));
+        assert_eq!(traces_output.ty, DataType::Trace); // Should always be Trace regardless of OTLP decoding
     }
 }

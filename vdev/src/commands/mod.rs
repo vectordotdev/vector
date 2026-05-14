@@ -13,7 +13,7 @@ macro_rules! cli_commands {
     };
     // All the identifiers are parsed out, build up the enum and impl blocks
     ( :: $( $mod:ident, )* :: ) => {
-        paste::paste! {
+        pastey::paste! {
             #[derive(clap::Subcommand, Debug)]
             enum Commands {
                 $( [<$mod:camel>]($mod::Cli), )*
@@ -72,7 +72,6 @@ mod check;
 mod complete;
 mod crate_versions;
 mod e2e;
-mod exec;
 mod features;
 mod fmt;
 mod info;
@@ -92,7 +91,6 @@ cli_commands! {
     complete,
     crate_versions,
     e2e,
-    exec,
     features,
     fmt,
     info,
@@ -111,7 +109,7 @@ cli_commands! {
 #[macro_export]
 macro_rules! script_wrapper {
     ( $mod:ident = $doc:literal => $script:literal ) => {
-        paste::paste! {
+        pastey::paste! {
             mod $mod {
                 #[doc = $doc]
                 #[derive(clap::Args, Debug)]

@@ -51,11 +51,14 @@ impl deadpool::managed::Manager for AmqpSinkChannelManager {
         channel: &mut Self::Type,
         _: &deadpool::managed::Metrics,
     ) -> deadpool::managed::RecycleResult<Self::Error> {
-        let state = channel.status().state();
-        if state == lapin::ChannelState::Connected {
+        let status = channel.status();
+        if status.connected() {
             Ok(())
         } else {
-            Err((AmqpError::ChannelClosed { state }).into())
+            Err((AmqpError::ChannelClosed {
+                status: status.clone(),
+            })
+            .into())
         }
     }
 }

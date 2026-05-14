@@ -16,14 +16,16 @@ use crate::{
     event::{Event, Metric, MetricTags, metric, metric::TagValue},
     test_util::components::assert_transform_compliance,
     transforms::{
-        tag_cardinality_limit::config::{BloomFilterConfig, Mode, default_cache_size},
+        tag_cardinality_limit::config::{
+            BloomFilterConfig, InternalMetricsConfig, Mode, default_cache_size,
+        },
         test::create_topology,
     },
 };
 
 #[test]
 fn generate_config() {
-    crate::test_util::test_generate_config::<TagCardinalityLimitConfig>();
+    crate::test_util::test_generate_config::<Config>();
 }
 
 fn make_metric_with_name(tags: MetricTags, name: &str) -> Event {
@@ -47,61 +49,70 @@ fn make_metric(tags: MetricTags) -> Event {
 fn make_transform_hashset(
     value_limit: usize,
     limit_exceeded_action: LimitExceededAction,
-) -> TagCardinalityLimitConfig {
-    TagCardinalityLimitConfig {
-        global: TagCardinalityLimitInnerConfig {
+) -> Config {
+    Config {
+        global: Inner {
             value_limit,
             limit_exceeded_action,
             mode: Mode::Exact,
+            internal_metrics: InternalMetricsConfig::default(),
         },
+        tracking_scope: TrackingScope::default(),
+        max_tracked_keys: None,
         per_metric_limits: HashMap::new(),
     }
 }
 
-fn make_transform_bloom(
-    value_limit: usize,
-    limit_exceeded_action: LimitExceededAction,
-) -> TagCardinalityLimitConfig {
-    TagCardinalityLimitConfig {
-        global: TagCardinalityLimitInnerConfig {
+fn make_transform_bloom(value_limit: usize, limit_exceeded_action: LimitExceededAction) -> Config {
+    Config {
+        global: Inner {
             value_limit,
             limit_exceeded_action,
             mode: Mode::Probabilistic(BloomFilterConfig {
                 cache_size_per_key: default_cache_size(),
             }),
+            internal_metrics: InternalMetricsConfig::default(),
         },
+        tracking_scope: TrackingScope::default(),
+        max_tracked_keys: None,
         per_metric_limits: HashMap::new(),
     }
 }
 
-const fn make_transform_hashset_with_per_metric_limits(
+fn make_transform_hashset_with_per_metric_limits(
     value_limit: usize,
     limit_exceeded_action: LimitExceededAction,
     per_metric_limits: HashMap<String, PerMetricConfig>,
-) -> TagCardinalityLimitConfig {
-    TagCardinalityLimitConfig {
-        global: TagCardinalityLimitInnerConfig {
+) -> Config {
+    Config {
+        global: Inner {
             value_limit,
             limit_exceeded_action,
             mode: Mode::Exact,
+            internal_metrics: InternalMetricsConfig::default(),
         },
+        tracking_scope: TrackingScope::default(),
+        max_tracked_keys: None,
         per_metric_limits,
     }
 }
 
-const fn make_transform_bloom_with_per_metric_limits(
+fn make_transform_bloom_with_per_metric_limits(
     value_limit: usize,
     limit_exceeded_action: LimitExceededAction,
     per_metric_limits: HashMap<String, PerMetricConfig>,
-) -> TagCardinalityLimitConfig {
-    TagCardinalityLimitConfig {
-        global: TagCardinalityLimitInnerConfig {
+) -> Config {
+    Config {
+        global: Inner {
             value_limit,
             limit_exceeded_action,
             mode: Mode::Probabilistic(BloomFilterConfig {
                 cache_size_per_key: default_cache_size(),
             }),
+            internal_metrics: InternalMetricsConfig::default(),
         },
+        tracking_scope: TrackingScope::default(),
+        max_tracked_keys: None,
         per_metric_limits,
     }
 }
@@ -116,7 +127,7 @@ async fn tag_cardinality_limit_drop_event_bloom() {
     drop_event(make_transform_bloom(2, LimitExceededAction::DropEvent)).await;
 }
 
-async fn drop_event(config: TagCardinalityLimitConfig) {
+async fn drop_event(config: Config) {
     assert_transform_compliance(async move {
         let mut event1 = make_metric(metric_tags!("tag1" => "val1"));
         let mut event2 = make_metric(metric_tags!("tag1" => "val2"));
@@ -168,7 +179,7 @@ async fn tag_cardinality_limit_drop_tag_bloom() {
     drop_tag(make_transform_bloom(2, LimitExceededAction::DropTag)).await;
 }
 
-async fn drop_tag(config: TagCardinalityLimitConfig) {
+async fn drop_tag(config: Config) {
     assert_transform_compliance(async move {
         let tags1 = metric_tags!("tag1" => "val1", "tag2" => "val1");
         let mut event1 = make_metric(tags1);
@@ -236,7 +247,7 @@ async fn tag_cardinality_limit_drop_tag_bloom_multi_value() {
     drop_tag_multi_value(make_transform_bloom(2, LimitExceededAction::DropTag)).await;
 }
 
-async fn drop_tag_multi_value(config: TagCardinalityLimitConfig) {
+async fn drop_tag_multi_value(config: Config) {
     assert_transform_compliance(async move {
         let mut tags1 = MetricTags::default();
         tags1.set_multi_value(
@@ -321,7 +332,7 @@ async fn tag_cardinality_limit_separate_value_limit_per_tag_bloom() {
 
 /// Test that hitting the value limit on one tag does not affect the ability to take new
 /// values for other tags.
-async fn separate_value_limit_per_tag(config: TagCardinalityLimitConfig) {
+async fn separate_value_limit_per_tag(config: Config) {
     assert_transform_compliance(async move {
         let mut event1 = make_metric(metric_tags!("tag1" => "val1", "tag2" => "val1"));
 
@@ -456,7 +467,7 @@ async fn tag_cardinality_limit_separate_value_limit_per_metric_name_bloom() {
 
 /// Test that hitting the value limit on one tag does not affect the ability to take new
 /// values for other tags.
-async fn separate_value_limit_per_metric_name(config: TagCardinalityLimitConfig) {
+async fn separate_value_limit_per_metric_name(config: Config) {
     assert_transform_compliance(async move {
         let mut event_a1 =
             make_metric_with_name(metric_tags!("tag1" => "val1", "tag2" => "val1"), "metricA");
@@ -591,4 +602,139 @@ async fn separate_value_limit_per_metric_name(config: TagCardinalityLimitConfig)
         );
     })
     .await;
+}
+
+/// With `tracking_scope: per_metric`, two metrics without explicit `per_metric_limits` entries
+/// each get their own tracking bucket, so one hitting the limit does not affect the other.
+#[test]
+fn tracking_scope_per_metric_isolates_metrics() {
+    let mut config = make_transform_hashset(2, LimitExceededAction::DropEvent);
+    config.tracking_scope = TrackingScope::PerMetric;
+    let mut transform = TagCardinalityLimit::new(config);
+
+    // Fill metric_a's bucket to its limit (2 distinct values).
+    let a1 = make_metric_with_name(metric_tags!("tag" => "v1"), "metric_a");
+    let a2 = make_metric_with_name(metric_tags!("tag" => "v2"), "metric_a");
+    // metric_b should be tracked in its own bucket — not affected by metric_a.
+    let b1 = make_metric_with_name(metric_tags!("tag" => "v3"), "metric_b");
+    let b2 = make_metric_with_name(metric_tags!("tag" => "v4"), "metric_b");
+    // A 3rd unique value on metric_a should be rejected (its bucket is full).
+    let a3 = make_metric_with_name(metric_tags!("tag" => "v5"), "metric_a");
+
+    assert_eq!(transform.transform_one(a1.clone()), Some(a1));
+    assert_eq!(transform.transform_one(a2.clone()), Some(a2));
+    assert_eq!(transform.transform_one(b1.clone()), Some(b1));
+    assert_eq!(transform.transform_one(b2.clone()), Some(b2));
+    assert_eq!(transform.transform_one(a3), None);
+}
+
+/// With the default `tracking_scope: global`, metrics without explicit `per_metric_limits`
+/// entries share a single tracking bucket — so values from different metrics pool together.
+#[test]
+fn tracking_scope_global_pools_metrics() {
+    // Default `tracking_scope` is `Global`.
+    let config = make_transform_hashset(2, LimitExceededAction::DropEvent);
+    let mut transform = TagCardinalityLimit::new(config);
+
+    let a1 = make_metric_with_name(metric_tags!("tag" => "v1"), "metric_a");
+    // Different metric, but values pool into the shared bucket → 2/2 used.
+    let b1 = make_metric_with_name(metric_tags!("tag" => "v2"), "metric_b");
+    // 3rd unique value across the shared bucket → rejected.
+    let a2 = make_metric_with_name(metric_tags!("tag" => "v3"), "metric_a");
+
+    assert_eq!(transform.transform_one(a1.clone()), Some(a1));
+    assert_eq!(transform.transform_one(b1.clone()), Some(b1));
+    assert_eq!(transform.transform_one(a2), None);
+}
+
+/// With `max_tracked_keys: 2`, only 2 distinct (metric, tag-key) pairs get tracking
+/// buckets. Tag values for additional pairs pass through unchecked rather than being
+/// rejected. The tag values for tracked pairs are still subject to `value_limit`.
+#[test]
+fn max_tracked_keys_caps_pair_allocation() {
+    let mut config = make_transform_hashset(1, LimitExceededAction::DropTag);
+    config.max_tracked_keys = Some(2);
+    let mut transform = TagCardinalityLimit::new(config);
+
+    // First 2 distinct (metric, tag-key) pairs allocate buckets.
+    // (None, "tag1") — bucket 1
+    let e1 = transform
+        .transform_one(make_metric(metric_tags!("tag1" => "v1")))
+        .unwrap();
+    assert_eq!("v1", e1.as_metric().tags().unwrap().get("tag1").unwrap());
+
+    // (None, "tag2") — bucket 2
+    let e2 = transform
+        .transform_one(make_metric(metric_tags!("tag2" => "v1")))
+        .unwrap();
+    assert_eq!("v1", e2.as_metric().tags().unwrap().get("tag2").unwrap());
+
+    // tag1 value_limit hit at 1 → second value rejected (drop_tag).
+    let e3 = transform
+        .transform_one(make_metric(metric_tags!("tag1" => "v2")))
+        .unwrap();
+    assert!(!e3.as_metric().tags().unwrap().contains_key("tag1"));
+
+    // (None, "tag3") would need a 3rd bucket — cap is 2, so it passes through
+    // unchecked. The tag is retained even though we can't enforce a value_limit on it.
+    let e4 = transform
+        .transform_one(make_metric(metric_tags!("tag3" => "v1")))
+        .unwrap();
+    assert_eq!("v1", e4.as_metric().tags().unwrap().get("tag3").unwrap());
+    let e5 = transform
+        .transform_one(make_metric(metric_tags!("tag3" => "v2")))
+        .unwrap();
+    assert_eq!("v2", e5.as_metric().tags().unwrap().get("tag3").unwrap());
+}
+
+/// With `max_tracked_keys` unset (default), cardinality limiting works normally and
+/// new pairs are always tracked.
+#[test]
+fn max_tracked_keys_unlimited_by_default() {
+    let config = make_transform_hashset(1, LimitExceededAction::DropTag);
+    assert!(config.max_tracked_keys.is_none());
+    let mut transform = TagCardinalityLimit::new(config);
+
+    // Many distinct tag keys all get tracked; each enforces value_limit=1.
+    for i in 0..10 {
+        let key = format!("tag{i}");
+        let _ = transform
+            .transform_one(make_metric(metric_tags!(key.clone() => "v1")))
+            .unwrap();
+        // Second value for the same tag key should be rejected.
+        let e = transform
+            .transform_one(make_metric(metric_tags!(key.clone() => "v2")))
+            .unwrap();
+        assert!(!e.as_metric().tags().unwrap().contains_key(key.as_str()));
+    }
+}
+
+/// With `tracking_scope: per_metric`, the cap is enforced across *all* per-metric
+/// buckets — not per bucket. Once the cap is hit, further metrics pass through
+/// unchecked.
+#[test]
+fn max_tracked_keys_caps_across_per_metric_buckets() {
+    let mut config = make_transform_hashset(1, LimitExceededAction::DropTag);
+    config.tracking_scope = TrackingScope::PerMetric;
+    config.max_tracked_keys = Some(2);
+    let mut transform = TagCardinalityLimit::new(config);
+
+    // metric_a, tag "k" → pair 1 of 2
+    let _ = transform
+        .transform_one(make_metric_with_name(metric_tags!("k" => "v1"), "metric_a"))
+        .unwrap();
+    // metric_b, tag "k" → pair 2 of 2 (different bucket because per_metric scope)
+    let _ = transform
+        .transform_one(make_metric_with_name(metric_tags!("k" => "v1"), "metric_b"))
+        .unwrap();
+    // metric_c, tag "k" → would be pair 3, cap is 2 → untracked passthrough.
+    let e = transform
+        .transform_one(make_metric_with_name(metric_tags!("k" => "v1"), "metric_c"))
+        .unwrap();
+    assert_eq!("v1", e.as_metric().tags().unwrap().get("k").unwrap());
+    // Multiple distinct values on metric_c also pass through (no enforcement).
+    let e = transform
+        .transform_one(make_metric_with_name(metric_tags!("k" => "v2"), "metric_c"))
+        .unwrap();
+    assert_eq!("v2", e.as_metric().tags().unwrap().get("k").unwrap());
 }
