@@ -28,7 +28,6 @@ permissions:
   contents: read
 
 env:
-  CARGO_INCREMENTAL: "0" # Disable incremental compilation for coverage
   CI: true
 
 jobs:
