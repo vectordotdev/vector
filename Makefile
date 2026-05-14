@@ -4,6 +4,11 @@
 mkfile_path := $(abspath $(lastword $(MAKEFILE_LIST)))
 mkfile_dir := $(dir $(mkfile_path))
 
+# Make project-local npm tools (installed by scripts/environment/prepare.sh on
+# laptops) discoverable to recipes without requiring contributors to edit PATH.
+# CI installs the same tools globally and is unaffected by the prefix.
+export PATH := $(mkfile_dir)scripts/environment/npm-tools/node_modules/.bin:$(PATH)
+
 # Begin OS detection
 ifeq ($(OS),Windows_NT) # is Windows_NT on XP, 2000, 7, Vista, 10...
     export OPERATING_SYSTEM := Windows
@@ -54,33 +59,9 @@ endif
 # If we're using podman create pods else if we're using docker create networks.
 export CURRENT_DIR = $(shell pwd)
 
-# Override this to automatically enter a container containing the correct, full, official build environment for Vector, ready for development
-export ENVIRONMENT ?= false
-# The upstream container we publish artifacts to on a successful master build.
-export ENVIRONMENT_UPSTREAM ?= docker.io/timberio/vector-dev:latest
-# Override to disable building the container, having it pull from the GitHub packages repo instead
-# TODO: Disable this by default. Blocked by `docker pull` from GitHub Packages requiring authenticated login
-export ENVIRONMENT_AUTOBUILD ?= true
-# Override to disable force pulling the image, leaving the container tool to pull it only when necessary instead
-export ENVIRONMENT_AUTOPULL ?= true
-# Override this when appropriate to disable a TTY being available in commands with `ENVIRONMENT=true`
-export ENVIRONMENT_TTY ?= true
-# Override to specify which network the environment will be connected to (leave empty to use the container tool default)
-export ENVIRONMENT_NETWORK ?= host
-# Override to specify environment port(s) to publish to the host (leave empty to not configure any port publishing)
-# Multiple port publishing can be provided using spaces, for example: 8686:8686 8080:8080/udp
-export ENVIRONMENT_PUBLISH ?=
-
-# If ENVIRONMENT is true, always use cargo vdev since it may be running inside the container
-ifeq ($(origin VDEV), environment)
-ifeq ($(ENVIRONMENT), true)
-VDEV := cargo vdev
-else
-# VDEV is already set from environment, keep it
-endif
-else
-VDEV := cargo vdev
-endif
+# Preserve any caller-supplied VDEV (e.g. CI exports the pinned prebuilt binary
+# via .github/actions/setup; falling back to `cargo vdev` recompiles vdev).
+VDEV ?= cargo vdev
 
 # Set dummy AWS credentials if not present - used for AWS and ES integration tests
 export AWS_ACCESS_KEY_ID ?= "dummy"
@@ -109,117 +90,23 @@ help:
 	@printf -- "                                      V E C T O R\n"
 	@printf -- "\n"
 	@printf -- "---------------------------------------------------------------------------------------\n"
-	@printf -- "Want to use ${FORMATTING_BEGIN_YELLOW}\`docker\`${FORMATTING_END} or ${FORMATTING_BEGIN_YELLOW}\`podman\`${FORMATTING_END}? See ${FORMATTING_BEGIN_YELLOW}\`ENVIRONMENT=true\`${FORMATTING_END} commands. (Default ${FORMATTING_BEGIN_YELLOW}\`CONTAINER_TOOL=docker\`${FORMATTING_END})\n"
+	@printf -- "Default ${FORMATTING_BEGIN_YELLOW}\`CONTAINER_TOOL=docker\`${FORMATTING_END} (auto-detects ${FORMATTING_BEGIN_YELLOW}\`docker\`${FORMATTING_END} or ${FORMATTING_BEGIN_YELLOW}\`podman\`${FORMATTING_END}).\n"
 	@printf -- "\n"
 	@awk 'BEGIN {FS = ":.*##"; printf "Usage: make ${FORMATTING_BEGIN_BLUE}<target>${FORMATTING_END}\n"} /^[a-zA-Z0-9_-]+:.*?##/ { printf "  ${FORMATTING_BEGIN_BLUE}%-46s${FORMATTING_END} %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
 ##@ Environment
-
-# These are some predefined macros, please use them!
-ifeq ($(ENVIRONMENT), true)
-define MAYBE_ENVIRONMENT_EXEC
-${ENVIRONMENT_EXEC}
-endef
-else
-define MAYBE_ENVIRONMENT_EXEC
-
-endef
-endif
-
-ifeq ($(ENVIRONMENT), true)
-define MAYBE_ENVIRONMENT_COPY_ARTIFACTS
-${ENVIRONMENT_COPY_ARTIFACTS}
-endef
-else
-define MAYBE_ENVIRONMENT_COPY_ARTIFACTS
-
-endef
-endif
-
-# docker container id file needs to live in the host machine and is later mounted into the container
-CIDFILE := $(shell mktemp -u /tmp/vector-environment-docker-cid.XXXXXX)
-
-# We use a volume here as non-Linux hosts are extremely slow to share disks, and Linux hosts tend to get permissions clobbered.
-define ENVIRONMENT_EXEC
-	${ENVIRONMENT_PREPARE}
-	@echo "Entering environment..."
-	@mkdir -p target
-	$(CONTAINER_TOOL) run \
-			--name vector-environment \
-			--rm \
-			$(if $(findstring true,$(ENVIRONMENT_TTY)),--tty,) \
-			--init \
-			--interactive \
-			--env INSIDE_ENVIRONMENT=true \
-			$(if $(ENVIRONMENT_NETWORK),--network $(ENVIRONMENT_NETWORK),) \
-			--mount type=bind,source=${CURRENT_DIR},target=/git/vectordotdev/vector \
-			$(if $(findstring docker,$(CONTAINER_TOOL)),--mount type=bind$(COMMA)source=/var/run/docker.sock$(COMMA)target=/var/run/docker.sock,) \
-			$(if $(findstring docker,$(CONTAINER_TOOL)),--cidfile $(CIDFILE),) \
-			$(if $(findstring docker,$(CONTAINER_TOOL)),--mount type=bind$(COMMA)source=$(CIDFILE)$(COMMA)target=/.docker-container-id,) \
-			--mount type=volume,source=vector-target,target=/git/vectordotdev/vector/target \
-			--mount type=volume,source=vector-cargo-cache,target=/root/.cargo \
-			--mount type=volume,source=vector-rustup-cache,target=/root/.rustup \
-			$(foreach publish,$(ENVIRONMENT_PUBLISH),--publish $(publish)) \
-			$(ENVIRONMENT_UPSTREAM); rm -f $(CIDFILE)
-endef
-
-
-ifneq ($(CONTAINER_TOOL), unknown)
-ifeq ($(ENVIRONMENT_AUTOBUILD), true)
-define ENVIRONMENT_PREPARE
-	@echo "Building the environment. (ENVIRONMENT_AUTOBUILD=true) This may take a few minutes..."
-	$(CONTAINER_TOOL) build \
-		$(if $(findstring true,$(VERBOSE)),,--quiet) \
-		--tag $(ENVIRONMENT_UPSTREAM) \
-		--file scripts/environment/Dockerfile \
-		.
-endef
-else ifeq ($(ENVIRONMENT_AUTOPULL), true)
-define ENVIRONMENT_PREPARE
-	@echo "Pulling the environment image. (ENVIRONMENT_AUTOPULL=true)"
-	$(CONTAINER_TOOL) pull $(ENVIRONMENT_UPSTREAM)
-endef
-endif
-else
-define ENVIRONMENT_PREPARE
-$(error "Please install a container tool such as Docker or Podman")
-endef
-endif
 
 .PHONY: check-container-tool
 check-container-tool: ## Checks what container tool is installed
 	@echo -n "Checking if $(CONTAINER_TOOL) is available..." && \
 	$(CONTAINER_TOOL) version 1>/dev/null && echo "yes"
 
-.PHONY: environment
-environment: export ENVIRONMENT_TTY = true ## Enter a full Vector dev shell in $CONTAINER_TOOL, binding this folder to the container.
-environment:
-	${ENVIRONMENT_EXEC}
-
-.PHONY: environment-prepare
-environment-prepare: ## Prepare the Vector dev shell using $CONTAINER_TOOL.
-	${ENVIRONMENT_PREPARE}
-
-.PHONY: environment-clean
-environment-clean: ## Clean the Vector dev shell using $CONTAINER_TOOL.
-	@$(CONTAINER_TOOL) volume rm -f vector-target vector-cargo-cache vector-rustup-cache
-	@$(CONTAINER_TOOL) rmi $(ENVIRONMENT_UPSTREAM) || true
-
-.PHONY: environment-push
-environment-push: environment-prepare ## Publish a new version of the container image.
-	$(CONTAINER_TOOL) push $(ENVIRONMENT_UPSTREAM)
-
 ##@ Building
 .PHONY: build
 build: check-build-tools
 build: export CFLAGS += -g0 -O3
-build: ## Build the project in release mode (Supports `ENVIRONMENT=true`)
-	${MAYBE_ENVIRONMENT_EXEC} cargo build --release --no-default-features --features ${FEATURES}
-	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
-
-.PHONY: build-dev
-build-dev: ## Build the project in development mode (Supports `ENVIRONMENT=true`)
-	${MAYBE_ENVIRONMENT_EXEC} cargo build --no-default-features --features ${FEATURES}
+build: ## Build the project in release mode
+	cargo build --release --no-default-features --features ${FEATURES}
 
 .PHONY: build-x86_64-unknown-linux-gnu
 build-x86_64-unknown-linux-gnu: target/x86_64-unknown-linux-gnu/release/vector ## Build a release binary for the x86_64-unknown-linux-gnu triple.
@@ -253,16 +140,10 @@ build-arm-unknown-linux-gnueabi: target/arm-unknown-linux-gnueabi/release/vector
 build-arm-unknown-linux-musleabi: target/arm-unknown-linux-musleabi/release/vector ## Build a release binary for the arm-unknown-linux-musleabi triple.
 	@echo "Output to ${<}"
 
-.PHONY: build-graphql-schema
-build-graphql-schema: ## Generate the `schema.json` for Vector's GraphQL API
-	${MAYBE_ENVIRONMENT_EXEC} cargo run --bin graphql-schema --no-default-features --features=default-no-api-client
-
 .PHONY: check-build-tools
 check-build-tools:
-ifneq ($(ENVIRONMENT), true)
 ifeq ($(shell command -v cargo >/dev/null || echo not-found), not-found)
 	$(error "Please install Rust: https://www.rust-lang.org/tools/install")
-endif
 endif
 
 ##@ Cross Compiling
@@ -366,7 +247,7 @@ target/%/vector.tar.gz: target/%/vector CARGO_HANDLES_FRESHNESS
 		./vector-${TRIPLE}
 	rm -rf target/scratch/
 
-##@ Testing (Supports `ENVIRONMENT=true`)
+##@ Testing
 
 # nextest doesn't support running doc tests yet so this is split out as
 # `test-docs`
@@ -381,11 +262,11 @@ target/%/vector.tar.gz: target/%/vector CARGO_HANDLES_FRESHNESS
 # https://github.com/rust-lang/cargo/issues/6454
 .PHONY: test
 test: ## Run the unit test suite
-	${MAYBE_ENVIRONMENT_EXEC} ${TEST_RUNNER} --workspace --no-fail-fast --no-default-features --features "${FEATURES}" ${SCOPE}
+	${TEST_RUNNER} --workspace --no-fail-fast --no-default-features --features "${FEATURES}" ${SCOPE}
 
 .PHONY: test-docs
 test-docs: ## Run the docs test suite
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --doc --workspace --no-fail-fast --no-default-features --features "${FEATURES}" ${SCOPE}
+	cargo test --doc --workspace --no-fail-fast --no-default-features --features "${FEATURES}" ${SCOPE}
 
 .PHONY: test-all
 test-all: test test-docs test-behavior test-integration test-component-validation ## Runs all tests: unit, docs, behavioral, integration, and component validation.
@@ -400,12 +281,12 @@ test-aarch64-unknown-linux-gnu: cross-test-aarch64-unknown-linux-gnu ## Runs uni
 
 .PHONY: test-behavior-config
 test-behavior-config: ## Runs configuration related behavioral tests
-	${MAYBE_ENVIRONMENT_EXEC} cargo build --no-default-features --features secret-backend-example --bin secret-backend-example
-	${MAYBE_ENVIRONMENT_EXEC} cargo run --no-default-features --features transforms -- test tests/behavior/config/*
+	cargo build --no-default-features --features secret-backend-example --bin secret-backend-example
+	cargo run --no-default-features --features transforms -- test tests/behavior/config/*
 
 .PHONY: test-behavior-%
 test-behavior-%: ## Runs behavioral test for a given category
-	${MAYBE_ENVIRONMENT_EXEC} cargo run --no-default-features --features transforms,vrl-functions-env,vrl-functions-system,vrl-functions-network,vrl-functions-crypto -- test tests/behavior/$*/*
+	cargo run --no-default-features --features transforms,vrl-functions-env,vrl-functions-system,vrl-functions-network,vrl-functions-crypto -- test tests/behavior/$*/*
 
 .PHONY: test-behavior
 test-behavior: ## Runs all behavioral tests
@@ -424,7 +305,7 @@ test-integration: test-integration-datadog-traces test-integration-shutdown
 .PHONY: test-integration-windows-event-log
 test-integration-windows-event-log: ## Runs Windows Event Log integration tests (Windows only)
 ifeq ($(OS),Windows_NT)
-	${MAYBE_ENVIRONMENT_EXEC} cargo test -p vector --no-default-features --features sources-windows_event_log-integration-tests windows_event_log::integration_tests
+	cargo test -p vector --no-default-features --features sources-windows_event_log-integration-tests windows_event_log::integration_tests
 else
 	@echo "Skipping windows-event-log integration tests (Windows only)"
 endif
@@ -439,78 +320,69 @@ ifeq ($(AUTODESPAWN), true)
 endif
 
 .PHONY: test-e2e-kubernetes
-test-e2e-kubernetes: ## Runs Kubernetes E2E tests (Sorry, no `ENVIRONMENT=true` support)
+test-e2e-kubernetes: ## Runs Kubernetes E2E tests
 	RUST_VERSION=${RUST_VERSION} scripts/test-e2e-kubernetes.sh
 
 .PHONY: test-cli
 test-cli: ## Runs cli tests
-	${MAYBE_ENVIRONMENT_EXEC} ${TEST_RUNNER} --no-fail-fast --no-default-features --features cli-tests --test integration --test-threads 4
+	${TEST_RUNNER} --no-fail-fast --no-default-features --features cli-tests --test integration --test-threads 4
 
 .PHONY: test-vector-api
 test-vector-api: ## Runs vector API tests (top and tap)
-	${MAYBE_ENVIRONMENT_EXEC} ${TEST_RUNNER} --no-fail-fast --no-default-features --features vector-api-tests --test vector_api
+	${TEST_RUNNER} --no-fail-fast --no-default-features --features vector-api-tests --test vector_api
 
 .PHONY: test-component-validation
 test-component-validation: ## Runs component validation tests
-	${MAYBE_ENVIRONMENT_EXEC} ${TEST_RUNNER} --no-fail-fast --no-default-features --features component-validation-tests --status-level pass --test-threads 4 --lib components::validation::tests
+	${TEST_RUNNER} --no-fail-fast --no-default-features --features component-validation-tests --status-level pass --test-threads 4 --lib components::validation::tests
 
 .PHONY: coverage-report
 coverage-report: ## Generate lcov report after running tests with COVERAGE=true (outputs lcov.info)
 	cargo llvm-cov report --lcov --output-path lcov.info
 
-##@ Benching (Supports `ENVIRONMENT=true`)
+##@ Benching
 
 .PHONY: bench
 bench: ## Run benchmarks in /benches
-	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "benches" ${CARGO_BENCH_FLAGS}
-	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
+	cargo bench --no-default-features --features "benches" ${CARGO_BENCH_FLAGS}
 
 .PHONY: bench-dnstap
 bench-dnstap: ## Run dnstap benches
-	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "dnstap-benches" --bench dnstap ${CARGO_BENCH_FLAGS}
-	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
+	cargo bench --no-default-features --features "dnstap-benches" --bench dnstap ${CARGO_BENCH_FLAGS}
 
 .PHONY: bench-dnsmsg-parser
 bench-dnsmsg-parser: ## Run dnsmsg-parser benches
-	${MAYBE_ENVIRONMENT_EXEC} CRITERION_HOME="$(CRITERION_HOME)" cargo bench --manifest-path lib/dnsmsg-parser/Cargo.toml ${CARGO_BENCH_FLAGS}
-	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
+	CRITERION_HOME="$(CRITERION_HOME)" cargo bench --manifest-path lib/dnsmsg-parser/Cargo.toml ${CARGO_BENCH_FLAGS}
 
 .PHONY: bench-remap-functions
 bench-remap-functions: ## Run remap-functions benches
-	${MAYBE_ENVIRONMENT_EXEC} CRITERION_HOME="$(CRITERION_HOME)" cargo bench --manifest-path lib/vrl/stdlib/Cargo.toml ${CARGO_BENCH_FLAGS}
-	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
+	CRITERION_HOME="$(CRITERION_HOME)" cargo bench --manifest-path lib/vrl/stdlib/Cargo.toml ${CARGO_BENCH_FLAGS}
 
 .PHONY: bench-remap
 bench-remap: ## Run remap benches
-	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "remap-benches" --bench remap ${CARGO_BENCH_FLAGS}
-	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
+	cargo bench --no-default-features --features "remap-benches" --bench remap ${CARGO_BENCH_FLAGS}
 
 .PHONY: bench-transform
 bench-transform: ## Run transform benches
-	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "transform-benches" --bench transform ${CARGO_BENCH_FLAGS}
-	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
+	cargo bench --no-default-features --features "transform-benches" --bench transform ${CARGO_BENCH_FLAGS}
 
 .PHONY: bench-languages
 bench-languages:  ### Run language comparison benches
-	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "language-benches" --bench languages ${CARGO_BENCH_FLAGS}
-	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
+	cargo bench --no-default-features --features "language-benches" --bench languages ${CARGO_BENCH_FLAGS}
 
 .PHONY: bench-metrics
 bench-metrics: ## Run metrics benches
-	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "metrics-benches" ${CARGO_BENCH_FLAGS}
-	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
+	cargo bench --no-default-features --features "metrics-benches" ${CARGO_BENCH_FLAGS}
 
 .PHONY: bench-all
 bench-all: ### Run all benches
 bench-all: bench-remap-functions
-	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "benches remap-benches  metrics-benches language-benches ${DNSTAP_BENCHES}" ${CARGO_BENCH_FLAGS}
-	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
+	cargo bench --no-default-features --features "benches remap-benches  metrics-benches language-benches ${DNSTAP_BENCHES}" ${CARGO_BENCH_FLAGS}
 
 ##@ Checking
 
 .PHONY: check
 check: ## Run prerequisite code checks
-	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) check rust
+	$(VDEV) check rust
 
 .PHONY: check-all
 check-all: ## Check everything
@@ -520,38 +392,38 @@ check-all: check-scripts check-deny check-generated-docs check-licenses
 
 .PHONY: check-component-features
 check-component-features: ## Check that all component features are setup properly
-	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) check component-features
+	$(VDEV) check component-features
 
 .PHONY: check-clippy
 check-clippy: ## Check code with Clippy
-	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) check rust
+	$(VDEV) check rust
 
 .PHONY: check-docs
 check-docs: generate-vrl-docs ## Check that all /docs file are valid - vrl docs due to remap.functions.* references
-	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) check docs
+	$(VDEV) check docs
 
 .PHONY: check-fmt
 check-fmt: ## Check that all files are formatted properly
-	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) check fmt
+	$(VDEV) check fmt
 
 .PHONY: check-licenses
 check-licenses: ## Check that the 3rd-party license file is up to date
-	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) check licenses
+	$(VDEV) check licenses
 
 .PHONY: check-markdown
 check-markdown: ## Check that markdown is styled properly
-	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) check markdown
+	$(VDEV) check markdown
 
 .PHONY: fix-markdown
 fix-markdown: ## Auto-fix markdown style issues
-	${MAYBE_ENVIRONMENT_EXEC} markdownlint-cli2 --fix $(shell git ls-files '*.md')
+	markdownlint-cli2 --fix $(shell git ls-files '*.md')
 
 .PHONY: check-prettier
 check-prettier: ## Check that JS/TS/YAML/JSON files are formatted with prettier
 	@for ext in yml yaml js ts tsx json; do \
 		files=$$(git ls-files "*.$$ext"); \
 		if [ -n "$$files" ]; then \
-			${MAYBE_ENVIRONMENT_EXEC} prettier --ignore-path .prettierignore --check $$files || exit 1; \
+		prettier --ignore-path .prettierignore --check $$files || exit 1; \
 		fi; \
 	done
 
@@ -560,38 +432,38 @@ fix-prettier: ## Auto-fix JS/TS/YAML/JSON formatting with prettier
 	@for ext in yml yaml js ts tsx json; do \
 		files=$$(git ls-files "*.$$ext"); \
 		if [ -n "$$files" ]; then \
-			${MAYBE_ENVIRONMENT_EXEC} prettier --ignore-path .prettierignore --write $$files || exit 1; \
+		prettier --ignore-path .prettierignore --write $$files || exit 1; \
 		fi; \
 	done
 
 .PHONY: check-examples
 check-examples: ## Check that the config/examples files are valid
-	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) check examples
+	$(VDEV) check examples
 
 .PHONY: check-scripts
 check-scripts: ## Check that scripts do not have common mistakes
-	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) check scripts
+	$(VDEV) check scripts
 
 .PHONY: check-deny
 check-deny: ## Check advisories licenses and sources for crate dependencies
-	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) check deny
+	$(VDEV) check deny
 
 .PHONY: check-deny-licenses
 check-deny-licenses: ## Check licenses for crate dependencies
-	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) check deny --licenses-only
+	$(VDEV) check deny --licenses-only
 
 .PHONY: check-events
 check-events: ## Check that events satisfy patterns set in https://github.com/vectordotdev/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
-	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) check events
+	$(VDEV) check events
 
 .PHONY: check-generated-docs
 check-generated-docs: generate-docs ## Checks that the machine-generated component Cue docs are up-to-date.
-	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) check generated-docs
+	$(VDEV) check generated-docs
 
 ##@ Rustdoc
 build-rustdoc: ## Build Vector's Rustdocs
 	# This command is mostly intended for use by the build process in vectordotdev/vector-rustdoc
-	${MAYBE_ENVIRONMENT_EXEC} cargo doc --no-deps --workspace
+	cargo doc --no-deps --workspace
 
 ##@ Packaging (forwarded to Makefile.packaging)
 
@@ -600,7 +472,7 @@ build-rustdoc: ## Build Vector's Rustdocs
 
 .PHONY: package
 package: build ## Build the Vector archive
-	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) package archive
+	$(VDEV) package archive
 
 package-%:
 	$(MAKE) -f Makefile.packaging $@
@@ -644,7 +516,7 @@ compile-vrl-wasm: ## Compile VRL crates to WASM target
 ##@ Utility
 
 .PHONY: clean
-clean: environment-clean ## Clean everything
+clean: ## Clean everything
 	cargo clean
 
 .PHONY: generate-kubernetes-manifests
@@ -653,9 +525,9 @@ generate-kubernetes-manifests: ## Generate Kubernetes manifests from latest Helm
 
 .PHONY: generate-component-docs
 generate-component-docs: ## Generate per-component Cue docs from the configuration schema.
-	${MAYBE_ENVIRONMENT_EXEC} cargo build $(if $(findstring true,$(CI)),--quiet,)
+	cargo build $(if $(findstring true,$(CI)),--quiet,)
 	target/debug/vector generate-schema > /tmp/vector-config-schema.json 2>/dev/null
-	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) build component-docs /tmp/vector-config-schema.json \
+	$(VDEV) build component-docs /tmp/vector-config-schema.json \
 		$(if $(findstring true,$(CI)),>/dev/null,)
 	./scripts/cue.sh fmt
 
@@ -668,7 +540,7 @@ endif
 
 .PHONY: generate-vector-vrl-docs
 generate-vector-vrl-docs: ## Generate VRL function documentation from Rust source.
-	${MAYBE_ENVIRONMENT_EXEC} $(VRL_DOC_BUILDER_CMD) --output docs/generated/ \
+	$(VRL_DOC_BUILDER_CMD) --output docs/generated/ \
 		$(if $(findstring true,$(CI)),>/dev/null,)
 
 .PHONY: generate-vrl-docs
@@ -701,12 +573,12 @@ ci-generate-publish-metadata: ## Generates the necessary metadata required for b
 
 .PHONY: clippy-fix
 clippy-fix:
-	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) check rust --fix
+	$(VDEV) check rust --fix
 
 .PHONY: fmt
 fmt:
-	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) fmt
+	$(VDEV) fmt
 
 .PHONY: build-licenses
 build-licenses:
-	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) build licenses
+	$(VDEV) build licenses
