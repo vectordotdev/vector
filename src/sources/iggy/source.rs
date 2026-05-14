@@ -323,12 +323,26 @@ async fn process_received_message(
     }
 
     if decode_failed {
-        // Drop the receiver without registering it for ack tracking. The
-        // caller advances past this offset directly via store_offset so the
-        // partition keeps making progress. Persistent downstream rejection (a
-        // sink that permanently refuses a message) is handled differently: the
-        // fence in PartitionState intentionally halts that partition; Vector
-        // must not silently discard events a sink refused.
+        warn!(
+            message = "Iggy message payload could not be decoded; skipping offset to avoid permanently wedging the partition.",
+            stream = metadata.stream,
+            topic = metadata.topic,
+            partition_id,
+            offset,
+        );
+        if acknowledgements {
+            // When acks are enabled, earlier frames from this payload may
+            // already be in-flight downstream. Register the receiver through
+            // the normal ack path so the broker offset only advances once
+            // those events have settled. An empty batch (the first frame was
+            // garbage) resolves as Delivered immediately and the offset
+            // advances on the next commit tick. If the in-flight events are
+            // rejected by a downstream sink the partition stalls, which is
+            // intentional: Vector must not silently skip events the sink
+            // refused.
+            tracker.register(partition_id, offset, receiver);
+            return Ok(ProcessOutcome::Ok);
+        }
         drop(receiver);
         return Ok(ProcessOutcome::DecodeFailed { partition_id, offset });
     }
@@ -454,13 +468,6 @@ pub async fn run_iggy_source(
                         {
                             Err(()) => return Err(()),
                             Ok(ProcessOutcome::DecodeFailed { partition_id, offset }) => {
-                                warn!(
-                                    message = "Iggy message payload could not be decoded; skipping offset to avoid permanently wedging the partition.",
-                                    stream,
-                                    topic,
-                                    partition_id,
-                                    offset,
-                                );
                                 match consumer.store_offset(offset, Some(partition_id)).await {
                                     Ok(()) => {
                                         partitions.entry(partition_id).or_default().committed =
