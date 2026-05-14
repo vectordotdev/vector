@@ -8,6 +8,7 @@ use vector_lib::config::clone_input_definitions;
 use vector_lib::configurable::configurable_component;
 
 use crate::{
+    conditions::{AnyCondition, Condition},
     config::{DataType, Input, OutputId, TransformConfig, TransformContext, TransformOutput},
     event::Event,
     schema,
@@ -24,6 +25,9 @@ pub struct DelayConfig {
     #[serde_as(as = "serde_with::DurationSecondsWithFrac<f64>")]
     #[configurable(metadata(docs::human_name = "Delay per event", docs::example = 0.2))]
     delay_per_event: Duration,
+
+    /// Delay only events matched by this condition.
+    condition: Option<AnyCondition>,
 }
 
 impl_generate_config_from_default!(DelayConfig);
@@ -32,7 +36,7 @@ impl_generate_config_from_default!(DelayConfig);
 #[typetag::serde(name = "delay")]
 impl TransformConfig for DelayConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
-        Ok(Transform::event_task(Delay::new(self, context)))
+        Ok(Transform::event_task(Delay::new(self, context)?))
     }
 
     fn input(&self) -> Input {
@@ -55,14 +59,21 @@ impl TransformConfig for DelayConfig {
 pub struct Delay {
     delay: Duration,
     queue: DelayQueue<Event>,
+    condition: Condition,
 }
 
 impl Delay {
-    pub fn new(config: &DelayConfig, _context: &TransformContext) -> Self {
-        Self {
+    pub fn new(config: &DelayConfig, context: &TransformContext) -> crate::Result<Self> {
+        Ok(Self {
             delay: config.delay_per_event,
             queue: DelayQueue::new(),
-        }
+            condition: config
+                .condition
+                .as_ref()
+                .map(|c| c.build(&context.enrichment_tables, &context.metrics_storage))
+                .transpose()?
+                .unwrap_or(Condition::AlwaysPass),
+        })
     }
 }
 
@@ -84,7 +95,12 @@ impl TaskTransform<Event> for Delay {
                                 done = true;
                             }
                             Some(event) => {
-                                self.queue.insert(event, self.delay);
+                                let (result, event) = self.condition.check(event);
+                                if result {
+                                    self.queue.insert(event, self.delay);
+                                } else {
+                                    yield event;
+                                }
                             }
                         }
                     },
@@ -105,6 +121,7 @@ mod tests {
     use std::task::Poll;
 
     use futures::SinkExt;
+    use vector_lib::event::TraceEvent;
 
     use super::*;
     use crate::event::LogEvent;
@@ -123,7 +140,8 @@ delay_per_event = 0.2
         )
         .unwrap();
 
-        let delay = Transform::event_task(Delay::new(&config, &TransformContext::default()));
+        let delay =
+            Transform::event_task(Delay::new(&config, &TransformContext::default()).unwrap());
 
         let delay = delay.into_task();
 
@@ -131,6 +149,43 @@ delay_per_event = 0.2
         let mut out_stream = delay.transform_events(Box::pin(rx));
 
         tx.send(LogEvent::default().into()).await.unwrap();
+
+        // We should be pending, because we are now waiting for the delay
+        assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
+
+        // Wait long enough for delay to end
+        tokio::time::sleep(Duration::from_secs_f64(0.3)).await;
+
+        if !matches!(futures::poll!(out_stream.next()), Poll::Ready(Some(_event))) {
+            panic!("Unexpectedly received None or Pending in output stream");
+        }
+    }
+
+    #[tokio::test]
+    async fn delay_events_condition() {
+        let config = toml::from_str::<DelayConfig>(
+            r#"
+delay_per_event = 0.2
+condition.type = "is_log"
+"#,
+        )
+        .unwrap();
+
+        let delay =
+            Transform::event_task(Delay::new(&config, &TransformContext::default()).unwrap());
+
+        let delay = delay.into_task();
+
+        let (mut tx, rx) = futures::channel::mpsc::channel(10);
+        let mut out_stream = delay.transform_events(Box::pin(rx));
+
+        tx.send(LogEvent::default().into()).await.unwrap();
+        tx.send(TraceEvent::default().into()).await.unwrap();
+
+        let Poll::Ready(Some(event)) = futures::poll!(out_stream.next()) else {
+            panic!("Unexpectedly received None or Pending in output stream");
+        };
+        assert!(event.try_into_trace().is_some());
 
         // We should be pending, because we are now waiting for the delay
         assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
