@@ -18,6 +18,7 @@ mod native_json;
 mod otlp;
 #[cfg(feature = "parquet")]
 mod parquet;
+mod proto_batch;
 mod protobuf;
 mod raw_message;
 #[cfg(feature = "syslog")]
@@ -45,6 +46,7 @@ pub use native::{NativeSerializer, NativeSerializerConfig};
 pub use native_json::{NativeJsonSerializer, NativeJsonSerializerConfig};
 #[cfg(feature = "opentelemetry")]
 pub use otlp::{OtlpSerializer, OtlpSerializerConfig};
+pub use proto_batch::{ProtoBatchEncodingError, ProtoBatchSerializer, ProtoBatchSerializerConfig};
 pub use protobuf::{ProtobufSerializer, ProtobufSerializerConfig, ProtobufSerializerOptions};
 pub use raw_message::{RawMessageSerializer, RawMessageSerializerConfig};
 #[cfg(feature = "syslog")]
