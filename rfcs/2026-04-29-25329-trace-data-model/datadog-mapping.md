@@ -184,7 +184,7 @@ agent_apm_mode = .resource.attributes."_dd.payload"."tags"."_dd.apm_mode"
 tracer_apm_mode = .resource.attributes."_dd.tracer"."_dd.apm_mode"
 
 # Inspect a meta_struct sub-entry (msgpack-encoded; Vector exposes it as bytes).
-metastruct_event = .spans[0].attributes."_dd.meta_struct"."dd.event_payload"
+meta_struct_event = .spans[0].attributes."_dd.meta_struct"."dd.event_payload"
 ```
 
 ### Implementation
@@ -281,7 +281,7 @@ implementation produces, in lockstep with the upstream reference.
 
 `TracerPayload.hostname` and `TracerPayload.env` map to typed
 `Resource.host` / `Resource.environment` directly and are not part of the deferred
-attribute set; an empty wire value normalises to `None` per the parent RFC's
+attribute set; an empty wire value normalizes to `None` per the parent RFC's
 "Empty-string invariant for `Option<KeyString>` slots". `TracerPayload.containerDebug`
 is a Datadog-internal diagnostic with no Vector consumer and is dropped on ingest (see
 "Out of scope").
@@ -289,7 +289,7 @@ is a Datadog-internal diagnostic with no Vector consumer and is dropped on inges
 #### `Span.resource` and `Span.type` empty-string egress consequence
 
 `Span.resource` and `Span.type` follow the parent RFC's "Empty-string invariant for
-`Option<KeyString>` slots": an empty wire value normalises to `None` on ingress. The
+`Option<KeyString>` slots": an empty wire value normalizes to `None` on ingress. The
 Datadog-egress derivation fallback ("When `Span.span_type` is `None` on Datadog egress…",
 below) then fires for the `None` value, including for Datadog-sourced spans whose producer
 wrote the empty string -- this is the standard Datadog-Agent behaviour and matches
@@ -605,8 +605,8 @@ On Datadog egress, the sink:
     to links because the Datadog `SpanLink.attributes` wire type is a flat string map,
     not the `meta` / `metrics` / `meta_struct` triple.
   - For Datadog-sourced events, `SpanLink.attributes` values are already
-    `AttrValue::String` on ingress due to the wire type, so the stringification on
-    egress is lossless for `Datadog -> Vector -> Datadog` round trips.
+    `AttrValue::String` on ingress due to the wire type, so the `dd_value_to_string`
+    conversion on egress is lossless for `Datadog -> Vector -> Datadog` round trips.
 
 #### Envelope reconstruction and chunk re-coalescence
 
@@ -981,7 +981,7 @@ land first.
   parent's "remove untyped forwarding methods" step so the build catches any
   unmigrated consumer.
 - [ ] Document the Datadog mapping in the trace migration guide section the parent
-  RFC's POA owns: the three-partition merge and the reserved
+  RFC's Plan of Attack owns: the three-partition merge and the reserved
   `Span.attributes."_dd.meta_struct"` key, the
   `Resource.attributes."_dd.payload"` / `"_dd.tracer"` envelope sub-objects,
   `TraceEvent.chunk`, and the typed-slot precedence rule for `Span.status` versus

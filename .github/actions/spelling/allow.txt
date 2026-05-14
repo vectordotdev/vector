@@ -115,6 +115,7 @@ databend
 datacenter
 datadog
 datadoghq
+datadogreceiver
 datanode
 ddog
 DEBHELPER

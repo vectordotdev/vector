@@ -74,12 +74,12 @@ below.
   `datadog.span.resource`, `datadog.span.type`): lifted from `Span.attributes` into
   typed `TraceEvent.chunk` / `Span.resource_name` / `Span.span_type` slots on OTLP
   ingress and stripped; synthesized into `Span.attributes` from the typed slots on OTLP
-  egress, overwriting any pre-existing attribute at the same key. The Datadog sub-RFC
+  egress, overwriting any existing attribute at the same key. The Datadog sub-RFC
   specifies the contents these keys carry; this sub-RFC reserves the keys.
 - **OTLP fields at `Development` or `Alpha` stability tier** are dropped on OTLP ingress.
 - **Empty `string_value` on a promoted resource attribute** (`service.name`,
   `deployment.environment.name`, the deprecated `deployment.environment`, or
-  `host.name`): consumed from `Resource.attributes` on ingress and normalised to typed
+  `host.name`): consumed from `Resource.attributes` on ingress and normalized to typed
   slot `None` per the parent RFC's "Empty-string invariant for `Option<KeyString>`
   slots". Egress emits the typed `None` as field-absent rather than as the original
   empty-string attribute.
@@ -294,7 +294,7 @@ bytes differ:
   on the wire is spec-equivalent to a default-valued message. The model carries
   `TraceEvent.resource` and `TraceEvent.scope` as values rather than `Option`, and egress
   emits the field unconditionally. Within `Scope`, `name` and `version` are
-  `Option<KeyString>`: an absent or empty-string wire value normalises to `None` on
+  `Option<KeyString>`: an absent or empty-string wire value normalizes to `None` on
   ingress (OTLP treats empty and absent as equivalent); on egress `None` is emitted as an
   absent (zero-length proto3 string), which is spec-equivalent to the original.
 - `Span.status` (proto comment: "Semantically when Status isn't set, it means span's
@@ -335,7 +335,7 @@ OTLP ingress, an absent reserved key restores the typed slot to its default
 (`None` / `false` / `{}`), so the egress-omit-on-default pairs with an
 ingress-default-on-absent rule and the round trip is preserved.
 
-Reserved-key semantics: any pre-existing attribute at one of the reserved keys above on
+Reserved-key semantics: any existing attribute at one of the reserved keys above on
 OTLP egress is overwritten by the synthesized value (the typed slot is the single source
 of truth). On OTLP ingress, the keys are lifted into their typed slots and stripped from
 `Span.attributes` so OTLP egress through the same Vector emits them once under the typed
@@ -443,8 +443,8 @@ proto extension) are owned by the parent RFC's Plan of Attack and must land firs
   parent's "remove untyped forwarding methods" step so the build catches any unmigrated
   consumer.
 - [ ] Document the OTLP mapping in the trace migration guide section the parent RFC's
-  POA owns: which OTLP wire fields land in which typed slots, how to write VRL against
-  the typed surface, and the reserved-key conventions for cross-format relay.
+  Plan of Attack owns: which OTLP wire fields land in which typed slots, how to write
+  VRL against the typed surface, and the reserved-key conventions for cross-format relay.
 
 ## Future Improvements
 

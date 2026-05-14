@@ -460,7 +460,7 @@ Every `Option<KeyString>` typed slot in the data model -- `Resource.service` /
 `Span.resource_name` / `span_type`, and `ChunkContext.origin` -- carries `None` for the
 absent / unset case and a non-empty string otherwise. `Some("")` is unrepresentable in a
 well-formed `TraceEvent`, so consumers do not need to discriminate between `None` and a
-present-but-empty value at the typed surface. Every construction site normalises an
+present-but-empty value at the typed surface. Every construction site normalizes an
 empty input to `None`; the per-format applications are specified in the corresponding
 sub-RFC.
 
@@ -1093,8 +1093,8 @@ alternatives in "Alternatives".
   `LogEvent`-per-span design. `EventCount::event_count()` continues to return `1` per
   `TraceEvent` (not per span), so `component_received_events_total` and related
   accounting count container events, not individual spans. This is consistent with how
-  `Metric` reports (one event per metric, not per sample) but may undercount span-level
-  throughput in dashboards.
+  `Metric` reports (one event per metric, not per sample); dashboards that expect
+  per-span event counts will read lower values than the actual span throughput.
 - Per-span operations (filter, sample, mutate one span) require VRL iteration over
   `.spans` rather than per-event treatment. A topology-level expand-on-input / collapse-
   on-output shim could let single-span transforms operate unchanged; that mechanism is
@@ -1114,8 +1114,8 @@ alternatives in "Alternatives".
   in "Migration: coexistence of `LogEvent` and typed representations" all fail to catch
   a missed `to_typed()` call, the runtime backstop panics the affected task on the first
   `Legacy` event. This is a task crash rather than a controlled error; it is production-
-  reachable via fan-in from unflipped sources, disk-buffer replay, and `vector` source
-  traffic from older peers. The intent is that the earlier layers prevent this from
+  reachable via fan-in from sources that have not yet migrated to `Typed`, disk-buffer
+  replay, and `vector` source traffic from older peers. The intent is that the earlier layers prevent this from
   occurring; the panic is a fail-loud safety net, not the primary enforcement. A
   panicked task may leave in-flight event finalizers unfired, causing upstream
   backpressure to stall until the task is restarted by the topology supervisor. VRL
@@ -1381,11 +1381,11 @@ of Attack. The overall sequencing across all three RFCs is:
 
 1. Format-agnostic prerequisites (this RFC), in order: fallible decode boundary; legacy-
    layout hint precursor; `TraceEvent` migration enum; internal `TypedTrace` proto
-   extension.
+   extension; VRL typed-path dispatch.
 2. Per-format shim landings (sub-RFCs), in either order: OTLP `Legacy -> Typed` shim and
    encoder; Datadog `Legacy -> Typed` shim and encoder. Independent of each other.
-3. Cross-cutting transform and VRL work (this RFC): VRL typed-path support; `sample` and
-   `trace_to_log` transform migrations.
+3. Cross-cutting transform and VRL work (this RFC): VRL auto-convert on typed-path
+   access of `Legacy` events; `sample` and `trace_to_log` transform migrations.
 4. Removal of untyped forwarders (this RFC) -- the compile-time gate that catches any
    unmigrated consumer.
 5. Per-format source flips (sub-RFCs), in either order: `opentelemetry` source emits
@@ -1433,17 +1433,25 @@ The format-agnostic PRs owned by this RFC are:
     legacy paths break against `Typed` events);
   - field-by-key VRL programs against the old `trace_to_log` output (must move to the
     new uniform layout);
-  - the wire-mapping documentation contributed by each sub-RFC's POA;
+  - the wire-mapping documentation contributed by each sub-RFC's Plan of Attack;
   - removal of the legacy `tracerPayloads`-empty Datadog ingest path (owned by the
-    Datadog mapping sub-RFC POA).
+    Datadog mapping sub-RFC's Plan of Attack).
   - cross-version `vector` source/sink chains spanning the typed migration must run a
     release line that includes at least the migration-boundary release (see Drawbacks).
-- [ ] Add VRL typed-path support for `.resource.*`, `.scope.*`, `.chunk.*`, and
-  `.spans[*].*` on `VrlTarget`. Untyped VRL paths against `Typed` events return a
-  deterministic error. Typed VRL paths against `Legacy` events auto-convert via
-  `to_typed()` inside `VrlTarget` (which has `&mut self` access). This step lands after
-  both per-format shims (sub-RFC POAs) so that auto-convert succeeds for all registered
-  layout hints.
+- [ ] Add VRL typed-path dispatch for `.resource.*`, `.scope.*`, `.chunk.*`, and
+  `.spans[*].*` on `VrlTarget`. Typed paths against `Typed` events resolve normally.
+  Typed paths against `Legacy` events return `null` without attempting conversion (the
+  shim registry is not yet populated at this step). Untyped paths against `Typed` events
+  return a deterministic runtime error. Lands after the migration enum step; no
+  dependency on the per-format shims.
+- [ ] Enable VRL auto-convert in `VrlTarget`: replace the `Legacy`-event `null` return
+  introduced in the previous step with an in-place call to `to_typed()` on first
+  typed-path access (`VrlTarget` has `&mut self` access). If `to_typed()` fails (absent
+  or unrecognized `vector.trace_legacy_layout` hint), `VrlTarget` aborts the VRL
+  expression with a runtime error; the event is forwarded to the topology error path
+  unchanged, a counter is incremented, and a warning log identifies the failing event.
+  Lands after both per-format shims (sub-RFC Plans of Attack) so that auto-convert
+  succeeds for all registered layout hints.
 - [ ] Migrate the `sample` transform (and tests) to typed access. The `sample`
   transform operates per-event; today's per-`TraceChunk` atomicity is incidental (one
   `LogEvent` per chunk), not an intentional sampling guarantee. After the typed
@@ -1458,7 +1466,7 @@ The format-agnostic PRs owned by this RFC are:
   `LogEvent`, etc.) from `TraceEvent`. Call sites that still use them through
   `TraceEvent` become compile errors; each migrates to the typed accessor API or
   pattern-matches into the `Legacy(LogEvent)` arm explicitly. The build must be green
-  before the source-flip steps in the sub-RFC POAs.
+  before the source-flip steps in the sub-RFC Plans of Attack.
 - [ ] Collapse the `TraceEvent` enum to a struct with only the typed variant's fields,
   after both source flips land. The per-component shim functions are retained as wire
   decoders for the deprecation window so that `LegacyTrace`-encoded events from disk
