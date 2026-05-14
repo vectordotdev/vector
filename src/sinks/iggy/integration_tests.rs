@@ -49,7 +49,14 @@ async fn publish_and_check(conf: IggySinkConfig) -> Result<(), IggyError> {
     let verifier_url = conf.url.clone();
     let connection = Arc::new(Connection::new(&conf));
     connection.get().await?;
-    let sink = VectorSink::from_event_streamsink(IggySink::new(&conf, connection)?);
+    let batcher_settings = conf
+        .batch
+        .validate()
+        .expect("test batch settings are valid")
+        .into_batcher_settings()
+        .expect("test batch settings are valid");
+    let sink =
+        VectorSink::from_event_streamsink(IggySink::new(&conf, batcher_settings, connection)?);
 
     let num_events = 10;
     let (input, events) = random_lines_with_stream(100, num_events, None);

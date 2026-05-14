@@ -26,16 +26,11 @@ pub(super) struct IggySink {
 impl IggySink {
     pub(super) fn new(
         config: &IggySinkConfig,
+        batcher_settings: BatcherSettings,
         connection: Arc<Connection>,
     ) -> Result<Self, IggyError> {
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.build().context(EncodingSnafu)?;
-        let batcher_settings = config
-            .batch
-            .validate()
-            .map_err(|_| IggyError::InvalidBatchSettings)?
-            .into_batcher_settings()
-            .map_err(|_| IggyError::InvalidBatchSettings)?;
         Ok(IggySink {
             request: config.request,
             transformer,
@@ -134,13 +129,11 @@ impl RetryLogic for IggyRetryLogic {
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         use iggy::prelude::IggyError as Sdk;
         let source = match error {
-            IggyError::Encoding { .. } | IggyError::InvalidBatchSettings => return false,
+            IggyError::Encoding { .. } => return false,
             IggyError::Connect { source } | IggyError::Producer { source } => source,
         };
-        // The SDK's producer wraps send failures from its background send
-        // path in `ProducerSendFailed`; unwrap the underlying cause so
-        // transient errors (e.g. `Disconnected`, `TcpError`) are still
-        // classified as retriable by the allowlist below.
+        // Unwrap the cause the SDK wraps around background send failures so
+        // transient errors reach the allowlist below.
         let source = match source {
             Sdk::ProducerSendFailed { cause, .. } => &**cause,
             source => source,

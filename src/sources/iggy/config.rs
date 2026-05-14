@@ -174,6 +174,9 @@ impl SourceConfig for IggySourceConfig {
         if self.drain_timeout_secs == 0 {
             return Err("`drain_timeout_secs` must be at least 1".into());
         }
+        if self.poll_interval_ms == 0 {
+            return Err("`poll_interval_ms` must be at least 1".into());
+        }
         // The SDK's HTTP client has no consumer group state and refuses the
         // join, so reject the combination here instead of failing the source
         // after it connects.

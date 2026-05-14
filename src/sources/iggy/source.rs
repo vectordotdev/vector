@@ -431,6 +431,14 @@ pub(crate) async fn run_iggy_source(
     // broker times it out and delay any consumer-group rebalance.
     let mut downstream_closed = false;
 
+    // Exponential backoff for repeated read failures. Without it, a broker
+    // outage produces an IggyReadError log line and counter increment every
+    // 500 ms for the duration of the outage. Starts at 500 ms and doubles
+    // up to 30 s; reset to the base delay after any successful poll.
+    let mut read_backoff = ExponentialBackoff::from_millis(2)
+        .factor(250)
+        .max_delay(Duration::from_secs(30));
+
     loop {
         tokio::select! {
             biased;
@@ -466,6 +474,8 @@ pub(crate) async fn run_iggy_source(
             next = consumer.next() => {
                 match next {
                     Some(Ok(received)) => {
+                        read_backoff.reset();
+
                         // A new assignment starts a fresh partition generation.
                         // Fences and pending acks from the previous one must not
                         // survive it, or a stale rejection blocks every commit.
@@ -502,11 +512,22 @@ pub(crate) async fn run_iggy_source(
                     }
                     Some(Err(error)) => {
                         emit(IggyReadError { error: error.error });
-                        // Back off briefly before the next poll. Without this
-                        // sleep, SDK error variants that do not internally
-                        // sleep (e.g. transient non-connectivity errors) cause
-                        // a tight spin that pegs CPU and floods the log.
-                        sleep(Duration::from_millis(500)).await;
+                        // Back off before the next poll. Without this sleep,
+                        // SDK error variants that do not internally sleep
+                        // (e.g. transient non-connectivity errors) cause a
+                        // tight spin that pegs CPU and floods the log. The
+                        // delay doubles each iteration up to the configured
+                        // max so a sustained outage does not flood either.
+                        // The sleep races against shutdown so a graceful
+                        // stop does not wait out the full backoff delay.
+                        let delay = read_backoff.next().unwrap_or(Duration::from_secs(30));
+                        tokio::select! {
+                            _ = &mut shutdown => {
+                                info!("Shutdown signal received. Stopping Iggy consumer.");
+                                break;
+                            }
+                            () = sleep(delay) => {}
+                        }
                     }
                     None => {
                         consumer_ended = true;

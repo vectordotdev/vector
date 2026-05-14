@@ -154,6 +154,27 @@ impl InternalEvent for IggyReadError {
 }
 
 #[derive(Debug, NamedInternalEvent)]
+pub(crate) struct IggyConsumerStreamEndedError;
+
+impl InternalEvent for IggyConsumerStreamEndedError {
+    fn emit(self) {
+        error!(
+            message = "Iggy consumer stream ended unexpectedly. The SDK's reconnection logic gave up; the source will stop.",
+            error_code = "consumer_stream_ended",
+            error_type = error_type::READER_FAILED,
+            stage = error_stage::RECEIVING,
+        );
+        counter!(
+            CounterName::ComponentErrorsTotal,
+            "error_code" => "consumer_stream_ended",
+            "error_type" => error_type::READER_FAILED,
+            "stage" => error_stage::RECEIVING,
+        )
+        .increment(1);
+    }
+}
+
+#[derive(Debug, NamedInternalEvent)]
 pub(crate) struct IggyInvalidPayloadError {
     pub payload_len: usize,
 }

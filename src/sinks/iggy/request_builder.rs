@@ -28,8 +28,7 @@ impl MetaDescriptive for IggyRequest {
     }
 }
 
-// Holds pre-encode event tags so byte_size can be updated after a successful
-// encode (the encoder consumes the event).
+// Keeps pre-encode tags for byte-size telemetry; encoding consumes the event.
 struct TagsCapture(TaggedEventsSent);
 
 impl GetEventCountTags for TagsCapture {
@@ -53,7 +52,6 @@ pub(super) fn request_builder(
     let mut payloads = Vec::with_capacity(events.len());
     for mut event in events {
         transformer.transform(&mut event);
-        // Capture telemetry metadata before encoding consumes the event.
         let json_size = event.estimated_json_encoded_size_of();
         let size_of = event.size_of();
         let tags = TagsCapture(event.get_tags());
@@ -84,10 +82,8 @@ pub(super) fn request_builder(
         }
     }
 
-    // Every event in the batch failed encoding; their finalizers were
-    // already marked Errored individually above. Drop the request rather
-    // than dispatching an empty one, which would still emit "Delivered"
-    // telemetry for the original event count even though nothing was sent.
+    // All events failed encoding and were marked Errored above. Drop the
+    // request instead of emitting "Delivered" for an empty send.
     if payloads.is_empty() {
         return None;
     }

@@ -1,6 +1,6 @@
 use std::{sync::Arc, time::Instant};
 
-use iggy::prelude::{Client, IggyClient, IggyProducer};
+use iggy::prelude::{Client, IggyClient, IggyClientBuilder, IggyProducer};
 use snafu::ResultExt;
 use tokio::sync::OnceCell;
 use vector_lib::codecs::JsonSerializerConfig;
@@ -102,6 +102,46 @@ impl GenerateConfig for IggySinkConfig {
     }
 }
 
+/// Batch settings validated once so `build` and the send path do not re-derive
+/// them.
+#[derive(Debug)]
+pub struct ValidatedIggySink {
+    batcher_settings: BatcherSettings,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for IggySinkConfig {
+    type Validated = ValidatedIggySink;
+
+    fn validate(&self) -> crate::Result<ValidatedIggySink> {
+        if self.partitions == 0 {
+            return Err("`partitions` must be at least 1".into());
+        }
+        // Reject a malformed connection string while the topology is built.
+        // Connecting stays lazy so `require_healthy = false` and
+        // `validate --skip-healthchecks` still apply to an unreachable broker.
+        IggyClientBuilder::from_connection_string(&secure_connection_string(&self.url))
+            .map_err(|error| format!("`url` is not a valid Iggy connection string: {error}"))?;
+        self.encoding.validate()?;
+        let batcher_settings = self.batch.validate()?.into_batcher_settings()?;
+        Ok(ValidatedIggySink { batcher_settings })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedIggySink,
+        _cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        // Connecting here would make an unreachable broker a topology error
+        // before healthcheck settings apply, defeating `require_healthy =
+        // false` and `vector validate --skip-healthchecks`.
+        let connection = Arc::new(Connection::new(self));
+        let healthcheck = healthcheck(Arc::clone(&connection)).boxed();
+        let sink = IggySink::new(self, validated.batcher_settings, connection)?;
+        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
+    }
+}
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "iggy")]
 impl SinkConfig for IggySinkConfig {
@@ -153,7 +193,7 @@ impl Connection {
     /// Connect and authenticate only; the healthcheck needs no producer and
     /// must not create the stream or topic as a side effect.
     pub(super) async fn client(&self) -> Result<Arc<IggyClient>, IggyError> {
-        use iggy::prelude::{Client, IggyClientBuilder};
+        use iggy::prelude::Client;
 
         self.client
             .get_or_try_init(|| async {
@@ -236,32 +276,17 @@ async fn healthcheck(connection: Arc<Connection>) -> crate::Result<()> {
     client.ping().await.map_err(Into::into)
 }
 
-/// Retained state produced by structural validation.
-#[derive(Debug)]
-pub struct ValidatedIggySink;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-#[async_trait::async_trait]
-impl ValidatedSink for IggySinkConfig {
-    type Validated = ValidatedIggySink;
+    #[test]
+    fn validate_rejects_a_malformed_connection_string() {
+        let mut config: IggySinkConfig =
+            serde_json::from_value(IggySinkConfig::generate_config()).unwrap();
+        assert!(config.validate().is_ok());
 
-    fn validate(&self) -> crate::Result<ValidatedIggySink> {
-        Ok(ValidatedIggySink)
-    }
-
-    async fn build(
-        &self,
-        _validated: &ValidatedIggySink,
-        _cx: SinkContext,
-    ) -> crate::Result<(VectorSink, Healthcheck)> {
-        if self.partitions == 0 {
-            return Err("`partitions` must be at least 1".into());
-        }
-        // Connecting here would make an unreachable broker a topology error
-        // before healthcheck settings apply, defeating `require_healthy =
-        // false` and `vector validate --skip-healthchecks`.
-        let connection = Arc::new(Connection::new(self));
-        let healthcheck = healthcheck(Arc::clone(&connection)).boxed();
-        let sink = IggySink::new(self, connection)?;
-        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
+        config.url = "not-a-url".into();
+        assert!(config.validate().is_err());
     }
 }

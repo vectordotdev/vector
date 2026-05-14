@@ -22,8 +22,6 @@ enum IggyError {
     Encoding {
         source: vector_lib::codecs::encoding::BuildError,
     },
-    #[snafu(display("invalid batch settings"))]
-    InvalidBatchSettings,
     #[snafu(display("Iggy connection error: {}", source))]
     Connect { source: iggy::prelude::IggyError },
     #[snafu(display("Iggy producer error: {}", source))]
