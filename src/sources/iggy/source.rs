@@ -2,7 +2,7 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use chrono::Utc;
 use futures::{StreamExt, future::join_all, stream::BoxStream};
-use iggy::prelude::{Client, IggyConsumer, ReceivedMessage};
+use iggy::prelude::{Client, IggyConsumer, IggyError, ReceivedMessage};
 use tokio::time::{MissedTickBehavior, interval, sleep};
 use tokio_stream::StreamMap;
 use vector_lib::{
@@ -122,16 +122,21 @@ fn record_ack(state: &mut PartitionState, partition_id: u32, status: BatchStatus
 ///
 /// On success the committed offset is updated so the eager-commit
 /// threshold is measured against what the server actually knows. On
-/// transient error the pending offset is not re-queued; a later ack
-/// will set a fresh (higher) pending value, and the next commit tick
-/// will pick it up. Not re-queuing also prevents an infinite retry
-/// loop when the consumer no longer owns the partition (e.g. after a
-/// consumer-group rebalance revokes it).
+/// `IggyError::NotResolvedConsumer` the broker has told us we no
+/// longer own the partition (typical after a consumer-group rebalance
+/// revokes it), so the per-partition entries in `partitions`,
+/// `finalizers`, and `ack_streams` are removed; without that, every
+/// subsequent commit tick would emit the same error indefinitely. On
+/// other transient errors the pending offset is not re-queued; a later
+/// ack will set a fresh (higher) pending value and the next commit
+/// tick will pick it up.
 async fn commit_offsets(
     consumer: &IggyConsumer,
     stream: &str,
     topic: &str,
     partitions: &mut HashMap<u32, PartitionState>,
+    finalizers: &mut HashMap<u32, OrderedFinalizer<u64>>,
+    ack_streams: &mut StreamMap<u32, BoxStream<'static, (BatchStatus, u64)>>,
 ) {
     let pending: Vec<(u32, u64)> = partitions
         .iter_mut()
@@ -164,6 +169,17 @@ async fn commit_offsets(
                     partition: partition_id,
                     offset,
                 });
+            }
+            Err(
+                IggyError::NotResolvedConsumer(_) | IggyError::ConsumerGroupPartitionNotOwned(..),
+            ) => {
+                partitions.remove(&partition_id);
+                finalizers.remove(&partition_id);
+                ack_streams.remove(&partition_id);
+                debug!(
+                    message = "Partition no longer assigned to this consumer; dropping per-partition acknowledgement state.",
+                    stream, topic, partition_id,
+                );
             }
             Err(error) => {
                 if let Some(state) = partitions.get_mut(&partition_id) {
@@ -482,12 +498,28 @@ pub(crate) async fn run_iggy_source(
                     None => false,
                 };
                 if should_commit {
-                    commit_offsets(&consumer, stream, topic, &mut partitions).await;
+                    commit_offsets(
+                        &consumer,
+                        stream,
+                        topic,
+                        &mut partitions,
+                        &mut finalizers,
+                        &mut ack_streams,
+                    )
+                    .await;
                 }
             }
 
             _ = commit_timer.tick() => {
-                commit_offsets(&consumer, stream, topic, &mut partitions).await;
+                commit_offsets(
+                    &consumer,
+                    stream,
+                    topic,
+                    &mut partitions,
+                    &mut finalizers,
+                    &mut ack_streams,
+                )
+                .await;
             }
 
             _ = &mut shutdown => {
@@ -573,11 +605,13 @@ pub(crate) async fn run_iggy_source(
         // Stop accepting new pending entries, then wait (bounded by
         // `drain_timeout_secs`) for events already sent downstream to be
         // acknowledged before committing the final offsets, so a graceful
-        // shutdown does not replay delivered messages on restart. Dropping
+        // shutdown does not replay delivered messages on restart. Clearing
         // the finalizer map closes each per-partition sender; the streams
         // remain in `ack_streams` until their pending entries finalize,
-        // then end and are removed from the map.
-        drop(finalizers);
+        // then end and are removed from the map. Clear (rather than drop)
+        // so the final `commit_offsets` below can still borrow `finalizers`
+        // to prune entries the broker rejects as no-longer-assigned.
+        finalizers.clear();
         let drain_deadline = sleep(Duration::from_secs(config.drain_timeout_secs));
         tokio::pin!(drain_deadline);
         while !ack_streams.is_empty() {
@@ -607,7 +641,15 @@ pub(crate) async fn run_iggy_source(
                 }
             }
         }
-        commit_offsets(&consumer, stream, topic, &mut partitions).await;
+        commit_offsets(
+            &consumer,
+            stream,
+            topic,
+            &mut partitions,
+            &mut finalizers,
+            &mut ack_streams,
+        )
+        .await;
     }
 
     if let Err(error) = consumer.shutdown().await {
