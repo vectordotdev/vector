@@ -757,6 +757,66 @@ fn max_tracked_keys_unlimited_by_default() {
     }
 }
 
+/// Regression: with `value_limit: 0`, `limit_exceeded_action: drop_event`, and
+/// `max_tracked_keys` exhausted, the documented untracked-passthrough behavior must
+/// still apply. `tag_limit_exceeded` previously rejected *any* missing-bucket lookup
+/// when `value_limit == 0`, causing events to be dropped before `record_tag_value`
+/// could detect the allocation cap. New (metric, tag-key) pairs that cannot be
+/// allocated must instead pass through unchecked.
+#[test]
+fn max_tracked_keys_passthrough_with_zero_value_limit_drop_event() {
+    // metric_a uses a normal per-metric override with room for a value, so the first
+    // event reserves the only allocation slot. metric_b inherits the global config,
+    // which combines `value_limit: 0` + `drop_event` — the corner case that originally
+    // dropped events even when the pair couldn't be tracked.
+    let config = make_transform_hashset_with_per_metric_limits(
+        0,
+        LimitExceededAction::DropEvent,
+        HashMap::from([(
+            "metric_a".to_string(),
+            make_per_metric(5, LimitExceededAction::DropEvent, HashMap::new()),
+        )]),
+    );
+    let mut transform = {
+        let mut c = config;
+        c.tracking_scope = TrackingScope::PerMetric;
+        c.max_tracked_keys = Some(1);
+        TagCardinalityLimit::new(c)
+    };
+
+    // metric_a consumes the only allocation slot (its per-metric value_limit is 5).
+    let a1 = make_metric_with_name(metric_tags!("tag" => "v1"), "metric_a");
+    assert_eq!(transform.transform_one(a1.clone()), Some(a1));
+
+    // metric_b inherits the global config: value_limit=0, drop_event. A new
+    // (metric_b, "tag") pair would need a fresh bucket, but max_tracked_keys is
+    // already at the cap. The event MUST pass through unchecked rather than being
+    // dropped by the value_limit=0 guard.
+    let untracked = make_metric_with_name(metric_tags!("tag" => "v2"), "metric_b");
+    assert_eq!(
+        transform.transform_one(untracked.clone()),
+        Some(untracked),
+        "untracked pair beyond max_tracked_keys must not trigger DropEvent under value_limit=0"
+    );
+
+    // A second distinct value for the same untracked pair also passes through:
+    // no bucket exists, no enforcement applies.
+    let untracked2 = make_metric_with_name(metric_tags!("tag" => "v3"), "metric_b");
+    assert_eq!(
+        transform.transform_one(untracked2.clone()),
+        Some(untracked2)
+    );
+
+    // metric_b never allocated any storage.
+    assert!(
+        transform
+            .accepted_tags
+            .get(&Some((None, "metric_b".to_string())))
+            .is_none(),
+        "untracked pair must not occupy a tracking bucket"
+    );
+}
+
 /// With `tracking_scope: per_metric`, the cap is enforced across *all* per-metric
 /// buckets — not per bucket. Once the cap is hit, further metrics pass through
 /// unchecked.

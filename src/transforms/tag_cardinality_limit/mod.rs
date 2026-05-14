@@ -257,9 +257,12 @@ impl TagCardinalityLimit {
             Some(value_set) if value_set.contains(value) => false,
             // Adding this value would push us at or past the configured cap. Treat a
             // missing bucket as an empty set so `value_limit: 0` correctly rejects
-            // the first occurrence too.
+            // the first occurrence too — but only when the (metric, tag) pair would
+            // actually be tracked. If `max_tracked_keys` is exhausted, `record_tag_value`
+            // will pass the tag through unchecked and emit `TagCardinalityLimitUntracked`,
+            // so we must not pre-empt that path by reporting the limit as exceeded here.
             Some(value_set) => value_set.len() >= resolved.value_limit,
-            None => resolved.value_limit == 0,
+            None => resolved.value_limit == 0 && self.can_allocate_new_key(),
         }
     }
 
