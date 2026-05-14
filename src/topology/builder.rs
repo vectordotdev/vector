@@ -2,7 +2,10 @@ use std::{
     collections::HashMap,
     future::ready,
     num::NonZeroUsize,
-    sync::{Arc, LazyLock, Mutex},
+    sync::{
+        Arc, LazyLock, Mutex,
+        atomic::{AtomicU64, Ordering},
+    },
     time::Instant,
 };
 
@@ -30,7 +33,10 @@ use vector_lib::{
     source_sender::{CHUNK_SIZE, SourceSenderItem},
     transform::update_runtime_schema_definition,
 };
-use vector_lib::{gauge, internal_event::GaugeName};
+use vector_lib::{
+    gauge, histogram,
+    internal_event::{GaugeName, HistogramName},
+};
 use vector_vrl_metrics::MetricsStorage;
 
 use super::{
@@ -755,6 +761,7 @@ impl<'a> Builder<'a> {
             node.input_details.data_type(),
             outputs,
             LatencyRecorder::new(self.config.global.latency_ewma_alpha),
+            node.key.id().to_owned(),
         );
         let transform = if node.enable_concurrency {
             runner.run_concurrently().boxed()
@@ -1144,6 +1151,7 @@ struct Runner {
     timer_tx: UtilizationComponentSender,
     latency_recorder: LatencyRecorder,
     events_received: Registered<EventsReceived>,
+    component_id: String,
 }
 
 impl Runner {
@@ -1154,6 +1162,7 @@ impl Runner {
         input_type: DataType,
         outputs: TransformOutputs,
         latency_recorder: LatencyRecorder,
+        component_id: String,
     ) -> Self {
         Self {
             transform,
@@ -1163,6 +1172,7 @@ impl Runner {
             timer_tx,
             latency_recorder,
             events_received: register!(EventsReceived),
+            component_id,
         }
     }
 
@@ -1220,6 +1230,8 @@ impl Runner {
 
         let mut in_flight = FuturesOrdered::new();
         let mut shutting_down = false;
+        let completed_count = Arc::new(AtomicU64::new(0));
+        let mut yielded_since_last_record: u64 = 0;
 
         self.timer_tx.try_send_start_wait();
         loop {
@@ -1227,6 +1239,7 @@ impl Runner {
                 biased;
 
                 result = in_flight.next(), if !in_flight.is_empty() => {
+                    yielded_since_last_record += 1;
                     match result {
                         Some(Ok(mut outputs_buf)) => {
                             self.send_outputs(&mut outputs_buf).await
@@ -1237,6 +1250,16 @@ impl Runner {
                 }
 
                 input_arrays = input_rx.next(), if in_flight.len() < *TRANSFORM_CONCURRENCY_LIMIT && !shutting_down => {
+                    let blocked_completions = completed_count
+                        .fetch_sub(yielded_since_last_record, Ordering::Relaxed);
+                    yielded_since_last_record = 0;
+                    histogram!(
+                        HistogramName::EstimatedConcurrentTransformSchedulingPressure,
+                        "component_id" => self.component_id.clone()
+                    )
+                    .record(
+                        (blocked_completions as f64 / *TRANSFORM_CONCURRENCY_LIMIT as f64).min(1.0),
+                    );
                     match input_arrays {
                         Some(input_arrays) => {
                             let mut len = 0;
@@ -1247,10 +1270,12 @@ impl Runner {
 
                             let mut t = self.transform.clone();
                             let mut outputs_buf = self.outputs.new_buf_with_capacity(len);
+                            let completed = Arc::clone(&completed_count);
                             let task = tokio::spawn(async move {
                                 for events in input_arrays {
                                     t.transform_all(events, &mut outputs_buf);
                                 }
+                                completed.fetch_add(1, Ordering::Relaxed);
                                 outputs_buf
                             }.in_current_span());
                             in_flight.push_back(task);
