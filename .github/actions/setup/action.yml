@@ -228,26 +228,17 @@ runs:
       shell: bash
       run: sudo apt-get update && sudo apt-get install -y libsasl2-dev
 
-    # librdkafka is built from source and cached so subsequent CI runs skip the
-    # multi-minute compile. Ubuntu's apt librdkafka-dev is older than rdkafka-sys
-    # requires, so we can't just `apt-get install`.
-    - name: Cache librdkafka
-      if: ${{ inputs.librdkafka == 'true' && runner.os == 'Linux' }}
-      id: librdkafka-cache
-      uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
-      with:
-        path: ~/.local/librdkafka-2.12.1
-        key: ${{ runner.os }}-${{ runner.arch }}-librdkafka-2.12.1
-
+    # librdkafka is built from source because Ubuntu's apt librdkafka-dev is
+    # older than rdkafka-sys requires.
     - name: Install librdkafka build deps
-      if: ${{ inputs.librdkafka == 'true' && runner.os == 'Linux' && steps.librdkafka-cache.outputs.cache-hit != 'true' }}
+      if: ${{ inputs.librdkafka == 'true' && runner.os == 'Linux' }}
       shell: bash
       run: |
         sudo apt-get update
         sudo apt-get install -y libsasl2-dev zlib1g-dev libssl-dev libzstd-dev libcurl4-openssl-dev
 
     - name: Build librdkafka
-      if: ${{ inputs.librdkafka == 'true' && runner.os == 'Linux' && steps.librdkafka-cache.outputs.cache-hit != 'true' }}
+      if: ${{ inputs.librdkafka == 'true' && runner.os == 'Linux' }}
       shell: bash
       run: ./scripts/environment/install-librdkafka.sh
 
