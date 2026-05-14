@@ -49,6 +49,7 @@ jobs:
           cargo-nextest: true
           protoc: true
           libsasl2: true
+          librdkafka: true
           cargo-hack: true
 
       - run: make check-component-features

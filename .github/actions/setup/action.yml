@@ -28,6 +28,10 @@ inputs:
     required: false
     default: false
     description: "Install libsasl2." # Required to fully build Vector
+  librdkafka:
+    required: false
+    default: false
+    description: "Install librdkafka. Required when building with `rdkafka?/dynamic_linking` (e.g. the `default` feature)."
 
   # prepare.sh - rust
   rust: # rustup module
@@ -223,6 +227,19 @@ runs:
       if: ${{ inputs.libsasl2 == 'true' }}
       shell: bash
       run: sudo apt-get update && sudo apt-get install -y libsasl2-dev
+
+    # Ubuntu's apt librdkafka-dev is older than rdkafka-sys requires, so we
+    # pull it from Confluent's apt repo (upstream maintainers of librdkafka).
+    - name: Install librdkafka (Confluent apt repo)
+      if: ${{ inputs.librdkafka == 'true' && runner.os == 'Linux' }}
+      shell: bash
+      run: |
+        curl -fsSL https://packages.confluent.io/clients/deb/archive.key \
+          | sudo gpg --dearmor -o /usr/share/keyrings/confluent-archive-keyring.gpg
+        echo "deb [signed-by=/usr/share/keyrings/confluent-archive-keyring.gpg] https://packages.confluent.io/clients/deb $(lsb_release -cs) main" \
+          | sudo tee /etc/apt/sources.list.d/confluent-clients.list
+        sudo apt-get update
+        sudo apt-get install -y librdkafka-dev
 
     - name: Cache cargo binaries
       id: cache-cargo-binaries

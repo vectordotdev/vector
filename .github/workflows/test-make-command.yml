@@ -52,6 +52,7 @@ jobs:
           rust: true
           protoc: true
           libsasl2: true
+          librdkafka: true
           cargo-nextest: ${{ inputs.cargo_nextest }}
           datadog-ci: ${{ inputs.upload_test_results }}
       - run: make ${{ inputs.command }}
