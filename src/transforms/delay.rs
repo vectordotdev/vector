@@ -34,8 +34,8 @@ pub struct DelayConfig {
     #[serde(default)]
     overflow_strategy: OverflowStrategy,
 
-    /// Delay only events matched by this condition.
-    condition: Option<AnyCondition>,
+    /// Delay events in provided delay periods until the condition is met.
+    delay_until_condition: Option<AnyCondition>,
 }
 
 /// Event handling behavior when delay queue is full.
@@ -94,7 +94,7 @@ pub struct Delay {
     queue: DelayQueue<Event>,
     queue_capacity: Option<NonZeroUsize>,
     overflow_strategy: OverflowStrategy,
-    condition: Condition,
+    delay_until_condition: Condition,
 }
 
 impl Delay {
@@ -107,8 +107,8 @@ impl Delay {
                 .unwrap_or_default(),
             queue_capacity: config.queue_capacity,
             overflow_strategy: config.overflow_strategy,
-            condition: config
-                .condition
+            delay_until_condition: config
+                .delay_until_condition
                 .as_ref()
                 .map(|c| c.build(&context.enrichment_tables, &context.metrics_storage))
                 .transpose()?
@@ -135,37 +135,38 @@ impl TaskTransform<Event> for Delay {
                                 done = true;
                             }
                             Some(event) => {
-                                let (result, event) = self.condition.check(event);
-                                if result {
-                                    if let Some(capacity) = self.queue_capacity && capacity.get() <= self.queue.len() {
-                                        match self.overflow_strategy {
-                                            OverflowStrategy::Block => {
-                                                while capacity.get() <= self.queue.len() && let Some(next) = self.queue.next().await {
-                                                    yield next.into_inner();
-                                                }
-                                            },
-                                            OverflowStrategy::DropNewest => {
-                                                emit!(ComponentEventsDropped::<INTENTIONAL> {
-                                                    count: 1,
-                                                    reason: "Queue is full and overflow strategy is drop_newest",
-                                                });
-                                                continue;
+                                if let Some(capacity) = self.queue_capacity && capacity.get() <= self.queue.len() {
+                                    match self.overflow_strategy {
+                                        OverflowStrategy::Block => {
+                                            while capacity.get() <= self.queue.len() && let Some(next) = self.queue.next().await {
+                                                yield next.into_inner();
                                             }
-                                            OverflowStrategy::Pass => {
-                                                yield event;
-                                                continue;
-                                            }
+                                        },
+                                        OverflowStrategy::DropNewest => {
+                                            emit!(ComponentEventsDropped::<INTENTIONAL> {
+                                                count: 1,
+                                                reason: "Queue is full and overflow strategy is drop_newest",
+                                            });
+                                            continue;
+                                        }
+                                        OverflowStrategy::Pass => {
+                                            yield event;
+                                            continue;
                                         }
                                     }
-                                    self.queue.insert(event, self.delay);
-                                } else {
-                                    yield event;
                                 }
+                                self.queue.insert(event, self.delay);
                             }
                         }
                     },
                     Some(res) = self.queue.next() => {
-                        yield res.into_inner();
+                        let event = res.into_inner();
+                        let (result, event) = self.delay_until_condition.check(event);
+                        if result {
+                            yield event;
+                        } else {
+                            self.queue.insert(event, self.delay);
+                        }
                         if done && self.queue.is_empty() {
                             break;
                         }
@@ -209,43 +210,6 @@ delay_per_event = 0.2
         let mut out_stream = delay.transform_events(Box::pin(rx));
 
         tx.send(LogEvent::default().into()).await.unwrap();
-
-        // We should be pending, because we are now waiting for the delay
-        assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
-
-        // Wait long enough for delay to end
-        tokio::time::sleep(Duration::from_secs_f64(0.3)).await;
-
-        if !matches!(futures::poll!(out_stream.next()), Poll::Ready(Some(_event))) {
-            panic!("Unexpectedly received None or Pending in output stream");
-        }
-    }
-
-    #[tokio::test]
-    async fn delay_events_condition() {
-        let config = toml::from_str::<DelayConfig>(
-            r#"
-delay_per_event = 0.2
-condition.type = "is_log"
-"#,
-        )
-        .unwrap();
-
-        let delay =
-            Transform::event_task(Delay::new(&config, &TransformContext::default()).unwrap());
-
-        let delay = delay.into_task();
-
-        let (mut tx, rx) = futures::channel::mpsc::channel(10);
-        let mut out_stream = delay.transform_events(Box::pin(rx));
-
-        tx.send(LogEvent::default().into()).await.unwrap();
-        tx.send(TraceEvent::default().into()).await.unwrap();
-
-        let Poll::Ready(Some(event)) = futures::poll!(out_stream.next()) else {
-            panic!("Unexpectedly received None or Pending in output stream");
-        };
-        assert!(event.try_into_trace().is_some());
 
         // We should be pending, because we are now waiting for the delay
         assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
