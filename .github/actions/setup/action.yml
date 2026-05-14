@@ -228,27 +228,18 @@ runs:
       shell: bash
       run: sudo apt-get update && sudo apt-get install -y libsasl2-dev
 
-    # librdkafka is built from source because Ubuntu's apt librdkafka-dev is
-    # older than rdkafka-sys requires.
-    - name: Install librdkafka build deps
+    # Ubuntu's apt librdkafka-dev is older than rdkafka-sys requires, so we
+    # pull it from Confluent's apt repo (upstream maintainers of librdkafka).
+    - name: Install librdkafka (Confluent apt repo)
       if: ${{ inputs.librdkafka == 'true' && runner.os == 'Linux' }}
       shell: bash
       run: |
+        curl -fsSL https://packages.confluent.io/clients/deb/archive.key \
+          | sudo gpg --dearmor -o /usr/share/keyrings/confluent-archive-keyring.gpg
+        echo "deb [signed-by=/usr/share/keyrings/confluent-archive-keyring.gpg] https://packages.confluent.io/clients/deb $(lsb_release -cs) main" \
+          | sudo tee /etc/apt/sources.list.d/confluent-clients.list
         sudo apt-get update
-        sudo apt-get install -y libsasl2-dev zlib1g-dev libssl-dev libzstd-dev libcurl4-openssl-dev
-
-    - name: Build librdkafka
-      if: ${{ inputs.librdkafka == 'true' && runner.os == 'Linux' }}
-      shell: bash
-      run: ./scripts/environment/install-librdkafka.sh
-
-    - name: Expose librdkafka via pkg-config
-      if: ${{ inputs.librdkafka == 'true' && runner.os == 'Linux' }}
-      shell: bash
-      run: |
-        PREFIX="$HOME/.local/librdkafka-2.12.1"
-        echo "PKG_CONFIG_PATH=$PREFIX/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}" >> "$GITHUB_ENV"
-        echo "LD_LIBRARY_PATH=$PREFIX/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" >> "$GITHUB_ENV"
+        sudo apt-get install -y librdkafka-dev
 
     - name: Cache cargo binaries
       id: cache-cargo-binaries

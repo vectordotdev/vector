@@ -48,7 +48,14 @@ Loosely, you'll need the following:
 - **To build Vector:** Have working Rustup, Protobuf tools, C++/C build tools (LLVM, GCC, or MSVC), Python, and Perl, `make` (the GNU one preferably), `bash`, `cmake`, `GNU coreutils`, and `autotools`.
   - The `default` feature links Kafka dynamically against a system `librdkafka` (`>= 2.12.1`) so dev builds skip the multi-minute embedded `rdkafka-sys` compile:
     - macOS: `brew install librdkafka`.
-    - Linux: Ubuntu's apt `librdkafka-dev` is too old. Run `scripts/environment/install-librdkafka.sh` to build and install a compatible version under `$HOME/.local/librdkafka-<version>` (set `PKG_CONFIG_PATH` to its `lib/pkgconfig`).
+    - Ubuntu: the distro `librdkafka-dev` is too old. Use [Confluent's apt repo](https://docs.confluent.io/platform/current/installation/installing_cp/deb-ubuntu.html#get-the-software):
+      ```bash
+      curl -fsSL https://packages.confluent.io/clients/deb/archive.key \
+        | sudo gpg --dearmor -o /usr/share/keyrings/confluent-archive-keyring.gpg
+      echo "deb [signed-by=/usr/share/keyrings/confluent-archive-keyring.gpg] https://packages.confluent.io/clients/deb $(lsb_release -cs) main" \
+        | sudo tee /etc/apt/sources.list.d/confluent-clients.list
+      sudo apt-get update && sudo apt-get install -y librdkafka-dev
+      ```
   - The `default` feature does not enable Kerberos/GSSAPI SASL for kafka, so local dev builds (`cargo build`, `make build`) have no other system prerequisites beyond the C build tools above.
   - To enable GSSAPI for kafka, choose one of:
     - `gssapi`: dynamically links against system `libsasl2`. Requires `libsasl2-dev` (Ubuntu: `sudo apt-get install -y libsasl2-dev`) or `cyrus-sasl` (macOS: `brew install cyrus-sasl`) installed.
