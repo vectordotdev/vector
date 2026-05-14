@@ -288,29 +288,33 @@ fn new_client(
 #[derive(Debug, Clone)]
 struct VectorGrpcRetryLogic;
 
+fn is_permanent_grpc_status(code: tonic::Code) -> bool {
+    use tonic::Code::*;
+
+    matches!(
+        code,
+        // List taken from
+        //
+        // <https://github.com/grpc/grpc/blob/ed1b20777c69bd47e730a63271eafc1b299f6ca0/doc/statuscodes.md>
+        NotFound
+            | InvalidArgument
+            | AlreadyExists
+            | PermissionDenied
+            | OutOfRange
+            | Unimplemented
+            | Unauthenticated
+            | DataLoss
+    )
+}
+
 impl RetryLogic for VectorGrpcRetryLogic {
     type Error = VectorSinkError;
     type Request = VectorRequest;
     type Response = VectorResponse;
 
     fn is_retriable_error(&self, err: &Self::Error) -> bool {
-        use tonic::Code::*;
-
         match err {
-            VectorSinkError::Request { source } => !matches!(
-                source.code(),
-                // List taken from
-                //
-                // <https://github.com/grpc/grpc/blob/ed1b20777c69bd47e730a63271eafc1b299f6ca0/doc/statuscodes.md>
-                NotFound
-                    | InvalidArgument
-                    | AlreadyExists
-                    | PermissionDenied
-                    | OutOfRange
-                    | Unimplemented
-                    | Unauthenticated
-                    | DataLoss
-            ),
+            VectorSinkError::Request { source } => !is_permanent_grpc_status(source.code()),
             _ => true,
         }
     }
@@ -329,9 +333,52 @@ impl HealthLogic for VectorHealthLogic {
             Err(error) => error
                 .downcast_ref::<VectorSinkError>()
                 .and_then(|err| match err {
-                    VectorSinkError::Request { .. } => Some(false),
+                    VectorSinkError::Request { source } => {
+                        if is_permanent_grpc_status(source.code()) {
+                            None
+                        } else {
+                            Some(false)
+                        }
+                    }
                     _ => None,
                 }),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use tonic::{Code, Status};
+
+    use super::*;
+
+    #[test]
+    fn grpc_retry_logic_does_not_retry_permanent_statuses() {
+        let logic = VectorGrpcRetryLogic;
+
+        assert!(!logic.is_retriable_error(&VectorSinkError::Request {
+            source: Status::new(Code::InvalidArgument, "invalid request"),
+        }));
+        assert!(logic.is_retriable_error(&VectorSinkError::Request {
+            source: Status::new(Code::Unavailable, "temporarily unavailable"),
+        }));
+    }
+
+    #[test]
+    fn grpc_health_logic_only_marks_transient_statuses_unhealthy() {
+        let logic = VectorHealthLogic;
+
+        assert_eq!(
+            logic.is_healthy(&Err(Box::new(VectorSinkError::Request {
+                source: Status::new(Code::InvalidArgument, "invalid request"),
+            }))),
+            None
+        );
+        assert_eq!(
+            logic.is_healthy(&Err(Box::new(VectorSinkError::Request {
+                source: Status::new(Code::Unavailable, "temporarily unavailable"),
+            }))),
+            Some(false)
+        );
     }
 }
