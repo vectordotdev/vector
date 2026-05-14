@@ -169,6 +169,9 @@ impl SourceConfig for IggySourceConfig {
         if self.drain_timeout_secs == 0 {
             return Err("`drain_timeout_secs` must be at least 1".into());
         }
+        if self.poll_interval_ms == 0 {
+            return Err("`poll_interval_ms` must be at least 1".into());
+        }
 
         let log_namespace = cx.log_namespace(self.log_namespace);
         let decoder =
