@@ -4,8 +4,9 @@ use async_stream::stream;
 use futures::{Stream, StreamExt};
 use serde_with::serde_as;
 use tokio_util::time::DelayQueue;
-use vector_lib::config::clone_input_definitions;
 use vector_lib::configurable::configurable_component;
+use vector_lib::internal_event::INTENTIONAL;
+use vector_lib::{config::clone_input_definitions, internal_event::ComponentEventsDropped};
 
 use crate::{
     conditions::{AnyCondition, Condition},
@@ -144,7 +145,10 @@ impl TaskTransform<Event> for Delay {
                                                 }
                                             },
                                             OverflowStrategy::DropNewest => {
-                                                // Just ignore this event
+                                                emit!(ComponentEventsDropped::<INTENTIONAL> {
+                                                    count: 1,
+                                                    reason: "Queue is full and overflow strategy is drop_newest",
+                                                });
                                                 continue;
                                             }
                                             OverflowStrategy::Pass => {
