@@ -46,7 +46,10 @@ To build Vector on your own host will require a fairly complete development envi
 Loosely, you'll need the following:
 
 - **To build Vector:** Have working Rustup, Protobuf tools, C++/C build tools (LLVM, GCC, or MSVC), Python, and Perl, `make` (the GNU one preferably), `bash`, `cmake`, `GNU coreutils`, and `autotools`.
-  - The `default` feature does not enable Kerberos/GSSAPI SASL for kafka, so local dev builds (`cargo build`, `make build`) have no extra system prerequisites beyond the C build tools above.
+  - The `default` feature links Kafka dynamically against a system `librdkafka` (`>= 2.12.1`) so dev builds skip the multi-minute embedded `rdkafka-sys` compile:
+    - macOS: `brew install librdkafka`.
+    - Linux: Ubuntu's apt `librdkafka-dev` is too old. Run `scripts/environment/install-librdkafka.sh` to build and install a compatible version under `$HOME/.local/librdkafka-<version>` (set `PKG_CONFIG_PATH` to its `lib/pkgconfig`).
+  - The `default` feature does not enable Kerberos/GSSAPI SASL for kafka, so local dev builds (`cargo build`, `make build`) have no other system prerequisites beyond the C build tools above.
   - To enable GSSAPI for kafka, choose one of:
     - `gssapi`: dynamically links against system `libsasl2`. Requires `libsasl2-dev` (Ubuntu: `sudo apt-get install -y libsasl2-dev`) or `cyrus-sasl` (macOS: `brew install cyrus-sasl`) installed.
     - `gssapi-vendored` (or `vendored`, which includes it): builds `libsasl2` and `krb5` from bundled source. No system install needed. Linux only; the bundled path does not currently link on macOS arm64.
