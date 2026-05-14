@@ -199,11 +199,6 @@ generated: components: sources: prometheus_scrape: configuration: {
 		required:    true
 		type: array: items: type: string: examples: ["http://localhost:9090/metrics"]
 	}
-	follow_redirects: {
-		description: "Whether to follow HTTP redirects for scrape requests."
-		required:    false
-		type: bool: default: true
-	}
 	honor_labels: {
 		description: """
 			Controls how tag conflicts are handled if the scraped source has tags to be added.
@@ -224,11 +219,6 @@ generated: components: sources: prometheus_scrape: configuration: {
 			"""
 		required: false
 		type: string: {}
-	}
-	max_redirects: {
-		description: "Maximum number of redirects to follow when enabled."
-		required:    false
-		type: uint: default: 5
 	}
 	query: {
 		description: """
@@ -267,6 +257,22 @@ generated: components: sources: prometheus_scrape: configuration: {
 					}
 					string: {}
 				}
+			}
+		}
+	}
+	redirects: {
+		description: "HTTP redirect configuration."
+		required:    false
+		type: object: options: {
+			follow: {
+				description: "Whether to follow HTTP redirects."
+				required:    false
+				type: bool: default: true
+			}
+			max: {
+				description: "Maximum number of redirects to follow when enabled."
+				required:    false
+				type: uint: default: 5
 			}
 		}
 	}

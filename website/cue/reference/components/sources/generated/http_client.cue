@@ -535,11 +535,6 @@ generated: components: sources: http_client: configuration: {
 		required: true
 		type: string: examples: ["http://127.0.0.1:9898/logs"]
 	}
-	follow_redirects: {
-		description: "Whether to follow HTTP redirects."
-		required:    false
-		type: bool: default: false
-	}
 	framing: {
 		description: "Framing to use in the decoding."
 		required:    false
@@ -739,11 +734,6 @@ generated: components: sources: http_client: configuration: {
 			}
 		}
 	}
-	max_redirects: {
-		description: "Maximum number of redirects to follow when enabled."
-		required:    false
-		type: uint: default: 5
-	}
 	method: {
 		description: "Specifies the method of the HTTP request."
 		required:    false
@@ -807,6 +797,22 @@ generated: components: sources: http_client: configuration: {
 					}
 					string: {}
 				}
+			}
+		}
+	}
+	redirects: {
+		description: "HTTP redirect configuration."
+		required:    false
+		type: object: options: {
+			follow: {
+				description: "Whether to follow HTTP redirects."
+				required:    false
+				type: bool: default: false
+			}
+			max: {
+				description: "Maximum number of redirects to follow when enabled."
+				required:    false
+				type: uint: default: 5
 			}
 		}
 	}
