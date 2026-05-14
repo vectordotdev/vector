@@ -50,7 +50,7 @@ pub use proto_batch::{ProtoBatchEncodingError, ProtoBatchSerializer, ProtoBatchS
 pub use protobuf::{ProtobufSerializer, ProtobufSerializerConfig, ProtobufSerializerOptions};
 pub use raw_message::{RawMessageSerializer, RawMessageSerializerConfig};
 #[cfg(feature = "syslog")]
-pub use syslog::{SyslogSerializer, SyslogSerializerConfig};
+pub use syslog::{SyslogSerializer, SyslogSerializerConfig, SyslogSerializerOptions};
 pub use text::{TextSerializer, TextSerializerConfig};
 use vector_core::event::Event;
 
