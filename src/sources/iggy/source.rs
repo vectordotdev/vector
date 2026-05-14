@@ -19,7 +19,7 @@ use vector_lib::{
 use crate::{
     SourceSender,
     codecs::Decoder,
-    event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, EventFinalizer, EventStatus},
+    event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
     internal_events::{
         IggyBytesReceived, IggyEventsReceived, IggyOffsetCommitted, IggyOffsetUpdateError,
         IggyOffsetUpdated, IggyReadError, StreamClosedError,
@@ -40,13 +40,9 @@ struct PartitionState {
 }
 
 impl PartitionState {
-    /// Record a Delivered acknowledgement for `offset`. Returns `true` if
-    /// this cleared a previously fenced offset (i.e. a redelivery succeeded).
-    fn record_delivered(&mut self, offset: u64) -> bool {
-        let was_fenced = self.rejected.remove(&offset);
+    fn record_delivered(&mut self, offset: u64) {
         self.max_delivered = Some(self.max_delivered.map_or(offset, |m| m.max(offset)));
         self.recompute_pending();
-        was_fenced
     }
 
     /// Record a non-Delivered acknowledgement for `offset`. Returns `true`
@@ -88,12 +84,7 @@ impl PartitionState {
 fn record_ack(state: &mut PartitionState, partition_id: u32, status: BatchStatus, offset: u64) {
     match status {
         BatchStatus::Delivered => {
-            if state.record_delivered(offset) {
-                debug!(
-                    message = "Previously rejected Iggy offset was redelivered; fence updated.",
-                    partition_id, offset,
-                );
-            }
+            state.record_delivered(offset);
         }
         status => {
             if state.record_rejection(offset) {
@@ -180,13 +171,28 @@ impl AckTracker<'_> {
     }
 }
 
+/// Outcome of processing one polled Iggy message.
+enum ProcessOutcome {
+    /// Message was decoded and forwarded successfully (or acks are disabled).
+    Ok,
+    /// Payload hit a non-continuable decode error. The caller must skip this
+    /// offset directly via `store_offset` rather than putting it in the fence
+    /// set, where it would wedge the partition permanently (the SDK yields
+    /// each offset only once, so the fence can never be cleared).
+    DecodeFailed { partition_id: u32, offset: u64 },
+}
+
 /// Decode one polled Iggy message, forward its events downstream, and
 /// register the message for acknowledgement when acks are enabled.
 ///
-/// Returns `Err(())` when the downstream `SourceSender` has closed — the
-/// caller should bail out of the source loop. A non-continuable decode
-/// error is handled internally by marking the batch as `Rejected` so the
-/// fence logic refuses to commit past the malformed offset.
+/// Returns `Err(())` when the downstream `SourceSender` has closed; the
+/// caller should bail out of the source loop.
+///
+/// A non-continuable decode error returns `Ok(DecodeFailed)` so the caller
+/// can advance past the poison offset via `store_offset` without touching
+/// the fence bookkeeping. Events from earlier frames in the same multi-frame
+/// payload are *not* retroactively rejected: they keep whatever status they
+/// earn naturally downstream.
 async fn process_received_message(
     received: ReceivedMessage,
     decoder: &Decoder,
@@ -194,7 +200,7 @@ async fn process_received_message(
     acknowledgements: bool,
     tracker: &mut AckTracker<'_>,
     out: &mut SourceSender,
-) -> Result<(), ()> {
+) -> Result<ProcessOutcome, ()> {
     let payload = &received.message.payload;
     let partition_id = received.partition_id;
     let offset = received.message.header.offset;
@@ -294,28 +300,32 @@ async fn process_received_message(
         }
     }
 
-    // Drop our handle so the batch is finalized once the events that were
-    // attached to it are dropped downstream. On a non-continuable decode
-    // error, wrap the batch in an `EventFinalizer` set to `Rejected` so the
-    // offset is not committed; otherwise the default `Delivered` status
-    // would let a malformed message advance the consumer.
-    if decode_failed {
-        let efin = EventFinalizer::new(batch);
-        efin.update_status(EventStatus::Rejected);
-        drop(efin);
-    } else {
-        drop(batch);
-    }
+    // Drop the BatchNotifier handle so the batch is finalized once all events
+    // attached to it are settled downstream. On a decode failure we drop
+    // normally (no retroactive rejection) so events from earlier frames that
+    // were already sent downstream keep whatever status they earn naturally.
+    drop(batch);
 
     if channel_closed {
         return Err(());
+    }
+
+    if decode_failed {
+        // Drop the receiver without registering it for ack tracking. The
+        // caller advances past this offset directly via store_offset so the
+        // partition keeps making progress. Persistent downstream rejection (a
+        // sink that permanently refuses a message) is handled differently: the
+        // fence in PartitionState intentionally halts that partition; Vector
+        // must not silently discard events a sink refused.
+        drop(receiver);
+        return Ok(ProcessOutcome::DecodeFailed { partition_id, offset });
     }
 
     if acknowledgements {
         tracker.register(partition_id, offset, receiver);
     }
 
-    Ok(())
+    Ok(ProcessOutcome::Ok)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -420,7 +430,7 @@ pub async fn run_iggy_source(
                             finalizers: &mut finalizers,
                             ack_streams: &mut ack_streams,
                         };
-                        if process_received_message(
+                        match process_received_message(
                             received,
                             &decoder,
                             &metadata,
@@ -429,9 +439,33 @@ pub async fn run_iggy_source(
                             &mut out,
                         )
                         .await
-                        .is_err()
                         {
-                            return Err(());
+                            Err(()) => return Err(()),
+                            Ok(ProcessOutcome::DecodeFailed { partition_id, offset }) => {
+                                warn!(
+                                    message = "Iggy message payload could not be decoded; skipping offset to avoid permanently wedging the partition.",
+                                    stream,
+                                    topic,
+                                    partition_id,
+                                    offset,
+                                );
+                                match consumer.store_offset(offset, Some(partition_id)).await {
+                                    Ok(()) => {
+                                        partitions.entry(partition_id).or_default().committed =
+                                            offset;
+                                        emit!(IggyOffsetCommitted {
+                                            stream,
+                                            topic,
+                                            partition: partition_id,
+                                            offset,
+                                        });
+                                    }
+                                    Err(error) => {
+                                        emit!(IggyOffsetUpdateError { error });
+                                    }
+                                }
+                            }
+                            Ok(ProcessOutcome::Ok) => {}
                         }
                     }
                     Some(Err(error)) => {
@@ -528,12 +562,6 @@ mod tests {
     }
 
     #[test]
-    fn delivered_returns_false_when_not_fenced() {
-        let mut s = PartitionState::default();
-        assert!(!s.record_delivered(5));
-    }
-
-    #[test]
     fn rejection_fences_pending() {
         let mut s = PartitionState::default();
         s.record_delivered(10);
@@ -573,29 +601,6 @@ mod tests {
         let mut s = PartitionState::default();
         s.record_rejection(5);
         assert_eq!(s.pending, None);
-    }
-
-    #[test]
-    fn redelivery_clears_fence_and_advances_pending() {
-        let mut s = PartitionState::default();
-        s.record_delivered(10);
-        s.record_rejection(5);
-        assert_eq!(s.pending, Some(4));
-        assert!(s.record_delivered(5));
-        assert_eq!(s.pending, Some(10));
-    }
-
-    #[test]
-    fn pending_advances_to_next_fence_after_partial_clear() {
-        let mut s = PartitionState::default();
-        s.record_delivered(10);
-        s.record_rejection(5);
-        s.record_rejection(7);
-        assert_eq!(s.pending, Some(4));
-        s.record_delivered(5);
-        assert_eq!(s.pending, Some(6));
-        s.record_delivered(7);
-        assert_eq!(s.pending, Some(10));
     }
 
     #[test]
