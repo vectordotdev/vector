@@ -147,7 +147,24 @@ maybe_install_cargo_tool() {
   fi
 
   if ! $version_cmd --version 2>/dev/null | grep -q "^${version_pattern}"; then
-    cargo "${installer[@]}" "$tool" --version "$version" --force --locked
+    local should_install=true
+    # Outside CI, preserve a newer-than-pin version the user already has.
+    # `cargo install --force` would otherwise silently downgrade them.
+    if [[ -z "${CI:-}" ]]; then
+      local current
+      current=$($version_cmd --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)
+      if [[ -n "$current" ]] && [[ "$current" != "$version" ]]; then
+        local newest
+        newest=$(printf '%s\n%s\n' "$current" "$version" | sort -V | tail -1)
+        if [[ "$newest" == "$current" ]]; then
+          echo "Keeping ${tool} ${current} (newer than pin ${version}). Set CI=1 to force the pin."
+          should_install=false
+        fi
+      fi
+    fi
+    if [[ "$should_install" == "true" ]]; then
+      cargo "${installer[@]}" "$tool" --version "$version" --force --locked
+    fi
   fi
 
   # cargo-llvm-cov requires the llvm-tools-preview rustup component
@@ -199,6 +216,17 @@ maybe_install_npm_tools() {
 
   npm ci --prefix "${npm_tools_dir}"
 
+  # Outside CI, skip the global symlink to avoid a sudo write to /usr/local/bin
+  # (or equivalent). The Makefile prepends this directory to PATH, so `make`
+  # recipes find the tools automatically.
+  if [[ -z "${CI:-}" ]]; then
+    echo "npm tools installed under ${npm_tools_dir}/node_modules/.bin"
+    echo "Make recipes discover them automatically. To invoke directly from a"
+    echo "shell, add the directory to your PATH:"
+    echo "  export PATH=\"${npm_tools_dir}/node_modules/.bin:\$PATH\""
+    return 0
+  fi
+
   # Use sudo only when the target directory is not writable (e.g. /usr/local/bin
   # on Linux CI runners is root-owned, but Homebrew dirs on macOS are user-owned).
   local ln_cmd=(ln -sf)
@@ -210,8 +238,12 @@ maybe_install_npm_tools() {
   done
 }
 
-# Always ensure git safe.directory is set
-git config --global --add safe.directory "$(pwd)"
+# Set git safe.directory in CI where the repo may be checked out by a different
+# uid than the user running git. Skipped on workstations: the contributor owns
+# the checkout and a global config write is unnecessary.
+if [[ -n "${CI:-}" ]]; then
+  git config --global --add safe.directory "$(pwd)"
+fi
 
 REQUIRES_RUSTUP=(dd-rust-license-tool cargo-deb cross cargo-nextest cargo-deny cargo-msrv cargo-hack cargo-llvm-cov wasm-pack vdev)
 REQUIRES_BINSTALL=(cargo-deb cross cargo-nextest cargo-deny cargo-msrv cargo-hack cargo-llvm-cov wasm-pack vdev)
