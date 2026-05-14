@@ -60,6 +60,7 @@ fn make_transform_hashset(
         tracking_scope: TrackingScope::default(),
         max_tracked_keys: None,
         per_metric_limits: HashMap::new(),
+        per_tag_limits: HashMap::new(),
     }
 }
 
@@ -76,6 +77,7 @@ fn make_transform_bloom(value_limit: usize, limit_exceeded_action: LimitExceeded
         tracking_scope: TrackingScope::default(),
         max_tracked_keys: None,
         per_metric_limits: HashMap::new(),
+        per_tag_limits: HashMap::new(),
     }
 }
 
@@ -94,6 +96,7 @@ fn make_transform_hashset_with_per_metric_limits(
         tracking_scope: TrackingScope::default(),
         max_tracked_keys: None,
         per_metric_limits,
+        per_tag_limits: HashMap::new(),
     }
 }
 
@@ -114,6 +117,27 @@ fn make_transform_bloom_with_per_metric_limits(
         tracking_scope: TrackingScope::default(),
         max_tracked_keys: None,
         per_metric_limits,
+        per_tag_limits: HashMap::new(),
+    }
+}
+
+fn make_transform_with_global_per_tag_limits(
+    value_limit: usize,
+    limit_exceeded_action: LimitExceededAction,
+    mode: Mode,
+    per_tag_limits: HashMap<String, PerTagConfig>,
+) -> Config {
+    Config {
+        global: Inner {
+            value_limit,
+            limit_exceeded_action,
+            mode,
+            internal_metrics: InternalMetricsConfig::default(),
+        },
+        tracking_scope: TrackingScope::default(),
+        max_tracked_keys: None,
+        per_metric_limits: HashMap::new(),
+        per_tag_limits,
     }
 }
 
@@ -1129,5 +1153,251 @@ per_metric_limits:
     assert_eq!(capped.mode, PerTagMode::LimitOverride { value_limit: 10 });
 
     let excluded = per_metric.per_tag_limits.get("excluded_tag").unwrap();
+    assert_eq!(excluded.mode, PerTagMode::Excluded);
+}
+
+// ============================================================================
+// Global per_tag_limits tests (top-level `Config::per_tag_limits`)
+//
+// Mirror the per-metric per-tag suite: covers `excluded` and `limit_override`
+// at the global level, fallback semantics, and YAML deserialization.
+// ============================================================================
+
+#[test]
+fn global_per_tag_excluded_drop_tag_passthrough_hashset() {
+    global_per_tag_excluded_drop_tag_passthrough(Mode::Exact);
+}
+
+#[test]
+fn global_per_tag_excluded_drop_tag_passthrough_bloom() {
+    global_per_tag_excluded_drop_tag_passthrough(Mode::Probabilistic(BloomFilterConfig {
+        cache_size_per_key: default_cache_size(),
+    }));
+}
+
+/// A globally-excluded tag passes through unchanged on every metric, even when its values
+/// would have exceeded `value_limit`. Sibling non-excluded tags still respect the limit.
+fn global_per_tag_excluded_drop_tag_passthrough(mode: Mode) {
+    let config = make_transform_with_global_per_tag_limits(
+        2,
+        LimitExceededAction::DropTag,
+        mode,
+        HashMap::from([("kube_pod_name".to_string(), make_per_tag_excluded())]),
+    );
+    let mut transform = TagCardinalityLimit::new(config);
+
+    let event1 = make_metric(metric_tags!("kube_pod_name" => "pod-a", "tag1" => "val1"));
+    let event2 = make_metric(metric_tags!("kube_pod_name" => "pod-b", "tag1" => "val2"));
+    // value_limit=2 is hit on tag1, but kube_pod_name keeps passing through.
+    let event3 = make_metric(metric_tags!("kube_pod_name" => "pod-c", "tag1" => "val3"));
+
+    let new_event1 = transform.transform_one(event1).unwrap();
+    let new_event2 = transform.transform_one(event2).unwrap();
+    let new_event3 = transform.transform_one(event3).unwrap();
+
+    for ev in [&new_event1, &new_event2, &new_event3] {
+        assert!(
+            ev.as_metric().tags().unwrap().contains_key("kube_pod_name"),
+            "excluded tag should always pass through"
+        );
+    }
+    assert_eq!(
+        "val1",
+        new_event1.as_metric().tags().unwrap().get("tag1").unwrap()
+    );
+    assert_eq!(
+        "val2",
+        new_event2.as_metric().tags().unwrap().get("tag1").unwrap()
+    );
+    assert!(
+        !new_event3.as_metric().tags().unwrap().contains_key("tag1"),
+        "non-excluded tag should still be subject to the limit"
+    );
+}
+
+#[test]
+fn global_per_tag_excluded_drop_event_passthrough_hashset() {
+    global_per_tag_excluded_drop_event_passthrough(Mode::Exact);
+}
+
+#[test]
+fn global_per_tag_excluded_drop_event_passthrough_bloom() {
+    global_per_tag_excluded_drop_event_passthrough(Mode::Probabilistic(BloomFilterConfig {
+        cache_size_per_key: default_cache_size(),
+    }));
+}
+
+/// Under `DropEvent`, a globally-excluded tag never triggers a drop, but a non-excluded
+/// tag exceeding `value_limit` still does.
+fn global_per_tag_excluded_drop_event_passthrough(mode: Mode) {
+    let config = make_transform_with_global_per_tag_limits(
+        2,
+        LimitExceededAction::DropEvent,
+        mode,
+        HashMap::from([("kube_pod_name".to_string(), make_per_tag_excluded())]),
+    );
+    let mut transform = TagCardinalityLimit::new(config);
+
+    let event1 = make_metric(metric_tags!("kube_pod_name" => "pod-a", "tag1" => "val1"));
+    let event2 = make_metric(metric_tags!("kube_pod_name" => "pod-b", "tag1" => "val2"));
+    // 3rd value on non-excluded tag1 → DropEvent.
+    let event3 = make_metric(metric_tags!("kube_pod_name" => "pod-c", "tag1" => "val3"));
+    // tag1 reuses an accepted value, so a new pod name alone must not drop the event.
+    let event4 = make_metric(metric_tags!("kube_pod_name" => "pod-d", "tag1" => "val1"));
+
+    assert_eq!(transform.transform_one(event1.clone()), Some(event1));
+    assert_eq!(transform.transform_one(event2.clone()), Some(event2));
+    assert_eq!(transform.transform_one(event3), None);
+    assert_eq!(transform.transform_one(event4.clone()), Some(event4));
+}
+
+/// A globally-excluded tag must never enter the cache, even after seeing many distinct
+/// values. Asserting directly on `accepted_tags` pins the "never allocate" contract.
+#[test]
+fn global_per_tag_excluded_never_populates_cache() {
+    let config = make_transform_with_global_per_tag_limits(
+        2,
+        LimitExceededAction::DropTag,
+        Mode::Exact,
+        HashMap::from([("kube_pod_name".to_string(), make_per_tag_excluded())]),
+    );
+    let mut transform = TagCardinalityLimit::new(config);
+
+    for i in 0..10 {
+        let event = make_metric(metric_tags!(
+            "kube_pod_name" => format!("pod-{i}").as_str(),
+            "tag1" => "val1"
+        ));
+        transform.transform_one(event).unwrap();
+    }
+
+    let bucket = transform
+        .accepted_tags
+        .get(&None)
+        .expect("non-excluded tag1 should still allocate a global bucket");
+    assert!(
+        bucket.contains_key("tag1"),
+        "non-excluded tag must still be tracked"
+    );
+    assert!(
+        !bucket.contains_key("kube_pod_name"),
+        "excluded tag key must never enter the cache"
+    );
+}
+
+/// A global `LimitOverride` caps that tag at its own `value_limit` even though the global
+/// `value_limit` is much higher. Other tags continue to use the global limit.
+#[test]
+fn global_per_tag_limit_override_caps_at_explicit_value() {
+    let config = make_transform_with_global_per_tag_limits(
+        500,
+        LimitExceededAction::DropTag,
+        Mode::Exact,
+        HashMap::from([("tag1".to_string(), make_per_tag(2))]),
+    );
+    let mut transform = TagCardinalityLimit::new(config);
+
+    // First 2 values pass (per-tag limit = 2).
+    for v in ["v0", "v1"] {
+        let e = transform
+            .transform_one(make_metric(metric_tags!("tag1" => v)))
+            .unwrap();
+        assert_eq!(v, e.as_metric().tags().unwrap().get("tag1").unwrap());
+    }
+
+    // 3rd value dropped — proves the per-tag limit (2) applies, not the global (500).
+    let e3 = transform
+        .transform_one(make_metric(metric_tags!("tag1" => "v2")))
+        .unwrap();
+    assert!(!e3.as_metric().tags().unwrap().contains_key("tag1"));
+
+    // tag2 has no override → still uses the global limit (500), so we can push a new value.
+    let e_other = transform
+        .transform_one(make_metric(metric_tags!("tag2" => "v0")))
+        .unwrap();
+    assert_eq!(
+        "v0",
+        e_other.as_metric().tags().unwrap().get("tag2").unwrap()
+    );
+}
+
+/// Per-metric `per_tag_limits` shadows the global `per_tag_limits` for matched metrics:
+/// when a metric has its own `per_metric_limits` entry, the global per-tag overrides are
+/// not consulted for that metric. Metrics without a per-metric entry continue to use the
+/// global per-tag overrides.
+#[test]
+fn global_per_tag_overridden_by_per_metric_entry() {
+    let config = Config {
+        global: Inner {
+            value_limit: 2,
+            limit_exceeded_action: LimitExceededAction::DropTag,
+            mode: Mode::Exact,
+            internal_metrics: InternalMetricsConfig::default(),
+        },
+        tracking_scope: TrackingScope::default(),
+        max_tracked_keys: None,
+        per_metric_limits: HashMap::from([(
+            "metricA".to_string(),
+            make_per_metric(5, LimitExceededAction::DropTag, HashMap::new()),
+        )]),
+        per_tag_limits: HashMap::from([("tag1".to_string(), make_per_tag_excluded())]),
+    };
+    let mut transform = TagCardinalityLimit::new(config);
+
+    // metricA matches per_metric_limits → global per_tag_limits is ignored.
+    // tag1 must therefore be tracked under metricA's per-metric `value_limit: 5`.
+    for v in ["a0", "a1", "a2", "a3", "a4"] {
+        let e = transform
+            .transform_one(make_metric_with_name(metric_tags!("tag1" => v), "metricA"))
+            .unwrap();
+        assert_eq!(v, e.as_metric().tags().unwrap().get("tag1").unwrap());
+    }
+    // 6th value on metricA's tag1 must be dropped: per-metric limit reached.
+    let dropped = transform
+        .transform_one(make_metric_with_name(
+            metric_tags!("tag1" => "a5"),
+            "metricA",
+        ))
+        .unwrap();
+    assert!(
+        !dropped.as_metric().tags().unwrap().contains_key("tag1"),
+        "per-metric per_tag_limits is empty → metricA falls back to per-metric value_limit, \
+         not the global excluded entry"
+    );
+
+    // metricB has no per-metric entry → global `tag1: excluded` applies, so values pass
+    // through unbounded even though the global value_limit is 2.
+    for v in ["b0", "b1", "b2", "b3", "b4"] {
+        let e = transform
+            .transform_one(make_metric_with_name(metric_tags!("tag1" => v), "metricB"))
+            .unwrap();
+        assert_eq!(
+            v,
+            e.as_metric().tags().unwrap().get("tag1").unwrap(),
+            "globally-excluded tag should pass through on unmatched metrics"
+        );
+    }
+}
+
+/// Global per-tag YAML syntax mirrors per-metric `per_tag_limits`: `mode: limit_override`
+/// with `value_limit`, and `mode: excluded`.
+#[test]
+fn global_per_tag_modes_deserialize() {
+    let yaml = r#"
+value_limit: 5
+mode: exact
+per_tag_limits:
+  capped_tag:
+    mode: limit_override
+    value_limit: 10
+  excluded_tag:
+    mode: excluded
+"#;
+    let parsed: Config = serde_yaml::from_str(yaml).expect("yaml should deserialize");
+
+    let capped = parsed.per_tag_limits.get("capped_tag").unwrap();
+    assert_eq!(capped.mode, PerTagMode::LimitOverride { value_limit: 10 });
+
+    let excluded = parsed.per_tag_limits.get("excluded_tag").unwrap();
     assert_eq!(excluded.mode, PerTagMode::Excluded);
 }

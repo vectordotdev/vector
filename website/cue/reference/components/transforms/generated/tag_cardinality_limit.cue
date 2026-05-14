@@ -185,6 +185,50 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 			}
 		}
 	}
+	per_tag_limits: {
+		description: """
+			Global per-tag-key overrides. Each entry sets a `mode`:
+			- `mode: limit_override` + `value_limit: N` — track with a per-tag cap.
+			- `mode: excluded` — opt this tag out of tracking entirely (passed through unchanged
+			  for every metric, never counted against `value_limit`, and never added to the cache).
+
+			Useful for tag keys whose high cardinality is intentional on every metric (for example,
+			`kube_pod_name` or `tenant_id`), or for narrowing the cap on a single tag without
+			redefining the entire global limit.
+
+			Per-metric overrides take precedence: when a metric has a matching `per_metric_limits`
+			entry, only that entry's `per_tag_limits` is consulted for that metric; this top-level
+			`per_tag_limits` is ignored. Tags not listed at either level fall back to the
+			applicable metric-level configuration.
+			"""
+		required: false
+		type: object: options: "*": {
+			description: "An individual tag configuration."
+			required:    true
+			type: object: options: {
+				mode: {
+					description: "Controls how this tag key is handled."
+					required:    true
+					type: string: enum: {
+						excluded: """
+																			Opt this tag out of cardinality tracking entirely. All values pass through
+																			without being recorded or checked against any `value_limit`.
+																			"""
+						limit_override: """
+																			Track this tag with a per-tag value limit. The enclosing per-metric tracking
+																			algorithm and all other settings still apply.
+																			"""
+					}
+				}
+				value_limit: {
+					description:   "Maximum number of distinct values to accept for this tag key."
+					relevant_when: "mode = \"limit_override\""
+					required:      true
+					type: uint: {}
+				}
+			}
+		}
+	}
 	tracking_scope: {
 		description: "Controls how tag tracking state is partitioned across metrics."
 		required:    false

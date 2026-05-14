@@ -49,6 +49,26 @@ pub struct Config {
     )]
     #[serde(default)]
     pub per_metric_limits: HashMap<String, PerMetricConfig>,
+
+    /// Global per-tag-key overrides. Each entry sets a `mode`:
+    /// - `mode: limit_override` + `value_limit: N` — track with a per-tag cap.
+    /// - `mode: excluded` — opt this tag out of tracking entirely (passed through unchanged
+    ///   for every metric, never counted against `value_limit`, and never added to the cache).
+    ///
+    /// Useful for tag keys whose high cardinality is intentional on every metric (for example,
+    /// `kube_pod_name` or `tenant_id`), or for narrowing the cap on a single tag without
+    /// redefining the entire global limit.
+    ///
+    /// Per-metric overrides take precedence: when a metric has a matching `per_metric_limits`
+    /// entry, only that entry's `per_tag_limits` is consulted for that metric; this top-level
+    /// `per_tag_limits` is ignored. Tags not listed at either level fall back to the
+    /// applicable metric-level configuration.
+    #[configurable(
+        derived,
+        metadata(docs::additional_props_description = "An individual tag configuration.")
+    )]
+    #[serde(default)]
+    pub per_tag_limits: HashMap<String, PerTagConfig>,
 }
 
 /// Controls how tag tracking state is partitioned across metrics.
@@ -311,6 +331,7 @@ impl GenerateConfig for Config {
             tracking_scope: TrackingScope::default(),
             max_tracked_keys: None,
             per_metric_limits: HashMap::default(),
+            per_tag_limits: HashMap::default(),
         })
         .unwrap()
     }
