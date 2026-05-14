@@ -45,8 +45,8 @@ async fn build_test_client(url: &str) -> IggyClient {
 
 async fn publish_and_check(conf: IggySinkConfig) -> Result<(), IggyError> {
     let verifier_url = conf.url.clone();
-    let (_client, producer) = conf.connect_and_init().await?;
-    let sink = VectorSink::from_event_streamsink(IggySink::new(conf.clone(), producer)?);
+    let (client, producer) = conf.connect_and_init().await?;
+    let sink = VectorSink::from_event_streamsink(IggySink::new(conf.clone(), client, producer)?);
 
     let num_events = 10;
     let (input, events) = random_lines_with_stream(100, num_events, None);
