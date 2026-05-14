@@ -1,18 +1,30 @@
 use std::{
     sync::Arc,
     task::{Context, Poll},
+    time::Instant,
 };
-use vector_lib::internal_event::emit;
 
-use iggy::prelude::{IggyMessage, IggyProducer};
+use bytes::Bytes;
+use iggy::prelude::{Client, IggyMessage};
 use snafu::ResultExt;
 
-use super::{IggyError, ProducerSnafu, request_builder::IggyRequest};
-use crate::{internal_events::IggySendError, sinks::prelude::*};
+use super::{
+    ConnectSnafu, IggyError, ProducerSnafu, config::Connection, request_builder::IggyRequest,
+};
+use crate::common::iggy::{
+    RESOLVE_TIMEOUT, is_unauthenticated, login_if_http, logs_in_over_http, retained_operation,
+};
+use crate::sinks::prelude::*;
 
 #[derive(Clone)]
 pub(super) struct IggyService {
-    pub(super) producer: Arc<IggyProducer>,
+    connection: Arc<Connection>,
+}
+
+impl IggyService {
+    pub(super) const fn new(connection: Arc<Connection>) -> Self {
+        Self { connection }
+    }
 }
 
 pub(super) struct IggyResponse {
@@ -43,39 +55,84 @@ impl Service<IggyRequest> for IggyService {
     }
 
     fn call(&mut self, req: IggyRequest) -> Self::Future {
-        let producer = Arc::clone(&self.producer);
+        let connection = Arc::clone(&self.connection);
 
         Box::pin(async move {
-            let event_count = req.metadata.event_count();
-            let messages = req
-                .payloads
-                .into_iter()
-                .map(|payload| IggyMessage::builder().payload(payload).build())
-                .collect::<Result<Vec<_>, _>>()
-                .inspect_err(|source| {
-                    emit(IggySendError {
-                        count: event_count,
-                        error: source,
-                    });
-                })
-                .context(ProducerSnafu)?;
+            // The sink counts a failed request once, after the retry layer
+            // gives up; emitting here would count every attempt.
+            let IggyRequest {
+                payloads, metadata, ..
+            } = req;
 
-            if !messages.is_empty() {
-                producer
-                    .send(messages)
-                    .await
-                    .inspect_err(|source| {
-                        emit(IggySendError {
-                            count: event_count,
-                            error: source,
-                        });
-                    })
-                    .context(ProducerSnafu)?;
+            let (client, producer) = match connection.get().await {
+                Ok(pair) => pair,
+                Err(IggyError::Connect { source } | IggyError::Producer { source })
+                    if is_unauthenticated(&source) && logs_in_over_http(connection.url()) =>
+                {
+                    // The producer is created on the first event, so an HTTP
+                    // token that expired since the healthcheck fails in
+                    // `init()` before any send can reach the re-login branch.
+                    let client = connection.client().await?;
+                    login_if_http(&client, connection.url())
+                        .await
+                        .map_err(|source| IggyError::Connect { source })?;
+                    connection.get().await?
+                }
+                Err(error) => return Err(error),
+            };
+
+            let result = producer.send(build_messages(&payloads)?).await;
+            match result {
+                Ok(_) => Ok(IggyResponse { metadata }),
+                Err(error) if is_unauthenticated(&error) && logs_in_over_http(connection.url()) => {
+                    // HTTP access tokens expire and the SDK never renews them,
+                    // so log in again and resend once instead of failing every
+                    // later batch permanently.
+                    login_if_http(&client, connection.url())
+                        .await
+                        .context(ConnectSnafu)?;
+                    producer
+                        .send(build_messages(&payloads)?)
+                        .await
+                        .context(ProducerSnafu)?;
+                    Ok(IggyResponse { metadata })
+                }
+                Err(error) => match retained_operation(&error) {
+                    Some(op) => {
+                        // A timed-out send leaves its chunk retained in the
+                        // partition lane; the SDK resolves only operations it
+                        // registered, and a cancelled send never does.
+                        client
+                            .resolve_operation(op, Instant::now() + RESOLVE_TIMEOUT)
+                            .await
+                            .or_else(|error| match error {
+                                // Already released by a session change or a
+                                // concurrent resolve.
+                                iggy::prelude::IggyError::OperationNotRetained(_) => Ok(()),
+                                error => Err(error),
+                            })
+                            .context(ProducerSnafu)?;
+                        producer
+                            .send(build_messages(&payloads)?)
+                            .await
+                            .context(ProducerSnafu)?;
+                        Ok(IggyResponse { metadata })
+                    }
+                    None => Err(error).context(ProducerSnafu),
+                },
             }
-
-            Ok(IggyResponse {
-                metadata: req.metadata,
-            })
         })
     }
+}
+
+fn build_messages(payloads: &[Bytes]) -> Result<Vec<IggyMessage>, IggyError> {
+    payloads
+        .iter()
+        .map(|payload| {
+            IggyMessage::builder()
+                .payload(payload.clone())
+                .build()
+                .context(ProducerSnafu)
+        })
+        .collect()
 }

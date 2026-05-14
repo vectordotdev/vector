@@ -1,5 +1,8 @@
+use std::time::Duration;
+
 use iggy::prelude::{
-    Client, CommitPolicy, IggyClient, IggyClientBuilder, IggyConsumer, PollOptions,
+    Client, CommitPolicy, IggyClient, IggyClientBuilder, IggyConsumer, IggyDuration,
+    NonZeroIggyDuration, PollOptions,
 };
 use snafu::{ResultExt, Snafu};
 use vector_lib::{
@@ -12,7 +15,7 @@ use vrl::value::Kind;
 
 use crate::{
     codecs::DecodingConfig,
-    common::iggy::{login_if_http, secure_connection_string},
+    common::iggy::{login_if_http, secure_connection_string, uses_http},
     config::{
         GenerateConfig, SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput,
     },
@@ -64,7 +67,8 @@ pub struct IggySourceConfig {
 
     /// Pin the consumer to a single partition. When unset, a consumer group
     /// named after `consumer_name` is used and the broker assigns partitions
-    /// across members.
+    /// across members. The HTTP transport keeps no consumer group state, so
+    /// `partition` is required with `iggy+http://` URLs.
     #[serde(default)]
     pub partition: Option<u32>,
 
@@ -72,6 +76,12 @@ pub struct IggySourceConfig {
     #[serde(default = "default_batch_length")]
     #[derivative(Default(value = "default_batch_length()"))]
     pub batch_length: u32,
+
+    /// The maximum time, in milliseconds, the broker may hold a poll while
+    /// no messages are available.
+    #[serde(default = "default_poll_interval_ms")]
+    #[derivative(Default(value = "default_poll_interval_ms()"))]
+    pub poll_interval_ms: u64,
 
     /// The interval, in seconds, at which consumer offsets are committed to the
     /// Iggy server. Only used when end-to-end acknowledgements are enabled.
@@ -120,6 +130,10 @@ const fn default_batch_length() -> u32 {
     1000
 }
 
+const fn default_poll_interval_ms() -> u64 {
+    100
+}
+
 const fn default_commit_interval_secs() -> u64 {
     5
 }
@@ -151,18 +165,39 @@ impl GenerateConfig for IggySourceConfig {
 #[typetag::serde(name = "iggy")]
 impl SourceConfig for IggySourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
+        if self.batch_length == 0 {
+            return Err("`batch_length` must be at least 1".into());
+        }
+        if self.commit_interval_secs == 0 {
+            return Err("`commit_interval_secs` must be at least 1".into());
+        }
+        if self.drain_timeout_secs == 0 {
+            return Err("`drain_timeout_secs` must be at least 1".into());
+        }
+        // The SDK's HTTP client has no consumer group state and refuses the
+        // join, so reject the combination here instead of failing the source
+        // after it connects.
+        if self.partition.is_none() && uses_http(&self.url) {
+            return Err(
+                "`partition` must be set: the Iggy HTTP transport cannot join a consumer group"
+                    .into(),
+            );
+        }
+
         let log_namespace = cx.log_namespace(self.log_namespace);
         let decoder =
             DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
                 .build()?;
 
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
-        let (client, consumer) = self.connect_and_init(acknowledgements).await?;
 
+        // Connecting and initializing the consumer happens in the source
+        // future, not here: sources are built before any sink runs, so a
+        // broker that is still starting, or a topic a sink in the same
+        // topology creates on its first send, would fail construction with no
+        // retry that could resolve it.
         Ok(crate::sources::opaque_source(run_iggy_source(
             self.clone(),
-            client,
-            consumer,
             decoder,
             log_namespace,
             acknowledgements,
@@ -241,11 +276,13 @@ impl IggySourceConfig {
             } else {
                 CommitPolicy::OnRead
             },
-            ..Default::default()
+            ..PollOptions::wait(IggyDuration::from(Duration::from_millis(
+                self.poll_interval_ms,
+            )))
         }
     }
 
-    async fn connect_and_init(
+    pub(super) async fn connect_and_init(
         &self,
         acknowledgements: bool,
     ) -> Result<(IggyClient, IggyConsumer), BuildError> {
@@ -270,7 +307,14 @@ impl IggySourceConfig {
                 .consumer_group(&self.consumer_name, &self.stream, &self.topic)
                 .context(ConsumerSnafu)?,
         }
-        .poll_options(poll_options);
+        .poll_options(poll_options)
+        // Two polls of read-ahead keeps the consumer busy while staying far
+        // below the SDK default of 16,000 buffered messages.
+        .prefetch_messages(self.batch_length.saturating_mul(2))
+        // A source in the same topology as its sink can start before the sink
+        // creates the topic. The SDK retries the lookup a few times instead of
+        // failing the build, which the topology would only retry with backoff.
+        .init_retries(3, NonZeroIggyDuration::ONE_SECOND);
 
         // A partition reassigned to this consumer can hold offsets the previous
         // owner yielded without committing. The SDK filters them unless replay

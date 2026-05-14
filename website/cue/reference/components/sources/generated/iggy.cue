@@ -86,7 +86,8 @@ generated: components: sources: iggy: configuration: {
 		description: """
 			Pin the consumer to a single partition. When unset, a consumer group
 			named after `consumer_name` is used and the broker assigns partitions
-			across members.
+			across members. The HTTP transport keeps no consumer group state, so
+			`partition` is required with `iggy+http://` URLs.
 			"""
 		required: false
 		type: uint: {}

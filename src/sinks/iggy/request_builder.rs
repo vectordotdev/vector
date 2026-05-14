@@ -1,8 +1,9 @@
 use bytes::{Bytes, BytesMut};
+use iggy::prelude::MAX_PAYLOAD_SIZE;
 use tokio_util::codec::Encoder as _;
-use vector_lib::config::telemetry;
+use vector_lib::{config::telemetry, internal_event::emit};
 
-use crate::sinks::prelude::*;
+use crate::{internal_events::IggyInvalidPayloadError, sinks::prelude::*};
 
 #[derive(Clone)]
 pub(super) struct IggyRequest {
@@ -27,44 +28,75 @@ impl MetaDescriptive for IggyRequest {
     }
 }
 
-fn encode_event(
-    mut event: Event,
-    transformer: &Transformer,
-    encoder: &mut Encoder<()>,
-    byte_size: &mut GroupedCountByteSize,
-) -> Option<Bytes> {
-    transformer.transform(&mut event);
-    byte_size.add_event(&event, event.estimated_json_encoded_size_of());
+// Holds pre-encode event tags so byte_size can be updated after a successful
+// encode (the encoder consumes the event).
+struct TagsCapture(TaggedEventsSent);
 
-    let mut bytes = BytesMut::new();
-    encoder.encode(event, &mut bytes).ok()?;
-    Some(bytes.freeze())
+impl GetEventCountTags for TagsCapture {
+    fn get_tags(&self) -> TaggedEventsSent {
+        self.0.clone()
+    }
 }
 
 pub(super) fn request_builder(
     events: Vec<Event>,
     transformer: &Transformer,
     encoder: &mut Encoder<()>,
-) -> IggyRequest {
-    let builder = RequestMetadataBuilder::from_events(&events);
-
+) -> Option<IggyRequest> {
     let mut byte_size = telemetry().create_request_count_byte_size();
+    let mut event_count = 0usize;
+    let mut events_byte_size = 0usize;
     let mut uncompressed_byte_size = 0usize;
     let mut finalizers = EventFinalizers::default();
-    let payloads: Vec<Bytes> = events
-        .into_iter()
-        .filter_map(|mut event| {
-            let event_finalizers = event.take_finalizers();
-            if let Some(bytes) = encode_event(event, transformer, encoder, &mut byte_size) {
-                uncompressed_byte_size += bytes.len();
+
+    let mut buf = BytesMut::with_capacity(1024);
+    let mut payloads = Vec::with_capacity(events.len());
+    for mut event in events {
+        transformer.transform(&mut event);
+        // Capture telemetry metadata before encoding consumes the event.
+        let json_size = event.estimated_json_encoded_size_of();
+        let size_of = event.size_of();
+        let tags = TagsCapture(event.get_tags());
+        let event_finalizers = event.take_finalizers();
+
+        match encoder.encode(event, &mut buf) {
+            Ok(()) => {
+                let frame = buf.split().freeze();
+                // The SDK rejects empty and oversized payloads, which would
+                // fail the whole request and error its valid siblings.
+                if frame.is_empty() || frame.len() > MAX_PAYLOAD_SIZE as usize {
+                    emit(IggyInvalidPayloadError {
+                        payload_len: frame.len(),
+                    });
+                    event_finalizers.update_status(EventStatus::Errored);
+                    continue;
+                }
+                byte_size.add_event(&tags, json_size);
+                event_count += 1;
+                events_byte_size += size_of;
+                uncompressed_byte_size += frame.len();
                 finalizers.merge(event_finalizers);
-                Some(bytes)
-            } else {
-                event_finalizers.update_status(EventStatus::Errored);
-                None
+                payloads.push(frame);
             }
-        })
-        .collect();
+            Err(_) => {
+                event_finalizers.update_status(EventStatus::Errored);
+            }
+        }
+    }
+
+    // Every event in the batch failed encoding; their finalizers were
+    // already marked Errored individually above. Drop the request rather
+    // than dispatching an empty one, which would still emit "Delivered"
+    // telemetry for the original event count even though nothing was sent.
+    if payloads.is_empty() {
+        return None;
+    }
+
+    let builder = RequestMetadataBuilder::new(
+        event_count,
+        events_byte_size,
+        telemetry().create_request_count_byte_size(),
+    );
     let result = EncodeResult {
         payload: payloads,
         uncompressed_byte_size,
@@ -73,9 +105,9 @@ pub(super) fn request_builder(
     };
     let metadata = builder.build(&result);
 
-    IggyRequest {
+    Some(IggyRequest {
         payloads: result.into_payload(),
         finalizers,
         metadata,
-    }
+    })
 }

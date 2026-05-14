@@ -1,10 +1,16 @@
 //! Helpers shared by the Iggy sink and source.
 
 use std::borrow::Cow;
+#[cfg(feature = "sinks-iggy")]
+use std::time::Duration;
 
 use iggy::prelude::{IggyClient, IggyError, PersonalAccessTokenClient, UserClient};
 use percent_encoding::percent_decode_str;
 use url::Url;
+
+/// Matches the SDK's own binary operation timeout.
+#[cfg(feature = "sinks-iggy")]
+pub(crate) const RESOLVE_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// The SDK leaves certificate verification off for QUIC (`validate_certificate`)
 /// and for TLS over WebSocket (`tls_validate_certificate`) unless the
@@ -61,6 +67,50 @@ pub(crate) async fn login_if_http(
         None => {}
     }
     Ok(())
+}
+
+/// Whether the connection string authenticates over HTTP, the only transport
+/// whose access token expires and must be renewed by the caller.
+pub(crate) fn logs_in_over_http(connection_string: &str) -> bool {
+    http_credentials(connection_string).is_some()
+}
+
+/// Whether the connection string uses the HTTP transport. Its client keeps no
+/// consumer group state, so it cannot join a consumer group: the SDK refuses
+/// the join with `FeatureUnavailable`.
+#[cfg(feature = "sources-iggy")]
+pub(crate) fn uses_http(connection_string: &str) -> bool {
+    Url::parse(connection_string).is_ok_and(|url| url.scheme() == "iggy+http")
+}
+
+/// Whether the broker rejected the current credentials. The SDK never
+/// refreshes an HTTP access token, so callers re-login from the connection
+/// string and retry instead of failing the component permanently.
+pub(crate) fn is_unauthenticated(error: &IggyError) -> bool {
+    fn root_cause(error: &IggyError) -> &IggyError {
+        match error {
+            IggyError::ProducerSendFailed { cause, .. } => root_cause(cause),
+            error => error,
+        }
+    }
+    matches!(root_cause(error), IggyError::Unauthenticated)
+}
+
+/// The operation the SDK still retains because its outcome is unknown. Its
+/// lane admits nothing else until `Client::resolve_operation` replays it or
+/// `Client::abandon_operation` frees it, so recover before retrying.
+#[cfg(feature = "sinks-iggy")]
+pub(crate) fn retained_operation(error: &IggyError) -> Option<u64> {
+    let cause = match error {
+        IggyError::ProducerSendFailed { cause, .. } => &**cause,
+        error => error,
+    };
+    match cause {
+        IggyError::LaneBlocked(operation)
+        | IggyError::PartitionLaneBlocked(_, operation)
+        | IggyError::OperationUncertain(operation) => Some(*operation),
+        _ => None,
+    }
 }
 
 fn http_credentials(connection_string: &str) -> Option<HttpCredentials> {

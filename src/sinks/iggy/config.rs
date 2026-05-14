@@ -1,11 +1,14 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Instant};
 
-use iggy::prelude::{IggyClient, IggyProducer};
+use iggy::prelude::{Client, IggyClient, IggyProducer};
 use snafu::ResultExt;
+use tokio::sync::OnceCell;
 use vector_lib::codecs::JsonSerializerConfig;
 
 use super::{ConnectSnafu, IggyError, sink::IggySink};
-use crate::common::iggy::{login_if_http, secure_connection_string};
+use crate::common::iggy::{
+    RESOLVE_TIMEOUT, login_if_http, retained_operation, secure_connection_string,
+};
 use crate::config::ValidatedSink;
 use crate::sinks::{prelude::*, util::service::TowerRequestConfigDefaults};
 
@@ -13,7 +16,7 @@ use crate::sinks::{prelude::*, util::service::TowerRequestConfigDefaults};
 pub struct IggyTowerRequestConfigDefaults;
 
 impl TowerRequestConfigDefaults for IggyTowerRequestConfigDefaults {
-    const CONCURRENCY: Concurrency = Concurrency::Adaptive;
+    const CONCURRENCY: Concurrency = Concurrency::None;
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -111,42 +114,122 @@ impl SinkConfig for IggySinkConfig {
     }
 }
 
-impl IggySinkConfig {
-    pub(super) async fn connect_and_init(
-        &self,
-    ) -> Result<(Arc<IggyClient>, Arc<IggyProducer>), IggyError> {
-        use iggy::prelude::{Client, IggyClientBuilder, MaxTopicSize};
+/// How many retained operations the sink replays before it reports the failed
+/// producer initialization, so a lane that stays blocked cannot spin forever.
+const MAX_INIT_RECOVERIES: u32 = 3;
 
-        let client =
-            IggyClientBuilder::from_connection_string(&secure_connection_string(&self.url))
-                .context(ConnectSnafu)?
-                .build()
-                .context(ConnectSnafu)?;
+/// Broker client and producer, created on first use. Topology construction
+/// must not touch the network, so `healthcheck` and the first send initialize
+/// the pair on demand.
+pub(super) struct Connection {
+    url: String,
+    stream: String,
+    topic: String,
+    partitions: u32,
+    client: OnceCell<Arc<IggyClient>>,
+    producer: OnceCell<Arc<IggyProducer>>,
+}
 
-        client.connect().await.context(ConnectSnafu)?;
-        login_if_http(&client, &self.url)
+impl Connection {
+    pub(super) fn new(config: &IggySinkConfig) -> Self {
+        Self {
+            url: config.url.clone(),
+            stream: config.stream.clone(),
+            topic: config.topic.clone(),
+            partitions: config.partitions,
+            client: OnceCell::new(),
+            producer: OnceCell::new(),
+        }
+    }
+
+    pub(super) fn url(&self) -> &str {
+        &self.url
+    }
+
+    pub(super) fn connected_client(&self) -> Option<&Arc<IggyClient>> {
+        self.client.get()
+    }
+
+    /// Connect and authenticate only; the healthcheck needs no producer and
+    /// must not create the stream or topic as a side effect.
+    pub(super) async fn client(&self) -> Result<Arc<IggyClient>, IggyError> {
+        use iggy::prelude::{Client, IggyClientBuilder};
+
+        self.client
+            .get_or_try_init(|| async {
+                let client =
+                    IggyClientBuilder::from_connection_string(&secure_connection_string(&self.url))
+                        .context(ConnectSnafu)?
+                        .build()
+                        .context(ConnectSnafu)?;
+
+                client.connect().await.context(ConnectSnafu)?;
+                login_if_http(&client, &self.url)
+                    .await
+                    .context(ConnectSnafu)?;
+                Ok::<_, IggyError>(Arc::new(client))
+            })
             .await
-            .context(ConnectSnafu)?;
+            .map(Arc::clone)
+    }
 
-        let producer = client
-            .producer(&self.stream, &self.topic)
-            .context(ConnectSnafu)?
-            .create_stream_if_not_exists()
-            .create_topic_if_not_exists(
-                self.partitions,
-                iggy::prelude::IggyExpiry::ServerDefault,
-                MaxTopicSize::ServerDefault,
-            )
-            .build();
+    pub(super) async fn get(&self) -> Result<(Arc<IggyClient>, Arc<IggyProducer>), IggyError> {
+        use iggy::prelude::{IggyExpiry, MaxTopicSize};
 
-        producer.init().await.context(ConnectSnafu)?;
+        let client = self.client().await?;
 
-        Ok((Arc::new(client), Arc::new(producer)))
+        let producer = self
+            .producer
+            .get_or_try_init(|| async {
+                let producer = client
+                    .producer(&self.stream, &self.topic)
+                    .context(ConnectSnafu)?
+                    .create_stream_if_not_exists()
+                    .create_topic_if_not_exists(
+                        self.partitions,
+                        IggyExpiry::ServerDefault,
+                        MaxTopicSize::ServerDefault,
+                    )
+                    .build();
+
+                let mut recovered = 0;
+                loop {
+                    match producer.init().await {
+                        Ok(()) => return Ok(Arc::new(producer)),
+                        Err(error) => {
+                            let Some(operation) = retained_operation(&error) else {
+                                return Err(IggyError::Connect { source: error });
+                            };
+                            if recovered == MAX_INIT_RECOVERIES {
+                                return Err(IggyError::Connect { source: error });
+                            }
+                            recovered += 1;
+                            // A timed-out stream or topic creation stays
+                            // retained in the client's metadata lane, and init
+                            // runs before any send reaches the send-path
+                            // recovery, so every later init would fail with
+                            // `LaneBlocked` until the operation is replayed.
+                            match client
+                                .resolve_operation(operation, Instant::now() + RESOLVE_TIMEOUT)
+                                .await
+                            {
+                                Ok(()) | Err(iggy::prelude::IggyError::OperationNotRetained(_)) => {
+                                }
+                                Err(error) => return Err(IggyError::Connect { source: error }),
+                            }
+                        }
+                    }
+                }
+            })
+            .await?;
+
+        Ok((client, Arc::clone(producer)))
     }
 }
 
-async fn healthcheck(client: Arc<IggyClient>) -> crate::Result<()> {
+async fn healthcheck(connection: Arc<Connection>) -> crate::Result<()> {
     use iggy::prelude::SystemClient;
+    let client = connection.client().await?;
     // A missing stream or topic is created on first send. Distinguishing that
     // from a broker that denies creation needs the create attempt itself, so
     // the health check stays a ping; a denied create surfaces on the first event.
@@ -170,9 +253,15 @@ impl ValidatedSink for IggySinkConfig {
         _validated: &ValidatedIggySink,
         _cx: SinkContext,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
-        let (client, producer) = self.connect_and_init().await?;
-        let healthcheck = healthcheck(Arc::clone(&client)).boxed();
-        let sink = IggySink::new(self, producer)?;
+        if self.partitions == 0 {
+            return Err("`partitions` must be at least 1".into());
+        }
+        // Connecting here would make an unreachable broker a topology error
+        // before healthcheck settings apply, defeating `require_healthy =
+        // false` and `vector validate --skip-healthchecks`.
+        let connection = Arc::new(Connection::new(self));
+        let healthcheck = healthcheck(Arc::clone(&connection)).boxed();
+        let sink = IggySink::new(self, connection)?;
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 }

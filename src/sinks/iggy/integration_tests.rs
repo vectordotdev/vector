@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 use futures::StreamExt;
 use iggy::prelude::{
@@ -8,7 +8,7 @@ use vector_lib::codecs::TextSerializerConfig;
 
 use super::{
     IggyError,
-    config::{IggySinkConfig, IggyTowerRequestConfigDefaults},
+    config::{Connection, IggySinkConfig, IggyTowerRequestConfigDefaults},
     sink::IggySink,
 };
 use crate::{
@@ -47,8 +47,9 @@ async fn build_test_client(url: &str) -> IggyClient {
 
 async fn publish_and_check(conf: IggySinkConfig) -> Result<(), IggyError> {
     let verifier_url = conf.url.clone();
-    let (_client, producer) = conf.connect_and_init().await?;
-    let sink = VectorSink::from_event_streamsink(IggySink::new(&conf, producer)?);
+    let connection = Arc::new(Connection::new(&conf));
+    connection.get().await?;
+    let sink = VectorSink::from_event_streamsink(IggySink::new(&conf, connection)?);
 
     let num_events = 10;
     let (input, events) = random_lines_with_stream(100, num_events, None);
@@ -108,10 +109,10 @@ async fn iggy_creates_stream_and_topic_on_connect() {
     let topic = format!("logs-{}", random_string(8));
 
     let conf = generate_sink_config(&url, &stream, &topic);
-    let (_client, _producer) = conf
-        .connect_and_init()
+    Connection::new(&conf)
+        .get()
         .await
-        .expect("connect_and_init failed");
+        .expect("connection failed");
 
     let verifier = build_test_client(&url).await;
     let stream_details = verifier
@@ -129,10 +130,10 @@ async fn iggy_creates_stream_and_topic_on_connect() {
         .expect("get_topic failed");
     assert!(topic_details.is_some(), "topic was not created");
 
-    // A follow-up `connect_and_init` against the same stream/topic must
-    // succeed even though both already exist.
-    let _ = generate_sink_config(&url, &stream, &topic)
-        .connect_and_init()
+    // A fresh connection against the same stream/topic must succeed even
+    // though both already exist.
+    Connection::new(&generate_sink_config(&url, &stream, &topic))
+        .get()
         .await
         .expect("idempotent re-init failed");
 }
