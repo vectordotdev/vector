@@ -295,6 +295,14 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
 		}
+		estimated_concurrent_transform_scheduling_pressure: {
+			description: """
+				For a concurrent function transform, the fraction of in-flight tasks that have completed but are blocked from emitting because the runner is preserving event ordering. A value near 1.0 indicates the ordering guarantee is throttling throughput.
+				"""
+			type:              "histogram"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
 		buffer_byte_size: {
 			description:        "The number of bytes currently in the buffer."
 			type:               "gauge"

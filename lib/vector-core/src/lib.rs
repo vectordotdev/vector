@@ -34,6 +34,7 @@ pub mod ipallowlist;
 pub mod latency;
 pub mod metrics;
 pub mod partition;
+pub mod scheduling_pressure;
 pub mod schema;
 pub mod serde;
 pub mod sink;
