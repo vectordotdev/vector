@@ -20,8 +20,8 @@ use hyper::{Body, Request};
 use tokio::time::Instant;
 use tokio_stream::wrappers::IntervalStream;
 use vector_lib::{
-    EstimatedJsonEncodedSizeOf, config::proxy::ProxyConfig, event::Event, json_size::JsonSize,
-    shutdown::ShutdownSignal,
+    EstimatedJsonEncodedSizeOf, config::proxy::ProxyConfig, configurable::configurable_component,
+    event::Event, json_size::JsonSize, shutdown::ShutdownSignal,
 };
 
 use crate::{
@@ -46,16 +46,36 @@ pub(crate) struct GenericHttpClientInputs {
     pub timeout: Duration,
     /// Map of Header+Value to apply to HTTP request.
     pub headers: HashMap<String, Vec<String>>,
-    /// Whether HTTP redirects should be followed automatically.
-    pub follow_redirects: bool,
-    /// Maximum number of redirects to follow when enabled.
-    pub max_redirects: usize,
+    /// HTTP redirect configuration.
+    pub redirects: Redirects,
     /// Content type of the HTTP request, determined by the source.
     pub content_type: String,
     pub auth: Option<Auth>,
     pub tls: TlsSettings,
     pub proxy: ProxyConfig,
     pub shutdown: ShutdownSignal,
+}
+
+/// HTTP redirect configuration.
+#[configurable_component]
+#[derive(Clone, Debug)]
+pub struct Redirects {
+    /// Whether to follow HTTP redirects.
+    #[serde(default)]
+    pub follow: bool,
+
+    /// Maximum number of redirects to follow when enabled.
+    #[serde(default = "default_max_redirects")]
+    pub max: usize,
+}
+
+impl Default for Redirects {
+    fn default() -> Self {
+        Self {
+            follow: false,
+            max: default_max_redirects(),
+        }
+    }
 }
 
 /// The default interval to call the HTTP endpoint if none is configured.
@@ -251,7 +271,7 @@ async fn send_request_with_redirects(
             })??;
 
         let status = response.status();
-        if !inputs.follow_redirects
+        if !inputs.redirects.follow
             || !matches!(
                 status,
                 StatusCode::MOVED_PERMANENTLY
@@ -264,10 +284,10 @@ async fn send_request_with_redirects(
             return Ok((url, response));
         }
 
-        if redirects >= inputs.max_redirects {
+        if redirects >= inputs.redirects.max {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
-                format!("Exceeded maximum redirects ({})", inputs.max_redirects),
+                format!("Exceeded maximum redirects ({})", inputs.redirects.max),
             )
             .into());
         }

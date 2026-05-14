@@ -102,8 +102,7 @@ async fn bytes_decoding() {
         body: None,
         tls: None,
         auth: None,
-        follow_redirects: false,
-        max_redirects: 5,
+        redirects: Default::default(),
         log_namespace: None,
     })
     .await;
@@ -134,8 +133,7 @@ async fn json_decoding_newline_delimited() {
         body: None,
         tls: None,
         auth: None,
-        follow_redirects: false,
-        max_redirects: 5,
+        redirects: Default::default(),
         log_namespace: None,
     })
     .await;
@@ -171,8 +169,7 @@ async fn json_decoding_character_delimited() {
         body: None,
         tls: None,
         auth: None,
-        follow_redirects: false,
-        max_redirects: 5,
+        redirects: Default::default(),
         log_namespace: None,
     })
     .await;
@@ -214,8 +211,7 @@ async fn request_query_applied() {
         body: None,
         tls: None,
         auth: None,
-        follow_redirects: false,
-        max_redirects: 5,
+        redirects: Default::default(),
         log_namespace: None,
     })
     .await;
@@ -328,8 +324,7 @@ async fn request_query_vrl_applied() {
         body: None,
         tls: None,
         auth: None,
-        follow_redirects: false,
-        max_redirects: 5,
+        redirects: Default::default(),
         log_namespace: None,
     })
     .await;
@@ -412,8 +407,7 @@ async fn request_query_vrl_dynamic_updates() {
         body: None,
         tls: None,
         auth: None,
-        follow_redirects: false,
-        max_redirects: 5,
+        redirects: Default::default(),
         log_namespace: None,
     })
     .await;
@@ -482,8 +476,7 @@ async fn headers_applied() {
         body: None,
         auth: None,
         tls: None,
-        follow_redirects: false,
-        max_redirects: 5,
+        redirects: Default::default(),
         log_namespace: None,
     })
     .await;
@@ -514,8 +507,7 @@ async fn accept_header_override() {
         body: None,
         auth: None,
         tls: None,
-        follow_redirects: false,
-        max_redirects: 5,
+        redirects: Default::default(),
         log_namespace: None,
     })
     .await;
@@ -553,8 +545,7 @@ async fn post_with_body() {
         body: Some(ParameterValue::String(test_json.to_string())),
         tls: None,
         auth: None,
-        follow_redirects: false,
-        max_redirects: 5,
+        redirects: Default::default(),
         log_namespace: None,
     })
     .await;
@@ -596,8 +587,7 @@ async fn post_without_body() {
         body: None,
         tls: None,
         auth: None,
-        follow_redirects: false,
-        max_redirects: 5,
+        redirects: Default::default(),
         log_namespace: None,
     })
     .await;
@@ -628,8 +618,7 @@ async fn post_with_custom_content_type() {
         body: Some(ParameterValue::String("plain text body".to_string())),
         tls: None,
         auth: None,
-        follow_redirects: false,
-        max_redirects: 5,
+        redirects: Default::default(),
         log_namespace: None,
     })
     .await;
@@ -667,8 +656,7 @@ async fn post_with_vrl_body() {
         }),
         tls: None,
         auth: None,
-        follow_redirects: false,
-        max_redirects: 5,
+        redirects: Default::default(),
         log_namespace: None,
     })
     .await;
@@ -710,8 +698,7 @@ async fn query_vrl_compilation_error() {
         body: None,
         tls: None,
         auth: None,
-        follow_redirects: false,
-        max_redirects: 5,
+        redirects: Default::default(),
         log_namespace: None,
     };
 
@@ -755,8 +742,7 @@ async fn body_vrl_compilation_error() {
         }),
         tls: None,
         auth: None,
-        follow_redirects: false,
-        max_redirects: 5,
+        redirects: Default::default(),
         log_namespace: None,
     };
 

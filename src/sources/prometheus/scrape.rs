@@ -18,8 +18,9 @@ use crate::{
         util::{
             http::HttpMethod,
             http_client::{
-                GenericHttpClientInputs, HttpClientBuilder, HttpClientContext, build_url, call,
-                default_interval, default_max_redirects, default_timeout, warn_if_interval_too_low,
+                GenericHttpClientInputs, HttpClientBuilder, HttpClientContext, Redirects,
+                build_url, call, default_interval, default_max_redirects, default_timeout,
+                warn_if_interval_too_low,
             },
         },
     },
@@ -95,15 +96,10 @@ pub struct PrometheusScrapeConfig {
     #[configurable(metadata(docs::examples = "query_example()"))]
     query: QueryParameters,
 
-    /// Whether to follow HTTP redirects for scrape requests.
-    #[serde(default = "crate::serde::default_true")]
+    /// HTTP redirect configuration.
+    #[serde(default = "default_redirects")]
     #[configurable(metadata(docs::advanced))]
-    follow_redirects: bool,
-
-    /// Maximum number of redirects to follow when enabled.
-    #[serde(default = "default_max_redirects")]
-    #[configurable(metadata(docs::advanced))]
-    max_redirects: usize,
+    redirects: Redirects,
 
     #[configurable(derived)]
     tls: Option<TlsConfig>,
@@ -122,6 +118,13 @@ fn query_example() -> serde_json::Value {
     })
 }
 
+fn default_redirects() -> Redirects {
+    Redirects {
+        follow: true,
+        max: default_max_redirects(),
+    }
+}
+
 impl GenerateConfig for PrometheusScrapeConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
@@ -132,8 +135,7 @@ impl GenerateConfig for PrometheusScrapeConfig {
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: false,
             query: HashMap::new(),
-            follow_redirects: true,
-            max_redirects: default_max_redirects(),
+            redirects: default_redirects(),
             tls: None,
             auth: None,
         })
@@ -166,8 +168,7 @@ impl SourceConfig for PrometheusScrapeConfig {
             interval: self.interval,
             timeout: self.timeout,
             headers: HashMap::new(),
-            follow_redirects: self.follow_redirects,
-            max_redirects: self.max_redirects,
+            redirects: self.redirects.clone(),
             content_type: "text/plain".to_string(),
             auth: self.auth.clone(),
             tls,
@@ -379,8 +380,7 @@ mod test {
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: true,
             query: HashMap::new(),
-            follow_redirects: true,
-            max_redirects: default_max_redirects(),
+            redirects: default_redirects(),
             auth: None,
             tls: None,
         };
@@ -415,8 +415,7 @@ mod test {
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: true,
             query: HashMap::new(),
-            follow_redirects: true,
-            max_redirects: default_max_redirects(),
+            redirects: default_redirects(),
             auth: None,
             tls: None,
         };
@@ -469,8 +468,7 @@ mod test {
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: false,
             query: HashMap::new(),
-            follow_redirects: true,
-            max_redirects: default_max_redirects(),
+            redirects: default_redirects(),
             auth: None,
             tls: None,
         };
@@ -537,8 +535,7 @@ mod test {
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: true,
             query: HashMap::new(),
-            follow_redirects: true,
-            max_redirects: default_max_redirects(),
+            redirects: default_redirects(),
             auth: None,
             tls: None,
         };
@@ -608,8 +605,7 @@ mod test {
                     ]),
                 ),
             ]),
-            follow_redirects: true,
-            max_redirects: default_max_redirects(),
+            redirects: default_redirects(),
             auth: None,
             tls: None,
         };
@@ -677,8 +673,7 @@ mod test {
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: false,
             query: HashMap::new(),
-            follow_redirects: true,
-            max_redirects: default_max_redirects(),
+            redirects: default_redirects(),
             auth: None,
             tls: None,
         };
@@ -768,8 +763,7 @@ mod test {
                 query: HashMap::new(),
                 interval: Duration::from_secs(1),
                 timeout: default_timeout(),
-                follow_redirects: true,
-                max_redirects: default_max_redirects(),
+                redirects: default_redirects(),
                 tls: None,
                 auth: None,
             },
@@ -862,8 +856,7 @@ mod integration_tests {
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: false,
             query: HashMap::new(),
-            follow_redirects: true,
-            max_redirects: default_max_redirects(),
+            redirects: default_redirects(),
             auth: None,
             tls: None,
         };

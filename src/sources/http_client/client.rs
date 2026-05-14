@@ -37,8 +37,8 @@ use crate::{
         http::HttpMethod,
         http_client,
         http_client::{
-            GenericHttpClientInputs, HttpClientBuilder, build_url, call, default_interval,
-            default_timeout, warn_if_interval_too_low,
+            GenericHttpClientInputs, HttpClientBuilder, Redirects, build_url, call,
+            default_interval, default_timeout, warn_if_interval_too_low,
         },
     },
     tls::{TlsConfig, TlsSettings},
@@ -123,15 +123,10 @@ pub struct HttpClientConfig {
     #[serde(default)]
     pub body: Option<ParameterValue>,
 
-    /// Whether to follow HTTP redirects.
+    /// HTTP redirect configuration.
     #[serde(default)]
     #[configurable(metadata(docs::advanced))]
-    pub follow_redirects: bool,
-
-    /// Maximum number of redirects to follow when enabled.
-    #[serde(default = "http_client::default_max_redirects")]
-    #[configurable(metadata(docs::advanced))]
-    pub max_redirects: usize,
+    pub redirects: Redirects,
 
     /// TLS configuration.
     #[configurable(derived)]
@@ -234,8 +229,7 @@ impl Default for HttpClientConfig {
             headers: HashMap::new(),
             method: default_http_method(),
             body: None,
-            follow_redirects: false,
-            max_redirects: http_client::default_max_redirects(),
+            redirects: Redirects::default(),
             tls: None,
             auth: None,
             log_namespace: None,
@@ -388,8 +382,7 @@ impl SourceConfig for HttpClientConfig {
             interval: self.interval,
             timeout: self.timeout,
             headers: self.headers.clone(),
-            follow_redirects: self.follow_redirects,
-            max_redirects: self.max_redirects,
+            redirects: self.redirects.clone(),
             content_type,
             auth: self.auth.clone(),
             tls,
