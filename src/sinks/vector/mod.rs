@@ -26,6 +26,9 @@ pub enum VectorSinkError {
     #[snafu(display("Vector source unhealthy: {:?}", status))]
     Health { status: Option<&'static str> },
 
+    #[snafu(display("`connection.concurrency` must be greater than 0, got {}", value))]
+    InvalidConnectionConcurrency { value: usize },
+
     #[snafu(display("URL has no host."))]
     NoHost,
 }
@@ -80,23 +83,36 @@ mod tests {
     }
 
     async fn run_sink_test(test_type: TestType) {
-        run_sink_test_with_compression(test_type, None).await;
+        run_sink_test_with_options(test_type, None, None).await;
     }
 
     async fn run_sink_test_with_compression(test_type: TestType, compression: Option<&str>) {
+        run_sink_test_with_options(test_type, compression, None).await;
+    }
+
+    async fn run_sink_test_with_options(
+        test_type: TestType,
+        compression: Option<&str>,
+        connection_concurrency: Option<usize>,
+    ) {
         let num_lines = 10;
 
         let (_guard, in_addr) = next_addr();
 
-        let config = match compression {
-            Some(c) => format!(
+        let mut config = format!(r#"address = "http://{in_addr}/""#);
+        if let Some(c) = compression {
+            config.push_str(&format!(
                 r#"
-                    address = "http://{in_addr}/"
-                    compression = "{c}"
-                "#
-            ),
-            None => format!(r#"address = "http://{in_addr}/""#),
-        };
+compression = "{c}""#
+            ));
+        }
+        if let Some(connection_concurrency) = connection_concurrency {
+            config.push_str(&format!(
+                r#"
+connection.concurrency = {connection_concurrency}"#
+            ));
+        }
+
         let config: VectorConfig = toml::from_str(&config).unwrap();
 
         let cx = SinkContext::default();
@@ -179,6 +195,11 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn deliver_message_with_multiple_connections() {
+        run_sink_test_with_options(TestType::Normal, None, Some(2)).await;
+    }
+
+    #[tokio::test]
     async fn data_volume_tags() {
         init_telemetry(
             Telemetry {
@@ -233,6 +254,35 @@ mod tests {
         assert_eq!(
             with_default_scheme("0.0.0.0", true).unwrap().to_string(),
             "https://0.0.0.0/"
+        );
+    }
+
+    #[test]
+    fn connection_concurrency_defaults_to_one() {
+        let config = toml::from_str::<VectorConfig>(r#"address = "http://127.0.0.1:6000/""#)
+            .expect("config should parse");
+
+        assert_eq!(config.connection.concurrency, 1);
+    }
+
+    #[tokio::test]
+    async fn connection_concurrency_zero_is_rejected() {
+        let config = toml::from_str::<VectorConfig>(
+            r#"
+            address = "http://127.0.0.1:6000/"
+            connection.concurrency = 0
+        "#,
+        )
+        .expect("config should parse so build-time validation can run");
+
+        let error = match config.build(SinkContext::default()).await {
+            Ok(_) => panic!("zero connection concurrency must fail"),
+            Err(error) => error,
+        };
+
+        assert_eq!(
+            error.to_string(),
+            "`connection.concurrency` must be greater than 0, got 0"
         );
     }
 
