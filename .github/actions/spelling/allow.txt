@@ -209,6 +209,7 @@ greptime
 greptimecloud
 greptimedb
 GSM
+gssapi
 gvisor
 gws
 gzip'd
