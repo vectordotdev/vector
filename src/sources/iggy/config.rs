@@ -160,6 +160,16 @@ impl GenerateConfig for IggySourceConfig {
 #[typetag::serde(name = "iggy")]
 impl SourceConfig for IggySourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
+        if self.batch_length == 0 {
+            return Err("`batch_length` must be at least 1".into());
+        }
+        if self.commit_interval_secs == 0 {
+            return Err("`commit_interval_secs` must be at least 1".into());
+        }
+        if self.drain_timeout_secs == 0 {
+            return Err("`drain_timeout_secs` must be at least 1".into());
+        }
+
         let log_namespace = cx.log_namespace(self.log_namespace);
         let decoder =
             DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
