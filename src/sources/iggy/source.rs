@@ -24,8 +24,8 @@ use crate::{
     common::backoff::ExponentialBackoff,
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
     internal_events::{
-        IggyBytesReceived, IggyEventsReceived, IggyOffsetCommitted, IggyOffsetPolled,
-        IggyOffsetUpdateError, IggyReadError, StreamClosedError,
+        IggyBytesReceived, IggyConsumerStreamEnded, IggyEventsReceived, IggyOffsetCommitted,
+        IggyOffsetPolled, IggyOffsetUpdateError, IggyReadError, StreamClosedError,
     },
     shutdown::ShutdownSignal,
     sources::iggy::config::IggySourceConfig,
@@ -519,7 +519,7 @@ pub async fn run_iggy_source(
                         sleep(delay).await;
                     }
                     None => {
-                        warn!("Iggy consumer stream ended unexpectedly.");
+                        emit!(IggyConsumerStreamEnded);
                         break;
                     }
                 }
@@ -548,7 +548,16 @@ pub async fn run_iggy_source(
                     }
                 }
 
-                _ = &mut drain_deadline => break,
+                _ = &mut drain_deadline => {
+                    if !ack_streams.is_empty() {
+                        warn!(
+                            message = "Drain deadline reached with in-flight acknowledgements still pending; committing best-effort and exiting.",
+                            drain_timeout_secs = config.drain_timeout_secs,
+                            pending_partitions = ack_streams.len(),
+                        );
+                    }
+                    break;
+                }
             }
         }
         commit_offsets(&mut consumer, stream, topic, &mut partitions).await;
