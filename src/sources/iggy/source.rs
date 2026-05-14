@@ -1,11 +1,7 @@
-use std::{
-    collections::HashMap,
-    sync::Arc,
-    time::Duration,
-};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use chrono::Utc;
-use futures::{StreamExt, stream::BoxStream};
+use futures::{StreamExt, future::join_all, stream::BoxStream};
 use iggy::prelude::{Client, IggyConsumer, ReceivedMessage};
 use tokio::time::{MissedTickBehavior, interval, sleep};
 use tokio_stream::StreamMap;
@@ -24,8 +20,9 @@ use crate::{
     common::backoff::ExponentialBackoff,
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
     internal_events::{
-        IggyBytesReceived, IggyConsumerInitError, IggyEventsReceived, IggyOffsetCommitted,
-        IggyOffsetPolled, IggyOffsetUpdateError, IggyReadError, StreamClosedError,
+        IggyBytesReceived, IggyConsumerInitError, IggyConsumerStreamEndedError, IggyEventsReceived,
+        IggyOffsetCommitted, IggyOffsetPolled, IggyOffsetUpdateError, IggyReadError,
+        StreamClosedError,
     },
     shutdown::ShutdownSignal,
     sources::iggy::config::IggySourceConfig,
@@ -117,26 +114,50 @@ fn record_ack(state: &mut PartitionState, partition_id: u32, status: BatchStatus
     }
 }
 
-/// Store each partition's pending offset on the Iggy server. On success the
-/// committed offset is updated so the eager-commit threshold is measured
-/// against what the server actually knows. On transient error the pending
-/// offset is not re-queued; a later ack will set a fresh (higher) pending
-/// value, and the next commit tick will pick it up. Not re-queuing also
-/// prevents an infinite retry loop when the consumer no longer owns the
-/// partition (e.g. after a consumer-group rebalance revokes it).
+/// Store each partition's pending offset on the Iggy server. The per-
+/// partition `store_offset` calls run concurrently so a slow broker
+/// response on partition A does not block the `tokio::select!` for the
+/// duration of every other partition's commit (which would back up new
+/// polls in the SDK queue and delay shutdown observation).
+///
+/// On success the committed offset is updated so the eager-commit
+/// threshold is measured against what the server actually knows. On
+/// transient error the pending offset is not re-queued; a later ack
+/// will set a fresh (higher) pending value, and the next commit tick
+/// will pick it up. Not re-queuing also prevents an infinite retry
+/// loop when the consumer no longer owns the partition (e.g. after a
+/// consumer-group rebalance revokes it).
 async fn commit_offsets(
-    consumer: &mut IggyConsumer,
+    consumer: &IggyConsumer,
     stream: &str,
     topic: &str,
     partitions: &mut HashMap<u32, PartitionState>,
 ) {
-    for (&partition_id, state) in partitions.iter_mut() {
-        let Some(offset) = state.pending.take() else {
-            continue;
-        };
-        match consumer.store_offset(offset, Some(partition_id)).await {
+    let pending: Vec<(u32, u64)> = partitions
+        .iter_mut()
+        .filter_map(|(&partition_id, state)| state.pending.take().map(|o| (partition_id, o)))
+        .collect();
+
+    if pending.is_empty() {
+        return;
+    }
+
+    let results = join_all(
+        pending
+            .into_iter()
+            .map(|(partition_id, offset)| async move {
+                let result = consumer.store_offset(offset, Some(partition_id)).await;
+                (partition_id, offset, result)
+            }),
+    )
+    .await;
+
+    for (partition_id, offset, result) in results {
+        match result {
             Ok(()) => {
-                state.committed = Some(offset);
+                if let Some(state) = partitions.get_mut(&partition_id) {
+                    state.committed = Some(offset);
+                }
                 emit(IggyOffsetCommitted {
                     stream,
                     topic,
@@ -145,6 +166,9 @@ async fn commit_offsets(
                 });
             }
             Err(error) => {
+                if let Some(state) = partitions.get_mut(&partition_id) {
+                    state.pending = Some(offset);
+                }
                 emit(IggyOffsetUpdateError { error });
             }
         }
@@ -384,9 +408,6 @@ pub(crate) async fn run_iggy_source(
         }
     };
     let keep_alive_client = Arc::new(keep_alive_client);
-    // A consumer EOF before shutdown stops the source; report it as a failure
-    // so the topology does not treat the stopped component as completed.
-    let mut consumer_ended = false;
     let stream = config.stream.as_str();
     let topic = config.topic.as_str();
     let stream_path = owned_value_path!("stream");
@@ -430,6 +451,9 @@ pub(crate) async fn run_iggy_source(
     // from the select arm would leave the TCP session open until the
     // broker times it out and delay any consumer-group rebalance.
     let mut downstream_closed = false;
+    // A consumer EOF before shutdown stops the source; report it as a failure
+    // so the topology does not treat the stopped component as completed.
+    let mut consumer_ended = false;
 
     // Exponential backoff for repeated read failures. Without it, a broker
     // outage produces an IggyReadError log line and counter increment every
@@ -458,12 +482,12 @@ pub(crate) async fn run_iggy_source(
                     None => false,
                 };
                 if should_commit {
-                    commit_offsets(&mut consumer, stream, topic, &mut partitions).await;
+                    commit_offsets(&consumer, stream, topic, &mut partitions).await;
                 }
             }
 
             _ = commit_timer.tick() => {
-                commit_offsets(&mut consumer, stream, topic, &mut partitions).await;
+                commit_offsets(&consumer, stream, topic, &mut partitions).await;
             }
 
             _ = &mut shutdown => {
@@ -530,8 +554,8 @@ pub(crate) async fn run_iggy_source(
                         }
                     }
                     None => {
+                        emit(IggyConsumerStreamEndedError);
                         consumer_ended = true;
-                        warn!("Iggy consumer stream ended unexpectedly.");
                         break;
                     }
                 }
@@ -571,10 +595,19 @@ pub(crate) async fn run_iggy_source(
                     None => break,
                 },
 
-                () = &mut drain_deadline => break,
+                () = &mut drain_deadline => {
+                    if !ack_streams.is_empty() {
+                        warn!(
+                            message = "Drain deadline reached with in-flight acknowledgements still pending; committing best-effort and exiting.",
+                            drain_timeout_secs = config.drain_timeout_secs,
+                            pending_partitions = ack_streams.len(),
+                        );
+                    }
+                    break;
+                }
             }
         }
-        commit_offsets(&mut consumer, stream, topic, &mut partitions).await;
+        commit_offsets(&consumer, stream, topic, &mut partitions).await;
     }
 
     if let Err(error) = consumer.shutdown().await {
