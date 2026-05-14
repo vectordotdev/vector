@@ -107,7 +107,7 @@ impl SinkConfig for IggySinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let (client, producer) = self.connect_and_init().await?;
         let healthcheck = healthcheck(Arc::clone(&client)).boxed();
-        let sink = IggySink::new(self.clone(), producer)?;
+        let sink = IggySink::new(self.clone(), Arc::clone(&client), producer)?;
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 

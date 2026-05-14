@@ -5,7 +5,9 @@ use std::{
 
 use chrono::Utc;
 use futures::{StreamExt, stream::BoxStream};
-use iggy::prelude::{ConsumerGroupClient, Identifier, IggyClient, IggyConsumer, ReceivedMessage};
+use iggy::prelude::{
+    Client, ConsumerGroupClient, Identifier, IggyClient, IggyConsumer, ReceivedMessage,
+};
 use tokio::time::{MissedTickBehavior, interval, sleep};
 use tokio_stream::StreamMap;
 use vector_lib::{
@@ -101,8 +103,11 @@ fn record_ack(state: &mut PartitionState, partition_id: u32, status: BatchStatus
 
 /// Store each partition's pending offset on the Iggy server. On success the
 /// committed offset is updated so the eager-commit threshold is measured
-/// against what the server actually knows. On error the pending offset is
-/// left in place for a later timer tick or the shutdown drain to retry.
+/// against what the server actually knows. On transient error the pending
+/// offset is not re-queued; a later ack will set a fresh (higher) pending
+/// value, and the next commit tick will pick it up. Not re-queuing also
+/// prevents an infinite retry loop when the consumer no longer owns the
+/// partition (e.g. after a consumer-group rebalance revokes it).
 async fn commit_offsets(
     consumer: &mut IggyConsumer,
     stream: &str,
@@ -125,7 +130,6 @@ async fn commit_offsets(
             }
             Err(error) => {
                 emit!(IggyOffsetUpdateError { error });
-                state.pending = Some(offset);
             }
         }
     }
@@ -517,6 +521,11 @@ pub async fn run_iggy_source(
     // the consumer group directly via the keep-alive client (no-op when
     // the consumer is pinned to a single partition).
     if acknowledgements {
+        // When pinned to a single partition there is no consumer group to
+        // leave, and we deliberately do not call consumer.shutdown() because
+        // the SDK's shutdown flushes last_consumed_offsets to the broker
+        // (bypassing our ack-based commit logic), which would advance the
+        // stored offset past messages that were polled but not yet delivered.
         if config.partition.is_none()
             && let Err(error) = keep_alive_client
                 .leave_consumer_group(&stream_id, &topic_id, &group_id)
@@ -530,6 +539,13 @@ pub async fn run_iggy_source(
     } else if let Err(error) = consumer.shutdown().await {
         warn!(
             message = "Failed to shut down Iggy consumer cleanly; the consumer-group rebalance may be delayed until the broker times out the connection.",
+            %error,
+        );
+    }
+
+    if let Err(error) = keep_alive_client.disconnect().await {
+        warn!(
+            message = "Failed to disconnect Iggy client on source shutdown.",
             %error,
         );
     }
