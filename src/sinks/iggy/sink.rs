@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use iggy::prelude::IggyProducer;
+use iggy::prelude::{IggyClient, IggyProducer};
 use snafu::ResultExt;
 
 use super::{
@@ -15,6 +15,7 @@ pub(super) struct IggySink {
     request: TowerRequestConfig<IggyTowerRequestConfigDefaults>,
     transformer: Transformer,
     encoder: Encoder<()>,
+    client: Arc<IggyClient>,
     producer: Arc<IggyProducer>,
     batcher_settings: BatcherSettings,
 }
@@ -22,6 +23,7 @@ pub(super) struct IggySink {
 impl IggySink {
     pub(super) fn new(
         config: IggySinkConfig,
+        client: Arc<IggyClient>,
         producer: Arc<IggyProducer>,
     ) -> Result<Self, IggyError> {
         let transformer = config.encoding.transformer();
@@ -36,6 +38,7 @@ impl IggySink {
             request: config.request,
             transformer,
             encoder: Encoder::<()>::new(serializer),
+            client,
             producer,
             batcher_settings,
         })
@@ -43,6 +46,7 @@ impl IggySink {
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let request = self.request.into_settings();
+        let client = Arc::clone(&self.client);
 
         let service = ServiceBuilder::new()
             .settings(request, IggyRetryLogic)
@@ -54,7 +58,7 @@ impl IggySink {
         let transformer = self.transformer.clone();
         let batcher_settings = self.batcher_settings.as_byte_size_config();
 
-        input
+        let result = input
             .batched(batcher_settings)
             .filter_map(|events| {
                 futures::future::ready(request_builder(events, &transformer, &mut encoder))
@@ -62,7 +66,14 @@ impl IggySink {
             .into_driver(service)
             .protocol("iggy")
             .run()
-            .await
+            .await;
+
+        use iggy::prelude::Client;
+        if let Err(error) = client.disconnect().await {
+            warn!(message = "Failed to disconnect Iggy client on sink shutdown.", %error);
+        }
+
+        result
     }
 }
 
