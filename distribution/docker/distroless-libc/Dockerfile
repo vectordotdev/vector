@@ -1,4 +1,4 @@
-FROM docker.io/debian:trixie-slim@sha256:26f98ccd92fd0a44d6928ce8ff8f4921b4d2f535bfa07555ee5d18f61429cf0c AS builder
+FROM docker.io/debian:trixie-slim@sha256:109e2c65005bf160609e4ba6acf7783752f8502ad218e298253428690b9eaa4b AS builder
 
 WORKDIR /vector
 
@@ -15,7 +15,7 @@ RUN src=$(dpkg -L zlib1g | grep -E '/libz\.so\.1$') && \
 
 # distroless doesn't use static tags
 # hadolint ignore=DL3007
-FROM gcr.io/distroless/cc-debian12:latest@sha256:329e54034ce498f9c6b345044e8f530c6691f99e94a92446f68c0adf9baa8464
+FROM gcr.io/distroless/cc-debian12:latest@sha256:847433844c7e04bcf07a3a0f0f5a8de554c6df6fa9e3e3ab14d3f6b73d780235
 
 # https://github.com/opencontainers/image-spec/blob/main/annotations.md
 LABEL org.opencontainers.image.url="https://vector.dev"
