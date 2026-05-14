@@ -14,7 +14,7 @@ pub use self::tcp::{
     request_limiter::RequestLimiter, try_bind_tcp_listener,
 };
 #[cfg(feature = "sources-utils-net-udp")]
-pub use self::udp::try_bind_udp_socket;
+pub use self::udp::{UDP_BATCH_SIZE, UdpBatchReceiver, try_bind_udp_socket};
 use crate::config::{Protocol, Resource};
 
 #[derive(Clone, Debug, Eq, PartialEq, Snafu)]

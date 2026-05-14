@@ -4,15 +4,13 @@ use std::{net::SocketAddr, time::Duration};
 
 use bytes::Bytes;
 use chrono::Utc;
-use futures::StreamExt;
 use listenfd::ListenFd;
 use smallvec::SmallVec;
-use tokio_util::udp::UdpFramed;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::{
-        BytesDecoder, OctetCountingDecoder, SyslogDeserializerConfig,
-        decoding::{Deserializer, Framer},
+        OctetCountingDecoder, SyslogDeserializerConfig,
+        decoding::{Deserializer, Framer, format::Deserializer as FormatDeserializer},
     },
     config::{LegacyKey, LogNamespace},
     configurable::configurable_component,
@@ -36,7 +34,9 @@ use crate::{
     },
     net,
     shutdown::ShutdownSignal,
-    sources::util::net::{SocketListenAddr, TcpNullAcker, TcpSource, try_bind_udp_socket},
+    sources::util::net::{
+        SocketListenAddr, TcpNullAcker, TcpSource, UdpBatchReceiver, try_bind_udp_socket,
+    },
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsSourceConfig},
 };
@@ -317,10 +317,10 @@ impl TcpSource for SyslogTcpSource {
 
 pub fn udp(
     addr: SocketListenAddr,
-    _max_length: usize,
+    max_length: usize,
     host_key: Option<OwnedValuePath>,
     receive_buffer_bytes: Option<usize>,
-    shutdown: ShutdownSignal,
+    mut shutdown: ShutdownSignal,
     log_namespace: LogNamespace,
     mut out: SourceSender,
 ) -> super::Source {
@@ -339,6 +339,13 @@ pub fn udp(
             warn!(message = "Failed configuring receive buffer size on UDP socket.", %error);
         }
 
+        let mut receiver = UdpBatchReceiver::from_socket(socket, max_length).map_err(|error| {
+            emit!(SocketReceiveError {
+                mode: SocketMode::Udp,
+                error: &error,
+            })
+        })?;
+
         info!(
             message = "Listening.",
             addr = %addr,
@@ -347,54 +354,77 @@ pub fn udp(
 
         let bytes_received = register!(BytesReceived::from(Protocol::UDP));
 
-        let mut stream = UdpFramed::new(
-            socket,
-            Decoder::new(
-                Framer::Bytes(BytesDecoder::new()),
-                Deserializer::Syslog(
-                    SyslogDeserializerConfig::from_source(SyslogConfig::NAME).build(),
-                ),
-            ),
-        )
-        .take_until(shutdown)
-        .filter_map(|frame| {
-            let host_key = host_key.clone();
-            let bytes_received = bytes_received.clone();
-            async move {
-                match frame {
-                    Ok(((mut events, byte_size), received_from)) => {
+        let parser = SyslogDeserializerConfig::from_source(SyslogConfig::NAME).build();
+
+        loop {
+            let datagrams = {
+                let batch = tokio::select! {
+                    recv = receiver.recv_batch() => match recv {
+                        Ok(batch) => batch,
+                        Err(error) => {
+                            emit!(SocketReceiveError {
+                                mode: SocketMode::Udp,
+                                error: &error,
+                            });
+                            continue;
+                        }
+                    },
+                    _ = &mut shutdown => return Ok(()),
+                };
+
+                if batch.is_empty() {
+                    continue;
+                }
+
+                batch
+                    .iter()
+                    .map(|datagram| (datagram.address, Bytes::copy_from_slice(datagram.payload)))
+                    .collect::<Vec<_>>()
+            };
+
+            let mut output: Vec<Event> = Vec::with_capacity(datagrams.len());
+
+            for (address, payload) in datagrams {
+                match parser.parse(payload.clone(), log_namespace) {
+                    Ok(mut events) => {
+                        if events.is_empty() {
+                            continue;
+                        }
+
                         let count = events.len();
-                        bytes_received.emit(ByteSize(byte_size));
+                        bytes_received.emit(ByteSize(payload.len()));
                         emit!(SocketEventsReceived {
                             mode: SocketMode::Udp,
                             byte_size: events.estimated_json_encoded_size_of(),
                             count,
                         });
-                        let received_from = received_from.ip().to_string().into();
+
+                        let received_from = address.ip().to_string().into();
                         handle_events(&mut events, &host_key, Some(received_from), log_namespace);
-                        Some(events.remove(0))
+                        output.extend(events);
                     }
                     Err(error) => {
                         emit!(SocketReceiveError {
                             mode: SocketMode::Udp,
                             error: &error,
                         });
-                        None
                     }
                 }
             }
-        })
-        .boxed();
 
-        match out.send_event_stream(&mut stream).await {
-            Ok(()) => {
-                debug!("Finished sending.");
-                Ok(())
+            if output.is_empty() {
+                continue;
             }
-            Err(_) => {
-                let (count, _) = stream.size_hint();
-                emit!(StreamClosedError { count });
-                Err(())
+
+            let count = output.len();
+            tokio::select! {
+                result = out.send_batch(output) => {
+                    if result.is_err() {
+                        emit!(StreamClosedError { count });
+                        return Err(());
+                    }
+                }
+                _ = &mut shutdown => return Ok(()),
             }
         }
     })
@@ -466,6 +496,7 @@ mod test {
     use std::{collections::HashMap, fmt, str::FromStr};
 
     use chrono::prelude::*;
+    use futures::StreamExt;
     use rand::{Rng, rng};
     use serde::Deserialize;
     use tokio::time::{Duration, Instant, sleep};
