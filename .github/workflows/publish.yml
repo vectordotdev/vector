@@ -91,7 +91,7 @@ jobs:
         run: |
           dnf install -y --setopt=install_weak_deps=False \
             gcc gcc-c++ make cmake perl perl-IPC-Cmd \
-            openssl-devel cyrus-sasl-devel \
+            openssl-devel cyrus-sasl-devel zlib-devel \
             pkgconfig clang \
             rpm-build sudo \
             git tar gzip xz which findutils \
@@ -215,6 +215,7 @@ jobs:
         env:
           TARGET: "${{ matrix.architecture }}-apple-darwin"
           NATIVE_BUILD: true
+          FEATURES: "target-aarch64-apple-darwin"
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
           make package

@@ -4,21 +4,8 @@ ARG BUILD=false
 
 FROM docker.io/rust:${RUST_VERSION}-slim-trixie
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    cmake \
-    curl \
-    git \
-    clang \
-    libclang-dev \
-    libsasl2-dev \
-    libssl-dev \
-    libxxhash-dev \
-    zlib1g-dev \
-    zlib1g \
-    unzip \
-    mold \
-  && rm -rf /var/lib/apt/lists/*
+COPY scripts/environment/install-debian-build-deps.sh /
+RUN bash /install-debian-build-deps.sh
 
 COPY tests/data/ca/certs /certs
 
