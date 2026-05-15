@@ -59,9 +59,12 @@ mod tests {
     use metrics::{KeyName, Label};
     use metrics_tracing_context::LabelFilter;
 
-    use super::{MetricLabel, VectorLabelFilter};
+    use super::VectorLabelFilter;
 
-    inventory::submit!(MetricLabel("test_extra_label"));
+    // Use the macro so that removing either arm (MetricLabel or SpanField) from
+    // register_extra_span_field! would cause the tests below to fail, locking the
+    // dual-registration contract.
+    crate::register_extra_span_field!("test_extra_label");
 
     fn key(name: &'static str) -> KeyName {
         KeyName::from_const_str(name)
