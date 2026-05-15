@@ -543,7 +543,7 @@ mod tests {
         let limit = MemoryBufferSize::MaxEvents(NonZeroUsize::new(2).unwrap());
         let (mut tx, mut rx) = limited(
             limit,
-            Some(ChannelMetricMetadata::new("test_channel", None)),
+            Some(ChannelMetricMetadata::new(BufferChannelKind::Source, None)),
             None,
         );
 
@@ -565,7 +565,7 @@ mod tests {
         let limit = MemoryBufferSize::MaxEvents(NonZeroUsize::new(2).unwrap());
         let (mut tx, mut rx) = limited(
             limit,
-            Some(ChannelMetricMetadata::new("test_channel_oversized", None)),
+            Some(ChannelMetricMetadata::new(BufferChannelKind::Source, None)),
             None,
         );
         let metrics = tx.inner.metrics.as_ref().unwrap().recorded_values.clone();
@@ -948,7 +948,7 @@ mod tests {
             let limit = NonZeroUsize::new(size * 10).unwrap();
             let (tx, rx) = limited(
                 MemoryBufferSize::MaxEvents(limit),
-                Some(ChannelMetricMetadata::new("test_channel_concurrent", None)),
+                Some(ChannelMetricMetadata::new(BufferChannelKind::Source, None)),
                 None,
             );
             let metrics = tx.inner.metrics.as_ref().unwrap().recorded_values.clone();
