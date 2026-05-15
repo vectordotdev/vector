@@ -121,9 +121,13 @@ impl Prepare {
     /// Steps 1 & 2
     fn create_release_branches(&self) -> Result<()> {
         debug!("create_release_branches");
-        // Step 1: Create a new release branch
-        git::run_and_check_output(&["fetch"])?;
-        git::checkout_main_branch()?;
+
+        if !self.dry_run {
+            // Step 1: Sync with remote and start from master.
+            git::run_and_check_output(&["fetch"])?;
+            git::checkout_main_branch()?;
+        }
+        // In dry-run mode the branches are created from whatever branch is currently checked out.
 
         git::checkout_or_create_branch(self.release_branch.as_str())?;
         if !self.dry_run {
