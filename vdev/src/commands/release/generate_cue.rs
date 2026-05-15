@@ -12,7 +12,10 @@ use regex::Regex;
 use semver::Version;
 use serde_json::json;
 
-use crate::utils::{git, paths};
+use crate::utils::{
+    deprecation::{self, DeprecationEntry},
+    git, paths,
+};
 
 const RELEASES_DIR: &str = "website/cue/reference/releases";
 const CHANGELOG_DIR: &str = "changelog.d";
@@ -80,9 +83,27 @@ pub(super) fn run(new_version: &Version) -> Result<PathBuf> {
     let changelog_dir = repo_root.join(CHANGELOG_DIR);
     let changelog_entries = read_changelog_fragments(&changelog_dir)?;
 
-    let cue_text = render_release_cue(&new_version, &changelog_entries, &commits);
+    let deprecation_dir = repo_root.join(deprecation::DEPRECATION_DIR);
+    let all_deprecations = deprecation::read_deprecation_fragments(&deprecation_dir)?;
+
+    // Partition deprecation entries: enacted (major.minor matches this release) vs planned.
+    // Patch is ignored: a deprecation labelled "0.56" is enacted on any 0.56.x release.
+    let (enacted_deprecations, planned_deprecations): (Vec<_>, Vec<_>) = all_deprecations
+        .into_iter()
+        .partition(|e| e.deprecation_version.matches_release(&new_version));
+
+    let cue_text = render_release_cue(
+        &new_version,
+        &changelog_entries,
+        &commits,
+        &enacted_deprecations,
+        &planned_deprecations,
+    );
     fs::write(&cue_path, cue_text)
         .with_context(|| format!("Failed to write {}", cue_path.display()))?;
+
+    // Retire enacted deprecation fragments via `git rm`.
+    retire_deprecation_fragments(&deprecation_dir, &enacted_deprecations)?;
 
     // Retire the changelog fragments via `git rm` (preserves README.md).
     retire_changelog_fragments(&changelog_dir)?;
@@ -502,12 +523,27 @@ fn retire_changelog_fragments(dir: &Path) -> Result<()> {
     Ok(())
 }
 
+fn retire_deprecation_fragments(dir: &Path, enacted: &[DeprecationEntry]) -> Result<()> {
+    if !dir.is_dir() || enacted.is_empty() {
+        return Ok(());
+    }
+    let cwd = env::current_dir()?;
+    for entry in enacted {
+        let path = dir.join(&entry.filename);
+        let rel = path.strip_prefix(&cwd).unwrap_or(&path);
+        git::rm(&rel.to_string_lossy())?;
+    }
+    Ok(())
+}
+
 // ---------- CUE rendering ----------
 
 fn render_release_cue(
     version: &Version,
     changelog: &[ChangelogEntry],
     commits: &[Commit],
+    enacted_deprecations: &[DeprecationEntry],
+    planned_deprecations: &[DeprecationEntry],
 ) -> String {
     let date = Utc::now().format("%Y-%m-%d").to_string();
     let changelog_block = render_changelog(changelog);
@@ -516,6 +552,9 @@ fn render_release_cue(
         .map(Commit::render_cue)
         .collect::<Vec<_>>()
         .join(",\n    ");
+
+    let deprecations_block = render_deprecation_section(enacted_deprecations);
+    let planned_deprecations_block = render_deprecation_section(planned_deprecations);
 
     format!(
         "package metadata\n\
@@ -526,6 +565,14 @@ fn render_release_cue(
          \n\
          \twhats_next: []\n\
          \n\
+         \tdeprecations: [\n\
+         {deprecations_block}\n\
+         \t]\n\
+         \n\
+         \tplanned_deprecations: [\n\
+         {planned_deprecations_block}\n\
+         \t]\n\
+         \n\
          \tchangelog: [\n\
          {changelog_block}\n\
          \t]\n\
@@ -533,6 +580,36 @@ fn render_release_cue(
          \tcommits: [\n    {commits_block}\n\t]\n\
          }}\n"
     )
+}
+
+fn render_deprecation_section(entries: &[DeprecationEntry]) -> String {
+    entries
+        .iter()
+        .map(|e| {
+            let mut s = String::new();
+            s.push_str("\t\t{\n");
+            writeln!(s, "\t\t\twhat: {}", json!(e.what)).unwrap();
+            writeln!(
+                s,
+                "\t\t\tdeprecation_version: {}",
+                json!(e.deprecation_version.to_string())
+            )
+            .unwrap();
+            if let Some(ref ann) = e.announcement_version {
+                writeln!(s, "\t\t\tannouncement_version: {}", json!(ann.to_string())).unwrap();
+            }
+            if !e.description.is_empty() {
+                s.push_str("\t\t\tdescription: #\"\"\"\n");
+                for line in e.description.lines() {
+                    writeln!(s, "\t\t\t\t{line}").unwrap();
+                }
+                s.push_str("\t\t\t\t\"\"\"#\n");
+            }
+            s.push_str("\t\t}");
+            s
+        })
+        .collect::<Vec<_>>()
+        .join(",\n")
 }
 
 fn render_changelog(entries: &[ChangelogEntry]) -> String {
@@ -703,7 +780,7 @@ mod tests {
             deletions_count: 3,
         }];
 
-        let out = render_release_cue(&Version::new(0, 99, 0), &entries, &commits);
+        let out = render_release_cue(&Version::new(0, 99, 0), &entries, &commits, &[], &[]);
 
         assert!(out.starts_with("package metadata\n"));
         assert!(out.contains("releases: \"0.99.0\":"));
