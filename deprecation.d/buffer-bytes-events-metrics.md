@@ -1,7 +1,7 @@
 ---
 what: "The `buffer_byte_size` and `buffer_events` gauge metrics"
 announcement_version: 0.53.0
-deprecation_version: 0.53.0
+deprecation_version: TBD
 ---
 
 The `buffer_byte_size` and `buffer_events` gauges are deprecated in favor of the
