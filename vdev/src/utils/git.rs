@@ -123,6 +123,11 @@ pub fn commit(commit_message: &str) -> Result<String> {
         .check_output()
 }
 
+/// Stages a specific file using `git add`.
+pub fn add(path: &str) -> Result<String> {
+    Command::new("git").args(["add", path]).check_output()
+}
+
 /// Removes a file from the index (and working tree) using `git rm`.
 pub fn rm(path: &str) -> Result<String> {
     Command::new("git").args(["rm", path]).check_output()

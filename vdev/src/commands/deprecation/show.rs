@@ -81,11 +81,8 @@ impl Cli {
 
 fn print_entry(e: &DeprecationEntry) {
     println!("  [{}] {}", e.deprecation_version, e.what);
-    if let Some(ref ann) = e.announcement_version {
-        println!("      announced: {ann}");
-    }
+    println!("      announced: {}", e.announcement_version);
     if !e.description.is_empty() {
-        // Indent description lines for readability
         for line in e.description.lines() {
             println!("      {line}");
         }

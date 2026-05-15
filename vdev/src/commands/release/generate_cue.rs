@@ -102,6 +102,10 @@ pub(super) fn run(new_version: &Version) -> Result<PathBuf> {
     fs::write(&cue_path, cue_text)
         .with_context(|| format!("Failed to write {}", cue_path.display()))?;
 
+    // In surviving (planned) fragments, replace any `next` version values with the
+    // concrete release version so the files stay accurate going forward.
+    rewrite_next_in_planned(&deprecation_dir, &planned_deprecations, &new_version)?;
+
     // Retire enacted deprecation fragments via `git rm`.
     retire_deprecation_fragments(&deprecation_dir, &enacted_deprecations)?;
 
@@ -523,6 +527,22 @@ fn retire_changelog_fragments(dir: &Path) -> Result<()> {
     Ok(())
 }
 
+fn rewrite_next_in_planned(
+    dir: &Path,
+    planned: &[DeprecationEntry],
+    release: &Version,
+) -> Result<()> {
+    let cwd = env::current_dir()?;
+    for entry in planned {
+        let path = dir.join(&entry.filename);
+        if deprecation::rewrite_next_versions(&path, release)? {
+            let rel = path.strip_prefix(&cwd).unwrap_or(&path);
+            git::add(&rel.to_string_lossy())?;
+        }
+    }
+    Ok(())
+}
+
 fn retire_deprecation_fragments(dir: &Path, enacted: &[DeprecationEntry]) -> Result<()> {
     if !dir.is_dir() || enacted.is_empty() {
         return Ok(());
@@ -595,9 +615,12 @@ fn render_deprecation_section(entries: &[DeprecationEntry]) -> String {
                 json!(e.deprecation_version.to_string())
             )
             .unwrap();
-            if let Some(ref ann) = e.announcement_version {
-                writeln!(s, "\t\t\tannouncement_version: {}", json!(ann.to_string())).unwrap();
-            }
+            writeln!(
+                s,
+                "\t\t\tannouncement_version: {}",
+                json!(e.announcement_version.to_string())
+            )
+            .unwrap();
             if !e.description.is_empty() {
                 s.push_str("\t\t\tdescription: #\"\"\"\n");
                 for line in e.description.lines() {

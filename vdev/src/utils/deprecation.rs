@@ -9,11 +9,13 @@ use semver::Version;
 
 pub const DEPRECATION_DIR: &str = "deprecation.d";
 
-/// A version field that is either a concrete semver version or the placeholder `TBD`.
+/// A version field value: a concrete semver version, `TBD` (unknown), or `next`
+/// (the very next release, whatever its number turns out to be).
 #[derive(Debug, Clone, PartialEq)]
 pub enum VersionOrTbd {
     Version(Version),
     Tbd,
+    Next,
 }
 
 impl fmt::Display for VersionOrTbd {
@@ -21,17 +23,22 @@ impl fmt::Display for VersionOrTbd {
         match self {
             VersionOrTbd::Version(v) => write!(f, "{v}"),
             VersionOrTbd::Tbd => write!(f, "TBD"),
+            VersionOrTbd::Next => write!(f, "next"),
         }
     }
 }
 
 impl VersionOrTbd {
-    /// Returns true when this version's major.minor matches `release`'s major.minor.
-    /// Patch is intentionally ignored: a deprecation labelled "0.56" (stored as 0.56.0)
-    /// is enacted on any 0.56.x release cut.
+    /// Returns true when this version should be enacted for the given release.
+    ///
+    /// `next` always matches — it means "the very next release cut".
+    /// Concrete versions match when major.minor equals the release's major.minor;
+    /// patch is ignored so that `0.56` is enacted on any `0.56.x` release.
+    /// `TBD` never matches.
     pub fn matches_release(&self, release: &Version) -> bool {
         match self {
             VersionOrTbd::Version(v) => v.major == release.major && v.minor == release.minor,
+            VersionOrTbd::Next => true,
             VersionOrTbd::Tbd => false,
         }
     }
@@ -41,8 +48,10 @@ impl<'de> serde::Deserialize<'de> for VersionOrTbd {
     fn deserialize<D: serde::Deserializer<'de>>(d: D) -> std::result::Result<Self, D::Error> {
         let s = String::deserialize(d)?;
         let s = s.trim();
-        if s == "TBD" {
-            return Ok(VersionOrTbd::Tbd);
+        match s {
+            "TBD" => return Ok(VersionOrTbd::Tbd),
+            "next" => return Ok(VersionOrTbd::Next),
+            _ => {}
         }
         // Accept both "0.56" (major.minor) and "0.56.0" (major.minor.patch).
         // Normalize the two-part form by appending ".0".
@@ -63,7 +72,7 @@ use serde::Deserialize;
 struct Frontmatter {
     what: String,
     deprecation_version: VersionOrTbd,
-    announcement_version: Option<VersionOrTbd>,
+    announcement_version: VersionOrTbd,
 }
 
 /// A parsed and validated deprecation entry from `deprecation.d/`.
@@ -72,7 +81,7 @@ pub struct DeprecationEntry {
     pub filename: String,
     pub what: String,
     pub deprecation_version: VersionOrTbd,
-    pub announcement_version: Option<VersionOrTbd>,
+    pub announcement_version: VersionOrTbd,
     /// Optional body text (everything after the closing `---` of the frontmatter).
     pub description: String,
 }
@@ -137,6 +146,54 @@ fn parse_deprecation_fragment(path: &Path) -> Result<DeprecationEntry> {
     })
 }
 
+/// In a planned (surviving) deprecation fragment file, replace every `next` version value
+/// in the frontmatter with the concrete release version (`major.minor`).
+/// Returns true if the file was modified.
+pub fn rewrite_next_versions(path: &Path, release: &Version) -> Result<bool> {
+    let content =
+        fs::read_to_string(path).with_context(|| format!("Failed to read {}", path.display()))?;
+
+    let version_str = format!("{}.{}", release.major, release.minor);
+
+    // Only rewrite within the frontmatter block (between the two `---` delimiters).
+    let fm_close = content[3..] // skip opening `---`
+        .find("\n---")
+        .map(|p| p + 3) // offset back into original string
+        .unwrap_or(content.len());
+
+    let (front, rest) = content.split_at(fm_close);
+
+    let new_front: String = front
+        .lines()
+        .map(|line| {
+            if (line.starts_with("announcement_version:") || line.starts_with("deprecation_version:"))
+                && line.trim_end().ends_with("next")
+            {
+                let colon_pos = line.find(':').unwrap();
+                format!("{}: {version_str}", &line[..colon_pos])
+            } else {
+                line.to_string()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    if new_front == front {
+        return Ok(false);
+    }
+
+    // Preserve the trailing newline that was on `front` before the split.
+    let rejoined = if front.ends_with('\n') {
+        format!("{new_front}\n{rest}")
+    } else {
+        format!("{new_front}{rest}")
+    };
+
+    fs::write(path, rejoined)
+        .with_context(|| format!("Failed to write {}", path.display()))?;
+    Ok(true)
+}
+
 /// Split the raw file contents into the frontmatter string and the body.
 /// The file must begin with `---`, and have a closing `---` on its own line.
 fn split_frontmatter<'a>(content: &'a str, path: &Path) -> Result<(&'a str, &'a str)> {
@@ -182,10 +239,7 @@ mod tests {
         let e = &entries[0];
         assert_eq!(e.what, "The foo option");
         assert_eq!(e.deprecation_version, VersionOrTbd::Version(Version::new(0, 57, 0)));
-        assert_eq!(
-            e.announcement_version,
-            Some(VersionOrTbd::Version(Version::new(0, 55, 0)))
-        );
+        assert_eq!(e.announcement_version, VersionOrTbd::Version(Version::new(0, 55, 0)));
         assert_eq!(e.description, "Detailed explanation.");
     }
 
@@ -199,19 +253,18 @@ mod tests {
         .unwrap();
         let entries = read_deprecation_fragments(tmp.path()).unwrap();
         assert_eq!(entries[0].deprecation_version, VersionOrTbd::Tbd);
-        assert_eq!(entries[0].announcement_version, Some(VersionOrTbd::Tbd));
+        assert_eq!(entries[0].announcement_version, VersionOrTbd::Tbd);
     }
 
     #[test]
-    fn parse_no_announcement_version() {
+    fn rejects_missing_announcement_version() {
         let tmp = tempdir().unwrap();
         fs::write(
             tmp.path().join("baz.md"),
             "---\nwhat: Baz option\ndeprecation_version: \"0.60.0\"\n---\n",
         )
         .unwrap();
-        let entries = read_deprecation_fragments(tmp.path()).unwrap();
-        assert!(entries[0].announcement_version.is_none());
+        assert!(read_deprecation_fragments(tmp.path()).is_err());
     }
 
     #[test]
@@ -226,7 +279,7 @@ mod tests {
         let tmp = tempdir().unwrap();
         fs::write(
             tmp.path().join("empty.md"),
-            "---\nwhat: \"   \"\ndeprecation_version: \"0.60.0\"\n---\n",
+            "---\nwhat: \"   \"\ndeprecation_version: \"0.60.0\"\nannouncement_version: \"0.60.0\"\n---\n",
         )
         .unwrap();
         assert!(read_deprecation_fragments(tmp.path()).is_err());
@@ -245,7 +298,7 @@ mod tests {
         let tmp = tempdir().unwrap();
         fs::write(
             tmp.path().join("short.md"),
-            "---\nwhat: Short version\ndeprecation_version: \"0.56\"\n---\n",
+            "---\nwhat: Short version\ndeprecation_version: \"0.56\"\nannouncement_version: \"0.56\"\n---\n",
         )
         .unwrap();
         let entries = read_deprecation_fragments(tmp.path()).unwrap();
@@ -271,5 +324,53 @@ mod tests {
     #[test]
     fn tbd_never_matches_release() {
         assert!(!VersionOrTbd::Tbd.matches_release(&Version::new(0, 56, 0)));
+    }
+
+    #[test]
+    fn next_always_matches_release() {
+        assert!(VersionOrTbd::Next.matches_release(&Version::new(0, 56, 0)));
+        assert!(VersionOrTbd::Next.matches_release(&Version::new(1, 0, 0)));
+    }
+
+    #[test]
+    fn parse_next() {
+        let tmp = tempdir().unwrap();
+        fs::write(
+            tmp.path().join("next.md"),
+            "---\nwhat: Thing\ndeprecation_version: next\nannouncement_version: next\n---\n",
+        )
+        .unwrap();
+        let entries = read_deprecation_fragments(tmp.path()).unwrap();
+        assert_eq!(entries[0].deprecation_version, VersionOrTbd::Next);
+        assert_eq!(entries[0].announcement_version, VersionOrTbd::Next);
+    }
+
+    #[test]
+    fn rewrite_next_versions_replaces_next_in_frontmatter() {
+        let tmp = tempdir().unwrap();
+        let path = tmp.path().join("planned.md");
+        fs::write(
+            &path,
+            "---\nwhat: Thing\ndeprecation_version: next\nannouncement_version: next\n---\n\nSome body with next word.\n",
+        )
+        .unwrap();
+        let modified = rewrite_next_versions(&path, &Version::new(0, 57, 0)).unwrap();
+        assert!(modified);
+        let updated = fs::read_to_string(&path).unwrap();
+        assert!(updated.contains("deprecation_version: 0.57\n"));
+        assert!(updated.contains("announcement_version: 0.57\n"));
+        // Body must be left untouched
+        assert!(updated.contains("Some body with next word."));
+    }
+
+    #[test]
+    fn rewrite_next_versions_no_op_when_no_next() {
+        let tmp = tempdir().unwrap();
+        let path = tmp.path().join("concrete.md");
+        let original = "---\nwhat: Thing\ndeprecation_version: 0.57\nannouncement_version: 0.57\n---\n";
+        fs::write(&path, original).unwrap();
+        let modified = rewrite_next_versions(&path, &Version::new(0, 57, 0)).unwrap();
+        assert!(!modified);
+        assert_eq!(fs::read_to_string(&path).unwrap(), original);
     }
 }

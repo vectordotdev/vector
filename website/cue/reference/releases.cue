@@ -29,10 +29,10 @@ releases: {
 	}
 
 	#DeprecationEntry: {
-		what:                  string
-		deprecation_version:   string
-		announcement_version?: string
-		description?:          string
+		what:                 string
+		deprecation_version:  string
+		announcement_version: string
+		description?:         string
 	}
 
 	#Release: {

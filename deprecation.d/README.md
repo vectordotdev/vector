@@ -15,8 +15,8 @@ Each file must be named `<unique_slug>.md` and begin with YAML frontmatter:
 
 ```markdown
 ---
-announcement_version: "0.55.0"
-deprecation_version: "0.57.0"
+announcement_version: 0.55.0
+deprecation_version: 0.57.0
 what: "The `legacy_auth` configuration option"
 ---
 
@@ -41,8 +41,8 @@ auth:
 | Field | Required | Description |
 |-------|----------|-------------|
 | `what` | Yes | Short one-line description of what is deprecated. |
-| `deprecation_version` | Yes | Semver version when the item will be removed, or `"TBD"` if not yet decided. |
-| `announcement_version` | No | Semver version when the deprecation was first announced, or `"TBD"`. Omit if not applicable. |
+| `deprecation_version` | Yes | Version when the item will be removed. Accepts a semver string (`0.56`, `0.56.0`), `TBD` (unknown), or `next` (the very next release). |
+| `announcement_version` | Yes | Version when the deprecation was first announced. Accepts the same values as `deprecation_version`. Set to the same value as `deprecation_version` if the announcement and removal happen in the same release. |
 
 ### Body
 
