@@ -80,7 +80,7 @@ below.
 - **Empty `string_value` on a promoted resource attribute** (`service.name`,
   `deployment.environment.name`, the deprecated `deployment.environment`, or
   `host.name`): consumed from `Resource.attributes` on ingress and normalized to typed
-  slot `None` per the parent RFC's "Empty-string invariant for `Option<KeyString>`
+  slot `None` per the parent RFC's "Empty-string invariant for optional string
   slots". Egress emits the typed `None` as field-absent rather than as the original
   empty-string attribute.
 - **`Span.end_time_unix_nano < start_time_unix_nano`** is clamped to zero duration on
@@ -183,7 +183,7 @@ sole post-ingress owner of the value. This matches the move-not-copy pattern use
 `_dd.p.tid` consumption on Datadog ingest and for the reserved cross-format keys. A
 `string_value` whose contents are empty is consumed identically -- the key is stripped
 from `Resource.attributes` -- but the typed slot stays `None` per the parent RFC's
-"Empty-string invariant for `Option<KeyString>` slots"; this is the OTLP-side
+"Empty-string invariant for optional string slots"; this is the OTLP-side
 application of the invariant and is one of the OTLP-side zero-loss exclusions listed
 above. If the `AnyValue` for any of these three keys is a non-string variant (e.g.
 `int_value`, `bytes_value`, `bool_value`, `array_value`, `kvlist_value`, or an unset
@@ -294,7 +294,7 @@ bytes differ:
   on the wire is spec-equivalent to a default-valued message. The model carries
   `TraceEvent.resource` and `TraceEvent.scope` as values rather than `Option`, and egress
   emits the field unconditionally. Within `Scope`, `name` and `version` are
-  `Option<KeyString>`: an absent or empty-string wire value normalizes to `None` on
+  `Option<String>`: an absent or empty-string wire value normalizes to `None` on
   ingress (OTLP treats empty and absent as equivalent); on egress `None` is emitted as an
   absent (zero-length proto3 string), which is spec-equivalent to the original.
 - `Span.status` (proto comment: "Semantically when Status isn't set, it means span's

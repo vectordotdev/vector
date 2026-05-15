@@ -291,14 +291,14 @@ implementation produces, in lockstep with the upstream reference.
 `TracerPayload.hostname` and `TracerPayload.env` map to typed
 `Resource.host` / `Resource.environment` directly and are not part of the deferred
 attribute set; an empty wire value normalizes to `None` per the parent RFC's
-"Empty-string invariant for `Option<KeyString>` slots". `TracerPayload.containerDebug`
+"Empty-string invariant for optional string slots". `TracerPayload.containerDebug`
 is a Datadog-internal diagnostic with no Vector consumer and is dropped on ingest (see
 "Out of scope").
 
 #### `Span.resource` and `Span.type` empty-string egress consequence
 
 `Span.resource` and `Span.type` follow the parent RFC's "Empty-string invariant for
-`Option<KeyString>` slots": an empty wire value normalizes to `None` on ingress. The
+optional string slots": an empty wire value normalizes to `None` on ingress. The
 Datadog-egress derivation fallback ("When `Span.span_type` is `None` on Datadog egress…",
 below) then fires for the `None` value, including for Datadog-sourced spans whose
 producer wrote the empty string. An originally populated (non-empty) value is preserved

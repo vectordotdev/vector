@@ -246,7 +246,7 @@ pub struct Span {
     pub trace_state:    TraceState,
     pub flags:          TraceFlags,
 
-    pub name:           KeyString,
+    pub name:           String,
     pub kind:           SpanKind,
 
     pub start_time:     DateTime<Utc>,
@@ -256,11 +256,11 @@ pub struct Span {
 
     /// Datadog-native, no OTLP equivalent: human-readable identifier of
     /// the resource being traced.
-    pub resource_name:  Option<KeyString>,
+    pub resource_name:  Option<String>,
 
     /// Datadog-native, no OTLP equivalent: free-form classification of
     /// the span.
-    pub span_type:      Option<KeyString>,
+    pub span_type:      Option<String>,
 
     /// Per-span attribute map.
     pub attributes:     Attributes,
@@ -294,20 +294,20 @@ model because:
 
 ```rust
 pub struct Resource {
-    pub service:     Option<KeyString>,   // service.name
-    pub environment: Option<KeyString>,   // deployment.environment.name
-    pub host:        Option<KeyString>,   // host.name
+    pub service:     Option<String>,   // service.name
+    pub environment: Option<String>,   // deployment.environment.name
+    pub host:        Option<String>,   // host.name
     pub attributes:  Attributes,
-    pub schema_url:  Option<KeyString>,
+    pub schema_url:  Option<String>,
     pub dropped_attributes_count: u32,
 }
 
 pub struct Scope {
     /// `None` carries the OTLP "instrumentation scope name unknown" semantics.
-    pub name:       Option<KeyString>,
-    pub version:    Option<KeyString>,
+    pub name:       Option<String>,
+    pub version:    Option<String>,
     pub attributes: Attributes,
-    pub schema_url: Option<KeyString>,
+    pub schema_url: Option<String>,
     pub dropped_attributes_count: u32,
 }
 ```
@@ -403,7 +403,7 @@ pub enum SpanStatus {
 /// Datadog `TraceChunk`-scoped state. Default-empty for OTLP-sourced events.
 pub struct ChunkContext {
     pub priority: Option<SamplingPriority>,
-    pub origin:   Option<KeyString>,
+    pub origin:   Option<String>,
     pub dropped:  bool, /// `TraceChunk.droppedTrace`
     pub tags:     Attributes,
 }
@@ -453,9 +453,9 @@ variants are exhaustive for the known-value space.
   only `Error` carries a description); writing `message` to the empty string is a no-op
   for `Unset` / `Ok`. Writing `code` to `"unset"` or `"ok"` clears any existing message.
 
-#### Empty-string invariant for `Option<KeyString>` slots
+#### Empty-string invariant for optional string slots
 
-Every `Option<KeyString>` typed slot in the data model -- `Resource.service` /
+Every `Option<String>` typed slot in the data model -- `Resource.service` /
 `environment` / `host` / `schema_url`, `Scope.name` / `version` / `schema_url`,
 `Span.resource_name` / `span_type`, and `ChunkContext.origin` -- carries `None` for the
 absent / unset case and a non-empty string otherwise. `Some("")` is unrepresentable in a
@@ -544,7 +544,7 @@ that responsibility (consistent with the non-validating relay stance above).
 
 ```rust
 pub struct SpanEvent {
-    pub name: KeyString,
+    pub name: String,
     /// Epoch (`1970-01-01T00:00:00Z`) represents "timestamp unknown" per OTLP.
     /// On both OTLP and Datadog egress, epoch round-trips as `time_unix_nano = 0`
     /// (the proto3 default).
@@ -629,7 +629,7 @@ resolves to:
 - **`Option`-wrapped typed slot** (`Span.parent_span_id`, `Resource.service` /
   `environment` / `host` / `schema_url`, `Scope.name` / `version` / `schema_url`,
   `Span.resource_name`, `Span.span_type`, `ChunkContext.priority` / `origin`): `del()`
-  clears the slot to `None`. For each `Option<KeyString>` slot in this list, writing the
+  clears the slot to `None`. For each `Option<String>` slot in this list, writing the
   empty string `""` is equivalent to `del()` -- a consequence of the empty-string
   invariant above; the analogous rule for `Span.parent_span_id` is documented under
   "VRL surface for `TraceId` and `SpanId`".
@@ -1316,7 +1316,7 @@ Vector build round-trips spans with not-yet-defined flag bits without modificati
 
 ### Parsed `TraceState`
 
-Storing `TraceState` as `IndexMap<KeyString, KeyString>` would let transforms operate
+Storing `TraceState` as `IndexMap<KeyString, String>` would let transforms operate
 on entries without an accessor layer. Rejected because every source and sink would have
 to invoke the parser/serializer even for pure-relay pipelines, and because the W3C-
 imposed bounds (32 entries, 512 bytes total) and typical real-world headers (a single
