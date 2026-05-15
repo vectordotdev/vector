@@ -11,7 +11,9 @@ use metrics::Histogram;
 use tracing::Span;
 use vector_buffers::{
     config::MemoryBufferSize,
-    topology::channel::{self, BufferChannelKind, ChannelMetricMetadata, LimitedReceiver, LimitedSender},
+    topology::channel::{
+        self, BufferChannelKind, ChannelMetricMetadata, LimitedReceiver, LimitedSender,
+    },
 };
 use vector_common::{
     byte_size_of::ByteSizeOf,
@@ -29,7 +31,6 @@ use crate::{
     event::{Event, EventArray, EventContainer as _, EventRef, array},
     schema::Definition,
 };
-
 
 /// UnsentEvents tracks the number of events yet to be sent in the buffer. This is used to
 /// increment the appropriate counters when a future is not polled to completion. Particularly,

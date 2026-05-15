@@ -21,7 +21,10 @@ use vector_lib::{
         BufferType, WhenFull,
         topology::{
             builder::TopologyBuilder,
-            channel::{BufferChannelKind, BufferReceiver, BufferSender, ChannelMetricMetadata, LimitedReceiver},
+            channel::{
+                BufferChannelKind, BufferReceiver, BufferSender, ChannelMetricMetadata,
+                LimitedReceiver,
+            },
         },
     },
     internal_event::{self, CountByteSize, EventsSent, InternalEventHandle as _, Registered},
