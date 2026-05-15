@@ -1,6 +1,5 @@
 ---
 what: "GreptimeDB v0.x support in `greptimedb_metrics` and `greptimedb_logs` sinks"
-announcement_version: "TBD"
 deprecation_version: "0.56.0"
 ---
 

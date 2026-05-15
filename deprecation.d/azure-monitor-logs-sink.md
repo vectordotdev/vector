@@ -1,7 +1,6 @@
 ---
 what: "The `azure_monitor_logs` sink"
-announcement_version: "0.58.0"
-deprecation_version: "TBD"
+deprecation_version: "0.58.0"
 ---
 
 The `azure_monitor_logs` sink is deprecated in favor of the new `azure_logs_ingestion` sink,

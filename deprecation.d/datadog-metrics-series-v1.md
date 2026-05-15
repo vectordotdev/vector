@@ -1,7 +1,6 @@
 ---
 what: "The `series_api_version: v1` option on the `datadog_metrics` sink"
-announcement_version: "0.58.0"
-deprecation_version: "TBD"
+deprecation_version: "0.58.0"
 ---
 
 The `series_api_version: v1` option is deprecated in favor of `v2` (the default).
