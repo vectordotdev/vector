@@ -469,8 +469,7 @@ fn get_latest_vrl_tag_and_changelog() -> Result<String> {
         bail!("gh api tags failed: {stderr}");
     }
 
-    let tag = String::from_utf8(tag_output.stdout)
-        .context("gh api output is not valid UTF-8")?;
+    let tag = String::from_utf8(tag_output.stdout).context("gh api output is not valid UTF-8")?;
     let tag = tag.trim().to_string();
 
     // Step 2: fetch CHANGELOG.md for that tag
@@ -489,8 +488,8 @@ fn get_latest_vrl_tag_and_changelog() -> Result<String> {
         bail!("gh api CHANGELOG.md failed: {stderr}");
     }
 
-    let changelog = String::from_utf8(changelog_output.stdout)
-        .context("CHANGELOG.md is not valid UTF-8")?;
+    let changelog =
+        String::from_utf8(changelog_output.stdout).context("CHANGELOG.md is not valid UTF-8")?;
 
     // Extract the first release section (from the first ## to the next ##)
     let mut section = Vec::new();
