@@ -64,7 +64,7 @@ message GetCapabilitiesRequest {}
 message GetCapabilitiesResponse {
   // Whether allocation tracing is active on this instance
   bool allocation_tracing_enabled = 1;
-  // All metrics currently registered on this instance, deduplicated by name, sorted alphabetically
+  // All metrics known to this build of Vector, in enum declaration order
   repeated AvailableMetric available_metrics = 2;
 }
 
