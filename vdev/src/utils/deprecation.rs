@@ -114,6 +114,7 @@ pub struct DeprecationPartition {
 }
 
 /// Partition a list of deprecation entries into three buckets relative to `release`.
+/// Any `next` version values are resolved to the concrete `major.minor` of `release`.
 pub fn partition_by_release(
     entries: Vec<DeprecationEntry>,
     release: &Version,
@@ -122,6 +123,7 @@ pub fn partition_by_release(
     let mut announcing = Vec::new();
     let mut planned = Vec::new();
     for e in entries {
+        let e = resolve_next(e, release);
         if e.deprecation_version.matches_release(release) {
             enacted.push(e);
         } else if e.announcement_version.matches_release(release) {
@@ -134,6 +136,18 @@ pub fn partition_by_release(
         enacted,
         announcing,
         planned,
+    }
+}
+
+fn resolve_next(e: DeprecationEntry, release: &Version) -> DeprecationEntry {
+    let resolve = |v: VersionOrTbd| match v {
+        VersionOrTbd::Next => VersionOrTbd::Version(Version::new(release.major, release.minor, 0)),
+        other => other,
+    };
+    DeprecationEntry {
+        deprecation_version: resolve(e.deprecation_version),
+        announcement_version: resolve(e.announcement_version),
+        ..e
     }
 }
 
