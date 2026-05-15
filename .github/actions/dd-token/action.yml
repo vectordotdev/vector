@@ -40,10 +40,15 @@ runs:
         if [ -n "${DD_STS_API_KEY}" ]; then
           # Poll until the API key is valid; the DD API can be slow to propagate
           # permissions after token issuance.
+          app_key_header=()
+          if [ -n "${DD_STS_APP_KEY}" ]; then
+            app_key_header=(-H "DD-APPLICATION-KEY: ${DD_STS_APP_KEY}")
+          fi
           delay=1
           for i in $(seq 1 6); do
             status=$(curl -s -o /dev/null -w "%{http_code}" \
               -H "DD-API-KEY: ${DD_STS_API_KEY}" \
+              "${app_key_header[@]}" \
               "https://api.datadoghq.com/api/v1/validate")
             if [ "$status" = "200" ]; then
               echo "DD_API_KEY=${DD_STS_API_KEY}" >> "$GITHUB_ENV"
