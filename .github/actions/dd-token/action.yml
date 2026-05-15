@@ -46,10 +46,10 @@ runs:
           fi
           delay=1
           for i in $(seq 1 6); do
-            status=$(curl -s -o /dev/null -w "%{http_code}" \
+            status=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 \
               -H "DD-API-KEY: ${DD_STS_API_KEY}" \
               "${app_key_header[@]}" \
-              "https://api.datadoghq.com/api/v1/validate")
+              "https://api.datadoghq.com/api/v1/validate") || status="000"
             if [ "$status" = "200" ]; then
               echo "DD_API_KEY=${DD_STS_API_KEY}" >> "$GITHUB_ENV"
               break
