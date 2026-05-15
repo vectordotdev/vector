@@ -1,5 +1,6 @@
 ---
 what: "Boolean syntax for the `compression` field in the `vector` sink"
+announcement_version: "0.57.0"
 deprecation_version: "0.57.0"
 ---
 
