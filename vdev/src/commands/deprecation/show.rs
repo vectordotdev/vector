@@ -118,7 +118,7 @@ fn print_section(title: &str, entries: &[&DeprecationEntry]) {
 fn print_entry(e: &DeprecationEntry) {
     println!("{}", e.what.if_supports_color(Stdout, |t| t.bold()));
     println!(
-        "  {}  {}",
+        "  {} {}",
         "announced: ".if_supports_color(Stdout, |t| t.dimmed()),
         format_version(&e.announcement_version),
     );
