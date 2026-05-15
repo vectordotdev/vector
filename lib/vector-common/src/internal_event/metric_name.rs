@@ -1,131 +1,377 @@
 use strum::{AsRefStr, Display, EnumIter};
+use vector_config::configurable_component;
 
-/// Canonical list of all per-component internal metric names emitted by Vector.
+/// Canonical list of all per-component internal counter metric names emitted by Vector.
+#[configurable_component]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Display, AsRefStr, EnumIter)]
+#[serde(rename_all = "snake_case")]
 #[strum(serialize_all = "snake_case")]
 pub enum CounterName {
+    /// The number of events accepted by this component either from tagged
+    /// origins like file and uri, or cumulatively from other origins.
     ComponentReceivedEventsTotal,
+
+    /// The number of event bytes accepted by this component either from
+    /// tagged origins like file and uri, or cumulatively from other origins.
     ComponentReceivedEventBytesTotal,
+
+    /// The number of raw bytes accepted by this component from source origins.
     ComponentReceivedBytesTotal,
+
+    /// The total number of events emitted by this component.
     ComponentSentEventsTotal,
+
+    /// The total number of event bytes emitted by this component.
     ComponentSentEventBytesTotal,
+
+    /// The number of raw bytes sent by this component to destination sinks.
     ComponentSentBytesTotal,
+
+    /// The number of events dropped by this component.
     ComponentDiscardedEventsTotal,
+
+    /// The total number of errors encountered by this component.
     ComponentErrorsTotal,
+
+    /// The total number of events for which this source responded with a timeout error.
     ComponentTimedOutEventsTotal,
+
+    /// The total number of requests for which this source responded with a timeout error.
     ComponentTimedOutRequestsTotal,
+
+    /// The number of events received by this buffer.
     BufferReceivedEventsTotal,
+
+    /// The number of bytes received by this buffer.
     BufferReceivedBytesTotal,
+
+    /// The number of events sent by this buffer.
     BufferSentEventsTotal,
+
+    /// The number of bytes sent by this buffer.
     BufferSentBytesTotal,
+
+    /// The number of events dropped by this non-blocking buffer.
     BufferDiscardedEventsTotal,
+
+    /// The number of bytes dropped by this non-blocking buffer.
     BufferDiscardedBytesTotal,
+
+    /// The total number of buffer errors encountered.
     BufferErrorsTotal,
+
     // Internal events from src/internal_events/
+    /// The number of events recorded by the aggregate transform.
     AggregateEventsRecordedTotal,
+
+    /// The number of failed metric updates, `incremental` adds, encountered by the aggregate transform.
     AggregateFailedUpdates,
+
+    /// The number of flushes done by the aggregate transform.
     AggregateFlushesTotal,
+
+    /// The number of times the Vector API has been started.
     ApiStartedTotal,
+
+    /// The total number of files checkpointed.
     CheckpointsTotal,
+
+    /// The total number of errors identifying files via checksum.
     ChecksumErrorsTotal,
+
+    /// The total number of metrics collections completed for this component.
     CollectCompletedTotal,
+
+    /// The total number of times a command has been executed.
     CommandExecutedTotal,
+
+    /// The total number of times a connection has been established.
     ConnectionEstablishedTotal,
+
+    /// The total number of errors sending data via the connection.
     ConnectionSendErrorsTotal,
+
+    /// The total number of times the connection has been shut down.
     ConnectionShutdownTotal,
+
+    /// The total number of container events processed.
     ContainerProcessedEventsTotal,
+
+    /// The total number of times Vector stopped watching for container logs.
     ContainersUnwatchedTotal,
+
+    /// The total number of times Vector started watching for container logs.
     ContainersWatchedTotal,
+
+    /// The total number of byte order marks (BOM) removed from incoming data.
     DecoderBomRemovalsTotal,
+
+    /// The total number of warnings when replacing malformed characters during decoding.
     DecoderMalformedReplacementWarningsTotal,
+
+    /// The total number of bytes loaded into Doris.
     DorisBytesLoadedTotal,
+
+    /// The total number of rows filtered by Doris during stream load.
     DorisRowsFilteredTotal,
+
+    /// The total number of rows successfully loaded into Doris.
     DorisRowsLoadedTotal,
+
+    /// The total number of warnings when replacing unmappable characters during encoding.
     EncoderUnmappableReplacementWarningsTotal,
+
+    /// The total number of events discarded by this component.
     EventsDiscardedTotal,
+
+    /// The total number of files Vector has found to watch.
     FilesAddedTotal,
+
+    /// The total number of files deleted.
     FilesDeletedTotal,
+
+    /// The total number of times Vector has resumed watching a file.
     FilesResumedTotal,
+
+    /// The total number of times Vector has stopped watching a file.
     FilesUnwatchedTotal,
+
+    /// The total number of gRPC messages received.
     GrpcServerMessagesReceivedTotal,
+
+    /// The total number of gRPC messages sent.
     GrpcServerMessagesSentTotal,
+
+    /// The total number of HTTP client errors encountered.
     HttpClientErrorsTotal,
+
+    /// The total number of sent HTTP requests, tagged with the request method.
     HttpClientRequestsSentTotal,
+
+    /// The total number of HTTP requests, tagged with the response code.
     HttpClientResponsesTotal,
+
+    /// The total number of HTTP requests received.
     HttpServerRequestsReceivedTotal,
+
+    /// The total number of HTTP responses sent.
     HttpServerResponsesSentTotal,
+
+    /// Total number of message bytes (including framing) received from Kafka brokers.
     KafkaConsumedMessagesBytesTotal,
+
+    /// Total number of messages consumed, not including ignored messages (due to offset, etc), from Kafka brokers.
     KafkaConsumedMessagesTotal,
+
+    /// Total number of message bytes (including framing, such as per-Message framing and MessageSet/batch framing) transmitted to Kafka brokers.
     KafkaProducedMessagesBytesTotal,
+
+    /// Total number of messages transmitted (produced) to Kafka brokers.
     KafkaProducedMessagesTotal,
+
+    /// Total number of bytes transmitted to Kafka brokers.
     KafkaRequestsBytesTotal,
+
+    /// Total number of requests sent to Kafka brokers.
     KafkaRequestsTotal,
+
+    /// Total number of bytes received from Kafka brokers.
     KafkaResponsesBytesTotal,
+
+    /// Total number of responses received from Kafka brokers.
     KafkaResponsesTotal,
+
+    /// The total number of failed efforts to refresh AWS EC2 metadata.
     MetadataRefreshFailedTotal,
+
+    /// The total number of AWS EC2 metadata refreshes.
     MetadataRefreshSuccessfulTotal,
+
+    /// The total number of errors encountered while parsing.
     ParseErrorsTotal,
+
+    /// The total number of times the Vector instance has quit.
     QuitTotal,
+
+    /// The total number of times the Vector instance has been reloaded.
     ReloadedTotal,
+
+    /// The total number of events with rewrapped timestamps.
     RewrittenTimestampEventsTotal,
+
+    /// The total number of successful deferrals of SQS messages.
     SqsMessageDeferSucceededTotal,
+
+    /// The total number of successful deletions of SQS messages.
     SqsMessageDeleteSucceededTotal,
+
+    /// The total number of SQS messages successfully processed.
     SqsMessageProcessingSucceededTotal,
+
+    /// The total number of times successfully receiving SQS messages.
     SqsMessageReceiveSucceededTotal,
+
+    /// The total number of received SQS messages.
     SqsMessageReceivedMessagesTotal,
+
+    /// The number of stale events that Vector has flushed.
     StaleEventsFlushedTotal,
+
+    /// The total number of times the Vector instance has been started.
     StartedTotal,
+
+    /// The total number of times the Vector instance has been stopped.
     StoppedTotal,
+
+    /// The total number of events that contained a tag which exceeded the configured cardinality limit.
     TagCardinalityUntrackedEventsTotal,
+
+    /// The total number of events discarded because the tag has been rejected after hitting the configured `value_limit`.
     TagValueLimitExceededTotal,
+
+    /// The total number of times the value limit was reached.
     ValueLimitReachedTotal,
+
+    /// The total number of bytes sent over WebSocket connections.
     WebsocketBytesSentTotal,
+
+    /// The total number of messages sent over WebSocket connections.
     WebsocketMessagesSentTotal,
+
+    /// The total number of times the Windows service has been installed.
     WindowsServiceInstallTotal,
+
+    /// The total number of times the Windows service has been restarted.
     WindowsServiceRestartTotal,
+
+    /// The total number of times the Windows service has been started.
     WindowsServiceStartTotal,
+
+    /// The total number of times the Windows service has been stopped.
     WindowsServiceStopTotal,
+
+    /// The total number of times the Windows service has been uninstalled.
     WindowsServiceUninstallTotal,
+
+    /// The total number of failures to annotate Kubernetes events with namespace metadata.
     K8sEventNamespaceAnnotationFailuresTotal,
+
+    /// The total number of failures to annotate Kubernetes events with node metadata.
     K8sEventNodeAnnotationFailuresTotal,
+
+    /// The total number of edge cases encountered while picking format of the Kubernetes log message.
     K8sFormatPickerEdgeCasesTotal,
+
+    /// The total number of failures to parse a message as a JSON object.
     K8sDockerFormatParseFailuresTotal,
+
+    /// The total number of times an S3 record in an SQS message was ignored.
     SqsS3EventRecordIgnoredTotal,
+
+    /// The total number of bytes allocated by this component.
     ComponentAllocatedBytesTotal,
+
+    /// The total number of bytes deallocated by this component.
     ComponentDeallocatedBytesTotal,
+
+    /// The total number of failed insertions into the in-memory enrichment table.
     MemoryEnrichmentTableFailedInsertions,
+
+    /// The total number of failed reads from the in-memory enrichment table.
     MemoryEnrichmentTableFailedReads,
+
+    /// The total number of flushes of the in-memory enrichment table.
     MemoryEnrichmentTableFlushesTotal,
+
+    /// The total number of successful insertions into the in-memory enrichment table.
     MemoryEnrichmentTableInsertionsTotal,
+
+    /// The total number of successful reads from the in-memory enrichment table.
     MemoryEnrichmentTableReadsTotal,
+
+    /// The total number of entries evicted from the in-memory enrichment table due to TTL expiration.
     MemoryEnrichmentTableTtlExpirations,
 }
 
+/// Canonical list of all per-component internal histogram metric names emitted by Vector.
+#[configurable_component]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Display, AsRefStr, EnumIter)]
+#[serde(rename_all = "snake_case")]
 #[strum(serialize_all = "snake_case")]
 pub enum HistogramName {
+    /// A histogram of the number of events passed in each internal batch in Vector's internal topology.
+    ///
+    /// Note that this is separate than sink-level batching. It is mostly useful for low level
+    /// debugging performance issues in Vector due to small internal batches.
     ComponentReceivedEventsCount,
+
+    /// The size in bytes of each event received by the source.
     ComponentReceivedBytes,
+
+    /// The duration spent sending a payload to this buffer.
     BufferSendDurationSeconds,
+
+    /// The elapsed time, in fractional seconds, that an event spends in a single transform.
+    ///
+    /// This includes both the time spent queued in the transform's input buffer and the time spent
+    /// executing the transform itself.
     ComponentLatencySeconds,
+
+    /// The difference between the timestamp recorded in each event and the time when it was ingested, expressed as fractional seconds.
     SourceLagTimeSeconds,
+
+    /// The time elapsed blocking on the downstream channel to accept a single chunk from a batch of events received at the source.
     SourceSendLatencySeconds,
+
+    /// The time elapsed blocking on the downstream channel to accept an entire batch of events received at the source.
     SourceSendBatchLatencySeconds,
+
+    /// The average round-trip time (RTT) for the current window.
     AdaptiveConcurrencyAveragedRtt,
+
+    /// The amount of back pressure on the current component.
     AdaptiveConcurrencyBackPressure,
+
+    /// The number of outbound requests currently awaiting a response.
     AdaptiveConcurrencyInFlight,
+
+    /// The concurrency limit that the adaptive concurrency feature has decided on for this current window.
     AdaptiveConcurrencyLimit,
+
+    /// The observed round-trip time (RTT) for requests.
     AdaptiveConcurrencyObservedRtt,
+
+    /// The mean round-trip time (RTT) for the current window.
     AdaptiveConcurrencyPastRttMean,
+
+    /// The number of times the concurrency limit was reached.
     AdaptiveConcurrencyReachedLimit,
+
+    /// The time taken to process an S3 object that succeeded, in seconds.
     S3ObjectProcessingSucceededDurationSeconds,
+
+    /// The time taken to process an S3 object that failed, in seconds.
     S3ObjectProcessingFailedDurationSeconds,
+
+    /// The duration spent collecting metrics for this component.
     CollectDurationSeconds,
+
+    /// The command execution duration in seconds.
     CommandExecutionDurationSeconds,
+
+    /// The duration spent handling a gRPC request.
     GrpcServerHandlerDurationSeconds,
+
+    /// The duration spent handling an HTTP request.
     HttpServerHandlerDurationSeconds,
+
+    /// The round-trip time (RTT) of HTTP requests.
     HttpClientRttSeconds,
+
+    /// The round-trip time (RTT) of HTTP requests, tagged with the response code.
     HttpClientResponseRttSeconds,
+
+    /// The round-trip time (RTT) of HTTP requests that resulted in an error.
     HttpClientErrorRttSeconds,
 }
 
@@ -164,33 +410,89 @@ impl HistogramName {
     }
 }
 
+/// Canonical list of all per-component internal gauge metric names emitted by Vector.
+#[configurable_component]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Display, AsRefStr, EnumIter)]
+#[serde(rename_all = "snake_case")]
 #[strum(serialize_all = "snake_case")]
 pub enum GaugeName {
+    /// The mean elapsed time, in fractional seconds, that an event spends in a single transform.
+    ///
+    /// This includes both the time spent queued in the transform's input buffer and the time spent
+    /// executing the transform itself. This value is smoothed over time using an exponentially
+    /// weighted moving average (EWMA).
     ComponentLatencyMeanSeconds,
+
+    /// The maximum number of events in the buffer.
     BufferMaxSizeEvents,
+
+    /// The maximum size in events that the buffer can store.
     BufferMaxEventSize,
+
+    /// The maximum number of bytes in the buffer.
     BufferMaxSizeBytes,
+
+    /// The maximum size in bytes that the buffer can store.
     BufferMaxByteSize,
+
+    /// The number of events currently in the buffer.
     BufferEvents,
+
+    /// The number of events currently in the buffer.
     BufferSizeEvents,
+
+    /// The number of bytes currently in the buffer.
     BufferSizeBytes,
+
+    /// The number of bytes currently in the buffer.
     BufferByteSize,
+
+    /// The current utilization of this component, expressed as a value from 0 to 1.
     Utilization,
+
+    /// The number of bytes currently allocated by this component.
     ComponentAllocatedBytes,
+
+    /// The total number of open files.
     OpenFiles,
+
+    /// The number of seconds the Vector instance has been running.
     UptimeSeconds,
+
+    /// Pseudo-metric that provides build information for the Vector instance.
     BuildInfo,
+
+    /// Current number of messages in producer queues.
     KafkaQueueMessages,
+
+    /// Current total size of messages in producer queues.
     KafkaQueueMessagesBytes,
+
+    /// The Kafka consumer lag.
     KafkaConsumerLag,
+
+    /// The total memory currently being used by the Lua runtime.
     LuaMemoryUsedBytes,
+
+    /// The number of current open connections to Vector.
     OpenConnections,
+
+    /// The number of currently active endpoints.
     ActiveEndpoints,
+
+    /// The number of outstanding Splunk HEC indexer acknowledgement acks.
     SplunkPendingAcks,
+
+    /// Number of clients attached to a component.
     ActiveClients,
+
+    /// The number of objects currently stored in the in-memory enrichment table.
     MemoryEnrichmentTableObjectsCount,
+
+    /// The total size in bytes of all objects stored in the in-memory enrichment table.
     MemoryEnrichmentTableByteSize,
+
+    /// The number of tag keys currently being tracked by the tag cardinality limit transform.
     TagCardinalityTrackedKeys,
 }
 
