@@ -3,7 +3,8 @@
 
 use crate::commands::release::generate_cue;
 use crate::utils::{command::run_command, git, paths};
-use anyhow::{Context, Result, anyhow, bail};
+use anyhow::{Context, Result, anyhow};
+use reqwest::blocking::Client;
 use semver::Version;
 use std::{
     env, fs,
@@ -12,6 +13,7 @@ use std::{
     path::{Path, PathBuf},
     process::Command,
 };
+use toml::Value;
 use toml_edit::DocumentMut;
 
 const ALPINE_PREFIX: &str = "FROM docker.io/alpine:";
@@ -467,57 +469,53 @@ fn insert_block_after_changelog(original: &str, block: &str) -> String {
 }
 
 fn get_latest_vrl_tag_and_changelog() -> Result<String> {
-    // Step 1: get the latest tag
-    let tag_output = Command::new("gh")
-        .args(["api", "repos/vectordotdev/vrl/tags", "--jq", ".[0].name"])
-        .output()
-        .context("Failed to run `gh api` for VRL tags")?;
+    let client = Client::new();
 
-    if !tag_output.status.success() {
-        let stderr = String::from_utf8_lossy(&tag_output.stderr);
-        bail!("gh api tags failed: {stderr}");
-    }
+    // Step 1: Get latest tag from GitHub API
+    let tags_url = "https://api.github.com/repos/vectordotdev/vrl/tags";
+    let tags_response = client
+        .get(tags_url)
+        .header("User-Agent", "rust-reqwest") // GitHub API requires User-Agent
+        .send()?
+        .text()?;
 
-    let tag = String::from_utf8(tag_output.stdout)
-        .context("gh api output is not valid UTF-8")?;
-    let tag = tag.trim().to_string();
+    let tags: Vec<Value> = serde_json::from_str(&tags_response)?;
+    let latest_tag = tags
+        .first()
+        .and_then(|tag| tag.get("name"))
+        .and_then(|name| name.as_str())
+        .ok_or_else(|| anyhow!("Failed to extract latest tag"))?
+        .to_string();
 
-    // Step 2: fetch CHANGELOG.md for that tag
-    let changelog_output = Command::new("gh")
-        .args([
-            "api",
-            &format!("repos/vectordotdev/vrl/contents/CHANGELOG.md?ref={tag}"),
-            "-H",
-            "Accept: application/vnd.github.raw+json",
-        ])
-        .output()
-        .context("Failed to run `gh api` for VRL CHANGELOG.md")?;
+    // Step 2: Download CHANGELOG.md for the specific tag
+    let changelog_url =
+        format!("https://raw.githubusercontent.com/vectordotdev/vrl/{latest_tag}/CHANGELOG.md",);
+    let changelog = client
+        .get(&changelog_url)
+        .header("User-Agent", "rust-reqwest")
+        .send()?
+        .text()?;
 
-    if !changelog_output.status.success() {
-        let stderr = String::from_utf8_lossy(&changelog_output.stderr);
-        bail!("gh api CHANGELOG.md failed: {stderr}");
-    }
-
-    let changelog = String::from_utf8(changelog_output.stdout)
-        .context("CHANGELOG.md is not valid UTF-8")?;
-
-    // Extract the first release section (from the first ## to the next ##)
+    // Step 3: Extract text from first ## to next ##
+    let lines: Vec<&str> = changelog.lines().collect();
     let mut section = Vec::new();
     let mut found_first = false;
-    for line in changelog.lines() {
+
+    for line in lines {
         if line.starts_with("## ") {
             if found_first {
+                section.push(line.to_string());
                 break;
             }
             found_first = true;
-        }
-        if found_first {
-            section.push(line);
+            section.push(line.to_string());
+        } else if found_first {
+            section.push(line.to_string());
         }
     }
 
     if !found_first {
-        bail!("No ## headers found in VRL CHANGELOG.md");
+        return Err(anyhow!("No ## headers found in CHANGELOG.md"));
     }
 
     Ok(section.join("\n"))
