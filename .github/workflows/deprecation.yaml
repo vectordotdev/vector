@@ -1,40 +1,61 @@
-# Deprecation fragments
+# Deprecation Fragments
 #
 # Validates that all files in deprecation.d/ have the correct format.
-# Runs on PRs and on merge queues.
-name: Deprecation
+#
+# Runs on:
+#  - on PR review (see ci-review-trigger.yml)
+#  - on demand from GitHub Actions UI
+#  - on pull requests when deprecation.d/ or vdev/ files change
+
+name: Deprecation Fragments
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
-    paths:
-      - "deprecation.d/**"
+  workflow_call:
+    inputs:
+      ref:
+        description: "Git ref to checkout"
+        required: false
+        type: string
 
-  # Required by GitHub merge queue due to branch protection rules. Should always be successful.
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Git ref to checkout"
+        required: false
+        type: string
+
+  pull_request:
   merge_group:
     types: [checks_requested]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.number || github.sha }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
-  validate-deprecations:
+  changes:
+    if: ${{ github.event_name == 'pull_request' }}
+    uses: ./.github/workflows/changes.yml
+    secrets: inherit
+
+  check-deprecations:
     runs-on: ubuntu-24.04
-
+    timeout-minutes: 10
+    if: ${{ always() && (github.event_name != 'pull_request' || needs.changes.outputs.deprecations == 'true') }}
+    needs: [changes]
     steps:
-      - name: Merge queue
-        if: ${{ github.event_name == 'merge_group' }}
-        run: |
-          echo "merge_group event – passing without running deprecation validation."
-          exit 0
+      - name: Checkout branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.ref }}
 
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: ./.github/actions/setup
+        with:
+          vdev: true
+          mold: false
 
-      - name: Install Rust toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@v1
-
-      - name: Install vdev
-        run: cargo install --path vdev --locked
-
-      - name: Validate deprecation fragments
-        run: cargo vdev check deprecations
+      - name: Check deprecation fragments
+        run: vdev check deprecations
