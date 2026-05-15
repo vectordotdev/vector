@@ -1,12 +1,3 @@
-# Deprecation Fragments
-#
-# Validates that all files in deprecation.d/ have the correct format.
-#
-# Runs on:
-#  - on PR review (see ci-review-trigger.yml)
-#  - on demand from GitHub Actions UI
-#  - on pull requests when deprecation.d/ or vdev/ files change
-
 name: Deprecation Fragments
 
 on:
