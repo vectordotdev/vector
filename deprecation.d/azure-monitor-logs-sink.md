@@ -1,5 +1,5 @@
 ---
-what: "The `azure_monitor_logs` sink"
+what: "`azure_monitor_logs` sink"
 announcement_version: 0.54.0
 deprecation_version: 0.58.0
 ---

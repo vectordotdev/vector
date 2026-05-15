@@ -1,5 +1,5 @@
 ---
-what: "The `encoding` field on HTTP server sources"
+what: "`encoding` field on HTTP server sources"
 announcement_version: 0.50.0
 deprecation_version: TBD
 ---
