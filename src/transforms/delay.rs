@@ -94,7 +94,7 @@ pub struct Delay {
     queue: DelayQueue<Event>,
     queue_capacity: Option<NonZeroUsize>,
     overflow_strategy: OverflowStrategy,
-    delay_until_condition: Condition,
+    delay_until_condition: Option<Condition>,
 }
 
 impl Delay {
@@ -111,8 +111,7 @@ impl Delay {
                 .delay_until_condition
                 .as_ref()
                 .map(|c| c.build(&context.enrichment_tables, &context.metrics_storage))
-                .transpose()?
-                .unwrap_or(Condition::AlwaysPass),
+                .transpose()?,
         })
     }
 }
@@ -135,33 +134,60 @@ impl TaskTransform<Event> for Delay {
                                 done = true;
                             }
                             Some(event) => {
-                                if let Some(capacity) = self.queue_capacity && capacity.get() <= self.queue.len() {
-                                    match self.overflow_strategy {
-                                        OverflowStrategy::Block => {
-                                            while capacity.get() <= self.queue.len() && let Some(next) = self.queue.next().await {
-                                                yield next.into_inner();
+                                let (result, event) = if let Some(condition) = self.delay_until_condition.as_ref() {
+                                    condition.check(event)
+                                } else {
+                                    // We need to have 1 delay when no condition is set, put it in
+                                    // the queue
+                                    (false, event)
+                                };
+                                if result {
+                                    yield event
+                                } else {
+                                    if let Some(capacity) = self.queue_capacity && capacity.get() <= self.queue.len() {
+                                        match self.overflow_strategy {
+                                            OverflowStrategy::Block => {
+                                                while capacity.get() <= self.queue.len() && let Some(next) = self.queue.next().await {
+                                                    let event = next.into_inner();
+                                                    let (result, event) = if let Some(condition) = self.delay_until_condition.as_ref() {
+                                                        condition.check(event)
+                                                    } else {
+                                                        // One delay is done, pass the event further
+                                                        (true, event)
+                                                    };
+                                                    if result {
+                                                        yield event;
+                                                    } else {
+                                                        self.queue.insert(event, self.delay);
+                                                    }
+                                                }
+                                            },
+                                            OverflowStrategy::DropNewest => {
+                                                emit!(ComponentEventsDropped::<INTENTIONAL> {
+                                                    count: 1,
+                                                    reason: "Queue is full and overflow strategy is drop_newest",
+                                                });
+                                                continue;
                                             }
-                                        },
-                                        OverflowStrategy::DropNewest => {
-                                            emit!(ComponentEventsDropped::<INTENTIONAL> {
-                                                count: 1,
-                                                reason: "Queue is full and overflow strategy is drop_newest",
-                                            });
-                                            continue;
-                                        }
-                                        OverflowStrategy::Pass => {
-                                            yield event;
-                                            continue;
+                                            OverflowStrategy::Pass => {
+                                                yield event;
+                                                continue;
+                                            }
                                         }
                                     }
+                                    self.queue.insert(event, self.delay);
                                 }
-                                self.queue.insert(event, self.delay);
                             }
                         }
                     },
                     Some(res) = self.queue.next() => {
                         let event = res.into_inner();
-                        let (result, event) = self.delay_until_condition.check(event);
+                        let (result, event) = if let Some(condition) = self.delay_until_condition.as_ref() {
+                            condition.check(event)
+                        } else {
+                            // One delay is done, pass the event further
+                            (true, event)
+                        };
                         if result {
                             yield event;
                         } else {
