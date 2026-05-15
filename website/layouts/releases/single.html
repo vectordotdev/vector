@@ -80,6 +80,32 @@
       </div>
       {{ end }}
 
+      {{ if gt (len $release.deprecation_announcements) 0 }}
+      <div class="mt-8">
+        <div class="prose dark:prose-dark max-w-none">
+          {{ partial "heading.html" (dict "text" "Deprecation Announcements" "level" 2) }}
+        </div>
+
+        <div class="mt-6 flex flex-col space-y-6">
+          {{ range $release.deprecation_announcements }}
+          <div>
+            <span class="text-xl font-semibold text-dark dark:text-gray-300">
+              {{ .what | markdownify }}
+            </span>
+            <div class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              Announced in {{ .announcement_version }} &middot; Planned removal in {{ .deprecation_version }}
+            </div>
+            {{ with .description }}
+            <div class="mt-2.5 prose dark:prose-dark max-w-none">
+              {{ . | markdownify }}
+            </div>
+            {{ end }}
+          </div>
+          {{ end }}
+        </div>
+      </div>
+      {{ end }}
+
       <div class="mt-8">
         <div class="admonition dark:prose-dark prose rounded-xl border-3 px-3 py-3.5 lg:px-5 lg:py-4 border-yellow-400">
           <div class="flex items-center">

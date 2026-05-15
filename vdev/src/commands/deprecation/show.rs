@@ -56,24 +56,16 @@ impl Cli {
             .ok()
             .map(|v| Version::new(v.major, v.minor + 1, 0));
 
-        let is_next_release = |v: &VersionOrTbd| match next_minor.as_ref() {
-            Some(nv) => v.matches_release(nv),
-            None => matches!(v, VersionOrTbd::Next),
-        };
-
-        let mut enacted: Vec<&DeprecationEntry> = Vec::new();
-        let mut announcing: Vec<&DeprecationEntry> = Vec::new();
-        let mut preexisting: Vec<&DeprecationEntry> = Vec::new();
-
-        for e in &entries {
-            if is_next_release(&e.deprecation_version) {
-                enacted.push(e);
-            } else if is_next_release(&e.announcement_version) {
-                announcing.push(e);
-            } else {
-                preexisting.push(e);
-            }
-        }
+        // Use the computed next minor as the "release" for partitioning.
+        // If the next minor can't be determined, fall back to a sentinel version
+        // that only `next` keywords will match (major=0, minor=0 never matches real versions).
+        let partition_version = next_minor
+            .clone()
+            .unwrap_or_else(|| Version::new(0, 0, 0));
+        let p = deprecation::partition_by_release(entries, &partition_version);
+        let enacted: Vec<&DeprecationEntry> = p.enacted.iter().collect();
+        let announcing: Vec<&DeprecationEntry> = p.announcing.iter().collect();
+        let preexisting: Vec<&DeprecationEntry> = p.planned.iter().collect();
 
         let next_label = match &next_minor {
             Some(v) => format!("{}.{}", v.major, v.minor),

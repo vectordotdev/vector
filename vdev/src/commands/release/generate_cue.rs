@@ -102,24 +102,25 @@ pub(super) fn run(new_version: &Version) -> Result<PathBuf> {
     let deprecation_dir = repo_root.join(deprecation::DEPRECATION_DIR);
     let all_deprecations = deprecation::read_deprecation_fragments(&deprecation_dir)?;
 
-    // Partition deprecation entries: enacted (major.minor matches this release) vs planned.
-    // Patch is ignored: a deprecation labelled "0.56" is enacted on any 0.56.x release.
-    let (enacted_deprecations, planned_deprecations): (Vec<_>, Vec<_>) = all_deprecations
-        .into_iter()
-        .partition(|e| e.deprecation_version.matches_release(&new_version));
+    let deprecation::DeprecationPartition {
+        enacted: enacted_deprecations,
+        announcing: announcing_deprecations,
+        planned: planned_deprecations,
+    } = deprecation::partition_by_release(all_deprecations, &new_version);
 
     let cue_text = render_release_cue(
         &new_version,
         &changelog_entries,
         &commits,
         &enacted_deprecations,
+        &announcing_deprecations,
         &planned_deprecations,
     );
     fs::write(&cue_path, cue_text)
         .with_context(|| format!("Failed to write {}", cue_path.display()))?;
 
-    // In surviving (planned) fragments, replace any `next` version values with the
-    // concrete release version so the files stay accurate going forward.
+    // In surviving fragments, replace any `next` version values with the concrete release version.
+    rewrite_next_in_planned(&deprecation_dir, &announcing_deprecations, &new_version)?;
     rewrite_next_in_planned(&deprecation_dir, &planned_deprecations, &new_version)?;
 
     // Retire enacted deprecation fragments via `git rm`.
@@ -598,6 +599,7 @@ fn render_release_cue(
     changelog: &[ChangelogEntry],
     commits: &[Commit],
     enacted_deprecations: &[DeprecationEntry],
+    announcing_deprecations: &[DeprecationEntry],
     planned_deprecations: &[DeprecationEntry],
 ) -> String {
     let date = Utc::now().format("%Y-%m-%d").to_string();
@@ -609,6 +611,7 @@ fn render_release_cue(
         .join(",\n    ");
 
     let deprecations_block = render_deprecation_section(enacted_deprecations);
+    let deprecation_announcements_block = render_deprecation_section(announcing_deprecations);
     let planned_deprecations_block = render_deprecation_section(planned_deprecations);
 
     format!(
@@ -622,6 +625,10 @@ fn render_release_cue(
          \n\
          \tdeprecations: [\n\
          {deprecations_block}\n\
+         \t]\n\
+         \n\
+         \tdeprecation_announcements: [\n\
+         {deprecation_announcements_block}\n\
          \t]\n\
          \n\
          \tplanned_deprecations: [\n\
@@ -864,7 +871,7 @@ mod tests {
             deletions_count: 3,
         }];
 
-        let out = render_release_cue(&Version::new(0, 99, 0), &entries, &commits, &[], &[]);
+        let out = render_release_cue(&Version::new(0, 99, 0), &entries, &commits, &[], &[], &[]);
 
         assert!(out.starts_with("package metadata\n"));
         assert!(out.contains("releases: \"0.99.0\":"));

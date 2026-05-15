@@ -106,6 +106,33 @@ pub struct DeprecationEntry {
     pub description: String,
 }
 
+/// The result of partitioning deprecation entries relative to a specific release.
+pub struct DeprecationPartition {
+    /// Entries whose `deprecation_version` matches the release (being removed now).
+    pub enacted: Vec<DeprecationEntry>,
+    /// Entries whose `announcement_version` matches the release but are not enacted.
+    pub announcing: Vec<DeprecationEntry>,
+    /// Everything else — previously announced, future removal.
+    pub planned: Vec<DeprecationEntry>,
+}
+
+/// Partition a list of deprecation entries into three buckets relative to `release`.
+pub fn partition_by_release(entries: Vec<DeprecationEntry>, release: &Version) -> DeprecationPartition {
+    let mut enacted = Vec::new();
+    let mut announcing = Vec::new();
+    let mut planned = Vec::new();
+    for e in entries {
+        if e.deprecation_version.matches_release(release) {
+            enacted.push(e);
+        } else if e.announcement_version.matches_release(release) {
+            announcing.push(e);
+        } else {
+            planned.push(e);
+        }
+    }
+    DeprecationPartition { enacted, announcing, planned }
+}
+
 /// Read and parse all deprecation fragments from the given directory.
 /// Returns entries sorted by filename.
 pub fn read_deprecation_fragments(dir: &Path) -> Result<Vec<DeprecationEntry>> {
