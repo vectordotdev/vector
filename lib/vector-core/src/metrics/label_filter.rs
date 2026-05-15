@@ -24,7 +24,7 @@ inventory::submit!(MetricLabel("buffer_type"));
 /// Snapshot of every registered [`MetricLabel`], built on first access. `inventory` populates
 /// all submissions before `main`, so the snapshot is guaranteed to capture every entry — the
 /// hot path is then a single set lookup against this static.
-static LABELS: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
+pub static LABELS: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
     inventory::iter::<MetricLabel>()
         .map(|label| label.0)
         .collect()
