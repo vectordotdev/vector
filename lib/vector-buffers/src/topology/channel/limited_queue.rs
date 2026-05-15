@@ -502,7 +502,9 @@ mod tests {
     use tokio_test::{assert_pending, assert_ready, task::spawn};
     use vector_common::byte_size_of::ByteSizeOf;
 
-    use super::{BufferChannelKind, ChannelMetricMetadata, LimitedReceiver, LimitedSender, limited};
+    use super::{
+        BufferChannelKind, ChannelMetricMetadata, LimitedReceiver, LimitedSender, limited,
+    };
     use crate::{
         MemoryBufferSize,
         test::MultiEventRecord,
