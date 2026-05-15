@@ -28,6 +28,7 @@ impl Cli {
         }
 
         let mut entries = deprecation::read_deprecation_fragments(&dir)?;
+        entries.sort_by(|a, b| a.deprecation_version.cmp(&b.deprecation_version));
 
         if entries.is_empty() {
             println!("No deprecation notices found.");

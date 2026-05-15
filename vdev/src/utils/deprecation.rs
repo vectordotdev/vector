@@ -11,11 +11,31 @@ pub const DEPRECATION_DIR: &str = "deprecation.d";
 
 /// A version field value: a concrete semver version, `TBD` (unknown), or `next`
 /// (the very next release, whatever its number turns out to be).
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum VersionOrTbd {
     Version(Version),
     Tbd,
     Next,
+}
+
+impl PartialOrd for VersionOrTbd {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for VersionOrTbd {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        match (self, other) {
+            (Self::Version(a), Self::Version(b)) => a.cmp(b),
+            (Self::Version(_), _) => std::cmp::Ordering::Less,
+            (Self::Next, Self::Version(_)) => std::cmp::Ordering::Greater,
+            (Self::Next, Self::Next) => std::cmp::Ordering::Equal,
+            (Self::Next, Self::Tbd) => std::cmp::Ordering::Less,
+            (Self::Tbd, Self::Tbd) => std::cmp::Ordering::Equal,
+            (Self::Tbd, _) => std::cmp::Ordering::Greater,
+        }
+    }
 }
 
 impl fmt::Display for VersionOrTbd {
