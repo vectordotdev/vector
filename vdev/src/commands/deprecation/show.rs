@@ -46,7 +46,7 @@ impl Cli {
             }
             print_section_header(&format!("Deprecations enacted in {version}"));
             for e in &entries {
-                print_entry(e);
+                print_entry(e, None);
             }
             return Ok(());
         }
@@ -80,15 +80,10 @@ impl Cli {
             None => "next".to_string(),
         };
 
-        print_section(
-            &format!("Enacted in next release ({next_label})"),
-            &enacted,
-        );
-        print_section(
-            &format!("Announced in next release ({next_label})"),
-            &announcing,
-        );
-        print_section("Pre-existing deprecations", &preexisting);
+        let nm = next_minor.as_ref();
+        print_section(&format!("Enacted in next release ({next_label})"), &enacted, nm);
+        print_section(&format!("Announced in next release ({next_label})"), &announcing, nm);
+        print_section("Pre-existing deprecations", &preexisting, nm);
 
         Ok(())
     }
@@ -100,57 +95,56 @@ fn print_section_header(title: &str) {
     println!();
 }
 
-fn print_section(title: &str, entries: &[&DeprecationEntry]) {
+fn print_section(title: &str, entries: &[&DeprecationEntry], next_minor: Option<&Version>) {
     print_section_header(title);
     if entries.is_empty() {
-        println!(
-            "{}",
-            "(none)".if_supports_color(Stdout, |t| t.dimmed())
-        );
+        println!("{}", "(none)".if_supports_color(Stdout, |t| t.dimmed()));
     } else {
         for e in entries {
-            print_entry(e);
+            print_entry(e, next_minor);
         }
     }
     println!();
 }
 
-fn print_entry(e: &DeprecationEntry) {
+fn print_entry(e: &DeprecationEntry, next_minor: Option<&Version>) {
     println!("{}", e.what.if_supports_color(Stdout, |t| t.bold()));
     println!(
         "  {} {}",
         "announced: ".if_supports_color(Stdout, |t| t.dimmed()),
-        format_version(&e.announcement_version),
+        format_version(&e.announcement_version, next_minor),
     );
     println!(
         "  {} {}",
         "deprecated:".if_supports_color(Stdout, |t| t.dimmed()),
-        format_version(&e.deprecation_version),
+        format_version(&e.deprecation_version, next_minor),
     );
     if !e.description.is_empty() {
         println!();
         for line in e.description.lines() {
-            println!(
-                "  {}",
-                line.if_supports_color(Stdout, |t| t.italic())
-            );
+            println!("  {}", line.if_supports_color(Stdout, |t| t.italic()));
         }
     }
     println!();
 }
 
-fn format_version(v: &VersionOrTbd) -> String {
+fn format_version(v: &VersionOrTbd, next_minor: Option<&Version>) -> String {
+    let is_next = matches!(v, VersionOrTbd::Next)
+        || matches!((v, next_minor), (VersionOrTbd::Version(_), Some(nv)) if v.matches_release(nv));
+
+    if is_next {
+        let style = Style::new().bright_red().bold();
+        return v
+            .to_string()
+            .if_supports_color(Stdout, |t| t.style(style))
+            .to_string();
+    }
+
     match v {
-        VersionOrTbd::Next => {
-            let style = Style::new().bright_red().bold();
-            "next"
-                .if_supports_color(Stdout, |t| t.style(style))
-                .to_string()
-        }
         VersionOrTbd::Tbd => "TBD"
             .if_supports_color(Stdout, |t| t.bright_yellow())
             .to_string(),
-        VersionOrTbd::Version(ver) => ver
+        _ => v
             .to_string()
             .if_supports_color(Stdout, |t| t.bright_cyan())
             .to_string(),
