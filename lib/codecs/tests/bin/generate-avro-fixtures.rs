@@ -465,7 +465,9 @@ fn generate_avro_test_case_uuid() -> Result<()> {
 
 fn generate_test_case<S: Serialize>(schema: &str, value: S, filename: &str) -> Result<()> {
     let value = apache_avro::to_value(value)?;
-    generate_test_case_from_value(schema, value, filename)
+    generate_test_case_from_value(schema, value.clone(), filename)?;
+    generate_test_case_ocf_from_value(schema, value, filename)?;
+    Ok(())
 }
 
 fn generate_test_case_from_value(schema: &str, value: Value, filename: &str) -> Result<()> {
@@ -478,6 +480,25 @@ fn generate_test_case_from_value(schema: &str, value: Value, filename: &str) -> 
     let mut avro_file = File::create(format!("{FIXTURES_PATH}/{filename}.avro"))?;
     schema_file.write_all(schema.canonical_form().as_bytes())?;
     avro_file.write_all(&bytes)?;
+    Ok(())
+}
+
+fn generate_test_case_ocf_from_value(schema: &str, value: Value, filename: &str) -> Result<()> {
+    let schema = Schema::parse_str(schema)?;
+    let value = value.resolve(&schema)?;
+
+    // Use apache_avro::Writer to produce a correct OCF file:
+    // - The library generates a random sync marker per file
+    // - The schema is embedded in the header using the full JSON (not PCF/canonical form),
+    //   preserving doc strings, aliases, defaults, etc.
+    // - Records are batched into blocks with correct count/size encoding
+    let mut writer = apache_avro::Writer::new(&schema, Vec::new());
+    writer.append(value)?;
+    let buf = writer.into_inner()?;
+
+    // Create OCF file with .ocf.avro extension (schema is shared via .avsc)
+    let mut ocf_file = File::create(format!("{FIXTURES_PATH}/{filename}.ocf.avro"))?;
+    ocf_file.write_all(&buf)?;
     Ok(())
 }
 

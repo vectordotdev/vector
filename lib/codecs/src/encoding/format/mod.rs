@@ -36,7 +36,10 @@ pub use arrow::{
     ArrowEncodingError, ArrowStreamSerializer, ArrowStreamSerializerConfig, SchemaProvider,
     find_null_non_nullable_fields,
 };
-pub use avro::{AvroSerializer, AvroSerializerConfig, AvroSerializerOptions};
+pub use avro::{
+    AvroOcfSerializer, AvroOcfSerializerConfig, AvroSerializer, AvroSerializerConfig,
+    AvroSerializerOptions,
+};
 pub use cef::{CefSerializer, CefSerializerConfig};
 use dyn_clone::DynClone;
 pub use gelf::{GelfSerializer, GelfSerializerConfig};

@@ -17,12 +17,12 @@ pub use format::{
     find_null_non_nullable_fields,
 };
 pub use format::{
-    AvroSerializer, AvroSerializerConfig, AvroSerializerOptions, CefSerializer,
-    CefSerializerConfig, CsvSerializer, CsvSerializerConfig, GelfSerializer, GelfSerializerConfig,
-    JsonSerializer, JsonSerializerConfig, JsonSerializerOptions, LogfmtSerializer,
-    LogfmtSerializerConfig, NativeJsonSerializer, NativeJsonSerializerConfig, NativeSerializer,
-    NativeSerializerConfig, ProtoBatchEncodingError, ProtoBatchSerializer,
-    ProtoBatchSerializerConfig, ProtobufSerializer, ProtobufSerializerConfig,
+    AvroOcfSerializer, AvroOcfSerializerConfig, AvroSerializer, AvroSerializerConfig,
+    AvroSerializerOptions, CefSerializer, CefSerializerConfig, CsvSerializer, CsvSerializerConfig,
+    GelfSerializer, GelfSerializerConfig, JsonSerializer, JsonSerializerConfig,
+    JsonSerializerOptions, LogfmtSerializer, LogfmtSerializerConfig, NativeJsonSerializer,
+    NativeJsonSerializerConfig, NativeSerializer, NativeSerializerConfig, ProtoBatchEncodingError,
+    ProtoBatchSerializer, ProtoBatchSerializerConfig, ProtobufSerializer, ProtobufSerializerConfig,
     ProtobufSerializerOptions, RawMessageSerializer, RawMessageSerializerConfig, TextSerializer,
     TextSerializerConfig,
 };

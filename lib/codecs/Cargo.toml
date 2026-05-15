@@ -75,6 +75,7 @@ rstest = "0.26.1"
 tracing-test = "0.2.6"
 uuid.workspace = true
 vrl.workspace = true
+tempfile.workspace = true
 
 [features]
 arrow = ["dep:arrow", "arrow/chrono-tz"]

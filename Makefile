@@ -547,6 +547,15 @@ generate-vector-vrl-docs: ## Generate VRL function documentation from Rust sourc
 generate-vrl-docs: ## Generate combined VRL function documentation for the website.
 	$(MAKE) -C website generate-vrl-docs
 
+.PHONY: generate-avro-fixtures
+generate-avro-fixtures: ## Regenerate Avro test fixture files (datum .avro and OCF .ocf.avro).
+	cargo run --package codecs --bin generate-avro-fixtures
+
+.PHONY: check-avro-fixtures
+check-avro-fixtures: generate-avro-fixtures ## Check that committed Avro fixtures match the generator output.
+	@git diff --exit-code lib/codecs/tests/data/avro/generated/ || \
+		(echo "Avro fixtures are out of sync. Run 'make generate-avro-fixtures' and commit the results." && exit 1)
+
 .PHONY: generate-docs
 generate-docs: generate-component-docs generate-vector-vrl-docs generate-vrl-docs
 
