@@ -5,7 +5,7 @@ use owo_colors::{OwoColorize, Stream::Stdout, Style};
 use semver::Version;
 
 use crate::utils::{
-    deprecation::{self, DeprecationEntry, VersionOrTbd},
+    deprecation::{self, DeprecationEntry, DeprecationVersion},
     git, paths,
 };
 
@@ -126,9 +126,9 @@ fn print_entry(e: &DeprecationEntry, next_minor: Option<&Version>) {
     println!();
 }
 
-fn format_version(v: &VersionOrTbd, next_minor: Option<&Version>) -> String {
-    let is_next = matches!(v, VersionOrTbd::Next)
-        || matches!((v, next_minor), (VersionOrTbd::Version(_), Some(nv)) if v.matches_release(nv));
+fn format_version(v: &DeprecationVersion, next_minor: Option<&Version>) -> String {
+    let is_next = matches!(v, DeprecationVersion::Next)
+        || matches!((v, next_minor), (DeprecationVersion::Version(_), Some(nv)) if v.matches_release(nv));
 
     if is_next {
         let style = Style::new().bright_red().bold();
@@ -139,7 +139,7 @@ fn format_version(v: &VersionOrTbd, next_minor: Option<&Version>) -> String {
     }
 
     match v {
-        VersionOrTbd::Tbd => "TBD"
+        DeprecationVersion::Tbd => "TBD"
             .if_supports_color(Stdout, |t| t.bright_yellow())
             .to_string(),
         _ => v
