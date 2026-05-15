@@ -13,11 +13,11 @@ release notes:
 
 Each file must be named `<unique_slug>.md` and begin with YAML frontmatter:
 
-```markdown
+````markdown
 ---
 announcement_version: next
 deprecation_version: 0.57.0
-what: "The `legacy_auth` configuration option"
+what: "`legacy_auth` configuration option"
 ---
 
 The `legacy_auth` option has been replaced by the new `auth` block.
@@ -34,7 +34,7 @@ with:
 auth:
   token: "my_token"
 ```
-```
+````
 
 ### Frontmatter fields
 
