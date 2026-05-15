@@ -1,7 +1,7 @@
 #![allow(missing_docs)]
 use std::{
-    sync::{Arc, LazyLock, RwLock},
-    time::Duration,
+    sync::{Arc, LazyLock, Mutex, RwLock},
+    time::{Duration, Instant},
 };
 
 use base64::prelude::{BASE64_URL_SAFE, Engine as _};
@@ -39,6 +39,17 @@ pub const SCOPE_COMPUTE: &str = "https://www.googleapis.com/auth/compute";
 const TOKEN_REFRESH_INTERVAL: Duration = Duration::from_secs(30 * 60);
 const TOKEN_ERROR_RETRY: Duration = Duration::from_secs(2);
 
+// Bound on each token-fetch network call. The SDK's `access_token()` has no
+// internal timeout — without this a stuck metadata server / STS endpoint would
+// hang the regenerator forever and leave the cached token to silently expire.
+const FETCH_TOKEN_TIMEOUT: Duration = Duration::from_secs(30);
+
+// Lower bound on how often `force_refresh` will actually do work. Sinks call
+// it from retry hot paths on 401, which can fire many times per second under
+// a real outage; rebuilding credentials that often would DoS the STS endpoint
+// (and our own log volume) without buying anything.
+const MIN_FORCE_REFRESH_INTERVAL: Duration = Duration::from_secs(30);
+
 pub const PUBSUB_URL: &str = "https://pubsub.googleapis.com";
 
 pub static PUBSUB_ADDRESS: LazyLock<String> = LazyLock::new(|| {
@@ -65,6 +76,8 @@ pub enum GcpError {
     UnsupportedCredentialsType { ty: String },
     #[snafu(display("Failed to get GCP OAuth token: {}", source))]
     GetToken { source: CredentialsError },
+    #[snafu(display("Timed out after {:?} fetching GCP OAuth token", timeout))]
+    FetchTokenTimeout { timeout: Duration },
 }
 
 /// Configuration of the authentication strategy for interacting with GCP services.
@@ -131,65 +144,63 @@ pub enum GcpAuthenticator {
     None,
 }
 
+/// Where to fetch credentials from when (re)building. Kept so that each refresh
+/// rebuilds a fresh `AccessTokenCredentials`, which discards any cached token
+/// inside the SDK and re-reads the source file (so configmap/IAM-controller
+/// rotations are picked up without a pod restart).
+#[derive(Clone, Debug)]
+enum CredSource {
+    File { path: String, scope: String },
+    Implicit { scope: String },
+}
+
 pub struct InnerCreds {
-    creds: AccessTokenCredentials,
+    source: CredSource,
     token: RwLock<String>,
-    cred_type: String,
-    project_id: Option<String>,
+    cred_type: RwLock<String>,
+    project_id: RwLock<Option<String>>,
+    last_force_refresh: Mutex<Option<Instant>>,
 }
 
 impl std::fmt::Debug for InnerCreds {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("InnerCreds")
-            .field("cred_type", &self.cred_type)
-            .field("project_id", &self.project_id)
+            .field("source", &self.source)
+            .field("cred_type", &*self.cred_type.read().unwrap())
+            .field("project_id", &*self.project_id.read().unwrap())
             .finish_non_exhaustive()
     }
 }
 
 impl GcpAuthenticator {
     async fn from_file(path: &str, scope: &str) -> crate::Result<Self> {
-        let bytes = tokio::fs::read(path)
-            .await
-            .context(ReadCredentialsFileSnafu {
+        let (creds, cred_type, project_id) = build_from_file(path, scope).await?;
+        let initial = fetch_token(&creds, &cred_type, project_id.as_deref()).await?;
+        // `creds` is dropped here; subsequent fetches rebuild via `CredSource::File`.
+        Ok(Self::Credentials(Arc::new(InnerCreds {
+            source: CredSource::File {
                 path: path.to_string(),
-            })?;
-        let json: serde_json::Value =
-            serde_json::from_slice(&bytes).context(ParseCredentialsJsonSnafu)?;
-        let cred_type = json
-            .get("type")
-            .and_then(|v| v.as_str())
-            .unwrap_or("unknown")
-            .to_string();
-        let project_id = json
-            .get("project_id")
-            .and_then(|v| v.as_str())
-            .map(str::to_string);
-        let creds = build_credentials_from_json(&json, scope)?;
-        Self::from_credentials(creds, cred_type, project_id).await
+                scope: scope.to_string(),
+            },
+            token: RwLock::new(initial),
+            cred_type: RwLock::new(cred_type),
+            project_id: RwLock::new(project_id),
+            last_force_refresh: Mutex::new(None),
+        })))
     }
 
     async fn new_implicit(scope: &str) -> crate::Result<Self> {
-        let creds = AdcBuilder::default()
-            .with_scopes([scope])
-            .build_access_token_credentials()
-            .context(InvalidCredentialsSnafu)?;
-        Self::from_credentials(creds, "application_default".into(), None).await
-    }
-
-    async fn from_credentials(
-        creds: AccessTokenCredentials,
-        cred_type: String,
-        project_id: Option<String>,
-    ) -> crate::Result<Self> {
-        let initial = fetch_token(&creds, &cred_type, project_id.as_deref()).await?;
-        let inner = InnerCreds {
-            creds,
+        let creds = build_implicit(scope)?;
+        let initial = fetch_token(&creds, "application_default", None).await?;
+        Ok(Self::Credentials(Arc::new(InnerCreds {
+            source: CredSource::Implicit {
+                scope: scope.to_string(),
+            },
             token: RwLock::new(initial),
-            cred_type,
-            project_id,
-        };
-        Ok(Self::Credentials(Arc::new(inner)))
+            cred_type: RwLock::new("application_default".into()),
+            project_id: RwLock::new(None),
+            last_force_refresh: Mutex::new(None),
+        })))
     }
 
     fn from_api_key(api_key: &str) -> crate::Result<Self> {
@@ -242,6 +253,16 @@ impl GcpAuthenticator {
         receiver
     }
 
+    /// Out-of-band credential rebuild. Called by sink retry logic when GCS
+    /// returns 401 to convert a permanent stale-token state into a one-shot
+    /// self-heal. Internally throttled to `MIN_FORCE_REFRESH_INTERVAL`, so
+    /// callers can fire it on every 401 without coordination.
+    pub async fn force_refresh(&self) {
+        if let Self::Credentials(inner) = self {
+            inner.force_refresh().await;
+        }
+    }
+
     async fn token_regenerator(self, sender: watch::Sender<()>) {
         match self {
             Self::Credentials(inner) => {
@@ -279,10 +300,47 @@ impl GcpAuthenticator {
 }
 
 impl InnerCreds {
+    /// Build a fresh `AccessTokenCredentials` and fetch a token through it.
+    /// Both steps happen every refresh: rebuilding discards any token cached
+    /// inside the SDK, and re-reads the credentials file from disk (so
+    /// IAM-controller / kubelet rotations are picked up without restarting
+    /// the pod).
     async fn regenerate_token(&self) -> crate::Result<()> {
-        let token = fetch_token(&self.creds, &self.cred_type, self.project_id.as_deref()).await?;
+        let (creds, cred_type, project_id) = match &self.source {
+            CredSource::File { path, scope } => build_from_file(path, scope).await?,
+            CredSource::Implicit { scope } => (
+                build_implicit(scope)?,
+                "application_default".to_string(),
+                None,
+            ),
+        };
+        let token = fetch_token(&creds, &cred_type, project_id.as_deref()).await?;
+        // Briefly hold each write lock; never across an await.
         *self.token.write().unwrap() = token;
+        *self.cred_type.write().unwrap() = cred_type;
+        *self.project_id.write().unwrap() = project_id;
         Ok(())
+    }
+
+    async fn force_refresh(&self) {
+        {
+            let mut last = self.last_force_refresh.lock().unwrap();
+            let now = Instant::now();
+            if let Some(prev) = *last
+                && now.duration_since(prev) < MIN_FORCE_REFRESH_INTERVAL
+            {
+                debug!("Skipping forced GCP credentials refresh — within throttle window.");
+                return;
+            }
+            *last = Some(now);
+        }
+        match self.regenerate_token().await {
+            Ok(()) => debug!("Forced GCP credentials refresh succeeded."),
+            Err(error) => error!(
+                message = "Forced GCP credentials refresh failed.",
+                %error,
+            ),
+        }
     }
 
     fn make_token(&self) -> String {
@@ -301,8 +359,45 @@ async fn fetch_token(
         project_id = ?project_id,
         "Fetching GCP authentication token.",
     );
-    let token = creds.access_token().await.context(GetTokenSnafu)?;
+    let token = tokio::time::timeout(FETCH_TOKEN_TIMEOUT, creds.access_token())
+        .await
+        .map_err(|_| GcpError::FetchTokenTimeout {
+            timeout: FETCH_TOKEN_TIMEOUT,
+        })?
+        .context(GetTokenSnafu)?;
     Ok(token.token)
+}
+
+async fn build_from_file(
+    path: &str,
+    scope: &str,
+) -> crate::Result<(AccessTokenCredentials, String, Option<String>)> {
+    let bytes = tokio::fs::read(path)
+        .await
+        .context(ReadCredentialsFileSnafu {
+            path: path.to_string(),
+        })?;
+    let json: serde_json::Value =
+        serde_json::from_slice(&bytes).context(ParseCredentialsJsonSnafu)?;
+    let cred_type = json
+        .get("type")
+        .and_then(|v| v.as_str())
+        .unwrap_or("unknown")
+        .to_string();
+    let project_id = json
+        .get("project_id")
+        .and_then(|v| v.as_str())
+        .map(str::to_string);
+    let creds = build_credentials_from_json(&json, scope)?;
+    Ok((creds, cred_type, project_id))
+}
+
+fn build_implicit(scope: &str) -> crate::Result<AccessTokenCredentials> {
+    AdcBuilder::default()
+        .with_scopes([scope])
+        .build_access_token_credentials()
+        .context(InvalidCredentialsSnafu)
+        .map_err(Into::into)
 }
 
 fn build_credentials_from_json(

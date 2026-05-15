@@ -140,12 +140,26 @@ pub fn healthcheck_response(
 
 pub struct GcsRetryLogic<Request> {
     request: PhantomData<Request>,
+    /// Optional auth handle. When present, a 401 response fires a (throttled)
+    /// background credential rebuild before the standard retry is re-issued,
+    /// converting a permanent stale-token state into a one-shot self-heal.
+    auth: Option<GcpAuthenticator>,
+}
+
+impl<Request> GcsRetryLogic<Request> {
+    pub const fn with_auth(auth: GcpAuthenticator) -> Self {
+        Self {
+            request: PhantomData,
+            auth: Some(auth),
+        }
+    }
 }
 
 impl<Request> Default for GcsRetryLogic<Request> {
     fn default() -> Self {
         Self {
             request: PhantomData,
+            auth: None,
         }
     }
 }
@@ -154,6 +168,7 @@ impl<Request> Clone for GcsRetryLogic<Request> {
     fn clone(&self) -> Self {
         Self {
             request: PhantomData,
+            auth: self.auth.clone(),
         }
     }
 }
@@ -172,7 +187,22 @@ impl<Request: Clone + Send + Sync + 'static> RetryLogic for GcsRetryLogic<Reques
         let status = response.inner.status();
 
         match status {
-            StatusCode::UNAUTHORIZED => RetryAction::Retry("unauthorized".into()),
+            StatusCode::UNAUTHORIZED => {
+                // Fire-and-forget a credentials rebuild. By the time tower
+                // re-issues the request through GcsService::call (which reads
+                // the token from the auth's RwLock), the new token should
+                // be in place. If the refresh is still in flight we'll burn
+                // one or two more retries on the stale token before recovering
+                // — far cheaper than waiting for the next 30 min regenerator
+                // tick or for a pod restart.
+                if let Some(auth) = &self.auth {
+                    let auth = auth.clone();
+                    tokio::spawn(async move {
+                        auth.force_refresh().await;
+                    });
+                }
+                RetryAction::Retry("unauthorized".into())
+            }
             StatusCode::REQUEST_TIMEOUT => RetryAction::Retry("request timeout".into()),
             StatusCode::TOO_MANY_REQUESTS => RetryAction::Retry("too many requests".into()),
             StatusCode::NOT_IMPLEMENTED => {
