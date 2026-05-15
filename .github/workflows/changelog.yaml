@@ -55,3 +55,22 @@ jobs:
         run: |
           # Compare against origin/master
           ./scripts/check_changelog_fragments.sh
+
+  validate-deprecations:
+    permissions:
+      contents: read
+      pull-requests: none
+
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Merge queue
+        if: ${{ github.event_name == 'merge_group' }}
+        run: |
+          echo "merge_group event – passing without running deprecation validation."
+          exit 0
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Run deprecation fragment checker
+        run: ./scripts/check_deprecation_fragments.sh
