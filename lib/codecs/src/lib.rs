@@ -51,16 +51,10 @@ pub enum MetricTagValues {
     Single,
     /// All tags are exposed as arrays of either string or null values.
     Full,
-    /// Tag values are exposed using the shape that matches their underlying storage:
-    /// single-value tags are exposed as strings and multi-value tags are exposed as
-    /// arrays of either string or null values.
-    ///
-    /// Writes follow the same convention -- assigning a string or null to a tag stores
-    /// it as a single tag; assigning an array stores it as a multi-value tag.
-    ///
-    /// This preserves the on-the-wire shape of metrics that mix single- and multi-value
-    /// tags. Programs that consume tags in this mode must handle both string and array
-    /// shapes (for example, with `is_array(.tags.foo)` or by normalizing with `flatten`).
+    /// Tag values are exposed using their underlying shape: single-value tags as strings,
+    /// multi-value tags as arrays. Writes follow the same rule -- a string or null produces
+    /// a single tag; an array of length >= 2 produces a multi-value tag. A length-1 array
+    /// round-trips as a scalar; use `Full` to force array shape.
     Auto,
 }
 
