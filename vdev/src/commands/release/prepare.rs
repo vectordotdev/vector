@@ -448,12 +448,17 @@ fn format_vrl_changelog_block(changelog: &str) -> String {
 fn insert_block_after_changelog(original: &str, block: &str) -> String {
     let mut result = Vec::new();
     let mut inserted = false;
+    let mut in_changelog = false;
 
     for line in original.lines() {
         result.push(line.to_string());
 
-        // Insert *after* the line containing only the closing `]` (end of changelog array)
-        if !inserted && line.trim() == "]" {
+        if line.trim_start().starts_with("changelog:") {
+            in_changelog = true;
+        }
+
+        // Insert after the closing `]` of the changelog array specifically.
+        if !inserted && in_changelog && line.trim() == "]" {
             result.push(String::new()); // empty line before
             result.push(block.to_string());
             inserted = true;
