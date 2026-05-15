@@ -13,7 +13,7 @@ use crate::utils::{
 #[derive(clap::Args, Debug)]
 #[command()]
 pub struct Cli {
-    /// Filter to only show entries whose deprecation_version matches this release version.
+    /// Filter to only show entries whose `deprecation_version` matches this release version.
     #[arg(long)]
     version: Option<Version>,
 }
@@ -59,9 +59,7 @@ impl Cli {
         // Use the computed next minor as the "release" for partitioning.
         // If the next minor can't be determined, fall back to a sentinel version
         // that only `next` keywords will match (major=0, minor=0 never matches real versions).
-        let partition_version = next_minor
-            .clone()
-            .unwrap_or_else(|| Version::new(0, 0, 0));
+        let partition_version = next_minor.clone().unwrap_or_else(|| Version::new(0, 0, 0));
         let p = deprecation::partition_by_release(entries, &partition_version);
         let enacted: Vec<&DeprecationEntry> = p.enacted.iter().collect();
         let announcing: Vec<&DeprecationEntry> = p.announcing.iter().collect();
@@ -73,8 +71,16 @@ impl Cli {
         };
 
         let nm = next_minor.as_ref();
-        print_section(&format!("Enacted in next release ({next_label})"), &enacted, nm);
-        print_section(&format!("Announced in next release ({next_label})"), &announcing, nm);
+        print_section(
+            &format!("Enacted in next release ({next_label})"),
+            &enacted,
+            nm,
+        );
+        print_section(
+            &format!("Announced in next release ({next_label})"),
+            &announcing,
+            nm,
+        );
         print_section("Pre-existing deprecations", &preexisting, nm);
 
         Ok(())

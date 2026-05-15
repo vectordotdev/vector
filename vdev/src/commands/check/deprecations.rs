@@ -15,7 +15,10 @@ impl Cli {
         let dir = repo_root.join(deprecation::DEPRECATION_DIR);
 
         if !dir.is_dir() {
-            println!("No {dir} directory found; nothing to validate.", dir = dir.display());
+            println!(
+                "No {dir} directory found; nothing to validate.",
+                dir = dir.display()
+            );
             return Ok(());
         }
 

@@ -1,6 +1,5 @@
 use std::{
-    fmt,
-    fs,
+    fmt, fs,
     path::{Path, PathBuf},
 };
 
@@ -26,14 +25,12 @@ impl PartialOrd for VersionOrTbd {
 
 impl Ord for VersionOrTbd {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        use std::cmp::Ordering::{Equal, Greater, Less};
         match (self, other) {
             (Self::Version(a), Self::Version(b)) => a.cmp(b),
-            (Self::Version(_), _) => std::cmp::Ordering::Less,
-            (Self::Next, Self::Version(_)) => std::cmp::Ordering::Greater,
-            (Self::Next, Self::Next) => std::cmp::Ordering::Equal,
-            (Self::Next, Self::Tbd) => std::cmp::Ordering::Less,
-            (Self::Tbd, Self::Tbd) => std::cmp::Ordering::Equal,
-            (Self::Tbd, _) => std::cmp::Ordering::Greater,
+            (Self::Version(_), _) | (Self::Next, Self::Tbd) => Less,
+            (Self::Next, Self::Version(_)) | (Self::Tbd, Self::Version(_) | Self::Next) => Greater,
+            _ => Equal,
         }
     }
 }
@@ -117,7 +114,10 @@ pub struct DeprecationPartition {
 }
 
 /// Partition a list of deprecation entries into three buckets relative to `release`.
-pub fn partition_by_release(entries: Vec<DeprecationEntry>, release: &Version) -> DeprecationPartition {
+pub fn partition_by_release(
+    entries: Vec<DeprecationEntry>,
+    release: &Version,
+) -> DeprecationPartition {
     let mut enacted = Vec::new();
     let mut announcing = Vec::new();
     let mut planned = Vec::new();
@@ -130,7 +130,11 @@ pub fn partition_by_release(entries: Vec<DeprecationEntry>, release: &Version) -
             planned.push(e);
         }
     }
-    DeprecationPartition { enacted, announcing, planned }
+    DeprecationPartition {
+        enacted,
+        announcing,
+        planned,
+    }
 }
 
 /// Read and parse all deprecation fragments from the given directory.
@@ -158,7 +162,7 @@ fn parse_deprecation_fragment(path: &Path) -> Result<DeprecationEntry> {
         .unwrap_or("")
         .to_string();
 
-    if !filename.ends_with(".md") {
+    if !filename.to_ascii_lowercase().ends_with(".md") {
         bail!(
             "Deprecation fragment {} must have a .md extension",
             path.display()
@@ -170,12 +174,8 @@ fn parse_deprecation_fragment(path: &Path) -> Result<DeprecationEntry> {
 
     let (frontmatter_str, body) = split_frontmatter(&raw, path)?;
 
-    let fm: Frontmatter = serde_yaml::from_str(frontmatter_str).with_context(|| {
-        format!(
-            "Failed to parse YAML frontmatter in {}",
-            path.display()
-        )
-    })?;
+    let fm: Frontmatter = serde_yaml::from_str(frontmatter_str)
+        .with_context(|| format!("Failed to parse YAML frontmatter in {}", path.display()))?;
 
     if fm.what.trim().is_empty() {
         bail!(
@@ -205,15 +205,15 @@ pub fn rewrite_next_versions(path: &Path, release: &Version) -> Result<bool> {
     // Only rewrite within the frontmatter block (between the two `---` delimiters).
     let fm_close = content[3..] // skip opening `---`
         .find("\n---")
-        .map(|p| p + 3) // offset back into original string
-        .unwrap_or(content.len());
+        .map_or(content.len(), |p| p + 3);
 
     let (front, rest) = content.split_at(fm_close);
 
     let new_front: String = front
         .lines()
         .map(|line| {
-            if (line.starts_with("announcement_version:") || line.starts_with("deprecation_version:"))
+            if (line.starts_with("announcement_version:")
+                || line.starts_with("deprecation_version:"))
                 && line.trim_end().ends_with("next")
             {
                 let colon_pos = line.find(':').unwrap();
@@ -236,8 +236,7 @@ pub fn rewrite_next_versions(path: &Path, release: &Version) -> Result<bool> {
         format!("{new_front}{rest}")
     };
 
-    fs::write(path, rejoined)
-        .with_context(|| format!("Failed to write {}", path.display()))?;
+    fs::write(path, rejoined).with_context(|| format!("Failed to write {}", path.display()))?;
     Ok(true)
 }
 
@@ -256,9 +255,12 @@ fn split_frontmatter<'a>(content: &'a str, path: &Path) -> Result<(&'a str, &'a 
     let after_open = content[3..].trim_start_matches([' ', '\t']);
     let after_open = after_open.trim_start_matches('\n');
 
-    let close_pos = after_open
-        .find("\n---")
-        .ok_or_else(|| anyhow!("Deprecation fragment {} has unclosed frontmatter", path.display()))?;
+    let close_pos = after_open.find("\n---").ok_or_else(|| {
+        anyhow!(
+            "Deprecation fragment {} has unclosed frontmatter",
+            path.display()
+        )
+    })?;
 
     let frontmatter = &after_open[..close_pos];
     let rest = &after_open[close_pos + 4..]; // skip `\n---`
@@ -285,8 +287,14 @@ mod tests {
         assert_eq!(entries.len(), 1);
         let e = &entries[0];
         assert_eq!(e.what, "The foo option");
-        assert_eq!(e.deprecation_version, VersionOrTbd::Version(Version::new(0, 57, 0)));
-        assert_eq!(e.announcement_version, VersionOrTbd::Version(Version::new(0, 55, 0)));
+        assert_eq!(
+            e.deprecation_version,
+            VersionOrTbd::Version(Version::new(0, 57, 0))
+        );
+        assert_eq!(
+            e.announcement_version,
+            VersionOrTbd::Version(Version::new(0, 55, 0))
+        );
         assert_eq!(e.description, "Detailed explanation.");
     }
 
@@ -414,7 +422,8 @@ mod tests {
     fn rewrite_next_versions_no_op_when_no_next() {
         let tmp = tempdir().unwrap();
         let path = tmp.path().join("concrete.md");
-        let original = "---\nwhat: Thing\ndeprecation_version: 0.57\nannouncement_version: 0.57\n---\n";
+        let original =
+            "---\nwhat: Thing\ndeprecation_version: 0.57\nannouncement_version: 0.57\n---\n";
         fs::write(&path, original).unwrap();
         let modified = rewrite_next_versions(&path, &Version::new(0, 57, 0)).unwrap();
         assert!(!modified);
