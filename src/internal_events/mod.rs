@@ -74,6 +74,8 @@ mod http;
 pub mod http_client;
 #[cfg(feature = "sources-utils-http-client")]
 mod http_client_source;
+#[cfg(any(feature = "sources-iggy", feature = "sinks-iggy"))]
+mod iggy;
 #[cfg(feature = "sinks-influxdb")]
 mod influxdb;
 #[cfg(feature = "sources-internal_logs")]
@@ -226,6 +228,8 @@ pub(crate) use self::grpc::*;
 pub(crate) use self::host_metrics::*;
 #[cfg(feature = "sources-utils-http-client")]
 pub(crate) use self::http_client_source::*;
+#[cfg(any(feature = "sources-iggy", feature = "sinks-iggy"))]
+pub(crate) use self::iggy::*;
 #[cfg(feature = "sinks-influxdb")]
 pub(crate) use self::influxdb::*;
 #[cfg(feature = "sources-internal_logs")]

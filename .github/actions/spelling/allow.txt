@@ -242,6 +242,8 @@ Ideapad
 idn
 ifeq
 ifneq
+iggy
+iggypat
 imobile
 Infinix
 influxd
