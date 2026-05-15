@@ -142,6 +142,15 @@ Rationale section below.
 - **Pre-epoch `Span.start` and `SpanEvent.time`** are clamped to epoch-zero on Datadog
   egress; a counter is incremented and a warning log identifies the affected span. See
   the "Pre-epoch `Span.start` and `SpanEvent.time` handling" subsection.
+- **Wire-empty `Span.resource` and `Span.type`** ingest as the typed-slot `None` per the
+  parent RFC's empty-string invariant and egress as the derived value (`Span.name`
+  fallback for `Span.resource`; `"custom"` from the `Unspecified` `SpanKind2Type` row
+  for `Span.type`) rather than as the empty wire value. Wire-byte non-identical;
+  backend-observable behavior is unchanged because the Datadog Agent's own normalizer
+  rewrites empty `Span.resource` to `Span.name` upstream of the agent-to-backend hop
+  Vector targets, and the Datadog backend buckets empty `Span.type` and `"custom"`
+  together. See the "`Span.resource` and `Span.type` empty-string egress consequence"
+  subsection.
 
 The Datadog-side consequences of model-level exclusions defined in the parent RFC
 (zero-ID rejection and pre-epoch timestamps via the internal proto's `fixed64` encoding)
@@ -291,10 +300,31 @@ is a Datadog-internal diagnostic with no Vector consumer and is dropped on inges
 `Span.resource` and `Span.type` follow the parent RFC's "Empty-string invariant for
 `Option<KeyString>` slots": an empty wire value normalizes to `None` on ingress. The
 Datadog-egress derivation fallback ("When `Span.span_type` is `None` on Datadog egress…",
-below) then fires for the `None` value, including for Datadog-sourced spans whose producer
-wrote the empty string -- this is the standard Datadog-Agent behaviour and matches
-operator expectations that empty wire values are equivalent to "derive me". An originally
-populated value is preserved verbatim.
+below) then fires for the `None` value, including for Datadog-sourced spans whose
+producer wrote the empty string. An originally populated (non-empty) value is preserved
+verbatim.
+
+The wire bytes therefore differ from input to output for the empty-string case: empty
+`Span.resource` egresses as the value the `Span.name`-fallback rule produces (typically
+`Span.name` itself, since the OpenTelemetry semantic-convention attribute keys the
+derivation prefers are not normally present on Datadog-sourced spans), and empty
+`Span.type` egresses as `"custom"` (from the `Unspecified` row of the `SpanKind2Type`
+table -- Datadog-sourced spans always carry `Span.kind = Unspecified` per
+"Datadog egress derivation rules" below).
+
+Backend-observable behavior is unchanged on conforming Datadog Agent traffic:
+
+- The Datadog Agent's normalizer (`pkg/trace/agent/normalizer.go`) rewrites empty
+  `Span.resource` to `Span.name` before the span enters the agent-to-backend hop
+  Vector targets, so a wire-empty `Span.resource` is essentially not observed on this
+  hop in practice. The Vector derivation reaches the same `Span.name` value the Agent
+  normalizer would have produced.
+- The Datadog backend buckets empty `Span.type` and `"custom"` together in APM stats
+  and the UI, so the wire-byte change is not surfaced to operators.
+
+Empty wire input thus behaves consistently with the Datadog Agent's own handling: the
+empty value is the wire-level "derive me" signal. The wire-byte non-identity is
+declared as a Datadog-side round-trip exclusion above.
 
 #### `Span.duration` wire-domain handling
 
