@@ -54,10 +54,10 @@ unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tokio_unstable)'] }
 name = "vector"
 section = "admin"
 maintainer-scripts = "distribution/debian/scripts/"
-conf-files = ["/etc/vector/vector.yaml", "/etc/default/vector"]
+conf-files = ["/etc/default/vector"]
 assets = [
   ["target/release/vector", "/usr/bin/", "755"],
-  ["config/vector.yaml", "/etc/vector/vector.yaml", "644"],
+  ["config/vector.yaml", "/usr/share/vector/examples/vector.yaml", "644"],
   ["config/examples/*", "/etc/vector/examples/", "644"],
   ["distribution/systemd/vector.service", "/lib/systemd/system/vector.service", "644"],
   ["distribution/systemd/vector.default", "/etc/default/vector", "600"],
@@ -516,14 +516,35 @@ zstd = { version = "0.13.0", default-features = false }
 ntapi = { git = "https://github.com/MSxDOS/ntapi.git", rev = "24fc1e47677fc9f6e38e5f154e6011dc9b270da6" }
 
 [features]
-# Default features for *-unknown-linux-gnu and *-apple-darwin
-default = ["enable-unix", "rdkafka?/gssapi"]
+# Default features for *-unknown-linux-gnu and *-apple-darwin.
+#
+# Note on kafka: the `gssapi` feature is intentionally NOT enabled here. Linux GA releases
+# pick it up through the `vendored` feature on the x86_64-unknown-linux-gnu target, and
+# macOS releases pick it up through the `target-aarch64-apple-darwin` feature (see target
+# table below). Local dev builds skip it so they don't need `libsasl2-dev` / cyrus-sasl
+# installed, and so rdkafka's build script doesn't link GSSAPI.
+default = ["enable-unix"]
 # Default features for `cargo docs`. We're not using `gssapi` which would require installing libsasl2 in our doc environment.
 docs = ["enable-unix"]
 # Default features for *-unknown-linux-* which make use of `cmake` for dependencies
 default-cmake = ["enable-unix", "vendored", "rdkafka?/cmake_build"]
 
-vendored = ["rdkafka?/gssapi-vendored"]
+# Enables Kerberos / GSSAPI SASL support for kafka via dynamic linkage to a
+# system-provided libsasl2 (and the host's GSS implementation). Requires
+# `libsasl2-dev` / cyrus-sasl at compile time and a libsasl2 dylib at runtime.
+# This mirrors pre-PR `default` behavior on macOS, where the runner ships
+# libsasl2 + Apple's GSS framework.
+gssapi = ["rdkafka?/gssapi"]
+
+# Static-bundled variant of `gssapi`: builds libsasl2 (via `sasl2-sys`) and
+# `krb5-src` from source. Self-contained at runtime; produces larger binaries.
+# Note: the bundled libsasl2 + krb5 path does not currently link on
+# macOS arm64 (unresolved gss_* symbols), so this is Linux-only in practice.
+gssapi-vendored = ["gssapi", "rdkafka?/gssapi-vendored"]
+
+# Umbrella feature that opts into all bundled/static C dependencies. Currently
+# just `gssapi-vendored`; intended to grow as more vendored deps are introduced.
+vendored = ["gssapi-vendored"]
 
 # Default features for *-pc-windows-msvc
 # TODO: Enable SASL https://github.com/vectordotdev/vector/pull/3081#issuecomment-659298042
@@ -562,6 +583,10 @@ target-arm-unknown-linux-gnueabi =      ["target-unix"]
 target-arm-unknown-linux-musleabi =     ["target-base"]
 target-x86_64-unknown-linux-gnu =       ["target-unix", "vendored"]
 target-x86_64-unknown-linux-musl =      ["target-unix"]
+# Apple targets opt into `gssapi` (dynamic linkage to system libsasl2 + Apple's
+# GSS framework). The `gssapi-vendored` path does not currently link on
+# macOS arm64 (unresolved gss_* symbols).
+target-aarch64-apple-darwin =           ["enable-unix", "gssapi"]
 
 # Enables features that work only on systems providing `cfg(unix)`
 unix = ["tikv-jemallocator", "allocation-tracing"]
