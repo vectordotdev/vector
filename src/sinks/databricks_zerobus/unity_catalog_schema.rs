@@ -304,12 +304,23 @@ fn format_kind_type(kind: &prost_reflect::Kind) -> String {
 pub fn generate_descriptor_from_schema(
     schema: &UnityCatalogTableSchema,
 ) -> Result<prost_reflect::MessageDescriptor, ZerobusSinkError> {
-    let message_proto =
+    let sdk_message_proto =
         descriptor_from_uc_schema(schema).map_err(|e| ZerobusSinkError::ConfigError {
             message: format!("Failed to convert Unity Catalog schema to protobuf: {}", e),
         })?;
 
-    let message_name = message_proto.name().to_string();
+    // The SDK returns a prost-types 0.14 DescriptorProto, but prost-reflect (used
+    // below to build the descriptor pool) is on prost-types 0.13. Re-encode through
+    // the protobuf wire format to bridge the two versions.
+    let message_name = sdk_message_proto.name().to_string();
+    let encoded = prost_014::Message::encode_to_vec(&sdk_message_proto);
+    let message_proto =
+        <prost_reflect::prost_types::DescriptorProto as prost_reflect::prost::Message>::decode(
+            encoded.as_slice(),
+        )
+        .map_err(|e| ZerobusSinkError::ConfigError {
+            message: format!("Failed to re-decode SDK DescriptorProto: {}", e),
+        })?;
     let package_name = sanitize_package_name(&schema.catalog_name);
 
     let file_proto = prost_types::FileDescriptorProto {
