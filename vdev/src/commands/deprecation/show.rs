@@ -1,6 +1,7 @@
 #![allow(clippy::print_stdout)]
 
 use anyhow::Result;
+use owo_colors::{OwoColorize, Stream::Stdout, Style};
 use semver::Version;
 
 use crate::utils::{
@@ -43,8 +44,7 @@ impl Cli {
                 println!("No deprecations enacted in v{version}.");
                 return Ok(());
             }
-            println!("Deprecations enacted in {version}:");
-            println!();
+            print_section_header(&format!("Deprecations enacted in {version}"));
             for e in &entries {
                 print_entry(e);
             }
@@ -56,11 +56,6 @@ impl Cli {
             .ok()
             .map(|v| Version::new(v.major, v.minor + 1, 0));
 
-        // Group entries into three buckets:
-        //   1. Enacted in next release  — deprecation_version is `next` or matches the next minor
-        //   2. Announced in next release — announcement_version is `next` or matches next minor,
-        //                                  but NOT in bucket 1
-        //   3. Pre-existing             — everything else
         let is_next_release = |v: &VersionOrTbd| match next_minor.as_ref() {
             Some(nv) => v.matches_release(nv),
             None => matches!(v, VersionOrTbd::Next),
@@ -99,11 +94,19 @@ impl Cli {
     }
 }
 
-fn print_section(title: &str, entries: &[&DeprecationEntry]) {
-    println!("{title}:");
+fn print_section_header(title: &str) {
+    let style = Style::new().bold().underline();
+    println!("{}", title.if_supports_color(Stdout, |t| t.style(style)));
     println!();
+}
+
+fn print_section(title: &str, entries: &[&DeprecationEntry]) {
+    print_section_header(title);
     if entries.is_empty() {
-        println!("(none)");
+        println!(
+            "{}",
+            "(none)".if_supports_color(Stdout, |t| t.dimmed())
+        );
     } else {
         for e in entries {
             print_entry(e);
@@ -113,14 +116,43 @@ fn print_section(title: &str, entries: &[&DeprecationEntry]) {
 }
 
 fn print_entry(e: &DeprecationEntry) {
-    println!("{}", e.what);
-    println!("  announced:  {}", e.announcement_version);
-    println!("  deprecated: {}", e.deprecation_version);
+    println!("{}", e.what.if_supports_color(Stdout, |t| t.bold()));
+    println!(
+        "  {}  {}",
+        "announced: ".if_supports_color(Stdout, |t| t.dimmed()),
+        format_version(&e.announcement_version),
+    );
+    println!(
+        "  {} {}",
+        "deprecated:".if_supports_color(Stdout, |t| t.dimmed()),
+        format_version(&e.deprecation_version),
+    );
     if !e.description.is_empty() {
         println!();
         for line in e.description.lines() {
-            println!("  {line}");
+            println!(
+                "  {}",
+                line.if_supports_color(Stdout, |t| t.italic())
+            );
         }
     }
     println!();
+}
+
+fn format_version(v: &VersionOrTbd) -> String {
+    match v {
+        VersionOrTbd::Next => {
+            let style = Style::new().bright_red().bold();
+            "next"
+                .if_supports_color(Stdout, |t| t.style(style))
+                .to_string()
+        }
+        VersionOrTbd::Tbd => "TBD"
+            .if_supports_color(Stdout, |t| t.bright_yellow())
+            .to_string(),
+        VersionOrTbd::Version(ver) => ver
+            .to_string()
+            .if_supports_color(Stdout, |t| t.bright_cyan())
+            .to_string(),
+    }
 }
