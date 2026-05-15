@@ -373,6 +373,12 @@ pub enum HistogramName {
 
     /// The round-trip time (RTT) of HTTP requests that resulted in an error.
     HttpClientErrorRttSeconds,
+
+    /// The utilization of the source buffer.
+    SourceBufferUtilization,
+
+    /// The utilization of the buffer that feeds into a transform.
+    TransformBufferUtilization,
 }
 
 impl HistogramName {
@@ -406,6 +412,8 @@ impl HistogramName {
             Self::HttpClientRttSeconds => "http_client_rtt_seconds",
             Self::HttpClientResponseRttSeconds => "http_client_response_rtt_seconds",
             Self::HttpClientErrorRttSeconds => "http_client_error_rtt_seconds",
+            Self::SourceBufferUtilization => "source_buffer_utilization",
+            Self::TransformBufferUtilization => "transform_buffer_utilization",
         }
     }
 }
@@ -423,6 +431,46 @@ pub enum GaugeName {
     /// weighted moving average (EWMA).
     ComponentLatencyMeanSeconds,
 
+    /// The maximum number of events the source buffer can hold.
+    #[configurable(deprecated = "This metric has been deprecated in favor of `source_buffer_max_size_events`.")]
+    SourceBufferMaxEventSize,
+
+    /// The maximum number of bytes the source buffer can hold.
+    #[configurable(deprecated = "This metric has been deprecated in favor of `source_buffer_max_size_bytes`.")]
+    SourceBufferMaxByteSize,
+
+    /// The maximum number of events the source buffer can hold.
+    SourceBufferMaxSizeEvents,
+
+    /// The maximum number of bytes the source buffer can hold.
+    SourceBufferMaxSizeBytes,
+
+    /// The current utilization level of the source buffer.
+    SourceBufferUtilizationLevel,
+
+    /// The mean utilization of the source buffer, smoothed with an EWMA.
+    SourceBufferUtilizationMean,
+
+    /// The maximum number of events the buffer that feeds into a transform can hold.
+    #[configurable(deprecated = "This metric has been deprecated in favor of `transform_buffer_max_size_events`.")]
+    TransformBufferMaxEventSize,
+
+    /// The maximum number of bytes the buffer that feeds into a transform can hold.
+    #[configurable(deprecated = "This metric has been deprecated in favor of `transform_buffer_max_size_bytes`.")]
+    TransformBufferMaxByteSize,
+
+    /// The maximum number of events the buffer that feeds into a transform can hold.
+    TransformBufferMaxSizeEvents,
+
+    /// The maximum number of bytes the buffer that feeds into a transform can hold.
+    TransformBufferMaxSizeBytes,
+
+    /// The current utilization level of the buffer that feeds into a transform.
+    TransformBufferUtilizationLevel,
+
+    /// The mean utilization of the buffer that feeds into a transform, smoothed with an EWMA.
+    TransformBufferUtilizationMean,
+
     /// The maximum number of events in the buffer.
     BufferMaxSizeEvents,
 
@@ -436,6 +484,7 @@ pub enum GaugeName {
     BufferMaxByteSize,
 
     /// The number of events currently in the buffer.
+    #[configurable(deprecated = "This metric has been deprecated in favor of `buffer_size_events`.")]
     BufferEvents,
 
     /// The number of events currently in the buffer.
@@ -445,6 +494,7 @@ pub enum GaugeName {
     BufferSizeBytes,
 
     /// The number of bytes currently in the buffer.
+    #[configurable(deprecated = "This metric has been deprecated in favor of `buffer_size_bytes`.")]
     BufferByteSize,
 
     /// The current utilization of this component, expressed as a value from 0 to 1.
@@ -501,6 +551,18 @@ impl GaugeName {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::ComponentLatencyMeanSeconds => "component_latency_mean_seconds",
+            Self::SourceBufferMaxSizeEvents => "source_buffer_max_size_events",
+            Self::SourceBufferMaxSizeBytes => "source_buffer_max_size_bytes",
+            Self::SourceBufferMaxEventSize => "source_buffer_max_event_size",
+            Self::SourceBufferMaxByteSize => "source_buffer_max_byte_size",
+            Self::SourceBufferUtilizationLevel => "source_buffer_utilization_level",
+            Self::SourceBufferUtilizationMean => "source_buffer_utilization_mean",
+            Self::TransformBufferMaxSizeEvents => "transform_buffer_max_size_events",
+            Self::TransformBufferMaxSizeBytes => "transform_buffer_max_size_bytes",
+            Self::TransformBufferMaxEventSize => "transform_buffer_max_event_size",
+            Self::TransformBufferMaxByteSize => "transform_buffer_max_byte_size",
+            Self::TransformBufferUtilizationLevel => "transform_buffer_utilization_level",
+            Self::TransformBufferUtilizationMean => "transform_buffer_utilization_mean",
             Self::BufferMaxSizeEvents => "buffer_max_size_events",
             Self::BufferMaxEventSize => "buffer_max_event_size",
             Self::BufferMaxSizeBytes => "buffer_max_size_bytes",

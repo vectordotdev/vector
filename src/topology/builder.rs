@@ -21,7 +21,10 @@ use vector_lib::{
         BufferType, WhenFull,
         topology::{
             builder::TopologyBuilder,
-            channel::{BufferReceiver, BufferSender, ChannelMetricMetadata, LimitedReceiver},
+            channel::{
+                BufferChannelKind, BufferReceiver, BufferSender, ChannelMetricMetadata,
+                LimitedReceiver,
+            },
         },
     },
     internal_event::{self, CountByteSize, EventsSent, InternalEventHandle as _, Registered},
@@ -67,7 +70,6 @@ pub(crate) static SOURCE_SENDER_BUFFER_SIZE: LazyLock<usize> =
 
 const READY_ARRAY_CAPACITY: NonZeroUsize = NonZeroUsize::new(CHUNK_SIZE * 4).unwrap();
 pub(crate) const TOPOLOGY_BUFFER_SIZE: NonZeroUsize = NonZeroUsize::new(100).unwrap();
-const TRANSFORM_CHANNEL_METRIC_PREFIX: &str = "transform_buffer";
 
 static TRANSFORM_CONCURRENCY_LIMIT: LazyLock<usize> = LazyLock::new(|| {
     crate::app::worker_threads()
@@ -508,7 +510,7 @@ impl<'a> Builder<'a> {
                 Ok(transform) => transform,
             };
 
-            let metrics = ChannelMetricMetadata::new(TRANSFORM_CHANNEL_METRIC_PREFIX, None);
+            let metrics = ChannelMetricMetadata::new(BufferChannelKind::Transform, None);
             let (input_tx, input_rx) = TopologyBuilder::standalone_memory(
                 TOPOLOGY_BUFFER_SIZE,
                 WhenFull::Block,

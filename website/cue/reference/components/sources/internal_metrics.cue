@@ -247,15 +247,11 @@ components: sources: internal_metrics: {
 			type:               "gauge"
 			default_namespace:  "vector"
 			tags:               _component_tags
-			deprecated:         true
-			deprecated_message: "This metric has been deprecated in favor of [`buffer_size_bytes`](#buffer_size_bytes)."
 		}
 		buffer_events: {
 			type:               "gauge"
 			default_namespace:  "vector"
 			tags:               _component_tags
-			deprecated:         true
-			deprecated_message: "This metric has been deprecated in favor of [`buffer_size_events`](#buffer_size_events)."
 		}
 		buffer_size_bytes: {
 			type:              "gauge"
@@ -651,8 +647,6 @@ components: sources: internal_metrics: {
 			tags: _component_tags & {
 				output: _output
 			}
-			deprecated:         true
-			deprecated_message: "This metric has been deprecated in favor of [`source_buffer_max_size_bytes`](#source_buffer_max_size_bytes)."
 		}
 		source_buffer_max_event_size: {
 			type:              "gauge"
@@ -660,8 +654,6 @@ components: sources: internal_metrics: {
 			tags: _component_tags & {
 				output: _output
 			}
-			deprecated:         true
-			deprecated_message: "This metric has been deprecated in favor of [`source_buffer_max_size_events`](#source_buffer_max_size_events)."
 		}
 		source_buffer_max_size_bytes: {
 			type:              "gauge"
@@ -792,8 +784,6 @@ components: sources: internal_metrics: {
 			tags: _component_tags & {
 				output: _output
 			}
-			deprecated:         true
-			deprecated_message: "This metric has been deprecated in favor of [`transform_buffer_max_size_bytes`](#transform_buffer_max_size_bytes)."
 		}
 		transform_buffer_max_event_size: {
 			type:              "gauge"
@@ -801,8 +791,6 @@ components: sources: internal_metrics: {
 			tags: _component_tags & {
 				output: _output
 			}
-			deprecated:         true
-			deprecated_message: "This metric has been deprecated in favor of [`transform_buffer_max_size_events`](#transform_buffer_max_size_events)."
 		}
 		transform_buffer_max_size_bytes: {
 			type:              "gauge"
