@@ -55,6 +55,13 @@ pub struct ReduceConfig {
     /// The maximum number of events to group together.
     pub max_events: Option<NonZeroUsize>,
 
+    /// The maximum number of bytes to accumulate in a group before flushing.
+    ///
+    /// If adding an event would cause the accumulated group to exceed this limit, the current
+    /// group is flushed first and a new group is started with that event. If a single event
+    /// exceeds the limit on its own, it is emitted as its own group.
+    pub max_bytes: Option<NonZeroUsize>,
+
     /// An ordered list of fields by which to group events.
     ///
     /// Each group with matching values for the specified keys is reduced independently, allowing
