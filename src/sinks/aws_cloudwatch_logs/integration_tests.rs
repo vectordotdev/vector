@@ -571,6 +571,64 @@ async fn cloudwatch_healthcheck() {
     healthcheck(config, client).await.unwrap();
 }
 
+#[tokio::test]
+async fn cloudwatch_healthcheck_without_create_nonexistent_log_group() {
+    trace_init();
+    use super::healthcheck::healthcheck;
+
+    let config = CloudwatchLogsSinkConfig {
+        stream_name: Template::try_from("test-stream").unwrap(),
+        group_name: Template::try_from("nonexistent-group-name").unwrap(),
+        region: RegionOrEndpoint::with_both("us-east-1", cloudwatch_address().as_str()),
+        encoding: TextSerializerConfig::default().into(),
+        create_missing_group: false,
+        create_missing_stream: true,
+        retention: Default::default(),
+        compression: Default::default(),
+        batch: Default::default(),
+        request: Default::default(),
+        tls: Default::default(),
+        assume_role: None,
+        auth: Default::default(),
+        acknowledgements: Default::default(),
+        kms_key: None,
+        tags: None,
+    };
+
+    let client = config.create_client(&ProxyConfig::default()).await.unwrap();
+    let err = healthcheck(config, client).await.unwrap_err();
+    assert_eq!(err.to_string(), "No log group found");
+}
+
+#[tokio::test]
+async fn cloudwatch_healthcheck_skips_network_for_dynamic_group_name() {
+    trace_init();
+    use super::healthcheck::healthcheck;
+
+    let config = CloudwatchLogsSinkConfig {
+        stream_name: Template::try_from("test-stream").unwrap(),
+        group_name: Template::try_from("{{ file }}").unwrap(),
+        // If the healthcheck tries to dispatch to CloudWatch, this endpoint should fail fast.
+        region: RegionOrEndpoint::with_both("us-east-1", "http://127.0.0.1:1"),
+        encoding: TextSerializerConfig::default().into(),
+        create_missing_group: true,
+        create_missing_stream: true,
+        retention: Default::default(),
+        compression: Default::default(),
+        batch: Default::default(),
+        request: Default::default(),
+        tls: Default::default(),
+        assume_role: None,
+        auth: AwsAuthentication::test_auth(),
+        acknowledgements: Default::default(),
+        kms_key: None,
+        tags: None,
+    };
+
+    let client = config.create_client(&ProxyConfig::default()).await.unwrap();
+    healthcheck(config, client).await.unwrap();
+}
+
 async fn create_client_test() -> CloudwatchLogsClient {
     let auth = AwsAuthentication::test_auth();
     let region = Some(Region::new("us-east-1"));
