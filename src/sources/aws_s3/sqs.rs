@@ -412,42 +412,46 @@ impl IngestorProcess {
         pin!(shutdown);
 
         loop {
-            select! {
+            let messages = select! {
+                biased;
                 _ = &mut shutdown => break,
-                result = self.run_once() => {
-                    match result {
-                        Ok(()) => {
-                            // Reset backoff on successful receive
-                            self.backoff.reset();
-                        }
-                        Err(_) => {
-                            let delay = self.backoff.next().expect("backoff never ends");
-                            trace!(
-                                delay_ms = delay.as_millis(),
-                                "`run_once` failed, will retry after delay.",
-                            );
-                            tokio::time::sleep(delay).await;
-                        }
+                messages = self.receive_with_backoff() => messages,
+            };
+
+            // Not raced against shutdown to avoid duplicate SQS delivery
+            // after visibility_timeout expires.
+            self.process_messages(messages).await;
+        }
+    }
+
+    async fn receive_with_backoff(&mut self) -> Vec<Message> {
+        loop {
+            match self.receive_messages().await {
+                Ok(messages) => {
+                    emit!(SqsMessageReceiveSucceeded {
+                        count: messages.len(),
+                    });
+                    if messages.is_empty() {
+                        continue;
                     }
-                },
+                    self.backoff.reset();
+                    return messages;
+                }
+                Err(err) => {
+                    emit!(SqsMessageReceiveError { error: &err });
+                    let delay = self.backoff.next().expect("backoff never ends");
+                    trace!(
+                        delay_ms = delay.as_millis(),
+                        "receive_messages failed, will retry after delay.",
+                    );
+                    tokio::time::sleep(delay).await;
+                }
             }
         }
     }
 
-    async fn run_once(&mut self) -> Result<(), ()> {
-        let messages = match self.receive_messages().await {
-            Ok(messages) => {
-                emit!(SqsMessageReceiveSucceeded {
-                    count: messages.len(),
-                });
-                messages
-            }
-            Err(err) => {
-                emit!(SqsMessageReceiveError { error: &err });
-                return Err(());
-            }
-        };
-
+    // Must not be cancelled mid-flight to avoid duplicate SQS delivery.
+    async fn process_messages(&mut self, messages: Vec<Message>) {
         let mut delete_entries = Vec::new();
         let mut deferred_entries = Vec::new();
         for message in messages {
@@ -539,7 +543,7 @@ impl IngestorProcess {
         if !deferred_entries.is_empty() {
             let Some(deferred) = &self.state.deferred else {
                 warn!("Deferred queue not configured, but received deferred entries.");
-                return Ok(());
+                return;
             };
             let cloned_entries = deferred_entries.clone();
             match self
@@ -594,7 +598,6 @@ impl IngestorProcess {
                 }
             }
         }
-        Ok(())
     }
 
     async fn handle_sqs_message(&mut self, message: Message) -> Result<(), ProcessingError> {
@@ -1298,4 +1301,253 @@ fn parse_sqs_config() {
         "#,
     );
     assert!(test.is_err());
+}
+
+#[cfg(test)]
+mod shutdown_tests {
+    use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    use aws_credential_types::{Credentials, provider::SharedCredentialsProvider};
+    use aws_types::region::Region;
+    use tokio::io::AsyncWriteExt;
+    use tokio::net::TcpListener;
+
+    const TEST_REGION: &str = "us-east-1";
+
+    fn test_credentials() -> SharedCredentialsProvider {
+        SharedCredentialsProvider::new(Credentials::new("test", "test", None, None, "test"))
+    }
+
+    fn build_sqs_client(endpoint: &str) -> SqsClient {
+        let config = aws_sdk_sqs::config::Builder::new()
+            .credentials_provider(test_credentials())
+            .endpoint_url(endpoint)
+            .region(Some(Region::new(TEST_REGION)))
+            .retry_config(aws_sdk_sqs::config::retry::RetryConfig::disabled())
+            .stalled_stream_protection(
+                aws_sdk_sqs::config::StalledStreamProtectionConfig::disabled(),
+            )
+            .build();
+        SqsClient::from_conf(config)
+    }
+
+    fn build_s3_client(endpoint: &str) -> S3Client {
+        let config = aws_sdk_s3::config::Builder::new()
+            .credentials_provider(test_credentials())
+            .endpoint_url(endpoint)
+            .region(Some(Region::new(TEST_REGION)))
+            .retry_config(aws_sdk_s3::config::retry::RetryConfig::disabled())
+            .stalled_stream_protection(
+                aws_sdk_s3::config::StalledStreamProtectionConfig::disabled(),
+            )
+            .build();
+        S3Client::from_conf(config)
+    }
+
+    fn build_ingestor(
+        sqs_client: SqsClient,
+        s3_client: S3Client,
+        shutdown: ShutdownSignal,
+    ) -> IngestorProcess {
+        let (out, _rx) = crate::SourceSender::new_test();
+        let state = Arc::new(State {
+            region: Region::new(TEST_REGION),
+            s3_client,
+            sqs_client,
+            compression: super::super::Compression::Auto,
+            multiline: None,
+            queue_url: "http://localhost/queue".to_string(),
+            poll_secs: 1,
+            max_number_of_messages: 10,
+            client_concurrency: 1,
+            visibility_timeout_secs: 300,
+            delete_message: true,
+            delete_failed_message: true,
+            decoder: crate::codecs::Decoder::default(),
+            deferred: None,
+        });
+        IngestorProcess::new(
+            state,
+            out,
+            shutdown,
+            LogNamespace::Legacy,
+            false,
+        )
+    }
+
+    // Uses Connection: close so the client opens a new connection per request.
+    async fn write_http_response(
+        stream: &mut tokio::net::TcpStream,
+        status: u16,
+        body: &str,
+    ) {
+        let response = format!(
+            "HTTP/1.1 {} OK\r\nContent-Type: application/x-amz-json-1.0\r\nConnection: close\r\nContent-Length: {}\r\n\r\n{}",
+            status,
+            body.len(),
+            body,
+        );
+        stream.write_all(response.as_bytes()).await.unwrap();
+        stream.flush().await.unwrap();
+    }
+
+    async fn read_request(stream: &mut tokio::net::TcpStream) -> String {
+        use tokio::io::AsyncReadExt;
+        let mut buf = vec![0u8; 8192];
+        let n = stream.read(&mut buf).await.unwrap();
+        String::from_utf8_lossy(&buf[..n]).to_string()
+    }
+
+    async fn start_listener() -> (TcpListener, String) {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let endpoint = format!("http://{}", listener.local_addr().unwrap());
+        (listener, endpoint)
+    }
+
+    #[tokio::test]
+    async fn shutdown_interrupts_long_poll() {
+        let (listener, endpoint) = start_listener().await;
+
+        // Hold connections open without responding to simulate a long-poll.
+        tokio::spawn(async move {
+            loop {
+                let (_socket, _) = listener.accept().await.unwrap();
+                tokio::spawn(async move {
+                    tokio::time::sleep(Duration::from_secs(300)).await;
+                    drop(_socket);
+                });
+            }
+        });
+
+        let sqs_client = build_sqs_client(&endpoint);
+        let s3_client = build_s3_client(&endpoint);
+        let (trigger, shutdown, _tripwire) = ShutdownSignal::new_wired();
+
+        let ingestor = build_ingestor(sqs_client, s3_client, shutdown);
+
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(200)).await;
+            drop(trigger);
+        });
+
+        let result = tokio::time::timeout(Duration::from_secs(5), ingestor.run()).await;
+        assert!(
+            result.is_ok(),
+            "run() should have completed after shutdown, not timed out"
+        );
+    }
+
+    #[tokio::test]
+    async fn shutdown_interrupts_backoff_sleep() {
+        let error_received = Arc::new(tokio::sync::Notify::new());
+        let error_received_clone = Arc::clone(&error_received);
+
+        let (listener, endpoint) = start_listener().await;
+
+        tokio::spawn(async move {
+            loop {
+                let (mut socket, _) = listener.accept().await.unwrap();
+                let notify = Arc::clone(&error_received_clone);
+                tokio::spawn(async move {
+                    let _ = read_request(&mut socket).await;
+                    let error_body = r#"{"__type":"InternalError","message":"Internal server error"}"#;
+                    write_http_response(&mut socket, 500, error_body).await;
+                    notify.notify_one();
+                });
+            }
+        });
+
+        let sqs_client = build_sqs_client(&endpoint);
+        let s3_client = build_s3_client(&endpoint);
+        let (trigger, shutdown, _tripwire) = ShutdownSignal::new_wired();
+
+        let ingestor = build_ingestor(sqs_client, s3_client, shutdown);
+
+        let run_handle = tokio::spawn(ingestor.run());
+
+        // Wait until receive_with_backoff() enters its backoff sleep.
+        error_received.notified().await;
+
+        drop(trigger);
+
+        let result = tokio::time::timeout(Duration::from_secs(5), run_handle).await;
+        assert!(
+            result.is_ok(),
+            "run() should have completed after shutdown during backoff sleep"
+        );
+    }
+
+    // Shutdown fires while process_messages() is mid-flight (during the
+    // DeleteMessageBatch call). Processing must still run to completion.
+    #[tokio::test]
+    async fn inflight_processing_completes_despite_shutdown() {
+        let delete_count = Arc::new(AtomicUsize::new(0));
+        let delete_count_clone = Arc::clone(&delete_count);
+
+        let (listener, endpoint) = start_listener().await;
+
+        let test_event_body = r#"{"Service":"Amazon S3","Event":"s3:TestEvent","Time":"2024-01-01T00:00:00.000Z","Bucket":"test-bucket","RequestId":"test-request","HostId":"test-host"}"#;
+
+        let receive_response = serde_json::json!({
+            "Messages": [{
+                "MessageId": "test-message-id",
+                "ReceiptHandle": "test-receipt-handle",
+                "Body": test_event_body,
+                "MD5OfBody": "dummy",
+            }]
+        });
+        let receive_json = serde_json::to_string(&receive_response).unwrap();
+
+        let delete_response = serde_json::json!({
+            "Successful": [{"Id": "test-message-id"}],
+            "Failed": []
+        });
+        let delete_json = serde_json::to_string(&delete_response).unwrap();
+
+        let (trigger, shutdown, _tripwire) = ShutdownSignal::new_wired();
+
+        let trigger = Arc::new(tokio::sync::Mutex::new(Some(trigger)));
+        let trigger_clone = Arc::clone(&trigger);
+
+        tokio::spawn(async move {
+            loop {
+                let (mut socket, _) = listener.accept().await.unwrap();
+                let del_count = Arc::clone(&delete_count_clone);
+                let receive = receive_json.clone();
+                let delete = delete_json.clone();
+                let trigger = Arc::clone(&trigger_clone);
+
+                tokio::spawn(async move {
+                    let request_str = read_request(&mut socket).await;
+
+                    if request_str.contains("DeleteMessageBatch") {
+                        // Fire shutdown mid-delete, before sending the response.
+                        trigger.lock().await.take();
+                        del_count.fetch_add(1, Ordering::SeqCst);
+                        write_http_response(&mut socket, 200, &delete).await;
+                    } else {
+                        write_http_response(&mut socket, 200, &receive).await;
+                    }
+                });
+            }
+        });
+
+        let sqs_client = build_sqs_client(&endpoint);
+        let s3_client = build_s3_client(&endpoint);
+
+        let ingestor = build_ingestor(sqs_client, s3_client, shutdown);
+
+        let result = tokio::time::timeout(Duration::from_secs(10), ingestor.run()).await;
+        assert!(
+            result.is_ok(),
+            "run() should have completed after processing messages and shutdown"
+        );
+
+        assert_eq!(
+            delete_count.load(Ordering::SeqCst),
+            1,
+            "SQS DeleteMessageBatch should have been called (process_messages completed)"
+        );
+    }
 }
