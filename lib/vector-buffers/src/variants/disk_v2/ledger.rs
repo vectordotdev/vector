@@ -223,6 +223,11 @@ where
     writer_notify: Notify,
     // Tracks when writer has fully shutdown.
     writer_done: AtomicBool,
+    // Set when the writer detects that its current data file has a corrupted last record and will
+    // be skipping to the next data file.  Readers use this to compute `is_finalized=true` for the
+    // current file so they return a PartialWrite error instead of busy-spinning at EOF.  Cleared
+    // when the writer successfully opens the next data file.
+    writer_file_abandoned: AtomicBool,
     // Number of pending record acknowledgements that have yeet to be consumed by the reader.
     pending_acks: AtomicU64,
     // The file ID offset of the reader past the acknowledged reader file ID.
@@ -409,6 +414,28 @@ where
     /// Returns `true` if the writer was marked as done.
     pub fn is_writer_done(&self) -> bool {
         self.writer_done.load(Ordering::Acquire)
+    }
+
+    /// Marks the current writer data file as abandoned due to detected corruption.
+    ///
+    /// When set, readers treat the current file as finalized even if the ledger's writer file ID
+    /// has not yet advanced.  This prevents readers from busy-spinning at EOF when the writer has
+    /// detected a corrupted last record and will skip to the next file on the next write.
+    pub fn mark_current_file_abandoned(&self) {
+        self.writer_file_abandoned.store(true, Ordering::Release);
+    }
+
+    /// Clears the "current file abandoned" flag set by [`mark_current_file_abandoned`].
+    ///
+    /// Called by the writer after it successfully opens the next data file, at which point the
+    /// corrupted tail of the old file is no longer relevant.
+    pub fn clear_current_file_abandoned(&self) {
+        self.writer_file_abandoned.store(false, Ordering::Release);
+    }
+
+    /// Returns `true` if the writer has marked the current data file as abandoned.
+    pub fn is_current_file_abandoned(&self) -> bool {
+        self.writer_file_abandoned.load(Ordering::Acquire)
     }
 
     /// Increments the pending acknowledgement counter by the given amount.
@@ -640,6 +667,7 @@ where
             reader_notify: Notify::new(),
             writer_notify: Notify::new(),
             writer_done: AtomicBool::new(false),
+            writer_file_abandoned: AtomicBool::new(false),
             pending_acks: AtomicU64::new(0),
             unacked_reader_file_id_offset: AtomicU16::new(0),
             last_flush: AtomicCell::new(Instant::now()),
