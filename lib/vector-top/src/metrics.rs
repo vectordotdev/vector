@@ -10,7 +10,9 @@ use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
 use vector_api_client::{
     Client,
-    proto::{Component, ComponentType, MetricName, stream_component_metrics_response::Value},
+    proto::{
+        Component, ComponentType, MetricMode, MetricName, stream_component_metrics_response::Value,
+    },
 };
 
 use crate::state::{self, OutputMetrics, SentEventsMetric};
@@ -121,6 +123,13 @@ fn component_to_row(component: &Component) -> state::ComponentRow {
         #[cfg(feature = "allocation-tracing")]
         allocated_bytes: 0,
         errors: 0,
+        discarded_events_total: 0,
+        discarded_events_throughput_sec: 0,
+        buffer_utilization: None,
+        buffer_fill: None,
+        buffer_discarded_total: 0,
+        buffer_discarded_throughput_sec: 0,
+        channel_fill: None,
     }
 }
 
@@ -424,6 +433,211 @@ async fn errors_totals(
     }
 }
 
+async fn discarded_events_totals(
+    mut client: Client,
+    tx: state::EventTx,
+    interval: i64,
+    components_patterns: Arc<Vec<Pattern>>,
+) {
+    let Ok(mut stream) = client
+        .stream_raw_component_metrics(
+            "component_discarded_events_total",
+            MetricMode::Total,
+            interval as i32,
+        )
+        .await
+    else {
+        return;
+    };
+
+    while let Some(Ok(response)) = stream.next().await {
+        let component_id = &response.component_id;
+        if !component_matches_patterns(component_id, &components_patterns) {
+            continue;
+        }
+        _ = tx
+            .send(state::EventType::DiscardedEventsTotals(vec![(
+                ComponentKey::from(component_id.as_str()),
+                response.value as i64,
+            )]))
+            .await;
+    }
+}
+
+async fn discarded_events_throughputs(
+    mut client: Client,
+    tx: state::EventTx,
+    interval: i64,
+    components_patterns: Arc<Vec<Pattern>>,
+) {
+    let Ok(mut stream) = client
+        .stream_raw_component_metrics(
+            "component_discarded_events_total",
+            MetricMode::Throughput,
+            interval as i32,
+        )
+        .await
+    else {
+        return;
+    };
+
+    while let Some(Ok(response)) = stream.next().await {
+        let component_id = &response.component_id;
+        if !component_matches_patterns(component_id, &components_patterns) {
+            continue;
+        }
+        _ = tx
+            .send(state::EventType::DiscardedEventsThroughputs(vec![(
+                ComponentKey::from(component_id.as_str()),
+                response.value as i64,
+            )]))
+            .await;
+    }
+}
+
+async fn buffer_utilizations(
+    mut client: Client,
+    tx: state::EventTx,
+    interval: i64,
+    components_patterns: Arc<Vec<Pattern>>,
+) {
+    let Ok(mut stream) = client
+        .stream_raw_component_metrics("utilization", MetricMode::Total, interval as i32)
+        .await
+    else {
+        return;
+    };
+
+    while let Some(Ok(response)) = stream.next().await {
+        let component_id = &response.component_id;
+        if !component_matches_patterns(component_id, &components_patterns) {
+            continue;
+        }
+        _ = tx
+            .send(state::EventType::BufferUtilizations(vec![(
+                ComponentKey::from(component_id.as_str()),
+                response.value,
+            )]))
+            .await;
+    }
+}
+
+async fn channel_fills(
+    mut client: Client,
+    tx: state::EventTx,
+    interval: i64,
+    components_patterns: Arc<Vec<Pattern>>,
+) {
+    let Ok(mut stream) = client
+        .stream_raw_component_metrics("channel_fill", MetricMode::Total, interval as i32)
+        .await
+    else {
+        return;
+    };
+
+    while let Some(Ok(response)) = stream.next().await {
+        let component_id = &response.component_id;
+        if !component_matches_patterns(component_id, &components_patterns) {
+            continue;
+        }
+        _ = tx
+            .send(state::EventType::ChannelFills(vec![(
+                ComponentKey::from(component_id.as_str()),
+                response.value,
+            )]))
+            .await;
+    }
+}
+
+async fn buffer_discarded_totals(
+    mut client: Client,
+    tx: state::EventTx,
+    interval: i64,
+    components_patterns: Arc<Vec<Pattern>>,
+) {
+    let Ok(mut stream) = client
+        .stream_raw_component_metrics(
+            "buffer_discarded_events_total",
+            MetricMode::Total,
+            interval as i32,
+        )
+        .await
+    else {
+        return;
+    };
+
+    while let Some(Ok(response)) = stream.next().await {
+        let component_id = &response.component_id;
+        if !component_matches_patterns(component_id, &components_patterns) {
+            continue;
+        }
+        _ = tx
+            .send(state::EventType::BufferDiscardedTotals(vec![(
+                ComponentKey::from(component_id.as_str()),
+                response.value as i64,
+            )]))
+            .await;
+    }
+}
+
+async fn buffer_discarded_throughputs(
+    mut client: Client,
+    tx: state::EventTx,
+    interval: i64,
+    components_patterns: Arc<Vec<Pattern>>,
+) {
+    let Ok(mut stream) = client
+        .stream_raw_component_metrics(
+            "buffer_discarded_events_total",
+            MetricMode::Throughput,
+            interval as i32,
+        )
+        .await
+    else {
+        return;
+    };
+
+    while let Some(Ok(response)) = stream.next().await {
+        let component_id = &response.component_id;
+        if !component_matches_patterns(component_id, &components_patterns) {
+            continue;
+        }
+        _ = tx
+            .send(state::EventType::BufferDiscardedThroughputs(vec![(
+                ComponentKey::from(component_id.as_str()),
+                response.value as i64,
+            )]))
+            .await;
+    }
+}
+
+async fn buffer_fills(
+    mut client: Client,
+    tx: state::EventTx,
+    interval: i64,
+    components_patterns: Arc<Vec<Pattern>>,
+) {
+    let Ok(mut stream) = client
+        .stream_raw_component_metrics("buffer_fill", MetricMode::Total, interval as i32)
+        .await
+    else {
+        return;
+    };
+
+    while let Some(Ok(response)) = stream.next().await {
+        let component_id = &response.component_id;
+        if !component_matches_patterns(component_id, &components_patterns) {
+            continue;
+        }
+        _ = tx
+            .send(state::EventType::BufferFills(vec![(
+                ComponentKey::from(component_id.as_str()),
+                response.value,
+            )]))
+            .await;
+    }
+}
+
 async fn uptime_changed(mut client: Client, tx: state::EventTx, interval: i64) {
     let Ok(mut stream) = client.stream_uptime(interval as i32).await else {
         return;
@@ -523,6 +737,48 @@ pub async fn subscribe(
             Arc::clone(&components_patterns),
         )),
         tokio::spawn(errors_totals(
+            client.clone(),
+            tx.clone(),
+            interval,
+            Arc::clone(&components_patterns),
+        )),
+        tokio::spawn(discarded_events_totals(
+            client.clone(),
+            tx.clone(),
+            interval,
+            Arc::clone(&components_patterns),
+        )),
+        tokio::spawn(discarded_events_throughputs(
+            client.clone(),
+            tx.clone(),
+            interval,
+            Arc::clone(&components_patterns),
+        )),
+        tokio::spawn(buffer_utilizations(
+            client.clone(),
+            tx.clone(),
+            interval,
+            Arc::clone(&components_patterns),
+        )),
+        tokio::spawn(channel_fills(
+            client.clone(),
+            tx.clone(),
+            interval,
+            Arc::clone(&components_patterns),
+        )),
+        tokio::spawn(buffer_discarded_totals(
+            client.clone(),
+            tx.clone(),
+            interval,
+            Arc::clone(&components_patterns),
+        )),
+        tokio::spawn(buffer_discarded_throughputs(
+            client.clone(),
+            tx.clone(),
+            interval,
+            Arc::clone(&components_patterns),
+        )),
+        tokio::spawn(buffer_fills(
             client.clone(),
             tx.clone(),
             interval,

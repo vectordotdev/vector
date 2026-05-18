@@ -137,10 +137,46 @@ fn format_metric_bytes(total: i64, throughput: i64, human_metrics: bool) -> Stri
     }
 }
 
+fn format_utilization(util: Option<f64>) -> (String, Style) {
+    match util {
+        None => ("N/A".to_string(), Style::default().fg(Color::DarkGray)),
+        Some(v) => {
+            let pct = v * 100.0;
+            let text = format!("{pct:.1}%");
+            let style = if v >= 0.95 {
+                Style::default().fg(Color::Red)
+            } else if v >= 0.80 {
+                Style::default().fg(Color::Yellow)
+            } else {
+                Style::default()
+            };
+            (text, style)
+        }
+    }
+}
+
+fn format_buffer_fill(fill: Option<f64>) -> (String, Style) {
+    match fill {
+        None => ("N/A".to_string(), Style::default().fg(Color::DarkGray)),
+        Some(v) => {
+            let pct = v * 100.0;
+            let text = format!("{pct:.1}%");
+            let style = if v >= 0.80 {
+                Style::default().fg(Color::Red)
+            } else if v >= 0.50 {
+                Style::default().fg(Color::Yellow)
+            } else {
+                Style::default()
+            };
+            (text, style)
+        }
+    }
+}
+
 const NUM_COLUMNS: usize = if is_allocation_tracing_enabled() {
-    10
+    15
 } else {
-    9
+    14
 };
 
 pub mod columns {
@@ -157,6 +193,11 @@ pub mod columns {
     pub const BYTES_OUT: &str = "Bytes Out";
     pub const BYTES_OUT_TOTAL: &str = "Bytes Out Total";
     pub const ERRORS: &str = "Errors";
+    pub const DISCARDED: &str = "Discarded";
+    pub const BUF_DROPPED: &str = "BufDrop";
+    pub const CHAN_FILL: &str = "ChanFill";
+    pub const UTIL: &str = "Util%";
+    pub const FILL: &str = "Fill%";
     #[cfg(feature = "allocation-tracing")]
     pub const MEMORY_USED: &str = "Memory Used";
 }
@@ -173,6 +214,11 @@ static HEADER: [&str; NUM_COLUMNS] = [
     #[cfg(feature = "allocation-tracing")]
     columns::MEMORY_USED,
     columns::ERRORS,
+    columns::DISCARDED,
+    columns::BUF_DROPPED,
+    columns::CHAN_FILL,
+    columns::UTIL,
+    columns::FILL,
 ];
 
 struct Widgets<'a> {
@@ -273,7 +319,7 @@ impl<'a> Widgets<'a> {
         let mut items = Vec::new();
         let mut sorted = state.components.iter().collect::<Vec<_>>();
         if let Some(column) = state.sort_state.column {
-            let sort_fn = match column {
+            let sort_fn: fn(&ComponentRow, &ComponentRow) -> std::cmp::Ordering = match column {
                 SortColumn::Id => row_comparator!(key),
                 SortColumn::Kind => row_comparator!(kind),
                 SortColumn::Type => row_comparator!(component_type),
@@ -286,6 +332,17 @@ impl<'a> Widgets<'a> {
                 SortColumn::BytesOut => row_comparator!(sent_bytes_throughput_sec),
                 SortColumn::BytesOutTotal => row_comparator!(sent_bytes_total),
                 SortColumn::Errors => row_comparator!(errors),
+                SortColumn::Discarded => row_comparator!(discarded_events_total),
+                SortColumn::BufDropped => row_comparator!(buffer_discarded_total),
+                SortColumn::ChanFill => {
+                    |l: &ComponentRow, r: &ComponentRow| l.channel_fill_ord().cmp(&r.channel_fill_ord())
+                }
+                SortColumn::BufferUtil => |l: &ComponentRow, r: &ComponentRow| {
+                    l.buffer_util_ord().cmp(&r.buffer_util_ord())
+                },
+                SortColumn::BufferFill => |l: &ComponentRow, r: &ComponentRow| {
+                    l.buffer_fill_ord().cmp(&r.buffer_fill_ord())
+                },
                 #[cfg(feature = "allocation-tracing")]
                 SortColumn::MemoryUsed => row_comparator!(allocated_bytes),
             };
@@ -315,53 +372,89 @@ impl<'a> Widgets<'a> {
                 true
             }
         }) {
-            let mut data = vec![
-                r.key.id().to_string(),
-                if !r.has_displayable_outputs() {
-                    "--"
-                } else {
-                    Default::default()
-                }
-                .to_string(),
-                r.kind.clone(),
-                r.component_type.clone(),
-            ];
+            let discarded_text = format_metric(
+                r.discarded_events_total,
+                r.discarded_events_throughput_sec,
+                self.human_metrics,
+            );
+            let discarded_cell = if r.discarded_events_total > 0 {
+                Cell::from(discarded_text).style(Style::default().fg(Color::Yellow))
+            } else {
+                Cell::from(discarded_text)
+            };
 
-            let formatted_metrics = [
-                format_metric(
+            let buf_dropped_text = format_metric(
+                r.buffer_discarded_total,
+                r.buffer_discarded_throughput_sec,
+                self.human_metrics,
+            );
+            let buf_dropped_cell = if r.buffer_discarded_total > 0 {
+                Cell::from(buf_dropped_text).style(Style::default().fg(Color::Red))
+            } else {
+                Cell::from(buf_dropped_text)
+            };
+
+            let (util_text, util_style) = format_utilization(r.buffer_utilization);
+            let util_cell = Cell::from(util_text).style(util_style);
+
+            let (fill_text, fill_style) = format_buffer_fill(r.buffer_fill);
+            let fill_cell = Cell::from(fill_text).style(fill_style);
+
+            let (chan_fill_text, chan_fill_style) = format_buffer_fill(r.channel_fill);
+            let chan_fill_cell = Cell::from(chan_fill_text).style(chan_fill_style);
+
+            let mut data: Vec<Cell> = vec![
+                Cell::from(r.key.id().to_string()),
+                Cell::from(
+                    if !r.has_displayable_outputs() {
+                        "--"
+                    } else {
+                        Default::default()
+                    }
+                    .to_string(),
+                ),
+                Cell::from(r.kind.clone()),
+                Cell::from(r.component_type.clone()),
+                Cell::from(format_metric(
                     r.received_events_total,
                     r.received_events_throughput_sec,
                     self.human_metrics,
-                ),
-                format_metric_bytes(
+                )),
+                Cell::from(format_metric_bytes(
                     r.received_bytes_total,
                     r.received_bytes_throughput_sec,
                     self.human_metrics,
-                ),
-                format_metric(
+                )),
+                Cell::from(format_metric(
                     r.sent_events_total,
                     r.sent_events_throughput_sec,
                     self.human_metrics,
-                ),
-                format_metric_bytes(
+                )),
+                Cell::from(format_metric_bytes(
                     r.sent_bytes_total,
                     r.sent_bytes_throughput_sec,
                     self.human_metrics,
-                ),
-                #[cfg(feature = "allocation-tracing")]
-                if state.allocation_tracing_active {
-                    r.allocated_bytes.human_format_bytes()
-                } else {
-                    "disabled".to_string()
-                },
-                if self.human_metrics {
-                    r.errors.human_format()
-                } else {
-                    r.errors.thousands_format()
-                },
+                )),
             ];
 
-            data.extend_from_slice(&formatted_metrics);
+            #[cfg(feature = "allocation-tracing")]
+            data.push(Cell::from(if state.allocation_tracing_active {
+                r.allocated_bytes.human_format_bytes()
+            } else {
+                "disabled".to_string()
+            }));
+
+            data.push(Cell::from(if self.human_metrics {
+                r.errors.human_format()
+            } else {
+                r.errors.thousands_format()
+            }));
+            data.push(discarded_cell);
+            data.push(buf_dropped_cell);
+            data.push(chan_fill_cell);
+            data.push(util_cell);
+            data.push(fill_cell);
+
             items.push(Row::new(data).style(Style::default()));
 
             // Add output rows
@@ -385,28 +478,38 @@ impl<'a> Widgets<'a> {
 
         let widths: &[Constraint] = if is_allocation_tracing_enabled() {
             &[
-                Constraint::Percentage(13), // ID
-                Constraint::Percentage(8),  // Output
-                Constraint::Percentage(5),  // Kind
-                Constraint::Percentage(9),  // Type
-                Constraint::Percentage(10), // Events In
-                Constraint::Percentage(12), // Bytes In
-                Constraint::Percentage(10), // Events Out
-                Constraint::Percentage(12), // Bytes Out
-                Constraint::Percentage(14), // Memory Used
-                Constraint::Percentage(7),  // Errors
+                Constraint::Percentage(9),  // ID
+                Constraint::Percentage(4),  // Output
+                Constraint::Percentage(4),  // Kind
+                Constraint::Percentage(5),  // Type
+                Constraint::Percentage(7),  // Events In
+                Constraint::Percentage(8),  // Bytes In
+                Constraint::Percentage(7),  // Events Out
+                Constraint::Percentage(8),  // Bytes Out
+                Constraint::Percentage(9),  // Memory Used
+                Constraint::Percentage(4),  // Errors
+                Constraint::Percentage(7),  // Discarded
+                Constraint::Percentage(7),  // BufDrop
+                Constraint::Percentage(7),  // ChanFill
+                Constraint::Percentage(7),  // Util%
+                Constraint::Percentage(7),  // Fill%
             ]
         } else {
             &[
-                Constraint::Percentage(13), // ID
-                Constraint::Percentage(12), // Output
-                Constraint::Percentage(10), // Kind
-                Constraint::Percentage(6),  // Type
-                Constraint::Percentage(12), // Events In
-                Constraint::Percentage(14), // Bytes In
-                Constraint::Percentage(12), // Events Out
-                Constraint::Percentage(14), // Bytes Out
-                Constraint::Percentage(7),  // Errors
+                Constraint::Percentage(9),  // ID
+                Constraint::Percentage(6),  // Output
+                Constraint::Percentage(5),  // Kind
+                Constraint::Percentage(4),  // Type
+                Constraint::Percentage(8),  // Events In
+                Constraint::Percentage(9),  // Bytes In
+                Constraint::Percentage(8),  // Events Out
+                Constraint::Percentage(9),  // Bytes Out
+                Constraint::Percentage(4),  // Errors
+                Constraint::Percentage(7),  // Discarded
+                Constraint::Percentage(7),  // BufDrop
+                Constraint::Percentage(7),  // ChanFill
+                Constraint::Percentage(8),  // Util%
+                Constraint::Percentage(9),  // Fill%
             ]
         };
         let w = Table::new(items, widths)
