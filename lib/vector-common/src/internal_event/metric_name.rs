@@ -127,6 +127,7 @@ pub enum HistogramName {
     HttpClientRttSeconds,
     HttpClientResponseRttSeconds,
     HttpClientErrorRttSeconds,
+    EstimatedConcurrentTransformSchedulingPressure,
 }
 
 impl HistogramName {
@@ -160,6 +161,9 @@ impl HistogramName {
             Self::HttpClientRttSeconds => "http_client_rtt_seconds",
             Self::HttpClientResponseRttSeconds => "http_client_response_rtt_seconds",
             Self::HttpClientErrorRttSeconds => "http_client_error_rtt_seconds",
+            Self::EstimatedConcurrentTransformSchedulingPressure => {
+                "estimated_concurrent_transform_scheduling_pressure"
+            }
         }
     }
 }
