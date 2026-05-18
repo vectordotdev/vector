@@ -69,6 +69,35 @@ Integration tests are not run by default when running `make test`. Instead, they
 You should use `./scripts/run-integration-test.sh`, which is the wrapper used by CI and which suits most development needs. Integration tests require a `cargo vdev int start`, `cargo vdev int test`, and `cargo vdev int stop`, which the script handles automatically. You can find the list of available integration tests using `cargo vdev int show`.
 
 
+## Testing vdev changes in a PR
+
+CI consumes a released vdev binary, so changes to `vdev/**` in a PR are not picked up by CI until a new version is published. When in-PR validation of a vdev change is needed, use a release candidate:
+
+1. **Bump the version** in `vdev/Cargo.toml` to the next pre-release (e.g. `0.3.4-rc.1` or `0.3.4-pr.1234`).
+
+2. **Push a tag** from the PR branch:
+
+   ```sh
+   git tag vdev-v0.3.4-pr.1234
+   git push origin vdev-v0.3.4-pr.1234
+   ```
+
+   This triggers `vdev_publish.yml`, which builds and uploads the binaries to a GitHub pre-release. No crates.io publish happens for pre-release tags (`-rc.*` or `-pr.*`).
+
+3. **Bump `VDEV_VERSION`** in `scripts/environment/prepare.sh` to the pre-release version:
+
+   ```sh
+   VDEV_VERSION="0.3.4-pr.1234"
+   ```
+
+   Commit this to the PR so CI binstalls the pre-release binary.
+
+4. **Validate** by watching the PR's CI runs. Once the change is confirmed, land the PR.
+
+5. **Promote to a stable release**: bump `vdev/Cargo.toml` to `0.3.4`, push `vdev-v0.3.4`, then update `VDEV_VERSION` in `prepare.sh` to `0.3.4`.
+
+The RC tag reuses the existing publish machinery (`vdev_publish.yml`) with no extra steps. `cargo binstall` resolves the version from the GitHub release assets, so crates.io is not involved for RC installs.
+
 ## Developing vdev
 
 If you are actively developing vdev itself, install from your working tree so the binary on `PATH` reflects your local changes:
