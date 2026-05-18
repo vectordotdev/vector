@@ -186,6 +186,49 @@ impl Inner {
 /// same boundary, but on a single future rather than the whole runtime, and
 /// it works on stable Rust without `--cfg tokio_unstable`.
 ///
+/// # Measurement scope and upstream isolation
+///
+/// Vector components communicate only through `BufferReceiver`/`BufferSender`
+/// channels — never through stream combinators chained across component
+/// boundaries. Each component runs in its own tokio task. When a transform
+/// polls its input channel, it dequeues items that the upstream component
+/// computed earlier, in its own task; it does **not** execute any upstream
+/// code. The upstream's CPU was already charged to the upstream's counter at
+/// the time those items were produced. This holds even when the channel is
+/// always full: the items were produced by upstream CPU that was already
+/// counted upstream; we are only dequeuing them.
+///
+/// As a consequence, this counter for a transform task **includes**:
+///
+/// - Input-channel dequeue (our task's poll of the channel, not upstream work)
+/// - `on_events_received` bookkeeping and metric emit
+/// - `transform_all` (the core CPU cost)
+/// - `send_outputs` / fanout dispatch to downstream channels
+/// - Per-event schema validation and latency recording
+/// - For transforms that spawn helper tasks (e.g. `aws_ec2_metadata` IMDS
+///   refresh, `throttle`'s flush loop): those tasks' polls, via
+///   [`spawn_timed`], feed the **same** counter rather than being silently
+///   excluded.
+///
+/// And **does not** include:
+///
+/// - Other components' CPU — channel isolation guarantees this.
+/// - Time the task is parked (`Poll::Pending`): no polls → no measurement.
+///   Back-pressure and input starvation show up as flat counter growth.
+/// - `Drop` of the inner future after the final `Poll::Ready`. The drop runs
+///   after `CpuTimedFuture::poll` returns, so it is outside the timed window.
+///   This is a one-time cost at task shutdown, not steady-state.
+/// - Tokio scheduler and waker overhead — executor work, not component work.
+///
+/// # Concurrent sync transforms
+///
+/// For transforms that run concurrently (`enable_concurrency() == true`), both
+/// the driver future **and** each per-batch spawned task are wrapped with this
+/// adapter. Because the spawned tasks are separate tokio tasks, the driver's
+/// `CpuTimedFuture` never observes their polls — there is no double-counting.
+/// The driver is measured for: input dequeue, `on_events_received`, and
+/// `send_outputs`. Each spawned task is measured for: `transform_all`.
+///
 /// Construct it via [`CpuTimedExt::cpu_timed`].
 #[pin_project]
 pub(crate) struct CpuTimedFuture<F> {
@@ -245,12 +288,28 @@ where
     tokio::spawn(future.cpu_timed(counter))
 }
 
-/// Registers the per-component CPU counter with the metrics recorder under
-/// `name` on platforms where thread CPU time is available (Linux, macOS,
+/// Registers the `component_cpu_usage_ns_total` counter for the calling
+/// component on platforms where thread CPU time is available (Linux, macOS,
 /// Windows). On other platforms it returns [`Counter::noop()`] — the metric
-/// is **not** emitted at all there, rather than reporting wall-clock or
-/// zero values that would be misleading to compare against supported
-/// platforms.
+/// is **not** emitted at all, rather than reporting wall-clock or zero values
+/// that would be misleading to compare against supported platforms.
+///
+/// Call this inside a tracing span that carries `component_id`,
+/// `component_kind`, and `component_type` labels so that those labels are
+/// automatically attached to the registered counter by the metrics recorder.
+///
+/// # Using the emitted counter
+///
+/// The counter is cumulative nanoseconds of CPU time. To derive the average
+/// number of CPU cores a component consumed over a window:
+///
+/// ```promql
+/// rate(component_cpu_usage_ns_total{component_id="my_remap"}[1m]) / 1e9
+/// ```
+///
+/// This value can exceed 1.0 when a transform genuinely uses multiple cores
+/// (concurrent execution path). Compare against `utilization` to separate
+/// CPU cost from pipeline back-pressure.
 #[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
 pub(crate) fn register_counter() -> Counter {
     vector_lib::counter!(vector_lib::internal_event::CounterName::ComponentCpuUsageNsTotal)

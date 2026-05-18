@@ -1269,11 +1269,8 @@ impl Runner {
                             let mut t = self.transform.clone();
                             let mut outputs_buf = self.outputs.new_buf_with_capacity(len);
                             // Hook CPU-time accounting onto the spawned task at
-                            // the `Future::poll` boundary. The transform body
-                            // contains no `.await`, so a single poll runs to
-                            // completion on one worker thread; if a future
-                            // refactor adds awaits, accumulation across polls
-                            // remains correct.
+                            // the `Future::poll` boundary.
+                            // This is a separate task from the current one, so there is no double-counting.
                             let task = spawn_timed(
                                 async move {
                                     for events in input_arrays {
