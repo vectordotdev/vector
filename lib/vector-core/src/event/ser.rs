@@ -3,9 +3,10 @@ use enumflags2::{BitFlags, FromBitsError, bitflags};
 use prost::Message;
 use snafu::Snafu;
 use vector_buffers::encoding::{AsMetadata, Encodable};
+use vector_common::internal_event::{self, ComponentEventsDropped, UNINTENTIONAL};
 use vrl::value::Value;
 
-use super::{Event, EventArray, proto};
+use super::{Event, EventArray, EventStatus, proto};
 
 /// Maximum nesting depth for event data values (`Log.fields`, `Trace.fields`).
 ///
@@ -71,18 +72,26 @@ pub(crate) fn check_value_depth(
 /// because the `Metadata` proto message adds an extra wrapper layer.
 ///
 /// For metrics, only metadata is checked since metric values have a fixed structure.
-pub fn event_exceeds_max_nesting_depth(event: &Event) -> Option<usize> {
+pub fn event_exceeds_max_nesting_depth(event: &Event) -> Option<(usize, usize)> {
     match event {
         Event::Log(log) => check_value_depth(log.value(), 0, MAX_NESTING_DEPTH)
-            .and_then(|()| check_value_depth(log.metadata().value(), 0, MAX_METADATA_NESTING_DEPTH))
+            .map_err(|op| (op, MAX_NESTING_DEPTH))
+            .and_then(|()| {
+                check_value_depth(log.metadata().value(), 0, MAX_METADATA_NESTING_DEPTH)
+                    .map_err(|op| (op, MAX_METADATA_NESTING_DEPTH))
+            })
             .err(),
         Event::Trace(trace) => check_value_depth(trace.value(), 0, MAX_NESTING_DEPTH)
+            .map_err(|op| (op, MAX_NESTING_DEPTH))
             .and_then(|()| {
                 check_value_depth(trace.metadata().value(), 0, MAX_METADATA_NESTING_DEPTH)
+                    .map_err(|op| (op, MAX_METADATA_NESTING_DEPTH))
             })
             .err(),
         Event::Metric(metric) => {
-            check_value_depth(metric.metadata().value(), 0, MAX_METADATA_NESTING_DEPTH).err()
+            check_value_depth(metric.metadata().value(), 0, MAX_METADATA_NESTING_DEPTH)
+                .map_err(|op| (op, MAX_METADATA_NESTING_DEPTH))
+                .err()
         }
     }
 }
@@ -218,6 +227,47 @@ impl Encodable for EventArray {
         proto::EventArray::from(self)
             .encode(buffer)
             .map_err(|_| EncodeError::BufferTooSmall)
+    }
+
+    fn pre_encode_drop_unencodable(&mut self) -> usize {
+        let exceeds =
+            |value: &Value, max_depth: usize| check_value_depth(value, 0, max_depth).is_err();
+        let mut dropped = 0;
+        match self {
+            EventArray::Logs(logs) => logs.retain(|log| {
+                let too_deep = exceeds(log.value(), MAX_NESTING_DEPTH)
+                    || exceeds(log.metadata().value(), MAX_METADATA_NESTING_DEPTH);
+                if too_deep {
+                    log.metadata().update_status(EventStatus::Rejected);
+                    dropped += 1;
+                }
+                !too_deep
+            }),
+            EventArray::Traces(traces) => traces.retain(|trace| {
+                let too_deep = exceeds(trace.value(), MAX_NESTING_DEPTH)
+                    || exceeds(trace.metadata().value(), MAX_METADATA_NESTING_DEPTH);
+                if too_deep {
+                    trace.metadata().update_status(EventStatus::Rejected);
+                    dropped += 1;
+                }
+                !too_deep
+            }),
+            EventArray::Metrics(metrics) => metrics.retain(|metric| {
+                let too_deep = exceeds(metric.metadata().value(), MAX_METADATA_NESTING_DEPTH);
+                if too_deep {
+                    metric.metadata().update_status(EventStatus::Rejected);
+                    dropped += 1;
+                }
+                !too_deep
+            }),
+        }
+        if dropped > 0 {
+            internal_event::emit(ComponentEventsDropped::<UNINTENTIONAL> {
+                count: dropped,
+                reason: "Event nesting depth exceeds maximum for protobuf encoding.",
+            });
+        }
+        dropped
     }
 
     fn decode<B>(metadata: Self::Metadata, buffer: B) -> Result<Self, Self::DecodeError>
