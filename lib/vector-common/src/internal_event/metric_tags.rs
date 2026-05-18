@@ -5,7 +5,7 @@ use std::sync::LazyLock;
 ///
 /// Intended for:
 /// - static initializers: `LazyLock::new(|| merge_lazy(&BASE, json!({...})))`
-/// - inline annotations:  `merge_lazy(&COMPONENT_TAGS, json!({...}))`
+/// - inline annotations: `merge_lazy(&COMPONENT_TAGS, json!({...}))`
 #[must_use]
 pub fn merge_lazy(base: &LazyLock<Value>, extra: Value) -> Value {
     let mut result = (**base).clone();
@@ -19,7 +19,7 @@ pub fn merge_lazy(base: &LazyLock<Value>, extra: Value) -> Value {
 
 pub static INTERNAL_METRICS_TAGS: LazyLock<Value> = LazyLock::new(|| {
     json!({
-        "pid":  {"description": "The process ID of the Vector instance.", "required": false},
+        "pid": {"description": "The process ID of the Vector instance.", "required": false},
         "host": {"description": "The hostname of the system Vector is running on.", "required": false}
     })
 });
@@ -32,12 +32,12 @@ pub static COMPONENT_TAGS: LazyLock<Value> = LazyLock::new(|| {
                 "description": "The Vector component kind.",
                 "required": true,
                 "enum": {
-                    "sink":      "Vector sink components",
-                    "source":    "Vector source components",
+                    "sink": "Vector sink components",
+                    "source": "Vector source components",
                     "transform": "Vector transform components"
                 }
             },
-            "component_id":   {"description": "The Vector component ID.", "required": true},
+            "component_id": {"description": "The Vector component ID.", "required": true},
             "component_type": {"description": "The Vector component type.", "required": true}
         }),
     )
@@ -58,7 +58,7 @@ pub static COMPONENT_TAGS_GRPC_METHOD_SERVICE: LazyLock<Value> = LazyLock::new(|
     merge_lazy(
         &COMPONENT_TAGS,
         json!({
-            "grpc_method":  {"description": "The name of the method called on the gRPC service.", "required": true},
+            "grpc_method": {"description": "The name of the method called on the gRPC service.", "required": true},
             "grpc_service": {"description": "The gRPC service name.", "required": true}
         }),
     )
@@ -114,34 +114,34 @@ pub static COMPONENT_TAGS_ERROR_TYPE_STAGE: LazyLock<Value> = LazyLock::new(|| {
         &COMPONENT_TAGS,
         json!({
             "error_type": {"description": "The type of the error", "required": true, "enum": {
-                "acknowledgements_failed":     "The acknowledgement operation failed.",
-                "delete_failed":               "The file deletion failed.",
-                "encode_failed":               "The encode operation failed.",
-                "field_missing":               "The event field was missing.",
-                "glob_failed":                 "The glob pattern match operation failed.",
-                "http_error":                  "The HTTP request resulted in an error code.",
-                "invalid_metric":              "The metric was invalid.",
-                "kafka_offset_update":         "The consumer offset update failed.",
-                "kafka_read":                  "The message from Kafka was invalid.",
-                "mapping_failed":              "The mapping failed.",
-                "match_failed":                "The match operation failed.",
-                "out_of_order":                "The event was out of order.",
-                "parse_failed":                "The parsing operation failed.",
-                "read_failed":                 "The file read operation failed.",
-                "render_error":                "The rendering operation failed.",
-                "stream_closed":               "The downstream was closed, forwarding the event(s) failed.",
-                "type_conversion_failed":      "The type conversion operating failed.",
-                "type_field_does_not_exist":   "The type field does not exist.",
+                "acknowledgements_failed": "The acknowledgement operation failed.",
+                "delete_failed": "The file deletion failed.",
+                "encode_failed": "The encode operation failed.",
+                "field_missing": "The event field was missing.",
+                "glob_failed": "The glob pattern match operation failed.",
+                "http_error": "The HTTP request resulted in an error code.",
+                "invalid_metric": "The metric was invalid.",
+                "kafka_offset_update": "The consumer offset update failed.",
+                "kafka_read": "The message from Kafka was invalid.",
+                "mapping_failed": "The mapping failed.",
+                "match_failed": "The match operation failed.",
+                "out_of_order": "The event was out of order.",
+                "parse_failed": "The parsing operation failed.",
+                "read_failed": "The file read operation failed.",
+                "render_error": "The rendering operation failed.",
+                "stream_closed": "The downstream was closed, forwarding the event(s) failed.",
+                "type_conversion_failed": "The type conversion operating failed.",
+                "type_field_does_not_exist": "The type field does not exist.",
                 "type_ip_address_parse_error": "The IP address did not parse.",
-                "unlabeled_event":             "The event was not labeled.",
-                "value_invalid":               "The value was invalid.",
-                "watch_failed":                "The file watch operation failed.",
-                "write_failed":                "The file write operation failed."
+                "unlabeled_event": "The event was not labeled.",
+                "value_invalid": "The value was invalid.",
+                "watch_failed": "The file watch operation failed.",
+                "write_failed": "The file write operation failed."
             }},
             "stage": {"description": "The stage within the component at which the error occurred.", "required": true, "enum": {
-                "receiving":  "While receiving data.",
+                "receiving": "While receiving data.",
                 "processing": "While processing data within the component.",
-                "sending":    "While sending data."
+                "sending": "While sending data."
             }}
         }),
     )
@@ -164,7 +164,7 @@ pub static INTERNAL_METRICS_TAGS_REASON: LazyLock<Value> = LazyLock::new(|| {
         json!({
             "reason": {"description": "The type of the error", "required": true, "enum": {
                 "out_of_order": "The event was out of order.",
-                "oversized":    "The event was too large."
+                "oversized": "The event was too large."
             }}
         }),
     )
@@ -176,15 +176,15 @@ pub static COMPONENT_RECEIVED_EVENTS_TOTAL_TAGS: LazyLock<Value> = LazyLock::new
     merge_lazy(
         &COMPONENT_TAGS,
         json!({
-            "file":           {"description": "The file from which the data originated.", "required": false},
-            "uri":            {"description": "The sanitized URI from which the data originated.", "required": false},
+            "file": {"description": "The file from which the data originated.", "required": false},
+            "uri": {"description": "The sanitized URI from which the data originated.", "required": false},
             "container_name": {"description": "The name of the container from which the data originated.", "required": false},
-            "pod_name":       {"description": "The name of the pod from which the data originated.", "required": false},
-            "peer_addr":      {"description": "The IP from which the data originated.", "required": false},
-            "peer_path":      {"description": "The pathname from which the data originated.", "required": false},
-            "mode":           {"description": "The connection mode used by the component.", "required": false, "enum": {
-                "udp":  "User Datagram Protocol",
-                "tcp":  "Transmission Control Protocol",
+            "pod_name": {"description": "The name of the pod from which the data originated.", "required": false},
+            "peer_addr": {"description": "The IP from which the data originated.", "required": false},
+            "peer_path": {"description": "The pathname from which the data originated.", "required": false},
+            "mode": {"description": "The connection mode used by the component.", "required": false, "enum": {
+                "udp": "User Datagram Protocol",
+                "tcp": "Transmission Control Protocol",
                 "unix": "Unix domain socket"
             }}
         }),
