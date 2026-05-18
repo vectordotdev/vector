@@ -82,11 +82,11 @@ pub enum CounterName {
     #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     BufferSentBytesTotal,
 
-    /// The number of events dropped by this non-blocking buffer.
+    /// The number of events dropped by this buffer.
     #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     BufferDiscardedEventsTotal,
 
-    /// The number of bytes dropped by this non-blocking buffer.
+    /// The number of bytes dropped by this buffer.
     #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     BufferDiscardedBytesTotal,
 
@@ -419,7 +419,7 @@ pub enum CounterName {
 
     /// The total number of errors reading datagram.
     #[configurable(metadata(docs::tags = merge_lazy(&COMPONENT_TAGS, json!({
-        "mode": {"description": "", "required": true, "enum": {"udp": "User Datagram Protocol"}}
+        "mode": {"description": "The connection mode used by the component.", "required": true, "enum": {"udp": "User Datagram Protocol"}}
     }))))]
     ConnectionReadErrorsTotal,
 
@@ -482,7 +482,7 @@ pub enum HistogramName {
     #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     AdaptiveConcurrencyAveragedRtt,
 
-    /// The amount of back pressure on the current component.
+    /// A boolean sample (1.0 if back pressure was observed during the current window, 0.0 otherwise).
     #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     AdaptiveConcurrencyBackPressure,
 
@@ -498,7 +498,7 @@ pub enum HistogramName {
     #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     AdaptiveConcurrencyObservedRtt,
 
-    /// The mean round-trip time (RTT) for the current window.
+    /// The mean round-trip time (RTT) from past windows, used as the baseline for adaptive concurrency decisions.
     #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     AdaptiveConcurrencyPastRttMean,
 

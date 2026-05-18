@@ -121,7 +121,7 @@ components: sources: internal_metrics: output: metrics: {
 		}
 	}
 	adaptive_concurrency_back_pressure: {
-		description:       "The amount of back pressure on the current component."
+		description:       "A boolean sample (1.0 if back pressure was observed during the current window, 0.0 otherwise)."
 		type:              "histogram"
 		default_namespace: "vector"
 		tags: {
@@ -273,7 +273,7 @@ components: sources: internal_metrics: output: metrics: {
 		}
 	}
 	adaptive_concurrency_past_rtt_mean: {
-		description:       "The mean round-trip time (RTT) for the current window."
+		description:       "The mean round-trip time (RTT) from past windows, used as the baseline for adaptive concurrency decisions."
 		type:              "histogram"
 		default_namespace: "vector"
 		tags: {
@@ -522,7 +522,7 @@ components: sources: internal_metrics: output: metrics: {
 		deprecated_message: "This metric has been deprecated in favor of [`buffer_size_bytes`](#buffer_size_bytes)."
 	}
 	buffer_discarded_bytes_total: {
-		description:       "The number of bytes dropped by this non-blocking buffer."
+		description:       "The number of bytes dropped by this buffer."
 		type:              "counter"
 		default_namespace: "vector"
 		tags: {
@@ -560,7 +560,7 @@ components: sources: internal_metrics: output: metrics: {
 		}
 	}
 	buffer_discarded_events_total: {
-		description:       "The number of events dropped by this non-blocking buffer."
+		description:       "The number of events dropped by this buffer."
 		type:              "counter"
 		default_namespace: "vector"
 		tags: {
@@ -2236,7 +2236,7 @@ components: sources: internal_metrics: output: metrics: {
 				examples: ["file", "http", "honeycomb", "splunk_hec"]
 			}
 			mode: {
-				description: ""
+				description: "The connection mode used by the component."
 				required:    true
 				enum: udp: "User Datagram Protocol"
 			}
