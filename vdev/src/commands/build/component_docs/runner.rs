@@ -2,7 +2,6 @@ use super::schema::SchemaContext;
 use anyhow::{Context, Result, bail};
 use indexmap::IndexMap;
 use serde_json::{Value, json};
-use std::fmt::Write as _;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -75,7 +74,7 @@ pub fn run(schema_path: &Path) -> Result<()> {
     // 4. Generate internal_metric_descriptions.cue from the metric name enums
     //    injected into the schema by `vector generate-schema`.
     if let Some(metric_schemas) = root_schema.get("_metric_schemas") {
-        generate_internal_metric_descriptions(metric_schemas)?;
+        generate_internal_metric_descriptions(&mut context, metric_schemas)?;
     }
 
     Ok(())
@@ -362,80 +361,11 @@ fn render_and_import_generated_top_level_config_schema(
     Ok(())
 }
 
-/// Converts a flat JSON tag-field object to a CUE struct literal.
-///
-/// The JSON is a map of tag-field names to field definitions:
-/// ```json
-/// {
-///   "component_id": {"description": "...", "required": true},
-///   "output":       {"description": "...", "required": false},
-///   "mode":         {"description": "...", "required": true,
-///                    "enum": {"udp": "User Datagram Protocol"}}
-/// }
-/// ```
-/// Produces: `{component_id: {description: "...", required: true}, output: {...}, ...}`
-fn json_tags_to_cue(obj: &serde_json::Map<String, Value>) -> String {
-    if obj.is_empty() {
-        return "{}".to_owned();
-    }
-
-    let fields: Vec<String> = obj
-        .iter()
-        .map(|(name, field)| {
-            let field_cue = json_field_to_cue(field);
-            format!("{name}: {field_cue}")
-        })
-        .collect();
-
-    format!("{{{}}}", fields.join(", "))
-}
-
-fn json_field_to_cue(val: &Value) -> String {
-    match val {
-        Value::Object(obj) => {
-            let desc = obj.get("description").and_then(Value::as_str).unwrap_or("");
-            let required = obj
-                .get("required")
-                .and_then(Value::as_bool)
-                .unwrap_or(false);
-            let enum_part = obj
-                .get("enum")
-                .and_then(Value::as_object)
-                .map_or(String::new(), |e| {
-                    let pairs: Vec<String> = e
-                        .iter()
-                        .map(|(k, v)| format!("{k}: \"{}\"", v.as_str().unwrap_or_default()))
-                        .collect();
-                    format!(", enum: {{{}}}", pairs.join(", "))
-                });
-            format!("{{description: \"{desc}\", required: {required}{enum_part}}}")
-        }
-        Value::String(s) => format!("\"{s}\""),
-        Value::Bool(b) => b.to_string(),
-        Value::Number(n) => n.to_string(),
-        _ => "{}".to_owned(),
-    }
-}
-
-struct MetricEntry {
-    name: String,
-    metric_type: &'static str,
-    description: String,
-    tags: String,
-    deprecated: bool,
-    deprecated_message: Option<String>,
-}
-
-fn generate_internal_metric_descriptions(metric_schemas: &Value) -> Result<()> {
-    let out_path =
-        PathBuf::from("website/cue/reference/generated/internal_metric_descriptions.cue");
-
-    if let Some(parent) = out_path.parent() {
-        fs::create_dir_all(parent)?;
-    }
-
-    let mut entries: Vec<MetricEntry> = Vec::new();
-
+/// Collects all metric variants from `metric_schemas` into an alphabetically-sorted JSON map.
+fn collect_metric_entries(
+    metric_schemas: &Value,
+) -> std::collections::BTreeMap<String, Value> {
+    let mut metrics = std::collections::BTreeMap::new();
     for (metric_type, schema) in [
         ("counter", metric_schemas.get("counters")),
         ("histogram", metric_schemas.get("histograms")),
@@ -454,19 +384,10 @@ fn generate_internal_metric_descriptions(metric_schemas: &Value) -> Result<()> {
             let Some(desc) = variant.get("description").and_then(Value::as_str) else {
                 continue;
             };
-            let deprecated = variant
-                .get("deprecated")
-                .and_then(Value::as_bool)
-                .unwrap_or(false);
-            let deprecated_message = variant
-                .get("_metadata")
-                .and_then(|m| m.get("deprecated_message"))
-                .and_then(Value::as_str)
-                .map(str::to_owned);
             let tags = match variant.get("_metadata").and_then(|m| m.get("docs::tags")) {
-                Some(Value::Object(obj)) => json_tags_to_cue(obj),
-                // String values are plain CUE expressions emitted verbatim (e.g. "{}").
-                Some(Value::String(s)) => s.clone(),
+                Some(v @ Value::Object(_)) => v.clone(),
+                // "{}" is the only string value used — treat it as an empty object.
+                Some(Value::String(s)) if s == "{}" => json!({}),
                 _ => {
                     warn!(
                         "metric variant '{}' has no docs::tags metadata — \
@@ -476,56 +397,91 @@ fn generate_internal_metric_descriptions(metric_schemas: &Value) -> Result<()> {
                     continue;
                 }
             };
-
-            entries.push(MetricEntry {
-                name: name.to_owned(),
-                metric_type,
-                description: desc
-                    .replace('\\', "\\\\")
-                    .replace('"', "\\\"")
-                    .replace('\n', "\\n"),
-                tags,
-                deprecated,
-                deprecated_message,
+            let deprecated = variant
+                .get("deprecated")
+                .and_then(Value::as_bool)
+                .unwrap_or(false);
+            let mut entry = json!({
+                "description": desc,
+                "type": metric_type,
+                "default_namespace": "vector",
+                "tags": tags,
             });
+            if deprecated {
+                entry["deprecated"] = json!(true);
+                if let Some(msg) = variant
+                    .get("_metadata")
+                    .and_then(|m| m.get("deprecated_message"))
+                    .and_then(Value::as_str)
+                {
+                    entry["deprecated_message"] = json!(msg);
+                }
+            }
+            metrics.insert(name.to_owned(), entry);
         }
     }
+    metrics
+}
 
-    entries.sort_by(|a, b| a.name.cmp(&b.name));
+fn generate_internal_metric_descriptions(
+    context: &mut SchemaContext,
+    metric_schemas: &Value,
+) -> Result<()> {
+    let out_path =
+        PathBuf::from("website/cue/reference/generated/internal_metric_descriptions.cue");
 
-    let mut cue = String::from(
-        "package metadata\n\
-         \n\
-         // Auto-generated by `vdev build component-docs`.\n\
-         // Do not edit manually — update the doc comment (or #[configurable(deprecated)]\n\
-         // attribute) on the relevant CounterName / HistogramName / GaugeName variant in\n\
-         // lib/vector-common/src/internal_event/metric_name.rs instead,\n\
-         // then re-run `make generate-component-docs`.\n\
-         components: sources: internal_metrics: output: metrics: {\n",
-    );
+    let metrics_value: serde_json::Map<String, Value> =
+        collect_metric_entries(metric_schemas).into_iter().collect();
 
-    for e in &entries {
-        writeln!(cue, "\t{}: {{", e.name).unwrap();
-        writeln!(cue, "\t\tdescription:       \"{}\"", e.description).unwrap();
-        writeln!(cue, "\t\ttype:              \"{}\"", e.metric_type).unwrap();
-        cue.push_str("\t\tdefault_namespace: \"vector\"\n");
-        writeln!(cue, "\t\ttags:              {}", e.tags).unwrap();
-        if e.deprecated {
-            cue.push_str("\t\tdeprecated:  true\n");
-            if let Some(msg) = &e.deprecated_message {
-                let escaped = msg
-                    .replace('\\', "\\\\")
-                    .replace('"', "\\\"")
-                    .replace('\n', "\\n");
-                writeln!(cue, "\t\tdeprecated_message: \"{escaped}\"").unwrap();
+    let data = json!({
+        "components": {
+            "sources": {
+                "internal_metrics": {
+                    "output": {
+                        "metrics": Value::Object(metrics_value)
+                    }
+                }
             }
         }
-        cue.push_str("\t}\n");
+    });
+
+    let json_str = serde_json::to_string_pretty(&data)?;
+    let json_file =
+        write_to_temp_file("internal-metric-descriptions-", ".json", &json_str)?;
+
+    if let Some(parent) = out_path.parent() {
+        fs::create_dir_all(parent)?;
     }
 
-    cue.push_str("}\n");
+    let status = Command::new(&context.cue_binary_path)
+        .args([
+            "import",
+            "-f",
+            "-o",
+            out_path.to_str().unwrap(),
+            "-p",
+            "metadata",
+            json_file.to_str().unwrap(),
+        ])
+        .status()?;
 
-    fs::write(&out_path, &cue)?;
+    if !status.success() {
+        bail!(
+            "Failed to import internal metric descriptions as valid CUE \
+             (cue exit status {status}). JSON written to {json_path}.",
+            json_path = json_file.display()
+        );
+    }
+
+    // Prepend the auto-generated header so editors know not to edit the file directly.
+    let generated = fs::read_to_string(&out_path)?;
+    let header = "// Auto-generated by `vdev build component-docs`.\n\
+                  // Do not edit manually — update the doc comment (or #[configurable(deprecated)]\n\
+                  // attribute) on the relevant CounterName / HistogramName / GaugeName variant in\n\
+                  // lib/vector-common/src/internal_event/metric_name.rs instead,\n\
+                  // then re-run `make generate-component-docs`.\n";
+    fs::write(&out_path, format!("{header}{generated}"))?;
+
     info!(
         "[✓]   Wrote internal metric descriptions to '{}'.",
         out_path.display()

@@ -19,8 +19,8 @@ pub fn merge_lazy(base: &LazyLock<Value>, extra: Value) -> Value {
 
 pub static INTERNAL_METRICS_TAGS: LazyLock<Value> = LazyLock::new(|| {
     json!({
-        "pid": {"description": "The process ID of the Vector instance.", "required": false},
-        "host": {"description": "The hostname of the system Vector is running on.", "required": false}
+        "pid": {"description": "The process ID of the Vector instance.", "required": false, "examples": ["4232"]},
+        "host": {"description": "The hostname of the system Vector is running on.", "required": false, "examples": ["my-host.local"]}
     })
 });
 
@@ -37,8 +37,8 @@ pub static COMPONENT_TAGS: LazyLock<Value> = LazyLock::new(|| {
                     "transform": "Vector transform components"
                 }
             },
-            "component_id": {"description": "The Vector component ID.", "required": true},
-            "component_type": {"description": "The Vector component type.", "required": true}
+            "component_id": {"description": "The Vector component ID.", "required": true, "examples": ["my_source", "my_sink"]},
+            "component_type": {"description": "The Vector component type.", "required": true, "examples": ["file", "http", "honeycomb", "splunk_hec"]}
         }),
     )
 });
