@@ -19,6 +19,10 @@ components: sources: internal_metrics: {
 
 	features: {
 		acknowledgements: false
+		collect: {
+			checkpoint: enabled: false
+			from: service:       services.vector
+		}
 		multiline: enabled: false
 	}
 
@@ -34,5 +38,18 @@ components: sources: internal_metrics: {
 
 	configuration: generated.components.sources.internal_metrics.configuration
 
-	how_it_works: {}
+	how_it_works: {
+		unique_series: {
+			title: "Sending metrics from multiple Vector instances"
+			body: """
+				When sending `internal_metrics` from multiple Vector instances
+				to the same destination, you will typically want to tag the
+				metrics with a tag that is unique to the Vector instance sending
+				the metrics to avoid the metric series conflicting. The
+				`tags.host_key` option can be used for this, but you can also
+				use a subsequent `remap` transform to add a different unique
+				tag from the environment.
+				"""
+		}
+	}
 }
