@@ -434,8 +434,9 @@ fn generate_internal_metric_descriptions(metric_schemas: &Value) -> Result<()> {
 
     for e in &entries {
         writeln!(cue, "\t{}: {{", e.name).unwrap();
-        writeln!(cue, "\t\tdescription: \"{}\"", e.description).unwrap();
-        writeln!(cue, "\t\ttype:        \"{}\"", e.metric_type).unwrap();
+        writeln!(cue, "\t\tdescription:       \"{}\"", e.description).unwrap();
+        writeln!(cue, "\t\ttype:              \"{}\"", e.metric_type).unwrap();
+        cue.push_str("\t\tdefault_namespace: \"vector\"\n");
         if e.deprecated {
             cue.push_str("\t\tdeprecated:  true\n");
             if let Some(msg) = &e.deprecated_message {
