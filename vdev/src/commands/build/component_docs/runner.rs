@@ -362,6 +362,74 @@ fn render_and_import_generated_top_level_config_schema(
     Ok(())
 }
 
+/// Converts a `docs::tags` JSON object produced by `serde_json::json!()` to a CUE expression.
+///
+/// Expected shape:
+/// ```json
+/// {
+///   "base": "_component_tags",          // optional CUE tag-group reference
+///   "extra": {
+///     "output": "_output",              // string value → CUE reference
+///     "mode": {                         // object value → inline definition
+///       "description": "...",
+///       "required": true,
+///       "enum": { "udp": "..." }        // optional
+///     }
+///   }
+/// }
+/// ```
+fn json_tags_to_cue(obj: &serde_json::Map<String, Value>) -> String {
+    let base = obj.get("base").and_then(Value::as_str);
+
+    let extras = obj.get("extra").and_then(Value::as_object).map(|extra| {
+        extra
+            .iter()
+            .map(|(name, val)| match val {
+                Value::String(cue_ref) => format!("{name}: {cue_ref}"),
+                Value::Object(field) => {
+                    let desc = field
+                        .get("description")
+                        .and_then(Value::as_str)
+                        .unwrap_or("");
+                    let required = field
+                        .get("required")
+                        .and_then(Value::as_bool)
+                        .unwrap_or(false);
+                    let enum_part =
+                        field
+                            .get("enum")
+                            .and_then(Value::as_object)
+                            .map_or(String::new(), |e| {
+                                let pairs: Vec<String> = e
+                                    .iter()
+                                    .map(|(k, v)| {
+                                        format!(
+                                            "{k}: \"{}\"",
+                                            v.as_str().unwrap_or_default()
+                                        )
+                                    })
+                                    .collect();
+                                format!(", enum: {{{}}}", pairs.join(", "))
+                            });
+                    format!(
+                        "{name}: {{description: \"{desc}\", required: {required}{enum_part}}}"
+                    )
+                }
+                _ => String::new(),
+            })
+            .filter(|s| !s.is_empty())
+            .collect::<Vec<_>>()
+            .join(", ")
+    });
+
+    match (base, extras.as_deref()) {
+        (None, None | Some("")) => "{}".to_owned(),
+        (Some(b), None | Some("")) => b.to_owned(),
+        (None, Some(ex)) => format!("{{{ex}}}"),
+        (Some(b), Some(ex)) => format!("{b} & {{{ex}}}"),
+    }
+}
+
 struct MetricEntry {
     name: String,
     metric_type: &'static str,
@@ -409,12 +477,11 @@ fn generate_internal_metric_descriptions(metric_schemas: &Value) -> Result<()> {
                 .and_then(|m| m.get("deprecated_message"))
                 .and_then(Value::as_str)
                 .map(str::to_owned);
-            let tags = variant
-                .get("_metadata")
-                .and_then(|m| m.get("docs::tags"))
-                .and_then(Value::as_str)
-                .unwrap_or("_component_tags")
-                .to_owned();
+            let tags = match variant.get("_metadata").and_then(|m| m.get("docs::tags")) {
+                Some(Value::String(s)) => s.clone(),
+                Some(Value::Object(obj)) => json_tags_to_cue(obj),
+                _ => "_component_tags".to_owned(),
+            };
 
             entries.push(MetricEntry {
                 name: name.to_owned(),

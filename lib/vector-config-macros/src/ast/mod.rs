@@ -237,6 +237,11 @@ impl FromMeta for Metadata {
                             key: path_to_string(&nv.path),
                             value: path.to_token_stream(),
                         }),
+                        // Accept macro invocations such as `serde_json::json!({...})`.
+                        Expr::Macro(mac) => Some(LazyCustomAttribute::KeyValue {
+                            key: path_to_string(&nv.path),
+                            value: mac.to_token_stream(),
+                        }),
                         expr => {
                             errors
                                 .push(darling::Error::unexpected_expr_type(expr).with_span(nmeta));
