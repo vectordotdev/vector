@@ -19,6 +19,10 @@ use crate::{
     config::{
         EnrichmentTableConfig, SinkConfig, SinkContext, SourceConfig, SourceContext, SourceOutput,
     },
+    enrichment_tables::memory::{
+        bloom_table::{BloomMemoryConfig, BloomMemoryTable},
+        cuckoo_table::{CuckooMemoryConfig, CuckooMemoryTable},
+    },
     sinks::Healthcheck,
     sources::Source,
 };
@@ -69,8 +73,18 @@ pub struct MemoryConfig {
     #[serde(default)]
     pub ttl_field: OptionalValuePath,
 
+    /// Set to make the table act as a probabilistic filter instead of storing original values. This
+    /// will prevent reading values from the table - found keys will have empty value.
+    #[configurable(derived)]
+    #[serde(default)]
+    pub filter: Option<TableFilter>,
+
     #[serde(skip)]
     memory: Arc<Mutex<Option<Box<Memory>>>>,
+    #[serde(skip)]
+    cuckoo: Arc<Mutex<Option<Box<CuckooMemoryTable>>>>,
+    #[serde(skip)]
+    bloom: Arc<Mutex<Option<Box<BloomMemoryTable>>>>,
 }
 
 /// Configuration for memory enrichment table source functionality.
@@ -102,6 +116,22 @@ pub struct MemorySourceConfig {
     pub source_key: String,
 }
 
+/// Configuration for memory enrichment table filter functionality.
+#[configurable_component]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[serde(deny_unknown_fields, rename_all = "snake_case", tag = "type")]
+#[configurable(metadata(docs::enum_tag_description = "The probabilistic filter to use."))]
+pub enum TableFilter {
+    /// Cuckoo filter
+    ///
+    /// Supports removal too, as well as TTL and LRU
+    Cuckoo(CuckooMemoryConfig),
+    /// Bloom filter
+    ///
+    /// Only supports insertion and presence check, no TTL
+    Bloom(BloomMemoryConfig),
+}
+
 impl PartialEq for MemoryConfig {
     fn eq(&self, other: &Self) -> bool {
         self.ttl == other.ttl
@@ -118,11 +148,14 @@ impl Default for MemoryConfig {
             scan_interval: default_scan_interval(),
             flush_interval: None,
             memory: Arc::new(Mutex::new(None)),
+            cuckoo: Arc::new(Mutex::new(None)),
+            bloom: Arc::new(Mutex::new(None)),
             max_byte_size: None,
             log_namespace: None,
             source_config: None,
             internal_metrics: InternalMetricsConfig::default(),
             ttl_field: OptionalValuePath::none(),
+            filter: None,
         }
     }
 }
@@ -142,6 +175,40 @@ impl MemoryConfig {
             .get_or_insert_with(|| Box::new(Memory::new(self.clone())))
             .clone()
     }
+
+    pub(super) async fn get_or_build_cuckoo(&self) -> crate::Result<CuckooMemoryTable> {
+        let mut boxed_cuckoo = self.cuckoo.lock().await;
+        let Some(TableFilter::Cuckoo(cuckoo)) = &self.filter else {
+            panic!("No cuckoo");
+        };
+        if let Some(boxed_cuckoo) = boxed_cuckoo.as_ref() {
+            Ok(*boxed_cuckoo.clone())
+        } else {
+            Ok(*boxed_cuckoo
+                .insert(Box::new(CuckooMemoryTable::new(
+                    self.clone(),
+                    cuckoo.clone(),
+                )?))
+                .clone())
+        }
+    }
+
+    pub(super) async fn get_or_build_bloom(&self) -> crate::Result<BloomMemoryTable> {
+        let mut boxed_bloom = self.bloom.lock().await;
+        let Some(TableFilter::Bloom(bloom)) = &self.filter else {
+            panic!("No bloom");
+        };
+        if let Some(boxed_bloom) = boxed_bloom.as_ref() {
+            Ok(*boxed_bloom.clone())
+        } else {
+            Ok(*boxed_bloom
+                .insert(Box::new(BloomMemoryTable::new(
+                    self.clone(),
+                    bloom.clone(),
+                )?))
+                .clone())
+        }
+    }
 }
 
 impl EnrichmentTableConfig for MemoryConfig {
@@ -149,7 +216,11 @@ impl EnrichmentTableConfig for MemoryConfig {
         &self,
         _globals: &crate::config::GlobalOptions,
     ) -> crate::Result<Box<dyn Table + Send + Sync>> {
-        Ok(Box::new(self.get_or_build_memory().await))
+        match &self.filter {
+            Some(TableFilter::Cuckoo(_)) => Ok(Box::new(self.get_or_build_cuckoo().await?)),
+            Some(TableFilter::Bloom(_)) => Ok(Box::new(self.get_or_build_bloom().await?)),
+            None => Ok(Box::new(self.get_or_build_memory().await)),
+        }
     }
 
     fn sink_config(
@@ -177,7 +248,15 @@ impl EnrichmentTableConfig for MemoryConfig {
 #[typetag::serde(name = "memory_enrichment_table")]
 impl SinkConfig for MemoryConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let sink = VectorSink::from_event_streamsink(self.get_or_build_memory().await);
+        let sink = match &self.filter {
+            Some(TableFilter::Cuckoo(_)) => {
+                VectorSink::from_event_streamsink(self.get_or_build_cuckoo().await?)
+            }
+            Some(TableFilter::Bloom(_)) => {
+                VectorSink::from_event_streamsink(self.get_or_build_bloom().await?)
+            }
+            None => VectorSink::from_event_streamsink(self.get_or_build_memory().await),
+        };
 
         Ok((sink, future::ok(()).boxed()))
     }
