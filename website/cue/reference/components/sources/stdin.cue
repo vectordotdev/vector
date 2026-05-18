@@ -92,6 +92,5 @@ components: sources: stdin: {
 		}
 	}
 
-	telemetry: metrics: {
-	}
+	telemetry: metrics: {}
 }

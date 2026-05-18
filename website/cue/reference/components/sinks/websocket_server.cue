@@ -82,10 +82,10 @@ components: sinks: websocket_server: {
 	}
 
 	telemetry: metrics: {
-		active_clients:               components.sources.internal_metrics.output.metrics.active_clients
-		open_connections:             components.sources.internal_metrics.output.metrics.open_connections
-		connection_established_total: components.sources.internal_metrics.output.metrics.connection_established_total
-		connection_shutdown_total:    components.sources.internal_metrics.output.metrics.connection_shutdown_total
+		active_clients:                components.sources.internal_metrics.output.metrics.active_clients
+		open_connections:              components.sources.internal_metrics.output.metrics.open_connections
+		connection_established_total:  components.sources.internal_metrics.output.metrics.connection_established_total
+		connection_shutdown_total:     components.sources.internal_metrics.output.metrics.connection_shutdown_total
 		websocket_messages_sent_total: components.sources.internal_metrics.output.metrics.websocket_messages_sent_total
 		websocket_bytes_sent_total:    components.sources.internal_metrics.output.metrics.websocket_bytes_sent_total
 	}

@@ -63,6 +63,5 @@ components: sinks: nats: {
 
 	how_it_works: components._nats.how_it_works
 
-	telemetry: metrics: {
-	}
+	telemetry: metrics: {}
 }

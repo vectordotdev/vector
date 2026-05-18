@@ -81,6 +81,5 @@ components: sinks: redis: {
 		}
 	}
 
-	telemetry: metrics: {
-	}
+	telemetry: metrics: {}
 }

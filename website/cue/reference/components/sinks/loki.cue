@@ -158,6 +158,5 @@ components: sinks: loki: {
 		}
 	}
 
-	telemetry: metrics: {
-	}
+	telemetry: metrics: {}
 }

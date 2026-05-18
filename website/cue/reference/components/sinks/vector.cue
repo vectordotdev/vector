@@ -80,6 +80,5 @@ components: sinks: vector: {
 
 	how_it_works: components.sinks.vector.how_it_works
 
-	telemetry: metrics: {
-	}
+	telemetry: metrics: {}
 }
