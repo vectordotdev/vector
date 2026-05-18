@@ -712,6 +712,8 @@ components: sources: internal_metrics: output: metrics: {
 				examples: ["file", "http", "honeycomb", "splunk_hec"]
 			}
 		}
+		deprecated:         true
+		deprecated_message: "This metric has been deprecated in favor of [`buffer_max_size_bytes`](#buffer_max_size_bytes)."
 	}
 	buffer_max_event_size: {
 		description:       "The maximum size in events that the buffer can store."
@@ -750,6 +752,8 @@ components: sources: internal_metrics: output: metrics: {
 				examples: ["file", "http", "honeycomb", "splunk_hec"]
 			}
 		}
+		deprecated:         true
+		deprecated_message: "This metric has been deprecated in favor of [`buffer_max_size_events`](#buffer_max_size_events)."
 	}
 	buffer_max_size_bytes: {
 		description:       "The maximum number of bytes in the buffer."

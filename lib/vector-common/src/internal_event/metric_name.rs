@@ -667,7 +667,10 @@ pub enum GaugeName {
     BufferMaxSizeEvents,
 
     /// The maximum size in events that the buffer can store.
-    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
+    #[configurable(
+        deprecated = "This metric has been deprecated in favor of [`buffer_max_size_events`](#buffer_max_size_events).",
+        metadata(docs::tags = &*COMPONENT_TAGS)
+    )]
     BufferMaxEventSize,
 
     /// The maximum number of bytes in the buffer.
@@ -675,7 +678,10 @@ pub enum GaugeName {
     BufferMaxSizeBytes,
 
     /// The maximum size in bytes that the buffer can store.
-    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
+    #[configurable(
+        deprecated = "This metric has been deprecated in favor of [`buffer_max_size_bytes`](#buffer_max_size_bytes).",
+        metadata(docs::tags = &*COMPONENT_TAGS)
+    )]
     BufferMaxByteSize,
 
     /// The number of events currently in the buffer.
@@ -694,7 +700,9 @@ pub enum GaugeName {
     BufferSizeBytes,
 
     /// The number of bytes currently in the buffer.
-    #[configurable(deprecated = "This metric has been deprecated in favor of [`buffer_size_bytes`](#buffer_size_bytes).")]
+    #[configurable(
+        deprecated = "This metric has been deprecated in favor of [`buffer_size_bytes`](#buffer_size_bytes)."
+    )]
     #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     BufferByteSize,
 
