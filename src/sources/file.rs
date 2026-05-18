@@ -1729,8 +1729,12 @@ mod tests {
             LogNamespace::Legacy,
             Some(Arc::clone(&event_count)),
             async {
-                wait_for_atomic_usize_timeout_ms(Arc::clone(&event_count), |n| n >= remaining, 5_000)
-                    .await;
+                wait_for_atomic_usize_timeout_ms(
+                    Arc::clone(&event_count),
+                    |n| n >= remaining,
+                    5_000,
+                )
+                .await;
             },
         )
         .await;
