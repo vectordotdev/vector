@@ -71,27 +71,33 @@ pub enum CounterName {
     AggregateFlushesTotal,
 
     /// The number of times the Vector API has been started.
+    #[configurable(metadata(docs::tags = "_internal_metrics_tags"))]
     ApiStartedTotal,
 
     /// The total number of files checkpointed.
+    #[configurable(metadata(docs::tags = "_internal_metrics_tags"))]
     CheckpointsTotal,
 
     /// The total number of errors identifying files via checksum.
     ChecksumErrorsTotal,
 
     /// The total number of metrics collections completed for this component.
+    #[configurable(metadata(docs::tags = "_internal_metrics_tags"))]
     CollectCompletedTotal,
 
     /// The total number of times a command has been executed.
     CommandExecutedTotal,
 
     /// The total number of times a connection has been established.
+    #[configurable(metadata(docs::tags = "_internal_metrics_tags"))]
     ConnectionEstablishedTotal,
 
     /// The total number of errors sending data via the connection.
+    #[configurable(metadata(docs::tags = "_internal_metrics_tags"))]
     ConnectionSendErrorsTotal,
 
     /// The total number of times the connection has been shut down.
+    #[configurable(metadata(docs::tags = "_internal_metrics_tags"))]
     ConnectionShutdownTotal,
 
     /// The total number of container events processed.
@@ -191,9 +197,11 @@ pub enum CounterName {
     ParseErrorsTotal,
 
     /// The total number of times the Vector instance has quit.
+    #[configurable(metadata(docs::tags = "_internal_metrics_tags"))]
     QuitTotal,
 
     /// The total number of times the Vector instance has been reloaded.
+    #[configurable(metadata(docs::tags = "_internal_metrics_tags"))]
     ReloadedTotal,
 
     /// The total number of events with rewrapped timestamps.
@@ -218,9 +226,11 @@ pub enum CounterName {
     StaleEventsFlushedTotal,
 
     /// The total number of times the Vector instance has been started.
+    #[configurable(metadata(docs::tags = "_internal_metrics_tags"))]
     StartedTotal,
 
     /// The total number of times the Vector instance has been stopped.
+    #[configurable(metadata(docs::tags = "_internal_metrics_tags"))]
     StoppedTotal,
 
     /// The total number of events that contained a tag which exceeded the configured cardinality limit.
@@ -239,18 +249,23 @@ pub enum CounterName {
     WebsocketMessagesSentTotal,
 
     /// The total number of times the Windows service has been installed.
+    #[configurable(metadata(docs::tags = "_internal_metrics_tags"))]
     WindowsServiceInstallTotal,
 
     /// The total number of times the Windows service has been restarted.
+    #[configurable(metadata(docs::tags = "_internal_metrics_tags"))]
     WindowsServiceRestartTotal,
 
     /// The total number of times the Windows service has been started.
+    #[configurable(metadata(docs::tags = "_internal_metrics_tags"))]
     WindowsServiceStartTotal,
 
     /// The total number of times the Windows service has been stopped.
+    #[configurable(metadata(docs::tags = "_internal_metrics_tags"))]
     WindowsServiceStopTotal,
 
     /// The total number of times the Windows service has been uninstalled.
+    #[configurable(metadata(docs::tags = "_internal_metrics_tags"))]
     WindowsServiceUninstallTotal,
 
     /// The total number of failures to annotate Kubernetes events with namespace metadata.
@@ -315,6 +330,7 @@ pub enum HistogramName {
     ///
     /// This includes both the time spent queued in the transform's input buffer and the time spent
     /// executing the transform itself.
+    #[configurable(metadata(docs::tags = "_internal_metrics_tags"))]
     ComponentLatencySeconds,
 
     /// The difference between the timestamp recorded in each event and the time when it was ingested, expressed as fractional seconds.
@@ -354,6 +370,7 @@ pub enum HistogramName {
     S3ObjectProcessingFailedDurationSeconds,
 
     /// The duration spent collecting metrics for this component.
+    #[configurable(metadata(docs::tags = "_internal_metrics_tags"))]
     CollectDurationSeconds,
 
     /// The command execution duration in seconds.
@@ -429,6 +446,7 @@ pub enum GaugeName {
     /// This includes both the time spent queued in the transform's input buffer and the time spent
     /// executing the transform itself. This value is smoothed over time using an exponentially
     /// weighted moving average (EWMA).
+    #[configurable(metadata(docs::tags = "_internal_metrics_tags"))]
     ComponentLatencyMeanSeconds,
 
     /// The maximum number of events the source buffer can hold.
@@ -507,6 +525,7 @@ pub enum GaugeName {
     OpenFiles,
 
     /// The number of seconds the Vector instance has been running.
+    #[configurable(metadata(docs::tags = "_internal_metrics_tags"))]
     UptimeSeconds,
 
     /// Pseudo-metric that provides build information for the Vector instance.
@@ -522,9 +541,11 @@ pub enum GaugeName {
     KafkaConsumerLag,
 
     /// The total memory currently being used by the Lua runtime.
+    #[configurable(metadata(docs::tags = "_internal_metrics_tags"))]
     LuaMemoryUsedBytes,
 
     /// The number of current open connections to Vector.
+    #[configurable(metadata(docs::tags = "_internal_metrics_tags"))]
     OpenConnections,
 
     /// The number of currently active endpoints.

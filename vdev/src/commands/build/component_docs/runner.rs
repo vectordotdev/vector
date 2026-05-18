@@ -366,6 +366,7 @@ struct MetricEntry {
     name: String,
     metric_type: &'static str,
     description: String,
+    tags: String,
     deprecated: bool,
     deprecated_message: Option<String>,
 }
@@ -408,11 +409,18 @@ fn generate_internal_metric_descriptions(metric_schemas: &Value) -> Result<()> {
                 .and_then(|m| m.get("deprecated_message"))
                 .and_then(Value::as_str)
                 .map(str::to_owned);
+            let tags = variant
+                .get("_metadata")
+                .and_then(|m| m.get("docs::tags"))
+                .and_then(Value::as_str)
+                .unwrap_or("_component_tags")
+                .to_owned();
 
             entries.push(MetricEntry {
                 name: name.to_owned(),
                 metric_type,
                 description: desc.replace('\\', "\\\\").replace('"', "\\\""),
+                tags,
                 deprecated,
                 deprecated_message,
             });
@@ -437,6 +445,7 @@ fn generate_internal_metric_descriptions(metric_schemas: &Value) -> Result<()> {
         writeln!(cue, "\t\tdescription:       \"{}\"", e.description).unwrap();
         writeln!(cue, "\t\ttype:              \"{}\"", e.metric_type).unwrap();
         cue.push_str("\t\tdefault_namespace: \"vector\"\n");
+        writeln!(cue, "\t\ttags:              {}", e.tags).unwrap();
         if e.deprecated {
             cue.push_str("\t\tdeprecated:  true\n");
             if let Some(msg) = &e.deprecated_message {
