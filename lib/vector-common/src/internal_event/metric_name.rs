@@ -3,14 +3,11 @@ use strum::{AsRefStr, Display, EnumIter};
 use vector_config::configurable_component;
 
 use super::metric_tags::{
-    BUILD_INFO_TAGS, COMPONENT_DISCARDED_EVENTS_TOTAL_TAGS, COMPONENT_RECEIVED_EVENTS_TAGS,
-    COMPONENT_RECEIVED_EVENTS_TOTAL_TAGS, COMPONENT_SENT_BYTES_TOTAL_TAGS, COMPONENT_TAGS,
+    COMPONENT_RECEIVED_EVENTS_TAGS, COMPONENT_RECEIVED_EVENTS_TOTAL_TAGS, COMPONENT_TAGS,
     COMPONENT_TAGS_ERROR_TYPE_STAGE, COMPONENT_TAGS_GRPC_ALL, COMPONENT_TAGS_GRPC_METHOD_SERVICE,
     COMPONENT_TAGS_HTTP_ALL, COMPONENT_TAGS_HTTP_METHOD, COMPONENT_TAGS_HTTP_METHOD_PATH,
-    COMPONENT_TAGS_HTTP_STATUS, COMPONENT_TAGS_OUTPUT, CONNECTION_READ_ERRORS_TOTAL_TAGS,
-    INTERNAL_METRICS_TAGS, INTERNAL_METRICS_TAGS_FILE, INTERNAL_METRICS_TAGS_REASON,
-    KAFKA_CONSUMER_LAG_TAGS, S3_OBJECT_PROCESSING_TAGS, TAG_VALUE_LIMIT_EXCEEDED_TOTAL_TAGS,
-    UTF8_CONVERT_ERRORS_TOTAL_TAGS, merge,
+    COMPONENT_TAGS_HTTP_STATUS, COMPONENT_TAGS_OUTPUT, INTERNAL_METRICS_TAGS,
+    INTERNAL_METRICS_TAGS_FILE, INTERNAL_METRICS_TAGS_REASON, S3_OBJECT_PROCESSING_TAGS, merge,
 };
 
 /// Canonical list of all per-component internal counter metric names emitted by Vector.
@@ -42,11 +39,18 @@ pub enum CounterName {
     ComponentSentEventBytesTotal,
 
     /// The number of raw bytes sent by this component to destination sinks.
-    #[configurable(metadata(docs::tags = &*COMPONENT_SENT_BYTES_TOTAL_TAGS))]
+    #[configurable(metadata(docs::tags = merge(&COMPONENT_TAGS, json!({
+        "endpoint": {"description": "The endpoint to which the bytes were sent. For HTTP, this will be the host and path only, excluding the query string.", "required": false},
+        "file":     {"description": "The absolute path of the destination file.", "required": false},
+        "protocol": {"description": "The protocol used to send the bytes.", "required": true},
+        "region":   {"description": "The AWS region name to which the bytes were sent. In some configurations, this may be a literal hostname.", "required": false}
+    }))))]
     ComponentSentBytesTotal,
 
     /// The number of events dropped by this component.
-    #[configurable(metadata(docs::tags = &*COMPONENT_DISCARDED_EVENTS_TOTAL_TAGS))]
+    #[configurable(metadata(docs::tags = merge(&COMPONENT_TAGS, json!({
+        "intentional": {"description": "True if the events were discarded intentionally, like a `filter` transform, or false if due to an error.", "required": true}
+    }))))]
     ComponentDiscardedEventsTotal,
 
     /// The total number of errors encountered by this component.
@@ -269,7 +273,10 @@ pub enum CounterName {
     TagCardinalityUntrackedEventsTotal,
 
     /// The total number of events discarded because the tag has been rejected after hitting the configured `value_limit`.
-    #[configurable(metadata(docs::tags = &*TAG_VALUE_LIMIT_EXCEEDED_TOTAL_TAGS))]
+    #[configurable(metadata(docs::tags = merge(&COMPONENT_TAGS, json!({
+        "metric_name": {"description": "The name of the metric whose tag value limit was exceeded. Only present when `internal_metrics.include_extended_tags` is enabled.", "required": false},
+        "tag_key":     {"description": "The key of the tag whose value limit was exceeded. Only present when `internal_metrics.include_extended_tags` is enabled.", "required": false}
+    }))))]
     TagValueLimitExceededTotal,
 
     /// The total number of times the value limit was reached.
@@ -314,7 +321,7 @@ pub enum CounterName {
     K8sDockerFormatParseFailuresTotal,
 
     /// The total number of times an S3 record in an SQS message was ignored.
-    #[configurable(metadata(docs::tags = merge(&*COMPONENT_TAGS, json!({
+    #[configurable(metadata(docs::tags = merge(&COMPONENT_TAGS, json!({
         "ignore_type": {
             "description": "The reason for ignoring the S3 record",
             "required": true,
@@ -348,7 +355,9 @@ pub enum CounterName {
     MemoryEnrichmentTableTtlExpirations,
 
     /// The total number of errors reading datagram.
-    #[configurable(metadata(docs::tags = &*CONNECTION_READ_ERRORS_TOTAL_TAGS))]
+    #[configurable(metadata(docs::tags = merge(&COMPONENT_TAGS, json!({
+        "mode": {"description": "", "required": true, "enum": {"udp": "User Datagram Protocol"}}
+    }))))]
     ConnectionReadErrorsTotal,
 
     /// The total number of metrics emitted from the internal metrics registry. This metric is deprecated in favor of `internal_metrics_cardinality`.
@@ -360,7 +369,9 @@ pub enum CounterName {
     ConfigReloadRejected,
 
     /// The total number of errors converting bytes to a UTF-8 string in UDP mode.
-    #[configurable(metadata(docs::tags = &*UTF8_CONVERT_ERRORS_TOTAL_TAGS))]
+    #[configurable(metadata(docs::tags = merge(&COMPONENT_TAGS, json!({
+        "mode": {"description": "The connection mode used by the component.", "required": true, "enum": {"udp": "User Datagram Protocol"}}
+    }))))]
     Utf8ConvertErrorsTotal,
 }
 
@@ -616,7 +627,13 @@ pub enum GaugeName {
     UptimeSeconds,
 
     /// Pseudo-metric that provides build information for the Vector instance.
-    #[configurable(metadata(docs::tags = &*BUILD_INFO_TAGS))]
+    #[configurable(metadata(docs::tags = merge(&INTERNAL_METRICS_TAGS, json!({
+        "debug":        {"description": "Whether this is a debug build of Vector", "required": true},
+        "version":      {"description": "Vector version.", "required": true},
+        "rust_version": {"description": "The Rust version from the package manifest.", "required": true},
+        "arch":         {"description": "The target architecture being compiled for. (e.g. x86_64)", "required": true},
+        "revision":     {"description": "Revision identifer, related to versioned releases.", "required": true}
+    }))))]
     BuildInfo,
 
     /// Current number of messages in producer queues.
@@ -626,7 +643,10 @@ pub enum GaugeName {
     KafkaQueueMessagesBytes,
 
     /// The Kafka consumer lag.
-    #[configurable(metadata(docs::tags = &*KAFKA_CONSUMER_LAG_TAGS))]
+    #[configurable(metadata(docs::tags = merge(&COMPONENT_TAGS, json!({
+        "topic_id":     {"description": "The Kafka topic id.", "required": true},
+        "partition_id": {"description": "The Kafka partition id.", "required": true}
+    }))))]
     KafkaConsumerLag,
 
     /// The total memory currently being used by the Lua runtime.

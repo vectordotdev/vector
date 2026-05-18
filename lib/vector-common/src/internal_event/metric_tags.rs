@@ -11,6 +11,7 @@ use std::sync::LazyLock;
 ///     "bucket": {"description": "The S3 bucket.", "required": true}
 /// }))))]
 /// ```
+#[must_use]
 pub fn merge(base: &Value, extra: Value) -> Value {
     let mut result = base.clone();
     if let (Some(obj), Value::Object(extra_obj)) = (result.as_object_mut(), extra) {
@@ -214,110 +215,11 @@ pub static COMPONENT_RECEIVED_EVENTS_TOTAL_TAGS: LazyLock<Value> = LazyLock::new
 pub static COMPONENT_RECEIVED_EVENTS_TAGS: LazyLock<Value> =
     LazyLock::new(|| COMPONENT_RECEIVED_EVENTS_TOTAL_TAGS.clone());
 
-pub static COMPONENT_DISCARDED_EVENTS_TOTAL_TAGS: LazyLock<Value> = LazyLock::new(|| {
-    let mut tags = COMPONENT_TAGS.clone();
-    tags.as_object_mut().unwrap().insert("intentional".to_owned(), json!({
-        "description": "True if the events were discarded intentionally, like a `filter` transform, or false if due to an error.",
-        "required": true
-    }));
-    tags
-});
-
-pub static COMPONENT_SENT_BYTES_TOTAL_TAGS: LazyLock<Value> = LazyLock::new(|| {
-    let mut tags = COMPONENT_TAGS.clone();
-    let obj = tags.as_object_mut().unwrap();
-    obj.insert("endpoint".to_owned(),
-        json!({"description": "The endpoint to which the bytes were sent. For HTTP, this will be the host and path only, excluding the query string.", "required": false}));
-    obj.insert(
-        "file".to_owned(),
-        json!({"description": "The absolute path of the destination file.", "required": false}),
-    );
-    obj.insert(
-        "protocol".to_owned(),
-        json!({"description": "The protocol used to send the bytes.", "required": true}),
-    );
-    obj.insert("region".to_owned(),
-        json!({"description": "The AWS region name to which the bytes were sent. In some configurations, this may be a literal hostname.", "required": false}));
-    tags
-});
-
 pub static S3_OBJECT_PROCESSING_TAGS: LazyLock<Value> = LazyLock::new(|| {
     let mut tags = COMPONENT_TAGS.clone();
     tags.as_object_mut().unwrap().insert(
         "bucket".to_owned(),
         json!({"description": "The name of the S3 bucket.", "required": true}),
-    );
-    tags
-});
-
-pub static KAFKA_CONSUMER_LAG_TAGS: LazyLock<Value> = LazyLock::new(|| {
-    let mut tags = COMPONENT_TAGS.clone();
-    let obj = tags.as_object_mut().unwrap();
-    obj.insert(
-        "topic_id".to_owned(),
-        json!({"description": "The Kafka topic id.", "required": true}),
-    );
-    obj.insert(
-        "partition_id".to_owned(),
-        json!({"description": "The Kafka partition id.", "required": true}),
-    );
-    tags
-});
-
-pub static TAG_VALUE_LIMIT_EXCEEDED_TOTAL_TAGS: LazyLock<Value> = LazyLock::new(|| {
-    let mut tags = COMPONENT_TAGS.clone();
-    let obj = tags.as_object_mut().unwrap();
-    obj.insert("metric_name".to_owned(),
-        json!({"description": "The name of the metric whose tag value limit was exceeded. Only present when `internal_metrics.include_extended_tags` is enabled.", "required": false}));
-    obj.insert("tag_key".to_owned(),
-        json!({"description": "The key of the tag whose value limit was exceeded. Only present when `internal_metrics.include_extended_tags` is enabled.", "required": false}));
-    tags
-});
-
-pub static BUILD_INFO_TAGS: LazyLock<Value> = LazyLock::new(|| {
-    let mut tags = INTERNAL_METRICS_TAGS.clone();
-    let obj = tags.as_object_mut().unwrap();
-    obj.insert(
-        "debug".to_owned(),
-        json!({"description": "Whether this is a debug build of Vector", "required": true}),
-    );
-    obj.insert(
-        "version".to_owned(),
-        json!({"description": "Vector version.", "required": true}),
-    );
-    obj.insert(
-        "rust_version".to_owned(),
-        json!({"description": "The Rust version from the package manifest.", "required": true}),
-    );
-    obj.insert("arch".to_owned(),
-        json!({"description": "The target architecture being compiled for. (e.g. x86_64)", "required": true}));
-    obj.insert("revision".to_owned(),
-        json!({"description": "Revision identifer, related to versioned releases.", "required": true}));
-    tags
-});
-
-pub static CONNECTION_READ_ERRORS_TOTAL_TAGS: LazyLock<Value> = LazyLock::new(|| {
-    let mut tags = COMPONENT_TAGS.clone();
-    tags.as_object_mut().unwrap().insert(
-        "mode".to_owned(),
-        json!({
-            "description": "",
-            "required": true,
-            "enum": {"udp": "User Datagram Protocol"}
-        }),
-    );
-    tags
-});
-
-pub static UTF8_CONVERT_ERRORS_TOTAL_TAGS: LazyLock<Value> = LazyLock::new(|| {
-    let mut tags = COMPONENT_TAGS.clone();
-    tags.as_object_mut().unwrap().insert(
-        "mode".to_owned(),
-        json!({
-            "description": "The connection mode used by the component.",
-            "required": true,
-            "enum": {"udp": "User Datagram Protocol"}
-        }),
     );
     tags
 });
