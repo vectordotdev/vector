@@ -362,71 +362,58 @@ fn render_and_import_generated_top_level_config_schema(
     Ok(())
 }
 
-/// Converts a `docs::tags` JSON object produced by `serde_json::json!()` to a CUE expression.
+/// Converts a flat JSON tag-field object to a CUE struct literal.
 ///
-/// Expected shape:
+/// The JSON is a map of tag-field names to field definitions:
 /// ```json
 /// {
-///   "base": "_component_tags",          // optional CUE tag-group reference
-///   "extra": {
-///     "output": "_output",              // string value → CUE reference
-///     "mode": {                         // object value → inline definition
-///       "description": "...",
-///       "required": true,
-///       "enum": { "udp": "..." }        // optional
-///     }
-///   }
+///   "component_id": {"description": "...", "required": true},
+///   "output":       {"description": "...", "required": false},
+///   "mode":         {"description": "...", "required": true,
+///                    "enum": {"udp": "User Datagram Protocol"}}
 /// }
 /// ```
+/// Produces: `{component_id: {description: "...", required: true}, output: {...}, ...}`
 fn json_tags_to_cue(obj: &serde_json::Map<String, Value>) -> String {
-    let base = obj.get("base").and_then(Value::as_str);
+    if obj.is_empty() {
+        return "{}".to_owned();
+    }
 
-    let extras = obj.get("extra").and_then(Value::as_object).map(|extra| {
-        extra
-            .iter()
-            .map(|(name, val)| match val {
-                Value::String(cue_ref) => format!("{name}: {cue_ref}"),
-                Value::Object(field) => {
-                    let desc = field
-                        .get("description")
-                        .and_then(Value::as_str)
-                        .unwrap_or("");
-                    let required = field
-                        .get("required")
-                        .and_then(Value::as_bool)
-                        .unwrap_or(false);
-                    let enum_part =
-                        field
-                            .get("enum")
-                            .and_then(Value::as_object)
-                            .map_or(String::new(), |e| {
-                                let pairs: Vec<String> = e
-                                    .iter()
-                                    .map(|(k, v)| {
-                                        format!(
-                                            "{k}: \"{}\"",
-                                            v.as_str().unwrap_or_default()
-                                        )
-                                    })
-                                    .collect();
-                                format!(", enum: {{{}}}", pairs.join(", "))
-                            });
-                    format!(
-                        "{name}: {{description: \"{desc}\", required: {required}{enum_part}}}"
-                    )
-                }
-                _ => String::new(),
-            })
-            .filter(|s| !s.is_empty())
-            .collect::<Vec<_>>()
-            .join(", ")
-    });
+    let fields: Vec<String> = obj
+        .iter()
+        .map(|(name, field)| {
+            let field_cue = json_field_to_cue(field);
+            format!("{name}: {field_cue}")
+        })
+        .collect();
 
-    match (base, extras.as_deref()) {
-        (None, None | Some("")) => "{}".to_owned(),
-        (Some(b), None | Some("")) => b.to_owned(),
-        (None, Some(ex)) => format!("{{{ex}}}"),
-        (Some(b), Some(ex)) => format!("{b} & {{{ex}}}"),
+    format!("{{{}}}", fields.join(", "))
+}
+
+fn json_field_to_cue(val: &Value) -> String {
+    match val {
+        Value::Object(obj) => {
+            let desc = obj.get("description").and_then(Value::as_str).unwrap_or("");
+            let required = obj
+                .get("required")
+                .and_then(Value::as_bool)
+                .unwrap_or(false);
+            let enum_part = obj
+                .get("enum")
+                .and_then(Value::as_object)
+                .map_or(String::new(), |e| {
+                    let pairs: Vec<String> = e
+                        .iter()
+                        .map(|(k, v)| format!("{k}: \"{}\"", v.as_str().unwrap_or_default()))
+                        .collect();
+                    format!(", enum: {{{}}}", pairs.join(", "))
+                });
+            format!("{{description: \"{desc}\", required: {required}{enum_part}}}")
+        }
+        Value::String(s) => format!("\"{s}\""),
+        Value::Bool(b) => b.to_string(),
+        Value::Number(n) => n.to_string(),
+        _ => "{}".to_owned(),
     }
 }
 
@@ -440,9 +427,8 @@ struct MetricEntry {
 }
 
 fn generate_internal_metric_descriptions(metric_schemas: &Value) -> Result<()> {
-    let out_path = PathBuf::from(
-        "website/cue/reference/generated/internal_metric_descriptions.cue",
-    );
+    let out_path =
+        PathBuf::from("website/cue/reference/generated/internal_metric_descriptions.cue");
 
     if let Some(parent) = out_path.parent() {
         fs::create_dir_all(parent)?;
@@ -478,8 +464,9 @@ fn generate_internal_metric_descriptions(metric_schemas: &Value) -> Result<()> {
                 .and_then(Value::as_str)
                 .map(str::to_owned);
             let tags = match variant.get("_metadata").and_then(|m| m.get("docs::tags")) {
-                Some(Value::String(s)) => s.clone(),
                 Some(Value::Object(obj)) => json_tags_to_cue(obj),
+                // String values are plain CUE expressions emitted verbatim (e.g. "{}").
+                Some(Value::String(s)) => s.clone(),
                 _ => "_component_tags".to_owned(),
             };
 
@@ -519,7 +506,10 @@ fn generate_internal_metric_descriptions(metric_schemas: &Value) -> Result<()> {
         if e.deprecated {
             cue.push_str("\t\tdeprecated:  true\n");
             if let Some(msg) = &e.deprecated_message {
-                let escaped = msg.replace('\\', "\\\\").replace('"', "\\\"").replace('\n', "\\n");
+                let escaped = msg
+                    .replace('\\', "\\\\")
+                    .replace('"', "\\\"")
+                    .replace('\n', "\\n");
                 writeln!(cue, "\t\tdeprecated_message: \"{escaped}\"").unwrap();
             }
         }

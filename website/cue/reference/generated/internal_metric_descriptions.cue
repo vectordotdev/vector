@@ -82,7 +82,7 @@ components: sources: internal_metrics: output: metrics: {
 		description:       "The number of times the Vector API has been started."
 		type:              "counter"
 		default_namespace: "vector"
-		tags:              _internal_metrics_tags
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}}
 	}
 	buffer_byte_size: {
 		description:        "The number of bytes currently in the buffer."
@@ -188,31 +188,31 @@ components: sources: internal_metrics: output: metrics: {
 		description:       "Pseudo-metric that provides build information for the Vector instance."
 		type:              "gauge"
 		default_namespace: "vector"
-		tags: _internal_metrics_tags & {debug: {description: "Whether this is a debug build of Vector", required: true}, version: {description: "Vector version.", required: true}, rust_version: {description: "The Rust version from the package manifest.", required: true}, arch: {description: "The target architecture being compiled for. (e.g. x86_64)", required: true}, revision: {description: "Revision identifer, related to versioned releases.", required: true}}
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}, debug: {description: "Whether this is a debug build of Vector", required: true}, version: {description: "Vector version.", required: true}, rust_version: {description: "The Rust version from the package manifest.", required: true}, arch: {description: "The target architecture being compiled for. (e.g. x86_64)", required: true}, revision: {description: "Revision identifer, related to versioned releases.", required: true}}
 	}
 	checkpoints_total: {
 		description:       "The total number of files checkpointed."
 		type:              "counter"
 		default_namespace: "vector"
-		tags:              _internal_metrics_tags
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}}
 	}
 	checksum_errors_total: {
 		description:       "The total number of errors identifying files via checksum."
 		type:              "counter"
 		default_namespace: "vector"
-		tags: _internal_metrics_tags & {file: _file}
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}, file: {description: "The file that produced the error.", required: false}}
 	}
 	collect_completed_total: {
 		description:       "The total number of metrics collections completed for this component."
 		type:              "counter"
 		default_namespace: "vector"
-		tags:              _internal_metrics_tags
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}}
 	}
 	collect_duration_seconds: {
 		description:       "The duration spent collecting metrics for this component."
 		type:              "histogram"
 		default_namespace: "vector"
-		tags:              _internal_metrics_tags
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}}
 	}
 	command_executed_total: {
 		description:       "The total number of times a command has been executed."
@@ -248,73 +248,73 @@ components: sources: internal_metrics: output: metrics: {
 		description:       "The number of events dropped by this component."
 		type:              "counter"
 		default_namespace: "vector"
-		tags: _component_tags & {intentional: {description: "True if the events were discarded intentionally, like a `filter` transform, or false if due to an error.", required: true}}
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}, component_kind: {description: "The Vector component kind.", required: true, enum: {sink: "Vector sink components", source: "Vector source components", transform: "Vector transform components"}}, component_id: {description: "The Vector component ID.", required: true}, component_type: {description: "The Vector component type.", required: true}, intentional: {description: "True if the events were discarded intentionally, like a `filter` transform, or false if due to an error.", required: true}}
 	}
 	component_errors_total: {
 		description:       "The total number of errors encountered by this component."
 		type:              "counter"
 		default_namespace: "vector"
-		tags: _component_tags & {error_type: _error_type, stage: _stage}
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}, component_kind: {description: "The Vector component kind.", required: true, enum: {sink: "Vector sink components", source: "Vector source components", transform: "Vector transform components"}}, component_id: {description: "The Vector component ID.", required: true}, component_type: {description: "The Vector component type.", required: true}, error_type: {description: "The type of the error", required: true, enum: {acknowledgements_failed: "The acknowledgement operation failed.", delete_failed: "The file deletion failed.", encode_failed: "The encode operation failed.", field_missing: "The event field was missing.", glob_failed: "The glob pattern match operation failed.", http_error: "The HTTP request resulted in an error code.", invalid_metric: "The metric was invalid.", kafka_offset_update: "The consumer offset update failed.", kafka_read: "The message from Kafka was invalid.", mapping_failed: "The mapping failed.", match_failed: "The match operation failed.", out_of_order: "The event was out of order.", parse_failed: "The parsing operation failed.", read_failed: "The file read operation failed.", render_error: "The rendering operation failed.", stream_closed: "The downstream was closed, forwarding the event(s) failed.", type_conversion_failed: "The type conversion operating failed.", type_field_does_not_exist: "The type field does not exist.", type_ip_address_parse_error: "The IP address did not parse.", unlabeled_event: "The event was not labeled.", value_invalid: "The value was invalid.", watch_failed: "The file watch operation failed.", write_failed: "The file write operation failed."}}, stage: {description: "The stage within the component at which the error occurred.", required: true, enum: {receiving: "While receiving data.", processing: "While processing data within the component.", sending: "While sending data."}}}
 	}
 	component_latency_mean_seconds: {
 		description:       "This includes both the time spent queued in the transform's input buffer and the time spent\nexecuting the transform itself. This value is smoothed over time using an exponentially\nweighted moving average (EWMA)."
 		type:              "gauge"
 		default_namespace: "vector"
-		tags:              _internal_metrics_tags
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}}
 	}
 	component_latency_seconds: {
 		description:       "This includes both the time spent queued in the transform's input buffer and the time spent\nexecuting the transform itself."
 		type:              "histogram"
 		default_namespace: "vector"
-		tags:              _internal_metrics_tags
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}}
 	}
 	component_received_bytes: {
 		description:       "The size in bytes of each event received by the source."
 		type:              "histogram"
 		default_namespace: "vector"
-		tags:              component_received_events_total.tags
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}, component_kind: {description: "The Vector component kind.", required: true, enum: {sink: "Vector sink components", source: "Vector source components", transform: "Vector transform components"}}, component_id: {description: "The Vector component ID.", required: true}, component_type: {description: "The Vector component type.", required: true}, file: {description: "The file from which the data originated.", required: false}, uri: {description: "The sanitized URI from which the data originated.", required: false}, container_name: {description: "The name of the container from which the data originated.", required: false}, pod_name: {description: "The name of the pod from which the data originated.", required: false}, peer_addr: {description: "The IP from which the data originated.", required: false}, peer_path: {description: "The pathname from which the data originated.", required: false}, mode: {description: "The connection mode used by the component.", required: false, enum: {udp: "User Datagram Protocol", tcp: "Transmission Control Protocol", unix: "Unix domain socket"}}}
 	}
 	component_received_bytes_total: {
 		description:       "The number of raw bytes accepted by this component from source origins."
 		type:              "counter"
 		default_namespace: "vector"
-		tags:              component_received_events_total.tags
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}, component_kind: {description: "The Vector component kind.", required: true, enum: {sink: "Vector sink components", source: "Vector source components", transform: "Vector transform components"}}, component_id: {description: "The Vector component ID.", required: true}, component_type: {description: "The Vector component type.", required: true}, file: {description: "The file from which the data originated.", required: false}, uri: {description: "The sanitized URI from which the data originated.", required: false}, container_name: {description: "The name of the container from which the data originated.", required: false}, pod_name: {description: "The name of the pod from which the data originated.", required: false}, peer_addr: {description: "The IP from which the data originated.", required: false}, peer_path: {description: "The pathname from which the data originated.", required: false}, mode: {description: "The connection mode used by the component.", required: false, enum: {udp: "User Datagram Protocol", tcp: "Transmission Control Protocol", unix: "Unix domain socket"}}}
 	}
 	component_received_event_bytes_total: {
 		description:       "The number of event bytes accepted by this component either from\ntagged origins like file and uri, or cumulatively from other origins."
 		type:              "counter"
 		default_namespace: "vector"
-		tags:              component_received_events_total.tags
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}, component_kind: {description: "The Vector component kind.", required: true, enum: {sink: "Vector sink components", source: "Vector source components", transform: "Vector transform components"}}, component_id: {description: "The Vector component ID.", required: true}, component_type: {description: "The Vector component type.", required: true}, file: {description: "The file from which the data originated.", required: false}, uri: {description: "The sanitized URI from which the data originated.", required: false}, container_name: {description: "The name of the container from which the data originated.", required: false}, pod_name: {description: "The name of the pod from which the data originated.", required: false}, peer_addr: {description: "The IP from which the data originated.", required: false}, peer_path: {description: "The pathname from which the data originated.", required: false}, mode: {description: "The connection mode used by the component.", required: false, enum: {udp: "User Datagram Protocol", tcp: "Transmission Control Protocol", unix: "Unix domain socket"}}}
 	}
 	component_received_events_count: {
 		description:       "Note that this is separate than sink-level batching. It is mostly useful for low level\ndebugging performance issues in Vector due to small internal batches."
 		type:              "histogram"
 		default_namespace: "vector"
-		tags:              component_received_events_total.tags
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}, component_kind: {description: "The Vector component kind.", required: true, enum: {sink: "Vector sink components", source: "Vector source components", transform: "Vector transform components"}}, component_id: {description: "The Vector component ID.", required: true}, component_type: {description: "The Vector component type.", required: true}, file: {description: "The file from which the data originated.", required: false}, uri: {description: "The sanitized URI from which the data originated.", required: false}, container_name: {description: "The name of the container from which the data originated.", required: false}, pod_name: {description: "The name of the pod from which the data originated.", required: false}, peer_addr: {description: "The IP from which the data originated.", required: false}, peer_path: {description: "The pathname from which the data originated.", required: false}, mode: {description: "The connection mode used by the component.", required: false, enum: {udp: "User Datagram Protocol", tcp: "Transmission Control Protocol", unix: "Unix domain socket"}}}
 	}
 	component_received_events_total: {
 		description:       "The number of events accepted by this component either from tagged\norigins like file and uri, or cumulatively from other origins."
 		type:              "counter"
 		default_namespace: "vector"
-		tags: _component_tags & {file: {description: "The file from which the data originated.", required: false}, uri: {description: "The sanitized URI from which the data originated.", required: false}, container_name: {description: "The name of the container from which the data originated.", required: false}, pod_name: {description: "The name of the pod from which the data originated.", required: false}, peer_addr: {description: "The IP from which the data originated.", required: false}, peer_path: {description: "The pathname from which the data originated.", required: false}, mode: _mode}
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}, component_kind: {description: "The Vector component kind.", required: true, enum: {sink: "Vector sink components", source: "Vector source components", transform: "Vector transform components"}}, component_id: {description: "The Vector component ID.", required: true}, component_type: {description: "The Vector component type.", required: true}, file: {description: "The file from which the data originated.", required: false}, uri: {description: "The sanitized URI from which the data originated.", required: false}, container_name: {description: "The name of the container from which the data originated.", required: false}, pod_name: {description: "The name of the pod from which the data originated.", required: false}, peer_addr: {description: "The IP from which the data originated.", required: false}, peer_path: {description: "The pathname from which the data originated.", required: false}, mode: {description: "The connection mode used by the component.", required: false, enum: {udp: "User Datagram Protocol", tcp: "Transmission Control Protocol", unix: "Unix domain socket"}}}
 	}
 	component_sent_bytes_total: {
 		description:       "The number of raw bytes sent by this component to destination sinks."
 		type:              "counter"
 		default_namespace: "vector"
-		tags: _component_tags & {endpoint: {description: "The endpoint to which the bytes were sent. For HTTP, this will be the host and path only, excluding the query string.", required: false}, file: {description: "The absolute path of the destination file.", required: false}, protocol: {description: "The protocol used to send the bytes.", required: true}, region: {description: "The AWS region name to which the bytes were sent. In some configurations, this may be a literal hostname.", required: false}}
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}, component_kind: {description: "The Vector component kind.", required: true, enum: {sink: "Vector sink components", source: "Vector source components", transform: "Vector transform components"}}, component_id: {description: "The Vector component ID.", required: true}, component_type: {description: "The Vector component type.", required: true}, endpoint: {description: "The endpoint to which the bytes were sent. For HTTP, this will be the host and path only, excluding the query string.", required: false}, file: {description: "The absolute path of the destination file.", required: false}, protocol: {description: "The protocol used to send the bytes.", required: true}, region: {description: "The AWS region name to which the bytes were sent. In some configurations, this may be a literal hostname.", required: false}}
 	}
 	component_sent_event_bytes_total: {
 		description:       "The total number of event bytes emitted by this component."
 		type:              "counter"
 		default_namespace: "vector"
-		tags: _component_tags & {output: _output}
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}, component_kind: {description: "The Vector component kind.", required: true, enum: {sink: "Vector sink components", source: "Vector source components", transform: "Vector transform components"}}, component_id: {description: "The Vector component ID.", required: true}, component_type: {description: "The Vector component type.", required: true}, output: {description: "The specific output of the component.", required: false}}
 	}
 	component_sent_events_total: {
 		description:       "The total number of events emitted by this component."
 		type:              "counter"
 		default_namespace: "vector"
-		tags: _component_tags & {output: _output}
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}, component_kind: {description: "The Vector component kind.", required: true, enum: {sink: "Vector sink components", source: "Vector source components", transform: "Vector transform components"}}, component_id: {description: "The Vector component ID.", required: true}, component_type: {description: "The Vector component type.", required: true}, output: {description: "The specific output of the component.", required: false}}
 	}
 	component_timed_out_events_total: {
 		description:       "The total number of events for which this source responded with a timeout error."
@@ -332,31 +332,31 @@ components: sources: internal_metrics: output: metrics: {
 		description:       "Number of configuration reload attempts that were rejected."
 		type:              "counter"
 		default_namespace: "vector"
-		tags: _internal_metrics_tags & {reason: _reason}
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}, reason: {description: "The type of the error", required: true, enum: {out_of_order: "The event was out of order.", oversized: "The event was too large."}}}
 	}
 	connection_established_total: {
 		description:       "The total number of times a connection has been established."
 		type:              "counter"
 		default_namespace: "vector"
-		tags:              _internal_metrics_tags
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}}
 	}
 	connection_read_errors_total: {
 		description:       "The total number of errors reading datagram."
 		type:              "counter"
 		default_namespace: "vector"
-		tags: _component_tags & {mode: {description: "", required: true, enum: {udp: "User Datagram Protocol"}}}
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}, component_kind: {description: "The Vector component kind.", required: true, enum: {sink: "Vector sink components", source: "Vector source components", transform: "Vector transform components"}}, component_id: {description: "The Vector component ID.", required: true}, component_type: {description: "The Vector component type.", required: true}, mode: {description: "", required: true, enum: {udp: "User Datagram Protocol"}}}
 	}
 	connection_send_errors_total: {
 		description:       "The total number of errors sending data via the connection."
 		type:              "counter"
 		default_namespace: "vector"
-		tags:              _internal_metrics_tags
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}}
 	}
 	connection_shutdown_total: {
 		description:       "The total number of times the connection has been shut down."
 		type:              "counter"
 		default_namespace: "vector"
-		tags:              _internal_metrics_tags
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}}
 	}
 	container_processed_events_total: {
 		description:       "The total number of container events processed."
@@ -416,49 +416,49 @@ components: sources: internal_metrics: output: metrics: {
 		description:       "The total number of events discarded by this component."
 		type:              "counter"
 		default_namespace: "vector"
-		tags: _internal_metrics_tags & {reason: _reason}
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}, reason: {description: "The type of the error", required: true, enum: {out_of_order: "The event was out of order.", oversized: "The event was too large."}}}
 	}
 	files_added_total: {
 		description:       "The total number of files Vector has found to watch."
 		type:              "counter"
 		default_namespace: "vector"
-		tags: _internal_metrics_tags & {file: _file}
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}, file: {description: "The file that produced the error.", required: false}}
 	}
 	files_deleted_total: {
 		description:       "The total number of files deleted."
 		type:              "counter"
 		default_namespace: "vector"
-		tags: _internal_metrics_tags & {file: _file}
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}, file: {description: "The file that produced the error.", required: false}}
 	}
 	files_resumed_total: {
 		description:       "The total number of times Vector has resumed watching a file."
 		type:              "counter"
 		default_namespace: "vector"
-		tags: _internal_metrics_tags & {file: _file}
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}, file: {description: "The file that produced the error.", required: false}}
 	}
 	files_unwatched_total: {
 		description:       "The total number of times Vector has stopped watching a file."
 		type:              "counter"
 		default_namespace: "vector"
-		tags: _internal_metrics_tags & {file: _file}
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}, file: {description: "The file that produced the error.", required: false}}
 	}
 	grpc_server_handler_duration_seconds: {
 		description:       "The duration spent handling a gRPC request."
 		type:              "histogram"
 		default_namespace: "vector"
-		tags: _component_tags & {grpc_method: _grpc_method, grpc_service: _grpc_service, grpc_status: _grpc_status}
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}, component_kind: {description: "The Vector component kind.", required: true, enum: {sink: "Vector sink components", source: "Vector source components", transform: "Vector transform components"}}, component_id: {description: "The Vector component ID.", required: true}, component_type: {description: "The Vector component type.", required: true}, grpc_method: {description: "The name of the method called on the gRPC service.", required: true}, grpc_service: {description: "The gRPC service name.", required: true}, grpc_status: {description: "The human-readable gRPC status code.", required: true}}
 	}
 	grpc_server_messages_received_total: {
 		description:       "The total number of gRPC messages received."
 		type:              "counter"
 		default_namespace: "vector"
-		tags: _component_tags & {grpc_method: _grpc_method, grpc_service: _grpc_service}
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}, component_kind: {description: "The Vector component kind.", required: true, enum: {sink: "Vector sink components", source: "Vector source components", transform: "Vector transform components"}}, component_id: {description: "The Vector component ID.", required: true}, component_type: {description: "The Vector component type.", required: true}, grpc_method: {description: "The name of the method called on the gRPC service.", required: true}, grpc_service: {description: "The gRPC service name.", required: true}}
 	}
 	grpc_server_messages_sent_total: {
 		description:       "The total number of gRPC messages sent."
 		type:              "counter"
 		default_namespace: "vector"
-		tags: _component_tags & {grpc_method: _grpc_method, grpc_service: _grpc_service, grpc_status: _grpc_status}
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}, component_kind: {description: "The Vector component kind.", required: true, enum: {sink: "Vector sink components", source: "Vector source components", transform: "Vector transform components"}}, component_id: {description: "The Vector component ID.", required: true}, component_type: {description: "The Vector component type.", required: true}, grpc_method: {description: "The name of the method called on the gRPC service.", required: true}, grpc_service: {description: "The gRPC service name.", required: true}, grpc_status: {description: "The human-readable gRPC status code.", required: true}}
 	}
 	http_client_error_rtt_seconds: {
 		description:       "The round-trip time (RTT) of HTTP requests that resulted in an error."
@@ -476,19 +476,19 @@ components: sources: internal_metrics: output: metrics: {
 		description:       "The total number of sent HTTP requests, tagged with the request method."
 		type:              "counter"
 		default_namespace: "vector"
-		tags: _component_tags & {method: _method}
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}, component_kind: {description: "The Vector component kind.", required: true, enum: {sink: "Vector sink components", source: "Vector source components", transform: "Vector transform components"}}, component_id: {description: "The Vector component ID.", required: true}, component_type: {description: "The Vector component type.", required: true}, method: {description: "The HTTP method of the request.", required: false}}
 	}
 	http_client_response_rtt_seconds: {
 		description:       "The round-trip time (RTT) of HTTP requests, tagged with the response code."
 		type:              "histogram"
 		default_namespace: "vector"
-		tags: _component_tags & {status: _status}
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}, component_kind: {description: "The Vector component kind.", required: true, enum: {sink: "Vector sink components", source: "Vector source components", transform: "Vector transform components"}}, component_id: {description: "The Vector component ID.", required: true}, component_type: {description: "The Vector component type.", required: true}, status: {description: "The HTTP status code of the request.", required: false}}
 	}
 	http_client_responses_total: {
 		description:       "The total number of HTTP requests, tagged with the response code."
 		type:              "counter"
 		default_namespace: "vector"
-		tags: _component_tags & {status: _status}
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}, component_kind: {description: "The Vector component kind.", required: true, enum: {sink: "Vector sink components", source: "Vector source components", transform: "Vector transform components"}}, component_id: {description: "The Vector component ID.", required: true}, component_type: {description: "The Vector component type.", required: true}, status: {description: "The HTTP status code of the request.", required: false}}
 	}
 	http_client_rtt_seconds: {
 		description:       "The round-trip time (RTT) of HTTP requests."
@@ -500,19 +500,19 @@ components: sources: internal_metrics: output: metrics: {
 		description:       "The duration spent handling an HTTP request."
 		type:              "histogram"
 		default_namespace: "vector"
-		tags: _component_tags & {method: _method, path: _path, status: _status}
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}, component_kind: {description: "The Vector component kind.", required: true, enum: {sink: "Vector sink components", source: "Vector source components", transform: "Vector transform components"}}, component_id: {description: "The Vector component ID.", required: true}, component_type: {description: "The Vector component type.", required: true}, method: {description: "The HTTP method of the request.", required: false}, path: {description: "The path that produced the error.", required: true}, status: {description: "The HTTP status code of the request.", required: false}}
 	}
 	http_server_requests_received_total: {
 		description:       "The total number of HTTP requests received."
 		type:              "counter"
 		default_namespace: "vector"
-		tags: _component_tags & {method: _method, path: _path}
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}, component_kind: {description: "The Vector component kind.", required: true, enum: {sink: "Vector sink components", source: "Vector source components", transform: "Vector transform components"}}, component_id: {description: "The Vector component ID.", required: true}, component_type: {description: "The Vector component type.", required: true}, method: {description: "The HTTP method of the request.", required: false}, path: {description: "The path that produced the error.", required: true}}
 	}
 	http_server_responses_sent_total: {
 		description:       "The total number of HTTP responses sent."
 		type:              "counter"
 		default_namespace: "vector"
-		tags: _component_tags & {method: _method, path: _path, status: _status}
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}, component_kind: {description: "The Vector component kind.", required: true, enum: {sink: "Vector sink components", source: "Vector source components", transform: "Vector transform components"}}, component_id: {description: "The Vector component ID.", required: true}, component_type: {description: "The Vector component type.", required: true}, method: {description: "The HTTP method of the request.", required: false}, path: {description: "The path that produced the error.", required: true}, status: {description: "The HTTP status code of the request.", required: false}}
 	}
 	internal_metrics_cardinality: {
 		description:       "The total number of metrics emitted from the internal metrics registry."
@@ -566,7 +566,7 @@ components: sources: internal_metrics: output: metrics: {
 		description:       "The Kafka consumer lag."
 		type:              "gauge"
 		default_namespace: "vector"
-		tags: _component_tags & {topic_id: {description: "The Kafka topic id.", required: true}, partition_id: {description: "The Kafka partition id.", required: true}}
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}, component_kind: {description: "The Vector component kind.", required: true, enum: {sink: "Vector sink components", source: "Vector source components", transform: "Vector transform components"}}, component_id: {description: "The Vector component ID.", required: true}, component_type: {description: "The Vector component type.", required: true}, topic_id: {description: "The Kafka topic id.", required: true}, partition_id: {description: "The Kafka partition id.", required: true}}
 	}
 	kafka_produced_messages_bytes_total: {
 		description:       "Total number of message bytes (including framing, such as per-Message framing and MessageSet/batch framing) transmitted to Kafka brokers."
@@ -620,7 +620,7 @@ components: sources: internal_metrics: output: metrics: {
 		description:       "The total memory currently being used by the Lua runtime."
 		type:              "gauge"
 		default_namespace: "vector"
-		tags:              _internal_metrics_tags
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}}
 	}
 	memory_enrichment_table_byte_size: {
 		description:       "The total size in bytes of all objects stored in the in-memory enrichment table."
@@ -686,7 +686,7 @@ components: sources: internal_metrics: output: metrics: {
 		description:       "The number of current open connections to Vector."
 		type:              "gauge"
 		default_namespace: "vector"
-		tags:              _internal_metrics_tags
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}}
 	}
 	open_files: {
 		description:       "The total number of open files."
@@ -704,13 +704,13 @@ components: sources: internal_metrics: output: metrics: {
 		description:       "The total number of times the Vector instance has quit."
 		type:              "counter"
 		default_namespace: "vector"
-		tags:              _internal_metrics_tags
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}}
 	}
 	reloaded_total: {
 		description:       "The total number of times the Vector instance has been reloaded."
 		type:              "counter"
 		default_namespace: "vector"
-		tags:              _internal_metrics_tags
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}}
 	}
 	rewritten_timestamp_events_total: {
 		description:       "The total number of events with rewrapped timestamps."
@@ -722,19 +722,19 @@ components: sources: internal_metrics: output: metrics: {
 		description:       "The time taken to process an S3 object that failed, in seconds."
 		type:              "histogram"
 		default_namespace: "vector"
-		tags: _component_tags & {bucket: {description: "The name of the S3 bucket.", required: true}}
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}, component_kind: {description: "The Vector component kind.", required: true, enum: {sink: "Vector sink components", source: "Vector source components", transform: "Vector transform components"}}, component_id: {description: "The Vector component ID.", required: true}, component_type: {description: "The Vector component type.", required: true}, bucket: {description: "The name of the S3 bucket.", required: true}}
 	}
 	s3_object_processing_succeeded_duration_seconds: {
 		description:       "The time taken to process an S3 object that succeeded, in seconds."
 		type:              "histogram"
 		default_namespace: "vector"
-		tags: _component_tags & {bucket: {description: "The name of the S3 bucket.", required: true}}
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}, component_kind: {description: "The Vector component kind.", required: true, enum: {sink: "Vector sink components", source: "Vector source components", transform: "Vector transform components"}}, component_id: {description: "The Vector component ID.", required: true}, component_type: {description: "The Vector component type.", required: true}, bucket: {description: "The name of the S3 bucket.", required: true}}
 	}
 	source_buffer_max_byte_size: {
 		description:       "The maximum number of bytes the source buffer can hold."
 		type:              "gauge"
 		default_namespace: "vector"
-		tags: _component_tags & {output: _output}
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}, component_kind: {description: "The Vector component kind.", required: true, enum: {sink: "Vector sink components", source: "Vector source components", transform: "Vector transform components"}}, component_id: {description: "The Vector component ID.", required: true}, component_type: {description: "The Vector component type.", required: true}, output: {description: "The specific output of the component.", required: false}}
 		deprecated:         true
 		deprecated_message: "This metric has been deprecated in favor of `source_buffer_max_size_bytes`."
 	}
@@ -742,7 +742,7 @@ components: sources: internal_metrics: output: metrics: {
 		description:       "The maximum number of events the source buffer can hold."
 		type:              "gauge"
 		default_namespace: "vector"
-		tags: _component_tags & {output: _output}
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}, component_kind: {description: "The Vector component kind.", required: true, enum: {sink: "Vector sink components", source: "Vector source components", transform: "Vector transform components"}}, component_id: {description: "The Vector component ID.", required: true}, component_type: {description: "The Vector component type.", required: true}, output: {description: "The specific output of the component.", required: false}}
 		deprecated:         true
 		deprecated_message: "This metric has been deprecated in favor of `source_buffer_max_size_events`."
 	}
@@ -750,31 +750,31 @@ components: sources: internal_metrics: output: metrics: {
 		description:       "The maximum number of bytes the source buffer can hold."
 		type:              "gauge"
 		default_namespace: "vector"
-		tags: _component_tags & {output: _output}
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}, component_kind: {description: "The Vector component kind.", required: true, enum: {sink: "Vector sink components", source: "Vector source components", transform: "Vector transform components"}}, component_id: {description: "The Vector component ID.", required: true}, component_type: {description: "The Vector component type.", required: true}, output: {description: "The specific output of the component.", required: false}}
 	}
 	source_buffer_max_size_events: {
 		description:       "The maximum number of events the source buffer can hold."
 		type:              "gauge"
 		default_namespace: "vector"
-		tags: _component_tags & {output: _output}
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}, component_kind: {description: "The Vector component kind.", required: true, enum: {sink: "Vector sink components", source: "Vector source components", transform: "Vector transform components"}}, component_id: {description: "The Vector component ID.", required: true}, component_type: {description: "The Vector component type.", required: true}, output: {description: "The specific output of the component.", required: false}}
 	}
 	source_buffer_utilization: {
 		description:       "The utilization of the source buffer."
 		type:              "histogram"
 		default_namespace: "vector"
-		tags: _component_tags & {output: _output}
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}, component_kind: {description: "The Vector component kind.", required: true, enum: {sink: "Vector sink components", source: "Vector source components", transform: "Vector transform components"}}, component_id: {description: "The Vector component ID.", required: true}, component_type: {description: "The Vector component type.", required: true}, output: {description: "The specific output of the component.", required: false}}
 	}
 	source_buffer_utilization_level: {
 		description:       "The current utilization level of the source buffer."
 		type:              "gauge"
 		default_namespace: "vector"
-		tags: _component_tags & {output: _output}
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}, component_kind: {description: "The Vector component kind.", required: true, enum: {sink: "Vector sink components", source: "Vector source components", transform: "Vector transform components"}}, component_id: {description: "The Vector component ID.", required: true}, component_type: {description: "The Vector component type.", required: true}, output: {description: "The specific output of the component.", required: false}}
 	}
 	source_buffer_utilization_mean: {
 		description:       "The mean utilization of the source buffer, smoothed with an EWMA."
 		type:              "gauge"
 		default_namespace: "vector"
-		tags: _component_tags & {output: _output}
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}, component_kind: {description: "The Vector component kind.", required: true, enum: {sink: "Vector sink components", source: "Vector source components", transform: "Vector transform components"}}, component_id: {description: "The Vector component ID.", required: true}, component_type: {description: "The Vector component type.", required: true}, output: {description: "The specific output of the component.", required: false}}
 	}
 	source_lag_time_seconds: {
 		description:       "The difference between the timestamp recorded in each event and the time when it was ingested, expressed as fractional seconds."
@@ -834,7 +834,7 @@ components: sources: internal_metrics: output: metrics: {
 		description:       "The total number of times an S3 record in an SQS message was ignored."
 		type:              "counter"
 		default_namespace: "vector"
-		tags: _component_tags & {ignore_type: {description: "The reason for ignoring the S3 record", required: true, enum: {invalid_event_kind: "The kind of invalid event."}}}
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}, component_kind: {description: "The Vector component kind.", required: true, enum: {sink: "Vector sink components", source: "Vector source components", transform: "Vector transform components"}}, component_id: {description: "The Vector component ID.", required: true}, component_type: {description: "The Vector component type.", required: true}, ignore_type: {description: "The reason for ignoring the S3 record", required: true, enum: {invalid_event_kind: "The kind of invalid event."}}}
 	}
 	stale_events_flushed_total: {
 		description:       "The number of stale events that Vector has flushed."
@@ -846,13 +846,13 @@ components: sources: internal_metrics: output: metrics: {
 		description:       "The total number of times the Vector instance has been started."
 		type:              "counter"
 		default_namespace: "vector"
-		tags:              _internal_metrics_tags
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}}
 	}
 	stopped_total: {
 		description:       "The total number of times the Vector instance has been stopped."
 		type:              "counter"
 		default_namespace: "vector"
-		tags:              _internal_metrics_tags
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}}
 	}
 	tag_cardinality_tracked_keys: {
 		description:       "The number of tag keys currently being tracked by the tag cardinality limit transform."
@@ -870,13 +870,13 @@ components: sources: internal_metrics: output: metrics: {
 		description:       "The total number of events discarded because the tag has been rejected after hitting the configured `value_limit`."
 		type:              "counter"
 		default_namespace: "vector"
-		tags: _component_tags & {metric_name: {description: "The name of the metric whose tag value limit was exceeded. Only present when `internal_metrics.include_extended_tags` is enabled.", required: false}, tag_key: {description: "The key of the tag whose value limit was exceeded. Only present when `internal_metrics.include_extended_tags` is enabled.", required: false}}
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}, component_kind: {description: "The Vector component kind.", required: true, enum: {sink: "Vector sink components", source: "Vector source components", transform: "Vector transform components"}}, component_id: {description: "The Vector component ID.", required: true}, component_type: {description: "The Vector component type.", required: true}, metric_name: {description: "The name of the metric whose tag value limit was exceeded. Only present when `internal_metrics.include_extended_tags` is enabled.", required: false}, tag_key: {description: "The key of the tag whose value limit was exceeded. Only present when `internal_metrics.include_extended_tags` is enabled.", required: false}}
 	}
 	transform_buffer_max_byte_size: {
 		description:       "The maximum number of bytes the buffer that feeds into a transform can hold."
 		type:              "gauge"
 		default_namespace: "vector"
-		tags: _component_tags & {output: _output}
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}, component_kind: {description: "The Vector component kind.", required: true, enum: {sink: "Vector sink components", source: "Vector source components", transform: "Vector transform components"}}, component_id: {description: "The Vector component ID.", required: true}, component_type: {description: "The Vector component type.", required: true}, output: {description: "The specific output of the component.", required: false}}
 		deprecated:         true
 		deprecated_message: "This metric has been deprecated in favor of `transform_buffer_max_size_bytes`."
 	}
@@ -884,7 +884,7 @@ components: sources: internal_metrics: output: metrics: {
 		description:       "The maximum number of events the buffer that feeds into a transform can hold."
 		type:              "gauge"
 		default_namespace: "vector"
-		tags: _component_tags & {output: _output}
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}, component_kind: {description: "The Vector component kind.", required: true, enum: {sink: "Vector sink components", source: "Vector source components", transform: "Vector transform components"}}, component_id: {description: "The Vector component ID.", required: true}, component_type: {description: "The Vector component type.", required: true}, output: {description: "The specific output of the component.", required: false}}
 		deprecated:         true
 		deprecated_message: "This metric has been deprecated in favor of `transform_buffer_max_size_events`."
 	}
@@ -892,43 +892,43 @@ components: sources: internal_metrics: output: metrics: {
 		description:       "The maximum number of bytes the buffer that feeds into a transform can hold."
 		type:              "gauge"
 		default_namespace: "vector"
-		tags: _component_tags & {output: _output}
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}, component_kind: {description: "The Vector component kind.", required: true, enum: {sink: "Vector sink components", source: "Vector source components", transform: "Vector transform components"}}, component_id: {description: "The Vector component ID.", required: true}, component_type: {description: "The Vector component type.", required: true}, output: {description: "The specific output of the component.", required: false}}
 	}
 	transform_buffer_max_size_events: {
 		description:       "The maximum number of events the buffer that feeds into a transform can hold."
 		type:              "gauge"
 		default_namespace: "vector"
-		tags: _component_tags & {output: _output}
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}, component_kind: {description: "The Vector component kind.", required: true, enum: {sink: "Vector sink components", source: "Vector source components", transform: "Vector transform components"}}, component_id: {description: "The Vector component ID.", required: true}, component_type: {description: "The Vector component type.", required: true}, output: {description: "The specific output of the component.", required: false}}
 	}
 	transform_buffer_utilization: {
 		description:       "The utilization of the buffer that feeds into a transform."
 		type:              "histogram"
 		default_namespace: "vector"
-		tags: _component_tags & {output: _output}
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}, component_kind: {description: "The Vector component kind.", required: true, enum: {sink: "Vector sink components", source: "Vector source components", transform: "Vector transform components"}}, component_id: {description: "The Vector component ID.", required: true}, component_type: {description: "The Vector component type.", required: true}, output: {description: "The specific output of the component.", required: false}}
 	}
 	transform_buffer_utilization_level: {
 		description:       "The current utilization level of the buffer that feeds into a transform."
 		type:              "gauge"
 		default_namespace: "vector"
-		tags: _component_tags & {output: _output}
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}, component_kind: {description: "The Vector component kind.", required: true, enum: {sink: "Vector sink components", source: "Vector source components", transform: "Vector transform components"}}, component_id: {description: "The Vector component ID.", required: true}, component_type: {description: "The Vector component type.", required: true}, output: {description: "The specific output of the component.", required: false}}
 	}
 	transform_buffer_utilization_mean: {
 		description:       "The mean utilization of the buffer that feeds into a transform, smoothed with an EWMA."
 		type:              "gauge"
 		default_namespace: "vector"
-		tags: _component_tags & {output: _output}
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}, component_kind: {description: "The Vector component kind.", required: true, enum: {sink: "Vector sink components", source: "Vector source components", transform: "Vector transform components"}}, component_id: {description: "The Vector component ID.", required: true}, component_type: {description: "The Vector component type.", required: true}, output: {description: "The specific output of the component.", required: false}}
 	}
 	uptime_seconds: {
 		description:       "The number of seconds the Vector instance has been running."
 		type:              "gauge"
 		default_namespace: "vector"
-		tags:              _internal_metrics_tags
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}}
 	}
 	utf8_convert_errors_total: {
 		description:       "The total number of errors converting bytes to a UTF-8 string in UDP mode."
 		type:              "counter"
 		default_namespace: "vector"
-		tags: _component_tags & {mode: {description: "The connection mode used by the component.", required: true, enum: {udp: "User Datagram Protocol"}}}
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}, component_kind: {description: "The Vector component kind.", required: true, enum: {sink: "Vector sink components", source: "Vector source components", transform: "Vector transform components"}}, component_id: {description: "The Vector component ID.", required: true}, component_type: {description: "The Vector component type.", required: true}, mode: {description: "The connection mode used by the component.", required: true, enum: {udp: "User Datagram Protocol"}}}
 	}
 	utilization: {
 		description:       "The current utilization of this component, expressed as a value from 0 to 1."
@@ -958,30 +958,30 @@ components: sources: internal_metrics: output: metrics: {
 		description:       "The total number of times the Windows service has been installed."
 		type:              "counter"
 		default_namespace: "vector"
-		tags:              _internal_metrics_tags
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}}
 	}
 	windows_service_restart_total: {
 		description:       "The total number of times the Windows service has been restarted."
 		type:              "counter"
 		default_namespace: "vector"
-		tags:              _internal_metrics_tags
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}}
 	}
 	windows_service_start_total: {
 		description:       "The total number of times the Windows service has been started."
 		type:              "counter"
 		default_namespace: "vector"
-		tags:              _internal_metrics_tags
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}}
 	}
 	windows_service_stop_total: {
 		description:       "The total number of times the Windows service has been stopped."
 		type:              "counter"
 		default_namespace: "vector"
-		tags:              _internal_metrics_tags
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}}
 	}
 	windows_service_uninstall_total: {
 		description:       "The total number of times the Windows service has been uninstalled."
 		type:              "counter"
 		default_namespace: "vector"
-		tags:              _internal_metrics_tags
+		tags: {pid: {description: "The process ID of the Vector instance.", required: false}, host: {description: "The hostname of the system Vector is running on.", required: false}}
 	}
 }
