@@ -364,6 +364,7 @@ fn render_and_import_generated_top_level_config_schema(
 
 struct MetricEntry {
     name: String,
+    metric_type: &'static str,
     description: String,
     deprecated: bool,
     deprecated_message: Option<String>,
@@ -380,14 +381,12 @@ fn generate_internal_metric_descriptions(metric_schemas: &Value) -> Result<()> {
 
     let mut entries: Vec<MetricEntry> = Vec::new();
 
-    for schema in [
-        metric_schemas.get("counters"),
-        metric_schemas.get("histograms"),
-        metric_schemas.get("gauges"),
-    ]
-    .into_iter()
-    .flatten()
-    {
+    for (metric_type, schema) in [
+        ("counter", metric_schemas.get("counters")),
+        ("histogram", metric_schemas.get("histograms")),
+        ("gauge", metric_schemas.get("gauges")),
+    ] {
+        let Some(schema) = schema else { continue };
         for variant in schema
             .get("oneOf")
             .and_then(Value::as_array)
@@ -412,6 +411,7 @@ fn generate_internal_metric_descriptions(metric_schemas: &Value) -> Result<()> {
 
             entries.push(MetricEntry {
                 name: name.to_owned(),
+                metric_type,
                 description: desc.replace('\\', "\\\\").replace('"', "\\\""),
                 deprecated,
                 deprecated_message,
@@ -433,18 +433,17 @@ fn generate_internal_metric_descriptions(metric_schemas: &Value) -> Result<()> {
     );
 
     for e in &entries {
+        writeln!(cue, "\t{}: {{", e.name).unwrap();
+        writeln!(cue, "\t\tdescription: \"{}\"", e.description).unwrap();
+        writeln!(cue, "\t\ttype:        \"{}\"", e.metric_type).unwrap();
         if e.deprecated {
-            writeln!(cue, "\t{}: {{", e.name).unwrap();
-            writeln!(cue, "\t\tdescription: \"{}\"", e.description).unwrap();
             cue.push_str("\t\tdeprecated:  true\n");
             if let Some(msg) = &e.deprecated_message {
                 let escaped = msg.replace('\\', "\\\\").replace('"', "\\\"");
                 writeln!(cue, "\t\tdeprecated_message: \"{escaped}\"").unwrap();
             }
-            cue.push_str("\t}\n");
-        } else {
-            writeln!(cue, "\t{}: description: \"{}\"", e.name, e.description).unwrap();
         }
+        cue.push_str("\t}\n");
     }
 
     cue.push_str("}\n");
