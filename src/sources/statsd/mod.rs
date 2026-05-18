@@ -21,7 +21,9 @@ use vector_lib::{
 };
 
 use self::parser::ParseError;
-use super::util::net::{SocketListenAddr, TcpNullAcker, TcpSource, try_bind_udp_socket};
+use super::util::net::{
+    DisconnectMode, SocketListenAddr, TcpNullAcker, TcpSource, try_bind_udp_socket,
+};
 use crate::{
     SourceSender,
     codecs::Decoder,
@@ -139,6 +141,10 @@ pub struct TcpConfig {
     #[configurable(metadata(docs::type_unit = "connections"))]
     connection_limit: Option<u32>,
 
+    #[configurable(derived)]
+    #[serde(default)]
+    disconnect_mode: DisconnectMode,
+
     ///	Whether or not to sanitize incoming statsd key names. When "true", keys are sanitized by:
     /// - "/" is replaced with "-"
     /// - All whitespace is replaced with "_"
@@ -163,6 +169,7 @@ impl TcpConfig {
             shutdown_timeout_secs: default_shutdown_timeout_secs(),
             receive_buffer_bytes: None,
             connection_limit: None,
+            disconnect_mode: DisconnectMode::Drain,
             sanitize: default_sanitize(),
             convert_to: default_convert_to(),
         }
@@ -222,6 +229,7 @@ impl SourceConfig for StatsdConfig {
                     tls_client_metadata_key,
                     config.receive_buffer_bytes,
                     None,
+                    config.disconnect_mode,
                     cx,
                     false.into(),
                     config.connection_limit,
