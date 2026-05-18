@@ -231,6 +231,12 @@ impl FromMeta for Metadata {
                                 }),
                             }
                         }
+                        // Accept path expressions so callers can reference constants:
+                        // `#[configurable(metadata(docs::tags = INTERNAL_METRICS_TAGS))]`
+                        Expr::Path(path) => Some(LazyCustomAttribute::KeyValue {
+                            key: path_to_string(&nv.path),
+                            value: path.to_token_stream(),
+                        }),
                         expr => {
                             errors
                                 .push(darling::Error::unexpected_expr_type(expr).with_span(nmeta));

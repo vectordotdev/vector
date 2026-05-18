@@ -1,6 +1,23 @@
 use strum::{AsRefStr, Display, EnumIter};
 use vector_config::configurable_component;
 
+// CUE tag-set constants referenced via `#[configurable(metadata(docs::tags = CONSTANT))]`.
+// The values are raw CUE expressions emitted verbatim by `vdev build component-docs`.
+pub const COMPONENT_TAGS: &str = "_component_tags";
+pub const INTERNAL_METRICS_TAGS: &str = "_internal_metrics_tags";
+pub const COMPONENT_TAGS_OUTPUT: &str = "_component_tags & {output: _output}";
+pub const INTERNAL_METRICS_TAGS_FILE: &str = "_internal_metrics_tags & {file: _file}";
+pub const INTERNAL_METRICS_TAGS_REASON: &str = "_internal_metrics_tags & {reason: _reason}";
+pub const COMPONENT_TAGS_GRPC_METHOD_SERVICE: &str =
+    "_component_tags & {grpc_method: _grpc_method, grpc_service: _grpc_service}";
+pub const COMPONENT_TAGS_GRPC_ALL: &str = "_component_tags & {grpc_method: _grpc_method, grpc_service: _grpc_service, grpc_status: _grpc_status}";
+pub const COMPONENT_TAGS_HTTP_METHOD: &str = "_component_tags & {method: _method}";
+pub const COMPONENT_TAGS_HTTP_STATUS: &str = "_component_tags & {status: _status}";
+pub const COMPONENT_TAGS_HTTP_METHOD_PATH: &str = "_component_tags & {method: _method, path: _path}";
+pub const COMPONENT_TAGS_HTTP_ALL: &str =
+    "_component_tags & {method: _method, path: _path, status: _status}";
+pub const COMPONENT_RECEIVED_EVENTS_TAGS: &str = "component_received_events_total.tags";
+
 /// Canonical list of all per-component internal counter metric names emitted by Vector.
 #[configurable_component]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Display, AsRefStr, EnumIter)]
@@ -9,28 +26,36 @@ use vector_config::configurable_component;
 pub enum CounterName {
     /// The number of events accepted by this component either from tagged
     /// origins like file and uri, or cumulatively from other origins.
+    #[configurable(metadata(docs::tags = "_component_tags & {file: {description: \"The file from which the data originated.\", required: false}, uri: {description: \"The sanitized URI from which the data originated.\", required: false}, container_name: {description: \"The name of the container from which the data originated.\", required: false}, pod_name: {description: \"The name of the pod from which the data originated.\", required: false}, peer_addr: {description: \"The IP from which the data originated.\", required: false}, peer_path: {description: \"The pathname from which the data originated.\", required: false}, mode: _mode}"))]
     ComponentReceivedEventsTotal,
 
     /// The number of event bytes accepted by this component either from
     /// tagged origins like file and uri, or cumulatively from other origins.
+    #[configurable(metadata(docs::tags = COMPONENT_RECEIVED_EVENTS_TAGS))]
     ComponentReceivedEventBytesTotal,
 
     /// The number of raw bytes accepted by this component from source origins.
+    #[configurable(metadata(docs::tags = COMPONENT_RECEIVED_EVENTS_TAGS))]
     ComponentReceivedBytesTotal,
 
     /// The total number of events emitted by this component.
+    #[configurable(metadata(docs::tags = COMPONENT_TAGS_OUTPUT))]
     ComponentSentEventsTotal,
 
     /// The total number of event bytes emitted by this component.
+    #[configurable(metadata(docs::tags = COMPONENT_TAGS_OUTPUT))]
     ComponentSentEventBytesTotal,
 
     /// The number of raw bytes sent by this component to destination sinks.
+    #[configurable(metadata(docs::tags = "_component_tags & {endpoint: {description: \"The endpoint to which the bytes were sent. For HTTP, this will be the host and path only, excluding the query string.\", required: false}, file: {description: \"The absolute path of the destination file.\", required: false}, protocol: {description: \"The protocol used to send the bytes.\", required: true}, region: {description: \"The AWS region name to which the bytes were sent. In some configurations, this may be a literal hostname.\", required: false}}"))]
     ComponentSentBytesTotal,
 
     /// The number of events dropped by this component.
+    #[configurable(metadata(docs::tags = "_component_tags & {intentional: {description: \"True if the events were discarded intentionally, like a `filter` transform, or false if due to an error.\", required: true}}"))]
     ComponentDiscardedEventsTotal,
 
     /// The total number of errors encountered by this component.
+    #[configurable(metadata(docs::tags = "_component_tags & {error_type: _error_type, stage: _stage}"))]
     ComponentErrorsTotal,
 
     /// The total number of events for which this source responded with a timeout error.
@@ -71,33 +96,34 @@ pub enum CounterName {
     AggregateFlushesTotal,
 
     /// The number of times the Vector API has been started.
-    #[configurable(metadata(docs::tags = "_internal_metrics_tags"))]
+    #[configurable(metadata(docs::tags = INTERNAL_METRICS_TAGS))]
     ApiStartedTotal,
 
     /// The total number of files checkpointed.
-    #[configurable(metadata(docs::tags = "_internal_metrics_tags"))]
+    #[configurable(metadata(docs::tags = INTERNAL_METRICS_TAGS))]
     CheckpointsTotal,
 
     /// The total number of errors identifying files via checksum.
+    #[configurable(metadata(docs::tags = INTERNAL_METRICS_TAGS_FILE))]
     ChecksumErrorsTotal,
 
     /// The total number of metrics collections completed for this component.
-    #[configurable(metadata(docs::tags = "_internal_metrics_tags"))]
+    #[configurable(metadata(docs::tags = INTERNAL_METRICS_TAGS))]
     CollectCompletedTotal,
 
     /// The total number of times a command has been executed.
     CommandExecutedTotal,
 
     /// The total number of times a connection has been established.
-    #[configurable(metadata(docs::tags = "_internal_metrics_tags"))]
+    #[configurable(metadata(docs::tags = INTERNAL_METRICS_TAGS))]
     ConnectionEstablishedTotal,
 
     /// The total number of errors sending data via the connection.
-    #[configurable(metadata(docs::tags = "_internal_metrics_tags"))]
+    #[configurable(metadata(docs::tags = INTERNAL_METRICS_TAGS))]
     ConnectionSendErrorsTotal,
 
     /// The total number of times the connection has been shut down.
-    #[configurable(metadata(docs::tags = "_internal_metrics_tags"))]
+    #[configurable(metadata(docs::tags = INTERNAL_METRICS_TAGS))]
     ConnectionShutdownTotal,
 
     /// The total number of container events processed.
@@ -128,39 +154,50 @@ pub enum CounterName {
     EncoderUnmappableReplacementWarningsTotal,
 
     /// The total number of events discarded by this component.
+    #[configurable(metadata(docs::tags = INTERNAL_METRICS_TAGS_REASON))]
     EventsDiscardedTotal,
 
     /// The total number of files Vector has found to watch.
+    #[configurable(metadata(docs::tags = INTERNAL_METRICS_TAGS_FILE))]
     FilesAddedTotal,
 
     /// The total number of files deleted.
+    #[configurable(metadata(docs::tags = INTERNAL_METRICS_TAGS_FILE))]
     FilesDeletedTotal,
 
     /// The total number of times Vector has resumed watching a file.
+    #[configurable(metadata(docs::tags = INTERNAL_METRICS_TAGS_FILE))]
     FilesResumedTotal,
 
     /// The total number of times Vector has stopped watching a file.
+    #[configurable(metadata(docs::tags = INTERNAL_METRICS_TAGS_FILE))]
     FilesUnwatchedTotal,
 
     /// The total number of gRPC messages received.
+    #[configurable(metadata(docs::tags = COMPONENT_TAGS_GRPC_METHOD_SERVICE))]
     GrpcServerMessagesReceivedTotal,
 
     /// The total number of gRPC messages sent.
+    #[configurable(metadata(docs::tags = COMPONENT_TAGS_GRPC_ALL))]
     GrpcServerMessagesSentTotal,
 
     /// The total number of HTTP client errors encountered.
     HttpClientErrorsTotal,
 
     /// The total number of sent HTTP requests, tagged with the request method.
+    #[configurable(metadata(docs::tags = COMPONENT_TAGS_HTTP_METHOD))]
     HttpClientRequestsSentTotal,
 
     /// The total number of HTTP requests, tagged with the response code.
+    #[configurable(metadata(docs::tags = COMPONENT_TAGS_HTTP_STATUS))]
     HttpClientResponsesTotal,
 
     /// The total number of HTTP requests received.
+    #[configurable(metadata(docs::tags = COMPONENT_TAGS_HTTP_METHOD_PATH))]
     HttpServerRequestsReceivedTotal,
 
     /// The total number of HTTP responses sent.
+    #[configurable(metadata(docs::tags = COMPONENT_TAGS_HTTP_ALL))]
     HttpServerResponsesSentTotal,
 
     /// Total number of message bytes (including framing) received from Kafka brokers.
@@ -197,11 +234,11 @@ pub enum CounterName {
     ParseErrorsTotal,
 
     /// The total number of times the Vector instance has quit.
-    #[configurable(metadata(docs::tags = "_internal_metrics_tags"))]
+    #[configurable(metadata(docs::tags = INTERNAL_METRICS_TAGS))]
     QuitTotal,
 
     /// The total number of times the Vector instance has been reloaded.
-    #[configurable(metadata(docs::tags = "_internal_metrics_tags"))]
+    #[configurable(metadata(docs::tags = INTERNAL_METRICS_TAGS))]
     ReloadedTotal,
 
     /// The total number of events with rewrapped timestamps.
@@ -226,17 +263,18 @@ pub enum CounterName {
     StaleEventsFlushedTotal,
 
     /// The total number of times the Vector instance has been started.
-    #[configurable(metadata(docs::tags = "_internal_metrics_tags"))]
+    #[configurable(metadata(docs::tags = INTERNAL_METRICS_TAGS))]
     StartedTotal,
 
     /// The total number of times the Vector instance has been stopped.
-    #[configurable(metadata(docs::tags = "_internal_metrics_tags"))]
+    #[configurable(metadata(docs::tags = INTERNAL_METRICS_TAGS))]
     StoppedTotal,
 
     /// The total number of events that contained a tag which exceeded the configured cardinality limit.
     TagCardinalityUntrackedEventsTotal,
 
     /// The total number of events discarded because the tag has been rejected after hitting the configured `value_limit`.
+    #[configurable(metadata(docs::tags = "_component_tags & {metric_name: {description: \"The name of the metric whose tag value limit was exceeded. Only present when `internal_metrics.include_extended_tags` is enabled.\", required: false}, tag_key: {description: \"The key of the tag whose value limit was exceeded. Only present when `internal_metrics.include_extended_tags` is enabled.\", required: false}}"))]
     TagValueLimitExceededTotal,
 
     /// The total number of times the value limit was reached.
@@ -249,23 +287,23 @@ pub enum CounterName {
     WebsocketMessagesSentTotal,
 
     /// The total number of times the Windows service has been installed.
-    #[configurable(metadata(docs::tags = "_internal_metrics_tags"))]
+    #[configurable(metadata(docs::tags = INTERNAL_METRICS_TAGS))]
     WindowsServiceInstallTotal,
 
     /// The total number of times the Windows service has been restarted.
-    #[configurable(metadata(docs::tags = "_internal_metrics_tags"))]
+    #[configurable(metadata(docs::tags = INTERNAL_METRICS_TAGS))]
     WindowsServiceRestartTotal,
 
     /// The total number of times the Windows service has been started.
-    #[configurable(metadata(docs::tags = "_internal_metrics_tags"))]
+    #[configurable(metadata(docs::tags = INTERNAL_METRICS_TAGS))]
     WindowsServiceStartTotal,
 
     /// The total number of times the Windows service has been stopped.
-    #[configurable(metadata(docs::tags = "_internal_metrics_tags"))]
+    #[configurable(metadata(docs::tags = INTERNAL_METRICS_TAGS))]
     WindowsServiceStopTotal,
 
     /// The total number of times the Windows service has been uninstalled.
-    #[configurable(metadata(docs::tags = "_internal_metrics_tags"))]
+    #[configurable(metadata(docs::tags = INTERNAL_METRICS_TAGS))]
     WindowsServiceUninstallTotal,
 
     /// The total number of failures to annotate Kubernetes events with namespace metadata.
@@ -281,6 +319,7 @@ pub enum CounterName {
     K8sDockerFormatParseFailuresTotal,
 
     /// The total number of times an S3 record in an SQS message was ignored.
+    #[configurable(metadata(docs::tags = "_component_tags & {ignore_type: {description: \"The reason for ignoring the S3 record\", required: true, enum: {invalid_event_kind: \"The kind of invalid event.\"}}}"))]
     SqsS3EventRecordIgnoredTotal,
 
     /// The total number of bytes allocated by this component.
@@ -318,9 +357,11 @@ pub enum HistogramName {
     ///
     /// Note that this is separate than sink-level batching. It is mostly useful for low level
     /// debugging performance issues in Vector due to small internal batches.
+    #[configurable(metadata(docs::tags = COMPONENT_RECEIVED_EVENTS_TAGS))]
     ComponentReceivedEventsCount,
 
     /// The size in bytes of each event received by the source.
+    #[configurable(metadata(docs::tags = COMPONENT_RECEIVED_EVENTS_TAGS))]
     ComponentReceivedBytes,
 
     /// The duration spent sending a payload to this buffer.
@@ -330,7 +371,7 @@ pub enum HistogramName {
     ///
     /// This includes both the time spent queued in the transform's input buffer and the time spent
     /// executing the transform itself.
-    #[configurable(metadata(docs::tags = "_internal_metrics_tags"))]
+    #[configurable(metadata(docs::tags = INTERNAL_METRICS_TAGS))]
     ComponentLatencySeconds,
 
     /// The difference between the timestamp recorded in each event and the time when it was ingested, expressed as fractional seconds.
@@ -364,37 +405,44 @@ pub enum HistogramName {
     AdaptiveConcurrencyReachedLimit,
 
     /// The time taken to process an S3 object that succeeded, in seconds.
+    #[configurable(metadata(docs::tags = "_component_tags & {bucket: {description: \"The name of the S3 bucket.\", required: true}}"))]
     S3ObjectProcessingSucceededDurationSeconds,
 
     /// The time taken to process an S3 object that failed, in seconds.
+    #[configurable(metadata(docs::tags = "_component_tags & {bucket: {description: \"The name of the S3 bucket.\", required: true}}"))]
     S3ObjectProcessingFailedDurationSeconds,
 
     /// The duration spent collecting metrics for this component.
-    #[configurable(metadata(docs::tags = "_internal_metrics_tags"))]
+    #[configurable(metadata(docs::tags = INTERNAL_METRICS_TAGS))]
     CollectDurationSeconds,
 
     /// The command execution duration in seconds.
     CommandExecutionDurationSeconds,
 
     /// The duration spent handling a gRPC request.
+    #[configurable(metadata(docs::tags = COMPONENT_TAGS_GRPC_ALL))]
     GrpcServerHandlerDurationSeconds,
 
     /// The duration spent handling an HTTP request.
+    #[configurable(metadata(docs::tags = COMPONENT_TAGS_HTTP_ALL))]
     HttpServerHandlerDurationSeconds,
 
     /// The round-trip time (RTT) of HTTP requests.
     HttpClientRttSeconds,
 
     /// The round-trip time (RTT) of HTTP requests, tagged with the response code.
+    #[configurable(metadata(docs::tags = COMPONENT_TAGS_HTTP_STATUS))]
     HttpClientResponseRttSeconds,
 
     /// The round-trip time (RTT) of HTTP requests that resulted in an error.
     HttpClientErrorRttSeconds,
 
     /// The utilization of the source buffer.
+    #[configurable(metadata(docs::tags = COMPONENT_TAGS_OUTPUT))]
     SourceBufferUtilization,
 
     /// The utilization of the buffer that feeds into a transform.
+    #[configurable(metadata(docs::tags = COMPONENT_TAGS_OUTPUT))]
     TransformBufferUtilization,
 }
 
@@ -446,47 +494,59 @@ pub enum GaugeName {
     /// This includes both the time spent queued in the transform's input buffer and the time spent
     /// executing the transform itself. This value is smoothed over time using an exponentially
     /// weighted moving average (EWMA).
-    #[configurable(metadata(docs::tags = "_internal_metrics_tags"))]
+    #[configurable(metadata(docs::tags = INTERNAL_METRICS_TAGS))]
     ComponentLatencyMeanSeconds,
 
     /// The maximum number of events the source buffer can hold.
     #[configurable(deprecated = "This metric has been deprecated in favor of `source_buffer_max_size_events`.")]
+    #[configurable(metadata(docs::tags = COMPONENT_TAGS_OUTPUT))]
     SourceBufferMaxEventSize,
 
     /// The maximum number of bytes the source buffer can hold.
     #[configurable(deprecated = "This metric has been deprecated in favor of `source_buffer_max_size_bytes`.")]
+    #[configurable(metadata(docs::tags = COMPONENT_TAGS_OUTPUT))]
     SourceBufferMaxByteSize,
 
     /// The maximum number of events the source buffer can hold.
+    #[configurable(metadata(docs::tags = COMPONENT_TAGS_OUTPUT))]
     SourceBufferMaxSizeEvents,
 
     /// The maximum number of bytes the source buffer can hold.
+    #[configurable(metadata(docs::tags = COMPONENT_TAGS_OUTPUT))]
     SourceBufferMaxSizeBytes,
 
     /// The current utilization level of the source buffer.
+    #[configurable(metadata(docs::tags = COMPONENT_TAGS_OUTPUT))]
     SourceBufferUtilizationLevel,
 
     /// The mean utilization of the source buffer, smoothed with an EWMA.
+    #[configurable(metadata(docs::tags = COMPONENT_TAGS_OUTPUT))]
     SourceBufferUtilizationMean,
 
     /// The maximum number of events the buffer that feeds into a transform can hold.
     #[configurable(deprecated = "This metric has been deprecated in favor of `transform_buffer_max_size_events`.")]
+    #[configurable(metadata(docs::tags = COMPONENT_TAGS_OUTPUT))]
     TransformBufferMaxEventSize,
 
     /// The maximum number of bytes the buffer that feeds into a transform can hold.
     #[configurable(deprecated = "This metric has been deprecated in favor of `transform_buffer_max_size_bytes`.")]
+    #[configurable(metadata(docs::tags = COMPONENT_TAGS_OUTPUT))]
     TransformBufferMaxByteSize,
 
     /// The maximum number of events the buffer that feeds into a transform can hold.
+    #[configurable(metadata(docs::tags = COMPONENT_TAGS_OUTPUT))]
     TransformBufferMaxSizeEvents,
 
     /// The maximum number of bytes the buffer that feeds into a transform can hold.
+    #[configurable(metadata(docs::tags = COMPONENT_TAGS_OUTPUT))]
     TransformBufferMaxSizeBytes,
 
     /// The current utilization level of the buffer that feeds into a transform.
+    #[configurable(metadata(docs::tags = COMPONENT_TAGS_OUTPUT))]
     TransformBufferUtilizationLevel,
 
     /// The mean utilization of the buffer that feeds into a transform, smoothed with an EWMA.
+    #[configurable(metadata(docs::tags = COMPONENT_TAGS_OUTPUT))]
     TransformBufferUtilizationMean,
 
     /// The maximum number of events in the buffer.
@@ -525,10 +585,11 @@ pub enum GaugeName {
     OpenFiles,
 
     /// The number of seconds the Vector instance has been running.
-    #[configurable(metadata(docs::tags = "_internal_metrics_tags"))]
+    #[configurable(metadata(docs::tags = INTERNAL_METRICS_TAGS))]
     UptimeSeconds,
 
     /// Pseudo-metric that provides build information for the Vector instance.
+    #[configurable(metadata(docs::tags = "_internal_metrics_tags & {debug: {description: \"Whether this is a debug build of Vector\", required: true}, version: {description: \"Vector version.\", required: true}, rust_version: {description: \"The Rust version from the package manifest.\", required: true}, arch: {description: \"The target architecture being compiled for. (e.g. x86_64)\", required: true}, revision: {description: \"Revision identifer, related to versioned releases.\", required: true}}"))]
     BuildInfo,
 
     /// Current number of messages in producer queues.
@@ -538,14 +599,15 @@ pub enum GaugeName {
     KafkaQueueMessagesBytes,
 
     /// The Kafka consumer lag.
+    #[configurable(metadata(docs::tags = "_component_tags & {topic_id: {description: \"The Kafka topic id.\", required: true}, partition_id: {description: \"The Kafka partition id.\", required: true}}"))]
     KafkaConsumerLag,
 
     /// The total memory currently being used by the Lua runtime.
-    #[configurable(metadata(docs::tags = "_internal_metrics_tags"))]
+    #[configurable(metadata(docs::tags = INTERNAL_METRICS_TAGS))]
     LuaMemoryUsedBytes,
 
     /// The number of current open connections to Vector.
-    #[configurable(metadata(docs::tags = "_internal_metrics_tags"))]
+    #[configurable(metadata(docs::tags = INTERNAL_METRICS_TAGS))]
     OpenConnections,
 
     /// The number of currently active endpoints.

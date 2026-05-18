@@ -19,10 +19,6 @@ components: sources: internal_metrics: {
 
 	features: {
 		acknowledgements: false
-		collect: {
-			checkpoint: enabled: false
-			from: service:       services.vector
-		}
 		multiline: enabled: false
 	}
 
@@ -57,12 +53,10 @@ components: sources: internal_metrics: {
 
 		// Metrics emitted by one or more components
 		// Reusable metric definitions
-		checksum_errors_total: {
-			tags: _internal_metrics_tags & {
-				file: _file
-			}
-		}
 		connection_read_errors_total: {
+			description:       "The total number of errors reading datagram."
+			type:              "counter"
+			default_namespace: "vector"
 			tags: _component_tags & {
 				mode: {
 					description: ""
@@ -73,328 +67,22 @@ components: sources: internal_metrics: {
 				}
 			}
 		}
-		events_discarded_total: {
-			tags: _internal_metrics_tags & {
-				reason: _reason
-			}
-		}
-		component_discarded_events_total: {
-			tags: _component_tags & {
-				intentional: {
-					description: "True if the events were discarded intentionally, like a `filter` transform, or false if due to an error."
-					required:    true
-				}
-			}
-		}
-		component_errors_total: {
-			tags: _component_tags & {
-				error_type: _error_type
-				stage:      _stage
-			}
-		}
-		component_received_bytes_total: {
-			tags:              component_received_events_total.tags
-		}
-		component_received_bytes: {
-			tags:              component_received_events_total.tags
-		}
-		component_received_events_total: {
-			tags: _component_tags & {
-				file: {
-					description: "The file from which the data originated."
-					required:    false
-				}
-				uri: {
-					description: "The sanitized URI from which the data originated."
-					required:    false
-				}
-				container_name: {
-					description: "The name of the container from which the data originated."
-					required:    false
-				}
-				pod_name: {
-					description: "The name of the pod from which the data originated."
-					required:    false
-				}
-				peer_addr: {
-					description: "The IP from which the data originated."
-					required:    false
-				}
-				peer_path: {
-					description: "The pathname from which the data originated."
-					required:    false
-				}
-				mode: _mode
-			}
-		}
-		component_received_events_count: {
-			tags: _component_tags & {
-				file: {
-					description: "The file from which the data originated."
-					required:    false
-				}
-				uri: {
-					description: "The sanitized URI from which the data originated."
-					required:    false
-				}
-				container_name: {
-					description: "The name of the container from which the data originated."
-					required:    false
-				}
-				pod_name: {
-					description: "The name of the pod from which the data originated."
-					required:    false
-				}
-				peer_addr: {
-					description: "The IP from which the data originated."
-					required:    false
-				}
-				peer_path: {
-					description: "The pathname from which the data originated."
-					required:    false
-				}
-				mode: _mode
-			}
-		}
-		component_received_event_bytes_total: {
-			tags:              component_received_events_total.tags
-		}
-		component_sent_bytes_total: {
-			tags: _component_tags & {
-				endpoint: {
-					description: "The endpoint to which the bytes were sent. For HTTP, this will be the host and path only, excluding the query string."
-					required:    false
-				}
-				file: {
-					description: "The absolute path of the destination file."
-					required:    false
-				}
-				protocol: {
-					description: "The protocol used to send the bytes."
-					required:    true
-				}
-				region: {
-					description: "The AWS region name to which the bytes were sent. In some configurations, this may be a literal hostname."
-					required:    false
-				}
-			}
-		}
-		component_sent_events_total: {
-			tags: _component_tags & {output: _output}
-		}
-		component_sent_event_bytes_total: {
-			tags: _component_tags & {output: _output}
-		}
 		internal_metrics_cardinality: {
+			description:       "The total number of metrics emitted from the internal metrics registry."
+			type:              "gauge"
+			default_namespace: "vector"
 			tags: {}
 		}
 		internal_metrics_cardinality_total: {
+			description:       "The total number of metrics emitted from the internal metrics registry. This metric is deprecated in favor of `internal_metrics_cardinality`."
+			type:              "counter"
+			default_namespace: "vector"
 			tags:              internal_metrics_cardinality.tags
 		}
-		kafka_consumer_lag: {
-			tags: _component_tags & {
-				topic_id: {
-					description: "The Kafka topic id."
-					required:    true
-				}
-				partition_id: {
-					description: "The Kafka partition id."
-					required:    true
-				}
-			}
-		}
-		files_added_total: {
-			tags: _internal_metrics_tags & {
-				file: _file
-			}
-		}
-		files_deleted_total: {
-			tags: _internal_metrics_tags & {
-				file: _file
-			}
-		}
-		files_resumed_total: {
-			tags: _internal_metrics_tags & {
-				file: _file
-			}
-		}
-		files_unwatched_total: {
-			tags: _internal_metrics_tags & {
-				file: _file
-			}
-		}
-		grpc_server_messages_received_total: {
-			tags: _component_tags & {
-				grpc_method:  _grpc_method
-				grpc_service: _grpc_service
-			}
-		}
-		grpc_server_messages_sent_total: {
-			tags: _component_tags & {
-				grpc_method:  _grpc_method
-				grpc_service: _grpc_service
-				grpc_status:  _grpc_status
-			}
-		}
-		grpc_server_handler_duration_seconds: {
-			tags: _component_tags & {
-				grpc_method:  _grpc_method
-				grpc_service: _grpc_service
-				grpc_status:  _grpc_status
-			}
-		}
-		http_client_response_rtt_seconds: {
-			tags: _component_tags & {
-				status: _status
-			}
-		}
-		http_client_requests_sent_total: {
-			tags: _component_tags & {
-				method: _method
-			}
-		}
-		http_client_responses_total: {
-			tags: _component_tags & {
-				status: _status
-			}
-		}
-		http_server_requests_received_total: {
-			tags: _component_tags & {
-				method: _method
-				path:   _path
-			}
-		}
-		http_server_responses_sent_total: {
-			tags: _component_tags & {
-				method: _method
-				path:   _path
-				status: _status
-			}
-		}
-		http_server_handler_duration_seconds: {
-			tags: _component_tags & {
-				method: _method
-				path:   _path
-				status: _status
-			}
-		}
-		source_buffer_max_byte_size: {
-			tags: _component_tags & {
-				output: _output
-			}
-		}
-		source_buffer_max_event_size: {
-			tags: _component_tags & {
-				output: _output
-			}
-		}
-		source_buffer_max_size_bytes: {
-			tags: _component_tags & {
-				output: _output
-			}
-		}
-		source_buffer_max_size_events: {
-			tags: _component_tags & {
-				output: _output
-			}
-		}
-		source_buffer_utilization: {
-			tags: _component_tags & {
-				output: _output
-			}
-		}
-		source_buffer_utilization_level: {
-			tags: _component_tags & {
-				output: _output
-			}
-		}
-		source_buffer_utilization_mean: {
-			tags: _component_tags & {
-				output: _output
-			}
-		}
-		s3_object_processing_failed_duration_seconds: {
-			tags: _component_tags & {
-				bucket: {
-					description: "The name of the S3 bucket."
-					required:    true
-				}
-			}
-		}
-		s3_object_processing_succeeded_duration_seconds: {
-			tags: _component_tags & {
-				bucket: {
-					description: "The name of the S3 bucket."
-					required:    true
-				}
-			}
-		}
-		sqs_s3_event_record_ignored_total: {
-
-			tags: _component_tags & {
-				ignore_type: {
-					description: "The reason for ignoring the S3 record"
-					required:    true
-					enum: {
-						"invalid_event_kind": "The kind of invalid event."
-					}
-				}
-			}
-		}
-		tag_value_limit_exceeded_total: {
-			tags: _component_tags & {
-				metric_name: {
-					description: """
-						The name of the metric whose tag value limit was exceeded.
-						Only present when `internal_metrics.include_extended_tags` is enabled.
-						"""
-					required: false
-				}
-				tag_key: {
-					description: """
-						The key of the tag whose value limit was exceeded.
-						Only present when `internal_metrics.include_extended_tags` is enabled.
-						"""
-					required: false
-				}
-			}
-		}
-		transform_buffer_max_byte_size: {
-			tags: _component_tags & {
-				output: _output
-			}
-		}
-		transform_buffer_max_event_size: {
-			tags: _component_tags & {
-				output: _output
-			}
-		}
-		transform_buffer_max_size_bytes: {
-			tags: _component_tags & {
-				output: _output
-			}
-		}
-		transform_buffer_max_size_events: {
-			tags: _component_tags & {
-				output: _output
-			}
-		}
-		transform_buffer_utilization: {
-			tags: _component_tags & {
-				output: _output
-			}
-		}
-		transform_buffer_utilization_level: {
-			tags: _component_tags & {
-				output: _output
-			}
-		}
-		transform_buffer_utilization_mean: {
-			tags: _component_tags & {
-				output: _output
-			}
-		}
 		utf8_convert_errors_total: {
+			description:       "The total number of errors converting bytes to a UTF-8 string in UDP mode."
+			type:              "counter"
+			default_namespace: "vector"
 			tags: _component_tags & {
 				mode: {
 					description: "The connection mode used by the component."
@@ -405,35 +93,14 @@ components: sources: internal_metrics: {
 				}
 			}
 		}
-		build_info: {
-			tags: _internal_metrics_tags & {
-				debug: {
-					description: "Whether this is a debug build of Vector"
-					required:    true
-				}
-				version: {
-					description: "Vector version."
-					required:    true
-				}
-				rust_version: {
-					description: "The Rust version from the package manifest."
-					required:    true
-				}
-				arch: {
-					description: "The target architecture being compiled for. (e.g. x86_64)"
-					required:    true
-				}
-				revision: {
-					description: "Revision identifer, related to versioned releases."
-					required:    true
-				}
-			}
-		}
 
 		// Windows metrics
 
 		// config metrics
 		config_reload_rejected: {
+			description:       "Number of configuration reload attempts that were rejected."
+			type:              "counter"
+			default_namespace: "vector"
 			tags: _internal_metrics_tags & {
 				reason: _reason
 			}
@@ -448,9 +115,11 @@ components: sources: internal_metrics: {
 
 		// All available tags
 		_collector: {
+			description: "Which collector this metric comes from."
 			required:    true
 		}
 		_component_kind: {
+			description: "The Vector component kind."
 			required:    true
 			enum: {
 				"sink":      "Vector sink components"
@@ -459,18 +128,22 @@ components: sources: internal_metrics: {
 			}
 		}
 		_component_id: {
+			description: "The Vector component ID."
 			required:    true
 			examples: ["my_source", "my_sink"]
 		}
 		_component_type: {
+			description: "The Vector component type."
 			required:    true
 			examples: ["file", "http", "honeycomb", "splunk_hec"]
 		}
 		_endpoint: {
+			description: "The absolute path of originating file."
 			required:    true
 			examples: ["http://localhost:8080/server-status?auto"]
 		}
 		_error_type: {
+			description: "The type of the error"
 			required:    true
 			enum: {
 				"acknowledgements_failed":     "The acknowledgement operation failed."
@@ -499,22 +172,28 @@ components: sources: internal_metrics: {
 			}
 		}
 		_file: {
+			description: "The file that produced the error"
 			required:    false
 		}
 		_grpc_method: {
+			description: "The name of the method called on the gRPC service."
 			required:    true
 		}
 		_grpc_service: {
+			description: "The gRPC service name."
 			required:    true
 		}
 		_grpc_status: {
+			description: "The human-readable [gRPC status code](\(urls.grpc_status_code))."
 			required:    true
 		}
 		_host: {
+			description: "The hostname of the originating system."
 			required:    true
 			examples: [_values.local_host]
 		}
 		_mode: {
+			description: "The connection mode used by the component."
 			required:    false
 			enum: {
 				udp:  "User Datagram Protocol"
@@ -523,9 +202,11 @@ components: sources: internal_metrics: {
 			}
 		}
 		_output: {
+			description: "The specific output of the component."
 			required:    false
 		}
 		_stage: {
+			description: "The stage within the component at which the error occurred."
 			required:    true
 			enum: {
 				receiving:  "While receiving data."
@@ -534,15 +215,19 @@ components: sources: internal_metrics: {
 			}
 		}
 		_status: {
+			description: "The HTTP status code of the request."
 			required:    false
 		}
 		_method: {
+			description: "The HTTP method of the request."
 			required:    false
 		}
 		_path: {
+			description: "The path that produced the error."
 			required:    true
 		}
 		_reason: {
+			description: "The type of the error"
 			required:    true
 			enum: {
 				"out_of_order": "The event was out of order."
@@ -552,17 +237,5 @@ components: sources: internal_metrics: {
 	}
 
 	how_it_works: {
-		unique_series: {
-			title: "Sending metrics from multiple Vector instances"
-			body: """
-				When sending `internal_metrics` from multiple Vector instances
-				to the same destination, you will typically want to tag the
-				metrics with a tag that is unique to the Vector instance sending
-				the metrics to avoid the metric series conflicting. The
-				`tags.host_key` option can be used for this, but you can also
-				use a subsequent `remap` transform to add a different unique
-				tag from the environment.
-				"""
-		}
 	}
 }
