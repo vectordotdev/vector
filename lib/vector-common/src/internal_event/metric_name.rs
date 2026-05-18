@@ -59,40 +59,52 @@ pub enum CounterName {
     ComponentErrorsTotal,
 
     /// The total number of events for which this source responded with a timeout error.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     ComponentTimedOutEventsTotal,
 
     /// The total number of requests for which this source responded with a timeout error.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     ComponentTimedOutRequestsTotal,
 
     /// The number of events received by this buffer.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     BufferReceivedEventsTotal,
 
     /// The number of bytes received by this buffer.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     BufferReceivedBytesTotal,
 
     /// The number of events sent by this buffer.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     BufferSentEventsTotal,
 
     /// The number of bytes sent by this buffer.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     BufferSentBytesTotal,
 
     /// The number of events dropped by this non-blocking buffer.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     BufferDiscardedEventsTotal,
 
     /// The number of bytes dropped by this non-blocking buffer.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     BufferDiscardedBytesTotal,
 
     /// The total number of buffer errors encountered.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     BufferErrorsTotal,
 
     // Internal events from src/internal_events/
     /// The number of events recorded by the aggregate transform.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     AggregateEventsRecordedTotal,
 
     /// The number of failed metric updates, `incremental` adds, encountered by the aggregate transform.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     AggregateFailedUpdates,
 
     /// The number of flushes done by the aggregate transform.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     AggregateFlushesTotal,
 
     /// The number of times the Vector API has been started.
@@ -112,6 +124,7 @@ pub enum CounterName {
     CollectCompletedTotal,
 
     /// The total number of times a command has been executed.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     CommandExecutedTotal,
 
     /// The total number of times a connection has been established.
@@ -127,30 +140,39 @@ pub enum CounterName {
     ConnectionShutdownTotal,
 
     /// The total number of container events processed.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     ContainerProcessedEventsTotal,
 
     /// The total number of times Vector stopped watching for container logs.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     ContainersUnwatchedTotal,
 
     /// The total number of times Vector started watching for container logs.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     ContainersWatchedTotal,
 
     /// The total number of byte order marks (BOM) removed from incoming data.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     DecoderBomRemovalsTotal,
 
     /// The total number of warnings when replacing malformed characters during decoding.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     DecoderMalformedReplacementWarningsTotal,
 
     /// The total number of bytes loaded into Doris.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     DorisBytesLoadedTotal,
 
     /// The total number of rows filtered by Doris during stream load.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     DorisRowsFilteredTotal,
 
     /// The total number of rows successfully loaded into Doris.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     DorisRowsLoadedTotal,
 
     /// The total number of warnings when replacing unmappable characters during encoding.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     EncoderUnmappableReplacementWarningsTotal,
 
     /// The total number of events discarded by this component.
@@ -182,6 +204,7 @@ pub enum CounterName {
     GrpcServerMessagesSentTotal,
 
     /// The total number of HTTP client errors encountered.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     HttpClientErrorsTotal,
 
     /// The total number of sent HTTP requests, tagged with the request method.
@@ -201,36 +224,47 @@ pub enum CounterName {
     HttpServerResponsesSentTotal,
 
     /// Total number of message bytes (including framing) received from Kafka brokers.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     KafkaConsumedMessagesBytesTotal,
 
     /// Total number of messages consumed, not including ignored messages (due to offset, etc), from Kafka brokers.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     KafkaConsumedMessagesTotal,
 
     /// Total number of message bytes (including framing, such as per-Message framing and MessageSet/batch framing) transmitted to Kafka brokers.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     KafkaProducedMessagesBytesTotal,
 
     /// Total number of messages transmitted (produced) to Kafka brokers.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     KafkaProducedMessagesTotal,
 
     /// Total number of bytes transmitted to Kafka brokers.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     KafkaRequestsBytesTotal,
 
     /// Total number of requests sent to Kafka brokers.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     KafkaRequestsTotal,
 
     /// Total number of bytes received from Kafka brokers.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     KafkaResponsesBytesTotal,
 
     /// Total number of responses received from Kafka brokers.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     KafkaResponsesTotal,
 
     /// The total number of failed efforts to refresh AWS EC2 metadata.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     MetadataRefreshFailedTotal,
 
     /// The total number of AWS EC2 metadata refreshes.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     MetadataRefreshSuccessfulTotal,
 
     /// The total number of errors encountered while parsing.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     ParseErrorsTotal,
 
     /// The total number of times the Vector instance has quit.
@@ -242,24 +276,31 @@ pub enum CounterName {
     ReloadedTotal,
 
     /// The total number of events with rewrapped timestamps.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     RewrittenTimestampEventsTotal,
 
     /// The total number of successful deferrals of SQS messages.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     SqsMessageDeferSucceededTotal,
 
     /// The total number of successful deletions of SQS messages.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     SqsMessageDeleteSucceededTotal,
 
     /// The total number of SQS messages successfully processed.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     SqsMessageProcessingSucceededTotal,
 
     /// The total number of times successfully receiving SQS messages.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     SqsMessageReceiveSucceededTotal,
 
     /// The total number of received SQS messages.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     SqsMessageReceivedMessagesTotal,
 
     /// The number of stale events that Vector has flushed.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     StaleEventsFlushedTotal,
 
     /// The total number of times the Vector instance has been started.
@@ -271,6 +312,7 @@ pub enum CounterName {
     StoppedTotal,
 
     /// The total number of events that contained a tag which exceeded the configured cardinality limit.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     TagCardinalityUntrackedEventsTotal,
 
     /// The total number of events discarded because the tag has been rejected after hitting the configured `value_limit`.
@@ -281,12 +323,15 @@ pub enum CounterName {
     TagValueLimitExceededTotal,
 
     /// The total number of times the value limit was reached.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     ValueLimitReachedTotal,
 
     /// The total number of bytes sent over WebSocket connections.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     WebsocketBytesSentTotal,
 
     /// The total number of messages sent over WebSocket connections.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     WebsocketMessagesSentTotal,
 
     /// The total number of times the Windows service has been installed.
@@ -310,15 +355,19 @@ pub enum CounterName {
     WindowsServiceUninstallTotal,
 
     /// The total number of failures to annotate Kubernetes events with namespace metadata.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     K8sEventNamespaceAnnotationFailuresTotal,
 
     /// The total number of failures to annotate Kubernetes events with node metadata.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     K8sEventNodeAnnotationFailuresTotal,
 
     /// The total number of edge cases encountered while picking format of the Kubernetes log message.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     K8sFormatPickerEdgeCasesTotal,
 
     /// The total number of failures to parse a message as a JSON object.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     K8sDockerFormatParseFailuresTotal,
 
     /// The total number of times an S3 record in an SQS message was ignored.
@@ -332,27 +381,35 @@ pub enum CounterName {
     SqsS3EventRecordIgnoredTotal,
 
     /// The total number of bytes allocated by this component.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     ComponentAllocatedBytesTotal,
 
     /// The total number of bytes deallocated by this component.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     ComponentDeallocatedBytesTotal,
 
     /// The total number of failed insertions into the in-memory enrichment table.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     MemoryEnrichmentTableFailedInsertions,
 
     /// The total number of failed reads from the in-memory enrichment table.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     MemoryEnrichmentTableFailedReads,
 
     /// The total number of flushes of the in-memory enrichment table.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     MemoryEnrichmentTableFlushesTotal,
 
     /// The total number of successful insertions into the in-memory enrichment table.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     MemoryEnrichmentTableInsertionsTotal,
 
     /// The total number of successful reads from the in-memory enrichment table.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     MemoryEnrichmentTableReadsTotal,
 
     /// The total number of entries evicted from the in-memory enrichment table due to TTL expiration.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     MemoryEnrichmentTableTtlExpirations,
 
     /// The total number of errors reading datagram.
@@ -394,6 +451,7 @@ pub enum HistogramName {
     ComponentReceivedBytes,
 
     /// The duration spent sending a payload to this buffer.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     BufferSendDurationSeconds,
 
     /// The elapsed time, in fractional seconds, that an event spends in a single transform.
@@ -404,33 +462,43 @@ pub enum HistogramName {
     ComponentLatencySeconds,
 
     /// The difference between the timestamp recorded in each event and the time when it was ingested, expressed as fractional seconds.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     SourceLagTimeSeconds,
 
     /// The time elapsed blocking on the downstream channel to accept a single chunk from a batch of events received at the source.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     SourceSendLatencySeconds,
 
     /// The time elapsed blocking on the downstream channel to accept an entire batch of events received at the source.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     SourceSendBatchLatencySeconds,
 
     /// The average round-trip time (RTT) for the current window.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     AdaptiveConcurrencyAveragedRtt,
 
     /// The amount of back pressure on the current component.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     AdaptiveConcurrencyBackPressure,
 
     /// The number of outbound requests currently awaiting a response.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     AdaptiveConcurrencyInFlight,
 
     /// The concurrency limit that the adaptive concurrency feature has decided on for this current window.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     AdaptiveConcurrencyLimit,
 
     /// The observed round-trip time (RTT) for requests.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     AdaptiveConcurrencyObservedRtt,
 
     /// The mean round-trip time (RTT) for the current window.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     AdaptiveConcurrencyPastRttMean,
 
     /// The number of times the concurrency limit was reached.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     AdaptiveConcurrencyReachedLimit,
 
     /// The time taken to process an S3 object that succeeded, in seconds.
@@ -446,6 +514,7 @@ pub enum HistogramName {
     CollectDurationSeconds,
 
     /// The command execution duration in seconds.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     CommandExecutionDurationSeconds,
 
     /// The duration spent handling a gRPC request.
@@ -457,6 +526,7 @@ pub enum HistogramName {
     HttpServerHandlerDurationSeconds,
 
     /// The round-trip time (RTT) of HTTP requests.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     HttpClientRttSeconds,
 
     /// The round-trip time (RTT) of HTTP requests, tagged with the response code.
@@ -464,6 +534,7 @@ pub enum HistogramName {
     HttpClientResponseRttSeconds,
 
     /// The round-trip time (RTT) of HTTP requests that resulted in an error.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     HttpClientErrorRttSeconds,
 
     /// The utilization of the source buffer.
@@ -587,40 +658,51 @@ pub enum GaugeName {
     TransformBufferUtilizationMean,
 
     /// The maximum number of events in the buffer.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     BufferMaxSizeEvents,
 
     /// The maximum size in events that the buffer can store.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     BufferMaxEventSize,
 
     /// The maximum number of bytes in the buffer.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     BufferMaxSizeBytes,
 
     /// The maximum size in bytes that the buffer can store.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     BufferMaxByteSize,
 
     /// The number of events currently in the buffer.
     #[configurable(
         deprecated = "This metric has been deprecated in favor of `buffer_size_events`."
     )]
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     BufferEvents,
 
     /// The number of events currently in the buffer.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     BufferSizeEvents,
 
     /// The number of bytes currently in the buffer.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     BufferSizeBytes,
 
     /// The number of bytes currently in the buffer.
     #[configurable(deprecated = "This metric has been deprecated in favor of `buffer_size_bytes`.")]
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     BufferByteSize,
 
     /// The current utilization of this component, expressed as a value from 0 to 1.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     Utilization,
 
     /// The number of bytes currently allocated by this component.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     ComponentAllocatedBytes,
 
     /// The total number of open files.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     OpenFiles,
 
     /// The number of seconds the Vector instance has been running.
@@ -638,9 +720,11 @@ pub enum GaugeName {
     BuildInfo,
 
     /// Current number of messages in producer queues.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     KafkaQueueMessages,
 
     /// Current total size of messages in producer queues.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     KafkaQueueMessagesBytes,
 
     /// The Kafka consumer lag.
@@ -659,21 +743,27 @@ pub enum GaugeName {
     OpenConnections,
 
     /// The number of currently active endpoints.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     ActiveEndpoints,
 
     /// The number of outstanding Splunk HEC indexer acknowledgement acks.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     SplunkPendingAcks,
 
     /// Number of clients attached to a component.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     ActiveClients,
 
     /// The number of objects currently stored in the in-memory enrichment table.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     MemoryEnrichmentTableObjectsCount,
 
     /// The total size in bytes of all objects stored in the in-memory enrichment table.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     MemoryEnrichmentTableByteSize,
 
     /// The number of tag keys currently being tracked by the tag cardinality limit transform.
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     TagCardinalityTrackedKeys,
 
     /// The total number of metrics emitted from the internal metrics registry.
