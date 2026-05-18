@@ -564,6 +564,31 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn records_utilization_transform_channel() {
+        let limit = MemoryBufferSize::MaxEvents(NonZeroUsize::new(2).unwrap());
+        let (mut tx, mut rx) = limited(
+            limit,
+            Some(ChannelMetricMetadata::new(
+                BufferChannelKind::Transform,
+                None,
+            )),
+            None,
+        );
+
+        let metrics = tx.inner.metrics.as_ref().unwrap().recorded_values.clone();
+
+        tx.send(Sample::new(1)).await.expect("send should succeed");
+        let records = metrics.lock().unwrap().clone();
+        assert_eq!(records.len(), 1);
+        assert_eq!(records.last().copied(), Some(1));
+
+        assert_eq!(Sample::new(1), rx.next().await.unwrap());
+        let records = metrics.lock().unwrap();
+        assert_eq!(records.len(), 2);
+        assert_eq!(records.last().copied(), Some(0));
+    }
+
+    #[tokio::test]
     async fn oversized_send_records_true_utilization_via_normal_send_path() {
         let limit = MemoryBufferSize::MaxEvents(NonZeroUsize::new(2).unwrap());
         let (mut tx, mut rx) = limited(
