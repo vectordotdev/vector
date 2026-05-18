@@ -328,7 +328,7 @@ fn rebuild_fixtures(proto: &str, deserializer: &dyn Deserializer, serializer: &m
 }
 
 // ---------------------------------------------------------------------------
-// Nesting depth guard integration tests for the native codec
+// Nesting cost guard integration tests for the native codec
 // ---------------------------------------------------------------------------
 
 fn create_nested_log_event(wrapping_levels: usize) -> LogEvent {
@@ -345,7 +345,8 @@ fn create_nested_log_event(wrapping_levels: usize) -> LogEvent {
 
 #[test]
 fn native_codec_rejects_overly_nested_event() {
-    // 33 wrapping levels + "data" key = depth 34 > MAX_NESTING_DEPTH (33)
+    // 33 wrapping object levels + outer fields object = 34 object levels in Value tree
+    // (cost 102) > MAX_VALUE_NESTING_FRAMES (99).
     let event = create_nested_log_event(33);
     let event = Event::Log(event);
 
@@ -355,13 +356,14 @@ fn native_codec_rejects_overly_nested_event() {
     let result = serializer.encode(event, &mut buffer);
     assert!(
         result.is_err(),
-        "native codec should reject events exceeding MAX_NESTING_DEPTH"
+        "native codec should reject events exceeding MAX_VALUE_NESTING_FRAMES"
     );
 }
 
 #[test]
 fn native_codec_roundtrip_max_depth_event() {
-    // 32 wrapping levels + "data" key = depth 33 = MAX_NESTING_DEPTH
+    // 32 wrapping object levels + outer fields object = 33 object levels in Value tree
+    // (cost 99) = MAX_VALUE_NESTING_FRAMES.
     let event = create_nested_log_event(32);
     let original_data = event.value().get("data").cloned();
     let event = Event::Log(event);
@@ -371,12 +373,12 @@ fn native_codec_roundtrip_max_depth_event() {
 
     serializer
         .encode(event, &mut buffer)
-        .expect("native codec should accept events at MAX_NESTING_DEPTH");
+        .expect("native codec should accept events at MAX_VALUE_NESTING_FRAMES");
 
     let deserializer = NativeDeserializerConfig.build();
     let decoded_events = deserializer
         .parse(buffer.freeze(), LogNamespace::Legacy)
-        .expect("native codec should decode events at MAX_NESTING_DEPTH");
+        .expect("native codec should decode events at MAX_VALUE_NESTING_FRAMES");
 
     assert_eq!(decoded_events.len(), 1);
     let decoded_log = decoded_events.into_iter().next().unwrap().into_log();
@@ -395,7 +397,7 @@ fn create_nested_value(wrapping_levels: usize) -> Value {
 
 #[test]
 fn native_codec_rejects_overly_nested_metadata() {
-    // Metadata at depth 33 > MAX_METADATA_NESTING_DEPTH (32)
+    // Metadata at 33 object levels = 99 frame cost > MAX_METADATA_VALUE_NESTING_FRAMES (96).
     let mut event = LogEvent::from("flat data");
     *event.metadata_mut().value_mut() = create_nested_value(33);
     let event = Event::Log(event);
@@ -406,13 +408,13 @@ fn native_codec_rejects_overly_nested_metadata() {
     let result = serializer.encode(event, &mut buffer);
     assert!(
         result.is_err(),
-        "native codec should reject events with metadata exceeding MAX_METADATA_NESTING_DEPTH"
+        "native codec should reject events with metadata exceeding MAX_METADATA_VALUE_NESTING_FRAMES"
     );
 }
 
 #[test]
 fn native_codec_roundtrip_max_metadata_depth_event() {
-    // Metadata at depth 32 = MAX_METADATA_NESTING_DEPTH
+    // Metadata at 32 object levels = 96 frame cost = MAX_METADATA_VALUE_NESTING_FRAMES.
     let mut event = LogEvent::from("flat data");
     let metadata_value = create_nested_value(32);
     *event.metadata_mut().value_mut() = metadata_value.clone();
@@ -423,12 +425,12 @@ fn native_codec_roundtrip_max_metadata_depth_event() {
 
     serializer
         .encode(event, &mut buffer)
-        .expect("native codec should accept events at MAX_METADATA_NESTING_DEPTH");
+        .expect("native codec should accept events at MAX_METADATA_VALUE_NESTING_FRAMES");
 
     let deserializer = NativeDeserializerConfig.build();
     let decoded_events = deserializer
         .parse(buffer.freeze(), LogNamespace::Legacy)
-        .expect("native codec should decode events at MAX_METADATA_NESTING_DEPTH");
+        .expect("native codec should decode events at MAX_METADATA_VALUE_NESTING_FRAMES");
 
     assert_eq!(decoded_events.len(), 1);
     let decoded_log = decoded_events.into_iter().next().unwrap().into_log();
