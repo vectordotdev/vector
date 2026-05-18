@@ -467,7 +467,14 @@ fn generate_internal_metric_descriptions(metric_schemas: &Value) -> Result<()> {
                 Some(Value::Object(obj)) => json_tags_to_cue(obj),
                 // String values are plain CUE expressions emitted verbatim (e.g. "{}").
                 Some(Value::String(s)) => s.clone(),
-                _ => "_component_tags".to_owned(),
+                _ => {
+                    warn!(
+                        "metric variant '{}' has no docs::tags metadata — \
+                         add #[configurable(metadata(docs::tags = ...))] to the enum variant",
+                        name
+                    );
+                    continue;
+                }
             };
 
             entries.push(MetricEntry {
