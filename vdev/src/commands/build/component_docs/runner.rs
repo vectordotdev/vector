@@ -362,9 +362,7 @@ fn render_and_import_generated_top_level_config_schema(
 }
 
 /// Collects all metric variants from `metric_schemas` into an alphabetically-sorted JSON map.
-fn collect_metric_entries(
-    metric_schemas: &Value,
-) -> std::collections::BTreeMap<String, Value> {
+fn collect_metric_entries(metric_schemas: &Value) -> std::collections::BTreeMap<String, Value> {
     let mut metrics = std::collections::BTreeMap::new();
     for (metric_type, schema) in [
         ("counter", metric_schemas.get("counters")),
@@ -455,8 +453,7 @@ fn generate_internal_metric_descriptions(
     });
 
     let json_str = serde_json::to_string_pretty(&data)?;
-    let json_file =
-        write_to_temp_file("internal-metric-descriptions-", ".json", &json_str)?;
+    let json_file = write_to_temp_file("internal-metric-descriptions-", ".json", &json_str)?;
 
     if let Some(parent) = out_path.parent() {
         fs::create_dir_all(parent)?;
