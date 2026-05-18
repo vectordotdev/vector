@@ -24,7 +24,7 @@ LABEL org.opencontainers.image.documentation="https://vector.dev/docs"
 RUN apk --no-cache add ca-certificates tzdata
 
 COPY --from=builder /vector/bin/* /usr/local/bin/
-COPY --from=builder /vector/config/vector.yaml /etc/vector/vector.yaml
+COPY --from=builder /vector/config/vector.yaml /usr/share/vector/examples/vector.yaml
 COPY --from=builder /var/lib/vector /var/lib/vector
 
 # Smoke test
