@@ -345,6 +345,22 @@ pub enum CounterName {
 
     /// The total number of entries evicted from the in-memory enrichment table due to TTL expiration.
     MemoryEnrichmentTableTtlExpirations,
+
+    /// The total number of errors reading datagram.
+    #[configurable(metadata(docs::tags = "_component_tags & {mode: {description: \"\", required: true, enum: {udp: \"User Datagram Protocol\"}}}"))]
+    ConnectionReadErrorsTotal,
+
+    /// The total number of metrics emitted from the internal metrics registry. This metric is deprecated in favor of `internal_metrics_cardinality`.
+    #[configurable(metadata(docs::tags = "{}"))]
+    InternalMetricsCardinalityTotal,
+
+    /// Number of configuration reload attempts that were rejected.
+    #[configurable(metadata(docs::tags = INTERNAL_METRICS_TAGS_REASON))]
+    ConfigReloadRejected,
+
+    /// The total number of errors converting bytes to a UTF-8 string in UDP mode.
+    #[configurable(metadata(docs::tags = "_component_tags & {mode: {description: \"The connection mode used by the component.\", required: true, enum: {udp: \"User Datagram Protocol\"}}}"))]
+    Utf8ConvertErrorsTotal,
 }
 
 /// Canonical list of all per-component internal histogram metric names emitted by Vector.
@@ -627,6 +643,10 @@ pub enum GaugeName {
 
     /// The number of tag keys currently being tracked by the tag cardinality limit transform.
     TagCardinalityTrackedKeys,
+
+    /// The total number of metrics emitted from the internal metrics registry.
+    #[configurable(metadata(docs::tags = "{}"))]
+    InternalMetricsCardinality,
 }
 
 impl GaugeName {
@@ -670,6 +690,7 @@ impl GaugeName {
             Self::MemoryEnrichmentTableObjectsCount => "memory_enrichment_table_objects_count",
             Self::MemoryEnrichmentTableByteSize => "memory_enrichment_table_byte_size",
             Self::TagCardinalityTrackedKeys => "tag_cardinality_tracked_keys",
+            Self::InternalMetricsCardinality => "internal_metrics_cardinality",
         }
     }
 }
@@ -783,6 +804,10 @@ impl CounterName {
             }
             Self::MemoryEnrichmentTableReadsTotal => "memory_enrichment_table_reads_total",
             Self::MemoryEnrichmentTableTtlExpirations => "memory_enrichment_table_ttl_expirations",
+            Self::ConnectionReadErrorsTotal => "connection_read_errors_total",
+            Self::InternalMetricsCardinalityTotal => "internal_metrics_cardinality_total",
+            Self::ConfigReloadRejected => "config_reload_rejected",
+            Self::Utf8ConvertErrorsTotal => "utf8_convert_errors_total",
         }
     }
 }

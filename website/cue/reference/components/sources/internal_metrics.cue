@@ -49,63 +49,6 @@ components: sources: internal_metrics: {
 			}
 		}
 
-		// Instance-level "process" metrics
-
-		// Metrics emitted by one or more components
-		// Reusable metric definitions
-		connection_read_errors_total: {
-			description:       "The total number of errors reading datagram."
-			type:              "counter"
-			default_namespace: "vector"
-			tags: _component_tags & {
-				mode: {
-					description: ""
-					required:    true
-					enum: {
-						udp: "User Datagram Protocol"
-					}
-				}
-			}
-		}
-		internal_metrics_cardinality: {
-			description:       "The total number of metrics emitted from the internal metrics registry."
-			type:              "gauge"
-			default_namespace: "vector"
-			tags: {}
-		}
-		internal_metrics_cardinality_total: {
-			description:       "The total number of metrics emitted from the internal metrics registry. This metric is deprecated in favor of `internal_metrics_cardinality`."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              internal_metrics_cardinality.tags
-		}
-		utf8_convert_errors_total: {
-			description:       "The total number of errors converting bytes to a UTF-8 string in UDP mode."
-			type:              "counter"
-			default_namespace: "vector"
-			tags: _component_tags & {
-				mode: {
-					description: "The connection mode used by the component."
-					required:    true
-					enum: {
-						udp: "User Datagram Protocol"
-					}
-				}
-			}
-		}
-
-		// Windows metrics
-
-		// config metrics
-		config_reload_rejected: {
-			description:       "Number of configuration reload attempts that were rejected."
-			type:              "counter"
-			default_namespace: "vector"
-			tags: _internal_metrics_tags & {
-				reason: _reason
-			}
-		}
-
 		// Helpful tag groupings
 		_component_tags: _internal_metrics_tags & {
 			component_kind: _component_kind
@@ -236,6 +179,5 @@ components: sources: internal_metrics: {
 		}
 	}
 
-	how_it_works: {
-	}
+	how_it_works: {}
 }
