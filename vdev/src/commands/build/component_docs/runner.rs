@@ -419,7 +419,10 @@ fn generate_internal_metric_descriptions(metric_schemas: &Value) -> Result<()> {
             entries.push(MetricEntry {
                 name: name.to_owned(),
                 metric_type,
-                description: desc.replace('\\', "\\\\").replace('"', "\\\""),
+                description: desc
+                    .replace('\\', "\\\\")
+                    .replace('"', "\\\"")
+                    .replace('\n', "\\n"),
                 tags,
                 deprecated,
                 deprecated_message,
@@ -449,7 +452,7 @@ fn generate_internal_metric_descriptions(metric_schemas: &Value) -> Result<()> {
         if e.deprecated {
             cue.push_str("\t\tdeprecated:  true\n");
             if let Some(msg) = &e.deprecated_message {
-                let escaped = msg.replace('\\', "\\\\").replace('"', "\\\"");
+                let escaped = msg.replace('\\', "\\\\").replace('"', "\\\"").replace('\n', "\\n");
                 writeln!(cue, "\t\tdeprecated_message: \"{escaped}\"").unwrap();
             }
         }
