@@ -73,7 +73,7 @@ inputs:
   vdev:
     required: false
     default: true
-    description: "Install vdev CLI tool via cargo binstall (uses VDEV_VERSION pinned in prepare.sh)."
+    description: "Install vdev CLI tool via cargo binstall (version from vdev/Cargo.toml)."
 
   # prepare.sh - npm
   markdownlint-cli2:
