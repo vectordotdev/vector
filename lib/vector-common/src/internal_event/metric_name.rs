@@ -42,9 +42,9 @@ pub enum CounterName {
     /// The number of raw bytes sent by this component to destination sinks.
     #[configurable(metadata(docs::tags = merge_lazy(&COMPONENT_TAGS, json!({
         "endpoint": {"description": "The endpoint to which the bytes were sent. For HTTP, this will be the host and path only, excluding the query string.", "required": false},
-        "file":     {"description": "The absolute path of the destination file.", "required": false},
+        "file": {"description": "The absolute path of the destination file.", "required": false},
         "protocol": {"description": "The protocol used to send the bytes.", "required": true},
-        "region":   {"description": "The AWS region name to which the bytes were sent. In some configurations, this may be a literal hostname.", "required": false}
+        "region": {"description": "The AWS region name to which the bytes were sent. In some configurations, this may be a literal hostname.", "required": false}
     }))))]
     ComponentSentBytesTotal,
 
@@ -276,7 +276,7 @@ pub enum CounterName {
     /// The total number of events discarded because the tag has been rejected after hitting the configured `value_limit`.
     #[configurable(metadata(docs::tags = merge_lazy(&COMPONENT_TAGS, json!({
         "metric_name": {"description": "The name of the metric whose tag value limit was exceeded. Only present when `internal_metrics.include_extended_tags` is enabled.", "required": false},
-        "tag_key":     {"description": "The key of the tag whose value limit was exceeded. Only present when `internal_metrics.include_extended_tags` is enabled.", "required": false}
+        "tag_key": {"description": "The key of the tag whose value limit was exceeded. Only present when `internal_metrics.include_extended_tags` is enabled.", "required": false}
     }))))]
     TagValueLimitExceededTotal,
 
@@ -629,11 +629,11 @@ pub enum GaugeName {
 
     /// Pseudo-metric that provides build information for the Vector instance.
     #[configurable(metadata(docs::tags = merge_lazy(&INTERNAL_METRICS_TAGS, json!({
-        "debug":        {"description": "Whether this is a debug build of Vector", "required": true},
-        "version":      {"description": "Vector version.", "required": true},
+        "debug": {"description": "Whether this is a debug build of Vector", "required": true},
+        "version": {"description": "Vector version.", "required": true},
         "rust_version": {"description": "The Rust version from the package manifest.", "required": true},
-        "arch":         {"description": "The target architecture being compiled for. (e.g. x86_64)", "required": true},
-        "revision":     {"description": "Revision identifer, related to versioned releases.", "required": true}
+        "arch": {"description": "The target architecture being compiled for. (e.g. x86_64)", "required": true},
+        "revision": {"description": "Revision identifer, related to versioned releases.", "required": true}
     }))))]
     BuildInfo,
 
@@ -645,7 +645,7 @@ pub enum GaugeName {
 
     /// The Kafka consumer lag.
     #[configurable(metadata(docs::tags = merge_lazy(&COMPONENT_TAGS, json!({
-        "topic_id":     {"description": "The Kafka topic id.", "required": true},
+        "topic_id": {"description": "The Kafka topic id.", "required": true},
         "partition_id": {"description": "The Kafka partition id.", "required": true}
     }))))]
     KafkaConsumerLag,
