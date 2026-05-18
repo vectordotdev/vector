@@ -1726,7 +1726,7 @@ mod tests {
             LogNamespace::Legacy,
             Some(Arc::clone(&event_count)),
             async {
-                crate::test_util::wait_for_atomic_usize(event_count.clone(), |n| n >= remaining)
+                crate::test_util::wait_for_atomic_usize(Arc::clone(&event_count), |n| n >= remaining)
                     .await;
             },
         )
@@ -1949,7 +1949,7 @@ mod tests {
 
                 // Block until event 5 is observed: the timeout fired and
                 // "INFO hello" was emitted before we write "too slow".
-                crate::test_util::wait_for_atomic_usize(event_count.clone(), |n| n >= 5).await;
+                crate::test_util::wait_for_atomic_usize(Arc::clone(&event_count), |n| n >= 5).await;
 
                 writeln!(&mut file, "too slow").unwrap();
                 writeln!(&mut file, "INFO doesn't have").unwrap();
@@ -1959,7 +1959,7 @@ mod tests {
 
                 // Wait for events 6 ("too slow") and 7 ("INFO doesn't have")
                 // before triggering shutdown.
-                crate::test_util::wait_for_atomic_usize(event_count.clone(), |n| n >= 7).await;
+                crate::test_util::wait_for_atomic_usize(Arc::clone(&event_count), |n| n >= 7).await;
             },
         )
         .await;
@@ -2020,7 +2020,7 @@ mod tests {
 
                 // Block until event 5 is observed: the timeout fired and
                 // "INFO hello" was emitted before we write "too slow".
-                crate::test_util::wait_for_atomic_usize(event_count.clone(), |n| n >= 5).await;
+                crate::test_util::wait_for_atomic_usize(Arc::clone(&event_count), |n| n >= 5).await;
 
                 writeln!(&mut file, "too slow").unwrap();
                 writeln!(&mut file, "INFO doesn't have").unwrap();
@@ -2030,7 +2030,7 @@ mod tests {
 
                 // Wait for events 6 ("too slow") and 7 ("INFO doesn't have")
                 // before triggering shutdown.
-                crate::test_util::wait_for_atomic_usize(event_count.clone(), |n| n >= 7).await;
+                crate::test_util::wait_for_atomic_usize(Arc::clone(&event_count), |n| n >= 7).await;
             },
         )
         .await;
