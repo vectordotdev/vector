@@ -69,7 +69,7 @@ Integration tests are not run by default when running `make test`. Instead, they
 You should use `./scripts/run-integration-test.sh`, which is the wrapper used by CI and which suits most development needs. Integration tests require a `cargo vdev int start`, `cargo vdev int test`, and `cargo vdev int stop`, which the script handles automatically. You can find the list of available integration tests using `cargo vdev int show`.
 
 
-## Testing vdev changes in a PR
+## Testing vdev changes in CI
 
 CI consumes a released vdev binary, so changes to `vdev/**` in a PR are not picked up by CI until a new version is published. When in-PR validation of a vdev change is needed, use a release candidate:
 
