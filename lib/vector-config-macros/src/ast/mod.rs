@@ -252,6 +252,11 @@ impl FromMeta for Metadata {
                             key: path_to_string(&nv.path),
                             value: u.to_token_stream(),
                         }),
+                        // Accept function calls such as `merge(&*BASE, json!({...}))`.
+                        Expr::Call(c) => Some(LazyCustomAttribute::KeyValue {
+                            key: path_to_string(&nv.path),
+                            value: c.to_token_stream(),
+                        }),
                         expr => {
                             errors
                                 .push(darling::Error::unexpected_expr_type(expr).with_span(nmeta));

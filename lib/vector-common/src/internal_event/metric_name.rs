@@ -1,15 +1,16 @@
+use serde_json::json;
 use strum::{AsRefStr, Display, EnumIter};
 use vector_config::configurable_component;
 
 use super::metric_tags::{
     BUILD_INFO_TAGS, COMPONENT_DISCARDED_EVENTS_TOTAL_TAGS, COMPONENT_RECEIVED_EVENTS_TAGS,
-    COMPONENT_RECEIVED_EVENTS_TOTAL_TAGS, COMPONENT_SENT_BYTES_TOTAL_TAGS,
+    COMPONENT_RECEIVED_EVENTS_TOTAL_TAGS, COMPONENT_SENT_BYTES_TOTAL_TAGS, COMPONENT_TAGS,
     COMPONENT_TAGS_ERROR_TYPE_STAGE, COMPONENT_TAGS_GRPC_ALL, COMPONENT_TAGS_GRPC_METHOD_SERVICE,
     COMPONENT_TAGS_HTTP_ALL, COMPONENT_TAGS_HTTP_METHOD, COMPONENT_TAGS_HTTP_METHOD_PATH,
     COMPONENT_TAGS_HTTP_STATUS, COMPONENT_TAGS_OUTPUT, CONNECTION_READ_ERRORS_TOTAL_TAGS,
     INTERNAL_METRICS_TAGS, INTERNAL_METRICS_TAGS_FILE, INTERNAL_METRICS_TAGS_REASON,
-    KAFKA_CONSUMER_LAG_TAGS, S3_OBJECT_PROCESSING_TAGS, SQS_S3_IGNORED_TOTAL_TAGS,
-    TAG_VALUE_LIMIT_EXCEEDED_TOTAL_TAGS, UTF8_CONVERT_ERRORS_TOTAL_TAGS,
+    KAFKA_CONSUMER_LAG_TAGS, S3_OBJECT_PROCESSING_TAGS, TAG_VALUE_LIMIT_EXCEEDED_TOTAL_TAGS,
+    UTF8_CONVERT_ERRORS_TOTAL_TAGS, merge,
 };
 
 /// Canonical list of all per-component internal counter metric names emitted by Vector.
@@ -313,7 +314,13 @@ pub enum CounterName {
     K8sDockerFormatParseFailuresTotal,
 
     /// The total number of times an S3 record in an SQS message was ignored.
-    #[configurable(metadata(docs::tags = &*SQS_S3_IGNORED_TOTAL_TAGS))]
+    #[configurable(metadata(docs::tags = merge(&*COMPONENT_TAGS, json!({
+        "ignore_type": {
+            "description": "The reason for ignoring the S3 record",
+            "required": true,
+            "enum": {"invalid_event_kind": "The kind of invalid event."}
+        }
+    }))))]
     SqsS3EventRecordIgnoredTotal,
 
     /// The total number of bytes allocated by this component.

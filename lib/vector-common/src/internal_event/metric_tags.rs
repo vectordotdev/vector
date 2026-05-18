@@ -1,6 +1,24 @@
 use serde_json::{Value, json};
 use std::sync::LazyLock;
 
+/// Clones `base` and inserts all fields from `extra`, returning the merged object.
+///
+/// Intended for inline use in `#[configurable(metadata(docs::tags = ...))]` to avoid
+/// naming single-use tag sets:
+///
+/// ```ignore
+/// #[configurable(metadata(docs::tags = merge(&*COMPONENT_TAGS, json!({
+///     "bucket": {"description": "The S3 bucket.", "required": true}
+/// }))))]
+/// ```
+pub fn merge(base: &Value, extra: Value) -> Value {
+    let mut result = base.clone();
+    if let (Some(obj), Value::Object(extra_obj)) = (result.as_object_mut(), extra) {
+        obj.extend(extra_obj);
+    }
+    result
+}
+
 // ─── Base tag groups ───────────────────────────────────────────────────────────
 
 pub static INTERNAL_METRICS_TAGS: LazyLock<Value> = LazyLock::new(|| {
@@ -13,19 +31,26 @@ pub static INTERNAL_METRICS_TAGS: LazyLock<Value> = LazyLock::new(|| {
 pub static COMPONENT_TAGS: LazyLock<Value> = LazyLock::new(|| {
     let mut tags = INTERNAL_METRICS_TAGS.clone();
     let obj = tags.as_object_mut().unwrap();
-    obj.insert("component_kind".to_owned(), json!({
-        "description": "The Vector component kind.",
-        "required": true,
-        "enum": {
-            "sink": "Vector sink components",
-            "source": "Vector source components",
-            "transform": "Vector transform components"
-        }
-    }));
-    obj.insert("component_id".to_owned(),
-        json!({"description": "The Vector component ID.", "required": true}));
-    obj.insert("component_type".to_owned(),
-        json!({"description": "The Vector component type.", "required": true}));
+    obj.insert(
+        "component_kind".to_owned(),
+        json!({
+            "description": "The Vector component kind.",
+            "required": true,
+            "enum": {
+                "sink": "Vector sink components",
+                "source": "Vector source components",
+                "transform": "Vector transform components"
+            }
+        }),
+    );
+    obj.insert(
+        "component_id".to_owned(),
+        json!({"description": "The Vector component ID.", "required": true}),
+    );
+    obj.insert(
+        "component_type".to_owned(),
+        json!({"description": "The Vector component type.", "required": true}),
+    );
     tags
 });
 
@@ -33,8 +58,10 @@ pub static COMPONENT_TAGS: LazyLock<Value> = LazyLock::new(|| {
 
 pub static COMPONENT_TAGS_OUTPUT: LazyLock<Value> = LazyLock::new(|| {
     let mut tags = COMPONENT_TAGS.clone();
-    tags.as_object_mut().unwrap().insert("output".to_owned(),
-        json!({"description": "The specific output of the component.", "required": false}));
+    tags.as_object_mut().unwrap().insert(
+        "output".to_owned(),
+        json!({"description": "The specific output of the component.", "required": false}),
+    );
     tags
 });
 
@@ -43,43 +70,55 @@ pub static COMPONENT_TAGS_GRPC_METHOD_SERVICE: LazyLock<Value> = LazyLock::new(|
     let obj = tags.as_object_mut().unwrap();
     obj.insert("grpc_method".to_owned(),
         json!({"description": "The name of the method called on the gRPC service.", "required": true}));
-    obj.insert("grpc_service".to_owned(),
-        json!({"description": "The gRPC service name.", "required": true}));
+    obj.insert(
+        "grpc_service".to_owned(),
+        json!({"description": "The gRPC service name.", "required": true}),
+    );
     tags
 });
 
 pub static COMPONENT_TAGS_GRPC_ALL: LazyLock<Value> = LazyLock::new(|| {
     let mut tags = COMPONENT_TAGS_GRPC_METHOD_SERVICE.clone();
-    tags.as_object_mut().unwrap().insert("grpc_status".to_owned(),
-        json!({"description": "The human-readable gRPC status code.", "required": true}));
+    tags.as_object_mut().unwrap().insert(
+        "grpc_status".to_owned(),
+        json!({"description": "The human-readable gRPC status code.", "required": true}),
+    );
     tags
 });
 
 pub static COMPONENT_TAGS_HTTP_METHOD: LazyLock<Value> = LazyLock::new(|| {
     let mut tags = COMPONENT_TAGS.clone();
-    tags.as_object_mut().unwrap().insert("method".to_owned(),
-        json!({"description": "The HTTP method of the request.", "required": false}));
+    tags.as_object_mut().unwrap().insert(
+        "method".to_owned(),
+        json!({"description": "The HTTP method of the request.", "required": false}),
+    );
     tags
 });
 
 pub static COMPONENT_TAGS_HTTP_STATUS: LazyLock<Value> = LazyLock::new(|| {
     let mut tags = COMPONENT_TAGS.clone();
-    tags.as_object_mut().unwrap().insert("status".to_owned(),
-        json!({"description": "The HTTP status code of the request.", "required": false}));
+    tags.as_object_mut().unwrap().insert(
+        "status".to_owned(),
+        json!({"description": "The HTTP status code of the request.", "required": false}),
+    );
     tags
 });
 
 pub static COMPONENT_TAGS_HTTP_METHOD_PATH: LazyLock<Value> = LazyLock::new(|| {
     let mut tags = COMPONENT_TAGS_HTTP_METHOD.clone();
-    tags.as_object_mut().unwrap().insert("path".to_owned(),
-        json!({"description": "The path that produced the error.", "required": true}));
+    tags.as_object_mut().unwrap().insert(
+        "path".to_owned(),
+        json!({"description": "The path that produced the error.", "required": true}),
+    );
     tags
 });
 
 pub static COMPONENT_TAGS_HTTP_ALL: LazyLock<Value> = LazyLock::new(|| {
     let mut tags = COMPONENT_TAGS_HTTP_METHOD_PATH.clone();
-    tags.as_object_mut().unwrap().insert("status".to_owned(),
-        json!({"description": "The HTTP status code of the request.", "required": false}));
+    tags.as_object_mut().unwrap().insert(
+        "status".to_owned(),
+        json!({"description": "The HTTP status code of the request.", "required": false}),
+    );
     tags
 });
 
@@ -123,8 +162,10 @@ pub static COMPONENT_TAGS_ERROR_TYPE_STAGE: LazyLock<Value> = LazyLock::new(|| {
 
 pub static INTERNAL_METRICS_TAGS_FILE: LazyLock<Value> = LazyLock::new(|| {
     let mut tags = INTERNAL_METRICS_TAGS.clone();
-    tags.as_object_mut().unwrap().insert("file".to_owned(),
-        json!({"description": "The file that produced the error.", "required": false}));
+    tags.as_object_mut().unwrap().insert(
+        "file".to_owned(),
+        json!({"description": "The file that produced the error.", "required": false}),
+    );
     tags
 });
 
@@ -143,18 +184,24 @@ pub static INTERNAL_METRICS_TAGS_REASON: LazyLock<Value> = LazyLock::new(|| {
 pub static COMPONENT_RECEIVED_EVENTS_TOTAL_TAGS: LazyLock<Value> = LazyLock::new(|| {
     let mut tags = COMPONENT_TAGS.clone();
     let obj = tags.as_object_mut().unwrap();
-    obj.insert("file".to_owned(),
-        json!({"description": "The file from which the data originated.", "required": false}));
+    obj.insert(
+        "file".to_owned(),
+        json!({"description": "The file from which the data originated.", "required": false}),
+    );
     obj.insert("uri".to_owned(),
         json!({"description": "The sanitized URI from which the data originated.", "required": false}));
     obj.insert("container_name".to_owned(),
         json!({"description": "The name of the container from which the data originated.", "required": false}));
     obj.insert("pod_name".to_owned(),
         json!({"description": "The name of the pod from which the data originated.", "required": false}));
-    obj.insert("peer_addr".to_owned(),
-        json!({"description": "The IP from which the data originated.", "required": false}));
-    obj.insert("peer_path".to_owned(),
-        json!({"description": "The pathname from which the data originated.", "required": false}));
+    obj.insert(
+        "peer_addr".to_owned(),
+        json!({"description": "The IP from which the data originated.", "required": false}),
+    );
+    obj.insert(
+        "peer_path".to_owned(),
+        json!({"description": "The pathname from which the data originated.", "required": false}),
+    );
     obj.insert("mode".to_owned(), json!({"description": "The connection mode used by the component.", "required": false, "enum": {
         "udp":  "User Datagram Protocol",
         "tcp":  "Transmission Control Protocol",
@@ -181,10 +228,14 @@ pub static COMPONENT_SENT_BYTES_TOTAL_TAGS: LazyLock<Value> = LazyLock::new(|| {
     let obj = tags.as_object_mut().unwrap();
     obj.insert("endpoint".to_owned(),
         json!({"description": "The endpoint to which the bytes were sent. For HTTP, this will be the host and path only, excluding the query string.", "required": false}));
-    obj.insert("file".to_owned(),
-        json!({"description": "The absolute path of the destination file.", "required": false}));
-    obj.insert("protocol".to_owned(),
-        json!({"description": "The protocol used to send the bytes.", "required": true}));
+    obj.insert(
+        "file".to_owned(),
+        json!({"description": "The absolute path of the destination file.", "required": false}),
+    );
+    obj.insert(
+        "protocol".to_owned(),
+        json!({"description": "The protocol used to send the bytes.", "required": true}),
+    );
     obj.insert("region".to_owned(),
         json!({"description": "The AWS region name to which the bytes were sent. In some configurations, this may be a literal hostname.", "required": false}));
     tags
@@ -192,18 +243,24 @@ pub static COMPONENT_SENT_BYTES_TOTAL_TAGS: LazyLock<Value> = LazyLock::new(|| {
 
 pub static S3_OBJECT_PROCESSING_TAGS: LazyLock<Value> = LazyLock::new(|| {
     let mut tags = COMPONENT_TAGS.clone();
-    tags.as_object_mut().unwrap().insert("bucket".to_owned(),
-        json!({"description": "The name of the S3 bucket.", "required": true}));
+    tags.as_object_mut().unwrap().insert(
+        "bucket".to_owned(),
+        json!({"description": "The name of the S3 bucket.", "required": true}),
+    );
     tags
 });
 
 pub static KAFKA_CONSUMER_LAG_TAGS: LazyLock<Value> = LazyLock::new(|| {
     let mut tags = COMPONENT_TAGS.clone();
     let obj = tags.as_object_mut().unwrap();
-    obj.insert("topic_id".to_owned(),
-        json!({"description": "The Kafka topic id.", "required": true}));
-    obj.insert("partition_id".to_owned(),
-        json!({"description": "The Kafka partition id.", "required": true}));
+    obj.insert(
+        "topic_id".to_owned(),
+        json!({"description": "The Kafka topic id.", "required": true}),
+    );
+    obj.insert(
+        "partition_id".to_owned(),
+        json!({"description": "The Kafka partition id.", "required": true}),
+    );
     tags
 });
 
@@ -217,25 +274,21 @@ pub static TAG_VALUE_LIMIT_EXCEEDED_TOTAL_TAGS: LazyLock<Value> = LazyLock::new(
     tags
 });
 
-pub static SQS_S3_IGNORED_TOTAL_TAGS: LazyLock<Value> = LazyLock::new(|| {
-    let mut tags = COMPONENT_TAGS.clone();
-    tags.as_object_mut().unwrap().insert("ignore_type".to_owned(), json!({
-        "description": "The reason for ignoring the S3 record",
-        "required": true,
-        "enum": {"invalid_event_kind": "The kind of invalid event."}
-    }));
-    tags
-});
-
 pub static BUILD_INFO_TAGS: LazyLock<Value> = LazyLock::new(|| {
     let mut tags = INTERNAL_METRICS_TAGS.clone();
     let obj = tags.as_object_mut().unwrap();
-    obj.insert("debug".to_owned(),
-        json!({"description": "Whether this is a debug build of Vector", "required": true}));
-    obj.insert("version".to_owned(),
-        json!({"description": "Vector version.", "required": true}));
-    obj.insert("rust_version".to_owned(),
-        json!({"description": "The Rust version from the package manifest.", "required": true}));
+    obj.insert(
+        "debug".to_owned(),
+        json!({"description": "Whether this is a debug build of Vector", "required": true}),
+    );
+    obj.insert(
+        "version".to_owned(),
+        json!({"description": "Vector version.", "required": true}),
+    );
+    obj.insert(
+        "rust_version".to_owned(),
+        json!({"description": "The Rust version from the package manifest.", "required": true}),
+    );
     obj.insert("arch".to_owned(),
         json!({"description": "The target architecture being compiled for. (e.g. x86_64)", "required": true}));
     obj.insert("revision".to_owned(),
@@ -245,20 +298,26 @@ pub static BUILD_INFO_TAGS: LazyLock<Value> = LazyLock::new(|| {
 
 pub static CONNECTION_READ_ERRORS_TOTAL_TAGS: LazyLock<Value> = LazyLock::new(|| {
     let mut tags = COMPONENT_TAGS.clone();
-    tags.as_object_mut().unwrap().insert("mode".to_owned(), json!({
-        "description": "",
-        "required": true,
-        "enum": {"udp": "User Datagram Protocol"}
-    }));
+    tags.as_object_mut().unwrap().insert(
+        "mode".to_owned(),
+        json!({
+            "description": "",
+            "required": true,
+            "enum": {"udp": "User Datagram Protocol"}
+        }),
+    );
     tags
 });
 
 pub static UTF8_CONVERT_ERRORS_TOTAL_TAGS: LazyLock<Value> = LazyLock::new(|| {
     let mut tags = COMPONENT_TAGS.clone();
-    tags.as_object_mut().unwrap().insert("mode".to_owned(), json!({
-        "description": "The connection mode used by the component.",
-        "required": true,
-        "enum": {"udp": "User Datagram Protocol"}
-    }));
+    tags.as_object_mut().unwrap().insert(
+        "mode".to_owned(),
+        json!({
+            "description": "The connection mode used by the component.",
+            "required": true,
+            "enum": {"udp": "User Datagram Protocol"}
+        }),
+    );
     tags
 });
