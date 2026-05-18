@@ -381,8 +381,17 @@ fn collect_metric_entries(
             let Some(name) = variant.get("const").and_then(Value::as_str) else {
                 continue;
             };
-            let Some(desc) = variant.get("description").and_then(Value::as_str) else {
-                continue;
+            let title = variant.get("title").and_then(Value::as_str);
+            let body = variant.get("description").and_then(Value::as_str);
+            let desc_owned;
+            let desc = match (title, body) {
+                (Some(t), Some(b)) => {
+                    desc_owned = format!("{t}\n\n{b}");
+                    desc_owned.as_str()
+                }
+                (Some(t), None) => t,
+                (None, Some(b)) => b,
+                (None, None) => continue,
             };
             let tags = match variant.get("_metadata").and_then(|m| m.get("docs::tags")) {
                 Some(v @ Value::Object(_)) => v.clone(),

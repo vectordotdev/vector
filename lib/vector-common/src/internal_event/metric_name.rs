@@ -315,14 +315,19 @@ pub enum CounterName {
     #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     TagCardinalityUntrackedEventsTotal,
 
-    /// The total number of events discarded because the tag has been rejected after hitting the configured `value_limit`.
+    /// The total number of events discarded because the tag has been rejected after
+    /// hitting the configured `value_limit`. When `internal_metrics.include_extended_tags`
+    /// is enabled in the `tag_cardinality_limit` transform, this metric includes
+    /// `metric_name` and `tag_key` labels. By default, this metric has no labels to
+    /// keep cardinality low.
     #[configurable(metadata(docs::tags = merge_lazy(&COMPONENT_TAGS, json!({
         "metric_name": {"description": "The name of the metric whose tag value limit was exceeded. Only present when `internal_metrics.include_extended_tags` is enabled.", "required": false},
         "tag_key": {"description": "The key of the tag whose value limit was exceeded. Only present when `internal_metrics.include_extended_tags` is enabled.", "required": false}
     }))))]
     TagValueLimitExceededTotal,
 
-    /// The total number of times the value limit was reached.
+    /// The total number of times new values for a key have been rejected because the
+    /// value limit has been reached.
     #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     ValueLimitReachedTotal,
 
@@ -370,7 +375,7 @@ pub enum CounterName {
     #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     K8sDockerFormatParseFailuresTotal,
 
-    /// The total number of times an S3 record in an SQS message was ignored.
+    /// The total number of times an S3 record in an SQS message was ignored (for an event that was not `ObjectCreated`).
     #[configurable(metadata(docs::tags = merge_lazy(&COMPONENT_TAGS, json!({
         "ignore_type": {
             "description": "The reason for ignoring the S3 record",
@@ -441,8 +446,8 @@ pub enum CounterName {
 pub enum HistogramName {
     /// A histogram of the number of events passed in each internal batch in Vector's internal topology.
     ///
-    /// Note that this is separate than sink-level batching. It is mostly useful for low level
-    /// debugging performance issues in Vector due to small internal batches.
+    /// Note that this is separate than sink-level batching. It is mostly useful for low level debugging
+    /// performance issues in Vector due to small internal batches.
     #[configurable(metadata(docs::tags = &*COMPONENT_RECEIVED_EVENTS_TAGS))]
     ComponentReceivedEventsCount,
 
@@ -537,11 +542,11 @@ pub enum HistogramName {
     #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     HttpClientErrorRttSeconds,
 
-    /// The utilization of the source buffer.
+    /// The utilization level of the source buffer. The outputs of the source send data to this buffer.
     #[configurable(metadata(docs::tags = &*COMPONENT_TAGS_OUTPUT))]
     SourceBufferUtilization,
 
-    /// The utilization of the buffer that feeds into a transform.
+    /// The utilization level of the buffer that feeds into a transform.
     #[configurable(metadata(docs::tags = &*COMPONENT_TAGS_OUTPUT))]
     TransformBufferUtilization,
 }
@@ -597,46 +602,46 @@ pub enum GaugeName {
     #[configurable(metadata(docs::tags = &*INTERNAL_METRICS_TAGS))]
     ComponentLatencyMeanSeconds,
 
-    /// The maximum number of events the source buffer can hold.
+    /// The maximum number of events the source buffer can hold. The outputs of the source send data to this buffer.
     #[configurable(
-        deprecated = "This metric has been deprecated in favor of `source_buffer_max_size_events`."
+        deprecated = "This metric has been deprecated in favor of [`source_buffer_max_size_events`](#source_buffer_max_size_events)."
     )]
     #[configurable(metadata(docs::tags = &*COMPONENT_TAGS_OUTPUT))]
     SourceBufferMaxEventSize,
 
-    /// The maximum number of bytes the source buffer can hold.
+    /// The maximum number of bytes the source buffer can hold. The outputs of the source send data to this buffer.
     #[configurable(
-        deprecated = "This metric has been deprecated in favor of `source_buffer_max_size_bytes`."
+        deprecated = "This metric has been deprecated in favor of [`source_buffer_max_size_bytes`](#source_buffer_max_size_bytes)."
     )]
     #[configurable(metadata(docs::tags = &*COMPONENT_TAGS_OUTPUT))]
     SourceBufferMaxByteSize,
 
-    /// The maximum number of events the source buffer can hold.
+    /// The maximum number of events the source buffer can hold. The outputs of the source send data to this buffer.
     #[configurable(metadata(docs::tags = &*COMPONENT_TAGS_OUTPUT))]
     SourceBufferMaxSizeEvents,
 
-    /// The maximum number of bytes the source buffer can hold.
+    /// The maximum number of bytes the source buffer can hold. The outputs of the source send data to this buffer.
     #[configurable(metadata(docs::tags = &*COMPONENT_TAGS_OUTPUT))]
     SourceBufferMaxSizeBytes,
 
-    /// The current utilization level of the source buffer.
+    /// The current utilization level of the source buffer. The outputs of the source send data to this buffer.
     #[configurable(metadata(docs::tags = &*COMPONENT_TAGS_OUTPUT))]
     SourceBufferUtilizationLevel,
 
-    /// The mean utilization of the source buffer, smoothed with an EWMA.
+    /// The mean utilization level of the source buffer. The outputs of the source send data to this buffer. The mean utilization is smoothed over time using an exponentially weighted moving average (EWMA).
     #[configurable(metadata(docs::tags = &*COMPONENT_TAGS_OUTPUT))]
     SourceBufferUtilizationMean,
 
     /// The maximum number of events the buffer that feeds into a transform can hold.
     #[configurable(
-        deprecated = "This metric has been deprecated in favor of `transform_buffer_max_size_events`."
+        deprecated = "This metric has been deprecated in favor of [`transform_buffer_max_size_events`](#transform_buffer_max_size_events)."
     )]
     #[configurable(metadata(docs::tags = &*COMPONENT_TAGS_OUTPUT))]
     TransformBufferMaxEventSize,
 
     /// The maximum number of bytes the buffer that feeds into a transform can hold.
     #[configurable(
-        deprecated = "This metric has been deprecated in favor of `transform_buffer_max_size_bytes`."
+        deprecated = "This metric has been deprecated in favor of [`transform_buffer_max_size_bytes`](#transform_buffer_max_size_bytes)."
     )]
     #[configurable(metadata(docs::tags = &*COMPONENT_TAGS_OUTPUT))]
     TransformBufferMaxByteSize,
@@ -653,7 +658,7 @@ pub enum GaugeName {
     #[configurable(metadata(docs::tags = &*COMPONENT_TAGS_OUTPUT))]
     TransformBufferUtilizationLevel,
 
-    /// The mean utilization of the buffer that feeds into a transform, smoothed with an EWMA.
+    /// The mean utilization level of the buffer that feeds into a transform. This value is smoothed over time using an exponentially weighted moving average (EWMA).
     #[configurable(metadata(docs::tags = &*COMPONENT_TAGS_OUTPUT))]
     TransformBufferUtilizationMean,
 
@@ -675,7 +680,7 @@ pub enum GaugeName {
 
     /// The number of events currently in the buffer.
     #[configurable(
-        deprecated = "This metric has been deprecated in favor of `buffer_size_events`."
+        deprecated = "This metric has been deprecated in favor of [`buffer_size_events`](#buffer_size_events)."
     )]
     #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     BufferEvents,
@@ -689,11 +694,11 @@ pub enum GaugeName {
     BufferSizeBytes,
 
     /// The number of bytes currently in the buffer.
-    #[configurable(deprecated = "This metric has been deprecated in favor of `buffer_size_bytes`.")]
+    #[configurable(deprecated = "This metric has been deprecated in favor of [`buffer_size_bytes`](#buffer_size_bytes).")]
     #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     BufferByteSize,
 
-    /// The current utilization of this component, expressed as a value from 0 to 1.
+    /// A ratio from 0 to 1 of the load on a component. A value of 0 would indicate a completely idle component that is simply waiting for input. A value of 1 would indicate a that is never idle. This value is updated every 5 seconds.
     #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     Utilization,
 
@@ -705,11 +710,11 @@ pub enum GaugeName {
     #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     OpenFiles,
 
-    /// The number of seconds the Vector instance has been running.
+    /// The total number of seconds the Vector instance has been up.
     #[configurable(metadata(docs::tags = &*INTERNAL_METRICS_TAGS))]
     UptimeSeconds,
 
-    /// Pseudo-metric that provides build information for the Vector instance.
+    /// Has a fixed value of 1.0. Contains build information such as Rust and Vector versions.
     #[configurable(metadata(docs::tags = merge_lazy(&INTERNAL_METRICS_TAGS, json!({
         "debug": {"description": "Whether this is a debug build of Vector", "required": true},
         "version": {"description": "Vector version.", "required": true},

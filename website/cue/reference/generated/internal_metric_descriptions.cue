@@ -519,7 +519,7 @@ components: sources: internal_metrics: output: metrics: {
 			}
 		}
 		deprecated:         true
-		deprecated_message: "This metric has been deprecated in favor of `buffer_size_bytes`."
+		deprecated_message: "This metric has been deprecated in favor of [`buffer_size_bytes`](#buffer_size_bytes)."
 	}
 	buffer_discarded_bytes_total: {
 		description:       "The number of bytes dropped by this non-blocking buffer."
@@ -673,7 +673,7 @@ components: sources: internal_metrics: output: metrics: {
 			}
 		}
 		deprecated:         true
-		deprecated_message: "This metric has been deprecated in favor of `buffer_size_events`."
+		deprecated_message: "This metric has been deprecated in favor of [`buffer_size_events`](#buffer_size_events)."
 	}
 	buffer_max_byte_size: {
 		description:       "The maximum size in bytes that the buffer can store."
@@ -1094,7 +1094,7 @@ components: sources: internal_metrics: output: metrics: {
 		}
 	}
 	build_info: {
-		description:       "Pseudo-metric that provides build information for the Vector instance."
+		description:       "Has a fixed value of 1.0. Contains build information such as Rust and Vector versions."
 		type:              "gauge"
 		default_namespace: "vector"
 		tags: {
@@ -1522,6 +1522,8 @@ components: sources: internal_metrics: output: metrics: {
 	}
 	component_latency_mean_seconds: {
 		description: """
+			The mean elapsed time, in fractional seconds, that an event spends in a single transform.
+
 			This includes both the time spent queued in the transform's input buffer and the time spent
 			executing the transform itself. This value is smoothed over time using an exponentially
 			weighted moving average (EWMA).
@@ -1545,6 +1547,8 @@ components: sources: internal_metrics: output: metrics: {
 	}
 	component_latency_seconds: {
 		description: """
+			The elapsed time, in fractional seconds, that an event spends in a single transform.
+
 			This includes both the time spent queued in the transform's input buffer and the time spent
 			executing the transform itself.
 			"""
@@ -1783,8 +1787,10 @@ components: sources: internal_metrics: output: metrics: {
 	}
 	component_received_events_count: {
 		description: """
-			Note that this is separate than sink-level batching. It is mostly useful for low level
-			debugging performance issues in Vector due to small internal batches.
+			A histogram of the number of events passed in each internal batch in Vector's internal topology.
+
+			Note that this is separate than sink-level batching. It is mostly useful for low level debugging
+			performance issues in Vector due to small internal batches.
 			"""
 		type:              "histogram"
 		default_namespace: "vector"
@@ -2776,7 +2782,7 @@ components: sources: internal_metrics: output: metrics: {
 				required:    true
 			}
 			grpc_status: {
-				description: "The human-readable gRPC status code."
+				description: "The human-readable [gRPC status code](https://grpc.github.io/grpc/core/md_doc_statuscodes.html)."
 				required:    true
 			}
 		}
@@ -2872,7 +2878,7 @@ components: sources: internal_metrics: output: metrics: {
 				required:    true
 			}
 			grpc_status: {
-				description: "The human-readable gRPC status code."
+				description: "The human-readable [gRPC status code](https://grpc.github.io/grpc/core/md_doc_statuscodes.html)."
 				required:    true
 			}
 		}
@@ -4508,7 +4514,7 @@ components: sources: internal_metrics: output: metrics: {
 		}
 	}
 	source_buffer_max_byte_size: {
-		description:       "The maximum number of bytes the source buffer can hold."
+		description:       "The maximum number of bytes the source buffer can hold. The outputs of the source send data to this buffer."
 		type:              "gauge"
 		default_namespace: "vector"
 		tags: {
@@ -4549,10 +4555,10 @@ components: sources: internal_metrics: output: metrics: {
 			}
 		}
 		deprecated:         true
-		deprecated_message: "This metric has been deprecated in favor of `source_buffer_max_size_bytes`."
+		deprecated_message: "This metric has been deprecated in favor of [`source_buffer_max_size_bytes`](#source_buffer_max_size_bytes)."
 	}
 	source_buffer_max_event_size: {
-		description:       "The maximum number of events the source buffer can hold."
+		description:       "The maximum number of events the source buffer can hold. The outputs of the source send data to this buffer."
 		type:              "gauge"
 		default_namespace: "vector"
 		tags: {
@@ -4593,10 +4599,10 @@ components: sources: internal_metrics: output: metrics: {
 			}
 		}
 		deprecated:         true
-		deprecated_message: "This metric has been deprecated in favor of `source_buffer_max_size_events`."
+		deprecated_message: "This metric has been deprecated in favor of [`source_buffer_max_size_events`](#source_buffer_max_size_events)."
 	}
 	source_buffer_max_size_bytes: {
-		description:       "The maximum number of bytes the source buffer can hold."
+		description:       "The maximum number of bytes the source buffer can hold. The outputs of the source send data to this buffer."
 		type:              "gauge"
 		default_namespace: "vector"
 		tags: {
@@ -4638,7 +4644,7 @@ components: sources: internal_metrics: output: metrics: {
 		}
 	}
 	source_buffer_max_size_events: {
-		description:       "The maximum number of events the source buffer can hold."
+		description:       "The maximum number of events the source buffer can hold. The outputs of the source send data to this buffer."
 		type:              "gauge"
 		default_namespace: "vector"
 		tags: {
@@ -4680,7 +4686,7 @@ components: sources: internal_metrics: output: metrics: {
 		}
 	}
 	source_buffer_utilization: {
-		description:       "The utilization of the source buffer."
+		description:       "The utilization level of the source buffer. The outputs of the source send data to this buffer."
 		type:              "histogram"
 		default_namespace: "vector"
 		tags: {
@@ -4722,7 +4728,7 @@ components: sources: internal_metrics: output: metrics: {
 		}
 	}
 	source_buffer_utilization_level: {
-		description:       "The current utilization level of the source buffer."
+		description:       "The current utilization level of the source buffer. The outputs of the source send data to this buffer."
 		type:              "gauge"
 		default_namespace: "vector"
 		tags: {
@@ -4764,7 +4770,7 @@ components: sources: internal_metrics: output: metrics: {
 		}
 	}
 	source_buffer_utilization_mean: {
-		description:       "The mean utilization of the source buffer, smoothed with an EWMA."
+		description:       "The mean utilization level of the source buffer. The outputs of the source send data to this buffer. The mean utilization is smoothed over time using an exponentially weighted moving average (EWMA)."
 		type:              "gauge"
 		default_namespace: "vector"
 		tags: {
@@ -5148,7 +5154,7 @@ components: sources: internal_metrics: output: metrics: {
 		}
 	}
 	sqs_s3_event_record_ignored_total: {
-		description:       "The total number of times an S3 record in an SQS message was ignored."
+		description:       "The total number of times an S3 record in an SQS message was ignored (for an event that was not `ObjectCreated`)."
 		type:              "counter"
 		default_namespace: "vector"
 		tags: {
@@ -5343,7 +5349,13 @@ components: sources: internal_metrics: output: metrics: {
 		}
 	}
 	tag_value_limit_exceeded_total: {
-		description:       "The total number of events discarded because the tag has been rejected after hitting the configured `value_limit`."
+		description: """
+			The total number of events discarded because the tag has been rejected after
+			hitting the configured `value_limit`. When `internal_metrics.include_extended_tags`
+			is enabled in the `tag_cardinality_limit` transform, this metric includes
+			`metric_name` and `tag_key` labels. By default, this metric has no labels to
+			keep cardinality low.
+			"""
 		type:              "counter"
 		default_namespace: "vector"
 		tags: {
@@ -5430,7 +5442,7 @@ components: sources: internal_metrics: output: metrics: {
 			}
 		}
 		deprecated:         true
-		deprecated_message: "This metric has been deprecated in favor of `transform_buffer_max_size_bytes`."
+		deprecated_message: "This metric has been deprecated in favor of [`transform_buffer_max_size_bytes`](#transform_buffer_max_size_bytes)."
 	}
 	transform_buffer_max_event_size: {
 		description:       "The maximum number of events the buffer that feeds into a transform can hold."
@@ -5474,7 +5486,7 @@ components: sources: internal_metrics: output: metrics: {
 			}
 		}
 		deprecated:         true
-		deprecated_message: "This metric has been deprecated in favor of `transform_buffer_max_size_events`."
+		deprecated_message: "This metric has been deprecated in favor of [`transform_buffer_max_size_events`](#transform_buffer_max_size_events)."
 	}
 	transform_buffer_max_size_bytes: {
 		description:       "The maximum number of bytes the buffer that feeds into a transform can hold."
@@ -5561,7 +5573,7 @@ components: sources: internal_metrics: output: metrics: {
 		}
 	}
 	transform_buffer_utilization: {
-		description:       "The utilization of the buffer that feeds into a transform."
+		description:       "The utilization level of the buffer that feeds into a transform."
 		type:              "histogram"
 		default_namespace: "vector"
 		tags: {
@@ -5645,7 +5657,7 @@ components: sources: internal_metrics: output: metrics: {
 		}
 	}
 	transform_buffer_utilization_mean: {
-		description:       "The mean utilization of the buffer that feeds into a transform, smoothed with an EWMA."
+		description:       "The mean utilization level of the buffer that feeds into a transform. This value is smoothed over time using an exponentially weighted moving average (EWMA)."
 		type:              "gauge"
 		default_namespace: "vector"
 		tags: {
@@ -5687,7 +5699,7 @@ components: sources: internal_metrics: output: metrics: {
 		}
 	}
 	uptime_seconds: {
-		description:       "The number of seconds the Vector instance has been running."
+		description:       "The total number of seconds the Vector instance has been up."
 		type:              "gauge"
 		default_namespace: "vector"
 		tags: {
@@ -5749,7 +5761,7 @@ components: sources: internal_metrics: output: metrics: {
 		}
 	}
 	utilization: {
-		description:       "The current utilization of this component, expressed as a value from 0 to 1."
+		description:       "A ratio from 0 to 1 of the load on a component. A value of 0 would indicate a completely idle component that is simply waiting for input. A value of 1 would indicate a that is never idle. This value is updated every 5 seconds."
 		type:              "gauge"
 		default_namespace: "vector"
 		tags: {
@@ -5787,7 +5799,10 @@ components: sources: internal_metrics: output: metrics: {
 		}
 	}
 	value_limit_reached_total: {
-		description:       "The total number of times the value limit was reached."
+		description: """
+			The total number of times new values for a key have been rejected because the
+			value limit has been reached.
+			"""
 		type:              "counter"
 		default_namespace: "vector"
 		tags: {

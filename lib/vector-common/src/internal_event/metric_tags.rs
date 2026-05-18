@@ -68,7 +68,7 @@ pub static COMPONENT_TAGS_GRPC_ALL: LazyLock<Value> = LazyLock::new(|| {
     merge_lazy(
         &COMPONENT_TAGS_GRPC_METHOD_SERVICE,
         json!({
-            "grpc_status": {"description": "The human-readable gRPC status code.", "required": true}
+            "grpc_status": {"description": "The human-readable [gRPC status code](https://grpc.github.io/grpc/core/md_doc_statuscodes.html).", "required": true}
         }),
     )
 });
