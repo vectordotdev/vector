@@ -86,18 +86,8 @@ components: sinks: websocket_server: {
 		open_connections:             components.sources.internal_metrics.output.metrics.open_connections
 		connection_established_total: components.sources.internal_metrics.output.metrics.connection_established_total
 		connection_shutdown_total:    components.sources.internal_metrics.output.metrics.connection_shutdown_total
-		websocket_messages_sent_total: {
-			description:       "Number of messages sent from the websocket server."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              components.sources.internal_metrics.output.metrics._component_tags
-		}
-		websocket_bytes_sent_total: {
-			description:       "Bytes sent from the websocket server."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              components.sources.internal_metrics.output.metrics._component_tags
-		}
+		websocket_messages_sent_total: components.sources.internal_metrics.output.metrics.websocket_messages_sent_total
+		websocket_bytes_sent_total:    components.sources.internal_metrics.output.metrics.websocket_bytes_sent_total
 	}
 
 	configuration: generated.components.sinks.websocket_server.configuration

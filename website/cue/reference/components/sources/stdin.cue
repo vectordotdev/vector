@@ -93,6 +93,5 @@ components: sources: stdin: {
 	}
 
 	telemetry: metrics: {
-		stdin_reads_failed_total: components.sources.internal_metrics.output.metrics.stdin_reads_failed_total
 	}
 }
