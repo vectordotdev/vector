@@ -311,7 +311,7 @@ components: sources: internal_metrics: output: metrics: {
 		}
 	}
 	adaptive_concurrency_reached_limit: {
-		description:       "The number of times the concurrency limit was reached."
+		description:       "A boolean sample (1.0 if the concurrency limit was reached during the most recent limit update, 0.0 otherwise)."
 		type:              "histogram"
 		default_namespace: "vector"
 		tags: {
@@ -2923,6 +2923,10 @@ components: sources: internal_metrics: output: metrics: {
 				required:    true
 				examples: ["file", "http", "honeycomb", "splunk_hec"]
 			}
+			error_kind: {
+				description: "The kind of HTTP error encountered (e.g. connection refused, connection reset)."
+				required:    true
+			}
 		}
 	}
 	http_client_errors_total: {
@@ -2960,6 +2964,10 @@ components: sources: internal_metrics: output: metrics: {
 				description: "The Vector component type."
 				required:    true
 				examples: ["file", "http", "honeycomb", "splunk_hec"]
+			}
+			error_kind: {
+				description: "The kind of HTTP error encountered (e.g. connection refused, connection reset)."
+				required:    true
 			}
 		}
 	}
@@ -4396,7 +4404,7 @@ components: sources: internal_metrics: output: metrics: {
 		}
 	}
 	rewritten_timestamp_events_total: {
-		description:       "The total number of events with rewrapped timestamps."
+		description:       "The total number of events whose timestamps were rewritten to maintain ordering."
 		type:              "counter"
 		default_namespace: "vector"
 		tags: {
@@ -5315,7 +5323,7 @@ components: sources: internal_metrics: output: metrics: {
 		}
 	}
 	tag_cardinality_untracked_events_total: {
-		description:       "The total number of events that contained a tag which exceeded the configured cardinality limit."
+		description:       "The total number of events whose tag keys are no longer tracked because `max_tracked_keys` was reached. These events pass through the transform unchecked."
 		type:              "counter"
 		default_namespace: "vector"
 		tags: {

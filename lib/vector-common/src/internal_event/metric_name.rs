@@ -5,10 +5,10 @@ use vector_config::configurable_component;
 use super::metric_tags::{
     COMPONENT_RECEIVED_EVENTS_TAGS, COMPONENT_RECEIVED_EVENTS_TOTAL_TAGS, COMPONENT_TAGS,
     COMPONENT_TAGS_ERROR_TYPE_STAGE, COMPONENT_TAGS_GRPC_ALL, COMPONENT_TAGS_GRPC_METHOD_SERVICE,
-    COMPONENT_TAGS_HTTP_ALL, COMPONENT_TAGS_HTTP_METHOD, COMPONENT_TAGS_HTTP_METHOD_PATH,
-    COMPONENT_TAGS_HTTP_STATUS, COMPONENT_TAGS_OUTPUT, INTERNAL_METRICS_TAGS,
-    INTERNAL_METRICS_TAGS_FILE, INTERNAL_METRICS_TAGS_REASON, S3_OBJECT_PROCESSING_TAGS,
-    merge_lazy,
+    COMPONENT_TAGS_HTTP_ALL, COMPONENT_TAGS_HTTP_ERROR_KIND, COMPONENT_TAGS_HTTP_METHOD,
+    COMPONENT_TAGS_HTTP_METHOD_PATH, COMPONENT_TAGS_HTTP_STATUS, COMPONENT_TAGS_OUTPUT,
+    INTERNAL_METRICS_TAGS, INTERNAL_METRICS_TAGS_FILE, INTERNAL_METRICS_TAGS_REASON,
+    S3_OBJECT_PROCESSING_TAGS, merge_lazy,
 };
 
 /// Canonical list of all per-component internal counter metric names emitted by Vector.
@@ -204,7 +204,7 @@ pub enum CounterName {
     GrpcServerMessagesSentTotal,
 
     /// The total number of HTTP client errors encountered.
-    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS_HTTP_ERROR_KIND))]
     HttpClientErrorsTotal,
 
     /// The total number of sent HTTP requests, tagged with the request method.
@@ -275,7 +275,7 @@ pub enum CounterName {
     #[configurable(metadata(docs::tags = &*INTERNAL_METRICS_TAGS))]
     ReloadedTotal,
 
-    /// The total number of events with rewrapped timestamps.
+    /// The total number of events whose timestamps were rewritten to maintain ordering.
     #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     RewrittenTimestampEventsTotal,
 
@@ -311,7 +311,7 @@ pub enum CounterName {
     #[configurable(metadata(docs::tags = &*INTERNAL_METRICS_TAGS))]
     StoppedTotal,
 
-    /// The total number of events that contained a tag which exceeded the configured cardinality limit.
+    /// The total number of events whose tag keys are no longer tracked because `max_tracked_keys` was reached. These events pass through the transform unchecked.
     #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     TagCardinalityUntrackedEventsTotal,
 
@@ -502,7 +502,7 @@ pub enum HistogramName {
     #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     AdaptiveConcurrencyPastRttMean,
 
-    /// The number of times the concurrency limit was reached.
+    /// A boolean sample (1.0 if the concurrency limit was reached during the most recent limit update, 0.0 otherwise).
     #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
     AdaptiveConcurrencyReachedLimit,
 
@@ -539,7 +539,7 @@ pub enum HistogramName {
     HttpClientResponseRttSeconds,
 
     /// The round-trip time (RTT) of HTTP requests that resulted in an error.
-    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS))]
+    #[configurable(metadata(docs::tags = &*COMPONENT_TAGS_HTTP_ERROR_KIND))]
     HttpClientErrorRttSeconds,
 
     /// The utilization level of the source buffer. The outputs of the source send data to this buffer.

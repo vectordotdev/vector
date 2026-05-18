@@ -211,6 +211,15 @@ pub static COMPONENT_RECEIVED_EVENTS_TOTAL_TAGS: LazyLock<Value> = LazyLock::new
 pub static COMPONENT_RECEIVED_EVENTS_TAGS: LazyLock<Value> =
     LazyLock::new(|| COMPONENT_RECEIVED_EVENTS_TOTAL_TAGS.clone());
 
+pub static COMPONENT_TAGS_HTTP_ERROR_KIND: LazyLock<Value> = LazyLock::new(|| {
+    merge_lazy(
+        &COMPONENT_TAGS,
+        json!({
+            "error_kind": {"description": "The kind of HTTP error encountered (e.g. connection refused, connection reset).", "required": true}
+        }),
+    )
+});
+
 pub static S3_OBJECT_PROCESSING_TAGS: LazyLock<Value> = LazyLock::new(|| {
     merge_lazy(
         &COMPONENT_TAGS,
