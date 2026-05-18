@@ -58,7 +58,16 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
     ) -> Result<Vec<Event>, ErrorMessage>;
 
     /// Called after `enrich_events` when `custom` auth returned metadata enrichment fields.
-    fn inject_auth_enrichment(&self, _events: &mut [Event], _enrichment: ObjectMap) {}
+    /// Sources that do not override this will emit a warning and drop the enrichment.
+    fn inject_auth_enrichment(&self, _events: &mut [Event], enrichment: ObjectMap) {
+        if !enrichment.is_empty() {
+            warn!(
+                message = "Auth metadata enrichment is not supported by this source and will be dropped. \
+                           Remove %field writes from the custom auth VRL program or switch to a source that supports enrichment.",
+                fields = ?enrichment.keys().collect::<Vec<_>>(),
+            );
+        }
+    }
 
     fn decode(&self, encoding_header: Option<&str>, body: Bytes) -> Result<Bytes, ErrorMessage> {
         decompress_body(encoding_header, body)
