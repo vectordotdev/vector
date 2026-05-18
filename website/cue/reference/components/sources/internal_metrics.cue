@@ -54,59 +54,13 @@ components: sources: internal_metrics: {
 		}
 
 		// Instance-level "process" metrics
-		active_clients: {
-		}
-		aggregate_events_recorded_total: {
-		}
-		aggregate_failed_updates: {
-		}
-		aggregate_flushes_total: {
-		}
-		api_started_total: {
-		}
-		component_timed_out_events_total: {
-		}
-		component_timed_out_requests_total: {
-		}
-		connection_established_total: {
-		}
-		connection_send_errors_total: {
-		}
-		connection_shutdown_total: {
-		}
-		quit_total: {
-		}
-		reloaded_total: {
-		}
-		started_total: {
-		}
-		stopped_total: {
-		}
 
 		// Metrics emitted by one or more components
 		// Reusable metric definitions
-		adaptive_concurrency_averaged_rtt: {
-		}
-		adaptive_concurrency_in_flight: {
-		}
-		adaptive_concurrency_limit: {
-		}
-		adaptive_concurrency_observed_rtt: {
-		}
-		checkpoints_total: {
-		}
 		checksum_errors_total: {
 			tags: _internal_metrics_tags & {
 				file: _file
 			}
-		}
-		collect_completed_total: {
-		}
-		collect_duration_seconds: {
-		}
-		command_executed_total: {
-		}
-		command_execution_duration_seconds: {
 		}
 		connection_read_errors_total: {
 			tags: _component_tags & {
@@ -119,50 +73,10 @@ components: sources: internal_metrics: {
 				}
 			}
 		}
-		container_processed_events_total: {
-		}
-		containers_unwatched_total: {
-		}
-		containers_watched_total: {
-		}
-		doris_bytes_loaded_total: {
-		}
-		doris_rows_filtered_total: {
-		}
-		doris_rows_loaded_total: {
-		}
-		k8s_format_picker_edge_cases_total: {
-		}
-		k8s_docker_format_parse_failures_total: {
-		}
 		events_discarded_total: {
 			tags: _internal_metrics_tags & {
 				reason: _reason
 			}
-		}
-		component_latency_seconds: {
-		}
-		component_latency_mean_seconds: {
-		}
-		buffer_byte_size: {
-		}
-		buffer_events: {
-		}
-		buffer_size_bytes: {
-		}
-		buffer_size_events: {
-		}
-		buffer_discarded_events_total: {
-		}
-		buffer_received_event_bytes_total: {
-		}
-		buffer_received_events_total: {
-		}
-		buffer_send_duration_seconds: {
-		}
-		buffer_sent_event_bytes_total: {
-		}
-		buffer_sent_events_total: {
 		}
 		component_discarded_events_total: {
 			tags: _component_tags & {
@@ -277,26 +191,6 @@ components: sources: internal_metrics: {
 		internal_metrics_cardinality_total: {
 			tags:              internal_metrics_cardinality.tags
 		}
-		kafka_queue_messages: {
-		}
-		kafka_queue_messages_bytes: {
-		}
-		kafka_requests_total: {
-		}
-		kafka_requests_bytes_total: {
-		}
-		kafka_responses_total: {
-		}
-		kafka_responses_bytes_total: {
-		}
-		kafka_produced_messages_total: {
-		}
-		kafka_produced_messages_bytes_total: {
-		}
-		kafka_consumed_messages_total: {
-		}
-		kafka_consumed_messages_bytes_total: {
-		}
 		kafka_consumer_lag: {
 			tags: _component_tags & {
 				topic_id: {
@@ -328,8 +222,6 @@ components: sources: internal_metrics: {
 			tags: _internal_metrics_tags & {
 				file: _file
 			}
-		}
-		open_files: {
 		}
 		grpc_server_messages_received_total: {
 			tags: _component_tags & {
@@ -366,10 +258,6 @@ components: sources: internal_metrics: {
 				status: _status
 			}
 		}
-		http_client_rtt_seconds: {
-		}
-		http_requests_total: {
-		}
 		http_server_requests_received_total: {
 			tags: _component_tags & {
 				method: _method
@@ -389,26 +277,6 @@ components: sources: internal_metrics: {
 				path:   _path
 				status: _status
 			}
-		}
-		invalid_record_total: {
-		}
-		lua_memory_used_bytes: {
-		}
-		metadata_refresh_failed_total: {
-		}
-		metadata_refresh_successful_total: {
-		}
-		open_connections: {
-		}
-		protobuf_decode_errors_total: {
-		}
-		send_errors_total: {
-		}
-		source_lag_time_seconds: {
-		}
-		source_send_batch_latency_seconds: {
-		}
-		source_send_latency_seconds: {
 		}
 		source_buffer_max_byte_size: {
 			tags: _component_tags & {
@@ -445,10 +313,6 @@ components: sources: internal_metrics: {
 				output: _output
 			}
 		}
-		splunk_pending_acks: {
-		}
-		streams_total: {
-		}
 		s3_object_processing_failed_duration_seconds: {
 			tags: _component_tags & {
 				bucket: {
@@ -465,14 +329,6 @@ components: sources: internal_metrics: {
 				}
 			}
 		}
-		sqs_message_delete_succeeded_total: {
-		}
-		sqs_message_processing_succeeded_total: {
-		}
-		sqs_message_receive_succeeded_total: {
-		}
-		sqs_message_received_messages_total: {
-		}
 		sqs_s3_event_record_ignored_total: {
 
 			tags: _component_tags & {
@@ -484,10 +340,6 @@ components: sources: internal_metrics: {
 					}
 				}
 			}
-		}
-		stale_events_flushed_total: {
-		}
-		stdin_reads_failed_total: {
 		}
 		tag_value_limit_exceeded_total: {
 			tags: _component_tags & {
@@ -506,8 +358,6 @@ components: sources: internal_metrics: {
 					required: false
 				}
 			}
-		}
-		timestamp_parse_errors_total: {
 		}
 		transform_buffer_max_byte_size: {
 			tags: _component_tags & {
@@ -544,8 +394,6 @@ components: sources: internal_metrics: {
 				output: _output
 			}
 		}
-		uptime_seconds: {
-		}
 		utf8_convert_errors_total: {
 			tags: _component_tags & {
 				mode: {
@@ -556,8 +404,6 @@ components: sources: internal_metrics: {
 					}
 				}
 			}
-		}
-		utilization: {
 		}
 		build_info: {
 			tags: _internal_metrics_tags & {
@@ -583,28 +429,14 @@ components: sources: internal_metrics: {
 				}
 			}
 		}
-		value_limit_reached_total: {
-		}
 
 		// Windows metrics
-		windows_service_install_total: {
-		}
-		windows_service_restart_total: {
-		}
-		windows_service_start_total: {
-		}
-		windows_service_stop_total: {
-		}
-		windows_service_uninstall_total: {
-		}
 
 		// config metrics
 		config_reload_rejected: {
 			tags: _internal_metrics_tags & {
 				reason: _reason
 			}
-		}
-		config_reloaded: {
 		}
 
 		// Helpful tag groupings
