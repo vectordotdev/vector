@@ -242,6 +242,16 @@ impl FromMeta for Metadata {
                             key: path_to_string(&nv.path),
                             value: mac.to_token_stream(),
                         }),
+                        // Accept reference/deref expressions such as `&*SOME_LAZY_LOCK`
+                        // so callers can coerce `LazyLock<T>` to `&T: Serialize`.
+                        Expr::Reference(r) => Some(LazyCustomAttribute::KeyValue {
+                            key: path_to_string(&nv.path),
+                            value: r.to_token_stream(),
+                        }),
+                        Expr::Unary(u) => Some(LazyCustomAttribute::KeyValue {
+                            key: path_to_string(&nv.path),
+                            value: u.to_token_stream(),
+                        }),
                         expr => {
                             errors
                                 .push(darling::Error::unexpected_expr_type(expr).with_span(nmeta));
