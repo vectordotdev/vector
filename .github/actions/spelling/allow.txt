@@ -59,6 +59,7 @@ BADVERS
 Bedove
 Benss
 bigendian
+bigquery
 bindir
 binstall
 binfmt

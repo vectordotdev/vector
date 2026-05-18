@@ -2,3 +2,4 @@
 ^\.github/actions/spelling/
 ^\Qbenches/codecs/moby_dick.txt\E$
 ^\Qwebsite/layouts/shortcodes/config/unit-tests.html\E$
+^proto/third-party/google/
