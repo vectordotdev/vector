@@ -2,6 +2,7 @@ use super::schema::SchemaContext;
 use anyhow::{Context, Result, bail};
 use indexmap::IndexMap;
 use serde_json::{Value, json};
+use std::fmt::Write as _;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -433,19 +434,16 @@ fn generate_internal_metric_descriptions(metric_schemas: &Value) -> Result<()> {
 
     for e in &entries {
         if e.deprecated {
-            cue.push_str(&format!("\t{}: {{\n", e.name));
-            cue.push_str(&format!("\t\tdescription: \"{}\"\n", e.description));
+            writeln!(cue, "\t{}: {{", e.name).unwrap();
+            writeln!(cue, "\t\tdescription: \"{}\"", e.description).unwrap();
             cue.push_str("\t\tdeprecated:  true\n");
             if let Some(msg) = &e.deprecated_message {
                 let escaped = msg.replace('\\', "\\\\").replace('"', "\\\"");
-                cue.push_str(&format!("\t\tdeprecated_message: \"{escaped}\"\n"));
+                writeln!(cue, "\t\tdeprecated_message: \"{escaped}\"").unwrap();
             }
             cue.push_str("\t}\n");
         } else {
-            cue.push_str(&format!(
-                "\t{}: description: \"{}\"\n",
-                e.name, e.description
-            ));
+            writeln!(cue, "\t{}: description: \"{}\"", e.name, e.description).unwrap();
         }
     }
 
