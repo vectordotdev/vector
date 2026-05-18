@@ -1,0 +1,178 @@
+data_dir: "/var/lib/vector"
+
+sources:
+  internal_metrics:
+    type: "internal_metrics"
+
+  syslog:
+    type: "syslog"
+    address: "0.0.0.0:8282"
+    max_length: 1500000
+    mode: "tcp"
+
+transforms:
+  remap:
+    type: "remap"
+    inputs: ["syslog"]
+    source: |-
+      .r001 = parse_regex(.message, r'(?P<word>\w{3,})') ?? {}
+      .r002 = parse_regex(.message, r'(?P<num>\d+)') ?? {}
+      .r003 = parse_regex(.message, r'(?P<upper>[A-Z]{2,})') ?? {}
+      .r004 = parse_regex(.message, r'(?P<ts>\d{2}:\d{2}:\d{2})') ?? {}
+      .r005 = parse_regex(.message, r'(?P<kv>\w+=\S+)') ?? {}
+      .r006 = parse_regex(.message, r'(?P<hex>[0-9a-f]{4,})') ?? {}
+      .r007 = parse_regex(.message, r'(?P<ip>\d{1,3}\.\d{1,3}\.\d{1,3})') ?? {}
+      .r008 = parse_regex(.message, r'(?P<phrase>\w+\s+\w+\s+\d+)') ?? {}
+      .r009 = parse_regex(.message, r'(?P<bracket>\[[^\]]+\])') ?? {}
+      .r010 = parse_regex(.message, r'(?P<alpha>[a-z]{4,})') ?? {}
+      .r011 = parse_regex(.message, r'(?P<word>\w{3,})') ?? {}
+      .r012 = parse_regex(.message, r'(?P<num>\d+)') ?? {}
+      .r013 = parse_regex(.message, r'(?P<upper>[A-Z]{2,})') ?? {}
+      .r014 = parse_regex(.message, r'(?P<ts>\d{2}:\d{2}:\d{2})') ?? {}
+      .r015 = parse_regex(.message, r'(?P<kv>\w+=\S+)') ?? {}
+      .r016 = parse_regex(.message, r'(?P<hex>[0-9a-f]{4,})') ?? {}
+      .r017 = parse_regex(.message, r'(?P<ip>\d{1,3}\.\d{1,3}\.\d{1,3})') ?? {}
+      .r018 = parse_regex(.message, r'(?P<phrase>\w+\s+\w+\s+\d+)') ?? {}
+      .r019 = parse_regex(.message, r'(?P<bracket>\[[^\]]+\])') ?? {}
+      .r020 = parse_regex(.message, r'(?P<alpha>[a-z]{4,})') ?? {}
+      .r021 = parse_regex(.message, r'(?P<word>\w{3,})') ?? {}
+      .r022 = parse_regex(.message, r'(?P<num>\d+)') ?? {}
+      .r023 = parse_regex(.message, r'(?P<upper>[A-Z]{2,})') ?? {}
+      .r024 = parse_regex(.message, r'(?P<ts>\d{2}:\d{2}:\d{2})') ?? {}
+      .r025 = parse_regex(.message, r'(?P<kv>\w+=\S+)') ?? {}
+      .r026 = parse_regex(.message, r'(?P<hex>[0-9a-f]{4,})') ?? {}
+      .r027 = parse_regex(.message, r'(?P<ip>\d{1,3}\.\d{1,3}\.\d{1,3})') ?? {}
+      .r028 = parse_regex(.message, r'(?P<phrase>\w+\s+\w+\s+\d+)') ?? {}
+      .r029 = parse_regex(.message, r'(?P<bracket>\[[^\]]+\])') ?? {}
+      .r030 = parse_regex(.message, r'(?P<alpha>[a-z]{4,})') ?? {}
+      .r031 = parse_regex(.message, r'(?P<word>\w{3,})') ?? {}
+      .r032 = parse_regex(.message, r'(?P<num>\d+)') ?? {}
+      .r033 = parse_regex(.message, r'(?P<upper>[A-Z]{2,})') ?? {}
+      .r034 = parse_regex(.message, r'(?P<ts>\d{2}:\d{2}:\d{2})') ?? {}
+      .r035 = parse_regex(.message, r'(?P<kv>\w+=\S+)') ?? {}
+      .r036 = parse_regex(.message, r'(?P<hex>[0-9a-f]{4,})') ?? {}
+      .r037 = parse_regex(.message, r'(?P<ip>\d{1,3}\.\d{1,3}\.\d{1,3})') ?? {}
+      .r038 = parse_regex(.message, r'(?P<phrase>\w+\s+\w+\s+\d+)') ?? {}
+      .r039 = parse_regex(.message, r'(?P<bracket>\[[^\]]+\])') ?? {}
+      .r040 = parse_regex(.message, r'(?P<alpha>[a-z]{4,})') ?? {}
+      .r041 = parse_regex(.message, r'(?P<word>\w{3,})') ?? {}
+      .r042 = parse_regex(.message, r'(?P<num>\d+)') ?? {}
+      .r043 = parse_regex(.message, r'(?P<upper>[A-Z]{2,})') ?? {}
+      .r044 = parse_regex(.message, r'(?P<ts>\d{2}:\d{2}:\d{2})') ?? {}
+      .r045 = parse_regex(.message, r'(?P<kv>\w+=\S+)') ?? {}
+      .r046 = parse_regex(.message, r'(?P<hex>[0-9a-f]{4,})') ?? {}
+      .r047 = parse_regex(.message, r'(?P<ip>\d{1,3}\.\d{1,3}\.\d{1,3})') ?? {}
+      .r048 = parse_regex(.message, r'(?P<phrase>\w+\s+\w+\s+\d+)') ?? {}
+      .r049 = parse_regex(.message, r'(?P<bracket>\[[^\]]+\])') ?? {}
+      .r050 = parse_regex(.message, r'(?P<alpha>[a-z]{4,})') ?? {}
+      .r051 = parse_regex(.message, r'(?P<word>\w{3,})') ?? {}
+      .r052 = parse_regex(.message, r'(?P<num>\d+)') ?? {}
+      .r053 = parse_regex(.message, r'(?P<upper>[A-Z]{2,})') ?? {}
+      .r054 = parse_regex(.message, r'(?P<ts>\d{2}:\d{2}:\d{2})') ?? {}
+      .r055 = parse_regex(.message, r'(?P<kv>\w+=\S+)') ?? {}
+      .r056 = parse_regex(.message, r'(?P<hex>[0-9a-f]{4,})') ?? {}
+      .r057 = parse_regex(.message, r'(?P<ip>\d{1,3}\.\d{1,3}\.\d{1,3})') ?? {}
+      .r058 = parse_regex(.message, r'(?P<phrase>\w+\s+\w+\s+\d+)') ?? {}
+      .r059 = parse_regex(.message, r'(?P<bracket>\[[^\]]+\])') ?? {}
+      .r060 = parse_regex(.message, r'(?P<alpha>[a-z]{4,})') ?? {}
+      .r061 = parse_regex(.message, r'(?P<word>\w{3,})') ?? {}
+      .r062 = parse_regex(.message, r'(?P<num>\d+)') ?? {}
+      .r063 = parse_regex(.message, r'(?P<upper>[A-Z]{2,})') ?? {}
+      .r064 = parse_regex(.message, r'(?P<ts>\d{2}:\d{2}:\d{2})') ?? {}
+      .r065 = parse_regex(.message, r'(?P<kv>\w+=\S+)') ?? {}
+      .r066 = parse_regex(.message, r'(?P<hex>[0-9a-f]{4,})') ?? {}
+      .r067 = parse_regex(.message, r'(?P<ip>\d{1,3}\.\d{1,3}\.\d{1,3})') ?? {}
+      .r068 = parse_regex(.message, r'(?P<phrase>\w+\s+\w+\s+\d+)') ?? {}
+      .r069 = parse_regex(.message, r'(?P<bracket>\[[^\]]+\])') ?? {}
+      .r070 = parse_regex(.message, r'(?P<alpha>[a-z]{4,})') ?? {}
+      .r071 = parse_regex(.message, r'(?P<word>\w{3,})') ?? {}
+      .r072 = parse_regex(.message, r'(?P<num>\d+)') ?? {}
+      .r073 = parse_regex(.message, r'(?P<upper>[A-Z]{2,})') ?? {}
+      .r074 = parse_regex(.message, r'(?P<ts>\d{2}:\d{2}:\d{2})') ?? {}
+      .r075 = parse_regex(.message, r'(?P<kv>\w+=\S+)') ?? {}
+      .r076 = parse_regex(.message, r'(?P<hex>[0-9a-f]{4,})') ?? {}
+      .r077 = parse_regex(.message, r'(?P<ip>\d{1,3}\.\d{1,3}\.\d{1,3})') ?? {}
+      .r078 = parse_regex(.message, r'(?P<phrase>\w+\s+\w+\s+\d+)') ?? {}
+      .r079 = parse_regex(.message, r'(?P<bracket>\[[^\]]+\])') ?? {}
+      .r080 = parse_regex(.message, r'(?P<alpha>[a-z]{4,})') ?? {}
+      .r081 = parse_regex(.message, r'(?P<word>\w{3,})') ?? {}
+      .r082 = parse_regex(.message, r'(?P<num>\d+)') ?? {}
+      .r083 = parse_regex(.message, r'(?P<upper>[A-Z]{2,})') ?? {}
+      .r084 = parse_regex(.message, r'(?P<ts>\d{2}:\d{2}:\d{2})') ?? {}
+      .r085 = parse_regex(.message, r'(?P<kv>\w+=\S+)') ?? {}
+      .r086 = parse_regex(.message, r'(?P<hex>[0-9a-f]{4,})') ?? {}
+      .r087 = parse_regex(.message, r'(?P<ip>\d{1,3}\.\d{1,3}\.\d{1,3})') ?? {}
+      .r088 = parse_regex(.message, r'(?P<phrase>\w+\s+\w+\s+\d+)') ?? {}
+      .r089 = parse_regex(.message, r'(?P<bracket>\[[^\]]+\])') ?? {}
+      .r090 = parse_regex(.message, r'(?P<alpha>[a-z]{4,})') ?? {}
+      .r091 = parse_regex(.message, r'(?P<word>\w{3,})') ?? {}
+      .r092 = parse_regex(.message, r'(?P<num>\d+)') ?? {}
+      .r093 = parse_regex(.message, r'(?P<upper>[A-Z]{2,})') ?? {}
+      .r094 = parse_regex(.message, r'(?P<ts>\d{2}:\d{2}:\d{2})') ?? {}
+      .r095 = parse_regex(.message, r'(?P<kv>\w+=\S+)') ?? {}
+      .r096 = parse_regex(.message, r'(?P<hex>[0-9a-f]{4,})') ?? {}
+      .r097 = parse_regex(.message, r'(?P<ip>\d{1,3}\.\d{1,3}\.\d{1,3})') ?? {}
+      .r098 = parse_regex(.message, r'(?P<phrase>\w+\s+\w+\s+\d+)') ?? {}
+      .r099 = parse_regex(.message, r'(?P<bracket>\[[^\]]+\])') ?? {}
+      .r100 = parse_regex(.message, r'(?P<alpha>[a-z]{4,})') ?? {}
+      .r101 = parse_regex(.message, r'(?P<word>\w{3,})') ?? {}
+      .r102 = parse_regex(.message, r'(?P<num>\d+)') ?? {}
+      .r103 = parse_regex(.message, r'(?P<upper>[A-Z]{2,})') ?? {}
+      .r104 = parse_regex(.message, r'(?P<ts>\d{2}:\d{2}:\d{2})') ?? {}
+      .r105 = parse_regex(.message, r'(?P<kv>\w+=\S+)') ?? {}
+      .r106 = parse_regex(.message, r'(?P<hex>[0-9a-f]{4,})') ?? {}
+      .r107 = parse_regex(.message, r'(?P<ip>\d{1,3}\.\d{1,3}\.\d{1,3})') ?? {}
+      .r108 = parse_regex(.message, r'(?P<phrase>\w+\s+\w+\s+\d+)') ?? {}
+      .r109 = parse_regex(.message, r'(?P<bracket>\[[^\]]+\])') ?? {}
+      .r110 = parse_regex(.message, r'(?P<alpha>[a-z]{4,})') ?? {}
+      .r111 = parse_regex(.message, r'(?P<word>\w{3,})') ?? {}
+      .r112 = parse_regex(.message, r'(?P<num>\d+)') ?? {}
+      .r113 = parse_regex(.message, r'(?P<upper>[A-Z]{2,})') ?? {}
+      .r114 = parse_regex(.message, r'(?P<ts>\d{2}:\d{2}:\d{2})') ?? {}
+      .r115 = parse_regex(.message, r'(?P<kv>\w+=\S+)') ?? {}
+      .r116 = parse_regex(.message, r'(?P<hex>[0-9a-f]{4,})') ?? {}
+      .r117 = parse_regex(.message, r'(?P<ip>\d{1,3}\.\d{1,3}\.\d{1,3})') ?? {}
+      .r118 = parse_regex(.message, r'(?P<phrase>\w+\s+\w+\s+\d+)') ?? {}
+      .r119 = parse_regex(.message, r'(?P<bracket>\[[^\]]+\])') ?? {}
+      .r120 = parse_regex(.message, r'(?P<alpha>[a-z]{4,})') ?? {}
+      .r121 = parse_regex(.message, r'(?P<word>\w{3,})') ?? {}
+      .r122 = parse_regex(.message, r'(?P<num>\d+)') ?? {}
+      .r123 = parse_regex(.message, r'(?P<upper>[A-Z]{2,})') ?? {}
+      .r124 = parse_regex(.message, r'(?P<ts>\d{2}:\d{2}:\d{2})') ?? {}
+      .r125 = parse_regex(.message, r'(?P<kv>\w+=\S+)') ?? {}
+      .r126 = parse_regex(.message, r'(?P<hex>[0-9a-f]{4,})') ?? {}
+      .r127 = parse_regex(.message, r'(?P<ip>\d{1,3}\.\d{1,3}\.\d{1,3})') ?? {}
+      .r128 = parse_regex(.message, r'(?P<phrase>\w+\s+\w+\s+\d+)') ?? {}
+      .r129 = parse_regex(.message, r'(?P<bracket>\[[^\]]+\])') ?? {}
+      .r130 = parse_regex(.message, r'(?P<alpha>[a-z]{4,})') ?? {}
+      .r131 = parse_regex(.message, r'(?P<word>\w{3,})') ?? {}
+      .r132 = parse_regex(.message, r'(?P<num>\d+)') ?? {}
+      .r133 = parse_regex(.message, r'(?P<upper>[A-Z]{2,})') ?? {}
+      .r134 = parse_regex(.message, r'(?P<ts>\d{2}:\d{2}:\d{2})') ?? {}
+      .r135 = parse_regex(.message, r'(?P<kv>\w+=\S+)') ?? {}
+      .r136 = parse_regex(.message, r'(?P<hex>[0-9a-f]{4,})') ?? {}
+      .r137 = parse_regex(.message, r'(?P<ip>\d{1,3}\.\d{1,3}\.\d{1,3})') ?? {}
+      .r138 = parse_regex(.message, r'(?P<phrase>\w+\s+\w+\s+\d+)') ?? {}
+      .r139 = parse_regex(.message, r'(?P<bracket>\[[^\]]+\])') ?? {}
+      .r140 = parse_regex(.message, r'(?P<alpha>[a-z]{4,})') ?? {}
+      .r141 = parse_regex(.message, r'(?P<word>\w{3,})') ?? {}
+      .r142 = parse_regex(.message, r'(?P<num>\d+)') ?? {}
+      .r143 = parse_regex(.message, r'(?P<upper>[A-Z]{2,})') ?? {}
+      .r144 = parse_regex(.message, r'(?P<ts>\d{2}:\d{2}:\d{2})') ?? {}
+      .r145 = parse_regex(.message, r'(?P<kv>\w+=\S+)') ?? {}
+      .r146 = parse_regex(.message, r'(?P<hex>[0-9a-f]{4,})') ?? {}
+      .r147 = parse_regex(.message, r'(?P<ip>\d{1,3}\.\d{1,3}\.\d{1,3})') ?? {}
+      .r148 = parse_regex(.message, r'(?P<phrase>\w+\s+\w+\s+\d+)') ?? {}
+      .r149 = parse_regex(.message, r'(?P<bracket>\[[^\]]+\])') ?? {}
+      .r150 = parse_regex(.message, r'(?P<alpha>[a-z]{4,})') ?? {}
+
+sinks:
+  prometheus:
+    type: "prometheus_exporter"
+    inputs: ["internal_metrics"]
+    address: "0.0.0.0:9090"
+
+  blackhole:
+    type: "blackhole"
+    print_interval_secs: 0
+    inputs: ["remap"]
