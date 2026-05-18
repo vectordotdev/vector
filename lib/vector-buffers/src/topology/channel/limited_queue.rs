@@ -144,41 +144,42 @@ impl Metrics {
         let ewma_half_life_seconds =
             ewma_half_life_seconds.unwrap_or(DEFAULT_EWMA_HALF_LIFE_SECONDS);
         let ChannelMetricMetadata { kind, output } = metadata;
-        let (max_name, legacy_name, histogram_name, level_name, mean_name, max_value) =
-            match (kind, limit) {
-                (BufferChannelKind::Source, MemoryBufferSize::MaxEvents(n)) => (
-                    GaugeName::SourceBufferMaxSizeEvents,
-                    GaugeName::SourceBufferMaxEventSize,
-                    HistogramName::SourceBufferUtilization,
-                    GaugeName::SourceBufferUtilizationLevel,
-                    GaugeName::SourceBufferUtilizationMean,
-                    n.get() as f64,
-                ),
-                (BufferChannelKind::Source, MemoryBufferSize::MaxSize(n)) => (
-                    GaugeName::SourceBufferMaxSizeBytes,
-                    GaugeName::SourceBufferMaxByteSize,
-                    HistogramName::SourceBufferUtilization,
-                    GaugeName::SourceBufferUtilizationLevel,
-                    GaugeName::SourceBufferUtilizationMean,
-                    n.get() as f64,
-                ),
-                (BufferChannelKind::Transform, MemoryBufferSize::MaxEvents(n)) => (
-                    GaugeName::TransformBufferMaxSizeEvents,
-                    GaugeName::TransformBufferMaxEventSize,
-                    HistogramName::TransformBufferUtilization,
-                    GaugeName::TransformBufferUtilizationLevel,
-                    GaugeName::TransformBufferUtilizationMean,
-                    n.get() as f64,
-                ),
-                (BufferChannelKind::Transform, MemoryBufferSize::MaxSize(n)) => (
-                    GaugeName::TransformBufferMaxSizeBytes,
-                    GaugeName::TransformBufferMaxByteSize,
-                    HistogramName::TransformBufferUtilization,
-                    GaugeName::TransformBufferUtilizationLevel,
-                    GaugeName::TransformBufferUtilizationMean,
-                    n.get() as f64,
-                ),
-            };
+
+        let (histogram_name, level_name, mean_name) = match kind {
+            BufferChannelKind::Source => (
+                HistogramName::SourceBufferUtilization,
+                GaugeName::SourceBufferUtilizationLevel,
+                GaugeName::SourceBufferUtilizationMean,
+            ),
+            BufferChannelKind::Transform => (
+                HistogramName::TransformBufferUtilization,
+                GaugeName::TransformBufferUtilizationLevel,
+                GaugeName::TransformBufferUtilizationMean,
+            ),
+        };
+
+        let (max_name, legacy_name, max_value) = match (kind, limit) {
+            (BufferChannelKind::Source, MemoryBufferSize::MaxEvents(n)) => (
+                GaugeName::SourceBufferMaxSizeEvents,
+                GaugeName::SourceBufferMaxEventSize,
+                n.get() as f64,
+            ),
+            (BufferChannelKind::Source, MemoryBufferSize::MaxSize(n)) => (
+                GaugeName::SourceBufferMaxSizeBytes,
+                GaugeName::SourceBufferMaxByteSize,
+                n.get() as f64,
+            ),
+            (BufferChannelKind::Transform, MemoryBufferSize::MaxEvents(n)) => (
+                GaugeName::TransformBufferMaxSizeEvents,
+                GaugeName::TransformBufferMaxEventSize,
+                n.get() as f64,
+            ),
+            (BufferChannelKind::Transform, MemoryBufferSize::MaxSize(n)) => (
+                GaugeName::TransformBufferMaxSizeBytes,
+                GaugeName::TransformBufferMaxByteSize,
+                n.get() as f64,
+            ),
+        };
         #[cfg(test)]
         let recorded_values = Arc::new(Mutex::new(Vec::new()));
         if let Some(label_value) = output {
