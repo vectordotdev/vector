@@ -43,7 +43,7 @@ generated: components: sources: heroku_logs: configuration: {
 				type: string: examples: ["${PASSWORD}", "password"]
 			}
 			source: {
-				description:   "The VRL boolean expression."
+				description:   "The VRL boolean expression. May write `%field = value` to enrich events."
 				relevant_when: "strategy = \"custom\""
 				required:      true
 				type: string: {}
@@ -62,7 +62,9 @@ generated: components: sources: heroku_logs: configuration: {
 					custom: """
 						Custom authentication using VRL code.
 
-						Takes in request and validates it using VRL code.
+						Takes in request and validates it using VRL code. The VRL program must return a boolean.
+						Metadata fields written via `%field = value` in the VRL program are extracted and injected
+						into every authenticated event.
 						"""
 				}
 			}
