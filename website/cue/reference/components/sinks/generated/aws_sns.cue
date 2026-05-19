@@ -904,4 +904,18 @@ generated: components: sinks: aws_sns: configuration: {
 		required:    true
 		type: string: examples: ["arn:aws:sns:us-east-2:123456789012:MyTopic"]
 	}
+	use_fips_endpoint: {
+		description: """
+			Whether to use [FIPS-compliant endpoints][fips] when communicating with AWS services.
+
+			When enabled, the SDK resolves FIPS-compliant endpoints for the target service.
+			This is required for FedRAMP and other compliance environments. When omitted, the
+			SDK falls back to its default provider chain (the `AWS_USE_FIPS_ENDPOINT` environment
+			variable and AWS config files).
+
+			[fips]: https://docs.aws.amazon.com/sdkref/latest/guide/setting-global-aws_use_fips_endpoint.html
+			"""
+		required: false
+		type: bool: {}
+	}
 }
