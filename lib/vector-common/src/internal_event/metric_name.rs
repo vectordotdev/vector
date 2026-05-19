@@ -355,15 +355,38 @@ impl CounterName {
             Self::ComponentAllocatedBytesTotal => "component_allocated_bytes_total",
             Self::ComponentDeallocatedBytesTotal => "component_deallocated_bytes_total",
             Self::MemoryEnrichmentTableFailedInsertions => {
-                "memory_enrichment_table_failed_insertions"
+                "memory_enrichment_table_failed_insertions_total"
             }
-            Self::MemoryEnrichmentTableFailedReads => "memory_enrichment_table_failed_reads",
+            Self::MemoryEnrichmentTableFailedReads => "memory_enrichment_table_failed_reads_total",
             Self::MemoryEnrichmentTableFlushesTotal => "memory_enrichment_table_flushes_total",
             Self::MemoryEnrichmentTableInsertionsTotal => {
                 "memory_enrichment_table_insertions_total"
             }
             Self::MemoryEnrichmentTableReadsTotal => "memory_enrichment_table_reads_total",
-            Self::MemoryEnrichmentTableTtlExpirations => "memory_enrichment_table_ttl_expirations",
+            Self::MemoryEnrichmentTableTtlExpirations => {
+                "memory_enrichment_table_ttl_expirations_total"
+            }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::CounterName;
+
+    #[test]
+    fn memory_enrichment_table_counter_names_end_in_total() {
+        assert_eq!(
+            CounterName::MemoryEnrichmentTableFailedInsertions.as_str(),
+            "memory_enrichment_table_failed_insertions_total"
+        );
+        assert_eq!(
+            CounterName::MemoryEnrichmentTableFailedReads.as_str(),
+            "memory_enrichment_table_failed_reads_total"
+        );
+        assert_eq!(
+            CounterName::MemoryEnrichmentTableTtlExpirations.as_str(),
+            "memory_enrichment_table_ttl_expirations_total"
+        );
     }
 }
