@@ -11,7 +11,7 @@ use vrl::{
 use crate::{
     conditions::{Condition, Conditional, ConditionalConfig},
     config::LogNamespace,
-    event::{Event, TargetEvents, VrlTarget},
+    event::{Event, MetricTagMode, TargetEvents, VrlTarget},
     format_vrl_diagnostics,
     internal_events::VrlConditionExecutionError,
 };
@@ -92,7 +92,7 @@ impl Vrl {
             .maybe_as_log()
             .map(|log| log.namespace())
             .unwrap_or(LogNamespace::Legacy);
-        let mut target = VrlTarget::new(event, self.program.info(), false);
+        let mut target = VrlTarget::new(event, self.program.info(), MetricTagMode::Single);
         // TODO: use timezone from remap config
         let timezone = TimeZone::default();
 

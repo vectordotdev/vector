@@ -11,7 +11,7 @@ use vector_lib::{
 
 use crate::{
     config::{self, CONFIG_PATHS, ComponentKey, DataType, Input, OutputId, TransformOutput},
-    event::{Event, lua::event::LuaEvent},
+    event::{Event, MetricTagMode, lua::event::LuaEvent},
     internal_events::{LuaBuildError, LuaGcTriggered},
     schema,
     schema::Definition,
@@ -84,6 +84,10 @@ pub struct LuaConfig {
     ///
     /// When set to `full`, all metric tags are exposed as arrays of either string or null
     /// values.
+    ///
+    /// When set to `auto`, single-value tags are exposed as strings and multi-value tags as
+    /// arrays, preserving the underlying shape of metrics that mix single- and multi-value
+    /// tags.
     #[serde(default)]
     metric_tag_values: MetricTagValues,
 }
@@ -222,7 +226,7 @@ pub struct Lua {
     hook_process: mlua::RegistryKey,
     hook_shutdown: Option<mlua::RegistryKey>,
     timers: Vec<(Timer, mlua::RegistryKey)>,
-    multi_value_tags: bool,
+    tag_mode: MetricTagMode,
     source_id: Arc<ComponentKey>,
 }
 
@@ -292,8 +296,6 @@ impl Lua {
             timers.push((timer, handler_key));
         }
 
-        let multi_value_tags = config.metric_tag_values == MetricTagValues::Full;
-
         Ok(Self {
             lua,
             invocations_after_gc: 0,
@@ -301,7 +303,7 @@ impl Lua {
             hook_init,
             hook_process,
             hook_shutdown,
-            multi_value_tags,
+            tag_mode: config.metric_tag_values.into(),
             source_id: Arc::new(key),
         })
     }
@@ -323,7 +325,7 @@ impl Lua {
                 .call((
                     LuaEvent {
                         event,
-                        metric_multi_value_tags: self.multi_value_tags,
+                        metric_tag_mode: self.tag_mode,
                     },
                     emit,
                 ))
@@ -383,7 +385,7 @@ impl RuntimeTransform for Lua {
                     .call((
                         LuaEvent {
                             event,
-                            metric_multi_value_tags: self.multi_value_tags,
+                            metric_tag_mode: self.tag_mode,
                         },
                         wrap_emit_fn(scope, emit_fn, source_id)?,
                     ))

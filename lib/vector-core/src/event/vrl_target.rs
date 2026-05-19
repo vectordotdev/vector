@@ -32,6 +32,11 @@ const VALID_METRIC_PATHS_GET: &str =
 /// fields such as `.tags.host.thing`.
 const MAX_METRIC_PATH_DEPTH: usize = 3;
 
+// `MetricTagMode` lives in its own always-compiled module so the `lua`
+// feature can use the same type without pulling in `vrl`. The canonical
+// public path is `crate::event::MetricTagMode`.
+use super::metric_tag_mode::MetricTagMode;
+
 /// An adapter to turn `Event`s into `vrl_lib::Target`s.
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
@@ -42,7 +47,7 @@ pub enum VrlTarget {
     Metric {
         metric: Metric,
         value: Value,
-        multi_value_tags: bool,
+        tag_mode: MetricTagMode,
     },
     Trace(Value, EventMetadata),
 }
@@ -100,7 +105,7 @@ impl Iterator for TargetIter<TraceEvent> {
 }
 
 impl VrlTarget {
-    pub fn new(event: Event, info: &ProgramInfo, multi_value_metric_tags: bool) -> Self {
+    pub fn new(event: Event, info: &ProgramInfo, tag_mode: MetricTagMode) -> Self {
         match event {
             Event::Log(event) => {
                 let (value, metadata) = event.into_parts();
@@ -110,12 +115,12 @@ impl VrlTarget {
                 // We pre-generate [`Value`] types for the metric fields accessed in
                 // the event. This allows us to then return references to those
                 // values, even if the field is accessed more than once.
-                let value = precompute_metric_value(&metric, info, multi_value_metric_tags);
+                let value = precompute_metric_value(&metric, info, tag_mode);
 
                 VrlTarget::Metric {
                     metric,
                     value,
-                    multi_value_tags: multi_value_metric_tags,
+                    tag_mode,
                 }
             }
             Event::Trace(event) => {
@@ -246,8 +251,17 @@ fn merge_array_definitions(mut definition: Definition) -> Definition {
     definition
 }
 
-fn set_metric_tag_values(name: String, value: &Value, metric: &mut Metric, multi_value_tags: bool) {
-    if multi_value_tags {
+fn set_metric_tag_values(name: String, value: &Value, metric: &mut Metric, tag_mode: MetricTagMode) {
+    // `Auto` dispatches by the *shape* of the assigned value: arrays go through
+    // the multi-value path, scalars go through the single-value path. `Full`
+    // and `Single` are unchanged.
+    let multi_value = match tag_mode {
+        MetricTagMode::Single => false,
+        MetricTagMode::Full => true,
+        MetricTagMode::Auto => matches!(value, Value::Array(_)),
+    };
+
+    if multi_value {
         let values = if let Value::Array(values) = value {
             values.as_slice()
         } else {
@@ -288,7 +302,7 @@ impl Target for VrlTarget {
                 VrlTarget::Metric {
                     metric,
                     value: metric_value,
-                    multi_value_tags,
+                    tag_mode,
                 } => {
                     if path.is_root() {
                         return Err(MetricPathError::SetPathError.to_string());
@@ -306,7 +320,7 @@ impl Target for VrlTarget {
                                         field[..].into(),
                                         value,
                                         metric,
-                                        *multi_value_tags,
+                                        *tag_mode,
                                     );
                                 }
                             }
@@ -315,7 +329,7 @@ impl Target for VrlTarget {
                                     (*field).to_owned(),
                                     &value,
                                     metric,
-                                    *multi_value_tags,
+                                    *tag_mode,
                                 );
                             }
                             ["name"] => {
@@ -416,7 +430,7 @@ impl Target for VrlTarget {
                 VrlTarget::Metric {
                     metric,
                     value,
-                    multi_value_tags: _,
+                    tag_mode: _,
                 } => {
                     if target_path.path.is_root() {
                         return Err(MetricPathError::SetPathError.to_string());
@@ -554,64 +568,100 @@ fn target_get_mut_metric<'a>(
     }
 }
 
+struct MetricProperty {
+    property: &'static str,
+    getter: fn(&Metric) -> Option<Value>,
+    set: bool,
+}
+
+impl MetricProperty {
+    fn new(property: &'static str, getter: fn(&Metric) -> Option<Value>) -> Self {
+        Self {
+            property,
+            getter,
+            set: false,
+        }
+    }
+
+    fn insert(&mut self, metric: &Metric, map: &mut ObjectMap) {
+        if self.set {
+            return;
+        }
+        if let Some(value) = (self.getter)(metric) {
+            map.insert(self.property.into(), value);
+            self.set = true;
+        }
+    }
+}
+
+fn get_single_value_tags(metric: &Metric) -> Option<Value> {
+    metric.tags().cloned().map(|tags| {
+        tags.into_iter_single()
+            .map(|(tag, value)| (tag.into(), value.into()))
+            .collect::<ObjectMap>()
+            .into()
+    })
+}
+
+fn get_multi_value_tags(metric: &Metric) -> Option<Value> {
+    metric.tags().cloned().map(|tags| {
+        tags.iter_sets()
+            .map(|(tag, tag_set)| {
+                let array_values: Vec<Value> = tag_set
+                    .iter()
+                    .map(|v| match v {
+                        Some(s) => Value::Bytes(s.as_bytes().to_vec().into()),
+                        None => Value::Null,
+                    })
+                    .collect();
+                (tag.into(), Value::Array(array_values))
+            })
+            .collect::<ObjectMap>()
+            .into()
+    })
+}
+
+/// `Auto` keeps the underlying shape: a tag with exactly one value renders
+/// as a scalar (string for `Value(_)`, null for `Bare`), and a tag with two
+/// or more values renders as an array. The discriminator must be `len()` --
+/// `as_single()` deliberately collapses multi-value sets to their last
+/// value to support `Single`-mode semantics, which is the opposite of what
+/// we want here.
+fn get_auto_value_tags(metric: &Metric) -> Option<Value> {
+    metric.tags().cloned().map(|tags| {
+        tags.iter_sets()
+            .map(|(tag, tag_set)| {
+                // Only a 1-element set scalarises. Empty sets keep the
+                // array shape so a noop Auto round-trip preserves them
+                // (otherwise an empty multi-value tag would be silently
+                // converted to a bare single-value tag).
+                let value = match tag_set.len() {
+                    1 => match tag_set.iter().next() {
+                        Some(Some(s)) => Value::Bytes(s.as_bytes().to_vec().into()),
+                        _ => Value::Null,
+                    },
+                    _ => Value::Array(
+                        tag_set
+                            .iter()
+                            .map(|v| match v {
+                                Some(s) => Value::Bytes(s.as_bytes().to_vec().into()),
+                                None => Value::Null,
+                            })
+                            .collect(),
+                    ),
+                };
+                (tag.into(), value)
+            })
+            .collect::<ObjectMap>()
+            .into()
+    })
+}
+
 /// pre-compute the `Value` structure of the metric.
 ///
 /// This structure is partially populated based on the fields accessed by
 /// the VRL program as informed by `ProgramInfo`.
-fn precompute_metric_value(metric: &Metric, info: &ProgramInfo, multi_value_tags: bool) -> Value {
-    struct MetricProperty {
-        property: &'static str,
-        getter: fn(&Metric) -> Option<Value>,
-        set: bool,
-    }
-
-    impl MetricProperty {
-        fn new(property: &'static str, getter: fn(&Metric) -> Option<Value>) -> Self {
-            Self {
-                property,
-                getter,
-                set: false,
-            }
-        }
-
-        fn insert(&mut self, metric: &Metric, map: &mut ObjectMap) {
-            if self.set {
-                return;
-            }
-            if let Some(value) = (self.getter)(metric) {
-                map.insert(self.property.into(), value);
-                self.set = true;
-            }
-        }
-    }
-
-    fn get_single_value_tags(metric: &Metric) -> Option<Value> {
-        metric.tags().cloned().map(|tags| {
-            tags.into_iter_single()
-                .map(|(tag, value)| (tag.into(), value.into()))
-                .collect::<ObjectMap>()
-                .into()
-        })
-    }
-
-    fn get_multi_value_tags(metric: &Metric) -> Option<Value> {
-        metric.tags().cloned().map(|tags| {
-            tags.iter_sets()
-                .map(|(tag, tag_set)| {
-                    let array_values: Vec<Value> = tag_set
-                        .iter()
-                        .map(|v| match v {
-                            Some(s) => Value::Bytes(s.as_bytes().to_vec().into()),
-                            None => Value::Null,
-                        })
-                        .collect();
-                    (tag.into(), Value::Array(array_values))
-                })
-                .collect::<ObjectMap>()
-                .into()
-        })
-    }
-
+fn precompute_metric_value(metric: &Metric, info: &ProgramInfo, tag_mode: MetricTagMode) -> Value {
     let mut name = MetricProperty::new("name", |metric| Some(metric.name().to_owned().into()));
     let mut kind = MetricProperty::new("kind", |metric| Some(metric.kind().into()));
     let mut type_ = MetricProperty::new("type", |metric| Some(metric.value().clone().into()));
@@ -624,10 +674,10 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo, multi_value_tags
         MetricProperty::new("timestamp", |metric| metric.timestamp().map(Into::into));
     let mut tags = MetricProperty::new(
         "tags",
-        if multi_value_tags {
-            get_multi_value_tags
-        } else {
-            get_single_value_tags
+        match tag_mode {
+            MetricTagMode::Single => get_single_value_tags,
+            MetricTagMode::Full => get_multi_value_tags,
+            MetricTagMode::Auto => get_auto_value_tags,
         },
     );
 
@@ -830,7 +880,8 @@ mod test {
                 target_queries: vec![],
                 target_assignments: vec![],
             };
-            let target = VrlTarget::new(Event::Log(LogEvent::from(value)), &info, false);
+            let target =
+                VrlTarget::new(Event::Log(LogEvent::from(value)), &info, MetricTagMode::Single);
             let path = OwnedTargetPath::event(path);
 
             assert_eq!(
@@ -934,7 +985,8 @@ mod test {
                 target_queries: vec![],
                 target_assignments: vec![],
             };
-            let mut target = VrlTarget::new(Event::Log(LogEvent::from(object)), &info, false);
+            let mut target =
+                VrlTarget::new(Event::Log(LogEvent::from(object)), &info, MetricTagMode::Single);
             let expect = LogEvent::from(expect);
             let value: Value = value;
             let path = OwnedTargetPath::event(path);
@@ -1033,7 +1085,8 @@ mod test {
                 target_queries: vec![],
                 target_assignments: vec![],
             };
-            let mut target = VrlTarget::new(Event::Log(LogEvent::from(object)), &info, false);
+            let mut target =
+                VrlTarget::new(Event::Log(LogEvent::from(object)), &info, MetricTagMode::Single);
             let path = OwnedTargetPath::event(path);
             let removed = Target::target_get(&target, &path).unwrap().cloned();
 
@@ -1088,7 +1141,7 @@ mod test {
             let mut target = VrlTarget::new(
                 Event::Log(LogEvent::new_with_metadata(metadata.clone())),
                 &info,
-                false,
+                MetricTagMode::Single,
             );
 
             Target::target_insert(&mut target, &OwnedTargetPath::event_root(), value).unwrap();
@@ -1137,7 +1190,7 @@ mod test {
             ],
             target_assignments: vec![],
         };
-        let target = VrlTarget::new(Event::Metric(metric), &info, false);
+        let target = VrlTarget::new(Event::Metric(metric), &info, MetricTagMode::Single);
 
         assert_eq!(
             Ok(Some(
@@ -1229,7 +1282,7 @@ mod test {
             ],
             target_assignments: vec![],
         };
-        let mut target = VrlTarget::new(Event::Metric(metric), &info, false);
+        let mut target = VrlTarget::new(Event::Metric(metric), &info, MetricTagMode::Single);
 
         for Case {
             path,
@@ -1275,7 +1328,7 @@ mod test {
             target_queries: vec![],
             target_assignments: vec![],
         };
-        let mut target = VrlTarget::new(Event::Metric(metric), &info, false);
+        let mut target = VrlTarget::new(Event::Metric(metric), &info, MetricTagMode::Single);
         let _result = target.target_insert(
             &OwnedTargetPath::event(owned_value_path!("tags")),
             Value::Object(BTreeMap::from([("a".into(), "b".into())])),
@@ -1285,7 +1338,7 @@ mod test {
             VrlTarget::Metric {
                 metric,
                 value: _,
-                multi_value_tags: _,
+                tag_mode: _,
             } => {
                 assert!(metric.tags().is_some());
                 assert_eq!(metric.tags().unwrap(), &crate::metric_tags!("a" => "b"));
@@ -1327,7 +1380,7 @@ mod test {
             target_queries: vec![],
             target_assignments: vec![],
         };
-        let mut target = VrlTarget::new(Event::Metric(metric), &info, false);
+        let mut target = VrlTarget::new(Event::Metric(metric), &info, MetricTagMode::Single);
 
         assert_eq!(
             Err(format!(
@@ -1381,7 +1434,7 @@ mod test {
             target_assignments: vec![],
         };
 
-        let mut target = VrlTarget::new(Event::Metric(metric), &info, true);
+        let mut target = VrlTarget::new(Event::Metric(metric), &info, MetricTagMode::Full);
 
         let value = Value::Array(vec!["a".into(), "".into(), Value::Null, "b".into()]);
         target
@@ -1410,5 +1463,322 @@ mod test {
 
         // get single value (should be the last one)
         assert_eq!(metric.tag_value("foo"), Some("b".into()));
+    }
+
+    fn auto_mode_program_info() -> ProgramInfo {
+        ProgramInfo {
+            fallible: false,
+            abortable: false,
+            target_queries: vec![OwnedTargetPath::event(owned_value_path!("tags"))],
+            target_assignments: vec![],
+        }
+    }
+
+    /// Auto exposes a single-value tag as a plain string -- the same shape
+    /// `Single` would produce -- so existing VRL programs that read scalar
+    /// tags work unchanged.
+    #[test]
+    fn metric_auto_read_single_value_tag_returns_string() {
+        let metric = Metric::new(
+            "m",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.0 },
+        )
+        .with_tags(Some(metric_tags!("env" => "prod")));
+
+        let info = auto_mode_program_info();
+        let target = VrlTarget::new(Event::Metric(metric), &info, MetricTagMode::Auto);
+
+        let tags = target
+            .target_get(&OwnedTargetPath::event(owned_value_path!("tags")))
+            .unwrap()
+            .unwrap()
+            .clone();
+
+        assert_eq!(
+            tags,
+            Value::Object(BTreeMap::from([("env".into(), Value::from("prod"))])),
+        );
+    }
+
+    /// Auto exposes a multi-value tag as an array -- the same shape `Full`
+    /// would produce -- so multi-value information survives the round trip
+    /// instead of being collapsed to the last value.
+    #[test]
+    fn metric_auto_read_multi_value_tag_returns_array() {
+        use super::super::metric::{MetricTags, TagValueSet};
+        let metric = Metric::new(
+            "m",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.0 },
+        )
+        .with_tags(Some(MetricTags(BTreeMap::from([(
+            "shard".to_string(),
+            TagValueSet::from(vec![
+                TagValue::from("a".to_string()),
+                TagValue::from("b".to_string()),
+            ]),
+        )]))));
+
+        let info = auto_mode_program_info();
+        let target = VrlTarget::new(Event::Metric(metric), &info, MetricTagMode::Auto);
+
+        let tags = target
+            .target_get(&OwnedTargetPath::event(owned_value_path!("tags")))
+            .unwrap()
+            .unwrap()
+            .clone();
+
+        assert_eq!(
+            tags,
+            Value::Object(BTreeMap::from([(
+                "shard".into(),
+                Value::Array(vec!["a".into(), "b".into()])
+            )])),
+        );
+    }
+
+    /// Auto reads a mixed metric (one single, one multi) preserving both
+    /// shapes -- the property the new mode exists for.
+    #[test]
+    fn metric_auto_read_mixed_tags_preserves_both_shapes() {
+        use super::super::metric::{MetricTags, TagValueSet};
+        let mut tags = BTreeMap::new();
+        tags.insert(
+            "env".to_string(),
+            TagValueSet::from(vec!["prod".to_string()]),
+        );
+        tags.insert(
+            "shard".to_string(),
+            TagValueSet::from(vec!["a".to_string(), "b".to_string()]),
+        );
+        let metric = Metric::new(
+            "m",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.0 },
+        )
+        .with_tags(Some(MetricTags(tags)));
+
+        let info = auto_mode_program_info();
+        let target = VrlTarget::new(Event::Metric(metric), &info, MetricTagMode::Auto);
+
+        let tags = target
+            .target_get(&OwnedTargetPath::event(owned_value_path!("tags")))
+            .unwrap()
+            .unwrap()
+            .clone();
+
+        assert_eq!(
+            tags,
+            Value::Object(BTreeMap::from([
+                ("env".into(), Value::from("prod")),
+                (
+                    "shard".into(),
+                    Value::Array(vec!["a".into(), "b".into()])
+                ),
+            ])),
+        );
+    }
+
+    /// Auto write: assigning a scalar produces a single-value tag (so a VRL
+    /// program that did `.tags.env = "staging"` round-trips as `Single`-style).
+    #[test]
+    fn metric_auto_write_string_creates_single_tag() {
+        let metric = Metric::new(
+            "m",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.0 },
+        );
+        let info = auto_mode_program_info();
+        let mut target = VrlTarget::new(Event::Metric(metric), &info, MetricTagMode::Auto);
+
+        target
+            .target_insert(
+                &OwnedTargetPath::event(owned_value_path!("tags", "env")),
+                Value::from("staging"),
+            )
+            .unwrap();
+
+        let VrlTarget::Metric { metric, .. } = target else {
+            unreachable!()
+        };
+        let metric_tags = metric.tags().expect("tag should be set");
+        let tag_set = metric_tags
+            .iter_sets()
+            .find(|(k, _)| *k == "env")
+            .expect("env tag missing")
+            .1;
+        assert_eq!(tag_set.len(), 1, "scalar assignment must produce a 1-element set");
+        assert_eq!(tag_set.as_single(), Some("staging"));
+    }
+
+    /// Auto write: assigning an array produces a multi-value tag (the
+    /// behaviour `Single` would silently drop and `Full` would force on
+    /// every other tag).
+    #[test]
+    fn metric_auto_write_array_creates_multi_value_tag() {
+        let metric = Metric::new(
+            "m",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.0 },
+        );
+        let info = auto_mode_program_info();
+        let mut target = VrlTarget::new(Event::Metric(metric), &info, MetricTagMode::Auto);
+
+        target
+            .target_insert(
+                &OwnedTargetPath::event(owned_value_path!("tags", "shard")),
+                Value::Array(vec!["a".into(), "b".into(), "c".into()]),
+            )
+            .unwrap();
+
+        let VrlTarget::Metric { metric, .. } = target else {
+            unreachable!()
+        };
+        let metric_tags = metric.tags().expect("tag should be set");
+        let tag_set = metric_tags
+            .iter_sets()
+            .find(|(k, _)| *k == "shard")
+            .expect("shard tag missing")
+            .1;
+        assert_eq!(tag_set.len(), 3);
+        let collected: Vec<Option<&str>> = tag_set.iter().collect();
+        assert_eq!(
+            collected,
+            vec![Some("a"), Some("b"), Some("c")],
+            "array assignment must preserve every element"
+        );
+    }
+
+    /// Auto round-trip across two passes: a length-1 array write reaches the
+    /// metric storage as `TagValueSet::Single` (the storage layer never holds
+    /// a `Set` with fewer than 2 elements), so when a *subsequent* VRL pass
+    /// constructs a new `VrlTarget` around that metric, the tag surfaces as a
+    /// scalar string rather than a 1-element array. This pins that behaviour
+    /// as intentional -- a true array-shape preserving round-trip needs
+    /// `MetricTagMode::Full`.
+    ///
+    /// Within a single pass, the `VrlTarget` caches writes verbatim in its
+    /// precomputed `Value`, so an intra-pass `.tags.region` read sees the
+    /// original array; the collapse is observable only across passes.
+    #[test]
+    fn metric_auto_one_element_array_normalises_to_scalar() {
+        let metric = Metric::new(
+            "m",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.0 },
+        );
+        let info = auto_mode_program_info();
+        let mut first_pass =
+            VrlTarget::new(Event::Metric(metric), &info, MetricTagMode::Auto);
+
+        first_pass
+            .target_insert(
+                &OwnedTargetPath::event(owned_value_path!("tags", "region")),
+                Value::Array(vec!["us-east-1".into()]),
+            )
+            .unwrap();
+
+        let VrlTarget::Metric { metric, .. } = first_pass else {
+            unreachable!()
+        };
+        let tag_set = metric
+            .tags()
+            .expect("tag should be set")
+            .iter_sets()
+            .find(|(k, _)| *k == "region")
+            .expect("region tag missing")
+            .1;
+        assert_eq!(
+            tag_set.len(),
+            1,
+            "storage layer must collapse a 1-element multi-value tag to a Single",
+        );
+
+        let second_pass = VrlTarget::new(Event::Metric(metric), &info, MetricTagMode::Auto);
+        let tags = second_pass
+            .target_get(&OwnedTargetPath::event(owned_value_path!("tags")))
+            .unwrap()
+            .unwrap()
+            .clone();
+
+        assert_eq!(
+            tags,
+            Value::Object(BTreeMap::from([(
+                "region".into(),
+                Value::from("us-east-1"),
+            )])),
+            "a length-1 array written in one Auto pass must read back as a \
+             scalar on the next pass",
+        );
+    }
+
+    /// Auto read: an empty tag set (`len() == 0`) keeps its array shape so a
+    /// noop `.tags = .tags` round-trip preserves it. Without this guarantee
+    /// an empty multi-value tag would silently morph into a bare single-value
+    /// tag through one Auto round-trip.
+    #[test]
+    fn metric_auto_read_empty_tag_set_returns_array() {
+        use super::super::metric::{MetricTags, TagValueSet};
+        let mut tags = BTreeMap::new();
+        tags.insert("empty".to_string(), TagValueSet::default());
+        let metric = Metric::new(
+            "m",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.0 },
+        )
+        .with_tags(Some(MetricTags(tags)));
+
+        let info = auto_mode_program_info();
+        let target = VrlTarget::new(Event::Metric(metric), &info, MetricTagMode::Auto);
+
+        let tags = target
+            .target_get(&OwnedTargetPath::event(owned_value_path!("tags")))
+            .unwrap()
+            .unwrap()
+            .clone();
+
+        assert_eq!(
+            tags,
+            Value::Object(BTreeMap::from([(
+                "empty".into(),
+                Value::Array(vec![])
+            )])),
+            "empty tag set must surface as an empty array, not as null",
+        );
+    }
+
+    /// Auto write: assigning `null` falls through the scalar path, producing
+    /// a single bare tag (matches `Single` semantics so the two modes agree
+    /// on the unambiguous case).
+    #[test]
+    fn metric_auto_write_null_creates_single_bare_tag() {
+        let metric = Metric::new(
+            "m",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.0 },
+        );
+        let info = auto_mode_program_info();
+        let mut target = VrlTarget::new(Event::Metric(metric), &info, MetricTagMode::Auto);
+
+        target
+            .target_insert(
+                &OwnedTargetPath::event(owned_value_path!("tags", "bare")),
+                Value::Null,
+            )
+            .unwrap();
+
+        let VrlTarget::Metric { metric, .. } = target else {
+            unreachable!()
+        };
+        let metric_tags = metric.tags().expect("tag should be set");
+        let tag_set = metric_tags
+            .iter_sets()
+            .find(|(k, _)| *k == "bare")
+            .expect("bare tag missing")
+            .1;
+        assert_eq!(tag_set.len(), 1);
+        let collected: Vec<Option<&str>> = tag_set.iter().collect();
+        assert_eq!(collected, vec![None], "null must produce a single bare value");
     }
 }
