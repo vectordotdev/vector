@@ -8,11 +8,14 @@ use vector_lib::configurable::configurable_component;
 
 use crate::{
     gcp::{GcpAuthenticator, GcpError},
-    http::HttpClient,
+    http::{HttpClient, HttpError},
     sinks::{
         Healthcheck, HealthcheckError,
         gcs_common::service::GcsResponse,
-        util::retries::{RetryAction, RetryLogic},
+        util::{
+            http::{HttpResponse, RetryStrategy},
+            retries::{RetryAction, RetryLogic},
+        },
     },
 };
 
@@ -193,8 +196,8 @@ impl<Request: Clone + Send + Sync + 'static> RetryLogic for GcsRetryLogic<Reques
                 // the token from the auth's RwLock), the new token should
                 // be in place. If the refresh is still in flight we'll burn
                 // one or two more retries on the stale token before recovering
-                // — far cheaper than waiting for the next 30 min regenerator
-                // tick or for a pod restart.
+                // — far cheaper than waiting for the next regenerator tick or
+                // for a pod restart.
                 if let Some(auth) = &self.auth {
                     let auth = auth.clone();
                     tokio::spawn(async move {
@@ -212,5 +215,108 @@ impl<Request: Clone + Send + Sync + 'static> RetryLogic for GcsRetryLogic<Reques
             _ if status.is_success() => RetryAction::Successful,
             _ => RetryAction::DontRetry(format!("response status: {status}").into()),
         }
+    }
+}
+
+/// Retry logic for GCP sinks that go through the generic `HttpService` /
+/// `BatchedHttpSink` machinery rather than `GcsService`. Adds 401-driven
+/// credential self-heal to a base `RetryStrategy`. Generic over the response
+/// type via a status-extractor closure so it can wrap both
+/// `http::Response<Bytes>` (BatchedHttpSink) and `HttpResponse` (HttpService).
+pub struct GcpAuthRetryLogic<F, Req, Res> {
+    get_status: F,
+    retry_strategy: RetryStrategy,
+    auth: GcpAuthenticator,
+    _markers: PhantomData<fn(Req) -> Res>,
+}
+
+impl<F, Req, Res> GcpAuthRetryLogic<F, Req, Res> {
+    pub const fn new(get_status: F, retry_strategy: RetryStrategy, auth: GcpAuthenticator) -> Self {
+        Self {
+            get_status,
+            retry_strategy,
+            auth,
+            _markers: PhantomData,
+        }
+    }
+}
+
+/// Convenience constructor for sinks whose tower service returns
+/// `http::Response<Bytes>` (i.e. `BatchedHttpSink`).
+pub fn gcp_hyper_response_retry_logic<Req: Clone + Send + Sync + 'static>(
+    retry_strategy: RetryStrategy,
+    auth: GcpAuthenticator,
+) -> GcpAuthRetryLogic<
+    impl Fn(&http::Response<bytes::Bytes>) -> StatusCode + Clone + Send + Sync + 'static,
+    Req,
+    http::Response<bytes::Bytes>,
+> {
+    GcpAuthRetryLogic::new(
+        |r: &http::Response<bytes::Bytes>| r.status(),
+        retry_strategy,
+        auth,
+    )
+}
+
+/// Convenience constructor for sinks whose tower service returns
+/// `HttpResponse` (i.e. the modern `HttpService`-based stream sinks).
+pub fn gcp_http_response_retry_logic<Req: Clone + Send + Sync + 'static>(
+    retry_strategy: RetryStrategy,
+    auth: GcpAuthenticator,
+) -> GcpAuthRetryLogic<
+    impl Fn(&HttpResponse) -> StatusCode + Clone + Send + Sync + 'static,
+    Req,
+    HttpResponse,
+> {
+    GcpAuthRetryLogic::new(
+        |r: &HttpResponse| r.http_response.status(),
+        retry_strategy,
+        auth,
+    )
+}
+
+impl<F: Clone, Req, Res> Clone for GcpAuthRetryLogic<F, Req, Res> {
+    fn clone(&self) -> Self {
+        Self {
+            get_status: self.get_status.clone(),
+            retry_strategy: self.retry_strategy.clone(),
+            auth: self.auth.clone(),
+            _markers: PhantomData,
+        }
+    }
+}
+
+impl<F, Req, Res> RetryLogic for GcpAuthRetryLogic<F, Req, Res>
+where
+    F: Fn(&Res) -> StatusCode + Clone + Send + Sync + 'static,
+    Req: Clone + Send + Sync + 'static,
+    Res: Send + Sync + 'static,
+{
+    type Error = HttpError;
+    type Request = Req;
+    type Response = Res;
+
+    fn is_retriable_error(&self, error: &Self::Error) -> bool {
+        if self.retry_strategy == RetryStrategy::None {
+            false
+        } else {
+            error.is_retriable()
+        }
+    }
+
+    fn is_retriable_timeout(&self) -> bool {
+        self.retry_strategy != RetryStrategy::None
+    }
+
+    fn should_retry_response(&self, response: &Self::Response) -> RetryAction<Self::Request> {
+        let status = (self.get_status)(response);
+        if status == StatusCode::UNAUTHORIZED {
+            let auth = self.auth.clone();
+            tokio::spawn(async move {
+                auth.force_refresh().await;
+            });
+            return RetryAction::Retry("unauthorized".into());
+        }
+        self.retry_strategy.retry_action(status)
     }
 }

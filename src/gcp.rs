@@ -33,10 +33,14 @@ pub const SCOPE_MALACHITE_INGESTION: &str = "https://www.googleapis.com/auth/mal
 #[cfg(test)]
 pub const SCOPE_COMPUTE: &str = "https://www.googleapis.com/auth/compute";
 
-// Fixed refresh interval. GCP access tokens are typically ~1h; refreshing
-// every 30 min keeps a fresh token available without driving the loop from
-// per-token expiry metadata (the new SDK does not expose it).
-const TOKEN_REFRESH_INTERVAL: Duration = Duration::from_secs(30 * 60);
+// Fixed refresh interval. GCP access tokens are typically ~1h, but
+// Workload-Identity-Federation / impersonated-service-account flows can
+// issue tokens with sub-1800s lifetimes. The SDK's public `AccessToken`
+// discards the inner `expires_at`, so the loop can't be driven from
+// per-token expiry; pick a fallback interval short enough to bound the
+// damage for those flows. The 401 self-heal path on each request handles
+// the common-case stale-token case ahead of this tick.
+const TOKEN_REFRESH_INTERVAL: Duration = Duration::from_secs(5 * 60);
 const TOKEN_ERROR_RETRY: Duration = Duration::from_secs(2);
 
 // Bound on each token-fetch network call. The SDK's `access_token()` has no

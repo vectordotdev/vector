@@ -17,11 +17,11 @@ use crate::{
     http::HttpClient,
     schema,
     sinks::{
-        gcs_common::config::healthcheck_response,
+        gcs_common::config::{gcp_http_response_retry_logic, healthcheck_response},
         prelude::*,
         util::{
             BoxedRawValue, RealtimeSizeBasedDefaultBatchSettings,
-            http::{HttpService, RetryStrategy, http_response_retry_logic},
+            http::{HttpService, RetryStrategy},
             service::TowerRequestConfigDefaults,
         },
     },
@@ -275,7 +275,7 @@ impl SinkConfig for StackdriverConfig {
         let service = ServiceBuilder::new()
             .settings(
                 request_limits,
-                http_response_retry_logic(self.retry_strategy.clone()),
+                gcp_http_response_retry_logic(self.retry_strategy.clone(), auth.clone()),
             )
             .service(service);
 

@@ -544,7 +544,7 @@ impl PubsubSource {
                             busy_flag,
                         ).await;
                     }
-                    Some(Err(error)) => break translate_error(error),
+                    Some(Err(error)) => break translate_error(error, &self.auth),
                     None => break State::RetryNow,
                 },
                 _ = &mut self.shutdown, if pending_acks == 0 => return State::Shutdown,
@@ -712,7 +712,7 @@ impl PubsubSource {
     }
 }
 
-fn translate_error(error: tonic::Status) -> State {
+fn translate_error(error: tonic::Status, auth: &GcpAuthenticator) -> State {
     // GCP occasionally issues a connection reset
     // in the middle of the streaming pull. This
     // reset is not technically an error, so we
@@ -721,11 +721,19 @@ fn translate_error(error: tonic::Status) -> State {
     // underlying library (`tonic`).
     if is_reset(&error) {
         debug!("Stream reset by server.");
-        State::RetryNow
-    } else {
-        emit!(GcpPubsubReceiveError { error });
-        State::RetryDelay
+        return State::RetryNow;
     }
+    if error.code() == Code::Unauthenticated {
+        // Fire-and-forget a credentials rebuild so the next reconnect uses
+        // a fresh token. force_refresh internally throttles, so a 401 burst
+        // across concurrent streams is safe to spam.
+        let auth = auth.clone();
+        tokio::spawn(async move {
+            auth.force_refresh().await;
+        });
+    }
+    emit!(GcpPubsubReceiveError { error });
+    State::RetryDelay
 }
 
 fn is_reset(error: &Status) -> bool {

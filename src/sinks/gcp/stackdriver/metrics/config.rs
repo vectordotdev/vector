@@ -11,12 +11,10 @@ use crate::{
     http::HttpClient,
     sinks::{
         HTTPRequestBuilderSnafu, gcp,
+        gcs_common::config::gcp_http_response_retry_logic,
         prelude::*,
         util::{
-            http::{
-                HttpRequest, HttpService, HttpServiceRequestBuilder, RetryStrategy,
-                http_response_retry_logic,
-            },
+            http::{HttpRequest, HttpService, HttpServiceRequestBuilder, RetryStrategy},
             service::TowerRequestConfigDefaults,
         },
     },
@@ -124,15 +122,17 @@ impl SinkConfig for StackdriverConfig {
 
         auth.spawn_regenerate_token();
 
-        let stackdriver_metrics_service_request_builder =
-            StackdriverMetricsServiceRequestBuilder { uri, auth };
+        let stackdriver_metrics_service_request_builder = StackdriverMetricsServiceRequestBuilder {
+            uri,
+            auth: auth.clone(),
+        };
 
         let service = HttpService::new(client, stackdriver_metrics_service_request_builder);
 
         let service = ServiceBuilder::new()
             .settings(
                 request_limits,
-                http_response_retry_logic(self.retry_strategy.clone()),
+                gcp_http_response_retry_logic(self.retry_strategy.clone(), auth),
             )
             .service(service);
 
