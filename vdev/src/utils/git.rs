@@ -123,6 +123,29 @@ pub fn commit(commit_message: &str) -> Result<String> {
         .check_output()
 }
 
+/// Returns the latest semver release tag (e.g. `0.55.0`), ignoring `vdev-v…` tags.
+pub fn latest_release_version() -> Result<semver::Version> {
+    let output = Command::new("git")
+        .args(["tag", "--list", "--sort=-v:refname"])
+        .check_output()?;
+    let re = regex::Regex::new(r"^v[0-9]+\.[0-9]+\.[0-9]+$").unwrap();
+    for tag in output.lines() {
+        if tag.starts_with("vdev-v") {
+            continue;
+        }
+        if re.is_match(tag) {
+            return semver::Version::parse(tag.trim_start_matches('v'))
+                .context("Failed to parse version from tag");
+        }
+    }
+    anyhow::bail!("No valid semantic version tag found")
+}
+
+/// Stages a specific file using `git add`.
+pub fn add(path: &str) -> Result<String> {
+    Command::new("git").args(["add", path]).check_output()
+}
+
 /// Removes a file from the index (and working tree) using `git rm`.
 pub fn rm(path: &str) -> Result<String> {
     Command::new("git").args(["rm", path]).check_output()

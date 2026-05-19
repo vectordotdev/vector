@@ -28,6 +28,13 @@ releases: {
 		contributors: [string, ...string] | *[]
 	}
 
+	#DeprecationEntry: {
+		what:                 string
+		deprecation_version:  string
+		announcement_version: string
+		description?:         string
+	}
+
 	#Release: {
 		version:      string
 		codename?:    string
@@ -39,6 +46,9 @@ releases: {
 		changelog: [#ChangeLogEntry, ...#ChangeLogEntry] | *[]
 		vrl_changelog?: string
 		whats_next: #Any | *[]
+		deprecations: [#DeprecationEntry, ...#DeprecationEntry] | *[]
+		deprecation_announcements: [#DeprecationEntry, ...#DeprecationEntry] | *[]
+		planned_deprecations: [#DeprecationEntry, ...#DeprecationEntry] | *[]
 	}
 
 	{[Version=string]: #Release & {version: Version}}
