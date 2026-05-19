@@ -1,5 +1,4 @@
 use bytes::Bytes;
-use goauth::scopes::Scope;
 use http::{Request, Uri, header::CONTENT_TYPE};
 use snafu::ResultExt;
 
@@ -8,16 +7,14 @@ use super::{
     sink::StackdriverMetricsSink,
 };
 use crate::{
-    gcp::{GcpAuthConfig, GcpAuthenticator},
+    gcp::{GcpAuthConfig, GcpAuthenticator, SCOPE_MONITORING_WRITE},
     http::HttpClient,
     sinks::{
         HTTPRequestBuilderSnafu, gcp,
+        gcs_common::config::gcp_http_response_retry_logic,
         prelude::*,
         util::{
-            http::{
-                HttpRequest, HttpService, HttpServiceRequestBuilder, RetryStrategy,
-                http_response_retry_logic,
-            },
+            http::{HttpRequest, HttpService, HttpServiceRequestBuilder, RetryStrategy},
             service::TowerRequestConfigDefaults,
         },
     },
@@ -98,7 +95,7 @@ impl_generate_config_from_default!(StackdriverConfig);
 #[typetag::serde(name = "gcp_stackdriver_metrics")]
 impl SinkConfig for StackdriverConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let auth = self.auth.build(Scope::MonitoringWrite).await?;
+        let auth = self.auth.build(SCOPE_MONITORING_WRITE).await?;
 
         let healthcheck = healthcheck().boxed();
         let started = chrono::Utc::now();
@@ -125,15 +122,17 @@ impl SinkConfig for StackdriverConfig {
 
         auth.spawn_regenerate_token();
 
-        let stackdriver_metrics_service_request_builder =
-            StackdriverMetricsServiceRequestBuilder { uri, auth };
+        let stackdriver_metrics_service_request_builder = StackdriverMetricsServiceRequestBuilder {
+            uri,
+            auth: auth.clone(),
+        };
 
         let service = HttpService::new(client, stackdriver_metrics_service_request_builder);
 
         let service = ServiceBuilder::new()
             .settings(
                 request_limits,
-                http_response_retry_logic(self.retry_strategy.clone()),
+                gcp_http_response_retry_logic(self.retry_strategy.clone(), auth),
             )
             .service(service);
 

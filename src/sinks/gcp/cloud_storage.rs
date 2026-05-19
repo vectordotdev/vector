@@ -22,7 +22,7 @@ use crate::{
     codecs::{Encoder, EncodingConfigWithFraming, SinkType, Transformer},
     config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     event::Event,
-    gcp::{GcpAuthConfig, GcpAuthenticator, Scope},
+    gcp::{GcpAuthConfig, GcpAuthenticator, SCOPE_DEVSTORAGE_READ_WRITE},
     http::{HttpClient, get_http_scheme_from_uri},
     serde::json::to_string,
     sinks::{
@@ -265,7 +265,7 @@ impl GenerateConfig for GcsSinkConfig {
 #[typetag::serde(name = "gcp_cloud_storage")]
 impl SinkConfig for GcsSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let auth = self.auth.build(Scope::DevStorageReadWrite).await?;
+        let auth = self.auth.build(SCOPE_DEVSTORAGE_READ_WRITE).await?;
         let base_url = format!("{}/{}/", self.endpoint, self.bucket);
         let tls = TlsSettings::from_options(self.tls.as_ref())?;
         let client = HttpClient::new(tls, cx.proxy())?;
@@ -307,7 +307,7 @@ impl GcsSinkConfig {
         let protocol = get_http_scheme_from_uri(&base_url.parse::<Uri>().unwrap());
 
         let svc = ServiceBuilder::new()
-            .settings(request, GcsRetryLogic::default())
+            .settings(request, GcsRetryLogic::with_auth(auth.clone()))
             .service(GcsService::new(client, base_url, auth));
 
         let request_settings = RequestSettings::new(self, cx)?;
