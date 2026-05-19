@@ -154,6 +154,32 @@ components: sources: opentelemetry: {
 						unit: null
 					}
 				}
+				"scope.schema_url": {
+					description: "The schema URL for the instrumentation scope. Applies to all log records within this scope."
+					required:    false
+					common:      false
+					type: string: {
+						default: null
+						examples: ["https://opentelemetry.io/schemas/1.21.0"]
+					}
+				}
+				schema_url: {
+					description: "The schema URL for the resource. Applies to the data in the `resources` field."
+					required:    false
+					common:      false
+					type: string: {
+						default: null
+						examples: ["https://opentelemetry.io/schemas/1.21.0"]
+					}
+				}
+				resource_dropped_attributes_count: {
+					description: "Number of attributes dropped from the resource due to collection limits (if not zero)."
+					required:    false
+					common:      false
+					type: uint: {
+						unit: null
+					}
+				}
 				message: {
 					description: "Contains the body of the log record."
 					required:    false
@@ -243,8 +269,211 @@ components: sources: opentelemetry: {
 		metrics: "": {
 			description: "Metric events that may be emitted by this source."
 		}
-		traces: "": {
-			description: "Trace events that may be emitted by this source."
+		traces: event: {
+			description: "An individual trace span event from a batch of events received through an OTLP request. The following applies only when the `use_otlp_decoding` option is `false`. Trace spans are stored as key/value maps at the event root."
+			fields: {
+				trace_id: {
+					description: "A unique identifier for the trace (hex-encoded 16 bytes)."
+					required:    true
+					type: string: {
+						default: null
+						examples: ["0123456789abcdef0123456789abcdef"]
+					}
+				}
+				span_id: {
+					description: "A unique identifier for the span within the trace (hex-encoded 8 bytes)."
+					required:    true
+					type: string: {
+						default: null
+						examples: ["0123456789abcdef"]
+					}
+				}
+				parent_span_id: {
+					description: "The span_id of this span's parent span (hex-encoded 8 bytes). Empty for root spans."
+					required:    false
+					common:      true
+					type: string: {
+						default: null
+						examples: ["fedcba9876543210"]
+					}
+				}
+				trace_state: {
+					description: "W3C trace-state header value conveying vendor-specific trace information."
+					required:    false
+					common:      false
+					type: string: {
+						default: null
+						examples: ["rojo=00f067aa0ba902b7"]
+					}
+				}
+				name: {
+					description: "A description of the span's operation (e.g. a qualified method name)."
+					required:    true
+					type: string: {
+						default: null
+						examples: ["GET /api/users", "mysql.query"]
+					}
+				}
+				kind: {
+					description: "The span kind. 0=Unspecified, 1=Internal, 2=Server, 3=Client, 4=Producer, 5=Consumer."
+					required:    true
+					type: uint: {
+						unit: null
+						examples: [1, 2, 3]
+					}
+				}
+				start_time_unix_nano: {
+					description: "Start time of the span."
+					required:    true
+					type: timestamp: {}
+				}
+				end_time_unix_nano: {
+					description: "End time of the span."
+					required:    true
+					type: timestamp: {}
+				}
+				attributes: {
+					description: "Span-level attributes as key/value pairs."
+					required:    false
+					common:      true
+					type: object: {
+						examples: [
+							{
+								"http.method":      "GET"
+								"http.status_code": 200
+							},
+						]
+					}
+				}
+				dropped_attributes_count: {
+					description: "Number of span attributes dropped due to collection limits."
+					required:    true
+					type: uint: {
+						unit: null
+					}
+				}
+				events: {
+					description: "Time-stamped annotations on the span."
+					required:    false
+					common:      true
+					type: array: items: type: object: options: {}
+				}
+				dropped_events_count: {
+					description: "Number of span events dropped."
+					required:    true
+					type: uint: {
+						unit: null
+					}
+				}
+				links: {
+					description: "References from this span to spans in the same or different traces."
+					required:    false
+					common:      false
+					type: array: items: type: object: options: {}
+				}
+				dropped_links_count: {
+					description: "Number of span links dropped."
+					required:    true
+					type: uint: {
+						unit: null
+					}
+				}
+				status: {
+					description: "Status of the span with `message` and `code` fields."
+					required:    false
+					common:      true
+					type: object: {
+						examples: [
+							{
+								message: ""
+								code:    0
+							},
+						]
+					}
+				}
+				resources: {
+					description: "Set of attributes that describe the resource."
+					required:    false
+					common:      true
+					type: object: {
+						examples: [
+							{
+								"service.name":    "my-service"
+								"service.version": "1.0.0"
+							},
+						]
+					}
+				}
+				"scope.name": {
+					description: "Instrumentation scope name (e.g. tracer library name)."
+					required:    false
+					common:      true
+					type: string: {
+						default: null
+						examples: ["io.opentelemetry.contrib.mongodb"]
+					}
+				}
+				"scope.version": {
+					description: "Instrumentation scope version."
+					required:    false
+					common:      false
+					type: string: {
+						default: null
+						examples: ["1.2.3"]
+					}
+				}
+				"scope.attributes": {
+					description: "Set of attributes that belong to the instrumentation scope."
+					required:    false
+					common:      false
+					type: object: {
+						examples: [
+							{
+								"attr1": "value1"
+							},
+						]
+					}
+				}
+				"scope.dropped_attributes_count": {
+					description: "Number of attributes dropped from the instrumentation scope (if not zero)."
+					required:    false
+					common:      false
+					type: uint: {
+						unit: null
+					}
+				}
+				"scope.schema_url": {
+					description: "The schema URL for the instrumentation scope."
+					required:    false
+					common:      false
+					type: string: {
+						default: null
+						examples: ["https://opentelemetry.io/schemas/1.21.0"]
+					}
+				}
+				schema_url: {
+					description: "The schema URL for the resource."
+					required:    false
+					common:      false
+					type: string: {
+						default: null
+						examples: ["https://opentelemetry.io/schemas/1.21.0"]
+					}
+				}
+				resource_dropped_attributes_count: {
+					description: "Number of attributes dropped from the resource due to collection limits (if not zero)."
+					required:    false
+					common:      false
+					type: uint: {
+						unit: null
+					}
+				}
+				ingest_timestamp: {
+					description: "The UTC time when Vector received the trace event."
+					required:    true
+					type: timestamp: {}
+				}
+			}
 		}
 	}
 

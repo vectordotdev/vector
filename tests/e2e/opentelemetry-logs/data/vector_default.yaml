@@ -72,6 +72,15 @@ sinks:
     encoding:
       codec: json
 
+  # Raw decoded events (before remap) for field-level assertions
+  decoded_file_sink:
+    type: file
+    path: "/output/opentelemetry-logs/vector-decoded-events.log"
+    inputs:
+      - source0.logs
+    encoding:
+      codec: json
+
   metrics_file_sink:
     type: file
     path: "/output/opentelemetry-logs/vector-internal-metrics-sink.log"
