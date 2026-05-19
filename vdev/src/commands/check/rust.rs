@@ -36,12 +36,6 @@ impl Cli {
             Vec::default()
         };
 
-        let clippy_args = if self.clippy {
-            vec!["--", "-D", "warnings"]
-        } else {
-            Vec::default()
-        };
-
         let feature_args = if self.features.is_empty() {
             vec!["--all-features".to_string()]
         } else {
@@ -55,7 +49,6 @@ impl Cli {
         [tool.as_ref(), "--workspace", "--all-targets"]
             .chain_args(feature_args)
             .chain_args(pre_args)
-            .chain_args(clippy_args)
     }
 
     pub fn exec(self) -> Result<()> {
