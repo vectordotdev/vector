@@ -310,7 +310,11 @@ where
 
     fn should_retry_response(&self, response: &Self::Response) -> RetryAction<Self::Request> {
         let status = (self.get_status)(response);
-        if status == StatusCode::UNAUTHORIZED {
+        // Only override the configured strategy when retries are enabled at
+        // all; `RetryStrategy::None` means "do not retry any errors" and we
+        // respect that, including skipping the credential refresh since the
+        // failed request will not be re-issued.
+        if status == StatusCode::UNAUTHORIZED && self.retry_strategy != RetryStrategy::None {
             let auth = self.auth.clone();
             tokio::spawn(async move {
                 auth.force_refresh().await;
