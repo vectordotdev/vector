@@ -490,6 +490,8 @@ fn generate_variant_metadata(
     let maybe_title = get_metadata_title(meta_ident, variant.title());
     let maybe_description = get_metadata_description(meta_ident, variant.description());
     let maybe_deprecated = get_metadata_deprecated(meta_ident, variant.deprecated());
+    let maybe_deprecated_message =
+        get_metadata_deprecated_message(meta_ident, variant.deprecated_message());
 
     // We have to mark variants as transparent, so that if we're dealing with an untagged enum, we
     // don't panic if their description is intentionally left out.
@@ -520,6 +522,7 @@ fn generate_variant_metadata(
         #maybe_title
         #maybe_description
         #maybe_deprecated
+        #maybe_deprecated_message
         #maybe_transparent
         #maybe_custom_attributes
         #variant_logical_name

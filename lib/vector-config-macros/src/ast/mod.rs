@@ -231,6 +231,32 @@ impl FromMeta for Metadata {
                                 }),
                             }
                         }
+                        // Accept path expressions so callers can reference constants:
+                        // `#[configurable(metadata(docs::tags = INTERNAL_METRICS_TAGS))]`
+                        Expr::Path(path) => Some(LazyCustomAttribute::KeyValue {
+                            key: path_to_string(&nv.path),
+                            value: path.to_token_stream(),
+                        }),
+                        // Accept macro invocations such as `serde_json::json!({...})`.
+                        Expr::Macro(mac) => Some(LazyCustomAttribute::KeyValue {
+                            key: path_to_string(&nv.path),
+                            value: mac.to_token_stream(),
+                        }),
+                        // Accept reference/deref expressions such as `&*SOME_LAZY_LOCK`
+                        // so callers can coerce `LazyLock<T>` to `&T: Serialize`.
+                        Expr::Reference(r) => Some(LazyCustomAttribute::KeyValue {
+                            key: path_to_string(&nv.path),
+                            value: r.to_token_stream(),
+                        }),
+                        Expr::Unary(u) => Some(LazyCustomAttribute::KeyValue {
+                            key: path_to_string(&nv.path),
+                            value: u.to_token_stream(),
+                        }),
+                        // Accept function calls such as `merge(&*BASE, json!({...}))`.
+                        Expr::Call(c) => Some(LazyCustomAttribute::KeyValue {
+                            key: path_to_string(&nv.path),
+                            value: c.to_token_stream(),
+                        }),
                         expr => {
                             errors
                                 .push(darling::Error::unexpected_expr_type(expr).with_span(nmeta));
