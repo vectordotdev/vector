@@ -1227,6 +1227,11 @@ fn create_consumer(
         }
     }
 
+    let oauthbearer = config
+        .librdkafka_options
+        .as_ref()
+        .and_then(kafka::extract_oauthbearer_config);
+
     let (callbacks, callback_rx) = mpsc::unbounded_channel();
     let consumer = client_config
         .create_with_context::<_, StreamConsumer<_>>(KafkaSourceContext::new(
@@ -1234,6 +1239,7 @@ fn create_consumer(
             acknowledgements,
             callbacks,
             Span::current(),
+            oauthbearer,
         ))
         .context(CreateSnafu)?;
 
@@ -1274,11 +1280,13 @@ impl KafkaSourceContext {
         acknowledgements: bool,
         callbacks: UnboundedSender<KafkaCallback>,
         span: Span,
+        oauthbearer: Option<kafka::KafkaOAuthBearerConfig>,
     ) -> Self {
         Self {
             stats: kafka::KafkaStatisticsContext {
                 expose_lag_metrics,
                 span,
+                oauthbearer,
             },
             acknowledgements,
             consumer: OnceLock::default(),
@@ -1360,8 +1368,17 @@ impl KafkaSourceContext {
 }
 
 impl ClientContext for KafkaSourceContext {
+    const ENABLE_REFRESH_OAUTH_TOKEN: bool = true;
+
     fn stats(&self, statistics: Statistics) {
         self.stats.stats(statistics)
+    }
+
+    fn generate_oauth_token(
+        &self,
+        oauthbearer_config: Option<&str>,
+    ) -> Result<rdkafka::client::OAuthToken, Box<dyn std::error::Error>> {
+        self.stats.generate_oauth_token(oauthbearer_config)
     }
 }
 
