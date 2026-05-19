@@ -105,6 +105,26 @@ where
         .unwrap_or_else(|e| panic!("Invalid config generated from string:\n\n{e}\n'{cfg}'"));
 }
 
+pub fn test_generate_config_yaml<T>()
+where
+    for<'de> T: GenerateConfig + serde::Deserialize<'de>,
+{
+    let cfg = serde_yaml::to_string(&T::generate_config()).unwrap();
+
+    serde_yaml::from_str::<T>(&cfg)
+        .unwrap_or_else(|e| panic!("Invalid config generated from YAML string:\n\n{e}\n'{cfg}'"));
+}
+
+pub fn test_generate_config_json<T>()
+where
+    for<'de> T: GenerateConfig + serde::Deserialize<'de>,
+{
+    let cfg = serde_json::to_string_pretty(&T::generate_config()).unwrap();
+
+    serde_json::from_str::<T>(&cfg)
+        .unwrap_or_else(|e| panic!("Invalid config generated from JSON string:\n\n{e}\n'{cfg}'"));
+}
+
 pub fn open_fixture(path: impl AsRef<Path>) -> crate::Result<serde_json::Value> {
     let test_file = File::open(path)?;
     let value: serde_json::Value = serde_json::from_reader(test_file)?;
