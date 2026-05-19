@@ -1,0 +1,3 @@
+TCP-based sources that emit acknowledgements (`fluent`, `logstash`) no longer log a spurious `Error writing acknowledgement, dropping connection.` at ERROR level when the ack write fails because the peer cleanly closed its TLS session (for example, during a rolling pod restart). These graceful shutdowns now log at WARN and increment `connection_shutdown_total{mode="tcp"}` instead of `component_errors_total{error_code="ack_failed", ...}`, matching the treatment already used for `TcpSocketConnectionShutdown` and preventing operator dashboards/alerts from firing on routine peer disconnects. Genuine ack write failures are still logged at ERROR and continue to increment `component_errors_total`.
+
+authors: taylorchandleryoung
