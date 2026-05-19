@@ -260,6 +260,22 @@ generated: components: sources: prometheus_scrape: configuration: {
 			}
 		}
 	}
+	redirects: {
+		description: "HTTP redirect configuration."
+		required:    false
+		type: object: options: {
+			follow: {
+				description: "Whether to follow HTTP redirects."
+				required:    false
+				type: bool: default: true
+			}
+			max: {
+				description: "Maximum number of redirects to follow when enabled."
+				required:    false
+				type: uint: default: 5
+			}
+		}
+	}
 	scrape_interval_secs: {
 		description: """
 			The interval between scrapes. Requests are run concurrently so if a scrape takes longer

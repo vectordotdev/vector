@@ -3,7 +3,7 @@ use vector_lib::configurable::configurable_component;
 
 /// HTTP method.
 #[configurable_component]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum HttpMethod {
     /// HTTP HEAD method.
