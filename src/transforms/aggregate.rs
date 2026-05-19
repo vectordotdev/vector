@@ -351,13 +351,16 @@ impl Aggregate {
             // Check for future timestamps
             if self.config.max_future_ms > 0 {
                 let now = Utc::now();
-                // Range-validated in `Aggregate::new` to fit in i64; `as`
-                // would silently wrap for misconfigured `u64` values above
-                // `i64::MAX` and make `max_future` land in the past.
+                // Range-validated in `Aggregate::new` to fit in i64.
                 let max_future_ms = i64::try_from(self.config.max_future_ms)
                     .expect("max_future_ms validated to fit in i64 in Aggregate::new");
-                let max_future = now + chrono::Duration::milliseconds(max_future_ms);
-                if ts > max_future {
+                // Compare drift in millis: `now + Duration::milliseconds(max_future_ms)`
+                // panics when the sum exceeds `NaiveDateTime`'s representable range,
+                // which a `max_future_ms` close to `i64::MAX` reliably triggers.
+                let drift_ms = ts
+                    .timestamp_millis()
+                    .saturating_sub(now.timestamp_millis());
+                if drift_ms > max_future_ms {
                     emit!(AggregateEventDropped {
                         reason: "Event timestamp too far in the future."
                     });
@@ -2694,6 +2697,42 @@ time_source = "event_time"
         let mut out = vec![];
         agg.flush_into(&mut out);
         assert_eq!(0, out.len(), "Far-future event must be dropped");
+    }
+
+    /// `Aggregate::new` accepts `max_future_ms: i64::MAX as u64` -- the
+    /// largest non-wrapping i64 cast -- but a naive future-skew check that
+    /// computes `Utc::now() + Duration::milliseconds(i64::MAX)` overflows
+    /// `NaiveDateTime`'s representable range and panics in `<DateTime as
+    /// Add<Duration>>::add` as soon as the first event is recorded. The
+    /// check must instead compare drift in millis with saturating math so
+    /// the boundary value is safe at record time.
+    #[test]
+    fn event_time_record_with_max_future_ms_at_i64_max_does_not_panic() {
+        let mut agg = Aggregate::new(&AggregateConfig {
+            interval_ms: 1000,
+            mode: AggregationMode::Auto,
+            time_source: TimeSource::EventTime,
+            allowed_lateness_ms: 0,
+            use_system_time_for_missing_timestamps: false,
+            max_future_ms: i64::MAX as u64,
+        })
+        .unwrap();
+
+        let event = make_metric_with_timestamp(
+            "counter_now",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 1.0 },
+            Utc::now(),
+        );
+        agg.record(event);
+
+        let mut out = vec![];
+        agg.flush_event_time_buckets(&mut out, true);
+        assert_eq!(
+            out.len(),
+            1,
+            "realistic timestamp must record under boundary max_future_ms",
+        );
     }
 
     /// With `max_future_ms = 0` arbitrary future timestamps are accepted, so a
