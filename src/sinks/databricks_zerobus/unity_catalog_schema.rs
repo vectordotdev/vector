@@ -6,7 +6,7 @@
 
 use bytes::Buf;
 use databricks_zerobus_ingest_sdk::schema::descriptor_from_uc_schema;
-use http::{Request, Uri};
+use http::{Request, StatusCode, Uri};
 use http_body::Body as HttpBody;
 use hyper::Body;
 use percent_encoding::{NON_ALPHANUMERIC, percent_encode};
@@ -14,9 +14,20 @@ use prost_reflect::prost_types;
 use serde::Deserialize;
 
 use super::error::ZerobusSinkError;
-use crate::config::ProxyConfig;
 use crate::http::HttpClient;
-use crate::tls::TlsSettings;
+
+/// Whether a Unity Catalog HTTP response status should be retried.
+///
+/// 5xx, 408 (Request Timeout), and 429 (Too Many Requests) are transient;
+/// other 4xx statuses (404, 401, 403, ...) indicate permanent configuration
+/// problems that won't fix themselves on retry. The canonical list of
+/// retryable statuses for HTTP-based sinks lives at
+/// [`crate::sinks::util::http::RetryStrategy::Default`].
+fn status_is_retryable(status: StatusCode) -> bool {
+    status.is_server_error()
+        || status == StatusCode::REQUEST_TIMEOUT
+        || status == StatusCode::TOO_MANY_REQUESTS
+}
 
 // Alias the SDK types under the names the rest of the sink already uses.
 #[cfg(test)]
@@ -35,17 +46,10 @@ pub async fn fetch_table_schema(
     table_name: &str,
     client_id: &str,
     client_secret: &str,
-    proxy: &ProxyConfig,
+    http_client: &HttpClient,
 ) -> Result<UnityCatalogTableSchema, ZerobusSinkError> {
-    let http_client = HttpClient::new(TlsSettings::default(), proxy).map_err(|e| {
-        ZerobusSinkError::ConfigError {
-            message: format!("Failed to create HTTP client: {}", e),
-        }
-    })?;
-
-    // First, get OAuth token
     let token = get_oauth_token(
-        &http_client,
+        http_client,
         unity_catalog_endpoint,
         client_id,
         client_secret,
@@ -82,8 +86,9 @@ pub async fn fetch_table_schema(
     let response = http_client
         .send(request)
         .await
-        .map_err(|e| ZerobusSinkError::ConfigError {
+        .map_err(|e| ZerobusSinkError::SchemaError {
             message: format!("Failed to fetch table schema: {}", e),
+            retryable: true,
         })?;
 
     let status = response.status();
@@ -95,11 +100,12 @@ pub async fn fetch_table_schema(
             .map(|c| c.to_bytes())
             .unwrap_or_default();
         let error_text = String::from_utf8_lossy(&body_bytes);
-        return Err(ZerobusSinkError::ConfigError {
+        return Err(ZerobusSinkError::SchemaError {
             message: format!(
                 "Unity Catalog API returned error {}: {}",
                 status, error_text
             ),
+            retryable: status_is_retryable(status),
         });
     }
 
@@ -108,8 +114,9 @@ pub async fn fetch_table_schema(
         .collect()
         .await
         .map(|c| c.to_bytes())
-        .map_err(|e| ZerobusSinkError::ConfigError {
+        .map_err(|e| ZerobusSinkError::SchemaError {
             message: format!("Failed to read response body: {}", e),
+            retryable: true,
         })?;
 
     let schema: UnityCatalogTableSchema =
@@ -157,8 +164,9 @@ async fn get_oauth_token(
     let response = http_client
         .send(request)
         .await
-        .map_err(|e| ZerobusSinkError::ConfigError {
+        .map_err(|e| ZerobusSinkError::SchemaError {
             message: format!("Failed to get OAuth token: {}", e),
+            retryable: true,
         })?;
 
     let status = response.status();
@@ -170,8 +178,9 @@ async fn get_oauth_token(
             .map(|c| c.to_bytes())
             .unwrap_or_default();
         let error_text = String::from_utf8_lossy(&body_bytes);
-        return Err(ZerobusSinkError::ConfigError {
+        return Err(ZerobusSinkError::SchemaError {
             message: format!("OAuth token request failed {}: {}", status, error_text),
+            retryable: status_is_retryable(status),
         });
     }
 
@@ -180,8 +189,9 @@ async fn get_oauth_token(
         .collect()
         .await
         .map(|c| c.to_bytes())
-        .map_err(|e| ZerobusSinkError::ConfigError {
+        .map_err(|e| ZerobusSinkError::SchemaError {
             message: format!("Failed to read OAuth response body: {}", e),
+            retryable: true,
         })?;
 
     let token_response: OAuthTokenResponse =
