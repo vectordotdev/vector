@@ -138,13 +138,7 @@ fn format_version(v: &DeprecationVersion, next_minor: Option<&Version>) -> Strin
             .to_string();
     }
 
-    match v {
-        DeprecationVersion::Tbd => "TBD"
-            .if_supports_color(Stdout, |t| t.bright_yellow())
-            .to_string(),
-        _ => v
-            .to_string()
-            .if_supports_color(Stdout, |t| t.bright_cyan())
-            .to_string(),
-    }
+    v.to_string()
+        .if_supports_color(Stdout, |t| t.bright_cyan())
+        .to_string()
 }

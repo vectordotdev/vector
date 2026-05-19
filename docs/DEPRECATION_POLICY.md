@@ -83,7 +83,7 @@ When introducing a deprecation into Vector, the pull request introducing the dep
 - Add a deprecation notice file to [`deprecation.d/`](../deprecation.d/) following the format described in
   [`deprecation.d/README.md`](../deprecation.d/README.md). Both `announcement_version` and `deprecation_version`
   are required. Set `announcement_version` to `next` (recommended) or the current release version if known. Set
-  `deprecation_version` to the planned removal version, `TBD` if not yet decided, or `next` if removal is intended
+  `deprecation_version` to the planned removal version or `next` if removal is intended
   for the very next release. The release tooling will replace any `next` values with the concrete version when the
   release is cut. Run `cargo vdev deprecation show` to view all current notices and `cargo vdev check deprecations`
   to validate the file.

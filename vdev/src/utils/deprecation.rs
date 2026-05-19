@@ -8,12 +8,11 @@ use semver::Version;
 
 pub const DEPRECATION_DIR: &str = "deprecation.d";
 
-/// A version field value: a concrete semver version, `TBD` (unknown), or `next`
+/// A version field value: a concrete semver version or `next`
 /// (the very next release, whatever its number turns out to be).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DeprecationVersion {
     Version(Version),
-    Tbd,
     Next,
 }
 
@@ -28,8 +27,8 @@ impl Ord for DeprecationVersion {
         use std::cmp::Ordering::{Equal, Greater, Less};
         match (self, other) {
             (Self::Version(a), Self::Version(b)) => a.cmp(b),
-            (Self::Version(_), _) | (Self::Next, Self::Tbd) => Less,
-            (Self::Next, Self::Version(_)) | (Self::Tbd, Self::Version(_) | Self::Next) => Greater,
+            (Self::Version(_), Self::Next) => Less,
+            (Self::Next, Self::Version(_)) => Greater,
             _ => Equal,
         }
     }
@@ -39,7 +38,6 @@ impl fmt::Display for DeprecationVersion {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             DeprecationVersion::Version(v) => write!(f, "{v}"),
-            DeprecationVersion::Tbd => write!(f, "TBD"),
             DeprecationVersion::Next => write!(f, "next"),
         }
     }
@@ -51,12 +49,10 @@ impl DeprecationVersion {
     /// `next` always matches — it means "the very next release cut".
     /// Concrete versions match when major.minor equals the release's major.minor;
     /// patch is ignored so that `0.56` is enacted on any `0.56.x` release.
-    /// `TBD` never matches.
     pub fn matches_release(&self, release: &Version) -> bool {
         match self {
             DeprecationVersion::Version(v) => v.major == release.major && v.minor == release.minor,
             DeprecationVersion::Next => true,
-            DeprecationVersion::Tbd => false,
         }
     }
 }
@@ -65,10 +61,8 @@ impl<'de> serde::Deserialize<'de> for DeprecationVersion {
     fn deserialize<D: serde::Deserializer<'de>>(d: D) -> std::result::Result<Self, D::Error> {
         let s = String::deserialize(d)?;
         let s = s.trim();
-        match s {
-            "TBD" => return Ok(DeprecationVersion::Tbd),
-            "next" => return Ok(DeprecationVersion::Next),
-            _ => {}
+        if s == "next" {
+            return Ok(DeprecationVersion::Next);
         }
         // Accept both "0.56" (major.minor) and "0.56.0" (major.minor.patch).
         // Normalize the two-part form by appending ".0".
@@ -144,7 +138,7 @@ fn resolve_next(e: DeprecationEntry, release: &Version) -> DeprecationEntry {
         DeprecationVersion::Next => {
             DeprecationVersion::Version(Version::new(release.major, release.minor, 0))
         }
-        other => other,
+        DeprecationVersion::Version(_) => v,
     };
     DeprecationEntry {
         deprecation_version: resolve(e.deprecation_version),
@@ -315,19 +309,6 @@ mod tests {
     }
 
     #[test]
-    fn parse_tbd_versions() {
-        let tmp = tempdir().unwrap();
-        fs::write(
-            tmp.path().join("bar.md"),
-            "---\nwhat: Bar thing\ndeprecation_version: \"TBD\"\nannouncement_version: \"TBD\"\n---\n",
-        )
-        .unwrap();
-        let entries = read_deprecation_fragments(tmp.path()).unwrap();
-        assert_eq!(entries[0].deprecation_version, DeprecationVersion::Tbd);
-        assert_eq!(entries[0].announcement_version, DeprecationVersion::Tbd);
-    }
-
-    #[test]
     fn rejects_missing_announcement_version() {
         let tmp = tempdir().unwrap();
         fs::write(
@@ -390,11 +371,6 @@ mod tests {
         // Different minor/major must not match
         assert!(!v.matches_release(&Version::new(0, 57, 0)));
         assert!(!v.matches_release(&Version::new(1, 56, 0)));
-    }
-
-    #[test]
-    fn tbd_never_matches_release() {
-        assert!(!DeprecationVersion::Tbd.matches_release(&Version::new(0, 56, 0)));
     }
 
     #[test]

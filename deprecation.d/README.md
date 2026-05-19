@@ -41,7 +41,7 @@ auth:
 | Field | Required | Description |
 | ----- | -------- | ----------- |
 | `what` | Yes | Short one-line description of what is deprecated. |
-| `deprecation_version` | Yes | Version when the item will be removed. Accepts a semver string (`0.56`, `0.56.0`), `TBD` (unknown), or `next` (the very next release). |
+| `deprecation_version` | Yes | Version when the item will be removed. Accepts a semver string (`0.56`, `0.56.0`) or `next` (the very next release). |
 | `announcement_version` | Yes | Version when the deprecation was first announced. Accepts the same values as `deprecation_version`. Use `next` (recommended) when opening the PR — the release tooling will replace it with the concrete version automatically. |
 
 ### Body
