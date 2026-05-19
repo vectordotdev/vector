@@ -411,7 +411,7 @@ where
             };
             futures::pin_mut!(sleep);
             match select(shutdown_data, sleep).await {
-                Either::Left((_, _)) => {
+                Either::Left((_shutdown_token, _)) => {
                     chans
                         .close()
                         .await
@@ -423,6 +423,8 @@ where
                         error!(?error, "Error writing checkpoints before shutdown");
                     }
                     return Ok(Shutdown);
+                    // _shutdown_token is dropped here, after checkpoints are written,
+                    // which signals shutdown_done to the caller.
                 }
                 Either::Right((_, future)) => shutdown_data = future,
             }
