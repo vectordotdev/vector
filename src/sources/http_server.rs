@@ -13,10 +13,13 @@ use vector_lib::{
     },
     config::{DataType, LegacyKey, LogNamespace},
     configurable::configurable_component,
-    lookup::{lookup_v2::OptionalValuePath, owned_value_path, path},
+    lookup::{PathPrefix, lookup_v2::OptionalValuePath, owned_value_path, path},
     schema::Definition,
 };
-use vrl::value::{Kind, kind::Collection};
+use vrl::{
+    path::ValuePath as _,
+    value::{Kind, ObjectMap, kind::Collection},
+};
 use warp::http::HeaderMap;
 
 use crate::{
@@ -521,6 +524,35 @@ impl HttpSource for SimpleHttpSource {
     fn enable_source_ip(&self) -> bool {
         self.host_key.path.is_some()
     }
+
+    /// Injects `%field` enrichment from a `custom` auth VRL program into events.
+    /// Both namespaces use insert-if-empty semantics so auth enrichment never
+    /// overwrites built-in source metadata (`path`, `host`, `headers`, …) that
+    /// `enrich_events` already populated.
+    /// Legacy namespace: inserted into the event body.
+    /// Vector namespace: inserted into event metadata under `http_server.<field>`.
+    fn inject_auth_enrichment(&self, events: &mut [Event], enrichment: ObjectMap) {
+        for event in events.iter_mut() {
+            if let Event::Log(log) = event {
+                for (key, value) in &enrichment {
+                    match self.log_namespace {
+                        LogNamespace::Vector => {
+                            log.try_insert(
+                                (
+                                    PathPrefix::Metadata,
+                                    path!(SimpleHttpConfig::NAME).concat(path!(key.as_str())),
+                                ),
+                                value.clone(),
+                            );
+                        }
+                        LogNamespace::Legacy => {
+                            log.try_insert((PathPrefix::Event, path!(key.as_str())), value.clone());
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -543,11 +575,15 @@ mod tests {
         config::LogNamespace,
         event::LogEvent,
         lookup::{
-            OwnedTargetPath, PathPrefix, event_path, lookup_v2::OptionalValuePath, owned_value_path,
+            OwnedTargetPath, PathPrefix, event_path, lookup_v2::OptionalValuePath,
+            owned_value_path, path,
         },
         schema::Definition,
     };
-    use vrl::value::{Kind, ObjectMap, kind::Collection};
+    use vrl::{
+        path::ValuePath as _,
+        value::{Kind, ObjectMap, kind::Collection},
+    };
 
     use super::{SimpleHttpConfig, remove_duplicates};
     use crate::{
@@ -1723,6 +1759,69 @@ mod tests {
                 list_dedup
             );
         }
+    }
+
+    #[test]
+    fn inject_auth_enrichment_does_not_clobber_vector_namespace_builtin_fields() {
+        use crate::{codecs::DecodingConfig, sources::util::HttpSource as _};
+        use vector_lib::codecs::BytesDeserializerConfig;
+        use vrl::value::KeyString;
+
+        let decoder = DecodingConfig::new(
+            BytesDecoderConfig::new().into(),
+            BytesDeserializerConfig::new().into(),
+            LogNamespace::Vector,
+        )
+        .build()
+        .unwrap()
+        .with_log_namespace(LogNamespace::Vector);
+
+        let source = super::SimpleHttpSource {
+            headers: vec![],
+            query_parameters: vec![],
+            path_key: OptionalValuePath::none(),
+            host_key: OptionalValuePath::none(),
+            decoder,
+            log_namespace: LogNamespace::Vector,
+        };
+
+        let mut log = LogEvent::default();
+        // Pre-populate %http_server.path as enrich_events would.
+        log.insert(
+            (
+                PathPrefix::Metadata,
+                path!(SimpleHttpConfig::NAME).concat(path!("path")),
+            ),
+            "/real/path",
+        );
+
+        let mut events = vec![Event::Log(log)];
+        let mut enrichment = ObjectMap::new();
+        // Attempt to clobber the built-in `path` field and inject a new field.
+        enrichment.insert(KeyString::from("path"), Value::from("/clobbered"));
+        enrichment.insert(KeyString::from("tenant_id"), Value::from("t-123"));
+
+        source.inject_auth_enrichment(&mut events, enrichment);
+
+        let Event::Log(log) = &events[0] else {
+            panic!("expected log event");
+        };
+        assert_eq!(
+            log.get((
+                PathPrefix::Metadata,
+                path!(SimpleHttpConfig::NAME).concat(path!("path")),
+            )),
+            Some(&Value::from("/real/path")),
+            "auth enrichment must not overwrite built-in source metadata"
+        );
+        assert_eq!(
+            log.get((
+                PathPrefix::Metadata,
+                path!(SimpleHttpConfig::NAME).concat(path!("tenant_id")),
+            )),
+            Some(&Value::from("t-123")),
+            "new auth enrichment field must be injected"
+        );
     }
 
     impl ValidatableComponent for SimpleHttpConfig {
