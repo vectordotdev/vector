@@ -39,7 +39,6 @@ CARGO_LLVM_COV_VERSION="0.8.4"
 WASM_PACK_VERSION="0.13.1"
 # npm tool versions are defined in scripts/environment/npm-tools/package.json
 # and pinned (including transitive deps) in npm-tools/package-lock.json.
-VDEV_VERSION="0.3.3"
 
 ALL_MODULES=(
   rustup
@@ -122,11 +121,13 @@ contains_module() {
 }
 
 # Helper function to check version and install if needed
-# Usage: maybe_install_cargo_tool <tool-name> <version> [<version-check-pattern>]
+# Usage: maybe_install_cargo_tool <tool-name> [<version> [<version-check-pattern>]]
 # Note: cargo-* tools are invoked as "cargo <subcommand>", not as direct binaries
+# vdev omits the version argument: binstall reads it from vdev/Cargo.toml via
+# --manifest-path, which also provides the pkg-url so crates.io is not consulted.
 maybe_install_cargo_tool() {
   local tool="$1"
-  local version="$2"
+  local version="${2:-}"
   local version_pattern="${3:-${tool} ${version}}"  # Default to "tool version"
 
   if ! contains_module "$tool"; then
@@ -139,11 +140,17 @@ maybe_install_cargo_tool() {
     version_cmd="cargo ${tool#cargo-}"
   fi
 
-  # vdev fails fast on missing prebuilts so a cache/asset miss can't
-  # reintroduce the source-compile path that previously stalled a release.
-  local installer=("${install[@]}")
-  if [[ "$tool" == "vdev" && "${installer[0]}" == "binstall" ]]; then
-    installer+=(--disable-strategies compile)
+  # vdev: binstall handles version resolution and idempotency via --manifest-path.
+  # Fail fast on missing prebuilts so a cache miss can't reintroduce source compilation.
+  if [[ "$tool" == "vdev" ]]; then
+    local installer=("${install[@]}")
+    if [[ "${installer[0]}" == "binstall" ]]; then
+      installer+=(--disable-strategies compile)
+      cargo "${installer[@]}" --manifest-path vdev/Cargo.toml vdev
+    else
+      cargo "${installer[@]}" vdev --force --locked
+    fi
+    return 0
   fi
 
   if ! $version_cmd --version 2>/dev/null | grep -q "^${version_pattern}"; then
@@ -163,7 +170,7 @@ maybe_install_cargo_tool() {
       fi
     fi
     if [[ "$should_install" == "true" ]]; then
-      cargo "${installer[@]}" "$tool" --version "$version" --force --locked
+      cargo "${install[@]}" "$tool" --version "$version" --force --locked
     fi
   fi
 
@@ -289,6 +296,6 @@ maybe_install_cargo_tool cargo-hack "${CARGO_HACK_VERSION}"
 maybe_install_cargo_tool cargo-llvm-cov "${CARGO_LLVM_COV_VERSION}"
 maybe_install_cargo_tool dd-rust-license-tool "${DD_RUST_LICENSE_TOOL_VERSION}"
 maybe_install_cargo_tool wasm-pack "${WASM_PACK_VERSION}"
-maybe_install_cargo_tool vdev "${VDEV_VERSION}"
+maybe_install_cargo_tool vdev
 
 maybe_install_npm_tools

@@ -57,10 +57,13 @@ jobs:
         uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2.5.0
         with:
           files: ${{ env.ASSET }}
+          prerelease: ${{ contains(github.ref_name, '-rc') || contains(github.ref_name, '-pr.') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   publish:
+    # Skip crates.io publish for pre-releases (-rc, -pr.N); binary assets are sufficient for binstall.
+    if: ${{ !(contains(github.ref_name, '-rc') || contains(github.ref_name, '-pr.')) }}
     runs-on: ubuntu-24.04
     needs: build
     env:

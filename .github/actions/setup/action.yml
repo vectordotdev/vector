@@ -73,7 +73,7 @@ inputs:
   vdev:
     required: false
     default: true
-    description: "Install vdev CLI tool via cargo binstall (uses VDEV_VERSION pinned in prepare.sh)."
+    description: "Install vdev CLI tool via cargo binstall (version from vdev/Cargo.toml)."
 
   # prepare.sh - npm
   markdownlint-cli2:
@@ -239,7 +239,7 @@ runs:
           ~/.cargo/bin/dd-rust-license-tool
           ~/.cargo/bin/wasm-pack
           ~/.cargo/bin/vdev
-        key: ${{ runner.os }}-cargo-binaries-${{ hashFiles('scripts/environment/*.sh') }}
+        key: ${{ runner.os }}-cargo-binaries-${{ hashFiles('scripts/environment/*.sh', 'vdev/Cargo.toml') }}
         restore-keys: |
           ${{ runner.os }}-cargo-binaries-
 

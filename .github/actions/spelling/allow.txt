@@ -61,6 +61,7 @@ Benss
 bigendian
 bindir
 binstall
+binstalls
 binfmt
 bitcast
 bitcode
