@@ -8,6 +8,7 @@ use std::{
 
 use futures::{FutureExt, StreamExt, TryStreamExt, stream::FuturesOrdered};
 use futures_util::stream::FuturesUnordered;
+use metrics::Counter;
 use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
 use tokio::{
     select,
@@ -48,6 +49,7 @@ use crate::{
         ComponentKey, Config, DataType, EnrichmentTableConfig, Input, Inputs, OutputId,
         ProxyConfig, SinkContext, SourceContext, TransformContext, TransformOuter, TransformOutput,
     },
+    cpu_time::{CpuTimedExt, spawn_timed},
     event::{EventArray, EventContainer},
     extra_context::ExtraContext,
     internal_events::EventsReceived,
@@ -492,6 +494,13 @@ impl<'a> Builder<'a> {
                 merged_schema_definition: merged_definition.clone(),
                 schema: self.config.schema,
                 extra_context: self.extra_context.clone(),
+                // Resolve the per-component CPU counter inside the transform span so it
+                // picks up component_id/component_kind/component_type tags. The same
+                // handle is shared between the main transform task and any helper
+                // tokio tasks the transform spawns at construction time. On platforms
+                // without per-thread CPU time, `register_counter` returns a noop
+                // handle and the metric is silently omitted.
+                cpu_ns: crate::cpu_time::register_counter(),
             };
 
             let node =
@@ -728,14 +737,7 @@ impl<'a> Builder<'a> {
             // TODO: avoid the double boxing for function transforms here
             Transform::Function(t) => self.build_sync_transform(Box::new(t), node, input_rx),
             Transform::Synchronous(t) => self.build_sync_transform(t, node, input_rx),
-            Transform::Task(t) => self.build_task_transform(
-                t,
-                input_rx,
-                node.input_details.data_type(),
-                node.typetag,
-                &node.key,
-                &node.outputs,
-            ),
+            Transform::Task(t) => self.build_task_transform(t, node, input_rx),
         }
     }
 
@@ -757,11 +759,17 @@ impl<'a> Builder<'a> {
             node.input_details.data_type(),
             outputs,
             LatencyRecorder::new(self.config.global.latency_ewma_alpha),
+            node.cpu_ns.clone(),
         );
+        // Attribute the runner task's per-poll CPU time (driver loop +,
+        // for the inline variant, the transform body) to the component. The
+        // concurrent variant additionally spawns transform invocations onto
+        // their own tasks with `spawn_timed`, which feed the same counter.
+        let cpu_ns = node.cpu_ns.clone();
         let transform = if node.enable_concurrency {
-            runner.run_concurrently().boxed()
+            runner.run_concurrently().cpu_timed(cpu_ns).boxed()
         } else {
-            runner.run_inline().boxed()
+            runner.run_inline().cpu_timed(cpu_ns).boxed()
         };
 
         let transform = async move {
@@ -795,12 +803,19 @@ impl<'a> Builder<'a> {
     fn build_task_transform(
         &self,
         t: Box<dyn TaskTransform<EventArray>>,
+        node: TransformNode,
         input_rx: BufferReceiver<EventArray>,
-        input_type: DataType,
-        typetag: &str,
-        key: &ComponentKey,
-        outputs: &[TransformOutput],
     ) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
+        let TransformNode {
+            key,
+            typetag,
+            input_details,
+            outputs,
+            cpu_ns,
+            ..
+        } = node;
+        let input_type = input_details.data_type();
+
         let (mut fanout, control) = Fanout::new();
 
         let sender = self
@@ -867,12 +882,13 @@ impl<'a> Builder<'a> {
                 }
             }
         }
+        .cpu_timed(cpu_ns)
         .boxed();
 
         let mut outputs = HashMap::new();
-        outputs.insert(OutputId::from(key), control);
+        outputs.insert(OutputId::from(&key), control);
 
-        let task = Task::new(key.clone(), typetag, transform);
+        let task = Task::new(key, typetag, transform);
 
         (task, outputs)
     }
@@ -1118,6 +1134,7 @@ struct TransformNode {
     input_details: Input,
     outputs: Vec<TransformOutput>,
     enable_concurrency: bool,
+    cpu_ns: Counter,
 }
 
 impl TransformNode {
@@ -1134,6 +1151,7 @@ impl TransformNode {
             input_details: transform.inner.input(),
             outputs: transform.inner.outputs(context, schema_definition),
             enable_concurrency: transform.inner.enable_concurrency(),
+            cpu_ns: context.cpu_ns.clone(),
         }
     }
 }
@@ -1146,6 +1164,7 @@ struct Runner {
     timer_tx: UtilizationComponentSender,
     latency_recorder: LatencyRecorder,
     events_received: Registered<EventsReceived>,
+    cpu_ns: Counter,
 }
 
 impl Runner {
@@ -1156,6 +1175,7 @@ impl Runner {
         input_type: DataType,
         outputs: TransformOutputs,
         latency_recorder: LatencyRecorder,
+        cpu_ns: Counter,
     ) -> Self {
         Self {
             transform,
@@ -1165,6 +1185,7 @@ impl Runner {
             timer_tx,
             latency_recorder,
             events_received: register!(EventsReceived),
+            cpu_ns,
         }
     }
 
@@ -1249,12 +1270,19 @@ impl Runner {
 
                             let mut t = self.transform.clone();
                             let mut outputs_buf = self.outputs.new_buf_with_capacity(len);
-                            let task = tokio::spawn(async move {
-                                for events in input_arrays {
-                                    t.transform_all(events, &mut outputs_buf);
+                            // Hook CPU-time accounting onto the spawned task at
+                            // the `Future::poll` boundary.
+                            // This is a separate task from the current one, so there is no double-counting.
+                            let task = spawn_timed(
+                                async move {
+                                    for events in input_arrays {
+                                        t.transform_all(events, &mut outputs_buf);
+                                    }
+                                    outputs_buf
                                 }
-                                outputs_buf
-                            }.in_current_span());
+                                .in_current_span(),
+                                self.cpu_ns.clone(),
+                            );
                             in_flight.push_back(task);
                         }
                         None => {

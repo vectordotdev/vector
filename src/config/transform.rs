@@ -6,6 +6,7 @@ use std::{
 
 use async_trait::async_trait;
 use dyn_clone::DynClone;
+use metrics::Counter;
 use serde::Serialize;
 use vector_lib::{
     config::{GlobalOptions, Input, LogNamespace, TransformOutput},
@@ -141,6 +142,12 @@ pub struct TransformContext {
     /// Extra context data provided by the running app and shared across all components. This can be
     /// used to pass shared settings or other data from outside the components.
     pub extra_context: ExtraContext,
+
+    /// Counter handle for `component_cpu_usage_ns_total`, pre-tagged with this transform's
+    /// component identity. Transforms that spawn helper tokio tasks at construction time
+    /// (e.g. `aws_ec2_metadata`, `throttle`) clone this and `.cpu_timed(...)` those tasks so
+    /// their CPU is attributed to the component alongside the main transform task.
+    pub cpu_ns: Counter,
 }
 
 impl Default for TransformContext {
@@ -154,6 +161,7 @@ impl Default for TransformContext {
             merged_schema_definition: schema::Definition::any(),
             schema: SchemaOptions::default(),
             extra_context: Default::default(),
+            cpu_ns: Counter::noop(),
         }
     }
 }
