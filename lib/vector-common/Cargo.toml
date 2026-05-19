@@ -57,5 +57,10 @@ vector-config.workspace = true
 vector-common-macros.workspace = true
 
 [dev-dependencies]
+criterion.workspace = true
 futures = { version = "0.3.31", default-features = false, features = ["async-await"] }
 tokio = { workspace = true, features = ["rt", "time"] }
+
+[[bench]]
+name = "fast_clock"
+harness = false
