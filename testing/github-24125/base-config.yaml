@@ -1,0 +1,30 @@
+# Static base config for the vector#24125 repro.
+# Bind-mounted directly into the container at /etc/vector/base.yaml; the rendered
+# sinks file lives next to it as /etc/vector/sinks.yaml and Vector merges both
+# via --config-dir.
+
+api:
+  enabled: true
+  address: 0.0.0.0:8686
+
+sources:
+  demo:
+    type: demo_logs
+    format: json
+    interval: 0.1
+  internal:
+    type: internal_metrics
+    scrape_interval_secs: 5
+
+transforms:
+  router:
+    type: route
+    inputs: [demo]
+    route:
+      all: 'true'
+
+sinks:
+  metrics_out:
+    type: prometheus_exporter
+    inputs: [internal]
+    address: 0.0.0.0:9598
