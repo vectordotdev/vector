@@ -310,16 +310,29 @@ where
 
     fn should_retry_response(&self, response: &Self::Response) -> RetryAction<Self::Request> {
         let status = (self.get_status)(response);
-        // Only override the configured strategy when retries are enabled at
-        // all; `RetryStrategy::None` means "do not retry any errors" and we
-        // respect that, including skipping the credential refresh since the
-        // failed request will not be re-issued.
-        if status == StatusCode::UNAUTHORIZED && self.retry_strategy != RetryStrategy::None {
-            let auth = self.auth.clone();
-            tokio::spawn(async move {
-                auth.force_refresh().await;
-            });
-            return RetryAction::Retry("unauthorized".into());
+        if status == StatusCode::UNAUTHORIZED {
+            // Decide whether 401 self-heals. `Default` historically returned
+            // DontRetry on 401; we override because 401 typically indicates a
+            // stale token and the next attempt with a fresh token will succeed
+            // (this matches GcsRetryLogic). `All` already retries everything,
+            // so we just add the refresh. `Custom` is an explicit user choice
+            // — honor it. `None` means "do not retry any errors" — honor it,
+            // and skip the refresh since the failed request will not be
+            // re-issued.
+            let self_heal = match &self.retry_strategy {
+                RetryStrategy::None => false,
+                RetryStrategy::Default | RetryStrategy::All => true,
+                RetryStrategy::Custom { status_codes } => {
+                    status_codes.contains(&StatusCode::UNAUTHORIZED)
+                }
+            };
+            if self_heal {
+                let auth = self.auth.clone();
+                tokio::spawn(async move {
+                    auth.force_refresh().await;
+                });
+                return RetryAction::Retry("unauthorized".into());
+            }
         }
         self.retry_strategy.retry_action(status)
     }
