@@ -85,8 +85,8 @@ When introducing a deprecation into Vector, the pull request introducing the dep
   are required. Set `announcement_version` to `next` (recommended) or the current release version if known. Set
   `deprecation_version` to the planned removal version, `TBD` if not yet decided, or `next` if removal is intended
   for the very next release. The release tooling will replace any `next` values with the concrete version when the
-  release is cut. Run
-  `cargo vdev check deprecations` to validate the file.
+  release is cut. Run `cargo vdev deprecation show` to view all current notices and `cargo vdev check deprecations`
+  to validate the file.
 
 When removing a deprecation in a subsequent release, the pull request should:
 
