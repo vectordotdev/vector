@@ -3,6 +3,7 @@ use std::io::Read;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+#[cfg(test)]
 use base64::prelude::*;
 
 use azure_core::error::Error as AzureCoreError;
@@ -278,10 +279,6 @@ impl SpecificAzureCredential {
                     )
                 })?;
 
-                // Note: in azure_identity 0.33.0+, this changes to SecretBytes, and the base64 encoding is no longer needed
-                let certificate_base64: azure_core::credentials::Secret =
-                    BASE64_STANDARD.encode(&certificate_bytes).into();
-
                 let mut options: ClientCertificateCredentialOptions =
                     ClientCertificateCredentialOptions::default();
                 if let Some(password) = certificate_password {
@@ -291,7 +288,7 @@ impl SpecificAzureCredential {
                 ClientCertificateCredential::new(
                     azure_tenant_id.clone(),
                     azure_client_id.clone(),
-                    certificate_base64,
+                    certificate_bytes.into(),
                     Some(options),
                 )?
             }
@@ -596,8 +593,8 @@ pub async fn build_client(
         }
     }
 
-    // Use reqwest v0.12 since Azure SDK only implements HttpClient for reqwest::Client v0.12
-    let mut reqwest_builder = reqwest_12::ClientBuilder::new();
+    // Use reqwest v0.13 since Azure SDK only implements HttpClient for reqwest::Client v0.13
+    let mut reqwest_builder = reqwest_13::ClientBuilder::new();
     let bypass_proxy = {
         let host = url.host_str().unwrap_or("");
         let port = url.port();
@@ -611,13 +608,13 @@ pub async fn build_client(
         reqwest_builder = reqwest_builder.no_proxy();
     } else {
         if let Some(http) = &proxy.http {
-            let p = reqwest_12::Proxy::http(http)
+            let p = reqwest_13::Proxy::http(http)
                 .map_err(|e| format!("Invalid HTTP proxy URL: {e}"))?;
             // If credentials are embedded in the proxy URL, reqwest will handle them.
             reqwest_builder = reqwest_builder.proxy(p);
         }
         if let Some(https) = &proxy.https {
-            let p = reqwest_12::Proxy::https(https)
+            let p = reqwest_13::Proxy::https(https)
                 .map_err(|e| format!("Invalid HTTPS proxy URL: {e}"))?;
             // If credentials are embedded in the proxy URL, reqwest will handle them.
             reqwest_builder = reqwest_builder.proxy(p);
@@ -629,7 +626,7 @@ pub async fn build_client(
     {
         let mut buf = Vec::new();
         File::open(ca_file)?.read_to_end(&mut buf)?;
-        let cert = reqwest_12::Certificate::from_pem(&buf)?;
+        let cert = reqwest_13::Certificate::from_pem(&buf)?;
 
         warn!("Adding TLS root certificate from {}", ca_file.display());
         reqwest_builder = reqwest_builder.add_root_certificate(cert);

@@ -11,19 +11,7 @@ use crate::{
     transforms::{Transform, tag_cardinality_limit::TagCardinalityLimit},
 };
 
-/// Configuration of internal metrics for the TagCardinalityLimit transform.
-#[configurable_component]
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-#[serde(deny_unknown_fields)]
-pub struct InternalMetricsConfig {
-    /// Whether to include extended tags (metric_name, tag_key) in the `tag_value_limit_exceeded_total` metric.
-    ///
-    /// This helps identify which metrics and tag keys are hitting cardinality limits, but can significantly
-    /// increase metric cardinality. Defaults to `false` because these tags have potentially unbounded cardinality.
-    #[serde(default = "default_include_extended_tags")]
-    #[configurable(metadata(docs::human_name = "Include Extended Tags"))]
-    pub include_extended_tags: bool,
-}
+// Top-level configuration
 
 /// Configuration for the `tag_cardinality_limit` transform.
 #[configurable_component(transform(
@@ -79,7 +67,7 @@ pub enum TrackingScope {
     PerMetric,
 }
 
-/// Configuration for the `tag_cardinality_limit` transform for a specific group of metrics.
+/// Configuration block used at the global level.
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Inner {
@@ -99,7 +87,7 @@ pub struct Inner {
     pub internal_metrics: InternalMetricsConfig,
 }
 
-/// Controls the approach taken for tracking tag cardinality.
+/// Controls the approach taken for tracking tag cardinality at the global level.
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[serde(tag = "mode", rename_all = "snake_case", deny_unknown_fields)]
@@ -122,18 +110,130 @@ pub enum Mode {
     Probabilistic(BloomFilterConfig),
 }
 
-/// Bloom filter configuration in probabilistic mode.
+/// Per-metric name tag cardinality limit configuration.
+#[configurable_component]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PerMetricConfig {
+    /// Namespace of the metric this configuration refers to.
+    #[serde(default)]
+    pub namespace: Option<String>,
+
+    /// Per-tag-key overrides scoped to this metric. Each entry sets a `mode`:
+    /// - `mode: limit_override` + `value_limit: N` — track with a per-tag cap.
+    /// - `mode: excluded` — opt this tag out of tracking entirely.
+    ///
+    ///  All other settings (tracking algorithm, `limit_exceeded_action`, etc.)
+    /// are inherited from the enclosing per-metric configuration.
+    /// Tags not listed here use the per-metric configuration.
+    #[configurable(
+        derived,
+        metadata(docs::additional_props_description = "An individual tag configuration.")
+    )]
+    #[serde(default)]
+    pub per_tag_limits: HashMap<String, PerTagConfig>,
+
+    #[serde(flatten)]
+    pub config: OverrideInner,
+}
+
+/// Configuration block used at per-metric level. Same shape as the global configuration but
+/// with `OverrideMode`, which adds `excluded` for opting that metric out of cardinality
+/// control entirely.
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct BloomFilterConfig {
-    /// The size of the cache for detecting duplicate tags, in bytes.
-    ///
-    /// The larger the cache size, the less likely it is to have a false positive, or a case where
-    /// we allow a new value for tag even after we have reached the configured limits.
-    #[serde(default = "default_cache_size")]
-    #[configurable(metadata(docs::human_name = "Cache Size per Key"))]
-    pub cache_size_per_key: usize,
+pub struct OverrideInner {
+    /// How many distinct values to accept for any given key. Ignored when `mode: excluded`.
+    #[serde(default = "default_value_limit")]
+    pub value_limit: usize,
+
+    #[configurable(derived)]
+    #[serde(default = "default_limit_exceeded_action")]
+    pub limit_exceeded_action: LimitExceededAction,
+
+    #[serde(flatten)]
+    pub mode: OverrideMode,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    pub internal_metrics: InternalMetricsConfig,
 }
+
+/// Controls the approach taken for tracking tag cardinality at the per-metric level.
+/// Adds `excluded` to the global `Mode` variants to allow opting a metric out entirely.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[serde(tag = "mode", rename_all = "snake_case", deny_unknown_fields)]
+#[configurable(metadata(
+    docs::enum_tag_description = "Controls the approach taken for tracking tag cardinality."
+))]
+pub enum OverrideMode {
+    /// Tracks cardinality exactly. See `Mode::Exact` for details.
+    Exact,
+
+    /// Tracks cardinality probabilistically. See `Mode::Probabilistic` for details.
+    Probabilistic(BloomFilterConfig),
+
+    /// Skip cardinality tracking for this metric. All tag values pass through and nothing is
+    /// limited. Other fields in this per-metric configuration are ignored when this is selected.
+    Excluded,
+}
+
+impl OverrideMode {
+    /// Returns the equivalent global `Mode` if this scope is tracked, or `None` if excluded.
+    pub const fn as_mode(&self) -> Option<Mode> {
+        match self {
+            OverrideMode::Exact => Some(Mode::Exact),
+            OverrideMode::Probabilistic(b) => Some(Mode::Probabilistic(*b)),
+            OverrideMode::Excluded => None,
+        }
+    }
+}
+
+/// Per-tag cardinality configuration.
+///
+/// Specify `mode` to control how this tag is handled:
+///
+/// Example:
+/// ```yaml
+/// per_tag_limits:
+///   environment:
+///     mode: limit_override  # track with a per-tag cap
+///     value_limit: 3
+///   trace_id:
+///     mode: excluded        # opt out of tracking entirely
+/// ```
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct PerTagConfig {
+    #[configurable(derived)]
+    #[serde(flatten)]
+    pub mode: PerTagMode,
+}
+
+/// Mode applied to a specific tag key within a per-metric override.
+///
+/// The tracking algorithm (`exact`/`probabilistic`), `cache_size_per_key`,
+/// `limit_exceeded_action`, and `internal_metrics` are always inherited from the
+/// enclosing per-metric configuration.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[serde(tag = "mode", rename_all = "snake_case", deny_unknown_fields)]
+#[configurable(metadata(docs::enum_tag_description = "Controls how this tag key is handled."))]
+pub enum PerTagMode {
+    /// Track this tag with a per-tag value limit. The enclosing per-metric tracking
+    /// algorithm and all other settings still apply.
+    LimitOverride {
+        /// Maximum number of distinct values to accept for this tag key.
+        value_limit: usize,
+    },
+    /// Opt this tag out of cardinality tracking entirely. All values pass through
+    /// without being recorded or checked against any `value_limit`.
+    Excluded,
+}
+
+// =============================================================================
+// Shared building blocks
+// =============================================================================
 
 /// Possible actions to take when an event arrives that would exceed the cardinality limit for one
 /// or more of its tags.
@@ -148,24 +248,43 @@ pub enum LimitExceededAction {
     DropEvent,
 }
 
-/// Tag cardinality limit configuration per metric name.
+/// Bloom filter configuration in probabilistic mode.
 #[configurable_component]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct PerMetricConfig {
-    /// Namespace of the metric this configuration refers to.
-    #[serde(default)]
-    pub namespace: Option<String>,
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct BloomFilterConfig {
+    /// The size of the cache for detecting duplicate tags, in bytes.
+    ///
+    /// The larger the cache size, the less likely it is to have a false positive, or a case where
+    /// we allow a new value for tag even after we have reached the configured limits.
+    #[serde(default = "default_cache_size")]
+    #[configurable(metadata(docs::human_name = "Cache Size per Key"))]
+    pub cache_size_per_key: usize,
+}
 
-    #[serde(flatten)]
-    pub config: Inner,
+/// Configuration of internal metrics for the TagCardinalityLimit transform.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct InternalMetricsConfig {
+    /// Whether to include extended tags (metric_name, tag_key) in the `tag_value_limit_exceeded_total` metric.
+    ///
+    /// This helps identify which metrics and tag keys are hitting cardinality limits, but can significantly
+    /// increase metric cardinality. Defaults to `false` because these tags have potentially unbounded cardinality.
+    #[serde(default = "default_include_extended_tags")]
+    #[configurable(metadata(docs::human_name = "Include Extended Tags"))]
+    pub include_extended_tags: bool,
+}
+
+// =============================================================================
+// Defaults
+// =============================================================================
+
+const fn default_value_limit() -> usize {
+    500
 }
 
 const fn default_limit_exceeded_action() -> LimitExceededAction {
     LimitExceededAction::DropTag
-}
-
-const fn default_value_limit() -> usize {
-    500
 }
 
 const fn default_include_extended_tags() -> bool {
@@ -175,6 +294,10 @@ const fn default_include_extended_tags() -> bool {
 pub(crate) const fn default_cache_size() -> usize {
     5 * 1024 // 5KB
 }
+
+// =============================================================================
+// Transform plumbing
+// =============================================================================
 
 impl GenerateConfig for Config {
     fn generate_config() -> toml::Value {
