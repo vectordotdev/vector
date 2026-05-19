@@ -4323,7 +4323,6 @@ dependencies = [
  "futures-util",
  "glob",
  "indexmap 2.12.0",
- "libc",
  "quickcheck",
  "tempfile",
  "tokio",
