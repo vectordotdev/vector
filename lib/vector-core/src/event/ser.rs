@@ -20,16 +20,26 @@ pub(crate) const OBJECT_FRAME_COST: usize = 3;
 /// frames before reaching the child Value.
 pub(crate) const ARRAY_FRAME_COST: usize = 2;
 
+/// Per-leaf prost recursion frame cost of a [`Value::Timestamp`].
+///
+/// Unlike other scalar variants, `Value::Timestamp` is encoded as a nested
+/// `google.protobuf.Timestamp` message, so decoding it consumes one additional frame
+/// beyond the enclosing `Value`. Without this cost a timestamp leaf at the deepest
+/// allowed branch (event-data object depth 33 or metadata object depth 32) sneaks past
+/// the gate and trips prost's recursion limit on decode.
+pub(crate) const TIMESTAMP_FRAME_COST: usize = 1;
+
 /// Maximum prost recursion frame cost for event data values (`Log.fields`, `Trace.fields`).
 ///
 /// Prost enforces a decode recursion limit of 100 (no limit on encode). Each nesting level
-/// consumes 3 frames for [`Value::Object`] or 2 for [`Value::Array`], plus a fixed overhead
-/// for the proto wrappers outside the Value tree. The event data path (`EventArray` →
-/// `*Array` → Event → fields) has fewer wrappers than the metadata path, allowing a higher
-/// frame budget.
+/// consumes 3 frames for [`Value::Object`], 2 for [`Value::Array`], or 1 for a
+/// [`Value::Timestamp`] leaf, plus a fixed overhead for the proto wrappers outside the
+/// Value tree. The event data path (`EventArray` → `*Array` → Event → fields) has fewer
+/// wrappers than the metadata path, allowing a higher frame budget.
 ///
 /// Object-only depth 33 (cost 99) roundtrips; depth 34 (cost 102) fails decode. Array-only
-/// nesting is correspondingly looser: depth 49 (cost 98) is the highest that fits.
+/// nesting is correspondingly looser: depth 49 (cost 98) is the highest that fits. A
+/// `Value::Timestamp` leaf added at depth 33 raises the cost to 100 and fails decode.
 pub const MAX_VALUE_NESTING_FRAMES: usize = 99;
 
 /// Maximum prost recursion frame cost for event metadata values (via `metadata_full`).
@@ -38,15 +48,18 @@ pub const MAX_VALUE_NESTING_FRAMES: usize = 99;
 /// proto wrapper message than the event data path due to the `Metadata` message, reducing
 /// the safe budget by 3 frames.
 ///
-/// Object-only depth 32 (cost 96) roundtrips; depth 33 (cost 99) fails decode.
+/// Object-only depth 32 (cost 96) roundtrips; depth 33 (cost 99) fails decode. A
+/// `Value::Timestamp` leaf added at depth 32 raises the cost to 97 and fails decode.
 pub const MAX_METADATA_VALUE_NESTING_FRAMES: usize = 96;
 
 /// Walks a [`Value`] tree accumulating prost recursion frame cost, returning
 /// `Err(over_budget_cost)` as soon as any branch exceeds `budget`.
 ///
 /// Object levels weigh [`OBJECT_FRAME_COST`] frames each, array levels weigh
-/// [`ARRAY_FRAME_COST`]; scalar leaves are free. Performs an early-exit traversal so
-/// well-formed events incur a single descent of the deepest branch only.
+/// [`ARRAY_FRAME_COST`], and timestamp leaves weigh [`TIMESTAMP_FRAME_COST`] (because
+/// they decode into a nested `google.protobuf.Timestamp` message); other scalar leaves
+/// are free. Performs an early-exit traversal so well-formed events incur a single
+/// descent of the deepest branch only.
 ///
 /// # Errors
 ///
@@ -59,6 +72,7 @@ pub(crate) fn check_value_nesting_cost(
     let level_cost = match value {
         Value::Object(_) => OBJECT_FRAME_COST,
         Value::Array(_) => ARRAY_FRAME_COST,
+        Value::Timestamp(_) => TIMESTAMP_FRAME_COST,
         _ => 0,
     };
     let next = accumulated + level_cost;

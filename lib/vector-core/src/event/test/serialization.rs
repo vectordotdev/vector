@@ -1,6 +1,7 @@
 use super::*;
 use crate::config::log_schema;
 use bytes::{Buf, BufMut, BytesMut};
+use chrono::TimeZone;
 use prost::Message;
 use quickcheck::{QuickCheck, TestResult};
 use regex::Regex;
@@ -9,7 +10,7 @@ use vector_buffers::encoding::Encodable;
 
 use crate::event::ser::{
     ARRAY_FRAME_COST, MAX_METADATA_VALUE_NESTING_FRAMES, MAX_VALUE_NESTING_FRAMES,
-    OBJECT_FRAME_COST, check_value_nesting_cost,
+    OBJECT_FRAME_COST, TIMESTAMP_FRAME_COST, check_value_nesting_cost,
 };
 
 fn encode_value<T: Encodable, B: BufMut>(value: T, buffer: &mut B) {
@@ -156,6 +157,28 @@ fn create_nested_array(wrapping_levels: usize) -> Value {
         value = Value::Array(vec![value]);
     }
     value
+}
+
+/// Creates a Value with the specified number of nested Object wrapping levels around
+/// the supplied leaf. Used to probe leaf-specific frame costs (e.g. `Value::Timestamp`).
+fn create_nested_value_with_leaf(wrapping_levels: usize, leaf: Value) -> Value {
+    let mut value = leaf;
+    for _ in 0..wrapping_levels {
+        let mut map = ObjectMap::new();
+        map.insert("nested".into(), value);
+        value = Value::Object(map);
+    }
+    value
+}
+
+/// A fixed [`Value::Timestamp`] for use as a leaf in nesting tests.
+fn ts_leaf() -> Value {
+    Value::Timestamp(
+        chrono::Utc
+            .timestamp_opt(1_700_000_000, 0)
+            .single()
+            .unwrap(),
+    )
 }
 
 /// Create a [`LogEvent`] with event data at `value_depth` and metadata at `metadata_depth`.
@@ -483,6 +506,129 @@ fn nesting_gate_handles_mixed_array_object_nesting() {
         ),
         "nesting gate should reject 39 alternating metadata levels (cost 97)",
     );
+}
+
+/// Verify the gate rejects a `Value::Timestamp` leaf sitting at the deepest object
+/// position the budget would otherwise allow, and that the underlying proto roundtrip
+/// would in fact fail there — confirming the timestamp leaf is not free.
+#[test]
+fn nesting_gate_rejects_timestamp_leaf_at_max_object_depth() {
+    let roundtrip_log = |value: Value| -> bool {
+        let mut event = LogEvent::default();
+        event.insert("data", value);
+        let array = EventArray::Logs(LogArray::from(vec![event]));
+        let proto_array = proto::EventArray::from(array);
+        let mut buf = BytesMut::with_capacity(65536);
+        proto_array.encode(&mut buf).unwrap();
+        proto::EventArray::decode(buf.freeze()).is_ok()
+    };
+    let roundtrip_metadata = |value: Value| -> bool {
+        let mut event = LogEvent::from("flat");
+        *event.metadata_mut().value_mut() = value;
+        let array = EventArray::Logs(LogArray::from(vec![event]));
+        let proto_array = proto::EventArray::from(array);
+        let mut buf = BytesMut::with_capacity(65536);
+        proto_array.encode(&mut buf).unwrap();
+        proto::EventArray::decode(buf.freeze()).is_ok()
+    };
+
+    // Event data: at object depth 33, a Bytes leaf decodes but a Timestamp leaf does not,
+    // because the Timestamp message consumes one more recursion frame.
+    let event_data_ts = create_nested_value_with_leaf(MAX_OBJECT_DEPTH_VALUE - 1, ts_leaf());
+    assert!(
+        !roundtrip_log(event_data_ts.clone()),
+        "depth {MAX_OBJECT_DEPTH_VALUE} with Timestamp leaf is expected to fail prost decode"
+    );
+
+    let mut event = LogEvent::default();
+    event.insert("data", event_data_ts);
+    let array = EventArray::Logs(LogArray::from(vec![event]));
+    let mut buf = BytesMut::with_capacity(65536);
+    assert!(
+        matches!(
+            array.encode(&mut buf),
+            Err(super::super::ser::EncodeError::NestingTooDeep { .. })
+        ),
+        "gate should reject event-data Timestamp leaf at object depth {MAX_OBJECT_DEPTH_VALUE}",
+    );
+
+    // Metadata: same boundary, one shallower.
+    let metadata_ts = create_nested_value_with_leaf(MAX_OBJECT_DEPTH_METADATA, ts_leaf());
+    assert!(
+        !roundtrip_metadata(metadata_ts.clone()),
+        "metadata depth {MAX_OBJECT_DEPTH_METADATA} with Timestamp leaf is expected to fail prost decode"
+    );
+
+    let mut event = LogEvent::from("flat");
+    *event.metadata_mut().value_mut() = metadata_ts;
+    let array = EventArray::Logs(LogArray::from(vec![event]));
+    let mut buf = BytesMut::with_capacity(65536);
+    assert!(
+        matches!(
+            array.encode(&mut buf),
+            Err(super::super::ser::EncodeError::NestingTooDeep { .. })
+        ),
+        "gate should reject metadata Timestamp leaf at object depth {MAX_OBJECT_DEPTH_METADATA}",
+    );
+}
+
+/// Verify the gate still admits Timestamp leaves one level shallower than the boundary
+/// — they cost exactly one frame, no more — and that those payloads roundtrip cleanly
+/// through prost.
+#[test]
+fn nesting_gate_accepts_timestamp_leaf_below_max_object_depth() {
+    // Event data: depth (max-1) Object + Timestamp leaf = (max-1)*3 + 1 frames.
+    let mut event = LogEvent::default();
+    event.insert(
+        "data",
+        create_nested_value_with_leaf(MAX_OBJECT_DEPTH_VALUE - 2, ts_leaf()),
+    );
+    let array = EventArray::Logs(LogArray::from(vec![event]));
+    let mut buf = BytesMut::with_capacity(65536);
+    assert!(
+        array.encode(&mut buf).is_ok(),
+        "gate should accept event-data Timestamp leaf at object depth {}",
+        MAX_OBJECT_DEPTH_VALUE - 1,
+    );
+    assert!(
+        proto::EventArray::decode(buf.freeze()).is_ok(),
+        "prost should decode event-data Timestamp leaf at object depth {}",
+        MAX_OBJECT_DEPTH_VALUE - 1,
+    );
+
+    // Metadata: one shallower.
+    let mut event = LogEvent::from("flat");
+    *event.metadata_mut().value_mut() =
+        create_nested_value_with_leaf(MAX_OBJECT_DEPTH_METADATA - 1, ts_leaf());
+    let array = EventArray::Logs(LogArray::from(vec![event]));
+    let mut buf = BytesMut::with_capacity(65536);
+    assert!(
+        array.encode(&mut buf).is_ok(),
+        "gate should accept metadata Timestamp leaf at object depth {}",
+        MAX_OBJECT_DEPTH_METADATA - 1,
+    );
+    assert!(
+        proto::EventArray::decode(buf.freeze()).is_ok(),
+        "prost should decode metadata Timestamp leaf at object depth {}",
+        MAX_OBJECT_DEPTH_METADATA - 1,
+    );
+}
+
+/// Unit-level check that `check_value_nesting_cost` charges `TIMESTAMP_FRAME_COST`
+/// for a `Value::Timestamp` leaf, independent of nesting.
+#[test]
+fn check_value_nesting_cost_charges_timestamp_leaf() {
+    let ts = ts_leaf();
+    assert!(check_value_nesting_cost(&ts, 0, TIMESTAMP_FRAME_COST).is_ok());
+    assert!(check_value_nesting_cost(&ts, 0, TIMESTAMP_FRAME_COST - 1).is_err());
+
+    // A single object level containing a timestamp leaf: OBJECT_FRAME_COST + TIMESTAMP_FRAME_COST.
+    let mut map = ObjectMap::new();
+    map.insert("ts".into(), ts);
+    let nested = Value::Object(map);
+    let expected = OBJECT_FRAME_COST + TIMESTAMP_FRAME_COST;
+    assert!(check_value_nesting_cost(&nested, 0, expected).is_ok());
+    assert!(check_value_nesting_cost(&nested, 0, expected - 1).is_err());
 }
 
 /// Verify flat events pass without issues.
