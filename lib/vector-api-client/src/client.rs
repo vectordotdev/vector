@@ -9,7 +9,8 @@ use crate::{
     error::{Error, Result},
     proto::{
         GetAllocationTracingStatusRequest, GetAllocationTracingStatusResponse,
-        GetComponentsRequest, GetComponentsResponse, GetMetaRequest, GetMetaResponse, MetricName,
+        GetCapabilitiesRequest, GetCapabilitiesResponse, GetComponentsRequest,
+        GetComponentsResponse, GetMetaRequest, GetMetaResponse, MetricName,
         StreamComponentAllocatedBytesRequest, StreamComponentAllocatedBytesResponse,
         StreamComponentMetricsRequest, StreamComponentMetricsResponse, StreamHeartbeatRequest,
         StreamHeartbeatResponse, StreamOutputEventsRequest, StreamOutputEventsResponse,
@@ -102,6 +103,17 @@ impl Client {
         let response = client
             .get_components(GetComponentsRequest { limit })
             .await?;
+        Ok(response.into_inner())
+    }
+
+    /// Get capabilities of the connected Vector instance.
+    ///
+    /// Returns allocation tracing status and all registered metric names with their kinds.
+    /// On older servers that don't support this RPC, returns a default response (no metrics,
+    /// allocation tracing disabled).
+    pub async fn get_capabilities(&mut self) -> Result<GetCapabilitiesResponse> {
+        let client = self.ensure_connected()?;
+        let response = client.get_capabilities(GetCapabilitiesRequest {}).await?;
         Ok(response.into_inner())
     }
 
