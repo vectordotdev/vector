@@ -151,7 +151,10 @@ runs:
       uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
       with:
         key: "vector-${{ runner.os }}-v1"
-        save-if: ${{ github.ref == 'refs/heads/master' }}
+        # TEMP: save on all refs while prototyping so this branch seeds the
+        # cache. Restore to `${{ github.ref == 'refs/heads/master' }}` before
+        # merging.
+        save-if: true
 
     - name: Install mold
       if: ${{ runner.os == 'Linux' && env.DISABLE_MOLD != 'true' && inputs.mold == 'true' }}
