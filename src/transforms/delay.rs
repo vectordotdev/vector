@@ -24,7 +24,7 @@ use crate::{
 pub struct DelayConfig {
     /// Time to delay each event, in seconds.
     #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
-    #[configurable(metadata(docs::human_name = "Delay in milliseconds", docs::example = 0.2))]
+    #[configurable(metadata(docs::human_name = "Delay in milliseconds", docs::example = 200))]
     delay_milliseconds: Duration,
 
     /// Optional limit for number of items in the delay queue.
@@ -221,7 +221,7 @@ mod tests {
     async fn delay_events() {
         let config = toml::from_str::<DelayConfig>(
             r"
-delay_milliseconds = 0.2
+delay_milliseconds = 200
 ",
         )
         .unwrap();
@@ -251,7 +251,7 @@ delay_milliseconds = 0.2
     async fn delay_events_at_capacity_drop_newest() {
         let config = toml::from_str::<DelayConfig>(
             r#"
-delay_milliseconds = 0.2
+delay_milliseconds = 200
 queue_capacity = 1
 overflow_strategy = "drop_newest"
 "#,
@@ -288,7 +288,7 @@ overflow_strategy = "drop_newest"
     async fn delay_events_at_capacity_pass() {
         let config = toml::from_str::<DelayConfig>(
             r#"
-delay_milliseconds = 0.2
+delay_milliseconds = 200
 queue_capacity = 1
 overflow_strategy = "pass"
 "#,
