@@ -106,7 +106,7 @@ impl NormalizerSettings for DefaultNormalizerSettings {
 /// Normalizes metrics according to a set of rules.
 ///
 /// Depending on the system in which they are being sent to, metrics may have to be modified in order to fit the data
-/// model or constraints placed on that system.  Typically, this boils down to whether or not the system can accept
+/// model or constraints placed on that system. Typically, this boils down to whether or not the system can accept
 /// absolute metrics or incremental metrics: the latest value of a metric, or the delta between the last time the
 /// metric was observed and now, respective. Other rules may need to be applied, such as dropping metrics of a specific
 /// type that the system does not support.
@@ -205,7 +205,15 @@ pub struct MetricEntry {
 
 impl ByteSizeOf for MetricEntry {
     fn allocated_bytes(&self) -> usize {
-        self.data.allocated_bytes() + self.metadata.allocated_bytes()
+        // Calculate the size of the data and metadata
+        let data_size = self.data.allocated_bytes();
+        let metadata_size = self.metadata.allocated_bytes();
+
+        // Include struct overhead - size of self without double-counting fields
+        // that we already accounted for in their respective allocated_bytes() calls
+        let struct_size = size_of::<Self>();
+
+        data_size + metadata_size + struct_size
     }
 }
 
@@ -282,13 +290,11 @@ impl CapacityPolicy {
         self.current_memory = self.current_memory.saturating_sub(bytes);
     }
 
-    /// Frees the memory for an item if max_bytes is set.
-    /// Only calculates and tracks memory when max_bytes is specified.
+    /// Frees the memory for an item, always tracking memory usage.
+    /// Memory tracking now happens regardless of whether max_bytes is set.
     pub fn free_item(&mut self, series: &MetricSeries, entry: &MetricEntry) {
-        if self.max_bytes.is_some() {
-            let freed_memory = self.item_size(series, entry);
-            self.remove_memory(freed_memory);
-        }
+        let freed_memory = self.item_size(series, entry);
+        self.remove_memory(freed_memory);
     }
 
     /// Updates memory tracking.
@@ -324,7 +330,7 @@ impl CapacityPolicy {
 
     /// Gets the total memory size of entry/series, excluding LRU cache overhead.
     pub fn item_size(&self, series: &MetricSeries, entry: &MetricEntry) -> usize {
-        entry.allocated_bytes() + series.allocated_bytes()
+        entry.size_of() + series.size_of()
     }
 }
 
@@ -387,6 +393,8 @@ pub struct MetricSet {
     capacity_policy: Option<CapacityPolicy>,
     /// Optional TTL policy for time-based expiration
     ttl_policy: Option<TtlPolicy>,
+    /// Counter for evictions. Used for metrics tracking
+    eviction_count: usize,
 }
 
 impl MetricSet {
@@ -417,6 +425,7 @@ impl MetricSet {
             inner: LruCache::unbounded(),
             capacity_policy,
             ttl_policy,
+            eviction_count: 0,
         }
     }
 
@@ -467,10 +476,18 @@ impl MetricSet {
         while capacity_policy.needs_eviction(self.inner.len()) {
             if let Some((series, entry)) = self.inner.pop_lru() {
                 capacity_policy.free_item(&series, &entry);
+                self.eviction_count += 1;
             } else {
                 break; // No more entries to evict
             }
         }
+    }
+
+    /// Reset the eviction count and return the previous value
+    pub const fn get_and_reset_eviction_count(&mut self) -> usize {
+        let count = self.eviction_count;
+        self.eviction_count = 0;
+        count
     }
 
     /// Perform TTL cleanup if configured and needed.
@@ -508,10 +525,11 @@ impl MetricSet {
 
         // Remove expired entries and update memory tracking (if max_bytes is set)
         for series in expired_keys {
-            if let Some(entry) = self.inner.pop(&series)
-                && let Some(ref mut capacity_policy) = self.capacity_policy
-            {
-                capacity_policy.free_item(&series, &entry);
+            if let Some(entry) = self.inner.pop(&series) {
+                self.eviction_count += 1;
+                if let Some(ref mut capacity_policy) = self.capacity_policy {
+                    capacity_policy.free_item(&series, &entry);
+                }
             }
         }
     }
@@ -523,23 +541,19 @@ impl MetricSet {
             return; // No capacity limits configured, return immediately
         };
 
-        // Handle differently based on whether we need to track memory
-        if capacity_policy.max_bytes.is_some() {
-            // When tracking memory, we need to calculate sizes before and after
-            let entry_size = capacity_policy.item_size(&series, &entry);
-
-            if let Some(existing_entry) = self.inner.put(series.clone(), entry) {
-                // If we had an existing entry, calculate its size and adjust memory tracking
-                let existing_size = capacity_policy.item_size(&series, &existing_entry);
-                capacity_policy.replace_memory(existing_size, entry_size);
-            } else {
-                // No existing entry, just add the new entry's size
-                capacity_policy.replace_memory(0, entry_size);
-            }
+        // Always track memory when capacity policy exists
+        let entry_size = capacity_policy.item_size(&series, &entry);
+        if let Some(existing_entry) = self.inner.put(series.clone(), entry) {
+            // If we had an existing entry, calculate its size and adjust memory tracking
+            let existing_size = capacity_policy.item_size(&series, &existing_entry);
+            capacity_policy.replace_memory(existing_size, entry_size);
         } else {
-            // When not tracking memory (only entry count limits), just put directly
-            self.inner.put(series, entry);
+            // No existing entry, just add the new entry's size
+            capacity_policy.replace_memory(0, entry_size);
         }
+
+        // Get item; move to back of LRU cache
+        self.inner.get(&series);
 
         // Enforce limits after insertion
         self.enforce_capacity_policy();
@@ -703,5 +717,184 @@ impl MetricSet {
 impl Default for MetricSet {
     fn default() -> Self {
         Self::new(MetricSetSettings::default())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use similar_asserts::assert_eq;
+    use vector_lib::event::{Metric, MetricKind, MetricValue};
+
+    // Helper function to create a metric with a unique name and value
+    fn create_test_metric(name: &str, kind: MetricKind, value: MetricValue) -> Metric {
+        Metric::new(name, kind, value)
+    }
+
+    #[test]
+    fn test_metric_set_max_events_limit() {
+        // Create a MetricSet with a max events limit of 5
+        let settings = MetricSetSettings {
+            max_events: Some(5),
+            max_bytes: None,
+            time_to_live: None,
+        };
+        let mut metric_set = MetricSet::new(settings);
+
+        // Push 10 distinct metrics (0-9)
+        for i in 0..10 {
+            let metric = create_test_metric(
+                &format!("test-metric-{}", i),
+                MetricKind::Incremental,
+                MetricValue::Counter { value: i as f64 },
+            );
+            metric_set.insert_update(metric);
+        }
+
+        // Verify we have only 5 metrics in the cache
+        assert_eq!(metric_set.len(), 5);
+
+        // Verify eviction count is 5
+        assert_eq!(metric_set.get_and_reset_eviction_count(), 5);
+
+        // Convert to vec and verify we have 5 metrics
+        let metrics = metric_set.into_metrics();
+        assert_eq!(metrics.len(), 5);
+
+        // Collect the metric names - these should be test-metric-5 through test-metric-9
+        // since those are the most recently added metrics that should be retained by the LRU cache
+        let mut metric_names = Vec::new();
+        for metric in &metrics {
+            metric_names.push(metric.name().to_string());
+        }
+
+        // Check that we have the expected metric names (the 5 most recently added)
+        for i in 5..10 {
+            let expected_name = format!("test-metric-{}", i);
+            assert!(
+                metric_names.contains(&expected_name),
+                "Expected to find metric named {} in result set",
+                expected_name
+            );
+        }
+    }
+
+    #[test]
+    fn test_incremental_to_absolute_conversion() {
+        let mut metric_set = MetricSet::default();
+
+        // Process a sequence of incremental counter metrics
+        let incremental1 = create_test_metric(
+            "test-metric",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 1.0 },
+        );
+        let absolute1 = metric_set.make_absolute(incremental1.clone()).unwrap();
+
+        // First metric should be converted to absolute with the same value
+        assert_eq!(absolute1.kind(), MetricKind::Absolute);
+        match absolute1.value() {
+            MetricValue::Counter { value } => assert_eq!(*value, 1.0),
+            _ => panic!("Expected counter metric"),
+        }
+
+        // Send a second incremental metric
+        let incremental2 = create_test_metric(
+            "test-metric",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 2.0 },
+        );
+        let absolute2 = metric_set.make_absolute(incremental2.clone()).unwrap();
+
+        // Second metric should be converted to absolute with accumulated value (1.0 + 2.0 = 3.0)
+        assert_eq!(absolute2.kind(), MetricKind::Absolute);
+        match absolute2.value() {
+            MetricValue::Counter { value } => assert_eq!(*value, 3.0),
+            _ => panic!("Expected counter metric"),
+        }
+
+        // Verify absolute metrics are handled correctly
+        let absolute_test = create_test_metric(
+            "test-gauge",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 5.0 },
+        );
+
+        // Process the absolute metric
+        let absolute_test = metric_set.make_absolute(absolute_test.clone()).unwrap();
+
+        // Absolute metrics should be returned unchanged
+        assert_eq!(absolute_test.kind(), MetricKind::Absolute);
+        match absolute_test.value() {
+            MetricValue::Gauge { value } => assert_eq!(*value, 5.0),
+            _ => panic!("Expected gauge metric"),
+        }
+    }
+
+    #[test]
+    fn test_absolute_to_incremental_conversion() {
+        let mut metric_set = MetricSet::default();
+
+        // Process a sequence of absolute counter metrics
+        let absolute1 = create_test_metric(
+            "test-metric",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 10.0 },
+        );
+
+        // First metric should be stored but not emitted (returns None)
+        let incremental1 = metric_set.make_incremental(absolute1.clone());
+        assert!(
+            incremental1.is_none(),
+            "First absolute metric should not produce an incremental output"
+        );
+
+        // Send a second absolute metric with a higher value
+        let absolute2 = create_test_metric(
+            "test-metric",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 15.0 },
+        );
+        let incremental2 = metric_set.make_incremental(absolute2.clone()).unwrap();
+
+        // Second metric should be converted to incremental with the delta (15.0 - 10.0 = 5.0)
+        assert_eq!(incremental2.kind(), MetricKind::Incremental);
+        match incremental2.value() {
+            MetricValue::Counter { value } => assert_eq!(*value, 5.0),
+            _ => panic!("Expected counter metric"),
+        }
+
+        // Send a third absolute metric with a lower value (simulating counter reset)
+        let absolute3 = create_test_metric(
+            "test-metric",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 3.0 },
+        );
+
+        // For counter resets, we expect None to be returned
+        let incremental3 = metric_set.make_incremental(absolute3.clone());
+        assert!(
+            incremental3.is_none(),
+            "Expected None when counter resets to a lower value"
+        );
+
+        // Verify incremental metrics are handled correctly
+        let incremental_test = create_test_metric(
+            "test-counter",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 5.0 },
+        );
+
+        // Process the incremental metric
+        let incremental_result = metric_set
+            .make_incremental(incremental_test.clone())
+            .unwrap();
+
+        // Incremental metrics should be returned unchanged
+        assert_eq!(incremental_result.kind(), MetricKind::Incremental);
+        match incremental_result.value() {
+            MetricValue::Counter { value } => assert_eq!(*value, 5.0),
+            _ => panic!("Expected counter metric"),
+        }
     }
 }
