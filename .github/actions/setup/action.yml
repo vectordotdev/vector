@@ -149,9 +149,12 @@ runs:
       if: ${{ inputs.cargo-cache == 'true' || env.NEEDS_RUST == 'true' }}
       uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
       with:
-        # Swatinem appends `${runnerOS}-${runnerArch}` to the key automatically,
-        # so no need to repeat `runner.os` here.
-        shared-key: "vector"
+        # No `shared-key`: let Swatinem partition by job-id (its default).
+        # Sharing one key across jobs caused races — the lightest job
+        # (check-fmt) consistently won the save lock, persisting an
+        # almost-empty target/ and locking out heavier jobs (check-clippy,
+        # Build) from saving their actual artifacts.
+        prefix-key: "v1-vector"
         # TEMP: save on all refs while prototyping so this branch seeds the
         # cache. Restore to `${{ github.ref == 'refs/heads/master' }}` before
         # merging.
