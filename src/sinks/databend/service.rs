@@ -23,6 +23,36 @@ use crate::{internal_events::EndpointBytesSent, sinks::util::retries::RetryLogic
 
 use super::config::DatabendLoadMode;
 
+fn quote_identifier(identifier: &str) -> String {
+    format!("`{}`", identifier.replace('`', "``"))
+}
+
+fn quote_sql_string(value: &str) -> String {
+    let mut quoted = String::with_capacity(value.len() + 2);
+    quoted.push('\'');
+    for char in value.chars() {
+        match char {
+            '\'' => quoted.push_str("''"),
+            '\\' => quoted.push_str("\\\\"),
+            '\n' => quoted.push_str("\\n"),
+            '\r' => quoted.push_str("\\r"),
+            '\t' => quoted.push_str("\\t"),
+            char => quoted.push(char),
+        }
+    }
+    quoted.push('\'');
+    quoted
+}
+
+fn file_format_option_sql(key: &str, value: &str) -> String {
+    let value = match key {
+        "field_delimiter" | "record_delimiter" | "missing_field_as" => quote_sql_string(value),
+        _ => value.to_string(),
+    };
+
+    format!("{key}={value}")
+}
+
 #[derive(Clone)]
 pub struct DatabendRetryLogic;
 
@@ -190,7 +220,8 @@ impl DatabendService {
         let size = data.len() as u64;
         let reader = Box::new(Cursor::new(data));
         self.client.upload_to_stage(&stage, reader, size).await?;
-        let sql = format!("INSERT INTO `{}` VALUES", self.table);
+        let table = quote_identifier(&self.table);
+        let sql = format!("INSERT INTO {table} VALUES");
         let _ = self
             .client
             .insert_with_stage(
@@ -205,9 +236,9 @@ impl DatabendService {
 
     async fn streaming_load(&self, data: Bytes) -> Result<(), DatabendError> {
         let reader = Box::new(Cursor::new(data));
+        let table = quote_identifier(&self.table);
         let sql = format!(
-            "INSERT INTO {} FROM @_databend_load FILE_FORMAT=({})",
-            self.table,
+            "INSERT INTO {table} FROM @_databend_load FILE_FORMAT=({})",
             self.file_format_options_sql()
         );
         let _ = self
@@ -226,8 +257,14 @@ impl DatabendService {
         let size = data.len() as u64;
         let reader = Box::new(Cursor::new(data));
         self.client.upload_to_stage(&stage, reader, size).await?;
-        let primary_key = self.primary_key.join(", ");
-        let sql = format!("REPLACE INTO {} ON ({primary_key}) VALUES", self.table);
+        let table = quote_identifier(&self.table);
+        let primary_key = self
+            .primary_key
+            .iter()
+            .map(|key| quote_identifier(key))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let sql = format!("REPLACE INTO {table} ON ({primary_key}) VALUES");
         let _ = self
             .client
             .insert_with_stage(
@@ -250,7 +287,7 @@ impl DatabendService {
     fn file_format_options_sql(&self) -> String {
         self.file_format_options
             .iter()
-            .map(|(key, value)| format!("{key}={value}"))
+            .map(|(key, value)| file_format_option_sql(key, value))
             .collect::<Vec<_>>()
             .join(" ")
     }
@@ -283,5 +320,61 @@ impl Service<DatabendRequest> for DatabendService {
             Ok(DatabendResponse { metadata })
         };
         Box::pin(future)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeMap;
+
+    use super::{file_format_option_sql, quote_identifier, quote_sql_string};
+
+    #[test]
+    fn quote_identifier_escapes_backticks() {
+        assert_eq!(quote_identifier("events"), "`events`");
+        assert_eq!(quote_identifier("odd`table"), "`odd``table`");
+    }
+
+    #[test]
+    fn quote_sql_string_escapes_special_characters() {
+        assert_eq!(quote_sql_string(","), "','");
+        assert_eq!(quote_sql_string("\n"), "'\\n'");
+        assert_eq!(quote_sql_string("it's"), "'it''s'");
+    }
+
+    #[test]
+    fn file_format_option_sql_quotes_string_values() {
+        assert_eq!(file_format_option_sql("type", "CSV"), "type=CSV");
+        assert_eq!(
+            file_format_option_sql("field_delimiter", ","),
+            "field_delimiter=','"
+        );
+        assert_eq!(
+            file_format_option_sql("record_delimiter", "\n"),
+            "record_delimiter='\\n'"
+        );
+        assert_eq!(file_format_option_sql("skip_header", "0"), "skip_header=0");
+    }
+
+    #[test]
+    fn file_format_options_are_stable_for_streaming_sql() {
+        let options = BTreeMap::from([
+            ("compression", "GZIP"),
+            ("field_delimiter", ","),
+            ("record_delimiter", "\n"),
+            ("skip_header", "0"),
+            ("type", "CSV"),
+        ]);
+
+        let sql = options
+            .iter()
+            .map(|(key, value)| file_format_option_sql(key, value))
+            .collect::<Vec<_>>()
+            .join(" ");
+
+        assert_eq!(
+            sql,
+            "compression=GZIP field_delimiter=',' record_delimiter='\\n' skip_header=0 type=CSV"
+        );
     }
 }

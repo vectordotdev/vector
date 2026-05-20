@@ -276,10 +276,6 @@ impl SinkConfig for DatabendConfig {
         let framer = FramingConfig::NewlineDelimited.build();
         let transformer = encoding.transformer();
 
-        if matches!(self.load_mode, DatabendLoadMode::Streaming) {
-            file_format_options.insert("compression", "AUTO");
-        }
-
         let mut copy_options = BTreeMap::new();
         copy_options.insert(
             "purge",
