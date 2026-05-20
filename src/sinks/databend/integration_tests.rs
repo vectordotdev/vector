@@ -113,7 +113,7 @@ async fn prepare_raw_config() -> (String, String, Arc<DatabendAPIClient>) {
             encoding.codec = "json"
             raw.enabled = true
             raw.create_table = true
-            raw.metadata.includes = ["%file"]
+            raw.metadata.includes = ["%file.path", "%file.offset"]
         "#,
     );
 
@@ -321,7 +321,7 @@ async fn raw_auto_create_table_with_metadata_paths() {
 
     let resp = client
         .query_all(&format!(
-            "select raw_data::String, record_metadata::String from `{table}`"
+            "select raw_data::String, file_path::String, file_offset::String from `{table}`"
         ))
         .await
         .unwrap();
@@ -330,10 +330,8 @@ async fn raw_auto_create_table_with_metadata_paths() {
         Some(r#"{"event":"raw-a","n":1}"#.to_string()),
         resp.data[0][0]
     );
-    let metadata = resp.data[0][1].as_ref().unwrap();
-    let metadata: serde_json::Value = serde_json::from_str(metadata).unwrap();
-    assert_eq!(metadata["file"]["path"], "/tmp/vector/raw.log");
-    assert_eq!(metadata["file"]["offset"], 42);
+    assert_eq!(Some("/tmp/vector/raw.log".to_string()), resp.data[0][1]);
+    assert_eq!(Some("42".to_string()), resp.data[0][2]);
 }
 
 fn response_to_map(resp: &Page) -> Vec<BTreeMap<String, Option<String>>> {

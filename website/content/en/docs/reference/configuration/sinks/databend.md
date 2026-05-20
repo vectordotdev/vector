@@ -50,18 +50,21 @@ sinks:
 replace with streaming load, so `primary_key` cannot be used with
 `load_mode: streaming`.
 
-Raw mode writes each event into a fixed raw ingest schema:
+Raw mode writes each event into a generated raw ingest schema. The sink always
+uses these columns:
 
 ```sql
-uuid String,
-koffset BIGINT,
-kpartition INT,
 raw_data JSON,
-record_metadata JSON,
 add_time TIMESTAMP
 ```
 
-Enable `raw.create_table` to create this table during sink startup:
+`raw.metadata.includes` adds metadata columns to that schema. Metadata paths are
+converted to column names by removing `%` and replacing separators with `_`. For
+example, `%kafka.topic` becomes `kafka_topic`.
+
+Enable `raw.create_table` to create this table during sink startup. With the
+following configuration, the generated table includes `raw_data`, `add_time`,
+`kafka_topic`, `kafka_partition`, and `kafka_offset`:
 
 ```yaml
 sinks:
@@ -74,12 +77,15 @@ sinks:
       enabled: true
       create_table: true
       metadata:
-        includes: ["*"]
+        includes:
+          - "%kafka.topic"
+          - "%kafka.partition"
+          - "%kafka.offset"
 ```
 
 `raw.metadata.includes` accepts Vector metadata paths. If the option is not
-configured, it defaults to `["*"]`, which copies all metadata. Set it to an empty array to omit
-metadata:
+configured, it defaults to `["*"]`, which copies all metadata into a `metadata`
+JSON column. Set it to an empty array to omit metadata columns:
 
 ```yaml
 raw:
@@ -87,7 +93,7 @@ raw:
     includes: []
 ```
 
-You can include specific metadata paths:
+You can include specific metadata paths as separate columns:
 
 ```yaml
 raw:

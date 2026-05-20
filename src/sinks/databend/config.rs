@@ -42,6 +42,66 @@ fn default_raw_message_key() -> String {
     "message".to_string()
 }
 
+pub(crate) fn raw_metadata_column_name(path: &str) -> Option<String> {
+    let path = path.trim();
+    let path = if path == "*" {
+        "metadata"
+    } else {
+        path.trim_start_matches('%')
+    };
+
+    let mut column = String::new();
+    let mut previous_was_underscore = false;
+    for char in path.chars() {
+        if char.is_ascii_alphanumeric() {
+            column.push(char.to_ascii_lowercase());
+            previous_was_underscore = false;
+        } else if !previous_was_underscore {
+            column.push('_');
+            previous_was_underscore = true;
+        }
+    }
+    let column = column.trim_matches('_');
+    if column.is_empty() {
+        return None;
+    }
+
+    let mut column = column.to_string();
+    if column
+        .chars()
+        .next()
+        .is_some_and(|char| char.is_ascii_digit())
+    {
+        column.insert(0, '_');
+    }
+
+    Some(column)
+}
+
+fn raw_create_table_sql(table: &str, raw: &DatabendRawOptions) -> String {
+    let mut columns = vec![
+        "raw_data JSON".to_string(),
+        "add_time TIMESTAMP".to_string(),
+    ];
+    let mut seen_columns = std::collections::BTreeSet::new();
+
+    for path in &raw.metadata.includes {
+        let Some(column) = raw_metadata_column_name(path) else {
+            continue;
+        };
+
+        if seen_columns.insert(column.clone()) {
+            columns.push(format!("{column} JSON"));
+        }
+    }
+
+    format!(
+        "CREATE TABLE IF NOT EXISTS {} ({})",
+        table,
+        columns.join(", ")
+    )
+}
+
 /// Databend load API to use for this sink.
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Default)]
@@ -60,10 +120,10 @@ pub enum DatabendLoadMode {
 #[derive(Clone, Debug)]
 #[serde(default)]
 pub struct DatabendRawMetadataOptions {
-    /// Vector metadata paths to include in `record_metadata`.
+    /// Vector metadata paths to include as raw metadata columns.
     ///
-    /// If unset, all supported metadata fields are included. If set to an empty array, no
-    /// metadata fields are included.
+    /// If unset, all metadata is included in the `metadata` column. If set to an empty array,
+    /// no metadata columns are included.
     pub includes: Vec<String>,
 }
 
@@ -130,15 +190,15 @@ impl DatabendCopyOnError {
     }
 }
 
-/// Raw Kafka ingest compatibility mode.
+/// Raw ingest mode.
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(default)]
 pub struct DatabendRawOptions {
-    /// Enable bend-ingest-kafka compatible raw records.
+    /// Enable raw records.
     pub enabled: bool,
 
-    /// Controls which Vector metadata fields are copied into `record_metadata`.
+    /// Controls which Vector metadata fields are copied into generated raw metadata columns.
     #[serde(default = "default_raw_metadata")]
     pub metadata: DatabendRawMetadataOptions,
 
@@ -225,7 +285,7 @@ pub struct DatabendConfig {
     #[serde(default)]
     pub primary_key: Vec<String>,
 
-    /// bend-ingest-kafka compatible raw Kafka ingest options.
+    /// Raw ingest options.
     #[serde(default)]
     pub raw: DatabendRawOptions,
 
@@ -372,10 +432,7 @@ impl SinkConfig for DatabendConfig {
 
         let client = DatabendAPIClient::new(&endpoint, Some(ua)).await?;
         if self.raw.create_table {
-            let sql = format!(
-                "CREATE TABLE IF NOT EXISTS {} (uuid String, koffset BIGINT, kpartition INT, raw_data JSON, record_metadata JSON, add_time TIMESTAMP)",
-                self.table
-            );
+            let sql = raw_create_table_sql(&self.table, &self.raw);
             client.query_all(&sql).await?;
         }
         let service = DatabendService::new(
@@ -574,5 +631,40 @@ mod tests {
         .unwrap();
 
         assert!(cfg.primary_key.is_empty());
+    }
+
+    #[test]
+    fn raw_metadata_column_names_are_sanitized() {
+        assert_eq!(
+            raw_metadata_column_name("%kafka.topic"),
+            Some("kafka_topic".to_string())
+        );
+        assert_eq!(
+            raw_metadata_column_name("%kafka.partition"),
+            Some("kafka_partition".to_string())
+        );
+        assert_eq!(raw_metadata_column_name("*"), Some("metadata".to_string()));
+        assert_eq!(raw_metadata_column_name(""), None);
+    }
+
+    #[test]
+    fn raw_create_table_uses_metadata_includes_as_columns() {
+        let raw = DatabendRawOptions {
+            enabled: true,
+            metadata: DatabendRawMetadataOptions {
+                includes: vec![
+                    "%kafka.topic".to_string(),
+                    "%kafka.partition".to_string(),
+                    "%kafka.topic".to_string(),
+                ],
+            },
+            create_table: true,
+            message_key: default_raw_message_key(),
+        };
+
+        assert_eq!(
+            raw_create_table_sql("raw_events", &raw),
+            "CREATE TABLE IF NOT EXISTS raw_events (raw_data JSON, add_time TIMESTAMP, kafka_topic JSON, kafka_partition JSON)"
+        );
     }
 }
