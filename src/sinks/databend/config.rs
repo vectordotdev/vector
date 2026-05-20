@@ -38,51 +38,6 @@ fn default_stage_path_prefix() -> String {
     "vector".to_string()
 }
 
-fn default_raw_message_key() -> String {
-    "message".to_string()
-}
-
-pub(crate) fn raw_metadata_column_name(path: &str) -> Option<String> {
-    let path = path.trim();
-    if path.is_empty() {
-        return None;
-    }
-
-    if path == "*" {
-        Some("metadata".to_string())
-    } else {
-        Some(path.to_string())
-    }
-}
-
-fn quote_databend_identifier(identifier: &str) -> String {
-    format!("\"{}\"", identifier.replace('"', "\"\""))
-}
-
-fn raw_create_table_sql(table: &str, raw: &DatabendRawOptions) -> String {
-    let mut columns = vec![
-        "raw_data JSON".to_string(),
-        "add_time TIMESTAMP".to_string(),
-    ];
-    let mut seen_columns = std::collections::BTreeSet::new();
-
-    for path in &raw.metadata.includes {
-        let Some(column) = raw_metadata_column_name(path) else {
-            continue;
-        };
-
-        if seen_columns.insert(column.clone()) {
-            columns.push(format!("{} JSON", quote_databend_identifier(&column)));
-        }
-    }
-
-    format!(
-        "CREATE TABLE IF NOT EXISTS {} ({})",
-        table,
-        columns.join(", ")
-    )
-}
-
 /// Databend load API to use for this sink.
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Default)]
@@ -94,30 +49,6 @@ pub enum DatabendLoadMode {
 
     /// Stream each batch directly through Databend's `/v1/streaming_load` endpoint.
     Streaming,
-}
-
-/// Metadata options for raw ingest records.
-#[configurable_component]
-#[derive(Clone, Debug)]
-#[serde(default)]
-pub struct DatabendRawMetadataOptions {
-    /// Vector metadata paths to include as raw metadata columns.
-    ///
-    /// If unset, all metadata is included in the `metadata` column. If set to an empty array,
-    /// no metadata columns are included.
-    pub includes: Vec<String>,
-}
-
-impl Default for DatabendRawMetadataOptions {
-    fn default() -> Self {
-        Self {
-            includes: vec!["*".to_string()],
-        }
-    }
-}
-
-fn default_raw_metadata() -> DatabendRawMetadataOptions {
-    DatabendRawMetadataOptions::default()
 }
 
 /// COPY options used by staged Databend loads.
@@ -167,37 +98,6 @@ impl DatabendCopyOnError {
         match self {
             Self::Abort => "abort",
             Self::Continue => "continue",
-        }
-    }
-}
-
-/// Raw ingest mode.
-#[configurable_component]
-#[derive(Clone, Debug)]
-#[serde(default)]
-pub struct DatabendRawOptions {
-    /// Enable raw records.
-    pub enabled: bool,
-
-    /// Controls which Vector metadata fields are copied into generated raw metadata columns.
-    #[serde(default = "default_raw_metadata")]
-    pub metadata: DatabendRawMetadataOptions,
-
-    /// Create the raw target table during sink startup if it does not exist.
-    pub create_table: bool,
-
-    /// Event field containing the raw Kafka payload.
-    #[serde(default = "default_raw_message_key")]
-    pub message_key: String,
-}
-
-impl Default for DatabendRawOptions {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            metadata: default_raw_metadata(),
-            create_table: false,
-            message_key: default_raw_message_key(),
         }
     }
 }
@@ -262,13 +162,9 @@ pub struct DatabendConfig {
     /// Columns used for `REPLACE INTO ... ON (...)`.
     ///
     /// When empty, Databend uses normal insert mode. When non-empty, Databend uses replace mode.
-    /// This is independent of raw mode. Configure it to match the target table's logical key.
+    /// Configure it to match the target table's logical key.
     #[serde(default)]
     pub primary_key: Vec<String>,
-
-    /// Raw ingest options.
-    #[serde(default)]
-    pub raw: DatabendRawOptions,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -412,10 +308,6 @@ impl SinkConfig for DatabendConfig {
         copy_options.insert("on_error", self.copy_options.on_error.as_str());
 
         let client = DatabendAPIClient::new(&endpoint, Some(ua)).await?;
-        if self.raw.create_table {
-            let sql = raw_create_table_sql(&self.table, &self.raw);
-            client.query_all(&sql).await?;
-        }
         let service = DatabendService::new(
             client,
             DatabendServiceSettings {
@@ -433,8 +325,7 @@ impl SinkConfig for DatabendConfig {
             .service(service);
 
         let encoder = Encoder::<Framer>::new(framer, serializer);
-        let request_builder =
-            DatabendRequestBuilder::new(compression, (transformer, encoder), self.raw.clone());
+        let request_builder = DatabendRequestBuilder::new(compression, (transformer, encoder));
 
         let sink = DatabendSink::new(batch_settings, request_builder, service);
 
@@ -524,10 +415,6 @@ mod tests {
             copy_options.disable_variant_check = true
             copy_options.on_error = "continue"
             primary_key = ["id", "source"]
-            raw.enabled = true
-            raw.create_table = true
-            raw.message_key = "message"
-            raw.metadata.includes = ["%kafka.topic", "%kafka.partition", "%kafka.offset", "%kafka.message_key"]
         "#,
         )
         .unwrap();
@@ -544,61 +431,6 @@ mod tests {
             DatabendCopyOnError::Continue
         ));
         assert_eq!(cfg.primary_key, ["id", "source"]);
-        assert!(cfg.raw.enabled);
-        assert!(cfg.raw.create_table);
-        assert_eq!(
-            cfg.raw.metadata.includes,
-            [
-                "%kafka.topic",
-                "%kafka.partition",
-                "%kafka.offset",
-                "%kafka.message_key",
-            ]
-        );
-    }
-
-    #[test]
-    fn parse_config_with_default_raw_metadata_includes_all() {
-        let cfg = toml::from_str::<DatabendConfig>(
-            r#"
-            endpoint = "databend://localhost:8000/mydatabase?sslmode=disable"
-            table = "mytable"
-            raw.enabled = true
-        "#,
-        )
-        .unwrap();
-
-        assert_eq!(cfg.raw.metadata.includes, [String::from("*")]);
-    }
-
-    #[test]
-    fn parse_config_with_empty_raw_metadata_config_includes_all() {
-        let cfg = toml::from_str::<DatabendConfig>(
-            r#"
-            endpoint = "databend://localhost:8000/mydatabase?sslmode=disable"
-            table = "mytable"
-            raw.enabled = true
-            raw.metadata = {}
-        "#,
-        )
-        .unwrap();
-
-        assert_eq!(cfg.raw.metadata.includes, [String::from("*")]);
-    }
-
-    #[test]
-    fn parse_config_with_empty_raw_metadata_includes_none() {
-        let cfg = toml::from_str::<DatabendConfig>(
-            r#"
-            endpoint = "databend://localhost:8000/mydatabase?sslmode=disable"
-            table = "mytable"
-            raw.enabled = true
-            raw.metadata.includes = []
-        "#,
-        )
-        .unwrap();
-
-        assert!(cfg.raw.metadata.includes.is_empty());
     }
 
     #[test]
@@ -612,40 +444,5 @@ mod tests {
         .unwrap();
 
         assert!(cfg.primary_key.is_empty());
-    }
-
-    #[test]
-    fn raw_metadata_column_names_are_sanitized() {
-        assert_eq!(
-            raw_metadata_column_name("%kafka.topic"),
-            Some("%kafka.topic".to_string())
-        );
-        assert_eq!(
-            raw_metadata_column_name("%kafka.partition"),
-            Some("%kafka.partition".to_string())
-        );
-        assert_eq!(raw_metadata_column_name("*"), Some("metadata".to_string()));
-        assert_eq!(raw_metadata_column_name(""), None);
-    }
-
-    #[test]
-    fn raw_create_table_uses_metadata_includes_as_columns() {
-        let raw = DatabendRawOptions {
-            enabled: true,
-            metadata: DatabendRawMetadataOptions {
-                includes: vec![
-                    "%kafka.topic".to_string(),
-                    "%kafka.partition".to_string(),
-                    "%kafka.topic".to_string(),
-                ],
-            },
-            create_table: true,
-            message_key: default_raw_message_key(),
-        };
-
-        assert_eq!(
-            raw_create_table_sql("raw_events", &raw),
-            "CREATE TABLE IF NOT EXISTS raw_events (raw_data JSON, add_time TIMESTAMP, \"%kafka.topic\" JSON, \"%kafka.partition\" JSON)"
-        );
     }
 }

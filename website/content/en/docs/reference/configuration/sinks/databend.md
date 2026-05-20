@@ -13,7 +13,7 @@ This doc is generated using:
 2. The relevant CUE data in cue/reference/components/...
 */}}
 
-## Raw ingest and replace mode
+## Ingest Modes
 
 The Databend sink supports staged batch loading by default. Set `load_mode` to
 `streaming` to use Databend's streaming load API for normal inserts.
@@ -46,60 +46,5 @@ sinks:
     primary_key: ["id", "source"]
 ```
 
-`primary_key` is independent of raw mode. Databend does not currently support
-replace with streaming load, so `primary_key` cannot be used with
-`load_mode: streaming`.
-
-Raw mode writes each event into a generated raw ingest schema. The sink always
-uses these columns:
-
-```sql
-raw_data JSON,
-add_time TIMESTAMP
-```
-
-`raw.metadata.includes` adds metadata columns to that schema. Metadata paths are
-used as column names as-is and quoted in the generated Databend SQL. For
-example, `%kafka.topic` creates a `"%kafka.topic"` column.
-
-Enable `raw.create_table` to create this table during sink startup. With the
-following configuration, the generated table includes `raw_data`, `add_time`,
-`"%kafka.topic"`, `"%kafka.partition"`, and `"%kafka.offset"`:
-
-```yaml
-sinks:
-  databend:
-    type: databend
-    inputs: ["logs"]
-    endpoint: "databend://root:@127.0.0.1:8000/default?sslmode=disable"
-    table: "raw_events"
-    raw:
-      enabled: true
-      create_table: true
-      metadata:
-        includes:
-          - "%kafka.topic"
-          - "%kafka.partition"
-          - "%kafka.offset"
-```
-
-`raw.metadata.includes` accepts Vector metadata paths. If the option is not
-configured, it defaults to `["*"]`, which copies all metadata into a `metadata`
-JSON column. Set it to an empty array to omit metadata columns:
-
-```yaml
-raw:
-  metadata:
-    includes: []
-```
-
-You can include specific metadata paths as separate columns:
-
-```yaml
-raw:
-  metadata:
-    includes:
-      - "%kafka.topic"
-      - "%kafka.partition"
-      - "%kafka.offset"
-```
+Databend does not currently support replace with streaming load, so
+`primary_key` cannot be used with `load_mode: streaming`.

@@ -2,10 +2,7 @@ use std::{collections::BTreeMap, sync::Arc};
 
 use databend_client::{APIClient as DatabendAPIClient, Page};
 use futures::{future::ready, stream};
-use vector_lib::{
-    event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent, ObjectMap, Value},
-    lookup::{PathPrefix, path},
-};
+use vector_lib::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent, Value};
 
 use super::config::DatabendConfig;
 use crate::{
@@ -96,30 +93,6 @@ async fn prepare_config(
     (cfg, table, client)
 }
 
-async fn prepare_raw_config() -> (String, String, Arc<DatabendAPIClient>) {
-    trace_init();
-
-    let table = random_table_name();
-    let endpoint = databend_endpoint();
-    let client = DatabendAPIClient::new(&endpoint, Some("vector/integration-test".to_string()))
-        .await
-        .unwrap();
-
-    let cfg = format!(
-        r#"
-            endpoint = "{endpoint}"
-            table = "{table}"
-            batch.max_events = 1
-            encoding.codec = "json"
-            raw.enabled = true
-            raw.create_table = true
-            raw.metadata.includes = ["%file.path", "%file.offset"]
-        "#,
-    );
-
-    (cfg, table, client)
-}
-
 fn make_replace_event(id: i64, source: &str, value: &str) -> Event {
     let mut event = LogEvent::default();
     event.insert("id", id);
@@ -132,15 +105,6 @@ fn make_copy_error_event(id: Value, value: &str) -> Event {
     let mut event = LogEvent::default();
     event.insert("id", id);
     event.insert("value", value);
-    event.into()
-}
-
-fn make_raw_event(message: &str) -> Event {
-    let mut event = LogEvent::from(message);
-    let mut file = ObjectMap::new();
-    file.insert("path".into(), "/tmp/vector/raw.log".into());
-    file.insert("offset".into(), 42.into());
-    event.insert((PathPrefix::Metadata, path!("file")), Value::Object(file));
     event.into()
 }
 
@@ -304,34 +268,6 @@ async fn replace_event_with_primary_key() {
     assert_eq!(Some("new".to_string()), resp.data[0][2]);
     assert_eq!(Some("2".to_string()), resp.data[1][0]);
     assert_eq!(Some("steady".to_string()), resp.data[1][2]);
-}
-
-#[tokio::test]
-async fn raw_auto_create_table_with_metadata_paths() {
-    let (cfg, table, client) = prepare_raw_config().await;
-    let (config, _) = load_sink::<DatabendConfig>(&cfg).unwrap();
-    let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
-
-    run_and_assert_sink_compliance(
-        sink,
-        stream::once(ready(make_raw_event(r#"{"event":"raw-a","n":1}"#))),
-        &HTTP_SINK_TAGS,
-    )
-    .await;
-
-    let resp = client
-        .query_all(&format!(
-            "select raw_data::String, \"%file.path\"::String, \"%file.offset\"::String from `{table}`"
-        ))
-        .await
-        .unwrap();
-    assert_eq!(1, resp.data.len());
-    assert_eq!(
-        Some(r#"{"event":"raw-a","n":1}"#.to_string()),
-        resp.data[0][0]
-    );
-    assert_eq!(Some("/tmp/vector/raw.log".to_string()), resp.data[0][1]);
-    assert_eq!(Some("42".to_string()), resp.data[0][2]);
 }
 
 fn response_to_map(resp: &Page) -> Vec<BTreeMap<String, Option<String>>> {
