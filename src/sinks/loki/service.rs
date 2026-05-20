@@ -5,7 +5,6 @@ use http::StatusCode;
 use snafu::Snafu;
 use std::sync::atomic::{AtomicI64, Ordering};
 use tracing::Instrument;
-use std::sync::atomic::{AtomicI64, Ordering};
 
 use crate::{
     http::{Auth, HttpClient},
