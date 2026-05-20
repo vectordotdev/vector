@@ -60,8 +60,9 @@ impl fmt::Debug for TagValueSetStorage {
 
 impl AcceptedTagValueSet {
     pub fn new(value_limit: usize, mode: &Mode) -> Self {
+        let _ = value_limit; // capacity is grown lazily; `value_limit` only caps `len()` at insert time
         let storage = match &mode {
-            Mode::Exact => TagValueSetStorage::Set(HashSet::with_capacity(value_limit)),
+            Mode::Exact => TagValueSetStorage::Set(HashSet::new()),
             Mode::Probabilistic(config) => {
                 TagValueSetStorage::Bloom(BloomFilterStorage::new(config.cache_size_per_key))
             }
