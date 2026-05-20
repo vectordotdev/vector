@@ -46,8 +46,8 @@ pub enum OverflowStrategy {
     /// Wait for free space in the queue.
     ///
     /// This applies backpressure up the topology, signalling that sources should slow down
-    /// the acceptance/consumption of events. This means that while no data is lost, data will pile
-    /// up at the edge.
+    /// the acceptance/consumption of events. This may cause the system to degenerate if this
+    /// component blocks for too long.
     #[default]
     Block,
 
@@ -58,9 +58,8 @@ pub enum OverflowStrategy {
     /// slowdown in the acceptance/consumption of events.
     DropNewest,
 
-    /// Passes the event immediately instead of waiting for delay, to not take up the space in the
-    /// queue.
-    Pass,
+    /// Forward the event without any delay to next component.
+    Forward,
 }
 
 impl_generate_config_from_default!(DelayConfig);
@@ -169,7 +168,7 @@ impl TaskTransform<Event> for Delay {
                                                 });
                                                 continue;
                                             }
-                                            OverflowStrategy::Pass => {
+                                            OverflowStrategy::Forward => {
                                                 yield event;
                                                 continue;
                                             }
