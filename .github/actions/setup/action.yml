@@ -134,17 +134,24 @@ runs:
       run: echo "::add-matcher::.github/matchers/rust.json"
       shell: bash
 
-    - name: Cache Cargo registry, index, and git DB
+    # Caches ~/.cargo (registry + git + cargo-installed bin) AND target/ build
+    # artifacts. Master pushes save the cache; PRs read it but don't write
+    # back, so a single fixed key per OS keeps the 10 GB GHA cache budget
+    # under control even as Cargo.lock churns. PRs only recompile what their
+    # changes invalidate (Cargo fingerprints), so unchanged deps
+    # (rdkafka-sys, openssl-sys, …) are reused as-is from master's cache.
+    #
+    # `key:` is fixed (no lockfile hash) on purpose: Swatinem's default key
+    # would create a new ~2-3 GB entry per Cargo.lock variant, which blows
+    # past the 10 GB GHA cap fast. Cargo's fingerprint system handles
+    # invalidation inside the cache. Bump the `-v?` suffix to force a
+    # full rebuild if a cache ever gets into a bad state.
+    - name: Cache Cargo + target/
       if: ${{ inputs.cargo-cache == 'true' || env.NEEDS_RUST == 'true' }}
-      uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+      uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
       with:
-        path: |
-          ~/.cargo/registry/index/
-          ~/.cargo/registry/cache/
-          ~/.cargo/git/db/
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-cargo-
+        key: "vector-${{ runner.os }}-v1"
+        save-if: ${{ github.ref == 'refs/heads/master' }}
 
     - name: Install mold
       if: ${{ runner.os == 'Linux' && env.DISABLE_MOLD != 'true' && inputs.mold == 'true' }}
