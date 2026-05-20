@@ -4,7 +4,7 @@ generated: components: transforms: delay: configuration: {
 	delay_milliseconds: {
 		description: "Time to delay each event, in seconds."
 		required:    true
-		type: float: unit: "seconds"
+		type: uint: unit: "milliseconds"
 	}
 	delay_until_condition: {
 		description: "Delay events in provided delay periods until the condition is met."
@@ -21,8 +21,8 @@ generated: components: transforms: delay: configuration: {
 					Wait for free space in the queue.
 
 					This applies backpressure up the topology, signalling that sources should slow down
-					the acceptance/consumption of events. This means that while no data is lost, data will pile
-					up at the edge.
+					the acceptance/consumption of events. This may cause the system to degenerate if this
+					component blocks for too long.
 					"""
 				drop_newest: """
 					Drops the event instead of waiting for free space in the queue.
@@ -31,10 +31,7 @@ generated: components: transforms: delay: configuration: {
 					highest priority, and it is preferable to temporarily lose events rather than cause a
 					slowdown in the acceptance/consumption of events.
 					"""
-				pass: """
-					Passes the event immediately instead of waiting for delay, to not take up the space in the
-					queue.
-					"""
+				forward: "Forward the event without any delay to next component."
 			}
 		}
 	}
