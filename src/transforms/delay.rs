@@ -126,6 +126,9 @@ impl TaskTransform<Event> for Delay {
         Box::pin(stream! {
             let mut done = false;
             loop {
+                if done && self.queue.is_empty() {
+                    break;
+                }
                 tokio::select! {
                     maybe_event = input_rx.next(), if !done => {
                         match maybe_event {
