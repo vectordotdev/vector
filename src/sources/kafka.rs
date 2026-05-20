@@ -13,8 +13,13 @@ use std::{
 use async_stream::stream;
 use bytes::Bytes;
 use chrono::{DateTime, TimeZone, Utc};
-use futures::{Stream, StreamExt, stream::FuturesOrdered};
+use futures::{
+    Stream, StreamExt,
+    future::{Ready, ready},
+    stream::FuturesOrdered,
+};
 use futures_util::future::OptionFuture;
+use pin_project::pin_project;
 use rdkafka::{
     ClientConfig, ClientContext, Statistics, Timestamp, TopicPartitionList,
     consumer::{
@@ -34,7 +39,7 @@ use tokio::{
         mpsc::{self, UnboundedReceiver, UnboundedSender},
         oneshot,
     },
-    task::{JoinHandle, JoinSet},
+    task::{JoinError, JoinHandle, JoinSet},
     time::Sleep,
 };
 use tracing::{Instrument, Span};
@@ -576,6 +581,29 @@ struct Draining {
     span: Span,
 }
 type OptionDeadline = OptionFuture<Pin<Box<Sleep>>>;
+enum ProcessingEvent {
+    ParsedMessage(Option<(OwnedMessage, BatchStatusReceiver)>),
+    Eof,
+}
+#[pin_project(project = ProcessingFutureProj)]
+enum ProcessingFuture {
+    ParsedMessage(#[pin] JoinHandle<ProcessingEvent>),
+    Eof(#[pin] Ready<ProcessingEvent>),
+}
+impl Future for ProcessingFuture {
+    type Output = Result<ProcessingEvent, JoinError>;
+
+    fn poll(
+        self: Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Self::Output> {
+        let this = self.project();
+        match this {
+            ProcessingFutureProj::ParsedMessage(join_handle) => join_handle.poll(cx),
+            ProcessingFutureProj::Eof(ready) => ready.poll(cx).map(Ok),
+        }
+    }
+}
 enum ConsumerState {
     Consuming(ConsumerStateInner<Consuming>),
     Draining(ConsumerStateInner<Draining>),
@@ -652,7 +680,7 @@ impl ConsumerStateInner<Consuming> {
             let mut messages = p.stream().ready_chunks(CHUNK_SIZE);
             let (finalizer, mut ack_stream) = OrderedFinalizer::<FinalizerEntry>::new(None);
             let (future_done_tx, mut future_done_rx) = mpsc::channel::<()>(256);
-            let mut processing_futures = FuturesOrdered::<JoinHandle<Option<(OwnedMessage, BatchStatusReceiver)>>>::new();
+            let mut processing_futures = FuturesOrdered::<ProcessingFuture>::new();
 
             // finalizer is the entry point for new pending acknowledgements;
             // when it is dropped, no new messages will be consumed, and the
@@ -691,8 +719,14 @@ impl ConsumerStateInner<Consuming> {
 
                     Some(()) = future_done_rx.recv(), if finalizer.is_some() => {
                         while let Some(res) = processing_futures.next().await {
-                            if let Ok(batch_result) = res {
-                                Self::finalize_batch(batch_result, finalizer.as_ref());
+                            if let Ok(event) = res {
+                                match event {
+                                    ProcessingEvent::ParsedMessage(batch_result) => Self::finalize_batch(batch_result, finalizer.as_ref()),
+                                    ProcessingEvent::Eof => {
+                                        status = PartitionConsumerStatus::PartitionEOF;
+                                        finalizer.take();
+                                    }
+                                }
                             }
                         }
                     }
@@ -719,7 +753,7 @@ impl ConsumerStateInner<Consuming> {
                                 let message_handling_tasks_semaphore = Arc::clone(message_handling_tasks_semaphore);
                                 let permit = message_handling_tasks_semaphore.acquire_owned().await.expect("Message handling tasks semaphore closed");
                                 let future_done_tx = future_done_tx.clone();
-                                processing_futures.push_back(tokio::spawn(async move {
+                                processing_futures.push_back(ProcessingFuture::ParsedMessage(tokio::spawn(async move {
                                     let result = parse_message(msgs, &decoder, &keys, &mut out, acknowledgements, log_namespace).await;
                                     // Force moving permit into the task, to release only once done
                                     // parsing
@@ -729,8 +763,8 @@ impl ConsumerStateInner<Consuming> {
                                     // already a notification waiting, meaning this task will get
                                     // processed anyways
                                     let _ = future_done_tx.try_send(());
-                                    result
-                                }.instrument(span.clone())));
+                                    ProcessingEvent::ParsedMessage(result)
+                                }.instrument(span.clone()))));
                             } else {
                                 let batch_result = parse_message(msgs, &decoder, &keys, &mut out, acknowledgements, log_namespace).await;
                                 Self::finalize_batch(batch_result, finalizer.as_ref());
@@ -740,8 +774,14 @@ impl ConsumerStateInner<Consuming> {
                                 match error {
                                     rdkafka::error::KafkaError::PartitionEOF(partition) if exit_eof => {
                                         debug!("EOF for partition {}.", partition);
-                                        status = PartitionConsumerStatus::PartitionEOF;
-                                        finalizer.take();
+                                        if message_handling_tasks_semaphore.is_some() {
+                                            // We don't care about permits here, since there is no
+                                            // task here
+                                            processing_futures.push_back(ProcessingFuture::Eof(ready(ProcessingEvent::Eof)));
+                                        } else {
+                                            status = PartitionConsumerStatus::PartitionEOF;
+                                            finalizer.take();
+                                        }
                                     },
                                     _ => emit!(KafkaReadError { error }),
                                 }
