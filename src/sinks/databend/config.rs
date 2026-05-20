@@ -12,7 +12,7 @@ use super::{
     compression::DatabendCompression,
     encoding::{DatabendEncodingConfig, DatabendMissingFieldAS, DatabendSerializerConfig},
     request_builder::DatabendRequestBuilder,
-    service::{DatabendRetryLogic, DatabendService},
+    service::{DatabendRetryLogic, DatabendService, DatabendServiceSettings},
     sink::DatabendSink,
 };
 use crate::{
@@ -29,6 +29,137 @@ use crate::{
     tls::TlsConfig,
     vector_version,
 };
+
+fn default_stage() -> String {
+    "~".to_string()
+}
+
+fn default_stage_path_prefix() -> String {
+    "vector".to_string()
+}
+
+fn default_raw_message_key() -> String {
+    "message".to_string()
+}
+
+/// Databend load API to use for this sink.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum DatabendLoadMode {
+    /// Upload each batch to a stage, then load it into the table.
+    #[default]
+    Staged,
+
+    /// Stream each batch directly through Databend's `/v1/streaming_load` endpoint.
+    Streaming,
+}
+
+/// Metadata options for raw ingest records.
+#[configurable_component]
+#[derive(Clone, Debug)]
+#[serde(default)]
+pub struct DatabendRawMetadataOptions {
+    /// Vector metadata paths to include in `record_metadata`.
+    ///
+    /// If unset, all supported metadata fields are included. If set to an empty array, no
+    /// metadata fields are included.
+    pub includes: Vec<String>,
+}
+
+impl Default for DatabendRawMetadataOptions {
+    fn default() -> Self {
+        Self {
+            includes: vec!["*".to_string()],
+        }
+    }
+}
+
+fn default_raw_metadata() -> DatabendRawMetadataOptions {
+    DatabendRawMetadataOptions::default()
+}
+
+/// COPY options used by staged Databend loads.
+#[configurable_component]
+#[derive(Clone, Debug)]
+#[serde(default)]
+pub struct DatabendCopyOptions {
+    /// Whether to remove loaded files from the stage after a successful load.
+    pub purge: bool,
+
+    /// Whether to load files even if Databend has loaded them before.
+    pub force: bool,
+
+    /// Whether to disable variant type checks while loading.
+    pub disable_variant_check: bool,
+
+    /// How Databend handles errors while loading staged files.
+    pub on_error: DatabendCopyOnError,
+}
+
+impl Default for DatabendCopyOptions {
+    fn default() -> Self {
+        Self {
+            purge: true,
+            force: false,
+            disable_variant_check: false,
+            on_error: DatabendCopyOnError::Abort,
+        }
+    }
+}
+
+/// COPY `ON_ERROR` behavior.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum DatabendCopyOnError {
+    /// Abort the load when an error is encountered.
+    #[default]
+    Abort,
+
+    /// Continue loading other rows when an error is encountered.
+    Continue,
+}
+
+impl DatabendCopyOnError {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Abort => "abort",
+            Self::Continue => "continue",
+        }
+    }
+}
+
+/// Raw Kafka ingest compatibility mode.
+#[configurable_component]
+#[derive(Clone, Debug)]
+#[serde(default)]
+pub struct DatabendRawOptions {
+    /// Enable bend-ingest-kafka compatible raw records.
+    pub enabled: bool,
+
+    /// Controls which Vector metadata fields are copied into `record_metadata`.
+    #[serde(default = "default_raw_metadata")]
+    pub metadata: DatabendRawMetadataOptions,
+
+    /// Create the raw target table during sink startup if it does not exist.
+    pub create_table: bool,
+
+    /// Event field containing the raw Kafka payload.
+    #[serde(default = "default_raw_message_key")]
+    pub message_key: String,
+}
+
+impl Default for DatabendRawOptions {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            metadata: default_raw_metadata(),
+            create_table: false,
+            message_key: default_raw_message_key(),
+        }
+    }
+}
 
 /// Configuration for the `databend` sink.
 #[configurable_component(sink("databend", "Deliver log data to a Databend database."))]
@@ -70,6 +201,33 @@ pub struct DatabendConfig {
     #[configurable(derived)]
     #[serde(default)]
     pub compression: DatabendCompression,
+
+    /// The Databend load API to use.
+    #[serde(default)]
+    pub load_mode: DatabendLoadMode,
+
+    /// The user stage to upload staged batch files into.
+    #[serde(default = "default_stage")]
+    pub stage: String,
+
+    /// Path prefix used under `stage` for staged batch files.
+    #[serde(default = "default_stage_path_prefix")]
+    pub stage_path_prefix: String,
+
+    /// COPY options for staged loads.
+    #[serde(default)]
+    pub copy_options: DatabendCopyOptions,
+
+    /// Columns used for `REPLACE INTO ... ON (...)`.
+    ///
+    /// When empty, Databend uses normal insert mode. When non-empty, Databend uses replace mode.
+    /// This is independent of raw mode. Configure it to match the target table's logical key.
+    #[serde(default)]
+    pub primary_key: Vec<String>,
+
+    /// bend-ingest-kafka compatible raw Kafka ingest options.
+    #[serde(default)]
+    pub raw: DatabendRawOptions,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -158,6 +316,10 @@ impl SinkConfig for DatabendConfig {
                 file_format_options.insert("compression", "NONE");
                 Compression::None
             }
+            DatabendCompression::Zstd => {
+                file_format_options.insert("compression", "ZSTD");
+                Compression::zstd_default()
+            }
         };
         let encoding: EncodingConfig = self.encoding.clone().into();
         let serializer = match self.encoding.config() {
@@ -177,22 +339,64 @@ impl SinkConfig for DatabendConfig {
         let framer = FramingConfig::NewlineDelimited.build();
         let transformer = encoding.transformer();
 
+        if matches!(self.load_mode, DatabendLoadMode::Streaming) {
+            file_format_options.insert("compression", "AUTO");
+        }
+
         let mut copy_options = BTreeMap::new();
-        copy_options.insert("purge", "true");
+        copy_options.insert(
+            "purge",
+            if self.copy_options.purge {
+                "true"
+            } else {
+                "false"
+            },
+        );
+        copy_options.insert(
+            "force",
+            if self.copy_options.force {
+                "true"
+            } else {
+                "false"
+            },
+        );
+        copy_options.insert(
+            "disable_variant_check",
+            if self.copy_options.disable_variant_check {
+                "true"
+            } else {
+                "false"
+            },
+        );
+        copy_options.insert("on_error", self.copy_options.on_error.as_str());
 
         let client = DatabendAPIClient::new(&endpoint, Some(ua)).await?;
+        if self.raw.create_table {
+            let sql = format!(
+                "CREATE TABLE IF NOT EXISTS {} (uuid String, koffset BIGINT, kpartition INT, raw_data JSON, record_metadata JSON, add_time TIMESTAMP)",
+                self.table
+            );
+            client.query_all(&sql).await?;
+        }
         let service = DatabendService::new(
             client,
-            self.table.clone(),
-            file_format_options,
-            copy_options,
+            DatabendServiceSettings {
+                table: self.table.clone(),
+                load_mode: self.load_mode,
+                stage: self.stage.clone(),
+                stage_path_prefix: self.stage_path_prefix.clone(),
+                file_format_options,
+                copy_options,
+                primary_key: self.primary_key.clone(),
+            },
         )?;
         let service = ServiceBuilder::new()
             .settings(request_settings, DatabendRetryLogic)
             .service(service);
 
         let encoder = Encoder::<Framer>::new(framer, serializer);
-        let request_builder = DatabendRequestBuilder::new(compression, (transformer, encoder));
+        let request_builder =
+            DatabendRequestBuilder::new(compression, (transformer, encoder), self.raw.clone());
 
         let sink = DatabendSink::new(batch_settings, request_builder, service);
 
@@ -265,5 +469,110 @@ mod tests {
             DatabendSerializerConfig::Csv(_)
         ));
         assert!(matches!(cfg.compression, DatabendCompression::Gzip));
+    }
+
+    #[test]
+    fn parse_config_with_ingest_options() {
+        let cfg = toml::from_str::<DatabendConfig>(
+            r#"
+            endpoint = "databend://localhost:8000/mydatabase?sslmode=disable"
+            table = "mytable"
+            compression = "zstd"
+            load_mode = "streaming"
+            stage = "ingest_stage"
+            stage_path_prefix = "kafka"
+            copy_options.purge = false
+            copy_options.force = true
+            copy_options.disable_variant_check = true
+            copy_options.on_error = "continue"
+            primary_key = ["id", "source"]
+            raw.enabled = true
+            raw.create_table = true
+            raw.message_key = "message"
+            raw.metadata.includes = ["%kafka.topic", "%kafka.partition", "%kafka.offset", "%kafka.message_key"]
+        "#,
+        )
+        .unwrap();
+
+        assert!(matches!(cfg.compression, DatabendCompression::Zstd));
+        assert!(matches!(cfg.load_mode, DatabendLoadMode::Streaming));
+        assert_eq!(cfg.stage, "ingest_stage");
+        assert_eq!(cfg.stage_path_prefix, "kafka");
+        assert!(!cfg.copy_options.purge);
+        assert!(cfg.copy_options.force);
+        assert!(cfg.copy_options.disable_variant_check);
+        assert!(matches!(
+            cfg.copy_options.on_error,
+            DatabendCopyOnError::Continue
+        ));
+        assert_eq!(cfg.primary_key, ["id", "source"]);
+        assert!(cfg.raw.enabled);
+        assert!(cfg.raw.create_table);
+        assert_eq!(
+            cfg.raw.metadata.includes,
+            [
+                "%kafka.topic",
+                "%kafka.partition",
+                "%kafka.offset",
+                "%kafka.message_key",
+            ]
+        );
+    }
+
+    #[test]
+    fn parse_config_with_default_raw_metadata_includes_all() {
+        let cfg = toml::from_str::<DatabendConfig>(
+            r#"
+            endpoint = "databend://localhost:8000/mydatabase?sslmode=disable"
+            table = "mytable"
+            raw.enabled = true
+        "#,
+        )
+        .unwrap();
+
+        assert_eq!(cfg.raw.metadata.includes, [String::from("*")]);
+    }
+
+    #[test]
+    fn parse_config_with_empty_raw_metadata_config_includes_all() {
+        let cfg = toml::from_str::<DatabendConfig>(
+            r#"
+            endpoint = "databend://localhost:8000/mydatabase?sslmode=disable"
+            table = "mytable"
+            raw.enabled = true
+            raw.metadata = {}
+        "#,
+        )
+        .unwrap();
+
+        assert_eq!(cfg.raw.metadata.includes, [String::from("*")]);
+    }
+
+    #[test]
+    fn parse_config_with_empty_raw_metadata_includes_none() {
+        let cfg = toml::from_str::<DatabendConfig>(
+            r#"
+            endpoint = "databend://localhost:8000/mydatabase?sslmode=disable"
+            table = "mytable"
+            raw.enabled = true
+            raw.metadata.includes = []
+        "#,
+        )
+        .unwrap();
+
+        assert!(cfg.raw.metadata.includes.is_empty());
+    }
+
+    #[test]
+    fn parse_config_with_default_primary_key_empty() {
+        let cfg = toml::from_str::<DatabendConfig>(
+            r#"
+            endpoint = "databend://localhost:8000/mydatabase?sslmode=disable"
+            table = "mytable"
+        "#,
+        )
+        .unwrap();
+
+        assert!(cfg.primary_key.is_empty());
     }
 }

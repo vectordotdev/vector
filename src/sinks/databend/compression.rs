@@ -17,4 +17,9 @@ pub enum DatabendCompression {
     ///
     /// [gzip]: https://www.gzip.org/
     Gzip,
+
+    /// [Zstandard][zstd] compression.
+    ///
+    /// [zstd]: https://facebook.github.io/zstd/
+    Zstd,
 }
