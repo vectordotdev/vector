@@ -293,7 +293,7 @@ overflow_strategy = "drop_newest"
             r#"
 delay_milliseconds = 200
 queue_capacity = 1
-overflow_strategy = "pass"
+overflow_strategy = "forward"
 "#,
         )
         .unwrap();
