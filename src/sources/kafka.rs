@@ -1117,7 +1117,7 @@ async fn parse_message(
                 (lc + rc, ls)
             },
         );
-    let mut batch_stream = futures::stream::select_all(streams).map(|event| {
+    let mut batch_stream = futures::stream::iter(streams).flatten().map(|event| {
         // All acknowledgements flow through the normal Finalizer stream so
         // that they can be handled in one place, but are only tied to the
         // batch when acknowledgements are enabled
