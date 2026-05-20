@@ -24,8 +24,8 @@ use crate::{
 pub struct DelayConfig {
     /// Time to delay each event, in seconds.
     #[serde_as(as = "serde_with::DurationSecondsWithFrac<f64>")]
-    #[configurable(metadata(docs::human_name = "Delay per event", docs::example = 0.2))]
-    delay_per_event: Duration,
+    #[configurable(metadata(docs::human_name = "Delay in milliseconds", docs::example = 0.2))]
+    delay_milliseconds: Duration,
 
     /// Optional limit for number of items in the delay queue.
     queue_capacity: Option<NonZeroUsize>,
@@ -100,7 +100,7 @@ pub struct Delay {
 impl Delay {
     pub fn new(config: &DelayConfig, context: &TransformContext) -> crate::Result<Self> {
         Ok(Self {
-            delay: config.delay_per_event,
+            delay: config.delay_milliseconds,
             queue: config
                 .queue_capacity
                 .map(|c| DelayQueue::with_capacity(c.into()))
@@ -222,7 +222,7 @@ mod tests {
     async fn delay_events() {
         let config = toml::from_str::<DelayConfig>(
             r"
-delay_per_event = 0.2
+delay_milliseconds = 0.2
 ",
         )
         .unwrap();
@@ -252,7 +252,7 @@ delay_per_event = 0.2
     async fn delay_events_at_capacity_drop_newest() {
         let config = toml::from_str::<DelayConfig>(
             r#"
-delay_per_event = 0.2
+delay_milliseconds = 0.2
 queue_capacity = 1
 overflow_strategy = "drop_newest"
 "#,
@@ -289,7 +289,7 @@ overflow_strategy = "drop_newest"
     async fn delay_events_at_capacity_pass() {
         let config = toml::from_str::<DelayConfig>(
             r#"
-delay_per_event = 0.2
+delay_milliseconds = 0.2
 queue_capacity = 1
 overflow_strategy = "pass"
 "#,
