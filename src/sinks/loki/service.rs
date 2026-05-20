@@ -3,8 +3,8 @@ use std::task::{Context, Poll};
 use bytes::Bytes;
 use http::StatusCode;
 use snafu::Snafu;
-use tracing::Instrument;
 use std::sync::atomic::{AtomicI64, Ordering};
+use tracing::Instrument;
 
 use crate::{
     http::{Auth, HttpClient},
@@ -101,7 +101,12 @@ impl LokiService {
     ) -> crate::Result<Self> {
         let endpoint = endpoint.append_path(&path)?.with_auth(auth);
         let request_count = AtomicI64::new(0);
-        Ok(Self { client, endpoint, keep_alive_requests: keep_alive_requests.unwrap_or(0), request_count })
+        Ok(Self {
+            client,
+            endpoint,
+            keep_alive_requests: keep_alive_requests.unwrap_or(0),
+            request_count
+        })
     }
 }
 
@@ -110,7 +115,7 @@ impl Clone for LokiService {
         Self {
             endpoint: self.endpoint.clone(),
             client: self.client.clone(),
-            keep_alive_requests: self.keep_alive_requests.clone(),
+            keep_alive_requests: self.keep_alive_requests,
             request_count: AtomicI64::new(self.request_count.load(Ordering::SeqCst)),
         }
      }
@@ -144,7 +149,7 @@ impl Service<LokiRequest> for LokiService {
 
         if self.keep_alive_requests > 0 {
             let request_count = self.request_count.fetch_add(1, Ordering::Relaxed);
-            if request_count >= self.keep_alive_requests {
+            if request_count + 1 >= self.keep_alive_requests {
                 self.request_count.store(0, Ordering::Relaxed);
                 req = req.header("Connection", "close");
             }
