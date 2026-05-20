@@ -57,7 +57,7 @@ pub enum HttpServerAuthConfig {
     ///
     /// Takes in request and validates it using VRL code. The VRL program must return a boolean.
     /// Metadata fields written via `%field = value` in the VRL program are extracted and injected
-    /// into every authenticated event.
+    /// into the log's body if log namespacing is enabled.
     Custom {
         /// The VRL boolean expression. May write `%field = value` to enrich events.
         source: String,

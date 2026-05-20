@@ -64,7 +64,7 @@ generated: components: sources: heroku_logs: configuration: {
 
 						Takes in request and validates it using VRL code. The VRL program must return a boolean.
 						Metadata fields written via `%field = value` in the VRL program are extracted and injected
-						into every authenticated event.
+						into the log's body if log namespacing is enabled.
 						"""
 				}
 			}

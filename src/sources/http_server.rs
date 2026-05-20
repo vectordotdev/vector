@@ -220,9 +220,16 @@ impl SimpleHttpConfig {
             )
             .with_standard_vector_source_metadata();
 
-        // for metadata that is added to the events dynamically from config options
+        // For metadata that is added to the events dynamically from config options.
         if log_namespace == LogNamespace::Legacy {
-            schema_definition = schema_definition.unknown_fields(Kind::bytes());
+            // Custom auth programs can inject any VRL value, not just bytes; widen the unknown
+            // field kind accordingly so schema-aware downstream components don't reject events.
+            let unknown_kind = if matches!(self.auth, Some(HttpServerAuthConfig::Custom { .. })) {
+                Kind::any()
+            } else {
+                Kind::bytes()
+            };
+            schema_definition = schema_definition.unknown_fields(unknown_kind);
         }
 
         schema_definition
@@ -426,6 +433,12 @@ struct SimpleHttpSource {
     log_namespace: LogNamespace,
 }
 
+/// Built-in `http_server` metadata keys written by `enrich_events` with a trusted value.
+/// Auth enrichment must not overwrite these; all other keys are auth-derived and may override
+/// client-supplied metadata from decoded events (e.g. a native-codec request).
+const RESERVED_HTTP_SERVER_METADATA_KEYS: &[&str] =
+    &["path", "host", "headers", "query_parameters"];
+
 impl HttpSource for SimpleHttpSource {
     /// Enriches the log events with metadata for the `request_path` and for each of the headers.
     /// Non-log events are skipped.
@@ -529,23 +542,43 @@ impl HttpSource for SimpleHttpSource {
     /// Both namespaces use insert-if-empty semantics so auth enrichment never
     /// overwrites built-in source metadata (`path`, `host`, `headers`, …) that
     /// `enrich_events` already populated.
-    /// Legacy namespace: inserted into the event body.
-    /// Vector namespace: inserted into event metadata under `http_server.<field>`.
+    /// Vector namespace: inserted into event metadata under `http_server.<field>` for
+    ///   all event types (Log, Metric, Trace).
+    /// Legacy namespace: inserted into the Log event body only (Metric/Trace are skipped).
     fn inject_auth_enrichment(&self, events: &mut [Event], enrichment: ObjectMap) {
         for event in events.iter_mut() {
-            if let Event::Log(log) = event {
-                for (key, value) in &enrichment {
-                    match self.log_namespace {
-                        LogNamespace::Vector => {
-                            log.try_insert(
-                                (
-                                    PathPrefix::Metadata,
-                                    path!(SimpleHttpConfig::NAME).concat(path!(key.as_str())),
-                                ),
+            match self.log_namespace {
+                LogNamespace::Vector => {
+                    // metadata_mut() dispatches to Log, Metric, and Trace so every
+                    // decoded event type receives the auth enrichment fields.
+                    let meta = event.metadata_mut().value_mut();
+                    for (key, value) in &enrichment {
+                        let key_str = key.as_str();
+                        if RESERVED_HTTP_SERVER_METADATA_KEYS.contains(&key_str) {
+                            // Built-in source key: skip if already written by enrich_events.
+                            if meta
+                                .get(path!(SimpleHttpConfig::NAME).concat(path!(key_str)))
+                                .is_none()
+                            {
+                                meta.insert(
+                                    path!(SimpleHttpConfig::NAME).concat(path!(key_str)),
+                                    value.clone(),
+                                );
+                            }
+                        } else {
+                            // Auth-derived key: overwrite any client-supplied value so
+                            // clients cannot spoof fields the auth program sets.
+                            meta.insert(
+                                path!(SimpleHttpConfig::NAME).concat(path!(key_str)),
                                 value.clone(),
                             );
                         }
-                        LogNamespace::Legacy => {
+                    }
+                }
+                LogNamespace::Legacy => {
+                    // Legacy enrichment targets the event body; only Log events have one.
+                    if let Event::Log(log) = event {
+                        for (key, value) in &enrichment {
                             log.try_insert((PathPrefix::Event, path!(key.as_str())), value.clone());
                         }
                     }
@@ -1821,6 +1854,111 @@ mod tests {
             )),
             Some(&Value::from("t-123")),
             "new auth enrichment field must be injected"
+        );
+    }
+
+    #[test]
+    fn inject_auth_enrichment_overwrites_client_supplied_metadata_in_vector_namespace() {
+        use crate::{codecs::DecodingConfig, sources::util::HttpSource as _};
+        use vector_lib::codecs::BytesDeserializerConfig;
+        use vrl::value::KeyString;
+
+        let decoder = DecodingConfig::new(
+            BytesDecoderConfig::new().into(),
+            BytesDeserializerConfig::new().into(),
+            LogNamespace::Vector,
+        )
+        .build()
+        .unwrap()
+        .with_log_namespace(LogNamespace::Vector);
+
+        let source = super::SimpleHttpSource {
+            headers: vec![],
+            query_parameters: vec![],
+            path_key: OptionalValuePath::none(),
+            host_key: OptionalValuePath::none(),
+            decoder,
+            log_namespace: LogNamespace::Vector,
+        };
+
+        let mut log = LogEvent::default();
+        // Simulate a client pre-populating an auth-derived key (e.g. via native codec).
+        log.insert(
+            (
+                PathPrefix::Metadata,
+                path!(SimpleHttpConfig::NAME).concat(path!("tenant_id")),
+            ),
+            "attacker",
+        );
+
+        let mut events = vec![Event::Log(log)];
+        let mut enrichment = ObjectMap::new();
+        enrichment.insert(KeyString::from("tenant_id"), Value::from("trusted"));
+
+        source.inject_auth_enrichment(&mut events, enrichment);
+
+        let Event::Log(log) = &events[0] else {
+            panic!("expected log event");
+        };
+        assert_eq!(
+            log.get((
+                PathPrefix::Metadata,
+                path!(SimpleHttpConfig::NAME).concat(path!("tenant_id")),
+            )),
+            Some(&Value::from("trusted")),
+            "auth enrichment must overwrite client-supplied metadata for auth-derived keys"
+        );
+    }
+
+    #[test]
+    fn inject_auth_enrichment_applies_to_non_log_events_in_vector_namespace() {
+        use crate::{codecs::DecodingConfig, sources::util::HttpSource as _};
+        use vector_lib::{
+            codecs::BytesDeserializerConfig,
+            event::{Metric, MetricKind, MetricValue},
+        };
+        use vrl::value::KeyString;
+
+        let decoder = DecodingConfig::new(
+            BytesDecoderConfig::new().into(),
+            BytesDeserializerConfig::new().into(),
+            LogNamespace::Vector,
+        )
+        .build()
+        .unwrap()
+        .with_log_namespace(LogNamespace::Vector);
+
+        let source = super::SimpleHttpSource {
+            headers: vec![],
+            query_parameters: vec![],
+            path_key: OptionalValuePath::none(),
+            host_key: OptionalValuePath::none(),
+            decoder,
+            log_namespace: LogNamespace::Vector,
+        };
+
+        let metric = Metric::new(
+            "requests",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 1.0 },
+        );
+        let mut events = vec![Event::Metric(metric)];
+
+        let mut enrichment = ObjectMap::new();
+        enrichment.insert(KeyString::from("tenant_id"), Value::from("t-456"));
+
+        source.inject_auth_enrichment(&mut events, enrichment);
+
+        let Event::Metric(metric) = &events[0] else {
+            panic!("expected metric event");
+        };
+        assert_eq!(
+            metric
+                .metadata()
+                .value()
+                .get(path!(SimpleHttpConfig::NAME).concat(path!("tenant_id")),),
+            Some(&Value::from("t-456")),
+            "auth enrichment must be written to non-log event metadata"
         );
     }
 
