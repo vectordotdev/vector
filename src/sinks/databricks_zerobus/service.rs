@@ -589,7 +589,7 @@ mod tests {
     }
 
     async fn current_stream(service: &ZerobusService) -> Arc<ActiveStream> {
-        service.stream.lock().await.as_ref().unwrap().clone()
+        Arc::clone(service.stream.lock().await.as_ref().unwrap())
     }
 
     #[tokio::test]
