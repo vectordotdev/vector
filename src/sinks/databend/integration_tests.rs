@@ -321,7 +321,7 @@ async fn raw_auto_create_table_with_metadata_paths() {
 
     let resp = client
         .query_all(&format!(
-            "select raw_data::String, file_path::String, file_offset::String from `{table}`"
+            "select raw_data::String, \"%file.path\"::String, \"%file.offset\"::String from `{table}`"
         ))
         .await
         .unwrap();

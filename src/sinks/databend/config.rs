@@ -44,38 +44,19 @@ fn default_raw_message_key() -> String {
 
 pub(crate) fn raw_metadata_column_name(path: &str) -> Option<String> {
     let path = path.trim();
-    let path = if path == "*" {
-        "metadata"
-    } else {
-        path.trim_start_matches('%')
-    };
-
-    let mut column = String::new();
-    let mut previous_was_underscore = false;
-    for char in path.chars() {
-        if char.is_ascii_alphanumeric() {
-            column.push(char.to_ascii_lowercase());
-            previous_was_underscore = false;
-        } else if !previous_was_underscore {
-            column.push('_');
-            previous_was_underscore = true;
-        }
-    }
-    let column = column.trim_matches('_');
-    if column.is_empty() {
+    if path.is_empty() {
         return None;
     }
 
-    let mut column = column.to_string();
-    if column
-        .chars()
-        .next()
-        .is_some_and(|char| char.is_ascii_digit())
-    {
-        column.insert(0, '_');
+    if path == "*" {
+        Some("metadata".to_string())
+    } else {
+        Some(path.to_string())
     }
+}
 
-    Some(column)
+fn quote_databend_identifier(identifier: &str) -> String {
+    format!("\"{}\"", identifier.replace('"', "\"\""))
 }
 
 fn raw_create_table_sql(table: &str, raw: &DatabendRawOptions) -> String {
@@ -91,7 +72,7 @@ fn raw_create_table_sql(table: &str, raw: &DatabendRawOptions) -> String {
         };
 
         if seen_columns.insert(column.clone()) {
-            columns.push(format!("{column} JSON"));
+            columns.push(format!("{} JSON", quote_databend_identifier(&column)));
         }
     }
 
@@ -637,11 +618,11 @@ mod tests {
     fn raw_metadata_column_names_are_sanitized() {
         assert_eq!(
             raw_metadata_column_name("%kafka.topic"),
-            Some("kafka_topic".to_string())
+            Some("%kafka.topic".to_string())
         );
         assert_eq!(
             raw_metadata_column_name("%kafka.partition"),
-            Some("kafka_partition".to_string())
+            Some("%kafka.partition".to_string())
         );
         assert_eq!(raw_metadata_column_name("*"), Some("metadata".to_string()));
         assert_eq!(raw_metadata_column_name(""), None);
@@ -664,7 +645,7 @@ mod tests {
 
         assert_eq!(
             raw_create_table_sql("raw_events", &raw),
-            "CREATE TABLE IF NOT EXISTS raw_events (raw_data JSON, add_time TIMESTAMP, kafka_topic JSON, kafka_partition JSON)"
+            "CREATE TABLE IF NOT EXISTS raw_events (raw_data JSON, add_time TIMESTAMP, \"%kafka.topic\" JSON, \"%kafka.partition\" JSON)"
         );
     }
 }

@@ -7,6 +7,7 @@ use vector_lib::{
     codecs::encoding::Framer,
     event::{Event, LogEvent, Value},
     finalization::{EventFinalizers, Finalizable},
+    lookup::{OwnedTargetPath, OwnedValuePath},
     request_metadata::RequestMetadata,
 };
 
@@ -60,6 +61,11 @@ impl DatabendRequestBuilder {
         }
     }
 
+    fn insert_raw_column(raw_log: &mut LogEvent, column: &str, value: Value) {
+        let path = OwnedTargetPath::event(OwnedValuePath::single_field(column));
+        raw_log.insert(&path, value);
+    }
+
     fn raw_record(&self, event: Event) -> Event {
         let Event::Log(log) = &event else {
             return event;
@@ -77,12 +83,12 @@ impl DatabendRequestBuilder {
             };
 
             if path == "*" {
-                raw_log.insert(column.as_str(), log.metadata().value().clone());
+                Self::insert_raw_column(&mut raw_log, &column, log.metadata().value().clone());
                 continue;
             }
 
             if let Some(value) = Self::get_path(log, path) {
-                raw_log.insert(column.as_str(), value.clone());
+                Self::insert_raw_column(&mut raw_log, &column, value.clone());
             }
         }
 

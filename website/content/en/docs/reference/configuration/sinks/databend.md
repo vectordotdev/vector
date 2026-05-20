@@ -59,12 +59,12 @@ add_time TIMESTAMP
 ```
 
 `raw.metadata.includes` adds metadata columns to that schema. Metadata paths are
-converted to column names by removing `%` and replacing separators with `_`. For
-example, `%kafka.topic` becomes `kafka_topic`.
+used as column names as-is and quoted in the generated Databend SQL. For
+example, `%kafka.topic` creates a `"%kafka.topic"` column.
 
 Enable `raw.create_table` to create this table during sink startup. With the
 following configuration, the generated table includes `raw_data`, `add_time`,
-`kafka_topic`, `kafka_partition`, and `kafka_offset`:
+`"%kafka.topic"`, `"%kafka.partition"`, and `"%kafka.offset"`:
 
 ```yaml
 sinks:
