@@ -191,17 +191,16 @@ impl<Request: Clone + Send + Sync + 'static> RetryLogic for GcsRetryLogic<Reques
 
         match status {
             StatusCode::UNAUTHORIZED => {
-                // Fire-and-forget a credentials rebuild. By the time tower
-                // re-issues the request through GcsService::call (which reads
-                // the token from the auth's RwLock), the new token should
-                // be in place. If the refresh is still in flight we'll burn
-                // one or two more retries on the stale token before recovering
-                // — far cheaper than waiting for the next regenerator tick or
-                // for a pod restart.
+                // Synchronously wait for the refresh so the retry uses the
+                // fresh token instead of burning a retry slot on the stale
+                // one. See `GcpAuthRetryLogic::should_retry_response` for
+                // the full rationale (block_in_place + in-flight coalescing).
                 if let Some(auth) = &self.auth {
                     let auth = auth.clone();
-                    tokio::spawn(async move {
-                        auth.force_refresh().await;
+                    tokio::task::block_in_place(|| {
+                        tokio::runtime::Handle::current().block_on(async move {
+                            auth.force_refresh().await;
+                        });
                     });
                 }
                 RetryAction::Retry("unauthorized".into())
@@ -227,10 +226,15 @@ pub struct GcpAuthRetryLogic<F, Req, Res> {
     get_status: F,
     retry_strategy: RetryStrategy,
     auth: GcpAuthenticator,
-    _markers: PhantomData<fn(Req) -> Res>,
+    _markers: PhantomData<(Req, Res)>,
 }
 
 impl<F, Req, Res> GcpAuthRetryLogic<F, Req, Res> {
+    // `const fn` because clippy prefers it and there's no downside — it
+    // remains callable from non-const contexts. The convenience helpers
+    // below pass an `impl Fn` for `get_status` and aren't themselves const,
+    // so this isn't actually invokable in const code today; the qualifier
+    // is purely forward-compatible.
     pub const fn new(get_status: F, retry_strategy: RetryStrategy, auth: GcpAuthenticator) -> Self {
         Self {
             get_status,
@@ -327,13 +331,155 @@ where
                 }
             };
             if self_heal {
+                // Synchronously wait for the refresh so the retry uses a
+                // fresh token rather than burning a retry slot on the same
+                // stale token. `block_in_place` releases this worker thread
+                // for other tasks during the wait; `force_refresh`'s
+                // in-flight guard coalesces concurrent 401s so the actual
+                // STS call happens at most once per burst.
+                //
+                // Requires the multi-thread tokio runtime (Vector's CLI
+                // configures this); tests exercising this path must use
+                // `#[tokio::test(flavor = "multi_thread")]`.
                 let auth = self.auth.clone();
-                tokio::spawn(async move {
-                    auth.force_refresh().await;
+                tokio::task::block_in_place(|| {
+                    tokio::runtime::Handle::current().block_on(async move {
+                        auth.force_refresh().await;
+                    });
                 });
                 return RetryAction::Retry("unauthorized".into());
             }
         }
         self.retry_strategy.retry_action(status)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bytes::Bytes;
+
+    /// Helper that maps a `RetryAction` variant to a short tag so we can
+    /// table-test cleanly. The `Cow<'static, str>` reasons aren't part of the
+    /// behavior contract we're testing — only which arm fired.
+    #[derive(Debug, PartialEq, Eq)]
+    enum Action {
+        Retry,
+        DontRetry,
+        Successful,
+    }
+
+    fn classify<R>(action: &RetryAction<R>) -> Action {
+        match action {
+            RetryAction::Retry(_) => Action::Retry,
+            RetryAction::RetryPartial(_) => Action::Retry,
+            RetryAction::DontRetry(_) => Action::DontRetry,
+            RetryAction::Successful => Action::Successful,
+        }
+    }
+
+    fn response(status: StatusCode) -> http::Response<Bytes> {
+        http::Response::builder()
+            .status(status)
+            .body(Bytes::new())
+            .unwrap()
+    }
+
+    // Verifies the (HTTP status × RetryStrategy) decision matrix in
+    // `GcpAuthRetryLogic::should_retry_response`. The auth handle is
+    // `GcpAuthenticator::None`, which makes `force_refresh` a no-op — the
+    // matrix only asserts which `RetryAction` variant fires, not the side
+    // effect.
+    //
+    // `multi_thread` flavor: the self-heal path uses `block_in_place`, which
+    // panics on a current-thread runtime.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+    async fn retry_logic_matrix() {
+        let auth = GcpAuthenticator::None;
+        let custom_401 = RetryStrategy::Custom {
+            status_codes: vec![StatusCode::UNAUTHORIZED],
+        };
+        let custom_500 = RetryStrategy::Custom {
+            status_codes: vec![StatusCode::INTERNAL_SERVER_ERROR],
+        };
+
+        let cases: Vec<(StatusCode, RetryStrategy, Action)> = vec![
+            // 200 OK always classifies as Successful regardless of strategy.
+            (StatusCode::OK, RetryStrategy::None, Action::Successful),
+            (StatusCode::OK, RetryStrategy::Default, Action::Successful),
+            (StatusCode::OK, RetryStrategy::All, Action::Successful),
+            // 401: self-heal kicks in for Default/All and for Custom that
+            // explicitly lists 401. None and Custom-without-401 honor the
+            // user choice and do NOT retry.
+            (
+                StatusCode::UNAUTHORIZED,
+                RetryStrategy::None,
+                Action::DontRetry,
+            ),
+            (
+                StatusCode::UNAUTHORIZED,
+                RetryStrategy::Default,
+                Action::Retry,
+            ),
+            (StatusCode::UNAUTHORIZED, RetryStrategy::All, Action::Retry),
+            (StatusCode::UNAUTHORIZED, custom_401.clone(), Action::Retry),
+            (
+                StatusCode::UNAUTHORIZED,
+                custom_500.clone(),
+                Action::DontRetry,
+            ),
+            // 5xx: defer to strategy. Default retries 5xx; None doesn't;
+            // Custom honors its list.
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                RetryStrategy::None,
+                Action::DontRetry,
+            ),
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                RetryStrategy::Default,
+                Action::Retry,
+            ),
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                RetryStrategy::All,
+                Action::Retry,
+            ),
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                custom_401.clone(),
+                Action::DontRetry,
+            ),
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                custom_500.clone(),
+                Action::Retry,
+            ),
+            // 404 (a non-401 4xx): never retried by Default. Custom honors
+            // its list. All retries everything non-2xx.
+            (
+                StatusCode::NOT_FOUND,
+                RetryStrategy::None,
+                Action::DontRetry,
+            ),
+            (
+                StatusCode::NOT_FOUND,
+                RetryStrategy::Default,
+                Action::DontRetry,
+            ),
+            (StatusCode::NOT_FOUND, RetryStrategy::All, Action::Retry),
+            (StatusCode::NOT_FOUND, custom_401, Action::DontRetry),
+            (StatusCode::NOT_FOUND, custom_500, Action::DontRetry),
+        ];
+
+        for (status, strategy, expected) in cases {
+            let logic = gcp_hyper_response_retry_logic::<Bytes>(strategy.clone(), auth.clone());
+            let action = logic.should_retry_response(&response(status));
+            assert_eq!(
+                classify(&action),
+                expected,
+                "status={status}, strategy={strategy:?}",
+            );
+        }
     }
 }

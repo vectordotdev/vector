@@ -7,7 +7,7 @@ use super::{
     sink::StackdriverMetricsSink,
 };
 use crate::{
-    gcp::{GcpAuthConfig, GcpAuthenticator, SCOPE_MONITORING_WRITE},
+    gcp::{GcpAuthConfig, GcpAuthenticator, Scope},
     http::HttpClient,
     sinks::{
         HTTPRequestBuilderSnafu, gcp,
@@ -95,7 +95,7 @@ impl_generate_config_from_default!(StackdriverConfig);
 #[typetag::serde(name = "gcp_stackdriver_metrics")]
 impl SinkConfig for StackdriverConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let auth = self.auth.build(SCOPE_MONITORING_WRITE).await?;
+        let auth = self.auth.build(Scope::MONITORING_WRITE).await?;
 
         let healthcheck = healthcheck().boxed();
         let started = chrono::Utc::now();
@@ -120,7 +120,7 @@ impl SinkConfig for StackdriverConfig {
         )
         .parse()?;
 
-        auth.spawn_regenerate_token();
+        auth.start_background_refresh();
 
         let stackdriver_metrics_service_request_builder = StackdriverMetricsServiceRequestBuilder {
             uri,

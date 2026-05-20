@@ -13,7 +13,7 @@ use super::{
     service::StackdriverLogsServiceRequestBuilder, sink::StackdriverLogsSink,
 };
 use crate::{
-    gcp::{GcpAuthConfig, GcpAuthenticator, SCOPE_LOGGING_WRITE},
+    gcp::{GcpAuthConfig, GcpAuthenticator, Scope},
     http::HttpClient,
     schema,
     sinks::{
@@ -239,7 +239,7 @@ impl_generate_config_from_default!(StackdriverConfig);
 #[typetag::serde(name = "gcp_stackdriver_logs")]
 impl SinkConfig for StackdriverConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let auth = self.auth.build(SCOPE_LOGGING_WRITE).await?;
+        let auth = self.auth.build(Scope::LOGGING_WRITE).await?;
 
         let request_builder = StackdriverLogsRequestBuilder {
             encoder: StackdriverLogsEncoder::new(
@@ -283,7 +283,7 @@ impl SinkConfig for StackdriverConfig {
 
         let healthcheck = healthcheck(client, auth.clone(), uri).boxed();
 
-        auth.spawn_regenerate_token();
+        auth.start_background_refresh();
 
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }

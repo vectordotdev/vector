@@ -29,7 +29,7 @@ use vrl::value::Kind;
 use crate::{
     codecs::{self, EncodingConfig},
     config::{GenerateConfig, SinkConfig, SinkContext},
-    gcp::{GcpAuthConfig, GcpAuthenticator, SCOPE_MALACHITE_INGESTION},
+    gcp::{GcpAuthConfig, GcpAuthenticator, Scope},
     http::HttpClient,
     schema,
     sinks::{
@@ -302,7 +302,7 @@ pub enum ChronicleError {
 #[typetag::serde(name = "gcp_chronicle_unstructured")]
 impl SinkConfig for ChronicleUnstructuredConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let creds = self.auth.build(SCOPE_MALACHITE_INGESTION).await?;
+        let creds = self.auth.build(Scope::MALACHITE_INGESTION).await?;
 
         let tls = TlsSettings::from_options(self.tls.as_ref())?;
         let client = HttpClient::new(tls, cx.proxy())?;
@@ -313,7 +313,7 @@ impl SinkConfig for ChronicleUnstructuredConfig {
         let healthcheck_endpoint = self.create_endpoint("v2/logtypes")?;
 
         let healthcheck = build_healthcheck(client.clone(), &healthcheck_endpoint, creds.clone())?;
-        creds.spawn_regenerate_token();
+        creds.start_background_refresh();
         let sink = self.build_sink(client, endpoint, creds)?;
 
         Ok((sink, healthcheck))

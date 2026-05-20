@@ -13,7 +13,7 @@ use crate::{
     codecs::{Encoder, EncodingConfig, Transformer},
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     event::Event,
-    gcp::{GcpAuthConfig, GcpAuthenticator, PUBSUB_URL, SCOPE_PUBSUB},
+    gcp::{GcpAuthConfig, GcpAuthenticator, PUBSUB_URL, Scope},
     http::HttpClient,
     sinks::{
         Healthcheck, UriParseSnafu, VectorSink,
@@ -128,8 +128,12 @@ impl SinkConfig for PubsubConfig {
         let client = HttpClient::new(tls_settings, cx.proxy())?;
 
         let healthcheck = healthcheck(client.clone(), sink.uri("")?, sink.auth.clone()).boxed();
-        sink.auth.spawn_regenerate_token();
+        sink.auth.start_background_refresh();
 
+        // Strategy is hardcoded to `Default` because PubsubConfig does not
+        // expose a `retry_strategy` knob (unlike the stackdriver sinks).
+        // This matches the prior `BatchedHttpSink::new` behavior; switch to
+        // a configurable strategy if the sink ever grows the field.
         let retry_logic = gcp_hyper_response_retry_logic(RetryStrategy::Default, sink.auth.clone());
 
         let sink = BatchedHttpSink::with_logic(
@@ -165,7 +169,7 @@ struct PubsubSink {
 impl PubsubSink {
     async fn from_config(config: &PubsubConfig) -> crate::Result<Self> {
         // We only need to load the credentials if we are not targeting an emulator.
-        let auth = config.auth.build(SCOPE_PUBSUB).await?;
+        let auth = config.auth.build(Scope::PUBSUB).await?;
 
         let uri_base = format!(
             "{}/v1/projects/{}/topics/{}",
