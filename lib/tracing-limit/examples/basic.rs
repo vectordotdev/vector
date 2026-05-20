@@ -1,4 +1,4 @@
-use tracing::{info, trace, Dispatch};
+use tracing::{Dispatch, info, trace};
 use tracing_limit::RateLimitedLayer;
 use tracing_subscriber::layer::SubscriberExt;
 
@@ -14,11 +14,7 @@ fn main() {
     tracing::dispatcher::with_default(&dispatch, || {
         for i in 0..40usize {
             trace!("This field is not rate limited!");
-            info!(
-                message = "This message is rate limited",
-                count = &i,
-                internal_log_rate_limit = true,
-            );
+            info!(message = "This message is rate limited", count = &i);
             std::thread::sleep(std::time::Duration::from_millis(1000));
         }
     })

@@ -2,22 +2,25 @@ use std::{fmt::Debug, sync::Arc};
 
 use async_trait::async_trait;
 use futures_util::{
-    stream::{self, BoxStream},
     StreamExt,
+    stream::{self, BoxStream},
 };
-use tokio::sync::oneshot::{channel, Sender};
+use tokio::sync::oneshot::{Sender, channel};
 use tower::Service;
-use vector_lib::stream::{BatcherSettings, DriverResponse};
-use vector_lib::{config::log_schema, event::Event, partition::Partitioner, sink::StreamSink};
-use vrl::event_path;
-use vrl::path::PathPrefix;
+use vector_lib::{
+    config::log_schema,
+    event::Event,
+    partition::Partitioner,
+    sink::StreamSink,
+    stream::{BatcherSettings, DriverResponse},
+};
+use vrl::{event_path, path::PathPrefix};
 
+use super::service::TraceApiRequest;
 use crate::{
     internal_events::DatadogTracesEncodingError,
     sinks::{datadog::traces::request_builder::DatadogTracesRequestBuilder, util::SinkBuilderExt},
 };
-
-use super::service::TraceApiRequest;
 
 #[derive(Default)]
 struct EventPartitioner;
@@ -105,7 +108,9 @@ where
         let batch_settings = self.batch_settings;
 
         input
-            .batched_partitioned(EventPartitioner, || batch_settings.as_byte_size_config())
+            .batched_partitioned(EventPartitioner, batch_settings.timeout, |_| {
+                batch_settings.as_byte_size_config()
+            })
             .incremental_request_builder(self.request_builder)
             .flat_map(stream::iter)
             .filter_map(|request| async move {

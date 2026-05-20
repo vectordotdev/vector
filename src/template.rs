@@ -3,15 +3,15 @@ use std::{borrow::Cow, convert::TryFrom, fmt, hash::Hash, path::PathBuf, sync::L
 
 use bytes::Bytes;
 use chrono::{
-    format::{strftime::StrftimeItems, Item},
     FixedOffset, Utc,
+    format::{Item, strftime::StrftimeItems},
 };
 use regex::Regex;
 use snafu::Snafu;
-use vector_lib::configurable::{
-    configurable_component, ConfigurableNumber, ConfigurableString, NumberClass,
+use vector_lib::{
+    configurable::{ConfigurableNumber, ConfigurableString, NumberClass, configurable_component},
+    lookup::lookup_v2::parse_target_path,
 };
-use vector_lib::lookup::lookup_v2::parse_target_path;
 
 use crate::{
     config::log_schema,
@@ -26,7 +26,10 @@ static RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\{\{(?P<key>[^\}]+)\}
 pub enum TemplateParseError {
     #[snafu(display("Invalid strftime item"))]
     StrftimeError,
-    #[snafu(display("Invalid field path in template {:?} (see https://vector.dev/docs/reference/configuration/template-syntax/)", path))]
+    #[snafu(display(
+        "Invalid field path in template {:?} (see https://vector.dev/docs/reference/configuration/template-syntax/)",
+        path
+    ))]
     InvalidPathSyntax { path: String },
     #[snafu(display("Invalid numeric template"))]
     InvalidNumericTemplate { template: String },
@@ -40,8 +43,6 @@ pub enum TemplateRenderingError {
     MissingKeys { missing_keys: Vec<String> },
     #[snafu(display("Not numeric: {:?}", input))]
     NotNumeric { input: String },
-    #[snafu(display("Unsupported part for numeric value"))]
-    UnsupportedNumeric,
 }
 
 /// A templated field.
@@ -228,13 +229,14 @@ impl Template {
         (!parts.is_empty()).then_some(parts)
     }
 
+    #[allow(clippy::missing_const_for_fn)] // Adding `const` results in https://doc.rust-lang.org/error_codes/E0015.html
     /// Returns a reference to the template string.
     pub fn get_ref(&self) -> &str {
         &self.src
     }
 
     /// Returns `true` if this template string has a length of zero, and `false` otherwise.
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.src.is_empty()
     }
 
@@ -283,6 +285,9 @@ pub struct UnsignedIntTemplate {
 
     #[serde(skip)]
     parts: Vec<Part>,
+
+    #[serde(skip)]
+    tz_offset: Option<FixedOffset>,
 }
 
 impl TryFrom<UnsignedIntTemplateSource> for UnsignedIntTemplate {
@@ -293,6 +298,7 @@ impl TryFrom<UnsignedIntTemplateSource> for UnsignedIntTemplate {
             UnsignedIntTemplateSource::Number(num) => Ok(UnsignedIntTemplate {
                 src: UnsignedIntTemplateSource::Number(num),
                 parts: Vec::new(),
+                tz_offset: None,
             }),
             UnsignedIntTemplateSource::String(s) => UnsignedIntTemplate::try_from(s),
         }
@@ -326,6 +332,7 @@ impl From<u64> for UnsignedIntTemplate {
         UnsignedIntTemplate {
             src: UnsignedIntTemplateSource::Number(num),
             parts: Vec::new(),
+            tz_offset: None,
         }
     }
 }
@@ -343,6 +350,7 @@ impl TryFrom<Cow<'_, str>> for UnsignedIntTemplate {
                     Ok(num) => Ok(UnsignedIntTemplate {
                         src: UnsignedIntTemplateSource::Number(num),
                         parts,
+                        tz_offset: None,
                     }),
                     Err(_) => Err(TemplateParseError::InvalidNumericTemplate {
                         template: src.into_owned(),
@@ -352,6 +360,7 @@ impl TryFrom<Cow<'_, str>> for UnsignedIntTemplate {
                 Ok(UnsignedIntTemplate {
                     parts,
                     src: UnsignedIntTemplateSource::String(src.into_owned()),
+                    tz_offset: None,
                 })
             }
         })
@@ -391,6 +400,12 @@ impl UnsignedIntTemplate {
         }
     }
 
+    /// set tz offset
+    pub const fn with_tz_offset(mut self, tz_offset: Option<FixedOffset>) -> Self {
+        self.tz_offset = tz_offset;
+        self
+    }
+
     fn render_event(&self, event: EventRef<'_>) -> Result<u64, TemplateRenderingError> {
         let mut missing_keys = Vec::new();
         let mut out = String::with_capacity(20);
@@ -418,7 +433,9 @@ impl UnsignedIntTemplate {
                         }),
                     );
                 }
-                _ => return Err(TemplateRenderingError::UnsupportedNumeric),
+                Part::Strftime(items) => {
+                    out.push_str(&render_timestamp(items, event, self.tz_offset))
+                }
             }
         }
         if missing_keys.is_empty() {
@@ -601,9 +618,12 @@ fn render_timestamp(
 mod tests {
     use chrono::{Offset, TimeZone, Utc};
     use chrono_tz::Tz;
-    use vector_lib::config::LogNamespace;
-    use vector_lib::lookup::{metadata_path, PathPrefix};
-    use vector_lib::metric_tags;
+    use vector_lib::{
+        config::LogNamespace,
+        lookup::{PathPrefix, metadata_path},
+        metric_tags,
+    };
+    use vrl::event_path;
 
     use super::*;
     use crate::event::{Event, LogEvent, MetricKind, MetricValue};
@@ -625,6 +645,7 @@ mod tests {
             .get_fields()
             .unwrap();
         let f6 = UnsignedIntTemplate::from(123u64).get_fields();
+        let f7 = UnsignedIntTemplate::try_from("%s").unwrap().get_fields();
 
         assert_eq!(f1, vec!["foo"]);
         assert_eq!(f2, vec!["foo", "bar"]);
@@ -632,18 +653,23 @@ mod tests {
         assert_eq!(f4, None);
         assert_eq!(f5, vec!["foo", "bar"]);
         assert_eq!(f6, None);
+        assert_eq!(f7, None);
     }
 
     #[test]
     fn is_dynamic() {
         assert!(Template::try_from("/kube-demo/%F").unwrap().is_dynamic());
         assert!(!Template::try_from("/kube-demo/echo").unwrap().is_dynamic());
-        assert!(Template::try_from("/kube-demo/{{ foo }}")
-            .unwrap()
-            .is_dynamic());
-        assert!(Template::try_from("/kube-demo/{{ foo }}/%F")
-            .unwrap()
-            .is_dynamic());
+        assert!(
+            Template::try_from("/kube-demo/{{ foo }}")
+                .unwrap()
+                .is_dynamic()
+        );
+        assert!(
+            Template::try_from("/kube-demo/{{ foo }}/%F")
+                .unwrap()
+                .is_dynamic()
+        );
     }
 
     #[test]
@@ -954,6 +980,23 @@ mod tests {
         );
     }
 
+    #[test]
+    fn render_log_unsigned_int_with_timezone() {
+        let ts = Utc.with_ymd_and_hms(2001, 2, 3, 4, 5, 6).unwrap();
+
+        let template = UnsignedIntTemplate::try_from("%Y%m%d%H").unwrap();
+        let mut event = Event::Log(LogEvent::from("hello world"));
+        event.as_mut_log().insert(event_path!("timestamp"), ts);
+
+        let tz: Tz = "Asia/Singapore".parse().unwrap();
+        let offset = Some(Utc::now().with_timezone(&tz).offset().fix());
+
+        assert_eq!(
+            Ok(2001020312),
+            template.with_tz_offset(offset).render(&event)
+        );
+    }
+
     fn sample_metric() -> Metric {
         Metric::new(
             "a-counter",
@@ -972,6 +1015,22 @@ mod tests {
         assert_eq!(
             Template::try_from("%E").unwrap_err(),
             TemplateParseError::StrftimeError
+        );
+    }
+
+    #[test]
+    fn strftime_non_int_result() {
+        let template = UnsignedIntTemplate::try_from("a-%s").unwrap();
+        let ts = Utc.with_ymd_and_hms(2001, 2, 3, 4, 5, 6).unwrap();
+
+        let mut event = Event::Log(LogEvent::from("hello world"));
+        event.as_mut_log().insert(event_path!("timestamp"), ts);
+
+        assert_eq!(
+            Err(TemplateRenderingError::NotNumeric {
+                input: "a-981173106".to_owned()
+            }),
+            template.render(&event)
         );
     }
 }

@@ -2,21 +2,21 @@
 //! Accepts log events streamed from [`Apache Pulsar`][pulsar].
 //!
 //! [pulsar]: https://pulsar.apache.org/
+use std::path::Path;
+
 use chrono::TimeZone;
 use futures_util::StreamExt;
 use pulsar::{
+    Authentication, Consumer, Pulsar, SubType, TokioExecutor,
     authentication::oauth2::{OAuth2Authentication, OAuth2Params},
     consumer::Message,
     message::proto::MessageIdData,
-    Authentication, Consumer, Pulsar, SubType, TokioExecutor,
 };
-use std::path::Path;
-use tokio_util::codec::FramedRead;
-
 use vector_lib::{
+    EstimatedJsonEncodedSizeOf,
     codecs::{
+        Decoder, DecoderFramedRead, DecodingConfig, StreamDecodingError,
         decoding::{DeserializerConfig, FramingConfig},
-        StreamDecodingError,
     },
     config::{LegacyKey, LogNamespace, SourceAcknowledgementsConfig, SourceOutput},
     configurable::configurable_component,
@@ -29,19 +29,17 @@ use vector_lib::{
     },
     sensitive_string::SensitiveString,
     shutdown::ShutdownSignal,
-    EstimatedJsonEncodedSizeOf,
 };
 use vrl::{owned_value_path, path, value::Kind};
 
 use crate::{
-    codecs::{Decoder, DecodingConfig},
+    SourceSender,
     config::{SourceConfig, SourceContext},
     event::BatchNotifier,
     internal_events::{
         PulsarErrorEvent, PulsarErrorEventData, PulsarErrorEventType, StreamClosedError,
     },
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
-    SourceSender,
 };
 
 /// Configuration for the `pulsar` source.
@@ -390,7 +388,7 @@ async fn parse_message(
     let topic = msg.topic.clone();
     let producer_name = msg.payload.metadata.producer_name.clone();
 
-    let mut stream = FramedRead::new(msg.payload.data.as_ref(), decoder.clone());
+    let mut stream = DecoderFramedRead::new(msg.payload.data.as_ref(), decoder.clone());
     let stream = async_stream::stream! {
         while let Some(next) = stream.next().await {
             match next {
@@ -442,7 +440,7 @@ async fn parse_message(
                     }
                 }
                 Err(error) => {
-                    // Error is logged by `crate::codecs`, no further
+                    // Error is logged by `vector_lib::codecs`, no further
                     // handling is needed here.
                     if !error.can_continue() {
                         break;
@@ -551,10 +549,15 @@ mod tests {
 #[cfg(test)]
 mod integration_tests {
     use super::*;
-    use crate::config::log_schema;
-    use crate::test_util::components::{assert_source_compliance, SOURCE_TAGS};
-    use crate::test_util::{collect_n, random_string, trace_init};
-    use crate::tls::TEST_PEM_INTERMEDIATE_CA_PATH;
+    use crate::{
+        config::log_schema,
+        test_util::{
+            collect_n,
+            components::{SOURCE_TAGS, assert_source_compliance},
+            random_string, trace_init,
+        },
+        tls::TEST_PEM_INTERMEDIATE_CA_PATH,
+    };
 
     fn pulsar_host() -> String {
         std::env::var("PULSAR_HOST").unwrap_or_else(|_| "127.0.0.1".into())

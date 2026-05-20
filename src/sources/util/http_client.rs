@@ -8,28 +8,31 @@
 //!   - Call call() supplying the generic inputs for calling and the source-specific
 //!     context.
 
-use bytes::Bytes;
-use futures_util::{stream, FutureExt, StreamExt, TryFutureExt};
-use http::{response::Parts, Uri};
-use hyper::{Body, Request};
-use std::time::Duration;
-use std::{collections::HashMap, future::ready};
-use tokio_stream::wrappers::IntervalStream;
-use vector_lib::json_size::JsonSize;
+// Okta source only imports defaults but doesn't use the rest of the client
+#![cfg_attr(feature = "sources-okta", allow(dead_code))]
 
-use crate::http::QueryParameters;
+use std::{collections::HashMap, future::ready, time::Duration};
+
+use bytes::Bytes;
+use futures_util::{FutureExt, StreamExt, TryFutureExt, stream};
+use http::{Uri, response::Parts};
+use hyper::{Body, Request};
+use tokio_stream::wrappers::IntervalStream;
+use vector_lib::{
+    EstimatedJsonEncodedSizeOf, config::proxy::ProxyConfig, event::Event, json_size::JsonSize,
+    shutdown::ShutdownSignal,
+};
+
 use crate::{
-    http::{Auth, HttpClient},
+    SourceSender,
+    http::{Auth, HttpClient, QueryParameterValue, QueryParameters},
     internal_events::{
         EndpointBytesReceived, HttpClientEventsReceived, HttpClientHttpError,
         HttpClientHttpResponseError, StreamClosedError,
     },
     sources::util::http::HttpMethod,
     tls::TlsSettings,
-    SourceSender,
 };
-use vector_lib::shutdown::ShutdownSignal;
-use vector_lib::{config::proxy::ProxyConfig, event::Event, EstimatedJsonEncodedSizeOf};
 
 /// Contains the inputs generic to any http client.
 pub(crate) struct GenericHttpClientInputs {
@@ -76,6 +79,19 @@ pub(crate) trait HttpClientContext {
     /// (Optional) Called if the HTTP response is not 200 ('OK').
     fn on_http_response_error(&self, _uri: &Uri, _header: &Parts) {}
 
+    /// (Optional) Process the base URL before each request.
+    /// Allows for dynamic query parameters that update at runtime.
+    /// Returns a new URL if parameters need to be updated, or None to use the original URL.
+    fn process_url(&self, _url: &Uri) -> Option<Uri> {
+        None
+    }
+
+    /// (Optional) Get the request body to send with the HTTP request.
+    /// Returns the body as a String if one should be sent, or None for an empty body.
+    fn get_request_body(&self) -> Option<String> {
+        None
+    }
+
     // This function can be defined to enrich events with additional HTTP
     // metadata. This function should be used rather than internal enrichment so
     // that accurate byte count metrics can be emitted.
@@ -88,10 +104,17 @@ pub(crate) fn build_url(uri: &Uri, query: &QueryParameters) -> Uri {
     if let Some(query) = uri.query() {
         serializer.extend_pairs(url::form_urlencoded::parse(query.as_bytes()));
     };
-    for (k, l) in query {
-        for v in l {
-            serializer.append_pair(k, v);
-        }
+    for (k, query_value) in query {
+        match query_value {
+            QueryParameterValue::SingleParam(param) => {
+                serializer.append_pair(k, param.value());
+            }
+            QueryParameterValue::MultiParams(params) => {
+                for v in params {
+                    serializer.append_pair(k, v.value());
+                }
+            }
+        };
     }
     let mut builder = Uri::builder();
     if let Some(scheme) = uri.scheme() {
@@ -141,12 +164,15 @@ pub(crate) async fn call<
         .take_until(inputs.shutdown)
         .map(move |_| stream::iter(inputs.urls.clone()))
         .flatten()
-        .map(move |url| {
+        .map(move |base_url| {
             let client = client.clone();
-            let endpoint = url.to_string();
+            let endpoint = base_url.to_string();
 
             let context_builder = context_builder.clone();
-            let mut context = context_builder.build(&url);
+            let mut context = context_builder.build(&base_url);
+
+            // Check if we need to process the URL dynamically (for updating VRL expressions)
+            let url = context.process_url(&base_url).unwrap_or(base_url);
 
             let mut builder = match http_method {
                 HttpMethod::Head => Request::head(&url),
@@ -170,8 +196,23 @@ pub(crate) async fn call<
                 builder = builder.header(http::header::ACCEPT, &inputs.content_type);
             }
 
-            // building an empty request should be infallible
-            let mut request = builder.body(Body::empty()).expect("error creating request");
+            // Get the request body from the context (if any)
+            let body = match context.get_request_body() {
+                Some(body_str) => {
+                    // Set Content-Type header if not already set
+                    if !inputs
+                        .headers
+                        .contains_key(http::header::CONTENT_TYPE.as_str())
+                    {
+                        builder = builder.header(http::header::CONTENT_TYPE, "application/json");
+                    }
+                    Body::from(body_str)
+                }
+                None => Body::empty(),
+            };
+
+            // building the request should be infallible
+            let mut request = builder.body(body).expect("error creating request");
 
             if let Some(auth) = &inputs.auth {
                 auth.apply(&mut request);
@@ -191,7 +232,7 @@ pub(crate) async fn call<
                 })
                 .and_then(|response| async move {
                     let (header, body) = response.into_parts();
-                    let body = hyper::body::to_bytes(body).await?;
+                    let body = http_body::Body::collect(body).await?.to_bytes();
                     emit!(EndpointBytesReceived {
                         byte_size: body.len(),
                         protocol: "http",

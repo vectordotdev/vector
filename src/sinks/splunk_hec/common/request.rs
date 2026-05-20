@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
 use bytes::Bytes;
-use vector_lib::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_lib::{
-    event::{EventFinalizers, Finalizable},
     ByteSizeOf,
+    event::{EventFinalizers, Finalizable},
+    request_metadata::{MetaDescriptive, RequestMetadata},
 };
 
 use crate::sinks::util::ElementCount;

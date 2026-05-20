@@ -1,29 +1,30 @@
-use futures::{future, FutureExt};
+use futures::{FutureExt, future};
 use tokio::io;
-use vector_lib::codecs::{
-    encoding::{Framer, FramingConfig},
-    JsonSerializerConfig,
+use vector_lib::{
+    codecs::{
+        JsonSerializerConfig,
+        encoding::{Framer, FramingConfig},
+    },
+    configurable::configurable_component,
 };
-use vector_lib::configurable::configurable_component;
 
 use crate::{
     codecs::{Encoder, EncodingConfigWithFraming, SinkType},
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
-    sinks::{console::sink::WriterSink, Healthcheck, VectorSink},
+    sinks::{Healthcheck, VectorSink, console::sink::WriterSink},
 };
 
 /// The [standard stream][standard_streams] to write to.
 ///
 /// [standard_streams]: https://en.wikipedia.org/wiki/Standard_streams
 #[configurable_component]
-#[derive(Clone, Debug, Derivative)]
-#[derivative(Default)]
+#[derive(Clone, Debug, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum Target {
     /// Write output to [STDOUT][stdout].
     ///
     /// [stdout]: https://en.wikipedia.org/wiki/Standard_streams#Standard_output_(stdout)
-    #[derivative(Default)]
+    #[default]
     Stdout,
 
     /// Write output to [STDERR][stderr].

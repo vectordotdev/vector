@@ -6,15 +6,17 @@ use std::{
 
 use bytes::Bytes;
 use http::{
-    header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
     Request,
+    header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
 };
 use hyper::Body;
 use tracing::Instrument;
 
 use super::{NewRelicCredentials, NewRelicSinkError};
-use crate::sinks::prelude::*;
-use crate::{http::HttpClient, sinks::util::Compression};
+use crate::{
+    http::HttpClient,
+    sinks::{prelude::*, util::Compression},
+};
 
 #[derive(Debug, Clone)]
 pub struct NewRelicApiRequest {

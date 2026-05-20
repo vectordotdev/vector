@@ -1,12 +1,14 @@
-use crate::internal_events::PulsarPropertyExtractionError;
-use crate::sinks::pulsar::config::PulsarSinkConfig;
-use crate::sinks::pulsar::sink::PulsarEvent;
-use crate::template::Template;
-use bytes::Bytes;
 use std::collections::HashMap;
-use vector_lib::event::Event;
-use vector_lib::lookup::lookup_v2::OptionalTargetPath;
+
+use bytes::Bytes;
+use vector_lib::{event::Event, lookup::lookup_v2::OptionalTargetPath};
 use vrl::value::{KeyString, Value};
+
+use crate::{
+    internal_events::PulsarPropertyExtractionError,
+    sinks::pulsar::{config::PulsarSinkConfig, sink::PulsarEvent},
+    template::Template,
+};
 
 /// Transforms an event into a Pulsar event by rendering the required template fields.
 /// Returns None if there is an error whilst rendering.

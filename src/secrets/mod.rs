@@ -4,8 +4,10 @@ use std::collections::{HashMap, HashSet};
 use enum_dispatch::enum_dispatch;
 use vector_lib::configurable::configurable_component;
 
-use crate::config::GenerateConfig;
-use crate::{config::SecretBackend, signal};
+use crate::{
+    config::{GenerateConfig, SecretBackend},
+    signal,
+};
 
 #[cfg(feature = "secrets-aws-secrets-manager")]
 mod aws_secrets_manager;
@@ -49,7 +51,7 @@ mod test;
 /// Secrets are loaded when Vector starts or if Vector receives a `SIGHUP` signal triggering its
 /// configuration reload process.
 #[allow(clippy::large_enum_variant)]
-#[configurable_component(global_option("secret"))]
+#[configurable_component]
 #[derive(Clone, Debug)]
 #[enum_dispatch(SecretBackend)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -75,6 +77,20 @@ pub enum SecretBackends {
     /// Test.
     #[configurable(metadata(docs::hidden))]
     Test(test::TestBackend),
+}
+
+// Manual NamedComponent impl required because enum_dispatch doesn't support it yet.
+impl vector_lib::configurable::NamedComponent for SecretBackends {
+    fn get_component_name(&self) -> &'static str {
+        match self {
+            Self::File(config) => config.get_component_name(),
+            Self::Directory(config) => config.get_component_name(),
+            Self::Exec(config) => config.get_component_name(),
+            #[cfg(feature = "secrets-aws-secrets-manager")]
+            Self::AwsSecretsManager(config) => config.get_component_name(),
+            Self::Test(config) => config.get_component_name(),
+        }
+    }
 }
 
 impl GenerateConfig for SecretBackends {

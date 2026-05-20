@@ -44,7 +44,7 @@ components: sources: eventstoredb_metrics: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.eventstoredb_metrics.configuration
+	configuration: generated.components.sources.eventstoredb_metrics.configuration
 
 	output: metrics: {
 		_eventstoredb_metrics_tags: {

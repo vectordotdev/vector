@@ -1,9 +1,10 @@
+use std::time::Duration;
+
 use serde_json::Value;
 use tracing::info;
+use vector::test_util::trace_init;
 
 use super::*;
-use std::time::Duration;
-use vector::test_util::trace_init;
 
 const LOGS_ENDPOINT: &str = "/api/v2/logs";
 const MAX_RETRIES: usize = 10;

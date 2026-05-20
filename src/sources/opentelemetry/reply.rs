@@ -1,7 +1,7 @@
 use bytes::BytesMut;
-use http::{header::CONTENT_TYPE, HeaderValue};
+use http::{HeaderValue, header::CONTENT_TYPE};
 use prost::Message;
-use warp::{reply::Response, Reply};
+use warp::{Reply, reply::Response};
 
 use super::status::Status;
 

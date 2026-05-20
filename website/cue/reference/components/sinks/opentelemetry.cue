@@ -31,12 +31,21 @@ components: sinks: opentelemetry: {
 	}
 
 	support: {
-		requirements: ["This sink excepts events conforming to the [OTEL proto format](\(urls.opentelemetry_proto)). You can use [Remap](\(urls.vector_remap_transform)) to prepare events for ingestion."]
-		warnings: []
+		requirements: ["This sink accepts events conforming to the [OTEL proto format](\(urls.opentelemetry_proto)). You can use [Remap](\(urls.vector_remap_transform)) to prepare events for ingestion."]
+		warnings: [
+			"""
+				Batching only works with `encoding.codec: otlp`, which encodes events as protobuf
+				and supports native batching (recommended). The legacy `encoding.codec: json` path
+				produces newline-delimited JSON, which is not a valid OTLP request body, so on
+				that path you must either set `batch.max_events: 1` or merge events into a single
+				envelope upstream with the [`reduce`](\(urls.vector_reduce_transform)) transform.
+				See [#22054](https://github.com/vectordotdev/vector/issues/22054).
+				""",
+		]
 		notices: []
 	}
 
-	configuration: base.components.sinks.opentelemetry.configuration
+	configuration: generated.components.sinks.opentelemetry.configuration
 	how_it_works: {
 		quickstart: {
 			title: "Quickstart"

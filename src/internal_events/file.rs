@@ -1,14 +1,19 @@
-use metrics::{counter, gauge};
+#![allow(dead_code)] // TODO requires optional feature compilation
+
 use std::borrow::Cow;
+
 use vector_lib::{
+    NamedInternalEvent,
     configurable::configurable_component,
-    internal_event::{ComponentEventsDropped, InternalEvent, UNINTENTIONAL},
+    counter, gauge,
+    internal_event::{
+        ComponentEventsDropped, CounterName, GaugeName, InternalEvent, UNINTENTIONAL, error_stage,
+        error_type,
+    },
 };
 
 #[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
 pub use self::source::*;
-
-use vector_lib::internal_event::{error_stage, error_type};
 
 /// Configuration of internal metrics for file-based components.
 #[configurable_component]
@@ -23,18 +28,18 @@ pub struct FileInternalMetricsConfig {
     pub include_file_tag: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct FileOpen {
     pub count: usize,
 }
 
 impl InternalEvent for FileOpen {
     fn emit(self) {
-        gauge!("open_files").set(self.count as f64);
+        gauge!(GaugeName::OpenFiles).set(self.count as f64);
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct FileBytesSent<'a> {
     pub byte_size: usize,
     pub file: Cow<'a, str>,
@@ -51,13 +56,13 @@ impl InternalEvent for FileBytesSent<'_> {
         );
         if self.include_file_metric_tag {
             counter!(
-                "component_sent_bytes_total",
+                CounterName::ComponentSentBytesTotal,
                 "protocol" => "file",
                 "file" => self.file.clone().into_owned(),
             )
         } else {
             counter!(
-                "component_sent_bytes_total",
+                CounterName::ComponentSentBytesTotal,
                 "protocol" => "file",
             )
         }
@@ -65,7 +70,7 @@ impl InternalEvent for FileBytesSent<'_> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct FileIoError<'a, P> {
     pub error: std::io::Error,
     pub code: &'static str,
@@ -83,10 +88,9 @@ impl<P: std::fmt::Debug> InternalEvent for FileIoError<'_, P> {
             error_code = %self.code,
             error_type = error_type::IO_FAILED,
             stage = error_stage::SENDING,
-            internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_code" => self.code,
             "error_type" => error_type::IO_FAILED,
             "stage" => error_stage::SENDING,
@@ -106,17 +110,19 @@ impl<P: std::fmt::Debug> InternalEvent for FileIoError<'_, P> {
 mod source {
     use std::{io::Error, path::Path, time::Duration};
 
-    use metrics::counter;
-    use vector_lib::file_source::FileSourceInternalEvents;
-
-    use super::{FileOpen, InternalEvent};
-    use vector_lib::emit;
+    use bytes::BytesMut;
     use vector_lib::{
-        internal_event::{error_stage, error_type},
+        NamedInternalEvent, counter, emit,
+        file_source_common::internal_events::FileSourceInternalEvents,
+        internal_event::{
+            ComponentEventsDropped, CounterName, INTENTIONAL, error_stage, error_type,
+        },
         json_size::JsonSize,
     };
 
-    #[derive(Debug)]
+    use super::{FileOpen, InternalEvent};
+
+    #[derive(Debug, NamedInternalEvent)]
     pub struct FileBytesReceived<'a> {
         pub byte_size: usize,
         pub file: &'a str,
@@ -133,13 +139,13 @@ mod source {
             );
             if self.include_file_metric_tag {
                 counter!(
-                    "component_received_bytes_total",
+                    CounterName::ComponentReceivedBytesTotal,
                     "protocol" => "file",
                     "file" => self.file.to_owned()
                 )
             } else {
                 counter!(
-                    "component_received_bytes_total",
+                    CounterName::ComponentReceivedBytesTotal,
                     "protocol" => "file",
                 )
             }
@@ -147,7 +153,7 @@ mod source {
         }
     }
 
-    #[derive(Debug)]
+    #[derive(Debug, NamedInternalEvent)]
     pub struct FileEventsReceived<'a> {
         pub count: usize,
         pub file: &'a str,
@@ -165,24 +171,24 @@ mod source {
             );
             if self.include_file_metric_tag {
                 counter!(
-                    "component_received_events_total",
+                    CounterName::ComponentReceivedEventsTotal,
                     "file" => self.file.to_owned(),
                 )
                 .increment(self.count as u64);
                 counter!(
-                    "component_received_event_bytes_total",
+                    CounterName::ComponentReceivedEventBytesTotal,
                     "file" => self.file.to_owned(),
                 )
                 .increment(self.byte_size.get() as u64);
             } else {
-                counter!("component_received_events_total").increment(self.count as u64);
-                counter!("component_received_event_bytes_total")
+                counter!(CounterName::ComponentReceivedEventsTotal).increment(self.count as u64);
+                counter!(CounterName::ComponentReceivedEventBytesTotal)
                     .increment(self.byte_size.get() as u64);
             }
         }
     }
 
-    #[derive(Debug)]
+    #[derive(Debug, NamedInternalEvent)]
     pub struct FileChecksumFailed<'a> {
         pub file: &'a Path,
         pub include_file_metric_tag: bool,
@@ -196,17 +202,17 @@ mod source {
             );
             if self.include_file_metric_tag {
                 counter!(
-                    "checksum_errors_total",
+                    CounterName::ChecksumErrorsTotal,
                     "file" => self.file.to_string_lossy().into_owned(),
                 )
             } else {
-                counter!("checksum_errors_total")
+                counter!(CounterName::ChecksumErrorsTotal)
             }
             .increment(1);
         }
     }
 
-    #[derive(Debug)]
+    #[derive(Debug, NamedInternalEvent)]
     pub struct FileFingerprintReadError<'a> {
         pub file: &'a Path,
         pub error: Error,
@@ -222,11 +228,10 @@ mod source {
                 error_code = "reading_fingerprint",
                 error_type = error_type::READER_FAILED,
                 stage = error_stage::RECEIVING,
-                internal_log_rate_limit = true,
             );
             if self.include_file_metric_tag {
                 counter!(
-                    "component_errors_total",
+                    CounterName::ComponentErrorsTotal,
                     "error_code" => "reading_fingerprint",
                     "error_type" => error_type::READER_FAILED,
                     "stage" => error_stage::RECEIVING,
@@ -234,7 +239,7 @@ mod source {
                 )
             } else {
                 counter!(
-                    "component_errors_total",
+                    CounterName::ComponentErrorsTotal,
                     "error_code" => "reading_fingerprint",
                     "error_type" => error_type::READER_FAILED,
                     "stage" => error_stage::RECEIVING,
@@ -246,7 +251,7 @@ mod source {
 
     const DELETION_FAILED: &str = "deletion_failed";
 
-    #[derive(Debug)]
+    #[derive(Debug, NamedInternalEvent)]
     pub struct FileDeleteError<'a> {
         pub file: &'a Path,
         pub error: Error,
@@ -262,11 +267,10 @@ mod source {
                 error_code = DELETION_FAILED,
                 error_type = error_type::COMMAND_FAILED,
                 stage = error_stage::RECEIVING,
-                internal_log_rate_limit = true,
             );
             if self.include_file_metric_tag {
                 counter!(
-                    "component_errors_total",
+                    CounterName::ComponentErrorsTotal,
                     "file" => self.file.to_string_lossy().into_owned(),
                     "error_code" => DELETION_FAILED,
                     "error_type" => error_type::COMMAND_FAILED,
@@ -274,7 +278,7 @@ mod source {
                 )
             } else {
                 counter!(
-                    "component_errors_total",
+                    CounterName::ComponentErrorsTotal,
                     "error_code" => DELETION_FAILED,
                     "error_type" => error_type::COMMAND_FAILED,
                     "stage" => error_stage::RECEIVING,
@@ -284,7 +288,7 @@ mod source {
         }
     }
 
-    #[derive(Debug)]
+    #[derive(Debug, NamedInternalEvent)]
     pub struct FileDeleted<'a> {
         pub file: &'a Path,
         pub include_file_metric_tag: bool,
@@ -298,17 +302,17 @@ mod source {
             );
             if self.include_file_metric_tag {
                 counter!(
-                    "files_deleted_total",
+                    CounterName::FilesDeletedTotal,
                     "file" => self.file.to_string_lossy().into_owned(),
                 )
             } else {
-                counter!("files_deleted_total")
+                counter!(CounterName::FilesDeletedTotal)
             }
             .increment(1);
         }
     }
 
-    #[derive(Debug)]
+    #[derive(Debug, NamedInternalEvent)]
     pub struct FileUnwatched<'a> {
         pub file: &'a Path,
         pub include_file_metric_tag: bool,
@@ -325,13 +329,13 @@ mod source {
             );
             if self.include_file_metric_tag {
                 counter!(
-                    "files_unwatched_total",
+                    CounterName::FilesUnwatchedTotal,
                     "file" => self.file.to_string_lossy().into_owned(),
                     "reached_eof" => reached_eof,
                 )
             } else {
                 counter!(
-                    "files_unwatched_total",
+                    CounterName::FilesUnwatchedTotal,
                     "reached_eof" => reached_eof,
                 )
             }
@@ -339,7 +343,7 @@ mod source {
         }
     }
 
-    #[derive(Debug)]
+    #[derive(Debug, NamedInternalEvent)]
     struct FileWatchError<'a> {
         pub file: &'a Path,
         pub error: Error,
@@ -355,11 +359,10 @@ mod source {
                 error_type = error_type::COMMAND_FAILED,
                 stage = error_stage::RECEIVING,
                 file = %self.file.display(),
-                internal_log_rate_limit = true,
             );
             if self.include_file_metric_tag {
                 counter!(
-                    "component_errors_total",
+                    CounterName::ComponentErrorsTotal,
                     "error_code" => "watching",
                     "error_type" => error_type::COMMAND_FAILED,
                     "stage" => error_stage::RECEIVING,
@@ -367,7 +370,7 @@ mod source {
                 )
             } else {
                 counter!(
-                    "component_errors_total",
+                    CounterName::ComponentErrorsTotal,
                     "error_code" => "watching",
                     "error_type" => error_type::COMMAND_FAILED,
                     "stage" => error_stage::RECEIVING,
@@ -377,7 +380,7 @@ mod source {
         }
     }
 
-    #[derive(Debug)]
+    #[derive(Debug, NamedInternalEvent)]
     pub struct FileResumed<'a> {
         pub file: &'a Path,
         pub file_position: u64,
@@ -393,17 +396,17 @@ mod source {
             );
             if self.include_file_metric_tag {
                 counter!(
-                    "files_resumed_total",
+                    CounterName::FilesResumedTotal,
                     "file" => self.file.to_string_lossy().into_owned(),
                 )
             } else {
-                counter!("files_resumed_total")
+                counter!(CounterName::FilesResumedTotal)
             }
             .increment(1);
         }
     }
 
-    #[derive(Debug)]
+    #[derive(Debug, NamedInternalEvent)]
     pub struct FileAdded<'a> {
         pub file: &'a Path,
         pub include_file_metric_tag: bool,
@@ -417,17 +420,17 @@ mod source {
             );
             if self.include_file_metric_tag {
                 counter!(
-                    "files_added_total",
+                    CounterName::FilesAddedTotal,
                     "file" => self.file.to_string_lossy().into_owned(),
                 )
             } else {
-                counter!("files_added_total")
+                counter!(CounterName::FilesAddedTotal)
             }
             .increment(1);
         }
     }
 
-    #[derive(Debug)]
+    #[derive(Debug, NamedInternalEvent)]
     pub struct FileCheckpointed {
         pub count: usize,
         pub duration: Duration,
@@ -440,11 +443,11 @@ mod source {
                 count = %self.count,
                 duration_ms = self.duration.as_millis() as u64,
             );
-            counter!("checkpoints_total").increment(self.count as u64);
+            counter!(CounterName::CheckpointsTotal).increment(self.count as u64);
         }
     }
 
-    #[derive(Debug)]
+    #[derive(Debug, NamedInternalEvent)]
     pub struct FileCheckpointWriteError {
         pub error: Error,
     }
@@ -457,10 +460,9 @@ mod source {
                 error_code = "writing_checkpoints",
                 error_type = error_type::WRITER_FAILED,
                 stage = error_stage::RECEIVING,
-                internal_log_rate_limit = true,
             );
             counter!(
-                "component_errors_total",
+                CounterName::ComponentErrorsTotal,
                 "error_code" => "writing_checkpoints",
                 "error_type" => error_type::WRITER_FAILED,
                 "stage" => error_stage::RECEIVING,
@@ -469,7 +471,7 @@ mod source {
         }
     }
 
-    #[derive(Debug)]
+    #[derive(Debug, NamedInternalEvent)]
     pub struct PathGlobbingError<'a> {
         pub path: &'a Path,
         pub error: &'a Error,
@@ -484,15 +486,45 @@ mod source {
                 error_type = error_type::READER_FAILED,
                 stage = error_stage::RECEIVING,
                 path = %self.path.display(),
-                internal_log_rate_limit = true,
             );
             counter!(
-                "component_errors_total",
+                CounterName::ComponentErrorsTotal,
                 "error_code" => "globbing",
                 "error_type" => error_type::READER_FAILED,
                 "stage" => error_stage::RECEIVING,
             )
             .increment(1);
+        }
+    }
+
+    #[derive(Debug, NamedInternalEvent)]
+    pub struct FileLineTooBigError<'a> {
+        pub truncated_bytes: &'a BytesMut,
+        pub configured_limit: usize,
+        pub encountered_size_so_far: usize,
+    }
+
+    impl InternalEvent for FileLineTooBigError<'_> {
+        fn emit(self) {
+            error!(
+                message = "Found line that exceeds max_line_bytes; discarding.",
+                truncated_bytes = ?self.truncated_bytes,
+                configured_limit = self.configured_limit,
+                encountered_size_so_far = self.encountered_size_so_far,
+                error_type = error_type::CONDITION_FAILED,
+                stage = error_stage::RECEIVING,
+            );
+            counter!(
+                CounterName::ComponentErrorsTotal,
+                "error_code" => "reading_line_from_file",
+                "error_type" => error_type::CONDITION_FAILED,
+                "stage" => error_stage::RECEIVING,
+            )
+            .increment(1);
+            emit!(ComponentEventsDropped::<INTENTIONAL> {
+                count: 1,
+                reason: "Found line that exceeds max_line_bytes; discarding.",
+            });
         }
     }
 
@@ -577,6 +609,19 @@ mod source {
 
         fn emit_path_globbing_failed(&self, path: &Path, error: &Error) {
             emit!(PathGlobbingError { path, error });
+        }
+
+        fn emit_file_line_too_long(
+            &self,
+            truncated_bytes: &bytes::BytesMut,
+            configured_limit: usize,
+            encountered_size_so_far: usize,
+        ) {
+            emit!(FileLineTooBigError {
+                truncated_bytes,
+                configured_limit,
+                encountered_size_so_far
+            });
         }
     }
 }

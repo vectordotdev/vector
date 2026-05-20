@@ -4,8 +4,8 @@ use encoding_rs::Encoding;
 use serde_json::Value;
 
 use crate::{
-    schema::{generate_string_schema, SchemaGenerator, SchemaObject},
     Configurable, GenerateError, Metadata, ToValue,
+    schema::{SchemaGenerator, SchemaObject, generate_string_schema},
 };
 
 impl Configurable for &'static Encoding {

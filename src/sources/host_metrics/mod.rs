@@ -13,19 +13,21 @@ use serde_with::serde_as;
 use sysinfo::System;
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
-use vector_lib::config::LogNamespace;
-use vector_lib::configurable::configurable_component;
-use vector_lib::internal_event::{
-    ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,
+use vector_lib::{
+    EstimatedJsonEncodedSizeOf,
+    config::LogNamespace,
+    configurable::configurable_component,
+    internal_event::{
+        ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,
+    },
 };
-use vector_lib::EstimatedJsonEncodedSizeOf;
 
 use crate::{
+    SourceSender,
     config::{SourceConfig, SourceContext, SourceOutput},
     event::metric::{Metric, MetricKind, MetricTags, MetricValue},
     internal_events::{EventsReceived, HostMetricsScrapeDetailError, StreamClosedError},
     shutdown::ShutdownSignal,
-    SourceSender,
 };
 
 #[cfg(target_os = "linux")]
@@ -343,7 +345,7 @@ impl HostMetricsConfig {
     fn has_collector(&self, collector: Collector) -> bool {
         match &self.collectors {
             None => true,
-            Some(collectors) => collectors.iter().any(|&c| c == collector),
+            Some(collectors) => collectors.contains(&collector),
         }
     }
 }
@@ -673,10 +675,10 @@ impl From<PatternWrapper> for String {
 
 #[cfg(test)]
 mod tests {
-    use crate::test_util::components::{run_and_assert_source_compliance, SOURCE_TAGS};
     use std::{collections::HashSet, future::Future, time::Duration};
 
     use super::*;
+    use crate::test_util::components::{SOURCE_TAGS, run_and_assert_source_compliance};
 
     #[test]
     fn filterlist_default_includes_everything() {
@@ -770,8 +772,7 @@ mod tests {
 
             assert!(
                 all_metrics_count > some_metrics.len(),
-                "collector={:?}",
-                collector
+                "collector={collector:?}"
             );
         }
     }
@@ -782,12 +783,14 @@ mod tests {
             .capture_metrics()
             .await;
         let hostname = crate::get_hostname().expect("Broken hostname");
-        assert!(!metrics.into_iter().any(|event| event
-            .tags()
-            .expect("Missing tags")
-            .get("host")
-            .expect("Missing \"host\" tag")
-            != hostname));
+        assert!(!metrics.into_iter().any(|event| {
+            event
+                .tags()
+                .expect("Missing tags")
+                .get("host")
+                .expect("Missing \"host\" tag")
+                != hostname
+        }));
     }
 
     #[tokio::test]
@@ -799,9 +802,11 @@ mod tests {
         .capture_metrics()
         .await;
 
-        assert!(metrics
-            .into_iter()
-            .all(|event| event.namespace() == Some("other")));
+        assert!(
+            metrics
+                .into_iter()
+                .all(|event| event.namespace() == Some("other"))
+        );
     }
 
     #[tokio::test]
@@ -810,9 +815,11 @@ mod tests {
             .capture_metrics()
             .await;
 
-        assert!(metrics
-            .iter()
-            .all(|event| event.namespace() == Some("host")));
+        assert!(
+            metrics
+                .iter()
+                .all(|event| event.namespace() == Some("host"))
+        );
     }
 
     // Windows does not produce load average metrics.
@@ -828,9 +835,11 @@ mod tests {
         assert!(all_gauges(&metrics));
 
         // All metrics are named load*
-        assert!(!metrics
-            .iter()
-            .any(|metric| !metric.name().starts_with("load")));
+        assert!(
+            !metrics
+                .iter()
+                .any(|metric| !metric.name().starts_with("load"))
+        );
     }
 
     #[tokio::test]
@@ -905,7 +914,7 @@ mod tests {
         // Pick an arbitrary key value
         if let Some(key) = keys.into_iter().next() {
             let key_prefix = &key[..key.len() - 1].to_string();
-            let key_prefix_pattern = PatternWrapper::try_from(format!("{}*", key_prefix)).unwrap();
+            let key_prefix_pattern = PatternWrapper::try_from(format!("{key_prefix}*")).unwrap();
             let key_pattern = PatternWrapper::try_from(key.clone()).unwrap();
 
             let filter = FilterList {

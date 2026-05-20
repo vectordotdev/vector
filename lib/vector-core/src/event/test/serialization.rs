@@ -1,11 +1,10 @@
+use super::*;
+use crate::config::log_schema;
 use bytes::{Buf, BufMut, BytesMut};
 use quickcheck::{QuickCheck, TestResult};
 use regex::Regex;
 use similar_asserts::assert_eq;
 use vector_buffers::encoding::Encodable;
-
-use super::*;
-use crate::config::log_schema;
 
 fn encode_value<T: Encodable, B: BufMut>(value: T, buffer: &mut B) {
     value.encode(buffer).expect("encoding should not fail");
@@ -39,7 +38,7 @@ fn serde_eventarray_no_size_loss() {
 // Ser/De the EventArray type through EncodeBytes -> DecodeBytes
 #[test]
 #[allow(clippy::neg_cmp_op_on_partial_ord)] // satisfying clippy leads to less
-                                            // clear expression
+// clear expression
 fn back_and_forth_through_bytes() {
     fn inner(events: EventArray) -> TestResult {
         let expected = events.clone();

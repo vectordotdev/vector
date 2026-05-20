@@ -1,23 +1,18 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, sync::Arc};
 
-use futures::future::ready;
-use futures::stream;
-
-use databend_client::response::QueryResponse as DatabendAPIResponse;
-use databend_client::APIClient as DatabendAPIClient;
+use databend_client::{APIClient as DatabendAPIClient, Page};
+use futures::{future::ready, stream};
 use vector_lib::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent};
 
-use crate::sinks::util::test::load_sink;
+use super::config::DatabendConfig;
 use crate::{
     config::{SinkConfig, SinkContext},
-    sinks::util::UriSerde,
+    sinks::util::{UriSerde, test::load_sink},
     test_util::{
-        components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
+        components::{HTTP_SINK_TAGS, run_and_assert_sink_compliance},
         random_table_name, trace_init,
     },
 };
-
-use super::config::DatabendConfig;
 
 fn databend_endpoint() -> String {
     std::env::var("DATABEND_ENDPOINT")
@@ -31,7 +26,10 @@ fn make_event() -> (Event, BatchStatusReceiver) {
     (event.into(), receiver)
 }
 
-async fn prepare_config(codec: &str, compression: &str) -> (String, String, DatabendAPIClient) {
+async fn prepare_config(
+    codec: &str,
+    compression: &str,
+) -> (String, String, Arc<DatabendAPIClient>) {
     trace_init();
 
     let table = random_table_name();
@@ -40,11 +38,10 @@ async fn prepare_config(codec: &str, compression: &str) -> (String, String, Data
 
     let mut cfg = format!(
         r#"
-            endpoint = "{}"
-            table = "{}"
+            endpoint = "{endpoint}"
+            table = "{table}"
             batch.max_events = 1
         "#,
-        endpoint, table,
     );
     match codec {
         "json" => {
@@ -89,12 +86,10 @@ async fn prepare_config(codec: &str, compression: &str) -> (String, String, Data
     (cfg, table, client)
 }
 
-async fn insert_event_with_cfg(cfg: String, table: String, client: DatabendAPIClient) {
-    let create_table_sql = format!(
-        "create table `{}` (host String, timestamp String, message String)",
-        table
-    );
-    client.query(&create_table_sql).await.unwrap();
+async fn insert_event_with_cfg(cfg: String, table: String, client: Arc<DatabendAPIClient>) {
+    let create_table_sql =
+        format!("create table `{table}` (host String, timestamp String, message String)");
+    client.query_all(&create_table_sql).await.unwrap();
 
     let (config, _) = load_sink::<DatabendConfig>(&cfg).unwrap();
     let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
@@ -107,8 +102,8 @@ async fn insert_event_with_cfg(cfg: String, table: String, client: DatabendAPICl
     )
     .await;
 
-    let select_all_sql = format!("select * from `{}`", table);
-    let resp = client.query(&select_all_sql).await.unwrap();
+    let select_all_sql = format!("select * from `{table}`");
+    let resp = client.query_all(&select_all_sql).await.unwrap();
     assert_eq!(1, resp.data.len());
 
     // drop input_event after comparing with response
@@ -147,7 +142,7 @@ async fn insert_event_csv_gzip() {
     insert_event_with_cfg(cfg, table, client).await;
 }
 
-fn response_to_map(resp: &DatabendAPIResponse) -> Vec<BTreeMap<String, Option<String>>> {
+fn response_to_map(resp: &Page) -> Vec<BTreeMap<String, Option<String>>> {
     let mut result = Vec::new();
     for row in &resp.data {
         let mut map = BTreeMap::new();

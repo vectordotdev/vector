@@ -1,6 +1,6 @@
 ---
 title: Going to Production
-weight: 3
+weight: 4
 ---
 
 This section offers guidance and best practices for infrastructure architects deploying Vector into production environments.

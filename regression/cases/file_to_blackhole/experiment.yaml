@@ -4,7 +4,7 @@ erratic: true
 target:
   name: vector
   command: /usr/bin/vector
-  cpu_allotment: 7
+  cpu_allotment: 6
   memory_allotment: 8GiB
 
   environment:

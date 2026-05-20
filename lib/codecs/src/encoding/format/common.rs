@@ -1,5 +1,4 @@
-use vector_core::config::log_schema;
-use vector_core::schema;
+use vector_core::{config::log_schema, schema};
 use vrl::value::Kind;
 
 /// Inspect the global log schema and create a schema requirement.

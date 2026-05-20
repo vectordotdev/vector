@@ -1,8 +1,10 @@
-use metrics::counter;
-use vector_lib::internal_event::InternalEvent;
-use vector_lib::json_size::JsonSize;
+use vector_lib::{
+    NamedInternalEvent, counter,
+    internal_event::{CounterName, InternalEvent},
+    json_size::JsonSize,
+};
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct InternalLogsBytesReceived {
     pub byte_size: usize,
 }
@@ -11,14 +13,14 @@ impl InternalEvent for InternalLogsBytesReceived {
     fn emit(self) {
         // MUST NOT emit logs here to avoid an infinite log loop
         counter!(
-            "component_received_bytes_total",
+            CounterName::ComponentReceivedBytesTotal,
             "protocol" => "internal",
         )
         .increment(self.byte_size as u64);
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct InternalLogsEventsReceived {
     pub byte_size: JsonSize,
     pub count: usize,
@@ -27,7 +29,8 @@ pub struct InternalLogsEventsReceived {
 impl InternalEvent for InternalLogsEventsReceived {
     fn emit(self) {
         // MUST NOT emit logs here to avoid an infinite log loop
-        counter!("component_received_events_total").increment(self.count as u64);
-        counter!("component_received_event_bytes_total").increment(self.byte_size.get() as u64);
+        counter!(CounterName::ComponentReceivedEventsTotal).increment(self.count as u64);
+        counter!(CounterName::ComponentReceivedEventBytesTotal)
+            .increment(self.byte_size.get() as u64);
     }
 }

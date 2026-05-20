@@ -33,10 +33,12 @@ async fn parse_no_input() {
     let errs = build_unit_tests(config).await.err().unwrap();
     assert_eq!(
         errs,
-        vec![indoc! {r"
+        vec![
+            indoc! {r"
             Failed to build test 'broken test':
               inputs[0]: unable to locate target transform 'foo'"}
-        .to_owned(),]
+            .to_owned(),
+        ]
     );
 
     let config: ConfigBuilder = toml::from_str(indoc! {r#"
@@ -69,10 +71,12 @@ async fn parse_no_input() {
     let errs = build_unit_tests(config).await.err().unwrap();
     assert_eq!(
         errs,
-        vec![indoc! {r"
+        vec![
+            indoc! {r"
             Failed to build test 'broken test':
               inputs[1]: unable to locate target transform 'foo'"}
-        .to_owned(),]
+            .to_owned(),
+        ]
     );
 }
 
@@ -102,10 +106,12 @@ async fn parse_no_test_input() {
     let errs = build_unit_tests(config).await.err().unwrap();
     assert_eq!(
         errs,
-        vec![indoc! {r"
+        vec![
+            indoc! {r"
             Failed to build test 'broken test':
               must specify at least one input."}
-        .to_owned(),]
+            .to_owned(),
+        ]
     );
 }
 
@@ -133,10 +139,12 @@ async fn parse_no_outputs() {
     let errs = build_unit_tests(config).await.err().unwrap();
     assert_eq!(
         errs,
-        vec![indoc! {r"
+        vec![
+            indoc! {r"
             Failed to build test 'broken test':
               unit test must contain at least one of `outputs` or `no_outputs_from`."}
-        .to_owned(),]
+            .to_owned(),
+        ]
     );
 }
 
@@ -170,10 +178,12 @@ async fn parse_invalid_output_targets() {
     let errs = build_unit_tests(config).await.err().unwrap();
     assert_eq!(
         errs,
-        vec![indoc! {r"
+        vec![
+            indoc! {r"
             Failed to build test 'broken test':
               Invalid extract_from target in test 'broken test': 'nonexistent' does not exist"}
-        .to_owned(),]
+            .to_owned(),
+        ]
     );
 
     let config: ConfigBuilder = toml::from_str(indoc! {r#"
@@ -197,10 +207,12 @@ async fn parse_invalid_output_targets() {
     let errs = build_unit_tests(config).await.err().unwrap();
     assert_eq!(
         errs,
-        vec![indoc! {r"
+        vec![
+            indoc! {r"
             Failed to build test 'broken test':
               Invalid no_outputs_from target in test 'broken test': 'nonexistent' does not exist"}
-        .to_owned(),]
+            .to_owned(),
+        ]
     );
 }
 
@@ -338,10 +350,12 @@ async fn parse_bad_input_event() {
     let errs = build_unit_tests(config).await.err().unwrap();
     assert_eq!(
         errs,
-        vec![indoc! {r"
+        vec![
+            indoc! {r"
             Failed to build test 'broken test':
               unrecognized input type 'nah', expected one of: 'raw', 'log' or 'metric'"}
-        .to_owned(),]
+            .to_owned(),
+        ]
     );
 }
 
@@ -1283,4 +1297,239 @@ async fn test_glob_input() {
 
     let mut tests = build_unit_tests(config).await.unwrap();
     assert!(tests.remove(0).run().await.errors.is_empty());
+}
+
+#[tokio::test]
+async fn expected_event_count_correct() {
+    crate::test_util::trace_init();
+
+    let config: ConfigBuilder = crate::config::format::deserialize(
+        indoc! {r#"
+            transforms:
+              foo:
+                inputs:
+                  - ignored
+                type: remap
+                source: |
+                  . = [{"message": "one"}, {"message": "two"}, {"message": "three"}]
+            tests:
+              - name: event count check
+                inputs:
+                  - insert_at: foo
+                    value: doesnt matter
+                outputs:
+                  - extract_from: foo
+                    expected_event_count: 3
+                    conditions:
+                      - type: vrl
+                        source: |
+                          assert!(exists(.message), "message field must exist")
+        "#},
+        crate::config::Format::Yaml,
+    )
+    .unwrap();
+
+    let mut tests = build_unit_tests(config).await.unwrap();
+    assert!(tests.remove(0).run().await.errors.is_empty());
+}
+
+#[tokio::test]
+async fn expected_event_count_wrong() {
+    crate::test_util::trace_init();
+
+    let config: ConfigBuilder = crate::config::format::deserialize(
+        indoc! {r#"
+            transforms:
+              foo:
+                inputs:
+                  - ignored
+                type: remap
+                source: |
+                  . = [{"message": "one"}, {"message": "two"}, {"message": "three"}]
+            tests:
+              - name: wrong event count
+                inputs:
+                  - insert_at: foo
+                    value: doesnt matter
+                outputs:
+                  - extract_from: foo
+                    expected_event_count: 2
+                    conditions:
+                      - type: vrl
+                        source: |
+                          assert!(exists(.message), "message field must exist")
+        "#},
+        crate::config::Format::Yaml,
+    )
+    .unwrap();
+
+    let mut tests = build_unit_tests(config).await.unwrap();
+    let errors = tests.remove(0).run().await.errors;
+    assert!(!errors.is_empty());
+    assert!(
+        errors
+            .iter()
+            .any(|e| e.contains("expected 2 events") && e.contains("but received 3")),
+        "expected event count error, got: {errors:?}"
+    );
+}
+
+#[tokio::test]
+async fn expected_event_count_zero_no_conditions() {
+    crate::test_util::trace_init();
+
+    let config: ConfigBuilder = crate::config::format::deserialize(
+        indoc! {r#"
+            transforms:
+              foo:
+                inputs:
+                  - ignored
+                type: remap
+                source: |
+                  if .message == "drop me" {
+                    abort
+                  }
+            tests:
+              - name: zero events expected
+                inputs:
+                  - insert_at: foo
+                    value: "drop me"
+                outputs:
+                  - extract_from: foo
+                    expected_event_count: 0
+        "#},
+        crate::config::Format::Yaml,
+    )
+    .unwrap();
+
+    let mut tests = build_unit_tests(config).await.unwrap();
+    assert!(tests.remove(0).run().await.errors.is_empty());
+}
+
+#[tokio::test]
+async fn expected_event_count_zero_with_conditions_rejected() {
+    crate::test_util::trace_init();
+
+    let config: ConfigBuilder = crate::config::format::deserialize(
+        indoc! {r#"
+            transforms:
+              foo:
+                inputs:
+                  - ignored
+                type: remap
+                source: |
+                  if .message == "drop me" {
+                    abort
+                  }
+            tests:
+              - name: zero with conditions
+                inputs:
+                  - insert_at: foo
+                    value: "drop me"
+                outputs:
+                  - extract_from: foo
+                    expected_event_count: 0
+                    conditions:
+                      - type: vrl
+                        source: |
+                          assert!(exists(.message), "unreachable")
+        "#},
+        crate::config::Format::Yaml,
+    )
+    .unwrap();
+
+    let errs = build_unit_tests(config).await.err().unwrap();
+    assert!(
+        errs.iter()
+            .any(|e| e.contains("expected_event_count of 0") && e.contains("conditions")),
+        "expected config error about zero count with conditions, got: {errs:?}"
+    );
+}
+
+#[tokio::test]
+async fn expected_event_count_conflicting_values() {
+    crate::test_util::trace_init();
+
+    let config: ConfigBuilder = crate::config::format::deserialize(
+        indoc! {r#"
+            transforms:
+              foo:
+                inputs:
+                  - ignored
+                type: remap
+                source: |
+                  . = [{"message": "one"}, {"message": "two"}]
+            tests:
+              - name: conflicting counts
+                inputs:
+                  - insert_at: foo
+                    value: doesnt matter
+                outputs:
+                  - extract_from: foo
+                    expected_event_count: 2
+                    conditions:
+                      - type: vrl
+                        source: |
+                          assert!(exists(.message), "ok")
+                  - extract_from: foo
+                    expected_event_count: 5
+                    conditions:
+                      - type: vrl
+                        source: |
+                          assert!(exists(.message), "ok")
+        "#},
+        crate::config::Format::Yaml,
+    )
+    .unwrap();
+
+    let errs = build_unit_tests(config).await.err().unwrap();
+    assert!(
+        errs.iter()
+            .any(|e| e.contains("conflicting expected_event_count")),
+        "expected conflicting count error, got: {errs:?}"
+    );
+}
+
+#[tokio::test]
+async fn expected_event_count_zero_split_with_conditions_rejected() {
+    crate::test_util::trace_init();
+
+    // Splitting expected_event_count: 0 and conditions across two output
+    // entries that share the same extract_from must still be rejected after
+    // merge, otherwise the conditions would pass vacuously against zero events.
+    let config: ConfigBuilder = crate::config::format::deserialize(
+        indoc! {r#"
+            transforms:
+              foo:
+                inputs:
+                  - ignored
+                type: remap
+                source: |
+                  if .message == "drop me" {
+                    abort
+                  }
+            tests:
+              - name: split zero with conditions
+                inputs:
+                  - insert_at: foo
+                    value: "drop me"
+                outputs:
+                  - extract_from: foo
+                    expected_event_count: 0
+                  - extract_from: foo
+                    conditions:
+                      - type: vrl
+                        source: |
+                          assert!(false, "should never be evaluated")
+        "#},
+        crate::config::Format::Yaml,
+    )
+    .unwrap();
+
+    let errs = build_unit_tests(config).await.err().unwrap();
+    assert!(
+        errs.iter()
+            .any(|e| e.contains("expected_event_count of 0") && e.contains("conditions")),
+        "expected config error about zero count with conditions after merge, got: {errs:?}"
+    );
 }

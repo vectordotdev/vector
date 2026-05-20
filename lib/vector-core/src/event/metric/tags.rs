@@ -1,16 +1,18 @@
 #[cfg(test)]
 use std::borrow::Borrow;
-
-use std::borrow::Cow;
-use std::collections::{hash_map::DefaultHasher, BTreeMap};
-use std::fmt::Display;
-use std::hash::{Hash, Hasher};
-use std::{cmp::Ordering, mem};
+use std::{
+    borrow::Cow,
+    cmp::Ordering,
+    collections::{BTreeMap, hash_map::DefaultHasher},
+    fmt::Display,
+    hash::{Hash, Hasher},
+    mem,
+};
 
 use indexmap::IndexSet;
-use serde::{ser::SerializeSeq, Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer, ser::SerializeSeq};
 use vector_common::byte_size_of::ByteSizeOf;
-use vector_config::{configurable_component, Configurable};
+use vector_config::{Configurable, configurable_component};
 
 /// A single tag value, either a bare tag or a value.
 #[derive(Clone, Configurable, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
@@ -92,9 +94,10 @@ type TagValueRef<'a> = Option<&'a str>;
 
 /// Tag values for a metric series.  This may be empty, a single value, or a set of values. This is
 /// used to provide the storage for `TagValueSet`.
-#[derive(Clone, Configurable, Debug, Eq, PartialEq)]
+#[derive(Clone, Configurable, Debug, Eq, PartialEq, Default)]
 pub enum TagValueSet {
     /// This represents a set containing no value.
+    #[default]
     Empty,
 
     /// This represents a set containing a single value. This is stored separately to avoid the
@@ -107,12 +110,6 @@ pub enum TagValueSet {
     /// elements. This allows us to retrieve the last element inserted which in turn allows us to
     /// emulate the set having a single value.
     Set(IndexSet<TagValue>),
-}
-
-impl Default for TagValueSet {
-    fn default() -> Self {
-        Self::Empty
-    }
 }
 
 impl Display for TagValueSet {
@@ -531,6 +528,12 @@ impl MetricTags {
         self.0.remove(name).and_then(TagValueSet::into_single)
     }
 
+    /// Remove a tag and return its full [`TagValueSet`], preserving all values rather than reducing
+    /// to a single string like [`Self::remove`].
+    pub fn remove_set(&mut self, name: &str) -> Option<TagValueSet> {
+        self.0.remove(name)
+    }
+
     pub fn keys(&self) -> impl Iterator<Item = &str> {
         self.0.keys().map(String::as_str)
     }
@@ -606,13 +609,13 @@ impl ByteSizeOf for MetricTags {
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "generate-fixtures"))]
 mod test_support {
     use std::collections::HashSet;
 
     use quickcheck::{Arbitrary, Gen};
 
-    use super::*;
+    use super::{BTreeMap, MetricTags, TagValue, TagValueSet};
 
     impl Arbitrary for TagValue {
         fn arbitrary(g: &mut Gen) -> Self {
@@ -642,6 +645,33 @@ mod tests {
     use proptest::prelude::*;
 
     use super::*;
+
+    fn make_tags(pairs: &[(&str, &str)]) -> MetricTags {
+        pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect()
+    }
+
+    #[test]
+    fn remove_set_returns_full_value_set() {
+        let mut tags = MetricTags::default();
+        tags.insert("k".to_string(), TagValue::Value("a".to_string()));
+        tags.insert("k".to_string(), TagValue::Value("b".to_string()));
+
+        let removed = tags.remove_set("k").expect("tag should exist");
+        assert_eq!(removed.len(), 2);
+        assert!(removed.contains(&TagValue::Value("a".to_string())));
+        assert!(removed.contains(&TagValue::Value("b".to_string())));
+        assert!(!tags.contains_key("k"));
+    }
+
+    #[test]
+    fn remove_set_missing_returns_none() {
+        let mut tags = make_tags(&[("a", "1")]);
+        assert!(tags.remove_set("missing").is_none());
+        assert!(tags.contains_key("a"));
+    }
 
     proptest! {
         #[test]

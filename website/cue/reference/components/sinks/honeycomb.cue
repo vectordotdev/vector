@@ -63,7 +63,7 @@ components: sinks: honeycomb: {
 		notices: []
 	}
 
-	configuration: base.components.sinks.honeycomb.configuration
+	configuration: generated.components.sinks.honeycomb.configuration
 
 	input: {
 		logs:    true

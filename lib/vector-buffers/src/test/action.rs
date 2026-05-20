@@ -1,4 +1,4 @@
-use quickcheck::{single_shrinker, Arbitrary, Gen};
+use quickcheck::{Arbitrary, Gen, single_shrinker};
 
 use crate::test::Message;
 

@@ -5,7 +5,7 @@ use std::{
 
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Utc};
-use serde_json::{value::RawValue, Value as JsonValue};
+use serde_json::{Value as JsonValue, value::RawValue};
 use smallvec::SmallVec;
 use vrl::value::{KeyString, Value};
 

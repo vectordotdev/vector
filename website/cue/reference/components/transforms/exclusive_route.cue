@@ -4,7 +4,9 @@ components: transforms: exclusive_route: {
 	title: "Exclusive Route"
 
 	description: """
-		Routes events from one or more streams to unique sub-streams based on a set of user-defined conditions.
+		Routes events from one or more streams to unique sub-streams based on a set of user-defined conditions. Routes are
+		evaluated in order and once an event matches a route, it is sent exclusively to that route and no further routes
+		are evaluated.
 
 		Also, see the [Route](\(urls.vector_route_transform)) transform for routing an event to multiple streams.
 		"""
@@ -26,7 +28,7 @@ components: transforms: exclusive_route: {
 		notices: []
 	}
 
-	configuration: base.components.transforms.exclusive_route.configuration
+	configuration: generated.components.transforms.exclusive_route.configuration
 
 	input: {
 		logs: true
@@ -39,6 +41,18 @@ components: transforms: exclusive_route: {
 			summary:      true
 		}
 		traces: true
+	}
+
+	output: {
+		logs: "": {
+			description: "The input `log` event."
+		}
+		metrics: "": {
+			description: "The input `metric` event."
+		}
+		traces: "": {
+			description: "The input `trace` event."
+		}
 	}
 
 	outputs: [

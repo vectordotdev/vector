@@ -1,14 +1,12 @@
 use core::fmt;
 use std::collections::BTreeSet;
 
-use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
-
+use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
 use vector_common::byte_size_of::ByteSizeOf;
 use vector_config::configurable_component;
 
-use crate::{float_eq, metrics::AgentDDSketch};
-
 use super::{samples_to_buckets, write_list, write_word};
+use crate::{float_eq, metrics::AgentDDSketch};
 
 const INFINITY: &str = "inf";
 const NEG_INFINITY: &str = "-inf";
@@ -212,18 +210,18 @@ impl MetricValue {
     #[must_use]
     pub fn add(&mut self, other: &Self) -> bool {
         match (self, other) {
-            (Self::Counter { ref mut value }, Self::Counter { value: value2 })
-            | (Self::Gauge { ref mut value }, Self::Gauge { value: value2 }) => {
+            (Self::Counter { value }, Self::Counter { value: value2 })
+            | (Self::Gauge { value }, Self::Gauge { value: value2 }) => {
                 *value += value2;
                 true
             }
-            (Self::Set { ref mut values }, Self::Set { values: values2 }) => {
+            (Self::Set { values }, Self::Set { values: values2 }) => {
                 values.extend(values2.iter().map(Into::into));
                 true
             }
             (
                 Self::Distribution {
-                    ref mut samples,
+                    samples,
                     statistic: statistic_a,
                 },
                 Self::Distribution {
@@ -236,9 +234,9 @@ impl MetricValue {
             }
             (
                 Self::AggregatedHistogram {
-                    ref mut buckets,
-                    ref mut count,
-                    ref mut sum,
+                    buckets,
+                    count,
+                    sum,
                 },
                 Self::AggregatedHistogram {
                     buckets: buckets2,
@@ -282,17 +280,15 @@ impl MetricValue {
             // process restart, etc.  Thus, being able to generate negative deltas would violate
             // that.  Whether a counter is reset to 0, or if it incorrectly warps to a previous
             // value, it doesn't matter: we're going to reinitialize it.
-            (Self::Counter { ref mut value }, Self::Counter { value: value2 })
-                if *value >= *value2 =>
-            {
+            (Self::Counter { value }, Self::Counter { value: value2 }) if *value >= *value2 => {
                 *value -= value2;
                 true
             }
-            (Self::Gauge { ref mut value }, Self::Gauge { value: value2 }) => {
+            (Self::Gauge { value }, Self::Gauge { value: value2 }) => {
                 *value -= value2;
                 true
             }
-            (Self::Set { ref mut values }, Self::Set { values: values2 }) => {
+            (Self::Set { values }, Self::Set { values: values2 }) => {
                 for item in values2 {
                     values.remove(item);
                 }
@@ -300,7 +296,7 @@ impl MetricValue {
             }
             (
                 Self::Distribution {
-                    ref mut samples,
+                    samples,
                     statistic: statistic_a,
                 },
                 Self::Distribution {
@@ -331,11 +327,16 @@ impl MetricValue {
             // fewer values -- would not make sense, since buckets should never be able to have negative counts... and
             // it's not clear that a saturating subtraction is technically correct either.  Instead, we avoid having to
             // make that decision, and simply force the metric to be reinitialized.
+            //
+            // We also check that each individual bucket count is >= the corresponding count in the
+            // other histogram, since bucket value redistribution (e.g., after a source restart or
+            // cache eviction) can cause individual buckets to have lower counts even when the total
+            // count is higher. Failing here leads to the metric being reinitialized.
             (
                 Self::AggregatedHistogram {
-                    ref mut buckets,
-                    ref mut count,
-                    ref mut sum,
+                    buckets,
+                    count,
+                    sum,
                 },
                 Self::AggregatedHistogram {
                     buckets: buckets2,
@@ -347,7 +348,7 @@ impl MetricValue {
                 && buckets
                     .iter()
                     .zip(buckets2.iter())
-                    .all(|(b1, b2)| b1.upper_limit == b2.upper_limit) =>
+                    .all(|(b1, b2)| b1.upper_limit == b2.upper_limit && b1.count >= b2.count) =>
             {
                 for (b1, b2) in buckets.iter_mut().zip(buckets2) {
                     b1.count -= b2.count;
@@ -538,7 +539,7 @@ pub enum StatisticKind {
 pub enum MetricSketch {
     /// [DDSketch][ddsketch] implementation based on the [Datadog Agent][ddagent].
     ///
-    /// While DDSketch has open-source implementations based on the white paper, the version used in
+    /// While `DDSketch` has open-source implementations based on the white paper, the version used in
     /// the Datadog Agent itself is subtly different. This version is suitable for sending directly
     /// to Datadog's sketch ingest endpoint.
     ///

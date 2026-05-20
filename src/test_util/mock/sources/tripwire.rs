@@ -1,13 +1,12 @@
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
-use futures_util::{future, FutureExt};
+use futures_util::{FutureExt, future};
 use stream_cancel::{Trigger, Tripwire};
-use vector_lib::config::LogNamespace;
-use vector_lib::configurable::configurable_component;
-use vector_lib::schema::Definition;
 use vector_lib::{
-    config::{DataType, SourceOutput},
+    config::{DataType, LogNamespace, SourceOutput},
+    configurable::configurable_component,
+    schema::Definition,
     source::Source,
 };
 

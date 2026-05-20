@@ -17,7 +17,7 @@ mod prelude;
 mod query;
 
 #[cfg(feature = "sources-utils-http-encoding")]
-pub use encoding::decode;
+pub use encoding::{decompress_body, emit_decompress_error};
 #[cfg(feature = "sources-utils-http-headers")]
 pub use headers::add_headers;
 pub use method::HttpMethod;

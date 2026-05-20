@@ -1,18 +1,17 @@
-use std::error::Error;
-use std::fmt::Debug;
+use std::{error::Error, fmt::Debug};
 
-use metrics::{counter, gauge};
-use vector_lib::internal_event::InternalEvent;
+use vector_lib::{
+    NamedInternalEvent, counter, gauge,
+    internal_event::{CounterName, GaugeName, InternalEvent, error_stage, error_type},
+};
 
-use vector_lib::internal_event::{error_stage, error_type};
-
-#[derive(Debug)]
-pub struct WsListenerConnectionEstablished {
+#[derive(Debug, NamedInternalEvent)]
+pub struct WebSocketListenerConnectionEstablished {
     pub client_count: usize,
     pub extra_tags: Vec<(String, String)>,
 }
 
-impl InternalEvent for WsListenerConnectionEstablished {
+impl InternalEvent for WebSocketListenerConnectionEstablished {
     fn emit(self) {
         debug!(
             message = format!(
@@ -20,22 +19,18 @@ impl InternalEvent for WsListenerConnectionEstablished {
                 self.client_count
             )
         );
-        counter!("connection_established_total", &self.extra_tags).increment(1);
-        gauge!("active_clients", &self.extra_tags).set(self.client_count as f64);
-    }
-
-    fn name(&self) -> Option<&'static str> {
-        Some("WsListenerConnectionEstablished")
+        counter!(CounterName::ConnectionEstablishedTotal, &self.extra_tags).increment(1);
+        gauge!(GaugeName::ActiveClients, &self.extra_tags).set(self.client_count as f64);
     }
 }
 
-#[derive(Debug)]
-pub struct WsListenerConnectionFailedError {
+#[derive(Debug, NamedInternalEvent)]
+pub struct WebSocketListenerConnectionFailedError {
     pub error: Box<dyn Error>,
     pub extra_tags: Vec<(String, String)>,
 }
 
-impl InternalEvent for WsListenerConnectionFailedError {
+impl InternalEvent for WebSocketListenerConnectionFailedError {
     fn emit(self) {
         error!(
             message = "WebSocket connection failed.",
@@ -43,7 +38,6 @@ impl InternalEvent for WsListenerConnectionFailedError {
             error_code = "ws_connection_error",
             error_type = error_type::CONNECTION_FAILED,
             stage = error_stage::SENDING,
-            internal_log_rate_limit = true,
         );
         let mut all_tags = self.extra_tags.clone();
         all_tags.extend([
@@ -56,21 +50,17 @@ impl InternalEvent for WsListenerConnectionFailedError {
         ]);
         // Tags required by `component_errors_total` are dynamically added above.
         // ## skip check-validity-events ##
-        counter!("component_errors_total", &all_tags).increment(1);
-    }
-
-    fn name(&self) -> Option<&'static str> {
-        Some("WsListenerConnectionFailed")
+        counter!(CounterName::ComponentErrorsTotal, &all_tags).increment(1);
     }
 }
 
-#[derive(Debug)]
-pub struct WsListenerConnectionShutdown {
+#[derive(Debug, NamedInternalEvent)]
+pub struct WebSocketListenerConnectionShutdown {
     pub client_count: usize,
     pub extra_tags: Vec<(String, String)>,
 }
 
-impl InternalEvent for WsListenerConnectionShutdown {
+impl InternalEvent for WebSocketListenerConnectionShutdown {
     fn emit(self) {
         info!(
             message = format!(
@@ -78,21 +68,17 @@ impl InternalEvent for WsListenerConnectionShutdown {
                 self.client_count
             )
         );
-        counter!("connection_shutdown_total", &self.extra_tags).increment(1);
-        gauge!("active_clients", &self.extra_tags).set(self.client_count as f64);
-    }
-
-    fn name(&self) -> Option<&'static str> {
-        Some("WsListenerConnectionShutdown")
+        counter!(CounterName::ConnectionShutdownTotal, &self.extra_tags).increment(1);
+        gauge!(GaugeName::ActiveClients, &self.extra_tags).set(self.client_count as f64);
     }
 }
 
-#[derive(Debug)]
-pub struct WsListenerSendError {
+#[derive(Debug, NamedInternalEvent)]
+pub struct WebSocketListenerSendError {
     pub error: Box<dyn Error>,
 }
 
-impl InternalEvent for WsListenerSendError {
+impl InternalEvent for WebSocketListenerSendError {
     fn emit(self) {
         error!(
             message = "WebSocket message send error.",
@@ -100,36 +86,27 @@ impl InternalEvent for WsListenerSendError {
             error_code = "ws_server_connection_error",
             error_type = error_type::WRITER_FAILED,
             stage = error_stage::SENDING,
-            internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_code" => "ws_server_connection_error",
             "error_type" => error_type::WRITER_FAILED,
             "stage" => error_stage::SENDING,
         )
         .increment(1);
     }
-
-    fn name(&self) -> Option<&'static str> {
-        Some("WsListenerConnectionError")
-    }
 }
 
-#[derive(Debug)]
-pub struct WsListenerMessageSent {
+#[derive(Debug, NamedInternalEvent)]
+pub struct WebSocketListenerMessageSent {
     pub message_size: usize,
     pub extra_tags: Vec<(String, String)>,
 }
 
-impl InternalEvent for WsListenerMessageSent {
+impl InternalEvent for WebSocketListenerMessageSent {
     fn emit(self) {
-        counter!("websocket_messages_sent_total", &self.extra_tags).increment(1);
-        counter!("websocket_bytes_sent_total", &self.extra_tags)
+        counter!(CounterName::WebsocketMessagesSentTotal, &self.extra_tags).increment(1);
+        counter!(CounterName::WebsocketBytesSentTotal, &self.extra_tags)
             .increment(self.message_size as u64);
-    }
-
-    fn name(&self) -> Option<&'static str> {
-        Some("WsListenerMessageSent")
     }
 }

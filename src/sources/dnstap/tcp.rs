@@ -1,23 +1,27 @@
-use ipnet::IpNet;
 use std::time::Duration;
 
 use bytes::Bytes;
+use ipnet::IpNet;
 use serde_with::serde_as;
-use vector_lib::configurable::configurable_component;
-use vector_lib::ipallowlist::IpAllowlistConfig;
-use vector_lib::lookup::{owned_value_path, path};
-use vector_lib::tcp::TcpKeepaliveConfig;
-use vector_lib::tls::{CertificateMetadata, MaybeTlsSettings, TlsSourceConfig};
-use vector_lib::EstimatedJsonEncodedSizeOf;
-use vrl::path::OwnedValuePath;
-use vrl::value::ObjectMap;
+use vector_lib::{
+    EstimatedJsonEncodedSizeOf,
+    config::{LegacyKey, LogNamespace},
+    configurable::configurable_component,
+    ipallowlist::IpAllowlistConfig,
+    lookup::{lookup_v2::OptionalValuePath, owned_value_path, path},
+    tcp::TcpKeepaliveConfig,
+    tls::{CertificateMetadata, MaybeTlsSettings, TlsSourceConfig},
+};
+use vrl::{path::OwnedValuePath, value::ObjectMap};
 
-use crate::internal_events::{SocketEventsReceived, SocketMode};
-use crate::sources::util::framestream::{FrameHandler, TcpFrameHandler};
-use crate::{event::Event, sources::util::net::SocketListenAddr};
-
-use vector_lib::config::{LegacyKey, LogNamespace};
-use vector_lib::lookup::lookup_v2::OptionalValuePath;
+use crate::{
+    event::Event,
+    internal_events::{SocketEventsReceived, SocketMode},
+    sources::util::{
+        framestream::{FrameHandler, TcpFrameHandler},
+        net::SocketListenAddr,
+    },
+};
 
 /// TCP configuration for the `dnstap` source.
 #[serde_as]
@@ -211,7 +215,7 @@ impl<T: FrameHandler + Clone> FrameHandler for DnstapFrameHandler<T> {
         self.frame_handler.multithreaded()
     }
 
-    fn max_frame_handling_tasks(&self) -> u32 {
+    fn max_frame_handling_tasks(&self) -> usize {
         self.frame_handler.max_frame_handling_tasks()
     }
 

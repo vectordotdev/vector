@@ -1,4 +1,6 @@
 //! Functionality to handle enrichment tables.
+use std::path::PathBuf;
+
 use enum_dispatch::enum_dispatch;
 use vector_lib::configurable::configurable_component;
 pub use vector_lib::enrichment::{Condition, IndexHandle, Table};
@@ -33,7 +35,7 @@ pub mod mmdb;
 /// condition. We don't recommend using a condition that uses only date range searches.
 ///
 ///
-#[configurable_component(global_option("enrichment_tables"))]
+#[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(tag = "type", rename_all = "snake_case")]
 #[enum_dispatch(EnrichmentTableConfig)]
@@ -65,6 +67,21 @@ pub enum EnrichmentTables {
     Mmdb(mmdb::MmdbConfig),
 }
 
+// Manual NamedComponent impl required because enum_dispatch doesn't support it yet.
+impl vector_lib::configurable::NamedComponent for EnrichmentTables {
+    fn get_component_name(&self) -> &'static str {
+        match self {
+            Self::File(config) => config.get_component_name(),
+            #[cfg(feature = "enrichment-tables-memory")]
+            Self::Memory(config) => config.get_component_name(),
+            #[cfg(feature = "enrichment-tables-geoip")]
+            Self::Geoip(config) => config.get_component_name(),
+            #[cfg(feature = "enrichment-tables-mmdb")]
+            Self::Mmdb(config) => config.get_component_name(),
+        }
+    }
+}
+
 impl GenerateConfig for EnrichmentTables {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self::File(file::FileConfig {
@@ -75,5 +92,20 @@ impl GenerateConfig for EnrichmentTables {
             schema: Default::default(),
         }))
         .unwrap()
+    }
+}
+
+impl EnrichmentTables {
+    /// Gets the files to watch to trigger reload
+    pub fn files_to_watch(&self) -> Vec<&PathBuf> {
+        match self {
+            EnrichmentTables::File(file_config) => vec![&file_config.file.path],
+            #[cfg(feature = "enrichment-tables-memory")]
+            EnrichmentTables::Memory(_) => vec![],
+            #[cfg(feature = "enrichment-tables-geoip")]
+            EnrichmentTables::Geoip(geoip_config) => vec![&geoip_config.path],
+            #[cfg(feature = "enrichment-tables-mmdb")]
+            EnrichmentTables::Mmdb(mmdb_config) => vec![&mmdb_config.path],
+        }
     }
 }

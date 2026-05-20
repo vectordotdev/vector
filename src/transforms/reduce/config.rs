@@ -1,28 +1,30 @@
-use std::collections::HashMap;
-use std::num::NonZeroUsize;
-use std::time::Duration;
+use std::{collections::HashMap, num::NonZeroUsize, time::Duration};
 
 use indexmap::IndexMap;
 use serde_with::serde_as;
-use vrl::path::{parse_target_path, PathPrefix};
-use vrl::prelude::{Collection, KeyString, Kind};
-
 use vector_lib::configurable::configurable_component;
-
-use crate::conditions::AnyCondition;
-use crate::config::{
-    schema, DataType, Input, LogNamespace, OutputId, TransformConfig, TransformContext,
-    TransformOutput,
+use vrl::{
+    path::{PathPrefix, parse_target_path},
+    prelude::{Collection, KeyString, Kind},
 };
-use crate::schema::Definition;
-use crate::transforms::reduce::merge_strategy::MergeStrategy;
-use crate::transforms::{reduce::transform::Reduce, Transform};
+
+use crate::{
+    conditions::AnyCondition,
+    config::{
+        DataType, Input, OutputId, TransformConfig, TransformContext, TransformOutput, schema,
+    },
+    schema::Definition,
+    transforms::{
+        Transform,
+        reduce::{merge_strategy::MergeStrategy, transform::Reduce},
+    },
+};
 
 /// Configuration for the `reduce` transform.
 #[serde_as]
 #[configurable_component(transform(
-"reduce",
-"Collapse multiple log events into a single event based on a set of conditions and merge strategies.",
+    "reduce",
+    "Collapse multiple log events into a single event based on a set of conditions and merge strategies.",
 ))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
@@ -117,7 +119,8 @@ impl_generate_config_from_default!(ReduceConfig);
 #[typetag::serde(name = "reduce")]
 impl TransformConfig for ReduceConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
-        Reduce::new(self, &context.enrichment_tables).map(Transform::event_task)
+        Reduce::new(self, &context.enrichment_tables, &context.metrics_storage)
+            .map(Transform::event_task)
     }
 
     fn input(&self) -> Input {
@@ -126,9 +129,8 @@ impl TransformConfig for ReduceConfig {
 
     fn outputs(
         &self,
-        _: vector_lib::enrichment::TableRegistry,
+        _: &TransformContext,
         input_definitions: &[(OutputId, schema::Definition)],
-        _: LogNamespace,
     ) -> Vec<TransformOutput> {
         // Events may be combined, so there isn't a true single "source" for events.
         // All of the definitions must be merged.

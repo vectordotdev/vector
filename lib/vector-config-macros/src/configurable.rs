@@ -2,8 +2,8 @@ use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::{quote, quote_spanned};
 use syn::{
-    parse_macro_input, parse_quote, spanned::Spanned, token::PathSep, DeriveInput, ExprPath, Ident,
-    PathArguments, Type,
+    DeriveInput, ExprPath, Ident, PathArguments, Type, parse_macro_input, parse_quote,
+    spanned::Spanned, token::PathSep,
 };
 use vector_config_common::validation::Validation;
 
@@ -250,8 +250,7 @@ fn generate_named_struct_field(
         .expect("named struct fields must always have an ident");
     let field_schema_ty = get_field_schema_ty(field);
     let field_already_contained = format!(
-        "schema properties already contained entry for `{}`, this should not occur",
-        field_name
+        "schema properties already contained entry for `{field_name}`, this should not occur"
     );
     let field_key = field.name();
 
@@ -675,8 +674,7 @@ fn generate_named_enum_field(field: &Field<'_>) -> proc_macro2::TokenStream {
     let field_name = field.ident().expect("field should be named");
     let field_ty = field.ty();
     let field_already_contained = format!(
-        "schema properties already contained entry for `{}`, this should not occur",
-        field_name
+        "schema properties already contained entry for `{field_name}`, this should not occur"
     );
     let field_key = field.name().to_string();
 
@@ -700,15 +698,24 @@ fn generate_named_enum_field(field: &Field<'_>) -> proc_macro2::TokenStream {
         None
     };
 
-    quote! {
-        {
-            #field_schema
-
-            if let Some(_) = properties.insert(#field_key.to_string(), subschema) {
-                panic!(#field_already_contained);
+    if field.flatten() {
+        quote! {
+            {
+                #field_schema
+                flattened_subschemas.push(subschema);
             }
+        }
+    } else {
+        quote! {
+            {
+                #field_schema
 
-            #maybe_field_required
+                if let Some(_) = properties.insert(#field_key.to_string(), subschema) {
+                    panic!(#field_already_contained);
+                }
+
+                #maybe_field_required
+            }
         }
     }
 }
@@ -733,6 +740,7 @@ fn generate_enum_struct_named_variant_schema(
         {
             let mut properties = ::vector_config::indexmap::IndexMap::new();
             let mut required = ::std::collections::BTreeSet::new();
+            let mut flattened_subschemas = ::std::vec::Vec::new();
 
             #(#mapped_fields)*
 
@@ -740,11 +748,18 @@ fn generate_enum_struct_named_variant_schema(
 
             #maybe_fill_discriminant_map
 
-            ::vector_config::schema::generate_struct_schema(
+            let mut schema = ::vector_config::schema::generate_struct_schema(
                 properties,
                 required,
                 None
-            )
+            );
+
+            // If we have any flattened subschemas, deal with them now.
+            if !flattened_subschemas.is_empty() {
+                ::vector_config::schema::convert_to_flattened_schema(&mut schema, flattened_subschemas);
+            }
+
+            schema
         }
     }
 }
@@ -841,7 +856,9 @@ fn generate_enum_variant_schema(
         // { "field_using_enum": { "<tag>": "VariantName" } }
         Tagging::Internal { tag } => match variant.style() {
             Style::Struct => {
-                let tag_already_contained = format!("enum tag `{}` already contained as a field in variant; tag cannot overlap with any fields in any variant", tag);
+                let tag_already_contained = format!(
+                    "enum tag `{tag}` already contained as a field in variant; tag cannot overlap with any fields in any variant"
+                );
 
                 // Just generate the tag field directly and pass it along to be included in the
                 // struct schema.

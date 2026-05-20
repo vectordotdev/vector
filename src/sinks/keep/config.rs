@@ -3,24 +3,22 @@
 use bytes::Bytes;
 use futures::FutureExt;
 use http::{Request, StatusCode, Uri};
-use vector_lib::configurable::configurable_component;
-use vector_lib::sensitive_string::SensitiveString;
+use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
 use vrl::value::Kind;
 
+use super::{
+    encoder::KeepEncoder, request_builder::KeepRequestBuilder, service::KeepSvcRequestBuilder,
+    sink::KeepSink,
+};
 use crate::{
     http::HttpClient,
     sinks::{
         prelude::*,
         util::{
-            http::{http_response_retry_logic, HttpService},
             BatchConfig, BoxedRawValue,
+            http::{HttpService, RetryStrategy, http_response_retry_logic},
         },
     },
-};
-
-use super::{
-    encoder::KeepEncoder, request_builder::KeepRequestBuilder, service::KeepSvcRequestBuilder,
-    sink::KeepSink,
 };
 
 pub(super) const HTTP_HEADER_KEEP_API_KEY: &str = "x-api-key";
@@ -61,6 +59,10 @@ pub struct KeepConfig {
         skip_serializing_if = "crate::serde::is_default"
     )]
     acknowledgements: AcknowledgementsConfig,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    pub retry_strategy: RetryStrategy,
 }
 
 fn default_endpoint() -> String {
@@ -113,7 +115,10 @@ impl SinkConfig for KeepConfig {
         let request_limits = self.request.into_settings();
 
         let service = ServiceBuilder::new()
-            .settings(request_limits, http_response_retry_logic())
+            .settings(
+                request_limits,
+                http_response_retry_logic(self.retry_strategy.clone()),
+            )
             .service(service);
 
         let sink = KeepSink::new(service, batch_settings, request_builder);
@@ -145,7 +150,7 @@ async fn healthcheck(uri: Uri, api_key: SensitiveString, client: HttpClient) -> 
     let res = client.send(req).await?;
 
     let status = res.status();
-    let body = hyper::body::to_bytes(res.into_body()).await?;
+    let body = http_body::Body::collect(res.into_body()).await?.to_bytes();
 
     match status {
         StatusCode::OK => Ok(()),          // Healthcheck passed
@@ -165,11 +170,7 @@ async fn healthcheck(uri: Uri, api_key: SensitiveString, client: HttpClient) -> 
         _ => {
             // Handle other unexpected statuses
             let body = String::from_utf8_lossy(&body[..]);
-            Err(format!(
-                "Server returned unexpected error status: {} body: {}",
-                status, body
-            )
-            .into())
+            Err(format!("Server returned unexpected error status: {status} body: {body}").into())
         }
     }
 }

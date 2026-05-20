@@ -1,8 +1,6 @@
 use indoc::indoc;
 use tower::ServiceBuilder;
-use vector_lib::config::proxy::ProxyConfig;
-use vector_lib::configurable::configurable_component;
-use vector_lib::schema;
+use vector_lib::{config::proxy::ProxyConfig, configurable::configurable_component, schema};
 use vrl::value::Kind;
 
 use super::{
@@ -14,9 +12,12 @@ use crate::{
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
-        datadog::{DatadogCommonConfig, LocalDatadogCommonConfig},
-        util::{http::HttpStatusRetryLogic, ServiceBuilderExt, TowerRequestConfig},
         Healthcheck, VectorSink,
+        datadog::{DatadogCommonConfig, LocalDatadogCommonConfig},
+        util::{
+            ServiceBuilderExt, TowerRequestConfig,
+            http::{HttpStatusRetryLogic, RetryStrategy},
+        },
     },
     tls::MaybeTlsSettings,
 };
@@ -35,6 +36,10 @@ pub struct DatadogEventsConfig {
     #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    pub retry_strategy: RetryStrategy,
 }
 
 impl GenerateConfig for DatadogEventsConfig {
@@ -66,7 +71,10 @@ impl DatadogEventsConfig {
 
         let request_opts = self.request;
         let request_settings = request_opts.into_settings();
-        let retry_logic = HttpStatusRetryLogic::new(|req: &DatadogEventsResponse| req.http_status);
+        let retry_logic = HttpStatusRetryLogic::new(
+            |req: &DatadogEventsResponse| req.http_status,
+            self.retry_strategy.clone(),
+        );
 
         let service = ServiceBuilder::new()
             .settings(request_settings, retry_logic)

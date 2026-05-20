@@ -1,19 +1,23 @@
+use std::{collections::HashSet, time::Duration};
+
+use config::AmqpPropertiesConfig;
+use futures::StreamExt;
+use lapin::types::ShortString;
+use vector_lib::{config::LogNamespace, event::LogEvent};
+
 use super::*;
 use crate::{
+    SourceSender,
     amqp::await_connection,
     config::{SinkConfig, SinkContext},
     shutdown::ShutdownSignal,
+    sinks::amqp::channel::new_channel_pool,
     template::{Template, UnsignedIntTemplate},
     test_util::{
-        components::{run_and_assert_sink_compliance, SINK_TAGS},
+        components::{SINK_TAGS, run_and_assert_sink_compliance},
         random_lines_with_stream, random_string,
     },
-    SourceSender,
 };
-use config::AmqpPropertiesConfig;
-use futures::StreamExt;
-use std::{collections::HashSet, sync::Arc, time::Duration};
-use vector_lib::{config::LogNamespace, event::LogEvent};
 
 pub fn make_config() -> AmqpSinkConfig {
     let mut config = AmqpSinkConfig {
@@ -24,8 +28,7 @@ pub fn make_config() -> AmqpSinkConfig {
     let pass = std::env::var("AMQP_PASSWORD").unwrap_or_else(|_| "guest".to_string());
     let host = std::env::var("AMQP_HOST").unwrap_or_else(|_| "rabbitmq".to_string());
     let vhost = std::env::var("AMQP_VHOST").unwrap_or_else(|_| "%2f".to_string());
-    config.connection.connection_string =
-        format!("amqp://{}:{}@{}:5672/{}", user, pass, host, vhost);
+    config.connection.connection_string = format!("amqp://{user}:{pass}@{host}:5672/{vhost}");
     config
 }
 
@@ -37,8 +40,8 @@ async fn healthcheck() {
     let mut config = make_config();
     config.exchange = Template::try_from(exchange.as_str()).unwrap();
     await_connection(&config.connection).await;
-    let (_conn, channel) = config.connection.connect().await.unwrap();
-    super::config::healthcheck(Arc::new(channel)).await.unwrap();
+    let channels = new_channel_pool(&config).unwrap();
+    super::config::healthcheck(channels).await.unwrap();
 }
 
 #[tokio::test]
@@ -59,7 +62,8 @@ async fn amqp_happy_path() {
     let mut config = make_config();
     let exchange = format!("test-{}-exchange", random_string(10));
     config.exchange = Template::try_from(exchange.as_str()).unwrap();
-    let queue = format!("test-{}-queue", random_string(10));
+    let queue: lapin::types::ShortString = format!("test-{}-queue", random_string(10)).into();
+    let exchange: ShortString = exchange.into();
 
     await_connection(&config.connection).await;
     let (_conn, channel) = config.connection.connect().await.unwrap();
@@ -69,7 +73,7 @@ async fn amqp_happy_path() {
     };
     channel
         .exchange_declare(
-            &exchange,
+            exchange.clone(),
             lapin::ExchangeKind::Fanout,
             exchange_opts,
             lapin::types::FieldTable::default(),
@@ -87,15 +91,19 @@ async fn amqp_happy_path() {
         ..Default::default()
     };
     channel
-        .queue_declare(&queue, queue_opts, lapin::types::FieldTable::default())
+        .queue_declare(
+            queue.clone(),
+            queue_opts,
+            lapin::types::FieldTable::default(),
+        )
         .await
         .unwrap();
 
     channel
         .queue_bind(
-            &queue,
-            &exchange,
-            "",
+            queue.clone(),
+            exchange,
+            "".into(),
             lapin::options::QueueBindOptions::default(),
             lapin::types::FieldTable::default(),
         )
@@ -105,8 +113,8 @@ async fn amqp_happy_path() {
     let consumer = format!("test-{}-consumer", random_string(10));
     let mut consumer = channel
         .basic_consume(
-            &queue,
-            &consumer,
+            queue,
+            consumer.into(),
             lapin::options::BasicConsumeOptions::default(),
             lapin::types::FieldTable::default(),
         )
@@ -149,6 +157,7 @@ async fn amqp_round_trip() {
     let exchange = format!("test-{}-exchange", random_string(10));
     config.exchange = Template::try_from(exchange.as_str()).unwrap();
     let queue = format!("test-{}-queue", random_string(10));
+    let exchange: ShortString = exchange.into();
 
     await_connection(&config.connection).await;
     let (_conn, channel) = config.connection.connect().await.unwrap();
@@ -158,7 +167,7 @@ async fn amqp_round_trip() {
     };
     channel
         .exchange_declare(
-            &exchange,
+            exchange.clone(),
             lapin::ExchangeKind::Fanout,
             exchange_opts,
             lapin::types::FieldTable::default(),
@@ -190,20 +199,25 @@ async fn amqp_round_trip() {
     .unwrap();
 
     // prepare server
+    let queue: ShortString = queue.into();
     let queue_opts = lapin::options::QueueDeclareOptions {
         auto_delete: true,
         ..Default::default()
     };
     channel
-        .queue_declare(&queue, queue_opts, lapin::types::FieldTable::default())
+        .queue_declare(
+            queue.clone(),
+            queue_opts,
+            lapin::types::FieldTable::default(),
+        )
         .await
         .unwrap();
 
     channel
         .queue_bind(
-            &queue,
-            &exchange,
-            "",
+            queue,
+            exchange,
+            "".into(),
             lapin::options::QueueBindOptions::default(),
             lapin::types::FieldTable::default(),
         )
@@ -233,6 +247,7 @@ async fn amqp_priority_with_template(
     let mut config = make_config();
     let exchange = format!("test-{}-exchange", random_string(10));
     config.exchange = Template::try_from(exchange.as_str()).unwrap();
+    let exchange: ShortString = exchange.into();
     config.properties = Some(AmqpPropertiesConfig {
         priority: Some(UnsignedIntTemplate::try_from(template).unwrap()),
         ..Default::default()
@@ -246,7 +261,7 @@ async fn amqp_priority_with_template(
     };
     channel
         .exchange_declare(
-            &exchange,
+            exchange.clone(),
             lapin::ExchangeKind::Fanout,
             exchange_opts,
             lapin::types::FieldTable::default(),
@@ -259,7 +274,7 @@ async fn amqp_priority_with_template(
     healthcheck.await.expect("Health check failed");
 
     // prepare consumer
-    let queue = format!("test-{}-queue", random_string(10));
+    let queue: ShortString = format!("test-{}-queue", random_string(10)).into();
     let queue_opts = lapin::options::QueueDeclareOptions {
         auto_delete: true,
         ..Default::default()
@@ -273,15 +288,15 @@ async fn amqp_priority_with_template(
         args
     };
     channel
-        .queue_declare(&queue, queue_opts, queue_args)
+        .queue_declare(queue.clone(), queue_opts, queue_args)
         .await
         .unwrap();
 
     channel
         .queue_bind(
-            &queue,
-            &exchange,
-            "",
+            queue.clone(),
+            exchange,
+            "".into(),
             lapin::options::QueueBindOptions::default(),
             lapin::types::FieldTable::default(),
         )
@@ -291,8 +306,8 @@ async fn amqp_priority_with_template(
     let consumer = format!("test-{}-consumer", random_string(10));
     let mut consumer = channel
         .basic_consume(
-            &queue,
-            &consumer,
+            queue.clone(),
+            consumer.into(),
             lapin::options::BasicConsumeOptions::default(),
             lapin::types::FieldTable::default(),
         )

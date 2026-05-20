@@ -5,11 +5,12 @@ mod tracer;
 mod tracing;
 mod tracing_allocator;
 
-pub use self::token::AllocationGroupId;
-pub use self::token::AllocationGroupToken;
-pub use self::tracer::Tracer;
-pub use self::tracing::AllocationLayer;
-pub use self::tracing_allocator::GroupedTraceableAllocator;
+pub use self::{
+    token::{AllocationGroupId, AllocationGroupToken},
+    tracer::Tracer,
+    tracing::AllocationLayer,
+    tracing_allocator::GroupedTraceableAllocator,
+};
 
 /// Runs the given closure without tracing allocations or deallocations.
 ///

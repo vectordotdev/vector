@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # This script is intended to run during CI, however it can be run locally by
 # committing changelog fragments before executing the script. If the script
@@ -8,7 +8,7 @@
 CHANGELOG_DIR="changelog.d"
 
 # NOTE: If these are altered, update both the 'changelog.d/README.md' and
-#       'scripts/generate-release-cue.rb' accordingly.
+#       'vdev/src/commands/release/generate_cue.rs' accordingly.
 FRAGMENT_TYPES="breaking|security|deprecation|feature|enhancement|fix"
 
 if [ ! -d "${CHANGELOG_DIR}" ]; then
@@ -17,15 +17,17 @@ if [ ! -d "${CHANGELOG_DIR}" ]; then
 fi
 
 # diff-filter=A lists only added files
-FRAGMENTS=$(git diff --name-only --diff-filter=A --merge-base origin/master ${CHANGELOG_DIR})
+FRAGMENTS=$(git diff --name-only --diff-filter=A --merge-base "${MERGE_BASE:-origin/master}" ${CHANGELOG_DIR})
 
 if [ -z "$FRAGMENTS" ]; then
   echo "No changelog fragments detected"
-  echo "If no changes  necessitate user-facing explanations, add the GH label 'no-changelog'"
+  echo "If no changes necessitate user-facing explanations, add the GH label 'no-changelog'"
   echo "Otherwise, add changelog fragments to changelog.d/"
   echo "For details, see 'changelog.d/README.md'"
   exit 1
 fi
+
+[[ "$(wc -l <<< "$FRAGMENTS")" -gt "${MAX_FRAGMENTS:-1000}" ]] && exit 1
 
 # extract the basename from the file path
 FRAGMENTS=$(xargs -n1 basename <<< "${FRAGMENTS}")

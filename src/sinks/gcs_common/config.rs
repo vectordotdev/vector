@@ -1,3 +1,5 @@
+use std::marker::PhantomData;
+
 use futures::FutureExt;
 use http::{StatusCode, Uri};
 use hyper::Body;
@@ -8,9 +10,9 @@ use crate::{
     gcp::{GcpAuthenticator, GcpError},
     http::HttpClient,
     sinks::{
+        Healthcheck, HealthcheckError,
         gcs_common::service::GcsResponse,
         util::retries::{RetryAction, RetryLogic},
-        Healthcheck, HealthcheckError,
     },
 };
 
@@ -24,8 +26,7 @@ pub fn default_endpoint() -> String {
 ///
 /// [predefined_acls]: https://cloud.google.com/storage/docs/access-control/lists#predefined-acl
 #[configurable_component]
-#[derive(Clone, Copy, Debug, Derivative)]
-#[derivative(Default)]
+#[derive(Clone, Copy, Debug, Default)]
 #[serde(rename_all = "kebab-case")]
 pub enum GcsPredefinedAcl {
     /// Bucket/object can be read by authenticated users.
@@ -63,10 +64,10 @@ pub enum GcsPredefinedAcl {
     /// part of the project team is granted the `READER` permission.
     ///
     /// This is the default.
-    #[derivative(Default)]
+    #[default]
     ProjectPrivate,
 
-    /// Bucket/object can be read publically.
+    /// Bucket/object can be read publicly.
     ///
     /// The bucket/object owner is granted the `OWNER` permission, and all other users, whether
     /// authenticated or anonymous, are granted the `READER` permission.
@@ -79,14 +80,13 @@ pub enum GcsPredefinedAcl {
 ///
 /// [storage_classes]: https://cloud.google.com/storage/docs/storage-classes
 #[configurable_component]
-#[derive(Clone, Copy, Debug, Derivative, PartialEq, Eq)]
-#[derivative(Default)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum GcsStorageClass {
     /// Standard storage.
     ///
     /// This is the default.
-    #[derivative(Default)]
+    #[default]
     Standard,
 
     /// Nearline storage.
@@ -138,19 +138,37 @@ pub fn healthcheck_response(
     }
 }
 
-#[derive(Clone)]
-pub struct GcsRetryLogic;
+pub struct GcsRetryLogic<Request> {
+    request: PhantomData<Request>,
+}
+
+impl<Request> Default for GcsRetryLogic<Request> {
+    fn default() -> Self {
+        Self {
+            request: PhantomData,
+        }
+    }
+}
+
+impl<Request> Clone for GcsRetryLogic<Request> {
+    fn clone(&self) -> Self {
+        Self {
+            request: PhantomData,
+        }
+    }
+}
 
 // This is a clone of HttpRetryLogic for the Body type, should get merged
-impl RetryLogic for GcsRetryLogic {
+impl<Request: Clone + Send + Sync + 'static> RetryLogic for GcsRetryLogic<Request> {
     type Error = hyper::Error;
+    type Request = Request;
     type Response = GcsResponse;
 
     fn is_retriable_error(&self, _error: &Self::Error) -> bool {
         true
     }
 
-    fn should_retry_response(&self, response: &Self::Response) -> RetryAction {
+    fn should_retry_response(&self, response: &Self::Response) -> RetryAction<Self::Request> {
         let status = response.inner.status();
 
         match status {
@@ -162,7 +180,7 @@ impl RetryLogic for GcsRetryLogic {
             }
             _ if status.is_server_error() => RetryAction::Retry(status.to_string().into()),
             _ if status.is_success() => RetryAction::Successful,
-            _ => RetryAction::DontRetry(format!("response status: {}", status).into()),
+            _ => RetryAction::DontRetry(format!("response status: {status}").into()),
         }
     }
 }

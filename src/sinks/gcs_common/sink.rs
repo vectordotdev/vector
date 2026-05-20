@@ -1,20 +1,22 @@
 use std::fmt;
 
+use vector_lib::{event::Event, partition::Partitioner};
+
 use crate::sinks::{prelude::*, util::partitioner::KeyPartitioner};
 
-pub struct GcsSink<Svc, RB> {
+pub struct GcsSink<Svc, RB, P = KeyPartitioner> {
     service: Svc,
     request_builder: RB,
-    partitioner: KeyPartitioner,
+    partitioner: P,
     batcher_settings: BatcherSettings,
     protocol: &'static str,
 }
 
-impl<Svc, RB> GcsSink<Svc, RB> {
+impl<Svc, RB, P> GcsSink<Svc, RB, P> {
     pub const fn new(
         service: Svc,
         request_builder: RB,
-        partitioner: KeyPartitioner,
+        partitioner: P,
         batcher_settings: BatcherSettings,
         protocol: &'static str,
     ) -> Self {
@@ -28,7 +30,7 @@ impl<Svc, RB> GcsSink<Svc, RB> {
     }
 }
 
-impl<Svc, RB> GcsSink<Svc, RB>
+impl<Svc, RB, P> GcsSink<Svc, RB, P>
 where
     Svc: Service<RB::Request> + Send + 'static,
     Svc::Future: Send + 'static,
@@ -37,6 +39,9 @@ where
     RB: RequestBuilder<(String, Vec<Event>)> + Send + Sync + 'static,
     RB::Error: fmt::Display + Send,
     RB::Request: Finalizable + MetaDescriptive + Send,
+    P: Partitioner<Item = Event, Key = Option<String>> + Unpin + Send,
+    P::Key: Eq + std::hash::Hash + Clone,
+    P::Item: ByteSizeOf,
 {
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let partitioner = self.partitioner;
@@ -45,7 +50,9 @@ where
         let request_builder = self.request_builder;
 
         input
-            .batched_partitioned(partitioner, || settings.as_byte_size_config())
+            .batched_partitioned(partitioner, settings.timeout, |_| {
+                settings.as_byte_size_config()
+            })
             .filter_map(|(key, batch)| async move {
                 // A `TemplateRenderingError` will have been emitted by `KeyPartitioner` if the key here is `None`,
                 // thus no further `EventsDropped` event needs emitting at this stage.
@@ -69,7 +76,7 @@ where
 }
 
 #[async_trait]
-impl<Svc, RB> StreamSink<Event> for GcsSink<Svc, RB>
+impl<Svc, RB, P> StreamSink<Event> for GcsSink<Svc, RB, P>
 where
     Svc: Service<RB::Request> + Send + 'static,
     Svc::Future: Send + 'static,
@@ -78,6 +85,9 @@ where
     RB: RequestBuilder<(String, Vec<Event>)> + Send + Sync + 'static,
     RB::Error: fmt::Display + Send,
     RB::Request: Finalizable + MetaDescriptive + Send,
+    P: Partitioner<Item = Event, Key = Option<String>> + Unpin + Send,
+    P::Key: Eq + std::hash::Hash + Clone,
+    P::Item: ByteSizeOf,
 {
     async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.run_inner(input).await

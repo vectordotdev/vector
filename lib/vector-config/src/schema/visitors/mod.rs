@@ -7,6 +7,7 @@ mod unevaluated;
 #[cfg(test)]
 mod test;
 
-pub use self::human_name::GenerateHumanFriendlyNameVisitor;
-pub use self::inline_single::InlineSingleUseReferencesVisitor;
-pub use self::unevaluated::DisallowUnevaluatedPropertiesVisitor;
+pub use self::{
+    human_name::GenerateHumanFriendlyNameVisitor, inline_single::InlineSingleUseReferencesVisitor,
+    unevaluated::DisallowUnevaluatedPropertiesVisitor,
+};

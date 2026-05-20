@@ -43,7 +43,7 @@ components: sinks: webhdfs: {
 		notices: []
 	}
 
-	configuration: base.components.sinks.webhdfs.configuration
+	configuration: generated.components.sinks.webhdfs.configuration
 
 	input: {
 		logs:    true

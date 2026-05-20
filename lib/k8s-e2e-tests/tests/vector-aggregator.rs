@@ -1,3 +1,5 @@
+#![allow(clippy::await_holding_lock)]
+
 use k8s_e2e_tests::*;
 use k8s_test_framework::{lock, vector::Config as VectorConfig};
 
@@ -17,7 +19,7 @@ async fn dummy_topology() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             "vector",
             "vector",
-            "https://helm.vector.dev",
+            &helm_chart_repo(),
             VectorConfig {
                 custom_helm_values: vec![&config_override_name(&override_name, false)],
                 ..Default::default()
@@ -27,7 +29,7 @@ async fn dummy_topology() -> Result<(), Box<dyn std::error::Error>> {
     framework
         .wait_for_rollout(
             &namespace,
-            &format!("statefulset/{}", override_name),
+            &format!("statefulset/{override_name}"),
             vec!["--timeout=60s"],
         )
         .await?;
@@ -52,7 +54,7 @@ async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             "vector",
             "vector",
-            "https://helm.vector.dev",
+            &helm_chart_repo(),
             VectorConfig {
                 custom_helm_values: vec![&config_override_name(&override_name, false)],
                 ..Default::default()
@@ -62,14 +64,14 @@ async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
     framework
         .wait_for_rollout(
             &namespace,
-            &format!("statefulset/{}", override_name),
+            &format!("statefulset/{override_name}"),
             vec!["--timeout=60s"],
         )
         .await?;
 
     let mut vector_metrics_port_forward = framework.port_forward(
         &namespace,
-        &format!("statefulset/{}", override_name),
+        &format!("statefulset/{override_name}"),
         9090,
         9090,
     )?;

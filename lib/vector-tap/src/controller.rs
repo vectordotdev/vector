@@ -3,7 +3,7 @@ use std::{
     num::NonZeroUsize,
 };
 
-use futures::{future::try_join_all, FutureExt};
+use futures::{FutureExt, future::try_join_all};
 use tokio::sync::{
     mpsc as tokio_mpsc,
     mpsc::error::{SendError, TrySendError},
@@ -11,13 +11,17 @@ use tokio::sync::{
 };
 use tracing::{Instrument, Span};
 use uuid::Uuid;
-use vector_buffers::{topology::builder::TopologyBuilder, WhenFull};
+use vector_buffers::{WhenFull, topology::builder::TopologyBuilder};
 use vector_common::config::ComponentKey;
-use vector_core::event::{EventArray, LogArray, MetricArray, TraceArray};
-use vector_core::fanout;
+use vector_core::{
+    event::{EventArray, LogArray, MetricArray, TraceArray},
+    fanout,
+};
 
-use crate::notification::{InvalidMatch, Matched, NotMatched, Notification};
-use crate::topology::{TapOutput, TapResource, WatchRx};
+use crate::{
+    notification::{InvalidMatch, Matched, NotMatched, Notification},
+    topology::{TapOutput, TapResource, WatchRx},
+};
 
 /// A tap sender is the control channel used to surface tap payloads to a client.
 type TapSender = tokio_mpsc::Sender<TapPayload>;
@@ -26,7 +30,7 @@ type TapSender = tokio_mpsc::Sender<TapPayload>;
 type ShutdownTx = oneshot::Sender<()>;
 type ShutdownRx = oneshot::Receiver<()>;
 
-const TAP_BUFFER_SIZE: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(100) };
+const TAP_BUFFER_SIZE: NonZeroUsize = NonZeroUsize::new(100).unwrap();
 
 /// Clients can supply glob patterns to find matched topology components.
 trait GlobMatcher<T> {
@@ -123,7 +127,9 @@ impl TapPayload {
         invalid_matches: Vec<String>,
     ) -> Self {
         let pattern = pattern.into();
-        let message = format!("[tap] Warning: source inputs cannot be tapped. Input pattern '{}' matches sources {:?}", pattern, invalid_matches);
+        let message = format!(
+            "[tap] Warning: source inputs cannot be tapped. Input pattern '{pattern}' matches sources {invalid_matches:?}"
+        );
         Self::Notification(Notification::InvalidMatch(InvalidMatch::new(
             message,
             pattern,
@@ -138,8 +144,7 @@ impl TapPayload {
     ) -> Self {
         let pattern = pattern.into();
         let message = format!(
-            "[tap] Warning: sink outputs cannot be tapped. Output pattern '{}' matches sinks {:?}",
-            pattern, invalid_matches
+            "[tap] Warning: sink outputs cannot be tapped. Output pattern '{pattern}' matches sinks {invalid_matches:?}"
         );
         Self::Notification(Notification::InvalidMatch(InvalidMatch::new(
             message,
@@ -301,6 +306,7 @@ async fn tap_handler(
                     source_keys,
                     sink_keys,
                     removals,
+                    ..
                 } = watch_rx.borrow().clone();
 
                 // Remove tap sinks from components that have gone away/can no longer match.
@@ -351,7 +357,13 @@ async fn tap_handler(
                             // target for the component, and spawn our transformer task which will
                             // wrap each event payload with the necessary metadata before forwarding
                             // it to our global tap receiver.
-                            let (tap_buffer_tx, mut tap_buffer_rx) = TopologyBuilder::standalone_memory(TAP_BUFFER_SIZE, WhenFull::DropNewest, &Span::current()).await;
+                            let (tap_buffer_tx, mut tap_buffer_rx) = TopologyBuilder::standalone_memory(
+                                TAP_BUFFER_SIZE,
+                                WhenFull::DropNewest,
+                                &Span::current(),
+                                None,
+                                None,
+                            );
                             let mut tap_transformer = TapTransformer::new(tx.clone(), output.clone());
 
                             tokio::spawn(async move {

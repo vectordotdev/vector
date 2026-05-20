@@ -53,7 +53,7 @@ components: sinks: nats: {
 		notices: []
 	}
 
-	configuration: base.components.sinks.nats.configuration
+	configuration: generated.components.sinks.nats.configuration
 
 	input: {
 		logs:    true

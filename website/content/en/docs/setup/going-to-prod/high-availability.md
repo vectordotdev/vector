@@ -39,7 +39,7 @@ Mitigate Vector process failures similarly to [node failures](#node-failure): Ve
 
 #### Data Receive Failure
 
-Mitigate data receive failures with Vector’s [end-to-end acknowledgements feature](/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/). When enabled, Vector only responds to the clients when data durably persists. Such as writing the data to the disk buffer or a downstream service.
+Mitigate data receive failures with Vector’s [end-to-end acknowledgements feature](/docs/architecture/end-to-end-acknowledgements/). When enabled, Vector only responds to the clients when data durably persists. Such as writing the data to the disk buffer or a downstream service.
 
 ![Failure](/img/going-to-prod/ha/receive-failure.png)
 
@@ -53,23 +53,26 @@ We recommend routing dropped events immediately to a backup destination to prior
 
 The following is an example configuration that routes failed events from a `remap` transform to a `aws_s3` sink:
 
-```toml
-[sources.input]
-    type = "datadog_agent"
+```yaml
+sources:
+  input:
+    type: "datadog_agent"
 
-[transforms.parsing]
-    inputs = ["input"]
-    type = "remap"
-    reroute_dropped = true
-    source = "..."
+transforms:
+  parsing:
+    inputs: ["input"]
+    type: "remap"
+    reroute_dropped: true
+    source: "..."
 
-[sinks.analysis]
-    inputs = ["parsing"]
-    type = "datadog_logs"
+sinks:
+  analysis:
+    inputs: ["parsing"]
+    type: "datadog_logs"
 
-[sinks.backup]
-    inputs = ["**parsing.dropped**"] # dropped events from the `parsing` transform
-    type = "aws_s3"
+  backup:
+    inputs: ["parsing.dropped"] # dropped events from the `parsing` transform
+    type: "aws_s3"
 ```
 
 {{< info >}}
@@ -78,7 +81,7 @@ Support for `dropped` channels in other components is forthcoming.
 
 #### Data Send Failure
 
-Mitigate data send failures with [Adaptive Request Concurrency (ARC)](/docs/about/under-the-hood/networking/arc/) and buffers.
+Mitigate data send failures with [Adaptive Request Concurrency (ARC)](/docs/architecture/arc/) and buffers.
 
 ARC automatically scales down the number of outgoing connections when Vector cannot send data. ARC minimizes the amount of in-flight data, appropriately applies backpressure, and prevents the stampede effect that often prohibits downstream services from recovering.
 
@@ -139,7 +142,7 @@ These actions mitigate [individual node failure](#node-failure) and [data center
 
 Mitigate software failures by configuring your Vector instances as follows:
 
-1. Able sources should enable [end-to-end acknowledgements](/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/).
+1. Able sources should enable [end-to-end acknowledgements](/docs/architecture/end-to-end-acknowledgements/).
 2. Sinks should implement disk or memory buffers that overflow to disk.
 3. Transforms should implement dropped event routing to your system of record.
 

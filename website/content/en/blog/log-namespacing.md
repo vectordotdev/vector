@@ -10,6 +10,10 @@ badges:
 tags: []
 ---
 
+{{< info >}}
+Please visit our [log namespace guide](/guides/level-up/log_namespace/) for more details.
+{{< /info >}}
+
 The Vector team has been hard at work improving the data model of events in Vector. These
 changes are now available for beta testing for those who want to try it out and give feedback.
 This is an opt-in feature. Nothing should change unless you specifically enable it.
@@ -26,7 +30,7 @@ of events in Vector.
 
 ## How to enable
 
-The [global config] `schema.log_namespace` can be set to `true` to enable the new
+The global config `schema.log_namespace` can be set to `true` to enable the new
 Log Namespacing feature for all components. The default is `false`.
 
 Every source also has a `log_namespace` config option. This will override the global setting,
@@ -35,27 +39,30 @@ so you can try out Log Namespacing on individual sources.
 The following example enables the `log_namespace` feature globally, then disables it for a single
 source.
 
-```toml
-schema.log_namespace = true
+```yaml
+schema:
+  log_namespace: true
 
-[sources.input_with_log_namespace]
-type = "demo_logs"
-format = "shuffle"
-lines = ["input_with_log_namespace"]
-interval = 1
+sources:
+  input_with_log_namespace:
+    type: "demo_logs"
+    format: "shuffle"
+    lines: ["input_with_log_namespace"]
+    interval: 1
 
-[sources.input_without_log_namespace]
-type = "demo_logs"
-format = "shuffle"
-lines = ["input_without_log_namespace"]
-interval = 1
-log_namespace = false
+  input_without_log_namespace:
+    type: "demo_logs"
+    format: "shuffle"
+    lines: ["input_without_log_namespace"]
+    interval: 1
+    log_namespace: false
 
-[sinks.console]
-type = "console"
-inputs = ["input_with_log_namespace", "input_without_log_namespace"]
-encoding.codec = "json"
-
+sinks:
+  console:
+    type: "console"
+    inputs: ["input_with_log_namespace", "input_without_log_namespace"]
+    encoding:
+      codec: "json"
 ```
 
 ## How It Works
@@ -163,7 +170,6 @@ sure a meaning exists for all required fields. If a source does not provide a re
 a meaning needs to be manually adjusted for any reason, the VRL function [set_semantic_meaning] can
 be used.
 
-[global log schema]: /docs/reference/configuration/global-options/#log_schema
+[global log schema]: /docs/reference/configuration/schema/#log_schema
 [set_semantic_meaning]: /docs/reference/vrl/functions/#set_semantic_meaning
 [remap]: /docs/reference/configuration/transforms/remap/
-[global config]: /docs/reference/configuration/global-options/#schema.log_namespace

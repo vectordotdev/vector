@@ -1,4 +1,3 @@
-use crate::encoding::BuildError;
 use bytes::BytesMut;
 use chrono::SecondsFormat;
 use csv_core::{WriteResult, Writer, WriterBuilder};
@@ -10,6 +9,8 @@ use vector_core::{
     event::{Event, Value},
     schema,
 };
+
+use crate::encoding::BuildError;
 
 /// The user configuration to choose the metric tag strategy.
 #[configurable_component]
@@ -122,7 +123,7 @@ pub struct CsvSerializerOptions {
     pub quote_style: QuoteStyle,
 
     /// Sets the capacity (in bytes) of the internal buffer used in the CSV writer.
-    /// This defaults to 8KB.
+    /// This defaults to 8192 bytes (8KB).
     #[serde(default = "default_capacity")]
     pub capacity: usize,
 

@@ -3,28 +3,30 @@ use std::{fmt, sync::Arc};
 use async_trait::async_trait;
 use chrono::Utc;
 use futures_util::{
+    StreamExt,
     future::ready,
     stream::{self, BoxStream},
-    StreamExt,
 };
 use tower::Service;
-use vector_lib::stream::{BatcherSettings, DriverResponse};
 use vector_lib::{
     event::{Event, Metric, MetricValue},
     partition::Partitioner,
     sink::StreamSink,
+    stream::{BatcherSettings, DriverResponse},
 };
 
 use super::{
-    config::DatadogMetricsEndpoint, normalizer::DatadogMetricsNormalizer,
-    request_builder::DatadogMetricsRequestBuilder, service::DatadogMetricsRequest,
+    config::{DatadogMetricsEndpoint, SeriesApiVersion},
+    normalizer::DatadogMetricsNormalizer,
+    request_builder::DatadogMetricsRequestBuilder,
+    service::DatadogMetricsRequest,
 };
 use crate::{
     internal_events::DatadogMetricsEncodingError,
     sinks::util::{
+        SinkBuilderExt,
         buffer::metrics::{AggregatedSummarySplitter, MetricSplitter},
         request_builder::default_request_builder_concurrency_limit,
-        SinkBuilderExt,
     },
 };
 
@@ -33,21 +35,24 @@ use crate::{
 /// Generally speaking, all "basic" metrics -- counter, gauge, set, aggregated summary-- are sent to
 /// the Series API, while distributions, aggregated histograms, and sketches (hehe) are sent to the
 /// Sketches API.
-struct DatadogMetricsTypePartitioner;
+struct DatadogMetricsTypePartitioner {
+    series_api_version: SeriesApiVersion,
+}
 
 impl Partitioner for DatadogMetricsTypePartitioner {
     type Item = Metric;
     type Key = (Option<Arc<str>>, DatadogMetricsEndpoint);
 
     fn partition(&self, item: &Self::Item) -> Self::Key {
+        let series = DatadogMetricsEndpoint::Series(self.series_api_version);
         let endpoint = match item.data().value() {
-            MetricValue::Counter { .. } => DatadogMetricsEndpoint::series(),
-            MetricValue::Gauge { .. } => DatadogMetricsEndpoint::series(),
-            MetricValue::Set { .. } => DatadogMetricsEndpoint::series(),
+            MetricValue::Counter { .. } => series,
+            MetricValue::Gauge { .. } => series,
+            MetricValue::Set { .. } => series,
             MetricValue::Distribution { .. } => DatadogMetricsEndpoint::Sketches,
             MetricValue::AggregatedHistogram { .. } => DatadogMetricsEndpoint::Sketches,
             // NOTE: AggregatedSummary will be split into counters and gauges during normalization
-            MetricValue::AggregatedSummary { .. } => DatadogMetricsEndpoint::series(),
+            MetricValue::AggregatedSummary { .. } => series,
             MetricValue::Sketch { .. } => DatadogMetricsEndpoint::Sketches,
         };
         (item.metadata().datadog_api_key(), endpoint)
@@ -57,8 +62,10 @@ impl Partitioner for DatadogMetricsTypePartitioner {
 pub(crate) struct DatadogMetricsSink<S> {
     service: S,
     request_builder: DatadogMetricsRequestBuilder,
-    batch_settings: BatcherSettings,
+    series_batch_settings: BatcherSettings,
+    sketches_batch_settings: BatcherSettings,
     protocol: String,
+    series_api_version: SeriesApiVersion,
 }
 
 impl<S> DatadogMetricsSink<S>
@@ -72,20 +79,28 @@ where
     pub const fn new(
         service: S,
         request_builder: DatadogMetricsRequestBuilder,
-        batch_settings: BatcherSettings,
+        series_batch_settings: BatcherSettings,
+        sketches_batch_settings: BatcherSettings,
         protocol: String,
+        series_api_version: SeriesApiVersion,
     ) -> Self {
         DatadogMetricsSink {
             service,
             request_builder,
-            batch_settings,
+            series_batch_settings,
+            sketches_batch_settings,
             protocol,
+            series_api_version,
         }
     }
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let mut splitter: MetricSplitter<AggregatedSummarySplitter> = MetricSplitter::default();
-        let batch_settings = self.batch_settings;
+        let series_batch_settings = self.series_batch_settings;
+        let sketches_batch_settings = self.sketches_batch_settings;
+        let partitioner = DatadogMetricsTypePartitioner {
+            series_api_version: self.series_api_version,
+        };
 
         input
             // Convert `Event` to `Metric` so we don't have to deal with constant conversions.
@@ -99,10 +114,20 @@ where
             // what quantiles to generate, etc.
             .normalized_with_default::<DatadogMetricsNormalizer>()
             // We batch metrics by their endpoint: series endpoint for counters, gauge, and sets vs sketch endpoint for
-            // distributions, aggregated histograms, and sketches.
-            .batched_partitioned(DatadogMetricsTypePartitioner, || {
-                batch_settings.as_byte_size_config()
-            })
+            // distributions, aggregated histograms, and sketches. Each endpoint uses its own byte size
+            // limit: 5 MiB for Series v2 and 60 MiB for Sketches.
+            .batched_partitioned(
+                partitioner,
+                series_batch_settings.timeout,
+                |(_api_key, endpoint)| match endpoint {
+                    DatadogMetricsEndpoint::Series(_) => {
+                        series_batch_settings.as_byte_size_config()
+                    }
+                    DatadogMetricsEndpoint::Sketches => {
+                        sketches_batch_settings.as_byte_size_config()
+                    }
+                },
+            )
             // Aggregate counters with identical timestamps, otherwise identical counters (same
             // series and same timestamp, when rounded to whole seconds) will be dropped in a
             // last-write-wins situation when they hit the DD metrics intake.
@@ -233,10 +258,8 @@ mod tests {
 
     use chrono::{DateTime, Utc};
     use proptest::prelude::*;
-    use vector_lib::{
-        event::{Metric, MetricKind, MetricValue},
-        metric_tags,
-    };
+    use vector_lib::event::{Metric, MetricKind, MetricValue};
+    use vector_lib::metric_tags;
 
     use super::sort_and_collapse_counters_by_series_and_timestamp;
 

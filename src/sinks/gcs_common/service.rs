@@ -3,13 +3,15 @@ use std::task::Poll;
 use bytes::Bytes;
 use futures::future::BoxFuture;
 use http::{
-    header::{HeaderName, HeaderValue},
     Request, Uri,
+    header::{HeaderName, HeaderValue},
 };
 use hyper::Body;
 use tower::Service;
-use vector_lib::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
-use vector_lib::stream::DriverResponse;
+use vector_lib::{
+    request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
+    stream::DriverResponse,
+};
 
 use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
@@ -68,6 +70,7 @@ pub struct GcsRequestSettings {
     pub content_type: HeaderValue,
     pub content_encoding: Option<HeaderValue>,
     pub storage_class: HeaderValue,
+    pub cache_control: Option<HeaderValue>,
     pub headers: Vec<(HeaderName, HeaderValue)>,
 }
 
@@ -127,6 +130,9 @@ impl Service<GcsRequest> for GcsService {
             .content_encoding
             .map(|ce| headers.insert("content-encoding", ce));
         settings.acl.map(|acl| headers.insert("x-goog-acl", acl));
+        settings
+            .cache_control
+            .map(|cc| headers.insert("cache-control", cc));
         headers.insert("x-goog-storage-class", settings.storage_class);
         for (p, v) in settings.headers {
             headers.insert(p, v);

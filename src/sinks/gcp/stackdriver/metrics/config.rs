@@ -1,6 +1,7 @@
 use bytes::Bytes;
 use goauth::scopes::Scope;
-use http::{header::CONTENT_TYPE, Request, Uri};
+use http::{Request, Uri, header::CONTENT_TYPE};
+use snafu::ResultExt;
 
 use super::{
     request_builder::{StackdriverMetricsEncoder, StackdriverMetricsRequestBuilder},
@@ -10,18 +11,17 @@ use crate::{
     gcp::{GcpAuthConfig, GcpAuthenticator},
     http::HttpClient,
     sinks::{
-        gcp,
+        HTTPRequestBuilderSnafu, gcp,
         prelude::*,
         util::{
             http::{
-                http_response_retry_logic, HttpRequest, HttpService, HttpServiceRequestBuilder,
+                HttpRequest, HttpService, HttpServiceRequestBuilder, RetryStrategy,
+                http_response_retry_logic,
             },
             service::TowerRequestConfigDefaults,
         },
-        HTTPRequestBuilderSnafu,
     },
 };
-use snafu::ResultExt;
 
 #[derive(Clone, Copy, Debug)]
 pub struct StackdriverMetricsTowerRequestConfigDefaults;
@@ -78,6 +78,10 @@ pub struct StackdriverConfig {
         skip_serializing_if = "crate::serde::is_default"
     )]
     pub(super) acknowledgements: AcknowledgementsConfig,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    pub retry_strategy: RetryStrategy,
 }
 
 fn default_metric_namespace_value() -> String {
@@ -127,7 +131,10 @@ impl SinkConfig for StackdriverConfig {
         let service = HttpService::new(client, stackdriver_metrics_service_request_builder);
 
         let service = ServiceBuilder::new()
-            .settings(request_limits, http_response_retry_logic())
+            .settings(
+                request_limits,
+                http_response_retry_logic(self.retry_strategy.clone()),
+            )
             .service(service);
 
         let sink = StackdriverMetricsSink::new(service, batch_settings, request_builder);

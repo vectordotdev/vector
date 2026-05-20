@@ -79,7 +79,7 @@ components: sinks: datadog_traces: {
 		notices: []
 	}
 
-	configuration: base.components.sinks.datadog_traces.configuration
+	configuration: generated.components.sinks.datadog_traces.configuration
 
 	input: {
 		logs:    false

@@ -50,7 +50,7 @@ components: sources: prometheus_pushgateway: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.prometheus_pushgateway.configuration
+	configuration: generated.components.sources.prometheus_pushgateway.configuration
 
 	output: metrics: {
 		counter:   output._passthrough_counter

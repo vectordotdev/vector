@@ -3,35 +3,35 @@ use std::num::NonZeroU32;
 use bytes::Bytes;
 use chrono::{SubsecRound, Utc};
 use flate2::read::ZlibDecoder;
-use futures::{channel::mpsc::Receiver, stream, StreamExt};
+use futures::{StreamExt, channel::mpsc::Receiver, stream};
 use http::request::Parts;
 use hyper::StatusCode;
 use indoc::indoc;
 use prost::Message;
-use rand::{rng, Rng};
-
+use rand::{Rng, rng};
 use vector_lib::{
-    config::{init_telemetry, Tags, Telemetry},
+    config::{Tags, Telemetry, init_telemetry},
     event::{BatchNotifier, BatchStatus, Event, Metric, MetricKind, MetricValue},
     metric_tags,
 };
 
+use super::{
+    DatadogMetricsConfig,
+    config::{SERIES_V1_PATH, SERIES_V2_PATH},
+    encoder::{ORIGIN_CATEGORY_VALUE, ORIGIN_PRODUCT_VALUE},
+};
 use crate::{
     config::SinkConfig,
     sinks::util::test::{build_test_server_status, load_sink},
     test_util::{
+        addr::next_addr,
         components::{
-            assert_data_volume_sink_compliance, assert_sink_compliance, DATA_VOLUME_SINK_TAGS,
-            SINK_TAGS,
+            DATA_VOLUME_SINK_TAGS, SINK_TAGS, assert_data_volume_sink_compliance,
+            assert_sink_compliance,
         },
-        map_event_batch_stream, next_addr,
+        compression::is_zstd,
+        map_event_batch_stream,
     },
-};
-
-use super::{
-    config::{SERIES_V1_PATH, SERIES_V2_PATH},
-    encoder::{ORIGIN_CATEGORY_VALUE, ORIGIN_PRODUCT_VALUE},
-    DatadogMetricsConfig,
 };
 
 #[allow(warnings, clippy::pedantic, clippy::nursery)]
@@ -120,10 +120,10 @@ async fn start_test(events: Vec<Event>) -> (Vec<Event>, Receiver<(http::request:
     "#};
     let (mut config, cx) = load_sink::<DatadogMetricsConfig>(config).unwrap();
 
-    let addr = next_addr();
+    let (_guard, addr) = next_addr();
     // Swap out the endpoint so we can force send it
     // to our local server
-    let endpoint = format!("http://{}", addr);
+    let endpoint = format!("http://{addr}");
     config.local_dd_common.endpoint = Some(endpoint.clone());
 
     let (sink, _) = config.build(cx).await.unwrap();
@@ -143,10 +143,14 @@ async fn start_test(events: Vec<Event>) -> (Vec<Event>, Receiver<(http::request:
 }
 
 fn decompress_payload(payload: Vec<u8>) -> std::io::Result<Vec<u8>> {
-    let mut decompressor = ZlibDecoder::new(&payload[..]);
-    let mut decompressed = Vec::new();
-    let result = std::io::copy(&mut decompressor, &mut decompressed);
-    result.map(|_| decompressed)
+    if is_zstd(&payload) {
+        zstd::decode_all(&payload[..])
+    } else {
+        let mut decompressor = ZlibDecoder::new(&payload[..]);
+        let mut decompressed = Vec::new();
+        std::io::copy(&mut decompressor, &mut decompressed)?;
+        Ok(decompressed)
+    }
 }
 
 #[tokio::test]
@@ -322,7 +326,9 @@ fn validate_protobuf_set_gauge_rate(request: &(Parts, Bytes)) {
             ddmetric_proto::metric_payload::MetricType::Gauge
         );
         assert_eq!(gauge.points[0].value, 5678.0);
-        assert_eq!(gauge.interval, 10);
+        // interval_ms is dropped during normalization (incremental → absolute conversion
+        // via into_absolute() sets interval_ms: None), so interval is always 0 for gauges.
+        assert_eq!(gauge.interval, 0);
     }
 
     // validate counter w interval = rate
@@ -380,12 +386,14 @@ fn validate_json_counters(request: &(Parts, Bytes)) {
     assert_eq!(metric_names, sorted_names);
 
     let entry = series.first().unwrap().as_object().unwrap();
-    assert!(entry
-        .get("metric")
-        .unwrap()
-        .as_str()
-        .unwrap()
-        .starts_with("foo.counter_"),);
+    assert!(
+        entry
+            .get("metric")
+            .unwrap()
+            .as_str()
+            .unwrap()
+            .starts_with("foo.counter_"),
+    );
     assert_eq!(entry.get("type").unwrap().as_str().unwrap(), "count");
     let points = entry
         .get("points")

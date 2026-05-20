@@ -2,10 +2,10 @@ use std::{
     cell::RefCell,
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     hash::Hash,
-    net::SocketAddr,
+    net::{Ipv4Addr, SocketAddr},
     num::{
-        NonZeroI16, NonZeroI32, NonZeroI64, NonZeroI8, NonZeroU16, NonZeroU32, NonZeroU64,
-        NonZeroU8, NonZeroUsize,
+        NonZeroI8, NonZeroI16, NonZeroI32, NonZeroI64, NonZeroU8, NonZeroU16, NonZeroU32,
+        NonZeroU64, NonZeroUsize,
     },
     path::PathBuf,
     time::Duration,
@@ -17,14 +17,14 @@ use vector_config_common::{attributes::CustomAttribute, constants, validation::V
 use vrl::value::KeyString;
 
 use crate::{
+    Configurable, GenerateError, Metadata, ToValue,
     num::ConfigurableNumber,
     schema::{
-        assert_string_schema_for_map, generate_array_schema, generate_bool_schema,
-        generate_map_schema, generate_number_schema, generate_optional_schema, generate_set_schema,
-        generate_string_schema, SchemaGenerator, SchemaObject,
+        SchemaGenerator, SchemaObject, assert_string_schema_for_map, generate_array_schema,
+        generate_bool_schema, generate_map_schema, generate_number_schema,
+        generate_optional_schema, generate_set_schema, generate_string_schema,
     },
     str::ConfigurableString,
-    Configurable, GenerateError, Metadata, ToValue,
 };
 
 // Unit type.
@@ -67,8 +67,10 @@ where
         T::validate_metadata(&converted)
     }
 
-    fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
-        generate_optional_schema(&T::as_configurable_ref(), gen)
+    fn generate_schema(
+        generator: &RefCell<SchemaGenerator>,
+    ) -> Result<SchemaObject, GenerateError> {
+        generate_optional_schema(&T::as_configurable_ref(), generator)
     }
 }
 
@@ -222,8 +224,10 @@ where
         T::validate_metadata(&converted)
     }
 
-    fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
-        generate_array_schema(&T::as_configurable_ref(), gen)
+    fn generate_schema(
+        generator: &RefCell<SchemaGenerator>,
+    ) -> Result<SchemaObject, GenerateError> {
+        generate_array_schema(&T::as_configurable_ref(), generator)
     }
 }
 
@@ -253,15 +257,17 @@ where
         V::validate_metadata(&converted)
     }
 
-    fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(
+        generator: &RefCell<SchemaGenerator>,
+    ) -> Result<SchemaObject, GenerateError> {
         // Make sure our key type is _truly_ a string schema.
         assert_string_schema_for_map(
             &K::as_configurable_ref(),
-            gen,
+            generator,
             std::any::type_name::<Self>(),
         )?;
 
-        generate_map_schema(&V::as_configurable_ref(), gen)
+        generate_map_schema(&V::as_configurable_ref(), generator)
     }
 }
 
@@ -292,8 +298,10 @@ where
         V::validate_metadata(&converted)
     }
 
-    fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
-        generate_set_schema(&V::as_configurable_ref(), gen)
+    fn generate_schema(
+        generator: &RefCell<SchemaGenerator>,
+    ) -> Result<SchemaObject, GenerateError> {
+        generate_set_schema(&V::as_configurable_ref(), generator)
     }
 }
 
@@ -323,15 +331,17 @@ where
         V::validate_metadata(&converted)
     }
 
-    fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(
+        generator: &RefCell<SchemaGenerator>,
+    ) -> Result<SchemaObject, GenerateError> {
         // Make sure our key type is _truly_ a string schema.
         assert_string_schema_for_map(
             &K::as_configurable_ref(),
-            gen,
+            generator,
             std::any::type_name::<Self>(),
         )?;
 
-        generate_map_schema(&V::as_configurable_ref(), gen)
+        generate_map_schema(&V::as_configurable_ref(), generator)
     }
 }
 
@@ -362,8 +372,10 @@ where
         V::validate_metadata(&converted)
     }
 
-    fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
-        generate_set_schema(&V::as_configurable_ref(), gen)
+    fn generate_schema(
+        generator: &RefCell<SchemaGenerator>,
+    ) -> Result<SchemaObject, GenerateError> {
+        generate_set_schema(&V::as_configurable_ref(), generator)
     }
 }
 
@@ -397,6 +409,31 @@ impl Configurable for SocketAddr {
 }
 
 impl ToValue for SocketAddr {
+    fn to_value(&self) -> Value {
+        Value::String(self.to_string())
+    }
+}
+
+impl Configurable for Ipv4Addr {
+    fn referenceable_name() -> Option<&'static str> {
+        Some("stdlib::Ipv4Addr")
+    }
+
+    fn metadata() -> Metadata {
+        let mut metadata = Metadata::default();
+        metadata.set_description("An IPv4 address.");
+        metadata
+    }
+
+    fn generate_schema(_: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
+        // TODO: We don't need anything other than a string schema to (de)serialize a `Ipv4Addr`,
+        // but we eventually should have validation since the format for the possible permutations
+        // is well-known and can be easily codified.
+        Ok(generate_string_schema())
+    }
+}
+
+impl ToValue for Ipv4Addr {
     fn to_value(&self) -> Value {
         Value::String(self.to_string())
     }

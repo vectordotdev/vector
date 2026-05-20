@@ -1,21 +1,20 @@
 use vector_lib::config::LogNamespace;
 
+use super::{
+    io::{ControlledEdges, InputEdge, OutputEdge},
+    telemetry::{Telemetry, TelemetryCollector},
+};
 use crate::{
     components::validation::{
+        ComponentConfiguration, ComponentType, ValidationConfiguration,
         component_names::*,
         sync::{Configuring, TaskCoordinator},
         util::GrpcAddress,
-        ComponentConfiguration, ComponentType, ValidationConfiguration,
     },
     config::{BoxedSink, BoxedSource, BoxedTransform, ConfigBuilder},
     sinks::vector::VectorConfig as VectorSinkConfig,
     sources::vector::VectorConfig as VectorSourceConfig,
-    test_util::next_addr,
-};
-
-use super::{
-    io::{ControlledEdges, InputEdge, OutputEdge},
-    telemetry::{Telemetry, TelemetryCollector},
+    test_util::addr::next_addr,
 };
 
 pub struct TopologyBuilder {
@@ -33,8 +32,7 @@ impl TopologyBuilder {
         let component_configuration = configuration
             .component_configuration_for_test_case(config_name)
             .ok_or(format!(
-                "No test case name defined for configuration {:?}.",
-                config_name
+                "No test case name defined for configuration {config_name:?}."
             ))?;
 
         Ok(match component_configuration {
@@ -127,7 +125,8 @@ impl TopologyBuilder {
 }
 
 fn build_input_edge(log_namespace: LogNamespace) -> (InputEdge, impl Into<BoxedSource>) {
-    let input_listen_addr = GrpcAddress::from(next_addr());
+    // TODO: This needs refactoring to properly hold the PortGuard for the lifetime of the topology.
+    let input_listen_addr = GrpcAddress::from(next_addr().1);
     debug!(listen_addr = %input_listen_addr, "Creating controlled input edge.");
 
     let mut input_source = VectorSourceConfig::from_address(input_listen_addr.as_socket_addr());
@@ -140,7 +139,8 @@ fn build_input_edge(log_namespace: LogNamespace) -> (InputEdge, impl Into<BoxedS
 }
 
 fn build_output_edge() -> (OutputEdge, impl Into<BoxedSink>) {
-    let output_listen_addr = GrpcAddress::from(next_addr());
+    // TODO: This needs refactoring to properly hold the PortGuard for the lifetime of the topology.
+    let output_listen_addr = GrpcAddress::from(next_addr().1);
     debug!(endpoint = %output_listen_addr, "Creating controlled output edge.");
 
     let mut output_sink = VectorSinkConfig::from_address(output_listen_addr.as_uri());

@@ -56,11 +56,18 @@ components: sinks: pulsar: {
 		notices: []
 	}
 
-	configuration: base.components.sinks.pulsar.configuration
+	configuration: generated.components.sinks.pulsar.configuration
 
 	input: {
-		logs:    true
-		metrics: null
-		traces:  false
+		logs: true
+		metrics: {
+			counter:      true
+			distribution: true
+			gauge:        true
+			histogram:    true
+			set:          true
+			summary:      true
+		}
+		traces: false
 	}
 }

@@ -1,8 +1,8 @@
 use vector_lib::ByteSizeOf;
 
 use super::super::{
-    batch::{Batch, BatchConfig, BatchError, PushResult},
     ElementCount,
+    batch::{Batch, BatchConfig, BatchError, PushResult},
 };
 use crate::sinks::util::{Merged, SinkBatchSettings};
 

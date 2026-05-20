@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
-use futures::{stream, Sink, Stream};
-use futures_util::{future, stream::BoxStream, FutureExt, StreamExt};
-use tokio::sync::{oneshot, Mutex};
-use vector_lib::configurable::configurable_component;
+use futures::{Sink, Stream, stream};
+use futures_util::{FutureExt, StreamExt, future, stream::BoxStream};
+use tokio::sync::{Mutex, oneshot};
 use vector_lib::{
     config::{DataType, Input, LogNamespace},
+    configurable::configurable_component,
     event::Event,
     schema,
     sink::{StreamSink, VectorSink},
@@ -117,7 +117,10 @@ impl SourceConfig for UnitTestStreamSourceConfig {
 #[derive(Clone, Default)]
 pub enum UnitTestSinkCheck {
     /// Check all events that are received against the list of conditions.
-    Checks(Vec<Vec<Condition>>),
+    Checks {
+        conditions: Vec<Vec<Condition>>,
+        expected_event_count: Option<usize>,
+    },
 
     /// Check that no events were received.
     NoOutputs,
@@ -203,8 +206,21 @@ impl StreamSink<Event> for UnitTestSink {
         }
 
         match self.check {
-            UnitTestSinkCheck::Checks(checks) => {
-                if output_events.is_empty() {
+            UnitTestSinkCheck::Checks {
+                conditions: checks,
+                expected_event_count,
+            } => {
+                if let Some(expected) = expected_event_count {
+                    let actual = output_events.len();
+                    if actual != expected {
+                        result.test_errors.push(format!(
+                            "expected {} events from transforms {:?}, but received {}",
+                            expected, self.transform_ids, actual
+                        ));
+                    }
+                }
+
+                if output_events.is_empty() && expected_event_count != Some(0) {
                     result
                         .test_errors
                         .push(format!("checks for transforms {:?} failed: no events received. Topology may be disconnected or transform is missing inputs.", self.transform_ids));
@@ -220,8 +236,7 @@ impl StreamSink<Event> for UnitTestSink {
                                         break;
                                     }
                                     Err(error) => {
-                                        condition_errors
-                                            .push(format!("  condition[{}]: {}", j, error));
+                                        condition_errors.push(format!("  condition[{j}]: {error}"));
                                     }
                                 }
                             }
@@ -262,10 +277,10 @@ impl StreamSink<Event> for UnitTestSink {
             UnitTestSinkCheck::NoOp => {}
         }
 
-        if let Some(tx) = self.result_tx {
-            if tx.send(result).is_err() {
-                error!(message = "Sending unit test results failed in unit test sink.");
-            }
+        if let Some(tx) = self.result_tx
+            && tx.send(result).is_err()
+        {
+            error!(message = "Sending unit test results failed in unit test sink.");
         }
         Ok(())
     }

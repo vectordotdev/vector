@@ -1,11 +1,13 @@
-use metrics::counter;
+#![allow(dead_code)] // TODO requires optional feature compilation
+
 #[cfg(feature = "sources-pulsar")]
 use metrics::Counter;
 use vector_lib::internal_event::{
-    error_stage, error_type, ComponentEventsDropped, InternalEvent, UNINTENTIONAL,
+    ComponentEventsDropped, CounterName, InternalEvent, UNINTENTIONAL, error_stage, error_type,
 };
+use vector_lib::{NamedInternalEvent, counter};
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct PulsarSendingError {
     pub count: usize,
     pub error: vector_lib::Error,
@@ -19,10 +21,9 @@ impl InternalEvent for PulsarSendingError {
             error = %self.error,
             error_type = error_type::REQUEST_FAILED,
             stage = error_stage::SENDING,
-            internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::SENDING,
         )
@@ -34,6 +35,7 @@ impl InternalEvent for PulsarSendingError {
     }
 }
 
+#[derive(NamedInternalEvent)]
 pub struct PulsarPropertyExtractionError<F: std::fmt::Display> {
     pub property_field: F,
 }
@@ -46,10 +48,9 @@ impl<F: std::fmt::Display> InternalEvent for PulsarPropertyExtractionError<F> {
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
             property_field = %self.property_field,
-            internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_code" => "extracting_property",
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
@@ -75,21 +76,21 @@ pub struct PulsarErrorEventData {
 registered_event!(
     PulsarErrorEvent => {
         ack_errors: Counter = counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_code" => "acknowledge_message",
             "error_type" => error_type::ACKNOWLEDGMENT_FAILED,
             "stage" => error_stage::RECEIVING,
         ),
 
         nack_errors: Counter = counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_code" => "negative_acknowledge_message",
             "error_type" => error_type::ACKNOWLEDGMENT_FAILED,
             "stage" => error_stage::RECEIVING,
         ),
 
         read_errors: Counter = counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_code" => "reading_message",
             "error_type" => error_type::READER_FAILED,
             "stage" => error_stage::RECEIVING,
@@ -105,7 +106,6 @@ registered_event!(
                     error_code = "reading_message",
                     error_type = error_type::READER_FAILED,
                     stage = error_stage::RECEIVING,
-                    internal_log_rate_limit = true,
                 );
 
                 self.read_errors.increment(1_u64);
@@ -117,7 +117,6 @@ registered_event!(
                     error_code = "acknowledge_message",
                     error_type = error_type::ACKNOWLEDGMENT_FAILED,
                     stage = error_stage::RECEIVING,
-                    internal_log_rate_limit = true,
                 );
 
                 self.ack_errors.increment(1_u64);
@@ -129,7 +128,6 @@ registered_event!(
                     error_code = "negative_acknowledge_message",
                     error_type = error_type::ACKNOWLEDGMENT_FAILED,
                     stage = error_stage::RECEIVING,
-                    internal_log_rate_limit = true,
                 );
 
                 self.nack_errors.increment(1_u64);

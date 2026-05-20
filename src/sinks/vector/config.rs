@@ -7,9 +7,10 @@ use tower::ServiceBuilder;
 use vector_lib::configurable::configurable_component;
 
 use super::{
-    service::{VectorResponse, VectorService},
-    sink::VectorSink,
     VectorSinkError,
+    compression::VectorCompression,
+    service::{VectorRequest, VectorResponse, VectorService},
+    sink::VectorSink,
 };
 use crate::{
     config::{
@@ -19,11 +20,11 @@ use crate::{
     http::build_proxy_connector,
     proto::vector as proto,
     sinks::{
-        util::{
-            retries::RetryLogic, BatchConfig, RealtimeEventBasedDefaultBatchSettings,
-            ServiceBuilderExt, TowerRequestConfig,
-        },
         Healthcheck, VectorSink as VectorSinkType,
+        util::{
+            BatchConfig, RealtimeEventBasedDefaultBatchSettings, ServiceBuilderExt,
+            TowerRequestConfig, retries::RetryLogic,
+        },
     },
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
@@ -49,14 +50,19 @@ pub struct VectorConfig {
     #[configurable(metadata(docs::examples = "https://somehost:6000"))]
     address: String,
 
-    /// Whether or not to compress requests.
+    /// Compression algorithm for requests.
     ///
-    /// If set to `true`, requests are compressed with [`gzip`][gzip_docs].
+    /// Supports `"none"`, `"gzip"`, or `"zstd"`.
     ///
-    /// [gzip_docs]: https://www.gzip.org/
-    #[configurable(metadata(docs::advanced))]
-    #[serde(default)]
-    compression: bool,
+    /// For backward compatibility, boolean values are still accepted:
+    /// - `true` defaults to gzip compression
+    /// - `false` disables compression (deprecated syntax)
+    #[configurable(derived)]
+    #[serde(
+        default,
+        deserialize_with = "super::compression::bool_or_vector_compression"
+    )]
+    compression: VectorCompression,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -97,7 +103,7 @@ fn default_config(address: &str) -> VectorConfig {
     VectorConfig {
         version: None,
         address: address.to_owned(),
-        compression: false,
+        compression: VectorCompression::None,
         batch: BatchConfig::default(),
         request: TowerRequestConfig::default(),
         tls: None,
@@ -120,7 +126,8 @@ impl SinkConfig for VectorConfig {
             .clone()
             .map(|uri| uri.uri)
             .unwrap_or_else(|| uri.clone());
-        let healthcheck_client = VectorService::new(client.clone(), healthcheck_uri, false);
+        let healthcheck_client =
+            VectorService::new(client.clone(), healthcheck_uri, VectorCompression::None);
         let healthcheck = healthcheck(healthcheck_client, cx.healthcheck);
         let service = VectorService::new(client, uri, self.compression);
         let request_settings = self.request.into_settings();
@@ -159,6 +166,10 @@ async fn healthcheck(
         return Ok(());
     }
 
+    // Use the custom Vector health check
+    // Note: Both custom and standard health checks behave identically - they just
+    // return serving status without actual health validation. The Vector source
+    // implements both protocols now for compatibility.
     let request = service.client.health_check(proto::HealthCheckRequest {});
     match request.await {
         Ok(response) => match proto::ServingStatus::try_from(response.into_inner().status) {
@@ -220,6 +231,7 @@ struct VectorGrpcRetryLogic;
 
 impl RetryLogic for VectorGrpcRetryLogic {
     type Error = VectorSinkError;
+    type Request = VectorRequest;
     type Response = VectorResponse;
 
     fn is_retriable_error(&self, err: &Self::Error) -> bool {

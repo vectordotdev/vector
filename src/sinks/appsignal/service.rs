@@ -5,22 +5,21 @@ use futures::{
     future,
     future::{BoxFuture, Ready},
 };
-use http::{header::AUTHORIZATION, Request, StatusCode, Uri};
+use http::{Request, StatusCode, Uri, header::AUTHORIZATION};
 use hyper::Body;
 use tower::{Service, ServiceExt};
-
-use vector_lib::stream::DriverResponse;
 use vector_lib::{
-    finalization::EventStatus, request_metadata::GroupedCountByteSize,
-    request_metadata::MetaDescriptive, sensitive_string::SensitiveString,
-};
-
-use crate::{
-    http::HttpClient,
-    sinks::util::{http::HttpBatchService, sink::Response, Compression},
+    finalization::EventStatus,
+    request_metadata::{GroupedCountByteSize, MetaDescriptive},
+    sensitive_string::SensitiveString,
+    stream::DriverResponse,
 };
 
 use super::request_builder::AppsignalRequest;
+use crate::{
+    http::HttpClient,
+    sinks::util::{Compression, http::HttpBatchService, sink::Response},
+};
 
 #[derive(Clone)]
 pub(super) struct AppsignalService {

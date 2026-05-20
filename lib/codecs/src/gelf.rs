@@ -3,8 +3,7 @@
 use std::sync::LazyLock;
 
 use regex::Regex;
-use vrl::owned_value_path;
-use vrl::path::OwnedTargetPath;
+use vrl::{owned_value_path, path::OwnedTargetPath};
 
 /// GELF Message fields. Definitions from <https://docs.graylog.org/docs/gelf>.
 pub mod gelf_fields {
@@ -74,4 +73,4 @@ pub(crate) static GELF_TARGET_PATHS: LazyLock<GelfTargetPaths> =
 /// As Graylog itself will produce GELF with any existing field names on the Graylog GELF Output,
 /// vector is more lenient, too, at least allowing the additional `@` character.
 pub static VALID_FIELD_REGEX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"^[\w\.\-@]*$").unwrap());
+    LazyLock::new(|| Regex::new(r"^[\w\.\-@]*$").expect("valid regex pattern"));

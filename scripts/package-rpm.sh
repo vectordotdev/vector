@@ -9,15 +9,15 @@ set -euo pipefail
 #
 # ENV VARS
 #
-#   $TARGET         a target triple. ex: x86_64-apple-darwin (no default)
+#   $TARGET         a target triple. ex: arm64-apple-darwin (no default)
 
-TARGET="${TARGET:?"You must specify a target triple, ex: x86_64-apple-darwin"}"
+TARGET="${TARGET:?"You must specify a target triple, ex: arm64-apple-darwin"}"
 
 #
 # Local vars
 #
 
-PACKAGE_VERSION="${VECTOR_VERSION:-"$(cargo vdev version)"}"
+PACKAGE_VERSION="${VECTOR_VERSION:-"$(${VDEV:-cargo vdev} version)"}"
 ARCHIVE_NAME="vector-$PACKAGE_VERSION-$TARGET.tar.gz"
 ARCHIVE_PATH="target/artifacts/$ARCHIVE_NAME"
 
@@ -63,11 +63,22 @@ cp -av distribution/systemd/. "$RPMBUILD_DIR/SOURCES/systemd"
 # Copy the archive into the sources dir
 cp -av "$ARCHIVE_PATH" "$RPMBUILD_DIR/SOURCES/vector-$ARCH.tar.gz"
 
+# Determine the correct strip tool for cross-compilation.
+case "$TARGET" in
+  aarch64-*) STRIP_TOOL="aarch64-linux-gnu-strip" ;;
+  armv7-*-gnueabihf) STRIP_TOOL="arm-linux-gnueabihf-strip" ;;
+  *) STRIP_TOOL="strip" ;;
+esac
+# Fall back to the host's strip when building natively on the target arch
+# (e.g., aarch64 native build doesn't have aarch64-linux-gnu-strip).
+command -v "$STRIP_TOOL" >/dev/null 2>&1 || STRIP_TOOL="strip"
+
 # Perform the build.
 rpmbuild \
   --define "_topdir $RPMBUILD_DIR" \
   --target "$ARCH-redhat-linux" \
   --define "_arch $ARCH" \
+  --define "__strip $STRIP_TOOL" \
   --nodebuginfo \
   -ba distribution/rpm/vector.spec
 

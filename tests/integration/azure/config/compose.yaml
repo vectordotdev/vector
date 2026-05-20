@@ -1,0 +1,21 @@
+version: "3"
+
+services:
+  local-azure-blob:
+    image: mcr.microsoft.com/azure-storage/azurite:${CONFIG_VERSION}
+    command: azurite --blobHost 0.0.0.0 --loose
+    volumes:
+      - /var/run:/var/run
+
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:${CONFIG_VERSION}
+    command: azurite --blobHost 0.0.0.0 --blobPort 14430 --queuePort 14431 --tablePort 14432 --loose --oauth basic --cert /certs/azurite-chain.cert.pem --key /private/azurite.key.pem
+    volumes:
+      - /var/run:/var/run
+      - ../../../data/ca/intermediate_server/certs:/certs
+      - ../../../data/ca/intermediate_server/private/azurite.key.pem:/private/azurite.key.pem
+
+networks:
+  default:
+    name: ${VECTOR_NETWORK}
+    external: true

@@ -37,6 +37,7 @@ components: sinks: azure_blob: {
 					enum: ["json", "text"]
 				}
 			}
+			proxy: enabled: true
 			request: {
 				enabled:        true
 				rate_limit_num: 250
@@ -67,7 +68,7 @@ components: sinks: azure_blob: {
 		notices: []
 	}
 
-	configuration: base.components.sinks.azure_blob.configuration
+	configuration: generated.components.sinks.azure_blob.configuration
 
 	input: {
 		logs:    true

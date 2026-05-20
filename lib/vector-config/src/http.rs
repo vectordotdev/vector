@@ -1,10 +1,13 @@
-use http::StatusCode;
-use serde_json::Value;
 use std::cell::RefCell;
 
+use http::StatusCode;
+use serde_json::Value;
+use vector_config_common::{attributes::CustomAttribute, constants};
+
 use crate::{
-    schema::{generate_number_schema, SchemaGenerator, SchemaObject},
     Configurable, GenerateError, Metadata, ToValue,
+    num::NumberClass,
+    schema::{SchemaGenerator, SchemaObject, generate_number_schema},
 };
 
 impl ToValue for StatusCode {
@@ -25,7 +28,10 @@ impl Configurable for StatusCode {
     fn metadata() -> Metadata {
         let mut metadata = Metadata::default();
         metadata.set_description("HTTP response status code");
-        metadata.set_default_value(StatusCode::OK);
+        metadata.add_custom_attribute(CustomAttribute::kv(
+            constants::DOCS_META_NUMERIC_TYPE,
+            NumberClass::Unsigned,
+        ));
         metadata
     }
 

@@ -1,19 +1,19 @@
 use darling::{
-    util::{Flag, Override, SpannedValue},
     FromAttributes,
+    util::{Flag, Override, SpannedValue},
 };
 use proc_macro2::{Span, TokenStream};
 use quote::ToTokens;
 use serde_derive_internals::ast as serde_ast;
-use syn::{parse_quote, ExprPath, Ident};
+use syn::{ExprPath, Ident, parse_quote};
 use vector_config_common::validation::Validation;
 
 use super::{
+    LazyCustomAttribute, Metadata,
     util::{
         err_field_implicit_transparent, err_field_missing_description,
         find_delegated_serde_deser_ty, get_serde_default_value, try_extract_doc_title_description,
     },
-    LazyCustomAttribute, Metadata,
 };
 
 /// A field of a container.

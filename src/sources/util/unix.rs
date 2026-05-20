@@ -1,5 +1,4 @@
-use std::os::unix::fs::PermissionsExt;
-use std::{fs, fs::remove_file, path::Path};
+use std::{fs, fs::remove_file, os::unix::fs::PermissionsExt, path::Path};
 
 use crate::internal_events::UnixSocketFileDeleteError;
 

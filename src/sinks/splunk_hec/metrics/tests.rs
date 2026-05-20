@@ -2,23 +2,26 @@ use std::{collections::BTreeSet, sync::Arc};
 
 use chrono::{DateTime, Utc};
 use futures_util::StreamExt;
-use serde_json::{json, Value as JsonValue};
+use serde_json::{Value as JsonValue, json};
 use vector_lib::{
+    ByteSizeOf,
     event::{Event, Metric, MetricKind, MetricValue},
-    metric_tags, ByteSizeOf,
+    metric_tags,
 };
 use vrl::owned_value_path;
 
-use super::sink::{process_metric, HecProcessedEvent};
-use crate::sinks::splunk_hec::common::config_host_key;
+use super::sink::{HecProcessedEvent, process_metric};
 use crate::{
     config::{SinkConfig, SinkContext},
     sinks::{
-        splunk_hec::metrics::{config::HecMetricsSinkConfig, encoder::HecMetricsEncoder},
-        util::{test::build_test_server, Compression},
+        splunk_hec::{
+            common::config_host_key,
+            metrics::{config::HecMetricsSinkConfig, encoder::HecMetricsEncoder},
+        },
+        util::{Compression, test::build_test_server},
     },
     template::Template,
-    test_util::next_addr,
+    test_util::addr::next_addr,
 };
 
 fn get_counter() -> Metric {
@@ -130,16 +133,18 @@ fn test_process_metric_unsupported_type_returns_none() {
     let source = None;
     let index = None;
     let default_namespace = None;
-    assert!(process_metric(
-        metric,
-        event_byte_size,
-        sourcetype,
-        source,
-        index,
-        Some(&owned_value_path!("host_key")),
-        default_namespace
-    )
-    .is_none());
+    assert!(
+        process_metric(
+            metric,
+            event_byte_size,
+            sourcetype,
+            source,
+            index,
+            Some(&owned_value_path!("host_key")),
+            default_namespace
+        )
+        .is_none()
+    );
 }
 
 #[test]
@@ -317,10 +322,10 @@ fn test_encode_event_gauge_overridden_namespace_returns_expected_json() {
 
 #[tokio::test]
 async fn splunk_passthrough_token() {
-    let addr = next_addr();
+    let (_guard, addr) = next_addr();
     let config = HecMetricsSinkConfig {
         default_token: "token".to_owned().into(),
-        endpoint: format!("http://{}", addr),
+        endpoint: format!("http://{addr}"),
         host_key: config_host_key(),
         index: None,
         sourcetype: None,

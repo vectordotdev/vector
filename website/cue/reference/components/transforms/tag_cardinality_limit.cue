@@ -22,9 +22,7 @@ components: transforms: tag_cardinality_limit: {
 		stateful:      true
 	}
 
-	features: {
-		filter: {}
-	}
+	features: filter: {}
 
 	support: {
 		requirements: []
@@ -34,7 +32,7 @@ components: transforms: tag_cardinality_limit: {
 
 	// TODO: It'd be nice to have a way to define the description of the enum tag field on the Rust
 	// side and propagate it forward, since this is a common pattern that gets used.
-	configuration: base.components.transforms.tag_cardinality_limit.configuration & {
+	configuration: generated.components.transforms.tag_cardinality_limit.configuration & {
 		mode: description: "Controls the approach taken for tracking tag cardinality."
 	}
 
@@ -50,6 +48,8 @@ components: transforms: tag_cardinality_limit: {
 		}
 		traces: false
 	}
+
+	output: metrics: "": description: "The modified input `metric` event."
 
 	examples: [
 		{
@@ -68,41 +68,27 @@ components: transforms: tag_cardinality_limit: {
 				{metric: {
 					kind: "incremental"
 					name: "logins"
-					counter: {
-						value: 2.0
-					}
-					tags: {
-						user_id: "user_id_1"
-					}
+					counter: value: 2.0
+					tags: user_id:  "user_id_1"
 				}},
 				{metric: {
 					kind: "incremental"
 					name: "logins"
-					counter: {
-						value: 2.0
-					}
-					tags: {
-						user_id: "user_id_2"
-					}
+					counter: value: 2.0
+					tags: user_id:  "user_id_2"
 				}},
 			]
 			output: [
 				{metric: {
 					kind: "incremental"
 					name: "logins"
-					counter: {
-						value: 2.0
-					}
-					tags: {
-						user_id: "user_id_1"
-					}
+					counter: value: 2.0
+					tags: user_id:  "user_id_1"
 				}},
 				{metric: {
 					kind: "incremental"
 					name: "logins"
-					counter: {
-						value: 2.0
-					}
+					counter: value: 2.0
 					tags: {}
 				}},
 			]

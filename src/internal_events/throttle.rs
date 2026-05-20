@@ -1,7 +1,9 @@
-use metrics::counter;
-use vector_lib::internal_event::{ComponentEventsDropped, InternalEvent, INTENTIONAL};
+use vector_lib::{
+    NamedInternalEvent, counter,
+    internal_event::{ComponentEventsDropped, CounterName, INTENTIONAL, InternalEvent},
+};
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub(crate) struct ThrottleEventDiscarded {
     pub key: String,
     pub emit_events_discarded_per_key: bool,
@@ -11,7 +13,7 @@ impl InternalEvent for ThrottleEventDiscarded {
     fn emit(self) {
         let message = "Rate limit exceeded.";
 
-        debug!(message, key = self.key, internal_log_rate_limit = true);
+        debug!(message, key = self.key);
         if self.emit_events_discarded_per_key {
             // TODO: Technically, the Component Specification states that the discarded events metric
             // must _only_ have the `intentional` tag, in addition to the core tags like
@@ -22,7 +24,7 @@ impl InternalEvent for ThrottleEventDiscarded {
             // if we should change the specification wording? Sort of a similar situation to the
             // `error_code` tag for the component errors metric, where it's meant to be optional and
             // only specified when relevant.
-            counter!("events_discarded_total", "key" => self.key).increment(1); // Deprecated.
+            counter!(CounterName::EventsDiscardedTotal, "key" => self.key).increment(1); // Deprecated.
         }
 
         emit!(ComponentEventsDropped::<INTENTIONAL> {

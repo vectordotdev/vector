@@ -1,23 +1,25 @@
-use vector_lib::codecs::JsonSerializerConfig;
-use vector_lib::configurable::configurable_component;
-use vector_lib::lookup::lookup_v2::{ConfigValuePath, OptionalTargetPath};
-use vector_lib::sensitive_string::SensitiveString;
+use vector_lib::{
+    codecs::JsonSerializerConfig,
+    configurable::configurable_component,
+    lookup::lookup_v2::{ConfigValuePath, OptionalTargetPath},
+    sensitive_string::SensitiveString,
+};
 
 use super::config_host_key_target_path;
-use crate::sinks::splunk_hec::common::config_timestamp_key_target_path;
 use crate::{
     codecs::EncodingConfig,
     config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     sinks::{
+        Healthcheck, VectorSink,
         splunk_hec::{
             common::{
-                acknowledgements::HecClientAcknowledgementsConfig, EndpointTarget,
-                SplunkHecDefaultBatchSettings,
+                EndpointTarget, SplunkHecDefaultBatchSettings,
+                acknowledgements::HecClientAcknowledgementsConfig,
+                config_timestamp_key_target_path,
             },
             logs::config::HecLogsSinkConfig,
         },
         util::{BatchConfig, Compression, TowerRequestConfig},
-        Healthcheck, VectorSink,
     },
     template::Template,
     tls::TlsConfig,
@@ -226,21 +228,22 @@ mod tests {
 #[cfg(test)]
 #[cfg(feature = "humio-integration-tests")]
 mod integration_tests {
+    use std::{collections::HashMap, convert::TryFrom};
+
     use chrono::{TimeZone, Utc};
     use futures::{future::ready, stream};
     use indoc::indoc;
     use serde::Deserialize;
-    use serde_json::{json, Value as JsonValue};
-    use std::{collections::HashMap, convert::TryFrom};
+    use serde_json::{Value as JsonValue, json};
     use tokio::time::Duration;
 
     use super::*;
     use crate::{
-        config::{log_schema, SinkConfig, SinkContext},
+        config::{SinkConfig, SinkContext, log_schema},
         event::LogEvent,
         sinks::util::Compression,
         test_util::{
-            components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
+            components::{HTTP_SINK_TAGS, run_and_assert_sink_compliance},
             random_string,
         },
     };
@@ -478,7 +481,7 @@ mod integration_tests {
             humio_address(),
             repository_name
         );
-        let search_query = format!(r#"message="{}""#, message);
+        let search_query = format!(r#"message="{message}""#);
 
         // events are not available to search API immediately
         // poll up 200 times for event to show up
@@ -499,10 +502,7 @@ mod integration_tests {
                 return logs[0].clone();
             }
         }
-        panic!(
-            "did not find event in Humio repository {} with message {}",
-            repository_name, message
-        );
+        panic!("did not find event in Humio repository {repository_name} with message {message}");
     }
 
     #[derive(Debug)]

@@ -1,12 +1,12 @@
 use std::time::Duration;
 
-use futures::{future, FutureExt};
+use futures::{FutureExt, future};
 use serde_with::serde_as;
 use vector_lib::configurable::configurable_component;
 
 use crate::{
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
-    sinks::{blackhole::sink::BlackholeSink, Healthcheck, VectorSink},
+    sinks::{Healthcheck, VectorSink, blackhole::sink::BlackholeSink},
 };
 
 const fn default_print_interval_secs() -> Duration {

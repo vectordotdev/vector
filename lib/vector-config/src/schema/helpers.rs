@@ -8,13 +8,12 @@ use indexmap::IndexMap;
 use serde_json::{Map, Value};
 use vector_config_common::{attributes::CustomAttribute, constants, schema::*};
 
-use crate::{
-    num::ConfigurableNumber, Configurable, ConfigurableRef, GenerateError, Metadata, ToValue,
-};
-
 use super::visitors::{
     DisallowUnevaluatedPropertiesVisitor, GenerateHumanFriendlyNameVisitor,
     InlineSingleUseReferencesVisitor,
+};
+use crate::{
+    Configurable, ConfigurableRef, GenerateError, Metadata, ToValue, num::ConfigurableNumber,
 };
 
 /// Applies metadata to the given schema.
@@ -56,7 +55,9 @@ fn apply_metadata(config: &ConfigurableRef, schema: &mut SchemaObject, metadata:
         config.referenceable_name().is_some() && base_metadata.description().is_some();
     let is_transparent = base_metadata.transparent() || metadata.transparent();
     if schema_description.is_none() && !is_transparent && !has_referenceable_description {
-        panic!("No description provided for `{type_name}`! All `Configurable` types must define a description, or have one specified at the field-level where the type is being used.");
+        panic!(
+            "No description provided for `{type_name}`! All `Configurable` types must define a description, or have one specified at the field-level where the type is being used."
+        );
     }
 
     // If a default value was given, serialize it.
@@ -101,10 +102,12 @@ fn apply_metadata(config: &ConfigurableRef, schema: &mut SchemaObject, metadata:
                         // Overriding a flag is fine, because flags are only ever "enabled", so there's
                         // no harm to enabling it... again. Likewise, if there was no existing value,
                         // it's fine.
-                        Some(Value::Bool(_)) | None => {},
+                        Some(Value::Bool(_)) | None => {}
                         // Any other value being present means we're clashing with a different metadata
                         // attribute, which is not good, so we have to bail out.
-                        _ => panic!("Tried to set metadata flag '{key}' but already existed in schema metadata for `{type_name}`."),
+                        _ => panic!(
+                            "Tried to set metadata flag '{key}' but already existed in schema metadata for `{type_name}`."
+                        ),
                     }
                 }
                 CustomAttribute::KeyValue { key, value } => {
@@ -224,10 +227,10 @@ where
 
 pub(crate) fn generate_array_schema(
     config: &ConfigurableRef,
-    gen: &RefCell<SchemaGenerator>,
+    generator: &RefCell<SchemaGenerator>,
 ) -> Result<SchemaObject, GenerateError> {
     // Generate the actual schema for the element type.
-    let element_schema = get_or_generate_schema(config, gen, None)?;
+    let element_schema = get_or_generate_schema(config, generator, None)?;
 
     Ok(SchemaObject {
         instance_type: Some(InstanceType::Array.into()),
@@ -241,10 +244,10 @@ pub(crate) fn generate_array_schema(
 
 pub(crate) fn generate_set_schema(
     config: &ConfigurableRef,
-    gen: &RefCell<SchemaGenerator>,
+    generator: &RefCell<SchemaGenerator>,
 ) -> Result<SchemaObject, GenerateError> {
     // Generate the actual schema for the element type.
-    let element_schema = get_or_generate_schema(config, gen, None)?;
+    let element_schema = get_or_generate_schema(config, generator, None)?;
 
     Ok(SchemaObject {
         instance_type: Some(InstanceType::Array.into()),
@@ -259,10 +262,10 @@ pub(crate) fn generate_set_schema(
 
 pub(crate) fn generate_map_schema(
     config: &ConfigurableRef,
-    gen: &RefCell<SchemaGenerator>,
+    generator: &RefCell<SchemaGenerator>,
 ) -> Result<SchemaObject, GenerateError> {
     // Generate the actual schema for the element type.
-    let element_schema = get_or_generate_schema(config, gen, None)?;
+    let element_schema = get_or_generate_schema(config, generator, None)?;
 
     Ok(SchemaObject {
         instance_type: Some(InstanceType::Object.into()),
@@ -297,7 +300,7 @@ pub fn generate_struct_schema(
 
 pub(crate) fn generate_optional_schema(
     config: &ConfigurableRef,
-    gen: &RefCell<SchemaGenerator>,
+    generator: &RefCell<SchemaGenerator>,
 ) -> Result<SchemaObject, GenerateError> {
     // Optional schemas are generally very simple in practice, but because of how we memoize schema
     // generation and use references to schema definitions, we have to handle quite a few cases
@@ -319,7 +322,7 @@ pub(crate) fn generate_optional_schema(
     // our "null or X" wrapped schema.
     let mut overrides = Metadata::default();
     overrides.add_custom_attribute(CustomAttribute::flag(constants::DOCS_META_OPTIONAL));
-    let mut schema = get_or_generate_schema(config, gen, Some(overrides))?;
+    let mut schema = get_or_generate_schema(config, generator, Some(overrides))?;
 
     // Take the metadata and extensions of the original schema.
     //
@@ -505,19 +508,19 @@ where
     let schema_gen = RefCell::new(schema_settings.into_generator());
 
     // Set env variable to enable generating all schemas, including platform-specific ones.
-    env::set_var("VECTOR_GENERATE_SCHEMA", "true");
+    unsafe { env::set_var("VECTOR_GENERATE_SCHEMA", "true") };
 
     let schema =
         get_or_generate_schema(&T::as_configurable_ref(), &schema_gen, Some(T::metadata()))?;
 
-    env::remove_var("VECTOR_GENERATE_SCHEMA");
+    unsafe { env::remove_var("VECTOR_GENERATE_SCHEMA") };
 
     Ok(schema_gen.into_inner().into_root_schema(schema))
 }
 
 pub fn get_or_generate_schema(
     config: &ConfigurableRef,
-    gen: &RefCell<SchemaGenerator>,
+    generator: &RefCell<SchemaGenerator>,
     overrides: Option<Metadata>,
 ) -> Result<SchemaObject, GenerateError> {
     let metadata = config.make_metadata();
@@ -526,13 +529,14 @@ pub fn get_or_generate_schema(
         // generator's definition list, and if it exists, create a schema reference to
         // it. Otherwise, generate it and backfill it in the schema generator.
         Some(name) => {
-            if !gen.borrow().definitions().contains_key(name) {
+            if !generator.borrow().definitions().contains_key(name) {
                 // In order to avoid infinite recursion, we copy the approach that `schemars` takes and
                 // insert a dummy boolean schema before actually generating the real schema, and then
                 // replace it afterwards. If any recursion occurs, a schema reference will be handed
                 // back, which means we don't have to worry about the dummy schema needing to be updated
                 // after the fact.
-                gen.borrow_mut()
+                generator
+                    .borrow_mut()
                     .definitions_mut()
                     .insert(name.to_string(), Schema::Bool(false));
 
@@ -546,18 +550,19 @@ pub fn get_or_generate_schema(
                 // should not have a default at all.  So, if we applied that override metadata, we'd
                 // be unwittingly applying a default for all usages of the type that didn't override
                 // the default themselves.
-                let mut schema = config.generate_schema(gen)?;
+                let mut schema = config.generate_schema(generator)?;
                 apply_metadata(config, &mut schema, metadata);
 
-                gen.borrow_mut()
+                generator
+                    .borrow_mut()
                     .definitions_mut()
                     .insert(name.to_string(), Schema::Object(schema));
             }
 
-            (get_schema_ref(gen, name), None)
+            (get_schema_ref(generator, name), None)
         }
         // Always generate the schema directly if the type is not referenceable.
-        None => (config.generate_schema(gen)?, Some(metadata)),
+        None => (config.generate_schema(generator)?, Some(metadata)),
     };
 
     // Figure out what metadata we should apply to the resulting schema.
@@ -596,10 +601,10 @@ pub fn get_or_generate_schema(
     Ok(schema)
 }
 
-fn get_schema_ref<S: AsRef<str>>(gen: &RefCell<SchemaGenerator>, name: S) -> SchemaObject {
+fn get_schema_ref<S: AsRef<str>>(generator: &RefCell<SchemaGenerator>, name: S) -> SchemaObject {
     let ref_path = format!(
         "{}{}",
-        gen.borrow().settings().definitions_path(),
+        generator.borrow().settings().definitions_path(),
         name.as_ref()
     );
     SchemaObject::new_ref(ref_path)
@@ -618,10 +623,10 @@ fn get_schema_ref<S: AsRef<str>>(gen: &RefCell<SchemaGenerator>, name: S) -> Sch
 /// the issue.
 pub(crate) fn assert_string_schema_for_map(
     config: &ConfigurableRef,
-    gen: &RefCell<SchemaGenerator>,
+    generator: &RefCell<SchemaGenerator>,
     map_type: &'static str,
 ) -> Result<(), GenerateError> {
-    let key_schema = get_or_generate_schema(config, gen, None)?;
+    let key_schema = get_or_generate_schema(config, generator, None)?;
     let key_type = config.type_name();
 
     // We need to force the schema to be treated as transparent so that when the schema generation
@@ -633,9 +638,9 @@ pub(crate) fn assert_string_schema_for_map(
 
     // Get a reference to the underlying schema if we're dealing with a reference, or just use what
     // we have if it's the actual definition.
-    let gen = gen.borrow();
+    let generator = generator.borrow();
     let underlying_schema = if wrapped_schema.is_ref() {
-        gen.dereference(&wrapped_schema)
+        generator.dereference(&wrapped_schema)
     } else {
         Some(&wrapped_schema)
     };
@@ -670,7 +675,7 @@ pub(crate) fn assert_string_schema_for_map(
     }
 }
 
-/// Determines whether or not an enum schema is ambiguous based on discriminants of its variants.
+/// Determines whether an enum schema is ambiguous based on discriminants of its variants.
 ///
 /// A discriminant is the set of the named fields which are required, which may be an empty set.
 pub fn has_ambiguous_discriminants(

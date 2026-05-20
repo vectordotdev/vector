@@ -1,16 +1,16 @@
 //! Configuration for the `http` sink.
 
+use std::{collections::BTreeMap, path::PathBuf};
+
 #[cfg(feature = "aws-core")]
 use aws_config::meta::region::ProvideRegion;
 #[cfg(feature = "aws-core")]
 use aws_types::region::Region;
-use http::{header::AUTHORIZATION, HeaderName, HeaderValue, Method, Request, StatusCode};
+use http::{HeaderName, HeaderValue, Method, Request, StatusCode, header::AUTHORIZATION};
 use hyper::Body;
-use indexmap::IndexMap;
-use std::path::PathBuf;
 use vector_lib::codecs::{
-    encoding::{Framer, Serializer},
     CharacterDelimitedEncoder,
+    encoding::{Framer, Serializer},
 };
 #[cfg(feature = "aws-core")]
 use vector_lib::config::proxy::ProxyConfig;
@@ -29,8 +29,11 @@ use crate::{
     sinks::{
         prelude::*,
         util::{
-            http::{http_response_retry_logic, HttpService, RequestConfig},
             RealtimeSizeBasedDefaultBatchSettings, UriSerde,
+            http::{
+                HttpService, OrderedHeaderName, RequestConfig, RetryStrategy,
+                http_response_retry_logic,
+            },
         },
     },
 };
@@ -48,7 +51,7 @@ pub struct HttpSinkConfig {
     ///
     /// This should include the protocol and host, but can also include the port, path, and any other valid part of a URI.
     #[configurable(metadata(docs::examples = "https://10.22.212.22:9000/endpoint"))]
-    pub uri: UriSerde,
+    pub uri: Template,
 
     /// The HTTP method to use when making the request.
     #[serde(default)]
@@ -56,13 +59,6 @@ pub struct HttpSinkConfig {
 
     #[configurable(derived)]
     pub auth: Option<Auth>,
-
-    /// A list of custom headers to add to each request.
-    #[configurable(deprecated = "This option has been deprecated, use `request.headers` instead.")]
-    #[configurable(metadata(
-        docs::additional_props_description = "An HTTP request header and it's value."
-    ))]
-    pub headers: Option<IndexMap<String, String>>,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -107,6 +103,10 @@ pub struct HttpSinkConfig {
         skip_serializing_if = "crate::serde::is_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    pub retry_strategy: RetryStrategy,
 }
 
 /// HTTP method.
@@ -115,9 +115,8 @@ pub struct HttpSinkConfig {
 ///
 /// [rfc9110]: https://datatracker.ietf.org/doc/html/rfc9110#section-9.1
 #[configurable_component]
-#[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
-#[derivative(Default)]
 pub enum HttpMethod {
     /// GET.
     Get,
@@ -126,7 +125,7 @@ pub enum HttpMethod {
     Head,
 
     /// POST.
-    #[derivative(Default)]
+    #[default]
     Post,
 
     /// PUT.
@@ -200,13 +199,13 @@ async fn healthcheck(uri: UriSerde, auth: Option<Auth>, client: HttpClient) -> c
 }
 
 pub(super) fn validate_headers(
-    headers: &IndexMap<String, String>,
+    headers: &BTreeMap<String, String>,
     configures_auth: bool,
-) -> crate::Result<IndexMap<HeaderName, HeaderValue>> {
+) -> crate::Result<BTreeMap<OrderedHeaderName, HeaderValue>> {
     let headers = crate::sinks::util::http::validate_headers(headers)?;
 
     for name in headers.keys() {
-        if configures_auth && name == AUTHORIZATION {
+        if configures_auth && name.inner() == AUTHORIZATION {
             return Err("Authorization header can not be used with defined auth options".into());
         }
     }
@@ -243,10 +242,10 @@ impl SinkConfig for HttpSinkConfig {
         let encoder = self.build_encoder()?;
         let transformer = self.encoding.transformer();
 
-        let mut request = self.request.clone();
-        request.add_old_option(self.headers.clone());
+        let request = self.request.clone();
 
-        let headers = validate_headers(&request.headers, self.auth.is_some())?;
+        validate_headers(&request.headers, self.auth.is_some())?;
+        let (static_headers, template_headers) = request.split_headers();
 
         let (payload_prefix, payload_suffix) =
             validate_payload_wrapper(&self.payload_prefix, &self.payload_suffix, &encoder)?;
@@ -269,6 +268,8 @@ impl SinkConfig for HttpSinkConfig {
                 (Json(_), CharacterDelimited(CharacterDelimitedEncoder { delimiter: b',' })) => {
                     Some(CONTENT_TYPE_JSON.to_owned())
                 }
+                #[cfg(feature = "codecs-opentelemetry")]
+                (Otlp(_), _) => Some("application/x-protobuf".to_owned()),
                 _ => None,
             }
         };
@@ -285,11 +286,20 @@ impl SinkConfig for HttpSinkConfig {
                 .to_string()
         });
 
+        let converted_static_headers = static_headers
+            .into_iter()
+            .map(|(name, value)| -> crate::Result<_> {
+                let header_name =
+                    HeaderName::from_bytes(name.as_bytes()).map(OrderedHeaderName::from)?;
+                let header_value = HeaderValue::try_from(value)?;
+                Ok((header_name, header_value))
+            })
+            .collect::<Result<BTreeMap<_, _>, _>>()?;
+
         let http_sink_request_builder = HttpSinkRequestBuilder::new(
-            self.uri.with_default_parts(),
             self.method,
-            self.auth.choose_one(&self.uri.auth)?,
-            headers,
+            self.auth.clone(),
+            converted_static_headers,
             content_type,
             content_encoding,
         );
@@ -327,10 +337,19 @@ impl SinkConfig for HttpSinkConfig {
         let request_limits = self.request.tower.into_settings();
 
         let service = ServiceBuilder::new()
-            .settings(request_limits, http_response_retry_logic())
+            .settings(
+                request_limits,
+                http_response_retry_logic(self.retry_strategy.clone()),
+            )
             .service(service);
 
-        let sink = HttpSink::new(service, batch_settings, request_builder);
+        let sink = HttpSink::new(
+            service,
+            self.uri.clone(),
+            template_headers,
+            batch_settings,
+            request_builder,
+        );
 
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
@@ -367,12 +386,17 @@ mod tests {
     impl ValidatableComponent for HttpSinkConfig {
         fn validation_configuration() -> ValidationConfiguration {
             use std::str::FromStr;
-            use vector_lib::codecs::{JsonSerializerConfig, MetricTagValues};
-            use vector_lib::config::LogNamespace;
+
+            use vector_lib::{
+                codecs::{JsonSerializerConfig, MetricTagValues},
+                config::LogNamespace,
+            };
+
+            let endpoint = "http://127.0.0.1:9000/endpoint";
+            let uri = UriSerde::from_str(endpoint).expect("should never fail to parse");
 
             let config = HttpSinkConfig {
-                uri: UriSerde::from_str("http://127.0.0.1:9000/endpoint")
-                    .expect("should never fail to parse"),
+                uri: Template::try_from(endpoint).expect("should never fail to parse"),
                 method: HttpMethod::Post,
                 encoding: EncodingConfigWithFraming::new(
                     None,
@@ -384,7 +408,6 @@ mod tests {
                     Transformer::default(),
                 ),
                 auth: None,
-                headers: None,
                 compression: Compression::default(),
                 batch: BatchConfig::default(),
                 request: RequestConfig::default(),
@@ -392,11 +415,12 @@ mod tests {
                 acknowledgements: AcknowledgementsConfig::default(),
                 payload_prefix: String::new(),
                 payload_suffix: String::new(),
+                retry_strategy: RetryStrategy::default(),
             };
 
             let external_resource = ExternalResource::new(
                 ResourceDirection::Push,
-                HttpResourceConfig::from_parts(config.uri.uri.clone(), Some(config.method.into())),
+                HttpResourceConfig::from_parts(uri.uri, Some(config.method.into())),
                 config.encoding.clone(),
             );
 

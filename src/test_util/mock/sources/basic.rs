@@ -1,22 +1,26 @@
-use std::sync::{
-    atomic::{AtomicUsize, Ordering},
-    Arc, Mutex,
+use std::{
+    num::NonZeroUsize,
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicUsize, Ordering},
+    },
 };
 
 use async_trait::async_trait;
-use vector_lib::buffers::topology::channel::{limited, LimitedReceiver};
-use vector_lib::configurable::configurable_component;
-use vector_lib::{config::LogNamespace, schema::Definition};
 use vector_lib::{
-    config::{DataType, SourceOutput},
+    buffers::{
+        config::MemoryBufferSize,
+        topology::channel::{LimitedReceiver, limited},
+    },
+    config::{DataType, LogNamespace, SourceOutput},
+    configurable::configurable_component,
     event::EventContainer,
+    schema::Definition,
     source::Source,
-};
-
-use crate::{
-    config::{SourceConfig, SourceContext},
     source_sender::SourceSenderItem,
 };
+
+use crate::config::{SourceConfig, SourceContext};
 
 /// Configuration for the `test_basic` source.
 #[configurable_component(source("test_basic", "Test (basic)."))]
@@ -41,7 +45,8 @@ pub struct BasicSourceConfig {
 
 impl Default for BasicSourceConfig {
     fn default() -> Self {
-        let (_, receiver) = limited(1000);
+        let limit = MemoryBufferSize::MaxEvents(NonZeroUsize::new(1000).unwrap());
+        let (_, receiver) = limited(limit, None, None);
         Self {
             receiver: Arc::new(Mutex::new(Some(receiver))),
             event_counter: None,

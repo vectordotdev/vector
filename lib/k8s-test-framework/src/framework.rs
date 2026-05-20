@@ -1,9 +1,9 @@
 //! The test framework main entry point.
 
 use super::{
-    exec_tail, kubernetes_version, log_lookup, namespace, pod, port_forward, restart_rollout,
-    test_pod, up_down, vector, wait_for_resource, wait_for_rollout, Interface, PortForwarder,
-    Reader, Result,
+    Interface, PortForwarder, Reader, Result, exec_tail, kubernetes_version, log_lookup, namespace,
+    pod, port_forward, restart_rollout, test_pod, up_down, vector, wait_for_resource,
+    wait_for_rollout,
 };
 
 /// Framework wraps the interface to the system with an easy-to-use rust API

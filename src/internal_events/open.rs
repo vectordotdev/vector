@@ -1,33 +1,35 @@
 use std::{
     hint,
     sync::{
-        atomic::{AtomicUsize, Ordering},
         Arc,
+        atomic::{AtomicUsize, Ordering},
     },
 };
 
-use metrics::gauge;
-use vector_lib::internal_event::InternalEvent;
+use vector_lib::{
+    NamedInternalEvent, gauge,
+    internal_event::{GaugeName, InternalEvent},
+};
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct ConnectionOpen {
     pub count: usize,
 }
 
 impl InternalEvent for ConnectionOpen {
     fn emit(self) {
-        gauge!("open_connections").set(self.count as f64);
+        gauge!(GaugeName::OpenConnections).set(self.count as f64);
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct EndpointsActive {
     pub count: usize,
 }
 
 impl InternalEvent for EndpointsActive {
     fn emit(self) {
-        gauge!("active_endpoints").set(self.count as f64);
+        gauge!(GaugeName::ActiveEndpoints).set(self.count as f64);
     }
 }
 

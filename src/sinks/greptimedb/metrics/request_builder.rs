@@ -1,13 +1,17 @@
-use crate::sinks::util::statistic::DistributionStatistic;
 use chrono::Utc;
-use greptimedb_ingester::{api::v1::*, helpers::values::*};
+use greptimedb_ingester::api::v1::{
+    ColumnDataType, ColumnSchema, Row, RowInsertRequest, Rows, SemanticType, Value,
+};
+use greptimedb_ingester::helpers::values::{f64_value, string_value, timestamp_millisecond_value};
 use vector_lib::{
     event::{
-        metric::{Bucket, MetricSketch, Quantile, Sample},
         Metric, MetricValue,
+        metric::{Bucket, MetricSketch, Quantile, Sample},
     },
     metrics::AgentDDSketch,
 };
+
+use crate::sinks::util::statistic::DistributionStatistic;
 
 pub(super) struct RequestBuilderOptions {
     pub(super) use_new_naming: bool,
@@ -237,6 +241,7 @@ fn tag_column(name: &str) -> ColumnSchema {
 #[cfg(test)]
 mod tests {
 
+    use greptimedb_ingester::api::v1::value;
     use similar_asserts::assert_eq;
 
     use super::*;

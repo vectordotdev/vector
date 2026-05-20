@@ -1,30 +1,29 @@
 use futures::FutureExt;
-use http::{header::AUTHORIZATION, Request, Uri};
+use http::{Request, Uri, header::AUTHORIZATION};
 use hyper::Body;
 use tower::ServiceBuilder;
-use vector_lib::configurable::configurable_component;
-use vector_lib::sensitive_string::SensitiveString;
 use vector_lib::{
-    config::{proxy::ProxyConfig, AcknowledgementsConfig, DataType, Input},
+    config::{AcknowledgementsConfig, DataType, Input, proxy::ProxyConfig},
+    configurable::configurable_component,
+    sensitive_string::SensitiveString,
     tls::{MaybeTlsSettings, TlsEnableableConfig},
-};
-
-use crate::{
-    codecs::Transformer,
-    http::HttpClient,
-    sinks::{
-        prelude::{SinkConfig, SinkContext},
-        util::{
-            http::HttpStatusRetryLogic, BatchConfig, Compression, ServiceBuilderExt,
-            SinkBatchSettings, TowerRequestConfig,
-        },
-        BuildError, Healthcheck, HealthcheckError, VectorSink,
-    },
 };
 
 use super::{
     service::{AppsignalResponse, AppsignalService},
     sink::AppsignalSink,
+};
+use crate::{
+    codecs::Transformer,
+    http::HttpClient,
+    sinks::{
+        BuildError, Healthcheck, HealthcheckError, VectorSink,
+        prelude::{SinkConfig, SinkContext},
+        util::{
+            BatchConfig, Compression, ServiceBuilderExt, SinkBatchSettings, TowerRequestConfig,
+            http::{HttpStatusRetryLogic, RetryStrategy},
+        },
+    },
 };
 
 /// Configuration for the `appsignal` sink.
@@ -68,6 +67,10 @@ pub(super) struct AppsignalConfig {
         skip_serializing_if = "crate::serde::is_default"
     )]
     acknowledgements: AcknowledgementsConfig,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    retry_strategy: RetryStrategy,
 }
 
 pub(super) fn default_endpoint() -> String {
@@ -100,7 +103,10 @@ impl AppsignalConfig {
 
         let request_opts = self.request;
         let request_settings = request_opts.into_settings();
-        let retry_logic = HttpStatusRetryLogic::new(|req: &AppsignalResponse| req.http_status);
+        let retry_logic = HttpStatusRetryLogic::new(
+            |req: &AppsignalResponse| req.http_status,
+            self.retry_strategy.clone(),
+        );
 
         let service = ServiceBuilder::new()
             .settings(request_settings, retry_logic)
@@ -146,7 +152,7 @@ impl SinkConfig for AppsignalConfig {
 }
 
 async fn healthcheck(uri: Uri, push_api_key: String, client: HttpClient) -> crate::Result<()> {
-    let request = Request::get(uri).header(AUTHORIZATION, format!("Bearer {}", push_api_key));
+    let request = Request::get(uri).header(AUTHORIZATION, format!("Bearer {push_api_key}"));
     let response = client.send(request.body(Body::empty()).unwrap()).await?;
 
     match response.status() {
@@ -169,7 +175,7 @@ pub fn endpoint_uri(endpoint: &str, path: &str) -> crate::Result<Uri> {
 
 #[cfg(test)]
 mod test {
-    use super::{endpoint_uri, AppsignalConfig};
+    use super::{AppsignalConfig, endpoint_uri};
 
     #[test]
     fn generate_config() {

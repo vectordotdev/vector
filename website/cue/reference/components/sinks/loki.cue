@@ -69,7 +69,7 @@ components: sinks: loki: {
 		notices: []
 	}
 
-	configuration: base.components.sinks.loki.configuration
+	configuration: generated.components.sinks.loki.configuration
 
 	input: {
 		logs:    true

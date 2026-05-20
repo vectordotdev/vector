@@ -1,0 +1,25 @@
+version: "3"
+services:
+  doris:
+    image: docker.io/yagagagaga/doris-standalone:${CONFIG_VERSION}
+    container_name: doris
+    hostname: doris
+    restart: unless-stopped
+    privileged: true
+    ports:
+      - "8030"
+      - "9030"
+      - "8040"
+    environment:
+      - SKIP_CHECK_ULIMIT=true
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8030/api/bootstrap"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+
+networks:
+  default:
+    name: ${VECTOR_NETWORK}
+    external: true

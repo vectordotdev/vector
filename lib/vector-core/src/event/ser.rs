@@ -1,10 +1,10 @@
 use bytes::{Buf, BufMut};
-use enumflags2::{bitflags, BitFlags, FromBitsError};
+use enumflags2::{BitFlags, FromBitsError, bitflags};
 use prost::Message;
 use snafu::Snafu;
 use vector_buffers::encoding::{AsMetadata, Encodable};
 
-use super::{proto, Event, EventArray};
+use super::{Event, EventArray, proto};
 
 #[derive(Debug, Snafu)]
 pub enum EncodeError {

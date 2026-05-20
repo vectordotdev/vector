@@ -9,11 +9,11 @@ use tokio::{io::AsyncWriteExt, net::TcpStream};
 
 use super::{DatadogAgentConfig, LOGS, METRICS};
 use crate::{
+    SourceSender,
     config::{GenerateConfig, SourceConfig, SourceContext},
     event::{EventStatus, Value},
     schema,
     test_util::{spawn_collect_n, wait_for_tcp},
-    SourceSender,
 };
 
 fn agent_address() -> String {
@@ -52,7 +52,9 @@ async fn wait_for_healthy(address: String) {
         // wait a second before retry...
         tokio::time::sleep(Duration::new(1, 0)).await;
     }
-    panic!("Unable to reach the Datadog Agent. Check that it's started and that the health endpoint is available at {}.", address);
+    panic!(
+        "Unable to reach the Datadog Agent. Check that it's started and that the health endpoint is available at {address}."
+    );
 }
 
 async fn wait_for_healthy_agent() {

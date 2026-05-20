@@ -1,16 +1,21 @@
-use crate::decoding::format::Deserializer;
-use crate::BytesDeserializerConfig;
 use bytes::Bytes;
-use derivative::Derivative;
-use smallvec::{smallvec, SmallVec};
+use smallvec::{SmallVec, smallvec};
 use vector_config_macros::configurable_component;
-use vector_core::config::{DataType, LogNamespace};
-use vector_core::event::{Event, TargetEvents, VrlTarget};
-use vector_core::{compile_vrl, schema};
-use vrl::compiler::state::ExternalEnv;
-use vrl::compiler::{runtime::Runtime, CompileConfig, Program, TimeZone, TypeState};
-use vrl::diagnostic::Formatter;
-use vrl::value::Kind;
+use vector_core::{
+    compile_vrl,
+    config::{DataType, LogNamespace},
+    event::{Event, TargetEvents, VrlTarget},
+    schema,
+};
+use vrl::{
+    compiler::{CompileConfig, Program, TimeZone, TypeState, runtime::Runtime, state::ExternalEnv},
+    diagnostic::Formatter,
+    value::Kind,
+};
+
+use vector_core::event::EventMetadata;
+
+use crate::decoding::format::Deserializer;
 
 /// Config used to build a `VrlDeserializer`.
 #[configurable_component]
@@ -22,12 +27,11 @@ pub struct VrlDeserializerConfig {
 
 /// VRL-specific decoding options.
 #[configurable_component]
-#[derive(Debug, Clone, PartialEq, Eq, Derivative)]
-#[derivative(Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct VrlDeserializerOptions {
     /// The [Vector Remap Language][vrl] (VRL) program to execute for each event.
-    /// Note that the final contents of the `.` target will be used as the decoding result.
-    /// Compilation error or use of 'abort' in a program will result in a decoding error.
+    /// The final contents of the `.` target are used as the decoding result.
+    /// Compilation errors or use of `abort` in the program result in a decoding error.
     ///
     ///
     /// [vrl]: https://vector.dev/docs/reference/vrl
@@ -37,7 +41,7 @@ pub struct VrlDeserializerOptions {
     /// time zone. The time zone name may be any name in the [TZ database][tz_database], or `local`
     /// to indicate system local time.
     ///
-    /// If not set, `local` will be used.
+    /// If not set, `local` is used.
     ///
     /// [tz_database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
     #[serde(default)]
@@ -55,13 +59,14 @@ impl VrlDeserializerConfig {
 
         match compile_vrl(
             &self.vrl.source,
-            &vrl::stdlib::all(),
+            &vector_vrl_functions::all(),
             &state,
             CompileConfig::default(),
         ) {
             Ok(result) => Ok(VrlDeserializer {
                 program: result.program,
                 timezone: self.vrl.timezone.unwrap_or(TimeZone::Local),
+                metadata_template: None,
             }),
             Err(diagnostics) => Err(Formatter::new(&self.vrl.source, diagnostics)
                 .to_string()
@@ -92,9 +97,28 @@ impl VrlDeserializerConfig {
 pub struct VrlDeserializer {
     program: Program,
     timezone: TimeZone,
+    /// Per-call metadata template set by the source before decoding. When
+    /// present, every `%`-prefixed path in the template is accessible from
+    /// within the VRL program (e.g. `%splunk_hec.host`, `%vector.secrets.*`).
+    metadata_template: Option<EventMetadata>,
+}
+
+impl VrlDeserializer {
+    /// Attach a metadata template that will be pre-populated on each synthetic
+    /// event before the VRL program runs.
+    ///
+    /// Sources call this once per decode call with the per-request context they
+    /// have assembled (envelope fields, auth tokens, etc.). VRL can then read
+    /// those values via `%`-prefixed paths.
+    #[must_use]
+    pub fn with_metadata_template(mut self, metadata: EventMetadata) -> Self {
+        self.metadata_template = Some(metadata);
+        self
+    }
 }
 
 fn parse_bytes(bytes: Bytes, log_namespace: LogNamespace) -> Event {
+    use crate::BytesDeserializerConfig;
     let bytes_deserializer = BytesDeserializerConfig::new().build();
     let log_event = bytes_deserializer.parse_single(bytes, log_namespace);
     Event::from(log_event)
@@ -106,11 +130,14 @@ impl Deserializer for VrlDeserializer {
         bytes: Bytes,
         log_namespace: LogNamespace,
     ) -> vector_common::Result<SmallVec<[Event; 1]>> {
-        let event = parse_bytes(bytes, log_namespace);
-        match self.run_vrl(event, log_namespace) {
-            Ok(events) => Ok(events),
-            Err(e) => Err(e),
+        let mut event = parse_bytes(bytes, log_namespace);
+        if let Some(template) = &self.metadata_template {
+            // Pre-populate the synthetic event with the source-assembled metadata so
+            // every `%`-prefixed path is in scope when VRL executes. This lets
+            // user programs read `%splunk_hec.host`, `%vector.secrets.*`, etc.
+            *event.metadata_mut() = template.clone();
         }
+        self.run_vrl(event, log_namespace)
     }
 }
 
@@ -135,12 +162,11 @@ impl VrlDeserializer {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use chrono::{DateTime, Utc};
     use indoc::indoc;
-    use vrl::btreemap;
-    use vrl::path::OwnedTargetPath;
-    use vrl::value::Value;
+    use vrl::{btreemap, path::OwnedTargetPath, value::Value};
+
+    use super::*;
 
     fn make_decoder(source: &str) -> VrlDeserializer {
         VrlDeserializerConfig {
@@ -257,7 +283,9 @@ mod tests {
         );
 
         // CEF input
-        let cef_bytes = Bytes::from("CEF:0|Security|Threat Manager|1.0|100|worm successfully stopped|10|src=10.0.0.1 dst=2.1.2.2 spt=1232");
+        let cef_bytes = Bytes::from(
+            "CEF:0|Security|Threat Manager|1.0|100|worm successfully stopped|10|src=10.0.0.1 dst=2.1.2.2 spt=1232",
+        );
         let result = decoder.parse(cef_bytes, LogNamespace::Vector).unwrap();
         assert_eq!(result.len(), 1);
         let cef_event = result.first().unwrap();
@@ -316,5 +344,56 @@ mod tests {
             .unwrap_err()
             .to_string();
         assert!(error.contains("aborted"));
+    }
+
+    fn metadata_with_secret(key: &str, value: &str) -> EventMetadata {
+        let mut metadata = EventMetadata::default();
+        metadata.secrets_mut().insert(key, value);
+        metadata
+    }
+
+    /// A VRL program that uses `get_secret!()` can read a secret injected via
+    /// `with_metadata_template`.
+    #[test]
+    fn test_with_metadata_template_vrl_can_read_secret() {
+        // VRL program copies the injected secret into an event field so we can
+        // assert on its value. The input bytes become `.message` (Legacy namespace)
+        // and we add `.secret_value` alongside it.
+        let decoder = make_decoder(r#".secret_value = get_secret!("my_token")"#)
+            .with_metadata_template(metadata_with_secret("my_token", "super-secret"));
+
+        let bytes = Bytes::from(r#"hello"#);
+        let events = decoder
+            .parse(bytes, LogNamespace::Legacy)
+            .expect("parse should succeed");
+
+        assert_eq!(events.len(), 1);
+        assert_eq!(
+            *events[0].as_log().get("secret_value").unwrap(),
+            Value::from("super-secret")
+        );
+    }
+
+    /// Secrets explicitly set by the VRL program win over the template because
+    /// `set_secret!` runs after the template is pre-populated.
+    #[test]
+    fn test_with_metadata_template_codec_wins_on_collision() {
+        let decoder = make_decoder(r#"set_secret!("my_token", "codec-wins")"#)
+            .with_metadata_template(metadata_with_secret("my_token", "template-loses"));
+
+        let bytes = Bytes::from(r#"hello"#);
+        let events = decoder
+            .parse(bytes, LogNamespace::Legacy)
+            .expect("parse should succeed");
+
+        assert_eq!(
+            events[0]
+                .metadata()
+                .secrets()
+                .get("my_token")
+                .unwrap()
+                .as_ref(),
+            "codec-wins"
+        );
     }
 }

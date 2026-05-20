@@ -21,7 +21,7 @@
         {{ partial "breadcrumb.html" . }}
       </div>
 
-      <div{{ if not $noindex }} id="page-content"{{ end }}>
+      <div {{ if not $noindex }} id="page-content"{{ end }}>
         <h1 class="dark:text-gray-50 font-secondary font-extrabold text-4xl lg:text-5xl leading-tight tracking-tight">
           {{ .Title | markdownify }}
         </h1>
@@ -34,10 +34,6 @@
 
         <div class="mt-8">
           {{ partial "docs/component-under-hero.html" . }}
-        </div>
-
-        <div class="mt-8">
-          {{ partial "page-actions.html" . }}
         </div>
 
         <div class="mt-12 prose dark:prose-dark max-w-none tracking-tight pb-32">
@@ -80,16 +76,22 @@
           {{ partial "data.html" (dict "component_env_vars" . ) }}
           {{ end }}
 
+          {{/* Component log/metric/trace input types */}}
+          {{ with $config.input }}
+          {{ partial "heading.html" (dict "text" "Input Types" "level" 2) }}
+          {{ partial "data.html" (dict "component_input_types" . ) }}
+          {{ end }}
+
           {{/* Component outputs */}}
           {{ with $config.outputs }}
           {{ partial "heading.html" (dict "text" "Outputs" "level" 2) }}
           {{ partial "data.html" (dict "component_outputs" . ) }}
           {{ end }}
 
-          {{/* Component log/metric output */}}
+          {{/* Component log/metric/trace output types */}}
           {{ with $config.output }}
-          {{ partial "heading.html" (dict "text" "Output Data" "level" 2) }}
-          {{ partial "data.html" (dict "component_output" . ) }}
+          {{ partial "heading.html" (dict "text" "Output Types" "level" 2) }}
+          {{ partial "data.html" (dict "component_output_types" . ) }}
           {{ end }}
 
           {{/* Component telemetry output */}}

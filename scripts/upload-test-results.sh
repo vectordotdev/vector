@@ -6,9 +6,23 @@ IFS=$'\n\t'
 #
 # SUMMARY
 #
-#   Upload `cargo-nextest` JUnit output to Datadog
+#   Upload `cargo-nextest` JUnit output to Datadog (CI only)
+#   Print test results location when running locally
+#
+# NOTES
+#
+#   Only uploads in CI environments. Prints file location when called locally.
 
-cd "$(dirname "${BASH_SOURCE[0]}")/.."
+JUNIT_FILE="$(dirname "${BASH_SOURCE[0]}")/../target/nextest/default/junit.xml"
+
+# Print location locally, upload in CI
+if [[ -z "${CI:-}" ]]; then
+  if [[ -f "$JUNIT_FILE" ]]; then
+    echo "Test results available at: $JUNIT_FILE"
+  fi
+  exit 0
+fi
+
 set -x
 
 _os_platform="$(uname -s)"
@@ -17,8 +31,5 @@ _os_architecture="$(uname -m)"
 export DD_TAGS="os.platform:$_os_platform,os.architecture:$_os_architecture"
 export DD_ENV="${DD_ENV:-"local"}"
 
-# TODO: outside contributors don't have access to the
-# CI secrets, so allowing this to fail for now
-datadog-ci junit upload \
-  --service vector \
-  target/nextest/default/junit.xml || echo "Failed to upload results"
+# TODO: outside contributors don't have access to the CI secrets, so upload might fail.
+datadog-ci junit upload --service vector "${JUNIT_FILE}" || echo "Failed to upload results"

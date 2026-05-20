@@ -1,25 +1,60 @@
 use std::{
+    collections::HashMap,
     pin::Pin,
-    task::{ready, Context, Poll},
-    time::{Duration, Instant},
+    sync::{Arc, Mutex},
+    task::{Context, Poll, ready},
+    time::Duration,
 };
 
+#[cfg(not(test))]
+use std::time::Instant;
+
+#[cfg(test)]
+use mock_instant::global::Instant;
+
 use futures::{Stream, StreamExt};
-use metrics::gauge;
+use metrics::Gauge;
 use pin_project::pin_project;
-use tokio::time::interval;
+use tokio::{
+    sync::mpsc::{Receiver, Sender, channel},
+    time::interval,
+};
 use tokio_stream::wrappers::IntervalStream;
+use vector_lib::{id::ComponentKey, shutdown::ShutdownSignal, stats};
 
-use crate::stats;
+const UTILIZATION_EMITTER_DURATION: Duration = Duration::from_secs(5);
 
+/// Stream wrappers used to approximate component utilization from poll timing.
+///
+/// Current model:
+///
+///
 #[pin_project]
 pub(crate) struct Utilization<S> {
-    timer: Timer,
     intervals: IntervalStream,
+    timer_tx: UtilizationComponentSender,
+    component_key: ComponentKey,
     inner: S,
 }
 
 impl<S> Utilization<S> {
+    /// Output-side utilization wrapper for task transforms.
+    ///
+    /// Measures the time after the wrapped stream yields an item until downstream
+    /// polls it again.
+    pub(crate) fn new(
+        timer_tx: UtilizationComponentSender,
+        component_key: ComponentKey,
+        inner: S,
+    ) -> Self {
+        Self {
+            intervals: IntervalStream::new(interval(Duration::from_secs(5))),
+            timer_tx,
+            component_key,
+            inner,
+        }
+    }
+
     /// Consumes this wrapper and returns the inner stream.
     ///
     /// This can't be constant because destructors can't be run in a const context, and we're
@@ -42,50 +77,26 @@ where
         // ready, with the side-effect of reporting every so often about how
         // long the wait gap is.
         //
-        // To achieve this we poll the `intervals` stream and if a new interval
-        // is ready we hit `Timer::report` and loop back around again to poll
-        // for a new `Event`. Calls to `Timer::start_wait` will only have an
-        // effect if `stop_wait` has been called, so the structure of this loop
-        // avoids double-measures.
+        // This will just measure the time, while UtilizationEmitter collects
+        // all the timers and emits utilization value periodically
         let this = self.project();
-        loop {
-            this.timer.start_wait();
-            match this.intervals.poll_next_unpin(cx) {
-                Poll::Ready(_) => {
-                    this.timer.report();
-                    continue;
-                }
-                Poll::Pending => {
-                    let result = ready!(this.inner.poll_next_unpin(cx));
-                    this.timer.stop_wait();
-                    return Poll::Ready(result);
-                }
-            }
-        }
+        this.timer_tx.try_send_start_wait();
+        let _ = this.intervals.poll_next_unpin(cx);
+        let result = ready!(this.inner.poll_next_unpin(cx));
+        this.timer_tx.try_send_stop_wait();
+        Poll::Ready(result)
     }
 }
 
-/// Wrap a stream to emit stats about utilization. This is designed for use with
-/// the input channels of transform and sinks components, and measures the
-/// amount of time that the stream is waiting for input from upstream. We make
-/// the simplifying assumption that this wait time is when the component is idle
-/// and the rest of the time it is doing useful work. This is more true for
-/// sinks than transforms, which can be blocked by downstream components, but
-/// with knowledge of the config the data is still useful.
-pub(crate) fn wrap<S>(inner: S) -> Utilization<S> {
-    Utilization {
-        timer: Timer::new(),
-        intervals: IntervalStream::new(interval(Duration::from_secs(5))),
-        inner,
-    }
-}
-
-pub(super) struct Timer {
+pub(crate) struct Timer {
     overall_start: Instant,
     span_start: Instant,
     waiting: bool,
     total_wait: Duration,
     ewma: stats::Ewma,
+    gauge: Gauge,
+    #[cfg(debug_assertions)]
+    component_id: Arc<str>,
 }
 
 /// A simple, specialized timer for tracking spans of waiting vs not-waiting
@@ -97,43 +108,46 @@ pub(super) struct Timer {
 /// to be of uniform length and used to aggregate span data into time-weighted
 /// averages.
 impl Timer {
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new(gauge: Gauge, #[cfg(debug_assertions)] component_id: Arc<str>) -> Self {
         Self {
             overall_start: Instant::now(),
             span_start: Instant::now(),
             waiting: false,
             total_wait: Duration::new(0, 0),
             ewma: stats::Ewma::new(0.9),
+            gauge,
+            #[cfg(debug_assertions)]
+            component_id,
         }
     }
 
     /// Begin a new span representing time spent waiting
-    pub(crate) fn start_wait(&mut self) {
+    pub(crate) fn start_wait(&mut self, at: Instant) {
         if !self.waiting {
-            self.end_span();
+            // Clamp start time in case of a late message
+            self.end_span(at.max(self.overall_start));
             self.waiting = true;
         }
     }
 
     /// Complete the current waiting span and begin a non-waiting span
-    pub(crate) fn stop_wait(&mut self) -> Instant {
+    pub(crate) fn stop_wait(&mut self, at: Instant) {
         if self.waiting {
-            let now = self.end_span();
+            // Clamp stop time in case of a late message
+            self.end_span(at.max(self.overall_start));
             self.waiting = false;
-            now
-        } else {
-            Instant::now()
         }
     }
 
     /// Meant to be called on a regular interval, this method calculates wait
     /// ratio since the last time it was called and reports the resulting
     /// utilization average.
-    pub(crate) fn report(&mut self) {
+    pub(crate) fn update_utilization(&mut self) {
         // End the current span so it can be accounted for, but do not change
         // whether or not we're in the waiting state. This way the next span
         // inherits the correct status.
-        let now = self.end_span();
+        let now = Instant::now();
+        self.end_span(now);
 
         let total_duration = now.duration_since(self.overall_start);
         let wait_ratio = self.total_wait.as_secs_f64() / total_duration.as_secs_f64();
@@ -141,19 +155,474 @@ impl Timer {
 
         self.ewma.update(utilization);
         let avg = self.ewma.average().unwrap_or(f64::NAN);
-        debug!(utilization = %avg);
-        gauge!("utilization").set(avg);
+        let avg_rounded = (avg * 10000.0).round() / 10000.0; // 4 digit precision
+        self.gauge.set(avg_rounded);
 
         // Reset overall statistics for the next reporting period.
-        self.overall_start = self.span_start;
+        self.overall_start = now;
         self.total_wait = Duration::new(0, 0);
+
+        #[cfg(debug_assertions)]
+        debug!(component_id = %self.component_id, utilization = %avg_rounded, internal_log_rate_limit = false);
     }
 
-    fn end_span(&mut self) -> Instant {
+    fn end_span(&mut self, at: Instant) {
         if self.waiting {
-            self.total_wait += self.span_start.elapsed();
+            // `at` can be before span start here, the result will be clamped to 0
+            // because `duration_since` returns zero if `at` is before span start
+            self.total_wait += at.duration_since(self.span_start);
         }
-        self.span_start = Instant::now();
-        self.span_start
+        self.span_start = at;
+    }
+}
+
+#[derive(Debug)]
+enum UtilizationTimerMessage {
+    StartWait(ComponentKey, Instant),
+    StopWait(ComponentKey, Instant),
+}
+
+#[derive(Clone)]
+pub(crate) struct UtilizationComponentSender {
+    component_key: ComponentKey,
+    timer_tx: Sender<UtilizationTimerMessage>,
+}
+
+impl UtilizationComponentSender {
+    pub(crate) fn try_send_start_wait(&self) {
+        if let Err(err) = self.timer_tx.try_send(UtilizationTimerMessage::StartWait(
+            self.component_key.clone(),
+            Instant::now(),
+        )) {
+            debug!(component_id = ?self.component_key, error = ?err, "Couldn't send utilization start wait message.");
+        }
+    }
+
+    pub(crate) fn try_send_stop_wait(&self) {
+        if let Err(err) = self.timer_tx.try_send(UtilizationTimerMessage::StopWait(
+            self.component_key.clone(),
+            Instant::now(),
+        )) {
+            debug!(component_id = ?self.component_key, error = ?err, "Couldn't send utilization stop wait message.");
+        }
+    }
+}
+
+/// Registry for components sending utilization data.
+///
+/// Cloning this is cheap and does not clone the underlying data.
+#[derive(Clone)]
+pub struct UtilizationRegistry {
+    timers: Arc<Mutex<HashMap<ComponentKey, Timer>>>,
+    timer_tx: Sender<UtilizationTimerMessage>,
+}
+
+impl UtilizationRegistry {
+    /// Adds a new component to this utilization metric emitter
+    ///
+    /// Returns a sender which can be used to send utilization information back to the emitter
+    pub(crate) fn add_component(
+        &self,
+        key: ComponentKey,
+        gauge: Gauge,
+    ) -> UtilizationComponentSender {
+        self.timers.lock().expect("mutex poisoned").insert(
+            key.clone(),
+            Timer::new(
+                gauge,
+                #[cfg(debug_assertions)]
+                key.id().into(),
+            ),
+        );
+        UtilizationComponentSender {
+            timer_tx: self.timer_tx.clone(),
+            component_key: key,
+        }
+    }
+
+    /// Removes a component from this utilization metric emitter
+    pub(crate) fn remove_component(&self, key: &ComponentKey) {
+        self.timers.lock().expect("mutex poisoned").remove(key);
+    }
+}
+
+pub(crate) struct UtilizationEmitter {
+    timers: Arc<Mutex<HashMap<ComponentKey, Timer>>>,
+    timer_rx: Receiver<UtilizationTimerMessage>,
+}
+
+impl UtilizationEmitter {
+    pub(crate) fn new() -> (Self, UtilizationRegistry) {
+        let (timer_tx, timer_rx) = channel(4096);
+        let timers = Arc::new(Mutex::new(HashMap::default()));
+        (
+            Self {
+                timers: Arc::clone(&timers),
+                timer_rx,
+            },
+            UtilizationRegistry { timers, timer_tx },
+        )
+    }
+
+    pub(crate) async fn run_utilization(mut self, mut shutdown: ShutdownSignal) {
+        let mut intervals = IntervalStream::new(interval(UTILIZATION_EMITTER_DURATION));
+        loop {
+            tokio::select! {
+                message = self.timer_rx.recv() => {
+                    match message {
+                        Some(UtilizationTimerMessage::StartWait(key, start_time)) => {
+                            // Timer could be removed in the registry while message is still in the queue
+                            if let Some(timer) = self.timers.lock().expect("mutex poisoned").get_mut(&key) {
+                                timer.start_wait(start_time);
+                            }
+                        }
+                        Some(UtilizationTimerMessage::StopWait(key, stop_time)) => {
+                            // Timer could be removed in the registry while message is still in the queue
+                            if let Some(timer) = self.timers.lock().expect("mutex poisoned").get_mut(&key) {
+                                timer.stop_wait(stop_time);
+                            }
+                        }
+                        None => break,
+                    }
+                },
+
+                Some(_) = intervals.next() => {
+                    for timer in self.timers.lock().expect("mutex poisoned").values_mut() {
+                        timer.update_utilization();
+                    }
+                },
+
+                _ = &mut shutdown => {
+                    break
+                }
+            }
+        }
+    }
+}
+
+/// Output-side counterpart of [`Utilization`]. Wraps the output stream of a
+/// task transform to track time spent waiting for downstream to accept items.
+///
+/// While [`Utilization`] measures idle time as "waiting for upstream input",
+/// this wrapper measures the complementary case: after yielding an item, the
+/// time until the consumer polls again is counted as downstream wait (idle).
+/// Both wrappers share a single [`Timer`] per component, and the idempotent
+/// `start_wait`/`stop_wait` transitions ensure no double-counting.
+pub(crate) struct OutputUtilization<S> {
+    timer_tx: UtilizationComponentSender,
+    inner: S,
+}
+
+impl<S> Stream for OutputUtilization<S>
+where
+    S: Stream + Unpin,
+{
+    type Item = S::Item;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let this = self.get_mut();
+        this.timer_tx.try_send_stop_wait();
+        let result = ready!(this.inner.poll_next_unpin(cx));
+        if result.is_some() {
+            this.timer_tx.try_send_start_wait();
+        }
+        Poll::Ready(result)
+    }
+}
+
+impl<S> OutputUtilization<S> {
+    /// Wrap a task transform stream to track time spent waiting for downstream
+    /// to consume items. This is the output-side counterpart to
+    /// [`Utilization::new`], designed for use with task transforms where the
+    /// framework cannot otherwise detect downstream backpressure.
+    pub(crate) const fn new(timer_tx: UtilizationComponentSender, inner: S) -> Self {
+        Self { timer_tx, inner }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use mock_instant::global::MockClock;
+    use serial_test::serial;
+    use strum::IntoEnumIterator;
+    use vector_lib::gauge;
+    use vector_lib::internal_event::GaugeName;
+
+    use super::*;
+
+    /// Helper function to reset mock clock and create a timer at T=100
+    fn setup_timer() -> Timer {
+        // Set mock clock to T=100
+        MockClock::set_time(Duration::from_secs(100));
+
+        Timer::new(
+            gauge!(GaugeName::iter().next().unwrap()),
+            #[cfg(debug_assertions)]
+            "test_component".into(),
+        )
+    }
+
+    const TOLERANCE: f64 = 0.01;
+
+    /// Helper function to assert utilization is approximately equal to expected value
+    /// and within valid bounds [0, 1]
+    fn assert_approx_eq(actual: f64, expected: f64, description: &str) {
+        assert!(
+            (0.0..=1.0).contains(&actual),
+            "Utilization {actual} is outside [0, 1]"
+        );
+        assert!(
+            (actual - expected).abs() < TOLERANCE,
+            "Expected utilization {description}, got {actual}"
+        );
+    }
+
+    #[test]
+    #[serial]
+    fn test_utilization_in_bounds_on_late_start() {
+        let mut timer = setup_timer();
+
+        MockClock::advance(Duration::from_secs(5));
+
+        timer.update_utilization();
+
+        let avg = timer.ewma.average().unwrap();
+        assert_approx_eq(avg, 1.0, "near 1.0 (never waiting)");
+
+        // Late message for start wait
+        timer.start_wait(Instant::now() - Duration::from_secs(1));
+        MockClock::advance(Duration::from_secs(5));
+
+        timer.update_utilization();
+        let avg = timer.ewma.average().unwrap();
+        assert_approx_eq(avg, 0.1, "~0.1");
+    }
+
+    #[test]
+    #[serial]
+    fn test_utilization_in_bounds_on_late_stop() {
+        let mut timer = setup_timer();
+
+        MockClock::advance(Duration::from_secs(5));
+
+        timer.waiting = true;
+        timer.update_utilization();
+
+        let avg = timer.ewma.average().unwrap();
+        assert_approx_eq(avg, 0.0, "near 0 (always waiting)");
+
+        // Late message for stop wait
+        timer.stop_wait(Instant::now() - Duration::from_secs(4));
+        MockClock::advance(Duration::from_secs(5));
+
+        timer.update_utilization();
+        let avg = timer.ewma.average().unwrap();
+        assert_approx_eq(avg, 0.9, "~0.9");
+    }
+
+    #[test]
+    #[serial]
+    fn test_normal_utilization_within_bounds() {
+        let mut timer = setup_timer();
+
+        // Timer created at T=100. Advance 1 second and start waiting
+        MockClock::advance(Duration::from_secs(1));
+        timer.start_wait(Instant::now());
+
+        // Advance 2 seconds while waiting (T=101 to T=103)
+        MockClock::advance(Duration::from_secs(2));
+        timer.stop_wait(Instant::now());
+
+        // Advance 2 more seconds (not waiting), then report (T=103 to T=105)
+        MockClock::advance(Duration::from_secs(2));
+        timer.update_utilization();
+
+        // total_wait = 2 seconds, total_duration = 5 seconds (T=100 to T=105)
+        // wait_ratio = 2/5 = 0.4, utilization = 1.0 - 0.4 = 0.6
+        let avg = timer.ewma.average().unwrap();
+        assert_approx_eq(avg, 0.6, "~0.6");
+    }
+
+    #[test]
+    #[serial]
+    fn test_always_waiting_utilization() {
+        let mut timer = setup_timer();
+
+        // Timer created at T=100. Start waiting immediately
+        timer.start_wait(Instant::now());
+
+        // Advance 5 seconds while waiting (T=100 to T=105)
+        MockClock::advance(Duration::from_secs(5));
+        timer.update_utilization();
+
+        // We waited the entire time: total_wait = 5s, total_duration = 5s
+        // wait_ratio = 1.0, utilization = 0.0
+        let avg = timer.ewma.average().unwrap();
+        assert_approx_eq(avg, 0.0, "near 0 (always waiting)");
+    }
+
+    #[test]
+    #[serial]
+    fn test_never_waiting_utilization() {
+        let mut timer = setup_timer();
+
+        // Advance 5 seconds without waiting (T=100 to T=105)
+        MockClock::advance(Duration::from_secs(5));
+        timer.update_utilization();
+
+        // Never waited: total_wait = 0, total_duration = 5s
+        // wait_ratio = 0.0, utilization = 1.0
+        let avg = timer.ewma.average().unwrap();
+        assert_approx_eq(avg, 1.0, "near 1.0 (never waiting)");
+    }
+
+    /// Mock task transform that passes events through unchanged, simulating
+    /// a configurable processing delay by advancing MockClock per item.
+    struct MockTaskTransform {
+        processing_time: Duration,
+    }
+
+    use crate::event::EventArray;
+    use crate::transforms::TaskTransform;
+
+    impl TaskTransform<EventArray> for MockTaskTransform {
+        fn transform(
+            self: Box<Self>,
+            task: Pin<Box<dyn Stream<Item = EventArray> + Send>>,
+        ) -> Pin<Box<dyn Stream<Item = EventArray> + Send>> {
+            let processing_time = self.processing_time;
+            task.map(move |events| {
+                MockClock::advance(processing_time);
+                events
+            })
+            .boxed()
+        }
+    }
+
+    /// End-to-end test exercising the Utilization (input) and
+    /// OutputUtilization (output) stream wrappers with a mock TaskTransform,
+    /// wired up the same way `build_task_transform` does in the builder.
+    ///
+    /// Pipeline: channel → Utilization(input) → TaskTransform → OutputUtilization(output)
+    ///
+    /// Timeline (10s):
+    ///   T=100..103  waiting for input       (3s wait)
+    ///   T=103..105  transform processing    (2s work)
+    ///   T=105..108  blocked on downstream   (3s wait, even though input has data)
+    ///   T=108..110  transform processing    (2s work)
+    ///
+    /// Expected utilization = 4/10 = 0.4
+    #[tokio::test]
+    #[serial]
+    async fn test_task_transform_utilization_end_to_end() {
+        use crate::event::{EventArray, LogEvent};
+        use crate::transforms::TaskTransform;
+        use futures::SinkExt;
+        use futures::channel::mpsc as futures_mpsc;
+
+        MockClock::set_time(Duration::from_secs(100));
+
+        let (mut emitter, registry) = UtilizationEmitter::new();
+        let key = ComponentKey::from("test_transform");
+
+        let sender = registry.add_component(key.clone(), gauge!(GaugeName::Utilization));
+        let output_sender = sender.clone();
+
+        // Upstream channel carrying EventArrays.
+        let (mut input_tx, input_rx) = futures_mpsc::channel::<EventArray>(10);
+
+        // Wire up the pipeline exactly like build_task_transform:
+        //   Utilization(input) → transform.transform() → OutputUtilization(output)
+        let input_wrapped = Utilization::new(sender, key.clone(), input_rx);
+        let transform = Box::new(MockTaskTransform {
+            processing_time: Duration::from_secs(2),
+        });
+        let transform_output = transform.transform(Box::pin(input_wrapped));
+        let mut pipeline = OutputUtilization::new(output_sender, transform_output);
+
+        let waker = futures::task::noop_waker();
+        let mut cx = std::task::Context::from_waker(&waker);
+
+        // -- Phase 1: poll transform, no input available --
+        // T=100: start_wait sent by input wrapper.
+        assert!(Pin::new(&mut pipeline).poll_next(&mut cx).is_pending());
+        MockClock::advance(Duration::from_secs(3));
+        // T=103: 3s of input wait. Period: 0s work / 3s → util = 0.0.
+        check_timer_utilization(&mut emitter, &key, 0.0, "0.0 (phase 1: all input wait)");
+
+        // -- Phase 2: send input, poll pipeline → transform processes --
+        input_tx
+            .send(EventArray::from(LogEvent::default()))
+            .await
+            .unwrap();
+        assert!(Pin::new(&mut pipeline).poll_next(&mut cx).is_ready());
+        // T=105: MockClock advanced 2s inside transform. start_wait sent by
+        // output wrapper. Period: 2s work / 0s wait → util = 1.0.
+        // EWMA: 0.9×1.0 + 0.1×0.0 = 0.9
+        check_timer_utilization(&mut emitter, &key, 0.9, "0.9 (phase 2: all work)");
+
+        // -- Phase 3: send another event, simulate downstream blocking --
+        // Data is available in the input channel, but the transform is not
+        // polled so no progress is made: the time counts as downstream wait.
+        input_tx
+            .send(EventArray::from(LogEvent::default()))
+            .await
+            .unwrap();
+        MockClock::advance(Duration::from_secs(3));
+        // T=108: 3s downstream wait. Period: 0s work / 3s → util = 0.0.
+        // EWMA: 0.9×0.0 + 0.1×0.9 = 0.09
+        check_timer_utilization(
+            &mut emitter,
+            &key,
+            0.09,
+            "0.09 (phase 3: downstream wait despite buffered input)",
+        );
+
+        // -- Phase 4: poll pipeline, processes the queued event --
+        assert!(Pin::new(&mut pipeline).poll_next(&mut cx).is_ready());
+        // T=110: MockClock advanced 2s inside transform. Period: 2s work / 0s wait → util = 1.0.
+        // EWMA: 0.9×1.0 + 0.1×0.09 ≈ 0.909
+        check_timer_utilization(
+            &mut emitter,
+            &key,
+            0.909,
+            "0.909 (phase 4: queued event processed)",
+        );
+    }
+
+    /// Drain pending timer messages and assert the current EWMA utilization
+    /// for a single reporting period.
+    fn check_timer_utilization(
+        emitter: &mut UtilizationEmitter,
+        key: &ComponentKey,
+        expected: f64,
+        description: &str,
+    ) {
+        drain_emitter_messages(emitter);
+        let mut timers = emitter.timers.lock().expect("mutex poisoned");
+        let timer = timers.get_mut(key).expect("timer should exist");
+        timer.update_utilization();
+        let avg = timer.ewma.average().unwrap();
+        assert_approx_eq(avg, expected, description);
+    }
+
+    /// Drain all pending messages from the emitter's channel into the timers,
+    /// simulating what `run_utilization` does in a loop.
+    fn drain_emitter_messages(emitter: &mut UtilizationEmitter) {
+        while let Ok(message) = emitter.timer_rx.try_recv() {
+            let mut timers = emitter.timers.lock().expect("mutex poisoned");
+            match message {
+                UtilizationTimerMessage::StartWait(key, at) => {
+                    if let Some(timer) = timers.get_mut(&key) {
+                        timer.start_wait(at);
+                    }
+                }
+                UtilizationTimerMessage::StopWait(key, at) => {
+                    if let Some(timer) = timers.get_mut(&key) {
+                        timer.stop_wait(at);
+                    }
+                }
+            }
+        }
     }
 }

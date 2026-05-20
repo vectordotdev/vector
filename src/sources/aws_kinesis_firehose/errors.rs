@@ -35,15 +35,8 @@ pub enum RequestError {
         source: std::io::Error,
         request_id: String,
     },
-    #[snafu(display(
-        "Could not forward events for request {}, downstream is closed: {}",
-        request_id,
-        source
-    ))]
-    ShuttingDown {
-        source: crate::source_sender::ClosedError,
-        request_id: String,
-    },
+    #[snafu(display("Could not forward events for request {request_id}, downstream is closed"))]
+    ShuttingDown { request_id: String },
     #[snafu(display("Unsupported encoding: {}", encoding))]
     UnsupportedEncoding {
         encoding: String,
@@ -76,6 +69,7 @@ impl RequestError {
         }
     }
 
+    #[allow(clippy::missing_const_for_fn)] // Adding `const` results in https://doc.rust-lang.org/error_codes/E0015.html
     pub fn request_id(&self) -> Option<&str> {
         use RequestError::*;
         match *self {

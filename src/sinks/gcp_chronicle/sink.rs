@@ -1,7 +1,9 @@
 use std::fmt;
 
-use crate::sinks::gcp_chronicle::partitioner::{ChroniclePartitionKey, ChroniclePartitioner};
-use crate::sinks::prelude::*;
+use crate::sinks::{
+    gcp_chronicle::partitioner::{ChroniclePartitionKey, ChroniclePartitioner},
+    prelude::*,
+};
 
 pub struct ChronicleSink<Svc, RB> {
     service: Svc,
@@ -46,7 +48,9 @@ where
         let request_builder = self.request_builder;
 
         input
-            .batched_partitioned(partitioner, || settings.as_byte_size_config())
+            .batched_partitioned(partitioner, settings.timeout, |_| {
+                settings.as_byte_size_config()
+            })
             .filter_map(|(key, batch)| async move {
                 // A `TemplateRenderingError` will have been emitted by `KeyPartitioner` if the key here is `None`,
                 // thus no further `EventsDropped` event needs emitting at this stage.

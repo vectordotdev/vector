@@ -1,5 +1,5 @@
 ARG RUST_VERSION=1.85
-ARG DEBIAN_RELEASE=bookworm
+ARG DEBIAN_RELEASE=trixie
 # Features required for both Agent and Aggregator Helm chart configurations
 ARG FEATURES=api,api-client,sources-datadog_agent,sources-fluent,sources-host_metrics,sources-internal_metrics,sources-kubernetes_logs,sources-logstash,sources-splunk_hec,sources-statsd,sources-syslog,sources-vector,sinks-console,sinks-prometheus,sinks-vector
 
@@ -7,11 +7,11 @@ ARG FEATURES=api,api-client,sources-datadog_agent,sources-fluent,sources-host_me
 # VECTOR BUILDER
 #
 FROM docker.io/rust:${RUST_VERSION}-${DEBIAN_RELEASE} as builder
-RUN apt-get update && apt-get -y --no-install-recommends install build-essential git clang cmake libclang-dev libsasl2-dev libstdc++-11-dev libssl-dev libxxhash-dev zlib1g-dev zlib1g
+RUN apt-get update && apt-get -y --no-install-recommends install build-essential git clang cmake libclang-dev libsasl2-dev libssl-dev libxxhash-dev zlib1g-dev zlib1g
 RUN git clone https://github.com/rui314/mold.git \
     && mkdir mold/build \
     && cd mold/build \
-    && git checkout v2.0.0 \
+    && git checkout v2.40.4 \
     && ../install-build-deps.sh \
     && cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=c++ .. \
     && cmake --build . -j $(nproc) \

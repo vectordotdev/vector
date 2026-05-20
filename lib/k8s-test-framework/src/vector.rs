@@ -2,7 +2,7 @@
 
 use std::process::{Command, Stdio};
 
-use crate::{helm_values_file::HelmValuesFile, resource_file::ResourceFile, up_down, Result};
+use crate::{Result, helm_values_file::HelmValuesFile, resource_file::ResourceFile, up_down};
 
 /// Parameters required to build `kubectl` & `helm` commands to manage charts deployments in the
 /// Kubernetes cluster.

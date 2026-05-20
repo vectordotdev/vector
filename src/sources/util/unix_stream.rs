@@ -9,14 +9,16 @@ use tokio::{
     time::sleep,
 };
 use tokio_stream::wrappers::UnixListenerStream;
-use tokio_util::codec::FramedRead;
-use tracing::{field, Instrument};
-use vector_lib::codecs::StreamDecodingError;
-use vector_lib::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
-use vector_lib::EstimatedJsonEncodedSizeOf;
+use tracing::{Instrument, field};
+use vector_lib::{
+    EstimatedJsonEncodedSizeOf,
+    codecs::{DecoderFramedRead, StreamDecodingError},
+    internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol},
+};
 
 use super::AfterReadExt;
 use crate::{
+    SourceSender,
     async_read::VecAsyncReadExt,
     event::Event,
     internal_events::{
@@ -24,10 +26,10 @@ use crate::{
         UnixSocketError, UnixSocketFileDeleteError,
     },
     shutdown::ShutdownSignal,
-    sources::util::change_socket_permissions,
-    sources::util::unix::UNNAMED_SOCKET_HOST,
-    sources::Source,
-    SourceSender,
+    sources::{
+        Source,
+        util::{change_socket_permissions, unix::UNNAMED_SOCKET_HOST},
+    },
 };
 
 /// Returns a `Source` object corresponding to a Unix domain stream socket.
@@ -44,7 +46,7 @@ pub fn build_unix_stream_source<D, F, E>(
 ) -> crate::Result<Source>
 where
     D: tokio_util::codec::Decoder<Item = (F, usize), Error = E> + Clone + Send + 'static,
-    E: StreamDecodingError + std::fmt::Display + Send,
+    E: StreamDecodingError + std::fmt::Display + Send + From<std::io::Error>,
     F: Into<SmallVec<[Event; 1]>> + Send,
 {
     Ok(Box::pin(async move {
@@ -103,7 +105,7 @@ where
                     bytes_received.emit(ByteSize(byte_size));
                 })
                 .allow_read_until(shutdown.clone().map(|_| ()));
-            let mut stream = FramedRead::new(stream, decoder.clone());
+            let mut stream = DecoderFramedRead::new(stream, decoder.clone());
 
             let connection_open = connection_open.clone();
             let mut out = out.clone();

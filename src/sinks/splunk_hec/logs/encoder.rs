@@ -3,12 +3,13 @@ use std::borrow::Cow;
 use bytes::BytesMut;
 use serde::Serialize;
 use tokio_util::codec::Encoder as _;
-use vector_lib::request_metadata::GroupedCountByteSize;
-use vector_lib::{config::telemetry, EstimatedJsonEncodedSizeOf};
+use vector_lib::{
+    EstimatedJsonEncodedSizeOf, codecs::Transformer, config::telemetry,
+    request_metadata::GroupedCountByteSize,
+};
 
 use super::sink::HecProcessedEvent;
 use crate::{
-    codecs::Transformer,
     event::{Event, LogEvent},
     internal_events::SplunkEventEncodeError,
     sinks::{splunk_hec::common::EndpointTarget, util::encoding::Encoder},
@@ -56,7 +57,7 @@ impl<'a> HecData<'a> {
 #[derive(Debug, Clone)]
 pub struct HecLogsEncoder {
     pub transformer: Transformer,
-    pub encoder: crate::codecs::Encoder<()>,
+    pub encoder: vector_lib::codecs::Encoder<()>,
     pub auto_extract_timestamp: bool,
 }
 

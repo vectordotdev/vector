@@ -194,10 +194,10 @@ In the pseudocode above, read scheduling is controlled by `sort`, `should_read`,
 would need to answer the following questions:
 
 1. In what order should I read the available files?
-1. Should I finish one file before moving on to the next?
-1. Should I back off reads to this file?
-1. Should I back off reads to all files (i.e. sleep)?
-1. How long should I spend working on a single file?
+2. Should I finish one file before moving on to the next?
+3. Should I back off reads to this file?
+4. Should I back off reads to all files (i.e. sleep)?
+5. How long should I spend working on a single file?
 
 These questions would then be answered by a combination of configuration, file
 metadata, and gathered statistics.
@@ -226,9 +226,9 @@ out a magic identifier, but also the logic to update our list of watched files
 based on those identifiers. It needs to answer the following:
 
 1. Given a visible path, does it contain a file I've seen before?
-1. If I have seen it before, has it been renamed?
-1. If I have seen it before, am I now seeing it in multiple places?
-1. If I'm seeing duplicates, how should I choose which to follow?
+2. If I have seen it before, has it been renamed?
+3. If I have seen it before, am I now seeing it in multiple places?
+4. If I'm seeing duplicates, how should I choose which to follow?
 
 This logic is mostly in one place in the current implementation, so it should
 not be terribly difficult to extract it. The use of `Fingerprinter` should
@@ -238,9 +238,9 @@ In addition to simply consolidating the logic, we can expand and make the use of
 `Fingerprinter` more intelligent. We currently have three ways it can work:
 
 1. Checksum (usually reliable but frustrating for small files)
-1. Device and inode (simple and works with small files, but doesn't handle edge
+2. Device and inode (simple and works with small files, but doesn't handle edge
    cases well)
-1. First line checksum (solid for intended use case but not yet general)
+3. First line checksum (solid for intended use case but not yet general)
 
 I'd first propose that we drop device and inode fingerprinting and add
 path-based fingerprinting in its place. This gives users the option to do the
@@ -255,8 +255,8 @@ in place, the algorithm can look something like the following:
 
 1. Read up to `max_line_length` bytes from the file starting at
    `ignored_header_bytes`
-1. Return no fingerprint if there is no newline in the returned bytes
-1. Otherwise, return the checksum of the bytes up to the first newline
+2. Return no fingerprint if there is no newline in the returned bytes
+3. Otherwise, return the checksum of the bytes up to the first newline
 
 This should give a good balance between usability and flexibility for the
 default strategy. As we implement it, we should evolve the current
@@ -278,11 +278,11 @@ about providing an understandable config UI than designing the right interface.
 This should be driven by real world use cases. For example:
 
 1. Ignoring existing checkpoints
-1. Start at the beginning or end of existing files, optionally taking into
+2. Start at the beginning or end of existing files, optionally taking into
    account factors like mtime
-1. Start at the beginning or end of files added while we're watching (this can
+3. Start at the beginning or end of files added while we're watching (this can
    be tricky)
-1. Ordering which of the above concerns take precedence
+4. Ordering which of the above concerns take precedence
 
 I would suggest a config like the following:
 
@@ -327,8 +327,8 @@ reads, but it will require a bit of experimentation before we're able to
 determine if it's worthwhile. There are a few possible approaches:
 
 1. Dispatch reads to an explicit threadpool
-1. Spawn a limited number of blocking tokio tasks
-1. Implement something with `iouring`
+2. Spawn a limited number of blocking tokio tasks
+3. Implement something with `iouring`
 
 The first two both introduce the questions of sizing and the ability of the
 underlying file system to enable concurrent access in a way that actually adds

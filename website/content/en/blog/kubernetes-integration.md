@@ -27,15 +27,17 @@ The crux of our Kubernetes integration for Vector is the new [`kubernetes_logs`]
 
 This simple Vector configuration, for example, would suffice to send logs from *all* of your Nodes/Pods to [Elasticsearch]:
 
-```toml title="vector.toml"
-[sources.k8s_all]
-type = "kubernetes_logs"
+```yaml title="vector.yaml"
+sources:
+  k8s_all:
+    type: "kubernetes_logs"
 
-[sinks.es_out]
-type = "elasticsearch"
-inputs = ["k8s_all"]
-host = "http://your-elasticsearch-cluster:9200"
-index = "vector-k8s-%F"
+sinks:
+  es_out:
+    type: "elasticsearch"
+    inputs: ["k8s_all"]
+    host: "http://your-elasticsearch-cluster:9200"
+    index: "vector-k8s-%F"
 ```
 
 Using this simple topology as a starting point, you can [transform][transforms] your log data in a wide variety of ways, ship it to [other sinks][sinks], and much more.
@@ -108,7 +110,7 @@ We want Vector to become the backbone of observability in Kubernetes. If you sha
 [arc]: /blog/adaptive-request-concurrency
 [chat]: https://chat.vector.dev
 [clickhouse]: /docs/reference/configuration/sinks/clickhouse
-[enriching]: /docs/reference/configuration/sources/kubernetes_logs/#output-data
+[enriching]: /docs/reference/configuration/sources/kubernetes_logs/#output-types
 [elasticsearch]: /docs/reference/configuration/sinks/elasticsearch
 [helm]: https://helm.sh
 [install]: /docs/setup/installation/platforms/kubernetes/#install

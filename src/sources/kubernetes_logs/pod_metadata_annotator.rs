@@ -6,17 +6,20 @@ use k8s_openapi::{
     api::core::v1::{Container, ContainerStatus, Pod, PodSpec, PodStatus},
     apimachinery::pkg::apis::meta::v1::ObjectMeta,
 };
-use kube::runtime::reflector::{store::Store, ObjectRef};
-use vector_lib::config::{LegacyKey, LogNamespace};
-use vector_lib::configurable::configurable_component;
-use vector_lib::lookup::{
-    lookup_v2::{OptionalTargetPath, ValuePath},
-    owned_value_path, path, OwnedTargetPath,
+use kube::runtime::reflector::{ObjectRef, store::Store};
+use vector_lib::{
+    config::{LegacyKey, LogNamespace},
+    configurable::configurable_component,
+    lookup::{
+        OwnedTargetPath,
+        lookup_v2::{OptionalTargetPath, ValuePath},
+        owned_value_path, path,
+    },
 };
 
 use super::{
-    path_helpers::{parse_log_file_path, LogFileInfo},
     Config,
+    path_helpers::{LogFileInfo, parse_log_file_path},
 };
 use crate::event::{Event, LogEvent};
 
@@ -404,10 +407,7 @@ fn annotate_from_pod_status(
             .map(|k| &k.path)
             .map(LegacyKey::Overwrite);
 
-        let value = value
-            .iter()
-            .filter_map(|k| k.ip.clone())
-            .collect::<Vec<String>>();
+        let value = value.iter().map(|k| k.ip.clone()).collect::<Vec<String>>();
 
         log_namespace.insert_source_metadata(Config::NAME, log, legacy_key, path!("pod_ips"), value)
     }
@@ -478,9 +478,10 @@ fn annotate_from_container(
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
     use k8s_openapi::api::core::v1::PodIP;
     use similar_asserts::assert_eq;
-    use std::path::PathBuf;
     use vector_lib::lookup::{event_path, metadata_path};
 
     use super::*;
@@ -885,7 +886,7 @@ mod tests {
                 FieldsSpec::default(),
                 PodStatus {
                     pod_ips: Some(vec![PodIP {
-                        ip: Some("192.168.1.2".to_owned()),
+                        ip: "192.168.1.2".to_owned(),
                     }]),
                     ..Default::default()
                 },
@@ -915,10 +916,10 @@ mod tests {
                     pod_ip: Some("192.168.1.2".to_owned()),
                     pod_ips: Some(vec![
                         PodIP {
-                            ip: Some("192.168.1.2".to_owned()),
+                            ip: "192.168.1.2".to_owned(),
                         },
                         PodIP {
-                            ip: Some("192.168.1.3".to_owned()),
+                            ip: "192.168.1.3".to_owned(),
                         },
                     ]),
                     ..Default::default()
@@ -941,10 +942,10 @@ mod tests {
                     pod_ip: Some("192.168.1.2".to_owned()),
                     pod_ips: Some(vec![
                         PodIP {
-                            ip: Some("192.168.1.2".to_owned()),
+                            ip: "192.168.1.2".to_owned(),
                         },
                         PodIP {
-                            ip: Some("192.168.1.3".to_owned()),
+                            ip: "192.168.1.3".to_owned(),
                         },
                     ]),
                     ..Default::default()

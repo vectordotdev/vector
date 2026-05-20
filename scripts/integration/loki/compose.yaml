@@ -1,6 +1,0 @@
-version: '3'
-
-services:
-  loki:
-    image: docker.io/grafana/loki:${CONFIG_VERSION}
-    command: -config.file=/etc/loki/local-config.yaml -auth.enabled=true

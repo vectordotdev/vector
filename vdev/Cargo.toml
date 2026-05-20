@@ -1,38 +1,57 @@
 [package]
 name = "vdev"
-version = "0.1.0"
-edition = "2021"
+version = "0.3.3"
+edition = "2024"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 license = "MPL-2.0"
 readme = "README.md"
-publish = false
+repository = "https://github.com/vectordotdev/vector"
+homepage = "https://vector.dev"
+description = "CLI utilities for Vector (vector.dev) development and CI workflows"
+keywords = ["cli", "developer-tools", "vector", "vdev"]
+categories = ["command-line-utilities"]
+include = [
+  "Cargo.toml",
+  "README.md",
+  "src/**",
+]
 
 [dependencies]
 anyhow.workspace = true
 chrono.workspace = true
 clap.workspace = true
-clap-verbosity-flag = "3.0.2"
-clap_complete = "4.5.48"
-confy = "0.6.1"
+clap-verbosity-flag = "3.0.4"
+clap_complete.workspace = true
 directories = "6.0.0"
-# remove this when stabilized https://doc.rust-lang.org/stable/std/path/fn.absolute.html
-dunce = "1.0.5"
 glob.workspace = true
 hex = "0.4.3"
 indexmap.workspace = true
-indicatif = { version = "0.17.11", features = ["improved_unicode"] }
-itertools = "0.14.0"
-log = "0.4.27"
+indicatif = { version = "0.18.4", features = ["improved_unicode"] }
+itertools.workspace = true
+log = "0.4.29"
 # watch https://github.com/epage/anstyle for official interop with Clap
-owo-colors = { version = "4.2.0", features = ["supports-colors"] }
-paste.workspace = true
-regex = { version = "1.11.1", default-features = false, features = ["std", "perf"] }
-reqwest = { version = "0.11", features = ["json", "blocking"] }
+owo-colors = { version = "4.2.3", features = ["supports-colors"] }
+pastey.workspace = true
+regex.workspace = true
+reqwest = { workspace = true, features = ["blocking"] }
 serde.workspace = true
-serde_json.workspace = true
-serde_yaml = "0.9.34"
+serde_json = { workspace = true, features = ["preserve_order"] }
+serde_yaml.workspace = true
 sha2 = "0.10.9"
 tempfile.workspace = true
 toml.workspace = true
+toml_edit = "0.23"
 semver.workspace = true
+strum.workspace = true
 indoc.workspace = true
+git2 = { version = "0.20.4" }
+cfg-if.workspace = true
+convert_case.workspace = true
+# Used by check-events to walk Rust source via syn's AST. The extra features
+# are vdev-local; they do not propagate into the `vector` package's build.
+syn = { workspace = true, features = ["full", "visit", "extra-traits", "printing", "parsing"] }
+proc-macro2 = { workspace = true, features = ["span-locations"] }
+quote.workspace = true
+
+[package.metadata.binstall]
+pkg-url = "{ repo }/releases/download/vdev-v{ version }/{ name }-{ target }-v{ version }.tgz"

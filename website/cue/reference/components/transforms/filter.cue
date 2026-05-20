@@ -24,7 +24,7 @@ components: transforms: filter: {
 		notices: []
 	}
 
-	configuration: base.components.transforms.filter.configuration
+	configuration: generated.components.transforms.filter.configuration
 
 	input: {
 		logs: true
@@ -37,6 +37,18 @@ components: transforms: filter: {
 			summary:      true
 		}
 		traces: true
+	}
+
+	output: {
+		logs: "": {
+			description: "The input `log` event."
+		}
+		metrics: "": {
+			description: "The input `metric` event."
+		}
+		traces: "": {
+			description: "The input `trace` event."
+		}
 	}
 
 	examples: [

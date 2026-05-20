@@ -166,8 +166,7 @@ principles of Vector:
 > One Tool. All Data. - One simple tool gets your logs, metrics, and traces
 > (coming soon) from A to B.
 
-[Vector
-principles](https://vector.dev/docs/about/what-is-vector/#who-should-use-vector)
+[Vector principles](https://vector.dev/docs/)
 
 On the same page, it is mentioned that Vector should be a replacement for
 Telegraf.

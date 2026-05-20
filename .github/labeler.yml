@@ -1,48 +1,48 @@
 # Generic component-level labels and high-level groupings.
 "domain: sources":
   - changed-files:
-    - any-glob-to-any-file: ["src/sources/**/*"]
+      - any-glob-to-any-file: ["src/sources/**/*"]
 
 "domain: sinks":
   - changed-files:
-    - any-glob-to-any-file: ["src/sinks/**/*"]
+      - any-glob-to-any-file: ["src/sinks/**/*"]
 
 "domain: transforms":
   - changed-files:
-    - any-glob-to-any-file: ["src/transforms/**/*"]
+      - any-glob-to-any-file: ["src/transforms/**/*"]
 
 "domain: topology":
   - changed-files:
-    - any-glob-to-any-file: ["src/topology/**/*"]
+      - any-glob-to-any-file: ["src/topology/**/*"]
 
 "domain: codecs":
   - changed-files:
-    - any-glob-to-any-file: ["src/codecs/**/*"]
+      - any-glob-to-any-file: ["src/codecs/**/*"]
 
 "domain: core":
   - changed-files:
-    - any-glob-to-any-file: ["lib/vector-core/**/*"]
+      - any-glob-to-any-file: ["lib/vector-core/**/*"]
 
 "domain: vrl":
   - changed-files:
-    - any-glob-to-any-file: ["lib/vrl/**/*"]
+      - any-glob-to-any-file: ["lib/vrl/**/*"]
 
 "domain: ci":
   - changed-files:
-    - any-glob-to-any-file: ["scripts/**/*"]
+      - any-glob-to-any-file: [".github/workflows/*", ".github/actions/**/*", ".github/*.yml"]
 
 "domain: vdev":
   - changed-files:
-    - any-glob-to-any-file: ["vdev/**/*"]
+      - any-glob-to-any-file: ["vdev/**/*"]
 
 "domain: releasing":
   - changed-files:
-    - any-glob-to-any-file: ["distribution/**/*", "scripts/package-*", "scripts/release-*"]
+      - any-glob-to-any-file: ["distribution/**/*", "scripts/package-*", "scripts/release-*"]
 
 "domain: rfc":
   - changed-files:
-    - any-glob-to-any-file: ["rfcs/**/*"]
+      - any-glob-to-any-file: ["rfcs/**/*"]
 
 "domain: external docs":
   - changed-files:
-    - any-glob-to-any-file: ["website/cue/**/*"]
+      - any-glob-to-any-file: ["website/cue/**/*"]

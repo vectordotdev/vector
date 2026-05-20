@@ -1,29 +1,27 @@
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 use async_trait::async_trait;
-use vector_lib::configurable::{component::GenerateConfig, configurable_component};
-use vector_lib::internal_event::Protocol;
 use vector_lib::{
     config::{AcknowledgementsConfig, Input},
+    configurable::{component::GenerateConfig, configurable_component},
+    internal_event::Protocol,
     sink::VectorSink,
 };
 
+use super::{request_builder::StatsdRequestBuilder, service::StatsdService, sink::StatsdSink};
+#[cfg(unix)]
+use crate::sinks::util::service::net::UnixConnectorConfig;
 use crate::{
     config::{SinkConfig, SinkContext},
     internal_events::SocketMode,
     sinks::{
-        util::{
-            service::net::{NetworkConnector, TcpConnectorConfig, UdpConnectorConfig},
-            BatchConfig, SinkBatchSettings,
-        },
         Healthcheck,
+        util::{
+            BatchConfig, SinkBatchSettings,
+            service::net::{NetworkConnector, TcpConnectorConfig, UdpConnectorConfig},
+        },
     },
 };
-
-#[cfg(unix)]
-use crate::sinks::util::service::net::UnixConnectorConfig;
-
-use super::{request_builder::StatsdRequestBuilder, service::StatsdService, sink::StatsdSink};
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct StatsdDefaultBatchSettings;

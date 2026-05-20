@@ -166,14 +166,14 @@ flexibility. This makes VRL ideal for critical, performance-sensitive
 infrastructure, like observability pipelines. To illustrate how we achieve these,
 below is a VRL feature matrix across these principles:
 
-| Feature                                       | Safety | Performance |
-| :-------------------------------------------- | :----- | :---------- |
-| [Compilation](#compilation)                   | ✅      | ✅           |
-| [Ergonomic safety](#ergonomic-safety)         | ✅      | ✅           |
-| [Fail safety](#fail-safety)                   | ✅      |             |
-| [Memory safety](#memory-safety)               | ✅      |             |
-| [Vector and Rust native](#vector-rust-native) | ✅      | ✅           |
-| [Statelessness](#stateless)                   | ✅      | ✅           |
+| Feature | Safety | Performance |
+| :-- | :----- | :---------- |
+| [Compilation](#compilation) | ✅ | ✅ |
+| [Ergonomic safety](#ergonomic-safety) | ✅ | ✅ |
+| [Fail safety](#fail-safety) | ✅ | |
+| [Memory safety](#memory-safety) | ✅ | |
+| [Vector and Rust native](#vector-rust-native) | ✅ | ✅ |
+| [Statelessness](#stateless) | ✅ | ✅ |
 
 ## Concepts
 
@@ -199,14 +199,14 @@ VRL has some core concepts that you should be aware of as you dive in.
 [dedupe]: /docs/reference/configuration/transforms/dedupe
 [del]: /docs/reference/vrl/functions#del
 [errors]: /docs/reference/vrl/errors
-[events]: /docs/about/under-the-hood-architecture/data-model
+[events]: /docs/architecture/data-model
 [fail_safe]: https://en.wikipedia.org/wiki/Fail-safe
 [ffi]: https://en.wikipedia.org/wiki/Foreign_function_interface
 [filter]: /docs/reference/configuration/transforms/filter
 [log]: /docs/reference/vrl/functions#log
-[logs]: /docs/about/under-the-hood/architecture/data-model/log
+[logs]: /docs/architecture/data-model/log
 [memory_safety]: https://en.wikipedia.org/wiki/Memory_safety
-[metrics]: /docs/about/under-the-hood/architecture/data-model/metrics
+[metrics]: /docs/architecture/data-model/metrics
 [now]: /docs/reference/vrl/functions#now
 [remap]: /docs/reference/configuration/transforms/remap
 [route]: /docs/reference/configuration/transforms/route

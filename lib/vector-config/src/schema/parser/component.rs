@@ -61,7 +61,7 @@ impl ComponentSchema<'_> {
 }
 
 impl QueryableSchema for ComponentSchema<'_> {
-    fn schema_type(&self) -> SchemaType {
+    fn schema_type(&self) -> SchemaType<'_> {
         self.schema.schema_type()
     }
 
@@ -133,7 +133,7 @@ fn get_component_metadata_kv_str<'a>(
             Value::String(name) => Ok(name),
             _ => Err(SchemaError::invalid_component_schema(
                 key,
-                format!("`{}` must be a string", key),
+                format!("`{key}` must be a string"),
             )),
         })
 }

@@ -1,28 +1,30 @@
 use std::sync::Arc;
 
-use azure_storage_blobs::prelude::*;
+use azure_storage_blob::BlobContainerClient;
 use tower::ServiceBuilder;
-use vector_lib::codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoderConfig};
-use vector_lib::configurable::configurable_component;
-use vector_lib::sensitive_string::SensitiveString;
+use vector_lib::{
+    codecs::{JsonSerializerConfig, NewlineDelimitedEncoderConfig, encoding::Framer},
+    configurable::configurable_component,
+    sensitive_string::SensitiveString,
+};
 
 use super::request_builder::AzureBlobRequestOptions;
-use crate::sinks::util::service::TowerRequestConfigDefaults;
 use crate::{
+    Result,
     codecs::{Encoder, EncodingConfigWithFraming, SinkType},
     config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     sinks::{
+        Healthcheck, VectorSink,
         azure_common::{
-            self, config::AzureBlobRetryLogic, service::AzureBlobService, sink::AzureBlobSink,
+            self, config::AzureAuthentication, config::AzureBlobRetryLogic,
+            config::AzureBlobTlsConfig, service::AzureBlobService, sink::AzureBlobSink,
         },
         util::{
-            partitioner::KeyPartitioner, BatchConfig, BulkSizeBasedDefaultBatchSettings,
-            Compression, ServiceBuilderExt, TowerRequestConfig,
+            BatchConfig, BulkSizeBasedDefaultBatchSettings, Compression, ServiceBuilderExt,
+            TowerRequestConfig, partitioner::KeyPartitioner, service::TowerRequestConfigDefaults,
         },
-        Healthcheck, VectorSink,
     },
     template::Template,
-    Result,
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -40,6 +42,10 @@ impl TowerRequestConfigDefaults for AzureBlobTowerRequestConfigDefaults {
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct AzureBlobSinkConfig {
+    #[configurable(derived)]
+    #[serde(default)]
+    pub auth: Option<AzureAuthentication>,
+
     /// The Azure Blob Storage Account connection string.
     ///
     /// Authentication with an access key or shared access signature (SAS)
@@ -54,44 +60,33 @@ pub struct AzureBlobSinkConfig {
     /// | Allowed services       | Blob               |
     /// | Allowed resource types | Container & Object |
     /// | Allowed permissions    | Read & Create      |
-    ///
-    /// Either `storage_account`, or this field, must be specified.
+    #[configurable(metadata(
+        docs::warnings = "Access keys and SAS tokens can be used to gain unauthorized access to Azure Blob Storage \
+        resources. Numerous security breaches have occurred due to leaked connection strings. It is important to keep \
+        connection strings secure and not expose them in logs, error messages, or version control systems."
+    ))]
     #[configurable(metadata(
         docs::examples = "DefaultEndpointsProtocol=https;AccountName=mylogstorage;AccountKey=storageaccountkeybase64encoded;EndpointSuffix=core.windows.net"
     ))]
     #[configurable(metadata(
         docs::examples = "BlobEndpoint=https://mylogstorage.blob.core.windows.net/;SharedAccessSignature=generatedsastoken"
     ))]
+    #[configurable(metadata(docs::examples = "AccountName=mylogstorage"))]
     pub connection_string: Option<SensitiveString>,
 
     /// The Azure Blob Storage Account name.
     ///
-    /// Attempts to load credentials for the account in the following ways, in order:
-    ///
-    /// - read from environment variables ([more information][env_cred_docs])
-    /// - looks for a [Managed Identity][managed_ident_docs]
-    /// - uses the `az` CLI tool to get an access token ([more information][az_cli_docs])
-    ///
-    /// Either `connection_string`, or this field, must be specified.
-    ///
-    /// [env_cred_docs]: https://docs.rs/azure_identity/latest/azure_identity/struct.EnvironmentCredential.html
-    /// [managed_ident_docs]: https://docs.microsoft.com/en-us/azure/active-directory/managed-identities-azure-resources/overview
-    /// [az_cli_docs]: https://docs.microsoft.com/en-us/cli/azure/account?view=azure-cli-latest#az-account-get-access-token
+    /// If provided, this will be used instead of the `connection_string`.
+    /// This is useful for authenticating with an Azure credential.
     #[configurable(metadata(docs::examples = "mylogstorage"))]
-    pub storage_account: Option<String>,
+    pub(super) account_name: Option<String>,
 
-    /// The Azure Blob Storage Endpoint URL.
+    /// The Azure Blob Storage endpoint.
     ///
-    /// This is used to override the default blob storage endpoint URL in cases where you are using
-    /// credentials read from the environment/managed identities or access tokens without using an
-    /// explicit connection_string (which already explicitly supports overriding the blob endpoint
-    /// URL).
-    ///
-    /// This may only be used with `storage_account` and is ignored when used with
-    /// `connection_string`.
-    #[configurable(metadata(docs::examples = "https://test.blob.core.usgovcloudapi.net/"))]
-    #[configurable(metadata(docs::examples = "https://test.blob.core.windows.net/"))]
-    pub endpoint: Option<String>,
+    /// If provided, this will be used instead of the `connection_string`.
+    /// This is useful for authenticating with an Azure credential.
+    #[configurable(metadata(docs::examples = "https://mylogstorage.blob.core.windows.net/"))]
+    pub(super) blob_endpoint: Option<String>,
 
     /// The Azure Blob Storage Account container name.
     #[configurable(metadata(docs::examples = "my-logs"))]
@@ -168,6 +163,10 @@ pub struct AzureBlobSinkConfig {
         skip_serializing_if = "crate::serde::is_default"
     )]
     pub(super) acknowledgements: AcknowledgementsConfig,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    pub tls: Option<AzureBlobTlsConfig>,
 }
 
 pub fn default_blob_prefix() -> Template {
@@ -177,10 +176,11 @@ pub fn default_blob_prefix() -> Template {
 impl GenerateConfig for AzureBlobSinkConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
+            auth: None,
             connection_string: Some(String::from("DefaultEndpointsProtocol=https;AccountName=some-account-name;AccountKey=some-account-key;").into()),
-            storage_account: Some(String::from("some-account-name")),
+            account_name: None,
+            blob_endpoint: None,
             container_name: String::from("logs"),
-            endpoint: None,
             blob_prefix: default_blob_prefix(),
             blob_time_format: Some(String::from("%s")),
             blob_append_uuid: Some(true),
@@ -189,6 +189,7 @@ impl GenerateConfig for AzureBlobSinkConfig {
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
             acknowledgements: Default::default(),
+            tls: None,
         })
         .unwrap()
     }
@@ -197,15 +198,57 @@ impl GenerateConfig for AzureBlobSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "azure_blob")]
 impl SinkConfig for AzureBlobSinkConfig {
-    async fn build(&self, _cx: SinkContext) -> Result<(VectorSink, Healthcheck)> {
+    async fn build(&self, cx: SinkContext) -> Result<(VectorSink, Healthcheck)> {
+        let connection_string: String = match (
+            &self.connection_string,
+            &self.account_name,
+            &self.blob_endpoint,
+        ) {
+            (Some(connstr), None, None) => connstr.inner().into(),
+            (None, Some(account_name), None) => {
+                if self.auth.is_none() {
+                    return Err(
+                        "`auth` configuration must be provided when using `account_name`".into(),
+                    );
+                }
+                format!("AccountName={}", account_name)
+            }
+            (None, None, Some(blob_endpoint)) => {
+                if self.auth.is_none() {
+                    return Err(
+                        "`auth` configuration must be provided when using `blob_endpoint`".into(),
+                    );
+                }
+                // BlobEndpoint must always end in a trailing slash
+                let blob_endpoint = if blob_endpoint.ends_with('/') {
+                    blob_endpoint.clone()
+                } else {
+                    format!("{}/", blob_endpoint)
+                };
+                format!("BlobEndpoint={}", blob_endpoint)
+            }
+            (None, None, None) => {
+                return Err("One of `connection_string`, `account_name`, or `blob_endpoint` must be provided".into());
+            }
+            (Some(_), Some(_), _) => {
+                return Err("Cannot provide both `connection_string` and `account_name`".into());
+            }
+            (Some(_), _, Some(_)) => {
+                return Err("Cannot provide both `connection_string` and `blob_endpoint`".into());
+            }
+            (_, Some(_), Some(_)) => {
+                return Err("Cannot provide both `account_name` and `blob_endpoint`".into());
+            }
+        };
+
         let client = azure_common::config::build_client(
-            self.connection_string
-                .as_ref()
-                .map(|v| v.inner().to_string()),
-            self.storage_account.as_ref().map(|v| v.to_string()),
+            self.auth.clone(),
+            connection_string.clone(),
             self.container_name.clone(),
-            self.endpoint.clone(),
-        )?;
+            cx.proxy(),
+            self.tls.clone(),
+        )
+        .await?;
 
         let healthcheck = azure_common::config::build_healthcheck(
             self.container_name.clone(),
@@ -229,7 +272,7 @@ const DEFAULT_FILENAME_TIME_FORMAT: &str = "%s";
 const DEFAULT_FILENAME_APPEND_UUID: bool = true;
 
 impl AzureBlobSinkConfig {
-    pub fn build_processor(&self, client: Arc<ContainerClient>) -> crate::Result<VectorSink> {
+    pub fn build_processor(&self, client: Arc<BlobContainerClient>) -> crate::Result<VectorSink> {
         let request_limits = self.request.into_settings();
         let service = ServiceBuilder::new()
             .settings(request_limits, AzureBlobRetryLogic)

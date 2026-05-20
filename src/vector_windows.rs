@@ -2,13 +2,13 @@
 use std::{ffi::OsString, time::Duration};
 
 use windows_service::{
-    define_windows_service,
+    Result, define_windows_service,
     service::{
         ServiceControl, ServiceControlAccept, ServiceExitCode, ServiceState, ServiceStatus,
         ServiceType,
     },
     service_control_handler::ServiceControlHandlerResult,
-    service_dispatcher, Result,
+    service_dispatcher,
 };
 
 use crate::{app::Application, signal::SignalTo};
@@ -24,12 +24,12 @@ pub mod service_control {
 
     use snafu::ResultExt;
     use windows_service::{
+        Result,
         service::{
             ServiceAccess, ServiceErrorControl, ServiceExitCode, ServiceInfo, ServiceStartType,
             ServiceState, ServiceStatus,
         },
         service_manager::{ServiceManager, ServiceManagerAccess},
-        Result,
     };
 
     use crate::{
@@ -46,15 +46,15 @@ pub mod service_control {
 
     impl fmt::Display for ErrorDisplay<'_> {
         fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-            if let windows_service::Error::Winapi(ref win_error) = &self.error {
-                write!(f, "{}", win_error)
+            if let windows_service::Error::Winapi(win_error) = &self.error {
+                write!(f, "{win_error}")
             } else {
                 write!(f, "{}", &self.error)
             }
         }
     }
 
-    const fn error_display(error: &windows_service::Error) -> ErrorDisplay {
+    const fn error_display(error: &windows_service::Error) -> ErrorDisplay<'_> {
         ErrorDisplay { error }
     }
 
@@ -81,9 +81,9 @@ pub mod service_control {
     #[derive(Debug, Copy, Clone, PartialEq)]
     pub enum ControlAction {
         Install,
-        Uninstall,
+        Uninstall { stop_timeout: Duration },
         Start,
-        Stop,
+        Stop { stop_timeout: Duration },
         Restart { stop_timeout: Duration },
     }
 
@@ -114,9 +114,13 @@ pub mod service_control {
         fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
             match s {
                 "install" => Ok(ControlAction::Install),
-                "uninstall" => Ok(ControlAction::Uninstall),
+                "uninstall" => Ok(ControlAction::Uninstall {
+                    stop_timeout: Duration::from_secs(10),
+                }),
                 "start" => Ok(ControlAction::Start),
-                "stop" => Ok(ControlAction::Stop),
+                "stop" => Ok(ControlAction::Stop {
+                    stop_timeout: Duration::from_secs(10),
+                }),
                 _ => Err(format!("invalid option {} for ControlAction", s)),
             }
         }
@@ -125,10 +129,12 @@ pub mod service_control {
     pub fn control(service_def: &ServiceDefinition, action: ControlAction) -> crate::Result<()> {
         match action {
             ControlAction::Start => start_service(service_def),
-            ControlAction::Stop => stop_service(service_def),
+            ControlAction::Stop { stop_timeout } => stop_service(service_def, stop_timeout),
             ControlAction::Restart { stop_timeout } => restart_service(service_def, stop_timeout),
             ControlAction::Install => install_service(service_def),
-            ControlAction::Uninstall => uninstall_service(service_def),
+            ControlAction::Uninstall { stop_timeout } => {
+                uninstall_service(service_def, stop_timeout)
+            }
         }
     }
 
@@ -138,7 +144,7 @@ pub mod service_control {
         let service_status = service.query_status().context(ServiceSnafu)?;
 
         if service_status.current_state != ServiceState::StartPending
-            || service_status.current_state != ServiceState::Running
+            && service_status.current_state != ServiceState::Running
         {
             service.start(&[] as &[OsString]).context(ServiceSnafu)?;
             emit!(WindowsServiceStart {
@@ -155,25 +161,30 @@ pub mod service_control {
         Ok(())
     }
 
-    fn stop_service(service_def: &ServiceDefinition) -> crate::Result<()> {
+    fn stop_service(service_def: &ServiceDefinition, stop_timeout: Duration) -> crate::Result<()> {
         let service_access = ServiceAccess::QUERY_STATUS | ServiceAccess::STOP;
         let service = open_service(service_def, service_access)?;
         let service_status = service.query_status().context(ServiceSnafu)?;
+        let already_stopped = service_status.current_state == ServiceState::Stopped;
 
-        if service_status.current_state != ServiceState::StopPending
-            || service_status.current_state != ServiceState::Stopped
-        {
+        if service_status.current_state != ServiceState::StopPending && !already_stopped {
             service.stop().context(ServiceSnafu)?;
-            emit!(WindowsServiceStop {
-                name: &*service_def.name.to_string_lossy(),
-                already_stopped: false,
-            });
-        } else {
-            emit!(WindowsServiceStop {
-                name: &*service_def.name.to_string_lossy(),
-                already_stopped: true,
-            });
         }
+
+        if !already_stopped {
+            let service_status = ensure_state(
+                &service,
+                ServiceState::Stopped,
+                stop_timeout,
+                Duration::from_secs(1),
+            )?;
+            handle_service_exit_code(service_status.exit_code);
+        }
+
+        emit!(WindowsServiceStop {
+            name: &*service_def.name.to_string_lossy(),
+            already_stopped,
+        });
 
         Ok(())
     }
@@ -242,7 +253,10 @@ pub mod service_control {
         Ok(())
     }
 
-    fn uninstall_service(service_def: &ServiceDefinition) -> crate::Result<()> {
+    fn uninstall_service(
+        service_def: &ServiceDefinition,
+        stop_timeout: Duration,
+    ) -> crate::Result<()> {
         let service_access =
             ServiceAccess::QUERY_STATUS | ServiceAccess::STOP | ServiceAccess::DELETE;
         let service = open_service(service_def, service_access)?;
@@ -259,7 +273,7 @@ pub mod service_control {
         let service_status = ensure_state(
             &service,
             ServiceState::Stopped,
-            Duration::from_secs(10),
+            stop_timeout,
             Duration::from_secs(1),
         )?;
         handle_service_exit_code(service_status.exit_code);

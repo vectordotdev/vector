@@ -76,7 +76,7 @@ components: sinks: databend: {
 		notices: []
 	}
 
-	configuration: base.components.sinks.databend.configuration
+	configuration: generated.components.sinks.databend.configuration
 
 	input: {
 		logs:    true

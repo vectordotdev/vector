@@ -5,144 +5,219 @@ on:
   merge_group:
     types: [checks_requested]
 
+# Workflow-level permissions - read access to repository contents
+permissions:
+  contents: read # Required to checkout code
+
 concurrency:
   # `github.ref` is unique for MQ runs and PRs
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:
-  AWS_ACCESS_KEY_ID: "dummy"
-  AWS_SECRET_ACCESS_KEY: "dummy"
   CONTAINER_TOOL: "docker"
   DD_ENV: "ci"
-  DD_API_KEY: ${{ secrets.DD_API_KEY }}
-  RUST_BACKTRACE: full
-  TEST_LOG: vector=debug
+  VECTOR_LOG: vector=debug
   VERBOSE: true
   CI: true
   PROFILE: debug
-  # observing issues fetching boringssl via HTTPS in the OSX build, seeing if this helps
-  # can be removed when we switch back to the upstream openssl-sys crate
-  CARGO_NET_GIT_FETCH_WITH_CLI: true
 
 jobs:
   changes:
     uses: ./.github/workflows/changes.yml
     secrets: inherit
-    with:
-      base_ref: ${{ github.event.merge_group.base_ref || github.event.pull_request.base.ref }}
-      head_ref: ${{ github.event.merge_group.head_ref || github.event.pull_request.head.ref }}
 
-  checks:
-    name: Checks
-    runs-on: ubuntu-24.04-8core
-    timeout-minutes: 60
+  check-fmt:
+    name: Check code format
+    runs-on: ubuntu-24.04
+    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.test-yml == 'true' || needs.changes.outputs.prettier == 'true' }}
     needs: changes
-    env:
-      CARGO_INCREMENTAL: 0
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: ./.github/actions/setup
         with:
-          # check-version needs tags
-          fetch-depth: 0 # fetch everything
+          rust: true
+          prettier: true
+      - run: make check-fmt
 
-      - uses: actions/cache@v4
-        name: Cache Cargo registry + index
+  check-clippy:
+    name: Check clippy
+    runs-on: ubuntu-24.04-8core
+    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.test-yml == 'true' }}
+    needs: changes
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: ./.github/actions/setup
         with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
+          rust: true
+          protoc: true
+          libsasl2: true
+      - run: make check-clippy
 
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
+  test:
+    needs: changes
+    permissions:
+      contents: read
+      id-token: write
+    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.test-yml == 'true' }}
+    uses: ./.github/workflows/unit-tests.yml
+    with:
+      default: true
+      component-validation: true
+    secrets: inherit
 
-      - uses: ruby/setup-ruby@v1
+  check-scripts:
+    name: Check scripts
+    runs-on: ubuntu-24.04
+    if: ${{ needs.changes.outputs.scripts == 'true' || needs.changes.outputs.test-yml == 'true' }}
+    needs: changes
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: ./.github/actions/setup
+        with:
+          cargo-cache: false
+          mold: false
+          vdev: true
+      - run: make check-scripts
 
-      - run: bash scripts/environment/prepare.sh
+  check-events:
+    name: Check events
+    runs-on: ubuntu-24.04-8core
+    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.test-yml == 'true' }}
+    needs: changes
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: ./.github/actions/setup
+        with:
+          cargo-cache: false
+          mold: false
+          vdev: true
+      - run: make check-events
 
-      - name: Enable Rust matcher
-        run: echo "::add-matcher::.github/matchers/rust.json"
+  check-licenses:
+    name: Check that the 3rd-party license file is up to date
+    runs-on: ubuntu-24.04
+    if: ${{ needs.changes.outputs.dependencies == 'true' || needs.changes.outputs.test-yml == 'true' }}
+    needs: changes
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: ./.github/actions/setup
+        with:
+          cargo-cache: false
+          mold: false
+          vdev: true
+          dd-rust-license-tool: true
+      - run: make check-licenses
 
-      - name: Check code format
-        run: make check-fmt
+  check-docs:
+    name: Check Cue docs
+    runs-on: ubuntu-24.04
+    if: ${{ needs.changes.outputs.cue == 'true' || needs.changes.outputs.test-yml == 'true' }}
+    needs: changes
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
+          cue: true
+      - run: make check-docs
+      - name: Check Cue website build
+        run: cd website && make cue-build
 
-      - name: Check clippy
-        if: needs.changes.outputs.source == 'true'
-        run: make check-clippy
+  check-markdown:
+    name: Check Markdown
+    runs-on: ubuntu-24.04
+    if: ${{ needs.changes.outputs.markdown == 'true' || needs.changes.outputs.test-yml == 'true' }}
+    needs: changes
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
+          markdownlint-cli2: true
+      - run: make check-markdown
 
-      - name: Unit - x86_64-unknown-linux-gnu
-        if: needs.changes.outputs.source == 'true'
-        run: make test
-        env:
-          CARGO_BUILD_JOBS: 5
+  check-generated-docs:
+    name: Check Generated Docs
+    runs-on: ubuntu-24.04-8core
+    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.component_docs == 'true' || needs.changes.outputs.test-yml == 'true' }}
+    needs: changes
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
+          protoc: true
+          cue: true
+          libsasl2: true
+      - run: make check-generated-docs
 
-      # Validates components for adherence to the Component Specification
-      - name: Check Component Spec
-        run: make test-component-validation
+  check-rust-docs:
+    name: Check Rust Docs
+    runs-on: ubuntu-24.04-8core
+    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.test-yml == 'true' }}
+    needs: changes
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
+      - run: cd rust-doc && make ci-docs-build
 
-      - name: Upload test results
-        run: scripts/upload-test-results.sh
-        if: always()
+  test-vrl:
+    name: VRL - Linux
+    runs-on: ubuntu-24.04-8core
+    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.cue == 'true' || needs.changes.outputs.test-yml == 'true' }}
+    needs: changes
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
+          protoc: true
+          wasm-pack: true
+      - run: make test-vrl
 
-      - name: Check version
-        run: make check-version
-
-      - name: Check scripts
-        run: make check-scripts
-
-      - name: Check events
-        if: needs.changes.outputs.source == 'true'
-        run: make check-events
-
-      - name: Check that the 3rd-party license file is up to date
-        if: needs.changes.outputs.dependencies == 'true'
-        run: make check-licenses
-
-      - name: Check Cue docs
-        if: needs.changes.outputs.cue == 'true'
-        run: make check-docs
-
-      - name: Check Markdown
-        if: needs.changes.outputs.markdown == 'true'
-        run: make check-markdown
-
-      - name: Check Component Docs
-        if: needs.changes.outputs.source == 'true' || needs.changes.outputs.component_docs == 'true'
-        run: make check-component-docs
-
-      - name: Check Rust Docs
-        if: needs.changes.outputs.source == 'true'
-        run: cd rust-doc && make docs
-
-      - name: VRL - Linux
-        if: needs.changes.outputs.source == 'true' || needs.changes.outputs.cue == 'true'
-        run: cargo vdev test-vrl
-
-      - name: Build VRL Playground
-        if: needs.changes.outputs.source == 'true' || needs.changes.outputs.dependencies == 'true'
-        run: |
+  build-vrl-playground:
+    name: Build VRL Playground
+    runs-on: ubuntu-24.04-8core
+    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.dependencies == 'true' || needs.changes.outputs.test-yml == 'true' }}
+    needs: changes
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
+          wasm-pack: true
+      - run: |
           cd lib/vector-vrl/web-playground/
-          ~/.cargo/bin/rustup target add wasm32-unknown-unknown
+          rustup target add wasm32-unknown-unknown
           wasm-pack build --target web --out-dir public/pkg
 
-  # This is a required status check, so it always needs to run if prior jobs failed, in order to mark the status correctly.
   all-checks:
     name: Test Suite
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
     if: always()
-    needs: [changes, checks]
-    env:
-      FAILED: ${{ contains(needs.*.result, 'failure') }}
+    needs:
+      - changes
+      - check-fmt
+      - check-clippy
+      - test
+      - check-scripts
+      - check-events
+      - check-licenses
+      - check-docs
+      - check-markdown
+      - check-generated-docs
+      - check-rust-docs
+      - test-vrl
+      - build-vrl-playground
     steps:
-      - run: |
-          echo "failed=${{ env.FAILED }}"
-          if [[ "$FAILED" == "true" ]] ; then
+      - name: Check all jobs status
+        run: |
+          if [[ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
+            echo "One or more jobs failed or were cancelled"
             exit 1
           else
-            exit 0
+            echo "All jobs completed successfully"
           fi

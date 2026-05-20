@@ -47,7 +47,7 @@ components: sources: syslog: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.syslog.configuration
+	configuration: generated.components.sources.syslog.configuration
 
 	output: logs: line: {
 		description: "An individual Syslog event"

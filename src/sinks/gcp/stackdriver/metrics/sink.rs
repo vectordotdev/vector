@@ -1,5 +1,6 @@
 use vector_lib::event::{Metric, MetricValue};
 
+use super::request_builder::StackdriverMetricsRequestBuilder;
 use crate::sinks::{
     prelude::*,
     util::{
@@ -7,8 +8,6 @@ use crate::sinks::{
         http::HttpRequest,
     },
 };
-
-use super::request_builder::StackdriverMetricsRequestBuilder;
 
 #[derive(Clone, Debug, Default)]
 struct StackdriverMetricsNormalize;

@@ -1,6 +1,5 @@
 use anyhow::{Ok, Result};
-use std::fs::File;
-use std::io::Write;
+use std::{fs::File, io::Write};
 
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
@@ -8,7 +7,7 @@ use std::os::unix::fs::PermissionsExt;
 use crate::app;
 use std::path::Path;
 
-const SIGNOFF_HOOK: &str = r#"#!/bin/bash
+const SIGNOFF_HOOK: &str = r#"#!/usr/bin/env bash
 set -euo pipefail
 
 # Automatically sign off your commits.

@@ -66,7 +66,7 @@ components: sources: host_metrics: {
 		}
 	}
 
-	configuration: base.components.sources.host_metrics.configuration
+	configuration: generated.components.sources.host_metrics.configuration
 
 	output: metrics: {
 		_host_metrics_tags: {

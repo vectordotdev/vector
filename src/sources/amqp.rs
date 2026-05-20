@@ -1,40 +1,42 @@
 //! `AMQP` source.
 //! Handles version AMQP 0.9.1 which is used by RabbitMQ.
-use crate::{
-    amqp::AmqpConfig,
-    codecs::{Decoder, DecodingConfig},
-    config::{SourceConfig, SourceContext, SourceOutput},
-    event::{BatchNotifier, BatchStatus},
-    internal_events::{
-        source::{AmqpAckError, AmqpBytesReceived, AmqpEventError, AmqpRejectError},
-        StreamClosedError,
-    },
-    serde::{bool_or_struct, default_decoding, default_framing_message_based},
-    shutdown::ShutdownSignal,
-    SourceSender,
-};
+use std::{io::Cursor, pin::Pin};
+
 use async_stream::stream;
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use futures::{FutureExt, StreamExt};
 use futures_util::Stream;
-use lapin::{acker::Acker, message::Delivery, Channel};
+use lapin::{Acker, Channel, message::Delivery, options::BasicQosOptions};
 use snafu::Snafu;
-use std::{io::Cursor, pin::Pin};
-use tokio_util::codec::FramedRead;
-use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig};
-use vector_lib::configurable::configurable_component;
-use vector_lib::lookup::{lookup_v2::OptionalValuePath, metadata_path, owned_value_path, path};
 use vector_lib::{
-    config::{log_schema, LegacyKey, LogNamespace, SourceAcknowledgementsConfig},
-    event::{Event, LogEvent},
     EstimatedJsonEncodedSizeOf,
-};
-use vector_lib::{
+    codecs::{
+        DecoderFramedRead,
+        decoding::{DeserializerConfig, FramingConfig},
+    },
+    config::{LegacyKey, LogNamespace, SourceAcknowledgementsConfig, log_schema},
+    configurable::configurable_component,
+    event::{Event, LogEvent},
     finalizer::UnorderedFinalizer,
     internal_event::{CountByteSize, EventsReceived, InternalEventHandle as _},
+    lookup::{lookup_v2::OptionalValuePath, metadata_path, owned_value_path, path},
 };
 use vrl::value::Kind;
+
+use crate::{
+    SourceSender,
+    amqp::AmqpConfig,
+    codecs::{Decoder, DecodingConfig},
+    config::{SourceConfig, SourceContext, SourceOutput},
+    event::{BatchNotifier, BatchStatus},
+    internal_events::{
+        StreamClosedError,
+        source::{AmqpAckError, AmqpBytesReceived, AmqpEventError, AmqpRejectError},
+    },
+    serde::{bool_or_struct, default_decoding, default_framing_message_based},
+    shutdown::ShutdownSignal,
+};
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -100,6 +102,17 @@ pub struct AmqpSourceConfig {
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     pub(crate) acknowledgements: SourceAcknowledgementsConfig,
+
+    /// Maximum number of unacknowledged messages the broker will deliver to this consumer.
+    ///
+    /// This controls flow control via AMQP QoS prefetch. Lower values limit memory usage and
+    /// prevent overwhelming slow consumers, but may reduce throughput. Higher values increase
+    /// throughput but consume more memory.
+    ///
+    /// If not set, the broker/client default applies (often unlimited).
+    #[serde(default)]
+    #[configurable(metadata(docs::examples = 100))]
+    pub(crate) prefetch_count: Option<u16>,
 }
 
 fn default_queue() -> String {
@@ -311,7 +324,7 @@ async fn receive_event(
 ) -> Result<(), ()> {
     let payload = Cursor::new(Bytes::copy_from_slice(&msg.data));
     let decoder = config.decoder(log_namespace).map_err(|_e| ())?;
-    let mut stream = FramedRead::new(payload, decoder);
+    let mut stream = DecoderFramedRead::new(payload, decoder);
 
     // Extract timestamp from AMQP message
     let timestamp = msg
@@ -422,17 +435,28 @@ async fn run_amqp_source(
     let (finalizer, mut ack_stream) =
         UnorderedFinalizer::<FinalizerEntry>::maybe_new(acknowledgements, Some(shutdown.clone()));
 
+    // Apply AMQP QoS (prefetch) before starting consumption.
+    if let Some(count) = config.prefetch_count {
+        // per-consumer prefetch (global = false)
+        channel
+            .basic_qos(count, BasicQosOptions { global: false })
+            .await
+            .map_err(|error| {
+                error!(message = "Failed to apply basic_qos.", ?error);
+            })?;
+    }
+
     debug!("Starting amqp source, listening to queue {}.", config.queue);
     let mut consumer = channel
         .basic_consume(
-            &config.queue,
-            &config.consumer,
+            config.queue.clone().into(),
+            config.consumer.clone().into(),
             lapin::options::BasicConsumeOptions::default(),
             lapin::types::FieldTable::default(),
         )
         .await
         .map_err(|error| {
-            error!(message = "Failed to consume.", error = ?error, internal_log_rate_limit = true);
+            error!(message = "Failed to consume.", ?error);
         })?
         .fuse();
     let mut shutdown = shutdown.fuse();
@@ -490,9 +514,7 @@ async fn handle_ack(status: BatchStatus, entry: FinalizerEntry) {
 
 #[cfg(test)]
 pub mod test {
-    use vector_lib::lookup::OwnedTargetPath;
-    use vector_lib::schema::Definition;
-    use vector_lib::tls::TlsConfig;
+    use vector_lib::{lookup::OwnedTargetPath, schema::Definition, tls::TlsConfig};
     use vrl::value::kind::Collection;
 
     use super::*;
@@ -511,8 +533,7 @@ pub mod test {
         let pass = std::env::var("AMQP_PASSWORD").unwrap_or_else(|_| "guest".to_string());
         let host = std::env::var("AMQP_HOST").unwrap_or_else(|_| "rabbitmq".to_string());
         let vhost = std::env::var("AMQP_VHOST").unwrap_or_else(|_| "%2f".to_string());
-        config.connection.connection_string =
-            format!("amqp://{}:{}@{}:5672/{}", user, pass, host, vhost);
+        config.connection.connection_string = format!("amqp://{user}:{pass}@{host}:5672/{vhost}");
 
         config
     }
@@ -528,8 +549,7 @@ pub mod test {
         let host = std::env::var("AMQP_HOST").unwrap_or_else(|_| "rabbitmq".to_string());
         let ca_file =
             std::env::var("AMQP_CA_FILE").unwrap_or_else(|_| "/certs/ca.cert.pem".to_string());
-        config.connection.connection_string =
-            format!("amqps://{}:{}@{}/{}", user, pass, host, vhost);
+        config.connection.connection_string = format!("amqps://{user}:{pass}@{host}/{vhost}");
         let tls = TlsConfig {
             ca_file: Some(ca_file.as_str().into()),
             ..Default::default()
@@ -603,40 +623,42 @@ pub mod test {
     }
 }
 
-/// Integration tests use the docker compose files in `scripts/integration/docker-compose.amqp.yml`.
+/// Integration tests use the docker compose files in `tests/integration/docker-compose.amqp.yml`.
 #[cfg(feature = "amqp-integration-tests")]
 #[cfg(test)]
 mod integration_test {
-    use super::test::*;
-    use super::*;
+    use chrono::Utc;
+    use lapin::types::ShortString;
+    use lapin::{BasicProperties, options::*};
+    use tokio::time::Duration;
+    use vector_lib::config::log_schema;
+
+    use super::{test::*, *};
     use crate::{
+        SourceSender,
         amqp::await_connection,
         shutdown::ShutdownSignal,
         test_util::{
-            components::{run_and_assert_source_compliance, SOURCE_TAGS},
+            components::{SOURCE_TAGS, run_and_assert_source_compliance},
             random_string,
         },
-        SourceSender,
     };
-    use chrono::Utc;
-    use lapin::options::*;
-    use lapin::BasicProperties;
-    use tokio::time::Duration;
-    use vector_lib::config::log_schema;
 
     #[tokio::test]
     async fn amqp_source_create_ok() {
         let config = make_config();
         await_connection(&config.connection).await;
-        assert!(amqp_source(
-            &config,
-            ShutdownSignal::noop(),
-            SourceSender::new_test().0,
-            LogNamespace::Legacy,
-            false,
-        )
-        .await
-        .is_ok());
+        assert!(
+            amqp_source(
+                &config,
+                ShutdownSignal::noop(),
+                SourceSender::new_test().0,
+                LogNamespace::Legacy,
+                false,
+            )
+            .await
+            .is_ok()
+        );
     }
 
     #[tokio::test]
@@ -644,15 +666,17 @@ mod integration_test {
         let config = make_tls_config();
         await_connection(&config.connection).await;
 
-        assert!(amqp_source(
-            &config,
-            ShutdownSignal::noop(),
-            SourceSender::new_test().0,
-            LogNamespace::Legacy,
-            false,
-        )
-        .await
-        .is_ok());
+        assert!(
+            amqp_source(
+                &config,
+                ShutdownSignal::noop(),
+                SourceSender::new_test().0,
+                LogNamespace::Legacy,
+                false,
+            )
+            .await
+            .is_ok()
+        );
     }
 
     async fn send_event(
@@ -668,8 +692,8 @@ mod integration_test {
 
         channel
             .basic_publish(
-                exchange,
-                routing_key,
+                exchange.into(),
+                routing_key.into(),
                 BasicPublishOptions::default(),
                 payload.as_ref(),
                 BasicProperties::default(),
@@ -685,6 +709,7 @@ mod integration_test {
         let queue = format!("test-{}-queue", random_string(10));
         let routing_key = "my_key";
         trace!("Test exchange name: {}.", exchange);
+        let exchange: ShortString = exchange.into();
         let consumer = format!("test-consumer-{}", random_string(10));
 
         config.consumer = consumer;
@@ -698,7 +723,7 @@ mod integration_test {
 
         channel
             .exchange_declare(
-                &exchange,
+                exchange.clone(),
                 lapin::ExchangeKind::Fanout,
                 exchange_opts,
                 lapin::types::FieldTable::default(),
@@ -710,9 +735,10 @@ mod integration_test {
             auto_delete: true,
             ..Default::default()
         };
+        let queue: ShortString = config.queue.clone().into();
         channel
             .queue_declare(
-                &config.queue,
+                queue.clone(),
                 queue_opts,
                 lapin::types::FieldTable::default(),
             )
@@ -721,9 +747,9 @@ mod integration_test {
 
         channel
             .queue_bind(
-                &config.queue,
-                &exchange,
-                "",
+                queue,
+                exchange.clone(),
+                "".into(),
                 lapin::options::QueueBindOptions::default(),
                 lapin::types::FieldTable::default(),
             )
@@ -734,7 +760,7 @@ mod integration_test {
         let now = Utc::now();
         send_event(
             &channel,
-            &exchange,
+            exchange.as_str(),
             routing_key,
             "my message",
             now.timestamp_millis(),
@@ -755,7 +781,7 @@ mod integration_test {
             .as_timestamp()
             .unwrap();
         assert!(log_ts.signed_duration_since(now) < chrono::Duration::seconds(1));
-        assert_eq!(log["exchange"], exchange.into());
+        assert_eq!(log["exchange"], exchange.as_str().into());
     }
 
     #[tokio::test]

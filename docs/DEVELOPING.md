@@ -1,8 +1,6 @@
 # Developing
 
 - [Setup](#setup)
-  - [Using a Docker or Podman environment](#using-a-docker-or-podman-environment)
-  - [Bring your own toolbox](#bring-your-own-toolbox)
 - [The basics](#the-basics)
   - [Directory structure](#directory-structure)
   - [Makefile](#makefile)
@@ -14,6 +12,7 @@
   - [Minimum Supported Rust Version](#minimum-supported-rust-version)
 - [Guidelines](#guidelines)
   - [Sink healthchecks](#sink-healthchecks)
+  - [Disabling internal log rate limiting](#disabling-internal-log-rate-limiting)
 - [Testing](#testing)
   - [Unit tests](#unit-tests)
   - [Integration tests](#integration-tests)
@@ -40,95 +39,39 @@
 
 ## Setup
 
-We're super excited to have you interested in working on Vector! Before you start you should pick how you want to develop.
-
-For small or first-time contributions, we recommend the Docker method. Prefer to do it yourself? That's fine too!
-
-### Using a Docker or Podman environment
-
-> **Targets:** You can use this method to produce AARCH64, Arm6/7, as well as x86/64 Linux builds.
-
-Since not everyone has a full working native environment, we took our environment and stuffed it into a Docker (or Podman) container!
-
-This is ideal for users who want it to "Just work" and just want to start contributing. It's also what we use for our CI, so you know if it breaks we can't do anything else until we fix it. 😉
-
-**Before you go further, install Docker or Podman through your official package manager, or from the [Docker](https://docs.docker.com/get-docker/) or [Podman](https://podman.io/) sites.**
-
-```bash
-# Optional: Only if you use `podman`
-export CONTAINER_TOOL="podman"
-```
-
-If your Linux environment runs SELinux in Enforcing mode, you will need to relabel the vector source code checkout with `container_home_t` context. Otherwise, the container environment cannot read/write the code:
-
-```bash
-cd your/checkout/of/vector/
-sudo semanage fcontext -a "${PWD}(/.*)?" -t container_file_t
-sudo restorecon . -R
-```
-
-By default, `make environment` style tasks will do a `docker pull` from GitHub's container repository, you can **optionally** build your own environment while you make your morning coffee ☕:
-
-```bash
-# Optional: Only if you want to go make a coffee
-make environment-prepare
-```
-
-Now that you have your coffee, you can enter the shell!
-
-```bash
-# Enter a shell with optimized mounts for interactive processes.
-# Inside here, you can use Vector like you have full toolchain (See below!)
-make environment
-# Try out a specific container tool. (Docker/Podman)
-make environment CONTAINER_TOOL="podman"
-# Add extra cli opts
-make environment CLI_OPTS="--publish 3000:2000"
-```
-
-Now you can use the jobs detailed in **"Bring your own toolbox"** below.
-
-Want to run from outside of the environment? _Clever. Good thinking._ You can run any of the following:
-
-```bash
-# Validate your code can compile
-make check ENVIRONMENT=true
-# Validate your code actually does compile (in dev mode)
-make build-dev ENVIRONMENT=true
-# Validate your test pass
-make test SCOPE="sources::example" ENVIRONMENT=true
-# Validate tests (that do not require other services) pass
-make test ENVIRONMENT=true
-# Validate your tests pass (starting required services in Docker)
-make test-integration SCOPE="sources::example" ENVIRONMENT=true
-# Validate your tests pass against a live service.
-make test-integration SCOPE="sources::example" AUTOSPAWN=false ENVIRONMENT=true
-# Validate all tests pass (starting required services in Docker)
-make test-integration ENVIRONMENT=true
-# Run your benchmarks
-make bench SCOPE="transforms::example" ENVIRONMENT=true
-# Format your code before pushing!
-make fmt ENVIRONMENT=true
-```
-
-We use explicit environment opt-in as many contributors choose to keep their Rust toolchain local.
-
-### Bring your own toolbox
-
-> **Targets:** This option is required for MSVC/Mac/FreeBSD toolchains. It can be used to build for any environment or OS.
+We're super excited to have you interested in working on Vector!
 
 To build Vector on your own host will require a fairly complete development environment!
 
 Loosely, you'll need the following:
 
 - **To build Vector:** Have working Rustup, Protobuf tools, C++/C build tools (LLVM, GCC, or MSVC), Python, and Perl, `make` (the GNU one preferably), `bash`, `cmake`, `GNU coreutils`, and `autotools`.
+  - You may also need to install `libsasl2` if you are compiling with default features or with any `kafka`-related features.
+    - Installing libsasl2 on Ubuntu
+      - Run `sudo apt-get install -y libsasl2-dev`
+    - Installing libsasl2 on MacOS
+      - Run `brew install cyrus-sasl`
+      - You will need to set the following environment variables:
+
+        ```bash
+        export LDFLAGS="-L$(brew --prefix cyrus-sasl)/lib $LDFLAGS"
+        export CPPFLAGS="-I$(brew --prefix cyrus-sasl)/include $CPPFLAGS"
+        export PKG_CONFIG_PATH="$(brew --prefix cyrus-sasl)/lib/pkgconfig:$PKG_CONFIG_PATH"
+        ```
+
 - **To run `make test`:** Install [`cargo-nextest`](https://nexte.st/)
 - **To run integration tests:** Have `docker` available, or a real live version of that service. (Use `AUTOSPAWN=false`)
 - **To run `make check-component-features`:** Have `remarshal` installed.
-- **To run `make check-licenses` or `cargo vdev build licenses`:** Have `dd-rust-license-tool` [installed](https://github.com/DataDog/rust-license-tool).
-- **To run `cargo vdev build component-docs`:** Have `cue` [installed](https://cuelang.org/docs/install/).
+- **To run `make check-licenses` or `make build-licenses`:** Have `dd-rust-license-tool` [installed](https://github.com/DataDog/rust-license-tool).
+- **To run `make generate-docs`:** Have `cue` [installed](https://cuelang.org/docs/install/).
 
-If you find yourself needing to run something inside the Docker environment described above, that's totally fine, they won't collide or hurt each other. In this case, you'd just run `make environment-generate`.
+**Tooling shortcut:** Once the system-level dependencies above are in place, you can install the Rust and npm tooling (`cargo-nextest`, `cargo-deny`, `dd-rust-license-tool`, `vdev`, `markdownlint-cli2`, `prettier`, and others) in one shot:
+
+```bash
+bash scripts/environment/prepare.sh
+```
+
+This is the same script CI uses to provision its toolchain, so what you get locally matches what CI installs.
 
 We're interested in reducing our dependencies if simple options exist. Got an idea? Try it out, we'd love to hear of your successes and failures!
 
@@ -140,7 +83,6 @@ cargo check
 make check
 # Validate your code actually does compile (in dev mode)
 cargo build
-make build-dev
 # Validate your test pass
 cargo test sources::example
 make test SCOPE="sources::example"
@@ -160,8 +102,8 @@ cargo bench transforms::example
 # Format your code before pushing!
 make fmt
 cargo fmt
-# Build component documentation for the website
-cargo vdev build component-docs
+# Build component and VRL documentation for the website
+make generate-docs
 ```
 
 If you run `make` you'll see a full list of all our tasks. Some of these will start Docker containers, sign commits, or even make releases. These are not common development commands and your mileage may vary.
@@ -328,6 +270,28 @@ that fall into a false negative circumstance. Our goal should be to minimize the
 likelihood of users needing to pull that lever while still making a good effort
 to detect common problems.
 
+### Disabling internal log rate limiting
+
+Vector rate limits its own internal logs by default (10-second windows). During development, you may want to see all log occurrences.
+
+**Globally** (CLI flag or environment variable):
+
+```bash
+vector --config vector.yaml -r 1
+# or
+VECTOR_INTERNAL_LOG_RATE_LIMIT=1 vector --config vector.yaml
+```
+
+**Per log statement**:
+
+```rust
+// Disable rate limiting for this log
+warn!(message = "Error occurred.", %error, internal_log_rate_limit = false);
+
+// Override rate limit window to 1 second
+info!(message = "Processing batch.", batch_size, internal_log_rate_secs = 1);
+```
+
 ## Testing
 
 Testing is very important since Vector's primary design principle is reliability.
@@ -412,14 +376,7 @@ tests related only to this component, the following approach can reduce waiting
 times:
 
 1. Install [cargo-watch](https://github.com/passcod/cargo-watch).
-2. (Only for GNU/Linux) Install LLVM 9 (for example, package `llvm-9` on Debian)
-   and set `RUSTFLAGS` environment variable to use `lld` as the linker:
-
-   ```sh
-   export RUSTFLAGS='-Clinker=clang-9 -Clink-arg=-fuse-ld=lld'
-   ```
-
-3. Run in the root directory of Vector's source
+2. Run in the root directory of Vector's source
 
    ```sh
    cargo watch -s clear -s \
@@ -438,8 +395,8 @@ times:
 
 We use `flog` to build a sample set of log files to test sending logs from a
 file. This can be done with the following commands on Mac with `homebrew`.
-Installation instruction for flog can be found
-[here](https://github.com/mingrammer/flog#installation).
+Installation instruction for flog can be found in the
+[flog README](https://github.com/mingrammer/flog#installation).
 
 ```bash
 flog --bytes $((100 * 1024 * 1024)) > sample.log

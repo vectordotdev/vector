@@ -4,10 +4,11 @@ use bytes::Bytes;
 use futures::{FutureExt, SinkExt};
 use http::{Request, StatusCode, Uri};
 use serde_json::json;
-use vector_lib::configurable::configurable_component;
-use vector_lib::sensitive_string::SensitiveString;
-use vrl::event_path;
-use vrl::value::{Kind, Value};
+use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
+use vrl::{
+    event_path,
+    value::{Kind, Value},
+};
 
 use crate::{
     codecs::Transformer,
@@ -16,9 +17,9 @@ use crate::{
     http::{Auth, HttpClient},
     schema,
     sinks::util::{
-        http::{HttpEventEncoder, HttpSink, PartitionHttpSink},
         BatchConfig, BoxedRawValue, JsonArrayBuffer, PartitionBuffer, PartitionInnerBuffer,
         RealtimeSizeBasedDefaultBatchSettings, TowerRequestConfig, UriSerde,
+        http::{HttpEventEncoder, HttpSink, PartitionHttpSink},
     },
     template::{Template, TemplateRenderingError},
 };
@@ -171,7 +172,7 @@ impl SinkConfig for MezmoConfig {
             batch_settings.timeout,
             client.clone(),
         )
-        .sink_map_err(|error| error!(message = "Fatal mezmo sink error.", %error));
+        .sink_map_err(|error| error!(message = "Fatal mezmo sink error.", %error, internal_log_rate_limit = false));
 
         let healthcheck = healthcheck(self.clone(), client).boxed();
 
@@ -367,7 +368,7 @@ impl MezmoConfig {
     fn build_uri(&self, query: &str) -> Uri {
         let host = &self.endpoint.uri;
 
-        let uri = format!("{}{}?{}", host, PATH, query);
+        let uri = format!("{host}{PATH}?{query}");
 
         uri.parse::<http::Uri>()
             .expect("This should be a valid uri")
@@ -394,9 +395,9 @@ async fn healthcheck(config: MezmoConfig, client: HttpClient) -> crate::Result<(
 
 #[cfg(test)]
 mod tests {
-    use futures::{channel::mpsc, StreamExt};
+    use futures::{StreamExt, channel::mpsc};
     use futures_util::stream;
-    use http::{request::Parts, StatusCode};
+    use http::{StatusCode, request::Parts};
     use serde_json::json;
     use vector_lib::event::{BatchNotifier, BatchStatus, Event, LogEvent};
 
@@ -405,8 +406,9 @@ mod tests {
         config::SinkConfig,
         sinks::util::test::{build_test_server_status, load_sink},
         test_util::{
-            components::{assert_sink_compliance, HTTP_SINK_TAGS},
-            next_addr, random_lines,
+            addr::next_addr,
+            components::{HTTP_SINK_TAGS, assert_sink_compliance},
+            random_lines,
         },
     };
 
@@ -478,11 +480,11 @@ mod tests {
         // Make sure we can build the config
         _ = config.build(cx.clone()).await.unwrap();
 
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         // Swap out the host so we can force send it
         // to our local server
         let endpoint = UriSerde {
-            uri: format!("http://{}", addr).parse::<http::Uri>().unwrap(),
+            uri: format!("http://{addr}").parse::<http::Uri>().unwrap(),
             auth: None,
         };
         config.endpoint = endpoint;
@@ -542,7 +544,7 @@ mod tests {
                 let (p, host) = hosts
                     .iter()
                     .enumerate()
-                    .find(|(_, host)| query.contains(&format!("hostname={}", host)))
+                    .find(|(_, host)| query.contains(&format!("hostname={host}")))
                     .expect("invalid hostname");
                 let lines = &partitions[p];
 

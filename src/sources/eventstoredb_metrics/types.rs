@@ -2,8 +2,8 @@ use std::sync::LazyLock;
 
 use regex::Regex;
 use serde::{
-    de::{self, Error, MapAccess, Unexpected, Visitor},
     Deserialize, Deserializer,
+    de::{self, Error, MapAccess, Unexpected, Visitor},
 };
 
 use crate::event::{Metric, MetricKind, MetricTags, MetricValue};
@@ -260,7 +260,7 @@ where
         {
             if let Some(caps) = PERCENT_REGEX.captures(value) {
                 caps[1].parse::<usize>().map_err(|err| {
-                    Error::custom(format!("could not parse percent value into usize: {}", err))
+                    Error::custom(format!("could not parse percent value into usize: {err}"))
                 })
             } else {
                 Err(de::Error::invalid_value(

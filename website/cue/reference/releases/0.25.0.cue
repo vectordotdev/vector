@@ -91,7 +91,7 @@ releases: "0.25.0": {
 				[`mod`](https://vrl.dev/functions#mod) function that was added in v0.24.0.
 
 				 Please see [the upgrade
-				 guide](/highlights/2022-10-04-0-25-0-upgrade-guide#module-removal) for more
+				 guide](/highlights/2022-10-04-0-25-0-upgrade-guide) for more
 				 details.
 				"""
 			pr_numbers: [14111, 14011]

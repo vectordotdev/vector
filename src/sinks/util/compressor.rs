@@ -3,7 +3,7 @@ use std::{io, io::BufWriter};
 use bytes::{BufMut, BytesMut};
 use flate2::write::{GzEncoder, ZlibEncoder};
 
-use super::{snappy::SnappyEncoder, zstd::ZstdEncoder, Compression};
+use super::{Compression, snappy::SnappyEncoder, zstd::ZstdEncoder};
 
 const GZIP_INPUT_BUFFER_CAPACITY: usize = 4_096;
 const ZLIB_INPUT_BUFFER_CAPACITY: usize = 4_096;

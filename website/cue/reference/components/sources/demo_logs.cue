@@ -39,7 +39,7 @@ components: sources: demo_logs: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.demo_logs.configuration
+	configuration: generated.components.sources.demo_logs.configuration
 
 	output: {
 		logs: line: {

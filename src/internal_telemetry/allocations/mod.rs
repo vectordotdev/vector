@@ -3,21 +3,23 @@
 mod allocator;
 use std::{
     sync::{
-        atomic::{AtomicBool, AtomicU64, Ordering},
         Mutex,
+        atomic::{AtomicBool, AtomicU64, Ordering},
     },
     thread,
     time::Duration,
 };
 
 use arr_macro::arr;
-use metrics::{counter, gauge};
 use rand_distr::num_traits::ToPrimitive;
+use vector_common::{
+    counter, gauge,
+    internal_event::{CounterName, GaugeName},
+};
 
 use self::allocator::Tracer;
-
 pub(crate) use self::allocator::{
-    without_allocation_tracing, AllocationGroupId, AllocationLayer, GroupedTraceableAllocator,
+    AllocationGroupId, AllocationLayer, GroupedTraceableAllocator, without_allocation_tracing,
 };
 
 const NUM_GROUPS: usize = 256;
@@ -145,26 +147,26 @@ pub fn init_allocation_tracing() {
                     let group_info = group.lock().unwrap();
                     if allocations_diff > 0 {
                         counter!(
-                            "component_allocated_bytes_total", "component_kind" => group_info.component_kind.clone(),
+                            CounterName::ComponentAllocatedBytesTotal, "component_kind" => group_info.component_kind.clone(),
                             "component_type" => group_info.component_type.clone(),
                             "component_id" => group_info.component_id.clone()).increment(allocations_diff);
                     }
                     if deallocations_diff > 0 {
                         counter!(
-                            "component_deallocated_bytes_total", "component_kind" => group_info.component_kind.clone(),
+                            CounterName::ComponentDeallocatedBytesTotal, "component_kind" => group_info.component_kind.clone(),
                             "component_type" => group_info.component_type.clone(),
                             "component_id" => group_info.component_id.clone()).increment(deallocations_diff);
                     }
                     if mem_used_diff > 0 {
                         gauge!(
-                            "component_allocated_bytes", "component_type" => group_info.component_type.clone(),
+                            GaugeName::ComponentAllocatedBytes, "component_type" => group_info.component_type.clone(),
                             "component_id" => group_info.component_id.clone(),
                             "component_kind" => group_info.component_kind.clone())
                             .increment(mem_used_diff.to_f64().expect("failed to convert mem_used from int to float"));
                     }
                     if mem_used_diff < 0 {
                         gauge!(
-                            "component_allocated_bytes", "component_type" => group_info.component_type.clone(),
+                            GaugeName::ComponentAllocatedBytes, "component_type" => group_info.component_type.clone(),
                             "component_id" => group_info.component_id.clone(),
                             "component_kind" => group_info.component_kind.clone())
                             .decrement(-mem_used_diff.to_f64().expect("failed to convert mem_used from int to float"));
@@ -190,19 +192,22 @@ pub fn acquire_allocation_group_id(
     component_type: String,
     component_kind: String,
 ) -> AllocationGroupId {
-    if let Some(group_id) = AllocationGroupId::register() {
-        if let Some(group_lock) = GROUP_INFO.get(group_id.as_raw() as usize) {
-            let mut writer = group_lock.lock().unwrap();
-            *writer = GroupInfo {
-                component_id,
-                component_kind,
-                component_type,
-            };
+    if let Some(group_id) = AllocationGroupId::register()
+        && let Some(group_lock) = GROUP_INFO.get(group_id.as_raw() as usize)
+    {
+        let mut writer = group_lock.lock().unwrap();
+        *writer = GroupInfo {
+            component_id,
+            component_kind,
+            component_type,
+        };
 
-            return group_id;
-        }
+        return group_id;
     }
 
-    warn!("Maximum number of registrable allocation group IDs reached ({}). Allocations for component '{}' will be attributed to the root allocation group.", NUM_GROUPS, component_id);
+    warn!(
+        "Maximum number of registrable allocation group IDs reached ({}). Allocations for component '{}' will be attributed to the root allocation group.",
+        NUM_GROUPS, component_id
+    );
     AllocationGroupId::ROOT
 }

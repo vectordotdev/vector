@@ -6,11 +6,11 @@ use std::{
 use tokio::{pin, sync::Barrier, time::sleep};
 
 use crate::{
+    Bufferable, WhenFull,
     topology::{
         channel::{BufferReceiver, BufferSender},
         test_util::{assert_current_send_capacity, build_buffer},
     },
-    Bufferable, WhenFull,
 };
 
 async fn assert_send_ok_with_capacities<T>(
@@ -90,7 +90,7 @@ where
 #[tokio::test]
 async fn test_sender_block() {
     // Get a non-overflow buffer in blocking mode with a capacity of 3.
-    let (mut tx, rx, _) = build_buffer(3, WhenFull::Block, None).await;
+    let (mut tx, rx, _) = build_buffer(3, WhenFull::Block, None);
 
     // We should be able to send three messages through unimpeded.
     assert_current_send_capacity(&mut tx, Some(3), None);
@@ -113,7 +113,7 @@ async fn test_sender_block() {
 #[tokio::test]
 async fn test_sender_drop_newest() {
     // Get a non-overflow buffer in "drop newest" mode with a capacity of 3.
-    let (mut tx, rx, _) = build_buffer(3, WhenFull::DropNewest, None).await;
+    let (mut tx, rx, _) = build_buffer(3, WhenFull::DropNewest, None);
 
     // We should be able to send three messages through unimpeded.
     assert_current_send_capacity(&mut tx, Some(3), None);
@@ -138,7 +138,7 @@ async fn test_sender_drop_newest() {
 async fn test_sender_overflow_block() {
     // Get an overflow buffer, where the overflow buffer is in blocking mode, and both the base
     // and overflow buffers have a capacity of 2.
-    let (mut tx, rx, _) = build_buffer(2, WhenFull::Overflow, Some(WhenFull::Block)).await;
+    let (mut tx, rx, _) = build_buffer(2, WhenFull::Overflow, Some(WhenFull::Block));
 
     // We should be able to send four message through unimpeded -- two for the base sender, and
     // two for the overflow sender.
@@ -164,7 +164,7 @@ async fn test_sender_overflow_block() {
 async fn test_sender_overflow_drop_newest() {
     // Get an overflow buffer, where the overflow buffer is in "drop newest" mode, and both the
     // base and overflow buffers have a capacity of 2.
-    let (mut tx, rx, _) = build_buffer(2, WhenFull::Overflow, Some(WhenFull::DropNewest)).await;
+    let (mut tx, rx, _) = build_buffer(2, WhenFull::Overflow, Some(WhenFull::DropNewest));
 
     // We should be able to send four message through unimpeded -- two for the base sender, and
     // two for the overflow sender.
@@ -190,7 +190,7 @@ async fn test_sender_overflow_drop_newest() {
 #[tokio::test]
 async fn test_buffer_metrics_normal() {
     // Get a regular blocking buffer.
-    let (mut tx, rx, handle) = build_buffer(5, WhenFull::Block, None).await;
+    let (mut tx, rx, handle) = build_buffer(5, WhenFull::Block, None);
 
     // Send three items through, and make sure the buffer usage stats reflect that.
     assert_current_send_capacity(&mut tx, Some(5), None);
@@ -217,7 +217,7 @@ async fn test_buffer_metrics_normal() {
 #[tokio::test]
 async fn test_buffer_metrics_drop_newest() {
     // Get a buffer that drops the newest items when full.
-    let (mut tx, rx, handle) = build_buffer(2, WhenFull::DropNewest, None).await;
+    let (mut tx, rx, handle) = build_buffer(2, WhenFull::DropNewest, None);
 
     // Send three items through, and make sure the buffer usage stats reflect that.
     assert_current_send_capacity(&mut tx, Some(2), None);

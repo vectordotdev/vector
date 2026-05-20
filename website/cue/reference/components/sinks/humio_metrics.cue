@@ -6,7 +6,7 @@ components: sinks: humio_metrics: {
 	classes:       sinks._humio.classes
 	features:      sinks._humio.features
 	support:       sinks._humio.support
-	configuration: base.components.sinks.humio_metrics.configuration
+	configuration: generated.components.sinks.humio_metrics.configuration
 
 	input: {
 		logs: false

@@ -4,22 +4,25 @@ use std::{
     time::Duration,
 };
 
-use base64::prelude::{Engine as _, BASE64_URL_SAFE};
+use base64::prelude::{BASE64_URL_SAFE, Engine as _};
 pub use goauth::scopes::Scope;
 use goauth::{
+    GoErr,
     auth::{JwtClaims, Token, TokenErr},
     credentials::Credentials,
-    GoErr,
 };
-use http::{uri::PathAndQuery, Uri};
+use http::{Uri, uri::PathAndQuery};
+use http_body::{Body as _, Collected};
 use hyper::header::AUTHORIZATION;
 use smpl_jwt::Jwt;
 use snafu::{ResultExt, Snafu};
 use tokio::sync::watch;
-use vector_lib::configurable::configurable_component;
-use vector_lib::sensitive_string::SensitiveString;
+use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
 
-use crate::{config::ProxyConfig, http::HttpClient, http::HttpError};
+use crate::{
+    config::ProxyConfig,
+    http::{HttpClient, HttpError},
+};
 
 const SERVICE_ACCOUNT_TOKEN_URL: &str =
     "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token";
@@ -257,7 +260,13 @@ impl InnerCreds {
 }
 
 async fn fetch_token(creds: &Credentials, scope: &Scope) -> crate::Result<Token> {
-    let claims = JwtClaims::new(creds.iss(), scope, creds.token_uri(), None, None);
+    let claims = JwtClaims::new(
+        creds.iss(),
+        std::slice::from_ref(scope),
+        creds.token_uri(),
+        None,
+        None,
+    );
     let rsa_key = creds.rsa_key().context(InvalidRsaKeySnafu)?;
     let jwt = Jwt::new(claims, rsa_key, None);
 
@@ -288,8 +297,10 @@ async fn get_token_implicit() -> Result<Token, GcpError> {
         .context(GetImplicitTokenSnafu)?;
 
     let body = res.into_body();
-    let bytes = hyper::body::to_bytes(body)
+    let bytes = body
+        .collect()
         .await
+        .map(Collected::to_bytes)
         .context(GetTokenBytesSnafu)?;
 
     // Token::from_str is irresponsible and may panic!

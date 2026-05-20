@@ -5,8 +5,8 @@ use std::cell::RefCell;
 use serde_json::Value;
 
 use crate::{
-    schema::{SchemaGenerator, SchemaObject},
     GenerateError, Metadata,
+    schema::{SchemaGenerator, SchemaObject},
 };
 
 /// A type that can be represented in a Vector configuration.
@@ -73,7 +73,7 @@ pub trait Configurable {
     ///
     /// If an error occurs while generating the schema, an error variant will be returned describing
     /// the issue.
-    fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError>
+    fn generate_schema(generator: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError>
     where
         Self: Sized;
 
@@ -133,8 +133,8 @@ impl ConfigurableRef {
     }
     pub(crate) fn generate_schema(
         &self,
-        gen: &RefCell<SchemaGenerator>,
+        generator: &RefCell<SchemaGenerator>,
     ) -> Result<SchemaObject, GenerateError> {
-        (self.generate_schema)(gen)
+        (self.generate_schema)(generator)
     }
 }

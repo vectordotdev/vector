@@ -3,12 +3,11 @@ use std::{
     net::SocketAddr,
     pin::Pin,
     task::{Context, Poll},
-    time::Duration,
 };
 
 use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
-use futures::{stream::BoxStream, task::noop_waker_ref, SinkExt, StreamExt};
+use futures::{SinkExt, StreamExt, stream::BoxStream, task::noop_waker_ref};
 use snafu::{ResultExt, Snafu};
 use tokio::{
     io::{AsyncRead, ReadBuf},
@@ -16,12 +15,14 @@ use tokio::{
     time::sleep,
 };
 use tokio_util::codec::Encoder;
-use vector_lib::configurable::configurable_component;
-use vector_lib::json_size::JsonSize;
-use vector_lib::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
+use vector_lib::{
+    ByteSizeOf, EstimatedJsonEncodedSizeOf, configurable::configurable_component,
+    json_size::JsonSize,
+};
 
 use crate::{
     codecs::Transformer,
+    common::backoff::ExponentialBackoff,
     dns,
     event::Event,
     internal_events::{
@@ -30,12 +31,11 @@ use crate::{
     },
     sink_ext::VecSinkExt,
     sinks::{
-        util::{
-            retries::ExponentialBackoff,
-            socket_bytes_sink::{BytesSink, ShutdownCheck},
-            EncodedEvent, SinkBuildError, StreamSink,
-        },
         Healthcheck, VectorSink,
+        util::{
+            EncodedEvent, SinkBuildError, StreamSink,
+            socket_bytes_sink::{BytesSink, ShutdownCheck},
+        },
     },
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, MaybeTlsStream, TlsEnableableConfig, TlsError},
@@ -106,10 +106,10 @@ impl TcpSinkConfig {
         &self,
         transformer: Transformer,
         encoder: impl Encoder<Event, Error = vector_lib::codecs::encoding::Error>
-            + Clone
-            + Send
-            + Sync
-            + 'static,
+        + Clone
+        + Send
+        + Sync
+        + 'static,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         let uri = self.address.parse::<http::Uri>()?;
         let host = uri.host().ok_or(SinkBuildError::MissingHost)?.to_string();
@@ -156,11 +156,9 @@ impl TcpConnector {
         Self::new(host, port, None, None.into(), None)
     }
 
-    const fn fresh_backoff() -> ExponentialBackoff {
+    fn fresh_backoff() -> ExponentialBackoff {
         // TODO: make configurable
-        ExponentialBackoff::from_millis(2)
-            .factor(250)
-            .max_delay(Duration::from_secs(60))
+        ExponentialBackoff::default()
     }
 
     async fn connect(&self) -> Result<MaybeTlsStream<TcpStream>, TcpError> {
@@ -177,16 +175,16 @@ impl TcpConnector {
             .await
             .context(ConnectSnafu)
             .map(|mut maybe_tls| {
-                if let Some(keepalive) = self.keepalive {
-                    if let Err(error) = maybe_tls.set_keepalive(keepalive) {
-                        warn!(message = "Failed configuring TCP keepalive.", %error);
-                    }
+                if let Some(keepalive) = self.keepalive
+                    && let Err(error) = maybe_tls.set_keepalive(keepalive)
+                {
+                    warn!(message = "Failed configuring TCP keepalive.", %error);
                 }
 
-                if let Some(send_buffer_bytes) = self.send_buffer_bytes {
-                    if let Err(error) = maybe_tls.set_send_buffer_bytes(send_buffer_bytes) {
-                        warn!(message = "Failed configuring send buffer size on TCP socket.", %error);
-                    }
+                if let Some(send_buffer_bytes) = self.send_buffer_bytes
+                    && let Err(error) = maybe_tls.set_send_buffer_bytes(send_buffer_bytes)
+                {
+                    warn!(message = "Failed configuring send buffer size on TCP socket.", %error);
                 }
 
                 maybe_tls
@@ -338,18 +336,18 @@ mod test {
     use tokio::net::TcpListener;
 
     use super::*;
-    use crate::test_util::{next_addr, trace_init};
+    use crate::test_util::{addr::next_addr, trace_init};
 
     #[tokio::test]
     async fn healthcheck() {
         trace_init();
 
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         let _listener = TcpListener::bind(&addr).await.unwrap();
         let good = TcpConnector::from_host_port(addr.ip().to_string(), addr.port());
         assert!(good.healthcheck().await.is_ok());
 
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         let bad = TcpConnector::from_host_port(addr.ip().to_string(), addr.port());
         assert!(bad.healthcheck().await.is_err());
     }

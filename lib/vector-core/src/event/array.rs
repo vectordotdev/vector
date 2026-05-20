@@ -2,22 +2,21 @@
 //! This module contains the definitions and wrapper types for handling
 //! arrays of type `Event`, in the various forms they may appear.
 
-use std::{iter, slice, sync::Arc, vec};
+use std::{iter, slice, vec};
 
-use futures::{stream, Stream};
+use futures::{Stream, stream};
 #[cfg(test)]
 use quickcheck::{Arbitrary, Gen};
 use vector_buffers::EventCount;
 use vector_common::{
     byte_size_of::ByteSizeOf,
-    config::ComponentKey,
     finalization::{AddBatchNotifier, BatchNotifier, EventFinalizers, Finalizable},
     json_size::JsonSize,
 };
 
 use super::{
-    EstimatedJsonEncodedSizeOf, Event, EventDataEq, EventFinalizer, EventMutRef, EventRef,
-    LogEvent, Metric, TraceEvent,
+    EstimatedJsonEncodedSizeOf, Event, EventDataEq, EventFinalizer, EventMetadata, EventMutRef,
+    EventRef, LogEvent, Metric, TraceEvent,
 };
 
 /// The type alias for an array of `LogEvent` elements.
@@ -142,38 +141,8 @@ pub enum EventArray {
 }
 
 impl EventArray {
-    /// Sets the `OutputId` in the metadata for all the events in this array.
-    pub fn set_output_id(&mut self, output_id: &Arc<ComponentKey>) {
-        match self {
-            EventArray::Logs(logs) => {
-                for log in logs {
-                    log.metadata_mut().set_source_id(Arc::clone(output_id));
-                }
-            }
-            EventArray::Metrics(metrics) => {
-                for metric in metrics {
-                    metric.metadata_mut().set_source_id(Arc::clone(output_id));
-                }
-            }
-            EventArray::Traces(traces) => {
-                for trace in traces {
-                    trace.metadata_mut().set_source_id(Arc::clone(output_id));
-                }
-            }
-        }
-    }
-
-    /// Sets the `source_type` in the metadata for all metric events in this array.
-    pub fn set_source_type(&mut self, source_type: &'static str) {
-        if let EventArray::Metrics(metrics) = self {
-            for metric in metrics {
-                metric.metadata_mut().set_source_type(source_type);
-            }
-        }
-    }
-
     /// Iterate over references to this array's events.
-    pub fn iter_events(&self) -> impl Iterator<Item = EventRef> {
+    pub fn iter_events(&self) -> impl Iterator<Item = EventRef<'_>> {
         match self {
             Self::Logs(array) => EventArrayIter::Logs(array.iter()),
             Self::Metrics(array) => EventArrayIter::Metrics(array.iter()),
@@ -182,7 +151,7 @@ impl EventArray {
     }
 
     /// Iterate over mutable references to this array's events.
-    pub fn iter_events_mut(&mut self) -> impl Iterator<Item = EventMutRef> {
+    pub fn iter_events_mut(&mut self) -> impl Iterator<Item = EventMutRef<'_>> {
         match self {
             Self::Logs(array) => EventArrayIterMut::Logs(array.iter_mut()),
             Self::Metrics(array) => EventArrayIterMut::Metrics(array.iter_mut()),
@@ -195,6 +164,27 @@ impl EventArray {
         match self {
             Self::Logs(array) => TypedArrayIterMut(Some(array.iter_mut())),
             _ => TypedArrayIterMut(None),
+        }
+    }
+
+    /// Applies a closure to each event's metadata in this array.
+    pub fn for_each_metadata_mut(&mut self, mut f: impl FnMut(&mut EventMetadata)) {
+        match self {
+            Self::Logs(logs) => {
+                for log in logs {
+                    f(log.metadata_mut());
+                }
+            }
+            Self::Metrics(metrics) => {
+                for metric in metrics {
+                    f(metric.metadata_mut());
+                }
+            }
+            Self::Traces(traces) => {
+                for trace in traces {
+                    f(trace.metadata_mut());
+                }
+            }
         }
     }
 }
@@ -333,7 +323,7 @@ impl Arbitrary for EventArray {
         let choice: u8 = u8::arbitrary(g);
         // Quickcheck can't derive Arbitrary for enums, see
         // https://github.com/BurntSushi/quickcheck/issues/98
-        if choice % 2 == 0 {
+        if choice.is_multiple_of(2) {
             let mut logs = Vec::new();
             for _ in 0..len {
                 logs.push(LogEvent::arbitrary(g));

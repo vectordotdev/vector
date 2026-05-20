@@ -1,8 +1,9 @@
 ---
+date: "2025-01-31"
 title: Config Autocompletion Guide
 short: Config Autocompletion
 description: Learn how to generate the Vector schema and use it for IDE autocompletion.
-author_github: https://github.com/pront
+authors: ["pront"]
 domain: dev
 tags: [ "dev", "ide", "autocompletion", "config", "guides", "guide" ]
 aliases: [ "/docs/guides/developer/config-autocompletion.md" ]
@@ -12,7 +13,7 @@ weight: 2
 {{< requirement >}}
 This guide assumes you understand [basic Vector concepts][concepts]
 
-[concepts]: /docs/about/concepts
+[concepts]: /docs/introduction/concepts
 {{< /requirement >}}
 
 Vector provides CLI [subcommands][subcommands] to perform various tasks apart from running pipelines. This short guide focuses on how to
@@ -36,11 +37,11 @@ vector generate-schema -o vector-v0.45.0-schema.json
 1. `Settings | Languages & Frameworks | Schemas and DTDs | JSON Schema Mappings`
 2. Import `vector-v0.45.0-schema.json`
 
-You can find more details [here][jetbrains].
+You can find more details in the [JetBrains JSON schema documentation][jetbrains].
 
 ### Visual Studio Code
 
-Follow the guide [here][vscode].
+Follow the [VS Code YAML schema validation guide][vscode].
 
 ## Example
 

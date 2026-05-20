@@ -39,7 +39,7 @@ impl<S, F> AllowReadUntil<S, F> {
         &self.reader
     }
 
-    pub fn get_mut(&mut self) -> &mut S {
+    pub const fn get_mut(&mut self) -> &mut S {
         &mut self.reader
     }
 }
@@ -66,7 +66,7 @@ where
 mod tests {
     use futures::FutureExt;
     use tokio::{
-        fs::{remove_file, File},
+        fs::{File, remove_file},
         io::{AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter},
     };
 

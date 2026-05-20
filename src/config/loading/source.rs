@@ -15,6 +15,12 @@ impl SourceLoader {
     }
 }
 
+impl Default for SourceLoader {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Process for SourceLoader {
     /// Prepares input by simply reading bytes to a string. Unlike other loaders, there's no
     /// interpolation of environment variables. This is on purpose to preserve the original config.

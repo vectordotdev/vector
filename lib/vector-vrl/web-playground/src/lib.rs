@@ -1,13 +1,15 @@
+use std::collections::BTreeMap;
+
 use gloo_utils::format::JsValueSerdeExt;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
-use vrl::compiler::runtime::{Runtime, Terminate};
-use vrl::compiler::TimeZone;
-use vrl::compiler::{compile_with_state, CompileConfig, TargetValue, TypeState};
-use vrl::diagnostic::DiagnosticList;
-use vrl::diagnostic::Formatter;
-use vrl::value::Secrets;
-use vrl::value::Value;
+use vrl::{
+    compiler::{
+        CompileConfig, TargetValue, TimeZone, TypeState, compile_with_state,
+        runtime::{Runtime, Terminate},
+    },
+    diagnostic::{DiagnosticList, Formatter},
+    value::{Secrets, Value},
+};
 use wasm_bindgen::prelude::*;
 
 pub mod built_info {
@@ -29,18 +31,13 @@ impl Input {
     }
 }
 
-// The module returns the result of the last expression and the event that results from the
-// applied program
+// The module returns the result of the last expression, the resulting event,
+// and the execution time.
 #[derive(Deserialize, Serialize)]
 pub struct VrlCompileResult {
-    pub output: Value,
-    pub result: Value,
-}
-
-impl VrlCompileResult {
-    fn new(output: Value, result: Value) -> Self {
-        Self { output, result }
-    }
+    pub runtime_result: Value,
+    pub target_value: Value,
+    pub elapsed_time: Option<f64>,
 }
 
 #[derive(Deserialize, Serialize, Default)]
@@ -76,16 +73,34 @@ impl VrlDiagnosticResult {
     }
 }
 
-fn compile(mut input: Input) -> Result<VrlCompileResult, VrlDiagnosticResult> {
-    let mut functions = vrl::stdlib::all();
-    functions.extend(vector_vrl_functions::all());
-    functions.extend(enrichment::vrl_functions());
+fn compile(
+    mut input: Input,
+    tz_str: Option<String>,
+) -> Result<VrlCompileResult, VrlDiagnosticResult> {
+    let functions = vector_vrl_functions::all();
 
     let event = &mut input.event;
     let state = TypeState::default();
     let mut runtime = Runtime::default();
     let config = CompileConfig::default();
-    let timezone = TimeZone::default();
+
+    let timezone = match tz_str.as_deref() {
+        // Empty or "Default" tz string will default to tz default
+        None | Some("") | Some("Default") => TimeZone::default(),
+        Some(other) => match other.parse() {
+            Ok(tz) => TimeZone::Named(tz),
+            Err(_) => {
+                // Returns error message if tz parsing has failed.
+                // This avoids head scratching, instead of it silently using the default timezone.
+                let error_message = format!("Invalid timezone identifier: '{other}'");
+                return Err(VrlDiagnosticResult {
+                    list: vec![error_message.clone()],
+                    msg: error_message.clone(),
+                    msg_colorized: error_message,
+                });
+            }
+        },
+    };
 
     let mut target_value = TargetValue {
         value: event.clone(),
@@ -93,23 +108,39 @@ fn compile(mut input: Input) -> Result<VrlCompileResult, VrlDiagnosticResult> {
         secrets: Secrets::new(),
     };
 
-    let program = match compile_with_state(&input.program, &functions, &state, config) {
-        Ok(program) => program,
+    let compilation_result = match compile_with_state(&input.program, &functions, &state, config) {
+        Ok(result) => result,
         Err(diagnostics) => return Err(VrlDiagnosticResult::new(&input.program, diagnostics)),
     };
 
-    match runtime.resolve(&mut target_value, &program.program, &timezone) {
-        Ok(result) => Ok(VrlCompileResult::new(result, target_value.value)),
+    let (result, elapsed_time) =
+        if let Some(performance) = web_sys::window().and_then(|w| w.performance()) {
+            let start_time = performance.now();
+            let result = runtime.resolve(&mut target_value, &compilation_result.program, &timezone);
+            let end_time = performance.now();
+            (result, Some(end_time - start_time))
+        } else {
+            // If performance API is not available, run the program without timing.
+            let result = runtime.resolve(&mut target_value, &compilation_result.program, &timezone);
+            (result, None)
+        };
+
+    match result {
+        Ok(runtime_result) => Ok(VrlCompileResult {
+            runtime_result,                   // This is the value of the last expression.
+            target_value: target_value.value, // The value of the final event
+            elapsed_time,
+        }),
         Err(err) => Err(VrlDiagnosticResult::new_runtime_error(&input.program, err)),
     }
 }
 
 // The user-facing function
 #[wasm_bindgen]
-pub fn run_vrl(incoming: &JsValue) -> JsValue {
+pub fn run_vrl(incoming: &JsValue, tz_str: &str) -> JsValue {
     let input: Input = incoming.into_serde().unwrap();
 
-    match compile(input) {
+    match compile(input, Some(tz_str.to_string())) {
         Ok(res) => JsValue::from_serde(&res).unwrap(),
         Err(err) => JsValue::from_serde(&err).unwrap(),
     }
@@ -129,6 +160,7 @@ pub fn vector_link() -> String {
 pub fn vrl_version() -> String {
     built_info::VRL_VERSION.to_string()
 }
+
 #[wasm_bindgen]
 pub fn vrl_link() -> String {
     built_info::VRL_LINK.to_string()

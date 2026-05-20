@@ -3,7 +3,6 @@
 {{ $siteGeneration := site.Params.site_generation }}
 import '@ryangjchandler/spruce';
 import 'alpinejs';
-import './cookie-banner'
 
 const sayHello = () => {
   console.log('Welcome to the Vector website and documentation!');
@@ -42,7 +41,7 @@ const manageState = () => {
     // Home page platform tab
     platformTab: '{{ $defaultPlatformTab }}',
     // Config format
-    format: 'toml',
+    format: 'yaml',
 
     // Helper functions
     setFormat(f) {

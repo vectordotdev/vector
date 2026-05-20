@@ -5,6 +5,7 @@ use http::StatusCode;
 use snafu::Snafu;
 use std::sync::atomic::{AtomicI64, Ordering};
 use tracing::Instrument;
+use std::sync::atomic::{AtomicI64, Ordering};
 
 use crate::{
     http::{Auth, HttpClient},
@@ -16,6 +17,7 @@ pub struct LokiRetryLogic;
 
 impl RetryLogic for LokiRetryLogic {
     type Error = LokiError;
+    type Request = LokiRequest;
     type Response = LokiResponse;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {

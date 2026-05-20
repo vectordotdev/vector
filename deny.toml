@@ -6,8 +6,11 @@ allow = [
   "BSD-3-Clause",
   "BSL-1.0",
   "CC0-1.0",
+  "CDLA-Permissive-2.0",
   "ISC",
   "MIT",
+  "MIT-0",
+  "BlueOak-1.0.0",
   "OpenSSL",
   "Unicode-3.0",
   "Unicode-DFS-2016",
@@ -21,6 +24,7 @@ exceptions = [
     # compliance we cannot be modifying the source files.
     { allow = ["MPL-2.0"], name = "colored", version = "*" },
     { allow = ["MPL-2.0"], name = "webpki-roots", version = "*" },
+    { allow = ["MPL-2.0"], name = "vector-common-macros", version = "*" },
     { allow = ["MPL-2.0"], name = "vector-config-common", version = "*" },
     { allow = ["MPL-2.0"], name = "vector-config-macros", version = "*" },
     { allow = ["MPL-2.0"], name = "vrl", version = "*" },
@@ -36,28 +40,15 @@ license-files = [
 
 [advisories]
 ignore = [
-  # Vulnerability in `rsa` crate: https://rustsec.org/advisories/RUSTSEC-2023-0071.html
-  # There is not fix available yet.
-  # https://github.com/vectordotdev/vector/issues/19262
-  "RUSTSEC-2023-0071",
-  # Vulnerability in `tonic` crate: https://rustsec.org/advisories/RUSTSEC-2024-0376
-  # There is a fixed version (v0.12.3) but we are blocked from upgrading to `http` v1, which
-  # `tonic` v0.12 depends on. See https://github.com/vectordotdev/vector/issues/19179
-  "RUSTSEC-2024-0376",
-  # Advisory in rustls crate: https://rustsec.org/advisories/RUSTSEC-2024-0336 If a `close_notify`
-  # alert is received during a handshake, `complete_io` does not terminate.
-  # Vulnerable version only used in dev-dependencies
-  "RUSTSEC-2024-0336",
-  # idna accepts Punycode labels that do not produce any non-ASCII when decoded
-  # Need to update some direct dependencies before we can upgrade idna to fix
-  "RUSTSEC-2024-0421",
-  { id = "RUSTSEC-2021-0139", reason = " ansi_term is unmaintained" },
-  { id = "RUSTSEC-2024-0388", reason = "derivative is unmaintained" },
-  { id = "RUSTSEC-2024-0384", reason = "instant is unmaintained" },
-  { id = "RUSTSEC-2020-0168", reason = "mach is unmaintained" },
-  { id = "RUSTSEC-2024-0370", reason = "proc-macro-error is unmaintained" },
-  { id = "RUSTSEC-2024-0320", reason = "yaml-rust is unmaintained" },
-  { id = "RUSTSEC-2024-0436", reason = "paste is unmaintained" },
-  { id = "RUSTSEC-2025-0012", reason = "backoff is unmaintained" },
-  { id = "RUSTSEC-2025-0014", reason = "humantime is unmaintained" },
+  { id = "RUSTSEC-2023-0071", reason = "rsa marvin attack - unpatched upstream (https://github.com/vectordotdev/vector/issues/19262)" },
+  { id = "RUSTSEC-2024-0388", reason = "derivative is unmaintained (https://github.com/vectordotdev/vector/issues/24940)" },
+  { id = "RUSTSEC-2025-0134", reason = "rustls-pemfile is unmaintained - unpatched crate (https://github.com/bytebeamio/rumqtt/issues/1010) & tonic/reqwest upgrade (https://github.com/vectordotdev/vector/issues/19179)" },
+  { id = "RUSTSEC-2026-0049", reason = "rustls-webpki 0.102 is vulnerable - tonic upgrade (https://github.com/vectordotdev/vector/issues/19179)" },
+  { id = "RUSTSEC-2026-0098", reason = "rustls-webpki 0.102/0.101 is vulnerable - tonic upgrade (https://github.com/vectordotdev/vector/issues/19179)" },
+  { id = "RUSTSEC-2026-0099", reason = "rustls-webpki 0.102/0.101 is vulnerable - tonic upgrade (https://github.com/vectordotdev/vector/issues/19179)" },
+  { id = "RUSTSEC-2024-0436", reason = "paste crate is unmaintained - transitive dependency via parquet v56.2.0, no safe upgrade available" },
+  { id = "RUSTSEC-2026-0097", reason = "rand 0.8.5 unsound with custom logger - transitive dependency, upstream crates have not updated to rand 0.9+" },
+  { id = "RUSTSEC-2026-0104", reason = "rustls-webpki 0.102/0.101 CRL parsing panic - tonic upgrade (https://github.com/vectordotdev/vector/issues/19179); 0.103 already patched to 0.103.13" },
+  { id = "RUSTSEC-2026-0105", reason = "core2 is unmaintained and all versions yanked - transitive dependency via libflate -> apache-avro, no safe upgrade available" },
+  { id = "RUSTSEC-2026-0119", reason = "hickory-proto 0.24 - unpatched crate (https://github.com/mongodb/mongo-rust-driver/pull/1682)" },
 ]

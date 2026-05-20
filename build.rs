@@ -20,7 +20,7 @@ impl TrackedEnv {
 
     pub fn emit_rerun_stanzas(&self) {
         for env_var in &self.tracked {
-            println!("cargo:rerun-if-env-changed={}", env_var);
+            println!("cargo:rerun-if-env-changed={env_var}");
         }
     }
 }
@@ -33,9 +33,9 @@ enum ConstantValue {
 impl ConstantValue {
     pub fn as_parts(&self) -> (&'static str, String) {
         match &self {
-            ConstantValue::Required(value) => ("&str", format!("\"{}\"", value)),
+            ConstantValue::Required(value) => ("&str", format!("\"{value}\"")),
             ConstantValue::Optional(value) => match value {
-                Some(value) => ("Option<&str>", format!("Some(\"{}\")", value)),
+                Some(value) => ("Option<&str>", format!("Some(\"{value}\")")),
                 None => ("Option<&str>", "None".to_string()),
             },
         }
@@ -79,10 +79,8 @@ impl BuildConstants {
 
         for (name, desc, value) in self.values {
             let (const_type, const_val) = value.as_parts();
-            let full = format!(
-                "#[doc=r#\"{}\"#]\npub const {}: {} = {};\n",
-                desc, name, const_type, const_val
-            );
+            let full =
+                format!("#[doc=r#\"{desc}\"#]\npub const {name}: {const_type} = {const_val};\n");
             output_file.write_all(full.as_ref())?;
         }
 
@@ -106,13 +104,30 @@ fn git_short_hash() -> std::io::Result<String> {
     })
 }
 
+#[cfg(not(feature = "nightly"))]
+fn git_path(path: &str) -> std::io::Result<String> {
+    let output_result = Command::new("git")
+        .args(["rev-parse", "--git-path", path])
+        .output();
+
+    output_result.map(|output| {
+        String::from_utf8(output.stdout)
+            .expect("valid UTF-8")
+            .trim_end_matches(['\r', '\n'])
+            .to_owned()
+    })
+}
+
 fn main() {
     // Always rerun if the build script itself changes.
     println!("cargo:rerun-if-changed=build.rs");
 
     // re-run if the HEAD has changed. This is only necessary for non-release and nightly builds.
     #[cfg(not(feature = "nightly"))]
-    println!("cargo:rerun-if-changed=.git/HEAD");
+    println!(
+        "cargo:rerun-if-changed={}",
+        git_path("HEAD").expect("git HEAD path detection failed")
+    );
 
     #[cfg(feature = "protobuf-build")]
     {
@@ -122,6 +137,7 @@ fn main() {
         println!("cargo:rerun-if-changed=proto/vector/dd_trace.proto");
         println!("cargo:rerun-if-changed=proto/vector/ddsketch_full.proto");
         println!("cargo:rerun-if-changed=proto/vector/vector.proto");
+        println!("cargo:rerun-if-changed=proto/vector/observability.proto");
 
         // Create and store the "file descriptor set" from the compiled Protocol Buffers packages.
         //
@@ -135,7 +151,8 @@ fn main() {
         let mut prost_build = prost_build::Config::new();
         prost_build
             .btree_map(["."])
-            .file_descriptor_set_path(protobuf_fds_path);
+            .file_descriptor_set_path(protobuf_fds_path)
+            .extern_path(".event", "crate::event::proto"); // Use existing event types from vector-core
 
         tonic_build::configure()
             .protoc_arg("--experimental_allow_proto3_optional")
@@ -149,6 +166,7 @@ fn main() {
                     "proto/third-party/google/pubsub/v1/pubsub.proto",
                     "proto/third-party/google/rpc/status.proto",
                     "proto/vector/vector.proto",
+                    "proto/vector/observability.proto",
                 ],
                 &[
                     "proto/third-party",
@@ -202,10 +220,7 @@ fn main() {
         .map_err(|e| {
             #[allow(clippy::print_stderr)]
             {
-                eprintln!(
-                    "Unable to determine git short hash from rev-parse command: {}",
-                    e
-                );
+                eprintln!("Unable to determine git short hash from rev-parse command: {e}");
             }
         })
         .expect("git hash detection failed");

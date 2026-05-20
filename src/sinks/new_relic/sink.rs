@@ -47,7 +47,7 @@ impl From<std::io::Error> for NewRelicSinkError {
 
 impl From<NewRelicSinkError> for std::io::Error {
     fn from(error: NewRelicSinkError) -> Self {
-        Self::new(std::io::ErrorKind::Other, error)
+        Self::other(error)
     }
 }
 

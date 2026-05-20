@@ -1,32 +1,31 @@
 //! Service implementation for the `http` sink.
 
+use std::{collections::BTreeMap, str::FromStr};
+
 use bytes::Bytes;
 use http::{
+    HeaderName, HeaderValue, Method, Request,
     header::{CONTENT_ENCODING, CONTENT_TYPE},
-    HeaderName, HeaderValue, Method, Request, Uri,
-};
-use indexmap::IndexMap;
-
-use crate::{
-    http::Auth,
-    sinks::{
-        util::{
-            http::{HttpRequest, HttpServiceRequestBuilder},
-            UriSerde,
-        },
-        HTTPRequestBuilderSnafu,
-    },
 };
 use snafu::ResultExt;
 
-use super::config::HttpMethod;
+use super::{config::HttpMethod, sink::PartitionKey};
+use crate::{
+    http::{Auth, MaybeAuth},
+    sinks::{
+        HTTPRequestBuilderSnafu,
+        util::{
+            UriSerde,
+            http::{HttpRequest, HttpServiceRequestBuilder, OrderedHeaderName},
+        },
+    },
+};
 
 #[derive(Debug, Clone)]
 pub(super) struct HttpSinkRequestBuilder {
-    uri: UriSerde,
     method: HttpMethod,
     auth: Option<Auth>,
-    headers: IndexMap<HeaderName, HeaderValue>,
+    static_headers: BTreeMap<OrderedHeaderName, HeaderValue>,
     content_type: Option<String>,
     content_encoding: Option<String>,
 }
@@ -34,28 +33,35 @@ pub(super) struct HttpSinkRequestBuilder {
 impl HttpSinkRequestBuilder {
     /// Creates a new `HttpSinkRequestBuilder`
     pub(super) const fn new(
-        uri: UriSerde,
         method: HttpMethod,
         auth: Option<Auth>,
-        headers: IndexMap<HeaderName, HeaderValue>,
+        static_headers: BTreeMap<OrderedHeaderName, HeaderValue>,
         content_type: Option<String>,
         content_encoding: Option<String>,
     ) -> Self {
         Self {
-            uri,
             method,
             auth,
-            headers,
+            static_headers,
             content_type,
             content_encoding,
         }
     }
 }
 
-impl HttpServiceRequestBuilder<()> for HttpSinkRequestBuilder {
-    fn build(&self, mut request: HttpRequest<()>) -> Result<Request<Bytes>, crate::Error> {
+impl HttpServiceRequestBuilder<PartitionKey> for HttpSinkRequestBuilder {
+    fn build(
+        &self,
+        mut request: HttpRequest<PartitionKey>,
+    ) -> Result<Request<Bytes>, crate::Error> {
+        let metadata = request.get_additional_metadata();
+        let uri_serde = UriSerde::from_str(&metadata.uri)?;
+        let uri_auth = uri_serde.auth;
+        let uri = uri_serde.uri;
+
+        let auth = self.auth.choose_one(&uri_auth)?;
+
         let method: Method = self.method.into();
-        let uri: Uri = self.uri.uri.clone();
         let mut builder = Request::builder().method(method).uri(uri);
 
         if let Some(content_type) = &self.content_type {
@@ -71,8 +77,18 @@ impl HttpServiceRequestBuilder<()> for HttpSinkRequestBuilder {
             // The request building should not have errors at this point, and if it did it would fail in the call to `body()` also.
             .expect("Failed to access headers in http::Request builder- builder has errors.");
 
-        for (header, value) in self.headers.iter() {
-            headers.insert(header, value.clone());
+        // Static headers from config
+        for (header_name, header_value) in self.static_headers.iter() {
+            headers.insert(header_name.inner(), header_value.clone());
+        }
+
+        // Template headers from the partition key
+        for (name, value) in metadata.headers.iter() {
+            let header_name = HeaderName::from_bytes(name.as_bytes())
+                .map_err(|e| format!("Invalid header name '{name}': {e}"))?;
+            let header_value = HeaderValue::from_bytes(value.as_bytes())
+                .map_err(|e| format!("Invalid header value '{value}': {e}"))?;
+            headers.insert(header_name, header_value);
         }
 
         // The request building should not have errors at this point
@@ -81,7 +97,7 @@ impl HttpServiceRequestBuilder<()> for HttpSinkRequestBuilder {
             .context(HTTPRequestBuilderSnafu)
             .map_err(Into::<crate::Error>::into)?;
 
-        if let Some(auth) = &self.auth {
+        if let Some(auth) = auth {
             auth.apply(&mut request);
         }
 

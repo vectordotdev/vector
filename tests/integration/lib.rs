@@ -1,5 +1,5 @@
 use std::{
-    fs::{create_dir, OpenOptions},
+    fs::{OpenOptions, create_dir},
     io::Write,
     path::PathBuf,
 };
@@ -29,7 +29,6 @@ pub fn overwrite_file(path: PathBuf, config: &str) {
         .unwrap();
 
     file.write_all(config.as_bytes()).unwrap();
-    file.flush().unwrap();
     file.sync_all().unwrap();
 }
 

@@ -42,8 +42,8 @@ _All buffers_ MUST emit a `BufferCreated` event upon creation. To avoid stale me
   - `max_size_bytes` - the max size of the buffer in bytes if relevant
   - `max_size_events` - the max size of the buffer in number of events if relevant
 - Metric
-  - MUST emit the `buffer_max_event_size` gauge (in-memory buffers) if the defined `max_size_events` value is present
-  - MUST emit the `buffer_max_byte_size` gauge (disk buffers) if the defined `max_size_bytes` value is present
+  - MUST emit the `buffer_max_size_events` gauge (in-memory buffers) if the defined `max_size_events` value is present, and emit `buffer_max_event_size` for backward compatibility
+  - MUST emit the `buffer_max_size_bytes` gauge (disk buffers) if the defined `max_size_bytes` value is present, and emit `buffer_max_byte_size` for backward compatibility
 
 #### BufferEventsReceived
 
@@ -58,8 +58,8 @@ _All buffers_ MUST emit a `BufferEventsReceived` event:
 - Metric
   - MUST increment the `buffer_received_events_total` counter by the defined `count`
   - MUST increment the `buffer_received_bytes_total` counter by the defined `byte_size`
-  - MUST increment the `buffer_events` gauge by the defined `count`
-  - MUST increment the `buffer_byte_size` gauge by the defined `byte_size`
+  - MUST increment the `buffer_size_events` gauge by the defined `count`, and emit `buffer_events` for backward compatibility
+  - MUST increment the `buffer_size_bytes` gauge by the defined `byte_size`, and emit `buffer_byte_size` for backward compatibility
 
 #### BufferEventsSent
 
@@ -71,8 +71,8 @@ _All buffers_ MUST emit a `BufferEventsSent` event after sending one or more Vec
 - Metric
   - MUST increment the `buffer_sent_events_total` counter by the defined `count`
   - MUST increment the `buffer_sent_bytes_total` counter by the defined `byte_size`
-  - MUST decrement the `buffer_events` gauge by the defined `count`
-  - MUST decrement the `buffer_byte_size` gauge by the defined `byte_size`
+  - MUST decrement the `buffer_size_events` gauge by the defined `count`, and emit `buffer_events` for backward compatibility
+  - MUST decrement the `buffer_size_bytes` gauge by the defined `byte_size`, and emit `buffer_byte_size` for backward compatibility
 
 #### BufferError
 

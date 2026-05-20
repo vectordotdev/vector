@@ -18,14 +18,17 @@ metric events through Kafka. Metrics events are encoded into a format that
 mimics our [internal metrics data model], ideal for custom consumers on the
 other end. Getting started is easy:
 
-```toml
-[sources.host_metrics]
-type = "host_metrics"
+```yaml
+sources:
+  host_metrics:
+    type: "host_metrics"
 
-[sinks.kafka]
-type = "kafka"
-inputs = ["host_metrics"]
-encoding.codec = "json"
+sinks:
+  kafka:
+    type: "kafka"
+    inputs: ["host_metrics"]
+    encoding:
+      codec: "json"
 ```
 
 ## Caveats
@@ -37,4 +40,4 @@ source and sink will support. See [issue 5809] for more info.
 
 [issue 5809]: https://github.com/vectordotdev/vector/issues/5809
 [kafka_sink]: /docs/reference/configuration/sinks/kafka/
-[metrics data model]: /docs/about/under-the-hood/architecture/data-model/metric/#schema
+[metrics data model]: /docs/architecture/data-model/metric/#schema

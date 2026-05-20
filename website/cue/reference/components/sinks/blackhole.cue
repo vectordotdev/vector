@@ -30,7 +30,7 @@ components: sinks: blackhole: {
 		notices: []
 	}
 
-	configuration: base.components.sinks.blackhole.configuration
+	configuration: generated.components.sinks.blackhole.configuration
 
 	input: {
 		logs: true

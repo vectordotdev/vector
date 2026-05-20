@@ -4,7 +4,7 @@ description: Combine multi-line CSV rows into single events using the Lua transf
 authors: ["binarylogic"]
 domain: transforms
 transforms: ["lua"]
-weight: 3
+weight: 2
 tags: ["lua", "merge", "multiline", "multi-line", "advanced", "guides", "guide"]
 ---
 
@@ -14,7 +14,7 @@ tags: ["lua", "merge", "multiline", "multi-line", "advanced", "guides", "guide"]
 * You understand the [basic Vector concepts][docs.about.concepts] and understand [how to set up a basic pipeline][docs.setup.quickstart].
 * You know how to [parse CSV logs with Lua][guides.parsing-csv-logs-with-lua].
 
-[docs.about.concepts]: /docs/about/concepts
+[docs.about.concepts]: /docs/introduction/concepts
 [docs.setup.quickstart]: /docs/setup/quickstart
 [docs.transforms.lua]: /docs/reference/configuration/transforms/lua
 [guides.parsing-csv-logs-with-lua]: /guides/advanced/parsing-csv-logs-with-lua
@@ -43,44 +43,44 @@ in the [guide on parsing CSV logs][guides.parsing-csv-logs-with-lua]. The underl
 
 Such an algorithm can be implemented, for example, with the following transform config:
 
-```toml title="vector.toml"
-[transforms.lua]
-  inputs = []
-  type = "lua"
-  version = "2"
-  source = """
-    csv = require("csv") -- load the `lua-csv` module
-    expected_columns = 23 -- expected number of columns in incoming CSV lines
-    line_separator = "\\r\\n" -- note the double escaping required by the TOML format
-  """
-  hooks.process = """
-    function (event, emit)
-      merged_event = merge(event)
-      if merged_event == nil then -- a global variable containing the merged event
-        merged_event = event -- if it is empty, set it to the current event
-      else -- otherwise, concatenate the line in the stored merged event
-           -- with the next line
-        merged_event.log.message = merged_event.log.message ..
-                                  line_separator .. event.log.message
-      end
+```yaml title="vector.yaml"
+transforms:
+  lua:
+    inputs: []
+    type: "lua"
+    version: "2"
+    source: |
+      csv = require("csv") -- load the `lua-csv` module
+      expected_columns = 23 -- expected number of columns in incoming CSV lines
+      line_separator = "\r\n"
+    hooks:
+      process: |
+        function (event, emit)
+          merged_event = merge(event)
+          if merged_event == nil then -- a global variable containing the merged event
+            merged_event = event -- if it is empty, set it to the current event
+          else -- otherwise, concatenate the line in the stored merged event
+               -- with the next line
+            merged_event.log.message = merged_event.log.message ..
+                                      line_separator .. event.log.message
+          end
 
-      fields = csv.openstring(event.log.message):lines()() -- parse CSV
-      if #fields < expected_columns then
-        return -- not all fields are present in the merged event yet
-      end
+          fields = csv.openstring(event.log.message):lines()() -- parse CSV
+          if #fields < expected_columns then
+            return -- not all fields are present in the merged event yet
+          end
 
-      -- do something with the array of the parsed fields
-      merged_event.log.csv_fields = fields -- for example, just store them in an
-                                           -- array field
+          -- do something with the array of the parsed fields
+          merged_event.log.csv_fields = fields -- for example, just store them in an
+                                               -- array field
 
-      emit(merged_event) -- emit the resulting event
-      merged_event = nil -- clear the merged event
-    end
-  """
+          emit(merged_event) -- emit the resulting event
+          merged_event = nil -- clear the merged event
+        end
 ```
 
-In this code sample, the `source` option defines code that's executed when the transform is created.
-while the `hooks.process` option defines a function that's called for each incoming event.
+In this code sample, the `source` option defines code that is executed when the transform is created,
+while the `hooks.process` option defines a function that is called for each incoming event.
 
 ## How It Works
 
@@ -148,7 +148,7 @@ in checking out the following guides:
 * [Unit Testing Your Configs][guides.unit-testing]
 * [Custom Aggregations with Lua][guides.advanced.custom-aggregations-with-lua]
 
-[docs.about.concepts]: /docs/about/concepts/
+[docs.about.concepts]: /docs/introduction/concepts/
 [docs.setup.quickstart]: /docs/setup/quickstart/
 [docs.sources.file#multiline]: /docs/reference/configuration/sources/file/#multiline
 [docs.transforms.lua#source]: /docs/reference/configuration/transforms/lua/#source

@@ -1,20 +1,20 @@
+use std::borrow::Cow;
+
 use bytes::Bytes;
 use chrono::{DateTime, Datelike, Utc};
 use derivative::Derivative;
-use lookup::{event_path, owned_value_path, OwnedTargetPath, OwnedValuePath};
-use smallvec::{smallvec, SmallVec};
-use std::borrow::Cow;
+use lookup::{OwnedTargetPath, OwnedValuePath, event_path, owned_value_path};
+use smallvec::{SmallVec, smallvec};
 use syslog_loose::{IncompleteDate, Message, ProcId, Protocol, Variant};
 use vector_config::configurable_component;
-use vector_core::config::{LegacyKey, LogNamespace};
 use vector_core::{
-    config::{log_schema, DataType},
+    config::{DataType, LegacyKey, LogNamespace, log_schema},
     event::{Event, LogEvent, ObjectMap, Value},
     schema,
 };
-use vrl::value::{kind::Collection, Kind};
+use vrl::value::{Kind, kind::Collection};
 
-use super::{default_lossy, Deserializer};
+use super::{Deserializer, default_lossy};
 
 /// Config used to build a `SyslogDeserializer`.
 #[configurable_component]
@@ -241,7 +241,7 @@ impl SyslogDeserializerConfig {
 #[derive(Debug, Clone, PartialEq, Eq, Derivative)]
 #[derivative(Default)]
 pub struct SyslogDeserializerOptions {
-    /// Determines whether or not to replace invalid UTF-8 sequences instead of failing.
+    /// Determines whether to replace invalid UTF-8 sequences instead of failing.
     ///
     /// When true, invalid UTF-8 sequences are replaced with the [`U+FFFD REPLACEMENT CHARACTER`][U+FFFD].
     ///
@@ -480,8 +480,9 @@ fn insert_fields_from_syslog(
 
 #[cfg(test)]
 mod tests {
+    use vector_core::config::{LogSchema, init_log_schema, log_schema};
+
     use super::*;
-    use vector_core::config::{init_log_schema, log_schema, LogSchema};
 
     #[test]
     fn deserialize_syslog_legacy_namespace() {

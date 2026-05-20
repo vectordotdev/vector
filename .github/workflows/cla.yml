@@ -1,0 +1,51 @@
+name: "CLA Assistant"
+on:
+  issue_comment:
+    types: [created]
+  pull_request_target:
+    types: [opened, closed, synchronize]
+  merge_group:
+    types: [checks_requested]
+
+permissions:
+  contents: read
+
+jobs:
+  CLAAssistant:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write # Required to comment on PRs
+      id-token: write # Required to federate tokens with dd-octo-sts-action
+      actions: write # Required to create/update workflow runs
+    steps:
+      - name: CLA already verified on PR
+        if: github.event_name == 'merge_group'
+        run: echo "CLA verification not needed for merge queue - already checked on PR"
+
+      - uses: DataDog/dd-octo-sts-action@acaa02eee7e3bb0839e4272dacb37b8f3b58ba80 # v1.0.3
+        if: github.event_name != 'merge_group'
+        id: octo-sts
+        with:
+          scope: DataDog/cla-signatures
+          policy: self.write-signatures-vector
+
+      - name: "CLA Assistant"
+        if: github.event_name != 'merge_group' && ((github.event.comment.body == 'recheck' || github.event.comment.body == 'I have read the CLA Document and I hereby sign the CLA') || github.event_name == 'pull_request_target')
+        uses: contributor-assistant/github-action@ca4a40a7d1004f18d9960b404b97e5f30a505a08 # v2.6.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PERSONAL_ACCESS_TOKEN: ${{ steps.octo-sts.outputs.token }}
+        with:
+          path-to-signatures: "cla.json"
+          path-to-document: "https://gist.github.com/bits-bot/55bdc97a4fdad52d97feb4d6c3d1d618" # e.g. a CLA or a DCO document
+          branch: "vector"
+          remote-repository-name: cla-signatures
+          remote-organization-name: DataDog
+          allowlist: step-security-bot
+
+          custom-notsigned-prcomment: |
+            Thank you for your contribution! Before we can merge this PR, please sign our [Contributor License Agreement](https://gist.github.com/bits-bot/55bdc97a4fdad52d97feb4d6c3d1d618).
+
+            To sign, copy and post the phrase below as a new comment on this PR.
+
+            > **Note:** If the bot says your username was not found, the email used in your git commit may not be linked to your GitHub account. Fix this at [github.com/settings/emails](https://github.com/settings/emails), then comment `recheck` to retry.

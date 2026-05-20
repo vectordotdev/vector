@@ -3,13 +3,15 @@ use std::{fs::remove_file, path::PathBuf};
 use bytes::{Bytes, BytesMut};
 use futures::StreamExt;
 use tokio::net::UnixDatagram;
-use tokio_util::codec::FramedRead;
 use tracing::field;
-use vector_lib::codecs::StreamDecodingError;
-use vector_lib::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
-use vector_lib::EstimatedJsonEncodedSizeOf;
+use vector_lib::{
+    EstimatedJsonEncodedSizeOf,
+    codecs::{DecoderFramedRead, StreamDecodingError},
+    internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol},
+};
 
 use crate::{
+    SourceSender,
     codecs::Decoder,
     event::Event,
     internal_events::{
@@ -17,10 +19,10 @@ use crate::{
         UnixSocketFileDeleteError,
     },
     shutdown::ShutdownSignal,
-    sources::util::change_socket_permissions,
-    sources::util::unix::UNNAMED_SOCKET_HOST,
-    sources::Source,
-    SourceSender,
+    sources::{
+        Source,
+        util::{change_socket_permissions, unix::UNNAMED_SOCKET_HOST},
+    },
 };
 
 /// Returns a `Source` object corresponding to a Unix domain datagram socket.
@@ -99,7 +101,7 @@ async fn listen(
 
                 let payload = buf.split_to(byte_size);
 
-                let mut stream = FramedRead::new(payload.as_ref(), decoder.clone());
+                let mut stream = DecoderFramedRead::new(payload.as_ref(), decoder.clone());
 
                 loop {
                     match stream.next().await {

@@ -1,12 +1,12 @@
-use apache_avro::{types::Value, Decimal, Schema};
+use std::{fs::File, io::Write, path::PathBuf};
+use vector_common::Result;
+
+use apache_avro::{Decimal, Schema, types::Value};
 use serde::{Deserialize, Serialize};
-use std::fs::File;
-use std::io::Write;
-use std::path::PathBuf;
 
 const FIXTURES_PATH: &str = "lib/codecs/tests/data/avro/generated";
 
-fn generate_avro_test_case_boolean() {
+fn generate_avro_test_case_boolean() -> Result<()> {
     let schema = r#"
     {
         "type": "record",
@@ -21,10 +21,10 @@ fn generate_avro_test_case_boolean() {
         bool_field: bool,
     }
     let value = Test { bool_field: true };
-    generate_test_case(schema, value, "boolean");
+    generate_test_case(schema, value, "boolean")
 }
 
-fn generate_avro_test_case_int() {
+fn generate_avro_test_case_int() -> Result<()> {
     let schema = r#"
     {
         "type": "record",
@@ -39,10 +39,10 @@ fn generate_avro_test_case_int() {
         int_field: i32,
     }
     let value = Test { int_field: 1234 };
-    generate_test_case(schema, value, "int");
+    generate_test_case(schema, value, "int")
 }
 
-fn generate_avro_test_case_long() {
+fn generate_avro_test_case_long() -> Result<()> {
     let schema = r#"
     {
         "type": "record",
@@ -59,10 +59,10 @@ fn generate_avro_test_case_long() {
     let value = Test {
         long_field: 42949672960i64,
     };
-    generate_test_case(schema, value, "long");
+    generate_test_case(schema, value, "long")
 }
 
-fn generate_avro_test_case_float() {
+fn generate_avro_test_case_float() -> Result<()> {
     let schema = r#"
     {
         "type": "record",
@@ -79,10 +79,10 @@ fn generate_avro_test_case_float() {
     let value = Test {
         float_field: 123.456,
     };
-    generate_test_case(schema, value, "float");
+    generate_test_case(schema, value, "float")
 }
 
-fn generate_avro_test_case_double() {
+fn generate_avro_test_case_double() -> Result<()> {
     let schema = r#"
     {
         "type": "record",
@@ -99,10 +99,10 @@ fn generate_avro_test_case_double() {
     let value = Test {
         double_field: 123.456f64,
     };
-    generate_test_case(schema, value, "double");
+    generate_test_case(schema, value, "double")
 }
 
-fn generate_avro_test_case_bytes() {
+fn generate_avro_test_case_bytes() -> Result<()> {
     let schema = r#"
     {
         "type": "record",
@@ -119,10 +119,10 @@ fn generate_avro_test_case_bytes() {
     let value = Test {
         bytes_field: vec![1, 2, 3, 4, 5, 6, 6, 7],
     };
-    generate_test_case(schema, value, "bytes");
+    generate_test_case(schema, value, "bytes")
 }
 
-fn generate_avro_test_case_string() {
+fn generate_avro_test_case_string() -> Result<()> {
     let schema = r#"
     {
         "type": "record",
@@ -139,11 +139,11 @@ fn generate_avro_test_case_string() {
     let value = Test {
         string_field: "hello world!".to_string(),
     };
-    generate_test_case(schema, value, "string");
+    generate_test_case(schema, value, "string")
 }
 
 #[allow(unused)]
-fn generate_avro_test_case_fixed() {
+fn generate_avro_test_case_fixed() -> Result<()> {
     let schema = r#"
     {
         "type": "record",
@@ -157,10 +157,10 @@ fn generate_avro_test_case_fixed() {
         "fixed_field".into(),
         Value::Fixed(16, b"1019181716151413".to_vec()),
     )]);
-    generate_test_case_from_value(schema, record, "fixed");
+    generate_test_case_from_value(schema, record, "fixed")
 }
 
-fn generate_avro_test_case_enum() {
+fn generate_avro_test_case_enum() -> Result<()> {
     let schema = r#"
     {
         "type": "record",
@@ -184,10 +184,10 @@ fn generate_avro_test_case_enum() {
     let value = Test {
         enum_field: Value::Hearts,
     };
-    generate_test_case(schema, value, "enum");
+    generate_test_case(schema, value, "enum")
 }
 
-fn generate_avro_test_case_union() {
+fn generate_avro_test_case_union() -> Result<()> {
     let schema = r#"
     {
         "type": "record",
@@ -208,10 +208,10 @@ fn generate_avro_test_case_union() {
     let value = Test {
         union_field: 123456,
     };
-    generate_test_case(schema, value, "union");
+    generate_test_case(schema, value, "union")
 }
 
-fn generate_avro_test_case_array() {
+fn generate_avro_test_case_array() -> Result<()> {
     let schema = r#"
     {
         "type": "record",
@@ -233,10 +233,10 @@ fn generate_avro_test_case_array() {
             "codec".to_string(),
         ],
     };
-    generate_test_case(schema, value, "array");
+    generate_test_case(schema, value, "array")
 }
 
-fn generate_avro_test_case_map() {
+fn generate_avro_test_case_map() -> Result<()> {
     let schema = r#"
     {
         "type": "record",
@@ -254,10 +254,10 @@ fn generate_avro_test_case_map() {
     let mut scores = HashMap::new();
     scores.insert(String::from("Blue"), 10i64);
     let value = Test { map_field: scores };
-    generate_test_case(schema, value, "map");
+    generate_test_case(schema, value, "map")
 }
 
-fn generate_avro_test_case_record() {
+fn generate_avro_test_case_record() -> Result<()> {
     let schema = r#"
     {
         "type": "record",
@@ -277,11 +277,11 @@ fn generate_avro_test_case_record() {
         name: "John".to_string(),
         age: 23,
     };
-    generate_test_case(schema, value, "record");
+    generate_test_case(schema, value, "record")
 }
 
 #[allow(unused)]
-fn generate_avro_test_case_date() {
+fn generate_avro_test_case_date() -> Result<()> {
     let schema = r#"
     {
         "type": "record",
@@ -296,11 +296,11 @@ fn generate_avro_test_case_date() {
         date_field: i32,
     }
     let value = Test { date_field: 19646 };
-    generate_test_case(schema, value, "date");
+    generate_test_case(schema, value, "date")
 }
 
 #[allow(unused)]
-fn generate_avro_test_case_decimal_var() {
+fn generate_avro_test_case_decimal_var() -> Result<()> {
     let schema = r#"
     {
         "type": "record",
@@ -317,11 +317,11 @@ fn generate_avro_test_case_decimal_var() {
             249, 33, 74, 206, 142, 64, 190, 170, 17, 153,
         ])),
     )]);
-    generate_test_case_from_value(schema, record, "decimal_var");
+    generate_test_case_from_value(schema, record, "decimal_var")
 }
 
 #[allow(unused)]
-fn generate_avro_test_case_time_millis() {
+fn generate_avro_test_case_time_millis() -> Result<()> {
     let schema = r#"
     {
         "type": "record",
@@ -338,10 +338,10 @@ fn generate_avro_test_case_time_millis() {
     let value = Test {
         time_millis_field: 59820123,
     };
-    generate_test_case(schema, value, "time_millis");
+    generate_test_case(schema, value, "time_millis")
 }
 
-fn generate_avro_test_case_time_micros() {
+fn generate_avro_test_case_time_micros() -> Result<()> {
     let schema = r#"
     {
         "type": "record",
@@ -358,10 +358,10 @@ fn generate_avro_test_case_time_micros() {
     let value: Test = Test {
         time_micros_field: 59820123456i64,
     };
-    generate_test_case(schema, value, "time_micros");
+    generate_test_case(schema, value, "time_micros")
 }
 
-fn generate_avro_test_case_timestamp_millis() {
+fn generate_avro_test_case_timestamp_millis() -> Result<()> {
     let schema = r#"
     {
         "type": "record",
@@ -378,10 +378,10 @@ fn generate_avro_test_case_timestamp_millis() {
     let value = Test {
         timestamp_millis_field: 1697445291056i64,
     };
-    generate_test_case(schema, value, "timestamp_millis");
+    generate_test_case(schema, value, "timestamp_millis")
 }
 
-fn generate_avro_test_case_timestamp_micros() {
+fn generate_avro_test_case_timestamp_micros() -> Result<()> {
     let schema = r#"
     {
         "type": "record",
@@ -398,10 +398,10 @@ fn generate_avro_test_case_timestamp_micros() {
     let value = Test {
         timestamp_micros_field: 1697445291056567i64,
     };
-    generate_test_case(schema, value, "timestamp_micros");
+    generate_test_case(schema, value, "timestamp_micros")
 }
 
-fn generate_avro_test_case_local_timestamp_millis() {
+fn generate_avro_test_case_local_timestamp_millis() -> Result<()> {
     let schema = r#"
     {
         "type": "record",
@@ -418,10 +418,10 @@ fn generate_avro_test_case_local_timestamp_millis() {
     let value = Test {
         local_timestamp_millis_field: 1697445291056i64,
     };
-    generate_test_case(schema, value, "local-timestamp_millis");
+    generate_test_case(schema, value, "local-timestamp_millis")
 }
 
-fn generate_avro_test_case_local_timestamp_micros() {
+fn generate_avro_test_case_local_timestamp_micros() -> Result<()> {
     let schema = r#"
     {
         "type": "record",
@@ -438,10 +438,10 @@ fn generate_avro_test_case_local_timestamp_micros() {
     let value = Test {
         local_timestamp_micros_field: 1697445291056567i64,
     };
-    generate_test_case(schema, value, "local-timestamp_micros");
+    generate_test_case(schema, value, "local-timestamp_micros")
 }
 
-fn generate_avro_test_case_uuid() {
+fn generate_avro_test_case_uuid() -> Result<()> {
     let schema = r#"
     {
         "type": "record",
@@ -460,48 +460,48 @@ fn generate_avro_test_case_uuid() {
     let value = Test {
         uuid_field: "550e8400-e29b-41d4-a716-446655440000".into(),
     };
-    generate_test_case(schema, value, "uuid");
+    generate_test_case(schema, value, "uuid")
 }
 
-fn generate_test_case<S: Serialize>(schema: &str, value: S, filename: &str) {
-    let value = apache_avro::to_value(value).unwrap();
-    generate_test_case_from_value(schema, value, filename);
+fn generate_test_case<S: Serialize>(schema: &str, value: S, filename: &str) -> Result<()> {
+    let value = apache_avro::to_value(value)?;
+    generate_test_case_from_value(schema, value, filename)
 }
 
-fn generate_test_case_from_value(schema: &str, value: Value, filename: &str) {
-    let schema = Schema::parse_str(schema).unwrap();
+fn generate_test_case_from_value(schema: &str, value: Value, filename: &str) -> Result<()> {
+    let schema = Schema::parse_str(schema)?;
 
-    let value = value.resolve(&schema).unwrap();
-    let bytes = apache_avro::to_avro_datum(&schema, value).unwrap();
+    let value = value.resolve(&schema)?;
+    let bytes = apache_avro::to_avro_datum(&schema, value)?;
 
-    let mut schema_file = File::create(format!("{FIXTURES_PATH}/{filename}.avsc")).unwrap();
-    let mut avro_file = File::create(format!("{FIXTURES_PATH}/{filename}.avro")).unwrap();
-    schema_file
-        .write_all(schema.canonical_form().as_bytes())
-        .unwrap();
-    avro_file.write_all(&bytes).unwrap();
+    let mut schema_file = File::create(format!("{FIXTURES_PATH}/{filename}.avsc"))?;
+    let mut avro_file = File::create(format!("{FIXTURES_PATH}/{filename}.avro"))?;
+    schema_file.write_all(schema.canonical_form().as_bytes())?;
+    avro_file.write_all(&bytes)?;
+    Ok(())
 }
 
-fn main() {
+fn main() -> Result<()> {
     if !PathBuf::from(FIXTURES_PATH).is_dir() {
         panic!("dir {FIXTURES_PATH} not exist\n");
     }
-    generate_avro_test_case_array();
-    generate_avro_test_case_boolean();
-    generate_avro_test_case_bytes();
-    generate_avro_test_case_double();
-    generate_avro_test_case_enum();
-    generate_avro_test_case_float();
-    generate_avro_test_case_int();
-    generate_avro_test_case_long();
-    generate_avro_test_case_map();
-    generate_avro_test_case_record();
-    generate_avro_test_case_string();
-    generate_avro_test_case_time_micros();
-    generate_avro_test_case_timestamp_micros();
-    generate_avro_test_case_timestamp_millis();
-    generate_avro_test_case_local_timestamp_micros();
-    generate_avro_test_case_local_timestamp_millis();
-    generate_avro_test_case_union();
-    generate_avro_test_case_uuid();
+    generate_avro_test_case_array()?;
+    generate_avro_test_case_boolean()?;
+    generate_avro_test_case_bytes()?;
+    generate_avro_test_case_double()?;
+    generate_avro_test_case_enum()?;
+    generate_avro_test_case_float()?;
+    generate_avro_test_case_int()?;
+    generate_avro_test_case_long()?;
+    generate_avro_test_case_map()?;
+    generate_avro_test_case_record()?;
+    generate_avro_test_case_string()?;
+    generate_avro_test_case_time_micros()?;
+    generate_avro_test_case_timestamp_micros()?;
+    generate_avro_test_case_timestamp_millis()?;
+    generate_avro_test_case_local_timestamp_micros()?;
+    generate_avro_test_case_local_timestamp_millis()?;
+    generate_avro_test_case_union()?;
+    generate_avro_test_case_uuid()?;
+    Ok(())
 }

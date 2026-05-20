@@ -1,5 +1,7 @@
-use std::fmt;
-use std::hash::{Hash, Hasher};
+use std::{
+    fmt,
+    hash::{Hash, Hasher},
+};
 
 use super::{LogEvent, ObjectMap, Value};
 
@@ -77,7 +79,7 @@ fn f64_eq(this: f64, other: f64) -> bool {
     }
     if this != other {
         return false;
-    };
+    }
     if (this.is_sign_positive() && other.is_sign_negative())
         || (this.is_sign_negative() && other.is_sign_positive())
     {
@@ -177,7 +179,7 @@ impl fmt::Display for Discriminant {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::{hash_map::DefaultHasher, HashMap};
+    use std::collections::{HashMap, hash_map::DefaultHasher};
 
     use super::*;
     use crate::event::LogEvent;

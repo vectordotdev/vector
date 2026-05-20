@@ -43,7 +43,6 @@ components: sources: redis: {
 			"aarch64-unknown-linux-musl":     true
 			"armv7-unknown-linux-gnueabihf":  true
 			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
 			"x86_64-pc-windows-msv":          true
 			"x86_64-unknown-linux-gnu":       true
 			"x86_64-unknown-linux-musl":      true
@@ -58,30 +57,38 @@ components: sources: redis: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.redis.configuration
+	configuration: generated.components.sources.redis.configuration
 
-	output: logs: record: {
-		description: "An individual Redis record"
-		fields: {
-			host:      fields._local_host
-			message:   fields._raw_line
-			timestamp: fields._current_timestamp
-			source_type: {
-				description: "The name of the source type."
-				required:    true
-				type: string: {
-					examples: ["redis"]
+	output: {
+		logs: record: {
+			description: "An individual Redis record"
+			fields: {
+				host:      fields._local_host
+				message:   fields._raw_line
+				timestamp: fields._current_timestamp
+				source_type: {
+					description: "The name of the source type."
+					required:    true
+					type: string: {
+						examples: ["redis"]
+					}
+				}
+				redis_key: {
+					description: "The Redis key the event came from"
+					required:    false
+					common:      false
+					type: string: {
+						examples: ["some_key"]
+						default: null
+					}
 				}
 			}
-			redis_key: {
-				description: "The Redis key the event came from"
-				required:    false
-				common:      false
-				type: string: {
-					examples: ["some_key"]
-					default: null
-				}
-			}
+		}
+		metrics: "": {
+			description: "Metric events that may be emitted by this source."
+		}
+		traces: "": {
+			description: "Trace events that may be emitted by this source."
 		}
 	}
 

@@ -1,5 +1,5 @@
-use tokio::time::{timeout, Duration};
-use vector_lib::codecs::{encoding::FramingConfig, TextSerializerConfig};
+use tokio::time::{Duration, timeout};
+use vector_lib::codecs::{TextSerializerConfig, encoding::FramingConfig};
 
 use crate::{
     config::Config,

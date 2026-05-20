@@ -1,18 +1,19 @@
-use metrics::counter;
-use vector_lib::internal_event::InternalEvent;
-use vector_lib::internal_event::{error_stage, error_type};
+use vector_lib::{
+    NamedInternalEvent, counter,
+    internal_event::{CounterName, InternalEvent, error_stage, error_type},
+};
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct AwsEc2MetadataRefreshSuccessful;
 
 impl InternalEvent for AwsEc2MetadataRefreshSuccessful {
     fn emit(self) {
         debug!(message = "AWS EC2 metadata refreshed.");
-        counter!("metadata_refresh_successful_total").increment(1);
+        counter!(CounterName::MetadataRefreshSuccessfulTotal).increment(1);
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct AwsEc2MetadataRefreshError {
     pub error: crate::Error,
 }
@@ -24,15 +25,14 @@ impl InternalEvent for AwsEc2MetadataRefreshError {
             error = %self.error,
             error_type = error_type::REQUEST_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::PROCESSING,
         )
         .increment(1);
         // deprecated
-        counter!("metadata_refresh_failed_total").increment(1);
+        counter!(CounterName::MetadataRefreshFailedTotal).increment(1);
     }
 }

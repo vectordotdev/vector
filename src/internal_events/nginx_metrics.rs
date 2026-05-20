@@ -1,13 +1,12 @@
-use metrics::counter;
-use vector_lib::internal_event::InternalEvent;
 use vector_lib::{
-    internal_event::{error_stage, error_type},
+    NamedInternalEvent, counter,
+    internal_event::{CounterName, InternalEvent, error_stage, error_type},
     json_size::JsonSize,
 };
 
 use crate::sources::nginx_metrics::parser::ParseError;
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct NginxMetricsEventsReceived<'a> {
     pub byte_size: JsonSize,
     pub count: usize,
@@ -23,18 +22,19 @@ impl InternalEvent for NginxMetricsEventsReceived<'_> {
             endpoint = self.endpoint,
         );
         counter!(
-            "component_received_events_total",
+            CounterName::ComponentReceivedEventsTotal,
             "endpoint" => self.endpoint.to_owned(),
         )
         .increment(self.count as u64);
         counter!(
-            "component_received_event_bytes_total",
+            CounterName::ComponentReceivedEventBytesTotal,
             "endpoint" => self.endpoint.to_owned(),
         )
         .increment(self.byte_size.get() as u64);
     }
 }
 
+#[derive(NamedInternalEvent)]
 pub struct NginxMetricsRequestError<'a> {
     pub error: crate::Error,
     pub endpoint: &'a str,
@@ -48,10 +48,9 @@ impl InternalEvent for NginxMetricsRequestError<'_> {
             error = %self.error,
             error_type = error_type::REQUEST_FAILED,
             stage = error_stage::RECEIVING,
-            internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "endpoint" => self.endpoint.to_owned(),
             "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::RECEIVING,
@@ -60,6 +59,7 @@ impl InternalEvent for NginxMetricsRequestError<'_> {
     }
 }
 
+#[derive(NamedInternalEvent)]
 pub(crate) struct NginxMetricsStubStatusParseError<'a> {
     pub error: ParseError,
     pub endpoint: &'a str,
@@ -73,10 +73,9 @@ impl InternalEvent for NginxMetricsStubStatusParseError<'_> {
             error = %self.error,
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "endpoint" => self.endpoint.to_owned(),
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,

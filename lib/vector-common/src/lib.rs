@@ -12,6 +12,8 @@
 #![deny(unused_assignments)]
 #![deny(unused_comparisons)]
 
+pub use vector_common_macros::NamedInternalEvent;
+
 #[cfg(feature = "btreemap")]
 pub use vrl::btreemap;
 
@@ -57,10 +59,69 @@ pub mod shutdown;
 #[cfg(feature = "sensitive_string")]
 pub mod sensitive_string;
 
+pub mod atomic;
+pub mod stats;
 pub mod trigger;
 
 #[macro_use]
 extern crate tracing;
+
+/// Typed wrapper around `metrics::counter!` that only accepts [`internal_event::CounterName`].
+#[macro_export]
+macro_rules! counter {
+    ($name:expr) => {{
+        let _name: $crate::internal_event::CounterName = $name;
+        #[allow(clippy::disallowed_macros)]
+        {
+            metrics::counter!(_name.as_str())
+        }
+    }};
+    ($name:expr, $($rest:tt)*) => {{
+        let _name: $crate::internal_event::CounterName = $name;
+        #[allow(clippy::disallowed_macros)]
+        {
+            metrics::counter!(_name.as_str(), $($rest)*)
+        }
+    }};
+}
+
+/// Typed wrapper around `metrics::histogram!` that only accepts [`internal_event::HistogramName`].
+#[macro_export]
+macro_rules! histogram {
+    ($name:expr) => {{
+        let _name: $crate::internal_event::HistogramName = $name;
+        #[allow(clippy::disallowed_macros)]
+        {
+            metrics::histogram!(_name.as_str())
+        }
+    }};
+    ($name:expr, $($rest:tt)*) => {{
+        let _name: $crate::internal_event::HistogramName = $name;
+        #[allow(clippy::disallowed_macros)]
+        {
+            metrics::histogram!(_name.as_str(), $($rest)*)
+        }
+    }};
+}
+
+/// Typed wrapper around `metrics::gauge!` that only accepts [`internal_event::GaugeName`].
+#[macro_export]
+macro_rules! gauge {
+    ($name:expr) => {{
+        let _name: $crate::internal_event::GaugeName = $name;
+        #[allow(clippy::disallowed_macros)]
+        {
+            metrics::gauge!(_name.as_str())
+        }
+    }};
+    ($name:expr, $($rest:tt)*) => {{
+        let _name: $crate::internal_event::GaugeName = $name;
+        #[allow(clippy::disallowed_macros)]
+        {
+            metrics::gauge!(_name.as_str(), $($rest)*)
+        }
+    }};
+}
 
 /// Vector's basic error type, dynamically dispatched and safe to send across
 /// threads.

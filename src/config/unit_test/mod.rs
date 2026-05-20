@@ -16,15 +16,15 @@ use std::{
     sync::Arc,
 };
 
-use futures_util::{stream::FuturesUnordered, StreamExt};
+use futures_util::{StreamExt, stream::FuturesUnordered};
 use indexmap::IndexMap;
 use tokio::sync::{
-    oneshot::{self, Receiver},
     Mutex,
+    oneshot::{self, Receiver},
 };
 use uuid::Uuid;
 use vrl::{
-    compiler::{state::RuntimeState, Context, TargetValue, TimeZone},
+    compiler::{Context, TargetValue, TimeZone, state::RuntimeState},
     diagnostic::Formatter,
     value,
 };
@@ -33,16 +33,19 @@ pub use self::unit_test_components::{
     UnitTestSinkCheck, UnitTestSinkConfig, UnitTestSinkResult, UnitTestSourceConfig,
     UnitTestStreamSinkConfig, UnitTestStreamSourceConfig,
 };
-use super::{compiler::expand_globs, graph::Graph, transform::get_transform_output_ids, OutputId};
+use super::{OutputId, compiler::expand_globs, graph::Graph, transform::get_transform_output_ids};
 use crate::{
     conditions::Condition,
     config::{
-        self, loading, ComponentKey, Config, ConfigBuilder, ConfigPath, SinkOuter, SourceOuter,
-        TestDefinition, TestInput, TestOutput,
+        self, ComponentKey, Config, ConfigBuilder, ConfigPath, SinkOuter, SourceOuter,
+        TestDefinition, TestInput, TestOutput, loading, loading::ConfigBuilderLoader,
     },
     event::{Event, EventMetadata, LogEvent},
     signal,
-    topology::{builder::TopologyPieces, RunningTopology},
+    topology::{
+        RunningTopology,
+        builder::{TopologyPieces, TopologyPiecesBuilder},
+    },
 };
 
 pub struct UnitTest {
@@ -90,7 +93,9 @@ fn init_log_schema_from_paths(
     config_paths: &[ConfigPath],
     deny_if_set: bool,
 ) -> Result<(), Vec<String>> {
-    let builder = config::loading::load_builder_from_paths(config_paths)?;
+    let builder = ConfigBuilderLoader::default()
+        .interpolate_env(true)
+        .load_from_paths(config_paths)?;
     vector_lib::config::init_log_schema(builder.global.log_schema, deny_if_set);
     Ok(())
 }
@@ -100,16 +105,19 @@ pub async fn build_unit_tests_main(
     signal_handler: &mut signal::SignalHandler,
 ) -> Result<Vec<UnitTest>, Vec<String>> {
     init_log_schema_from_paths(paths, false)?;
-    let mut secrets_backends_loader = loading::load_secret_backends_from_paths(paths)?;
-    let config_builder = if secrets_backends_loader.has_secrets_to_retrieve() {
-        let resolved_secrets = secrets_backends_loader
-            .retrieve(&mut signal_handler.subscribe())
-            .await
-            .map_err(|e| vec![e])?;
-        loading::load_builder_from_paths_with_secrets(paths, resolved_secrets)?
-    } else {
-        loading::load_builder_from_paths(paths)?
-    };
+    let secrets_backends_loader = loading::loader_from_paths(
+        loading::SecretBackendLoader::default().interpolate_env(true),
+        paths,
+    )?;
+    let secrets = secrets_backends_loader
+        .retrieve_secrets(signal_handler)
+        .await
+        .map_err(|e| vec![e])?;
+
+    let config_builder = ConfigBuilderLoader::default()
+        .interpolate_env(true)
+        .secrets(secrets)
+        .load_from_paths(paths)?;
 
     build_unit_tests(config_builder).await
 }
@@ -139,7 +147,7 @@ pub async fn build_unit_tests(
                 let mut test_error = errors.join("\n");
                 // Indent all line breaks
                 test_error = test_error.replace('\n', "\n  ");
-                test_error.insert_str(0, &format!("Failed to build test '{}':\n  ", test_name));
+                test_error.insert_str(0, &format!("Failed to build test '{test_name}':\n  "));
                 build_errors.push(test_error);
             }
         }
@@ -285,14 +293,17 @@ impl UnitTestBuildMetadata {
         let mut template_sinks = IndexMap::new();
         let mut test_result_rxs = Vec::new();
         // Add sinks with checks
-        for (ids, checks) in outputs {
+        for (ids, built) in outputs {
             let (tx, rx) = oneshot::channel();
             let sink_ids = ids.clone();
             let sink_config = UnitTestSinkConfig {
                 test_name: test_name.to_string(),
                 transform_ids: ids.iter().map(|id| id.to_string()).collect(),
                 result_tx: Arc::new(Mutex::new(Some(tx))),
-                check: UnitTestSinkCheck::Checks(checks),
+                check: UnitTestSinkCheck::Checks {
+                    conditions: built.conditions,
+                    expected_event_count: built.expected_event_count,
+                },
             };
 
             test_result_rxs.push(rx);
@@ -424,6 +435,15 @@ async fn build_unit_test(
         .collect::<Vec<_>>();
     valid_components.extend(unexpanded_transforms);
 
+    // Enrichment tables consume inputs but are referenced dynamically in VRL transforms
+    // (via get_enrichment_table_record). Since we can't statically analyze VRL usage,
+    // we conservatively include all enrichment table inputs as valid components.
+    config_builder
+        .enrichment_tables
+        .iter()
+        .filter_map(|(key, c)| c.as_sink(key).map(|(_, sink)| sink.inputs))
+        .for_each(|i| valid_components.extend(i.into_iter()));
+
     // Remove all transforms that are not relevant to the current test
     config_builder.transforms = config_builder
         .transforms
@@ -455,7 +475,7 @@ async fn build_unit_test(
     }
     let config = config_builder.build()?;
     let diff = config::ConfigDiff::initial(&config);
-    let pieces = TopologyPieces::build(&config, &diff, HashMap::new(), Default::default()).await?;
+    let pieces = TopologyPiecesBuilder::new(&config, &diff).build().await?;
 
     Ok(UnitTest {
         name: test.name,
@@ -550,10 +570,16 @@ fn build_and_validate_inputs(
     }
 }
 
+#[derive(Default)]
+pub(super) struct BuiltOutput {
+    pub(super) expected_event_count: Option<usize>,
+    pub(super) conditions: Vec<Vec<Condition>>,
+}
+
 fn build_outputs(
     test_outputs: &[TestOutput],
-) -> Result<IndexMap<Vec<OutputId>, Vec<Vec<Condition>>>, Vec<String>> {
-    let mut outputs: IndexMap<Vec<OutputId>, Vec<Vec<Condition>>> = IndexMap::new();
+) -> Result<IndexMap<Vec<OutputId>, BuiltOutput>, Vec<String>> {
+    let mut outputs: IndexMap<Vec<OutputId>, BuiltOutput> = IndexMap::new();
     let mut errors = Vec::new();
 
     for output in test_outputs {
@@ -565,19 +591,55 @@ fn build_outputs(
             .iter()
             .enumerate()
         {
-            match condition.build(&Default::default()) {
+            match condition.build(&Default::default(), &Default::default()) {
                 Ok(condition) => conditions.push(condition),
                 Err(error) => errors.push(format!(
-                    "failed to create test condition '{}': {}",
-                    index, error
+                    "failed to create test condition '{index}': {error}"
                 )),
             }
         }
 
+        let expected_event_count = output.expected_event_count;
+        if expected_event_count == Some(0) && !conditions.is_empty() {
+            errors.push(format!(
+                "output for {:?} has expected_event_count of 0 but also defines conditions; \
+                 conditions cannot be evaluated when no events are expected",
+                output.extract_from
+            ));
+        }
         outputs
             .entry(output.extract_from.clone().to_vec())
-            .and_modify(|existing_conditions| existing_conditions.push(conditions.clone()))
-            .or_insert(vec![conditions.clone()]);
+            .and_modify(|existing| {
+                if let (Some(prev), Some(new)) =
+                    (existing.expected_event_count, expected_event_count)
+                {
+                    if prev != new {
+                        errors.push(format!(
+                            "conflicting expected_event_count for extract_from {:?}: {} vs {}",
+                            output.extract_from, prev, new
+                        ));
+                    }
+                } else if existing.expected_event_count.is_none() {
+                    existing.expected_event_count = expected_event_count;
+                }
+                existing.conditions.push(conditions.clone());
+            })
+            .or_insert_with(|| BuiltOutput {
+                expected_event_count,
+                conditions: vec![conditions.clone()],
+            });
+    }
+
+    // Post-merge validation: after merging entries that share the same
+    // extract_from, reject any that ended up with expected_event_count of 0 and
+    // non-empty conditions (which would pass vacuously against zero events).
+    for (extract_from, built) in &outputs {
+        if built.expected_event_count == Some(0) && built.conditions.iter().any(|c| !c.is_empty()) {
+            errors.push(format!(
+                "output for {extract_from:?} has expected_event_count of 0 but also defines conditions; \
+                 conditions cannot be evaluated when no events are expected",
+            ));
+        }
     }
 
     if errors.is_empty() {
@@ -595,8 +657,7 @@ fn build_input_event(input: &TestInput) -> Result<Event, String> {
         },
         "vrl" => {
             if let Some(source) = &input.source {
-                let fns = vrl::stdlib::all();
-                let result = vrl::compiler::compile(source, &fns)
+                let result = vrl::compiler::compile(source, &vector_vrl_functions::all())
                     .map_err(|e| Formatter::new(source, e.clone()).to_string())?;
 
                 let mut target = TargetValue {

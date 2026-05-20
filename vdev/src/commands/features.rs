@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use anyhow::Result;
 use clap::Args;
 
-use crate::features;
+use crate::utils::features;
 
 /// Extract the set of features required to run a given config
 #[derive(Args, Debug)]

@@ -1,11 +1,11 @@
-use serde_json::Value;
 use std::{cell::RefCell, marker::PhantomData};
 
 use serde::{Serialize, Serializer};
+use serde_json::Value;
 
 use crate::{
-    schema::{SchemaGenerator, SchemaObject},
     Configurable, GenerateError, Metadata, ToValue,
+    schema::{SchemaGenerator, SchemaObject},
 };
 
 /// Delegated serialization.
@@ -91,9 +91,11 @@ where
         H::validate_metadata(&converted)
     }
 
-    fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(
+        generator: &RefCell<SchemaGenerator>,
+    ) -> Result<SchemaObject, GenerateError> {
         // Forward to the underlying `H`.
-        H::generate_schema(gen)
+        H::generate_schema(generator)
     }
 }
 

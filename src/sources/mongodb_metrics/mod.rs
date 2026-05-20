@@ -2,21 +2,22 @@ use std::time::{Duration, Instant};
 
 use chrono::Utc;
 use futures::{
-    future::{join_all, try_join_all},
     StreamExt,
+    future::{join_all, try_join_all},
 };
 use mongodb::{
-    bson::{self, doc, from_document, Bson, Document},
+    Client,
+    bson::{self, Bson, Document, doc, from_document},
     error::Error as MongoError,
     options::ClientOptions,
-    Client,
 };
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
-use vector_lib::configurable::configurable_component;
-use vector_lib::{metric_tags, ByteSizeOf, EstimatedJsonEncodedSizeOf};
+use vector_lib::{
+    ByteSizeOf, EstimatedJsonEncodedSizeOf, configurable::configurable_component, metric_tags,
+};
 
 use crate::{
     config::{SourceConfig, SourceContext, SourceOutput},
@@ -32,8 +33,8 @@ use types::{CommandBuildInfo, CommandIsMaster, CommandServerStatus, NodeType};
 use vector_lib::config::LogNamespace;
 
 macro_rules! tags {
-    ($tags:expr) => { $tags.clone() };
-    ($tags:expr, $($key:expr => $value:expr),*) => {
+    ($tags:expr_2021) => { $tags.clone() };
+    ($tags:expr_2021, $($key:expr_2021 => $value:expr_2021),*) => {
         {
             let mut tags = $tags.clone();
             $(
@@ -45,7 +46,7 @@ macro_rules! tags {
 }
 
 macro_rules! counter {
-    ($value:expr) => {
+    ($value:expr_2021) => {
         MetricValue::Counter {
             value: $value as f64,
         }
@@ -53,7 +54,7 @@ macro_rules! counter {
 }
 
 macro_rules! gauge {
-    ($value:expr) => {
+    ($value:expr_2021) => {
         MetricValue::Gauge {
             value: $value as f64,
         }
@@ -194,7 +195,7 @@ impl MongoDbMetrics {
         let doc = self
             .client
             .database("admin")
-            .run_command(doc! { "isMaster": 1 }, None)
+            .run_command(doc! { "isMaster": 1 })
             .await
             .map_err(CollectError::Mongo)?;
         let msg: CommandIsMaster = from_document(doc).map_err(CollectError::Bson)?;
@@ -215,7 +216,7 @@ impl MongoDbMetrics {
         let doc = self
             .client
             .database("admin")
-            .run_command(doc! { "buildInfo": 1 }, None)
+            .run_command(doc! { "buildInfo": 1 })
             .await
             .map_err(CollectError::Mongo)?;
         from_document(doc).map_err(CollectError::Bson)
@@ -280,10 +281,7 @@ impl MongoDbMetrics {
 
         let command = doc! { "serverStatus": 1, "opLatencies": { "histograms": true }};
         let db = self.client.database("admin");
-        let doc = db
-            .run_command(command, None)
-            .await
-            .map_err(CollectError::Mongo)?;
+        let doc = db.run_command(command).await.map_err(CollectError::Mongo)?;
         let byte_size = document_size(&doc);
         emit!(EndpointBytesReceived {
             byte_size,
@@ -1078,22 +1076,25 @@ mod tests {
         let endpoint = "mongodb://myDBReader:D1fficultP%40ssw0rd@mongos0.example.com:27017,mongos1.example.com:27017,mongos2.example.com:27017/?authSource=admin&tls=true";
         let client_options = ClientOptions::parse(endpoint).await.unwrap();
         let endpoint = sanitize_endpoint(endpoint, &client_options);
-        assert_eq!(&endpoint, "mongodb://mongos0.example.com:27017,mongos1.example.com:27017,mongos2.example.com:27017/?tls=true");
+        assert_eq!(
+            &endpoint,
+            "mongodb://mongos0.example.com:27017,mongos1.example.com:27017,mongos2.example.com:27017/?tls=true"
+        );
     }
 }
 
 #[cfg(all(test, feature = "mongodb_metrics-integration-tests"))]
 mod integration_tests {
     use futures::StreamExt;
-    use tokio::time::{timeout, Duration};
+    use tokio::time::{Duration, timeout};
 
     use super::*;
     use crate::{
+        SourceSender,
         test_util::{
-            components::{assert_source_compliance, PULL_SOURCE_TAGS},
+            components::{PULL_SOURCE_TAGS, assert_source_compliance},
             trace_init,
         },
-        SourceSender,
     };
 
     fn primary_mongo_address() -> String {

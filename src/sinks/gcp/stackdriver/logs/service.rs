@@ -1,16 +1,16 @@
 //! Service implementation for the `gcp_stackdriver_logs` sink.
 
 use bytes::Bytes;
-use http::{header::CONTENT_TYPE, Request, Uri};
+use http::{Request, Uri, header::CONTENT_TYPE};
+use snafu::ResultExt;
 
 use crate::{
     gcp::GcpAuthenticator,
     sinks::{
-        util::http::{HttpRequest, HttpServiceRequestBuilder},
         HTTPRequestBuilderSnafu,
+        util::http::{HttpRequest, HttpServiceRequestBuilder},
     },
 };
-use snafu::ResultExt;
 
 #[derive(Debug, Clone)]
 pub(super) struct StackdriverLogsServiceRequestBuilder {

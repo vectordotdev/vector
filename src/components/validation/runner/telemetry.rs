@@ -3,21 +3,18 @@ use std::time::Duration;
 use tokio::{select, sync::mpsc, task::JoinHandle};
 use vector_lib::event::Event;
 
+use super::io::{EventForwardService, spawn_grpc_server};
 use crate::{
     components::validation::{
         sync::{Configuring, TaskCoordinator},
         util::GrpcAddress,
     },
-    proto::vector::Server as VectorServer,
-};
-use crate::{
     config::ConfigBuilder,
+    proto::vector::Server as VectorServer,
     sinks::vector::VectorConfig as VectorSinkConfig,
     sources::{internal_logs::InternalLogsConfig, internal_metrics::InternalMetricsConfig},
-    test_util::next_addr,
+    test_util::addr::next_addr,
 };
-
-use super::io::{spawn_grpc_server, EventForwardService};
 
 const INTERNAL_LOGS_KEY: &str = "_telemetry_logs";
 const INTERNAL_METRICS_KEY: &str = "_telemetry_metrics";
@@ -35,7 +32,8 @@ pub struct Telemetry {
 impl Telemetry {
     /// Creates a telemetry collector by attaching the relevant components to an existing `ConfigBuilder`.
     pub fn attach_to_config(config_builder: &mut ConfigBuilder) -> Self {
-        let listen_addr = GrpcAddress::from(next_addr());
+        let (_guard, addr) = next_addr();
+        let listen_addr = GrpcAddress::from(addr);
         info!(%listen_addr, "Attaching telemetry components.");
 
         // Attach an internal logs and internal metrics source, and send them on to a dedicated Vector

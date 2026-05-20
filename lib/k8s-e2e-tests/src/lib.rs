@@ -8,15 +8,23 @@ use k8s_openapi::{
     apimachinery::pkg::apis::meta::v1::{LabelSelector, ObjectMeta},
 };
 use k8s_test_framework::{
-    test_pod, wait_for_resource::WaitFor, CommandBuilder, Framework, Interface, Manager, Reader,
+    CommandBuilder, Framework, Interface, Manager, Reader, test_pod, wait_for_resource::WaitFor,
 };
-use rand::distr::{Alphanumeric, SampleString};
-use rand::rng;
+use rand::{
+    distr::{Alphanumeric, SampleString},
+    rng,
+};
 use tracing::{debug, error, info};
 
 pub mod metrics;
 
 pub const BUSYBOX_IMAGE: &str = "busybox:1.28";
+
+/// Returns the Helm chart repo to use for E2E tests.
+/// Set `HELM_CHART_REPO` to override the default (e.g., a local chart path).
+pub fn helm_chart_repo() -> String {
+    env::var("HELM_CHART_REPO").unwrap_or_else(|_| "https://helm.vector.dev".to_string())
+}
 
 pub fn init() {
     _ = env_logger::builder().is_test(true).try_init();
@@ -27,17 +35,17 @@ pub fn get_namespace() -> String {
     // There is a 36 ^ 5 chance of a name collision, which is likely to be an acceptable risk.
     let id = Alphanumeric.sample_string(&mut rng(), 5).to_lowercase();
 
-    format!("vector-{}", id)
+    format!("vector-{id}")
 }
 
 pub fn get_namespace_appended(namespace: &str, suffix: &str) -> String {
-    format!("{}-{}", namespace, suffix)
+    format!("{namespace}-{suffix}")
 }
 
 /// Gets a name we can use for roles to prevent them conflicting with other tests.
 /// Uses the provided namespace as the root.
 pub fn get_override_name(namespace: &str, suffix: &str) -> String {
-    format!("{}-{}", namespace, suffix)
+    format!("{namespace}-{suffix}")
 }
 
 /// Is the MULTINODE environment variable set?
@@ -49,7 +57,7 @@ pub fn is_multinode() -> bool {
 /// to be run against the same cluster without the role names clashing.
 pub fn config_override_name(name: &str, cleanup: bool) -> String {
     let vectordir = if is_multinode() {
-        format!("{}-vector", name)
+        format!("{name}-vector")
     } else {
         "vector".to_string()
     };
@@ -184,6 +192,9 @@ pub fn make_test_pod_with_affinity<'a>(
                     label_selector: Some(selector),
                     namespaces: Some(vec![affinity_namespace.unwrap_or(namespace).to_string()]),
                     topology_key: "kubernetes.io/hostname".to_string(),
+                    match_label_keys: None,
+                    mismatch_label_keys: None,
+                    namespace_selector: None,
                 }]),
             }),
             pod_anti_affinity: None,
@@ -236,9 +247,7 @@ pub async fn smoke_check_first_line(log_reader: &mut Reader) {
     let expected_pat = "INFO vector::app:";
     assert!(
         first_line.contains(expected_pat),
-        "Expected a line ending with {:?} but got {:?}; vector might be malfunctioning",
-        expected_pat,
-        first_line
+        "Expected a line ending with {expected_pat:?} but got {first_line:?}; vector might be malfunctioning"
     );
 }
 
@@ -276,7 +285,9 @@ where
                 // We got an EOF error, this is most likely some very long line,
                 // we don't produce lines this bing is our test cases, so we'll
                 // just skip the error - as if it wasn't a JSON string.
-                error!("The JSON line we just got was incomplete, most likely it was too long, so we're skipping it");
+                error!(
+                    "The JSON line we just got was incomplete, most likely it was too long, so we're skipping it"
+                );
                 continue;
             }
             Err(err) => return Err(err.into()),

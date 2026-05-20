@@ -1,25 +1,27 @@
 use std::{
     sync::{
-        atomic::{AtomicUsize, Ordering},
         Arc,
+        atomic::{AtomicUsize, Ordering},
     },
     time::{Duration, Instant},
 };
 
 use async_trait::async_trait;
-use futures::{stream::BoxStream, StreamExt};
+use futures::{StreamExt, stream::BoxStream};
 use tokio::{
     select,
     sync::watch,
     time::{interval, sleep_until},
 };
-use vector_lib::internal_event::{
-    ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output, Protocol,
+use vector_lib::{
+    EstimatedJsonEncodedSizeOf,
+    internal_event::{
+        ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output, Protocol,
+    },
 };
-use vector_lib::EstimatedJsonEncodedSizeOf;
 
 use crate::{
-    event::{EventArray, EventContainer},
+    event::{EventArray, EventContainer, EventStatus, Finalizable},
     sinks::{blackhole::config::BlackholeConfig, util::StreamSink},
 };
 
@@ -63,6 +65,7 @@ impl StreamSink<EventArray> for BlackholeSink {
                             info!(
                                 events = total_events.load(Ordering::Relaxed),
                                 raw_bytes_collected = total_raw_bytes.load(Ordering::Relaxed),
+                                internal_log_rate_limit = false,
                                 "Collected events."
                             );
                         },
@@ -73,12 +76,13 @@ impl StreamSink<EventArray> for BlackholeSink {
                 info!(
                     events = total_events.load(Ordering::Relaxed),
                     raw_bytes_collected = total_raw_bytes.load(Ordering::Relaxed),
+                    internal_log_rate_limit = false,
                     "Collected events."
                 );
             });
         }
 
-        while let Some(events) = input.next().await {
+        while let Some(mut events) = input.next().await {
             if let Some(rate) = self.config.rate {
                 let factor: f32 = 1.0 / rate as f32;
                 let secs: f32 = factor * (events.len() as f32);
@@ -93,6 +97,9 @@ impl StreamSink<EventArray> for BlackholeSink {
             _ = self
                 .total_raw_bytes
                 .fetch_add(message_len.get(), Ordering::AcqRel);
+
+            let finalizers = events.take_finalizers();
+            finalizers.update_status(EventStatus::Delivered);
 
             events_sent.emit(CountByteSize(events.len(), message_len));
             bytes_sent.emit(ByteSize(message_len.get()));

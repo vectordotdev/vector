@@ -1,9 +1,9 @@
 use bytes::Bytes;
 use chrono::Utc;
 use uuid::Uuid;
-use vector_lib::codecs::encoding::Framer;
-use vector_lib::request_metadata::RequestMetadata;
-use vector_lib::EstimatedJsonEncodedSizeOf;
+use vector_lib::{
+    EstimatedJsonEncodedSizeOf, codecs::encoding::Framer, request_metadata::RequestMetadata,
+};
 
 use crate::{
     codecs::{Encoder, Transformer},
@@ -11,8 +11,8 @@ use crate::{
     sinks::{
         azure_common::config::{AzureBlobMetadata, AzureBlobRequest},
         util::{
-            metadata::RequestMetadataBuilder, request_builder::EncodeResult, Compression,
-            RequestBuilder,
+            Compression, RequestBuilder, metadata::RequestMetadataBuilder,
+            request_builder::EncodeResult,
         },
     },
 };
@@ -66,12 +66,11 @@ impl RequestBuilder<(String, Vec<Event>)> for AzureBlobRequestOptions {
         request_metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        let blob_name = {
-            let formatted_ts = Utc::now().format(self.blob_time_format.as_str());
-
-            self.blob_append_uuid
-                .then(|| format!("{}-{}", formatted_ts, Uuid::new_v4().hyphenated()))
-                .unwrap_or_else(|| formatted_ts.to_string())
+        let formatted_ts = Utc::now().format(self.blob_time_format.as_str());
+        let blob_name = if self.blob_append_uuid {
+            format!("{formatted_ts}-{}", Uuid::new_v4().hyphenated())
+        } else {
+            formatted_ts.to_string()
         };
 
         let extension = self.compression.extension();

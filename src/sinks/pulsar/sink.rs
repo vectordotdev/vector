@@ -1,9 +1,10 @@
+use std::collections::HashMap;
+
 use async_trait::async_trait;
 use bytes::Bytes;
 use pulsar::{Pulsar, TokioExecutor};
 use serde::Serialize;
 use snafu::Snafu;
-use std::collections::HashMap;
 use vrl::value::KeyString;
 
 use super::{

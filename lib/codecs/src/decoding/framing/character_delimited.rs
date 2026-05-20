@@ -47,13 +47,13 @@ pub struct CharacterDelimitedDecoderOptions {
     ///
     /// This length does *not* include the trailing delimiter.
     ///
-    /// By default, there is no maximum length enforced. If events are malformed, this can lead to
+    /// By default, no maximum length is enforced. If events are malformed, this can lead to
     /// additional resource usage as events continue to be buffered in memory, and can potentially
     /// lead to memory exhaustion in extreme cases.
     ///
     /// If there is a risk of processing malformed data, such as logs with user-controlled input,
     /// consider setting the maximum length to a reasonably large value as a safety net. This
-    /// ensures that processing is not actually unbounded.
+    /// prevents processing from being unbounded.
     #[serde(skip_serializing_if = "vector_core::serde::is_default")]
     pub max_length: Option<usize>,
 }
@@ -123,8 +123,7 @@ impl Decoder for CharacterDelimitedDecoder {
                         warn!(
                             message = "Discarding frame larger than max_length.",
                             buf_len = buf.len(),
-                            max_length = self.max_length,
-                            internal_log_rate_limit = true
+                            max_length = self.max_length
                         );
                         buf.advance(next_delimiter_idx + 1);
                     } else {
@@ -151,8 +150,7 @@ impl Decoder for CharacterDelimitedDecoder {
                     warn!(
                         message = "Discarding frame larger than max_length.",
                         buf_len = buf.len(),
-                        max_length = self.max_length,
-                        internal_log_rate_limit = true
+                        max_length = self.max_length
                     );
                     Ok(None)
                 } else {

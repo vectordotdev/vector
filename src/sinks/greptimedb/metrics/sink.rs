@@ -1,16 +1,18 @@
+use async_trait::async_trait;
+use futures::StreamExt;
+use futures_util::stream::BoxStream;
+use vector_lib::event::{Metric, MetricValue};
+
 use crate::sinks::{
     greptimedb::metrics::{
-        batch::GreptimeDBBatchSizer, request::GreptimeDBGrpcRequest,
-        request::GreptimeDBGrpcRetryLogic, request_builder::RequestBuilderOptions,
+        batch::GreptimeDBBatchSizer,
+        request::{GreptimeDBGrpcRequest, GreptimeDBGrpcRetryLogic},
+        request_builder::RequestBuilderOptions,
         service::GreptimeDBGrpcService,
     },
     prelude::*,
     util::buffer::metrics::{MetricNormalize, MetricSet},
 };
-use async_trait::async_trait;
-use futures::StreamExt;
-use futures_util::stream::BoxStream;
-use vector_lib::event::{Metric, MetricValue};
 
 #[derive(Clone, Debug, Default)]
 pub struct GreptimeDBMetricNormalize;

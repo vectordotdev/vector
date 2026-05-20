@@ -2,7 +2,7 @@
 name = "vector-lookup"
 version = "0.1.0"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
-edition = "2021"
+edition = "2024"
 publish = false
 license = "MPL-2.0"
 

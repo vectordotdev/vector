@@ -59,7 +59,7 @@ components: sinks: postgres: {
 		notices: []
 	}
 
-	configuration: base.components.sinks.postgres.configuration
+	configuration: generated.components.sinks.postgres.configuration
 
 	input: {
 		logs: true

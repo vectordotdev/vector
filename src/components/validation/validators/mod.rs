@@ -1,11 +1,10 @@
 mod component_spec;
 
-pub use self::component_spec::ComponentSpecValidator;
-
 use std::fmt::{Display, Formatter};
 
 use vector_lib::event::Event;
 
+pub use self::component_spec::ComponentSpecValidator;
 use super::{ComponentType, RunnerMetrics, TestCaseExpectation, TestEvent};
 
 /// A component validator.
