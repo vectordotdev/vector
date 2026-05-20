@@ -3,12 +3,16 @@ use std::{
     fmt,
     hash::{Hash, Hasher},
     num::NonZeroU64,
+    sync::Arc,
 };
 
 use vector_lib::{
     config::LegacyKey,
     lookup::{OwnedTargetPath, lookup_v2::OptionalValuePath},
 };
+
+use vector_lib::counter;
+use vector_lib::internal_event::CounterName;
 
 use crate::{
     conditions::Condition,
@@ -139,6 +143,11 @@ pub enum SampleKeySource {
     },
 }
 
+/// Callback signature for [`Sample::with_discarded_event_tags`]. Returns
+/// `(key, value)` pairs that are merged into the
+/// `component_discarded_events_total` counter on each drop.
+pub type DiscardedEventTagsFn = dyn Fn(&Event) -> Vec<(String, String)> + Send + Sync;
+
 #[derive(Clone)]
 pub struct Sample {
     name: String,
@@ -147,6 +156,7 @@ pub struct Sample {
     dynamic_event_counters: HashMap<Option<String>, u64>,
     exclude: Option<Condition>,
     sample_rate_key: OptionalValuePath,
+    discarded_event_tags: Option<Arc<DiscardedEventTagsFn>>,
 }
 
 impl Sample {
@@ -204,7 +214,27 @@ impl Sample {
             dynamic_event_counters: HashMap::default(),
             exclude,
             sample_rate_key,
+            discarded_event_tags: None,
         }
+    }
+
+    /// Register a callback that returns extra `(key, value)` tags to attach
+    /// to the `component_discarded_events_total` counter each time this
+    /// transform drops an event. If unset (default), behavior is unchanged.
+    ///
+    /// The callback is invoked at the drop site with a reference to the
+    /// event being discarded. The returned tags are merged with the
+    /// standard `intentional` label on the counter.
+    ///
+    /// Intended for downstream wrappers (e.g., Observability Pipelines)
+    /// that group sampled events by user-provided fields and want the
+    /// discard metric tagged accordingly.
+    pub fn with_discarded_event_tags<F>(mut self, f: F) -> Self
+    where
+        F: Fn(&Event) -> Vec<(String, String)> + Send + Sync + 'static,
+    {
+        self.discarded_event_tags = Some(Arc::new(f));
+        self
     }
 
     #[cfg(test)]
@@ -323,6 +353,30 @@ impl Sample {
 
         self.get_event_value(event, key_field)
     }
+
+    /// Emit the discard metric. When `discarded_event_tags` is set,
+    /// bypasses the standard `SampleEventDiscarded` path so the per-event
+    /// tags can be merged onto `component_discarded_events_total`.
+    fn emit_discard(&self, event: &Event) {
+        match &self.discarded_event_tags {
+            Some(tag_fn) => {
+                let extra_tags = tag_fn(event);
+                let mut labels: Vec<metrics::Label> = Vec::with_capacity(extra_tags.len() + 1);
+                labels.push(metrics::Label::new("intentional", "true"));
+                for (k, v) in extra_tags {
+                    labels.push(metrics::Label::new(k, v));
+                }
+                counter!(CounterName::ComponentDiscardedEventsTotal, labels).increment(1);
+                tracing::debug!(
+                    message = "Events dropped",
+                    intentional = true,
+                    count = 1_u64,
+                    reason = "Sample discarded.",
+                );
+            }
+            None => emit!(SampleEventDiscarded),
+        }
+    }
 }
 
 impl FunctionTransform for Sample {
@@ -378,7 +432,7 @@ impl FunctionTransform for Sample {
             }
             output.push(event);
         } else {
-            emit!(SampleEventDiscarded);
+            self.emit_discard(&event);
         }
     }
 }
