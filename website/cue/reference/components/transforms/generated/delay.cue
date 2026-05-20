@@ -2,7 +2,7 @@ package metadata
 
 generated: components: transforms: delay: configuration: {
 	delay_milliseconds: {
-		description: "Time to delay each event, in seconds."
+		description: "Time to delay each event, in milliseconds."
 		required:    true
 		type: uint: unit: "milliseconds"
 	}

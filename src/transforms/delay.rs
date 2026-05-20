@@ -22,7 +22,7 @@ use crate::{
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct DelayConfig {
-    /// Time to delay each event, in seconds.
+    /// Time to delay each event, in milliseconds.
     #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
     #[configurable(metadata(docs::human_name = "Delay in milliseconds", docs::example = 200))]
     delay_milliseconds: Duration,
