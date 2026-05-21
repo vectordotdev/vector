@@ -19,7 +19,7 @@ use crate::{
 /// Configuration for the `delay` transform.
 #[serde_as]
 #[configurable_component(transform("delay", "Slow down events passing through a topology."))]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct DelayConfig {
     /// Time to delay each event, in milliseconds.
@@ -41,6 +41,17 @@ pub struct DelayConfig {
 
 const fn default_queue_capacity() -> NonZeroUsize {
     unsafe { NonZeroUsize::new_unchecked(500) }
+}
+
+impl Default for DelayConfig {
+    fn default() -> Self {
+        Self {
+            delay_milliseconds: Default::default(),
+            queue_capacity: default_queue_capacity(),
+            overflow_strategy: Default::default(),
+            delay_until_condition: Default::default(),
+        }
+    }
 }
 
 /// Event handling behavior when delay queue is full.
@@ -96,7 +107,7 @@ impl TransformConfig for DelayConfig {
 pub struct Delay {
     delay: Duration,
     queue: DelayQueue<Event>,
-    queue_capacity: Option<NonZeroUsize>,
+    queue_capacity: NonZeroUsize,
     overflow_strategy: OverflowStrategy,
     delay_until_condition: Option<Condition>,
 }
@@ -105,10 +116,7 @@ impl Delay {
     pub fn new(config: &DelayConfig, context: &TransformContext) -> crate::Result<Self> {
         Ok(Self {
             delay: config.delay_milliseconds,
-            queue: config
-                .queue_capacity
-                .map(|c| DelayQueue::with_capacity(c.into()))
-                .unwrap_or_default(),
+            queue: DelayQueue::with_capacity(config.queue_capacity.get()),
             queue_capacity: config.queue_capacity,
             overflow_strategy: config.overflow_strategy,
             delay_until_condition: config
@@ -151,10 +159,10 @@ impl TaskTransform<Event> for Delay {
                                 if result {
                                     yield event
                                 } else {
-                                    if let Some(capacity) = self.queue_capacity && capacity.get() <= self.queue.len() {
+                                    if self.queue_capacity.get() <= self.queue.len() {
                                         match self.overflow_strategy {
                                             OverflowStrategy::Block => {
-                                                while capacity.get() <= self.queue.len() && let Some(next) = self.queue.next().await {
+                                                while self.queue_capacity.get() <= self.queue.len() && let Some(next) = self.queue.next().await {
                                                     let event = next.into_inner();
                                                     let (result, event) = if let Some(condition) = self.delay_until_condition.as_ref() {
                                                         condition.check(event)
