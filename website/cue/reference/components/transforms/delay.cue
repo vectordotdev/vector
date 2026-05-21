@@ -22,10 +22,10 @@ components: transforms: delay: {
 		requirements: []
 		warnings: [
 			"""
-			Delay transform operates at millisecond granularity and when multiple events are
-			received in the same millisecond and the component doesn't preserve original ordering if
-			items are emitted in the same millisecond.
-			""",
+				Delay transform operates at millisecond granularity and when multiple events are
+				received in the same millisecond and the component doesn't preserve original ordering if
+				items are emitted in the same millisecond.
+				""",
 		]
 		notices: []
 	}

@@ -36,8 +36,8 @@ generated: components: transforms: delay: configuration: {
 		}
 	}
 	queue_capacity: {
-		description: "Optional limit for number of items in the delay queue."
+		description: "Limit for number of items in the delay queue."
 		required:    false
-		type: uint: {}
+		type: uint: default: 500
 	}
 }
