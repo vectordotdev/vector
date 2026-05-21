@@ -699,13 +699,13 @@ impl ConsumerStateInner<Consuming> {
     }
 
     fn finalize_batch(
-        batch: Option<(OwnedMessage, BatchStatusReceiver)>,
+        batch: Option<(FinalizerEntry, BatchStatusReceiver)>,
         finalizer: Option<&OrderedFinalizer<FinalizerEntry>>,
     ) {
         if let Some((msg, receiver)) = batch
             && let Some(f) = finalizer.as_ref()
         {
-            f.add(msg.into(), receiver);
+            f.add(msg, receiver);
         }
     }
 }
@@ -978,9 +978,9 @@ async fn parse_message(
     out: &mut SourceSender,
     acknowledgements: bool,
     log_namespace: LogNamespace,
-) -> Option<(OwnedMessage, BatchStatusReceiver)> {
+) -> Option<(FinalizerEntry, BatchStatusReceiver)> {
     let (batch, receiver) = BatchNotifier::new_with_receiver();
-    let last = messages.last().cloned()?;
+    let last: FinalizerEntry = messages.last()?.into();
     let size = messages.len();
     let (count, streams) = messages
         .into_iter()
@@ -1207,10 +1207,10 @@ struct FinalizerEntry {
     offset: i64,
 }
 
-impl From<OwnedMessage> for FinalizerEntry {
-    fn from(msg: OwnedMessage) -> Self {
+impl From<&OwnedMessage> for FinalizerEntry {
+    fn from(msg: &OwnedMessage) -> Self {
         Self {
-            topic: msg.topic,
+            topic: msg.topic.clone(),
             partition: msg.partition,
             offset: msg.offset,
         }
