@@ -111,7 +111,7 @@ fn make_copy_error_event(id: Value, value: &str) -> Event {
 async fn insert_event_with_cfg(cfg: String, table: String, client: Arc<DatabendAPIClient>) {
     let create_table_sql =
         format!("create table `{table}` (host String, timestamp String, message String)");
-    client.query_all(&create_table_sql).await.unwrap();
+    client.query_all(&create_table_sql, None).await.unwrap();
 
     let (config, _) = load_sink::<DatabendConfig>(&cfg).unwrap();
     let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
@@ -125,7 +125,7 @@ async fn insert_event_with_cfg(cfg: String, table: String, client: Arc<DatabendA
     .await;
 
     let select_all_sql = format!("select * from `{table}`");
-    let resp = client.query_all(&select_all_sql).await.unwrap();
+    let resp = client.query_all(&select_all_sql, None).await.unwrap();
     assert_eq!(1, resp.data.len());
 
     // drop input_event after comparing with response
@@ -180,7 +180,10 @@ async fn staged_copy_on_error_continue_skips_bad_rows() {
         .await
         .unwrap();
     client
-        .query_all(&format!("create table `{table}` (id Int64, value String)"))
+        .query_all(
+            &format!("create table `{table}` (id Int64, value String)"),
+            None,
+        )
         .await
         .unwrap();
 
@@ -208,7 +211,10 @@ async fn staged_copy_on_error_continue_skips_bad_rows() {
     .await;
 
     let resp = client
-        .query_all(&format!("select id, value from `{table}` order by id"))
+        .query_all(
+            &format!("select id, value from `{table}` order by id"),
+            None,
+        )
         .await
         .unwrap();
     assert_eq!(1, resp.data.len());
@@ -226,9 +232,10 @@ async fn replace_event_with_primary_key() {
         .await
         .unwrap();
     client
-        .query_all(&format!(
-            "create table `{table}` (id Int64, source String, value String)"
-        ))
+        .query_all(
+            &format!("create table `{table}` (id Int64, source String, value String)"),
+            None,
+        )
         .await
         .unwrap();
 
@@ -257,9 +264,10 @@ async fn replace_event_with_primary_key() {
     .await;
 
     let resp = client
-        .query_all(&format!(
-            "select id, source, value from `{table}` order by id"
-        ))
+        .query_all(
+            &format!("select id, source, value from `{table}` order by id"),
+            None,
+        )
         .await
         .unwrap();
     assert_eq!(2, resp.data.len());

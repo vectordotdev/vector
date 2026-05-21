@@ -75,7 +75,7 @@ impl RetryLogic for DatabendRetryLogic {
                     _ => false,
                 }
             }
-            DatabendError::WithContext(boxed_error, ..) => self.is_retriable_error(boxed_error),
+            DatabendError::WithContext { inner, .. } => self.is_retriable_error(inner),
             DatabendError::IO(_) => true,
             _ => false,
         }

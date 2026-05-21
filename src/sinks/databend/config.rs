@@ -338,7 +338,7 @@ impl SinkConfig for DatabendConfig {
 }
 
 async fn select_one(client: Arc<DatabendAPIClient>) -> crate::Result<()> {
-    client.query_all("SELECT 1").await?;
+    client.query_all("SELECT 1", None).await?;
     Ok(())
 }
 
