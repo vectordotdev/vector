@@ -222,11 +222,36 @@ mod tests {
 
     use crate::tls::{TEST_PEM_CA_PATH, TEST_PEM_CRT_PATH, TEST_PEM_KEY_PATH};
     use openssl::ssl::{SslAcceptor, SslConnector, SslFiletype, SslMethod, SslVerifyMode};
+    use serial_test::serial;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::{TcpListener, TcpStream};
     use tokio_openssl::SslStream;
+    use vector_lib::event::MetricValue;
+    use vector_lib::internal_event::InternalEvent;
+    use vector_lib::metrics::Controller;
 
-    use super::is_graceful_tls_shutdown;
+    use super::{TcpSendAckError, TcpSourceConnectionShutdown, is_graceful_tls_shutdown};
+
+    /// Returns the current value of a counter matching `name` and all `tags`.
+    /// Counters that have not yet been touched aren't in the snapshot and
+    /// register as 0.0 here.
+    fn counter_value(name: &str, tags: &[(&str, &str)]) -> f64 {
+        Controller::get()
+            .expect("metrics controller initialized")
+            .capture_metrics()
+            .into_iter()
+            .find(|m| {
+                m.name() == name
+                    && tags.iter().all(|(k, v)| {
+                        m.tags().is_some_and(|t| t.get(k) == Some(*v))
+                    })
+            })
+            .map(|m| match m.value() {
+                MetricValue::Counter { value } => *value,
+                other => panic!("expected counter for {name}, got {other:?}"),
+            })
+            .unwrap_or(0.0)
+    }
 
     #[test]
     fn plain_io_errors_are_not_graceful() {
@@ -308,5 +333,146 @@ mod tests {
         );
 
         server.await.unwrap();
+    }
+
+    /// Drives a real bidirectional SSL shutdown to elicit a genuine
+    /// `openssl::ssl::Error`, returning the wrapping `io::Error` from the same
+    /// code path Vector hits in production. Used by the ack-error metric tests
+    /// to avoid synthesizing an `openssl::ssl::Error` (its fields are crate-private).
+    async fn make_graceful_tls_io_error() -> io::Error {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        let server = tokio::spawn(async move {
+            let (stream, _) = listener.accept().await.unwrap();
+            let mut acceptor = SslAcceptor::mozilla_intermediate(SslMethod::tls()).unwrap();
+            acceptor
+                .set_private_key_file(TEST_PEM_KEY_PATH, SslFiletype::PEM)
+                .unwrap();
+            acceptor
+                .set_certificate_chain_file(TEST_PEM_CRT_PATH)
+                .unwrap();
+            let acceptor = acceptor.build();
+            let ssl = openssl::ssl::Ssl::new(acceptor.context()).unwrap();
+            let mut tls = SslStream::new(ssl, stream).unwrap();
+            Pin::new(&mut tls).accept().await.unwrap();
+            Pin::new(&mut tls).shutdown().await.unwrap();
+        });
+
+        let mut connector = SslConnector::builder(SslMethod::tls()).unwrap();
+        connector.set_ca_file(TEST_PEM_CA_PATH).unwrap();
+        connector.set_verify(SslVerifyMode::NONE);
+        let ssl = connector
+            .build()
+            .configure()
+            .unwrap()
+            .into_ssl("localhost")
+            .unwrap();
+        let stream = TcpStream::connect(addr).await.unwrap();
+        let mut tls = SslStream::new(ssl, stream).unwrap();
+        Pin::new(&mut tls).connect().await.unwrap();
+
+        let mut buf = [0u8; 1];
+        let _ = tls.read(&mut buf).await.unwrap();
+        Pin::new(&mut tls).shutdown().await.unwrap();
+        let err = tls.write_all(b"too late").await.expect_err("write fails");
+        server.await.unwrap();
+        err
+    }
+
+    /// The post-loop emit in `handle_stream` MUST bump
+    /// `connection_shutdown_total{mode="tcp"}` once per accepted connection.
+    /// This pins the contract that the unified counter is owned by this event.
+    #[test]
+    #[serial]
+    fn tcp_source_connection_shutdown_increments_shutdown_total() {
+        crate::test_util::trace_init();
+        let before = counter_value("connection_shutdown_total", &[("mode", "tcp")]);
+
+        TcpSourceConnectionShutdown.emit();
+
+        let after = counter_value("connection_shutdown_total", &[("mode", "tcp")]);
+        assert_eq!(after - before, 1.0);
+    }
+
+    /// Graceful TLS shutdown during ack write must not bump any counter — the
+    /// connection-shutdown increment is owned by `TcpSourceConnectionShutdown`
+    /// at the source loop exit, and the case is not an error so
+    /// `component_errors_total` must stay flat too. This is what the customer
+    /// PR is actually fixing on the metrics side.
+    #[tokio::test]
+    #[serial]
+    async fn graceful_ack_error_does_not_increment_counters() {
+        crate::test_util::trace_init();
+        let shutdown_before = counter_value("connection_shutdown_total", &[("mode", "tcp")]);
+        let errors_before = counter_value(
+            "component_errors_total",
+            &[("error_code", "ack_failed"), ("mode", "tcp")],
+        );
+
+        let err = make_graceful_tls_io_error().await;
+        assert!(
+            is_graceful_tls_shutdown(&err),
+            "test prerequisite: io::Error must be a graceful TLS shutdown",
+        );
+        TcpSendAckError { error: err }.emit();
+
+        assert_eq!(
+            counter_value("connection_shutdown_total", &[("mode", "tcp")]),
+            shutdown_before,
+            "graceful TcpSendAckError must not bump connection_shutdown_total \
+             (that counter is owned by TcpSourceConnectionShutdown)",
+        );
+        assert_eq!(
+            counter_value(
+                "component_errors_total",
+                &[("error_code", "ack_failed"), ("mode", "tcp")],
+            ),
+            errors_before,
+            "graceful TcpSendAckError must not bump component_errors_total",
+        );
+    }
+
+    /// A non-graceful ack write failure (a plain io::Error, e.g. ECONNRESET)
+    /// must still log at ERROR and bump `component_errors_total` with the
+    /// `ack_failed` error_code — preserving the existing error contract for
+    /// genuine ack write failures.
+    #[test]
+    #[serial]
+    fn non_graceful_ack_error_increments_component_errors_total() {
+        crate::test_util::trace_init();
+        let errors_before = counter_value(
+            "component_errors_total",
+            &[
+                ("error_code", "ack_failed"),
+                ("error_type", "writer_failed"),
+                ("stage", "sending"),
+                ("mode", "tcp"),
+            ],
+        );
+        let shutdown_before = counter_value("connection_shutdown_total", &[("mode", "tcp")]);
+
+        let err = io::Error::from(io::ErrorKind::ConnectionReset);
+        assert!(!is_graceful_tls_shutdown(&err));
+        TcpSendAckError { error: err }.emit();
+
+        assert_eq!(
+            counter_value(
+                "component_errors_total",
+                &[
+                    ("error_code", "ack_failed"),
+                    ("error_type", "writer_failed"),
+                    ("stage", "sending"),
+                    ("mode", "tcp"),
+                ],
+            ) - errors_before,
+            1.0,
+        );
+        assert_eq!(
+            counter_value("connection_shutdown_total", &[("mode", "tcp")]),
+            shutdown_before,
+            "non-graceful ack failure must not directly bump shutdown counter \
+             (that's the source-loop-exit emit's job)",
+        );
     }
 }
