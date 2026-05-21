@@ -213,7 +213,7 @@ impl TagCardinalityLimit {
         let metric_accepted_tags = self.accepted_tags.entry(metric_key_owned).or_default();
         let tag_value_set = metric_accepted_tags
             .entry_ref(key)
-            .or_insert_with(|| AcceptedTagValueSet::new(config.value_limit, &config.mode));
+            .or_insert_with(|| AcceptedTagValueSet::new(&config.mode));
 
         if tag_value_set.contains(value) {
             // Tag value has already been accepted, nothing more to do.
@@ -300,7 +300,7 @@ impl TagCardinalityLimit {
         let metric_accepted_tags = self.accepted_tags.entry(metric_key_owned).or_default();
         metric_accepted_tags
             .entry_ref(key)
-            .or_insert_with(|| AcceptedTagValueSet::new(config.value_limit, &config.mode))
+            .or_insert_with(|| AcceptedTagValueSet::new(&config.mode))
             .insert(value.clone());
         false
     }
