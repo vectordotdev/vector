@@ -554,6 +554,19 @@ where
     wait_for(|| ready(unblock(value.load(Ordering::SeqCst)))).await
 }
 
+pub async fn wait_for_atomic_usize_timeout_ms<T, F>(value: T, unblock: F, timeout_ms: u64)
+where
+    T: AsRef<AtomicUsize>,
+    F: Fn(usize) -> bool,
+{
+    let value = value.as_ref();
+    wait_for_duration(
+        || ready(unblock(value.load(Ordering::SeqCst))),
+        Duration::from_millis(timeout_ms),
+    )
+    .await
+}
+
 // Retries a func every `retry` duration until given an Ok(T); panics after `until` elapses
 pub async fn retry_until<'a, F, Fut, T, E>(mut f: F, retry: Duration, until: Duration) -> T
 where

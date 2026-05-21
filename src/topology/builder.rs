@@ -8,7 +8,6 @@ use std::{
 
 use futures::{FutureExt, StreamExt, TryStreamExt, stream::FuturesOrdered};
 use futures_util::stream::FuturesUnordered;
-use metrics::gauge;
 use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
 use tokio::{
     select,
@@ -22,7 +21,10 @@ use vector_lib::{
         BufferType, WhenFull,
         topology::{
             builder::TopologyBuilder,
-            channel::{BufferReceiver, BufferSender, ChannelMetricMetadata, LimitedReceiver},
+            channel::{
+                BufferChannelKind, BufferReceiver, BufferSender, ChannelMetricMetadata,
+                LimitedReceiver,
+            },
         },
     },
     internal_event::{self, CountByteSize, EventsSent, InternalEventHandle as _, Registered},
@@ -31,6 +33,7 @@ use vector_lib::{
     source_sender::{CHUNK_SIZE, SourceSenderItem},
     transform::update_runtime_schema_definition,
 };
+use vector_lib::{gauge, internal_event::GaugeName};
 use vector_vrl_metrics::MetricsStorage;
 
 use super::{
@@ -67,7 +70,6 @@ pub(crate) static SOURCE_SENDER_BUFFER_SIZE: LazyLock<usize> =
 
 const READY_ARRAY_CAPACITY: NonZeroUsize = NonZeroUsize::new(CHUNK_SIZE * 4).unwrap();
 pub(crate) const TOPOLOGY_BUFFER_SIZE: NonZeroUsize = NonZeroUsize::new(100).unwrap();
-const TRANSFORM_CHANNEL_METRIC_PREFIX: &str = "transform_buffer";
 
 static TRANSFORM_CONCURRENCY_LIMIT: LazyLock<usize> = LazyLock::new(|| {
     crate::app::worker_threads()
@@ -508,7 +510,7 @@ impl<'a> Builder<'a> {
                 Ok(transform) => transform,
             };
 
-            let metrics = ChannelMetricMetadata::new(TRANSFORM_CHANNEL_METRIC_PREFIX, None);
+            let metrics = ChannelMetricMetadata::new(BufferChannelKind::Transform, None);
             let (input_tx, input_rx) = TopologyBuilder::standalone_memory(
                 TOPOLOGY_BUFFER_SIZE,
                 WhenFull::Block,
@@ -627,7 +629,7 @@ impl<'a> Builder<'a> {
 
             let utilization_sender = self
                 .utilization_registry
-                .add_component(key.clone(), gauge!("utilization"));
+                .add_component(key.clone(), gauge!(GaugeName::Utilization));
             let component_key = key.clone();
             let sink = async move {
                 debug!("Sink starting.");
@@ -747,7 +749,7 @@ impl<'a> Builder<'a> {
 
         let sender = self
             .utilization_registry
-            .add_component(node.key.clone(), gauge!("utilization"));
+            .add_component(node.key.clone(), gauge!(GaugeName::Utilization));
         let runner = Runner::new(
             t,
             input_rx,
@@ -803,7 +805,7 @@ impl<'a> Builder<'a> {
 
         let sender = self
             .utilization_registry
-            .add_component(key.clone(), gauge!("utilization"));
+            .add_component(key.clone(), gauge!(GaugeName::Utilization));
         let output_sender = sender.clone();
         let input_rx = Utilization::new(sender, key.clone(), input_rx.into_stream());
 
@@ -884,30 +886,44 @@ async fn run_source_output_pump(
 ) -> TaskResult {
     debug!("Source pump starting.");
 
-    while let Some(SourceSenderItem {
-        events: mut array,
-        send_reference,
-    }) = rx.next().await
-    {
-        // Even though we have a `send_reference` timestamp above, that reference time is when
-        // the events were enqueued in the `SourceSender`, not when they were pulled out of the
-        // `rx` stream on this end. Since those times can be quite different (due to blocking
-        // inherent to the fanout send operation), we set the `last_transform_timestamp` to the
-        // current time instead to get an accurate reference for when the events started waiting
-        // for the first transform.
-        let now = Instant::now();
-        array.for_each_metadata_mut(|metadata| {
-            metadata.set_source_id(Arc::clone(&source));
-            metadata.set_source_type(source_type);
-            metadata.set_last_transform_timestamp(now);
-        });
-        fanout
-            .send(array, Some(send_reference))
-            .await
-            .map_err(|e| {
-                debug!("Source pump finished with an error.");
-                TaskError::wrapped(e)
-            })?;
+    let mut control_channel_open = true;
+    loop {
+        tokio::select! {
+            biased;
+            // Process control messages (e.g. Remove/Pause) even when the source
+            // is idle, so that config reloads can proceed without waiting for the
+            // next event.
+            alive = fanout.recv_control_message(), if control_channel_open => {
+                control_channel_open = alive;
+            }
+            item = rx.next() => {
+                match item {
+                    Some(SourceSenderItem { events: mut array, send_reference }) => {
+                        // Even though we have a `send_reference` timestamp above, that reference
+                        // time is when the events were enqueued in the `SourceSender`, not when
+                        // they were pulled out of the `rx` stream on this end. Since those times
+                        // can be quite different (due to blocking inherent to the fanout send
+                        // operation), we set the `last_transform_timestamp` to the current time
+                        // instead to get an accurate reference for when the events started
+                        // waiting for the first transform.
+                        let now = Instant::now();
+                        array.for_each_metadata_mut(|metadata| {
+                            metadata.set_source_id(Arc::clone(&source));
+                            metadata.set_source_type(source_type);
+                            metadata.set_last_transform_timestamp(now);
+                        });
+                        fanout
+                            .send(array, Some(send_reference))
+                            .await
+                            .map_err(|e| {
+                                debug!("Source pump finished with an error.");
+                                TaskError::wrapped(e)
+                            })?;
+                    }
+                    None => break,
+                }
+            }
+        }
     }
 
     debug!("Source pump finished normally.");
