@@ -42,6 +42,7 @@ use tokio::{
     task::{JoinError, JoinHandle, JoinSet},
     time::Sleep,
 };
+use tokio_util::sync::CancellationToken;
 use tracing::{Instrument, Span};
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
@@ -587,11 +588,11 @@ enum ProcessingEvent {
 }
 #[pin_project(project = ProcessingFutureProj)]
 enum ProcessingFuture {
-    ParsedMessage(#[pin] JoinHandle<ProcessingEvent>),
+    ParsedMessage(#[pin] JoinHandle<Option<ProcessingEvent>>),
     Eof(#[pin] Ready<ProcessingEvent>),
 }
 impl Future for ProcessingFuture {
-    type Output = Result<ProcessingEvent, JoinError>;
+    type Output = Result<Option<ProcessingEvent>, JoinError>;
 
     fn poll(
         self: Pin<&mut Self>,
@@ -600,7 +601,7 @@ impl Future for ProcessingFuture {
         let this = self.project();
         match this {
             ProcessingFutureProj::ParsedMessage(join_handle) => join_handle.poll(cx),
-            ProcessingFutureProj::Eof(ready) => ready.poll(cx).map(Ok),
+            ProcessingFutureProj::Eof(ready) => ready.poll(cx).map(Some).map(Ok),
         }
     }
 }
@@ -681,6 +682,7 @@ impl ConsumerStateInner<Consuming> {
             let (finalizer, mut ack_stream) = OrderedFinalizer::<FinalizerEntry>::new(None);
             let (future_done_tx, mut future_done_rx) = mpsc::channel::<()>(256);
             let mut processing_futures = FuturesOrdered::<ProcessingFuture>::new();
+            let processing_cancellation_token = CancellationToken::new();
 
             // finalizer is the entry point for new pending acknowledgements;
             // when it is dropped, no new messages will be consumed, and the
@@ -720,7 +722,7 @@ impl ConsumerStateInner<Consuming> {
                     Some(()) = future_done_rx.recv(), if finalizer.is_some() => {
                         while let Some(res) = processing_futures.next().await {
                             match res {
-                                Ok(event) => {
+                                Ok(Some(event)) => {
                                     match event {
                                         ProcessingEvent::ParsedMessage(batch_result) => Self::finalize_batch(batch_result, finalizer.as_ref()),
                                         ProcessingEvent::Eof => {
@@ -729,6 +731,7 @@ impl ConsumerStateInner<Consuming> {
                                         }
                                     }
                                 }
+                                Ok(None) => (), // ignored
                                 Err(_err) => {
                                     error!("Message parsing task failed!");
                                 }
@@ -758,7 +761,8 @@ impl ConsumerStateInner<Consuming> {
                                 let message_handling_tasks_semaphore = Arc::clone(message_handling_tasks_semaphore);
                                 let permit = message_handling_tasks_semaphore.acquire_owned().await.expect("Message handling tasks semaphore closed");
                                 let future_done_tx = future_done_tx.clone();
-                                processing_futures.push_back(ProcessingFuture::ParsedMessage(tokio::spawn(async move {
+                                let cancellation_token = processing_cancellation_token.clone();
+                                processing_futures.push_back(ProcessingFuture::ParsedMessage(tokio::spawn(cancellation_token.run_until_cancelled_owned(async move {
                                     let result = parse_message(msgs, &decoder, &keys, &mut out, acknowledgements, log_namespace).await;
                                     // Force moving permit into the task, to release only once done
                                     // parsing
@@ -769,7 +773,7 @@ impl ConsumerStateInner<Consuming> {
                                     // processed anyways
                                     let _ = future_done_tx.try_send(());
                                     ProcessingEvent::ParsedMessage(result)
-                                }.instrument(span.clone()))));
+                                }.instrument(span.clone())))));
                             } else {
                                 let batch_result = parse_message(msgs, &decoder, &keys, &mut out, acknowledgements, log_namespace).await;
                                 Self::finalize_batch(batch_result, finalizer.as_ref());
