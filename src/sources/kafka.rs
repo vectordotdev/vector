@@ -719,13 +719,18 @@ impl ConsumerStateInner<Consuming> {
 
                     Some(()) = future_done_rx.recv(), if finalizer.is_some() => {
                         while let Some(res) = processing_futures.next().await {
-                            if let Ok(event) = res {
-                                match event {
-                                    ProcessingEvent::ParsedMessage(batch_result) => Self::finalize_batch(batch_result, finalizer.as_ref()),
-                                    ProcessingEvent::Eof => {
-                                        status = PartitionConsumerStatus::PartitionEOF;
-                                        finalizer.take();
+                            match res {
+                                Ok(event) => {
+                                    match event {
+                                        ProcessingEvent::ParsedMessage(batch_result) => Self::finalize_batch(batch_result, finalizer.as_ref()),
+                                        ProcessingEvent::Eof => {
+                                            status = PartitionConsumerStatus::PartitionEOF;
+                                            finalizer.take();
+                                        }
                                     }
+                                }
+                                Err(_err) => {
+                                    error!("Message parsing task failed!");
                                 }
                             }
                         }
