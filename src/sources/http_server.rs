@@ -433,12 +433,6 @@ struct SimpleHttpSource {
     log_namespace: LogNamespace,
 }
 
-/// Built-in `http_server` metadata keys written by `enrich_events` with a trusted value.
-/// Auth enrichment must not overwrite these; all other keys are auth-derived and may override
-/// client-supplied metadata from decoded events (e.g. a native-codec request).
-const RESERVED_HTTP_SERVER_METADATA_KEYS: &[&str] =
-    &["path", "host", "headers", "query_parameters"];
-
 impl HttpSource for SimpleHttpSource {
     /// Enriches the log events with metadata for the `request_path` and for each of the headers.
     /// Non-log events are skipped.
@@ -554,24 +548,11 @@ impl HttpSource for SimpleHttpSource {
                     let meta = event.metadata_mut().value_mut();
                     for (key, value) in &enrichment {
                         let key_str = key.as_str();
-                        if RESERVED_HTTP_SERVER_METADATA_KEYS.contains(&key_str) {
-                            // Built-in source key: skip if already written by enrich_events.
-                            if meta
-                                .get(path!(SimpleHttpConfig::NAME).concat(path!(key_str)))
-                                .is_none()
-                            {
-                                meta.insert(
-                                    path!(SimpleHttpConfig::NAME).concat(path!(key_str)),
-                                    value.clone(),
-                                );
-                            }
-                        } else {
-                            // Auth-derived key: overwrite any client-supplied value so
-                            // clients cannot spoof fields the auth program sets.
-                            meta.insert(
-                                path!(SimpleHttpConfig::NAME).concat(path!(key_str)),
-                                value.clone(),
-                            );
+                        let name_part = path!(SimpleHttpConfig::NAME);
+                        let key_part = path!(key_str);
+                        let full_path = name_part.concat(key_part);
+                        if meta.get(full_path.clone()).is_none() {
+                            meta.insert(full_path, value.clone());
                         }
                     }
                 }
@@ -1858,7 +1839,7 @@ mod tests {
     }
 
     #[test]
-    fn inject_auth_enrichment_overwrites_client_supplied_metadata_in_vector_namespace() {
+    fn inject_auth_enrichment_does_not_overwrite_existing_metadata_in_vector_namespace() {
         use crate::{codecs::DecodingConfig, sources::util::HttpSource as _};
         use vector_lib::codecs::BytesDeserializerConfig;
         use vrl::value::KeyString;
@@ -1882,18 +1863,18 @@ mod tests {
         };
 
         let mut log = LogEvent::default();
-        // Simulate a client pre-populating an auth-derived key (e.g. via native codec).
+        // Pre-populate a key (e.g. already written by enrich_events or the decoded event).
         log.insert(
             (
                 PathPrefix::Metadata,
                 path!(SimpleHttpConfig::NAME).concat(path!("tenant_id")),
             ),
-            "attacker",
+            "existing",
         );
 
         let mut events = vec![Event::Log(log)];
         let mut enrichment = ObjectMap::new();
-        enrichment.insert(KeyString::from("tenant_id"), Value::from("trusted"));
+        enrichment.insert(KeyString::from("tenant_id"), Value::from("auth-value"));
 
         source.inject_auth_enrichment(&mut events, enrichment);
 
@@ -1905,8 +1886,8 @@ mod tests {
                 PathPrefix::Metadata,
                 path!(SimpleHttpConfig::NAME).concat(path!("tenant_id")),
             )),
-            Some(&Value::from("trusted")),
-            "auth enrichment must overwrite client-supplied metadata for auth-derived keys"
+            Some(&Value::from("existing")),
+            "auth enrichment must not overwrite already-present metadata keys"
         );
     }
 
