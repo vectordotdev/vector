@@ -639,9 +639,20 @@ impl ConsumerStateInner<Consuming> {
                     message = messages.next(), if finalizer.is_some() => match message {
                         None => unreachable!("MessageStream never calls Ready(None)"),
                         Some(msgs) => {
-                            let (oks, errors): (Vec<_>, Vec<_>) = msgs.into_iter().partition(Result::is_ok);
-                            let oks: Vec<_> = oks.into_iter().map(Result::unwrap).collect();
-                            let errors: Vec<_> = errors.into_iter().map(Result::unwrap_err).collect();
+                            let mut oks = Vec::default();
+                            let mut errors = Vec::default();
+                            for msg in msgs {
+                                match msg {
+                                    Ok(msg) => oks.push(msg),
+                                    Err(err) => {
+                                        if matches!(err, rdkafka::error::KafkaError::PartitionEOF(_)) {
+                                            errors.push(err);
+                                            break;
+                                        }
+                                        errors.push(err);
+                                    }
+                                }
+                            }
 
                             // Detach messages from rdkafka early - this duplicates some memory,
                             // but is needed for multithreading. Parsing has to copy data
