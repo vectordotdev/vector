@@ -278,7 +278,7 @@ impl KafkaSourceConfig {
 
 /// Configuration for multithreading for the `kafka` source.
 #[configurable_component]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct MultithreadingConfig {
     /// Number of tasks that may run in parallel for message processing.
@@ -1566,6 +1566,7 @@ mod test {
         topic: &str,
         group: &str,
         log_namespace: LogNamespace,
+        multithreading: bool,
         librdkafka_options: Option<HashMap<String, String>>,
     ) -> KafkaSourceConfig {
         KafkaSourceConfig {
@@ -1584,13 +1585,18 @@ mod test {
             socket_timeout_ms: Duration::from_millis(60000),
             fetch_wait_max_ms: Duration::from_millis(100),
             log_namespace: Some(log_namespace == LogNamespace::Vector),
+            multithreading: if multithreading {
+                Some(MultithreadingConfig::default())
+            } else {
+                None
+            },
             ..Default::default()
         }
     }
 
     #[test]
     fn test_output_schema_definition_vector_namespace() {
-        let definitions = make_config("topic", "group", LogNamespace::Vector, None)
+        let definitions = make_config("topic", "group", LogNamespace::Vector, false, None)
             .outputs(LogNamespace::Vector)
             .remove(0)
             .schema_definition(true);
@@ -1638,7 +1644,7 @@ mod test {
 
     #[test]
     fn test_output_schema_definition_legacy_namespace() {
-        let definitions = make_config("topic", "group", LogNamespace::Legacy, None)
+        let definitions = make_config("topic", "group", LogNamespace::Legacy, false, None)
             .outputs(LogNamespace::Legacy)
             .remove(0)
             .schema_definition(true);
@@ -1674,7 +1680,7 @@ mod test {
 
     #[tokio::test]
     async fn consumer_create_ok() {
-        let config = make_config("topic", "group", LogNamespace::Legacy, None);
+        let config = make_config("topic", "group", LogNamespace::Legacy, false, None);
         assert!(create_consumer(&config, true).is_ok());
     }
 
@@ -1682,7 +1688,7 @@ mod test {
     async fn consumer_create_incorrect_auto_offset_reset() {
         let config = KafkaSourceConfig {
             auto_offset_reset: "incorrect-auto-offset-reset".to_string(),
-            ..make_config("topic", "group", LogNamespace::Legacy, None)
+            ..make_config("topic", "group", LogNamespace::Legacy, false, None)
         };
         assert!(create_consumer(&config, true).is_err());
     }
@@ -1821,42 +1827,82 @@ mod integration_test {
 
     #[tokio::test]
     async fn consumes_event_with_acknowledgements() {
-        send_receive(true, |_| false, 10, LogNamespace::Legacy).await;
+        send_receive(true, |_| false, 10, LogNamespace::Legacy, false).await;
     }
 
     #[tokio::test]
     async fn consumes_event_with_acknowledgements_vector_namespace() {
-        send_receive(true, |_| false, 10, LogNamespace::Vector).await;
+        send_receive(true, |_| false, 10, LogNamespace::Vector, false).await;
     }
 
     #[tokio::test]
     async fn consumes_event_without_acknowledgements() {
-        send_receive(false, |_| false, 10, LogNamespace::Legacy).await;
+        send_receive(false, |_| false, 10, LogNamespace::Legacy, false).await;
     }
 
     #[tokio::test]
     async fn consumes_event_without_acknowledgements_vector_namespace() {
-        send_receive(false, |_| false, 10, LogNamespace::Vector).await;
+        send_receive(false, |_| false, 10, LogNamespace::Vector, false).await;
     }
 
     #[tokio::test]
     async fn handles_one_negative_acknowledgement() {
-        send_receive(true, |n| n == 2, 10, LogNamespace::Legacy).await;
+        send_receive(true, |n| n == 2, 10, LogNamespace::Legacy, false).await;
     }
 
     #[tokio::test]
     async fn handles_one_negative_acknowledgement_vector_namespace() {
-        send_receive(true, |n| n == 2, 10, LogNamespace::Vector).await;
+        send_receive(true, |n| n == 2, 10, LogNamespace::Vector, false).await;
     }
 
     #[tokio::test]
     async fn handles_permanent_negative_acknowledgement() {
-        send_receive(true, |n| n >= 2, 2, LogNamespace::Legacy).await;
+        send_receive(true, |n| n >= 2, 2, LogNamespace::Legacy, false).await;
     }
 
     #[tokio::test]
     async fn handles_permanent_negative_acknowledgement_vector_namespace() {
-        send_receive(true, |n| n >= 2, 2, LogNamespace::Vector).await;
+        send_receive(true, |n| n >= 2, 2, LogNamespace::Vector, false).await;
+    }
+
+    #[tokio::test]
+    async fn consumes_event_with_acknowledgements_multithreaded() {
+        send_receive(true, |_| false, 10, LogNamespace::Legacy, true).await;
+    }
+
+    #[tokio::test]
+    async fn consumes_event_with_acknowledgements_vector_namespace_multithreaded() {
+        send_receive(true, |_| false, 10, LogNamespace::Vector, true).await;
+    }
+
+    #[tokio::test]
+    async fn consumes_event_without_acknowledgements_multithreaded() {
+        send_receive(false, |_| false, 10, LogNamespace::Legacy, true).await;
+    }
+
+    #[tokio::test]
+    async fn consumes_event_without_acknowledgements_vector_namespace_multithreaded() {
+        send_receive(false, |_| false, 10, LogNamespace::Vector, true).await;
+    }
+
+    #[tokio::test]
+    async fn handles_one_negative_acknowledgement_multithreaded() {
+        send_receive(true, |n| n == 2, 10, LogNamespace::Legacy, true).await;
+    }
+
+    #[tokio::test]
+    async fn handles_one_negative_acknowledgement_vector_namespace_multithreaded() {
+        send_receive(true, |n| n == 2, 10, LogNamespace::Vector, true).await;
+    }
+
+    #[tokio::test]
+    async fn handles_permanent_negative_acknowledgement_multithreaded() {
+        send_receive(true, |n| n >= 2, 2, LogNamespace::Legacy, true).await;
+    }
+
+    #[tokio::test]
+    async fn handles_permanent_negative_acknowledgement_vector_namespace_multithreaded() {
+        send_receive(true, |n| n >= 2, 2, LogNamespace::Vector, true).await;
     }
 
     async fn send_receive(
@@ -1864,12 +1910,13 @@ mod integration_test {
         error_at: impl Fn(usize) -> bool,
         receive_count: usize,
         log_namespace: LogNamespace,
+        multithreaded: bool,
     ) {
         const SEND_COUNT: usize = 10;
 
         let topic = format!("test-topic-{}", random_string(10));
         let group_id = format!("test-group-{}", random_string(10));
-        let config = make_config(&topic, &group_id, log_namespace, None);
+        let config = make_config(&topic, &group_id, log_namespace, multithreaded, None);
 
         let now = send_events(topic.clone(), 1, 10).await;
 
@@ -1959,7 +2006,7 @@ mod integration_test {
     fn make_rand_config() -> (String, String, KafkaSourceConfig) {
         let topic = format!("test-topic-{}", random_string(10));
         let group_id = format!("test-group-{}", random_string(10));
-        let config = make_config(&topic, &group_id, LogNamespace::Legacy, None);
+        let config = make_config(&topic, &group_id, LogNamespace::Legacy, false, None);
         (topic, group_id, config)
     }
 
@@ -2167,7 +2214,13 @@ mod integration_test {
         opts.insert("enable.partition.eof".into(), "true".into());
         opts.insert("fetch.message.max.bytes".into(), kafka_max_bytes());
         let events1 = {
-            let config = make_config(&topic, &group_id, LogNamespace::Legacy, Some(opts.clone()));
+            let config = make_config(
+                &topic,
+                &group_id,
+                LogNamespace::Legacy,
+                false,
+                Some(opts.clone()),
+            );
             let (tx, rx) = SourceSender::new_test_errors(|_| false);
             let (trigger_shutdown, shutdown_done) =
                 spawn_kafka(tx, config, true, false, LogNamespace::Legacy);
@@ -2188,7 +2241,7 @@ mod integration_test {
 
         // 4. Run the kafka source again to finish reading the events
         let events2 = {
-            let config = make_config(&topic, &group_id, LogNamespace::Legacy, Some(opts));
+            let config = make_config(&topic, &group_id, LogNamespace::Legacy, false, Some(opts));
             let (tx, rx) = SourceSender::new_test_errors(|_| false);
             let (trigger_shutdown, shutdown_done) =
                 spawn_kafka(tx, config, true, true, LogNamespace::Legacy);
@@ -2248,6 +2301,7 @@ mod integration_test {
             &topic,
             &group_id,
             LogNamespace::Legacy,
+            false,
             Some(kafka_options.clone()),
         );
         let config2 = config1.clone();
