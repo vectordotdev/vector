@@ -207,6 +207,7 @@ impl TaskTransform<Event> for Delay {
 
 #[cfg(test)]
 mod tests {
+    use indoc::indoc;
     use std::task::Poll;
 
     use futures::SinkExt;
@@ -222,11 +223,9 @@ mod tests {
 
     #[tokio::test]
     async fn delay_events() {
-        let config = toml::from_str::<DelayConfig>(
-            r"
-delay_milliseconds = 200
-",
-        )
+        let config = toml::from_str::<DelayConfig>(indoc! {"
+            delay_milliseconds = 200
+        "})
         .unwrap();
 
         let delay =
@@ -252,13 +251,11 @@ delay_milliseconds = 200
 
     #[tokio::test]
     async fn delay_events_at_capacity_drop_newest() {
-        let config = toml::from_str::<DelayConfig>(
-            r#"
-delay_milliseconds = 200
-queue_capacity = 1
-overflow_strategy = "drop_newest"
-"#,
-        )
+        let config = toml::from_str::<DelayConfig>(indoc! {r#"
+            delay_milliseconds = 200
+            queue_capacity = 1
+            overflow_strategy = "drop_newest"
+        "#})
         .unwrap();
 
         let delay =
@@ -289,13 +286,11 @@ overflow_strategy = "drop_newest"
 
     #[tokio::test]
     async fn delay_events_at_capacity_pass() {
-        let config = toml::from_str::<DelayConfig>(
-            r#"
-delay_milliseconds = 200
-queue_capacity = 1
-overflow_strategy = "forward"
-"#,
-        )
+        let config = toml::from_str::<DelayConfig>(indoc! {r#"
+            delay_milliseconds = 200
+            queue_capacity = 1
+            overflow_strategy = "forward"
+        "#})
         .unwrap();
 
         let delay =
