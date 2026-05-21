@@ -3479,8 +3479,9 @@ dependencies = [
 
 [[package]]
 name = "databricks-zerobus-ingest-sdk"
-version = "2.0.0"
-source = "git+https://github.com/databricks/zerobus-sdk-rs?rev=132996d05ae11c57490660643915d6dca38f9fc1#132996d05ae11c57490660643915d6dca38f9fc1"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "90f87c99484cd20e2c9c361e2fe8884f614f35d8cde7d630cfaacbc09c4c21e9"
 dependencies = [
  "async-trait",
  "bytes",
@@ -5577,7 +5578,6 @@ dependencies = [
  "percent-encoding",
  "pin-project-lite",
  "socket2 0.6.3",
- "system-configuration 0.6.1",
  "tokio",
  "tower-service",
  "tracing 0.1.44",

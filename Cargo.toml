@@ -336,7 +336,7 @@ prost-reflect = { workspace = true, optional = true }
 prost-types = { workspace = true, optional = true }
 
 # Databricks Zerobus
-databricks-zerobus-ingest-sdk = { git = "https://github.com/databricks/zerobus-sdk-rs", rev = "132996d05ae11c57490660643915d6dca38f9fc1", optional = true }
+databricks-zerobus-ingest-sdk = { version = "2.0.1", optional = true }
 # The SDK returns prost-types 0.14 DescriptorProto values; prost-reflect (used by the rest
 # of the sink) is on prost-types 0.13. We bridge the two via wire-format re-encoding.
 prost-014 = { package = "prost", version = "0.14", optional = true }
