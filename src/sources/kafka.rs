@@ -83,6 +83,12 @@ enum BuildError {
         value: u64,
         session_timeout_ms: Duration,
     },
+    #[snafu(display(
+        "The number of message handling tasks ({}) must be less than the maximum ({})",
+        value,
+        max
+    ))]
+    InvalidTasksCount { value: usize, max: usize },
     #[snafu(display("Could not create Kafka consumer: {}", source))]
     CreateError { source: rdkafka::error::KafkaError },
     #[snafu(display("Could not subscribe to Kafka topics: {}", source))]
@@ -372,6 +378,20 @@ impl SourceConfig for KafkaSourceConfig {
         }
 
         let (consumer, callback_rx) = create_consumer(self, acknowledgements)?;
+
+        if let Some(tasks) = self
+            .multithreading
+            .as_ref()
+            .and_then(|m| m.max_message_handling_tasks.as_ref())
+        {
+            snafu::ensure!(
+                tasks.get() <= Semaphore::MAX_PERMITS,
+                InvalidTasksCountSnafu {
+                    value: tasks.get(),
+                    max: Semaphore::MAX_PERMITS
+                }
+            );
+        }
 
         Ok(Box::pin(kafka_source(
             self.clone(),
