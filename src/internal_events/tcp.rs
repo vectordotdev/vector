@@ -46,6 +46,20 @@ impl InternalEvent for TcpSocketConnectionShutdown {
     }
 }
 
+/// Emitted once per accepted TCP source connection, after the read/ack loop
+/// exits — regardless of whether the exit was graceful (peer EOF, shutdown
+/// signal) or caused by an error (decoder failure, downstream closed,
+/// ack write failure). Pairs with `ConnectionOpen`.
+#[derive(Debug, NamedInternalEvent)]
+pub struct TcpSourceConnectionShutdown;
+
+impl InternalEvent for TcpSourceConnectionShutdown {
+    fn emit(self) {
+        debug!(message = "Connection closed.");
+        counter!(CounterName::ConnectionShutdownTotal, "mode" => "tcp").increment(1);
+    }
+}
+
 #[cfg(all(unix, feature = "sources-dnstap"))]
 #[derive(Debug, NamedInternalEvent)]
 pub struct TcpSocketError<'a, E> {
@@ -123,13 +137,13 @@ impl InternalEvent for TcpSendAckError {
         if is_graceful_tls_shutdown(&self.error) {
             // The peer cleanly closed its TLS session (e.g. a rolling pod) before we
             // could send the acknowledgement. This is a lifecycle event, not an error
-            // — match the treatment of TcpSocketConnectionShutdown (warn + connection
-            // shutdown counter, no component_errors_total increment).
+            // — log it at warn and skip the component_errors_total increment. The
+            // connection_shutdown_total counter is bumped by the unified
+            // TcpSourceConnectionShutdown emit at the source loop exit.
             warn!(
                 message = "Connection closed by peer before acknowledgement could be sent.",
                 error = %self.error,
             );
-            counter!(CounterName::ConnectionShutdownTotal, "mode" => "tcp").increment(1);
             return;
         }
         error!(
@@ -206,13 +220,11 @@ mod tests {
     use std::io;
     use std::pin::Pin;
 
-    use openssl::ssl::{
-        SslAcceptor, SslConnector, SslFiletype, SslMethod, SslVerifyMode,
-    };
+    use crate::tls::{TEST_PEM_CA_PATH, TEST_PEM_CRT_PATH, TEST_PEM_KEY_PATH};
+    use openssl::ssl::{SslAcceptor, SslConnector, SslFiletype, SslMethod, SslVerifyMode};
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::{TcpListener, TcpStream};
     use tokio_openssl::SslStream;
-    use crate::tls::{TEST_PEM_CA_PATH, TEST_PEM_CRT_PATH, TEST_PEM_KEY_PATH};
 
     use super::is_graceful_tls_shutdown;
 
@@ -250,7 +262,9 @@ mod tests {
             acceptor
                 .set_private_key_file(TEST_PEM_KEY_PATH, SslFiletype::PEM)
                 .unwrap();
-            acceptor.set_certificate_chain_file(TEST_PEM_CRT_PATH).unwrap();
+            acceptor
+                .set_certificate_chain_file(TEST_PEM_CRT_PATH)
+                .unwrap();
             let acceptor = acceptor.build();
             let ssl = openssl::ssl::Ssl::new(acceptor.context()).unwrap();
             let mut tls = SslStream::new(ssl, stream).unwrap();

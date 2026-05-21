@@ -37,7 +37,7 @@ use crate::{
     internal_events::{
         ConnectionOpen, OpenGauge, SocketBindError, SocketEventsReceived, SocketMode,
         SocketReceiveError, StreamClosedError, TcpBytesReceived, TcpSendAckError,
-        TcpSocketTlsConnectionError,
+        TcpSocketTlsConnectionError, TcpSourceConnectionShutdown,
     },
     sources::util::{AfterReadExt, LenientFramedRead},
 };
@@ -432,6 +432,13 @@ async fn handle_stream<T>(
 
         drop(permit);
     }
+
+    // Single, unified connection-close emit. Fires for every cause the read/ack
+    // loop can exit on — graceful peer EOF, downstream-closed (StreamClosedError),
+    // decoder failure (DecoderFramingError), ack write failure (TcpSendAckError),
+    // shutdown signal, tripwire, and max connection duration. Handshake failures
+    // return before this point and remain captured by TcpSocketTlsConnectionError.
+    emit!(TcpSourceConnectionShutdown);
 }
 
 fn close_socket(socket: &MaybeTlsIncomingStream<TcpStream>) -> bool {
