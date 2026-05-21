@@ -27,8 +27,9 @@ pub struct DelayConfig {
     #[configurable(metadata(docs::human_name = "Delay in milliseconds", docs::example = 200))]
     delay_milliseconds: Duration,
 
-    /// Optional limit for number of items in the delay queue.
-    queue_capacity: Option<NonZeroUsize>,
+    /// Limit for number of items in the delay queue.
+    #[serde(default = "default_queue_capacity")]
+    queue_capacity: NonZeroUsize,
 
     /// Strategy to handle full queue capacity.
     #[serde(default)]
@@ -36,6 +37,10 @@ pub struct DelayConfig {
 
     /// Delay events in provided delay periods until the condition is met.
     delay_until_condition: Option<AnyCondition>,
+}
+
+const fn default_queue_capacity() -> NonZeroUsize {
+    unsafe { NonZeroUsize::new_unchecked(500) }
 }
 
 /// Event handling behavior when delay queue is full.
