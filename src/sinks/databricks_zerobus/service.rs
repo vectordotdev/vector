@@ -277,7 +277,9 @@ impl MockStream {
 /// Schema and encoding state derived from the Unity Catalog table.
 pub(super) struct ResolvedSchema {
     encoder: BatchEncoder,
-    descriptor_proto: Arc<prost_reflect::prost_types::DescriptorProto>,
+    /// SDK-typed (prost-types 0.14) descriptor — held in this form so each
+    /// stream rebuild avoids re-encoding from the prost-reflect 0.13 form.
+    descriptor_proto: Arc<prost_types_014::DescriptorProto>,
 }
 
 /// Service for handling Zerobus requests.
@@ -318,10 +320,21 @@ impl ZerobusService {
     }
 
     /// Resolve the protobuf message descriptor from Unity Catalog.
+    ///
+    /// Returns both the prost-reflect `MessageDescriptor` (used by the proto
+    /// batch encoder) and the SDK-typed `DescriptorProto` (used to construct
+    /// Zerobus streams). Returning both avoids re-encoding the descriptor
+    /// every time a stream is rebuilt after a retryable failure.
     async fn resolve_descriptor(
         config: &ZerobusSinkConfig,
         http_client: &HttpClient,
-    ) -> Result<prost_reflect::MessageDescriptor, ZerobusSinkError> {
+    ) -> Result<
+        (
+            prost_reflect::MessageDescriptor,
+            prost_types_014::DescriptorProto,
+        ),
+        ZerobusSinkError,
+    > {
         let (client_id, client_secret) = config.auth.credentials();
 
         let table_schema = unity_catalog_schema::fetch_table_schema(
@@ -340,8 +353,9 @@ impl ZerobusService {
     pub(super) async fn ensure_schema(&self) -> Result<&ResolvedSchema, ZerobusSinkError> {
         self.schema
             .get_or_try_init(|| async {
-                let descriptor = Self::resolve_descriptor(&self.config, &self.http_client).await?;
-                let descriptor_proto = Arc::new(descriptor.descriptor_proto().clone());
+                let (descriptor, sdk_descriptor_proto) =
+                    Self::resolve_descriptor(&self.config, &self.http_client).await?;
+                let descriptor_proto = Arc::new(sdk_descriptor_proto);
 
                 let batch_serializer =
                     BatchSerializerConfig::ProtoBatch(ProtoBatchSerializerConfig {
@@ -403,22 +417,12 @@ impl ZerobusService {
             let (client_id, client_secret) = (client_id.to_string(), client_secret.to_string());
 
             let stream_options = &self.config.stream_options;
-            // descriptor_proto is prost-types 0.13 (via prost-reflect); the SDK
-            // expects prost-types 0.14. Bridge through the protobuf wire format.
-            let encoded = <prost_reflect::prost_types::DescriptorProto as prost_reflect::prost::Message>::encode_to_vec(&*schema.descriptor_proto);
-            let sdk_descriptor =
-                <prost_types_014::DescriptorProto as prost_014::Message>::decode(
-                    encoded.as_slice(),
-                )
-                .map_err(|e| ZerobusSinkError::ConfigError {
-                    message: format!("Failed to re-encode DescriptorProto for SDK: {}", e),
-                })?;
             let stream = self
                 .sdk
                 .stream_builder()
                 .table(self.config.table_name.clone())
                 .oauth(client_id, client_secret)
-                .compiled_proto(sdk_descriptor)
+                .compiled_proto((*schema.descriptor_proto).clone())
                 .server_lack_of_ack_timeout_ms(stream_options.server_lack_of_ack_timeout_ms)
                 .flush_timeout_ms(stream_options.flush_timeout_ms)
                 .build()
