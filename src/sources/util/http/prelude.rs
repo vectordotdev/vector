@@ -21,7 +21,7 @@ use warp::{
     reject::Rejection,
 };
 
-use super::encoding::decompress_body;
+use super::encoding::{DEFAULT_MAX_DECOMPRESSED_BODY_SIZE, decompress_body};
 use crate::{
     SourceSender,
     common::http::{ErrorMessage, server_auth::HttpServerAuthConfig},
@@ -99,6 +99,28 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
             for s in path.split('/').filter(|&x| !x.is_empty()) {
                 filter = filter.and(warp::path(s.to_string())).boxed()
             }
+            // Defense-in-depth: reject oversized requests up front based on the declared
+            // `Content-Length`, before reading or decompressing the body. Mirrors the
+            // decompressed-body cap applied in `decompress_body`.
+            const MAX_REQUEST_BODY_SIZE: u64 = DEFAULT_MAX_DECOMPRESSED_BODY_SIZE as u64;
+            let body_filter: BoxedFilter<(Bytes,)> = warp::header::optional::<u64>(
+                "content-length",
+            )
+            .and_then(|declared: Option<u64>| async move {
+                match declared {
+                    Some(len) if len > MAX_REQUEST_BODY_SIZE => {
+                        Err(warp::reject::custom(ErrorMessage::new(
+                            StatusCode::PAYLOAD_TOO_LARGE,
+                            format!("Request body exceeds limit of {MAX_REQUEST_BODY_SIZE} bytes."),
+                        )))
+                    }
+                    _ => Ok(()),
+                }
+            })
+            .untuple_one()
+            .and(warp::body::bytes())
+            .boxed();
+
             let svc = filter
                 .and(warp::path::tail())
                 .and_then(move |tail: Tail| async move {
@@ -118,7 +140,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                 .and(warp::path::full())
                 .and(warp::header::optional::<String>("content-encoding"))
                 .and(warp::header::headers_cloned())
-                .and(warp::body::bytes())
+                .and(body_filter)
                 .and(warp::query::<HashMap<String, String>>())
                 .and(warp::filters::ext::optional())
                 .and_then(
