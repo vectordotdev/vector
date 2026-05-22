@@ -367,6 +367,16 @@ impl AcceptedTagValueSet {
             TagValueSetStorage::RollingBloom(s) => s.insert(&value),
         };
     }
+
+    /// Test-only accessor: true iff this set uses a TTL-enabled backend.
+    /// Lets tests pin backend selection without exposing the internal enum.
+    #[cfg(test)]
+    pub(crate) fn ttl_enabled(&self) -> bool {
+        matches!(
+            self.storage,
+            TagValueSetStorage::TtlSet(_) | TagValueSetStorage::RollingBloom(_)
+        )
+    }
 }
 
 #[cfg(test)]
@@ -432,20 +442,23 @@ mod tests {
 
     #[test]
     fn ttl_exact_refresh_on_contains_extends_lease() {
-        // Simulate: insert at t0, "sighting" at t0+30s, advance to t0+90s.
-        // Without refresh, value would be evicted; with refresh, it survives.
-        let ttl = Duration::from_secs(60);
-        let mut s = TtlExactStorage::new(8, ttl, 4);
-        let t0 = Instant::now();
-        s.map.insert(v("a"), t0);
-        s.last_sweep = t0;
-        // Refresh manually as if `contains` were called at t0+30s.
-        s.map.insert(v("a"), t0 + Duration::from_secs(30));
-        // Sweep at t0+90s: a's last_seen = t0+30, age = 60s, not yet > ttl.
-        s.sweep(t0 + Duration::from_secs(90));
+        // Seed the map with an old timestamp, then drive a real `contains`.
+        // The refresh path (`*slot = now;`) must push the stored Instant
+        // forward — otherwise sweeps continue to use the old (potentially
+        // expired) timestamp. A short sleep guarantees `Instant::now()` is
+        // strictly after `t_insert` on every platform.
+        let mut s = TtlExactStorage::new(8, Duration::from_secs(60), 4);
+        let t_insert = Instant::now();
+        s.map.insert(v("a"), t_insert);
+        s.last_sweep = t_insert;
+
+        std::thread::sleep(Duration::from_millis(2));
+
+        assert!(s.contains(&v("a")));
+        let after = *s.map.get(&v("a")).expect("entry should still be present");
         assert!(
-            s.map.contains_key(&v("a")),
-            "refresh should have extended lease"
+            after > t_insert,
+            "contains() must refresh the stored Instant; was {t_insert:?}, still {after:?}"
         );
     }
 
@@ -521,21 +534,28 @@ mod tests {
     }
 
     #[test]
-    fn rolling_bloom_refresh_on_contains_keeps_hot_values() {
-        // Drive 4 rotations (one full window) and "sight" `hot` between each
-        // one. Refresh-on-sighting should re-seat `hot` in the current shard
-        // so it survives the eventual eviction of its original shard.
+    fn rolling_bloom_refresh_on_contains_seeds_newest_shard() {
+        // Force one rotation so `hot` lives in the front shard and the back
+        // is fresh-empty. A real `contains` call must re-seed it into the
+        // newest shard — this is what gives hot values survival across
+        // future rotations.
         let mut s = RollingBloomStorage::new(default_cache_size(), 4, Duration::from_secs(4));
+        s.shards.back_mut().unwrap().insert(&v("hot"));
         let t0 = Instant::now();
         s.next_rotate = t0 + Duration::from_secs(1);
-        s.shards.back_mut().unwrap().insert(&v("hot"));
+        s.rotate_if_needed(t0 + Duration::from_secs(2));
 
-        for step in 1..=4 {
-            s.rotate_if_needed(t0 + Duration::from_secs(step));
-            assert!(s.shards.iter().rev().any(|sh| sh.contains(&v("hot"))));
-            s.shards.back_mut().unwrap().insert(&v("hot"));
-        }
-        assert!(s.shards.iter().any(|sh| sh.contains(&v("hot"))));
+        assert_eq!(
+            s.shards.back().unwrap().count(),
+            0,
+            "back shard should be fresh-empty after rotation"
+        );
+
+        assert!(s.contains(&v("hot")));
+        assert!(
+            s.shards.back().unwrap().contains(&v("hot")),
+            "contains() must re-seed found values into the newest shard"
+        );
     }
 
     #[test]

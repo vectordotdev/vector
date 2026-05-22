@@ -1491,11 +1491,17 @@ per_metric_limits:
     assert_eq!(pm.config.ttl_generations, 3);
 }
 
-/// Pins the public surface of `contains_no_refresh` for both TTL and non-TTL
-/// backends. The "no refresh" timing behavior itself is verified in
-/// `tag_value_set.rs::tests` where we can drive `Instant`s directly.
+/// Pins the basic contract of `contains_no_refresh`: it must return `true`
+/// for a value that was just inserted, across every backend variant. The
+/// "no-refresh" timing semantic (the actual *DropEvent* contract) is verified
+/// in `tag_value_set.rs::tests::{ttl_exact,rolling_bloom}_contains_no_refresh_*`,
+/// where the `Instant`-driven storage methods can be exercised directly.
+///
+/// Note: this test does NOT verify that `tag_limit_exceeded` calls
+/// `contains_no_refresh` (and not `contains`) — that wiring is enforced by
+/// code review of the (private) match arm in `mod.rs::tag_limit_exceeded`.
 #[test]
-fn drop_event_pre_check_uses_no_refresh_variant() {
+fn contains_no_refresh_finds_inserted_values_on_all_backends() {
     use super::tag_value_set::AcceptedTagValueSet;
     use crate::event::metric::TagValueSet;
 
@@ -1515,26 +1521,33 @@ fn drop_event_pre_check_uses_no_refresh_variant() {
     }
 }
 
-/// `ttl_secs: 0` must be equivalent to "TTL disabled". If we ever flipped this
-/// to "expire immediately" the cache would empty on every call, silently
-/// breaking `value_limit` for anyone who configured `0` to disable TTL.
+/// `ttl_secs: 0` must select the **non-TTL** backend (same as `None`). If we
+/// ever flipped this to "expire immediately" — i.e. a TTL backend with
+/// `Duration::ZERO` — the 1-second `sweep_interval` floor would mask the bug
+/// in any externally-observable behavior, but the cache would still degrade
+/// silently the moment a sweep boundary was crossed.
 #[test]
 fn ttl_zero_disables_ttl() {
     use super::tag_value_set::AcceptedTagValueSet;
-    use crate::event::metric::TagValueSet;
 
-    let v = TagValueSet::from(["v1".to_string()]);
     let bloom_mode = Mode::Probabilistic(BloomFilterConfig {
         cache_size_per_key: default_cache_size(),
     });
-    for mut set in [
-        AcceptedTagValueSet::new(4, &Mode::Exact, Some(0), 4),
-        AcceptedTagValueSet::new(4, &bloom_mode, Some(0), 4),
+    for (label, set) in [
+        ("exact ttl=0", AcceptedTagValueSet::new(4, &Mode::Exact, Some(0), 4)),
+        ("bloom ttl=0", AcceptedTagValueSet::new(4, &bloom_mode, Some(0), 4)),
+        ("exact ttl=None", AcceptedTagValueSet::new(4, &Mode::Exact, None, 4)),
+        ("bloom ttl=None", AcceptedTagValueSet::new(4, &bloom_mode, None, 4)),
     ] {
-        set.insert(v.clone());
-        assert!(set.contains(&v));
-        assert_eq!(set.len(), 1);
+        assert!(
+            !set.ttl_enabled(),
+            "{label}: must select the non-TTL backend"
+        );
     }
+
+    // Sanity: TTL with a positive value DOES select the TTL backend.
+    let ttl_set = AcceptedTagValueSet::new(4, &Mode::Exact, Some(60), 4);
+    assert!(ttl_set.ttl_enabled(), "ttl=Some(60) should enable TTL");
 }
 
 #[test]
