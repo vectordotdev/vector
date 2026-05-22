@@ -165,6 +165,14 @@ impl TransformConfig for AggregateConfig {
 
 type MetricEntry = (MetricData, EventMetadata);
 
+// Never stored in a collection, only ephemeral/transient to forward ignored events
+#[allow(clippy::large_enum_variant)]
+#[derive(Debug)]
+pub enum RecordOutcome {
+    Aggregated,
+    Passthrough(Event),
+}
+
 #[derive(Debug)]
 pub struct Aggregate {
     interval: Duration,
@@ -181,9 +189,25 @@ impl Aggregate {
         })
     }
 
-    pub fn record(&mut self, event: Event) {
-        let (series, data, metadata) = event.into_metric().into_parts();
+    pub fn record(&mut self, event: Event) -> RecordOutcome {
+        let kind = event.as_metric().kind();
+        if matches!(
+            (&self.mode, kind),
+            (InnerMode::Sum, MetricKind::Absolute)
+                | (
+                    InnerMode::Latest | InnerMode::Diff { .. },
+                    MetricKind::Incremental
+                )
+                | (InnerMode::Max | InnerMode::Min, MetricKind::Incremental)
+                | (
+                    InnerMode::Mean { .. } | InnerMode::Stdev { .. },
+                    MetricKind::Incremental
+                )
+        ) {
+            return RecordOutcome::Passthrough(event);
+        }
 
+        let (series, data, metadata) = event.into_metric().into_parts();
         match &mut self.mode {
             InnerMode::Auto => match data.kind {
                 MetricKind::Incremental => self.record_sum(series, data, metadata),
@@ -192,33 +216,30 @@ impl Aggregate {
                 }
             },
             InnerMode::Sum => self.record_sum(series, data, metadata),
-            InnerMode::Latest | InnerMode::Diff { .. } => match data.kind {
-                MetricKind::Incremental => (),
-                MetricKind::Absolute => {
-                    self.map.insert(series, (data, metadata));
-                }
-            },
+            InnerMode::Latest | InnerMode::Diff { .. } => {
+                self.map.insert(series, (data, metadata));
+            }
             InnerMode::Count => self.record_count(series, data, metadata),
             InnerMode::Max | InnerMode::Min => self.record_comparison(series, data, metadata),
-            InnerMode::Mean { multi_map } | InnerMode::Stdev { multi_map } => match data.kind {
-                MetricKind::Incremental => (),
-                MetricKind::Absolute => {
-                    if matches!(data.value, MetricValue::Gauge { value: _ }) {
-                        match multi_map.entry(series) {
-                            Entry::Occupied(mut entry) => {
-                                let existing = entry.get_mut();
-                                existing.push((data, metadata));
-                            }
-                            Entry::Vacant(entry) => {
-                                entry.insert(vec![(data, metadata)]);
-                            }
+            InnerMode::Mean { multi_map } | InnerMode::Stdev { multi_map } => {
+                if matches!(data.value, MetricValue::Gauge { value: _ }) {
+                    match multi_map.entry(series) {
+                        Entry::Occupied(mut entry) => entry.get_mut().push((data, metadata)),
+                        Entry::Vacant(entry) => {
+                            entry.insert(vec![(data, metadata)]);
                         }
                     }
                 }
-            },
+            }
         }
-
         emit!(AggregateEventRecorded);
+        RecordOutcome::Aggregated
+    }
+
+    pub fn record_into(&mut self, event: Event, output: &mut Vec<Event>) {
+        if let RecordOutcome::Passthrough(event) = self.record(event) {
+            output.push(event);
+        }
     }
 
     fn record_count(
@@ -241,23 +262,20 @@ impl Aggregate {
     }
 
     fn record_sum(&mut self, series: MetricSeries, data: MetricData, metadata: EventMetadata) {
-        match data.kind {
-            MetricKind::Incremental => match self.map.entry(series) {
-                Entry::Occupied(mut entry) => {
-                    let existing = entry.get_mut();
-                    // In order to update (add) the new and old kind's must match
-                    if existing.0.kind == data.kind && existing.0.update(&data) {
-                        existing.1.merge(metadata);
-                    } else {
-                        emit!(AggregateUpdateFailed);
-                        *existing = (data, metadata);
-                    }
+        match self.map.entry(series) {
+            Entry::Occupied(mut entry) => {
+                let existing = entry.get_mut();
+                // In order to update (add) the new and old kind's must match
+                if existing.0.kind == data.kind && existing.0.update(&data) {
+                    existing.1.merge(metadata);
+                } else {
+                    emit!(AggregateUpdateFailed);
+                    *existing = (data, metadata);
                 }
-                Entry::Vacant(entry) => {
-                    entry.insert((data, metadata));
-                }
-            },
-            MetricKind::Absolute => {}
+            }
+            Entry::Vacant(entry) => {
+                entry.insert((data, metadata));
+            }
         }
     }
 
@@ -267,36 +285,33 @@ impl Aggregate {
         data: MetricData,
         metadata: EventMetadata,
     ) {
-        match data.kind {
-            MetricKind::Incremental => (),
-            MetricKind::Absolute => match self.map.entry(series) {
-                Entry::Occupied(mut entry) => {
-                    let existing = entry.get_mut();
-                    // In order to update (add) the new and old kind's must match
-                    if existing.0.kind == data.kind {
-                        if let MetricValue::Gauge {
-                            value: existing_value,
-                        } = existing.0.value()
-                            && let MetricValue::Gauge { value: new_value } = data.value()
-                        {
-                            let should_update = match self.mode {
-                                InnerMode::Max => new_value > existing_value,
-                                InnerMode::Min => new_value < existing_value,
-                                _ => false,
-                            };
-                            if should_update {
-                                *existing = (data, metadata);
-                            }
+        match self.map.entry(series) {
+            Entry::Occupied(mut entry) => {
+                let existing = entry.get_mut();
+                // In order to update (add) the new and old kind's must match
+                if existing.0.kind == data.kind {
+                    if let MetricValue::Gauge {
+                        value: existing_value,
+                    } = existing.0.value()
+                        && let MetricValue::Gauge { value: new_value } = data.value()
+                    {
+                        let should_update = match self.mode {
+                            InnerMode::Max => new_value > existing_value,
+                            InnerMode::Min => new_value < existing_value,
+                            _ => false,
+                        };
+                        if should_update {
+                            *existing = (data, metadata);
                         }
-                    } else {
-                        emit!(AggregateUpdateFailed);
-                        *existing = (data, metadata);
                     }
+                } else {
+                    emit!(AggregateUpdateFailed);
+                    *existing = (data, metadata);
                 }
-                Entry::Vacant(entry) => {
-                    entry.insert((data, metadata));
-                }
-            },
+            }
+            Entry::Vacant(entry) => {
+                entry.insert((data, metadata));
+            }
         }
     }
 
@@ -405,7 +420,7 @@ impl TaskTransform<Event> for Aggregate {
                                 self.flush_into(&mut output);
                                 done = true;
                             }
-                            Some(event) => self.record(event),
+                            Some(event) => self.record_into(event, &mut output),
                         }
                     }
                 };
@@ -947,6 +962,60 @@ mod tests {
         agg.flush_into(&mut out);
         assert_eq!(1, out.len());
         assert_eq!(&stdev_result, &out[0]);
+    }
+
+    #[test]
+    fn passes_through_ignored_kind() {
+        // Sum mode aggregates incremental, passes through absolute without collapsing.
+        let mut agg = Aggregate::new(&AggregateConfig {
+            interval_ms: 1000_u64,
+            mode: AggregationMode::Sum,
+        })
+        .unwrap();
+
+        let counter_1 = make_metric(
+            "counter_a",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 10.0 },
+        );
+        let counter_2 = make_metric(
+            "counter_a",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 5.0 },
+        );
+        let counter_summed = make_metric(
+            "counter_a",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 15.0 },
+        );
+        let gauge_1 = make_metric(
+            "gauge_a",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 42.0 },
+        );
+        let gauge_2 = make_metric(
+            "gauge_a",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 99.0 },
+        );
+
+        // Absolute metrics pass through immediately (not held until flush).
+        assert!(
+            matches!(agg.record(gauge_1.clone()), RecordOutcome::Passthrough(e) if e == gauge_1)
+        );
+        assert!(
+            matches!(agg.record(gauge_2.clone()), RecordOutcome::Passthrough(e) if e == gauge_2)
+        );
+
+        // Each is returned individually — no collapsing to latest.
+        agg.record(counter_1);
+        agg.record(counter_2);
+
+        let mut out = vec![];
+        agg.flush_into(&mut out);
+        // Only the summed incremental counter appears at flush; the gauges already passed through.
+        assert_eq!(1, out.len());
+        assert_eq!(&counter_summed, &out[0]);
     }
 
     #[test]
