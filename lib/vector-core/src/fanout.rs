@@ -870,7 +870,6 @@ mod tests {
     // The empty-batch guard panics via `debug_assert!` in debug builds and silently drops in
     // release builds. The two tests below cover each half of that behavior.
     #[tokio::test]
-    #[cfg(not(debug_assertions))]
     async fn fanout_drops_empty_event_array_in_release_builds() {
         let (mut fanout, _, receivers) = fanout_from_senders(&[2, 2]);
         let empty: EventArray = Vec::<LogEvent>::new().into();
