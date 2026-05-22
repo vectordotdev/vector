@@ -195,16 +195,27 @@ components: transforms: tag_cardinality_limit: {
 				**Mode interaction**:
 
 				- `mode: exact` — every value carries a precise last-seen timestamp.
-				  Eviction is exact to within roughly `ttl_secs / ttl_generations`
-				  (capped at a 1-second minimum to keep sweep cost negligible).
+				  Eviction is exact to within roughly `ttl_secs / ttl_generations`.
 				  `ttl_generations` controls only the sweep cadence in exact mode.
 				- `mode: probabilistic` — the underlying bloom filter is split into
 				  `ttl_generations` rolling shards. Memory cost rises to
 				  `ttl_generations * cache_size_per_key` per (metric, tag-key) pair.
 				  Reduce `cache_size_per_key` if you want to keep total memory flat.
-				`ttl_generations: 1` produces a tumbling window (everything resets
+				  `ttl_generations: 1` produces a tumbling window (everything resets
 				  at once every `ttl_secs`), which can be useful for matching a strict
-				  billing-window boundary.
+				  billing-window boundary. The `value_limit` cap is enforced against an
+				  upper-bound estimate of the union cardinality across shards. Under
+				  refresh-on-sighting, hot continuously-seen values may be counted in
+				  more than one shard, so the effective cap can be as low as
+				  `value_limit / ttl_generations` for refresh-heavy workloads. If this
+				  shows up as elevated `tag_value_limit_exceeded_total` without a
+				  matching rise in distinct admitted values, set `ttl_generations: 1`.
+
+				**`ttl_secs` shorter than `ttl_generations`**: the effective number of
+				generations is silently capped to `ttl_secs` so the configured TTL
+				window is honored exactly. For example `ttl_secs: 2, ttl_generations: 8`
+				resolves to 2 generations of 1-second slices (not 8 generations of
+				1-second slices, which would stretch the window to 8 s).
 
 				**Per-metric overrides do not inherit**: setting `ttl_secs` inside a
 				`per_metric_limits.<name>` block (or leaving it unset there) fully

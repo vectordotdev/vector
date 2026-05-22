@@ -82,6 +82,42 @@ impl TagCardinalityLimit {
         });
     }
 
+    /// Drop (metric, tag-key) buckets whose `AcceptedTagValueSet` has been
+    /// fully expired by TTL, decrementing `tracked_keys_count` so freed slots
+    /// can be reused under `max_tracked_keys`.
+    ///
+    /// Without this, TTL sweeps in `TtlExactStorage` / `RollingBloomStorage`
+    /// only shrink the inner storage; the empty bucket itself lingers and
+    /// permanently consumes a slot. High-churn workloads under
+    /// `max_tracked_keys` would then hit the cap forever — every new
+    /// `(metric, tag-key)` pair would fall through as untracked even after
+    /// the cache for older pairs has fully aged out.
+    ///
+    /// Called lazily on cap-hit paths so the steady-state overhead is zero;
+    /// the scan only fires when a new allocation would otherwise be rejected.
+    /// `len()` is intentionally called on every set because it also drives
+    /// the lazy sweep/rotation that may be what empties the bucket.
+    fn reclaim_empty_buckets(&mut self) {
+        let mut reclaimed = 0usize;
+        self.accepted_tags.retain(|_, inner| {
+            inner.retain(|_, set| {
+                if set.len() == 0 {
+                    reclaimed += 1;
+                    false
+                } else {
+                    true
+                }
+            });
+            !inner.is_empty()
+        });
+        if reclaimed > 0 {
+            self.tracked_keys_count = self.tracked_keys_count.saturating_sub(reclaimed);
+            emit!(TagCardinalityTrackedKeys {
+                count: self.tracked_keys_count,
+            });
+        }
+    }
+
     /// Resolve the configuration that applies to a specific (metric, tag) pair.
     ///
     /// Per-tag entries support two modes:
@@ -214,7 +250,12 @@ impl TagCardinalityLimit {
 
         if !pair_exists {
             if !self.can_allocate_new_key() {
-                return AcceptResult::Untracked;
+                // Reclaim before giving up: a TTL backend may have emptied
+                // buckets we're still accounting against `max_tracked_keys`.
+                self.reclaim_empty_buckets();
+                if !self.can_allocate_new_key() {
+                    return AcceptResult::Untracked;
+                }
             }
             self.record_new_key_allocation();
         }
@@ -315,7 +356,12 @@ impl TagCardinalityLimit {
 
         if !pair_exists {
             if !self.can_allocate_new_key() {
-                return true;
+                // See `try_accept_tag` — try reclaiming empty TTL buckets
+                // before treating the new pair as untracked.
+                self.reclaim_empty_buckets();
+                if !self.can_allocate_new_key() {
+                    return true;
+                }
             }
             self.record_new_key_allocation();
         }

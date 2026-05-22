@@ -1591,6 +1591,57 @@ cache_size_per_key: 2048
     assert_eq!(parsed.global.ttl_generations, default_ttl_generations());
 }
 
+/// Regression for Codex P2 (empty-bucket reclaim): once `max_tracked_keys`
+/// is reached, the transform must reclaim buckets that have been fully
+/// emptied by TTL eviction so new `(metric, tag-key)` pairs can be tracked
+/// again. Without reclaim, high-churn workloads under `max_tracked_keys`
+/// would silently stay in `Untracked` mode forever, even after old buckets
+/// fully aged out.
+#[test]
+fn max_tracked_keys_reclaims_empty_buckets() {
+    use super::tag_value_set::AcceptedTagValueSet;
+
+    let mut config = make_transform_hashset(10, LimitExceededAction::DropTag);
+    config.max_tracked_keys = Some(1);
+    let mut transform = TagCardinalityLimit::new(config);
+
+    // Pre-seed an empty bucket so the transform sees its slot as used.
+    let metric_key: Option<MetricId> = None;
+    let stale_set = AcceptedTagValueSet::new(&Mode::Exact, None, default_ttl_generations());
+    let mut inner = hashbrown::HashMap::new();
+    inner.insert("stale_tag".to_string(), stale_set);
+    transform.accepted_tags.insert(metric_key.clone(), inner);
+    transform.tracked_keys_count = 1;
+
+    assert!(
+        !transform.can_allocate_new_key(),
+        "should be at cap before reclaim"
+    );
+
+    // A new tag key should be tracked: reclaim fires, drops the empty
+    // `stale_tag` bucket, frees the slot, and the new pair is allocated.
+    let value = TagValueSet::from(["v".to_string()]);
+    let result = transform.try_accept_tag(metric_key.as_ref(), "fresh_tag", &value);
+    assert_eq!(
+        result,
+        AcceptResult::Tracked,
+        "fresh tag must be tracked after the stale bucket is reclaimed"
+    );
+    let inner_after = transform.accepted_tags.get(&metric_key).unwrap();
+    assert!(
+        inner_after.contains_key("fresh_tag"),
+        "fresh_tag must be present after reclaim"
+    );
+    assert!(
+        !inner_after.contains_key("stale_tag"),
+        "stale_tag bucket must be dropped by reclaim"
+    );
+    assert_eq!(
+        transform.tracked_keys_count, 1,
+        "tracked_keys_count must reflect the swap (1 dropped + 1 added)"
+    );
+}
+
 /// Global per-tag YAML syntax mirrors per-metric `per_tag_limits`: `mode: limit_override`
 /// with `value_limit`, and `mode: excluded`.
 #[test]
