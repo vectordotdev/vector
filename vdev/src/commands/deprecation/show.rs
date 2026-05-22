@@ -57,13 +57,11 @@ impl Cli {
             .map(|v| Version::new(v.major, v.minor + 1, 0));
 
         // Use the computed next minor as the "release" for partitioning.
-        // If the next minor can't be determined, fall back to a sentinel version
-        // that only `next` keywords will match (major=0, minor=0 never matches real versions).
         let partition_version = next_minor.clone().unwrap_or_else(|| Version::new(0, 0, 0));
         let p = deprecation::partition_by_release(entries, &partition_version);
         let enacted: Vec<&DeprecationEntry> = p.enacted.iter().collect();
         let announcing: Vec<&DeprecationEntry> = p.announcing.iter().collect();
-        let preexisting: Vec<&DeprecationEntry> = p.planned.iter().collect();
+        let planned: Vec<&DeprecationEntry> = p.planned.iter().collect();
 
         let next_label = match &next_minor {
             Some(v) => format!("{}.{}", v.major, v.minor),
@@ -81,7 +79,7 @@ impl Cli {
             &announcing,
             nm,
         );
-        print_section("Pre-existing deprecations", &preexisting, nm);
+        print_section("Previously announced", &planned, nm);
 
         Ok(())
     }
@@ -109,11 +107,6 @@ fn print_entry(e: &DeprecationEntry, next_minor: Option<&Version>) {
     println!("{}", e.what.if_supports_color(Stdout, |t| t.bold()));
     println!(
         "  {} {}",
-        "announced: ".if_supports_color(Stdout, |t| t.dimmed()),
-        format_version(&e.announcement_version, next_minor),
-    );
-    println!(
-        "  {} {}",
         "deprecated:".if_supports_color(Stdout, |t| t.dimmed()),
         format_version(&e.deprecation_version, next_minor),
     );
@@ -127,8 +120,7 @@ fn print_entry(e: &DeprecationEntry, next_minor: Option<&Version>) {
 }
 
 fn format_version(v: &DeprecationVersion, next_minor: Option<&Version>) -> String {
-    let is_next = matches!(v, DeprecationVersion::Next)
-        || matches!((v, next_minor), (DeprecationVersion::Version(_), Some(nv)) if v.matches_release(nv));
+    let is_next = next_minor.is_some_and(|nv| v.matches_release(nv));
 
     if is_next {
         let style = Style::new().bright_red().bold();

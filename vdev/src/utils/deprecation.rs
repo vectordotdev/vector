@@ -8,52 +8,28 @@ use semver::Version;
 
 pub const DEPRECATION_DIR: &str = "deprecation.d";
 
-/// A version field value: a concrete semver version or `next`
-/// (the very next release, whatever its number turns out to be).
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum DeprecationVersion {
-    Version(Version),
-    Next,
-}
-
-impl PartialOrd for DeprecationVersion {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for DeprecationVersion {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        use std::cmp::Ordering::{Equal, Greater, Less};
-        match (self, other) {
-            (Self::Version(a), Self::Version(b)) => a.cmp(b),
-            (Self::Version(_), Self::Next) => Less,
-            (Self::Next, Self::Version(_)) => Greater,
-            _ => Equal,
-        }
-    }
-}
+/// A concrete semver version identifying when a deprecation takes effect.
+/// Accepted forms: `"0.56"` (major.minor) or `"0.56.0"` (major.minor.patch).
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct DeprecationVersion(pub Version);
 
 impl fmt::Display for DeprecationVersion {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            DeprecationVersion::Version(v) => write!(f, "{v}"),
-            DeprecationVersion::Next => write!(f, "next"),
-        }
+        write!(f, "{}", self.0)
     }
 }
 
 impl DeprecationVersion {
     /// Returns true when this version should be enacted for the given release.
-    ///
-    /// `next` always matches — it means "the very next release cut".
-    /// Concrete versions match when major.minor equals the release's major.minor;
-    /// patch is ignored so that `0.56` is enacted on any `0.56.x` release.
+    /// Patch is ignored so `0.56` (stored as 0.56.0) matches any 0.56.x release.
     pub fn matches_release(&self, release: &Version) -> bool {
-        match self {
-            DeprecationVersion::Version(v) => v.major == release.major && v.minor == release.minor,
-            DeprecationVersion::Next => true,
-        }
+        self.0.major == release.major && self.0.minor == release.minor
+    }
+
+    /// Returns true when this version is strictly in the future relative to `latest`.
+    /// A fragment is outdated if its deprecation_version ≤ the latest release.
+    pub fn is_future_relative_to(&self, latest: &Version) -> bool {
+        (self.0.major, self.0.minor) > (latest.major, latest.minor)
     }
 }
 
@@ -61,9 +37,6 @@ impl<'de> serde::Deserialize<'de> for DeprecationVersion {
     fn deserialize<D: serde::Deserializer<'de>>(d: D) -> std::result::Result<Self, D::Error> {
         let s = String::deserialize(d)?;
         let s = s.trim();
-        if s == "next" {
-            return Ok(DeprecationVersion::Next);
-        }
         // Accept both "0.56" (major.minor) and "0.56.0" (major.minor.patch).
         // Normalize the two-part form by appending ".0".
         let normalized = if s.chars().filter(|&c| c == '.').count() == 1 {
@@ -72,7 +45,7 @@ impl<'de> serde::Deserialize<'de> for DeprecationVersion {
             std::borrow::Cow::Borrowed(s)
         };
         Version::parse(&normalized)
-            .map(DeprecationVersion::Version)
+            .map(DeprecationVersion)
             .map_err(|e| serde::de::Error::custom(format!("invalid version '{s}': {e}")))
     }
 }
@@ -83,7 +56,6 @@ use serde::Deserialize;
 struct Frontmatter {
     what: String,
     deprecation_version: DeprecationVersion,
-    announcement_version: DeprecationVersion,
 }
 
 /// A parsed and validated deprecation entry from `deprecation.d/`.
@@ -92,23 +64,24 @@ pub struct DeprecationEntry {
     pub filename: String,
     pub what: String,
     pub deprecation_version: DeprecationVersion,
-    pub announcement_version: DeprecationVersion,
     /// Optional body text (everything after the closing `---` of the frontmatter).
     pub description: String,
+    /// True for `*.announced.md` files (announced in a prior release).
+    /// False for `*.md` files (being announced for the first time).
+    pub previously_announced: bool,
 }
 
 /// The result of partitioning deprecation entries relative to a specific release.
 pub struct DeprecationPartition {
     /// Entries whose `deprecation_version` matches the release (being removed now).
     pub enacted: Vec<DeprecationEntry>,
-    /// Entries whose `announcement_version` matches the release but are not enacted.
+    /// Not-enacted entries with `previously_announced = false` (new this release).
     pub announcing: Vec<DeprecationEntry>,
-    /// Everything else — previously announced, future removal.
+    /// Not-enacted entries with `previously_announced = true` (announced earlier).
     pub planned: Vec<DeprecationEntry>,
 }
 
 /// Partition a list of deprecation entries into three buckets relative to `release`.
-/// Any `next` version values are resolved to the concrete `major.minor` of `release`.
 pub fn partition_by_release(
     entries: Vec<DeprecationEntry>,
     release: &Version,
@@ -117,13 +90,12 @@ pub fn partition_by_release(
     let mut announcing = Vec::new();
     let mut planned = Vec::new();
     for e in entries {
-        let e = resolve_next(e, release);
         if e.deprecation_version.matches_release(release) {
             enacted.push(e);
-        } else if e.announcement_version.matches_release(release) {
-            announcing.push(e);
-        } else {
+        } else if e.previously_announced {
             planned.push(e);
+        } else {
+            announcing.push(e);
         }
     }
     DeprecationPartition {
@@ -133,21 +105,8 @@ pub fn partition_by_release(
     }
 }
 
-fn resolve_next(e: DeprecationEntry, release: &Version) -> DeprecationEntry {
-    let resolve = |v: DeprecationVersion| match v {
-        DeprecationVersion::Next => {
-            DeprecationVersion::Version(Version::new(release.major, release.minor, 0))
-        }
-        DeprecationVersion::Version(_) => v,
-    };
-    DeprecationEntry {
-        deprecation_version: resolve(e.deprecation_version),
-        announcement_version: resolve(e.announcement_version),
-        ..e
-    }
-}
-
 /// Read and parse all deprecation fragments from the given directory.
+/// Includes both `*.md` (new) and `*.announced.md` (previously announced) files.
 /// Returns entries sorted by filename.
 pub fn read_deprecation_fragments(dir: &Path) -> Result<Vec<DeprecationEntry>> {
     if !dir.is_dir() {
@@ -155,14 +114,36 @@ pub fn read_deprecation_fragments(dir: &Path) -> Result<Vec<DeprecationEntry>> {
     }
     let mut paths: Vec<PathBuf> = fs::read_dir(dir)?
         .filter_map(|e| e.ok().map(|e| e.path()))
-        .filter(|p| p.extension().is_some_and(|x| x == "md"))
-        .filter(|p| p.file_name().and_then(|n| n.to_str()) != Some("README.md"))
+        .filter(|p| is_deprecation_fragment(p))
         .collect();
     paths.sort();
     paths
         .into_iter()
         .map(|p| parse_deprecation_fragment(&p))
         .collect()
+}
+
+/// Returns the path with `.md` replaced by `.announced.md`.
+/// Used by the release tooling to mark a new-announcement fragment as having been announced.
+pub fn announced_path(path: &Path) -> PathBuf {
+    let stem = path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("");
+    let announced_name = format!("{stem}.announced.md");
+    path.with_file_name(announced_name)
+}
+
+fn is_deprecation_fragment(path: &Path) -> bool {
+    let name = match path.file_name().and_then(|n| n.to_str()) {
+        Some(n) => n,
+        None => return false,
+    };
+    if name == "README.md" {
+        return false;
+    }
+    // Accept *.announced.md and *.md (but not *.announced.md double-counted via extension)
+    name.ends_with(".announced.md") || (name.ends_with(".md") && !name.ends_with(".announced.md"))
 }
 
 fn parse_deprecation_fragment(path: &Path) -> Result<DeprecationEntry> {
@@ -172,12 +153,7 @@ fn parse_deprecation_fragment(path: &Path) -> Result<DeprecationEntry> {
         .unwrap_or("")
         .to_string();
 
-    if !filename.to_ascii_lowercase().ends_with(".md") {
-        bail!(
-            "Deprecation fragment {} must have a .md extension",
-            path.display()
-        );
-    }
+    let previously_announced = filename.ends_with(".announced.md");
 
     let raw =
         fs::read_to_string(path).with_context(|| format!("Failed to read {}", path.display()))?;
@@ -198,56 +174,9 @@ fn parse_deprecation_fragment(path: &Path) -> Result<DeprecationEntry> {
         filename,
         what: fm.what.trim().to_string(),
         deprecation_version: fm.deprecation_version,
-        announcement_version: fm.announcement_version,
         description: body.trim().to_string(),
+        previously_announced,
     })
-}
-
-/// In a planned (surviving) deprecation fragment file, replace every `next` version value
-/// in the frontmatter with the concrete release version (`major.minor`).
-/// Returns true if the file was modified.
-pub fn rewrite_next_versions(path: &Path, release: &Version) -> Result<bool> {
-    let content =
-        fs::read_to_string(path).with_context(|| format!("Failed to read {}", path.display()))?;
-
-    let version_str = format!("{}.{}", release.major, release.minor);
-
-    // Only rewrite within the frontmatter block (between the two `---` delimiters).
-    let fm_close = content[3..] // skip opening `---`
-        .find("\n---")
-        .map_or(content.len(), |p| p + 3);
-
-    let (front, rest) = content.split_at(fm_close);
-
-    let new_front: String = front
-        .lines()
-        .map(|line| {
-            if (line.starts_with("announcement_version:")
-                || line.starts_with("deprecation_version:"))
-                && line.trim_end().ends_with("next")
-            {
-                let colon_pos = line.find(':').unwrap();
-                format!("{}: {version_str}", &line[..colon_pos])
-            } else {
-                line.to_string()
-            }
-        })
-        .collect::<Vec<_>>()
-        .join("\n");
-
-    if new_front == front {
-        return Ok(false);
-    }
-
-    // Preserve the trailing newline that was on `front` before the split.
-    let rejoined = if front.ends_with('\n') {
-        format!("{new_front}\n{rest}")
-    } else {
-        format!("{new_front}{rest}")
-    };
-
-    fs::write(path, rejoined).with_context(|| format!("Failed to write {}", path.display()))?;
-    Ok(true)
 }
 
 /// Split the raw file contents into the frontmatter string and the body.
@@ -286,11 +215,11 @@ mod tests {
     use tempfile::tempdir;
 
     #[test]
-    fn parse_full_entry() {
+    fn parse_new_entry() {
         let tmp = tempdir().unwrap();
         fs::write(
             tmp.path().join("foo_opt.md"),
-            "---\nwhat: The foo option\ndeprecation_version: \"0.57.0\"\nannouncement_version: \"0.55.0\"\n---\n\nDetailed explanation.\n",
+            "---\nwhat: The foo option\ndeprecation_version: \"0.57.0\"\n---\n\nDetailed explanation.\n",
         )
         .unwrap();
         let entries = read_deprecation_fragments(tmp.path()).unwrap();
@@ -299,24 +228,23 @@ mod tests {
         assert_eq!(e.what, "The foo option");
         assert_eq!(
             e.deprecation_version,
-            DeprecationVersion::Version(Version::new(0, 57, 0))
-        );
-        assert_eq!(
-            e.announcement_version,
-            DeprecationVersion::Version(Version::new(0, 55, 0))
+            DeprecationVersion(Version::new(0, 57, 0))
         );
         assert_eq!(e.description, "Detailed explanation.");
+        assert!(!e.previously_announced);
     }
 
     #[test]
-    fn rejects_missing_announcement_version() {
+    fn parse_announced_entry() {
         let tmp = tempdir().unwrap();
         fs::write(
-            tmp.path().join("baz.md"),
-            "---\nwhat: Baz option\ndeprecation_version: \"0.60.0\"\n---\n",
+            tmp.path().join("foo_opt.announced.md"),
+            "---\nwhat: The foo option\ndeprecation_version: \"0.57.0\"\n---\n\nDetailed explanation.\n",
         )
         .unwrap();
-        assert!(read_deprecation_fragments(tmp.path()).is_err());
+        let entries = read_deprecation_fragments(tmp.path()).unwrap();
+        assert_eq!(entries.len(), 1);
+        assert!(entries[0].previously_announced);
     }
 
     #[test]
@@ -331,7 +259,7 @@ mod tests {
         let tmp = tempdir().unwrap();
         fs::write(
             tmp.path().join("empty.md"),
-            "---\nwhat: \"   \"\ndeprecation_version: \"0.60.0\"\nannouncement_version: \"0.60.0\"\n---\n",
+            "---\nwhat: \"   \"\ndeprecation_version: \"0.60.0\"\n---\n",
         )
         .unwrap();
         assert!(read_deprecation_fragments(tmp.path()).is_err());
@@ -350,75 +278,66 @@ mod tests {
         let tmp = tempdir().unwrap();
         fs::write(
             tmp.path().join("short.md"),
-            "---\nwhat: Short version\ndeprecation_version: \"0.56\"\nannouncement_version: \"0.56\"\n---\n",
+            "---\nwhat: Short version\ndeprecation_version: \"0.56\"\n---\n",
         )
         .unwrap();
         let entries = read_deprecation_fragments(tmp.path()).unwrap();
-        // "0.56" normalises to 0.56.0
         assert_eq!(
             entries[0].deprecation_version,
-            DeprecationVersion::Version(Version::new(0, 56, 0))
+            DeprecationVersion(Version::new(0, 56, 0))
         );
     }
 
     #[test]
     fn matches_release_ignores_patch() {
-        let v = DeprecationVersion::Version(Version::new(0, 56, 0));
-        // "0.56" (stored as 0.56.0) should match any 0.56.x release
+        let v = DeprecationVersion(Version::new(0, 56, 0));
         assert!(v.matches_release(&Version::new(0, 56, 0)));
         assert!(v.matches_release(&Version::new(0, 56, 1)));
-        assert!(v.matches_release(&Version::new(0, 56, 99)));
-        // Different minor/major must not match
         assert!(!v.matches_release(&Version::new(0, 57, 0)));
-        assert!(!v.matches_release(&Version::new(1, 56, 0)));
     }
 
     #[test]
-    fn next_always_matches_release() {
-        assert!(DeprecationVersion::Next.matches_release(&Version::new(0, 56, 0)));
-        assert!(DeprecationVersion::Next.matches_release(&Version::new(1, 0, 0)));
+    fn is_future_relative_to() {
+        let v = DeprecationVersion(Version::new(0, 57, 0));
+        assert!(v.is_future_relative_to(&Version::new(0, 56, 0)));
+        assert!(!v.is_future_relative_to(&Version::new(0, 57, 0)));
+        assert!(!v.is_future_relative_to(&Version::new(0, 58, 0)));
     }
 
     #[test]
-    fn parse_next() {
+    fn partition_three_buckets() {
         let tmp = tempdir().unwrap();
         fs::write(
-            tmp.path().join("next.md"),
-            "---\nwhat: Thing\ndeprecation_version: next\nannouncement_version: next\n---\n",
+            tmp.path().join("enacted.md"),
+            "---\nwhat: Enacted\ndeprecation_version: \"0.56\"\n---\n",
+        )
+        .unwrap();
+        fs::write(
+            tmp.path().join("new.md"),
+            "---\nwhat: New announcement\ndeprecation_version: \"0.58\"\n---\n",
+        )
+        .unwrap();
+        fs::write(
+            tmp.path().join("old.announced.md"),
+            "---\nwhat: Previously announced\ndeprecation_version: \"0.60\"\n---\n",
         )
         .unwrap();
         let entries = read_deprecation_fragments(tmp.path()).unwrap();
-        assert_eq!(entries[0].deprecation_version, DeprecationVersion::Next);
-        assert_eq!(entries[0].announcement_version, DeprecationVersion::Next);
+        let p = partition_by_release(entries, &Version::new(0, 56, 0));
+        assert_eq!(p.enacted.len(), 1);
+        assert_eq!(p.enacted[0].what, "Enacted");
+        assert_eq!(p.announcing.len(), 1);
+        assert_eq!(p.announcing[0].what, "New announcement");
+        assert_eq!(p.planned.len(), 1);
+        assert_eq!(p.planned[0].what, "Previously announced");
     }
 
     #[test]
-    fn rewrite_next_versions_replaces_next_in_frontmatter() {
-        let tmp = tempdir().unwrap();
-        let path = tmp.path().join("planned.md");
-        fs::write(
-            &path,
-            "---\nwhat: Thing\ndeprecation_version: next\nannouncement_version: next\n---\n\nSome body with next word.\n",
-        )
-        .unwrap();
-        let modified = rewrite_next_versions(&path, &Version::new(0, 57, 0)).unwrap();
-        assert!(modified);
-        let updated = fs::read_to_string(&path).unwrap();
-        assert!(updated.contains("deprecation_version: 0.57\n"));
-        assert!(updated.contains("announcement_version: 0.57\n"));
-        // Body must be left untouched
-        assert!(updated.contains("Some body with next word."));
-    }
-
-    #[test]
-    fn rewrite_next_versions_no_op_when_no_next() {
-        let tmp = tempdir().unwrap();
-        let path = tmp.path().join("concrete.md");
-        let original =
-            "---\nwhat: Thing\ndeprecation_version: 0.57\nannouncement_version: 0.57\n---\n";
-        fs::write(&path, original).unwrap();
-        let modified = rewrite_next_versions(&path, &Version::new(0, 57, 0)).unwrap();
-        assert!(!modified);
-        assert_eq!(fs::read_to_string(&path).unwrap(), original);
+    fn announced_path_replaces_extension() {
+        let p = Path::new("deprecation.d/foo-bar.md");
+        assert_eq!(
+            announced_path(p),
+            Path::new("deprecation.d/foo-bar.announced.md")
+        );
     }
 }

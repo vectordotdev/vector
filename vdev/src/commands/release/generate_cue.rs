@@ -119,9 +119,8 @@ pub(super) fn run(new_version: &Version) -> Result<PathBuf> {
     fs::write(&cue_path, cue_text)
         .with_context(|| format!("Failed to write {}", cue_path.display()))?;
 
-    // In surviving fragments, replace any `next` version values with the concrete release version.
-    rewrite_next_in_planned(&deprecation_dir, &announcing_deprecations, &new_version)?;
-    rewrite_next_in_planned(&deprecation_dir, &planned_deprecations, &new_version)?;
+    // Promote new-announcement fragments from *.md to *.announced.md.
+    rename_announcing_fragments(&deprecation_dir, &announcing_deprecations)?;
 
     // Retire enacted deprecation fragments via `git rm`.
     retire_deprecation_fragments(&deprecation_dir, &enacted_deprecations)?;
@@ -563,18 +562,17 @@ fn retire_changelog_fragments(dir: &Path) -> Result<()> {
     Ok(())
 }
 
-fn rewrite_next_in_planned(
-    dir: &Path,
-    planned: &[DeprecationEntry],
-    release: &Version,
-) -> Result<()> {
+fn rename_announcing_fragments(dir: &Path, announcing: &[DeprecationEntry]) -> Result<()> {
+    if announcing.is_empty() {
+        return Ok(());
+    }
     let cwd = env::current_dir()?;
-    for entry in planned {
-        let path = dir.join(&entry.filename);
-        if deprecation::rewrite_next_versions(&path, release)? {
-            let rel = path.strip_prefix(&cwd).unwrap_or(&path);
-            git::add(&rel.to_string_lossy())?;
-        }
+    for entry in announcing {
+        let src = dir.join(&entry.filename);
+        let dst = deprecation::announced_path(&src);
+        let src_rel = src.strip_prefix(&cwd).unwrap_or(&src);
+        let dst_rel = dst.strip_prefix(&cwd).unwrap_or(&dst);
+        git::mv(&src_rel.to_string_lossy(), &dst_rel.to_string_lossy())?;
     }
     Ok(())
 }
@@ -655,12 +653,6 @@ fn render_deprecation_section(entries: &[DeprecationEntry]) -> String {
                 s,
                 "\t\t\tdeprecation_version: {}",
                 json!(e.deprecation_version.to_string())
-            )
-            .unwrap();
-            writeln!(
-                s,
-                "\t\t\tannouncement_version: {}",
-                json!(e.announcement_version.to_string())
             )
             .unwrap();
             if !e.description.is_empty() {

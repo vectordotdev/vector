@@ -1,8 +1,8 @@
 #![allow(clippy::print_stdout)]
 
-use anyhow::Result;
+use anyhow::{Result, bail};
 
-use crate::utils::{deprecation, paths};
+use crate::utils::{deprecation, git, paths};
 
 /// Check that all deprecation.d fragments are valid
 #[derive(clap::Args, Debug)]
@@ -33,6 +33,35 @@ impl Cli {
             println!("  ok  {}", entry.filename);
         }
         println!("{} deprecation fragment(s) are valid.", entries.len());
+
+        // Validate that no fragment's deprecation_version has already been released.
+        match git::latest_release_version() {
+            Ok(latest) => {
+                let mut stale = false;
+                for entry in &entries {
+                    if !entry.deprecation_version.is_future_relative_to(&latest) {
+                        eprintln!(
+                            "  STALE  {} (deprecation_version {} is not greater than latest release {})",
+                            entry.filename, entry.deprecation_version, latest
+                        );
+                        stale = true;
+                    }
+                }
+                if stale {
+                    bail!(
+                        "One or more deprecation fragments have a deprecation_version \
+                         that is not greater than the latest release v{latest}. \
+                         These should have been enacted and removed during the {latest} release."
+                    );
+                }
+                println!(
+                    "All deprecation_versions are greater than latest release v{latest}."
+                );
+            }
+            Err(e) => {
+                eprintln!("Warning: could not determine latest release version ({e}); skipping version freshness check.");
+            }
+        }
 
         Ok(())
     }

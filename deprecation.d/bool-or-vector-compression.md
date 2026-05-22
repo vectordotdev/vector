@@ -1,7 +1,6 @@
 ---
 what: "Boolean syntax for the `compression` field in the `vector` sink"
-announcement_version: next
-deprecation_version: next
+deprecation_version: 0.56
 ---
 
 The boolean syntax (`compression: true` / `compression: false`) is deprecated.

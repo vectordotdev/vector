@@ -141,9 +141,9 @@ pub fn latest_release_version() -> Result<semver::Version> {
     anyhow::bail!("No valid semantic version tag found")
 }
 
-/// Stages a specific file using `git add`.
-pub fn add(path: &str) -> Result<String> {
-    Command::new("git").args(["add", path]).check_output()
+/// Renames/moves a file using `git mv`.
+pub fn mv(src: &str, dst: &str) -> Result<String> {
+    Command::new("git").args(["mv", src, dst]).check_output()
 }
 
 /// Removes a file from the index (and working tree) using `git rm`.
