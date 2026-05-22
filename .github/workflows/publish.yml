@@ -308,7 +308,8 @@ jobs:
       - name: Install dd-pkg for linting
         run: |
           ARCH=$(uname -m)
-          curl -sSL "https://dd-package-tools.s3.amazonaws.com/dd-pkg/${DD_PKG_VERSION}/dd-pkg_Linux_${ARCH/aarch64/arm64}.tar.gz" | tar -xz -C /usr/local/bin dd-pkg
+          case "$ARCH" in aarch64) ARCH_DL=arm64 ;; *) ARCH_DL="$ARCH" ;; esac
+          curl -sSL "https://dd-package-tools.s3.amazonaws.com/dd-pkg/${DD_PKG_VERSION}/dd-pkg_Linux_${ARCH_DL}.tar.gz" | tar -xz -C /usr/local/bin dd-pkg
       - name: Fix Git safe directories issue when in containers (actions/checkout#760)
         run: git config --global --add safe.directory /__w/vector/vector
       - name: Checkout Vector
@@ -368,7 +369,8 @@ jobs:
       - name: Install dd-pkg for linting
         run: |
           ARCH=$(uname -m)
-          curl -sSL "https://dd-package-tools.s3.amazonaws.com/dd-pkg/${DD_PKG_VERSION}/dd-pkg_Linux_${ARCH/aarch64/arm64}.tar.gz" | tar -xz -C /usr/local/bin dd-pkg
+          case "$ARCH" in aarch64) ARCH_DL=arm64 ;; *) ARCH_DL="$ARCH" ;; esac
+          curl -sSL "https://dd-package-tools.s3.amazonaws.com/dd-pkg/${DD_PKG_VERSION}/dd-pkg_Linux_${ARCH_DL}.tar.gz" | tar -xz -C /usr/local/bin dd-pkg
       - name: Fix Git safe directories issue when in containers (actions/checkout#760)
         run: git config --global --add safe.directory /__w/vector/vector
       - name: Checkout Vector
