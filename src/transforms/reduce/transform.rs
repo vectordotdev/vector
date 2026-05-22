@@ -14,7 +14,7 @@ use vrl::{
 };
 
 use crate::{
-    conditions::Condition,
+    conditions::{AnyCondition, Condition, ConditionConfig},
     event::{Event, EventMetadata, LogEvent, TraceEvent, discriminant::Discriminant},
     internal_events::{ReduceAddEventError, ReduceStaleEventFlushed},
     transforms::{
@@ -180,6 +180,22 @@ impl Reduce {
     ) -> crate::Result<Self> {
         if config.ends_when.is_some() && config.starts_when.is_some() {
             return Err("only one of `ends_when` and `starts_when` can be provided".into());
+        }
+
+        if config.data_type == ReduceDataType::Trace {
+            for (field, condition) in [
+                ("ends_when", &config.ends_when),
+                ("starts_when", &config.starts_when),
+            ] {
+                if let Some(AnyCondition::Map(ConditionConfig::DatadogSearch(_))) = condition {
+                    return Err(format!(
+                        "`{field}` does not support `datadog_search` conditions when \
+                         `data_type = \"trace\"`: the `datadog_search` matcher only \
+                         evaluates log events and would silently never match trace inputs."
+                    )
+                    .into());
+                }
+            }
         }
 
         let ends_when = config
@@ -1199,5 +1215,35 @@ merge_strategies.baz = "max"
             assert_eq!(out.recv().await, None);
         })
         .await;
+    }
+
+    #[test]
+    fn rejects_datadog_search_with_trace_data_type() {
+        // `DatadogSearchRunner::matches` is log-only, so combining it with
+        // `data_type = "trace"` would silently never fire the boundary
+        // condition. Reject the combination at config build time.
+        let config = toml::from_str::<ReduceConfig>(indoc!(
+            r#"
+            data_type = "trace"
+            group_by = [ "request_id" ]
+
+            [ends_when]
+              type = "datadog_search"
+              source = "@test_end:yep"
+            "#,
+        ))
+        .unwrap();
+        let error = Reduce::new(
+            &config,
+            &TableRegistry::default(),
+            &MetricsStorage::default(),
+        )
+        .unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("`datadog_search` conditions when `data_type = \"trace\"`"),
+            "unexpected error: {error}"
+        );
     }
 }
