@@ -1513,19 +1513,19 @@ fn contains_no_refresh_finds_inserted_values_on_all_backends() {
     for (label, mut set) in [
         (
             "exact no-ttl",
-            AcceptedTagValueSet::new(4, &Mode::Exact, None, 4),
+            AcceptedTagValueSet::new(&Mode::Exact, None, 4),
         ),
         (
             "bloom no-ttl",
-            AcceptedTagValueSet::new(4, &bloom_mode, None, 4),
+            AcceptedTagValueSet::new(&bloom_mode, None, 4),
         ),
         (
             "exact ttl",
-            AcceptedTagValueSet::new(4, &Mode::Exact, Some(60), 4),
+            AcceptedTagValueSet::new(&Mode::Exact, Some(60), 4),
         ),
         (
             "bloom ttl",
-            AcceptedTagValueSet::new(4, &bloom_mode, Some(60), 4),
+            AcceptedTagValueSet::new(&bloom_mode, Some(60), 4),
         ),
     ] {
         set.insert(v1.clone());
@@ -1551,19 +1551,19 @@ fn ttl_zero_disables_ttl() {
     for (label, set) in [
         (
             "exact ttl=0",
-            AcceptedTagValueSet::new(4, &Mode::Exact, Some(0), 4),
+            AcceptedTagValueSet::new(&Mode::Exact, Some(0), 4),
         ),
         (
             "bloom ttl=0",
-            AcceptedTagValueSet::new(4, &bloom_mode, Some(0), 4),
+            AcceptedTagValueSet::new(&bloom_mode, Some(0), 4),
         ),
         (
             "exact ttl=None",
-            AcceptedTagValueSet::new(4, &Mode::Exact, None, 4),
+            AcceptedTagValueSet::new(&Mode::Exact, None, 4),
         ),
         (
             "bloom ttl=None",
-            AcceptedTagValueSet::new(4, &bloom_mode, None, 4),
+            AcceptedTagValueSet::new(&bloom_mode, None, 4),
         ),
     ] {
         assert!(
@@ -1573,7 +1573,7 @@ fn ttl_zero_disables_ttl() {
     }
 
     // Sanity: TTL with a positive value DOES select the TTL backend.
-    let ttl_set = AcceptedTagValueSet::new(4, &Mode::Exact, Some(60), 4);
+    let ttl_set = AcceptedTagValueSet::new(&Mode::Exact, Some(60), 4);
     assert!(ttl_set.ttl_enabled(), "ttl=Some(60) should enable TTL");
 }
 

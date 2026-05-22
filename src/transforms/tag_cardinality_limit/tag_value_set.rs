@@ -91,12 +91,12 @@ struct TtlExactStorage {
 }
 
 impl TtlExactStorage {
-    fn new(value_limit: usize, ttl: Duration, generations: u8) -> Self {
+    fn new(ttl: Duration, generations: u8) -> Self {
         let now = Instant::now();
         let divisor = generations.max(1) as u32;
         let sweep_interval = (ttl / divisor).max(Duration::from_secs(1));
         Self {
-            map: HashMap::with_capacity(value_limit),
+            map: HashMap::new(),
             ttl,
             sweep_interval,
             last_sweep: now,
@@ -284,23 +284,20 @@ impl fmt::Debug for TagValueSetStorage {
 }
 
 impl AcceptedTagValueSet {
-    /// Construct the appropriate backend.
+    /// Construct the appropriate backend from `(mode, ttl_secs, ttl_generations)`.
     ///
-    /// When `ttl_secs` is `None` (default), the backend is identical to the pre-TTL
-    /// behavior — `HashSet` for exact, single `BloomFilter` for probabilistic — so
-    /// existing configs see zero behavioral change.
-    pub fn new(
-        value_limit: usize,
-        mode: &Mode,
-        ttl_secs: Option<u64>,
-        ttl_generations: u8,
-    ) -> Self {
+    /// When `ttl_secs` is `None` or `0`, this is identical to the pre-TTL
+    /// behavior — `HashSet` for exact, single `BloomFilter` for probabilistic —
+    /// so existing configs see zero behavioral change. Neither backend
+    /// pre-allocates with `value_limit` capacity (see vectordotdev/vector#25480
+    /// for the memory rationale).
+    pub fn new(mode: &Mode, ttl_secs: Option<u64>, ttl_generations: u8) -> Self {
         let ttl = ttl_secs.and_then(|s| (s > 0).then(|| Duration::from_secs(s)));
 
         let storage = match (mode, ttl) {
-            (Mode::Exact, None) => TagValueSetStorage::Set(HashSet::with_capacity(value_limit)),
+            (Mode::Exact, None) => TagValueSetStorage::Set(HashSet::new()),
             (Mode::Exact, Some(ttl)) => {
-                TagValueSetStorage::TtlSet(TtlExactStorage::new(value_limit, ttl, ttl_generations))
+                TagValueSetStorage::TtlSet(TtlExactStorage::new(ttl, ttl_generations))
             }
             (Mode::Probabilistic(config), None) => {
                 TagValueSetStorage::Bloom(BloomFilterStorage::new(config.cache_size_per_key))
@@ -392,7 +389,7 @@ mod tests {
 
     #[test]
     fn exact_no_ttl_preserves_today_behavior() {
-        let mut set = AcceptedTagValueSet::new(2, &Mode::Exact, None, 4);
+        let mut set = AcceptedTagValueSet::new(&Mode::Exact, None, 4);
         assert!(!set.contains(&v("a")));
         assert_eq!(set.len(), 0);
         set.insert(v("a"));
@@ -407,7 +404,7 @@ mod tests {
         let mode = Mode::Probabilistic(BloomFilterConfig {
             cache_size_per_key: default_cache_size(),
         });
-        let mut set = AcceptedTagValueSet::new(2, &mode, None, 4);
+        let mut set = AcceptedTagValueSet::new(&mode, None, 4);
         set.insert(v("a"));
         set.insert(v("a"));
         assert_eq!(set.len(), 1, "duplicate insert must not bump count");
@@ -426,7 +423,7 @@ mod tests {
     #[test]
     fn ttl_exact_expires_values_past_ttl() {
         let ttl = Duration::from_secs(60);
-        let mut s = TtlExactStorage::new(8, ttl, 4);
+        let mut s = TtlExactStorage::new(ttl, 4);
         // t0: insert v=a manually so we control its timestamp.
         let t0 = Instant::now();
         s.map.insert(v("a"), t0);
@@ -446,7 +443,7 @@ mod tests {
         // forward — otherwise sweeps continue to use the old (potentially
         // expired) timestamp. A short sleep guarantees `Instant::now()` is
         // strictly after `t_insert` on every platform.
-        let mut s = TtlExactStorage::new(8, Duration::from_secs(60), 4);
+        let mut s = TtlExactStorage::new(Duration::from_secs(60), 4);
         let t_insert = Instant::now();
         s.map.insert(v("a"), t_insert);
         s.last_sweep = t_insert;
@@ -465,7 +462,7 @@ mod tests {
     fn ttl_exact_sweep_interval_floors_to_one_second() {
         // ttl=2s, generations=8 → naive slice = 250ms; we floor to 1s so sweeps
         // never become dominant. Verify the floor.
-        let s = TtlExactStorage::new(8, Duration::from_secs(2), 8);
+        let s = TtlExactStorage::new(Duration::from_secs(2), 8);
         assert!(s.sweep_interval >= Duration::from_secs(1));
     }
 
@@ -474,7 +471,7 @@ mod tests {
         // Regression for the `DropEvent` pre-check bug: a read-only check
         // must NOT update the stored Instant.
         let ttl = Duration::from_secs(60);
-        let mut s = TtlExactStorage::new(8, ttl, 4);
+        let mut s = TtlExactStorage::new(ttl, 4);
         let t0 = Instant::now();
         s.map.insert(v("a"), t0);
         s.last_sweep = t0;

@@ -221,12 +221,7 @@ impl TagCardinalityLimit {
 
         let metric_accepted_tags = self.accepted_tags.entry(metric_key_owned).or_default();
         let tag_value_set = metric_accepted_tags.entry_ref(key).or_insert_with(|| {
-            AcceptedTagValueSet::new(
-                config.value_limit,
-                &config.mode,
-                config.ttl_secs,
-                config.ttl_generations,
-            )
+            AcceptedTagValueSet::new(&config.mode, config.ttl_secs, config.ttl_generations)
         });
 
         if tag_value_set.contains(value) {
@@ -329,12 +324,7 @@ impl TagCardinalityLimit {
         metric_accepted_tags
             .entry_ref(key)
             .or_insert_with(|| {
-                AcceptedTagValueSet::new(
-                    config.value_limit,
-                    &config.mode,
-                    config.ttl_secs,
-                    config.ttl_generations,
-                )
+                AcceptedTagValueSet::new(&config.mode, config.ttl_secs, config.ttl_generations)
             })
             .insert(value.clone());
         false
