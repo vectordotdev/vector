@@ -197,7 +197,7 @@ async fn handles_failure_v1() {
         start_test_error(ApiStatus::BadRequestv1, BatchStatus::Rejected).await;
     let res = rx.try_recv();
 
-    assert!(matches!(res, Err(TryRecvError::Closed)));
+    assert!(matches!(res, Err(TryRecvError::Empty)));
 }
 
 #[tokio::test]
@@ -211,7 +211,7 @@ async fn handles_failure_v2() {
         start_test_error(ApiStatus::BadRequestv2, BatchStatus::Rejected).await;
     let res = rx.try_recv();
 
-    assert!(matches!(res, Err(TryRecvError::Closed)));
+    assert!(matches!(res, Err(TryRecvError::Empty)));
 }
 
 #[tokio::test]
