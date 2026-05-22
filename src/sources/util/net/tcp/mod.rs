@@ -220,6 +220,12 @@ where
                             tokio::spawn(
                                 fut.map(move |()| {
                                     drop(open_token);
+                                    // Paired with the ConnectionOpen emit above:
+                                    // fires exactly once per accepted connection,
+                                    // including paths that return early from
+                                    // handle_stream (TLS handshake failure,
+                                    // shutdown during handshake).
+                                    emit!(TcpSourceConnectionShutdown);
                                     drop(tcp_connection_permit);
                                 })
                                 .instrument(span.or_current()),
@@ -432,13 +438,6 @@ async fn handle_stream<T>(
 
         drop(permit);
     }
-
-    // Single, unified connection-close emit. Fires for every cause the read/ack
-    // loop can exit on — graceful peer EOF, downstream-closed (StreamClosedError),
-    // decoder failure (DecoderFramingError), ack write failure (TcpSendAckError),
-    // shutdown signal, tripwire, and max connection duration. Handshake failures
-    // return before this point and remain captured by TcpSocketTlsConnectionError.
-    emit!(TcpSourceConnectionShutdown);
 }
 
 fn close_socket(socket: &MaybeTlsIncomingStream<TcpStream>) -> bool {
