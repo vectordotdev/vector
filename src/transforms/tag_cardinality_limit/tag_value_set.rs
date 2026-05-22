@@ -26,12 +26,23 @@ use crate::{
     transforms::tag_cardinality_limit::config::Mode,
 };
 
-/// `Instant + Duration` panics if the resulting instant is outside the
-/// platform's representable range. Pathological `ttl_secs` values (close to
-/// `u64::MAX`) can hit that limit; this helper falls back to the original
-/// instant so the transform stays alive instead of crashing on misconfiguration.
+/// `Instant + Duration` panics outside the platform's representable range.
+/// On overflow, push the deadline `~136 years` into the future so rotation
+/// schedules degrade to a stable no-op rather than panicking or churning
+/// (returning `instant` here would leave `next_rotate <= now` on every call
+/// and force `generations` rotations per access).
 fn saturating_add(instant: Instant, duration: Duration) -> Instant {
-    instant.checked_add(duration).unwrap_or(instant)
+    if let Some(result) = instant.checked_add(duration) {
+        return result;
+    }
+    let mut fallback = Duration::from_secs(u32::MAX as u64);
+    while !fallback.is_zero() {
+        if let Some(result) = instant.checked_add(fallback) {
+            return result;
+        }
+        fallback = Duration::from_secs(fallback.as_secs() / 2);
+    }
+    instant
 }
 
 /// Container for storing the set of accepted values for a given tag key.
@@ -65,16 +76,9 @@ impl BloomFilterStorage {
     }
 
     fn insert(&mut self, value: &TagValueSet) {
-        // Set the bits unconditionally; `bloomy::BloomFilter::insert` is
-        // idempotent at the bit level (already-set bits are a no-op). The
-        // unconditional form matters for the rolling-bloom refresh path:
-        // `RollingBloomStorage::contains` re-inserts hits into the newest
-        // shard, and skipping that write on a false-positive `contains` hit
-        // would mean the value rides on someone else's bits in the newest
-        // shard rather than holding its own — making its lifetime depend on
-        // when those unrelated bits age out instead of the value's own
-        // activity. Count tracking remains conditional so we still report
-        // distinct first-time inserts.
+        // Write bits unconditionally so the rolling-bloom refresh path can
+        // not leave a value riding on another value's false-positive bits.
+        // Count tracks distinct first sightings only.
         let was_already_present = self.inner.contains(value);
         self.inner.insert(value);
         if !was_already_present {
@@ -91,16 +95,11 @@ impl BloomFilterStorage {
     }
 }
 
-// =============================================================================
-// Exact mode + TTL
-// =============================================================================
-
 /// `HashMap`-backed exact cache with per-value last-seen timestamps.
 ///
-/// Sweep policy: at most once per `sweep_interval` (= `ttl / max(generations, 1)`,
-/// floored to 1 second), `retain` drops every entry whose `last_seen` is older
-/// than `ttl`. The sweep runs inside `insert`/`contains`/`len` — lazy, no
-/// background task.
+/// At most once per `sweep_interval` (= `ttl / effective_generations`),
+/// `retain` drops every entry whose `last_seen` is older than `ttl`. The
+/// sweep runs lazily inside `insert`/`contains`/`len` — no background task.
 struct TtlExactStorage {
     map: HashMap<TagValueSet, Instant>,
     ttl: Duration,
@@ -110,13 +109,9 @@ struct TtlExactStorage {
 
 impl TtlExactStorage {
     fn new(ttl: Duration, generations: u8) -> Self {
-        // Same cap as `RollingBloomStorage::new`: clamp effective generations
-        // so `sweep_interval >= 1s` without stretching the configured TTL
-        // window. For `ttl_secs >= 1` the invariant
-        // `sweep_interval * effective == ttl` holds exactly. Eviction
-        // precision in exact mode is `[ttl, ttl + sweep_interval)` — the cap
-        // keeps that upper bound proportional to the configured TTL instead
-        // of being silently widened by the old 1-second floor.
+        // Cap effective generations so `sweep_interval >= 1s` and
+        // `sweep_interval * effective == ttl`. Eviction precision is then
+        // `[ttl, ttl + sweep_interval)`.
         let requested = generations.max(1) as u32;
         let max_for_ttl = ttl.as_secs().max(1) as u32;
         let effective = requested.min(max_for_ttl).max(1);
@@ -181,10 +176,6 @@ impl TtlExactStorage {
     }
 }
 
-// =============================================================================
-// Probabilistic mode + TTL: rolling bloom filter
-// =============================================================================
-
 /// Sliding-window bloom: `generations` shards, each a full `cache_size_per_key`
 /// bloom filter. Front of the deque is the oldest shard; back is the current.
 /// On rotation, the front shard is dropped and a fresh empty one is pushed at the
@@ -195,22 +186,16 @@ struct RollingBloomStorage {
     generations: u8,
     slice: Duration,
     cache_size_per_key: usize,
-    /// The boundary at which the next rotation is due. Advances by `slice` on
-    /// every rotation. Storing the *next-tick* timestamp instead of "last_rotate"
-    /// makes the catch-up loop in `rotate_if_needed` trivial and tolerant of
-    /// long pauses between calls.
+    /// Boundary at which the next rotation is due. Advances by `slice` on
+    /// every rotation; storing the next tick (not the last) keeps the
+    /// catch-up loop in `rotate_if_needed` trivial.
     next_rotate: Instant,
 }
 
 impl RollingBloomStorage {
     fn new(cache_size_per_key: usize, generations: u8, ttl: Duration) -> Self {
-        // Cap effective generations so `slice >= 1s` (avoid `rotate_if_needed`
-        // spinning) WITHOUT stretching the TTL window past `ttl_secs`. The
-        // previous behavior — flooring `slice` to 1s — silently grew the
-        // effective retention window to `1s × ttl_generations` whenever
-        // `ttl_secs < ttl_generations`, violating the configured TTL contract.
-        // For every valid `ttl_secs >= 1`, this preserves the invariant
-        // `slice * effective_generations == ttl` exactly.
+        // Cap effective generations so `slice >= 1s` and
+        // `slice * effective_generations == ttl`.
         let requested = generations.max(1) as u32;
         let max_for_ttl = ttl.as_secs().max(1) as u32;
         let effective = requested.min(max_for_ttl).max(1);
@@ -223,12 +208,6 @@ impl RollingBloomStorage {
             generations: effective as u8,
             slice,
             cache_size_per_key,
-            // Pathological `ttl_secs` (e.g. close to `u64::MAX`) could push
-            // `now + slice` past `Instant`'s platform-specific range and panic.
-            // Saturating to `now` is safe: the first call to `rotate_if_needed`
-            // will fast-forward `next_rotate` via the same guard below and
-            // settle into a normal rotation cadence (which for any oversized
-            // TTL will never actually fire under realistic Vector uptime).
             next_rotate: saturating_add(now, slice),
         }
     }
@@ -261,15 +240,11 @@ impl RollingBloomStorage {
     fn contains(&mut self, value: &TagValueSet) -> bool {
         let now = Instant::now();
         self.rotate_if_needed(now);
-
-        // Check newest -> oldest so hot values short-circuit immediately.
+        // Newest -> oldest short-circuits hot values; re-seed hits into the
+        // newest shard so they survive the next rotation.
         let found = self.shards.iter().rev().any(|s| s.contains(value));
-        if found {
-            // Refresh: ensure the value is in the current shard so it survives
-            // the next rotation. `BloomFilterStorage::insert` is idempotent.
-            if let Some(newest) = self.shards.back_mut() {
-                newest.insert(value);
-            }
+        if found && let Some(newest) = self.shards.back_mut() {
+            newest.insert(value);
         }
         found
     }
@@ -291,35 +266,19 @@ impl RollingBloomStorage {
         }
     }
 
-    /// Upper bound on the number of distinct values currently retained.
+    /// Strict upper bound on the number of distinct values currently retained.
     ///
-    /// Bloom shards can't be enumerated, so the true union cardinality
-    /// isn't directly computable. Summing per-shard counts is a strict
-    /// upper bound: a value present in N shards (because refresh-on-sighting
-    /// has re-seeded it into newer shards) contributes N to the sum but
-    /// only 1 to the union.
-    ///
-    /// Bias is bounded by `ttl_generations`. Cold-churn workloads — the
-    /// original TTL motivation (`pod_name`, ephemeral IDs) — see no bias
-    /// because each value lives in exactly one shard. Hot, continuously-
-    /// sighted values are over-counted by up to a factor of `ttl_generations`;
-    /// users running such workloads can set `ttl_generations: 1` (tumbling
-    /// window) to eliminate it.
-    ///
-    /// `sum` is preferred over `max` because a cardinality limiter must
-    /// never silently admit values past `value_limit`. `max` underestimates
-    /// the union (distinct values spread across shards keep every shard
-    /// below the cap while the union exceeds it). The only failure mode of
-    /// `sum` is over-rejection, which is observable via
-    /// `tag_value_limit_exceeded_total`.
+    /// Bloom shards are not enumerable, so the true union cardinality is not
+    /// directly computable. Summing per-shard counts never under-counts; the
+    /// alternative — `max` — could let distinct values spread across shards
+    /// silently exceed `value_limit`. See the `ttl` section of the transform
+    /// documentation for the over-rejection trade-off.
     fn len(&mut self) -> usize {
         let now = Instant::now();
         self.rotate_if_needed(now);
         self.shards.iter().map(|s| s.count()).sum()
     }
 }
-
-// =============================================================================
 
 impl fmt::Debug for TagValueSetStorage {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -345,9 +304,7 @@ impl AcceptedTagValueSet {
     ///
     /// When `ttl_secs` is `None` or `0`, this is identical to the pre-TTL
     /// behavior — `HashSet` for exact, single `BloomFilter` for probabilistic —
-    /// so existing configs see zero behavioral change. Neither backend
-    /// pre-allocates with `value_limit` capacity (see vectordotdev/vector#25480
-    /// for the memory rationale).
+    /// so existing configs see zero behavioral change.
     pub fn new(mode: &Mode, ttl_secs: Option<u64>, ttl_generations: u8) -> Self {
         let ttl = ttl_secs.and_then(|s| (s > 0).then(|| Duration::from_secs(s)));
 
@@ -446,10 +403,6 @@ mod tests {
 
     #[test]
     fn bloom_filter_storage_count_is_idempotent_per_value() {
-        // Pin the count contract that survives Codex P1: `BloomFilterStorage::insert`
-        // now writes the bloom bits unconditionally, but the count must still
-        // bump exactly once per distinct value so per-shard `len()` stays
-        // accurate. Inserting the same value twice must leave count at 1.
         let mut b = BloomFilterStorage::new(default_cache_size());
         b.insert(&v("a"));
         b.insert(&v("a"));
@@ -485,35 +438,27 @@ mod tests {
         assert!(set.contains(&v("b")));
     }
 
-    // -------------------- TtlExactStorage --------------------
-    //
-    // We exercise the storage type directly so we can advance wall-clock time
-    // via the `now: Instant` parameter on private helpers. `AcceptedTagValueSet`
-    // itself uses `Instant::now()`, which can't be mocked cheaply.
+    // The storage types are exercised directly so we can drive
+    // `Instant`-typed parameters on private helpers; `AcceptedTagValueSet`
+    // itself calls `Instant::now()`, which can't be mocked cheaply.
 
     #[test]
     fn ttl_exact_expires_values_past_ttl() {
         let ttl = Duration::from_secs(60);
         let mut s = TtlExactStorage::new(ttl, 4);
-        // t0: insert v=a manually so we control its timestamp.
         let t0 = Instant::now();
         s.map.insert(v("a"), t0);
         s.last_sweep = t0;
-        // t0+30s: still alive.
         s.sweep(t0 + Duration::from_secs(30));
-        assert!(s.map.contains_key(&v("a")));
-        // t0+90s: expired.
+        assert!(s.map.contains_key(&v("a")), "still alive within ttl");
         s.sweep(t0 + Duration::from_secs(90));
-        assert!(!s.map.contains_key(&v("a")));
+        assert!(!s.map.contains_key(&v("a")), "evicted past ttl");
     }
 
     #[test]
     fn ttl_exact_refresh_on_contains_extends_lease() {
-        // Seed the map with an old timestamp, then drive a real `contains`.
-        // The refresh path (`*slot = now;`) must push the stored Instant
-        // forward — otherwise sweeps continue to use the old (potentially
-        // expired) timestamp. A short sleep guarantees `Instant::now()` is
-        // strictly after `t_insert` on every platform.
+        // Short sleep guarantees `Instant::now()` is strictly after `t_insert`
+        // on every platform.
         let mut s = TtlExactStorage::new(Duration::from_secs(60), 4);
         let t_insert = Instant::now();
         s.map.insert(v("a"), t_insert);
@@ -531,27 +476,19 @@ mod tests {
 
     #[test]
     fn ttl_exact_caps_generations_when_ttl_lt_generations() {
-        // Regression for Codex P2: previously `sweep_interval` was floored to
-        // 1s, which silently stretched the effective TTL window when
-        // `ttl_secs < generations`. The fix caps the effective generations
-        // so `sweep_interval * effective == ttl` exactly while keeping
-        // `sweep_interval >= 1s`.
+        // ttl=1s, generations=4 → effective=1, sweep_interval=1s.
         let s = TtlExactStorage::new(Duration::from_secs(1), 4);
         assert_eq!(s.sweep_interval, Duration::from_secs(1));
-        // ttl=2s / generations=8 → effective=2, sweep_interval=1s (not floored
-        // from 250ms with the old code, which would have stretched the
-        // window to 8s).
+        // ttl=2s, generations=8 → effective=2, sweep_interval=1s.
         let s = TtlExactStorage::new(Duration::from_secs(2), 8);
         assert_eq!(s.sweep_interval, Duration::from_secs(1));
-        // Tall TTL is unaffected.
+        // ttl >> generations is unaffected by the cap.
         let s = TtlExactStorage::new(Duration::from_secs(3600), 4);
         assert_eq!(s.sweep_interval, Duration::from_secs(900));
     }
 
     #[test]
     fn ttl_exact_contains_no_refresh_does_not_extend_lease() {
-        // Regression for the `DropEvent` pre-check bug: a read-only check
-        // must NOT update the stored Instant.
         let ttl = Duration::from_secs(60);
         let mut s = TtlExactStorage::new(ttl, 4);
         let t0 = Instant::now();
@@ -564,24 +501,19 @@ mod tests {
             Some(t0),
             "timestamp must remain at t0 after no-refresh checks"
         );
-        // Sanity: the refreshing variant `contains` *does* update the
-        // timestamp. We can't pin its exact post-call value (it depends on
-        // `Instant::now()`), but it must have moved forward.
+        // Sanity: the refreshing variant must move the timestamp forward.
         s.contains(&v("a"));
         assert!(s.map.get(&v("a")).copied().unwrap() >= t0);
     }
 
     #[test]
     fn rolling_bloom_contains_no_refresh_does_not_seed_newest_shard() {
-        // Same regression as above, but for the probabilistic backend: a
-        // no-refresh check must not insert into the newest shard.
         let mut s = RollingBloomStorage::new(default_cache_size(), 4, Duration::from_secs(4));
         s.shards.back_mut().unwrap().insert(&v("a"));
-        // Drive a rotation so we have a distinct newest shard.
+        // Drive a rotation so "a" sits in the (now older) front shard.
         let t0 = Instant::now();
         s.next_rotate = t0 + Duration::from_secs(1);
         s.rotate_if_needed(t0 + Duration::from_secs(2));
-        // "a" is in the (now older) front shard, not the back.
         let newest_before = s.shards.back().unwrap().count();
         assert!(s.contains_no_refresh(&v("a")));
         let newest_after = s.shards.back().unwrap().count();
@@ -589,16 +521,13 @@ mod tests {
             newest_before, newest_after,
             "contains_no_refresh must not seed the newest shard"
         );
-        // Sanity: the refreshing variant *does* seed it.
+        // Sanity: the refreshing variant must seed it.
         assert!(s.contains(&v("a")));
         assert!(s.shards.back().unwrap().contains(&v("a")));
     }
 
-    // -------------------- RollingBloomStorage --------------------
-
     #[test]
     fn rolling_bloom_drops_oldest_shard_on_rotate() {
-        // ttl=4s, generations=4 → 1s per shard.
         let mut s = RollingBloomStorage::new(default_cache_size(), 4, Duration::from_secs(4));
         let t0 = Instant::now();
         s.next_rotate = t0 + Duration::from_secs(1);
@@ -613,10 +542,8 @@ mod tests {
 
     #[test]
     fn rolling_bloom_refresh_on_contains_seeds_newest_shard() {
-        // Force one rotation so `hot` lives in the front shard and the back
-        // is fresh-empty. A real `contains` call must re-seed it into the
-        // newest shard — this is what gives hot values survival across
-        // future rotations.
+        // After one rotation, `hot` lives in the front shard and the back is
+        // fresh-empty; `contains` must re-seed it into the newest shard.
         let mut s = RollingBloomStorage::new(default_cache_size(), 4, Duration::from_secs(4));
         s.shards.back_mut().unwrap().insert(&v("hot"));
         let t0 = Instant::now();
@@ -638,13 +565,12 @@ mod tests {
 
     #[test]
     fn rolling_bloom_catch_up_capped_to_generations() {
-        // Long idle period: ensure rotate_if_needed doesn't spin past
-        // `generations` even if the elapsed time covers many windows.
+        // After a long idle gap, `rotate_if_needed` must rotate at most
+        // `generations` times even if elapsed covers many windows.
         let mut s = RollingBloomStorage::new(default_cache_size(), 4, Duration::from_secs(4));
         let t0 = Instant::now();
         s.next_rotate = t0 + Duration::from_secs(1);
         s.shards.back_mut().unwrap().insert(&v("stale"));
-        // 1 hour gap: should rotate exactly `generations` times.
         s.rotate_if_needed(t0 + Duration::from_secs(3600));
         assert_eq!(s.shards.len(), 4, "deque size capped at `generations`");
         assert!(
@@ -655,8 +581,7 @@ mod tests {
 
     #[test]
     fn rolling_bloom_generations_clamped_to_at_least_one() {
-        // generations=0 would imply div-by-zero or an empty deque; ensure
-        // the constructor clamps it so we always have at least one shard.
+        // `generations: 0` would divide by zero / leave an empty deque.
         let s = RollingBloomStorage::new(default_cache_size(), 0, Duration::from_secs(60));
         assert_eq!(s.generations, 1);
         assert_eq!(s.shards.len(), 1);
@@ -664,16 +589,11 @@ mod tests {
 
     #[test]
     fn rolling_bloom_caps_generations_when_ttl_lt_generations() {
-        // Regression for Codex P2: with ttl=1s and the default generations=4,
-        // the old code floored `slice` to 1s and silently stretched the
-        // effective window to ~4s. The fix caps effective generations to
-        // `ttl.as_secs()` so `slice * generations == ttl` is preserved.
+        // ttl=1s, generations=4 → effective=1, slice=1s.
         let s = RollingBloomStorage::new(default_cache_size(), 4, Duration::from_secs(1));
         assert_eq!(s.generations, 1, "effective generations capped to ttl");
         assert_eq!(s.slice, Duration::from_secs(1));
-        // ttl=2s / generations=8 → effective=2, slice=1s. Without the cap
-        // the old code produced slice=1s but kept generations=8, stretching
-        // the window to 8s.
+        // ttl=2s, generations=8 → effective=2, slice=1s.
         let s = RollingBloomStorage::new(default_cache_size(), 8, Duration::from_secs(2));
         assert_eq!(s.generations, 2);
         assert_eq!(s.slice, Duration::from_secs(1));
@@ -682,7 +602,7 @@ mod tests {
     #[test]
     fn rolling_bloom_window_matches_ttl_exactly() {
         // `slice * effective_generations == ttl` must hold for every valid
-        // (ttl_secs, generations) so the configured TTL is honored exactly.
+        // (ttl_secs, generations).
         for (ttl_secs, generations) in [(1u64, 4u8), (2, 8), (3, 4), (60, 4), (3600, 4), (86400, 6)]
         {
             let s = RollingBloomStorage::new(
@@ -704,12 +624,8 @@ mod tests {
 
     #[test]
     fn rolling_bloom_len_sums_across_shards() {
-        // Regression for Codex P1: `len()` must return the sum of per-shard
-        // counts, not the max. Otherwise distinct cold values spread across
-        // shards keep every individual shard below `value_limit` while the
-        // union exceeds it, and the cardinality limiter silently admits past
-        // the cap. Build the deque directly so the layout is unambiguous;
-        // `rotate_if_needed` is exercised separately by other tests.
+        // Distinct values spread across shards must contribute to `len()`;
+        // otherwise the union could silently exceed `value_limit`.
         let mut s = RollingBloomStorage::new(default_cache_size(), 4, Duration::from_secs(4));
         s.shards.clear();
         for name in ["a", "b", "c", "d"] {
@@ -717,11 +633,8 @@ mod tests {
             shard.insert(&v(name));
             s.shards.push_back(shard);
         }
-        // Push the next rotation far enough out that the `len()` call below
-        // doesn't lazily rotate and disturb our hand-built layout.
+        // Push the next rotation far out so `len()` doesn't lazily rotate.
         s.next_rotate = Instant::now() + Duration::from_secs(3600);
-        // Each shard holds 1 distinct value. max() would return 1; the union
-        // is 4 — and `sum` must return 4.
         assert_eq!(
             s.len(),
             4,
@@ -731,25 +644,48 @@ mod tests {
 
     #[test]
     fn rolling_bloom_oversized_ttl_doesnt_panic() {
-        // Regression for Codex P2 (Instant overflow): a pathological
-        // `ttl_secs` close to `u64::MAX` would previously panic the
-        // transform via `now + slice` overflowing `Instant`'s
-        // platform-specific range. The `saturating_add` guard must keep
-        // construction and the first rotation alive.
         let mut s =
             RollingBloomStorage::new(default_cache_size(), 4, Duration::from_secs(u64::MAX));
-        // Operate on the storage so we exercise both call sites that use
-        // `saturating_add` (constructor + `rotate_if_needed`).
+        // Exercises both `saturating_add` call sites (constructor and
+        // `rotate_if_needed`).
         s.insert(&v("a"));
         assert!(s.contains(&v("a")));
         assert_eq!(s.len(), 1);
     }
 
     #[test]
+    fn saturating_add_overflow_pushes_deadline_far_into_future() {
+        // The fallback must advance `instant` by a non-trivial amount —
+        // returning `instant` itself would leave `next_rotate <= now` on
+        // every access and force `generations` rotations per call.
+        let now = Instant::now();
+        let advanced = saturating_add(now, Duration::from_secs(u64::MAX));
+        let gain = advanced.duration_since(now);
+        assert!(
+            gain >= Duration::from_secs(60 * 60 * 24 * 365),
+            "saturating_add must push the deadline at least a year out on \
+             overflow; got {gain:?}",
+        );
+    }
+
+    #[test]
+    fn rolling_bloom_overflow_does_not_churn_on_repeated_access() {
+        // Repeated reads with an overflowing TTL must not silently rotate
+        // out values inserted between them; the rotation deadline has to
+        // sit far enough in the future that `rotate_if_needed` is a no-op.
+        let mut s =
+            RollingBloomStorage::new(default_cache_size(), 4, Duration::from_secs(u64::MAX));
+        s.insert(&v("a"));
+        for _ in 0..16 {
+            assert!(s.contains(&v("a")));
+        }
+        assert_eq!(s.len(), 1);
+    }
+
+    #[test]
     fn rolling_bloom_len_upper_bounds_value_limit() {
-        // Pin the contract that motivates Fix 1: across the full window the
-        // sum-based `len()` must reach `value_limit` once enough distinct
-        // values are admitted, so `try_accept_tag` actually stops admitting.
+        // `len()` must reach `value_limit` once enough distinct values are
+        // admitted across the full window so `try_accept_tag` stops admitting.
         let value_limit = 8usize;
         let generations = 4u8;
         let mut s =

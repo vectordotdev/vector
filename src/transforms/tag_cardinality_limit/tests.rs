@@ -758,18 +758,15 @@ fn max_tracked_keys_unlimited_by_default() {
     }
 }
 
-/// Regression: with `value_limit: 0`, `limit_exceeded_action: drop_event`, and
-/// `max_tracked_keys` exhausted, the documented untracked-passthrough behavior must
-/// still apply. `tag_limit_exceeded` previously rejected *any* missing-bucket lookup
-/// when `value_limit == 0`, causing events to be dropped before `record_tag_value`
-/// could detect the allocation cap. New (metric, tag-key) pairs that cannot be
-/// allocated must instead pass through unchecked.
+/// With `value_limit: 0`, `limit_exceeded_action: drop_event`, and
+/// `max_tracked_keys` exhausted, new (metric, tag-key) pairs that cannot be
+/// allocated must pass through unchecked rather than dropping the event.
 #[test]
 fn max_tracked_keys_passthrough_with_zero_value_limit_drop_event() {
-    // metric_a uses a normal per-metric override with room for a value, so the first
-    // event reserves the only allocation slot. metric_b inherits the global config,
-    // which combines `value_limit: 0` + `drop_event` — the corner case that originally
-    // dropped events even when the pair couldn't be tracked.
+    // metric_a uses a per-metric override with room for a value, so the first
+    // event reserves the only allocation slot. metric_b inherits the global
+    // config — `value_limit: 0` + `drop_event` — which exercises the
+    // missing-bucket passthrough path under cap exhaustion.
     let config = make_transform_hashset_with_per_metric_limits(
         0,
         LimitExceededAction::DropEvent,
@@ -1591,12 +1588,8 @@ cache_size_per_key: 2048
     assert_eq!(parsed.global.ttl_generations, default_ttl_generations());
 }
 
-/// Regression for Codex P2 (empty-bucket reclaim): once `max_tracked_keys`
-/// is reached, the transform must reclaim buckets that have been fully
-/// emptied by TTL eviction so new `(metric, tag-key)` pairs can be tracked
-/// again. Without reclaim, high-churn workloads under `max_tracked_keys`
-/// would silently stay in `Untracked` mode forever, even after old buckets
-/// fully aged out.
+/// Once `max_tracked_keys` is reached, buckets emptied by TTL eviction are
+/// reclaimed so new `(metric, tag-key)` pairs can still be tracked.
 #[test]
 fn max_tracked_keys_reclaims_empty_buckets() {
     use super::tag_value_set::AcceptedTagValueSet;
@@ -1618,8 +1611,6 @@ fn max_tracked_keys_reclaims_empty_buckets() {
         "should be at cap before reclaim"
     );
 
-    // A new tag key should be tracked: reclaim fires, drops the empty
-    // `stale_tag` bucket, frees the slot, and the new pair is allocated.
     let value = TagValueSet::from(["v".to_string()]);
     let result = transform.try_accept_tag(metric_key.as_ref(), "fresh_tag", &value);
     assert_eq!(
@@ -1639,6 +1630,39 @@ fn max_tracked_keys_reclaims_empty_buckets() {
     assert_eq!(
         transform.tracked_keys_count, 1,
         "tracked_keys_count must reflect the swap (1 dropped + 1 added)"
+    );
+}
+
+/// With `value_limit: 0` + `drop_event` + `max_tracked_keys` full but with a
+/// reclaimable empty bucket, `tag_limit_exceeded` must reclaim before deciding
+/// — otherwise the pre-check returns "not exceeded" (cap appears full → fall
+/// through to untracked passthrough) while `record_tag_value` then reclaims
+/// and admits a value that should have been rejected.
+#[test]
+fn tag_limit_exceeded_reclaims_before_value_limit_zero_check() {
+    use super::tag_value_set::AcceptedTagValueSet;
+
+    let mut config = make_transform_hashset(0, LimitExceededAction::DropEvent);
+    config.max_tracked_keys = Some(1);
+    let mut transform = TagCardinalityLimit::new(config);
+
+    let metric_key: Option<MetricId> = None;
+    let stale_set = AcceptedTagValueSet::new(&Mode::Exact, None, default_ttl_generations());
+    let mut inner = hashbrown::HashMap::new();
+    inner.insert("stale_tag".to_string(), stale_set);
+    transform.accepted_tags.insert(metric_key.clone(), inner);
+    transform.tracked_keys_count = 1;
+
+    assert!(
+        !transform.can_allocate_new_key(),
+        "should be at cap before reclaim"
+    );
+
+    let value = TagValueSet::from(["v".to_string()]);
+    assert!(
+        transform.tag_limit_exceeded(metric_key.as_ref(), "fresh_tag", &value),
+        "value_limit: 0 with a reclaimable empty bucket must flag the new \
+         tag as exceeded; otherwise record_tag_value would silently admit it"
     );
 }
 

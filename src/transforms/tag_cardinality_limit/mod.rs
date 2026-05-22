@@ -82,21 +82,11 @@ impl TagCardinalityLimit {
         });
     }
 
-    /// Drop (metric, tag-key) buckets whose `AcceptedTagValueSet` has been
-    /// fully expired by TTL, decrementing `tracked_keys_count` so freed slots
-    /// can be reused under `max_tracked_keys`.
-    ///
-    /// Without this, TTL sweeps in `TtlExactStorage` / `RollingBloomStorage`
-    /// only shrink the inner storage; the empty bucket itself lingers and
-    /// permanently consumes a slot. High-churn workloads under
-    /// `max_tracked_keys` would then hit the cap forever — every new
-    /// `(metric, tag-key)` pair would fall through as untracked even after
-    /// the cache for older pairs has fully aged out.
-    ///
-    /// Called lazily on cap-hit paths so the steady-state overhead is zero;
-    /// the scan only fires when a new allocation would otherwise be rejected.
-    /// `len()` is intentionally called on every set because it also drives
-    /// the lazy sweep/rotation that may be what empties the bucket.
+    /// Drop empty `AcceptedTagValueSet` buckets left behind by TTL eviction,
+    /// decrementing `tracked_keys_count` so freed slots can be reused under
+    /// `max_tracked_keys`. Called lazily on cap-hit paths so steady-state
+    /// overhead is zero. `len()` is called on every set because, for TTL
+    /// backends, it also drives the lazy sweep that may empty the bucket.
     fn reclaim_empty_buckets(&mut self) {
         let mut reclaimed = 0usize;
         self.accepted_tags.retain(|_, inner| {
@@ -250,8 +240,7 @@ impl TagCardinalityLimit {
 
         if !pair_exists {
             if !self.can_allocate_new_key() {
-                // Reclaim before giving up: a TTL backend may have emptied
-                // buckets we're still accounting against `max_tracked_keys`.
+                // TTL may have emptied buckets that still count against `max_tracked_keys`.
                 self.reclaim_empty_buckets();
                 if !self.can_allocate_new_key() {
                     return AcceptResult::Untracked;
@@ -266,8 +255,6 @@ impl TagCardinalityLimit {
         });
 
         if tag_value_set.contains(value) {
-            // Already accepted; `contains` also refreshes the TTL lease on
-            // TTL backends. See `AcceptedTagValueSet::contains`.
             return AcceptResult::Tracked;
         }
 
@@ -303,31 +290,34 @@ impl TagCardinalityLimit {
             TagSettings::Excluded => return false,
             TagSettings::Tracked(inner) => inner,
         };
-        let can_allocate = self.can_allocate_new_key();
-        match self
+
+        if let Some(value_set) = self
             .accepted_tags
             .get_mut(&metric_key.cloned())
             .and_then(|metric_accepted_tags| metric_accepted_tags.get_mut(key))
         {
-            // Pattern guards bind variables immutably, so the mutable call
-            // can't live in a guard; hence the if/else inside the arm.
-            Some(value_set) => {
-                // Must be the non-refreshing variant: `DropEvent` may still
-                // reject this event on a later tag, and we must not extend
-                // any TTL lease for an event that gets dropped. Refresh
-                // happens on the accept path via `record_tag_value::insert`.
-                if value_set.contains_no_refresh(value) {
-                    false
-                } else {
-                    value_set.len() >= resolved.value_limit
-                }
-            }
-            // Missing bucket: treat as empty so `value_limit: 0` rejects the
-            // first occurrence too — but only when the pair can actually be
-            // allocated. Otherwise `record_tag_value` will forward untracked
-            // (and emit `TagCardinalityLimitUntracked`).
-            None => resolved.value_limit == 0 && can_allocate,
+            // Non-refreshing: `DropEvent` may still reject this event on
+            // a later tag; refresh happens on the accept path via
+            // `record_tag_value`.
+            return if value_set.contains_no_refresh(value) {
+                false
+            } else {
+                value_set.len() >= resolved.value_limit
+            };
         }
+
+        // Missing bucket: only `value_limit == 0` can flag the first
+        // sighting as exceeded; every other limit fits an empty set.
+        if resolved.value_limit != 0 {
+            return false;
+        }
+        // Mirror `record_tag_value`'s capacity view: reclaim empty TTL
+        // buckets first so we don't pass-through-untracked here and let
+        // the record path silently admit a value that should be rejected.
+        if !self.can_allocate_new_key() {
+            self.reclaim_empty_buckets();
+        }
+        self.can_allocate_new_key()
     }
 
     /// Record an accepted tag value (mutation-only, no limit check). Used by the `DropEvent`
@@ -356,8 +346,7 @@ impl TagCardinalityLimit {
 
         if !pair_exists {
             if !self.can_allocate_new_key() {
-                // See `try_accept_tag` — try reclaiming empty TTL buckets
-                // before treating the new pair as untracked.
+                // See `try_accept_tag` for rationale.
                 self.reclaim_empty_buckets();
                 if !self.can_allocate_new_key() {
                     return true;
