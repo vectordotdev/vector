@@ -370,7 +370,7 @@ impl AcceptedTagValueSet {
     /// Test-only accessor: true iff this set uses a TTL-enabled backend.
     /// Lets tests pin backend selection without exposing the internal enum.
     #[cfg(test)]
-    pub(crate) fn ttl_enabled(&self) -> bool {
+    pub(crate) const fn ttl_enabled(&self) -> bool {
         matches!(
             self.storage,
             TagValueSetStorage::TtlSet(_) | TagValueSetStorage::RollingBloom(_)
