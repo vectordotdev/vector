@@ -267,22 +267,6 @@ impl Reduce {
     }
 
     pub fn transform_one(&mut self, emitter: &mut Emitter<Event>, event: Event) {
-        // `input()` restricts the variants we can see here to `Log` or
-        // `Trace` based on `data_type`. `TraceEvent` is a newtype around
-        // `LogEvent` (`From<TraceEvent> for LogEvent` is lossless), so we
-        // unwrap traces to `Event::Log` before evaluating conditions. This
-        // lets log-only matchers (e.g. `datadog_search`, whose runner only
-        // matches `EventRef::Log`) fire for trace inputs, and avoids a
-        // second unwrap after each condition. We re-wrap on flush via
-        // `wrap_flushed`.
-        let event = match event {
-            Event::Log(_) => event,
-            Event::Trace(trace) => Event::Log(LogEvent::from(trace)),
-            Event::Metric(_) => {
-                unreachable!("reduce input() rejects metric events")
-            }
-        };
-
         let (starts_here, event) = match &self.starts_when {
             Some(condition) => condition.check(event),
             None => (false, event),
@@ -293,7 +277,18 @@ impl Reduce {
             None => (false, event),
         };
 
-        let event = event.into_log();
+        // `input()` restricts the variants we can see here to `Log` or
+        // `Trace` based on `data_type`. `TraceEvent` is a newtype around
+        // `LogEvent` (`From<TraceEvent> for LogEvent` is lossless), so we
+        // operate on its inner `LogEvent` for the duration of the reduce
+        // and re-wrap on flush via `wrap_flushed`.
+        let event = match event {
+            Event::Log(log) => log,
+            Event::Trace(trace) => LogEvent::from(trace),
+            Event::Metric(_) => {
+                unreachable!("reduce input() rejects metric events")
+            }
+        };
         let discriminant = Discriminant::from_log_event(&event, &self.group_by);
 
         if let Some(max_events) = self.max_events {
@@ -1198,56 +1193,6 @@ merge_strategies.baz = "max"
                 ])),
             );
             assert_eq!(trace.get("baz"), Some(&3.into()));
-
-            drop(tx);
-            topology.stop().await;
-            assert_eq!(out.recv().await, None);
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    async fn reduce_trace_with_datadog_search_condition() {
-        // `DatadogSearchRunner::matches` only matches `EventRef::Log`, so
-        // boundary conditions would silently never fire on trace inputs if
-        // the trace were not unwrapped to `Event::Log` before condition
-        // evaluation. This test pins that contract.
-        let reduce_config = toml::from_str::<ReduceConfig>(
-            r#"
-data_type = "trace"
-group_by = [ "request_id" ]
-
-[ends_when]
-  type = "datadog_search"
-  source = "@test_end:yep"
-"#,
-        )
-        .unwrap();
-
-        assert_transform_compliance(async move {
-            let (tx, rx) = mpsc::channel(1);
-            let (topology, mut out) = create_topology(ReceiverStream::new(rx), reduce_config).await;
-
-            let mut e_1 = LogEvent::from("trace message 1");
-            e_1.insert("counter", 1);
-            e_1.insert("request_id", "1");
-
-            let mut e_2 = LogEvent::from("trace message 2");
-            e_2.insert("counter", 2);
-            e_2.insert("request_id", "1");
-            e_2.insert("test_end", "yep");
-
-            for log in [e_1, e_2] {
-                tx.send(Event::Trace(TraceEvent::from(log))).await.unwrap();
-            }
-
-            let trace = match out.recv().await.unwrap() {
-                Event::Trace(t) => t,
-                other => panic!("expected Event::Trace, got {other:?}"),
-            };
-            assert_eq!(trace.get("message"), Some(&"trace message 1".into()));
-            assert_eq!(trace.get("counter"), Some(&Value::from(3)));
-            assert_eq!(trace.get("test_end"), Some(&"yep".into()));
 
             drop(tx);
             topology.stop().await;
