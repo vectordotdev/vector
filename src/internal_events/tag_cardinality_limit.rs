@@ -103,3 +103,27 @@ impl InternalEvent for TagCardinalityTrackedKeys {
         gauge!(GaugeName::TagCardinalityTrackedKeys).set(self.count as f64);
     }
 }
+
+/// Emitted when a TTL sweep removes tag values from a tracking bucket.
+///
+/// The `count` is the number of *distinct* values evicted in that pass.
+/// For the probabilistic backend this is the count drained from the oldest
+/// rolling-bloom shard; for the exact backend it is the number of entries
+/// whose last sighting was older than `ttl_secs`.
+#[derive(NamedInternalEvent)]
+pub struct TagCardinalityTtlExpired {
+    pub count: u64,
+}
+
+impl InternalEvent for TagCardinalityTtlExpired {
+    fn emit(self) {
+        if self.count == 0 {
+            return;
+        }
+        debug!(
+            message = "Expired tag values from cardinality cache.",
+            count = self.count,
+        );
+        counter!(CounterName::TagCardinalityTtlExpirationsTotal).increment(self.count);
+    }
+}

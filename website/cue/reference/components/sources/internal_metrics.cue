@@ -931,6 +931,18 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
+		tag_cardinality_ttl_expirations_total: {
+			description: """
+				The total number of distinct tag values expired by the `tag_cardinality_limit`
+				transform's TTL eviction (only emitted when `ttl_secs` is configured). In
+				`exact` mode this is the number of values whose last sighting was older than
+				`ttl_secs`; in `probabilistic` mode this is the count drained from the oldest
+				rolling-bloom shard at each rotation.
+				"""
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
 		tag_value_limit_exceeded_total: {
 			description: """
 				The total number of events discarded because the tag has been rejected after

@@ -120,6 +120,11 @@ impl TagCardinalityLimit {
         let limit_exceeded_action = per_metric.config.limit_exceeded_action;
         let metric_value_limit = per_metric.config.value_limit;
         let internal_metrics = per_metric.config.internal_metrics;
+        // Per-metric TTL is a *full override* of the global TTL for this metric:
+        // unset (`None`) means "no TTL for this metric" rather than "inherit from
+        // global", mirroring how per-metric `value_limit` shadows the global value.
+        let ttl_secs = per_metric.config.ttl_secs;
+        let ttl_generations = per_metric.config.ttl_generations;
 
         // Per-tag entry: LimitOverride uses an explicit value_limit; Excluded opts
         // the tag out. All other settings are always inherited from per-metric.
@@ -134,6 +139,8 @@ impl TagCardinalityLimit {
                         limit_exceeded_action,
                         mode: metric_mode,
                         internal_metrics,
+                        ttl_secs,
+                        ttl_generations,
                     });
                 }
             }
@@ -143,6 +150,8 @@ impl TagCardinalityLimit {
             limit_exceeded_action,
             mode: metric_mode,
             internal_metrics,
+            ttl_secs,
+            ttl_generations,
         })
     }
 
@@ -211,12 +220,18 @@ impl TagCardinalityLimit {
         }
 
         let metric_accepted_tags = self.accepted_tags.entry(metric_key_owned).or_default();
-        let tag_value_set = metric_accepted_tags
-            .entry_ref(key)
-            .or_insert_with(|| AcceptedTagValueSet::new(config.value_limit, &config.mode));
+        let tag_value_set = metric_accepted_tags.entry_ref(key).or_insert_with(|| {
+            AcceptedTagValueSet::new(
+                config.value_limit,
+                &config.mode,
+                config.ttl_secs,
+                config.ttl_generations,
+            )
+        });
 
         if tag_value_set.contains(value) {
-            // Tag value has already been accepted, nothing more to do.
+            // Already accepted; `contains` also refreshes the TTL lease on
+            // TTL backends. See `AcceptedTagValueSet::contains`.
             return AcceptResult::Tracked;
         }
 
@@ -238,8 +253,12 @@ impl TagCardinalityLimit {
 
     /// Checks if recording a key and value corresponding to a tag on an incoming Metric would
     /// exceed the cardinality limit.
+    ///
+    /// Note: takes `&mut self` because TTL-enabled backends (`TtlSet`,
+    /// `RollingBloom`) perform lazy sweep/rotation inside `contains`/`len`.
+    /// The non-TTL backends are still effectively read-only here.
     fn tag_limit_exceeded(
-        &self,
+        &mut self,
         metric_key: Option<&MetricId>,
         key: &str,
         value: &TagValueSet,
@@ -248,21 +267,30 @@ impl TagCardinalityLimit {
             TagSettings::Excluded => return false,
             TagSettings::Tracked(inner) => inner,
         };
+        let can_allocate = self.can_allocate_new_key();
         match self
             .accepted_tags
-            .get(&metric_key.cloned())
-            .and_then(|metric_accepted_tags| metric_accepted_tags.get(key))
+            .get_mut(&metric_key.cloned())
+            .and_then(|metric_accepted_tags| metric_accepted_tags.get_mut(key))
         {
-            // Already accepted — never exceeds.
-            Some(value_set) if value_set.contains(value) => false,
-            // Adding this value would push us at or past the configured cap. Treat a
-            // missing bucket as an empty set so `value_limit: 0` correctly rejects
-            // the first occurrence too — but only when the (metric, tag) pair would
-            // actually be tracked. If `max_tracked_keys` is exhausted, `record_tag_value`
-            // will pass the tag through unchecked and emit `TagCardinalityLimitUntracked`,
-            // so we must not pre-empt that path by reporting the limit as exceeded here.
-            Some(value_set) => value_set.len() >= resolved.value_limit,
-            None => resolved.value_limit == 0 && self.can_allocate_new_key(),
+            // Pattern guards bind variables immutably, so the mutable call
+            // can't live in a guard; hence the if/else inside the arm.
+            Some(value_set) => {
+                // Must be the non-refreshing variant: `DropEvent` may still
+                // reject this event on a later tag, and we must not extend
+                // any TTL lease for an event that gets dropped. Refresh
+                // happens on the accept path via `record_tag_value::insert`.
+                if value_set.contains_no_refresh(value) {
+                    false
+                } else {
+                    value_set.len() >= resolved.value_limit
+                }
+            }
+            // Missing bucket: treat as empty so `value_limit: 0` rejects the
+            // first occurrence too — but only when the pair can actually be
+            // allocated. Otherwise `record_tag_value` will forward untracked
+            // (and emit `TagCardinalityLimitUntracked`).
+            None => resolved.value_limit == 0 && can_allocate,
         }
     }
 
@@ -300,7 +328,14 @@ impl TagCardinalityLimit {
         let metric_accepted_tags = self.accepted_tags.entry(metric_key_owned).or_default();
         metric_accepted_tags
             .entry_ref(key)
-            .or_insert_with(|| AcceptedTagValueSet::new(config.value_limit, &config.mode))
+            .or_insert_with(|| {
+                AcceptedTagValueSet::new(
+                    config.value_limit,
+                    &config.mode,
+                    config.ttl_secs,
+                    config.ttl_generations,
+                )
+            })
             .insert(value.clone());
         false
     }

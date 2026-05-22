@@ -165,6 +165,58 @@ components: transforms: tag_cardinality_limit: {
 				"""
 		}
 
+		ttl: {
+			title: "TTL (sliding-window cardinality)"
+			body: """
+				By default, the cardinality cache grows monotonically — every distinct value
+				ever seen for a tag occupies a slot under `value_limit` until Vector restarts.
+				Setting `ttl_secs` turns the cache into a *sliding window*: any tag value not
+				observed within that many seconds is dropped, freeing room for fresh values.
+
+				This is useful when the downstream system bills or pages on a rolling
+				unique-series window (e.g. Datadog computes custom-metric cardinality on a
+				1-hour p95). A monotonic cache will eventually saturate at `value_limit` and
+				start rejecting legitimate new values long after the old ones have aged out
+				of the billing window.
+
+				```yaml
+				type: tag_cardinality_limit
+				value_limit: 500
+				mode: probabilistic
+				cache_size_per_key: 5120
+				ttl_secs: 3600       # match the Datadog billing window
+				ttl_generations: 4   # eviction granularity = 15 min
+				```
+
+				**Refresh-on-sighting**: every cache hit (not just inserts) extends the
+				value's lease. Continuously-observed values stay in the cache indefinitely;
+				only values that go silent for longer than `ttl_secs` are evicted.
+
+				**Mode interaction**:
+
+				- `mode: exact` — every value carries a precise last-seen timestamp.
+				  Eviction is exact to within roughly `ttl_secs / ttl_generations`
+				  (capped at a 1-second minimum to keep sweep cost negligible).
+				  `ttl_generations` controls only the sweep cadence in exact mode.
+				- `mode: probabilistic` — the underlying bloom filter is split into
+				  `ttl_generations` rolling shards. Memory cost rises to
+				  `ttl_generations * cache_size_per_key` per (metric, tag-key) pair.
+				  Reduce `cache_size_per_key` if you want to keep total memory flat.
+				`ttl_generations: 1` produces a tumbling window (everything resets
+				  at once every `ttl_secs`), which can be useful for matching a strict
+				  billing-window boundary.
+
+				**Per-metric overrides do not inherit**: setting `ttl_secs` inside a
+				`per_metric_limits.<name>` block (or leaving it unset there) fully
+				replaces the global TTL for that metric — it does not fall back to
+				the top-level `ttl_secs`. This mirrors the precedence rules for
+				`value_limit`. To share the global TTL on a specific metric, copy the
+				value explicitly.
+
+				**Restarts still reset the cache** — see [restarts](#restarts).
+				"""
+		}
+
 		per_tag_limits: {
 			title: "Per-tag overrides"
 			body: """
@@ -223,7 +275,8 @@ components: transforms: tag_cardinality_limit: {
 	}
 
 	telemetry: metrics: {
-		tag_value_limit_exceeded_total: components.sources.internal_metrics.output.metrics.tag_value_limit_exceeded_total
-		value_limit_reached_total:      components.sources.internal_metrics.output.metrics.value_limit_reached_total
+		tag_cardinality_ttl_expirations_total: components.sources.internal_metrics.output.metrics.tag_cardinality_ttl_expirations_total
+		tag_value_limit_exceeded_total:        components.sources.internal_metrics.output.metrics.tag_value_limit_exceeded_total
+		value_limit_reached_total:             components.sources.internal_metrics.output.metrics.value_limit_reached_total
 	}
 }
