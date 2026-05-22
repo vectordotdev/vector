@@ -1511,13 +1511,28 @@ fn contains_no_refresh_finds_inserted_values_on_all_backends() {
     });
 
     for (label, mut set) in [
-        ("exact no-ttl", AcceptedTagValueSet::new(4, &Mode::Exact, None, 4)),
-        ("bloom no-ttl", AcceptedTagValueSet::new(4, &bloom_mode, None, 4)),
-        ("exact ttl", AcceptedTagValueSet::new(4, &Mode::Exact, Some(60), 4)),
-        ("bloom ttl", AcceptedTagValueSet::new(4, &bloom_mode, Some(60), 4)),
+        (
+            "exact no-ttl",
+            AcceptedTagValueSet::new(4, &Mode::Exact, None, 4),
+        ),
+        (
+            "bloom no-ttl",
+            AcceptedTagValueSet::new(4, &bloom_mode, None, 4),
+        ),
+        (
+            "exact ttl",
+            AcceptedTagValueSet::new(4, &Mode::Exact, Some(60), 4),
+        ),
+        (
+            "bloom ttl",
+            AcceptedTagValueSet::new(4, &bloom_mode, Some(60), 4),
+        ),
     ] {
         set.insert(v1.clone());
-        assert!(set.contains_no_refresh(&v1), "{label}: should find inserted value");
+        assert!(
+            set.contains_no_refresh(&v1),
+            "{label}: should find inserted value"
+        );
     }
 }
 
@@ -1534,10 +1549,22 @@ fn ttl_zero_disables_ttl() {
         cache_size_per_key: default_cache_size(),
     });
     for (label, set) in [
-        ("exact ttl=0", AcceptedTagValueSet::new(4, &Mode::Exact, Some(0), 4)),
-        ("bloom ttl=0", AcceptedTagValueSet::new(4, &bloom_mode, Some(0), 4)),
-        ("exact ttl=None", AcceptedTagValueSet::new(4, &Mode::Exact, None, 4)),
-        ("bloom ttl=None", AcceptedTagValueSet::new(4, &bloom_mode, None, 4)),
+        (
+            "exact ttl=0",
+            AcceptedTagValueSet::new(4, &Mode::Exact, Some(0), 4),
+        ),
+        (
+            "bloom ttl=0",
+            AcceptedTagValueSet::new(4, &bloom_mode, Some(0), 4),
+        ),
+        (
+            "exact ttl=None",
+            AcceptedTagValueSet::new(4, &Mode::Exact, None, 4),
+        ),
+        (
+            "bloom ttl=None",
+            AcceptedTagValueSet::new(4, &bloom_mode, None, 4),
+        ),
     ] {
         assert!(
             !set.ttl_enabled(),

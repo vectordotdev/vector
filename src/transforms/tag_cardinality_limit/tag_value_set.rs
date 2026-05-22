@@ -22,8 +22,7 @@ use std::{
 use bloomy::BloomFilter;
 
 use crate::{
-    event::metric::TagValueSet,
-    internal_events::TagCardinalityTtlExpired,
+    event::metric::TagValueSet, internal_events::TagCardinalityTtlExpired,
     transforms::tag_cardinality_limit::config::Mode,
 };
 
