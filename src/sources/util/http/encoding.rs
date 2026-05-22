@@ -16,8 +16,7 @@ pub(crate) const DEFAULT_MAX_DECOMPRESSED_BODY_SIZE: usize = 100 * 1024 * 1024;
 ///
 /// Supports gzip, deflate, snappy, zstd, and identity (no compression).
 ///
-/// Caps the decompressed output at [`DEFAULT_MAX_DECOMPRESSED_BODY_SIZE`] to mitigate
-/// decompression-bomb DoS attacks. For a custom limit, use [`decompress_body_with_limit`].
+/// Caps the decompressed output at 100 MiB to mitigate decompression-bomb DoS attacks.
 pub fn decompress_body(header: Option<&str>, body: Bytes) -> Result<Bytes, ErrorMessage> {
     decompress_body_with_limit(header, body, Some(DEFAULT_MAX_DECOMPRESSED_BODY_SIZE))
 }
