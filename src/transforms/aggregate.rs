@@ -205,7 +205,10 @@ impl Aggregate {
             (InnerMode::Max | InnerMode::Min, MetricKind::Absolute) => {
                 self.record_comparison(series, data, metadata);
             }
-            (InnerMode::Mean { multi_map } | InnerMode::Stdev { multi_map }, MetricKind::Absolute) => {
+            (
+                InnerMode::Mean { multi_map } | InnerMode::Stdev { multi_map },
+                MetricKind::Absolute,
+            ) => {
                 if matches!(data.value, MetricValue::Gauge { value: _ }) {
                     match multi_map.entry(series) {
                         Entry::Occupied(mut entry) => entry.get_mut().push((data, metadata)),
