@@ -20,16 +20,43 @@ use crate::{
     },
 };
 
+/// The event data type a `reduce` transform instance accepts and emits.
+///
+/// A single `reduce` instance handles exactly one data type. To reduce both
+/// logs and traces, instantiate two `reduce` transforms with different
+/// `data_type` values.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ReduceDataType {
+    /// Accept and emit `log` events.
+    #[default]
+    Log,
+
+    /// Accept and emit `trace` events.
+    Trace,
+}
+
 /// Configuration for the `reduce` transform.
 #[serde_as]
 #[configurable_component(transform(
     "reduce",
-    "Collapse multiple log events into a single event based on a set of conditions and merge strategies.",
+    "Collapse multiple log or trace events into a single event based on a set of conditions and merge strategies.",
 ))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
 pub struct ReduceConfig {
+    /// The event data type this transform instance operates on.
+    ///
+    /// `reduce` accepts and emits a single data type per instance. Defaults
+    /// to `log` to preserve historical behavior; set to `trace` to reduce
+    /// trace events instead. The selected value drives both the topology-
+    /// level input type filter and the type of the emitted reduced events.
+    #[serde(default)]
+    #[configurable(metadata(docs::human_name = "Data Type"))]
+    pub data_type: ReduceDataType,
+
     /// The maximum period of time to wait after the last event is received, in milliseconds, before
     /// a combined event should be considered complete.
     #[serde(default = "default_expire_after_ms")]
@@ -124,7 +151,10 @@ impl TransformConfig for ReduceConfig {
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        match self.data_type {
+            ReduceDataType::Log => Input::log(),
+            ReduceDataType::Trace => Input::trace(),
+        }
     }
 
     fn outputs(
@@ -229,7 +259,13 @@ impl TransformConfig for ReduceConfig {
             output_definitions.insert(output.clone(), schema_definition.clone());
         }
 
-        vec![TransformOutput::new(DataType::Log, output_definitions)]
+        vec![TransformOutput::new(
+            match self.data_type {
+                ReduceDataType::Log => DataType::Log,
+                ReduceDataType::Trace => DataType::Trace,
+            },
+            output_definitions,
+        )]
     }
 }
 
