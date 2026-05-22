@@ -25,10 +25,6 @@ updates:
       aws:
         patterns:
           - "aws-*"
-      aws-security:
-        applies-to: security-updates
-        patterns:
-          - "aws-*"
       azure:
         patterns:
           - "azure_*"
@@ -86,6 +82,15 @@ updates:
       zstd:
         patterns:
           - "zstd*"
+
+      cargo-other:
+        applies-to: version-updates
+        patterns:
+          - "*"
+      cargo-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
   - package-ecosystem: "docker"
     directory: "/distribution/docker/alpine"
     schedule:

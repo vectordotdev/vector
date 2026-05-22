@@ -220,7 +220,7 @@ jobs:
           context: baseline-vector/
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          file: regression/Dockerfile
+          file: baseline-vector/regression/Dockerfile
           builder: ${{ steps.buildx.outputs.name }}
           outputs: type=docker,dest=${{ runner.temp }}/baseline-image.tar
           tags: |
@@ -259,7 +259,7 @@ jobs:
           context: comparison-vector/
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          file: regression/Dockerfile
+          file: comparison-vector/regression/Dockerfile
           builder: ${{ steps.buildx.outputs.name }}
           outputs: type=docker,dest=${{ runner.temp }}/comparison-image.tar
           tags: |
