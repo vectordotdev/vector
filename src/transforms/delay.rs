@@ -40,7 +40,7 @@ pub struct DelayConfig {
 }
 
 const fn default_queue_capacity() -> NonZeroUsize {
-    unsafe { NonZeroUsize::new_unchecked(500) }
+    NonZeroUsize::new(500).expect("static non-zero number")
 }
 
 impl Default for DelayConfig {
