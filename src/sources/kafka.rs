@@ -603,7 +603,7 @@ struct Draining {
 }
 type OptionDeadline = OptionFuture<Pin<Box<Sleep>>>;
 enum ProcessingEvent {
-    ParsedMessage(Option<(OwnedMessage, BatchStatusReceiver)>),
+    ParsedMessage(Option<(Vec<Event>, OwnedMessage, BatchStatusReceiver)>),
     Eof,
 }
 #[pin_project(project = ProcessingFutureProj)]
@@ -744,7 +744,19 @@ impl ConsumerStateInner<Consuming> {
                             match res {
                                 Ok(Some(event)) => {
                                     match event {
-                                        ProcessingEvent::ParsedMessage(batch_result) => Self::finalize_batch(batch_result, finalizer.as_ref()),
+                                        ProcessingEvent::ParsedMessage(parse_result) => {
+                                            if let Some((events, last, receiver)) = parse_result {
+                                                let count = events.len();
+                                                let batch_result = match out.send_batch(events).await {
+                                                    Err(_) => {
+                                                        emit!(StreamClosedError { count });
+                                                        None
+                                                    }
+                                                    Ok(_) => Some((last, receiver)),
+                                                };
+                                                Self::finalize_batch(batch_result, finalizer.as_ref());
+                                            }
+                                        },
                                         ProcessingEvent::Eof => {
                                             status = PartitionConsumerStatus::PartitionEOF;
                                             finalizer.take();
@@ -777,13 +789,12 @@ impl ConsumerStateInner<Consuming> {
                             if let Some(message_handling_tasks_semaphore) = &message_handling_tasks_semaphore {
                                 let decoder = decoder.clone();
                                 let keys = keys.clone();
-                                let mut out = out.clone();
                                 let message_handling_tasks_semaphore = Arc::clone(message_handling_tasks_semaphore);
                                 let permit = message_handling_tasks_semaphore.acquire_owned().await.expect("Message handling tasks semaphore closed");
                                 let future_done_tx = future_done_tx.clone();
                                 let cancellation_token = processing_cancellation_token.clone();
                                 processing_futures.push_back(ProcessingFuture::ParsedMessage(tokio::spawn(cancellation_token.run_until_cancelled_owned(async move {
-                                    let result = parse_message(msgs, &decoder, &keys, &mut out, acknowledgements, log_namespace).await;
+                                    let result = parse_message(msgs, &decoder, &keys, acknowledgements, log_namespace).await;
                                     // Force moving permit into the task, to release only once done
                                     // parsing
                                     drop(permit);
@@ -794,8 +805,15 @@ impl ConsumerStateInner<Consuming> {
                                     let _ = future_done_tx.try_send(());
                                     ProcessingEvent::ParsedMessage(result)
                                 }.instrument(span.clone())))));
-                            } else {
-                                let batch_result = parse_message(msgs, &decoder, &keys, &mut out, acknowledgements, log_namespace).await;
+                            } else if let Some((events, last, receiver)) = parse_message(msgs, &decoder, &keys, acknowledgements, log_namespace).await {
+                                let count = events.len();
+                                let batch_result = match out.send_batch(events).await {
+                                    Err(_) => {
+                                        emit!(StreamClosedError { count });
+                                        None
+                                    }
+                                    Ok(_) => Some((last, receiver)),
+                                };
                                 Self::finalize_batch(batch_result, finalizer.as_ref());
                             }
 
@@ -1129,40 +1147,37 @@ async fn parse_message(
     messages: Vec<OwnedMessage>,
     decoder: &Decoder,
     keys: &Keys,
-    out: &mut SourceSender,
     acknowledgements: bool,
     log_namespace: LogNamespace,
-) -> Option<(OwnedMessage, BatchStatusReceiver)> {
+) -> Option<(Vec<Event>, OwnedMessage, BatchStatusReceiver)> {
     let (batch, receiver) = BatchNotifier::new_with_receiver();
     let last = messages.last().cloned()?;
     let size = messages.len();
-    let (count, streams) = messages
+    let streams = messages
         .into_iter()
         .filter_map(|msg| parse_stream(msg, decoder.clone(), keys, log_namespace))
-        .fold(
-            (0usize, Vec::with_capacity(size)),
-            |(lc, mut ls), (rc, rs)| {
-                ls.push(rs);
-                (lc + rc, ls)
-            },
-        );
-    let mut batch_stream = futures::stream::iter(streams).flatten().map(|event| {
-        // All acknowledgements flow through the normal Finalizer stream so
-        // that they can be handled in one place, but are only tied to the
-        // batch when acknowledgements are enabled
-        if acknowledgements {
-            event.with_batch_notifier(&batch)
-        } else {
-            event
-        }
-    });
-    match out.send_event_stream(&mut batch_stream).await {
-        Err(_) => {
-            emit!(StreamClosedError { count });
-            None
-        }
-        Ok(_) => Some((last, receiver)),
-    }
+        .fold(Vec::with_capacity(size), |mut ls, rs| {
+            ls.push(rs);
+            ls
+        });
+    Some((
+        futures::stream::iter(streams)
+            .flatten()
+            .map(|event: Event| {
+                // All acknowledgements flow through the normal Finalizer stream so
+                // that they can be handled in one place, but are only tied to the
+                // batch when acknowledgements are enabled
+                if acknowledgements {
+                    event.with_batch_notifier(&batch)
+                } else {
+                    event
+                }
+            })
+            .collect::<Vec<Event>>()
+            .await,
+        last,
+        receiver,
+    ))
 }
 
 // Turn the received message into a stream of parsed events.
@@ -1171,7 +1186,7 @@ fn parse_stream<'a>(
     decoder: Decoder,
     keys: &'a Keys,
     log_namespace: LogNamespace,
-) -> Option<(usize, impl Stream<Item = Event> + 'a + use<'a>)> {
+) -> Option<impl Stream<Item = Event> + 'a + use<'a>> {
     let size = msg.payload.len();
     emit!(KafkaBytesReceived {
         byte_size: size,
@@ -1184,7 +1199,6 @@ fn parse_stream<'a>(
     let payload = Cursor::new(Bytes::from_owner(msg.payload));
 
     let mut stream = DecoderFramedRead::with_capacity(payload, decoder, size);
-    let (count, _) = stream.size_hint();
     let stream = stream! {
         while let Some(result) = stream.next().await {
             match result {
@@ -1211,7 +1225,7 @@ fn parse_stream<'a>(
         }
     }
     .boxed();
-    Some((count, stream))
+    Some(stream)
 }
 
 #[derive(Clone, Debug)]
