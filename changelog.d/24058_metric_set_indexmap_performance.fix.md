@@ -1,5 +1,5 @@
-Fixed a CPU regression introduced in 0.50.0 affecting all sinks that use metric normalization (e.g. `prometheus_remote_write`, `aws_cloudwatch_metrics`, `statsd`). The `MetricSet` used to normalize metrics was changed from `IndexMap` to `LruCache` to support the new `incremental_to_absolute` transform's capacity eviction feature. However, `LruCache::get_mut` unconditionally updates LRU bookkeeping (pointer manipulation in a doubly-linked list) on every metric lookup, even when no capacity eviction policy is configured. For high-throughput metrics pipelines this overhead accumulates on the hot path for every metric event.
+Fixed a CPU regression introduced in 0.50.0 affecting all sinks that use metric normalization such as `prometheus_remote_write`, `aws_cloudwatch_metrics`, `statsd` and others.
 
-`MetricSet` now uses `IndexMap` internally when no capacity policy is configured (the common case), and only switches to `LruCache` when `max_bytes` or `max_events` limits are set. This restores pre-0.50.0 performance for all sinks using the default unbounded metric state while preserving correct LRU eviction ordering for the `incremental_to_absolute` transform.
+The only exception is the `incremental_to_absolute` transform when `max_bytes` or `max_events` are configured, where the overhead is expected and necessary for eviction to work correctly.
 
 authors: thomasqueirozb
