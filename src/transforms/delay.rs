@@ -143,6 +143,26 @@ impl TaskTransform<Event> for Delay {
                     break;
                 }
                 tokio::select! {
+                    biased;
+
+                    Some(res) = self.queue.next() => {
+                        let event = res.into_inner();
+                        let (result, event) = if let Some(condition) = self.condition.as_ref() {
+                            condition.check(event)
+                        } else {
+                            // One delay is done, pass the event further
+                            (true, event)
+                        };
+                        if result {
+                            yield event;
+                        } else {
+                            self.queue.insert(event, self.delay);
+                        }
+                        if done && self.queue.is_empty() {
+                            break;
+                        }
+                    },
+
                     maybe_event = input_rx.next(), if !done => {
                         match maybe_event {
                             None => {
@@ -195,23 +215,6 @@ impl TaskTransform<Event> for Delay {
                             }
                         }
                     },
-                    Some(res) = self.queue.next() => {
-                        let event = res.into_inner();
-                        let (result, event) = if let Some(condition) = self.condition.as_ref() {
-                            condition.check(event)
-                        } else {
-                            // One delay is done, pass the event further
-                            (true, event)
-                        };
-                        if result {
-                            yield event;
-                        } else {
-                            self.queue.insert(event, self.delay);
-                        }
-                        if done && self.queue.is_empty() {
-                            break;
-                        }
-                    }
                 }
             }
         })
