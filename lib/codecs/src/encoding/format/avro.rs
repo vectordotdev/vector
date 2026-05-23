@@ -27,7 +27,7 @@ impl AvroSerializerConfig {
             .map_err(|error| format!("Failed building Avro serializer: {error}"))?;
 
         if let Some(schema_id) = self.avro.schema_id
-            && schema_id < 0
+            && schema_id <= 0
         {
             return Err("Confluent Avro schema id must be a positive i32 number".into());
         }
