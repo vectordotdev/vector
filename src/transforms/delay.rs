@@ -25,7 +25,7 @@ pub struct DelayConfig {
     /// Time to delay each event, in milliseconds.
     #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
     #[configurable(metadata(docs::human_name = "Delay in milliseconds", docs::example = 200))]
-    delay_milliseconds: Duration,
+    delay_ms: Duration,
 
     /// Limit for number of items in the delay queue.
     #[serde(default = "default_queue_capacity")]
@@ -46,7 +46,7 @@ const fn default_queue_capacity() -> NonZeroUsize {
 impl Default for DelayConfig {
     fn default() -> Self {
         Self {
-            delay_milliseconds: Default::default(),
+            delay_ms: Default::default(),
             queue_capacity: default_queue_capacity(),
             overflow_strategy: Default::default(),
             delay_until_condition: Default::default(),
@@ -115,7 +115,7 @@ pub struct Delay {
 impl Delay {
     pub fn new(config: &DelayConfig, context: &TransformContext) -> crate::Result<Self> {
         Ok(Self {
-            delay: config.delay_milliseconds,
+            delay: config.delay_ms,
             queue: DelayQueue::with_capacity(config.queue_capacity.get()),
             queue_capacity: config.queue_capacity,
             overflow_strategy: config.overflow_strategy,
@@ -237,7 +237,7 @@ mod tests {
     #[tokio::test]
     async fn delay_events() {
         let config = toml::from_str::<DelayConfig>(indoc! {"
-            delay_milliseconds = 200
+            delay_ms = 200
         "})
         .unwrap();
 
@@ -265,7 +265,7 @@ mod tests {
     #[tokio::test]
     async fn delay_events_at_capacity_drop_newest() {
         let config = toml::from_str::<DelayConfig>(indoc! {r#"
-            delay_milliseconds = 200
+            delay_ms = 200
             queue_capacity = 1
             overflow_strategy = "drop_newest"
         "#})
@@ -300,7 +300,7 @@ mod tests {
     #[tokio::test]
     async fn delay_events_at_capacity_pass() {
         let config = toml::from_str::<DelayConfig>(indoc! {r#"
-            delay_milliseconds = 200
+            delay_ms = 200
             queue_capacity = 1
             overflow_strategy = "forward"
         "#})

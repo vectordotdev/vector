@@ -1,7 +1,7 @@
 package metadata
 
 generated: components: transforms: delay: configuration: {
-	delay_milliseconds: {
+	delay_ms: {
 		description: "Time to delay each event, in milliseconds."
 		required:    true
 		type: uint: unit: "milliseconds"
