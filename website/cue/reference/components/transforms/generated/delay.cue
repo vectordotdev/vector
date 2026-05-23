@@ -6,7 +6,7 @@ generated: components: transforms: delay: configuration: {
 		required:    true
 		type: uint: unit: "milliseconds"
 	}
-	delay_until_condition: {
+	condition: {
 		description: "Delay events in provided delay periods until the condition is met."
 		required:    false
 		type: condition: {}

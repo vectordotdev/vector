@@ -36,7 +36,7 @@ pub struct DelayConfig {
     overflow_strategy: OverflowStrategy,
 
     /// Delay events in provided delay periods until the condition is met.
-    delay_until_condition: Option<AnyCondition>,
+    condition: Option<AnyCondition>,
 }
 
 const fn default_queue_capacity() -> NonZeroUsize {
@@ -49,7 +49,7 @@ impl Default for DelayConfig {
             delay_ms: Default::default(),
             queue_capacity: default_queue_capacity(),
             overflow_strategy: Default::default(),
-            delay_until_condition: Default::default(),
+            condition: Default::default(),
         }
     }
 }
@@ -109,7 +109,7 @@ pub struct Delay {
     queue: DelayQueue<Event>,
     queue_capacity: NonZeroUsize,
     overflow_strategy: OverflowStrategy,
-    delay_until_condition: Option<Condition>,
+    condition: Option<Condition>,
 }
 
 impl Delay {
@@ -119,8 +119,8 @@ impl Delay {
             queue: DelayQueue::with_capacity(config.queue_capacity.get()),
             queue_capacity: config.queue_capacity,
             overflow_strategy: config.overflow_strategy,
-            delay_until_condition: config
-                .delay_until_condition
+            condition: config
+                .condition
                 .as_ref()
                 .map(|c| c.build(&context.enrichment_tables, &context.metrics_storage))
                 .transpose()?,
@@ -149,7 +149,7 @@ impl TaskTransform<Event> for Delay {
                                 done = true;
                             }
                             Some(event) => {
-                                let (result, event) = if let Some(condition) = self.delay_until_condition.as_ref() {
+                                let (result, event) = if let Some(condition) = self.condition.as_ref() {
                                     condition.check(event)
                                 } else {
                                     // We need to have 1 delay when no condition is set, put it in
@@ -164,7 +164,7 @@ impl TaskTransform<Event> for Delay {
                                             OverflowStrategy::Block => {
                                                 while self.queue_capacity.get() <= self.queue.len() && let Some(next) = self.queue.next().await {
                                                     let event = next.into_inner();
-                                                    let (result, event) = if let Some(condition) = self.delay_until_condition.as_ref() {
+                                                    let (result, event) = if let Some(condition) = self.condition.as_ref() {
                                                         condition.check(event)
                                                     } else {
                                                         // One delay is done, pass the event further
@@ -197,7 +197,7 @@ impl TaskTransform<Event> for Delay {
                     },
                     Some(res) = self.queue.next() => {
                         let event = res.into_inner();
-                        let (result, event) = if let Some(condition) = self.delay_until_condition.as_ref() {
+                        let (result, event) = if let Some(condition) = self.condition.as_ref() {
                             condition.check(event)
                         } else {
                             // One delay is done, pass the event further
