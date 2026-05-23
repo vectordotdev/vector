@@ -3,6 +3,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+use indexmap::IndexMap;
 use lru::LruCache;
 use serde_with::serde_as;
 use snafu::Snafu;
@@ -375,14 +376,106 @@ pub struct MetricSetSettings {
     pub time_to_live: Option<u64>,
 }
 
-/// Dual-limit cache using standard LRU with optional capacity and TTL policies.
+/// Inner storage for `MetricSet`.
 ///
-/// This implementation uses the standard LRU crate with optional enforcement of both
-/// memory and entry count limits via CapacityPolicy, plus optional TTL via TtlPolicy.
+/// Uses `IndexMap` when no capacity eviction policy is configured — avoiding the
+/// per-access LRU bookkeeping (pointer chasing in a doubly-linked list) that
+/// `LruCache::get_mut` performs unconditionally.  `LruCache` is used only when a
+/// capacity policy is set, so that LRU eviction order is maintained correctly.
+#[derive(Clone, Debug)]
+enum MetricSetInner {
+    /// Unbounded storage with no eviction.  Hash-map lookup only, no LRU overhead.
+    Unbounded(IndexMap<MetricSeries, MetricEntry>),
+    /// Bounded storage with LRU eviction semantics.
+    Bounded(LruCache<MetricSeries, MetricEntry>),
+}
+
+impl MetricSetInner {
+    fn len(&self) -> usize {
+        match self {
+            Self::Unbounded(m) => m.len(),
+            Self::Bounded(m) => m.len(),
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        match self {
+            Self::Unbounded(m) => m.is_empty(),
+            Self::Bounded(m) => m.is_empty(),
+        }
+    }
+
+    /// Returns a mutable reference to the entry.
+    ///
+    /// For `Unbounded` this is a plain hash-map lookup.
+    /// For `Bounded` this also promotes the entry to the MRU end of the LRU list.
+    fn get_mut(&mut self, key: &MetricSeries) -> Option<&mut MetricEntry> {
+        match self {
+            Self::Unbounded(m) => m.get_mut(key),
+            Self::Bounded(m) => m.get_mut(key),
+        }
+    }
+
+    /// Inserts or replaces an entry, returning the previous value if any.
+    fn put(&mut self, key: MetricSeries, value: MetricEntry) -> Option<MetricEntry> {
+        match self {
+            Self::Unbounded(m) => m.insert(key, value),
+            Self::Bounded(m) => m.put(key, value),
+        }
+    }
+
+    /// Removes an entry by key, returning it if present.
+    fn pop(&mut self, key: &MetricSeries) -> Option<MetricEntry> {
+        match self {
+            // swap_remove is O(1) vs shift_remove's O(n); insertion order is not required here.
+            Self::Unbounded(m) => m.swap_remove(key),
+            Self::Bounded(m) => m.pop(key),
+        }
+    }
+
+    /// Removes and returns the least-recently-used entry.
+    ///
+    /// Only called on `Bounded` variants (capacity enforcement path).
+    fn pop_lru(&mut self) -> Option<(MetricSeries, MetricEntry)> {
+        match self {
+            Self::Unbounded(m) => m.shift_remove_index(0),
+            Self::Bounded(m) => m.pop_lru(),
+        }
+    }
+
+    fn iter(&self) -> MetricSetIter<'_> {
+        match self {
+            Self::Unbounded(m) => MetricSetIter::Unbounded(m.iter()),
+            Self::Bounded(m) => MetricSetIter::Bounded(m.iter()),
+        }
+    }
+}
+
+enum MetricSetIter<'a> {
+    Unbounded(indexmap::map::Iter<'a, MetricSeries, MetricEntry>),
+    Bounded(lru::Iter<'a, MetricSeries, MetricEntry>),
+}
+
+impl<'a> Iterator for MetricSetIter<'a> {
+    type Item = (&'a MetricSeries, &'a MetricEntry);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Unbounded(it) => it.next(),
+            Self::Bounded(it) => it.next(),
+        }
+    }
+}
+
+/// Dual-limit cache for metric normalization with optional capacity and TTL policies.
+///
+/// Uses `IndexMap` internally when no capacity eviction policy is configured, avoiding
+/// the per-access LRU pointer-manipulation overhead of `LruCache`. Switches to
+/// `LruCache` only when a `max_bytes` or `max_events` capacity policy is set, so that
+/// LRU eviction ordering is preserved for those cases.
 #[derive(Clone, Debug)]
 pub struct MetricSet {
-    /// LRU cache for storing metric entries
-    inner: LruCache<MetricSeries, MetricEntry>,
+    inner: MetricSetInner,
     /// Optional capacity policy for memory and/or entry count limits
     capacity_policy: Option<CapacityPolicy>,
     /// Optional TTL policy for time-based expiration
@@ -411,10 +504,15 @@ impl MetricSet {
         capacity_policy: Option<CapacityPolicy>,
         ttl_policy: Option<TtlPolicy>,
     ) -> Self {
-        // Always use an unbounded cache since we manually track limits
-        // This ensures our capacity policy can properly track memory for all evicted entries
+        // Use LruCache only when a capacity policy requires LRU eviction ordering.
+        // Without a capacity policy, IndexMap avoids the per-access LRU overhead.
+        let inner = if capacity_policy.is_some() {
+            MetricSetInner::Bounded(LruCache::unbounded())
+        } else {
+            MetricSetInner::Unbounded(IndexMap::default())
+        };
         Self {
-            inner: LruCache::unbounded(),
+            inner,
             capacity_policy,
             ttl_policy,
         }
@@ -497,14 +595,13 @@ impl MetricSet {
             return; // No TTL policy, nothing to do
         };
 
-        let mut expired_keys = Vec::new();
-
         // Collect expired keys using the provided timestamp
-        for (series, entry) in self.inner.iter() {
-            if entry.is_expired(ttl, now) {
-                expired_keys.push(series.clone());
-            }
-        }
+        let expired_keys: Vec<MetricSeries> = self
+            .inner
+            .iter()
+            .filter(|(_, e)| e.is_expired(ttl, now))
+            .map(|(s, _)| s.clone())
+            .collect();
 
         // Remove expired entries and update memory tracking (if max_bytes is set)
         for series in expired_keys {
@@ -549,11 +646,19 @@ impl MetricSet {
     pub fn into_metrics(mut self) -> Vec<Metric> {
         // Clean up expired entries first (using current time)
         self.cleanup_expired(Instant::now());
-        let mut metrics = Vec::new();
-        while let Some((series, entry)) = self.inner.pop_lru() {
-            metrics.push(entry.into_metric(series));
+        match self.inner {
+            MetricSetInner::Unbounded(m) => m
+                .into_iter()
+                .map(|(series, entry)| entry.into_metric(series))
+                .collect(),
+            MetricSetInner::Bounded(mut m) => {
+                let mut metrics = Vec::with_capacity(m.len());
+                while let Some((series, entry)) = m.pop_lru() {
+                    metrics.push(entry.into_metric(series));
+                }
+                metrics
+            }
         }
-        metrics
     }
 
     /// Either pass the metric through as-is if absolute, or convert it
@@ -703,5 +808,58 @@ impl MetricSet {
 impl Default for MetricSet {
     fn default() -> Self {
         Self::new(MetricSetSettings::default())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use vector_lib::event::metric::{MetricKind, MetricValue};
+
+    use super::*;
+
+    fn counter(name: &str, value: f64, kind: MetricKind) -> Metric {
+        Metric::new(name, kind, MetricValue::Counter { value })
+    }
+
+    // Verifies that the default (no capacity policy) path uses IndexMap and that
+    // make_absolute / into_metrics behave correctly across multiple updates.
+    #[test]
+    fn unbounded_incremental_to_absolute_accumulates() {
+        let mut set = MetricSet::default();
+        assert!(matches!(set.inner, MetricSetInner::Unbounded(_)));
+
+        // First incremental: stored as reference, emitted as absolute 1.0
+        let out = set.make_absolute(counter("hits", 1.0, MetricKind::Incremental));
+        assert_eq!(out.unwrap().value(), &MetricValue::Counter { value: 1.0 });
+
+        // Second incremental: accumulated with previous, emitted as absolute 3.0
+        let out = set.make_absolute(counter("hits", 2.0, MetricKind::Incremental));
+        assert_eq!(out.unwrap().value(), &MetricValue::Counter { value: 3.0 });
+
+        // into_metrics drains the set and returns all tracked series
+        let metrics = set.into_metrics();
+        assert_eq!(metrics.len(), 1);
+        assert_eq!(metrics[0].name(), "hits");
+    }
+
+    #[test]
+    fn unbounded_absolute_passes_through() {
+        let mut set = MetricSet::default();
+
+        let out = set.make_absolute(counter("rps", 42.0, MetricKind::Absolute));
+        assert_eq!(out.unwrap().value(), &MetricValue::Counter { value: 42.0 });
+
+        // Absolute metrics are not stored in the set
+        assert!(set.is_empty());
+    }
+
+    // Verifies that capacity policy switches to the LruCache (Bounded) path.
+    #[test]
+    fn bounded_path_selected_when_capacity_policy_set() {
+        let set = MetricSet::new(MetricSetSettings {
+            max_events: Some(10),
+            ..Default::default()
+        });
+        assert!(matches!(set.inner, MetricSetInner::Bounded(_)));
     }
 }
