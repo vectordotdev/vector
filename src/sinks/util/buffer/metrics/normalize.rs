@@ -433,16 +433,6 @@ impl MetricSetInner {
         }
     }
 
-    /// Removes and returns the least-recently-used entry.
-    ///
-    /// Only called on `Bounded` variants (capacity enforcement path).
-    fn pop_lru(&mut self) -> Option<(MetricSeries, MetricEntry)> {
-        match self {
-            Self::Unbounded(m) => m.shift_remove_index(0),
-            Self::Bounded(m) => m.pop_lru(),
-        }
-    }
-
     fn iter(&self) -> MetricSetIter<'_> {
         match self {
             Self::Unbounded(m) => MetricSetIter::Unbounded(m.iter()),
@@ -561,9 +551,14 @@ impl MetricSet {
             return; // No capacity limits configured
         };
 
+        // A capacity policy is only set when inner is Bounded; this should always be true.
+        let MetricSetInner::Bounded(ref mut lru) = self.inner else {
+            return;
+        };
+
         // Keep evicting until we're within limits
-        while capacity_policy.needs_eviction(self.inner.len()) {
-            if let Some((series, entry)) = self.inner.pop_lru() {
+        while capacity_policy.needs_eviction(lru.len()) {
+            if let Some((series, entry)) = lru.pop_lru() {
                 capacity_policy.free_item(&series, &entry);
             } else {
                 break; // No more entries to evict
