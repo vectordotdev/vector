@@ -126,6 +126,16 @@ impl Delay {
                 .transpose()?,
         })
     }
+
+    fn check_condition(&self, event: Event, first: bool) -> (bool, Event) {
+        if let Some(condition) = self.condition.as_ref() {
+            condition.check(event)
+        } else {
+            // If this is the first check, we need to ensure at least one delay is
+            // done if no condition is configured
+            (!first, event)
+        }
+    }
 }
 
 impl TaskTransform<Event> for Delay {
@@ -147,12 +157,7 @@ impl TaskTransform<Event> for Delay {
 
                     Some(res) = self.queue.next() => {
                         let event = res.into_inner();
-                        let (result, event) = if let Some(condition) = self.condition.as_ref() {
-                            condition.check(event)
-                        } else {
-                            // One delay is done, pass the event further
-                            (true, event)
-                        };
+                        let (result, event) = self.check_condition(event, false);
                         if result {
                             yield event;
                         } else {
@@ -169,13 +174,7 @@ impl TaskTransform<Event> for Delay {
                                 done = true;
                             }
                             Some(event) => {
-                                let (result, event) = if let Some(condition) = self.condition.as_ref() {
-                                    condition.check(event)
-                                } else {
-                                    // We need to have 1 delay when no condition is set, put it in
-                                    // the queue
-                                    (false, event)
-                                };
+                                let (result, event) = self.check_condition(event, true);
                                 if result {
                                     yield event
                                 } else {
@@ -184,12 +183,7 @@ impl TaskTransform<Event> for Delay {
                                             OverflowStrategy::Block => {
                                                 while self.queue_capacity.get() <= self.queue.len() && let Some(next) = self.queue.next().await {
                                                     let event = next.into_inner();
-                                                    let (result, event) = if let Some(condition) = self.condition.as_ref() {
-                                                        condition.check(event)
-                                                    } else {
-                                                        // One delay is done, pass the event further
-                                                        (true, event)
-                                                    };
+                                                    let (result, event) = self.check_condition(event, false);
                                                     if result {
                                                         yield event;
                                                     } else {
