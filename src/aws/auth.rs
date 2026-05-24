@@ -325,8 +325,7 @@ impl AwsAuthentication {
                 let auth_region = region.clone().map(Region::new).unwrap_or(service_region);
                 let provider_config = ProviderConfig::empty()
                     .with_region(Option::from(auth_region))
-                    .with_http_client(connector)
-                    .with_use_fips(resolve_use_fips().await);
+                    .with_http_client(connector);
 
                 let profile_provider = ProfileFileCredentialsProvider::builder()
                     .profile_files(profile_files)
