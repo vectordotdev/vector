@@ -645,7 +645,7 @@ impl ConsumerStateInner<Consuming> {
                                 match msg {
                                     Ok(msg) => oks.push(msg),
                                     Err(err) => {
-                                        if matches!(err, rdkafka::error::KafkaError::PartitionEOF(_)) {
+                                        if matches!(err, rdkafka::error::KafkaError::PartitionEOF(_)) && exit_eof {
                                             errors.push(err);
                                             break;
                                         }
