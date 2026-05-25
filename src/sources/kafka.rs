@@ -1003,21 +1003,17 @@ async fn parse_message(
                 (lc + rc, ls)
             },
         );
-    let events_batch = futures::stream::iter(streams)
-        .flatten()
-        .map(|event| {
-            // All acknowledgements flow through the normal Finalizer stream so
-            // that they can be handled in one place, but are only tied to the
-            // batch when acknowledgements are enabled
-            if acknowledgements {
-                event.with_batch_notifier(&batch)
-            } else {
-                event
-            }
-        })
-        .collect::<Vec<_>>()
-        .await;
-    match out.send_batch(events_batch).await {
+    let mut batch_stream = futures::stream::iter(streams).flatten().map(|event| {
+        // All acknowledgements flow through the normal Finalizer stream so
+        // that they can be handled in one place, but are only tied to the
+        // batch when acknowledgements are enabled
+        if acknowledgements {
+            event.with_batch_notifier(&batch)
+        } else {
+            event
+        }
+    });
+    match out.send_event_stream(&mut batch_stream).await {
         Err(_) => {
             emit!(StreamClosedError { count });
             None
