@@ -252,6 +252,8 @@ runs:
 
     - name: Run prepare.sh
       shell: bash
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
       run: |
         mods=()
         [[ "${{ inputs.rust == 'true' || env.NEEDS_RUST == 'true' }}" == "true" ]] && mods+=("rustup")
@@ -272,6 +274,10 @@ runs:
 
         if [[ "$csm" != "" ]]; then
           ./scripts/environment/prepare.sh --modules="${csm}"
+        fi
+
+        if [[ "$NEEDS_RUST" == "true" ]]; then
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
         fi
 
     - name: Set VDEV environment variable
