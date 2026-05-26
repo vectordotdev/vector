@@ -16,6 +16,8 @@ mod prelude;
 ))]
 mod query;
 
+#[cfg(feature = "sources-opentelemetry")]
+pub(crate) use encoding::{DEFAULT_MAX_DECOMPRESSED_BODY_SIZE, limited_body};
 #[cfg(feature = "sources-utils-http-encoding")]
 pub use encoding::{decompress_body, emit_decompress_error};
 #[cfg(feature = "sources-utils-http-headers")]

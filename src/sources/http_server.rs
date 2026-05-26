@@ -1274,9 +1274,11 @@ mod tests {
     async fn http_rejects_gzip_bomb_with_413() {
         // A modestly-sized gzipped blob of zeros that would expand past the default
         // 100 MiB cap if decompression were unbounded.
-        let plaintext = vec![0u8; 200 * 1024 * 1024];
         let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
-        encoder.write_all(&plaintext).unwrap();
+        let chunk = [0u8; 8 * 1024];
+        for _ in 0..(200 * 1024 * 1024 / chunk.len()) {
+            encoder.write_all(&chunk).unwrap();
+        }
         let body = encoder.finish().unwrap();
 
         let mut headers = HeaderMap::new();

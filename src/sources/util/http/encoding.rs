@@ -1,9 +1,10 @@
 use std::io::Read;
 
-use bytes::{Buf, Bytes};
+use bytes::{Buf, BufMut, Bytes, BytesMut};
 use flate2::read::{MultiGzDecoder, ZlibDecoder};
+use futures_util::StreamExt;
 use snap::raw::Decoder as SnappyDecoder;
-use warp::http::StatusCode;
+use warp::{Filter, filters::BoxedFilter, http::StatusCode};
 
 use crate::{common::http::ErrorMessage, internal_events::HttpDecompressError};
 
@@ -11,6 +12,31 @@ use crate::{common::http::ErrorMessage, internal_events::HttpDecompressError};
 ///
 /// Prevents a compressed "bomb" payload from causing unbounded memory growth.
 pub(crate) const DEFAULT_MAX_DECOMPRESSED_BODY_SIZE: usize = 100 * 1024 * 1024;
+
+/// Collects a request body into [`Bytes`] while enforcing an in-memory size cap.
+#[allow(dead_code)]
+pub(crate) fn limited_body(max_body_size: usize) -> BoxedFilter<(Bytes,)> {
+    let max_body_size_header = u64::try_from(max_body_size).unwrap_or(u64::MAX);
+
+    warp::header::optional::<u64>("content-length")
+        .and_then(move |declared: Option<u64>| async move {
+            if declared.is_some_and(|len| len > max_body_size_header) {
+                Err(warp::reject::custom(request_body_too_large_error(
+                    max_body_size,
+                )))
+            } else {
+                Ok(())
+            }
+        })
+        .untuple_one()
+        .and(warp::body::stream())
+        .and_then(move |body| async move {
+            collect_body_with_limit(body, max_body_size)
+                .await
+                .map_err(warp::reject::custom)
+        })
+        .boxed()
+}
 
 /// Decompresses the body based on the Content-Encoding header.
 ///
@@ -117,6 +143,25 @@ fn decompress_snappy(
     Ok(decoded.into())
 }
 
+async fn collect_body_with_limit<S, B>(body: S, max_body_size: usize) -> Result<Bytes, ErrorMessage>
+where
+    S: futures_util::Stream<Item = Result<B, warp::Error>>,
+    B: Buf,
+{
+    futures_util::pin_mut!(body);
+
+    let mut bytes = BytesMut::new();
+    while let Some(chunk) = body.next().await {
+        let chunk = chunk.map_err(body_read_error)?;
+        if chunk.remaining() > max_body_size.saturating_sub(bytes.len()) {
+            return Err(request_body_too_large_error(max_body_size));
+        }
+        bytes.put(chunk);
+    }
+
+    Ok(bytes.freeze())
+}
+
 fn ensure_body_within_limit(
     body: &Bytes,
     encoding: &str,
@@ -141,10 +186,24 @@ fn zstd_window_log_max(max_decompressed_size: usize) -> Option<u32> {
     })
 }
 
+fn request_body_too_large_error(max: usize) -> ErrorMessage {
+    ErrorMessage::new(
+        StatusCode::PAYLOAD_TOO_LARGE,
+        format!("Request body exceeds limit of {max} bytes."),
+    )
+}
+
 fn decompressed_too_large_error(encoding: &str, max: usize) -> ErrorMessage {
     ErrorMessage::new(
         StatusCode::PAYLOAD_TOO_LARGE,
         format!("Decompressed {encoding} body exceeds limit of {max} bytes."),
+    )
+}
+
+fn body_read_error(error: warp::Error) -> ErrorMessage {
+    ErrorMessage::new(
+        StatusCode::BAD_REQUEST,
+        format!("Failed reading request body: {error}"),
     )
 }
 
@@ -164,6 +223,7 @@ mod tests {
     use std::io::Write;
 
     use flate2::{Compression, write::GzEncoder};
+    use futures_util::stream;
     use zstd::stream::Encoder as ZstdEncoder;
 
     use super::*;
@@ -198,16 +258,6 @@ mod tests {
 
         let err =
             decompress_body_with_limit(Some("gzip"), body, Some(1024)).expect_err("should reject");
-        assert_eq!(err.status_code(), StatusCode::PAYLOAD_TOO_LARGE);
-    }
-
-    #[test]
-    fn default_limit_protects_against_decompression_bomb() {
-        // A small input that would expand far past 100 MB if we let it run unbounded.
-        let plaintext = vec![0u8; 200 * 1024 * 1024];
-        let body = gzip_payload(&plaintext);
-
-        let err = decompress_body(Some("gzip"), body).expect_err("should reject");
         assert_eq!(err.status_code(), StatusCode::PAYLOAD_TOO_LARGE);
     }
 
@@ -266,5 +316,29 @@ mod tests {
             zstd_window_log_max(DEFAULT_MAX_DECOMPRESSED_BODY_SIZE),
             Some(27)
         );
+    }
+
+    #[tokio::test]
+    async fn collect_body_with_limit_succeeds_within_limit() {
+        let body = stream::iter([
+            Ok::<_, warp::Error>(Bytes::from_static(b"hello")),
+            Ok::<_, warp::Error>(Bytes::from_static(b" world")),
+        ]);
+
+        let collected = collect_body_with_limit(body, 11).await.unwrap();
+        assert_eq!(collected, Bytes::from_static(b"hello world"));
+    }
+
+    #[tokio::test]
+    async fn collect_body_with_limit_rejects_oversized_stream() {
+        let body = stream::iter([
+            Ok::<_, warp::Error>(Bytes::from_static(b"hello")),
+            Ok::<_, warp::Error>(Bytes::from_static(b" world")),
+        ]);
+
+        let err = collect_body_with_limit(body, 5)
+            .await
+            .expect_err("should reject");
+        assert_eq!(err.status_code(), StatusCode::PAYLOAD_TOO_LARGE);
     }
 }
