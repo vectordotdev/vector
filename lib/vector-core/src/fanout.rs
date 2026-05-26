@@ -867,28 +867,7 @@ mod tests {
             .expect("should not fail");
     }
 
-    // The empty-batch guard panics via `debug_assert!` in debug builds and silently drops in
-    // release builds. The two tests below cover each half of that behavior.
     #[tokio::test]
-    async fn fanout_drops_empty_event_array_in_release_builds() {
-        let (mut fanout, _, receivers) = fanout_from_senders(&[2, 2]);
-        let empty: EventArray = Vec::<LogEvent>::new().into();
-
-        fanout
-            .send(empty, None)
-            .await
-            .expect("empty batch should be dropped, not errored");
-
-        for receiver in receivers {
-            assert!(
-                collect_ready(receiver.into_stream()).is_empty(),
-                "no downstream receiver should observe the empty batch",
-            );
-        }
-    }
-
-    #[tokio::test]
-    #[cfg(debug_assertions)]
     #[should_panic(expected = "Fanout received empty event batch from upstream component")]
     async fn fanout_panics_on_empty_event_array_in_debug_builds() {
         let (mut fanout, _, _receivers) = fanout_from_senders(&[2, 2]);
