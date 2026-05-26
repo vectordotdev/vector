@@ -256,15 +256,15 @@ mod tests {
             component_id = "foo",
             component_type = "internal_logs",
         );
-        let _enter = span.enter();
+        let enter = span.enter();
 
         error!(message = "Before source started.", %test_id);
 
-        drop(_enter); // don't hold the span guard across an await point
+        drop(enter); // don't hold the span guard across an await point
 
         let rx = start_source().await;
 
-        let _enter = span.enter();
+        let enter = span.enter();
 
         error!(message = "After source started.", %test_id);
 
@@ -280,7 +280,7 @@ mod tests {
             error!(message = "In a nested span.", %test_id);
         }
 
-        drop(_enter);
+        drop(enter);
 
         sleep(Duration::from_millis(1)).await;
         let mut events = collect_ready(rx).await;
