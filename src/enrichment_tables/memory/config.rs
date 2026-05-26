@@ -27,6 +27,7 @@ use crate::{
 /// Configuration for the `memory` enrichment table.
 #[configurable_component(enrichment_table("memory"))]
 #[derive(Clone)]
+#[serde(deny_unknown_fields)]
 pub struct MemoryConfig {
     /// TTL (time-to-live in seconds) is used to limit the lifetime of data stored in the cache.
     /// When TTL expires, data behind a specific key in the cache is removed.
