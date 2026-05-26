@@ -65,6 +65,7 @@ volumes/
 
 # LLM tools
 copilot-instructions.md
+.claude/settings.local.json
 
 # local files not checked in
 local/

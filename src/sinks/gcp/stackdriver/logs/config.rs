@@ -17,11 +17,11 @@ use crate::{
     http::HttpClient,
     schema,
     sinks::{
-        gcs_common::config::healthcheck_response,
+        gcs_common::config::{gcp_http_response_retry_logic, healthcheck_response},
         prelude::*,
         util::{
             BoxedRawValue, RealtimeSizeBasedDefaultBatchSettings,
-            http::{HttpService, RetryStrategy, http_response_retry_logic},
+            http::{HttpService, RetryStrategy},
             service::TowerRequestConfigDefaults,
         },
     },
@@ -239,7 +239,7 @@ impl_generate_config_from_default!(StackdriverConfig);
 #[typetag::serde(name = "gcp_stackdriver_logs")]
 impl SinkConfig for StackdriverConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let auth = self.auth.build(Scope::LoggingWrite).await?;
+        let auth = self.auth.build(Scope::LOGGING_WRITE).await?;
 
         let request_builder = StackdriverLogsRequestBuilder {
             encoder: StackdriverLogsEncoder::new(
@@ -275,7 +275,7 @@ impl SinkConfig for StackdriverConfig {
         let service = ServiceBuilder::new()
             .settings(
                 request_limits,
-                http_response_retry_logic(self.retry_strategy.clone()),
+                gcp_http_response_retry_logic(self.retry_strategy.clone(), auth.clone()),
             )
             .service(service);
 
@@ -283,7 +283,7 @@ impl SinkConfig for StackdriverConfig {
 
         let healthcheck = healthcheck(client, auth.clone(), uri).boxed();
 
-        auth.spawn_regenerate_token();
+        auth.start_background_refresh();
 
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }

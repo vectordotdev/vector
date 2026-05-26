@@ -5,7 +5,6 @@ use std::{collections::HashMap, io};
 
 use bytes::{Bytes, BytesMut};
 use futures_util::{future::BoxFuture, task::Poll};
-use goauth::scopes::Scope;
 use http::{
     Request, StatusCode, Uri,
     header::{self, HeaderName, HeaderValue},
@@ -30,7 +29,7 @@ use vrl::value::Kind;
 use crate::{
     codecs::{self, EncodingConfig},
     config::{GenerateConfig, SinkConfig, SinkContext},
-    gcp::{GcpAuthConfig, GcpAuthenticator},
+    gcp::{GcpAuthConfig, GcpAuthenticator, Scope},
     http::HttpClient,
     schema,
     sinks::{
@@ -303,7 +302,7 @@ pub enum ChronicleError {
 #[typetag::serde(name = "gcp_chronicle_unstructured")]
 impl SinkConfig for ChronicleUnstructuredConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let creds = self.auth.build(Scope::MalachiteIngestion).await?;
+        let creds = self.auth.build(Scope::MALACHITE_INGESTION).await?;
 
         let tls = TlsSettings::from_options(self.tls.as_ref())?;
         let client = HttpClient::new(tls, cx.proxy())?;
@@ -314,7 +313,7 @@ impl SinkConfig for ChronicleUnstructuredConfig {
         let healthcheck_endpoint = self.create_endpoint("v2/logtypes")?;
 
         let healthcheck = build_healthcheck(client.clone(), &healthcheck_endpoint, creds.clone())?;
-        creds.spawn_regenerate_token();
+        creds.start_background_refresh();
         let sink = self.build_sink(client, endpoint, creds)?;
 
         Ok((sink, healthcheck))
@@ -348,7 +347,7 @@ impl ChronicleUnstructuredConfig {
         let partitioner = self.partitioner()?;
 
         let svc = ServiceBuilder::new()
-            .settings(request, GcsRetryLogic::default())
+            .settings(request, GcsRetryLogic::with_auth(creds.clone()))
             .service(ChronicleService::new(client, base_url, creds));
 
         let request_settings = ChronicleRequestBuilder::new(self)?;

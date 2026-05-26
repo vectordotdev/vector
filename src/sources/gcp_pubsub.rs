@@ -281,7 +281,7 @@ impl SourceConfig for PubsubConfig {
             }
         };
 
-        let auth = self.auth.build(Scope::PubSub).await?;
+        let auth = self.auth.build(Scope::PUBSUB).await?;
 
         let mut uri: Uri = self.endpoint.parse().context(UriSnafu)?;
         auth.apply_uri(&mut uri);
@@ -301,7 +301,7 @@ impl SourceConfig for PubsubConfig {
             endpoint = endpoint.tls_config(tls_config).context(EndpointTlsSnafu)?;
         }
 
-        let token_generator = auth.spawn_regenerate_token();
+        let token_generator = auth.subscribe_token_rotation();
 
         let protocol = uri
             .scheme()
@@ -485,13 +485,19 @@ impl PubsubSource {
         let mut client = proto::subscriber_client::SubscriberClient::with_interceptor(
             connection,
             |mut req: Request<()>| {
-                if let Some(token) = self.auth.make_token() {
-                    let authorization = MetadataValue::try_from(&token).map_err(|_| {
-                        Status::new(
-                            Code::FailedPrecondition,
-                            "Invalid token text returned by GCP",
-                        )
-                    })?;
+                if let Some(header) = self.auth.auth_header() {
+                    // tonic Ascii metadata is byte-compatible with an
+                    // ASCII-only HeaderValue, which is what the SDK produces.
+                    let authorization = header
+                        .to_str()
+                        .ok()
+                        .and_then(|s| MetadataValue::try_from(s).ok())
+                        .ok_or_else(|| {
+                            Status::new(
+                                Code::FailedPrecondition,
+                                "Invalid token text returned by GCP",
+                            )
+                        })?;
                     req.metadata_mut().insert("authorization", authorization);
                 }
                 Ok(req)
@@ -544,7 +550,7 @@ impl PubsubSource {
                             busy_flag,
                         ).await;
                     }
-                    Some(Err(error)) => break translate_error(error),
+                    Some(Err(error)) => break translate_error(error, &self.auth),
                     None => break State::RetryNow,
                 },
                 _ = &mut self.shutdown, if pending_acks == 0 => return State::Shutdown,
@@ -712,7 +718,7 @@ impl PubsubSource {
     }
 }
 
-fn translate_error(error: tonic::Status) -> State {
+fn translate_error(error: tonic::Status, auth: &GcpAuthenticator) -> State {
     // GCP occasionally issues a connection reset
     // in the middle of the streaming pull. This
     // reset is not technically an error, so we
@@ -721,11 +727,19 @@ fn translate_error(error: tonic::Status) -> State {
     // underlying library (`tonic`).
     if is_reset(&error) {
         debug!("Stream reset by server.");
-        State::RetryNow
-    } else {
-        emit!(GcpPubsubReceiveError { error });
-        State::RetryDelay
+        return State::RetryNow;
     }
+    if error.code() == Code::Unauthenticated {
+        // Fire-and-forget a credentials rebuild so the next reconnect uses
+        // a fresh token. force_refresh internally throttles, so a 401 burst
+        // across concurrent streams is safe to spam.
+        let auth = auth.clone();
+        tokio::spawn(async move {
+            auth.force_refresh().await;
+        });
+    }
+    emit!(GcpPubsubReceiveError { error });
+    State::RetryDelay
 }
 
 fn is_reset(error: &Status) -> bool {
@@ -760,6 +774,27 @@ mod tests {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<PubsubConfig>();
+    }
+
+    /// `Code::Unauthenticated` should classify as `RetryDelay` (same as the
+    /// non-Unauthenticated, non-reset error path). The `force_refresh` spawn
+    /// is fire-and-forget — with `GcpAuthenticator::None` it's a no-op, so
+    /// this asserts the State transition without needing a real STS round-trip.
+    #[tokio::test]
+    async fn translate_error_unauthenticated_returns_retry_delay() {
+        let auth = GcpAuthenticator::None;
+        let status = tonic::Status::unauthenticated("token expired");
+        assert!(matches!(translate_error(status, &auth), State::RetryDelay));
+    }
+
+    /// Sanity check on a non-Unauthenticated, non-reset error: same
+    /// `RetryDelay` outcome, but no `force_refresh` spawn — covers the
+    /// branch fallthrough.
+    #[tokio::test]
+    async fn translate_error_other_returns_retry_delay() {
+        let auth = GcpAuthenticator::None;
+        let status = tonic::Status::internal("transient");
+        assert!(matches!(translate_error(status, &auth), State::RetryDelay));
     }
 
     #[test]

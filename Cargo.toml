@@ -339,8 +339,8 @@ prost-types = { workspace = true, optional = true }
 databricks-zerobus-ingest-sdk = { git = "https://github.com/databricks/zerobus-sdk-rs", rev = "273efe09130a7554e6b34d20b95df50289e58524", optional = true }
 
 # GCP
-goauth = { version = "0.16.0", optional = true }
-smpl_jwt = { version = "0.8.0", default-features = false, optional = true }
+google-cloud-auth = { version = "1.9", default-features = false, optional = true }
+rustls = { version = "0.23", default-features = false, features = ["ring", "logging", "std", "tls12"], optional = true }
 
 # AMQP
 lapin = { version = "4.3.0", default-features = false, features = ["tokio", "native-tls"], optional = true }
@@ -640,7 +640,7 @@ aws-core = [
 # Anything that requires Protocol Buffers.
 protobuf-build = ["dep:tonic-build", "dep:prost-build"]
 
-gcp = ["dep:base64", "dep:goauth", "dep:smpl_jwt"]
+gcp = ["dep:base64", "dep:google-cloud-auth", "dep:rustls"]
 
 # Enrichment Tables
 enrichment-tables = ["enrichment-tables-geoip", "enrichment-tables-mmdb", "enrichment-tables-memory"]
