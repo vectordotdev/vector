@@ -68,12 +68,12 @@ impl InternalEvent for MemoryEnrichmentTableRemoved<'_> {
     fn emit(self) {
         if self.include_key_metric_tag {
             counter!(
-                "memory_enrichment_table_removed_total",
+                CounterName::MemoryEnrichmentTableRemovedTotal,
                 "key" => self.key.to_owned()
             )
             .increment(1);
         } else {
-            counter!("memory_enrichment_table_removed_total",).increment(1);
+            counter!(CounterName::MemoryEnrichmentTableRemovedTotal).increment(1);
         }
     }
 }
@@ -119,7 +119,7 @@ pub(crate) struct MemoryEnrichmentTableTtlExpiredCount {
 
 impl InternalEvent for MemoryEnrichmentTableTtlExpiredCount {
     fn emit(self) {
-        counter!("memory_enrichment_table_ttl_expirations",).increment(self.count);
+        counter!(CounterName::MemoryEnrichmentTableTtlExpirations,).increment(self.count);
     }
 }
 
