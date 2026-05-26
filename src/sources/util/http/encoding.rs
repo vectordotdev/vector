@@ -45,8 +45,15 @@ pub(crate) fn decompress_body_with_limit(
                 )?,
                 "snappy" => decompress_snappy(&body, max_decompressed_size)?,
                 "zstd" => {
-                    let decoder = zstd::stream::read::Decoder::new(body.reader())
+                    let mut decoder = zstd::stream::read::Decoder::new(body.reader())
                         .map_err(|error| emit_decompress_error(encoding, error))?;
+                    if let Some(max) = max_decompressed_size
+                        && let Some(window_log_max) = zstd_window_log_max(max)
+                    {
+                        decoder
+                            .window_log_max(window_log_max)
+                            .map_err(|error| emit_decompress_error(encoding, error))?;
+                    }
                     decompress_reader(decoder, encoding, max_decompressed_size)?
                 }
                 encoding => {
@@ -59,6 +66,7 @@ pub(crate) fn decompress_body_with_limit(
         }
     }
 
+    ensure_body_within_limit(&body, "identity", max_decompressed_size)?;
     Ok(body)
 }
 
@@ -109,6 +117,30 @@ fn decompress_snappy(
     Ok(decoded.into())
 }
 
+fn ensure_body_within_limit(
+    body: &Bytes,
+    encoding: &str,
+    max_decompressed_size: Option<usize>,
+) -> Result<(), ErrorMessage> {
+    if let Some(max) = max_decompressed_size
+        && body.len() > max
+    {
+        return Err(decompressed_too_large_error(encoding, max));
+    }
+    Ok(())
+}
+
+fn zstd_window_log_max(max_decompressed_size: usize) -> Option<u32> {
+    const MIN_ZSTD_WINDOW_LOG: u32 = 10;
+    const MAX_ZSTD_WINDOW_LOG: u32 = 31;
+
+    // `window_log_max` is expressed as a power-of-two log. Use the smallest zstd
+    // window capable of representing the configured byte budget.
+    max_decompressed_size.checked_sub(1).map(|max_index| {
+        (usize::BITS - max_index.leading_zeros()).clamp(MIN_ZSTD_WINDOW_LOG, MAX_ZSTD_WINDOW_LOG)
+    })
+}
+
 fn decompressed_too_large_error(encoding: &str, max: usize) -> ErrorMessage {
     ErrorMessage::new(
         StatusCode::PAYLOAD_TOO_LARGE,
@@ -132,11 +164,19 @@ mod tests {
     use std::io::Write;
 
     use flate2::{Compression, write::GzEncoder};
+    use zstd::stream::Encoder as ZstdEncoder;
 
     use super::*;
 
     fn gzip_payload(plaintext: &[u8]) -> Bytes {
         let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
+        encoder.write_all(plaintext).unwrap();
+        encoder.finish().unwrap().into()
+    }
+
+    fn zstd_payload_with_window_log(plaintext: &[u8], window_log: u32) -> Bytes {
+        let mut encoder = ZstdEncoder::new(Vec::new(), 0).unwrap();
+        encoder.window_log(window_log).unwrap();
         encoder.write_all(plaintext).unwrap();
         encoder.finish().unwrap().into()
     }
@@ -183,9 +223,48 @@ mod tests {
     }
 
     #[test]
+    fn zstd_exceeding_limit_returns_413() {
+        let plaintext = vec![0u8; 10_000];
+        let compressed = zstd_payload_with_window_log(plaintext.as_slice(), 10);
+
+        let err = decompress_body_with_limit(Some("zstd"), compressed, Some(1024))
+            .expect_err("should reject");
+        assert_eq!(err.status_code(), StatusCode::PAYLOAD_TOO_LARGE);
+    }
+
+    #[test]
     fn identity_passes_through() {
         let body: Bytes = Bytes::from_static(b"hello world");
         let decoded = decompress_body(Some("identity"), body.clone()).unwrap();
         assert_eq!(decoded, body);
+    }
+
+    #[test]
+    fn identity_exceeding_limit_returns_413() {
+        let body = Bytes::from_static(b"hello world");
+
+        let err =
+            decompress_body_with_limit(Some("identity"), body, Some(5)).expect_err("should reject");
+        assert_eq!(err.status_code(), StatusCode::PAYLOAD_TOO_LARGE);
+    }
+
+    #[test]
+    fn missing_content_encoding_exceeding_limit_returns_413() {
+        let body = Bytes::from_static(b"hello world");
+
+        let err = decompress_body_with_limit(None, body, Some(5)).expect_err("should reject");
+        assert_eq!(err.status_code(), StatusCode::PAYLOAD_TOO_LARGE);
+    }
+
+    #[test]
+    fn zstd_window_log_tracks_limit() {
+        assert_eq!(zstd_window_log_max(0), None);
+        assert_eq!(zstd_window_log_max(1), Some(10));
+        assert_eq!(zstd_window_log_max(1024), Some(10));
+        assert_eq!(zstd_window_log_max(1025), Some(11));
+        assert_eq!(
+            zstd_window_log_max(DEFAULT_MAX_DECOMPRESSED_BODY_SIZE),
+            Some(27)
+        );
     }
 }
