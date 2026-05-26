@@ -227,8 +227,7 @@ impl Fanout {
 
         // Drop empty event batches before they reach any downstream buffer, this is technically
         // programmer error. In debug/test builds the `debug_assert!` makes the underlying bug fail
-        // loudly; in release builds the batch is dropped with a rate-limited warning naming the
-        // upstream component.
+        // loudly.
         debug_assert!(
             !events.is_empty(),
             "Fanout received empty event batch from upstream component '{}'",
