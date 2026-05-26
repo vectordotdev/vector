@@ -569,8 +569,6 @@ pub async fn init_components(
         })
         .collect::<BTreeMap<_, _>>();
 
-    let mut state = state::State::new(rows);
-
     #[cfg(feature = "allocation-tracing")]
     {
         // Allocation tracing is a compile-time + startup-time setting on the
@@ -578,12 +576,15 @@ pub async fn init_components(
         // (e.g. older server without this RPC) we default to false, matching
         // pre-existing behavior. This is re-evaluated on every reconnect via
         // the retry loop in `subscription()`.
+        let mut state = state::State::new(rows);
         state.allocation_tracing_active = client
             .get_allocation_tracing_status()
             .await
             .map(|r| r.enabled)
             .unwrap_or(false);
+        Ok(state)
     }
 
-    Ok(state)
+    #[cfg(not(feature = "allocation-tracing"))]
+    Ok(state::State::new(rows))
 }

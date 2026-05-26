@@ -21,19 +21,19 @@ our brand spanking new [`aws_ec2_metadata` transform][docs.transforms.aws_ec2_me
 Configuration isn't complicated, just add and hook up the transform. If you
 don't want all enrichments added then white-list them with the `fields` option:
 
-```toml
-[transforms.fill_me_up]
-  type = "aws_ec2_metadata"
-  inputs = ["my-source-id"]
-  fields = [
-    "instance-id",
-    "local-hostname",
-    "public-hostname",
-    "public-ipv4",
-    "ami-id",
-    "availability-zone",
-    "region",
-  ]
+```yaml
+transforms:
+  fill_me_up:
+    type: "aws_ec2_metadata"
+    inputs: ["my-source-id"]
+    fields:
+      - "instance-id"
+      - "local-hostname"
+      - "public-hostname"
+      - "public-ipv4"
+      - "ami-id"
+      - "availability-zone"
+      - "region"
 ```
 
 For more guidance get on the [reference page][docs.transforms.aws_ec2_metadata].

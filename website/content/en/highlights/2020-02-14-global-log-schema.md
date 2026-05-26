@@ -24,11 +24,11 @@ the default names for the [`message_key`][docs.global-options#message_key],
 [`host_key`][docs.global-options#host_key],
 [`timestamp_key`][docs.global-options#host_key], and more:
 
-```toml title="vector.toml"
-[log_schema]
-  host_key = "host" # default
-  message_key = "message" # default
-  timestamp_key = "timestamp" # default
+```yaml title="vector.yaml"
+log_schema:
+  host_key: "host" # default
+  message_key: "message" # default
+  timestamp_key: "timestamp" # default
 ```
 
 Why is this useful?

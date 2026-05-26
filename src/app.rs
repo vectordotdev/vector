@@ -28,7 +28,9 @@ use crate::{
     config::{self, ComponentConfig, ComponentType, Config, ConfigPath},
     extra_context::ExtraContext,
     heartbeat,
-    internal_events::{VectorConfigLoadError, VectorQuit, VectorStarted, VectorStopped},
+    internal_events::{
+        VectorConfigLoadError, VectorQuit, VectorStarted, VectorStopped, VectorStopping,
+    },
     signal::{SignalHandler, SignalPair, SignalRx, SignalTo},
     topology::{
         ReloadOutcome, RunningTopology, SharedTopologyController, ShutdownErrorReceiver,
@@ -36,8 +38,6 @@ use crate::{
     },
     trace,
 };
-#[cfg(feature = "api")]
-use std::sync::Arc;
 
 static WORKER_THREADS: AtomicUsize = AtomicUsize::new(0);
 
@@ -141,7 +141,6 @@ impl ApplicationConfig {
             let api_server = handle.block_on(api::GrpcServer::start(
                 self.topology.config(),
                 self.topology.watch(),
-                Arc::clone(&self.topology.running),
             ));
             match api_server {
                 Ok(server) => {
@@ -493,16 +492,19 @@ impl FinishedApplication {
     }
 
     async fn stop(topology_controller: TopologyController, mut signal_rx: SignalRx) -> ExitStatus {
-        emit!(VectorStopped);
+        emit!(VectorStopping);
         tokio::select! {
-            _ = topology_controller.stop() => ExitStatus::from_raw({
-                #[cfg(windows)]
-                {
-                    exitcode::OK as u32
-                }
-                #[cfg(unix)]
-                exitcode::OK
-            }), // Graceful shutdown finished
+            _ = topology_controller.stop() => {
+                emit!(VectorStopped);
+                ExitStatus::from_raw({
+                    #[cfg(windows)]
+                    {
+                        exitcode::OK as u32
+                    }
+                    #[cfg(unix)]
+                    exitcode::OK
+                })
+            }, // Graceful shutdown finished
             _ = signal_rx.recv() => Self::quit(),
         }
     }

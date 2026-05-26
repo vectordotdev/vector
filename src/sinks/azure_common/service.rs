@@ -47,13 +47,12 @@ impl Service<AzureBlobRequest> for AzureBlobService {
                 blob_content_type: Some(request.content_type.to_string()),
                 blob_content_encoding: request.content_encoding.map(|e| e.to_string()),
                 ..Default::default()
-            };
+            }
+            .with_if_not_exists();
 
             let result = blob_client
                 .upload(
                     RequestContent::from(request.blob_data.to_vec()),
-                    false,
-                    byte_size as u64,
                     Some(upload_options),
                 )
                 .instrument(info_span!("request").or_current())
