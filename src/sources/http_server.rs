@@ -117,6 +117,14 @@ pub struct SimpleHttpConfig {
     #[configurable(metadata(docs::examples = "*"))]
     query_parameters: Vec<String>,
 
+    /// HTTP authentication configuration.
+    ///
+    /// Use HTTP authentication with HTTPS only. The authentication credentials are passed as an
+    /// HTTP header without any additional encryption beyond what is provided by the transport itself.
+    ///
+    /// When using the `custom` strategy, the VRL program may write `%field = value` to enrich
+    /// authenticated events. These metadata fields are injected into the event body (legacy
+    /// namespace) or under `http_server.<field>` in event metadata (Vector namespace).
     #[configurable(derived)]
     auth: Option<HttpServerAuthConfig>,
 
