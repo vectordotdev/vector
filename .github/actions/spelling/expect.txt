@@ -124,6 +124,7 @@ customizability
 CVS
 cwl
 daschl
+databricks
 dataflows
 datafuselabs
 datasources
@@ -351,6 +352,7 @@ mezmo
 mfoo
 mgmt
 MIDP
+mij
 mingrammer
 mkto
 mlua
@@ -380,6 +382,7 @@ mycie
 mycorp
 mydatabase
 mylabel
+mylogstorage
 mypod
 myvalue
 Namazu
@@ -604,6 +607,7 @@ transitioning
 Trauring
 Treemap
 trialled
+Trino
 Trivago
 trivy
 trl
@@ -676,6 +680,7 @@ ytt
 YXRR
 yyy
 zieme
+zerobus
 zoog
 zork
 zorp

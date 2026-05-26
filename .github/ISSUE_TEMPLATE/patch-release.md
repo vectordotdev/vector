@@ -24,8 +24,10 @@ export PREP_BRANCH=prepare-v-0-"${CURRENT_MINOR_VERSION}"-"${NEW_PATCH_VERSION}"
 - [ ] Cherry-pick in all commits to be released from the associated release milestone
   - If any merge conflicts occur, attempt to solve them and if needed enlist the aid of those familiar with the conflicting commits.
 - [ ] Bump the release number in the `Cargo.toml` to the current version number
-- [ ] Run `cargo vdev build release-cue` to generate a new cue file for the release
-  - [ ] Add description key to the generated cue file with a description of the release (see
+- [ ] Add a new cue file for the release at `website/cue/reference/releases/${NEW_VERSION}.cue`
+      by copying the previous patch release file and editing the version, date, commits, and
+      changelog entries to match this release.
+  - [ ] Add a description key to the cue file with a description of the release (see
         previous releases for examples).
 - [ ] Update version number in `distribution/install.sh`
 - [ ] Add new version to `website/cue/reference/versions.cue`
@@ -62,5 +64,5 @@ export PREP_BRANCH=prepare-v-0-"${CURRENT_MINOR_VERSION}"-"${NEW_PATCH_VERSION}"
   - Follow the [instructions at the top of the mirror.yaml file](https://github.com/DataDog/images/blob/fbf12868e90d52e513ebca0389610dea8a3c7e1a/mirror.yaml#L33-L49).
 - [ ] Cherry-pick any release commits from the release branch that are not on `master`, to `master`
 - [ ] Reset the `website` branch to the `HEAD` of the release branch to update https://vector.dev
-  - [ ] `git checkout website && git reset --hard origin/"${RELEASE_BRANCH}" && git push`
+  - [ ] `git fetch origin && git checkout website && git reset --hard origin/"${RELEASE_BRANCH}" && git push --force-with-lease`
 - [ ] Kick-off post-mortems for any regressions resolved by the release

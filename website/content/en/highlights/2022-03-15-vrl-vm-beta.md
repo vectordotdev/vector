@@ -20,14 +20,14 @@ the VRL program that is being run.
 
 You can give the VM a try by adding the `runtime` configuration option to your Remap transform:
 
-```toml
-[transforms.remap]
-type = "remap"
-inputs = [ "..." ]
-runtime = "vm"
-source = '''
-...
-'''
+```yaml
+transforms:
+  remap:
+    type: "remap"
+    inputs: ["..."]
+    runtime: "vm"
+    source: |
+      ...
 ```
 
 ## Let us know what you think!

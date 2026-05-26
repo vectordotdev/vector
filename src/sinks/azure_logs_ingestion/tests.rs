@@ -8,6 +8,8 @@ use vector_lib::config::log_schema;
 use azure_core::credentials::{AccessToken, TokenCredential};
 use azure_core::time::OffsetDateTime;
 
+use crate::sinks::azure_common::config::{AzureAuthentication, SpecificAzureCredential};
+
 use super::config::AzureLogsIngestionConfig;
 
 use crate::{
@@ -26,50 +28,22 @@ fn generate_config() {
 
 #[tokio::test]
 async fn basic_config_error_with_no_auth() {
-    let config: AzureLogsIngestionConfig = toml::from_str::<AzureLogsIngestionConfig>(
-        r#"
+    let config: Result<AzureLogsIngestionConfig, toml::de::Error> =
+        toml::from_str::<AzureLogsIngestionConfig>(
+            r#"
             endpoint = "https://my-dce-5kyl.eastus-1.ingest.monitor.azure.com"
             dcr_immutable_id = "dcr-00000000000000000000000000000000"
             stream_name = "Custom-UnitTest"
         "#,
-    )
-    .expect("Config parsing failed");
+        );
 
-    assert_eq!(
-        config.endpoint,
-        "https://my-dce-5kyl.eastus-1.ingest.monitor.azure.com"
-    );
-    assert_eq!(
-        config.dcr_immutable_id,
-        "dcr-00000000000000000000000000000000"
-    );
-    assert_eq!(config.stream_name, "Custom-UnitTest");
-    assert_eq!(config.token_scope, "https://monitor.azure.com/.default");
-    assert_eq!(config.timestamp_field, "TimeGenerated");
-
-    match &config.auth {
-        crate::sinks::azure_logs_ingestion::config::AzureAuthentication::ClientSecretCredential {
-            azure_tenant_id,
-            azure_client_id,
-            azure_client_secret,
-        } => {
-            assert_eq!(azure_tenant_id, "");
-            assert_eq!(azure_client_id, "");
-            let secret: String = azure_client_secret.inner().into();
-            assert_eq!(secret, "");
-        }
-        _ => panic!("Expected ClientSecretCredential variant"),
-    }
-
-    let cx = SinkContext::default();
-    let sink = config.build(cx).await;
-    match sink {
-        Ok(_) => panic!("Config build should have errored due to missing auth info"),
+    match config {
+        Ok(_) => panic!("Config parsing should have failed due to missing auth config"),
         Err(e) => {
             let err_str = e.to_string();
             assert!(
-                err_str.contains("`auth.azure_tenant_id` is blank"),
-                "Config build did not complain about azure_tenant_id being blank: {}",
+                err_str.contains("missing field `auth`"),
+                "Config parsing did not complain about missing auth field: {}",
                 err_str
             );
         }
@@ -85,6 +59,7 @@ fn basic_config_with_client_credentials() {
             stream_name = "Custom-UnitTest"
 
             [auth]
+            azure_credential_kind = "client_secret_credential"
             azure_tenant_id = "00000000-0000-0000-0000-000000000000"
             azure_client_id = "mock-client-id"
             azure_client_secret = "mock-client-secret"
@@ -105,17 +80,17 @@ fn basic_config_with_client_credentials() {
     assert_eq!(config.timestamp_field, "TimeGenerated");
 
     match &config.auth {
-        crate::sinks::azure_logs_ingestion::config::AzureAuthentication::ClientSecretCredential {
+        AzureAuthentication::Specific(SpecificAzureCredential::ClientSecretCredential {
             azure_tenant_id,
             azure_client_id,
             azure_client_secret,
-        } => {
+        }) => {
             assert_eq!(azure_tenant_id, "00000000-0000-0000-0000-000000000000");
             assert_eq!(azure_client_id, "mock-client-id");
             let secret: String = azure_client_secret.inner().into();
             assert_eq!(secret, "mock-client-secret");
         }
-        _ => panic!("Expected ClientSecretCredential variant"),
+        _ => panic!("Expected Specific(ClientSecretCredential) variant"),
     }
 }
 
@@ -146,11 +121,7 @@ fn basic_config_with_managed_identity() {
     assert_eq!(config.timestamp_field, "TimeGenerated");
 
     match &config.auth {
-        crate::sinks::azure_logs_ingestion::config::AzureAuthentication::Specific(
-            crate::sinks::azure_logs_ingestion::config::SpecificAzureCredential::ManagedIdentity {
-                ..
-            },
-        ) => {
+        AzureAuthentication::Specific(SpecificAzureCredential::ManagedIdentity { .. }) => {
             // Expected variant
         }
         _ => panic!("Expected Specific(ManagedIdentity) variant"),
@@ -182,6 +153,7 @@ async fn correct_request() {
             stream_name = "Custom-UnitTest"
 
             [auth]
+            azure_credential_kind = "client_secret_credential"
             azure_tenant_id = "00000000-0000-0000-0000-000000000000"
             azure_client_id = "mock-client-id"
             azure_client_secret = "mock-client-secret"
@@ -292,6 +264,7 @@ async fn mock_healthcheck_with_400_response() {
             stream_name = "Custom-UnitTest"
 
             [auth]
+            azure_credential_kind = "client_secret_credential"
             azure_tenant_id = "00000000-0000-0000-0000-000000000000"
             azure_client_id = "mock-client-id"
             azure_client_secret = "mock-client-secret"
@@ -361,6 +334,7 @@ async fn mock_healthcheck_with_403_response() {
             stream_name = "Custom-UnitTest"
 
             [auth]
+            azure_credential_kind = "client_secret_credential"
             azure_tenant_id = "00000000-0000-0000-0000-000000000000"
             azure_client_id = "mock-client-id"
             azure_client_secret = "mock-client-secret"
