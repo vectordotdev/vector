@@ -12,7 +12,9 @@ use crate::sinks::prelude::*;
 use crate::sinks::util::metadata::RequestMetadataBuilder;
 use crate::sinks::util::{RealtimeSizeBasedDefaultBatchSettings, TowerRequestSettings};
 
-use super::service::{ZerobusRequest, ZerobusRetryLogic, ZerobusService};
+use super::service::{
+    RetryableErrorAsErroredLayer, ZerobusRequest, ZerobusRetryLogic, ZerobusService,
+};
 
 /// The main Zerobus sink.
 pub struct ZerobusSink {
@@ -39,6 +41,7 @@ impl ZerobusSink {
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let result = {
             let tower_service = ServiceBuilder::new()
+                .layer(RetryableErrorAsErroredLayer)
                 .settings(self.request_limits, ZerobusRetryLogic)
                 .service(self.service.clone());
 

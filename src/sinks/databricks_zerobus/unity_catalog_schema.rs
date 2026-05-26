@@ -18,15 +18,17 @@ use crate::http::HttpClient;
 
 /// Whether a Unity Catalog HTTP response status should be retried.
 ///
-/// 5xx, 408 (Request Timeout), and 429 (Too Many Requests) are transient;
-/// other 4xx statuses (404, 401, 403, ...) indicate permanent configuration
-/// problems that won't fix themselves on retry. The canonical list of
-/// retryable statuses for HTTP-based sinks lives at
-/// [`crate::sinks::util::http::RetryStrategy::Default`].
+/// Delegates to the canonical Vector HTTP retry policy
+/// [`crate::sinks::util::http::RetryStrategy::Default`] so this sink stays in
+/// lock-step with other HTTP-based sinks: 5xx (except 501 Not Implemented),
+/// 408 (Request Timeout), and 429 (Too Many Requests) are transient; 4xx
+/// otherwise (404, 401, 403, ...) and 501 are permanent.
 fn status_is_retryable(status: StatusCode) -> bool {
-    status.is_server_error()
-        || status == StatusCode::REQUEST_TIMEOUT
-        || status == StatusCode::TOO_MANY_REQUESTS
+    use crate::sinks::util::{http::RetryStrategy, retries::RetryAction};
+    matches!(
+        RetryStrategy::Default.retry_action::<()>(status),
+        RetryAction::Retry(_) | RetryAction::RetryPartial(_)
+    )
 }
 
 // Alias the SDK types under the names the rest of the sink already uses.
@@ -389,6 +391,24 @@ fn sanitize_package_name(name: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn status_is_retryable_matches_canonical_policy() {
+        // Transient — must retry.
+        assert!(status_is_retryable(StatusCode::INTERNAL_SERVER_ERROR));
+        assert!(status_is_retryable(StatusCode::BAD_GATEWAY));
+        assert!(status_is_retryable(StatusCode::SERVICE_UNAVAILABLE));
+        assert!(status_is_retryable(StatusCode::GATEWAY_TIMEOUT));
+        assert!(status_is_retryable(StatusCode::REQUEST_TIMEOUT));
+        assert!(status_is_retryable(StatusCode::TOO_MANY_REQUESTS));
+        // Permanent — must not retry. 501 in particular: the server doesn't
+        // support the requested functionality; retry won't change that.
+        assert!(!status_is_retryable(StatusCode::NOT_IMPLEMENTED));
+        assert!(!status_is_retryable(StatusCode::NOT_FOUND));
+        assert!(!status_is_retryable(StatusCode::UNAUTHORIZED));
+        assert!(!status_is_retryable(StatusCode::FORBIDDEN));
+        assert!(!status_is_retryable(StatusCode::BAD_REQUEST));
+    }
 
     /// Smoke test: the wrapper calls into the SDK and builds a usable
     /// `MessageDescriptor` via the descriptor pool.

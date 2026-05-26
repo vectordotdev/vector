@@ -9,7 +9,7 @@ use databricks_zerobus_ingest_sdk::{ConnectorFactory, ProxyConnector, ZerobusSdk
 use futures::future::BoxFuture;
 use std::sync::Arc;
 use tokio::sync::{Mutex, OnceCell, RwLock};
-use tower::Service;
+use tower::{Layer, Service};
 use tracing::warn;
 use vector_lib::codecs::encoding::{
     BatchEncoder, BatchOutput, BatchSerializerConfig, ProtoBatchSerializerConfig,
@@ -71,14 +71,40 @@ pub struct ZerobusRequest {
 }
 
 /// Response type for the Zerobus service.
+///
+/// Carries the final `EventStatus` so the driver can mark finalizers correctly:
+/// `Delivered` on success, `Errored` when the retry budget was exhausted on a
+/// transient failure (asking the source / disk buffer to replay), and `Err`
+/// from `Service::call` reserved for permanent failures (driver maps to
+/// `Rejected`).
 #[derive(Debug)]
 pub struct ZerobusResponse {
     pub events_byte_size: GroupedCountByteSize,
+    pub status: vector_lib::event::EventStatus,
+}
+
+impl ZerobusResponse {
+    const fn delivered(events_byte_size: GroupedCountByteSize) -> Self {
+        Self {
+            events_byte_size,
+            status: vector_lib::event::EventStatus::Delivered,
+        }
+    }
+
+    /// Synthesize a response signalling a transient failure that exhausted the
+    /// retry budget. Carries a telemetry-aware zero `events_byte_size` because
+    /// the driver only consumes `events_sent()` on the `Delivered` path.
+    fn errored() -> Self {
+        Self {
+            events_byte_size: vector_lib::config::telemetry().create_request_count_byte_size(),
+            status: vector_lib::event::EventStatus::Errored,
+        }
+    }
 }
 
 impl DriverResponse for ZerobusResponse {
     fn event_status(&self) -> vector_lib::event::EventStatus {
-        vector_lib::event::EventStatus::Delivered
+        self.status
     }
 
     fn events_sent(&self) -> &GroupedCountByteSize {
@@ -441,7 +467,7 @@ impl ZerobusService {
         };
 
         match result {
-            Ok(()) => Ok(ZerobusResponse { events_byte_size }),
+            Ok(()) => Ok(ZerobusResponse::delivered(events_byte_size)),
             Err(e) => {
                 if e.is_retryable() {
                     // Clear the slot so the next attempt creates a fresh stream,
@@ -556,6 +582,80 @@ impl RetryLogic for ZerobusRetryLogic {
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         error.is_retryable()
+    }
+}
+
+/// Tower layer that converts retry-budget-exhausted retryable errors into a
+/// successful `ZerobusResponse` carrying `EventStatus::Errored`.
+///
+/// Wraps the retry layer from the outside. When the retry layer returns:
+/// - `Ok(resp)` — pass through unchanged.
+/// - `Err(e)` where `e.is_retryable()` — convert to `Ok(ZerobusResponse::errored())`
+///   so the driver marks finalizers `Errored` (transient — source / disk
+///   buffer may replay) rather than `Rejected` (permanent drop).
+/// - `Err(e)` permanent — propagate so the driver maps to `Rejected`.
+///
+/// Without this layer the driver maps every `Err` from `Service::call` to
+/// `EventStatus::Rejected`, which would drop transient-but-exhausted failures
+/// as if they were permanent.
+#[derive(Clone, Debug, Default)]
+pub struct RetryableErrorAsErroredLayer;
+
+impl<S> Layer<S> for RetryableErrorAsErroredLayer {
+    type Service = RetryableErrorAsErrored<S>;
+
+    fn layer(&self, inner: S) -> Self::Service {
+        RetryableErrorAsErrored { inner }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct RetryableErrorAsErrored<S> {
+    inner: S,
+}
+
+impl<S> Service<ZerobusRequest> for RetryableErrorAsErrored<S>
+where
+    S: Service<ZerobusRequest, Response = ZerobusResponse, Error = crate::Error>,
+    S::Future: Send + 'static,
+{
+    type Response = ZerobusResponse;
+    type Error = crate::Error;
+    type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
+
+    fn poll_ready(
+        &mut self,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Result<(), Self::Error>> {
+        self.inner.poll_ready(cx)
+    }
+
+    fn call(&mut self, req: ZerobusRequest) -> Self::Future {
+        let fut = self.inner.call(req);
+        Box::pin(async move {
+            match fut.await {
+                Ok(resp) => Ok(resp),
+                Err(e) => {
+                    // The Tower stack boxes errors above us (retry, timeout,
+                    // adaptive-concurrency). Downcast to inspect retryability;
+                    // anything that isn't a `ZerobusSinkError` (e.g. a timeout
+                    // `Elapsed`) is conservatively treated as transient.
+                    let retryable = match e.downcast_ref::<ZerobusSinkError>() {
+                        Some(zb) => zb.is_retryable(),
+                        None => true,
+                    };
+                    if retryable {
+                        warn!(
+                            message = "Zerobus retry budget exhausted on transient error; signaling Errored so source or buffer may replay.",
+                            error = %e,
+                        );
+                        Ok(ZerobusResponse::errored())
+                    } else {
+                        Err(e)
+                    }
+                }
+            }
+        })
     }
 }
 
@@ -808,5 +908,103 @@ mod tests {
         );
         // And the slot was cleared so the next ingest creates a fresh stream.
         assert!(!service.has_active_stream().await);
+    }
+
+    fn dummy_request() -> ZerobusRequest {
+        ZerobusRequest {
+            events: Arc::new(vec![]),
+            metadata: RequestMetadata::default(),
+            finalizers: EventFinalizers::default(),
+        }
+    }
+
+    #[tokio::test]
+    async fn retryable_err_after_exhaustion_becomes_ok_errored() {
+        use tower::ServiceExt;
+        let inner = tower::service_fn(|_req: ZerobusRequest| async move {
+            let err: crate::Error = Box::new(ZerobusSinkError::SchemaError {
+                message: "UC 503".to_string(),
+                retryable: true,
+            });
+            Err::<ZerobusResponse, _>(err)
+        });
+        let mut svc = RetryableErrorAsErrored { inner };
+        let resp = svc
+            .ready()
+            .await
+            .unwrap()
+            .call(dummy_request())
+            .await
+            .unwrap();
+        assert_eq!(resp.status, vector_lib::event::EventStatus::Errored);
+    }
+
+    #[tokio::test]
+    async fn non_retryable_err_propagates() {
+        use tower::ServiceExt;
+        let inner = tower::service_fn(|_req: ZerobusRequest| async move {
+            let err: crate::Error = Box::new(ZerobusSinkError::EncodingError {
+                message: "bad".to_string(),
+            });
+            Err::<ZerobusResponse, _>(err)
+        });
+        let mut svc = RetryableErrorAsErrored { inner };
+        let err = svc
+            .ready()
+            .await
+            .unwrap()
+            .call(dummy_request())
+            .await
+            .unwrap_err();
+        let zb = err.downcast_ref::<ZerobusSinkError>().unwrap();
+        assert!(matches!(zb, ZerobusSinkError::EncodingError { .. }));
+    }
+
+    #[tokio::test]
+    async fn unknown_err_treated_as_transient() {
+        use tower::ServiceExt;
+        // Simulate a Tower-layer error that isn't a ZerobusSinkError (e.g.
+        // timeout `Elapsed`): conservatively becomes Errored, not Rejected.
+        #[derive(Debug)]
+        struct Other;
+        impl std::fmt::Display for Other {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(f, "other")
+            }
+        }
+        impl std::error::Error for Other {}
+
+        let inner = tower::service_fn(|_req: ZerobusRequest| async move {
+            let err: crate::Error = Box::new(Other);
+            Err::<ZerobusResponse, _>(err)
+        });
+        let mut svc = RetryableErrorAsErrored { inner };
+        let resp = svc
+            .ready()
+            .await
+            .unwrap()
+            .call(dummy_request())
+            .await
+            .unwrap();
+        assert_eq!(resp.status, vector_lib::event::EventStatus::Errored);
+    }
+
+    #[tokio::test]
+    async fn ok_response_passes_through() {
+        use tower::ServiceExt;
+        let inner = tower::service_fn(|_req: ZerobusRequest| async move {
+            Ok::<_, crate::Error>(ZerobusResponse::delivered(
+                GroupedCountByteSize::new_untagged(),
+            ))
+        });
+        let mut svc = RetryableErrorAsErrored { inner };
+        let resp = svc
+            .ready()
+            .await
+            .unwrap()
+            .call(dummy_request())
+            .await
+            .unwrap();
+        assert_eq!(resp.status, vector_lib::event::EventStatus::Delivered);
     }
 }
