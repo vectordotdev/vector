@@ -3333,7 +3333,7 @@ version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "55e69956d137a478913ed8c017a31f483258e3a238282c40d89b014478e978b3"
 dependencies = [
- "rand 0.9.2",
+ "rand 0.9.4",
 ]
 
 [[package]]
