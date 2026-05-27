@@ -9,15 +9,7 @@ use crate::sinks::{
     util::{BatchConfig, RealtimeSizeBasedDefaultBatchSettings},
 };
 
-use vector_lib::codecs::encoding::{
-    BatchEncoder, BatchSerializerConfig, ProtoBatchSerializerConfig,
-};
-
-use super::{
-    error::ZerobusSinkError,
-    service::{StreamMode, ZerobusService},
-    sink::ZerobusSink,
-};
+use super::{error::ZerobusSinkError, service::ZerobusService, sink::ZerobusSink};
 
 /// Authentication configuration for Databricks.
 #[configurable_component]
@@ -163,27 +155,12 @@ impl SinkConfig for ZerobusSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         self.validate()?;
 
-        let descriptor = ZerobusService::resolve_descriptor(self, cx.proxy()).await?;
-
-        // The zerobus sink always encodes in proto_batch form — the stream
-        // descriptor is the one we just resolved from Unity Catalog.
-        let descriptor_proto = std::sync::Arc::new(descriptor.descriptor_proto().clone());
-        let stream_mode = StreamMode::Proto { descriptor_proto };
-
-        let proto_config = ProtoBatchSerializerConfig {
-            descriptor: Some(descriptor),
-        };
-        let batch_serializer = BatchSerializerConfig::ProtoBatch(proto_config)
-            .build_batch_serializer()
-            .map_err(|e| format!("Failed to build batch serializer: {}", e))?;
-        let encoder = BatchEncoder::new(batch_serializer);
-
-        let service = ZerobusService::new(self.clone(), stream_mode, cx.proxy()).await?;
+        let service = ZerobusService::new(self.clone(), cx.proxy()).await?;
         let healthcheck_service = service.clone();
 
         let request_limits = self.request.into_settings();
 
-        let sink = ZerobusSink::new(service, request_limits, self.batch, encoder)?;
+        let sink = ZerobusSink::new(service, request_limits, self.batch)?;
 
         let healthcheck = async move {
             healthcheck_service
