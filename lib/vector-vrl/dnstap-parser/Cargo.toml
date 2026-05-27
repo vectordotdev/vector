@@ -20,5 +20,10 @@ vector-lookup = { path = "../../vector-lookup", features = ["test"] }
 vector-core = { path = "../../vector-core" }
 vrl.workspace = true
 
+[dev-dependencies]
+anyhow.workspace = true
+chrono-tz.workspace = true
+pastey.workspace = true
+
 [build-dependencies]
 prost-build.workspace = true

@@ -3743,6 +3743,7 @@ dependencies = [
  "chrono",
  "dnsmsg-parser",
  "hickory-proto",
+ "pastey",
  "prost 0.12.6",
  "prost-build 0.12.6",
  "snafu 0.9.0",
