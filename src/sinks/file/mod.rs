@@ -24,7 +24,11 @@ use vector_lib::{
         encoding::{Framer, FramingConfig},
     },
     configurable::configurable_component,
+    finalization::EventFinalizers,
     internal_event::{CountByteSize, EventsSent, InternalEventHandle as _, Output, Registered},
+    json_size::JsonSize,
+    partition::Partitioner,
+    stream::{BatcherSettings, batcher::limiter::ItemBatchSize},
 };
 
 use crate::{
@@ -35,7 +39,10 @@ use crate::{
     internal_events::{
         FileBytesSent, FileInternalMetricsConfig, FileIoError, FileOpen, TemplateRenderingError,
     },
-    sinks::util::{StreamSink, timezone_to_offset},
+    sinks::util::{
+        BatchConfig, RealtimeSizeBasedDefaultBatchSettings, SinkBuilderExt, StreamSink,
+        timezone_to_offset,
+    },
     template::Template,
 };
 
@@ -98,6 +105,16 @@ pub struct FileSinkConfig {
     #[configurable(derived)]
     #[serde(default)]
     pub truncate: FileTruncateConfig,
+
+    /// Controls how events are batched per destination file before writing.
+    ///
+    /// Events sharing the same rendered path are accumulated into a single buffer and written
+    /// with one syscall per batch, reducing overhead when routing to many partitions
+    /// (for example, one file per Kafka topic). The default timeout is 1 second; raising it
+    /// increases throughput at the cost of end-to-end latency.
+    #[configurable(derived)]
+    #[serde(default)]
+    pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
 }
 
 /// Configuration for truncating files.
@@ -127,6 +144,7 @@ impl GenerateConfig for FileSinkConfig {
             timezone: Default::default(),
             internal_metrics: Default::default(),
             truncate: Default::default(),
+            batch: Default::default(),
         })
         .unwrap()
     }
@@ -245,6 +263,7 @@ pub struct FileSink {
     transformer: Transformer,
     encoder: Encoder<Framer>,
     idle_timeout: Duration,
+    batch_settings: BatcherSettings,
     files: ExpiringHashMap<Bytes, OutFile>,
     compression: Compression,
     events_sent: Registered<EventsSent>,
@@ -257,6 +276,7 @@ impl FileSink {
         let transformer = config.encoding.transformer();
         let (framer, serializer) = config.encoding.build(SinkType::StreamBased)?;
         let encoder = Encoder::<Framer>::new(framer, serializer);
+        let batch_settings = config.batch.validate()?.into_batcher_settings()?;
 
         let offset = config
             .timezone
@@ -268,6 +288,7 @@ impl FileSink {
             transformer,
             encoder,
             idle_timeout: config.idle_timeout,
+            batch_settings,
             files: ExpiringHashMap::default(),
             compression: config.compression,
             events_sent: register!(EventsSent::from(Output(None))),
@@ -276,41 +297,44 @@ impl FileSink {
         })
     }
 
-    /// Uses pass the `event` to `self.path` template to obtain the file path
-    /// to store the event as.
-    fn partition_event(&mut self, event: &Event) -> Option<bytes::Bytes> {
-        let bytes = match self.path.render(event) {
-            Ok(b) => b,
-            Err(error) => {
-                emit!(TemplateRenderingError {
-                    error,
-                    field: Some("path"),
-                    drop_event: true,
-                });
-                return None;
-            }
-        };
-
-        Some(bytes)
-    }
-
     fn deadline_at(&self) -> Instant {
         Instant::now()
             .checked_add(self.idle_timeout)
             .expect("unable to compute next deadline")
     }
 
-    async fn run(&mut self, mut input: BoxStream<'_, Event>) -> crate::Result<()> {
+    async fn run(&mut self, input: BoxStream<'_, Event>) -> crate::Result<()> {
+        let partitioner = FilePathPartitioner {
+            path: self.path.clone(),
+        };
+        // Copy batch_settings so the closure below doesn't hold a borrow on `self`
+        // while the select loop needs `&mut self` for process_batch.
+        let batch_settings = self.batch_settings;
+        let mut batched =
+            input.batched_partitioned(partitioner, batch_settings.timeout, move |_| {
+                batch_settings.as_item_size_config(FileBatchSizer)
+            });
+
+        // Batches for different partitions are independent and could be written
+        // concurrently (tokio::join_all across partitions), but process_batch requires
+        // &mut self for the file-handle map. A follow-up could lift the handle map into
+        // an Arc<Mutex<ExpiringHashMap>> to enable parallel partition writes.
         loop {
             tokio::select! {
-                event = input.next() => {
-                    match event {
-                        Some(event) => self.process_event(event).await,
+                batch = batched.next() => {
+                    match batch {
+                        Some((None, events)) => {
+                            // Path template rendering failed — partitioner already emitted
+                            // the error; drain finalizers so upstream gets delivery status.
+                            for event in events {
+                                event.metadata().update_status(EventStatus::Errored);
+                            }
+                        }
+                        Some((Some(path), events)) => {
+                            self.process_batch(path, events).await;
+                        }
                         None => {
-                            // If we got `None` - terminate the processing.
                             debug!(message = "Receiver exhausted, terminating the processing loop.");
-
-                            // Close all the open files.
                             debug!(message = "Closing all the open files.");
                             for (path, file) in self.files.iter_mut() {
                                 if let Err(error) = file.close().await {
@@ -321,27 +345,19 @@ impl FileSink {
                                         path,
                                         dropped_events: 0,
                                     });
-                                } else{
+                                } else {
                                     trace!(message = "Successfully closed file.", path = ?path);
                                 }
                             }
-
-                            emit!(FileOpen {
-                                count: 0
-                            });
-
+                            emit!(FileOpen { count: 0 });
                             break;
                         }
                     }
                 }
                 result = self.files.next_expired(), if !self.files.is_empty() => {
                     match result {
-                        // We do not poll map when it's empty, so we should
-                        // never reach this branch.
                         None => unreachable!(),
                         Some((expired_file, path)) => {
-                            // We got an expired file. All we really want is to
-                            // flush and close it.
                             self.close_file(expired_file, path).await;
                         }
                     }
@@ -352,19 +368,7 @@ impl FileSink {
         Ok(())
     }
 
-    async fn process_event(&mut self, mut event: Event) {
-        let path = match self.partition_event(&event) {
-            Some(path) => path,
-            None => {
-                // We weren't able to find the path to use for the
-                // file.
-                // The error is already handled at `partition_event`, so
-                // here we just skip the event.
-                event.metadata().update_status(EventStatus::Errored);
-                return;
-            }
-        };
-
+    async fn process_batch(&mut self, path: Bytes, events: Vec<Event>) {
         let next_deadline = self.deadline_at();
         trace!(message = "Computed next deadline.", next_deadline = ?next_deadline, path = ?path);
 
@@ -378,23 +382,22 @@ impl FileSink {
             let file = match open_file(bytes_path, truncate).await {
                 Ok(file) => file,
                 Err(error) => {
-                    // We couldn't open the file for this event.
-                    // Maybe other events will work though! Just log
-                    // the error and skip this event.
+                    let dropped_events = events.len();
                     emit!(FileIoError {
                         code: "failed_opening_file",
                         message: "Unable to open the file.",
                         error,
                         path: &path,
-                        dropped_events: 1,
+                        dropped_events,
                     });
-                    event.metadata().update_status(EventStatus::Errored);
+                    for event in events {
+                        event.metadata().update_status(EventStatus::Errored);
+                    }
                     return;
                 }
             };
 
             let outfile = OutFile::new(file, self.compression);
-
             self.files.insert_at(path.clone(), outfile, next_deadline);
             emit!(FileOpen {
                 count: self.files.len()
@@ -402,13 +405,42 @@ impl FileSink {
             self.files.get_mut(&path).unwrap()
         };
 
-        trace!(message = "Writing an event to file.", path = ?path);
-        let event_size = event.estimated_json_encoded_size_of();
-        let finalizers = event.take_finalizers();
-        match write_event_to_file(file, event, &self.transformer, &mut self.encoder).await {
-            Ok(byte_size) => {
-                finalizers.update_status(EventStatus::Delivered);
-                self.events_sent.emit(CountByteSize(1, event_size));
+        // Encode the entire batch into one buffer, then issue a single write_all per partition.
+        // This reduces write syscalls from O(events) to O(1) per batch.
+        let mut batch_buffer = BytesMut::new();
+        let mut succeeded: Vec<(EventFinalizers, JsonSize)> = Vec::with_capacity(events.len());
+
+        trace!(message = "Encoding batch.", batch_size = events.len(), path = ?path);
+        for mut event in events {
+            let event_size = event.estimated_json_encoded_size_of();
+            let finalizers = event.take_finalizers();
+            self.transformer.transform(&mut event);
+            match self.encoder.encode(event, &mut batch_buffer) {
+                Ok(()) => succeeded.push((finalizers, event_size)),
+                Err(error) => {
+                    finalizers.update_status(EventStatus::Errored);
+                    emit!(FileIoError {
+                        code: "failed_encoding_event",
+                        message: "Failed to encode event.",
+                        error: std::io::Error::new(std::io::ErrorKind::InvalidData, error),
+                        path: &path,
+                        dropped_events: 1,
+                    });
+                }
+            }
+        }
+
+        if succeeded.is_empty() {
+            return;
+        }
+
+        let byte_size = batch_buffer.len();
+        match file.write_all(&batch_buffer).await {
+            Ok(()) => {
+                for (finalizers, event_size) in succeeded {
+                    finalizers.update_status(EventStatus::Delivered);
+                    self.events_sent.emit(CountByteSize(1, event_size));
+                }
                 emit!(FileBytesSent {
                     byte_size,
                     file: String::from_utf8_lossy(&path),
@@ -416,13 +448,16 @@ impl FileSink {
                 });
             }
             Err(error) => {
-                finalizers.update_status(EventStatus::Errored);
+                let dropped_events = succeeded.len();
+                for (finalizers, _) in succeeded {
+                    finalizers.update_status(EventStatus::Errored);
+                }
                 emit!(FileIoError {
                     code: "failed_writing_file",
                     message: "Failed to write the file.",
                     error,
                     path: &path,
-                    dropped_events: 1,
+                    dropped_events,
                 });
             }
         }
@@ -501,18 +536,36 @@ async fn open_file(path: impl AsRef<std::path::Path>, truncate: bool) -> std::io
         .await
 }
 
-async fn write_event_to_file(
-    file: &mut OutFile,
-    mut event: Event,
-    transformer: &Transformer,
-    encoder: &mut Encoder<Framer>,
-) -> Result<usize, std::io::Error> {
-    transformer.transform(&mut event);
-    let mut buffer = BytesMut::new();
-    encoder
-        .encode(event, &mut buffer)
-        .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error))?;
-    file.write_all(&buffer).await.map(|()| buffer.len())
+struct FilePathPartitioner {
+    path: Template,
+}
+
+impl Partitioner for FilePathPartitioner {
+    type Item = Event;
+    type Key = Option<Bytes>;
+
+    fn partition(&self, event: &Self::Item) -> Self::Key {
+        match self.path.render(event) {
+            Ok(bytes) => Some(bytes),
+            Err(error) => {
+                emit!(TemplateRenderingError {
+                    error,
+                    field: Some("path"),
+                    drop_event: true,
+                });
+                None
+            }
+        }
+    }
+}
+
+#[derive(Clone)]
+struct FileBatchSizer;
+
+impl ItemBatchSize<Event> for FileBatchSizer {
+    fn size(&self, event: &Event) -> usize {
+        event.estimated_json_encoded_size_of().get()
+    }
 }
 
 #[async_trait]
@@ -569,6 +622,7 @@ mod tests {
                 include_file_tag: true,
             },
             truncate: Default::default(),
+            batch: Default::default(),
         };
 
         let (input, _events) = random_lines_with_stream(100, 64, None);
@@ -596,6 +650,7 @@ mod tests {
                 include_file_tag: true,
             },
             truncate: Default::default(),
+            batch: Default::default(),
         };
 
         let (input, _) = random_lines_with_stream(100, 64, None);
@@ -623,6 +678,7 @@ mod tests {
                 include_file_tag: true,
             },
             truncate: Default::default(),
+            batch: Default::default(),
         };
 
         let (input, _) = random_lines_with_stream(100, 64, None);
@@ -655,6 +711,7 @@ mod tests {
                 include_file_tag: true,
             },
             truncate: Default::default(),
+            batch: Default::default(),
         };
 
         let (mut input, _events) = random_events_with_stream(32, 8, None);
@@ -738,6 +795,7 @@ mod tests {
                 include_file_tag: true,
             },
             truncate: Default::default(),
+            batch: Default::default(),
         };
 
         let (mut input, _events) = random_lines_with_stream(10, 64, None);
@@ -768,8 +826,8 @@ mod tests {
         tx.send(LogEvent::from(last_line).into()).await.unwrap();
         input.push(String::from(last_line));
 
-        // wait for another flush
-        tokio::time::sleep(Duration::from_secs(1)).await;
+        // wait for batch timeout (1s default) plus margin to flush
+        tokio::time::sleep(Duration::from_secs(3)).await;
 
         // make sure we appended instead of overwriting
         let output = lines_from_file(template);
@@ -795,6 +853,7 @@ mod tests {
                 include_file_tag: true,
             },
             truncate: Default::default(),
+            batch: Default::default(),
         };
 
         let (input, _events) = random_metrics_with_stream(100, None, None);
@@ -827,6 +886,7 @@ mod tests {
                 include_file_tag: true,
             },
             truncate: Default::default(),
+            batch: Default::default(),
         };
 
         let metric_count = 3;
@@ -879,6 +939,7 @@ mod tests {
                 include_file_tag: true,
             },
             truncate: Default::default(),
+            batch: Default::default(),
         };
 
         let (input, _events) = random_lines_with_stream(100, 64, None);
