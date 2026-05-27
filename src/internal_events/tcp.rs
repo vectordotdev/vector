@@ -245,9 +245,9 @@ mod tests {
             .into_iter()
             .find(|m| {
                 m.name() == name
-                    && tags.iter().all(|(k, v)| {
-                        m.tags().is_some_and(|t| t.get(k) == Some(*v))
-                    })
+                    && tags
+                        .iter()
+                        .all(|(k, v)| m.tags().is_some_and(|t| t.get(k) == Some(*v)))
             })
             .map(|m| match m.value() {
                 MetricValue::Counter { value } => *value,
