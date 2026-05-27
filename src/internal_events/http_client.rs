@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use http::{
     Request, Response,
-    header::{self, HeaderMap, HeaderValue},
+    header::{self, HeaderMap, HeaderName, HeaderValue},
 };
 use hyper::{Error, body::HttpBody};
 use vector_lib::{
@@ -17,12 +17,17 @@ pub struct AboutToSendHttpRequest<'a, T> {
 
 fn remove_sensitive(headers: &HeaderMap<HeaderValue>) -> HeaderMap<HeaderValue> {
     let mut headers = headers.clone();
-    for name in &[
+    let sensitive: &[HeaderName] = &[
         header::AUTHORIZATION,
         header::PROXY_AUTHORIZATION,
         header::COOKIE,
         header::SET_COOKIE,
-    ] {
+        HeaderName::from_static("dd-api-key"),
+        HeaderName::from_static("x-honeycomb-team"),
+        HeaderName::from_static("x-api-key"),
+        HeaderName::from_static("api-key"),
+    ];
+    for name in sensitive {
         if let Some(value) = headers.get_mut(name) {
             value.set_sensitive(true);
         }
