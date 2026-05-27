@@ -11,6 +11,8 @@ pub mod sample;
 pub mod aggregate;
 #[cfg(feature = "transforms-aws_ec2_metadata")]
 pub mod aws_ec2_metadata;
+#[cfg(feature = "transforms-delay")]
+pub mod delay;
 #[cfg(feature = "transforms-exclusive-route")]
 mod exclusive_route;
 #[cfg(feature = "transforms-filter")]
