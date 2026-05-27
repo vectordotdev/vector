@@ -542,6 +542,12 @@ generated: components: sinks: gcp_cloud_storage: configuration: {
 				type: string: {
 					default: "single"
 					enum: {
+						auto: """
+															Tag values are exposed using their underlying shape: single-value tags as strings,
+															multi-value tags as arrays. Writes follow the same rule -- a string or null produces
+															a single tag; an array of length >= 2 produces a multi-value tag. A length-1 array
+															round-trips as a scalar; use `Full` to force array shape.
+															"""
 						full: "All tags are exposed as arrays of either string or null values."
 						single: """
 															Tag values are exposed as single strings, the same as they were before this config

@@ -94,6 +94,11 @@ pub struct RemapConfig {
     ///
     /// When set to `full`, all metric tags are exposed as arrays of either string or null
     /// values.
+    ///
+    /// When set to `auto`, single-value tags are exposed as strings and multi-value tags as
+    /// arrays. Writes follow the same convention -- assigning a string or null produces a
+    /// single tag, assigning an array produces a multi-value tag. This preserves the
+    /// underlying shape of metrics that mix single- and multi-value tags.
     #[serde(default)]
     pub metric_tag_values: MetricTagValues,
 
@@ -591,14 +596,7 @@ where
             .map(|log| log.namespace())
             .unwrap_or(LogNamespace::Legacy);
 
-        let mut target = VrlTarget::new(
-            event,
-            self.program.info(),
-            match self.metric_tag_values {
-                MetricTagValues::Single => false,
-                MetricTagValues::Full => true,
-            },
-        );
+        let mut target = VrlTarget::new(event, self.program.info(), self.metric_tag_values.into());
         let result = self.run_vrl(&mut target);
 
         match result {

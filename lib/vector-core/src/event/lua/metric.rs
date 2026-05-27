@@ -9,16 +9,17 @@ use super::{
     },
     util::{table_to_timestamp, timestamp_to_table},
 };
+use crate::event::MetricTagMode;
 use crate::metrics::AgentDDSketch;
 
 pub struct LuaMetric {
     pub metric: Metric,
-    pub multi_value_tags: bool,
+    pub tag_mode: MetricTagMode,
 }
 
 pub struct LuaMetricTags {
     pub tags: MetricTags,
-    pub multi_value_tags: bool,
+    pub tag_mode: MetricTagMode,
 }
 
 impl IntoLua for MetricKind {
@@ -106,8 +107,8 @@ impl FromLua for MetricTags {
 
 impl IntoLua for LuaMetricTags {
     fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
-        if self.multi_value_tags {
-            Ok(LuaValue::Table(lua.create_table_from(
+        match self.tag_mode {
+            MetricTagMode::Full => Ok(LuaValue::Table(lua.create_table_from(
                 self.tags.0.into_iter().map(|(key, value)| {
                     let value: Vec<_> = value
                         .into_iter()
@@ -115,11 +116,35 @@ impl IntoLua for LuaMetricTags {
                         .collect();
                     (key, value)
                 }),
-            )?))
-        } else {
-            Ok(LuaValue::Table(
+            )?)),
+            MetricTagMode::Single => Ok(LuaValue::Table(
                 lua.create_table_from(self.tags.iter_single())?,
-            ))
+            )),
+            // `Auto` exposes single-value tags as scalars and multi-value tags
+            // as arrays. Only a 1-element set scalarises -- empty sets keep
+            // the array shape so a noop Auto round-trip preserves them.
+            // (`as_single()` is unsuitable here because it deliberately
+            // collapses multi-value sets to their last value to power
+            // `Single` mode.)
+            MetricTagMode::Auto => {
+                let table = lua.create_table()?;
+                for (key, value) in self.tags.0 {
+                    if value.len() == 1 {
+                        let scalar =
+                            value.into_iter().next().and_then(TagValue::into_option);
+                        table.raw_set(key, scalar)?;
+                    } else {
+                        let arr: Vec<_> = value
+                            .into_iter()
+                            .filter_map(|tag_value| {
+                                tag_value.into_option().into_lua(lua).ok()
+                            })
+                            .collect();
+                        table.raw_set(key, arr)?;
+                    }
+                }
+                Ok(LuaValue::Table(table))
+            }
         }
     }
 }
@@ -144,7 +169,7 @@ impl IntoLua for LuaMetric {
                 "tags",
                 LuaMetricTags {
                     tags,
-                    multi_value_tags: self.multi_value_tags,
+                    tag_mode: self.tag_mode,
                 },
             )?;
         }
@@ -350,16 +375,10 @@ mod test {
 
     use super::*;
 
-    fn assert_metric(metric: Metric, multi_value_tags: bool, assertions: Vec<&'static str>) {
+    fn assert_metric(metric: Metric, tag_mode: MetricTagMode, assertions: Vec<&'static str>) {
         let lua = Lua::new();
         lua.globals()
-            .set(
-                "metric",
-                LuaMetric {
-                    metric,
-                    multi_value_tags,
-                },
-            )
+            .set("metric", LuaMetric { metric, tag_mode })
             .unwrap();
 
         for assertion in assertions {
@@ -389,7 +408,7 @@ mod test {
 
         assert_metric(
             metric.clone(),
-            false,
+            MetricTagMode::Single,
             vec![
                 "type(metric) == 'table'",
                 "metric.name == 'example counter'",
@@ -410,7 +429,7 @@ mod test {
         );
         assert_metric(
             metric,
-            true,
+            MetricTagMode::Full,
             vec![
                 "type(metric) == 'table'",
                 "metric.name == 'example counter'",
@@ -448,11 +467,101 @@ mod test {
 
         assert_metric(
             metric,
-            true,
+            MetricTagMode::Full,
             vec![
                 "type(metric.tags) == 'table'",
                 "metric.tags['example tag'][1] == 'a'",
                 "metric.tags['example tag'][2] == 'b'",
+            ],
+        );
+    }
+
+    /// `Auto` exposes single-value tags as scalars and multi-value tags as
+    /// arrays, matching how each shape would naturally appear in Lua.
+    #[test]
+    fn auto_mode_preserves_tag_shapes() {
+        let mut tags = BTreeMap::new();
+        tags.insert(
+            "single".to_string(),
+            TagValueSet::from(vec!["one".to_string()]),
+        );
+        tags.insert(
+            "multi".to_string(),
+            TagValueSet::from(vec!["a".to_string(), "b".to_string()]),
+        );
+        let metric = Metric::new(
+            "example counter",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 1.0 },
+        )
+        .with_tags(Some(MetricTags(tags)));
+
+        assert_metric(
+            metric,
+            MetricTagMode::Auto,
+            vec![
+                "type(metric.tags) == 'table'",
+                "metric.tags['single'] == 'one'",
+                "type(metric.tags['multi']) == 'table'",
+                "metric.tags['multi'][1] == 'a'",
+                "metric.tags['multi'][2] == 'b'",
+            ],
+        );
+    }
+
+    /// `Auto` round-trip: a 1-element multi-value tag is normalised to a
+    /// single-value tag by the metric storage layer (`TagValueSet::Set` is
+    /// never reduced below 2 elements), so it surfaces in Lua as a string
+    /// scalar rather than a 1-element table. This test pins that behaviour
+    /// as intentional -- a true array-shape preserving round-trip needs
+    /// `MetricTagMode::Full`.
+    #[test]
+    fn auto_mode_one_element_array_normalises_to_scalar() {
+        let mut tags = BTreeMap::new();
+        tags.insert(
+            "region".to_string(),
+            TagValueSet::from(vec!["us-east-1".to_string()]),
+        );
+        let metric = Metric::new(
+            "example counter",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 1.0 },
+        )
+        .with_tags(Some(MetricTags(tags)));
+
+        assert_metric(
+            metric,
+            MetricTagMode::Auto,
+            vec![
+                "type(metric.tags) == 'table'",
+                "type(metric.tags['region']) == 'string'",
+                "metric.tags['region'] == 'us-east-1'",
+            ],
+        );
+    }
+
+    /// `Auto` keeps an empty tag set as an array (Lua table). Without this,
+    /// an empty multi-value tag would silently morph into `nil` (and a Lua
+    /// `tags['empty'] = ...` assignment would then need to know the original
+    /// shape to round-trip correctly).
+    #[test]
+    fn auto_mode_empty_set_stays_array() {
+        let mut tags = BTreeMap::new();
+        tags.insert("empty".to_string(), TagValueSet::default());
+        let metric = Metric::new(
+            "example counter",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 1.0 },
+        )
+        .with_tags(Some(MetricTags(tags)));
+
+        assert_metric(
+            metric,
+            MetricTagMode::Auto,
+            vec![
+                "type(metric.tags) == 'table'",
+                "type(metric.tags['empty']) == 'table'",
+                "#metric.tags['empty'] == 0",
             ],
         );
     }
@@ -467,10 +576,10 @@ mod test {
             },
         );
 
-        for multi_value_tags in [false, true] {
+        for tag_mode in [MetricTagMode::Single, MetricTagMode::Full, MetricTagMode::Auto] {
             assert_metric(
                 metric.clone(),
-                multi_value_tags,
+                tag_mode,
                 vec![
                     "metric.timestamp == nil",
                     "metric.tags == nil",
@@ -490,7 +599,7 @@ mod test {
         );
         assert_metric(
             metric,
-            false,
+            MetricTagMode::Single,
             vec!["metric.gauge.value == 1.6180339", "metric.counter == nil"],
         );
     }
@@ -508,7 +617,7 @@ mod test {
         );
         assert_metric(
             metric,
-            false,
+            MetricTagMode::Single,
             vec![
                 "type(metric.set) == 'table'",
                 "type(metric.set.values) == 'table'",
@@ -531,7 +640,7 @@ mod test {
         );
         assert_metric(
             metric,
-            false,
+            MetricTagMode::Single,
             vec![
                 "type(metric.distribution) == 'table'",
                 "#metric.distribution.values == 2",
@@ -557,7 +666,7 @@ mod test {
         );
         assert_metric(
             metric,
-            false,
+            MetricTagMode::Single,
             vec![
                 "type(metric.aggregated_histogram) == 'table'",
                 "#metric.aggregated_histogram.buckets == 4",
@@ -588,7 +697,7 @@ mod test {
 
         assert_metric(
             metric,
-            false,
+            MetricTagMode::Single,
             vec![
                 "type(metric.aggregated_summary) == 'table'",
                 "#metric.aggregated_summary.quantiles == 7",
