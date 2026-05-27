@@ -335,6 +335,7 @@ impl Table for CuckooMemoryTable {
                                 associated_data.get_fingerprint()
                             ))),
                         ),
+                        (KeyString::from("value"), Value::Null),
                     ]);
                     if let Ok(ttl) = associated_data.get_stored_ttl_value()
                         && let Ok(ttl) = (ttl as u64 * self.config.scan_interval.get()).try_into()
