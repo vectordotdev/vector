@@ -127,6 +127,7 @@ jobs:
             aws service
             azure service
             confluent service
+            databricks_zerobus sink
             datadog service
             elastic service
             gcp service
