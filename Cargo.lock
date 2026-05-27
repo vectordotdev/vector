@@ -4228,13 +4228,11 @@ dependencies = [
  "futures-util",
  "glob",
  "indexmap 2.12.0",
- "libc",
  "quickcheck",
  "tempfile",
  "tokio",
  "tracing 0.1.44",
  "vector-common",
- "winapi",
 ]
 
 [[package]]
