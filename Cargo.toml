@@ -186,7 +186,6 @@ rand_distr = { version = "0.5.1", default-features = false }
 rdkafka = { version = "0.39.0", default-features = false }
 regex = { version = "1.12.3", default-features = false, features = ["std", "perf"] }
 reqwest = { version = "0.11", features = ["json"] }
-rust_decimal = { version = "1.40.0", default-features = false, features = ["std"] }
 semver = { version = "1.0.28", default-features = false, features = ["serde", "std"] }
 serde = { version = "1.0.219", default-features = false, features = ["alloc", "derive", "rc"] }
 serde_json = { version = "1.0.149", default-features = false, features = ["preserve_order", "raw_value", "std"] }
@@ -427,7 +426,6 @@ redis = { version = "0.32.4", default-features = false, features = ["connection-
 regex.workspace = true
 roaring = { version = "0.11.2", default-features = false, features = ["std"], optional = true }
 rumqttc = { version = "0.24.0", default-features = false, features = ["use-rustls"], optional = true }
-rust_decimal = { workspace = true, optional = true }
 seahash = { version = "4.1.0", default-features = false }
 smallvec = { version = "1", default-features = false, features = ["union", "serde"] }
 snap = { version = "1.1.1", default-features = false }
@@ -918,7 +916,7 @@ sinks-azure_logs_ingestion = ["dep:azure_core", "dep:azure_identity", "dep:azure
 sinks-azure_monitor_logs = []
 sinks-blackhole = []
 sinks-chronicle = []
-sinks-clickhouse = ["dep:nom", "dep:rust_decimal", "codecs-arrow"]
+sinks-clickhouse = ["dep:nom", "codecs-arrow"]
 sinks-console = []
 sinks-databend = ["dep:databend-client"]
 sinks-databricks-zerobus = ["dep:databricks-zerobus-ingest-sdk", "dep:prost-reflect", "dep:base64"]
