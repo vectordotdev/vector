@@ -2698,10 +2698,8 @@ dependencies = [
  "async-trait",
  "bytes",
  "chrono",
- "chrono-tz",
  "csv-core",
  "derivative",
- "derive_more",
  "dyn-clone",
  "flate2",
  "futures",
@@ -2718,9 +2716,7 @@ dependencies = [
  "rand 0.9.4",
  "regex",
  "rstest",
- "rust_decimal",
  "serde",
- "serde-aux",
  "serde_json",
  "serde_with",
  "similar-asserts",
@@ -3778,7 +3774,6 @@ dependencies = [
  "snafu 0.9.0",
  "tracing 0.1.44",
  "vector-common",
- "vector-config",
  "vector-core",
  "vector-lookup",
  "vrl",
@@ -4275,7 +4270,6 @@ dependencies = [
  "chrono",
  "crc",
  "dashmap",
- "glob",
  "libc",
  "quickcheck",
  "serde",
@@ -10288,18 +10282,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "serde-aux"
-version = "4.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "207f67b28fe90fb596503a9bf0bf1ea5e831e21307658e177c5dfcdfc3ab8a0a"
-dependencies = [
- "chrono",
- "serde",
- "serde-value",
- "serde_json",
-]
-
-[[package]]
 name = "serde-toml-merge"
 version = "0.3.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12836,7 +12818,6 @@ dependencies = [
  "arc-swap",
  "arr_macro",
  "arrow 56.2.0",
- "arrow-schema 56.2.0",
  "assert_cmd",
  "async-compression",
  "async-nats",
@@ -12871,7 +12852,6 @@ dependencies = [
  "base64 0.22.1",
  "bloomy",
  "bollard",
- "byteorder",
  "bytes",
  "bytesize",
  "cfg-if",
@@ -12910,13 +12890,11 @@ dependencies = [
  "headers 0.3.9",
  "heim",
  "hex",
- "hickory-proto",
  "hostname 0.4.2",
  "http 0.2.12",
  "http 1.3.1",
  "http-body 0.4.6",
  "http-serde",
- "humantime",
  "hyper 0.14.32",
  "hyper-openssl 0.9.2",
  "hyper-proxy",
@@ -12933,7 +12911,6 @@ dependencies = [
  "loki-logproto",
  "lru",
  "maxminddb",
- "md-5",
  "metrics",
  "metrics-tracing-context",
  "mlua",
@@ -12949,7 +12926,6 @@ dependencies = [
  "openssl-src",
  "ordered-float 4.6.0",
  "parquet",
- "pastey",
  "percent-encoding",
  "pin-project",
  "postgres-openssl",
@@ -13072,7 +13048,6 @@ dependencies = [
  "criterion",
  "crossbeam-queue",
  "crossbeam-utils",
- "dashmap",
  "derivative",
  "fslock",
  "futures",
@@ -13082,8 +13057,6 @@ dependencies = [
  "metrics-tracing-context",
  "metrics-util",
  "num-traits",
- "ordered-float 4.6.0",
- "pastey",
  "proptest",
  "quickcheck",
  "rand 0.9.4",
@@ -13215,7 +13188,6 @@ dependencies = [
  "http 0.2.12",
  "hyper-proxy",
  "indexmap 2.12.0",
- "inventory",
  "ipnet",
  "metrics",
  "metrics-tracing-context",
@@ -13355,22 +13327,17 @@ name = "vector-top"
 version = "0.1.0"
 dependencies = [
  "chrono",
- "clap",
  "crossterm",
- "exitcode",
  "futures",
- "futures-util",
  "glob",
  "http 0.2.12",
  "humantime",
- "indoc",
  "num-format",
  "ratatui",
  "regex",
  "tokio",
  "tokio-stream",
  "unit-prefix",
- "url",
  "vector-api-client",
  "vector-common",
 ]
