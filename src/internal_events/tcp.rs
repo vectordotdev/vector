@@ -46,10 +46,12 @@ impl InternalEvent for TcpSocketConnectionShutdown {
     }
 }
 
-/// Emitted once per accepted TCP source connection, after the read/ack loop
-/// exits — regardless of whether the exit was graceful (peer EOF, shutdown
-/// signal) or caused by an error (decoder failure, downstream closed,
-/// ack write failure). Pairs with `ConnectionOpen`.
+/// Emitted once per accepted TCP source connection, after the per-connection
+/// task exits — regardless of cause. This includes pre-loop exits (TLS
+/// handshake failure, shutdown signal arriving during handshake) as well as
+/// every read/ack loop exit (graceful peer EOF, decoder failure, downstream
+/// closed, ack write failure, shutdown signal, tripwire, max connection
+/// duration). Pairs exactly with `ConnectionOpen`.
 #[derive(Debug, NamedInternalEvent)]
 pub struct TcpSourceConnectionShutdown;
 
