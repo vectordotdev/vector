@@ -1,15 +1,15 @@
 package metadata
 
 generated: components: transforms: delay: configuration: {
-	delay_ms: {
-		description: "Time to delay each event, in milliseconds."
-		required:    true
-		type: uint: unit: "milliseconds"
-	}
 	condition: {
 		description: "Delay events in provided delay periods until the condition is met."
 		required:    false
 		type: condition: {}
+	}
+	delay_ms: {
+		description: "Time to delay each event, in milliseconds."
+		required:    true
+		type: uint: unit: "milliseconds"
 	}
 	overflow_strategy: {
 		description: "Strategy to handle full queue capacity."
