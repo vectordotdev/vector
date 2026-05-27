@@ -14,7 +14,7 @@ use cuckoo_clock::{
 };
 use futures::{StreamExt, stream::BoxStream};
 use tempfile::NamedTempFile;
-use tokio::time::interval;
+use tokio::time::{Instant, interval_at};
 use tokio_stream::wrappers::IntervalStream;
 use vector_config::configurable_component;
 use vector_lib::{
@@ -388,20 +388,29 @@ impl StreamSink<Event> for CuckooMemoryTable {
     async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
         let events_sent = register!(EventsSent::from(Output(None)));
         let bytes_sent = register!(BytesSent::from(Protocol("memory_enrichment_table".into(),)));
-        let mut scan_interval = IntervalStream::new(interval(Duration::from_secs(
-            self.config.scan_interval.into(),
-        )));
-        let mut flush_interval = IntervalStream::new(interval(
-            self.config
-                .flush_interval
-                .map(Duration::from_secs)
-                .unwrap_or(Duration::MAX),
+        let now = Instant::now();
+        let cuckoo_scan_interval = Duration::from_secs(self.config.scan_interval.into());
+        let mut scan_interval = IntervalStream::new(interval_at(
+            now + cuckoo_scan_interval,
+            cuckoo_scan_interval,
         ));
-        let mut export_interval = IntervalStream::new(interval(
-            self.cuckoo_config
-                .export_interval
-                .map(Duration::from_secs)
-                .unwrap_or(Duration::MAX),
+        let cuckoo_flush_interval = self
+            .config
+            .flush_interval
+            .map(Duration::from_secs)
+            .unwrap_or(Duration::MAX);
+        let mut flush_interval = IntervalStream::new(interval_at(
+            now + cuckoo_flush_interval,
+            cuckoo_flush_interval,
+        ));
+        let cuckoo_export_interval = self
+            .cuckoo_config
+            .export_interval
+            .map(Duration::from_secs)
+            .unwrap_or(Duration::MAX);
+        let mut export_interval = IntervalStream::new(interval_at(
+            now + cuckoo_export_interval,
+            cuckoo_export_interval,
         ));
 
         loop {
