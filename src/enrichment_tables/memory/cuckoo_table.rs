@@ -3,6 +3,7 @@ use std::{
     io::{BufReader, BufWriter, Write},
     num::NonZeroUsize,
     path::PathBuf,
+    pin::Pin,
     time::Duration,
 };
 
@@ -12,9 +13,12 @@ use cuckoo_clock::{
     CuckooFilter, ExportableRandomState, InsertValues, LookupValues,
     config::{CounterConfig, CuckooConfiguration, LruConfig, TtlConfig},
 };
-use futures::{StreamExt, stream::BoxStream};
+use futures::{
+    Stream, StreamExt,
+    stream::{self, BoxStream},
+};
 use tempfile::NamedTempFile;
-use tokio::time::{Instant, interval_at};
+use tokio::time::{Instant, interval, interval_at};
 use tokio_stream::wrappers::IntervalStream;
 use vector_config::configurable_component;
 use vector_lib::{
@@ -390,29 +394,27 @@ impl StreamSink<Event> for CuckooMemoryTable {
         let events_sent = register!(EventsSent::from(Output(None)));
         let bytes_sent = register!(BytesSent::from(Protocol("memory_enrichment_table".into(),)));
         let now = Instant::now();
-        let cuckoo_scan_interval = Duration::from_secs(self.config.scan_interval.into());
+        let scan_interval_duration = Duration::from_secs(self.config.scan_interval.into());
         let mut scan_interval = IntervalStream::new(interval_at(
-            now + cuckoo_scan_interval,
-            cuckoo_scan_interval,
+            now.checked_add(scan_interval_duration).unwrap_or(now),
+            scan_interval_duration,
         ));
-        let cuckoo_flush_interval = self
+        let mut flush_interval: Pin<Box<dyn Stream<Item = Instant> + Send>> = self
             .config
             .flush_interval
             .map(Duration::from_secs)
-            .unwrap_or(Duration::MAX);
-        let mut flush_interval = IntervalStream::new(interval_at(
-            now + cuckoo_flush_interval,
-            cuckoo_flush_interval,
-        ));
-        let cuckoo_export_interval = self
+            .map::<Pin<Box<dyn Stream<Item = Instant> + Send>>, _>(|d| {
+                Box::pin(IntervalStream::new(interval(d)))
+            })
+            .unwrap_or(Box::pin(stream::empty()));
+        let mut export_interval: Pin<Box<dyn Stream<Item = Instant> + Send>> = self
             .cuckoo_config
             .export_interval
             .map(Duration::from_secs)
-            .unwrap_or(Duration::MAX);
-        let mut export_interval = IntervalStream::new(interval_at(
-            now + cuckoo_export_interval,
-            cuckoo_export_interval,
-        ));
+            .map::<Pin<Box<dyn Stream<Item = Instant> + Send>>, _>(|d| {
+                Box::pin(IntervalStream::new(interval(d)))
+            })
+            .unwrap_or(Box::pin(stream::empty()));
 
         loop {
             tokio::select! {
