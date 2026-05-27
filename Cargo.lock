@@ -13021,7 +13021,6 @@ dependencies = [
 name = "vector-api-client"
 version = "0.2.0"
 dependencies = [
- "futures",
  "http 0.2.12",
  "prost 0.12.6",
  "prost-build 0.12.6",
@@ -13418,7 +13417,6 @@ name = "vector-vrl-web-playground"
 version = "0.1.0"
 dependencies = [
  "cargo-lock",
- "enrichment",
  "getrandom 0.2.15",
  "getrandom 0.4.2",
  "gloo-utils",
