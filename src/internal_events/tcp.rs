@@ -141,7 +141,8 @@ impl InternalEvent for TcpSendAckError {
             // could send the acknowledgement. This is a lifecycle event, not an error
             // — log it at warn and skip the component_errors_total increment. The
             // connection_shutdown_total counter is bumped by the unified
-            // TcpSourceConnectionShutdown emit at the source loop exit.
+            // TcpSourceConnectionShutdown emit on the per-connection task's exit
+            // (paired with ConnectionOpen), so we don't bump it here.
             warn!(
                 message = "Connection closed by peer before acknowledgement could be sent.",
                 error = %self.error,
@@ -399,9 +400,9 @@ mod tests {
 
     /// Graceful TLS shutdown during ack write must not bump any counter — the
     /// connection-shutdown increment is owned by `TcpSourceConnectionShutdown`
-    /// at the source loop exit, and the case is not an error so
-    /// `component_errors_total` must stay flat too. This is what the customer
-    /// PR is actually fixing on the metrics side.
+    /// on the per-connection task's exit (paired with `ConnectionOpen`), and
+    /// the case is not an error so `component_errors_total` must stay flat
+    /// too. This is what the customer PR is actually fixing on the metrics side.
     #[tokio::test]
     #[serial]
     async fn graceful_ack_error_does_not_increment_counters() {
