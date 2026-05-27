@@ -12880,6 +12880,7 @@ dependencies = [
  "loki-logproto",
  "lru",
  "maxminddb",
+ "md-5",
  "metrics",
  "metrics-tracing-context",
  "mlua",
