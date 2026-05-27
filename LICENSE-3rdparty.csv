@@ -1,6 +1,5 @@
 Component,Origin,License,Copyright
 adler2,https://github.com/oyvindln/adler2,0BSD OR MIT OR Apache-2.0,"Jonas Schievink <jonasschievink@gmail.com>, oyvindln <oyvindln@users.noreply.github.com>"
-adler32,https://github.com/remram44/adler32-rs,Zlib,Remi Rampin <remirampin@gmail.com>
 aead,https://github.com/RustCrypto/traits,MIT OR Apache-2.0,RustCrypto Developers
 aes,https://github.com/RustCrypto/block-ciphers,MIT OR Apache-2.0,RustCrypto Developers
 aes-siv,https://github.com/RustCrypto/AEADs,Apache-2.0 OR MIT,RustCrypto Developers
@@ -20,7 +19,6 @@ anstyle-parse,https://github.com/rust-cli/anstyle,MIT OR Apache-2.0,The anstyle-
 anstyle-query,https://github.com/rust-cli/anstyle,MIT OR Apache-2.0,The anstyle-query Authors
 anstyle-wincon,https://github.com/rust-cli/anstyle,MIT OR Apache-2.0,The anstyle-wincon Authors
 anyhow,https://github.com/dtolnay/anyhow,MIT OR Apache-2.0,David Tolnay <dtolnay@gmail.com>
-apache-avro,https://github.com/apache/avro,Apache-2.0,Apache Avro team <dev@avro.apache.org>
 apache-avro,https://github.com/apache/avro-rs,Apache-2.0,The apache-avro Authors
 arbitrary,https://github.com/rust-fuzz/arbitrary,MIT OR Apache-2.0,"The Rust-Fuzz Project Developers, Nick Fitzgerald <fitzgen@gmail.com>, Manish Goregaokar <manishsmail@gmail.com>, Simonas Kazlauskas <arbitrary@kazlauskas.me>, Brian L. Troutwine <brian@troutwine.us>, Corey Farwell <coreyf@rwell.org>"
 arc-swap,https://github.com/vorner/arc-swap,MIT OR Apache-2.0,Michal 'vorner' Vaner <vorner@vorner.cz>
@@ -187,7 +185,6 @@ cookie_store,https://github.com/pfernie/cookie_store,MIT OR Apache-2.0,Patrick F
 core-foundation,https://github.com/servo/core-foundation-rs,MIT  OR  Apache-2.0,The Servo Project Developers
 core-foundation,https://github.com/servo/core-foundation-rs,MIT OR Apache-2.0,The Servo Project Developers
 core-foundation-sys,https://github.com/servo/core-foundation-rs,MIT OR Apache-2.0,The Servo Project Developers
-core2,https://github.com/bbqsrc/core2,Apache-2.0 OR MIT,Brendan Molloy <brendan@bbqsrc.net>
 cpufeatures,https://github.com/RustCrypto/utils,MIT OR Apache-2.0,RustCrypto Developers
 crc,https://github.com/mrhooray/crc-rs,MIT OR Apache-2.0,"Rui Hu <code@mrhooray.com>, Akhil Velagapudi <4@4khil.com>"
 crc-catalog,https://github.com/akhilles/crc-catalog,MIT OR Apache-2.0,Akhil Velagapudi <akhilvelagapudi@gmail.com>
@@ -213,7 +210,6 @@ curve25519-dalek-derive,https://github.com/dalek-cryptography/curve25519-dalek,M
 darling,https://github.com/TedDriggs/darling,MIT,Ted Driggs <ted.driggs@outlook.com>
 darling_core,https://github.com/TedDriggs/darling,MIT,Ted Driggs <ted.driggs@outlook.com>
 darling_macro,https://github.com/TedDriggs/darling,MIT,Ted Driggs <ted.driggs@outlook.com>
-dary_heap,https://github.com/hanmertens/dary_heap,MIT OR Apache-2.0,Han Mertens <hanmertens@outlook.com>
 dashmap,https://github.com/xacrimon/dashmap,MIT,Acrimon <joel.wejdenstal@gmail.com>
 data-encoding,https://github.com/ia0/data-encoding,MIT,Julien Cretin <git@ia0.eu>
 data-url,https://github.com/servo/rust-url,MIT OR Apache-2.0,Simon Sapin <simon.sapin@exyr.org>
@@ -431,8 +427,6 @@ lexical-util,https://github.com/Alexhuszagh/rust-lexical,MIT OR Apache-2.0,Alex 
 lexical-write-float,https://github.com/Alexhuszagh/rust-lexical,MIT OR Apache-2.0,Alex Huszagh <ahuszagh@gmail.com>
 lexical-write-integer,https://github.com/Alexhuszagh/rust-lexical,MIT OR Apache-2.0,Alex Huszagh <ahuszagh@gmail.com>
 libc,https://github.com/rust-lang/libc,MIT OR Apache-2.0,The Rust Project Developers
-libflate,https://github.com/sile/libflate,MIT,Takeru Ohta <phjgt308@gmail.com>
-libflate_lz77,https://github.com/sile/libflate,MIT,Takeru Ohta <phjgt308@gmail.com>
 libm,https://github.com/rust-lang/libm,MIT OR Apache-2.0,Jorge Aparicio <jorge@japaric.io>
 libsqlite3-sys,https://github.com/rusqlite/rusqlite,MIT,The rusqlite developers
 libz-sys,https://github.com/rust-lang/libz-sys,MIT OR Apache-2.0,"Alex Crichton <alex@alexcrichton.com>, Josh Triplett <josh@joshtriplett.org>, Sebastian Thiel <sebastian.thiel@icloud.com>"
@@ -648,7 +642,6 @@ rfc6979,https://github.com/RustCrypto/signatures/tree/master/rfc6979,Apache-2.0 
 ring,https://github.com/briansmith/ring,Apache-2.0 AND ISC,The ring Authors
 rkyv,https://github.com/rkyv/rkyv,MIT,David Koloski <djkoloski@gmail.com>
 rkyv_derive,https://github.com/rkyv/rkyv,MIT,David Koloski <djkoloski@gmail.com>
-rle-decode-fast,https://github.com/WanzenBug/rle-decode-helper,MIT OR Apache-2.0,Moritz Wanzenböck <moritz@wanzenbug.xyz>
 rmp,https://github.com/3Hren/msgpack-rust,MIT,"Evgeny Safronov <division494@gmail.com>, Kornel <kornel@geekhood.net>"
 rmp-serde,https://github.com/3Hren/msgpack-rust,MIT,Evgeny Safronov <division494@gmail.com>
 rmpv,https://github.com/3Hren/msgpack-rust,MIT,Evgeny Safronov <division494@gmail.com>
