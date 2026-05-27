@@ -3,6 +3,7 @@ use std::{num::NonZeroUsize, pin::Pin, time::Duration};
 use async_stream::stream;
 use futures::{Stream, StreamExt};
 use serde_with::serde_as;
+use snafu::Snafu;
 use tokio_util::time::DelayQueue;
 use vector_lib::configurable::configurable_component;
 use vector_lib::internal_event::INTENTIONAL;
@@ -84,6 +85,9 @@ impl_generate_config_from_default!(DelayConfig);
 #[typetag::serde(name = "delay")]
 impl TransformConfig for DelayConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
+        if self.delay_ms.as_millis() == 0 {
+            return Err(Box::new(BuildError::ZeroDelayDuration));
+        }
         Ok(Transform::event_task(Delay::new(self, context)?))
     }
 
@@ -213,6 +217,12 @@ impl TaskTransform<Event> for Delay {
             }
         })
     }
+}
+
+#[derive(Debug, Snafu)]
+pub enum BuildError {
+    #[snafu(display("The delay duration must not be zero"))]
+    ZeroDelayDuration,
 }
 
 #[cfg(test)]
