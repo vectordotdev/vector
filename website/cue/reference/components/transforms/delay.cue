@@ -9,7 +9,7 @@ components: transforms: delay: {
 
 	classes: {
 		commonly_used: false
-		development:   "stable"
+		development:   "alpha"
 		egress_method: "stream"
 		stateful:      true
 	}
