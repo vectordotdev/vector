@@ -16,9 +16,7 @@ This applies whether you wrote the code yourself, used AI as a coding assistant,
 
 ## Keep conversations human
 
-GitHub discussions (issues, PR descriptions, review threads) are how our community thinks together. We'd love for those to be written in your own voice. Pasting AI output into a review thread isn't a great substitute for engaging with feedback.
-
-AI is great for polishing grammar and prose, and that's totally fine. We just ask that the substance and ideas are yours.
+GitHub discussions (issues, PR descriptions, review threads) are how our community thinks together. Honestly, if a response is thoughtful and on point, does it matter whether a human wrote every word? We don't think so. What we'd rather avoid is raw AI output forwarded into a thread without review — that's not engaging with feedback, it's delegating it.
 
 ## Quality over volume
 
