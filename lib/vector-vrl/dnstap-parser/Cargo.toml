@@ -22,8 +22,3 @@ vrl.workspace = true
 
 [build-dependencies]
 prost-build.workspace = true
-
-[dev-dependencies]
-anyhow.workspace = true
-chrono-tz.workspace = true
-pastey.workspace = true
