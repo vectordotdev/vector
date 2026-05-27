@@ -46,7 +46,7 @@ fn quote_sql_string(value: &str) -> String {
 
 fn file_format_option_sql(key: &str, value: &str) -> String {
     let value = match key {
-        "field_delimiter" | "record_delimiter" | "missing_field_as" => quote_sql_string(value),
+        "field_delimiter" | "record_delimiter" => quote_sql_string(value),
         _ => value.to_string(),
     };
 
@@ -353,6 +353,10 @@ mod tests {
             file_format_option_sql("record_delimiter", "\n"),
             "record_delimiter='\\n'"
         );
+        assert_eq!(
+            file_format_option_sql("missing_field_as", "NULL"),
+            "missing_field_as=NULL"
+        );
         assert_eq!(file_format_option_sql("skip_header", "0"), "skip_header=0");
     }
 
@@ -361,6 +365,7 @@ mod tests {
         let options = BTreeMap::from([
             ("compression", "GZIP"),
             ("field_delimiter", ","),
+            ("missing_field_as", "FIELD_DEFAULT"),
             ("record_delimiter", "\n"),
             ("skip_header", "0"),
             ("type", "CSV"),
@@ -374,7 +379,7 @@ mod tests {
 
         assert_eq!(
             sql,
-            "compression=GZIP field_delimiter=',' record_delimiter='\\n' skip_header=0 type=CSV"
+            "compression=GZIP field_delimiter=',' missing_field_as=FIELD_DEFAULT record_delimiter='\\n' skip_header=0 type=CSV"
         );
     }
 }
