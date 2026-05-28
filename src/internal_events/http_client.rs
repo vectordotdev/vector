@@ -20,8 +20,11 @@ fn remove_sensitive(headers: &HeaderMap<HeaderValue>) -> HeaderMap<HeaderValue> 
     let sensitive: &[HeaderName] = &[
         header::AUTHORIZATION,
         header::PROXY_AUTHORIZATION,
+        header::PROXY_AUTHENTICATE,
+        header::WWW_AUTHENTICATE,
         header::COOKIE,
         header::SET_COOKIE,
+        HeaderName::from_static("cookie2"),
         HeaderName::from_static("dd-api-key"),
         HeaderName::from_static("x-honeycomb-team"),
         HeaderName::from_static("x-api-key"),
