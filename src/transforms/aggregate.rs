@@ -49,28 +49,28 @@ pub enum AggregationMode {
     #[default]
     Auto,
 
-    /// Sums incremental metrics, ignores absolute
+    /// Sums incremental metrics; absolute metrics pass through unchanged.
     Sum,
 
-    /// Returns the latest value for absolute metrics, ignores incremental
+    /// Returns the latest value for absolute metrics; incremental metrics pass through unchanged.
     Latest,
 
     /// Counts metrics for incremental and absolute metrics
     Count,
 
-    /// Returns difference between latest value for absolute, ignores incremental
+    /// Returns difference between latest value for absolute; incremental metrics pass through unchanged.
     Diff,
 
-    /// Max value of absolute metric, ignores incremental
+    /// Max value of absolute metric; incremental metrics pass through unchanged.
     Max,
 
-    /// Min value of absolute metric, ignores incremental
+    /// Min value of absolute metric; incremental metrics pass through unchanged.
     Min,
 
-    /// Mean value of absolute metric, ignores incremental
+    /// Mean value of absolute metric; incremental metrics pass through unchanged.
     Mean,
 
-    /// Stdev value of absolute metric, ignores incremental
+    /// Stdev value of absolute metric; incremental metrics pass through unchanged.
     Stdev,
 }
 
@@ -80,32 +80,32 @@ enum InnerMode {
     #[default]
     Auto,
 
-    /// Sums incremental metrics, ignores absolute
+    /// Sums incremental metrics; absolute metrics pass through unchanged.
     Sum,
 
-    /// Returns the latest value for absolute metrics, ignores incremental
+    /// Returns the latest value for absolute metrics; incremental metrics pass through unchanged.
     Latest,
 
     /// Counts metrics for incremental and absolute metrics
     Count,
 
-    /// Returns difference between latest value for absolute, ignores incremental
+    /// Returns difference between latest value for absolute; incremental metrics pass through unchanged.
     Diff {
         prev_map: HashMap<MetricSeries, MetricEntry>,
     },
 
-    /// Max value of absolute metric, ignores incremental
+    /// Max value of absolute metric; incremental metrics pass through unchanged.
     Max,
 
-    /// Min value of absolute metric, ignores incremental
+    /// Min value of absolute metric; incremental metrics pass through unchanged.
     Min,
 
-    /// Mean value of absolute metric, ignores incremental
+    /// Mean value of absolute metric; incremental metrics pass through unchanged.
     Mean {
         multi_map: HashMap<MetricSeries, Vec<MetricEntry>>,
     },
 
-    /// Stdev value of absolute metric, ignores incremental
+    /// Stdev value of absolute metric; incremental metrics pass through unchanged.
     Stdev {
         multi_map: HashMap<MetricSeries, Vec<MetricEntry>>,
     },
