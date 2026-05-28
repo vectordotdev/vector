@@ -3,7 +3,7 @@
 .github/workflows/regression.yml @vectordotdev/vector @vectordotdev/single-machine-performance
 regression/config.yaml @vectordotdev/vector @vectordotdev/single-machine-performance
 
-AI_POLICY.md @vectordotdev/vector @vectordotdev/documentation
+/*.md @vectordotdev/vector @vectordotdev/documentation
 
 # Keep documentation team paths in sync with .github/workflows/add_docs_review_label.yml
 docs/ @vectordotdev/vector @vectordotdev/documentation
