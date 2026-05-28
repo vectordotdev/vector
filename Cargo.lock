@@ -7123,7 +7123,7 @@ dependencies = [
  "serde_with",
  "sha1",
  "sha2",
- "socket2 0.6.0",
+ "socket2 0.6.3",
  "stringprep",
  "strsim",
  "take_mut",
