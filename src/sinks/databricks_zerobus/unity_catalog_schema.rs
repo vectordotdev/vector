@@ -313,15 +313,37 @@ fn format_kind_type(kind: &prost_reflect::Kind) -> String {
 /// wrapper adds the `FileDescriptorProto` / `DescriptorPool` plumbing that
 /// Vector needs to get a `prost_reflect::MessageDescriptor` usable for
 /// dynamic message encoding.
+///
+/// Returns both the `MessageDescriptor` (for dynamic encoding via prost-reflect)
+/// and the SDK-typed `DescriptorProto` (prost-types 0.14, used when constructing
+/// the Zerobus stream). Returning both lets us avoid re-encoding the descriptor
+/// on every stream rebuild.
 pub fn generate_descriptor_from_schema(
     schema: &UnityCatalogTableSchema,
-) -> Result<prost_reflect::MessageDescriptor, ZerobusSinkError> {
-    let message_proto =
+) -> Result<
+    (
+        prost_reflect::MessageDescriptor,
+        prost_types_014::DescriptorProto,
+    ),
+    ZerobusSinkError,
+> {
+    let sdk_message_proto =
         descriptor_from_uc_schema(schema).map_err(|e| ZerobusSinkError::ConfigError {
             message: format!("Failed to convert Unity Catalog schema to protobuf: {}", e),
         })?;
 
-    let message_name = message_proto.name().to_string();
+    // The SDK returns a prost-types 0.14 DescriptorProto, but prost-reflect (used
+    // below to build the descriptor pool) is on prost-types 0.13. Re-encode through
+    // the protobuf wire format to bridge the two versions.
+    let message_name = sdk_message_proto.name().to_string();
+    let encoded = prost_014::Message::encode_to_vec(&sdk_message_proto);
+    let message_proto =
+        <prost_reflect::prost_types::DescriptorProto as prost_reflect::prost::Message>::decode(
+            encoded.as_slice(),
+        )
+        .map_err(|e| ZerobusSinkError::ConfigError {
+            message: format!("Failed to re-decode SDK DescriptorProto: {}", e),
+        })?;
     let package_name = sanitize_package_name(&schema.catalog_name);
 
     let file_proto = prost_types::FileDescriptorProto {
@@ -355,7 +377,7 @@ pub fn generate_descriptor_from_schema(
         );
     }
 
-    Ok(message_descriptor)
+    Ok((message_descriptor, sdk_message_proto))
 }
 
 /// Default prefix for package name segments that start with a non-letter.
@@ -438,7 +460,7 @@ mod tests {
             ],
         };
 
-        let descriptor =
+        let (descriptor, _sdk_proto) =
             generate_descriptor_from_schema(&schema).expect("descriptor should be generated");
         assert_eq!(descriptor.fields().len(), 2);
         assert!(descriptor.get_field_by_name("id").is_some());
@@ -454,7 +476,7 @@ mod tests {
         let schema: UnityCatalogTableSchema =
             serde_json::from_str(json).expect("Failed to parse nested_structs_complete schema");
 
-        let descriptor =
+        let (descriptor, _sdk_proto) =
             generate_descriptor_from_schema(&schema).expect("Failed to generate descriptor");
 
         let proto_text = format_descriptor_as_proto(&descriptor);

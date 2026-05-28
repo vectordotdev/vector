@@ -277,7 +277,9 @@ impl MockStream {
 /// Schema and encoding state derived from the Unity Catalog table.
 pub(super) struct ResolvedSchema {
     encoder: BatchEncoder,
-    descriptor_proto: Arc<prost_reflect::prost_types::DescriptorProto>,
+    /// SDK-typed (prost-types 0.14) descriptor — held in this form so each
+    /// stream rebuild avoids re-encoding from the prost-reflect 0.13 form.
+    descriptor_proto: Arc<prost_types_014::DescriptorProto>,
 }
 
 /// Service for handling Zerobus requests.
@@ -318,10 +320,21 @@ impl ZerobusService {
     }
 
     /// Resolve the protobuf message descriptor from Unity Catalog.
+    ///
+    /// Returns both the prost-reflect `MessageDescriptor` (used by the proto
+    /// batch encoder) and the SDK-typed `DescriptorProto` (used to construct
+    /// Zerobus streams). Returning both avoids re-encoding the descriptor
+    /// every time a stream is rebuilt after a retryable failure.
     async fn resolve_descriptor(
         config: &ZerobusSinkConfig,
         http_client: &HttpClient,
-    ) -> Result<prost_reflect::MessageDescriptor, ZerobusSinkError> {
+    ) -> Result<
+        (
+            prost_reflect::MessageDescriptor,
+            prost_types_014::DescriptorProto,
+        ),
+        ZerobusSinkError,
+    > {
         let (client_id, client_secret) = config.auth.credentials();
 
         let table_schema = unity_catalog_schema::fetch_table_schema(
@@ -340,8 +353,9 @@ impl ZerobusService {
     pub(super) async fn ensure_schema(&self) -> Result<&ResolvedSchema, ZerobusSinkError> {
         self.schema
             .get_or_try_init(|| async {
-                let descriptor = Self::resolve_descriptor(&self.config, &self.http_client).await?;
-                let descriptor_proto = Arc::new(descriptor.descriptor_proto().clone());
+                let (descriptor, sdk_descriptor_proto) =
+                    Self::resolve_descriptor(&self.config, &self.http_client).await?;
+                let descriptor_proto = Arc::new(sdk_descriptor_proto);
 
                 let batch_serializer =
                     BatchSerializerConfig::ProtoBatch(ProtoBatchSerializerConfig {
