@@ -154,36 +154,6 @@ impl InternalEvent for TcpSendAckError {
     }
 }
 
-// SSL_R_PROTOCOL_IS_SHUTDOWN from openssl/include/openssl/sslerr.h. Stable across
-// OpenSSL 1.1.1 and 3.x. Not re-exported by the `openssl-sys` crate so we pin it here.
-const SSL_R_PROTOCOL_IS_SHUTDOWN: std::ffi::c_int = 207;
-
-/// Returns true when an `io::Error` represents a peer-initiated, graceful TLS
-/// shutdown (close_notify), rather than a real I/O failure.
-///
-/// Two cases are recognized:
-/// - `SSL_ERROR_ZERO_RETURN`: the peer sent `close_notify` and we observed it
-///   during this I/O call.
-/// - `SSL_R_PROTOCOL_IS_SHUTDOWN`: a subsequent write after the session was
-///   already shut down ("ssl session has been shut down").
-pub fn is_graceful_tls_shutdown(err: &std::io::Error) -> bool {
-    let Some(ssl) = err
-        .get_ref()
-        .and_then(|inner| inner.downcast_ref::<openssl::ssl::Error>())
-    else {
-        return false;
-    };
-    if ssl.code() == openssl::ssl::ErrorCode::ZERO_RETURN {
-        return true;
-    }
-    ssl.ssl_error().is_some_and(|stack| {
-        stack
-            .errors()
-            .iter()
-            .any(|e| e.reason_code() == SSL_R_PROTOCOL_IS_SHUTDOWN)
-    })
-}
-
 #[derive(Debug, NamedInternalEvent)]
 pub struct TcpBytesReceived {
     pub byte_size: usize,
@@ -208,19 +178,13 @@ impl InternalEvent for TcpBytesReceived {
 #[cfg(test)]
 mod tests {
     use std::io;
-    use std::pin::Pin;
 
-    use crate::tls::{TEST_PEM_CA_PATH, TEST_PEM_CRT_PATH, TEST_PEM_KEY_PATH};
-    use openssl::ssl::{SslAcceptor, SslConnector, SslFiletype, SslMethod, SslVerifyMode};
     use serial_test::serial;
-    use tokio::io::{AsyncReadExt, AsyncWriteExt};
-    use tokio::net::{TcpListener, TcpStream};
-    use tokio_openssl::SslStream;
     use vector_lib::event::MetricValue;
     use vector_lib::internal_event::InternalEvent;
     use vector_lib::metrics::Controller;
 
-    use super::{TcpSendAckError, TcpSourceConnectionClosed, is_graceful_tls_shutdown};
+    use super::{TcpSendAckError, TcpSourceConnectionClosed};
 
     /// Returns the current value of a counter matching `name` and all `tags`.
     /// Counters that have not yet been touched aren't in the snapshot and
@@ -241,88 +205,6 @@ mod tests {
                 other => panic!("expected counter for {name}, got {other:?}"),
             })
             .unwrap_or(0.0)
-    }
-
-    #[test]
-    fn plain_io_errors_are_not_graceful() {
-        for err in [
-            io::Error::from(io::ErrorKind::BrokenPipe),
-            io::Error::from(io::ErrorKind::ConnectionReset),
-            io::Error::from(io::ErrorKind::UnexpectedEof),
-            io::Error::other("not an ssl error"),
-        ] {
-            assert!(
-                !is_graceful_tls_shutdown(&err),
-                "expected non-graceful, got graceful for {err:?}",
-            );
-        }
-    }
-
-    // Drives a real TLS handshake between two local sockets and completes a
-    // bidirectional SSL shutdown. A subsequent write surfaces a `std::io::Error`
-    // wrapping an `openssl::ssl::Error` from the same code path production hits,
-    // validating that the helper correctly identifies it as a graceful shutdown
-    // — without having to synthesize an `openssl::ssl::Error` (whose fields are
-    // crate-private). Bidirectional shutdown is what reliably elicits
-    // SSL_R_PROTOCOL_IS_SHUTDOWN; a half-closed session would still permit
-    // writes per RFC 5246.
-    #[tokio::test]
-    async fn detects_graceful_shutdown_from_real_ssl_stream() {
-        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let addr = listener.local_addr().unwrap();
-
-        let server = tokio::spawn(async move {
-            let (stream, _) = listener.accept().await.unwrap();
-            let mut acceptor = SslAcceptor::mozilla_intermediate(SslMethod::tls()).unwrap();
-            acceptor
-                .set_private_key_file(TEST_PEM_KEY_PATH, SslFiletype::PEM)
-                .unwrap();
-            acceptor
-                .set_certificate_chain_file(TEST_PEM_CRT_PATH)
-                .unwrap();
-            let acceptor = acceptor.build();
-            let ssl = openssl::ssl::Ssl::new(acceptor.context()).unwrap();
-            let mut tls = SslStream::new(ssl, stream).unwrap();
-            Pin::new(&mut tls).accept().await.unwrap();
-            // Cleanly close the SSL session — sends close_notify and waits for the peer's.
-            Pin::new(&mut tls).shutdown().await.unwrap();
-        });
-
-        let mut connector = SslConnector::builder(SslMethod::tls()).unwrap();
-        connector.set_ca_file(TEST_PEM_CA_PATH).unwrap();
-        connector.set_verify(SslVerifyMode::NONE);
-        let ssl = connector
-            .build()
-            .configure()
-            .unwrap()
-            .into_ssl("localhost")
-            .unwrap();
-        let stream = TcpStream::connect(addr).await.unwrap();
-        let mut tls = SslStream::new(ssl, stream).unwrap();
-        Pin::new(&mut tls).connect().await.unwrap();
-
-        // Drain the server's close_notify so our SSL state observes the peer shutdown.
-        let mut buf = [0u8; 1];
-        let n = tls.read(&mut buf).await.unwrap();
-        assert_eq!(n, 0, "expected EOF from peer's close_notify");
-
-        // Complete the bidirectional SSL shutdown locally. Once both sides are
-        // shut down, OpenSSL marks the session as SHUTDOWN and any further write
-        // returns SSL_R_PROTOCOL_IS_SHUTDOWN ("ssl session has been shut down").
-        Pin::new(&mut tls).shutdown().await.unwrap();
-
-        let err = tls
-            .write_all(b"too late")
-            .await
-            .expect_err("write after bidirectional shutdown should fail");
-
-        assert!(
-            is_graceful_tls_shutdown(&err),
-            "expected graceful shutdown detection, got: {err:?} (inner: {:?})",
-            err.get_ref(),
-        );
-
-        server.await.unwrap();
     }
 
     /// `TcpSourceConnectionClosed` MUST bump `connection_shutdown_total{mode="tcp"}`

@@ -37,8 +37,9 @@ use crate::{
     internal_events::{
         ConnectionOpen, OpenGauge, SocketBindError, SocketEventsReceived, SocketMode,
         SocketReceiveError, StreamClosedError, TcpBytesReceived, TcpSendAckError,
-        TcpSocketTlsConnectionError, TcpSourceConnectionClosed, is_graceful_tls_shutdown,
+        TcpSocketTlsConnectionError, TcpSourceConnectionClosed,
     },
+    net::is_graceful_tls_shutdown,
     sources::util::{AfterReadExt, LenientFramedRead},
 };
 
