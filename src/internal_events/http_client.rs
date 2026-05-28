@@ -136,9 +136,16 @@ mod tests {
     #[test]
     fn marks_single_sensitive_header() {
         let mut headers = HeaderMap::new();
-        headers.insert(header::AUTHORIZATION, HeaderValue::from_static("Bearer token"));
+        headers.insert(
+            header::AUTHORIZATION,
+            HeaderValue::from_static("Bearer token"),
+        );
         let result = remove_sensitive(&headers);
-        assert!(is_sensitive(&result, &header::AUTHORIZATION).iter().all(|&s| s));
+        assert!(
+            is_sensitive(&result, &header::AUTHORIZATION)
+                .iter()
+                .all(|&s| s)
+        );
     }
 
     #[test]
@@ -152,14 +159,24 @@ mod tests {
         let result = remove_sensitive(&headers);
         let sensitive_flags = is_sensitive(&result, &x_api_key);
         assert_eq!(sensitive_flags.len(), 3);
-        assert!(sensitive_flags.iter().all(|&s| s), "not all duplicate x-api-key values were marked sensitive: {sensitive_flags:?}");
+        assert!(
+            sensitive_flags.iter().all(|&s| s),
+            "not all duplicate x-api-key values were marked sensitive: {sensitive_flags:?}"
+        );
     }
 
     #[test]
     fn does_not_mark_non_sensitive_headers() {
         let mut headers = HeaderMap::new();
-        headers.insert(header::CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        headers.insert(
+            header::CONTENT_TYPE,
+            HeaderValue::from_static("application/json"),
+        );
         let result = remove_sensitive(&headers);
-        assert!(is_sensitive(&result, &header::CONTENT_TYPE).iter().all(|&s| !s));
+        assert!(
+            is_sensitive(&result, &header::CONTENT_TYPE)
+                .iter()
+                .all(|&s| !s)
+        );
     }
 }
