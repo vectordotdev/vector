@@ -285,6 +285,23 @@ pub(super) struct ResolvedSchema {
     arrow_schema: Arc<arrow::datatypes::Schema>,
 }
 
+#[cfg(test)]
+impl ResolvedSchema {
+    /// Build a `ResolvedSchema` directly from an Arrow schema, mirroring what
+    /// `ensure_schema` does after a Unity Catalog fetch. Lets encoding tests
+    /// exercise the real `BatchEncoder` without a network round-trip.
+    fn for_test(schema: arrow::datatypes::Schema) -> Self {
+        let batch_serializer =
+            BatchSerializerConfig::ArrowStream(ArrowStreamSerializerConfig::new(schema.clone()))
+                .build_batch_serializer()
+                .expect("arrow batch serializer should build");
+        Self {
+            encoder: BatchEncoder::new(batch_serializer),
+            arrow_schema: Arc::new(schema),
+        }
+    }
+}
+
 /// Service for handling Zerobus requests.
 pub struct ZerobusService {
     sdk: Arc<ZerobusSdk>,
@@ -368,6 +385,15 @@ impl ZerobusService {
             .await
     }
 
+    /// Encode the whole batch into a single Arrow `RecordBatch`.
+    ///
+    /// Encoding is all-or-nothing: if any event fails to encode against the
+    /// table's Arrow schema — most commonly an event missing (or null on) a
+    /// column the Unity Catalog table declares `NOT NULL` — the entire batch
+    /// fails with a non-retryable `EncodingError` and is dropped. UC columns are
+    /// nullable by default, so this only affects tables with explicit `NOT NULL`
+    /// columns. The underlying codec emits `EncoderNullConstraintError` naming
+    /// the offending field(s).
     pub(super) fn encode_batch(
         schema: &ResolvedSchema,
         events: &[Event],
@@ -406,6 +432,14 @@ impl ZerobusService {
             let (client_id, client_secret) = self.config.auth.credentials();
             let (client_id, client_secret) = (client_id.to_string(), client_secret.to_string());
 
+            // We override only the two timeouts that `stream_options` exposes and
+            // otherwise accept the SDK's Arrow-stream defaults — notably
+            // `recovery = true`, so the SDK transparently reconnects and replays
+            // in-flight batches on transient stream errors. That layers under
+            // Vector's own retry: the SDK absorbs brief blips, and only surfaces a
+            // retryable error (triggering a fresh stream via Tower retry) once its
+            // own recovery budget is exhausted. Both layers are at-least-once, so
+            // a reconnect may re-send unacknowledged batches.
             let stream_options = &self.config.stream_options;
             let stream = self
                 .sdk
@@ -977,5 +1011,81 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(resp.status, vector_lib::event::EventStatus::Delivered);
+    }
+
+    /// Encode real log events against a schema covering the common UC→Arrow
+    /// types and assert the resulting `RecordBatch` columns, types, and a null
+    /// in a nullable column. Exercises the production `encode_batch` path
+    /// (`ArrowStreamSerializer` → `RecordBatch`), which the mock stream tests
+    /// bypass.
+    #[test]
+    fn encode_batch_maps_events_to_record_batch() {
+        use crate::event::LogEvent;
+        use arrow::array::{Array, AsArray};
+        use arrow::datatypes::{
+            DataType, Field, Int64Type, Schema, TimeUnit, TimestampMicrosecondType,
+        };
+        use chrono::Utc;
+
+        let schema = Schema::new(vec![
+            Field::new("id", DataType::Int64, false),
+            Field::new("body", DataType::LargeUtf8, true),
+            Field::new(
+                "ts",
+                DataType::Timestamp(TimeUnit::Microsecond, Some("UTC".into())),
+                true,
+            ),
+        ]);
+        let resolved = ResolvedSchema::for_test(schema);
+
+        let mut e1 = LogEvent::default();
+        e1.insert("id", 1i64);
+        e1.insert("body", "hello");
+        e1.insert("ts", Utc::now());
+
+        let mut e2 = LogEvent::default();
+        e2.insert("id", 2i64);
+        // `body` and `ts` omitted — both nullable, so they encode as null.
+
+        let batch =
+            ZerobusService::encode_batch(&resolved, &[Event::Log(e1), Event::Log(e2)]).unwrap();
+
+        assert_eq!(batch.num_rows(), 2);
+        assert_eq!(batch.num_columns(), 3);
+
+        let ids = batch.column(0).as_primitive::<Int64Type>();
+        assert_eq!(ids.value(0), 1);
+        assert_eq!(ids.value(1), 2);
+
+        // LargeUtf8 -> LargeStringArray (i64 offsets).
+        let body = batch.column(1).as_string::<i64>();
+        assert_eq!(body.value(0), "hello");
+        assert!(body.is_null(1));
+
+        let ts = batch.column(2).as_primitive::<TimestampMicrosecondType>();
+        assert!(!ts.is_null(0));
+        assert!(ts.is_null(1));
+    }
+
+    /// An event missing a column the table declares `NOT NULL` fails the whole
+    /// batch with a non-retryable `EncodingError` (the batch is dropped, not
+    /// replayed). Locks in the documented strict-null behavior.
+    #[test]
+    fn encode_batch_rejects_event_missing_non_nullable_field() {
+        use crate::event::LogEvent;
+        use arrow::datatypes::{DataType, Field, Schema};
+
+        let schema = Schema::new(vec![
+            Field::new("id", DataType::Int64, false), // NOT NULL
+            Field::new("body", DataType::LargeUtf8, true),
+        ]);
+        let resolved = ResolvedSchema::for_test(schema);
+
+        let mut e = LogEvent::default();
+        e.insert("body", "no id here"); // `id` omitted
+
+        let err = ZerobusService::encode_batch(&resolved, &[Event::Log(e)]).unwrap_err();
+        assert!(matches!(err, ZerobusSinkError::EncodingError { .. }));
+        assert!(!err.is_retryable());
     }
 }
