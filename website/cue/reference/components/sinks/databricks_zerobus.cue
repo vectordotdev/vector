@@ -82,7 +82,7 @@ components: sinks: databricks_zerobus: {
 		schema: {
 			title: "Schema"
 			body: """
-				The sink requires a schema to encode events into protobuf format.
+				The sink requires a schema to encode events into Arrow format.
 
 				The sink automatically fetches the table schema from the Unity Catalog API
 				at startup using the configured `table_name` and `unity_catalog_endpoint`,
@@ -94,13 +94,13 @@ components: sinks: databricks_zerobus: {
 		batching: {
 			title: "Batching"
 			body: """
-				Events are batched before being sent to Zerobus. Each event is individually
-				serialized as a protobuf message, and the batch is sent as a single request.
-				The maximum batch size is 10MB, enforced by the Zerobus SDK.
+				Events are batched before being sent to Zerobus. Each batch is encoded as a
+				single Arrow `RecordBatch` and sent over Arrow Flight as one request. The
+				maximum batch size is 10MB, enforced by the Zerobus SDK.
 
 				Vector sizes batches against `batch.max_bytes` using the *uncompressed,
 				pre-serialization* event size, while the SDK's 10MB cap applies to the
-				*encoded protobuf* size. For most schemas the protobuf encoding is smaller
+				*encoded Arrow* size. For most schemas the Arrow encoding is smaller
 				than (or comparable to) the source event, but for numeric-heavy schemas
 				(many integer or float fields) the encoded form can be larger — so a batch
 				configured right at the 10MB boundary may exceed the SDK limit and the
