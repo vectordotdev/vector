@@ -166,6 +166,20 @@ mod tests {
     }
 
     #[test]
+    fn header_name_matching_is_case_insensitive() {
+        // HeaderName normalizes to lowercase, so mixed-case variants are identical.
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            HeaderName::from_static("x-api-key"),
+            HeaderValue::from_static("secret"),
+        );
+        let result = remove_sensitive(&headers);
+        // Lookup with the mixed-case form resolves to the same normalized name.
+        let mixed_case = HeaderName::from_bytes(b"X-Api-Key").unwrap();
+        assert!(is_sensitive(&result, &mixed_case).iter().all(|&s| s));
+    }
+
+    #[test]
     fn does_not_mark_non_sensitive_headers() {
         let mut headers = HeaderMap::new();
         headers.insert(
