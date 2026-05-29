@@ -46,6 +46,8 @@ impl Service<AzureBlobRequest> for AzureBlobService {
             let upload_options = BlockBlobClientUploadOptions {
                 blob_content_type: Some(request.content_type.to_string()),
                 blob_content_encoding: request.content_encoding.map(|e| e.to_string()),
+                blob_tags_string: request.tags.clone(),
+                metadata: request.blob_metadata.clone(),
                 ..Default::default()
             }
             .if_not_exists();

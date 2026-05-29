@@ -411,6 +411,10 @@ pub struct AzureBlobRequest {
     pub content_type: &'static str,
     pub metadata: AzureBlobMetadata,
     pub request_metadata: RequestMetadata,
+    /// Pre-encoded `x-ms-tags` header value (`k=v&k=v`), or `None` to omit the header.
+    pub tags: Option<String>,
+    /// Custom blob metadata. Each entry becomes an `x-ms-meta-{key}` header.
+    pub blob_metadata: Option<std::collections::HashMap<String, String>>,
 }
 
 impl Finalizable for AzureBlobRequest {
@@ -621,8 +625,9 @@ pub async fn build_client(
         }
     }
 
-    if let Some(AzureBlobTlsConfig { ca_file }) = &tls
-        && let Some(ca_file) = ca_file
+    if let Some(AzureBlobTlsConfig {
+        ca_file: Some(ca_file),
+    }) = &tls
     {
         let mut buf = Vec::new();
         File::open(ca_file)?.read_to_end(&mut buf)?;
