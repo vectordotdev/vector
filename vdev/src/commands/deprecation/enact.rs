@@ -22,15 +22,13 @@ impl Cli {
         let repo_root = paths::find_repo_root()?;
         let dir = repo_root.join(deprecation::DEPRECATION_DIR);
 
-        // Accept "slug", "slug.md"
-        let filename = if std::path::Path::new(&self.slug)
-            .extension()
-            .is_some_and(|ext| ext.eq_ignore_ascii_case("md"))
-        {
-            self.slug.clone()
-        } else {
-            format!("{}.md", self.slug)
-        };
+        // Accept "slug", "slug.md", or a path like "deprecation.d/slug.md"
+        let slug_path = std::path::Path::new(&self.slug);
+        let stem = slug_path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or(&self.slug);
+        let filename = format!("{stem}.md");
 
         let path = dir.join(&filename);
         if !path.exists() {
