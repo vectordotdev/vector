@@ -63,7 +63,7 @@ impl Cli {
         deprecation::sync_deprecations_cue(&repo_root)?;
         println!(
             "Updated {}",
-            repo_root.join(deprecation::DEPRECATIONS_CUE).display()
+            repo_root.join(deprecation::DEPRECATIONS_JSON).display()
         );
 
         Ok(())

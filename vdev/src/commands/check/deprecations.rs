@@ -4,7 +4,7 @@ use anyhow::{Result, bail};
 
 use crate::utils::{deprecation, paths};
 
-/// Check that all deprecation.d fragments are valid and deprecations.cue is in sync
+/// Check that all deprecation.d fragments are valid and deprecations.json is in sync
 #[derive(clap::Args, Debug)]
 #[command()]
 pub struct Cli {}
@@ -33,19 +33,19 @@ impl Cli {
             println!("{} deprecation fragment(s) are valid.", entries.len());
         }
 
-        // Verify deprecations.cue is in sync with deprecation.d/.
-        let cue_path = repo_root.join(deprecation::DEPRECATIONS_CUE);
-        if cue_path.exists() {
+        // Verify generated/deprecations.json is in sync with deprecation.d/.
+        let json_path = repo_root.join(deprecation::DEPRECATIONS_JSON);
+        if json_path.exists() {
             let enacted = deprecation::read_enacted(&repo_root)?;
             let expected = deprecation::render_deprecations_cue_for_check(&entries, &enacted);
-            let actual = std::fs::read_to_string(&cue_path)?;
+            let actual = std::fs::read_to_string(&json_path)?;
             if actual != expected {
                 bail!(
                     "{} is out of sync with deprecation.d/. Run `cargo vdev deprecation sync-cue` to regenerate it.",
-                    cue_path.display()
+                    json_path.display()
                 );
             }
-            println!("{} is up to date.", cue_path.display());
+            println!("{} is up to date.", json_path.display());
         }
 
         Ok(())

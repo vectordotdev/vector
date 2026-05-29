@@ -4,7 +4,7 @@ use anyhow::Result;
 
 use crate::utils::{deprecation, paths};
 
-/// Regenerate website/cue/reference/deprecations.cue from deprecation.d/
+/// Regenerate website/cue/reference/generated/deprecations.json from deprecation.d/
 #[derive(clap::Args, Debug)]
 #[command()]
 pub struct Cli {}
@@ -15,7 +15,7 @@ impl Cli {
         deprecation::sync_deprecations_cue(&repo_root)?;
         println!(
             "Wrote {}",
-            repo_root.join(deprecation::DEPRECATIONS_CUE).display()
+            repo_root.join(deprecation::DEPRECATIONS_JSON).display()
         );
         Ok(())
     }

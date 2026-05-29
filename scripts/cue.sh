@@ -13,6 +13,7 @@ JSON_OUT="${ROOT}/website/data/docs.json"
 
 list-docs-files() {
   find "${CUE_SOURCES}" -name '*.cue'
+  find "${CUE_SOURCES}" -path '*/generated/*.json' 2>/dev/null || true
 }
 
 cmd_check() {
