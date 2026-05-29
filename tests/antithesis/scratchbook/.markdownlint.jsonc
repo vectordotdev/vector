@@ -1,0 +1,10 @@
+// Scoped relaxations for the Antithesis research scratchbook. These are internal
+// working notes (dense property tables, ad-hoc code fences), not published docs,
+// so a few cosmetic rules are disabled here only — the repo-wide config still
+// applies everywhere else.
+{
+  "extends": "../../../.markdownlint.jsonc",
+  "MD060": false, // table-column-style: the property-catalog tables use empty-header `| | |` 2-col layout
+  "MD040": false, // fenced-code-language: many ad-hoc evidence snippets are intentionally language-less
+  "MD022": false  // blanks-around-headings: relaxed for the dense note format
+}
