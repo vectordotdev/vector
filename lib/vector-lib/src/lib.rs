@@ -22,8 +22,8 @@ pub use vector_core::compile_vrl;
 pub use vector_core::{
     EstimatedJsonEncodedSizeOf, SpanField, buckets, default_data_dir, emit, event, fanout,
     ipallowlist, latency, metric_tags, metrics, partition, quantiles, register,
-    register_extra_span_field, samples, schema, serde, sink, source, source_sender, tcp, tls,
-    transform,
+    register_extra_span_field, samples, scheduling_pressure, schema, serde, sink, source,
+    source_sender, tcp, tls, transform,
 };
 pub use vector_lookup as lookup;
 pub use vector_stream as stream;
