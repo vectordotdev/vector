@@ -34,6 +34,13 @@ releases: {
 		description?:     string
 	}
 
+	#EnactedDeprecationEntry: {
+		what:             string
+		deprecated_since: string
+		removed_in:       string
+		description?:     string
+	}
+
 	#Release: {
 		version:      string
 		codename?:    string

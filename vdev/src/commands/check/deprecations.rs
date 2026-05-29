@@ -1,10 +1,10 @@
 #![allow(clippy::print_stdout)]
 
-use anyhow::Result;
+use anyhow::{Result, bail};
 
 use crate::utils::{deprecation, paths};
 
-/// Check that all deprecation.d fragments are valid
+/// Check that all deprecation.d fragments are valid and deprecations.cue is in sync
 #[derive(clap::Args, Debug)]
 #[command()]
 pub struct Cli {}
@@ -26,13 +26,27 @@ impl Cli {
 
         if entries.is_empty() {
             println!("No deprecation fragments found in {}.", dir.display());
-            return Ok(());
+        } else {
+            for entry in &entries {
+                println!("  ok  {}", entry.filename);
+            }
+            println!("{} deprecation fragment(s) are valid.", entries.len());
         }
 
-        for entry in &entries {
-            println!("  ok  {}", entry.filename);
+        // Verify deprecations.cue is in sync with deprecation.d/.
+        let cue_path = repo_root.join(deprecation::DEPRECATIONS_CUE);
+        if cue_path.exists() {
+            let enacted = deprecation::read_enacted(&repo_root)?;
+            let expected = deprecation::render_deprecations_cue_for_check(&entries, &enacted);
+            let actual = std::fs::read_to_string(&cue_path)?;
+            if actual != expected {
+                bail!(
+                    "{} is out of sync with deprecation.d/. Run `cargo vdev deprecation sync-cue` to regenerate it.",
+                    cue_path.display()
+                );
+            }
+            println!("{} is up to date.", cue_path.display());
         }
-        println!("{} deprecation fragment(s) are valid.", entries.len());
 
         Ok(())
     }
