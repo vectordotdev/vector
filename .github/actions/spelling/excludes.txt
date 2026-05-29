@@ -2,3 +2,7 @@
 ^\.github/actions/spelling/
 ^\Qbenches/codecs/moby_dick.txt\E$
 ^\Qwebsite/layouts/shortcodes/config/unit-tests.html\E$
+# Antithesis test harness: research notes + exerciser examples carry heavy jargon (sancov, libvoidstar, rkyv, vdbuf, lossfinder, ...)
+^tests/antithesis/
+^\Qlib/vector-buffers/examples/disk_v2_antithesis.rs\E$
+^\Qlib/vector-buffers/examples/disk_v2_lossfinder.rs\E$
