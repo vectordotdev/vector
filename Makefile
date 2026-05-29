@@ -46,16 +46,7 @@ export AUTOINSTALL ?= false
 # Override to true for a bit more log output in your environment building (more coming!)
 export VERBOSE ?= false
 # Override the container tool. Tries docker first and then tries podman.
-export CONTAINER_TOOL ?= auto
-ifeq ($(CONTAINER_TOOL),auto)
-	ifeq ($(shell docker version >/dev/null 2>&1 && echo docker), docker)
-		override CONTAINER_TOOL = docker
-	else ifeq ($(shell podman version >/dev/null 2>&1 && echo podman), podman)
-		override CONTAINER_TOOL = podman
-	else
-		override CONTAINER_TOOL = unknown
-	endif
-endif
+export CONTAINER_TOOL ?= $(shell docker version >/dev/null 2>&1 && echo docker || (podman version >/dev/null 2>&1 && echo podman) || echo unknown)
 # If we're using podman create pods else if we're using docker create networks.
 export CURRENT_DIR = $(shell pwd)
 
@@ -93,13 +84,6 @@ help:
 	@printf -- "Default ${FORMATTING_BEGIN_YELLOW}\`CONTAINER_TOOL=docker\`${FORMATTING_END} (auto-detects ${FORMATTING_BEGIN_YELLOW}\`docker\`${FORMATTING_END} or ${FORMATTING_BEGIN_YELLOW}\`podman\`${FORMATTING_END}).\n"
 	@printf -- "\n"
 	@awk 'BEGIN {FS = ":.*##"; printf "Usage: make ${FORMATTING_BEGIN_BLUE}<target>${FORMATTING_END}\n"} /^[a-zA-Z0-9_-]+:.*?##/ { printf "  ${FORMATTING_BEGIN_BLUE}%-46s${FORMATTING_END} %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
-
-##@ Environment
-
-.PHONY: check-container-tool
-check-container-tool: ## Checks what container tool is installed
-	@echo -n "Checking if $(CONTAINER_TOOL) is available..." && \
-	$(CONTAINER_TOOL) version 1>/dev/null && echo "yes"
 
 ##@ Building
 .PHONY: build
