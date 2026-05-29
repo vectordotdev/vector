@@ -22,12 +22,15 @@
   {{- end -}}
 {{- end -}}
 
+{{- $announced = sort $announced "deprecated_since" "desc" -}}
+
 {{- $removed := slice -}}
 {{- range $enacted -}}
   {{- if or (strings.HasPrefix .removed_in $prefix) (eq .removed_in $exact) -}}
     {{- $removed = $removed | append . -}}
   {{- end -}}
 {{- end -}}
+{{- $removed = sort $removed "deprecated_since" "desc" -}}
 
 {{ if gt (len $removed) 0 }}
 <div class="mt-8">

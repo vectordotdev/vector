@@ -3,8 +3,8 @@
 {{ end }}
 
 {{ define "main" }}
-{{ $pending := site.Data.docs.deprecations_pending }}
-{{ $enacted := site.Data.docs.deprecations_enacted }}
+{{ $pending := sort site.Data.docs.deprecations_pending "deprecated_since" "desc" }}
+{{ $enacted := sort site.Data.docs.deprecations_enacted "deprecated_since" "desc" }}
 
 <div class="max-w-3xl md:max-w-5xl px-6 lg:px-8 mx-auto">
   <div class="my-16">
