@@ -29,6 +29,37 @@ use crate::buffer_usage_data::BufferUsageHandle;
 
 pub const LEDGER_LEN: usize = align16(mem::size_of::<ArchivedLedgerState>());
 
+/// SUT-side Antithesis assertion: the in-memory `total_buffer_size` accounting
+/// atomic is never decremented by more than its current value. A violation is
+/// the root of Vector #21683 — the unsaturated `fetch_sub` wraps toward 2^64,
+/// `is_buffer_full()` then returns true forever, and the writer deadlocks.
+/// Isolated in its own function with broad `allow`s because `lib.rs` sets
+/// `#![deny(warnings)]` + `#![deny(clippy::pedantic)]` and the assertion-macro
+/// expansion need not satisfy those. No-op outside Antithesis.
+#[inline]
+#[allow(warnings, clippy::all, clippy::pedantic)]
+fn assert_total_buffer_size_no_underflow(current: u64, amount: u64) {
+    antithesis_sdk::assert_always!(
+        amount <= current,
+        "ledger total_buffer_size decrement never underflows (root of #21683)"
+    );
+}
+
+/// SUT-side Antithesis assertion: `get_total_records` computes the count as
+/// `next_writer_id.wrapping_sub(last_reader_id) - 1`. When the wrapped
+/// difference is `0` (a fully drained buffer where the reader has caught up to
+/// the writer's next id), the trailing `- 1` underflows to ~2^64 — a bogus
+/// ~18-quintillion buffered-records reading. The invariant is that the wrapped
+/// difference is always at least 1. No-op outside Antithesis.
+#[inline]
+#[allow(warnings, clippy::all, clippy::pedantic)]
+fn assert_total_records_no_underflow(next_writer_id: u64, last_reader_id: u64) {
+    antithesis_sdk::assert_always!(
+        next_writer_id.wrapping_sub(last_reader_id) >= 1,
+        "ledger get_total_records never underflows on a drained buffer (#21683 metrics)"
+    );
+}
+
 /// Error that occurred during calls to [`Ledger`].
 #[derive(Debug, Snafu)]
 pub enum LedgerLoadCreateError {
@@ -263,6 +294,7 @@ where
         let next_writer_id = self.state().get_next_writer_record_id();
         let last_reader_id = self.state().get_last_reader_record_id();
 
+        assert_total_records_no_underflow(next_writer_id, last_reader_id);
         next_writer_id.wrapping_sub(last_reader_id) - 1
     }
 
@@ -289,6 +321,10 @@ where
 
     /// Decrements the total number of bytes for all unread records in the buffer.
     pub fn decrement_total_buffer_size(&self, amount: u64) {
+        assert_total_buffer_size_no_underflow(
+            self.total_buffer_size.load(Ordering::Acquire),
+            amount,
+        );
         let last_total_buffer_size = self.total_buffer_size.fetch_sub(amount, Ordering::AcqRel);
         trace!(
             previous_buffer_size = last_total_buffer_size,

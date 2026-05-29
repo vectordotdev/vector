@@ -27,6 +27,22 @@ use crate::{
     variants::disk_v2::{io::AsyncFile, record::try_as_record_archive},
 };
 
+/// SUT-side Antithesis assertion: when accounting for a partially-read or
+/// truncated data file, `delete_completed_data_file` computes the buffer-size
+/// adjustment as `metadata.len() - bytes_read`. If the on-disk file is shorter
+/// than the bytes we believe we read (a torn tail after a crash, or filesystem
+/// fault), this unsaturated subtraction underflows to ~2^64 and is then fed
+/// into `decrement_total_buffer_size` — a #21683-class wrap. The invariant is
+/// `bytes_read <= metadata.len()`. No-op outside Antithesis.
+#[inline]
+#[allow(warnings, clippy::all, clippy::pedantic)]
+fn assert_data_file_size_delta_no_underflow(file_len: u64, bytes_read: u64) {
+    antithesis_sdk::assert_always!(
+        bytes_read <= file_len,
+        "reader data-file size delta never underflows (reader.rs:524, #21683-class)"
+    );
+}
+
 pub(super) struct ReadToken {
     record_id: u64,
     record_bytes: usize,
@@ -521,6 +537,7 @@ where
         let decrease_amount = bytes_read.map_or_else(
             || metadata.len(),
             |bytes_read| {
+                assert_data_file_size_delta_no_underflow(metadata.len(), bytes_read);
                 let size_delta = metadata.len() - bytes_read;
                 if size_delta > 0 {
                     debug!(

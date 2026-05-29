@@ -14,6 +14,10 @@
 #[macro_use]
 extern crate tracing;
 
+// Keep the Antithesis LLVM coverage-instrumentation runtime shim linked into any
+// binary that uses this crate (e.g. the Vector SUT). No effect outside Antithesis.
+use antithesis_instrumentation as _;
+
 mod buffer_usage_data;
 
 pub mod config;
