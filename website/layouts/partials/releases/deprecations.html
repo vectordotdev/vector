@@ -15,6 +15,12 @@
     {{- $announced = $announced | append . -}}
   {{- end -}}
 {{- end -}}
+{{- /* Also include enacted entries first announced in this release. */ -}}
+{{- range $enacted -}}
+  {{- if or (strings.HasPrefix .deprecated_since $prefix) (eq .deprecated_since $exact) -}}
+    {{- $announced = $announced | append . -}}
+  {{- end -}}
+{{- end -}}
 
 {{- $removed := slice -}}
 {{- range $enacted -}}
