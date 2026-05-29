@@ -1,0 +1,39 @@
+# node1, the tail. The vector source receives from node0 over the native
+# protocol and the http sink delivers to the loadgen-collector. node1 is a
+# "durable node" exactly as the e2e+disk-buffer durability claim describes: its
+# http sink is backed by a disk_v2 buffer with when_full: block and e2e acks, so
+# node1 acks node0 only once it has durably taken the event. Chaining two such
+# "durable" nodes is the configuration people claim cannot lose data — this
+# experiment forces it to.
+data_dir: /var/lib/vector
+
+sources:
+  in:
+    type: vector
+    address: 0.0.0.0:6000
+    acknowledgements:
+      enabled: true
+
+  metrics:
+    type: internal_metrics
+    scrape_interval_secs: 1
+
+sinks:
+  out:
+    type: http
+    inputs: [in]
+    uri: http://loadgen-collector:8686/ingest
+    method: post
+    encoding:
+      codec: json
+    buffer:
+      type: disk
+      max_size: 268435488 # ~256MB, the enforced minimum
+      when_full: block
+    acknowledgements:
+      enabled: true
+
+  prom:
+    type: prometheus_exporter
+    inputs: [metrics]
+    address: 0.0.0.0:9598

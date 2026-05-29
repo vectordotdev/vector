@@ -52,7 +52,7 @@ succeed. Breaking any single link silently stops all progress.
         ▼  (vector-common/src/finalizer.rs:FuturesOrdered::next())
 [OrderedFinalizer task yields (BatchStatus, amount: u64)]
         │    ledger.rs:703-707 ── tokio::spawn loop ── stream.next().await
-        │    NOTE: _status is DISCARDED here (ledger.rs:704 `let (_status, amount)`)
+        │    NOTE: _status is DISCARDED here (ledger.rs:717 `let (_status, amount)`)
         ▼
 [ledger.increment_pending_acks(amount)]          ledger.rs:705
 [ledger.notify_writer_waiters()]                 ledger.rs:706

@@ -1,0 +1,40 @@
+# node0, alternate config. Identical to node0.yaml except the vector sink carries
+# a benign `request.timeout_secs`. The reload fault swaps this with node0.yaml and
+# sends SIGHUP, so Vector sees the disk-buffered sink change and REBUILDS it. That
+# rebuild is what exercises #24948: BufferWriter::drop tears down the old buffer
+# without flushing, so any not-yet-flushed buffered event is lost on reload — the
+# conservation oracle catches it as a missing acked id.
+data_dir: /var/lib/vector
+
+sources:
+  in:
+    type: http_server
+    address: 0.0.0.0:8080
+    decoding:
+      codec: json
+    acknowledgements:
+      enabled: true
+
+  metrics:
+    type: internal_metrics
+    scrape_interval_secs: 1
+
+sinks:
+  out:
+    type: vector
+    inputs: [in]
+    address: "node1:6000"
+    compression: none
+    request:
+      timeout_secs: 45
+    buffer:
+      type: disk
+      max_size: 268435488 # ~256MB, the enforced minimum
+      when_full: block
+    acknowledgements:
+      enabled: true
+
+  prom:
+    type: prometheus_exporter
+    inputs: [metrics]
+    address: 0.0.0.0:9598

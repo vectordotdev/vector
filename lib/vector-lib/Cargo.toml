@@ -25,6 +25,9 @@ vrl = { workspace = true, optional = true }
 
 [features]
 allocation-tracing = ["vector-top?/allocation-tracing"]
+# Forwards to vector-buffers/antithesis: force-links the Antithesis coverage
+# runtime so sancov-instrumented builds link. Off by default.
+antithesis = ["vector-buffers/antithesis"]
 api-client = ["dep:vector-api-client"]
 arrow = ["codecs/arrow"]
 parquet = ["codecs/parquet"]

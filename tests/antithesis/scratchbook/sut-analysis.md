@@ -225,7 +225,7 @@ state is reachable).
    reload; double-counted then gapped metrics. PR #24949 addressed parts.
 4. **`drop_newest` silent loss vs. metrics (#24606/#24144).** Buffer-level
    discarded counter increments but `component_discarded_events_total` stays 0.
-5. **Sink-error acks discarded** (`ledger.rs:704` `_status` ignored) → silent loss
+5. **Sink-error acks discarded** (`ledger.rs:717` `_status` ignored) → silent loss
    under at-least-once.
 6. **File-ID rollover ordering bug** (`reader.rs:932` raw `u16 >`), reachable in
    tests where `MAX_FILE_ID=6`; production at 65536-file rollover.

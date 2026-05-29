@@ -527,6 +527,10 @@ ntapi = { git = "https://github.com/MSxDOS/ntapi.git", rev = "24fc1e47677fc9f6e3
 # table below). Local dev builds skip it so they don't need `libsasl2-dev` / cyrus-sasl
 # installed, and so rdkafka's build script doesn't link GSSAPI.
 default = ["enable-unix"]
+# Antithesis coverage instrumentation. Enable for builds compiled with the sancov
+# RUSTFLAGS (the Antithesis Docker images) so the instrumentation runtime is
+# force-linked and sancov symbols resolve. Off by default; no production impact.
+antithesis = ["vector-lib/antithesis"]
 # Default features for `cargo docs`. We're not using `gssapi` which would require installing libsasl2 in our doc environment.
 docs = ["enable-unix"]
 # Default features for *-unknown-linux-* which make use of `cmake` for dependencies

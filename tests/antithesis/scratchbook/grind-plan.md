@@ -9,6 +9,19 @@ needs SUT-side `antithesis_sdk` in `lib/vector-buffers` (rebuild Vector).
 Faults available (user-confirmed): node-termination (kill/restart), persistent
 buffer volume. Clock + custom faults: assume available, confirm at use.
 
+## Pivot (2026-06-02): accounting-underflow cluster moves OUT of Antithesis
+
+The #21683 accounting-underflow invariants (`total-buffer-size-never-underflows`,
+`record-id-wraparound-accounting-holds`) are now slated as **in-tree `proptest`
+property tests in `lib/vector-buffers`**, not Antithesis scenarios — they are
+deterministically reproducible in-process, where Antithesis adds only
+scheduler/coverage. See those two property files' "Test plan" sections for the
+two tests (A: ledger-level `get_total_records` wrap, pure sync; B: reopen +
+torn-tail `total_buffer_size` underflow, `current_thread` + `TestFilesystem`).
+Antithesis retains the genuinely-distributed work: the `vector_to_vector_e2e_disk`
+conservation experiment and the #24948 SIGHUP config-reload fault (both wired and
+`snouty validate`-green at this commit).
+
 ## G0 — Bootstrap (setup task #1/#2/#3)
 
 - Base harness green: vector healthy, workload `setup_complete` + reachable

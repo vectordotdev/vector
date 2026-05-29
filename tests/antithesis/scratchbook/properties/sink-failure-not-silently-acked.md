@@ -20,7 +20,7 @@ restart) and are never silently discarded within a live process.
 `BatchStatus::Errored` or `BatchStatus::Rejected`, the buffer retains the events for retry.
 Equivalently: the buffer never silently credits a failed delivery as a successful acknowledgement.
 
-**Current Status: VIOLATED.** The finalizer in `ledger.rs:704` discards the `BatchStatus`
+**Current Status: VIOLATED.** The finalizer in `ledger.rs:717` discards the `BatchStatus`
 entirely:
 
 ```rust
@@ -69,7 +69,7 @@ Antithesis workload, or a custom test sink that reads a flag). Then:
 The assertion to add SUT-side would sit inside `spawn_finalizer`, branching on `_status`:
 
 ```rust
-// Proposed instrumentation site (ledger.rs:704)
+// Proposed instrumentation site (ledger.rs:717)
 while let Some((status, amount)) = stream.next().await {
     match status {
         BatchStatus::Delivered => {
@@ -113,7 +113,7 @@ rather than accumulating events for replay.
 
 2. **Is the `OrderedFinalizer` typed to drop the status or does it give it to the caller?**
    `vector-common`'s `OrderedFinalizer<T>` yields `(BatchStatus, T)` from the stream (confirmed
-   at `ledger.rs:704`). The `_status` binding at the call site is the discard, not an upstream
+   at `ledger.rs:717`). The `_status` binding at the call site is the discard, not an upstream
    limitation. A fix can be made purely in `spawn_finalizer` without changing the finalizer
    library.
 
@@ -139,13 +139,13 @@ rather than accumulating events for replay.
 
 **Examined:** `src/sinks/util/http.rs:928–936` (`DriverResponse for HttpResponse`), `src/sinks/http/tests.rs` (test assertions on `BatchStatus`).
 
-**Found:** The `DriverResponse::event_status` implementation for `HttpResponse` at sinks/util/http.rs:929–936 explicitly returns `EventStatus::Errored` for transient HTTP errors and `EventStatus::Rejected` for permanent HTTP errors (non-2xx, non-transient responses). The test file `src/sinks/http/tests.rs` confirms this at lines 536 and 566 (`assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected))`) and line 956 (`Ok(BatchStatus::Rejected)`). The discard at `ledger.rs:704` (`_status` binding) is therefore exercisable in real workloads wherever an HTTP sink receives a 4xx/5xx response. The finalizer unconditionally increments `pending_acks` regardless of which status value reaches it.
+**Found:** The `DriverResponse::event_status` implementation for `HttpResponse` at sinks/util/http.rs:929–936 explicitly returns `EventStatus::Errored` for transient HTTP errors and `EventStatus::Rejected` for permanent HTTP errors (non-2xx, non-transient responses). The test file `src/sinks/http/tests.rs` confirms this at lines 536 and 566 (`assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected))`) and line 956 (`Ok(BatchStatus::Rejected)`). The discard at `ledger.rs:717` (`_status` binding) is therefore exercisable in real workloads wherever an HTTP sink receives a 4xx/5xx response. The finalizer unconditionally increments `pending_acks` regardless of which status value reaches it.
 
 **Not found:** No code path in `spawn_finalizer` (ledger.rs:701–710) that branches on `BatchStatus::Errored` or `BatchStatus::Rejected` — the match arm is `_status` with unconditional `increment_pending_acks`. No retry or nack path exists in the buffer.
 
-**Conclusion:** Sinks do emit `Errored`/`Rejected` in practice (confirmed in HTTP sink). The `_status` discard at ledger.rs:704 is therefore a live violation during normal operation with any non-2xx downstream, not only under synthetic fault injection.
+**Conclusion:** Sinks do emit `Errored`/`Rejected` in practice (confirmed in HTTP sink). The `_status` discard at ledger.rs:717 is therefore a live violation during normal operation with any non-2xx downstream, not only under synthetic fault injection.
 
-#### Is the `_status` discard at ledger.rs:704 intentional or a bug?
+#### Is the `_status` discard at ledger.rs:717 intentional or a bug?
 
 **Examined:** `ledger.rs:700–710` (`spawn_finalizer`), git history context (commit b7aae737c), no inline comment explaining the intent.
 

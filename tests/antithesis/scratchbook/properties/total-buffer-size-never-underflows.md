@@ -287,3 +287,42 @@ scenario, so that the fix can be validated with the harness.
 **The separate, unguarded site:** `delete_completed_data_file` at reader.rs:521–538 performs a plain `u64 -` subtraction (`metadata.len() - bytes_read`) with no saturation guard. If `bytes_read > metadata.len()` (reachable if two decrements race, the file was externally truncated, or a caller error passes an over-counted `bytes_read`), the subtraction wraps in release mode or panics in debug mode, and the resulting large `size_delta` is passed directly to `decrement_total_buffer_size` (ledger.rs:292), which calls `fetch_sub` with no bounds check. The `!self.ready_to_read` guard at reader.rs:468 does NOT protect this site — it only guards the per-record `record_acks.add_marker` call. The delete-time subtraction is a distinct, unguarded decrement path.
 
 **Conclusion:** Path B double-decrement (fast-forward case where `bytes_read = None` skips all `track_read` calls and `delete_completed_data_file` subtracts the full `metadata.len()`) is guarded by the `None` branch in the `bytes_read.map_or_else` at reader.rs:521 — in that case the full file size is decremented exactly once, not twice. The underflow risk in Path B is therefore not a double-decrement from track_read + delete, but from the re-seed in `update_buffer_size` exceeding what records actually represent, per Path A. The unguarded `metadata.len() - bytes_read` plain subtraction at reader.rs:524 remains a correctness risk for partial-read cases.
+
+---
+
+## Test plan (2026-06-02, expert-chorus decision)
+
+**Home:** in-tree `proptest` property test in `lib/vector-buffers`, NOT an Antithesis
+scenario. The bug is deterministically reproducible in-process; Antithesis would add only
+scheduler/coverage. (Antithesis keeps the distributed `vector_to_vector_e2e_disk`
+conservation experiment + the #24948 SIGHUP reload fault.)
+
+**This site (the byte-count underflow) requires a REOPEN** — it is NOT reachable purely
+in-process. `decrement_total_buffer_size` (ledger.rs:292 `fetch_sub`) and the reader's
+delete-time `metadata.len() - bytes_read` (reader.rs:524) only disagree across a restart:
+`from_config_inner` → `update_buffer_size` (ledger.rs:653-697) re-seeds `total_buffer_size`
+from the SUM of on-disk `.dat` bytes, then the reader's seek decrements per replayed record
+(reader.rs:469/538). They diverge only when on-disk file size exceeds valid-record bytes —
+a torn / partial tail.
+
+**Test B — `tests/reopen.rs`** (`current_thread` runtime + in-memory `TestFilesystem`):
+1. Write / read / ack a generated prefix through the real buffer.
+2. Drop reader + writer + ledger, then drain the spawned finalizer task via `yield_now` so
+   it releases the ledger lock (it holds an `Arc<Ledger>`; basic.rs:161-164, ledger.rs:700-710;
+   precedent model/mod.rs:890). On `current_thread` the task will not release until polled —
+   without this, reopen hits `LedgerLockAlreadyHeld`.
+3. INJECT a torn tail: truncate the last `.dat` by a generated N bytes via `TestFilesystem`
+   introspection. LOAD-BEARING — `TestFilesystem` has no-op `sync_all`/`flush` and
+   always-complete writes, so without injection it can never produce the divergence and the
+   test cannot reach the bug.
+4. Reopen via `from_config_inner` (same fs + data_dir) under a `timeout`.
+5. Assert the underflow directly (NOT a `< ceiling`): `total_buffer_size` did not wrap high
+   (no value near `u64::MAX`) and `bytes_read <= file_size`. `proptest` over
+   {prefix len, truncation bytes, max_data_file_size}; commit a regression seed; demote to a
+   plain `#[test]` if the space collapses.
+
+**Discipline:** the test must FAIL on current code (TDD); PR #23561 only saturated the gauge
+*reporter* (`buffer_usage_data.rs`), leaving the control-path `fetch_sub` broken, so a fix
+must address the control path. Do NOT extend `model_check` with a reopen action — the model
+would have to re-derive `update_buffer_size` (the logic under test → false failures) and its
+no-op filesystem can't make the torn tail anyway. No `sane`/`insane` in names.

@@ -1,10 +1,12 @@
 ---
 sut_path: /home/ssm-user/src/vector
-commit: b7aae737cef5dd37d1445915443a1eb97b584f85
-updated: 2026-05-28
+commit: a202ea3e1be8ea946d60f9e9fd0d9d4245bcb140
+updated: 2026-06-01
 external_references:
   - path: lib/vector-buffers/src/variants/disk_v2/mod.rs
     why: Confirms the buffer is single-process (intra-Vector reader+writer over an mmap'd ledger)
+  - path: https://antithesis.com/docs/environment/fault_injection
+    why: Faults are pod-level; node-termination "may lose all modified data and boot fresh from image" — drives one-pod-per-node + persistent-volume-per-node
   - path: (internal design doc, not linked)
     why: Disk buffer is configured per-sink; e2e acks require a supporting source; at-least-once semantics
   - path: (internal design doc, not linked)
@@ -171,4 +173,83 @@ meaningful.
   `http_server`, `datadog_agent`, or `socket`? (Affects workload protocol.)
 - Is config reload feasible as a custom fault (SIGHUP) in the harness, or must the
   workload drive it via Vector's API?
+
+---
+
+## Topology B — Multi-node conservation chain (for `multi-hop-conservation-no-loss`)
+
+The single-SUT topology above is intra-process: network faults never touch the
+buffer. The **conservation chain** the user asked for ("what goes in comes back
+out") is a deliberately different shape that turns network faults into buffer
+pressure.
+
+```text
+ head injector (parallel_driver xN)                                tail collector
+ mints unique ids, logs ACKED  --HTTP-->  [node_0]  --vector proto-->  [node_1]
+                                            src                          src
+                                            |                            |
+                                          disk_v2                      disk_v2
+                                          block+acks                   block+acks
+                                            |                            |
+                                          vsink ----vector proto--------> ...
+                                                                          |
+                                       [node_{N-1}] --HTTP--> collector (logs DELIVERED)
+   ^                                                                      |
+   |  (RING UPGRADE, later) node_{N-1}.sink --vector--> node_0.source, with a
+   +----------------------- lap-counter remap+route at node_0 that exits a record
+                            to the collector after one lap, else forwards it.
+```
+
+### Why each node is its own pod
+
+Antithesis faults are **pod-level** (`environment/fault_injection`): two
+processes in one pod never see network faults between them. To make the
+inter-node `vector` links partitionable — the whole point of the chain — **each
+Vector node must be its own container/pod.** Co-locating two nodes would silently
+disable the new fault lever.
+
+### Containers
+
+- **`node_0` … `node_{N-1}`** — N copies of the **same instrumented Vector
+  image** from Topology A. Config per node:
+  - `source`: `vector` (native protocol, `acknowledgements: true`). `node_0`
+    additionally takes an `http_server` source for head injection (or the
+    injector speaks the `vector` protocol directly — TBD by OQ-1 / ack
+    semantics).
+  - `sink`: `vector` sink → next node's `vector` source, `buffer: { type: disk,
+    when_full: block, max_size: … }`, `acknowledgements` wired through. The tail
+    node's sink is `http` → collector.
+  - Per-node **persistent volume** for `data_dir` (mandatory — fresh-boot
+    restart otherwise wipes that hop's buffer → spurious loss).
+  - Small `max_data_file_size` to force rotation; same Cluster-A/B SUT-side
+    asserts as Topology A (they fire on whichever node hits the bad state).
+- **`workload`** — head injector (`parallel_driver_`, N concurrent) + tail
+  collector (long-lived `serve`) + `eventually_` drain-and-check oracle. Same
+  container/SDK as Topology A; reuses `vdbuf-workload`'s produce + collector
+  modes. Globally-unique ids, shared-volume `ACKED`/`DELIVERED` logs, dedup at
+  collector.
+
+### Faults
+
+Node-kill/restart per node (independent), **partition between adjacent node
+pods** (the new lever — fills a buffer under `block`), CPU throttle, clock
+jitter. Each node killed/partitioned independently maximizes the cross-hop loss
+surface.
+
+### Start small
+
+Ship **N=3, no loop** first (chain → collector): real conservation oracle, three
+buffer crossings, no self-deadlock risk. Earn the **ring** (close tail→head +
+lap-drain) as a stress upgrade once the chain is green — the lap-drain is
+required to keep a `block`-mode ring from self-deadlocking on legitimate
+backpressure (a false positive). See `properties/multi-hop-conservation-no-loss.md`.
+
+### New open questions (Topology B)
+
+- e2e-ack transitivity across `vector` hops (OQ-1 in the property file) — decides
+  whether the head ack means durable-to-tail or durable-at-hop-0.
+- Does mid-chain `block` backpressure propagate to the head injector, or get
+  absorbed by an upstream source buffer?
+- Quiescence signal for the `eventually_` oracle: every node's buffer gauge ~0
+  AND collector count stable for K seconds (not a fixed sleep).
 </content>

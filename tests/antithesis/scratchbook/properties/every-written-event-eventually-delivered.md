@@ -156,7 +156,7 @@ various ack-flight states simultaneously. A small buffer drains too quickly for
 the fault injection to hit interesting timing windows.
 
 **OQ-4: Sink-error ack discarding — is this in scope for this property?**
-The `_status` discard at `ledger.rs:704` means this property as stated will
+The `_status` discard at `ledger.rs:717` means this property as stated will
 not catch sink-error loss (since the buffer always credits the ack). A separate
 property specifically testing `Errored`/`Rejected` ack propagation is
 recommended. For this property, use a reliable downstream sink stub that always

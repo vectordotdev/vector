@@ -1,0 +1,30 @@
+# Standalone package: deliberately kept OUT of Vector's parent workspace so the
+# HTTP workload's small dep tree (tiny_http/ureq) doesn't perturb Vector's build.
+# Each src/bin/<prefix>_<name>.rs is an Antithesis test command (compiled, then
+# injected into the test template by deploy/Dockerfile); src/lib.rs is the shared
+# logic. The collector bin is the long-lived workload service entrypoint.
+[workspace]
+
+[package]
+name = "harness"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# Bins are auto-discovered from src/bin/*.rs; the library is src/lib.rs.
+
+[dependencies]
+# Antithesis assertion + lifecycle SDK (assertions, setup_complete).
+antithesis_sdk = "0.2.8"
+# Antithesis LLVM coverage-instrumentation runtime shim (sancov + libvoidstar loader).
+antithesis-instrumentation = "0.1"
+serde_json = "1"
+# Tiny synchronous HTTP server for the sink collector endpoint.
+tiny_http = "0.12"
+# Tiny synchronous HTTP client for producing events + scraping metrics.
+# default-features = false drops TLS (we only speak plaintext HTTP intra-cluster)
+# and keeps the build small/fast.
+ureq = { version = "2", default-features = false }
+
+[profile.release]
+debug = true

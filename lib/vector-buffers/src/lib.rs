@@ -14,6 +14,16 @@
 #[macro_use]
 extern crate tracing;
 
+// Link the Antithesis coverage-instrumentation runtime when the `antithesis`
+// feature is on. The crate is link-only glue (no public API): it provides the
+// sancov callbacks (`__sanitizer_cov_trace_pc_guard*`) and an `.init_array`
+// constructor that loads libvoidstar. An `extern crate` declaration is what
+// pulls it onto the link line so coverage-instrumented (sancov) builds — the
+// vector binary AND the disk_v2 examples — resolve those symbols. Compiled out
+// entirely otherwise, so production Vector never links it.
+#[cfg(feature = "antithesis")]
+extern crate antithesis_instrumentation;
+
 mod buffer_usage_data;
 
 pub mod config;

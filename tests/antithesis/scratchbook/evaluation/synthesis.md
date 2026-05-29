@@ -1,7 +1,7 @@
 ---
 sut_path: /home/ssm-user/src/vector
-commit: b7aae737cef5dd37d1445915443a1eb97b584f85
-updated: 2026-05-28
+commit: dfecb470e
+updated: 2026-06-02
 external_references:
   - path: (internal design doc, not linked)
     why: Bug context for evaluated properties
@@ -15,6 +15,29 @@ Four lenses (antithesis-fit, coverage-balance, implementability, wildcard)
 evaluated the 19-property catalog as a portfolio. Findings categorized below as
 **Refinement** (applied to the catalog), **Gap** (filled via targeted discovery),
 or **Bias** (escalated to the user). Evidence: `evaluation/{lens}.md`.
+
+## Addendum — Semantics-first doctrine pass (2026-06-02, Category 8)
+
+Evaluation of the 3 new Category-8 properties (`semantic-claims-ledger.md`):
+
+- **Antithesis-fit:** strong. C1/C2 are exactly the rare, timing-sensitive,
+  externally-invisible divergences Antithesis is built to surface (a 200 followed by
+  a reload/crash inside the fsync window). The `assert_unreachable` loss-magnet is
+  the right shape for *exhibition* — it makes the search hunt the violation. No new
+  fault types: C1/C2 reuse the existing reload/kill/partition faults.
+- **Coverage-balance:** these do NOT add a new mechanism — they re-cut Clusters
+  A/B/E/F at the *claim* level. Their value is the doctrine (claim-first), not new
+  surface. Kept distinct because the *claim* is the unit the user wants demonstrated,
+  and C2 resolved a standing critical open question (acks not transitive).
+- **Implementability:** C1/C2 are already implemented by the launched harness
+  (`ack-does-not-imply-durability` IS the experiment). C11/C12 are oracle
+  *constraints* (sets-not-order, duplicates-as-anti-vacuity), already honored.
+- **Wildcard / false-red watch:** C11 and C12 exist precisely to prevent false reds
+  (duplicates and reordering are legal). Recording them as non-assertions is the
+  refinement.
+
+No bias escalations. This was an extension/reframing pass, not a re-evaluation of the
+existing 30; their refinements stand.
 
 ## Headline
 

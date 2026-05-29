@@ -411,7 +411,7 @@ inject sink errors, the workload simply returns 5xx responses for a window. This
 is a workload-driven custom "fault," not a built-in Antithesis fault type. It is
 fully implementable without any special Antithesis tenant capabilities.
 
-The bug is confirmed (`ledger.rs:704` discards `_status`). The observable signal:
+The bug is confirmed (`ledger.rs:717` discards `_status`). The observable signal:
 workload sends N events, forces the sink to error, waits for a quiet period, then
 restarts Vector and checks whether those events are replayed. Under the bug, they
 are not replayed (silently lost). This is a workload-observable end-to-end check.

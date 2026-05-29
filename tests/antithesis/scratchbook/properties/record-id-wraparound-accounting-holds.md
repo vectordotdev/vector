@@ -164,3 +164,32 @@ Antithesis property provides an automatic regression test for the fix.
 **Not found:** No evidence of a build-profile guard inside `get_total_records` or `synchronize_buffer_usage` that would suppress the panic in a specific configuration.
 
 **Conclusion:** The debug-build panic is real and fires on empty-buffer startup before release semantics (silent metric corruption) are observable. An Antithesis run using a debug build will see a crash on first clean restart with an empty buffer; a release build will see astronomical metric values. Both are confirmations of the same bug via different signals.
+
+---
+
+## Test plan (2026-06-02, expert-chorus decision)
+
+**Home:** in-tree `proptest` property test in `lib/vector-buffers`, NOT an Antithesis
+scenario (this arithmetic is deterministically reproducible in-process).
+
+**Test A — ledger-level, pure sync (no async, no buffer).** This is the cheapest, most
+direct test of Site 1 (`get_total_records`, ledger.rs:266 `next.wrapping_sub(last) - 1`):
+- Build a `Ledger` via `Ledger::load_or_create` backed by the `Vec<u8>` mmap
+  (`impl WritableMemoryMap for Vec<u8>` at tests/mod.rs:56). There is no bare-struct
+  constructor; go through `load_or_create` as known_errors.rs does.
+- Set `next_writer_record_id` / `last_reader_record_id` with the `#[cfg(test)]`
+  `unsafe_set_writer_next_record_id` / `unsafe_set_reader_last_record_id` helpers
+  (ledger.rs:173-203; pattern in known_errors.rs).
+- `proptest` over `(next, last)` and assert `get_total_records()` never wraps near
+  `u64::MAX`. The drained-after-use state `next == last` ⇒ `0 - 1` ⇒ `u64::MAX` is the
+  failing case; fresh state `next=1,last=0 ⇒ 0` is safe.
+
+This site is reachable purely in-process (write N / read N / ack N to drain, OR the
+ledger-level setter approach above) and also fires on reopen via `synchronize_buffer_usage`
+(ledger.rs:517). The setter approach is preferred: smallest, fastest, fully deterministic,
+needs no async runtime.
+
+**Discipline:** must FAIL on current code (TDD). Debug build ⇒ panic; release ⇒ silent
+`u64::MAX` — pick the profile that surfaces it (debug is the louder signal). No
+`sane`/`insane` in names. (Sibling test B for the `total_buffer_size` byte underflow lives
+in `total-buffer-size-never-underflows.md`; it needs a reopen + torn tail.)

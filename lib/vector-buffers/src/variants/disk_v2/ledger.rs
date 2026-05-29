@@ -289,6 +289,19 @@ where
 
     /// Decrements the total number of bytes for all unread records in the buffer.
     pub fn decrement_total_buffer_size(&self, amount: u64) {
+        // SUT-side root-cause detector for #21683: decrementing by more than the
+        // current value underflows the u64, wraps to ~2^64, and wedges the writer
+        // (is_buffer_full stays true forever). Catch it at the instruction that
+        // corrupts the counter. Compiled out of shipped Vector.
+        #[cfg(feature = "antithesis")]
+        {
+            let current = self.total_buffer_size.load(Ordering::Acquire);
+            antithesis_sdk::assert_always!(
+                amount <= current,
+                "total_buffer_size never underflows on decrement",
+                &serde_json::json!({ "amount": amount, "current": current })
+            );
+        }
         let last_total_buffer_size = self.total_buffer_size.fetch_sub(amount, Ordering::AcqRel);
         trace!(
             previous_buffer_size = last_total_buffer_size,

@@ -1,0 +1,37 @@
+# node0, the head. http_server source receives injected events, the vector sink
+# forwards them to node1 over the native protocol, and that sink is backed by a
+# disk_v2 buffer with when_full: block and e2e acks. This disk buffer is the
+# component under test. A 200 to the injector means the event was durably
+# accepted into this buffer.
+data_dir: /var/lib/vector
+
+sources:
+  in:
+    type: http_server
+    address: 0.0.0.0:8080
+    decoding:
+      codec: json
+    acknowledgements:
+      enabled: true
+
+  metrics:
+    type: internal_metrics
+    scrape_interval_secs: 1
+
+sinks:
+  out:
+    type: vector
+    inputs: [in]
+    address: "node1:6000"
+    compression: none
+    buffer:
+      type: disk
+      max_size: 268435488 # ~256MB, the enforced minimum
+      when_full: block
+    acknowledgements:
+      enabled: true
+
+  prom:
+    type: prometheus_exporter
+    inputs: [metrics]
+    address: 0.0.0.0:9598

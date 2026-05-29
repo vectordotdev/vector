@@ -1,7 +1,7 @@
 ---
 sut_path: /home/ssm-user/src/vector
-commit: 4ff41a0adb5240d071f30a5a43cb0d065e40f618
-updated: 2026-05-29
+commit: dfecb470e
+updated: 2026-06-02
 external_references:
   - path: lib/vector-buffers/src/variants/disk_v2/mod.rs
     why: Module-level doc comment is the authoritative design spec
@@ -59,12 +59,25 @@ data-fsync/ledger-msync pair.
   at the workload level, but the latter is the tighter buffer-internal invariant)
 - `recovery-completes-after-crash` (init doesn't hang/fail)
 - `partial-write-at-rotation-recovers` (torn-tail / rotation crash recovery)
+- `multi-hop-conservation-no-loss` (at-least-once **composed across N nodes** —
+  the cross-process generalization of `every-written-event-eventually-delivered`)
 
 **Connections:** `partial-write-at-rotation-recovers` is the mechanism by which
 `recovery-completes-after-crash` and `durable-unacked-events-survive-crash` can
 fail (torn tail → wrong fast-forward → silent skip or monotonicity panic). It also
 feeds Cluster A: a partial write is the canonical producer of the file-size vs.
 record-bytes discrepancy that triggers the underflow.
+
+`multi-hop-conservation-no-loss` is the **bridge between Cluster B and Cluster A**:
+it is a delivery/at-least-once property (B) whose distinctive value is that, in a
+multi-pod chain, inter-node network **partitions** drive a buffer to full under
+`when_full: block` — organically reproducing the full-buffer backpressure state
+where the Cluster-A underflow/deadlock lives, without a synthetic overfill
+workload. It strictly dominates `every-written-event-eventually-delivered` on
+coverage (N buffers crossed, N independent fault timings) but is harder to make
+quiescent (needs a lap-drain in the ring form to avoid `block`-mode
+self-deadlock false positives). Keep both: the single-hop property is the
+cheaper, always-quiescent baseline.
 
 ## Cluster C — Corruption detection & record integrity (shared fault: bit-flip / partial-write)
 
@@ -97,7 +110,7 @@ panic.
 
 ## Cluster E — Delivery-accounting bugs (silent loss invisible to operators)
 
-- `sink-failure-not-silently-acked` (`_status` discarded at `ledger.rs:704`)
+- `sink-failure-not-silently-acked` (`_status` discarded at `ledger.rs:717`)
 - `dropped-events-are-counted` (`drop_newest` not surfaced to component metric)
 - (related lifecycle: `config-reload-no-silent-loss`)
 
@@ -176,6 +189,30 @@ Dominance: `corruption-skip-loss-bounded` is the precondition (loss must be real
 the other two describe *consequences* (silent + accounting-corrupting). The single
 fault — a mid-file bit-flip in a multi-record data file, read live — exercises all
 three plus Cluster C's reachability check.
+
+## Cluster I — Semantic claim/reality divergences (doctrine pass, 2026-06-02)
+
+Claim-FIRST re-cut of the durability story (see `semantic-claims-ledger.md`). These
+are not a new failure mechanism — they name, at the level of *what people believe*,
+the gaps the mechanism clusters already encode, and pin the two foundational ones
+the 2026-06-02 code investigation grounded.
+
+- `ack-does-not-imply-durability` (C1) — the 200 fires at encode, before fsync
+  (`writer.rs:472`). **Root of Cluster F** (Drop-no-flush) at the semantic level and
+  the property the launched run exhibits; the *consequence* (lost acked data) is the
+  same loss `config-reload-no-silent-loss` (F) and `durable-unacked-events-survive-crash`
+  (B) measure mechanism-first.
+- `ack-is-per-hop-not-transitive` (C2) — the disk buffer mints a fresh ack chain
+  (`reader.rs:1117-1119`). **Resolves `multi-hop-conservation-no-loss` (B) OQ#1** and
+  is the reason the tail collector is the sole delivery truth. Directly falsifies the
+  "chain of durable nodes ⇒ no loss" reasoning.
+- `delivery-is-at-least-once-not-exactly-once` (C11) — **not a defect**; constrains
+  the oracle (sets not order/equality; duplicates as anti-vacuity). Guards every
+  delivery property in B against the false-red of treating a legal duplicate as loss.
+
+**Dominance:** C1 dominates the whole exhibition — if a 200 were truly durable,
+C2/C6/C10 losses could not occur. C1+C2 together are the semantic statement of the
+mission; Clusters A/B/E/F are the mechanism-level evidence and exhibits for them.
 
 ## Cross-cluster dominance summary
 

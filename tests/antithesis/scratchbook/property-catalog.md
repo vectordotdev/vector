@@ -1,10 +1,12 @@
 ---
 sut_path: /home/ssm-user/src/vector
-commit: 4ff41a0adb5240d071f30a5a43cb0d065e40f618
-updated: 2026-05-29
+commit: dfecb470e
+updated: 2026-06-02
 external_references:
   - path: lib/vector-buffers/src/variants/disk_v2/mod.rs
     why: Module-level doc comment is the authoritative design spec
+  - path: https://antithesis.com/docs/environment/fault_injection
+    why: Pod-level fault model — justifies one-pod-per-node so inter-node links are partitionable
   - path: rfcs/2021-10-14-9477-buffer-improvements.md
     why: Original buffer-rework RFC; intended design and guarantees
   - path: docs/specs/buffer.md
@@ -21,9 +23,15 @@ external_references:
 
 # Property Catalog: Disk Buffer v2
 
-29 properties across 7 categories (19 from discovery + 7 from evaluation
+> **Semantics-first doctrine (2026-06-02):** see `semantic-claims-ledger.md` for the
+> claim-as-people-state-it → code-reality → how-to-exhibit index over this catalog.
+> Category 8 below holds the three properties added by that pass.
+
+33 properties across 8 categories (19 from discovery + 7 from evaluation
 gap-filling — Category 7 + 3 from the 2026-05-29 data-loss expansion, in the
-Category 1 "silent data-loss cluster"). No Antithesis SDK assertions exist in the codebase
+Category 1 "silent data-loss cluster" + 1 from the 2026-06-01 multi-node
+conservation expansion, `multi-hop-conservation-no-loss`, in Category 2's
+delivery cluster). No Antithesis SDK assertions exist in the codebase
 today (`existing-assertions.md`); every SUT-side assertion noted below is
 **missing** and must be added. Each property has an evidence file at
 `properties/{slug}.md`. Evaluation refinements are recorded in
@@ -288,13 +296,32 @@ garbage, or wrong-ID fast-forward. All require node-termination faults.
 | **Type** | Liveness |
 | **Property** | With e2e acks enabled, every event accepted by the source is eventually delivered downstream at least once across crashes (duplicates allowed). |
 | **Invariant** | (Refined per evaluation W-O2: `Sometimes(all_produced)` is wrong for at-least-once — it passes on one good timeline, hiding loss on others.) Use **per-event `Always(produced ⊆ delivered)`** checked after each quiet-period drain (every produced ID appears ≥1 in the delivered multiset), plus a `Sometimes(delivery_path_reachable)` exploration hint. Workload tracks a `PRODUCED` set and a `DELIVERED` multiset (dedups duplicates). |
-| **Antithesis Angle** | Faults injected throughout; quiet period; drain. Surfaces three silent-loss paths: unlink-before-ledger-flush window (`reader.rs:546-549`), `_status` discard (`ledger.rs:704`), in-flight finalizer tasks not draining on SIGKILL. |
+| **Antithesis Angle** | Faults injected throughout; quiet period; drain. Surfaces three silent-loss paths: unlink-before-ledger-flush window (`reader.rs:546-549`), `_status` discard (`ledger.rs:717`), in-flight finalizer tasks not draining on SIGKILL. |
 | **Why It Matters** | The end-to-end at-least-once contract Datadog sells for mission-critical pipelines. |
 
 **Open Questions:**
 
 - Does the workload need a source that supports e2e acks, or can it observe delivery directly at a mock sink? Affects topology.
 - Duplicates are expected — confirm the workload dedups and only asserts ≥1 (not exactly-once).
+
+### multi-hop-conservation-no-loss — Conservation Across an N-Node Vector Chain
+
+| | |
+|---|---|
+| **Type** | Liveness (at-least-once, composed N times) |
+| **Property** | In an N-node chain (`source -> disk_v2(when_full=block)+e2e acks -> vector sink -> next node's source`), every id the head injector got an ack for eventually appears ≥1 at the tail collector, across faults. "What goes in comes back out." Cross-node generalization of `every-written-event-eventually-delivered`. |
+| **Invariant** | Workload-level `Always(ACKED \ unique(DELIVERED) == ∅)` after faults stop and the chain drains; `Sometimes(all_delivered)` for reachability. `\|DELIVERED\| ≥ \|ACKED\|` expected (per-hop replay dups). |
+| **Antithesis Angle** | **New lever vs. single-SUT:** inter-node `vector` links cross **pod boundaries**, so partitioning `node_i.sink`↔`node_{i+1}.source` while `node_i`'s buffer fills under `block` drives sustained backpressure into the #21683 full-buffer state (Cluster A) — organically, no synthetic overfill. N independent buffers also multiply the per-record loss-window chances. Each node killed/partitioned independently; tail oracle catches loss at any hop. Ring upgrade (close tail→head + lap-drain) keeps all buffers full and churning. |
+| **Why It Matters** | The product's at-least-once contract is what a customer chaining Vectors with disk buffers relies on end-to-end. A single hop losing an acked record breaks it invisibly. This is the harness the user actually asked for ("no data loss in the ring"). |
+
+**Open Questions:**
+
+- ~~**(Critical)** Does the `vector` source/sink protocol propagate e2e acks *transitively* end-to-end, or ack locally on buffer-accept?~~ **RESOLVED (2026-06-02): acks locally on buffer-accept.** The disk buffer mints a *fresh* `BatchNotifier` per record (`reader.rs:1117-1119`) and the source finalizer is consumed at encode (`writer.rs:472`), so there is NO transitive end-to-end ack — "acked at head" means only "durable in the head's buffer." The tail collector is the sole `DELIVERED` truth. See new property `ack-is-per-hop-not-transitive`.
+- `when_full: block` + a **closed ring with no drain** self-deadlocks from legitimate backpressure (false positive) — the lap-drain is load-bearing, not optional.
+- Persistent volume **per node** required; otherwise fresh-boot restart wipes a node's buffer → spurious loss.
+- SUT-side underflow asserts claimed in Dockerfile comments **do not exist in `lib/vector-buffers/src`** (grep=0) — resolve before relying on internal signal vs. workload-only oracle. `(needs follow-up — weeding task)`
+
+See `properties/multi-hop-conservation-no-loss.md` for the full evidence trail.
 
 ### recovery-completes-after-crash — Initialization Completes After Crash
 
@@ -379,13 +406,13 @@ metric blindness) and boundary arithmetic (file-ID and record-ID rollover).
 |---|---|
 | **Type** | Safety |
 | **Property** | An event whose downstream delivery status is `Errored`/`Rejected` is not silently treated as acknowledged and removed from the buffer. |
-| **Invariant** | `Always`: a non-`Delivered` batch status does not advance `reader_last_record`/free the record without retry. **Currently VIOLATED**: the finalizer discards `_status` (`ledger.rs:704`); at-least-once is only restored by a full crash+replay. |
+| **Invariant** | `Always`: a non-`Delivered` batch status does not advance `reader_last_record`/free the record without retry. **Currently VIOLATED**: the finalizer discards `_status` (`ledger.rs:717`); at-least-once is only restored by a full crash+replay. |
 | **Antithesis Angle** | Make the downstream sink Error/Reject under faults; assert events are retained/retried, not dropped. |
 | **Why It Matters** | Within a process lifetime, sink errors cause permanent silent loss of data the buffer claims to durably hold. |
 
 **Open Questions:**
 
-- Do sinks actually emit `Errored`/`Rejected` status under normal operation, or only under fault injection? Determines whether this is reachable without faults. `(partial: finalizer discard confirmed at ledger.rs:704; whether sinks emit non-Delivered status in practice not yet traced)`
+- Do sinks actually emit `Errored`/`Rejected` status under normal operation, or only under fault injection? Determines whether this is reachable without faults. `(partial: finalizer discard confirmed at ledger.rs:717; whether sinks emit non-Delivered status in practice not yet traced)`
 - Is the discard intentional (retry assumed at the source layer) or a genuine bug? `(needs human input)` — design-owner question.
 - **Priority note (evaluation R-H):** this is a deterministic logic bug (discarded status), arguably better caught by an integration test than Antithesis search. Keep as a **workload-side secondary check with no dedicated fault-search budget**; don't shape the fault strategy around it. See Bias B1 in `evaluation/synthesis.md`.
 
@@ -596,12 +623,62 @@ finalizer single-point-of-failure, and lock-contention throughput collapse.
 
 ---
 
+## Category 8 — Semantic claims vs. reality (doctrine pass, 2026-06-02)
+
+Properties framed claim-FIRST: each starts from a durability/correctness story
+people *state* about the topology, then names the code reality that falsifies it.
+Full claim→reality index in `semantic-claims-ledger.md`. These re-cut divergences
+that the mechanism-first catalog covered implicitly; the value is making the
+*claim* the unit of demonstration. C-numbers refer to ledger rows.
+
+### ack-does-not-imply-durability — A 200 Means "Encoded", Not "Durable" (C1)
+
+| | |
+|---|---|
+| **Type** | Safety (exhibition — expected to FAIL; the failure is the point). |
+| **Claim** | "If Vector acks (200), the event is durably persisted and survives a crash." |
+| **Reality** | The 200 fires at *encode into the in-memory write buffer*, before fsync: source finalizer dropped at `writer.rs:472` → default `Delivered` (`finalization.rs:243-252,284-289`); no flush on the send path (`sender.rs:46-59`). |
+| **Invariant** | `Always(missing_count==0)` at quiescence + `Unreachable("an end-to-end-acked event was permanently lost")` loss-magnet on the violation branch. |
+| **Antithesis Angle** | Reload (#24948, `BufferWriter::Drop` close-no-flush `writer.rs:1366-1374`) or kill node0 before fsync, or torn tail skipped on reopen (`reader.rs:111-115`). **This is what the launched run `48c94f81…` exhibits.** |
+| **Why It Matters** | The foundational durability promise. If a 200 isn't durable, every higher claim (chain, no-loss) collapses. |
+
+See `properties/ack-does-not-imply-durability.md`.
+
+### ack-is-per-hop-not-transitive — Head Ack ≠ Reached the Tail (C2)
+
+| | |
+|---|---|
+| **Type** | Safety (semantic divergence; loss exhibited via C1). |
+| **Claim** | "Chaining e2e-ack nodes chains the acks: the head's 200 means it made it end-to-end." |
+| **Reality** | The disk buffer terminates the upstream ack chain and mints a fresh `BatchNotifier` for the downstream hop (`reader.rs:1117-1119`); node0's 200 = local durable-write, independent of node1. |
+| **Invariant** | Tail-collector conservation: head-acked id must appear at the tail; `Unreachable("…permanently lost")`. |
+| **Antithesis Angle** | Head 200, partition node0↔node1 so the buffer can't drain, then drop node0's buffer (reload/crash) → head-acked id never reaches the tail. |
+| **Why It Matters** | Resolves `multi-hop-conservation-no-loss` OQ#1 (acks are NOT transitive) and falsifies the "chain of durable nodes ⇒ no loss" reasoning at its root. |
+
+See `properties/ack-is-per-hop-not-transitive.md`.
+
+### delivery-is-at-least-once-not-exactly-once — Duplicates Are Expected (C11)
+
+| | |
+|---|---|
+| **Type** | Clarifying / anti-vacuity. **NOT a defect.** |
+| **Claim** | "e2e acks ⇒ exactly-once, no duplicates." |
+| **Reality** | At-least-once by design; crash-replay + sink retries re-deliver; node1 source has no dedup. |
+| **Invariant** | Oracle uses **set membership** (`acked ⊆ delivered`), never equality/order (a duplicate must not red). `Sometimes(delivered_total > delivered_distinct)` proves the replay path ran. |
+| **Why It Matters** | Keeps the oracle sound: forbids the false-red of treating a legal duplicate as a fault, and turns duplicates into an anti-vacuity signal. |
+
+See `properties/delivery-is-at-least-once-not-exactly-once.md`. (Ledger row C12,
+end-to-end ordering, is recorded as a non-assertion for the same reason — order is
+not a product promise; an order-based check would false-red.)
+
+---
+
 ## File-Level Open Questions (catalog-wide)
 
 - **Node-termination (kill/restart) faults + persistent buffer storage: CONFIRMED ENABLED by the user (2026-05-28).** The crash-recovery cluster is testable. (Resolved.)
 - Config-reload (Category 6) and sink-error injection (`sink-failure-not-silently-acked`) need **custom faults** — feasibility depends on the harness/workload design.
 - **`(needs human input)` — surfaced from individual properties (require a design owner / tenant operator):**
-  - Is the finalizer's `BatchStatus` discard (`ledger.rs:704`) intentional (retry assumed at the source layer) or a genuine bug? — `sink-failure-not-silently-acked`.
+  - Is the finalizer's `BatchStatus` discard (`ledger.rs:717`) intentional (retry assumed at the source layer) or a genuine bug? — `sink-failure-not-silently-acked`.
   - Is **filesystem-fault injection** (truncating/corrupting `buffer.db` and `.dat` files) available in the tenant? Gates `ledger-corruption-no-sigbus-crashloop` and the filesystem-tamper angle of several Category-7 properties.
 - Does Vector's topology call `writer.flush()` on graceful shutdown, and does the tokio runtime drain the finalizer task before exit? Both affect multiple liveness/durability properties. `(partial: tokio Runtime::drop has a ~2s task window; the running.rs stop() drop-order vs. final flush is unresolved and needs code tracing)`
 - **RESOLVED — "Durably written" oracle:** use a wall-clock timestamp (event produced > 2×`flush_interval` ago) and run with `flush_interval=0` so every flush is an fsync. Do NOT use e2e-ack delivery as the durability marker (conflates delivery with fsync; suppressed by the deadlock). Reused across Category 3 (refinement R-F).

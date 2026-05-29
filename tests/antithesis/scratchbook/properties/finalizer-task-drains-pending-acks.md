@@ -33,7 +33,7 @@ task that acts as the bridge between sink delivery and buffer accounting:
 pub(super) fn spawn_finalizer(self: Arc<Self>) -> OrderedFinalizer<u64> {
     let (finalizer, mut stream) = OrderedFinalizer::new(None);  // ledger.rs:702
     tokio::spawn(async move {                                     // ledger.rs:703
-        while let Some((_status, amount)) = stream.next().await { // ledger.rs:704
+        while let Some((_status, amount)) = stream.next().await { // ledger.rs:717
             self.increment_pending_acks(amount);                   // ledger.rs:705
             self.notify_writer_waiters();                          // ledger.rs:706
         }
@@ -50,7 +50,7 @@ Key observations:
    drops it without draining, the caller has no way to detect this.
 
 2. **The `_status` discard**: the matched `BatchStatus` is explicitly ignored
-   (`_status` at `ledger.rs:704`). Every ack — regardless of whether it is
+   (`_status` at `ledger.rs:717`). Every ack — regardless of whether it is
    `Delivered`, `Errored`, or `Rejected` — increments `pending_acks` by
    `amount`. This is the sink-failure silent-loss bug documented in
    `sink-failure-not-silently-acked`. For this property, what matters is that
@@ -129,7 +129,7 @@ Key observations:
 | Location | Relevance |
 |---|---|
 | `lib/vector-buffers/src/variants/disk_v2/ledger.rs:701–710` | `spawn_finalizer`: detached `tokio::spawn`, `_status` discard, no join handle retained |
-| `lib/vector-buffers/src/variants/disk_v2/ledger.rs:704` | `_status` discard — `BatchStatus` ignored; every ack counted as `Delivered` |
+| `lib/vector-buffers/src/variants/disk_v2/ledger.rs:717` | `_status` discard — `BatchStatus` ignored; every ack counted as `Delivered` |
 | `lib/vector-buffers/src/variants/disk_v2/ledger.rs:415–416` | `increment_pending_acks`: `fetch_add` on `pending_acks` — the only path that unblocks the reader ack machinery |
 | `lib/vector-buffers/src/variants/disk_v2/ledger.rs:381` | `notify_writer_waiters`: wakes the reader, which then advances acks and frees files |
 | `lib/vector-buffers/src/variants/disk_v2/mod.rs:262–264` | `spawn_finalizer` call site: `Arc<Ledger>` cloned, `finalizer` passed to `BufferReader` |
