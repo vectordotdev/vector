@@ -1,10 +1,10 @@
 #![allow(clippy::print_stdout)]
 
-use anyhow::{Result, bail};
+use anyhow::Result;
 
 use crate::utils::{deprecation, paths};
 
-/// Check that all deprecation.d fragments are valid and deprecations.json is in sync
+/// Check deprecation.d fragments are valid and regenerate generated/deprecations.json
 #[derive(clap::Args, Debug)]
 #[command()]
 pub struct Cli {}
@@ -33,20 +33,11 @@ impl Cli {
             println!("{} deprecation fragment(s) are valid.", entries.len());
         }
 
-        // Verify generated/deprecations.json is in sync with deprecation.d/.
-        let json_path = repo_root.join(deprecation::DEPRECATIONS_JSON);
-        if json_path.exists() {
-            let enacted = deprecation::read_enacted(&repo_root)?;
-            let expected = deprecation::render_deprecations_cue_for_check(&entries, &enacted);
-            let actual = std::fs::read_to_string(&json_path)?;
-            if actual != expected {
-                bail!(
-                    "{} is out of sync with deprecation.d/. Run `cargo vdev deprecation sync-cue` to regenerate it.",
-                    json_path.display()
-                );
-            }
-            println!("{} is up to date.", json_path.display());
-        }
+        deprecation::sync_deprecations_cue(&repo_root)?;
+        println!(
+            "Wrote {}",
+            repo_root.join(deprecation::DEPRECATIONS_JSON).display()
+        );
 
         Ok(())
     }

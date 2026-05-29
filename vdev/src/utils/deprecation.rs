@@ -220,11 +220,6 @@ fn write_json(repo_root: &Path, data: &DeprecationsJson) -> Result<()> {
         .with_context(|| format!("Failed to write {}", path.display()))
 }
 
-/// Read the list of enacted deprecations from the generated JSON file.
-pub fn read_enacted(repo_root: &Path) -> Result<Vec<EnactedEntry>> {
-    Ok(read_json(repo_root)?.deprecations_enacted)
-}
-
 /// Append an enacted entry and regenerate the pending section from deprecation.d/.
 pub fn append_enacted(repo_root: &Path, entry: EnactedEntry) -> Result<()> {
     let dir = repo_root.join(DEPRECATION_DIR);
@@ -256,17 +251,6 @@ fn pending_to_json(entries: &[DeprecationEntry]) -> Vec<PendingJsonEntry> {
         .collect()
 }
 
-/// Returns the expected JSON content for the check command to diff against.
-pub fn render_deprecations_cue_for_check(
-    pending: &[DeprecationEntry],
-    enacted: &[EnactedEntry],
-) -> String {
-    let data = DeprecationsJson {
-        deprecations_pending: pending_to_json(pending),
-        deprecations_enacted: enacted.to_vec(),
-    };
-    serde_json::to_string_pretty(&data).unwrap() + "\n"
-}
 
 #[cfg(test)]
 mod tests {

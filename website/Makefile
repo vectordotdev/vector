@@ -30,10 +30,10 @@ generate-vrl-docs:
 	$(VDEV) build vrl-docs --output-dir cue/reference/remap/functions \
 		$(if $(findstring true,$(CI)),--vector-sha $(GITHUB_SHA),)
 
-generate-deprecations-cue:
-	$(VDEV) deprecation sync-cue
+generate-deprecations-json:
+	$(VDEV) check deprecations
 
-structured-data: generate-vrl-docs generate-deprecations-cue cue-build config-examples
+structured-data: generate-vrl-docs generate-deprecations-json cue-build config-examples
 
 serve: clean setup cargo-data structured-data
 	hugo server \
