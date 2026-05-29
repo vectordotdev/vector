@@ -21,7 +21,7 @@
       "description": "The `series_api_version: v1` option is deprecated in favor of `v2` (the default).\nThe v1 series endpoint (`/api/v1/series`) is a legacy endpoint.\n\nUsers should remove `series_api_version: v1` from their configuration or set it to `v2`."
     },
     {
-      "what": "FAKE EXAMPLE \u2014 `fake_option` on the `fake_sink` sink [remove before merging]",
+      "what": "FAKE EXAMPLE — `fake_option` on the `fake_sink` sink [remove before merging]",
       "deprecated_since": "0.56.0",
       "description": "This is a fake deprecation entry used to test the Deprecation Announcements section on the release page. Remove this file before merging."
     },
