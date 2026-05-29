@@ -243,31 +243,6 @@
       </div>
       {{ end }}
 
-      {{ if gt (len $release.planned_deprecations) 0 }}
-      <div class="mt-8">
-        <div class="prose dark:prose-dark max-w-none">
-          {{ partial "heading.html" (dict "text" "Planned Deprecations" "level" 2) }}
-        </div>
-
-        <div class="mt-6 flex flex-col space-y-6">
-          {{ range $release.planned_deprecations }}
-          <div>
-            <span class="text-xl font-semibold text-dark dark:text-gray-300">
-              {{ .what | markdownify }}
-            </span>
-            <div class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Deprecated since {{ .deprecated_since }}
-            </div>
-            {{ with .description }}
-            <div class="mt-2.5 prose dark:prose-dark max-w-none">
-              {{ . | markdownify }}
-            </div>
-            {{ end }}
-          </div>
-          {{ end }}
-        </div>
-      </div>
-      {{ end }}
     </div>
     <div class="mt-8">
       <div class="lg:grid lg:grid-cols-3 gap-8">

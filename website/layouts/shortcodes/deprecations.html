@@ -1,0 +1,83 @@
+{{- $pending := site.Data.docs.deprecations_pending -}}
+{{- $enacted := site.Data.docs.deprecations_enacted -}}
+
+{{- /* Optional version param: filter to a specific release (major.minor match).
+       Accepts "0.56" or "0.56.0" — both match deprecated_since values of the form "0.56.*". */ -}}
+{{- $version := .Get "version" -}}
+{{- if $version -}}
+  {{- $parts  := split $version "." -}}
+  {{- $prefix := printf "%s.%s." (index $parts 0) (index $parts 1) -}}
+  {{- $exact  := printf "%s.%s"  (index $parts 0) (index $parts 1) -}}
+  {{- $fp := slice -}}
+  {{- range $pending -}}
+    {{- if or (strings.HasPrefix .deprecated_since $prefix) (eq .deprecated_since $exact) -}}
+      {{- $fp = $fp | append . -}}
+    {{- end -}}
+  {{- end -}}
+  {{- $pending = $fp -}}
+  {{- $fe := slice -}}
+  {{- range $enacted -}}
+    {{- if or (strings.HasPrefix .deprecated_since $prefix) (eq .deprecated_since $exact) -}}
+      {{- $fe = $fe | append . -}}
+    {{- end -}}
+  {{- end -}}
+  {{- $enacted = $fe -}}
+{{- end -}}
+
+{{ if gt (len $pending) 0 }}
+<div class="mt-4">
+  {{ partial "heading.html" (dict "text" "Active Deprecations" "level" 2 "anchor" true) }}
+  <p class="mt-2 text-gray-600 dark:text-gray-400 text-sm">
+    These features are deprecated and will be removed in a future release.
+  </p>
+
+  <div class="mt-6 flex flex-col space-y-4 no-prose">
+    {{ range $pending }}
+    <div class="border dark:border-gray-700 rounded-lg p-5">
+      <div class="font-semibold text-dark dark:text-gray-200">
+        {{ .what | markdownify }}
+      </div>
+      <div class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+        Deprecated since {{ .deprecated_since }}
+      </div>
+      {{ with .description }}
+      <div class="mt-3 prose dark:prose-dark max-w-none text-sm">
+        {{ . | markdownify }}
+      </div>
+      {{ end }}
+    </div>
+    {{ end }}
+  </div>
+</div>
+{{ end }}
+
+{{ if gt (len $enacted) 0 }}
+<div class="mt-12">
+  {{ partial "heading.html" (dict "text" "Enacted Deprecations" "level" 2 "anchor" true) }}
+  <p class="mt-2 text-gray-600 dark:text-gray-400 text-sm">
+    These features have been removed from Vector.
+  </p>
+
+  <div class="mt-6 flex flex-col space-y-4 no-prose">
+    {{ range $enacted }}
+    <div class="border dark:border-gray-700 rounded-lg p-5 opacity-75">
+      <div class="font-semibold text-dark dark:text-gray-200">
+        {{ .what | markdownify }}
+      </div>
+      <div class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+        Deprecated since {{ .deprecated_since }} &middot; Removed in {{ .removed_in }}
+      </div>
+      {{ with .description }}
+      <div class="mt-3 prose dark:prose-dark max-w-none text-sm">
+        {{ . | markdownify }}
+      </div>
+      {{ end }}
+    </div>
+    {{ end }}
+  </div>
+</div>
+{{ end }}
+
+{{ if and (eq (len $pending) 0) (eq (len $enacted) 0) }}
+<p class="text-gray-500 dark:text-gray-400">No deprecations{{ if $version }} for v{{ $version }}{{ end }}.</p>
+{{ end }}
