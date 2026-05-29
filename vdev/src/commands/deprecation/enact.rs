@@ -54,7 +54,7 @@ impl Cli {
         let enacted = deprecation::EnactedEntry {
             what: entry.what.clone(),
             deprecated_since: entry.deprecated_since.to_string(),
-            removed_in: format!("{}.{}.0", version.major, version.minor),
+            removed_in: version.to_string(),
             description: entry.description.clone(),
         };
 
