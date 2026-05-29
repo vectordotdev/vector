@@ -71,15 +71,19 @@ for v in ANTITHESIS_TENANT ANTITHESIS_REPOSITORY; do
   fi
 done
 
-# Rebuild the images from current source before submitting. snouty reuses a
-# matching :latest tag instead of rebuilding, so without this a shot can ship
-# stale code (e.g. an image baked before a config rename or a code change).
-# Layer caching keeps this near-instant when nothing changed.
-build=(docker compose -f "$SCRIPT_DIR/docker-compose.yaml" build)
+# snouty's --config image resolution parses the compose with default substitution
+# only — it does NOT honor exported env vars — so a `${VAR:-default}` image tag
+# ships to the run as `:default` even though `docker compose build` (which is
+# env-aware) built `:$VAR`. The run then references an image that was never built.
+# To remove all ambiguity, materialize a fully-resolved compose (concrete revision
+# tag, absolute build context) and point snouty at THAT. A forced rebuild from it
+# also guarantees no stale image is reused. The dir is regenerated every shot.
+BUILD_DIR="$SCRIPT_DIR/.launch"
+build=(docker compose -f "$BUILD_DIR/docker-compose.yaml" build)
 
 cmd=(snouty launch
   --webhook "$WEBHOOK"
-  --config "$SCRIPT_DIR"
+  --config "$BUILD_DIR"
   --test-name "$TEST_NAME"
   --description "$DESCRIPTION"
   --source "$SOURCE"
@@ -87,11 +91,13 @@ cmd=(snouty launch
   "${FAULTS[@]}"
   "$@")
 
-printf 'build: '; printf ' %q' "${build[@]}"; printf '\n'
+printf 'image tag: %s\n' "$V2V_IMAGE_TAG"
 printf 'launch:'; printf ' %q' "${cmd[@]}"; printf '\n'
 if [[ "${DRY_RUN:-0}" == "1" ]]; then
-  echo "(dry run; not building or submitting)"
+  echo "(dry run; not resolving, building, or submitting)"
   exit 0
 fi
+mkdir -p "$BUILD_DIR"
+docker compose -f "$SCRIPT_DIR/docker-compose.yaml" config > "$BUILD_DIR/docker-compose.yaml"
 "${build[@]}"
 exec "${cmd[@]}"

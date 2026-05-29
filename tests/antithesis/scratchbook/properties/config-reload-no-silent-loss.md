@@ -139,5 +139,8 @@ workload oracle above.
   before the new `load_or_create`, but the detached finalizer holding `Arc<Ledger>`
   is not awaited — if still alive when the new writer opens, both share the dir
   with no OS-level protection.
-- **Fault flag:** SIGHUP via the committed `anytime_reload.sh` (`kill -HUP 1`);
-  confirm the tenant permits process-signal delivery / in-container script exec.
+- **Fault not built.** The SIGHUP reload trigger this property needs is not in the
+  harness — an earlier `anytime_reload` fault was removed because its `kill -HUP 1`
+  raced Vector's startup after a node restart and killed the node (exit 129) before
+  the SIGHUP handler installed. A reload fault gated on a fully-started node, plus
+  the loss-detecting asserts above, both remain to be built.

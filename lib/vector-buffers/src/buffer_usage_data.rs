@@ -505,4 +505,68 @@ mod tests {
         assert_eq!(current.event_count, 10);
         assert_eq!(current.event_byte_size, 1000);
     }
+
+    /// Demonstration of Vector issue #24606.
+    ///
+    /// When a disk buffer drops events because of `when_full = drop_newest`, the
+    /// buffer-level `buffer_discarded_events_total` counter is incremented, but
+    /// the component-level `component_discarded_events_total` (the metric
+    /// operators monitor for data loss) is NEVER emitted by the buffer drop
+    /// path — so the loss is silent on standard dashboards.
+    ///
+    /// This exercises the exact reporter code path that runs for real
+    /// drop_newest drops: `BufferUsageData::report` -> `emit(BufferEventsDropped
+    /// { intentional: true, reason: "drop_newest", .. })`. A local metrics
+    /// recorder captures everything emitted.
+    ///
+    /// CORRECT INVARIANT (asserted here): dropped events must also be counted at
+    /// the component level so operators see the loss. This test currently FAILS
+    /// against Vector because #24606 is unfixed — `component_discarded_events_total`
+    /// stays at 0 for disk-buffer drop_newest drops. The failure IS the bug
+    /// demonstration; it will pass once #24606 is fixed.
+    #[test]
+    fn drop_newest_drops_should_increment_component_discarded_metric_issue_24606() {
+        use metrics_util::debugging::{DebugValue, DebuggingRecorder};
+
+        let recorder = DebuggingRecorder::new();
+        let snapshotter = recorder.snapshotter();
+
+        metrics::with_local_recorder(&recorder, || {
+            let data = BufferUsageData::new(0);
+            let mut metrics = ReporterCurrentMetrics::default();
+            // 5 events dropped by `when_full = drop_newest` (intentional drops),
+            // exactly as `BufferSender` records them on the disk-buffer drop path.
+            data.dropped_intentional.increment(5, 500);
+            data.report(&mut metrics, "demo_disk_buffer");
+        });
+
+        let mut buffer_discarded = 0u64;
+        let mut component_discarded = 0u64;
+        for (ckey, _unit, _desc, value) in snapshotter.snapshot().into_vec() {
+            let name = ckey.key().name().to_string();
+            if let DebugValue::Counter(c) = value {
+                if name == "buffer_discarded_events_total" {
+                    buffer_discarded += c;
+                } else if name == "component_discarded_events_total" {
+                    component_discarded += c;
+                }
+            }
+        }
+
+        // The buffer accounted for the drops at the buffer level:
+        assert_eq!(
+            buffer_discarded, 5,
+            "buffer_discarded_events_total should reflect the 5 drop_newest drops"
+        );
+        // CORRECT INVARIANT: the component-level counter operators watch for
+        // data loss MUST also reflect the 5 drops. This currently FAILS (actual
+        // 0) — that failure is the #24606 demonstration: disk-buffer drop_newest
+        // drops are invisible on standard dashboards.
+        assert_eq!(
+            component_discarded, 5,
+            "#24606: component_discarded_events_total must reflect drop_newest \
+             drops (got {component_discarded}; the buffer never emits the \
+             component-level metric, so the loss is silent on dashboards)"
+        );
+    }
 }

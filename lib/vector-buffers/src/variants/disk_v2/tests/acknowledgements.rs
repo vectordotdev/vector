@@ -83,3 +83,53 @@ async fn ack_wakes_reader() {
     })
     .await;
 }
+
+#[tokio::test]
+async fn rejected_delivery_should_not_advance_acks_finalizer_status_discard() {
+    // Failing demonstration: `spawn_finalizer` does
+    // `while let Some((_status, amount)) = stream.next().await { increment_pending_acks(amount) }`
+    // — the BatchStatus is discarded.
+    //
+    // CORRECT INVARIANT (asserted here): a REJECTED delivery (the sink gave up /
+    // could not deliver) must NOT advance the buffer's pending acks — the events
+    // were not acknowledged and must be retained. Because the finalizer ignores
+    // BatchStatus, a rejection still advances acks, so the buffer forgets the
+    // events as if delivered. This test FAILS (acks advance by 7, not 0),
+    // demonstrating the silent within-process data loss.
+    with_temp_dir(|dir| {
+        let data_dir = dir.to_path_buf();
+
+        async move {
+            let usage_handle = BufferUsageHandle::noop();
+            let config = DiskBufferConfigBuilder::from_path(data_dir)
+                .build()
+                .expect("creating buffer should not fail");
+            let ledger = Ledger::load_or_create(config, usage_handle)
+                .await
+                .expect("ledger should not fail to load/create");
+            let ledger = Arc::new(ledger);
+            let finalizer = Arc::clone(&ledger).spawn_finalizer();
+            assert_eq!(ledger.consume_pending_acks(), 0);
+
+            // A batch of 7 events whose delivery is REJECTED (not Delivered).
+            let (batch, receiver) = BatchNotifier::new_with_receiver();
+            finalizer.add(7, receiver);
+            let efin = EventFinalizer::new(batch);
+            efin.update_status(EventStatus::Rejected);
+            drop(efin); // sends the Rejected status update
+            tokio::task::yield_now().await;
+
+            // Finalizer BatchStatus discard: a rejected (failed) delivery must
+            // leave pending acks at 0. It instead advances by the full count, so
+            // the buffer forgets the events as if delivered — this assertion FAILS.
+            assert_eq!(
+                ledger.consume_pending_acks(),
+                0,
+                "rejected delivery must not advance acks, but advanced by 7 — the \
+                 finalizer ignores BatchStatus, so failed deliveries are silently \
+                 treated as acknowledged"
+            );
+        }
+    })
+    .await;
+}

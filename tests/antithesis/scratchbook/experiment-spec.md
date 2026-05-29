@@ -48,8 +48,8 @@ experiment's goal.
 ## Forcing the loss-prone state
 
 Partition head↔tail so the buffer backs up with acked-but-undelivered records, keep
-producing hot, then fire the reload / kill a node at a rotation boundary on the
-persistent volume. The shrunk data-file knob (2 MiB, shipped) keeps both buffers
+producing hot, then kill a node at a rotation boundary on the persistent volume.
+The shrunk data-file knob (2 MiB, shipped) keeps both buffers
 rotating constantly so reopen/torn-tail boundaries are crossed often.
 
 ---

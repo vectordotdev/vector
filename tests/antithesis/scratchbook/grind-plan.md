@@ -17,8 +17,9 @@ in-process, where Antithesis adds only scheduler/coverage. See those two propert
 files' "Test plan" sections (A: ledger-level `get_total_records` wrap, pure sync; B:
 reopen + torn-tail `total_buffer_size` underflow, `current_thread` + `TestFilesystem`).
 Antithesis retains the distributed work: the `vector_to_vector_e2e_disk` conservation
-experiment and the #24948 SIGHUP config-reload fault (both wired and `snouty
-validate`-green at this commit).
+experiment (wired and `snouty validate`-green at this commit). The SIGHUP config-reload
+fault is not built — see `config-reload-no-silent-loss` for the startup-safe custom
+fault it still needs.
 
 ## G0 — Bootstrap (setup task #1/#2/#3)
 
