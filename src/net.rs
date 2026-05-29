@@ -92,7 +92,7 @@ mod tests {
 
     use crate::tls::{TEST_PEM_CA_PATH, TEST_PEM_CRT_PATH, TEST_PEM_KEY_PATH};
 
-    use super::{io, is_graceful_tls_shutdown, TcpStream};
+    use super::{TcpStream, io, is_graceful_tls_shutdown};
 
     #[test]
     fn plain_io_errors_are_not_graceful() {
