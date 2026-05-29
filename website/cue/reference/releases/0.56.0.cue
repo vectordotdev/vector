@@ -1,7 +1,7 @@
 package metadata
 
 releases: "0.56.0": {
-	date:     "2026-05-29"
+	date:     "2026-05-15"
 	codename: ""
 
 	whats_next: []
@@ -13,27 +13,25 @@ releases: "0.56.0": {
 			description: #"""
 				The boolean syntax (`compression: true` / `compression: false`) is deprecated.
 				Use the string syntax instead: `compression: "gzip"`, `compression: "zstd"`, or `compression: "none"`.
-				
+
 				The `bool_or_vector_compression` deserializer will be removed once the boolean syntax is no longer supported.
 				"""#
 		},
 		{
-			what:             "FAKE EXAMPLE — `fake_option` on the `fake_sink` sink [remove before merging]"
+			what:             "GreptimeDB v0.x support in `greptimedb_metrics` and `greptimedb_logs` sinks"
 			deprecated_since: "0.56.0"
 			description: #"""
-				This is a fake deprecation entry used to test the Deprecation Announcements section on the release page. Remove this file before merging.
+				The `greptimedb_metrics` and `greptimedb_logs` sinks drop support for GreptimeDB v0.x.
+				Users must upgrade their GreptimeDB instance to v1.x before upgrading Vector.
 				"""#
 		},
-	]
-
-	planned_deprecations: [
 		{
 			what:             "`azure_monitor_logs` sink"
 			deprecated_since: "0.58.0"
 			description: #"""
 				The `azure_monitor_logs` sink is deprecated in favor of the new `azure_logs_ingestion` sink,
 				which uses the Azure Monitor Logs Ingestion API.
-				
+
 				Users should migrate before Microsoft ends support for the old Data Collector API (scheduled
 				for September 2026).
 				"""#
@@ -52,16 +50,8 @@ releases: "0.56.0": {
 			description: #"""
 				The `series_api_version: v1` option is deprecated in favor of `v2` (the default).
 				The v1 series endpoint (`/api/v1/series`) is a legacy endpoint.
-				
+
 				Users should remove `series_api_version: v1` from their configuration or set it to `v2`.
-				"""#
-		},
-		{
-			what:             "GreptimeDB v0.x support in `greptimedb_metrics` and `greptimedb_logs` sinks"
-			deprecated_since: "0.55.0"
-			description: #"""
-				The `greptimedb_metrics` and `greptimedb_logs` sinks drop support for GreptimeDB v0.x.
-				Users must upgrade their GreptimeDB instance to v1.x before upgrading Vector.
 				"""#
 		},
 		{
@@ -71,7 +61,16 @@ releases: "0.56.0": {
 				The `encoding` field will be removed. Use `decoding` and `framing` instead.
 				"""#
 		},
+		{
+			what:             "FAKE EXAMPLE — `fake_option` on the `fake_sink` sink [remove before merging]"
+			deprecated_since: "0.56.0"
+			description: #"""
+				This is a fake deprecation entry used to test the Deprecation Announcements section on the release page. Remove this file before merging.
+				"""#
+		},
 	]
+
+	planned_deprecations: []
 
 	changelog: [
 		{
@@ -334,6 +333,32 @@ releases: "0.56.0": {
 		},
 	]
 
+	vrl_changelog: """
+		### [0.32.0 (2026-04-16)]
+		
+		#### New Features
+		
+		- Added a new `encode_csv` function that encodes an array of values into a CSV-formatted string. This is the inverse of the existing `parse_csv` function and supports an optional single-byte delimiter (defaults to `,`).
+		
+		authors: armleth (https://github.com/vectordotdev/vrl/pull/1649)
+		- Added `to_entries` and `from_entries` with jq-compatible behavior: `to_entries` supports both objects and arrays, and `from_entries` accepts `key`/`Key`/`name`/`Name` and `value`/`Value` aliases.
+		
+		authors: close2code-palm (https://github.com/vectordotdev/vrl/pull/1653)
+		
+		#### Enhancements
+		
+		- Added `except` parameter to `flatten` function to exclude specific keys from being flattened.
+		
+		authors: benjamin-awd (https://github.com/vectordotdev/vrl/pull/1682)
+		
+		#### Fixes
+		
+		- Fixed a bug where the REPL input validator was executing programs instead of only compiling them, causing functions with side effects (e.g. `http_request`) to run twice per submission.
+		
+		authors: prontidis (https://github.com/vectordotdev/vrl/pull/1701)
+		
+		"""
+
 	commits: [
 		{sha: "1c70988b54156abf8d031538f0f81f28e7c0a0e4", date: "2026-04-21 17:00:33 UTC", description: "restore HTTP GET /health endpoint", pr_number: 25234, scopes: ["api"], type: "fix", breaking_change: false, author: "Pavlos Rontidis", files_count: 6, insertions_count: 162, deletions_count: 11},
 		{sha: "aafd4cb44f5649e692722b97d82973fea5509a41", date: "2026-04-21 18:21:39 UTC", description: "drop fakedata_generator, fix broken fake domains", pr_number: 25236, scopes: ["demo_logs source"], type: "fix", breaking_change: false, author: "Pavlos Rontidis", files_count: 6, insertions_count: 61, deletions_count: 26},
@@ -468,11 +493,6 @@ releases: "0.56.0": {
 		{sha: "8eb5b4279e4b630548137f6edbcc502a2d1ce282", date: "2026-05-15 17:46:27 UTC", description: "fix insert_block_after_changelog to target the changelog array not the first ]", pr_number: null, scopes: ["releasing"], type: "fix", breaking_change: false, author: "Thomas", files_count: 1, insertions_count: 7, deletions_count: 2},
 		{sha: "9dabc01cea2e3eee0eb4720c23338b58360bf2f9", date: "2026-05-15 17:54:08 UTC", description: "fix markdown table separator spacing in deprecation.d README", pr_number: null, scopes: ["internal docs"], type: "chore", breaking_change: false, author: "Thomas", files_count: 1, insertions_count: 1, deletions_count: 1},
 		{sha: "3b2a6f05b071dafb216fb8738e01412f0ba87560", date: "2026-05-15 17:59:10 UTC", description: "use gh CLI to fetch VRL release notes instead of unauthenticated GitHub API", pr_number: null, scopes: ["releasing"], type: "chore", breaking_change: false, author: "Thomas", files_count: 1, insertions_count: 41, deletions_count: 39},
-		{sha: "62479c0fe77ab9b1c1ff0a98cfb8bb61380a9b9c", date: "2026-05-15 18:03:36 UTC", description: "add generated files", pr_number: null, scopes: ["website"], type: "chore", breaking_change: false, author: "Thomas", files_count: 2, insertions_count: 513, deletions_count: 0},
-		{sha: "0bc71ccdd463f6ad90e33e5161e07ed54b5c8a2f", date: "2026-05-15 18:04:48 UTC", description: "chore(releasing): use gh CLI to fetch VRL release notes instead of unauthenticated GitHub API", pr_number: null, scopes: [], type: "revert", breaking_change: false, author: "Thomas", files_count: 1, insertions_count: 39, deletions_count: 41},
-		{sha: "50644e7d82f1c36e1f9adb97bba3b49b7d81f89d", date: "2026-05-19 15:41:30 UTC", description: "rename DEPRECATION.md to DEPRECATION_POLICY.md and merge DEPRECATIONS.md", pr_number: null, scopes: ["internal docs"], type: "docs", breaking_change: false, author: "Thomas", files_count: 4, insertions_count: 5, deletions_count: 22},
-		{sha: "a5145677b01ef853a1dc67425ba91c390914eab7", date: "2026-05-19 20:18:12 UTC", description: "remove TBD as accepted deprecation_version; set concrete versions for existing entries", pr_number: null, scopes: ["releasing"], type: "chore", breaking_change: false, author: "Thomas", files_count: 7, insertions_count: 16, deletions_count: 46},
-		{sha: "8a89226ed362670e04202d812d193cfd6d78c959", date: "2026-05-22 16:35:14 UTC", description: "drop announcement_version; track via .announced.md filename convention", pr_number: null, scopes: ["releasing"], type: "chore", breaking_change: false, author: "Thomas", files_count: 16, insertions_count: 171, deletions_count: 255},
-		{sha: "f5c7fe6218f8e20ca58e88aba308d9c797402f94", date: "2026-05-29 15:45:49 UTC", description: "replace announcement_version/deprecation_version with deprecated_since", pr_number: null, scopes: ["releasing"], type: "chore", breaking_change: false, author: "Thomas", files_count: 17, insertions_count: 78, deletions_count: 307},
+		{sha: "35fbe89db6dbb2a4d4318496acdc7f45231871d0", date: "2026-05-15 18:01:44 UTC", description: "Pinned VRL version to 0.32.0", pr_number: null, scopes: ["releasing"], type: "chore", breaking_change: false, author: "Thomas", files_count: 2, insertions_count: 7, deletions_count: 6},
 	]
 }
