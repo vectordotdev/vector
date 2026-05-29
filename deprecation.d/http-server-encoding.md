@@ -1,6 +1,6 @@
 ---
 what: "`encoding` field on HTTP server sources"
-deprecation_version: 0.60
+deprecated_since: "0.50.0"
 ---
 
 The `encoding` field will be removed. Use `decoding` and `framing` instead.

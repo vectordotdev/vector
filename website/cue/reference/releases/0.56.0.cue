@@ -6,31 +6,28 @@ releases: "0.56.0": {
 
 	whats_next: []
 
-	deprecations: [
+	deprecation_announcements: [
 		{
-			what:                 "Boolean syntax for the `compression` field in the `vector` sink"
-			deprecation_version:  "0.56.0"
+			what:             "Boolean syntax for the `compression` field in the `vector` sink"
+			deprecated_since: "0.56.0"
 			description: #"""
 				The boolean syntax (`compression: true` / `compression: false`) is deprecated.
 				Use the string syntax instead: `compression: "gzip"`, `compression: "zstd"`, or `compression: "none"`.
-				
+
 				The `bool_or_vector_compression` deserializer will be removed once the boolean syntax is no longer supported.
 				"""#
 		},
 		{
-			what:                 "GreptimeDB v0.x support in `greptimedb_metrics` and `greptimedb_logs` sinks"
-			deprecation_version:  "0.56.0"
+			what:             "GreptimeDB v0.x support in `greptimedb_metrics` and `greptimedb_logs` sinks"
+			deprecated_since: "0.56.0"
 			description: #"""
 				The `greptimedb_metrics` and `greptimedb_logs` sinks drop support for GreptimeDB v0.x.
 				Users must upgrade their GreptimeDB instance to v1.x before upgrading Vector.
 				"""#
 		},
-	]
-
-	deprecation_announcements: [
 		{
-			what:                 "`azure_monitor_logs` sink"
-			deprecation_version:  "0.58.0"
+			what:             "`azure_monitor_logs` sink"
+			deprecated_since: "0.58.0"
 			description: #"""
 				The `azure_monitor_logs` sink is deprecated in favor of the new `azure_logs_ingestion` sink,
 				which uses the Azure Monitor Logs Ingestion API.
@@ -40,16 +37,16 @@ releases: "0.56.0": {
 				"""#
 		},
 		{
-			what:                 "`buffer_byte_size` and `buffer_events` gauge metrics"
-			deprecation_version:  "0.60.0"
+			what:             "`buffer_byte_size` and `buffer_events` gauge metrics"
+			deprecated_since: "0.53.0"
 			description: #"""
 				The `buffer_byte_size` and `buffer_events` gauges are deprecated in favor of the
 				`buffer_size_bytes` and `buffer_size_events` metrics described in `docs/specs/buffer.md`.
 				"""#
 		},
 		{
-			what:                 "`series_api_version: v1` option on the `datadog_metrics` sink"
-			deprecation_version:  "0.58.0"
+			what:             "`series_api_version: v1` option on the `datadog_metrics` sink"
+			deprecated_since: "0.58.0"
 			description: #"""
 				The `series_api_version: v1` option is deprecated in favor of `v2` (the default).
 				The v1 series endpoint (`/api/v1/series`) is a legacy endpoint.
@@ -58,15 +55,15 @@ releases: "0.56.0": {
 				"""#
 		},
 		{
-			what:                 "`encoding` field on HTTP server sources"
-			deprecation_version:  "0.60.0"
+			what:             "`encoding` field on HTTP server sources"
+			deprecated_since: "0.50.0"
 			description: #"""
 				The `encoding` field will be removed. Use `decoding` and `framing` instead.
 				"""#
 		},
 		{
-			what:                 "FAKE EXAMPLE — `fake_option` on the `fake_sink` sink [remove before merging]"
-			deprecation_version:  "0.58.0"
+			what:             "FAKE EXAMPLE — `fake_option` on the `fake_sink` sink [remove before merging]"
+			deprecated_since: "0.56.0"
 			description: #"""
 				This is a fake deprecation entry used to test the Deprecation Announcements section on the release page. Remove this file before merging.
 				"""#

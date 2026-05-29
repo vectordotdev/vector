@@ -1,6 +1,6 @@
 ---
 what: "`buffer_byte_size` and `buffer_events` gauge metrics"
-deprecation_version: 0.60
+deprecated_since: "0.53.0"
 ---
 
 The `buffer_byte_size` and `buffer_events` gauges are deprecated in favor of the

@@ -103,7 +103,6 @@ pub(super) fn run(new_version: &Version) -> Result<PathBuf> {
     let all_deprecations = deprecation::read_deprecation_fragments(&deprecation_dir)?;
 
     let deprecation::DeprecationPartition {
-        enacted: enacted_deprecations,
         announcing: announcing_deprecations,
         planned: planned_deprecations,
     } = deprecation::partition_by_release(all_deprecations, &new_version);
@@ -112,18 +111,11 @@ pub(super) fn run(new_version: &Version) -> Result<PathBuf> {
         &new_version,
         &changelog_entries,
         &commits,
-        &enacted_deprecations,
         &announcing_deprecations,
         &planned_deprecations,
     );
     fs::write(&cue_path, cue_text)
         .with_context(|| format!("Failed to write {}", cue_path.display()))?;
-
-    // Promote new-announcement fragments from *.md to *.announced.md.
-    rename_announcing_fragments(&deprecation_dir, &announcing_deprecations)?;
-
-    // Retire enacted deprecation fragments via `git rm`.
-    retire_deprecation_fragments(&deprecation_dir, &enacted_deprecations)?;
 
     // Retire the changelog fragments via `git rm` (preserves README.md).
     retire_changelog_fragments(&changelog_dir)?;
@@ -562,41 +554,12 @@ fn retire_changelog_fragments(dir: &Path) -> Result<()> {
     Ok(())
 }
 
-fn rename_announcing_fragments(dir: &Path, announcing: &[DeprecationEntry]) -> Result<()> {
-    if announcing.is_empty() {
-        return Ok(());
-    }
-    let cwd = env::current_dir()?;
-    for entry in announcing {
-        let src = dir.join(&entry.filename);
-        let dst = deprecation::announced_path(&src);
-        let src_rel = src.strip_prefix(&cwd).unwrap_or(&src);
-        let dst_rel = dst.strip_prefix(&cwd).unwrap_or(&dst);
-        git::mv(&src_rel.to_string_lossy(), &dst_rel.to_string_lossy())?;
-    }
-    Ok(())
-}
-
-fn retire_deprecation_fragments(dir: &Path, enacted: &[DeprecationEntry]) -> Result<()> {
-    if !dir.is_dir() || enacted.is_empty() {
-        return Ok(());
-    }
-    let cwd = env::current_dir()?;
-    for entry in enacted {
-        let path = dir.join(&entry.filename);
-        let rel = path.strip_prefix(&cwd).unwrap_or(&path);
-        git::rm(&rel.to_string_lossy())?;
-    }
-    Ok(())
-}
-
 // ---------- CUE rendering ----------
 
 fn render_release_cue(
     version: &Version,
     changelog: &[ChangelogEntry],
     commits: &[Commit],
-    enacted_deprecations: &[DeprecationEntry],
     announcing_deprecations: &[DeprecationEntry],
     planned_deprecations: &[DeprecationEntry],
 ) -> String {
@@ -608,7 +571,6 @@ fn render_release_cue(
         .collect::<Vec<_>>()
         .join(",\n    ");
 
-    let deprecations_block = render_deprecation_section(enacted_deprecations);
     let deprecation_announcements_block = render_deprecation_section(announcing_deprecations);
     let planned_deprecations_block = render_deprecation_section(planned_deprecations);
 
@@ -620,10 +582,6 @@ fn render_release_cue(
          \tcodename: \"\"\n\
          \n\
          \twhats_next: []\n\
-         \n\
-         \tdeprecations: [\n\
-         {deprecations_block}\n\
-         \t]\n\
          \n\
          \tdeprecation_announcements: [\n\
          {deprecation_announcements_block}\n\
@@ -651,8 +609,8 @@ fn render_deprecation_section(entries: &[DeprecationEntry]) -> String {
             writeln!(s, "\t\t\twhat: {}", json!(e.what)).unwrap();
             writeln!(
                 s,
-                "\t\t\tdeprecation_version: {}",
-                json!(e.deprecation_version.to_string())
+                "\t\t\tdeprecated_since: {}",
+                json!(e.deprecated_since.to_string())
             )
             .unwrap();
             if !e.description.is_empty() {
@@ -863,7 +821,7 @@ mod tests {
             deletions_count: 3,
         }];
 
-        let out = render_release_cue(&Version::new(0, 99, 0), &entries, &commits, &[], &[], &[]);
+        let out = render_release_cue(&Version::new(0, 99, 0), &entries, &commits, &[], &[]);
 
         assert!(out.starts_with("package metadata\n"));
         assert!(out.contains("releases: \"0.99.0\":"));
