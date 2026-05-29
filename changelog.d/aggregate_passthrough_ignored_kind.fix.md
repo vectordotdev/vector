@@ -9,6 +9,6 @@ transform are now forwarded to the next step in the pipeline unchanged rather th
 {kind: incremental, type: counter, name: "http.requests", value: 5}   → summed into aggregate
 ```
 
-If the previous drop behavior was intentional, add a `filter` transform before the aggregate transform to discard the unwanted metric kind.
+If you want to preserve the previous drop behavior, add a `filter` transform before the aggregate transform to discard the unwanted metric kind.
 
 authors: ArunPiduguDD
