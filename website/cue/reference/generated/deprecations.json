@@ -2,7 +2,7 @@
   "deprecations_pending": [
     {
       "what": "`azure_monitor_logs` sink",
-      "deprecated_since": "0.58.0",
+      "deprecated_since": "0.54.0",
       "description": "The `azure_monitor_logs` sink is deprecated in favor of the new `azure_logs_ingestion` sink,\nwhich uses the Azure Monitor Logs Ingestion API.\n\nUsers should migrate before Microsoft ends support for the old Data Collector API (scheduled\nfor September 2026)."
     },
     {
@@ -17,7 +17,7 @@
     },
     {
       "what": "`series_api_version: v1` option on the `datadog_metrics` sink",
-      "deprecated_since": "0.58.0",
+      "deprecated_since": "0.56.0",
       "description": "The `series_api_version: v1` option is deprecated in favor of `v2` (the default).\nThe v1 series endpoint (`/api/v1/series`) is a legacy endpoint.\n\nUsers should remove `series_api_version: v1` from their configuration or set it to `v2`."
     },
     {
