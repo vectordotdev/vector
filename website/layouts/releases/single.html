@@ -54,15 +54,7 @@
       </div>
       {{ end }}
 
-      <div class="mt-8">
-        <div class="prose dark:prose-dark max-w-none">
-          {{ partial "heading.html" (dict "text" "Deprecation Announcements" "level" 2) }}
-          <p class="text-sm text-gray-500 dark:text-gray-400">
-            See the <a href="/releases/deprecations/">deprecations page</a> for all active and historical deprecations.
-          </p>
-        </div>
-        {{ partial "releases/deprecations.html" (dict "version" $version) }}
-      </div>
+      {{ partial "releases/deprecations.html" (dict "version" $version) }}
 
       <div class="mt-8">
         <div class="admonition dark:prose-dark prose rounded-xl border-3 px-3 py-3.5 lg:px-5 lg:py-4 border-yellow-400">
