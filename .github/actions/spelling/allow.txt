@@ -71,6 +71,8 @@ bitwidth
 blackbox
 Blaupunkt
 Blusens
+bpf
+bpftrace
 buildname
 buildroot
 bytestream
@@ -530,11 +532,14 @@ ubuntu
 Umeox
 UMTS
 unchunked
+uprobe
+uprobes
 upstreaminfo
 urlencoding
 useragents
 usergroups
 userguide
+ustack
 Verizon
 vhosts
 Videocon

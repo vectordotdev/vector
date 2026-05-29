@@ -594,6 +594,7 @@ target-aarch64-apple-darwin =           ["enable-unix", "gssapi"]
 # Enables features that work only on systems providing `cfg(unix)`
 unix = ["tikv-jemallocator", "allocation-tracing"]
 allocation-tracing = ["vector-lib/allocation-tracing"]
+component-probes = ["nix/process"]
 
 # Enables kubernetes dependencies and shared code. Kubernetes-related sources,
 # transforms and sinks should depend on this feature.
