@@ -2,8 +2,8 @@
 slug: graceful-shutdown-flushes-all
 type: Liveness / Sometimes(graceful_shutdown_lossless)
 status: missing
-sut_commit: b7aae737cef5dd37d1445915443a1eb97b584f85
-updated: 2026-05-28
+sut_commit: 049eec79b737450c4669b7f8aa1dd814551ec466
+updated: 2026-06-02
 related_issues:
   - "vectordotdev/vector#24948 (config-reload stall, partially overlapping concern)"
   - "lib/vector-buffers/src/variants/disk_v2/mod.rs (design doc: 'graceful shutdown flushes everything → no loss')"
@@ -217,7 +217,11 @@ Secondary assertion (contrast):
 - Whether the 500ms fsync window creates any detectable loss on graceful
   shutdown when CPU/IO throttling slows the shutdown sequence.
 
-### Instrumentation to add (all new — zero Antithesis SDK exists today)
+### Instrumentation to add (not yet committed)
+
+The SDK is now wired and the three #21683 underflow detectors are present (see
+`existing-assertions.md`); the two assertions below are additional and not yet
+committed.
 
 Add to `BufferWriter::close()` (writer.rs:1358) or to the point where the
 write loop exits cleanly:
@@ -277,7 +281,7 @@ antithesis_sdk::assert_sometimes!(
 
 4. **Does the finalizer task complete before the buffer is re-opened on
    restart?** On graceful shutdown + restart, the finalizer task
-   (ledger.rs:701-710, spawned as a tokio task holding `Arc<Ledger>`) must
+   (ledger.rs:728-737, spawned as a tokio task holding `Arc<Ledger>`) must
    exit before the new process opens the same buffer directory. Since the
    finalizer task exits when the `OrderedFinalizer` sender side is dropped
    (which happens when `BufferWriter` is dropped), and the old process

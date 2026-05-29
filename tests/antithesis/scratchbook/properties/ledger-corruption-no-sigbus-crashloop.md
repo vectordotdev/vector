@@ -7,7 +7,8 @@ related:
   - recovery-completes-after-crash
   - record-id-monotonicity-holds
   - no-corrupted-record-delivered
-commit: b7aae737cef5dd37d1445915443a1eb97b584f85
+commit: 049eec79b737450c4669b7f8aa1dd814551ec466
+updated: 2026-06-02
 ---
 
 ### ledger-corruption-no-sigbus-crashloop — Ledger Corruption Yields a Clean Init Error, Not a SIGBUS Crash Loop
@@ -16,7 +17,7 @@ commit: b7aae737cef5dd37d1445915443a1eb97b584f85
 |---|---|
 | **Type** | Safety |
 | **Property** | If `buffer.db` is externally truncated or otherwise corrupted before or during Vector startup, the corruption is detected by rkyv `CheckBytes` validation in `BackedArchive::from_backing` and reported as a clean `LedgerLoadCreateError::FailedToDeserialize`, never as a SIGBUS signal mid-operation or as an infinite crash loop. |
-| **Invariant** | `AlwaysOrUnreachable`: if the ledger file is corrupted, the process either (a) detects it at `BackedArchive::from_backing` call (`ledger.rs:621`) and returns a `LedgerLoadCreateError`, OR (b) the ledger file is valid and this path is never taken. A SIGBUS-generating memory access against a truncated mmap'd region is `Unreachable` during normal operation; a restart loop (SIGBUS → crash → restart → SIGBUS again) is `Unreachable`. |
+| **Invariant** | `AlwaysOrUnreachable`: if the ledger file is corrupted, the process either (a) detects it at `BackedArchive::from_backing` call (`ledger.rs:648`) and returns a `LedgerLoadCreateError`, OR (b) the ledger file is valid and this path is never taken. A SIGBUS-generating memory access against a truncated mmap'd region is `Unreachable` during normal operation; a restart loop (SIGBUS → crash → restart → SIGBUS again) is `Unreachable`. |
 | **Antithesis Angle** | Filesystem fault: truncate or zero-fill `buffer.db` while Vector is stopped (before restart) or while it is running (after the file is mmap'd). Assert that Vector (a) either restarts cleanly with a fresh buffer, or (b) emits a detectable error and exits cleanly — it does not loop on SIGBUS signals. Requires Antithesis filesystem-fault capability to truncate a file from outside the process; flag this as potentially unavailable in some tenant configurations. |
 | **Why It Matters** | The `buffer.db` ledger is memory-mapped via `memmap2::MmapMut` (`io.rs:161`). There is no SIGBUS handler anywhere in the Vector codebase. If the mapped file is truncated while mapped, any read/write of the now-unmapped pages delivers SIGBUS, which is an unhandled signal and crashes the process. On restart, `open_mmap_writable` re-maps the same truncated file — the same access pattern fires again. The result is an infinite crash loop with no operator-visible error message, indistinguishable from a persistent hardware fault. The theoretical protection (`CheckBytes` at `from_backing`) is only effective at init time, before the mmap is held live. |
 
@@ -30,17 +31,17 @@ exposure and explains why `CheckBytes` is not sufficient as a defense.
 
 ### The mmap path in `load_or_create`
 
-`Ledger::load_or_create` (`ledger.rs:556–651`) performs the following sequence:
+`Ledger::load_or_create` (`ledger.rs:583–678`) performs the following sequence:
 
-1. Opens `buffer.db` as a read-write file (`ledger.rs:580–584`).
+1. Opens `buffer.db` as a read-write file (`ledger.rs:607–611`).
 2. Checks whether the file is empty; if so, writes the serialized default
-   `LedgerState` and calls `sync_all` (`ledger.rs:590–612`).
+   `LedgerState` and calls `sync_all` (`ledger.rs:618–638`).
 3. Opens the same file as a writable mmap:
 
    ```rust
    let ledger_mmap = config
        .filesystem
-       .open_mmap_writable(&ledger_path)    // ledger.rs:616–620
+       .open_mmap_writable(&ledger_path)    // ledger.rs:645–646
        .await
        .context(IoSnafu)?;
    ```
@@ -52,7 +53,7 @@ exposure and explains why `CheckBytes` is not sufficient as a defense.
 
    ```rust
    let ledger_state = match BackedArchive::from_backing(ledger_mmap) {
-       Ok(backed) => backed,                           // ledger.rs:622–629
+       Ok(backed) => backed,                           // ledger.rs:648–655
        Err(e) => {
            return Err(LedgerLoadCreateError::FailedToDeserialize {
                reason: e.into_inner(),
@@ -110,11 +111,11 @@ re-maps `buffer.db`. If the file is still truncated:
   truncated pages that were zero-filled by the OS may yield plausible-looking
   zero data rather than a SIGBUS. Whether this is valid depends on whether
   the rkyv `ArchivedLedgerState` layout treats zero-valued atomics as a
-  valid state — the `LedgerState::default()` impl (`ledger.rs:109+`) starts
+  valid state — the `LedgerState::default()` impl (`ledger.rs:110+`) starts
   all fields at 0, so a zero-filled truncated ledger may appear valid, causing
   Vector to start normally with a reset ledger rather than detecting corruption.
   This "silent reset" is a distinct failure mode from the crash loop.
-- If the file is zero-length, the init-time file-is-empty check (`ledger.rs:590`)
+- If the file is zero-length, the init-time file-is-empty check (`ledger.rs:618`)
   triggers re-initialization with the default state — this is the **correct
   recovery path** and the only case where existing code handles truncation
   gracefully.
@@ -138,13 +139,13 @@ ledger close, no error log.
 | Location | Relevance |
 |---|---|
 | `lib/vector-buffers/src/variants/disk_v2/io.rs:157–162` | `open_mmap_writable`: `unsafe { memmap2::MmapMut::map_mut(&std_file) }` — the mmap creation point; no SIGBUS guard |
-| `lib/vector-buffers/src/variants/disk_v2/ledger.rs:616–630` | `load_or_create`: mmap opened, then passed to `BackedArchive::from_backing` for `CheckBytes` validation |
+| `lib/vector-buffers/src/variants/disk_v2/ledger.rs:645–656` | `load_or_create`: mmap opened, then passed to `BackedArchive::from_backing` for `CheckBytes` validation |
 | `lib/vector-buffers/src/variants/disk_v2/backed_archive.rs:68–80` | `BackedArchive::from_backing`: calls `check_archived_root` — the only structural validation; only runs at init time |
 | `lib/vector-buffers/src/variants/disk_v2/backed_archive.rs:88–91` | `get_archive_ref`: `unsafe { archived_root::<T>(self.backing.as_ref()) }` — live mmap accesses; SIGBUS risk point |
 | `lib/vector-buffers/src/variants/disk_v2/ledger.rs:217` | `state: BackedArchive<FS::MutableMemoryMap, LedgerState>` — the held live mmap |
 | `lib/vector-buffers/src/variants/disk_v2/ledger.rs:253` | `pub fn state(&self) -> &ArchivedLedgerState` — every field access goes through this |
-| `lib/vector-buffers/src/variants/disk_v2/ledger.rs:507–509` | `flush`: `self.state.get_backing_ref().flush()` — calls `MmapMut::flush` (msync); SIGBUS risk if pages are unmapped |
-| `lib/vector-buffers/src/variants/disk_v2/ledger.rs:590` | Zero-length file check — the **only** existing graceful-recovery path for truncation |
+| `lib/vector-buffers/src/variants/disk_v2/ledger.rs:534–535` | `flush`: `self.state.get_backing_ref().flush()` — calls `MmapMut::flush` (msync); SIGBUS risk if pages are unmapped |
+| `lib/vector-buffers/src/variants/disk_v2/ledger.rs:618` | Zero-length file check — the **only** existing graceful-recovery path for truncation |
 | `lib/vector-buffers/src/variants/disk_v2/ledger.rs:34–75` | `LedgerLoadCreateError` variants — `FailedToDeserialize` is the intended corruption signal |
 
 ---
@@ -160,7 +161,7 @@ as long as the corruption is structurally visible to rkyv.
 
 **Scenario 2 — Corruption to page-aligned truncation (silent reset, unexpected behavior):**
 `buffer.db` is truncated to exactly 0 bytes before restart. The zero-length
-check at `ledger.rs:590` triggers `LedgerState::default()` initialization and
+check at `ledger.rs:618` triggers `LedgerState::default()` initialization and
 writes a fresh ledger. Vector starts with a reset ledger, treating all data
 files as unknown. This loses the reader's acked position — potentially
 re-delivering already-acked records. Unexpected but non-crashing.
@@ -208,9 +209,9 @@ detection) but not scenario 3 (live truncation).
 
 ---
 
-## Missing SUT Instrumentation
+## SUT Instrumentation
 
-No Antithesis SDK assertions exist. Needed:
+The Antithesis SDK is a committed dependency under the `antithesis` feature, and three `assert_always_greater_than_or_equal_to!` underflow detectors already ship (ledger.rs:271, ledger.rs:313, reader.rs:529 — see `existing-assertions.md`). None of them covers the SIGBUS / ledger-corruption surface, so the assertions below are genuine still-to-add suggestions:
 
 1. **`AlwaysOrUnreachable` assertion** at the mmap-access point in
    `get_archive_ref` (`backed_archive.rs:88`): the function is called in
@@ -228,7 +229,7 @@ No Antithesis SDK assertions exist. Needed:
    crash-loop signal.
 
 3. **Clean error detection:** an `AlwaysOrUnreachable` assertion in the
-   `BackedArchive::from_backing` `Err` arm (`ledger.rs:625–629`) confirms that
+   `BackedArchive::from_backing` `Err` arm (`ledger.rs:651–655`) confirms that
    the `FailedToDeserialize` path actually fires on corruption — i.e., that
    the recovery runs, not that it's dead code.
 
@@ -250,7 +251,7 @@ No Antithesis SDK assertions exist. Needed:
   the defense must be pre-access validation — the current code has none
   outside of init.
 
-- Does the `LedgerState::default()` zero-fill path (`ledger.rs:109–121`,
+- Does the `LedgerState::default()` zero-fill path (`ledger.rs:110–121`,
   assuming standard derive) produce a structurally valid `ArchivedLedgerState`
   that rkyv's `CheckBytes` will accept? If the all-zeros layout is not a valid
   rkyv archive, then truncation to zero would fail `CheckBytes` and trigger
@@ -283,9 +284,9 @@ No Antithesis SDK assertions exist. Needed:
 
 #### Does an all-zeros `LedgerState` pass `CheckBytes` (silent-reset vs. `FailedToDeserialize` on zero-truncation)?
 
-**Examined:** `ledger.rs:590` (zero-length file check), `ledger.rs:109+` (implied `LedgerState::default`), `backed_archive.rs:68–80` (`from_backing` / `check_archived_root`), `ledger.rs:93` (`#[derive(...)]` on `LedgerState`).
+**Examined:** `ledger.rs:618` (zero-length file check), `ledger.rs:110+` (implied `LedgerState::default`), `backed_archive.rs:68–80` (`from_backing` / `check_archived_root`), `ledger.rs:93` (`#[derive(...)]` on `LedgerState`).
 
-**Found:** The zero-length file check at ledger.rs:590 handles the empty-file case before the mmap path is reached — Vector re-initializes with `LedgerState::default()` and writes a fresh ledger. For a non-zero truncation that lands on a page boundary with zero-filled pages (OS behavior on Linux for sparse/truncated mmap regions), `check_archived_root` would validate the all-zeros bytes against the rkyv-archived `LedgerState` layout. Since `LedgerState` fields are all numeric types (AtomicU16, AtomicU64) and rkyv's `CheckBytes` for primitives validates alignment and range — all zeros is a valid representation for all numeric types — the all-zeros layout would likely pass `CheckBytes` and yield a ledger with all fields at 0 (equivalent to a fresh ledger). This means truncation to a page-aligned non-zero length could silently reset the ledger rather than returning `FailedToDeserialize`.
+**Found:** The zero-length file check at ledger.rs:618 handles the empty-file case before the mmap path is reached — Vector re-initializes with `LedgerState::default()` and writes a fresh ledger. For a non-zero truncation that lands on a page boundary with zero-filled pages (OS behavior on Linux for sparse/truncated mmap regions), `check_archived_root` would validate the all-zeros bytes against the rkyv-archived `LedgerState` layout. Since `LedgerState` fields are all numeric types (AtomicU16, AtomicU64) and rkyv's `CheckBytes` for primitives validates alignment and range — all zeros is a valid representation for all numeric types — the all-zeros layout would likely pass `CheckBytes` and yield a ledger with all fields at 0 (equivalent to a fresh ledger). This means truncation to a page-aligned non-zero length could silently reset the ledger rather than returning `FailedToDeserialize`.
 
 **Not found:** Definitive confirmation of rkyv `CheckBytes` behavior for the exact `ArchivedLedgerState` layout without running the code. The `#[derive(CheckBytes)]` on `LedgerState` is auto-generated; it validates alignment and field validity but does not enforce cross-field invariants (e.g., that writer ID >= reader ID).
 

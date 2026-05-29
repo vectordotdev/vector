@@ -4,8 +4,8 @@ property_id: 13
 type: Liveness
 antithesis_assertion: Sometimes(reader_returned_none_clean)
 sut_path: lib/vector-buffers/src/variants/disk_v2/
-commit: b7aae737cef5dd37d1445915443a1eb97b584f85
-updated: 2026-05-28
+commit: 049eec79b737450c4669b7f8aa1dd814551ec466
+updated: 2026-06-02
 cross_refs:
   - total-buffer-size-never-underflows   # termination condition uses total_buffer_size == 0
   - writer-eventually-makes-progress      # writer must be done before reader can terminate
@@ -34,10 +34,10 @@ end-of-stream — within finite time. Two failure modes must both be excluded:
 
 ## Termination Condition and Its Fragility
 
-The termination check is at `reader.rs:980-985`:
+The termination check is at `reader.rs:991-993`:
 
 ```rust
-// reader.rs:980-985
+// reader.rs:991-993
 if self.ledger.is_writer_done() {
     let total_buffer_size = self.ledger.get_total_buffer_size();
     if total_buffer_size == 0 {
@@ -48,13 +48,13 @@ if self.ledger.is_writer_done() {
 
 Both conditions must be simultaneously true:
 
-1. `is_writer_done()` reads the `writer_done: AtomicBool` at ledger.rs:410-412
-   with `Ordering::Acquire`. This is set by `mark_writer_done()` (ledger.rs:403-407)
+1. `is_writer_done()` reads the `writer_done: AtomicBool` at ledger.rs:437-439
+   with `Ordering::Acquire`. This is set by `mark_writer_done()` (ledger.rs:430-434)
    which is called when the writer is dropped/closed.
 
 2. `get_total_buffer_size()` reads `total_buffer_size: AtomicU64`. This is
-   decremented by `track_reads` (ledger.rs:393-397) when acks are processed in
-   `handle_pending_acknowledgements` (reader.rs:623-624).
+   decremented by `track_reads` (ledger.rs:420-424) when acks are processed in
+   `handle_pending_acknowledgements` (reader.rs:634-635).
 
 **Three distinct ways this condition can fail:**
 
@@ -74,11 +74,11 @@ loop {
 }
 ```
 
-The finalizer task (ledger.rs:703-707) calls:
+The finalizer task (ledger.rs:730-734) calls:
 
 ```rust
-self.increment_pending_acks(amount);   // ledger.rs:705: pending_acks += amount
-self.notify_writer_waiters();          // ledger.rs:706: wakes reader
+self.increment_pending_acks(amount);   // ledger.rs:732: pending_acks += amount
+self.notify_writer_waiters();          // ledger.rs:733: wakes reader
 ```
 
 These two operations are **not atomic**. The `notify_writer_waiters()` wakes
@@ -132,15 +132,17 @@ This is exactly the "missed wakeup" concern noted in sut-analysis.md §4.
 From sut-analysis.md §5 (L8) and §6 (root cause #1):
 
 If `total_buffer_size` has wrapped to ≈ 2^64 due to the unguarded `fetch_sub`
-in `decrement_total_buffer_size` (ledger.rs:291-298):
+in `decrement_total_buffer_size` (ledger.rs:306-320):
 
 ```rust
-// ledger.rs:291-298 — no saturation
+// ledger.rs:306-320 — no saturation
 pub fn decrement_total_buffer_size(&self, amount: u64) {
     let last_total_buffer_size = self.total_buffer_size.fetch_sub(amount, Ordering::AcqRel);
     ...
 }
 ```
+
+A committed `assert_always_greater_than_or_equal_to!` now precedes the `fetch_sub` at ledger.rs:313, so Antithesis flags the underflow as a finding — but it is a detector, not a guard: the `fetch_sub` itself still wraps.
 
 Then `total_buffer_size` equals ≈ 2^64, never reaches 0, and the termination
 condition `total_buffer_size == 0` is never satisfied. The reader loops forever
@@ -268,7 +270,9 @@ This property depends on both:
   `is_writer_done`, `total_buffer_size`, `pending_acks`, `reader_last_record`,
   `writer_next_record`.
 
-### Assertions to add (SUT-side, none currently exist)
+### Assertions to add (SUT-side)
+
+The Antithesis SDK is a committed dependency under the `antithesis` feature, and three `assert_always_greater_than_or_equal_to!` underflow detectors already ship (ledger.rs:271, ledger.rs:313, reader.rs:529 — see `existing-assertions.md`). The ledger.rs:313 detector sits on `decrement_total_buffer_size`, directly relevant to Failure B's wrap-to-2^64 termination break — but it is a detector, not a guard (the `fetch_sub` still wraps). None of the three covers the clean-termination check below, so these are genuine still-to-add suggestions:
 
 ```rust
 // At the top of the next() loop, before the termination check, assert
@@ -299,7 +303,7 @@ if self.ledger.is_writer_done() {
 ```
 
 ```rust
-// In finalizer task (ledger.rs:703-707), after increment and notify,
+// In finalizer task (ledger.rs:730-734), after increment and notify,
 // confirm reachability:
 tokio::spawn(async move {
     while let Some((_status, amount)) = stream.next().await {
@@ -357,7 +361,7 @@ exact race window, and (c) verify any fix actually closes the window.
    `BufferWriter::close()` or `BufferWriter::drop()`. If the writer is dropped
    mid-write (e.g., topology tear-down), this window exists.
 
-3. **Does `notify_writer_waiters()` at ledger.rs:706 correctly wake the reader
+3. **Does `notify_writer_waiters()` at ledger.rs:733 correctly wake the reader
    in all cases?** The `Notify` API stores at most one permit. If multiple acks
    arrive before the reader wakes, multiple calls to `notify_writer_waiters()`
    collapse into one permit. The reader wakes once, processes all pending acks
@@ -374,8 +378,8 @@ exact race window, and (c) verify any fix actually closes the window.
 
 5. **Can `total_buffer_size` reach 0 before all in-flight acks are processed
    due to the gap-marker path?** If records are skipped due to corruption
-   (`events_skipped > 0` at reader.rs:599-601), `track_dropped_events` is
-   called (reader.rs:639) but does NOT decrement `total_buffer_size`. The
+   (`events_skipped > 0` at reader.rs:610-612), `track_dropped_events` is
+   called (reader.rs:650) but does NOT decrement `total_buffer_size`. The
    decrement only happens in `track_reads` (via `bytes_acknowledged`). If
    corruption causes a gap that accounts for the last remaining bytes in
    `total_buffer_size`, and the gap is processed by `events_skipped` rather

@@ -2,7 +2,7 @@
 slug: dropped-events-are-counted
 type: Safety / Always
 status: CURRENTLY VIOLATED (confirmed by #24606/#24144 and direct code inspection)
-sut_commit: b7aae737cef5dd37d1445915443a1eb97b584f85
+sut_commit: 049eec79b737450c4669b7f8aa1dd814551ec466
 ---
 
 # Property 15: dropped-events-are-counted
@@ -88,7 +88,7 @@ This is a blind spot in the primary observability surface. Vector operators moni
 lower-level `buffer_discarded_events_total` counter. A pipeline silently dropping events under
 backpressure shows 0 on the component dashboard while data is being lost. This is a known bug
 (#24606, #24144) that appears to remain unaddressed as of the current commit
-(`b7aae737c`). The Antithesis property will both confirm the bug is present and provide a
+(`049eec79b`). The Antithesis property will both confirm the bug is present and provide a
 regression test once fixed.
 
 ## Open Questions
@@ -134,6 +134,6 @@ regression test once fixed.
 
 **Examined:** `lib/vector-buffers/src/variants/disk_v2/` (whole directory) via grep for `ComponentEventsDropped`.
 
-**Not found:** No call to `ComponentEventsDropped` anywhere in `lib/vector-buffers/` (confirmed by grep returning no results). No evidence of a partial fix or in-progress work at commit b7aae737c. Issues #24606 and #24144 remain open and unlinked to any merged PR at this commit.
+**Not found:** No call to `ComponentEventsDropped` anywhere in `lib/vector-buffers/` (confirmed by grep returning no results). No evidence of a partial fix or in-progress work at commit 049eec79b. Issues #24606 and #24144 remain open and unlinked to any merged PR at this commit.
 
-**Conclusion:** No partial fix is present at this commit. The missing `component_discarded_events_total` increment is an unaddressed gap as of b7aae737c.
+**Conclusion:** No partial fix is present at this commit. The missing `component_discarded_events_total` increment is an unaddressed gap as of 049eec79b.

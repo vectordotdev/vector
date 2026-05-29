@@ -4,8 +4,8 @@ property_id: 12
 type: Liveness
 antithesis_assertion: Sometimes(data_file_deleted)
 sut_path: lib/vector-buffers/src/variants/disk_v2/
-commit: b7aae737cef5dd37d1445915443a1eb97b584f85
-updated: 2026-05-28
+commit: 049eec79b737450c4669b7f8aa1dd814551ec466
+updated: 2026-06-02
 cross_refs:
   - total-buffer-size-never-underflows   # underflow blocks deletion indirectly
   - writer-eventually-makes-progress      # deletion is the prerequisite for writer unblock
@@ -51,47 +51,48 @@ succeed. Breaking any single link silently stops all progress.
         │
         ▼  (vector-common/src/finalizer.rs:FuturesOrdered::next())
 [OrderedFinalizer task yields (BatchStatus, amount: u64)]
-        │    ledger.rs:703-707 ── tokio::spawn loop ── stream.next().await
-        │    NOTE: _status is DISCARDED here (ledger.rs:717 `let (_status, amount)`)
+        │    ledger.rs:728-735 ── tokio::spawn loop ── stream.next().await
+        │    NOTE: _status is DISCARDED here (ledger.rs:731 `let (_status, amount)`)
         ▼
-[ledger.increment_pending_acks(amount)]          ledger.rs:705
-[ledger.notify_writer_waiters()]                 ledger.rs:706
+[ledger.increment_pending_acks(amount)]          ledger.rs:732
+[ledger.notify_writer_waiters()]                 ledger.rs:733
         │    (misleading name: wakes the *reader*, not the writer)
         ▼
 [reader.next() loop wakes; calls handle_pending_acknowledgements]
-        │    reader.rs:965-967
+        │    reader.rs:976
         ▼
-[ledger.consume_pending_acks()]                  reader.rs:582 / ledger.rs:421
-[record_acks.add_acknowledgements(consumed_acks)]  reader.rs:584
-[record_acks.get_next_eligible_marker() loop]    reader.rs:586-635
+[ledger.consume_pending_acks()]                  reader.rs:593
+[record_acks.add_acknowledgements(consumed_acks)]  reader.rs:595
+[record_acks.get_next_eligible_marker() loop]    reader.rs:598-635
         │    advances reader_last_record, accumulates bytes_acknowledged
         ▼
-[data_file_acks.add_acknowledgements(records_acknowledged)]  reader.rs:633
-[data_file_acks.get_next_eligible_marker() loop]  reader.rs:655-668
-        │    gated by: had_eligible_records || force_check_pending_data_files
+[data_file_acks.add_acknowledgements(records_acknowledged)]  reader.rs:644-645
+[data_file_acks.get_next_eligible_marker() loop]  reader.rs:667
+        │    gated by: had_eligible_records || force_check_pending_data_files (reader.rs:662)
         ▼
-[delete_completed_data_file(path, bytes_read)]   reader.rs:662 → reader.rs:489
-        ├── [ledger.filesystem().open_file_readable(path)]  reader.rs:514-518
+[delete_completed_data_file(path, bytes_read)]   reader.rs:673 → reader.rs:489
+        ├── [ledger.filesystem().open_file_readable(path)]  reader.rs:517
         │     (stat to get file size before unlink)
-        ├── [metadata.len() - bytes_read → decrease_amount]  reader.rs:521-535
-        │     BUG WINDOW: if metadata.len() < bytes_read → u64 underflow here (reader.rs:524)
-        ├── [ledger.decrement_total_buffer_size(decrease_amount)]  reader.rs:538 / ledger.rs:291-298
-        │     BUG: raw fetch_sub, no saturation (the #21683 control-path is unfixed)
-        ├── [filesystem.delete_file(path)]         reader.rs:546
+        ├── [metadata.len() - bytes_read → decrease_amount]  reader.rs:521-544
+        │     BUG WINDOW: if metadata.len() < bytes_read → u64 underflow at reader.rs:535
+        │     WATCHED: committed assert_always_greater_than_or_equal_to!(metadata.len(), bytes_read) at reader.rs:529 (detector, does not abort)
+        ├── [ledger.decrement_total_buffer_size(decrease_amount)]  reader.rs:549 / ledger.rs:306-325
+        │     BUG: raw fetch_sub, no saturation (the #21683 control-path is unfixed); detector at ledger.rs:313
+        ├── [filesystem.delete_file(path)]         reader.rs:557
         │     I/O FAULT POINT: ENOSPC, EPERM, flaky disk → error propagates up
-        ├── [ledger.increment_acked_reader_file_id()]  reader.rs:548 / ledger.rs:457-478
-        ├── [ledger.flush()]                       reader.rs:549
+        ├── [ledger.increment_acked_reader_file_id()]  reader.rs:559
+        ├── [ledger.flush()]                       reader.rs:560
         │     I/O FAULT POINT: msync failure
-        └── [ledger.notify_reader_waiters()]       reader.rs:555
+        └── [ledger.notify_reader_waiters()]       reader.rs:566
               (wakes the *writer*, per the inverted naming)
 ```
 
-**The `force_check_pending_data_files` path** (reader.rs:1076) is the
+**The `force_check_pending_data_files` path** (reader.rs:1087) is the
 mechanism by which deletion proceeds during a **quiet period** (no new writes).
 When the reader rolls to the next data file (`roll_to_next_data_file`,
-reader.rs:1075), it sets `force_check_pending_data_files = true` on the next
+reader.rs:705), it sets `force_check_pending_data_files = true` on the next
 loop iteration. That flag bypasses the `had_eligible_records` guard at
-reader.rs:651, allowing `data_file_acks.get_next_eligible_marker()` to fire
+reader.rs:662, allowing `data_file_acks.get_next_eligible_marker()` to fire
 even when no new acks arrived in that iteration. Without this path, a file
 whose last record was acked after the reader moved on would never be deleted
 until the next record ack arrived.
@@ -100,10 +101,10 @@ until the next record ack arrived.
 
 ## The Finalizer-Task-Death Scenario
 
-The finalizer is spawned at `ledger.rs:701-710` as a detached `tokio::spawn`:
+The finalizer is spawned at `ledger.rs:728-737` as a detached `tokio::spawn`:
 
 ```rust
-// ledger.rs:701-710
+// ledger.rs:728-737
 pub(super) fn spawn_finalizer(self: Arc<Self>) -> OrderedFinalizer<u64> {
     let (finalizer, mut stream) = OrderedFinalizer::new(None);
     tokio::spawn(async move {
@@ -132,7 +133,7 @@ Two observations:
    panics (a `BatchStatusReceiver` future panics), or the runtime is shut down
    while the task is still pending, the `OrderedFinalizer<u64>` sender
    (`finalizer`) is still alive in the reader, but the receiving task is gone.
-   Subsequent calls to `finalizer.add(amount, receiver)` at reader.rs:1119
+   Subsequent calls to `finalizer.add(amount, receiver)` at reader.rs:1130
    succeed (the unbounded channel accepts messages), but nobody is consuming
    that channel. From `vector-common/src/finalizer.rs:101-107`:
 
@@ -152,7 +153,7 @@ Two observations:
    task is dead. Result:
    - `pending_acks` is never incremented.
    - `notify_writer_waiters()` is never called.
-   - The reader's `handle_pending_acknowledgements` loop at reader.rs:582 calls
+   - The reader's `handle_pending_acknowledgements` loop at reader.rs:593 calls
      `ledger.consume_pending_acks()` and gets 0 every iteration.
    - `had_eligible_records` is always false.
    - `had_eligible_data_files` is always false (unless `force_check_pending_data_files`
@@ -183,13 +184,15 @@ Two observations:
 
 ## The `delete_completed_data_file` Underflow Window
 
-At reader.rs:521-535:
+At reader.rs:521-544:
 
 ```rust
 let decrease_amount = bytes_read.map_or_else(
     || metadata.len(),
     |bytes_read| {
-        let size_delta = metadata.len() - bytes_read;   // reader.rs:524
+        // committed detector at reader.rs:529 (antithesis feature, does not abort):
+        //   assert_always_greater_than_or_equal_to!(metadata.len(), bytes_read, ...)
+        let size_delta = metadata.len() - bytes_read;   // reader.rs:535
         ...
         size_delta
     },
@@ -200,9 +203,11 @@ let decrease_amount = bytes_read.map_or_else(
 cumulative number of bytes the reader successfully read from the file. If an
 I/O fault, crash-induced partial write, or race inflated `bytes_read` above the
 actual file size, `metadata.len() - bytes_read` **wraps** (both are `u64`).
-`decrease_amount` becomes ≈ 2^64. The subsequent
-`ledger.decrement_total_buffer_size(decrease_amount)` at reader.rs:538 calls the
-raw `fetch_sub` at ledger.rs:292, wrapping `total_buffer_size` to ≈ 2^64.
+The committed assert at reader.rs:529 reports this to Antithesis as a detector
+but does not prevent the subtraction. `decrease_amount` becomes ≈ 2^64. The
+subsequent `ledger.decrement_total_buffer_size(decrease_amount)` at reader.rs:549
+calls the raw `fetch_sub` at ledger.rs:319 (detector at ledger.rs:313),
+wrapping `total_buffer_size` to ≈ 2^64.
 Writer deadlocks permanently. This is a second trigger for the #21683 underflow
 beyond the startup reconstruction path.
 
@@ -234,7 +239,7 @@ beyond the startup reconstruction path.
   never deleted until the task is restored — confirming the dependency.
 - **Filesystem fault on `delete_file`** (inject `EIO` or `EPERM`). The error
   propagates from `delete_completed_data_file` → `handle_pending_acknowledgements`
-  → `next()` via `.context(IoSnafu)?` at reader.rs:966. The reader returns an
+  → `next()` via `.context(IoSnafu)?` at reader.rs:978. The reader returns an
   error. Assert the caller (the topology) handles this gracefully and retries.
   Currently `receiver.rs` panics on reader I/O error (sut-analysis.md §8), so
   the expected behavior is a process restart.
@@ -243,7 +248,15 @@ beyond the startup reconstruction path.
   the ledger is flushed and the file is eventually absent even if it takes
   longer than normal.
 
-### Assertions to add (SUT-side, none currently exist)
+### Assertions (SUT-side)
+
+The decrement-underflow detector is COMMITTED at ledger.rs:313:
+`assert_always_greater_than_or_equal_to!(self.total_buffer_size.load(Ordering::Acquire), amount, "ledger total_buffer_size decrement never underflows")`,
+gated `#[cfg(feature = "antithesis")]`. The reader-delta detector at reader.rs:529
+and the get_total_records detector at ledger.rs:271 are also committed. All three
+are detectors — they report but do not abort.
+
+The deletion-reachability assert below is NOT committed:
 
 ```rust
 // In delete_completed_data_file, after filesystem.delete_file succeeds:
@@ -256,14 +269,6 @@ antithesis_sdk::assert_sometimes!(
         "decrease_amount": decrease_amount,
         "total_buffer_size_after": self.ledger.get_total_buffer_size(),
     })
-);
-
-// In decrement_total_buffer_size, assert no underflow:
-antithesis_sdk::assert_always!(
-    amount <= self.total_buffer_size.load(Ordering::Acquire),
-    "total_buffer_size decrement must not underflow",
-    &serde_json::json!({ "amount": amount,
-        "current": self.total_buffer_size.load(Ordering::Acquire) })
 );
 ```
 
@@ -309,16 +314,18 @@ finalizer task being alive and having processed the ack futures.
 
 2. **What is the `bytes_read` value passed to `delete_completed_data_file` for
    a file where the reader rolled due to a bad record (the "only partial read"
-   case)?** If the reader rolled early (reader.rs:1036), `bytes_read` reflects
-   only what was read before the bad record. The remainder of the file is
-   charged as `size_delta = metadata.len() - bytes_read`. If a fault left the
+   case)?** If the reader rolled early (reader.rs:1047 / reader.rs:1086), `bytes_read` reflects
+   only what was read before the bad record (`roll_to_next_data_file` is invoked
+   at reader.rs:1047 / reader.rs:1086). The remainder of the file is charged as
+   `size_delta = metadata.len() - bytes_read` (reader.rs:535). If a fault left the
    file larger than expected (e.g., partial write at the tail bumped the file
-   size), `bytes_read` could exceed `metadata.len()`, triggering the underflow.
+   size), `bytes_read` could exceed `metadata.len()`, triggering the underflow
+   (watched by the committed detector at reader.rs:529).
 
 3. **Is `force_check_pending_data_files` sufficient for the quiet-period case
    where the reader is at the very end of the last data file and not rolling?**
    If the writer is done, the reader has read all records, all acks arrive, but
-   the reader is parked in `wait_for_writer()` at reader.rs:1080 (because it
+   the reader is parked in `wait_for_writer()` at reader.rs:1091 (because it
    already rolled and found an empty new file), then `notify_writer_waiters()`
    from the finalizer wakes the reader, which loops back to
    `handle_pending_acknowledgements`, which processes the acks and deletes the
@@ -326,7 +333,7 @@ finalizer task being alive and having processed the ack futures.
    delete sequence under Antithesis scheduling pressure is worth exploring.
 
 4. **What happens if `ledger.flush()` (the msync after delete) fails at
-   reader.rs:549?** The file is already unlinked by this point (reader.rs:546
+   reader.rs:560?** The file is already unlinked by this point (reader.rs:557
    ran first). The ledger's `reader_current_data_file` field is not yet updated.
    On restart, the reader will try to open a file that no longer exists and fall
    through the `NotFound` branch, skipping to the next file. This is the

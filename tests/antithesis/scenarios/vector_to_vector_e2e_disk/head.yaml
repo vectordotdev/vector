@@ -1,8 +1,3 @@
-# node0, the head. http_server source receives injected events, the vector sink
-# forwards them to node1 over the native protocol, and that sink is backed by a
-# disk_v2 buffer with when_full: block and e2e acks. This disk buffer is the
-# component under test. A 200 to the injector means the event was durably
-# accepted into this buffer.
 data_dir: /var/lib/vector
 
 sources:
@@ -22,11 +17,11 @@ sinks:
   out:
     type: vector
     inputs: [in]
-    address: "node1:6000"
+    address: "tail:6000"
     compression: none
     buffer:
       type: disk
-      max_size: 268435488 # ~256MB, the enforced minimum
+      max_size: 8388608 # 8MiB (4 data files), small enough that a stalled reader fills it and blocks
       when_full: block
     acknowledgements:
       enabled: true

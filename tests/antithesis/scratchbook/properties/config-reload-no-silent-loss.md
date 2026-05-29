@@ -2,8 +2,8 @@
 slug: config-reload-no-silent-loss
 type: Safety / Always
 status: missing
-sut_commit: b7aae737cef5dd37d1445915443a1eb97b584f85
-updated: 2026-05-28
+sut_commit: 049eec79b737450c4669b7f8aa1dd814551ec466
+updated: 2026-06-02
 related_issues:
   - "vectordotdev/vector#24948 (internal config-reload incident config-reload stall)"
   - "vectordotdev/vector PR#24949 (partial fix)"
@@ -101,7 +101,7 @@ When the reader later detects a gap (records present in the data file according
 to the ledger but not actually written), or when the buffer is re-initialized and
 `synchronize_buffer_usage` re-seeds accounting from file sizes, there is a
 mismatch. More directly, if the writer calls `track_dropped_events`
-(ledger.rs:526-537) for any reason during reload, the implementation explicitly
+(ledger.rs:553-564) for any reason during reload, the implementation explicitly
 passes `byte_size = 0`:
 
 ```rust
@@ -109,7 +109,7 @@ pub fn track_dropped_events(&self, count: u64) {
     // We don't know how many bytes are represented by dropped events because we never
     // actually had a chance to read them...
     self.usage_handle
-        .increment_dropped_event_count_and_byte_size(count, 0, false);  // ledger.rs:536
+        .increment_dropped_event_count_and_byte_size(count, 0, false);  // ledger.rs:563
 }
 ```
 
@@ -119,7 +119,7 @@ for the lifetime of the buffer instance.
 
 ### The advisory-lock gap: per-process, not per-thread
 
-`load_or_create` (ledger.rs:572-576) uses `fslock::LockFile::try_lock()`.
+`load_or_create` (ledger.rs:600-601) uses `fslock::LockFile::try_lock()`.
 POSIX `fcntl`/`flock` advisory locks are per-process on Linux: a second open
 from the **same process** succeeds even if the first lock is still held. During
 a config reload, if the old sink task is still running (being waited on by the
@@ -138,7 +138,7 @@ concurrently with no OS-level protection.
 
 ### Finalizer `Arc<Ledger>` retention during reload
 
-`spawn_finalizer` (ledger.rs:701-710) moves an `Arc<Ledger>` clone into a
+`spawn_finalizer` (ledger.rs:728-737) moves an `Arc<Ledger>` clone into a
 tokio task:
 
 ```rust
@@ -275,9 +275,18 @@ Key assertion point:
 
 ---
 
-## SUT-Side Instrumentation (MISSING — must be added)
+## SUT-Side Instrumentation (not yet committed)
 
-All Antithesis SDK calls below are absent from the codebase at this commit. The Antithesis Rust SDK must be added as a dependency.
+The Antithesis Rust SDK is now a committed dependency under the `antithesis`
+feature, and three underflow `assert_always_greater_than_or_equal_to!` detectors
+exist (ledger.rs:271/313, reader.rs:529; see existing-assertions.md). None
+covers the config-reload loss path. The SIGHUP config-reload fault this property
+needs is, moreover, the committed harness's other Antithesis target: the
+scenario's `anytime_reload.sh` swaps the two config files (`$VECTOR_CONFIG` ↔
+`$VECTOR_CONFIG_ALT`, i.e. `head.yaml`/`head.b.yaml`) and sends `kill -HUP 1`
+(the #24948 reload-from-disk path), so the reload trigger is already realized in
+the harness — what remains uncommitted is the loss-detecting instrumentation
+below.
 
 **Where to assert `accepted == forwarded + discarded`:**
 
@@ -294,7 +303,7 @@ All Antithesis SDK calls below are absent from the codebase at this commit. The 
    );
    ```
 
-2. **`track_dropped_events` (ledger.rs:526)** — `byte_size = 0` is passed unconditionally (confirmed at ledger.rs:536). Add an `assert_always!` that `count == 0` if the drop is unexpected (i.e., not during a known `when_full: drop_newest` policy invocation), or at minimum emit an `assert_reachable!` so that Antithesis confirms the site is exercised during a reload test and the count can be tracked.
+2. **`track_dropped_events` (ledger.rs:553)** — `byte_size = 0` is passed unconditionally (confirmed at ledger.rs:563). Add an `assert_always!` that `count == 0` if the drop is unexpected (i.e., not during a known `when_full: drop_newest` policy invocation), or at minimum emit an `assert_reachable!` so that Antithesis confirms the site is exercised during a reload test and the count can be tracked.
 
 3. **Workload-level** — after reload quiet period, assert:
 
@@ -318,4 +327,4 @@ All Antithesis SDK calls below are absent from the codebase at this commit. The 
 
 **Not found:** Any change to `BufferWriter::Drop` (writer.rs:1366–1374) that calls `flush()` before `close()`. `Drop` at this commit still calls only `self.close()` (writer.rs:1372), which calls only `ledger.mark_writer_done()` and `ledger.notify_writer_waiters()` — no `flush_inner` call. The `TrackingBufWriter` internal buffer is freed without flushing if any staged bytes remain at drop time. No code added by PR #24949 (or observable at this commit) closes the unflushed-`TrackingBufWriter` loss path.
 
-**Conclusion:** PR #24949 fixed the stall (detach-trigger cancellation) and partially addressed accounting. The `Drop`-without-flush silent loss path is not fixed at this commit (b7aae737c). Whether PR #24949 also added a pre-drop `flush()` call in the sink task teardown path (rather than in `Drop` itself) could not be confirmed without reviewing the PR diff directly — the topology teardown code at running.rs:656–668 awaits the old task completing, but does not call `writer.flush()` explicitly from that site. Loss is still possible for any bytes staged in `TrackingBufWriter` at the moment the write loop receives the tripwire signal and exits without a final flush.
+**Conclusion:** PR #24949 fixed the stall (detach-trigger cancellation) and partially addressed accounting. The `Drop`-without-flush silent loss path is not fixed at this commit (049eec79b). Whether PR #24949 also added a pre-drop `flush()` call in the sink task teardown path (rather than in `Drop` itself) could not be confirmed without reviewing the PR diff directly — the topology teardown code at running.rs:656–668 awaits the old task completing, but does not call `writer.flush()` explicitly from that site. Loss is still possible for any bytes staged in `TrackingBufWriter` at the moment the write loop receives the tripwire signal and exits without a final flush.

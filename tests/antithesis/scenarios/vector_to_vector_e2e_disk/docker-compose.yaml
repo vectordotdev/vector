@@ -1,21 +1,8 @@
 name: vector-to-vector-e2e-disk
 
-# loadgen-collector --HTTP--> node0 --vector--> node1 --HTTP--> loadgen-collector
-#                             disk_v2
-#                             block+acks
-#
-# node0 receives over http_server and forwards to node1 over the native vector
-# protocol through a disk_v2 buffer with e2e acks. node1 receives over vector and
-# delivers to the loadgen-collector over http. One loadgen-collector container
-# injects at node0 and collects from node1. Each container is its own pod so the
-# links are partitionable, since Antithesis faults are pod-level. node0 has a
-# persistent volume for its disk buffer. The loadgen-collector holds the oracle
-# state (issued/acked/delivered ids) in memory: it is the test apparatus, not the
-# SUT, so faults should target node0 and node1, not it.
-
 x-vector-build: &vector-build
   context: ../../../..
-  dockerfile: tests/antithesis/Dockerfile
+  dockerfile: tests/antithesis/scenarios/vector_to_vector_e2e_disk/Dockerfile
   target: vector
 
 x-node-health: &node-health
@@ -26,72 +13,65 @@ x-node-health: &node-health
   start_period: 10s
 
 services:
-  node0:
-    container_name: node0
-    hostname: node0
+  head:
+    container_name: head
+    hostname: head
     platform: linux/amd64
     init: true
     build: *vector-build
-    image: v2v-vector:latest
-    entrypoint: ["/usr/bin/vector", "--config", "/etc/vector/node0.yaml"]
-    # node0 runs the reload fault: VECTOR_CONFIG_ALT enables anytime_reload to
-    # swap configs and SIGHUP, forcing the disk-buffered sink to rebuild (#24948).
+    image: v2v-vector:${V2V_IMAGE_TAG:-dev}
+    entrypoint: ["/usr/bin/vector", "--config", "/etc/vector/head.yaml"]
+    # head runs the reload fault: VECTOR_CONFIG_ALT lets anytime_reload swap configs
+    # and SIGHUP, forcing the disk-buffered sink to rebuild.
     environment:
       NO_COLOR: "1"
-      VECTOR_CONFIG: "/etc/vector/node0.yaml"
-      VECTOR_CONFIG_ALT: "/etc/vector/node0.b.yaml"
-      # Antithesis-only knob: shrink node0's disk-buffer data file to 1MiB so it
-      # rotates constantly, making the reopen torn-tail (#21683) and file-id
-      # rollover paths reachable in a short run. node0's max_size (~256MiB) stays
-      # well above the 2*data_file_size minimum.
-      VECTOR_DISK_V2_MAX_DATA_FILE_SIZE: "1048576"
-    volumes: ["v2v-buffer0:/var/lib/vector"]
+      VECTOR_CONFIG: "/etc/vector/head.yaml"
+      VECTOR_CONFIG_ALT: "/etc/vector/head.b.yaml"
+      # Shrink head's disk-buffer data file from the 128MiB default so files fill
+      # and rotate constantly, but floor it to hold the largest payload class:
+      # 768KiB raw is ~1.5MiB once hex-encoded, and a record cannot span data
+      # files. 2MiB leaves headroom for record framing.
+      VECTOR_DISK_V2_MAX_DATA_FILE_SIZE: "2097152"
+    volumes: ["v2v-buffer-head:/var/lib/vector"]
     healthcheck: *node-health
 
-  node1:
-    container_name: node1
-    hostname: node1
+  tail:
+    container_name: tail
+    hostname: tail
     platform: linux/amd64
     init: true
     build: *vector-build
-    image: v2v-vector:latest
-    entrypoint: ["/usr/bin/vector", "--config", "/etc/vector/node1.yaml"]
+    image: v2v-vector:${V2V_IMAGE_TAG:-dev}
+    entrypoint: ["/usr/bin/vector", "--config", "/etc/vector/tail.yaml"]
     environment:
       NO_COLOR: "1"
-      # Same disk-buffer knob as node0: shrink node1's data file so its buffer
-      # rotates constantly and the reopen/torn-tail loss paths are reachable.
-      VECTOR_DISK_V2_MAX_DATA_FILE_SIZE: "1048576"
-    volumes: ["v2v-buffer1:/var/lib/vector"]
+      # Same as head: shrunk for constant rotation, floored at 2MiB to hold the
+      # largest payload class (768KiB raw, ~1.5MiB hex-encoded).
+      VECTOR_DISK_V2_MAX_DATA_FILE_SIZE: "2097152"
+    volumes: ["v2v-buffer-tail:/var/lib/vector"]
     healthcheck: *node-health
 
-  loadgen-collector:
-    container_name: loadgen-collector
-    hostname: loadgen-collector
+  oracle:
+    container_name: oracle
+    hostname: oracle
     platform: linux/amd64
     init: true
     build:
       context: ../../../..
-      dockerfile: tests/antithesis/Dockerfile
+      dockerfile: tests/antithesis/scenarios/vector_to_vector_e2e_disk/Dockerfile
       target: workload
-    image: v2v-loadgen-collector:latest
+    image: v2v-oracle:${V2V_IMAGE_TAG:-dev}
     environment:
       NO_COLOR: "1"
-      VECTOR_SOURCE_URL: "http://node0:8080/"
-      VECTOR_METRICS_URL: "http://node0:9598/metrics"
-      VECTOR_METRICS_URLS: "http://node0:9598/metrics,http://node1:9598/metrics"
-      COLLECTOR_ADDR: "0.0.0.0:8686"
-      # Test commands run in this container, so they reach the collector locally.
-      COLLECTOR_URL: "http://127.0.0.1:8686"
-      # The oracle journals issued/acked/delivered here and reloads on startup, so
-      # a collector restart cannot wipe its memory (a wiped oracle is both a false
-      # miss and a false red). Antithesis is also told never to terminate this pod.
-      COLLECTOR_STATE_DIR: "/var/lib/collector"
-    volumes: ["v2v-collector-state:/var/lib/collector"]
+      VECTOR_SOURCE_URL: "http://head:8080/"
+      VECTOR_METRICS_URL: "http://head:9598/metrics"
+      VECTOR_METRICS_URLS: "http://head:9598/metrics,http://tail:9598/metrics"
+      # Test commands run in this container, so they reach the oracle locally.
+      ORACLE_URL: "http://127.0.0.1:8686"
     depends_on:
-      node0: { condition: service_healthy }
-      node1: { condition: service_healthy }
+      head: { condition: service_healthy }
+      tail: { condition: service_healthy }
 
 volumes:
-  v2v-buffer0:
-  v2v-buffer1:
-  v2v-collector-state:
+  v2v-buffer-head:
+  v2v-buffer-tail:

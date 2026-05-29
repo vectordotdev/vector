@@ -2,7 +2,7 @@
 slug: file-id-rollover-stays-coordinated
 type: Safety / Always
 status: LATENT BUG — reachable in tests (MAX_FILE_ID=6), latent in production (MAX_FILE_ID=65536)
-sut_commit: b7aae737cef5dd37d1445915443a1eb97b584f85
+sut_commit: 049eec79b737450c4669b7f8aa1dd814551ec466
 ---
 
 # Property 16: file-id-rollover-stays-coordinated
@@ -23,10 +23,10 @@ false answers for any configuration where the reader's file ID has wrapped past 
 writer's has not (or vice versa), causing either premature "synchronized" claims or failure to
 terminate the seek loop.
 
-**The Bug — `reader.rs:930-934`:**
+**The Bug — `reader.rs:941-945`:**
 
 ```rust
-// reader.rs:930-934 — raw u16 comparison, not wrap-aware
+// reader.rs:941-945 — raw u16 comparison, not wrap-aware
 let (reader_file_id, writer_file_id) =
     self.ledger.get_current_reader_writer_file_id();
 if reader_file_id > writer_file_id {
@@ -56,15 +56,15 @@ The wrap-safe comparison requires tracking how many times each side has wrapped,
 distance function that is rollover-aware (e.g. treating file IDs as a modular ring). The writer
 and reader file IDs both live in the mmap'd ledger as `AtomicU16`; there is no wrap counter.
 The arithmetic used to compute "next" file IDs (`(current + 1) % MAX_FILE_ID`,
-`ledger.rs:129,151`) is wrap-correct, but the comparisons used for ordering are not.
+`ledger.rs:128,150`) is wrap-correct, but the comparisons used for ordering are not.
 
 **Additional file-ID arithmetic context:**
 
-- `get_next_writer_file_id` (`ledger.rs:129`): `(writer + 1) % MAX_FILE_ID` — wrap-correct.
-- `get_next_reader_file_id` (`ledger.rs:151`): `(reader + 1) % MAX_FILE_ID` — wrap-correct.
-- `get_offset_reader_file_id` (`ledger.rs:155`): `reader.wrapping_add(offset) % MAX_FILE_ID`
+- `get_next_writer_file_id` (`ledger.rs:128`): `(writer + 1) % MAX_FILE_ID` — wrap-correct.
+- `get_next_reader_file_id` (`ledger.rs:150`): `(reader + 1) % MAX_FILE_ID` — wrap-correct.
+- `get_offset_reader_file_id` (`ledger.rs:154`): `reader.wrapping_add(offset) % MAX_FILE_ID`
   — wrap-correct for the addition.
-- `reader_file_id > writer_file_id` (`reader.rs:932`): raw `u16` comparison — NOT wrap-aware.
+- `reader_file_id > writer_file_id` (`reader.rs:943`): raw `u16` comparison — NOT wrap-aware.
 
 **Reachability:**
 
@@ -116,14 +116,14 @@ are related to this class of issue.
 
 1. **Is the `reader_file_id > writer_file_id` comparison actually the problematic gate, or is
    there additional context (e.g. the `unacked_reader_file_id_offset` accounting) that makes
-   it correct in the rollover case?** `get_current_reader_file_id` (`ledger.rs:305-308`) adds
+   it correct in the rollover case?** `get_current_reader_file_id` (`ledger.rs:332-335`) adds
    the `unacked_reader_file_id_offset` to the persisted reader file ID. This offset represents
    how many files the reader has consumed but not yet acked. If this offset is bounded and
    resets correctly at rollover, the comparison may be more correct than the raw IDs suggest.
    Needs deeper analysis.
 
 2. **Does the `unacked_reader_file_id_offset` also suffer from rollover? The `get_offset_reader_file_id`
-   function uses `wrapping_add(offset) % MAX_FILE_ID` (ledger.rs:155). If `offset` grows large
+   function uses `wrapping_add(offset) % MAX_FILE_ID` (ledger.rs:154). If `offset` grows large
    enough (multiple unacked files), could the offset itself wrap and produce a spurious file ID?
    The offset is bounded by the number of concurrently unacked files, which is bounded by the
    buffer size / data file size, so it should be small in practice. But this should be verified.
@@ -160,16 +160,16 @@ pub const MAX_FILE_ID: u16 = u16::MAX;  // 65535
 pub const MAX_FILE_ID: u16 = 6;
 ```
 
-The test-only value of 6 means rollover is exercisable in a handful of file rotations under test; the production value of 65535 requires ~8TB of data through a single buffer. An Antithesis run using the production binary would not trigger rollover organically; triggering it would require either a test binary or injected file-ID state via `unsafe_set_writer_next_record_id` / `unsafe_set_reader_last_record_id`, which are themselves `#[cfg(test)]`-gated (ledger.rs:173, 189).
+The test-only value of 6 means rollover is exercisable in a handful of file rotations under test; the production value of 65535 requires ~8TB of data through a single buffer. An Antithesis run using the production binary would not trigger rollover organically; triggering it would require either a test binary or injected file-ID state via `unsafe_set_writer_next_record_id` / `unsafe_set_reader_last_record_id`, which are themselves `#[cfg(test)]`-gated (ledger.rs:174, 190).
 
 **Conclusion:** Confirmed cfg-gated at common.rs:43–45. Rollover testing in Antithesis requires the test binary (MAX_FILE_ID=6) or a specially instrumented production build.
 
-#### Does the `unacked_reader_file_id_offset` indirection make the raw `>` comparison at `reader.rs:932` more correct than it looks?
+#### Does the `unacked_reader_file_id_offset` indirection make the raw `>` comparison at `reader.rs:943` more correct than it looks?
 
-**Examined:** `ledger.rs:229` (`unacked_reader_file_id_offset: AtomicU16`), `ledger.rs:305–308` (`get_current_reader_file_id`), `ledger.rs:327–332` (`get_current_reader_writer_file_id`), `reader.rs:930–934`.
+**Examined:** `ledger.rs:229` (`unacked_reader_file_id_offset: AtomicU16`), `ledger.rs:332–335` (`get_current_reader_file_id`), `ledger.rs:354–359` (`get_current_reader_writer_file_id`), `reader.rs:941–945`.
 
-**Found:** `get_current_reader_file_id` at ledger.rs:305–308 returns `self.state().get_offset_reader_file_id(unacked_offset)` where `unacked_offset = self.unacked_reader_file_id_offset.load(Ordering::Acquire)`. The `get_offset_reader_file_id` helper at ledger.rs:154–156 computes `get_current_reader_file_id().wrapping_add(offset) % MAX_FILE_ID` — the `%` is wrap-correct for the arithmetic. `get_current_reader_writer_file_id` at ledger.rs:327–332 calls both accessors and returns the pair. The offset means `reader_file_id` at reader.rs:932 is the *adjusted* reader file ID (accounting for files consumed but not yet acked), not the raw persisted value. This makes the raw `u16 >` comparison slightly more correct than a comparison of bare persisted IDs, because the adjusted ID represents where the reader is actually reading, not just where it last checkpointed.
+**Found:** `get_current_reader_file_id` at ledger.rs:332–335 returns `self.state().get_offset_reader_file_id(unacked_offset)` where `unacked_offset = self.unacked_reader_file_id_offset.load(Ordering::Acquire)`. The `get_offset_reader_file_id` helper at ledger.rs:154–156 computes `get_current_reader_file_id().wrapping_add(offset) % MAX_FILE_ID` — the `%` is wrap-correct for the arithmetic. `get_current_reader_writer_file_id` at ledger.rs:354–359 calls both accessors and returns the pair. The offset means `reader_file_id` at reader.rs:943 is the *adjusted* reader file ID (accounting for files consumed but not yet acked), not the raw persisted value. This makes the raw `u16 >` comparison slightly more correct than a comparison of bare persisted IDs, because the adjusted ID represents where the reader is actually reading, not just where it last checkpointed.
 
 **Not found:** No wrap-aware modular distance function is used for the comparison — it is still `reader_file_id > writer_file_id` with raw `u16` values. The `unacked_reader_file_id_offset` does not introduce a generation counter or wrap-epoch tracking. If both the reader and writer have wrapped through 0 at least once, the adjusted reader ID can still be numerically less than the writer ID even though the reader is ahead in the modular ring, making the `>` comparison produce a false negative (reader incorrectly appears to be behind). The offset indirection reduces — but does not eliminate — the incorrectness of the raw comparison.
 
-**Conclusion:** The `unacked_reader_file_id_offset` makes the comparison marginally more correct (it reflects actual read position rather than acked position) but does not fix the rollover-incorrectness of the raw `u16 >` gate. The bug is real and the comparison at reader.rs:932 is not wrap-safe.
+**Conclusion:** The `unacked_reader_file_id_offset` makes the comparison marginally more correct (it reflects actual read position rather than acked position) but does not fix the rollover-incorrectness of the raw `u16 >` gate. The bug is real and the comparison at reader.rs:943 is not wrap-safe.

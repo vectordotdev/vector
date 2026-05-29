@@ -7,7 +7,8 @@ related:
   - total-buffer-size-never-underflows
   - writer-eventually-makes-progress
   - buffer-size-within-max
-commit: b7aae737cef5dd37d1445915443a1eb97b584f85
+commit: 049eec79b737450c4669b7f8aa1dd814551ec466
+updated: 2026-06-02
 ---
 
 ### foreign-data-file-no-writer-stall — Foreign `.dat` File Does Not Permanently Stall the Writer
@@ -24,10 +25,10 @@ commit: b7aae737cef5dd37d1445915443a1eb97b584f85
 
 ## What Led to This Property
 
-The `update_buffer_size` function (`ledger.rs:653–698`) is called once during
-`Ledger::load_or_create` (`ledger.rs:648`) to seed `total_buffer_size`. Its
-implementation (`ledger.rs:671–695`) reads the buffer data directory and sums
-the size of **every file whose name ends in `.dat`** (`ledger.rs:681`):
+The `update_buffer_size` function (`ledger.rs:680–724`) is called once during
+`Ledger::load_or_create` (`ledger.rs:675`) to seed `total_buffer_size`. Its
+implementation reads the buffer data directory and sums
+the size of **every file whose name ends in `.dat`** (`ledger.rs:708`):
 
 ```rust
 if file_name.ends_with(".dat") {
@@ -37,17 +38,17 @@ if file_name.ends_with(".dat") {
 
 The predicate is `ends_with(".dat")` — a suffix check with no further
 validation against the expected `buffer-data-{id}.dat` pattern. The comment at
-`ledger.rs:676–680` explicitly acknowledges this: the author wanted only
+`ledger.rs:703–707` explicitly acknowledges this: the author wanted only
 lowercase `.dat` files but made no attempt to filter by name prefix, accepting
 any compliant extension.
 
 The accumulated sum is applied unconditionally:
 
 ```rust
-self.increment_total_buffer_size(total_buffer_size);  // ledger.rs:695
+self.increment_total_buffer_size(total_buffer_size);  // ledger.rs:722
 ```
 
-This uses `fetch_add` with no saturation (`ledger.rs:282`). The resulting
+This uses `fetch_add` with no saturation (`ledger.rs:297`). The resulting
 `total_buffer_size` then feeds directly into `is_buffer_full()` in `writer.rs`:
 
 ```rust
@@ -66,9 +67,10 @@ and never exits, because there is nothing to ever decrement the contribution
 from the foreign file.
 
 The reader decrements `total_buffer_size` only by **record bytes it has actually
-read** (via `track_read`, called from `reader.rs:1115`) and by the
+read** (via `track_reads`, called from `reader.rs:635`) and by the
 **file-size minus bytes-read** delta when deleting completed data files
-(`reader.rs:521–538`, calling `decrement_total_buffer_size`). Neither path
+(`reader.rs:489–549`, calling `decrement_total_buffer_size` at reader.rs:549).
+Neither path
 reaches the foreign file, because the foreign file is not a valid `buffer-data-{id}.dat`
 file (it won't match the file-ID sequence the reader follows) and will never be
 opened, read, or deleted by the reader. The inflated seed never gets
@@ -93,15 +95,15 @@ and a restart.
 
 | Location | Relevance |
 |---|---|
-| `lib/vector-buffers/src/variants/disk_v2/ledger.rs:671–695` | `update_buffer_size` — scans `data_dir`, sums all `*.dat` files without name-prefix filtering |
-| `lib/vector-buffers/src/variants/disk_v2/ledger.rs:681` | Exact predicate: `file_name.ends_with(".dat")` — no `buffer-data-` prefix check |
-| `lib/vector-buffers/src/variants/disk_v2/ledger.rs:695` | `increment_total_buffer_size(total_buffer_size)` — unconditional seed |
-| `lib/vector-buffers/src/variants/disk_v2/ledger.rs:282` | `fetch_add` with no saturation on `total_buffer_size` |
-| `lib/vector-buffers/src/variants/disk_v2/ledger.rs:291–297` | `decrement_total_buffer_size` — raw `fetch_sub`, also no saturation |
+| `lib/vector-buffers/src/variants/disk_v2/ledger.rs:680–724` | `update_buffer_size` — scans `data_dir`, sums all `*.dat` files without name-prefix filtering |
+| `lib/vector-buffers/src/variants/disk_v2/ledger.rs:708` | Exact predicate: `file_name.ends_with(".dat")` — no `buffer-data-` prefix check |
+| `lib/vector-buffers/src/variants/disk_v2/ledger.rs:722` | `increment_total_buffer_size(total_buffer_size)` — unconditional seed |
+| `lib/vector-buffers/src/variants/disk_v2/ledger.rs:297` | `fetch_add` with no saturation on `total_buffer_size` |
+| `lib/vector-buffers/src/variants/disk_v2/ledger.rs:306–319` | `decrement_total_buffer_size` — raw `fetch_sub`, no saturation; committed underflow detector asserts at ledger.rs:313 |
 | `lib/vector-buffers/src/variants/disk_v2/writer.rs:993–997` | `is_buffer_full` — reads `total_buffer_size` directly |
 | `lib/vector-buffers/src/variants/disk_v2/writer.rs:1001–1020` | `ensure_ready_for_write` — permanent wait loop if `is_buffer_full` |
-| `lib/vector-buffers/src/variants/disk_v2/reader.rs:521–538` | `delete_completed_data_file` — decrements by `metadata.len() - bytes_read`; only runs for self-owned files |
-| `lib/vector-buffers/src/variants/disk_v2/reader.rs:1115` | `track_read` — decrements by record bytes; only runs for records actually read |
+| `lib/vector-buffers/src/variants/disk_v2/reader.rs:489–549` | `delete_completed_data_file` — decrements by `metadata.len() - bytes_read` (decrement at 549; underflow detector asserts at reader.rs:529); only runs for self-owned files |
+| `lib/vector-buffers/src/variants/disk_v2/reader.rs:635` | `track_reads` — decrements by record bytes; only runs for records actually read |
 
 ---
 
@@ -154,17 +156,20 @@ rather than a permanent corruption.
 
 ---
 
-## Missing SUT Instrumentation
+## SUT Instrumentation (not yet committed)
 
-No Antithesis SDK assertions exist in the codebase. The following SUT-side
-assertions would make this property automatically testable:
+The Antithesis SDK is a committed dependency under the `antithesis` feature, and
+three underflow `assert_always_greater_than_or_equal_to!` detectors exist
+(ledger.rs:271/313, reader.rs:529; see existing-assertions.md). None covers the
+foreign-file over-seed path. The following SUT-side assertions would make this
+property automatically testable:
 
-1. **`Always` assertion in `update_buffer_size`** (`ledger.rs:681`): before
+1. **`Always` assertion in `update_buffer_size`** (`ledger.rs:708`): before
    accumulating a `.dat` file's size, assert that the filename matches the
    expected `buffer-data-{N}.dat` pattern. If it does not, log a `warn!` and
    skip it (which would also fix the bug). Alternatively, assert
    `total_buffer_size_after_seed <= max_buffer_size` immediately after
-   `increment_total_buffer_size` at `ledger.rs:695` — an `Always` assertion
+   `increment_total_buffer_size` at `ledger.rs:722` — an `Always` assertion
    whose violation proves the seed-overrun condition.
 
 2. **`Sometimes` writer-progress assertion** in `ensure_ready_for_write`

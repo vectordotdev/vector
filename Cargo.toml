@@ -132,14 +132,19 @@ members = [
   "lib/vector-vrl/metrics",
   "lib/vector-vrl/tests",
   "lib/vector-vrl/web-playground",
+  "tests/antithesis/harness",
+  "tests/antithesis/scenarios/vector_to_vector_e2e_disk",
   "vdev",
 ]
 
 [workspace.dependencies]
+antithesis-instrumentation = { version = "0.1", default-features = false, features = [] }
+antithesis_sdk = { version = "0.2", default-features = false, features = [] }
 anyhow = { version = "1.0.102", default-features = false, features = ["std"] }
 arc-swap = { version = "1.8.2", default-features = false }
 async-stream = { version = "0.3.6", default-features = false }
 async-trait = { version = "0.1.89", default-features = false }
+axum = { version = "0.6.20", default-features = false }
 base64 = { version = "0.22.1", default-features = false }
 bytes = { version = "1.11.1", default-features = false, features = ["serde"] }
 cfg-if = { version = "1.0.4", default-features = false }
@@ -211,6 +216,7 @@ tracing = { version = "0.1.44", default-features = false }
 tracing-subscriber = { version = "0.3.22", default-features = false, features = ["fmt"] }
 url = { version = "2.5.4", default-features = false, features = ["serde"] }
 uuid = { version = "1.22.0", features = ["v4", "v7", "serde", "fast-rng"] }
+vector-buffers = { path = "lib/vector-buffers" }
 vector-config = { path = "lib/vector-config" }
 vector-config-common = { path = "lib/vector-config-common" }
 vector-config-macros = { path = "lib/vector-config-macros" }
@@ -527,9 +533,7 @@ ntapi = { git = "https://github.com/MSxDOS/ntapi.git", rev = "24fc1e47677fc9f6e3
 # table below). Local dev builds skip it so they don't need `libsasl2-dev` / cyrus-sasl
 # installed, and so rdkafka's build script doesn't link GSSAPI.
 default = ["enable-unix"]
-# Antithesis coverage instrumentation. Enable for builds compiled with the sancov
-# RUSTFLAGS (the Antithesis Docker images) so the instrumentation runtime is
-# force-linked and sancov symbols resolve. Off by default; no production impact.
+# Antithesis coverage instrumentation.
 antithesis = ["vector-lib/antithesis"]
 # Default features for `cargo docs`. We're not using `gssapi` which would require installing libsasl2 in our doc environment.
 docs = ["enable-unix"]

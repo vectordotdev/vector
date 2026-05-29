@@ -25,4 +25,7 @@ jobs:
         with:
           python-version: "3.10"
       - run: .\scripts\environment\bootstrap-windows-2025.ps1
-      - run: make test
+      # The Antithesis harness and scenario crates are Linux/Docker-only test
+      # scaffolding and pull in deps (antithesis_sdk, axum) plus the
+      # vector-buffers `antithesis` coverage runtime that don't build on Windows.
+      - run: make test WORKSPACE_EXCLUDE="--exclude harness --exclude vector-to-vector-e2e-disk"

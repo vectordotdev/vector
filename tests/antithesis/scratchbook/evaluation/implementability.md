@@ -1,18 +1,21 @@
 ---
 sut_path: /home/ssm-user/src/vector
-commit: b7aae737cef5dd37d1445915443a1eb97b584f85
-updated: 2026-05-28
+commit: 049eec79b737450c4669b7f8aa1dd814551ec466
+updated: 2026-06-02
 external_references: []
 ---
 
 # Implementability Evaluation: Disk Buffer v2 Property Catalog
 
-19 properties evaluated across 6 categories. The central implementation risk is
-the **instrumented-build burden**: zero Antithesis SDK instrumentation exists in
-the codebase today (confirmed by repo-wide grep), so every SUT-side assertion
-must be added from scratch by adding `antithesis-sdk` as a new Cargo dependency
-to `lib/vector-buffers`. This is a one-time setup cost shared across many
-properties, but it is a real precondition for roughly half the catalog.
+19 properties evaluated across 6 categories. The **instrumented-build burden**
+is now substantially lower than at first evaluation: `antithesis-sdk` is a
+committed dependency under the `antithesis` feature on `lib/vector-buffers`, and
+three `assert_always_greater_than_or_equal_to!` underflow detectors already ship
+(ledger.rs:271 `get_total_records`, ledger.rs:313 `decrement_total_buffer_size`,
+reader.rs:529 reader size-delta — see `existing-assertions.md`). The build wiring
+is therefore done; remaining SUT-side assertions are added incrementally at the
+sites identified per property, not bootstrapped from scratch. This remains a real
+precondition for roughly half the catalog, but the one-time setup cost is paid.
 
 A second structural risk is the **persistent-volume assumption**: the deployment
 topology explicitly requires that the `data_dir` survives node-termination faults.
@@ -40,8 +43,8 @@ one-time change. The assertion itself is well-posed. Fault injection (bit-flip o
 `.dat` files, partial write via kill during flush) is supported by Antithesis.
 
 One complication: the startup path (`seek_to_next_record`) calls
-`validate_record_archive` directly at `reader.rs:850`, not through `try_next_record`.
-The `Ok(Some(record))` assertion placement at `reader.rs:1131` may miss corruption
+`validate_record_archive` directly at `reader.rs:861`, not through `try_next_record`.
+The `Ok(Some(record))` assertion placement at `reader.rs:1142` may miss corruption
 detected (and recovered) during startup replay — a second assertion at the startup
 validation call site may be needed. This is an implementability wrinkle, not a
 blocker: the assertion is straightforwardly placeable at both sites.
@@ -141,13 +144,17 @@ If either is unavailable, the entire cluster becomes unimplementable or vacuous.
 
 ### total-buffer-size-never-underflows
 
-**Implementability: Requires instrumented build. The trigger requires a specific
-crash-boundary scenario that Antithesis must find, not the workload construct.**
+**Implementability: SUT-side detectors already committed. The trigger requires a
+specific crash-boundary scenario that Antithesis must find, not the workload construct.**
 
 The internal state (`total_buffer_size` atomic) is completely invisible to the
 workload. The only observable signal is downstream throughput collapse (which
-could have many causes). The SUT-side assertions at `ledger.rs:~291` and
-`reader.rs:~521-535` are necessary.
+could have many causes). The SUT-side detectors are already committed:
+`assert_always_greater_than_or_equal_to!` at ledger.rs:313 (`decrement_total_buffer_size`
+underflow) and reader.rs:529 (reader size-delta), plus ledger.rs:271 for the
+`get_total_records` empty-buffer underflow. These are detectors, not guards (the
+`fetch_sub` at ledger.rs:322 still wraps), so they flag the underflow as a finding
+without preventing it.
 
 Regarding the "specific deterministic trigger" concern: the underflow requires a
 kill at a file-rotation or partial-write boundary where file-on-disk bytes exceed
@@ -157,7 +164,7 @@ relies on Antithesis's systematic exploration across timelines. With a small
 the trigger window large relative to run time. This is a good fit for Antithesis
 exploration (not a single needle-in-a-haystack moment).
 
-One complication: the `trace!` log at `ledger.rs:295` includes
+One complication: the `trace!` log at `ledger.rs:322` includes
 `last_total_buffer_size - amount`, which also wraps. In a debug build this would
 panic before the `fetch_sub` wraps, preventing the bug from being observable in
 release semantics. The harness should use a release build (or a build that
@@ -265,7 +272,7 @@ conflating the two bugs, the workload should use a reliable downstream stub that
 always returns a successful response (never `Errored`/`Rejected`), isolating the
 crash-durability signal.
 
-The `unlink-before-ledger-flush` window at `reader.rs:546-549` is the most
+The `unlink-before-ledger-flush` window at `reader.rs:557-560` is the most
 subtle latent loss path. The workload cannot control this timing; Antithesis
 must find it. With many crash timings explored, the probability of hitting this
 specific window is reasonable.
@@ -489,7 +496,7 @@ Option 1 is simpler but requires the Antithesis harness to build Vector with
 `--cfg test` (or equivalent), which may interact with other test-only code paths.
 Option 2 requires a Vector code change.
 
-The raw `u16 >` comparison bug at `reader.rs:932` is real (confirmed by source
+The raw `u16 >` comparison bug at `reader.rs:943` is real (confirmed by source
 inspection). The question is only whether it can be triggered in the harness.
 
 **Verdict:** Not directly implementable with a standard production Vector binary
@@ -509,7 +516,7 @@ This is the most important implementability note in the entire catalog. The
 property title suggests testing u64 record-ID wraparound (a ~2^64 write
 threshold — completely unreachable by real traffic), but the actual bug that
 fires on every clean restart with an empty buffer is the `0 - 1 = u64::MAX`
-case in `get_total_records` at `ledger.rs:266`. This case is trivially reachable:
+case in `get_total_records` at `ledger.rs:281`. This case is trivially reachable:
 
 1. Write N events into the buffer.
 2. Read and acknowledge all N events (drain completely).
@@ -702,7 +709,7 @@ reachable with any production binary. The property as stated conflates two
 distinct scenarios:
 
 - **Empty-buffer equality** (trivially reachable, workload-observable, is a real
-  bug at `ledger.rs:266`).
+  bug at `ledger.rs:281`).
 - **True u64 wraparound** (not reachable without `#[cfg(test)]`-gated test
   helpers or 2^64 actual writes).
 
@@ -780,20 +787,24 @@ production binary rollover is unreachable. Decision required from the user:
 - **Evidence:** Property catalog file-level open questions; sut-analysis.md §Assumptions.
 - **Action:** Confirm node-termination faults are enabled in the target tenant.
 
-### F3 — Zero Antithesis SDK instrumentation (BLOCKER for 5 properties, burden for 3 more)
+### F3 — Antithesis SDK wiring done; remaining assertions incremental (PARTIALLY RESOLVED)
 
 - **Scope:** `total-buffer-size-never-underflows`, `record-id-monotonicity-holds`,
   `no-corrupted-record-delivered`, `corruption-is-detected-and-recovered`,
   `partial-write-at-rotation-recovers`; optional for `writer-eventually-makes-progress`,
   `recovery-completes-after-crash`, `graceful-shutdown-flushes-all`
-- **Concern:** Every SUT-side assertion must be added from scratch. The 5
-  critical properties have internal state that is entirely invisible from the
-  workload without SDK instrumentation.
-- **Evidence:** `existing-assertions.md` confirms zero SDK usage; repo-wide grep
-  returns no matches.
-- **Action:** Add `antithesis-sdk` to `lib/vector-buffers/Cargo.toml` and insert
-  assertions at the ~10 identified sites. This is a one-time build setup shared
-  across all affected properties.
+- **Status:** No longer a full blocker. `antithesis-sdk` is a committed dependency
+  under the `antithesis` feature on `lib/vector-buffers`, and three
+  `assert_always_greater_than_or_equal_to!` underflow detectors already ship
+  (ledger.rs:271, ledger.rs:313, reader.rs:529). `total-buffer-size-never-underflows`
+  is the most affected: ledger.rs:313 directly detects its decrement underflow
+  (detector, not guard — the `fetch_sub` still wraps), and ledger.rs:271 covers
+  the `get_total_records` empty-buffer underflow. The build wiring and overflow
+  pattern are established; the remaining critical properties still need their own
+  assertions, but they are added incrementally at known sites, not bootstrapped.
+- **Evidence:** `existing-assertions.md` lists the three committed asserts.
+- **Action:** Add the remaining per-property assertions at the identified sites
+  under the existing `antithesis` feature. The one-time build setup is already paid.
 
 ### F4 — `file-id-rollover-stays-coordinated` unreachable with production binary (BLOCKER)
 
@@ -814,9 +825,9 @@ production binary rollover is unreachable. Decision required from the user:
   unreachable with any production binary. The testable bug is the empty-buffer
   equality case (`wrapping_sub(0,0) - 1 = u64::MAX`), which triggers on every
   clean restart with a drained buffer.
-- **Evidence:** `ledger.rs:266` confirmed; `#[cfg(test)]` gate on
+- **Evidence:** `ledger.rs:281` confirmed; `#[cfg(test)]` gate on
   `unsafe_set_writer_next_record_id` / `unsafe_set_reader_last_record_id` at
-  `ledger.rs:173-196`; no path to u64::MAX record ID via real writes.
+  `ledger.rs:174-196`; no path to u64::MAX record ID via real writes.
 - **Action:** Refocus the property on the empty-buffer equality case (rename and
   re-scope). Implement as: drain buffer completely → restart → scrape
   `buffer_byte_size` or `buffer_events_received_total` → assert near 0. This
@@ -826,10 +837,10 @@ production binary rollover is unreachable. Decision required from the user:
 ### F6 — `total-buffer-size-never-underflows` debug-build conflict
 
 - **Scope:** `total-buffer-size-never-underflows`
-- **Concern:** The `trace!` macro at `ledger.rs:295` includes `last_total_buffer_size - amount`
+- **Concern:** The `trace!` macro at `ledger.rs:322` includes `last_total_buffer_size - amount`
   as a Rust expression, which panics in debug mode on overflow before the
   `fetch_sub` wrapping behavior is observable.
-- **Evidence:** `ledger.rs:291-298` source; Rust debug arithmetic overflow semantics.
+- **Evidence:** `ledger.rs:306-323` source; Rust debug arithmetic overflow semantics.
 - **Action:** Use release build for Antithesis testing of this property. Document
   this as a harness build requirement. Separately, fix the `trace!` to use
   `wrapping_sub` to avoid the debug-mode panic.
@@ -889,7 +900,7 @@ production binary rollover is unreachable. Decision required from the user:
    `WhenFull::DropNewest`. Needs an end-to-end path trace to confirm the disk
    buffer variant is reached (not just the in-memory `LimitedSender`).
 
-3. **Does the `unacked_reader_file_id_offset` context make the `reader.rs:932`
+3. **Does the `unacked_reader_file_id_offset` context make the `reader.rs:943`
    `u16 >` comparison more correct than the raw comparison suggests?** The
    evidence file acknowledges this open question. A deeper code trace of
    `get_current_reader_file_id` (`ledger.rs:305-308`) is needed before asserting

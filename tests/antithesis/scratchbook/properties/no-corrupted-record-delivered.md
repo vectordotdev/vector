@@ -103,14 +103,14 @@ The Vector comment in `reader.rs:77-78` is explicit: "corruption may have affect
 - **Torn tail after crash**: rkyv's `archived_root` reads the root offset from the last 8 bytes of the buffer. If a crash leaves trailing bytes that happen to encode a plausible offset, the structure might pass `CheckBytes` but point into the wrong region. CRC32C should catch this if the payload is actually wrong bytes, but a CRC collision (probability ~1/2^32 per check) would bypass it.
 - **Foreign `.dat` file injection**: Placing a file written by a different Vector version or by an unrelated process into the buffer directory. The record format is host-endian and version-specific; `CheckBytes` should reject misaligned/invalid archives.
 
-## SUT-Side Instrumentation Suggestions (ALL MISSING)
+## SUT-Side Instrumentation Suggestions
 
-No Antithesis SDK assertions exist anywhere in the codebase (confirmed by repo-wide scan in `existing-assertions.md`). All suggestions below require adding the Antithesis Rust SDK as a new `Cargo.toml` dependency.
+The Antithesis SDK is a committed dependency under the `antithesis` feature, and three `assert_always_greater_than_or_equal_to!` underflow detectors already ship (ledger.rs:271, ledger.rs:313, reader.rs:529 — see `existing-assertions.md`). None of them guards the corrupted-record-delivery path, so the assertions below are genuine still-to-add suggestions on top of the committed instrumentation.
 
-**Primary assertion** — in `BufferReader::next` (reader.rs), at the point `Ok(Some(record))` is returned (reader.rs:1131), assert that the record was validated:
+**Primary assertion** — in `BufferReader::next` (reader.rs), at the point `Ok(Some(record))` is returned (reader.rs:1142), assert that the record was validated:
 
 ```rust
-// Immediately after `reader.read_record(token)?` succeeds (reader.rs:1106)
+// Immediately after `reader.read_record(token)?` succeeds (reader.rs:1117)
 // and before returning Ok(Some(record)):
 antithesis_sdk::assert_always_or_unreachable!(
     "no_corrupted_record_delivered",

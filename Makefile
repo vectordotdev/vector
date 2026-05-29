@@ -246,7 +246,7 @@ target/%/vector.tar.gz: target/%/vector CARGO_HANDLES_FRESHNESS
 # https://github.com/rust-lang/cargo/issues/6454
 .PHONY: test
 test: ## Run the unit test suite
-	${TEST_RUNNER} --workspace --no-fail-fast --no-default-features --features "${FEATURES}" ${SCOPE}
+	${TEST_RUNNER} --workspace ${WORKSPACE_EXCLUDE} --no-fail-fast --no-default-features --features "${FEATURES}" ${SCOPE}
 
 .PHONY: test-docs
 test-docs: ## Run the docs test suite

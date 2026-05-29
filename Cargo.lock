@@ -4871,6 +4871,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "harness"
+version = "0.1.0"
+dependencies = [
+ "vector-buffers",
+]
+
+[[package]]
 name = "hash_hasher"
 version = "2.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -13437,6 +13444,21 @@ dependencies = [
  "vector-buffers",
  "vector-common",
  "vector-core",
+]
+
+[[package]]
+name = "vector-to-vector-e2e-disk"
+version = "0.1.0"
+dependencies = [
+ "antithesis-instrumentation",
+ "antithesis_sdk",
+ "axum 0.6.20",
+ "clap",
+ "harness",
+ "reqwest 0.11.26",
+ "serde_json",
+ "tokio",
+ "vector-buffers",
 ]
 
 [[package]]

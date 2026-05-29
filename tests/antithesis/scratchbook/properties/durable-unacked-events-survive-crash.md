@@ -44,7 +44,7 @@ to:
 
 - A crash between the data `sync_all` and the ledger `msync` (two separate
   non-atomic syscalls: `writer.rs:1314` `writer.sync_all()` then
-  `ledger.rs:507-508` `self.state.get_backing_ref().flush()`), leaving the
+  `ledger.rs:534-535` `self.state.get_backing_ref().flush()`), leaving the
   ledger lagging the data — handled by `validate_last_write` `Ordering::Less`
   path (`writer.rs:922-944`), which fast-forwards the ledger. If this path has
   a bug, synced data silently disappears.
@@ -52,7 +52,7 @@ to:
   logs "Events have likely been lost" and rolls to the next file — the correct
   detection path, but the roll-over leaves an intentional gap that should not
   include synced data.
-- `update_buffer_size` at startup (`ledger.rs:653-698`) sums `.dat` file sizes
+- `update_buffer_size` at startup (`ledger.rs:680-724`) sums `.dat` file sizes
   and seeds `total_buffer_size`. If this overseeds relative to what
   `seek_to_next_record` will decrement, the underflow path (#21683) can be
   triggered and the writer deadlocks, causing zero more events to be delivered
@@ -63,9 +63,9 @@ to:
 | Window | Code location | Risk |
 |--------|--------------|------|
 | Write committed to page cache, `sync_all` not yet called | `writer.rs:1308` `writer.flush()` succeeded; `writer.rs:1314` `writer.sync_all()` not reached | Loss is expected and in-contract (≤500ms) |
-| `sync_all` done, ledger `flush` not done | `writer.rs:1314` done; `ledger.rs:507` not done | Ledger lags data → `Ordering::Less` recovery path fast-forwards; synced data must survive |
-| Ledger `flush` done; file-rotation increment not yet done | `ledger.rs:507` done; `writer.rs:1138` `increment_writer_file_id` not reached | File ID in ledger still points to old file; recovery opens the same file; data must be re-readable |
-| Kill inside `delete_completed_data_file` | `reader.rs:546` unlink done; `reader.rs:548` `increment_acked_reader_file_id` and `ledger.flush` not done | Ledger still points at a deleted file; handled by `NotFound`→skip on restart; relevant unacked events in that file survive on the next undeleted file or are in-ack-flight |
+| `sync_all` done, ledger `flush` not done | `writer.rs:1314` done; `ledger.rs:534` not done | Ledger lags data → `Ordering::Less` recovery path fast-forwards; synced data must survive |
+| Ledger `flush` done; file-rotation increment not yet done | `ledger.rs:534` done; `writer.rs:1138` `increment_writer_file_id` not reached | File ID in ledger still points to old file; recovery opens the same file; data must be re-readable |
+| Kill inside `delete_completed_data_file` | `reader.rs:557` unlink done; `reader.rs:559` `increment_acked_reader_file_id` and `ledger.flush` not done | Ledger still points at a deleted file; handled by `NotFound`→skip on restart; relevant unacked events in that file survive on the next undeleted file or are in-ack-flight |
 
 **Recovery Branches Exercised:**
 
@@ -74,9 +74,9 @@ to:
 - `validate_last_write` `Ordering::Greater` (data lags ledger): `writer.rs:910-919`
   — emits error log, sets `should_skip_to_next_file = true`.
 - `seek_to_next_record` fast-path (different reader/writer file IDs):
-  `reader.rs:840-898` — mmap-validates last record of each reader file and
+  `reader.rs:851-907` — mmap-validates last record of each reader file and
   deletes already-acked files.
-- `seek_to_next_record` slow-path: `reader.rs:904-938` — reads records via
+- `seek_to_next_record` slow-path: `reader.rs:915-953` — reads records via
   `next()` until `last_reader_record_id` matches ledger.
 
 **Fault Requirements:** Node-termination faults (SIGKILL) required. These are
@@ -84,7 +84,9 @@ often disabled by default in Antithesis tenants — confirm enabled. CPU
 throttling (stretching the 500ms window beyond its nominal boundary) is a
 useful secondary lever.
 
-**Antithesis SDK Assertion (SUT-side, to be added):**
+**Antithesis SDK Assertion (SUT-side):**
+
+The Antithesis SDK is a committed dependency under the `antithesis` feature, and three `assert_always_greater_than_or_equal_to!` underflow detectors already ship (ledger.rs:271, ledger.rs:313, reader.rs:529 — see `existing-assertions.md`). None of them covers the durable-survives-crash paths, so the assertions below are genuine still-to-add suggestions:
 
 ```rust
 // In validate_last_write, after Ordering::Less fast-forward:
@@ -137,7 +139,7 @@ rolls to the next file and there are valid synced records in the old file that
 the reader hasn't yet read, are those records still accessible? They should be
 (the old file is not deleted), but the gap in `writer_next_record_id` means
 the reader might interpret them as a monotonicity violation — verify against
-`reader.rs:480-484` `MonotonicityViolation` panic.
+`reader.rs:482` `MonotonicityViolation` panic.
 
 **OQ-3: Is the data `sync_all` and ledger `msync` ordered (data first, ledger
 second) or can they be reordered under the Tokio executor?**

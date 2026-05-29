@@ -34,24 +34,11 @@ vector-config = { path = "../vector-config", default-features = false }
 vector-common = { path = "../vector-common", default-features = false, features = ["byte_size_of"] }
 dashmap.workspace = true
 ordered-float.workspace = true
-# Antithesis LLVM coverage-instrumentation runtime shim (sancov callbacks +
-# libvoidstar loader). Optional + force-linked only under the `antithesis`
-# feature (see lib.rs) so coverage-instrumented Antithesis builds resolve the
-# __sanitizer_cov_trace_pc_guard* symbols, while production Vector never links it.
-antithesis-instrumentation = { version = "0.1", optional = true }
-# Antithesis SDK assertion macros. Optional + only under the `antithesis` feature;
-# used for the SUT-side total_buffer_size underflow assertion (#21683). No-op
-# outside the Antithesis runtime and absent from production Vector.
-antithesis_sdk = { version = "0.2", optional = true }
-# Needed only for the antithesis assertion details payload (serde_json is
-# otherwise a dev-dependency here); pulled in by the `antithesis` feature.
+antithesis-instrumentation = { workspace = true, optional = true }
+antithesis_sdk = { workspace = true, optional = true, features = ["full"] }
 serde_json = { workspace = true, optional = true }
 
 [features]
-# Enable Antithesis coverage instrumentation. Turn this on for builds compiled
-# with the sancov RUSTFLAGS (the Antithesis Docker images); it force-links the
-# instrumentation runtime so the sancov symbols resolve at link time. Off by
-# default — no effect on normal/production builds.
 antithesis = ["dep:antithesis-instrumentation", "dep:antithesis_sdk", "dep:serde_json"]
 
 [dev-dependencies]

@@ -298,3 +298,22 @@ reproduced #21683 via Antithesis** — complementing the local failing test
 The get_total_records / reader.rs:524 underflows remain local-test-only for now
 (their preconditions are rarer); a longer run or fs-fault-heavier webhook would
 likely surface them. Crash-class manifestations still await a node-kill webhook.
+
+---
+
+## 2026-06-02 — closing note: harness + SUT asserts now committed
+
+Superseding the "built but not pushed / blocked" status recorded above: the
+`vector_to_vector_e2e_disk` harness (compose services head/tail/oracle) and the
+three SUT-side underflow detectors are now COMMITTED on this branch at
+049eec79b737450c4669b7f8aa1dd814551ec466. All three are
+`assert_always_greater_than_or_equal_to!` under the `antithesis` feature:
+
+- `ledger.rs:271` — get_total_records never underflows on a drained buffer
+- `ledger.rs:313` — ledger total_buffer_size decrement never underflows
+- `reader.rs:529` — reader data-file size delta never underflows (the earlier
+  log entries cite the pre-insertion line reader.rs:524; the assert now sits at 529)
+
+They are detectors, not guards: each reports the wrap, the subtraction still runs.
+The env knob `VECTOR_DISK_V2_MAX_DATA_FILE_SIZE` is set to 1 MiB on both head and
+tail in the shipped compose.

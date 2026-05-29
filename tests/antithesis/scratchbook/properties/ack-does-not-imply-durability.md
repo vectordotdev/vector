@@ -39,7 +39,7 @@ loses data the client was told (200) was safe.
 - **Cleanest:** config reload (#24948) — `BufferWriter::Drop` calls `close()` but
   never `flush()`/`sync_all()` (`writer.rs:1366-1374`), so a reload while the write
   buffer holds unflushed acked records drops them. No kernel-level fault needed.
-- **Crash variant:** kill node0 before the next file-roll/`should_flush` fsync.
+- **Crash variant:** kill head before the next file-roll/`should_flush` fsync.
 - **Torn-tail variant:** crash mid-write → the unflushed acked tail is skipped on
   reopen (`reader.rs:111-115`, "acknowledged but the data/file was corrupted").
 - Producer relays acks per id (one id/invocation); oracle at quiescence:

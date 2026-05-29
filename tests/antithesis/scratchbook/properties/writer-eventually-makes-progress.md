@@ -2,8 +2,8 @@
 slug: writer-eventually-makes-progress
 type: Liveness / Sometimes(writer_unblocked_after_full)
 sut_path: lib/vector-buffers/src/variants/disk_v2/
-commit: b7aae737cef5dd37d1445915443a1eb97b584f85
-updated: 2026-05-28
+commit: 049eec79b737450c4669b7f8aa1dd814551ec466
+updated: 2026-06-02
 linked_bugs:
   - vectordotdev/vector#21683 (root cause: see total-buffer-size-never-underflows)
   - L1 / L8 in sut-analysis.md §5 (liveness claims that fail under underflow)
@@ -22,7 +22,7 @@ The state where `is_buffer_full()` returns `true` permanently (writer deadlock)
 never persists indefinitely.
 
 **Invariant:** After every `delete_completed_data_file` invocation that calls
-`notify_reader_waiters()` (reader.rs:555), the writer unblocks and completes at
+`notify_reader_waiters()` (reader.rs:566), the writer unblocks and completes at
 least one successful `write_record` within a bounded time. Equivalently: the
 tuple `(is_buffer_full() == true, buffer_is_drained == false)` is not a
 permanent fixed point.
@@ -54,7 +54,10 @@ This is exactly the scenario disk buffer is supposed to prevent.
 
 ### Step 1: underflow fires (see `total-buffer-size-never-underflows.md`)
 
-`decrement_total_buffer_size` at ledger.rs:292 wraps `total_buffer_size` to ~u64::MAX.
+`decrement_total_buffer_size` at ledger.rs:306 wraps `total_buffer_size` to ~u64::MAX.
+This decrement is now WATCHED by the committed
+`assert_always_greater_than_or_equal_to!` underflow detector at ledger.rs:313 —
+a detector for the wrap, not a guard against it.
 
 ### Step 2: `is_buffer_full` permanently returns `true`
 
@@ -67,7 +70,7 @@ fn is_buffer_full(&self) -> bool {
 }
 ```
 
-`get_total_buffer_size()` loads `total_buffer_size` (ledger.rs:276-278) with
+`get_total_buffer_size()` loads `total_buffer_size` (ledger.rs:291-293) with
 `Ordering::Acquire`. The wrapped value is visible to the writer immediately.
 
 Note: `self.unflushed_bytes + u64::MAX` wraps a second time back near 0 on some
@@ -90,9 +93,9 @@ async fn ensure_ready_for_write(&mut self) -> io::Result<()> {
 }
 ```
 
-`wait_for_reader()` awaits `self.reader_notify.notified()` (ledger.rs:361-363).
+`wait_for_reader()` awaits `self.reader_notify.notified()` (ledger.rs:388-389).
 Every time the reader deletes a file it calls `notify_reader_waiters()`
-(reader.rs:555), which calls `self.reader_notify.notify_one()` (ledger.rs:376).
+(reader.rs:566), which calls `self.reader_notify.notify_one()` (ledger.rs:403).
 The writer wakes, calls `is_buffer_full()` (which returns `true`), and blocks
 again — the wakeup is real but the accounting is wrong.
 
@@ -131,7 +134,7 @@ cannot shut down cleanly.
 ```
 sink delivers event
   → BatchNotifier dropped
-    → finalizer task (ledger.rs:701-709) calls increment_pending_acks + notify_writer_waiters
+    → finalizer task (ledger.rs:728-736) calls increment_pending_acks + notify_writer_waiters
       → wakes READER (naming is misleading: notify_writer_waiters wakes the reader's wait_for_writer loop)
         → reader calls handle_pending_acknowledgements
           → delete_completed_data_file
@@ -158,7 +161,7 @@ and the writer stalls. Antithesis should kill at multiple points in this chain.
 - **No error logs at ERROR or WARN level** — the stall is silent at those levels;
   the trace! at writer.rs:1013-1016 is only emitted at `trace` level.
 
-### SUT-side (requires Antithesis SDK instrumentation — all MISSING)
+### SUT-side (the SDK is wired; these specific asserts not yet committed)
 
 - `assert_sometimes!` immediately after a successful `write_record` completes,
   conditional on `had_been_full` (a local flag set when `is_buffer_full()` was
@@ -171,7 +174,17 @@ and the writer stalls. Antithesis should kill at multiple points in this chain.
 
 ---
 
-## SUT-Side Instrumentation (MISSING — must be added)
+## SUT-Side Instrumentation (not yet committed — the SDK is wired and the three #21683 underflow asserts are present; these are additional)
+
+The committed harness already carries the workload-side liveness signal for this
+property: the post-recovery liveness probe in eventually_conservation.rs:218
+(`assert_always!(progressed, ...)`) drains and reasserts delivery progress after
+restart, so the "writer eventually makes progress" claim IS exercised
+workload-side today. The three committed SUT-side underflow detectors
+(ledger.rs:271/313, reader.rs:529) catch the arithmetic wrap that causes the
+stall. The `writer_unblocked_after_full` Sometimes and the stall-count
+Unreachable below are not among those and remain still-to-add. See
+existing-assertions.md for what is committed.
 
 ### Assertion 1 — Sometimes: writer unblocks after being full
 
@@ -299,13 +312,13 @@ AND `writer-eventually-makes-progress` fails, the combined result exposes the bu
   reader eventually stops notifying (buffer is empty), and the writer sleeps
   indefinitely — this is the bug, not a spurious wakeup race.
 
-- **Does `wait_for_reader` have a timeout?** No (ledger.rs:361-363). The writer
+- **Does `wait_for_reader` have a timeout?** No (ledger.rs:388-389). The writer
   will sleep indefinitely in the underflow case with no watchdog. A timeout-based
   health check (e.g. emit a WARN log if waiting > 30s) would be a useful
   diagnostic addition independent of Antithesis.
 
 - **Is the finalizer task shutdown correctly?** If the finalizer task (spawned by
-  `spawn_finalizer`, ledger.rs:701-709) is dropped before all in-flight acks are
+  `spawn_finalizer`, ledger.rs:728-736) is dropped before all in-flight acks are
   processed, pending acks are silently lost. This could cause the reader to
   stall waiting for acks that never arrive, which the writer then interprets as
   "reader made no progress." This is a separate liveness bug from #21683 but

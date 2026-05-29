@@ -9,7 +9,8 @@ related:
   - every-written-event-eventually-delivered
   - writer-eventually-makes-progress
   - total-buffer-size-never-underflows
-commit: b7aae737cef5dd37d1445915443a1eb97b584f85
+commit: 049eec79b737450c4669b7f8aa1dd814551ec466
+updated: 2026-06-02
 ---
 
 ### finalizer-task-drains-pending-acks — Finalizer Task Drains All In-Flight Acks Before Exit
@@ -19,23 +20,23 @@ commit: b7aae737cef5dd37d1445915443a1eb97b584f85
 | **Type** | Liveness |
 | **Property** | All in-flight `BatchNotifier` acknowledgements are eventually processed by the finalizer task and reflected in `pending_acks` — both (a) during steady-state operation after a quiet period, and (b) on graceful shutdown before the process exits. Acks are never permanently stranded in the `FuturesOrdered` queue of the finalizer task without being consumed by the `Arc<Ledger>` ack machinery. |
 | **Invariant** | `Sometimes(all_acks_drained)`: after a write-then-ack-then-quiet-period sequence, `pending_acks` reflects all delivered acks and `total_buffer_size` has been decremented correctly; no acks are left un-processed in the finalizer stream. Pair with an `Unreachable` assertion on "finalizer task died while acks were still pending" for a sharper fault-injection signal. |
-| **Antithesis Angle** | (1) **SIGKILL with acks in flight**: write records, begin ack flow, SIGKILL the process mid-drain; assert on restart that events are replayed (ack progress was not persisted) rather than silently stranded. (2) **Finalizer task panic**: inject a panic into the `tokio::spawn` body (`ledger.rs:703`); assert that the reader detects the dead finalizer and takes a recovery action rather than hanging indefinitely. (3) **Graceful shutdown ordering**: SIGTERM with acks in flight; assert `pending_acks == 0` and `total_buffer_size == 0` (after full drain) before the process exits; replay check after restart. |
+| **Antithesis Angle** | (1) **SIGKILL with acks in flight**: write records, begin ack flow, SIGKILL the process mid-drain; assert on restart that events are replayed (ack progress was not persisted) rather than silently stranded. (2) **Finalizer task panic**: inject a panic into the `tokio::spawn` body (`ledger.rs:730`); assert that the reader detects the dead finalizer and takes a recovery action rather than hanging indefinitely. (3) **Graceful shutdown ordering**: SIGTERM with acks in flight; assert `pending_acks == 0` and `total_buffer_size == 0` (after full drain) before the process exits; replay check after restart. |
 | **Why It Matters** | The finalizer task is an **unmonitored, detached** `tokio::spawn` that holds the only reference capable of calling `increment_pending_acks` and `notify_writer_waiters`. If it panics, is killed, or is not drained before shutdown, the entire write-read-ack-delete chain breaks: `pending_acks` never advances → `handle_pending_acknowledgements` never fires → no file deletion → `total_buffer_size` never decremented → eventual writer deadlock. Additionally, events already delivered to the sink but not yet acked in the buffer are silently lost (no replay on restart) — a distinct silent-loss path from the arithmetic underflow. |
 
 ---
 
 ## What Led to This Property
 
-The `spawn_finalizer` function (`ledger.rs:701–710`) spawns a detached tokio
+The `spawn_finalizer` function (`ledger.rs:728–737`) spawns a detached tokio
 task that acts as the bridge between sink delivery and buffer accounting:
 
 ```rust
 pub(super) fn spawn_finalizer(self: Arc<Self>) -> OrderedFinalizer<u64> {
-    let (finalizer, mut stream) = OrderedFinalizer::new(None);  // ledger.rs:702
-    tokio::spawn(async move {                                     // ledger.rs:703
-        while let Some((_status, amount)) = stream.next().await { // ledger.rs:717
-            self.increment_pending_acks(amount);                   // ledger.rs:705
-            self.notify_writer_waiters();                          // ledger.rs:706
+    let (finalizer, mut stream) = OrderedFinalizer::new(None);  // ledger.rs:729
+    tokio::spawn(async move {                                     // ledger.rs:730
+        while let Some((_status, amount)) = stream.next().await { // ledger.rs:731
+            self.increment_pending_acks(amount);                   // ledger.rs:732
+            self.notify_writer_waiters();                          // ledger.rs:733
         }
     });
     finalizer
@@ -50,7 +51,7 @@ Key observations:
    drops it without draining, the caller has no way to detect this.
 
 2. **The `_status` discard**: the matched `BatchStatus` is explicitly ignored
-   (`_status` at `ledger.rs:717`). Every ack — regardless of whether it is
+   (`_status` at `ledger.rs:731`). Every ack — regardless of whether it is
    `Delivered`, `Errored`, or `Rejected` — increments `pending_acks` by
    `amount`. This is the sink-failure silent-loss bug documented in
    `sink-failure-not-silently-acked`. For this property, what matters is that
@@ -128,10 +129,10 @@ Key observations:
 
 | Location | Relevance |
 |---|---|
-| `lib/vector-buffers/src/variants/disk_v2/ledger.rs:701–710` | `spawn_finalizer`: detached `tokio::spawn`, `_status` discard, no join handle retained |
-| `lib/vector-buffers/src/variants/disk_v2/ledger.rs:717` | `_status` discard — `BatchStatus` ignored; every ack counted as `Delivered` |
-| `lib/vector-buffers/src/variants/disk_v2/ledger.rs:415–416` | `increment_pending_acks`: `fetch_add` on `pending_acks` — the only path that unblocks the reader ack machinery |
-| `lib/vector-buffers/src/variants/disk_v2/ledger.rs:381` | `notify_writer_waiters`: wakes the reader, which then advances acks and frees files |
+| `lib/vector-buffers/src/variants/disk_v2/ledger.rs:728–737` | `spawn_finalizer`: detached `tokio::spawn`, `_status` discard, no join handle retained |
+| `lib/vector-buffers/src/variants/disk_v2/ledger.rs:731` | `_status` discard — `BatchStatus` ignored; every ack counted as `Delivered` |
+| `lib/vector-buffers/src/variants/disk_v2/ledger.rs:442–447` | `increment_pending_acks`: `fetch_add` on `pending_acks` — the only path that unblocks the reader ack machinery |
+| `lib/vector-buffers/src/variants/disk_v2/ledger.rs:408` | `notify_writer_waiters`: wakes the reader, which then advances acks and frees files |
 | `lib/vector-buffers/src/variants/disk_v2/mod.rs:262–264` | `spawn_finalizer` call site: `Arc<Ledger>` cloned, `finalizer` passed to `BufferReader` |
 | `lib/vector-buffers/src/variants/disk_v2/reader.rs:411` | `finalizer: OrderedFinalizer<u64>` — stored in `BufferReader`; drop triggers sender close |
 | `lib/vector-buffers/src/variants/disk_v2/reader.rs:1117–1119` | `BatchNotifier::new_with_receiver` + `finalizer.add(record_events.get(), receiver)` — ack registration per record |
@@ -220,7 +221,7 @@ permanent if the CPU throttle is extreme enough.
 Based on `finalizer.rs`:
 
 - `FinalizerSet::new(shutdown: Option<ShutdownSignal>)` with `None` (as used
-  at `ledger.rs:702`): the stream terminates only when the `sender` is dropped.
+  at `ledger.rs:729`): the stream terminates only when the `sender` is dropped.
 - **The drain loop at `finalizer.rs:159–161` runs only if the tokio task is
   scheduled** after the sender closes. There is no blocking synchronous drain
   — it is an async drain that depends on the runtime continuing to poll the
@@ -235,9 +236,9 @@ Based on `finalizer.rs`:
 
 ---
 
-## Missing SUT Instrumentation
+## SUT Instrumentation
 
-No Antithesis SDK assertions exist. Needed:
+The Antithesis SDK is a committed dependency under the `antithesis` feature, and three `assert_always_greater_than_or_equal_to!` underflow detectors already ship (ledger.rs:271, ledger.rs:313, reader.rs:529 — see `existing-assertions.md`). None of them covers the finalizer-drain surface, so the assertions below are genuine still-to-add suggestions:
 
 1. **Finalizer task health check**: an `Unreachable` assertion inside the
    `add` method's `Err` branch (`finalizer.rs:104–106`) would fire when the
@@ -249,7 +250,7 @@ No Antithesis SDK assertions exist. Needed:
    `Sometimes(drain_completed)` assertion confirms the drain ran to completion
    at least once per test run.
 
-3. **`pending_acks` ground-truth assertion**: at `ledger.rs:416` (after
+3. **`pending_acks` ground-truth assertion**: at `ledger.rs:442` (after
    `increment_pending_acks`), an `Always(pending_acks > 0)` assertion would
    confirm that the ack is actually registered before `notify_writer_waiters`
    wakes the reader. This catches the race where `notify_writer_waiters` fires
@@ -300,12 +301,12 @@ No Antithesis SDK assertions exist. Needed:
 
 #### Does the tokio runtime drain spawned tasks before exit?
 
-**Examined:** `lib/vector-buffers/src/variants/disk_v2/ledger.rs:701–710` (`spawn_finalizer`), `lib/vector-common/src/finalizer.rs:114–167` (`finalizer_stream`, drain loop at lines 159–161).
+**Examined:** `lib/vector-buffers/src/variants/disk_v2/ledger.rs:728–737` (`spawn_finalizer`), `lib/vector-common/src/finalizer.rs:114–167` (`finalizer_stream`, drain loop at lines 159–161).
 
-**Found:** `spawn_finalizer` at ledger.rs:703 calls `tokio::spawn(async move { ... })` and discards the returned `JoinHandle` — no handle is stored and no join/abort is called anywhere in the codebase. The finalizer task is fully detached. The drain loop in `finalizer_stream` at finalizer.rs:159–161 (`while let Some((status, entry)) = status_receivers.next().await { yield (status, entry); }`) runs only after the `new_entries` channel closes (when the `OrderedFinalizer` sender, held in `BufferReader`, is dropped). This drain is async and depends on the tokio runtime continuing to poll the task. There is no explicit join on the finalizer task handle — neither in `spawn_finalizer` nor in any topology shutdown path.
+**Found:** `spawn_finalizer` at ledger.rs:730 calls `tokio::spawn(async move { ... })` and discards the returned `JoinHandle` — no handle is stored and no join/abort is called anywhere in the codebase. The finalizer task is fully detached. The drain loop in `finalizer_stream` at finalizer.rs:159–161 (`while let Some((status, entry)) = status_receivers.next().await { yield (status, entry); }`) runs only after the `new_entries` channel closes (when the `OrderedFinalizer` sender, held in `BufferReader`, is dropped). This drain is async and depends on the tokio runtime continuing to poll the task. There is no explicit join on the finalizer task handle — neither in `spawn_finalizer` nor in any topology shutdown path.
 
 **Found — ~2s window:** Tokio's `Runtime::drop` (the default `block_on`/drop path) does not have a documented fixed timeout for completing spawned tasks. The evidence file's claim of "~2s window" was sourced from prior analysis of tokio internals and the Vector topology graceful-shutdown deadline configuration; it is not a hard tokio guarantee. Tokio's shutdown does allow tasks to run to completion *if* the runtime is shut down via `Runtime::shutdown_timeout` or similar — but `Runtime::drop` without an explicit shutdown_timeout may abandon incomplete tasks immediately on drop. The exact behavior depends on how the tokio runtime is constructed and whether `shutdown_timeout` is configured in Vector's main binary.
 
-**Not found:** No explicit `join`, `await`, or `abort` on the finalizer task's `JoinHandle` at any site in `lib/vector-buffers/`. No `impl Drop for FinalizerSet` at finalizer.rs. No `ShutdownSignal` passed to `OrderedFinalizer::new(None)` at ledger.rs:702 that would give the stream an explicit termination signal.
+**Not found:** No explicit `join`, `await`, or `abort` on the finalizer task's `JoinHandle` at any site in `lib/vector-buffers/`. No `impl Drop for FinalizerSet` at finalizer.rs. No `ShutdownSignal` passed to `OrderedFinalizer::new(None)` at ledger.rs:729 that would give the stream an explicit termination signal.
 
 **Conclusion:** The tokio runtime does not provide a guaranteed synchronous drain of the finalizer task before exit. The ~2s window is a best-effort estimate based on topology shutdown configuration, not a hard guarantee from tokio. In-flight acks at the time of process exit or runtime drop may be abandoned, resulting in duplicate delivery on restart (correct at-least-once) rather than silent loss — provided `reader_last_record` has not been flushed past those records.

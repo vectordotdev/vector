@@ -1,7 +1,7 @@
 ---
 sut_path: /home/ssm-user/src/vector
-commit: b7aae737cef5dd37d1445915443a1eb97b584f85
-updated: 2026-05-28
+commit: 049eec79b737450c4669b7f8aa1dd814551ec466
+updated: 2026-06-02
 external_references:
   - path: lib/vector-buffers/src/variants/disk_v2/mod.rs
     why: Module-level doc comment is the authoritative design spec (format, ledger, recovery)
@@ -209,11 +209,15 @@ state is reachable).
 ## 6. Failure-Prone Areas (ranked — these drive the property catalog)
 
 1. **`total_buffer_size` underflow → permanent writer deadlock (#21683).**
-   Root: `ledger.rs:291-298` raw `fetch_sub`; two trigger paths:
-   `reader.rs:524` `metadata.len() - bytes_read` (also unguarded) and the
-   startup `update_buffer_size`(file sizes) vs. seek-decrement(record bytes)
-   mismatch. Manifests as a silent pipeline stall; also breaks reader shutdown
-   (L8). **Highest-value target.** Requires node-kill + restart faults.
+   Root: the `decrement_total_buffer_size` `fetch_sub` (`ledger.rs:319`); two
+   trigger paths: `reader.rs:535` `metadata.len() - bytes_read` and the startup
+   `update_buffer_size`(file sizes) vs. seek-decrement(record bytes) mismatch.
+   Manifests as a silent pipeline stall; also breaks reader shutdown (L8).
+   **Highest-value target.** Requires node-kill + restart faults. Both subtraction
+   sites are now WATCHED under the `antithesis` feature by committed
+   `assert_always_greater_than_or_equal_to!` detectors — `ledger.rs:313` (decrement
+   `>= amount`) and `reader.rs:529` (`metadata.len() >= bytes_read`). These report
+   on the wrap, they do not guard it: the `fetch_sub`/delta subtraction still runs.
 2. **Crash-time durability/recovery windows.** fsync-vs-crash, data-file-fsync
    vs. ledger-msync non-atomicity, torn last record, `validate_last_write`
    `Greater`/`Less` reconciliation, partial write at file rotation. Tests cannot
@@ -232,7 +236,10 @@ state is reachable).
 7. **Reader skips the rest of a file on first bad record** — valid records after a
    corrupt one in the same 128MB file are silently abandoned.
 8. **`get_total_records` `- 1` non-wrapping** at record-ID equality/rollover →
-   ~2^64 phantom event count into metrics.
+   ~2^64 phantom event count into metrics. The subtraction (`ledger.rs:281`) is
+   now WATCHED under the `antithesis` feature by a committed
+   `assert_always_greater_than_or_equal_to!(next_writer_id.wrapping_sub(last_reader_id), 1)`
+   detector at `ledger.rs:271` — reports the bogus count, does not prevent it.
 9. **mmap SIGBUS / external file tampering** (foreign `.dat` files inflate
    `total_buffer_size`; truncation under read → underflow).
 
@@ -324,4 +331,3 @@ state is reachable).
   in-flight acks be lost (stranding the reader)?
 - Is the config-reload old/new topology overlap actually concurrent (making the
   per-process advisory-lock gap a live safety issue)?
-</content>

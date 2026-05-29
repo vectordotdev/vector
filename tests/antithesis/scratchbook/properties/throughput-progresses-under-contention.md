@@ -2,8 +2,8 @@
 slug: throughput-progresses-under-contention
 type: Liveness / Sometimes(throughput_above_floor)
 sut_path: lib/vector-buffers/src/variants/disk_v2/
-commit: b7aae737cef5dd37d1445915443a1eb97b584f85
-updated: 2026-05-28
+commit: 049eec79b737450c4669b7f8aa1dd814551ec466
+updated: 2026-06-02
 ---
 
 # Property: throughput-progresses-under-contention
@@ -153,9 +153,9 @@ same run: if `writer-eventually-makes-progress` fires but
 
 ---
 
-## SUT-Side Instrumentation (MISSING — must be added)
+## SUT-Side Instrumentation
 
-No Antithesis SDK instrumentation exists in the Vector codebase.
+The Antithesis SDK is a committed dependency under the `antithesis` feature, and three `assert_always_greater_than_or_equal_to!` underflow detectors already ship (ledger.rs:271, ledger.rs:313, reader.rs:529 — see `existing-assertions.md`). None of them addresses lock-contention throughput, so the assertions below are genuine still-to-add suggestions.
 
 ### Assertion 1 — Sometimes: throughput above floor
 

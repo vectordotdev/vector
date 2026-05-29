@@ -18,6 +18,8 @@ anstyle,https://github.com/rust-cli/anstyle,MIT OR Apache-2.0,The anstyle Author
 anstyle-parse,https://github.com/rust-cli/anstyle,MIT OR Apache-2.0,The anstyle-parse Authors
 anstyle-query,https://github.com/rust-cli/anstyle,MIT OR Apache-2.0,The anstyle-query Authors
 anstyle-wincon,https://github.com/rust-cli/anstyle,MIT OR Apache-2.0,The anstyle-wincon Authors
+antithesis-instrumentation,https://github.com/antithesishq/antithesis-instrumentation-rust,MIT,The antithesis-instrumentation Authors
+antithesis_sdk,https://github.com/antithesishq/antithesis-sdk-rust,MIT,The antithesis_sdk Authors
 anyhow,https://github.com/dtolnay/anyhow,MIT OR Apache-2.0,David Tolnay <dtolnay@gmail.com>
 apache-avro,https://github.com/apache/avro-rs,Apache-2.0,The apache-avro Authors
 arbitrary,https://github.com/rust-fuzz/arbitrary,MIT OR Apache-2.0,"The Rust-Fuzz Project Developers, Nick Fitzgerald <fitzgen@gmail.com>, Manish Goregaokar <manishsmail@gmail.com>, Simonas Kazlauskas <arbitrary@kazlauskas.me>, Brian L. Troutwine <brian@troutwine.us>, Corey Farwell <coreyf@rwell.org>"
@@ -427,12 +429,15 @@ lexical-util,https://github.com/Alexhuszagh/rust-lexical,MIT OR Apache-2.0,Alex 
 lexical-write-float,https://github.com/Alexhuszagh/rust-lexical,MIT OR Apache-2.0,Alex Huszagh <ahuszagh@gmail.com>
 lexical-write-integer,https://github.com/Alexhuszagh/rust-lexical,MIT OR Apache-2.0,Alex Huszagh <ahuszagh@gmail.com>
 libc,https://github.com/rust-lang/libc,MIT OR Apache-2.0,The Rust Project Developers
+libloading,https://github.com/nagisa/rust_libloading,ISC,Simonas Kazlauskas <libloading@kazlauskas.me>
 libm,https://github.com/rust-lang/libm,MIT OR Apache-2.0,Jorge Aparicio <jorge@japaric.io>
 libsqlite3-sys,https://github.com/rusqlite/rusqlite,MIT,The rusqlite developers
 libz-sys,https://github.com/rust-lang/libz-sys,MIT OR Apache-2.0,"Alex Crichton <alex@alexcrichton.com>, Josh Triplett <josh@joshtriplett.org>, Sebastian Thiel <sebastian.thiel@icloud.com>"
 line-clipping,https://github.com/joshka/line-clipping,MIT OR Apache-2.0,Josh McKinney
 linked-hash-map,https://github.com/contain-rs/linked-hash-map,MIT OR Apache-2.0,"Stepan Koltsov <stepan.koltsov@gmail.com>, Andrew Paseltiner <apaseltiner@gmail.com>"
 linked_hash_set,https://github.com/alexheretic/linked-hash-set,Apache-2.0,Alex Butler <alexheretic@gmail.com>
+linkme,https://github.com/dtolnay/linkme,MIT OR Apache-2.0,David Tolnay <dtolnay@gmail.com>
+linkme-impl,https://github.com/dtolnay/linkme,MIT OR Apache-2.0,David Tolnay <dtolnay@gmail.com>
 linux-raw-sys,https://github.com/sunfishcode/linux-raw-sys,Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT,Dan Gohman <dev@sunfishcode.online>
 listenfd,https://github.com/mitsuhiko/listenfd,Apache-2.0,Armin Ronacher <armin.ronacher@active-4.com>
 litemap,https://github.com/unicode-org/icu4x,Unicode-3.0,The ICU4X Project Developers

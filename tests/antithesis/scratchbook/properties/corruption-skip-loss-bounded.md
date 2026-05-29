@@ -15,12 +15,12 @@ lost. This property does.
 ## The mechanism (reader.rs)
 
 When `BufferReader::next` hits a bad read — `is_bad_read()` true for
-`Checksum` / `Deserialization` / `PartialWrite` (reader.rs:148-155) — it calls
-`roll_to_next_data_file()` (reader.rs:711-759) and returns the error. Rolling:
+`Checksum` / `Deserialization` / `PartialWrite` (reader.rs:132-139) — it calls
+`roll_to_next_data_file()` (reader.rs:705-753) and returns the error. Rolling:
 
 - adds a deletion marker covering only the records **actually read**
-  (`data_file_record_count`, reader.rs:728/743/749),
-- `self.reset()` + `increment_unacked_reader_file_id()` (reader.rs:755-756),
+  (`data_file_record_count`, reader.rs:722/743),
+- `self.reset()` + `increment_unacked_reader_file_id()` (reader.rs:749-750),
 - **unconditionally abandons the entire remainder of the current data file.**
 
 So for a data file `[A, B, CORRUPT, D, E]`, the reader delivers A, B, hits
@@ -28,7 +28,7 @@ CORRUPT, rolls, and **D and E are never read, delivered, acked, or counted** —
 even though they are perfectly valid records. A single bit-flip near the start
 of a 128 MB data file can abandon almost the whole file (the file holds up to
 `max_data_file_size` / `min_record_size` records). The code comment
-(reader.rs ~1018-1025) calls this intentional ("not sure the rest of the file
+(reader.rs ~1028) calls this intentional ("not sure the rest of the file
 is valid").
 
 ## The invariant we want to test
@@ -60,10 +60,13 @@ outside that 500 ms window — a silent contradiction of the stated guarantee fo
 an "at-least-once" buffer. Even if the conservative roll is accepted, the loss
 must at minimum be bounded and counted (see `corruption-skip-loss-is-counted`).
 
-## SUT-side instrumentation (MISSING)
+## SUT-side instrumentation (not yet committed)
 
-`existing-assertions.md`: only the 3 underflow `assert_always!` guards exist in
-`lib/vector-buffers` today; nothing here. Suggested: in `roll_to_next_data_file`
+The Antithesis SDK is a committed dependency under the `antithesis` feature.
+`existing-assertions.md`: only the three underflow
+`assert_always_greater_than_or_equal_to!` detectors exist in `lib/vector-buffers`
+today (ledger.rs:271/313, reader.rs:529); none covers corruption-skip loss.
+Suggested: in `roll_to_next_data_file`
 compute `abandoned = file_size_remaining_after(bytes_read)` and
 `assert_always!(abandoned == 0 || tail_is_unparseable, ...)` — or, more
 practically, a workload-level oracle (delivered ⊇ valid-records) since "tail is
@@ -86,11 +89,11 @@ genuinely unparseable" is hard to assert SUT-side.
 
 #### Is the whole-file roll an accepted tradeoff or should the reader resync?
 
-- Examined: `reader.rs` `roll_to_next_data_file` (711-759), `BufferReader::next` bad-read branch + comment (~1018-1025), `is_bad_read` (148-155); internal doc *internal buffer design notes* ((internal doc id omitted)).
+- Examined: `reader.rs` `roll_to_next_data_file` (705-753), `BufferReader::next` bad-read branch + comment (~1028, branch at 1046), `is_bad_read` (132-139); internal doc *internal buffer design notes* ((internal doc id omitted)).
 - Found: the roll is unconditional and the code comment frames it as intentional ("not sure the rest of the file is valid"). The internal spec's 500ms/synced-not-lost guarantee says nothing about corruption, so the two are not formally reconciled.
 - Not found: any product decision record stating whole-file abandonment is the accepted behavior for synced records. Conclusion: `(needs human input)` — owner must confirm intended vs. bug.
 
 #### Can records be re-found after a corrupt one?
 
-- Examined: length-delimited framing in `try_next_record` (reader.rs ~241-345), `read_length_delimiter`, CRC coverage in `record.rs`.
+- Examined: length-delimited framing in `try_next_record` (reader.rs:306+), `read_length_delimiter` (reader.rs:226+), CRC coverage in `record.rs`.
 - Found: the length delimiter is framing, not under the record CRC; a corrupt delimiter desyncs intra-file scanning, justifying the conservative roll. A payload-corrupt record with an intact delimiter could in principle be skipped past. Tagged `(partial)`.

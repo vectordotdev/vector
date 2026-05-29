@@ -24,16 +24,16 @@ This property extends that concern from `drop_newest` to the corruption path.
 This property is about the **read-side** corruption skip, a *different* code
 path with *no* counting at all:
 
-- `roll_to_next_data_file` (reader.rs:711-759) adds a deletion marker for the
+- `roll_to_next_data_file` (reader.rs:705-753) adds a deletion marker for the
   records **read** and abandons the rest. It never calls `track_dropped_events`.
-- `track_dropped_events(events_skipped)` (reader.rs:656) is invoked only for
-  **writer-side gap markers** in the ack-processing loop (reader.rs:596-656),
+- `track_dropped_events(events_skipped)` (reader.rs:650) is invoked only for
+  **writer-side gap markers** in the ack-processing loop (reader.rs:596-650),
   i.e. data files the *writer* explicitly marked to skip — not reader-side
   corruption rolls.
 - The abandoned records are therefore charged only to `decrement_total_buffer_size`
-  via `delete_completed_data_file`'s `size_delta` (reader.rs:521-535, the
-  reader.rs:524 underflow site) — a *byte-accounting* adjustment, never an
-  event-loss metric.
+  via `delete_completed_data_file`'s `size_delta` (reader.rs:535 computes it; the
+  reader.rs:529 underflow site asserts on it) — a *byte-accounting* adjustment,
+  never an event-loss metric.
 
 Net: corruption-skipped records increment **neither**
 `buffer_discarded_events_total` **nor** `component_discarded_events_total`.
@@ -66,9 +66,12 @@ finding in the Telemetry-correctness report.
 
 In `roll_to_next_data_file`, after computing the abandoned span, emit a
 `ComponentEventsDropped` (reason `"corruption_skip"`) for the abandoned events
-and `assert_always!(component_discarded_increased)`. Nothing in
-`lib/vector-buffers` references `ComponentEventsDropped` today
-(`existing-assertions.md` + grep) — fully missing.
+and `assert_always!(component_discarded_increased)`. The Antithesis SDK is a
+committed dependency under the `antithesis` feature and three underflow asserts
+exist (ledger.rs:271/313, reader.rs:529; see existing-assertions.md), but
+nothing in `lib/vector-buffers` references `ComponentEventsDropped` and no
+corruption-skip event-loss counting exists today — that specific emit + assert
+is genuinely still missing.
 
 ## Open Questions
 
@@ -85,7 +88,7 @@ and `assert_always!(component_discarded_increased)`. Nothing in
 
 #### Is the abandoned-record count computed internally?
 
-- Examined: `roll_to_next_data_file` (reader.rs:711-759), `track_dropped_events` callsite (reader.rs:656) and its ack-loop context (596-710), `delete_completed_data_file` size_delta (521-535).
+- Examined: `roll_to_next_data_file` (reader.rs:705-753), `track_dropped_events` callsite (reader.rs:650) and its ack-loop context (596-650), `delete_completed_data_file` size_delta (reader.rs:535, underflow assert 529).
 - Found: the roll computes `data_file_record_count`/`data_file_event_count` for records **read**, and the deletion marker carries `(records_read, bytes_read)`. The abandoned (post-corruption) records are never enumerated; `track_dropped_events` fires only for writer-side gap markers in the ack loop, not here. So the abandoned event count is never materialized and no discarded-events metric is emitted. Tagged `(partial)` — confirmed not computed; only byte-accounting via decrement.
 
 #### Intentional vs error counter semantics?

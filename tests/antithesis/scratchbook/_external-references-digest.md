@@ -45,9 +45,11 @@ don't need to re-fetch.
 1. **Ledger `total_buffer_size` AtomicU64 underflow → permanent writer deadlock**
    (Vector #21683, partially mitigated by PR #23561 on the *reporter* side only;
    the ledger atomic still wraps).
-   - `decrement_total_buffer_size` (ledger.rs ~291-298) does raw
-     `fetch_sub(amount, AcqRel)` with **no saturation**. If `amount >
-     current_value`, the atomic wraps to ≈ 2^64.
+   - `decrement_total_buffer_size` (ledger.rs, `fetch_sub` at ledger.rs:319) does
+     raw `fetch_sub(amount, AcqRel)` with **no saturation**. If `amount >
+     current_value`, the atomic wraps to ≈ 2^64. Under the `antithesis` feature
+     this site now carries a committed `assert_always_greater_than_or_equal_to!(total_buffer_size, amount)`
+     detector at ledger.rs:313 — it reports the wrap, it does not prevent the subtraction.
    - Then `total_buffer_size + unflushed_bytes` is always astronomical →
      `is_buffer_full()` returns true forever → `can_write_record()` false forever
      → writer's `ensure_ready_for_write()` (writer.rs ~1001-1020) loops on
@@ -110,4 +112,3 @@ don't need to re-fetch.
   itself; the strong levers are node kill/restart, node hang, CPU throttling
   (exposes the fsync/flush timing windows and lock contention), and filesystem
   state across restart.
-</content>

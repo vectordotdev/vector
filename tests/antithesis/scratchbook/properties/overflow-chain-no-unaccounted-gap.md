@@ -2,8 +2,8 @@
 slug: overflow-chain-no-unaccounted-gap
 type: Safety / Always
 sut_path: lib/vector-buffers/src/variants/disk_v2/
-commit: b7aae737cef5dd37d1445915443a1eb97b584f85
-updated: 2026-05-28
+commit: 049eec79b737450c4669b7f8aa1dd814551ec466
+updated: 2026-06-02
 ---
 
 # Property: overflow-chain-no-unaccounted-gap
@@ -173,9 +173,12 @@ The *actual* risk this property guards against is:
 
 ---
 
-## SUT-Side Instrumentation (MISSING — must be added)
+## SUT-Side Instrumentation (not yet committed — the SDK is wired and the three #21683 underflow asserts are present; these are additional)
 
-No Antithesis SDK instrumentation exists in the Vector codebase.
+The Antithesis SDK is a committed dependency under the `antithesis` feature, and
+three underflow `assert_always_greater_than_or_equal_to!` detectors exist
+(ledger.rs:271/313, reader.rs:529; see existing-assertions.md). None covers the
+overflow chain, so the assertions below remain genuine still-to-add suggestions.
 
 ### Assertion 1 — Reachability: overflow path is exercised
 

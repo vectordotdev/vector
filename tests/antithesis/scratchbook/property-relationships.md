@@ -1,6 +1,6 @@
 ---
 sut_path: /home/ssm-user/src/vector
-commit: dfecb470e
+commit: 049eec79b737450c4669b7f8aa1dd814551ec466
 updated: 2026-06-02
 external_references:
   - path: lib/vector-buffers/src/variants/disk_v2/mod.rs
@@ -28,8 +28,9 @@ faults/code-paths. Lightweight — connections noticed during synthesis.
 
 The single unguarded-subtraction bug radiates into many properties.
 
-- **Root:** `total-buffer-size-never-underflows` (the SUT-side invariant at the two
-  raw subtraction sites: `ledger.rs:292`, `reader.rs:524`).
+- **Root:** `total-buffer-size-never-underflows` (committed `assert_always_greater_than_or_equal_to!`
+  detectors at the subtraction sites: `ledger.rs:313` and `reader.rs:529`, under
+  the `antithesis` feature).
 - **Direct manifestation:** `writer-eventually-makes-progress` (the deadlock the
   underflow causes).
 - **Dominated / aliased symptoms** (likely the *same* failure observed elsewhere):
@@ -38,7 +39,7 @@ The single unguarded-subtraction bug radiates into many properties.
   - `buffer-size-within-max` — the deadlock makes this **vacuously pass** (no
     writes → no overflow); must be read jointly with `writer-eventually-makes-progress`.
   - `acked-files-eventually-deleted` — the delete-time `metadata.len() - bytes_read`
-    (`reader.rs:524`) is one of the two underflow triggers, and stalled deletion is
+    (`reader.rs:535`, watched at `reader.rs:529`) is one of the two underflow triggers, and stalled deletion is
     also an upstream *cause* of the full-buffer state.
 
 **Dominance:** if `total-buffer-size-never-underflows` holds, the deadlock-shaped
@@ -97,7 +98,7 @@ bug is a path to a monotonicity violation). `partial-write-at-rotation-recovers`
 ## Cluster D — Boundary arithmetic (shared mechanism: non-wrap-aware / unguarded integer ops)
 
 - `file-id-rollover-stays-coordinated` (`reader.rs:932` raw `u16 >`)
-- `record-id-wraparound-accounting-holds` (`ledger.rs:266` non-wrapping `- 1`)
+- `record-id-wraparound-accounting-holds` (`ledger.rs:281` non-wrapping `- 1`, watched at `ledger.rs:271`)
 - (related: `total-buffer-size-never-underflows` is also an arithmetic-safety bug,
   but its blast radius puts it in Cluster A)
 
@@ -110,7 +111,7 @@ panic.
 
 ## Cluster E — Delivery-accounting bugs (silent loss invisible to operators)
 
-- `sink-failure-not-silently-acked` (`_status` discarded at `ledger.rs:717`)
+- `sink-failure-not-silently-acked` (`_status` discarded at `ledger.rs:731`)
 - `dropped-events-are-counted` (`drop_newest` not surfaced to component metric)
 - (related lifecycle: `config-reload-no-silent-loss`)
 
@@ -182,7 +183,7 @@ the loss precise where Cluster C only confirmed the recovery path runs:
   neither buffer- nor component-level counter).
 - `corruption-skip-record-id-accounting-consistent` — the roll must not turn loss
   into accounting corruption. **Bridges Cluster A** (names the abandoned-tail as a
-  concrete real trigger for the reader.rs:524 underflow → #21683, validated-as-
+  concrete real trigger for the reader.rs:535 underflow (watched at reader.rs:529) → #21683, validated-as-
   reachable by run D0) and **Cluster D/C** (record-ID gap → monotonicity panic).
 
 Dominance: `corruption-skip-loss-bounded` is the precondition (loss must be real);
@@ -220,7 +221,7 @@ mission; Clusters A/B/E/F are the mechanism-level evidence and exhibits for them
   property: fixing/verifying it neutralizes the deadlock symptoms across A.
 - **Checksum-skip cluster (H)** is the highest-leverage *data-loss* entry point:
   one mid-file-corruption fault simultaneously exercises bounded-loss (H),
-  silent-loss counting (E/H), the reader.rs:524 underflow (A), and the
+  silent-loss counting (E/H), the reader.rs:535 underflow (A, watched at reader.rs:529), and the
   monotonicity guard (C/D).
 - **`partial-write-at-rotation-recovers` (B)** is the most connected *trigger*: it
   feeds A (underflow), B (recovery), and C (torn-tail/monotonicity). Antithesis
@@ -229,4 +230,3 @@ mission; Clusters A/B/E/F are the mechanism-level evidence and exhibits for them
 - **Observability-gap properties (E, F)** are independent of the durability/deadlock
   machinery and need their own workload setup (metric inspection, sink-error
   injection, config reload) — don't expect the crash-recovery workload to cover them.
-</content>

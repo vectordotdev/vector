@@ -1,6 +1,6 @@
 ---
 sut_path: /home/ssm-user/src/vector
-commit: dfecb470e
+commit: 049eec79b737450c4669b7f8aa1dd814551ec466
 updated: 2026-06-02
 external_references:
   - path: lib/vector-buffers/src/variants/disk_v2/mod.rs
@@ -31,9 +31,11 @@ external_references:
 gap-filling — Category 7 + 3 from the 2026-05-29 data-loss expansion, in the
 Category 1 "silent data-loss cluster" + 1 from the 2026-06-01 multi-node
 conservation expansion, `multi-hop-conservation-no-loss`, in Category 2's
-delivery cluster). No Antithesis SDK assertions exist in the codebase
-today (`existing-assertions.md`); every SUT-side assertion noted below is
-**missing** and must be added. Each property has an evidence file at
+delivery cluster). The three #21683 underflow asserts are committed under the
+`antithesis` feature (`ledger.rs:271` get_total_records, `ledger.rs:313`
+decrement_total_buffer_size, `reader.rs:529` reader size-delta), all
+`assert_always_greater_than_or_equal_to!`; the remaining SUT-side assertions
+noted below are **not yet added**. Each property has an evidence file at
 `properties/{slug}.md`. Evaluation refinements are recorded in
 `evaluation/synthesis.md`.
 
@@ -201,14 +203,14 @@ These three sharpen the user's concern *"if the checksum fails we'll skip record
 |---|---|
 | **Type** | Safety |
 | **Property** | A corruption roll never converts bounded data loss into accounting corruption: record-ID and `total_buffer_size` accounting stay self-consistent across the abandoned span (no underflow, no monotonicity-guard trip). |
-| **Invariant** | `Always` (SUT-side): after a roll, `next_writer_record_id - reader_last_record_id == on-disk unread records`, the rolled file's `total_buffer_size` decrement equals true remaining bytes (no reader.rs:524 underflow), and the monotonicity panic (`reader.rs:~480`) never trips. |
+| **Invariant** | `Always` (SUT-side): after a roll, `next_writer_record_id - reader_last_record_id == on-disk unread records`, the rolled file's `total_buffer_size` decrement equals true remaining bytes (no reader.rs:535 delta underflow — now watched by the committed assert at `reader.rs:529`), and the monotonicity panic (`reader.rs:~480`) never trips. |
 | **Antithesis Angle** | Mid-file corruption (non-empty abandoned tail) + continue across the file boundary and a crash+restart; watch the three underflow asserts already wired + the monotonicity guard. This is where the checksum-skip path and the organically-reproduced #21683 (run D0) meet. |
-| **Why It Matters** | Identifies the corruption-roll abandoned-tail as a concrete real trigger for the reader.rs:524 underflow (#21683) and the monotonicity panic — not only external truncation. Links the data-loss surface to the deadlock/crash-loop clusters. |
+| **Why It Matters** | Identifies the corruption-roll abandoned-tail as a concrete real trigger for the reader.rs:535 delta underflow (#21683, watched at `reader.rs:529`) and the monotonicity panic — not only external truncation. Links the data-loss surface to the deadlock/crash-loop clusters. |
 
 **Open Questions:**
 
 - Does any path advance `reader_last_record_id` over abandoned IDs, or is the gap permanent until the next file re-anchors? `(partial: roll does not advance it; cross-file re-anchor behavior needs a read trace)`
-- Is reader.rs:524 underflow reachable purely via corruption-roll without external truncation? `(needs human input / Antithesis run with mid-file corruption)`
+- Is the reader.rs:535 delta underflow reachable purely via corruption-roll without external truncation? `(needs human input / Antithesis run with mid-file corruption; the committed assert at reader.rs:529 will report it if so)`
 
 ---
 
@@ -225,13 +227,13 @@ unsaturated `u64` subtraction; a crash/partial-write discrepancy wraps it toward
 |---|---|
 | **Type** | Safety |
 | **Property** | `decrement_total_buffer_size` is never called with `amount > current total_buffer_size`; the atomic never wraps toward `u64::MAX`. |
-| **Invariant** | `Unreachable` for "underflow occurred" (equivalently `Always(amount <= current)`), placed SUT-side at the two unguarded subtraction sites: `ledger.rs:~292` (`fetch_sub`, no saturation) and `reader.rs:~524` (`metadata.len() - bytes_read`). State is invisible to the workload → requires SUT-side instrumentation (missing). |
+| **Invariant** | Committed SUT-side at both subtraction sites under the `antithesis` feature: `assert_always_greater_than_or_equal_to!(total_buffer_size, amount)` at `ledger.rs:313` (before the `fetch_sub` at `ledger.rs:319`) and `assert_always_greater_than_or_equal_to!(metadata.len(), bytes_read)` at `reader.rs:529` (before the `metadata.len() - bytes_read` delta at `reader.rs:535`). State is invisible to the workload, so these are detectors only — they report the wrap, the subtraction still runs. |
 | **Antithesis Angle** | Node-kill at file-rotation/partial-write boundary; restart; reader seeks through the partial file; `update_buffer_size` (file-size seed) vs. `track_read` (record-byte decrement) mismatch triggers the wrap. |
 | **Why It Matters** | Root cause of #21683 → permanent silent writer deadlock. PR #23561 masked only the gauge; the control-path atomic is still raw `fetch_sub`. |
 
 **Open Questions:**
 
-- Is the double-decrement via fast-forward + `track_read` during seek fully blocked by the `!self.ready_to_read` guard (`reader.rs:~468`), or can both fire for the same bytes? `(partial: guard exists for the seek-time path; the delete-time`metadata.len()-bytes_read`path at reader.rs:524 is separate and unguarded)`
+- Is the double-decrement via fast-forward + `track_read` during seek fully blocked by the `!self.ready_to_read` guard (`reader.rs:~468`), or can both fire for the same bytes? `(partial: guard exists for the seek-time path; the delete-time`metadata.len()-bytes_read`path at reader.rs:535 is separate and watched by the committed assert at reader.rs:529)`
 - Does the debug-build wrapping subtraction in the `trace!` at `ledger.rs:295` panic before the bug is observable in release semantics?
 
 ### writer-eventually-makes-progress — No Permanent Writer Deadlock
@@ -319,7 +321,7 @@ garbage, or wrong-ID fast-forward. All require node-termination faults.
 - ~~**(Critical)** Does the `vector` source/sink protocol propagate e2e acks *transitively* end-to-end, or ack locally on buffer-accept?~~ **RESOLVED (2026-06-02): acks locally on buffer-accept.** The disk buffer mints a *fresh* `BatchNotifier` per record (`reader.rs:1117-1119`) and the source finalizer is consumed at encode (`writer.rs:472`), so there is NO transitive end-to-end ack — "acked at head" means only "durable in the head's buffer." The tail collector is the sole `DELIVERED` truth. See new property `ack-is-per-hop-not-transitive`.
 - `when_full: block` + a **closed ring with no drain** self-deadlocks from legitimate backpressure (false positive) — the lap-drain is load-bearing, not optional.
 - Persistent volume **per node** required; otherwise fresh-boot restart wipes a node's buffer → spurious loss.
-- SUT-side underflow asserts claimed in Dockerfile comments **do not exist in `lib/vector-buffers/src`** (grep=0) — resolve before relying on internal signal vs. workload-only oracle. `(needs follow-up — weeding task)`
+- SUT-side underflow asserts are committed under the `antithesis` feature: `assert_always_greater_than_or_equal_to!` at `ledger.rs:271` (get_total_records), `ledger.rs:313` (decrement_total_buffer_size), and `reader.rs:529` (reader size-delta). `(resolved 2026-06-02 — the earlier grep=0 predated the commit)`
 
 See `properties/multi-hop-conservation-no-loss.md` for the full evidence trail.
 
@@ -455,7 +457,7 @@ metric blindness) and boundary arithmetic (file-ID and record-ID rollover).
 |---|---|
 | **Type** | Safety |
 | **Property** | At the empty-buffer equality case, event-count accounting stays correct; `get_total_records` never produces a ~2^64 phantom count. (Refocused per evaluation R-D: the *true* u64 record-ID wrap requires ~2^64 writes and is unreachable on a production binary — explicitly descoped; the reachable, real bug is the empty-buffer case below.) |
-| **Invariant** | `Always`: `get_total_records()` (`ledger.rs:266`) returns a sane count. **Bug**: the outer `- 1` is a plain (non-wrapping) subtraction; when `next == last` (drained buffer), `wrapping_sub` → 0 then `0 - 1` → `u64::MAX`, poisoning `synchronize_buffer_usage` on every clean restart of a drained buffer. Workload-observable — no SUT instrumentation needed. |
+| **Invariant** | `Always`: `get_total_records()` (`ledger.rs:262`) returns a sane count. **Bug**: the outer `- 1` (`ledger.rs:281`) is a plain (non-wrapping) subtraction; when `next == last` (drained buffer), `wrapping_sub` → 0 then `0 - 1` → `u64::MAX`, poisoning `synchronize_buffer_usage` on every clean restart of a drained buffer. Workload-observable; also watched SUT-side by the committed `assert_always_greater_than_or_equal_to!(next_writer_id.wrapping_sub(last_reader_id), 1)` at `ledger.rs:271` under the `antithesis` feature. |
 | **Antithesis Angle** | Drain the buffer completely; restart Vector; scrape `buffer_size_bytes`/`buffer_size_events` and assert near 0 (not ~2^64). No node-kill required (clean restart suffices), so this is reachable even without crash faults. |
 | **Why It Matters** | Poisons buffer metrics (debug: panic; release: silent 2^64), undermining all buffer-occupancy observability. |
 
@@ -639,7 +641,7 @@ that the mechanism-first catalog covered implicitly; the value is making the
 | **Claim** | "If Vector acks (200), the event is durably persisted and survives a crash." |
 | **Reality** | The 200 fires at *encode into the in-memory write buffer*, before fsync: source finalizer dropped at `writer.rs:472` → default `Delivered` (`finalization.rs:243-252,284-289`); no flush on the send path (`sender.rs:46-59`). |
 | **Invariant** | `Always(missing_count==0)` at quiescence + `Unreachable("an end-to-end-acked event was permanently lost")` loss-magnet on the violation branch. |
-| **Antithesis Angle** | Reload (#24948, `BufferWriter::Drop` close-no-flush `writer.rs:1366-1374`) or kill node0 before fsync, or torn tail skipped on reopen (`reader.rs:111-115`). **This is what the launched run `48c94f81…` exhibits.** |
+| **Antithesis Angle** | Reload (#24948, `BufferWriter::Drop` close-no-flush `writer.rs:1366-1374`) or kill head before fsync, or torn tail skipped on reopen (`reader.rs:111-115`). **This is what the launched run `48c94f81…` exhibits.** |
 | **Why It Matters** | The foundational durability promise. If a 200 isn't durable, every higher claim (chain, no-loss) collapses. |
 
 See `properties/ack-does-not-imply-durability.md`.
@@ -650,9 +652,9 @@ See `properties/ack-does-not-imply-durability.md`.
 |---|---|
 | **Type** | Safety (semantic divergence; loss exhibited via C1). |
 | **Claim** | "Chaining e2e-ack nodes chains the acks: the head's 200 means it made it end-to-end." |
-| **Reality** | The disk buffer terminates the upstream ack chain and mints a fresh `BatchNotifier` for the downstream hop (`reader.rs:1117-1119`); node0's 200 = local durable-write, independent of node1. |
+| **Reality** | The disk buffer terminates the upstream ack chain and mints a fresh `BatchNotifier` for the downstream hop (`reader.rs:1128-1129`); head's 200 = local durable-write, independent of tail. |
 | **Invariant** | Tail-collector conservation: head-acked id must appear at the tail; `Unreachable("…permanently lost")`. |
-| **Antithesis Angle** | Head 200, partition node0↔node1 so the buffer can't drain, then drop node0's buffer (reload/crash) → head-acked id never reaches the tail. |
+| **Antithesis Angle** | Head 200, partition head↔tail so the buffer can't drain, then drop head's buffer (reload/crash) → head-acked id never reaches the tail. |
 | **Why It Matters** | Resolves `multi-hop-conservation-no-loss` OQ#1 (acks are NOT transitive) and falsifies the "chain of durable nodes ⇒ no loss" reasoning at its root. |
 
 See `properties/ack-is-per-hop-not-transitive.md`.
@@ -663,7 +665,7 @@ See `properties/ack-is-per-hop-not-transitive.md`.
 |---|---|
 | **Type** | Clarifying / anti-vacuity. **NOT a defect.** |
 | **Claim** | "e2e acks ⇒ exactly-once, no duplicates." |
-| **Reality** | At-least-once by design; crash-replay + sink retries re-deliver; node1 source has no dedup. |
+| **Reality** | At-least-once by design; crash-replay + sink retries re-deliver; tail source has no dedup. |
 | **Invariant** | Oracle uses **set membership** (`acked ⊆ delivered`), never equality/order (a duplicate must not red). `Sometimes(delivered_total > delivered_distinct)` proves the replay path ran. |
 | **Why It Matters** | Keeps the oracle sound: forbids the false-red of treating a legal duplicate as a fault, and turns duplicates into an anti-vacuity signal. |
 
@@ -683,4 +685,3 @@ not a product promise; an order-based check would false-red.)
 - Does Vector's topology call `writer.flush()` on graceful shutdown, and does the tokio runtime drain the finalizer task before exit? Both affect multiple liveness/durability properties. `(partial: tokio Runtime::drop has a ~2s task window; the running.rs stop() drop-order vs. final flush is unresolved and needs code tracing)`
 - **RESOLVED — "Durably written" oracle:** use a wall-clock timestamp (event produced > 2×`flush_interval` ago) and run with `flush_interval=0` so every flush is an fsync. Do NOT use e2e-ack delivery as the durability marker (conflates delivery with fsync; suppressed by the deadlock). Reused across Category 3 (refinement R-F).
 - **Build profile:** run a **release build** for underflow/wrap-observing properties (debug `trace!`/arithmetic panics first); run a **test build** (or add a runtime `MAX_FILE_ID` knob) for `file-id-rollover-stays-coordinated`.
-</content>

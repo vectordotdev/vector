@@ -57,7 +57,7 @@ During initialization, `seek_to_next_record` calls `self.next()` in a loop (read
 
 ### Interaction with File-ID Rollover
 
-File IDs are `u16`, wrapping at 65,536 (reader.rs:932: `reader_file_id > writer_file_id` comparison, which is raw `u16 >` — not wrapping-aware). In production this is unlikely (131,072 file IDs written before a file is reused). In tests with `MAX_FILE_ID=6`, this is reachable. If the file-ID rollover causes the reader to open a file from a previous generation, that file's record IDs could be far lower than the current `record_acks` watermark, triggering the monotonicity panic.
+File IDs are `u16`, wrapping at 65,536 (reader.rs:943: `reader_file_id > writer_file_id` comparison, which is raw `u16 >` — not wrapping-aware). In production this is unlikely (131,072 file IDs written before a file is reused). In tests with `MAX_FILE_ID=6`, this is reachable. If the file-ID rollover causes the reader to open a file from a previous generation, that file's record IDs could be far lower than the current `record_acks` watermark, triggering the monotonicity panic.
 
 ### Torn-Tail Mis-Recovery (F5 from sut-analysis.md §10)
 
@@ -77,15 +77,17 @@ Additionally, the panic discards any in-flight data in `TrackingBufWriter`'s 256
 
 - **Node kill during `seek_to_next_record`**: If the process is killed while the reader is replaying records from a file, the next restart starts `seek_to_next_record` again. The ledger `reader_last_record` is updated lazily (only on explicit `ledger.flush()`). If the ledger persisted a partially-advanced `reader_last_record`, the reader might seek past a valid record, leaving its ID below the `record_acks` watermark.
 
-- **File-ID rollover during test** (small `MAX_FILE_ID`): Causes the reader to open a file from a previous file-ID generation. The raw `u16 >` comparison at reader.rs:932 does not handle wrap-around, so this can cause the reader to believe it is ahead of the writer when actually it has wrapped. The reader opens an old file, finds records with much lower IDs than `record_acks` expects, and triggers the panic.
+- **File-ID rollover during test** (small `MAX_FILE_ID`): Causes the reader to open a file from a previous file-ID generation. The raw `u16 >` comparison at reader.rs:943 does not handle wrap-around, so this can cause the reader to believe it is ahead of the writer when actually it has wrapped. The reader opens an old file, finds records with much lower IDs than `record_acks` expects, and triggers the panic.
 
 - **External file placement**: Placing a valid-looking `buffer-data-N.dat` from a different run (with lower record IDs) into the buffer directory. The reader would open it as part of the sequence, read records with old IDs, and panic.
 
-## SUT-Side Instrumentation Suggestions (ALL MISSING)
+## SUT-Side Instrumentation Suggestions
+
+The Antithesis SDK is a committed dependency under the `antithesis` feature, and three underflow detectors already ship (see `existing-assertions.md`): `assert_always_greater_than_or_equal_to!` at ledger.rs:271 (`get_total_records`), ledger.rs:313 (`decrement_total_buffer_size`), and reader.rs:529 (reader size-delta). The ledger.rs:271 assert sits directly on this property's record-counting concern — `get_total_records` computes `next_writer_id.wrapping_sub(last_reader_id) - 1`, the same writer-minus-reader span that record-ID monotonicity governs — so a monotonicity break that drives the reader ID past the writer ID is partly observable there already. None of the three is a monotonicity guard on the read path, so the assert below is a genuine still-to-add suggestion.
 
 The existing `panic!` is a strong signal but not an Antithesis assertion. Adding the SDK assertion before the panic converts this into a structured finding:
 
-**Primary assertion** — replace the panic in `track_read` (reader.rs:481-483) with an assertion that fires before panicking:
+**Primary assertion** — replace the panic in `track_read` (reader.rs:482) with an assertion that fires before panicking:
 
 ```rust
 MarkerError::MonotonicityViolation => {
@@ -131,7 +133,7 @@ This makes the crash-recovery fast-forward path reachable in Antithesis testing,
 
 - **Does `OrderedAcknowledgements::add_marker` use wrapping-aware comparison?** If record IDs wrap around `u64::MAX` (theoretically possible after 2^64 writes, not practically reachable but logically relevant at the zero-initialized state), a wrapping `record_id` of 0 would appear to violate monotonicity relative to a high watermark. This matters for how the reader handles the first record on a fresh buffer (where `next_expected_record_id = 0 + 1 = 1` but the first record might have ID 0). Checking the `OrderedAcknowledgements` implementation would clarify whether this is handled correctly.
 
-- **Is the `reader_file_id > writer_file_id` comparison at reader.rs:932 wrapping-safe?** The SUT analysis flags this as a known ordering bug with `MAX_FILE_ID=6`. If file-ID rollover causes this comparison to yield the wrong result, the reader exits the seek loop too early and then reads from the wrong file position — which could produce out-of-order record IDs and trigger the panic. This needs a dedicated test or direct code fix before the Antithesis property can be considered "sound."
+- **Is the `reader_file_id > writer_file_id` comparison at reader.rs:943 wrapping-safe?** The SUT analysis flags this as a known ordering bug with `MAX_FILE_ID=6`. If file-ID rollover causes this comparison to yield the wrong result, the reader exits the seek loop too early and then reads from the wrong file position — which could produce out-of-order record IDs and trigger the panic. This needs a dedicated test or direct code fix before the Antithesis property can be considered "sound."
 
 - **Can `validate_last_write` ever produce `record_next` lower than `ledger_next` due to torn-tail mis-read?** If yes, and if the `Ordering::Greater` branch simply rolls to the next file (writer.rs:910-920) without updating `next_record_id`, the writer's next record ID might be lower than what the reader's `record_acks` expects. Specifically: `validate_last_write` only updates `self.next_record_id` in the `Ordering::Less` branch (writer.rs:941); in the `Ordering::Greater` branch it just sets `should_skip_to_next_file = true`. Does `self.next_record_id` remain at `ledger.state().get_next_writer_record_id()` (the pre-crash persisted value), which might be higher than the torn-tail record's ID? This determines whether `Ordering::Greater` is safe from a monotonicity perspective.
 

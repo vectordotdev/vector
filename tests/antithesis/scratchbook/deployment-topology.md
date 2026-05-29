@@ -1,7 +1,7 @@
 ---
 sut_path: /home/ssm-user/src/vector
-commit: a202ea3e1be8ea946d60f9e9fd0d9d4245bcb140
-updated: 2026-06-01
+commit: 049eec79b737450c4669b7f8aa1dd814551ec466
+updated: 2026-06-02
 external_references:
   - path: lib/vector-buffers/src/variants/disk_v2/mod.rs
     why: Confirms the buffer is single-process (intra-Vector reader+writer over an mmap'd ledger)
@@ -30,7 +30,12 @@ filesystem. There is **no network, no peer, no quorum**. Therefore:
   No dependency containers are needed (no S3/Kafka/Postgres) — the buffer's only
   "dependency" is the local filesystem.
 
-## Topology
+## Topology A — single SUT + workload (SUPERSEDED)
+
+> SUPERSEDED by the committed Topology B (the head/tail/oracle chain, N=2).
+> The shipped compose under `tests/antithesis/scenarios/vector_to_vector_e2e_disk`
+> uses services `head`, `tail`, `oracle` — see Topology B below. This single-SUT
+> sketch is kept for the design rationale only.
 
 ```text
 +-----------------------------+         events (HTTP, e2e-ack-capable source)
@@ -116,13 +121,17 @@ filesystem. There is **no network, no peer, no quorum**. Therefore:
 
 ## SUT-side instrumentation (for the instrumented build)
 
-No Antithesis SDK exists in the repo today (`existing-assertions.md`). For the
-internal-state properties, add `antithesis-sdk` to `lib/vector-buffers/Cargo.toml`
-and insert (all currently MISSING):
+The Antithesis SDK is a committed dependency of `lib/vector-buffers` under the
+`antithesis` feature, and three #21683 underflow detectors are already present.
+For the internal-state properties:
 
-- `assert_unreachable!` / `assert_always!(amount <= current)` at the two unguarded
-  subtraction sites: `ledger.rs:~292` and `reader.rs:~524`
-  (`total-buffer-size-never-underflows`).
+- COMMITTED: `assert_always_greater_than_or_equal_to!` at the three underflow
+  sites — `ledger.rs:313` (`decrement_total_buffer_size`, `total_buffer_size >=
+  amount`, before the `fetch_sub` at `ledger.rs:319`), `reader.rs:529`
+  (`metadata.len() >= bytes_read`, before the delta at `reader.rs:535`), and
+  `ledger.rs:271` (`get_total_records`, the wrapped-id difference is `>= 1`).
+  All three back `total-buffer-size-never-underflows`. They are detectors,
+  not guards: they report the wrap, the subtraction still runs.
 - `assert_sometimes!(writer_unblocked_after_full)` after `ensure_ready_for_write`
   exits its wait loop; `assert_unreachable!` on repeated no-progress wakeups
   (`writer-eventually-makes-progress`).
@@ -183,21 +192,21 @@ buffer. The **conservation chain** the user asked for ("what goes in comes back
 out") is a deliberately different shape that turns network faults into buffer
 pressure.
 
+Shipped as N=2: `head` → `tail`, with the `oracle` container driving and
+collecting. Ports: 8080 head HTTP source, 6000 head→tail inter-node `vector`,
+9598 metrics (both nodes), 8686 oracle.
+
 ```text
- head injector (parallel_driver xN)                                tail collector
- mints unique ids, logs ACKED  --HTTP-->  [node_0]  --vector proto-->  [node_1]
-                                            src                          src
-                                            |                            |
-                                          disk_v2                      disk_v2
-                                          block+acks                   block+acks
-                                            |                            |
-                                          vsink ----vector proto--------> ...
-                                                                          |
-                                       [node_{N-1}] --HTTP--> collector (logs DELIVERED)
-   ^                                                                      |
-   |  (RING UPGRADE, later) node_{N-1}.sink --vector--> node_0.source, with a
-   +----------------------- lap-counter remap+route at node_0 that exits a record
-                            to the collector after one lap, else forwards it.
+ oracle injector (parallel_driver xN)                              oracle collector
+ mints unique ids, logs ACKED  --HTTP:8080-->  [head]  --vector proto:6000-->  [tail]
+                                                 src                            src
+                                                 |                              |
+                                               disk_v2                        disk_v2
+                                               block+acks                     block+acks
+                                                 |                              |
+                                               vsink ---vector proto:6000-----> |
+                                                                                |
+                                                              [tail] --HTTP--> oracle (logs DELIVERED)
 ```
 
 ### Why each node is its own pod
@@ -210,24 +219,24 @@ disable the new fault lever.
 
 ### Containers
 
-- **`node_0` … `node_{N-1}`** — N copies of the **same instrumented Vector
-  image** from Topology A. Config per node:
-  - `source`: `vector` (native protocol, `acknowledgements: true`). `node_0`
-    additionally takes an `http_server` source for head injection (or the
-    injector speaks the `vector` protocol directly — TBD by OQ-1 / ack
-    semantics).
-  - `sink`: `vector` sink → next node's `vector` source, `buffer: { type: disk,
-    when_full: block, max_size: … }`, `acknowledgements` wired through. The tail
-    node's sink is `http` → collector.
+- **`head` and `tail`** (shipped N=2) — two copies of the **same instrumented
+  Vector image**. Config per node:
+  - `source`: `head` takes an `http_server` source on `0.0.0.0:8080` for
+    injection; `tail` takes a `vector` source on `0.0.0.0:6000` (native protocol,
+    `acknowledgements: true`).
+  - `sink`: `head`'s sink is `vector` → `tail:6000`; `tail`'s sink is `http` →
+    oracle. Each carries `buffer: { type: disk, when_full: block, max_size:
+    8388608 }` (8 MiB, 8 data files) with `acknowledgements` wired through. Both
+    expose metrics on `0.0.0.0:9598`.
   - Per-node **persistent volume** for `data_dir` (mandatory — fresh-boot
-    restart otherwise wipes that hop's buffer → spurious loss).
-  - Small `max_data_file_size` to force rotation; same Cluster-A/B SUT-side
-    asserts as Topology A (they fire on whichever node hits the bad state).
-- **`workload`** — head injector (`parallel_driver_`, N concurrent) + tail
-  collector (long-lived `serve`) + `eventually_` drain-and-check oracle. Same
-  container/SDK as Topology A; reuses `vdbuf-workload`'s produce + collector
-  modes. Globally-unique ids, shared-volume `ACKED`/`DELIVERED` logs, dedup at
-  collector.
+    restart otherwise wipes that hop's buffer → spurious loss). Volumes
+    `v2v-buffer-head` / `v2v-buffer-tail` at `/var/lib/vector`.
+  - `VECTOR_DISK_V2_MAX_DATA_FILE_SIZE=1048576` (1 MiB) on **both** nodes to force
+    rotation; the committed `assert_always_greater_than_or_equal_to!` underflow
+    detectors fire on whichever node hits the bad state.
+- **`oracle`** — head injector (`parallel_driver_`, N concurrent) + collector
+  (long-lived `serve`) + `eventually_conservation` drain-and-check, listening on
+  8686. Globally-unique ids, shared `ACKED`/`DELIVERED` logs, dedup at collector.
 
 ### Faults
 
@@ -238,11 +247,16 @@ surface.
 
 ### Start small
 
-Ship **N=3, no loop** first (chain → collector): real conservation oracle, three
-buffer crossings, no self-deadlock risk. Earn the **ring** (close tail→head +
-lap-drain) as a stress upgrade once the chain is green — the lap-drain is
-required to keep a `block`-mode ring from self-deadlocking on legitimate
+Shipped as **N=2, no loop** (head → tail → oracle collector): real conservation
+oracle, two buffer crossings, no self-deadlock risk. Earn the **ring** (close
+tail→head + lap-drain) as a stress upgrade once the chain is green — the lap-drain
+is required to keep a `block`-mode ring from self-deadlocking on legitimate
 backpressure (a false positive). See `properties/multi-hop-conservation-no-loss.md`.
+
+Still-absent suggestion: an `assert_sometimes!(blocked_on_full_buffer)` on the
+chain (after a writer parks on a full `block`-mode buffer) would prove the
+partition-fills-buffer lever is actually exercised, not just configured. Not yet
+committed.
 
 ### New open questions (Topology B)
 
@@ -252,4 +266,3 @@ backpressure (a false positive). See `properties/multi-hop-conservation-no-loss.
   absorbed by an upstream source buffer?
 - Quiescence signal for the `eventually_` oracle: every node's buffer gauge ~0
   AND collector count stable for K seconds (not a fixed sleep).
-</content>

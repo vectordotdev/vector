@@ -183,7 +183,7 @@ use snafu::{ResultExt, Snafu};
 use vector_common::finalization::Finalizable;
 
 mod backed_archive;
-mod common;
+pub(crate) mod common;
 mod io;
 mod ledger;
 mod reader;
@@ -356,21 +356,21 @@ where
     usage_handle.set_buffer_limits(Some(max_size.get()), None);
 
     let buffer_path = get_disk_v2_data_dir_path(data_dir, id);
-    #[cfg_attr(not(feature = "antithesis"), allow(unused_mut))]
-    let mut builder = DiskBufferConfigBuilder::from_path(buffer_path).max_buffer_size(max_size.get());
-    // Antithesis-only test knob: shrink the data-file size (and matching record
-    // size) so node0 rotates constantly, making the rare reopen torn-tail and
-    // file-id rollover paths reachable in a short run. Compiled out of shipped
-    // Vector; the public YAML config never exposes these.
+    let builder = DiskBufferConfigBuilder::from_path(buffer_path).max_buffer_size(max_size.get());
+    // Shrink the data-file size (and the matching record size) so files fill and
+    // rotate constantly. That is what reaches the rare recovery paths the bug hides
+    // in: reopening a file whose last write was cut short, and reusing a file number
+    // after the counter wraps. Read from the environment, not the public YAML config.
     #[cfg(feature = "antithesis")]
-    if let Some(bytes) = std::env::var("VECTOR_DISK_V2_MAX_DATA_FILE_SIZE")
+    let builder = match std::env::var("VECTOR_DISK_V2_MAX_DATA_FILE_SIZE")
         .ok()
         .and_then(|v| v.parse::<u64>().ok())
     {
-        builder = builder
+        Some(bytes) => builder
             .max_data_file_size(bytes)
-            .max_record_size(usize::try_from(bytes).unwrap_or(usize::MAX));
-    }
+            .max_record_size(usize::try_from(bytes).unwrap_or(usize::MAX)),
+        None => builder,
+    };
     let config = builder.build()?;
     Buffer::from_config(config, usage_handle)
         .await

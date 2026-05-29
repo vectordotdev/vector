@@ -30,7 +30,7 @@ chain is not redundant — it reaches states the single-SUT topology cannot:
 1. **Composition multiplies the loss surface.** A record crosses N independent
    disk buffers, each with its own fault timing. A rare silent-loss window
    (e.g. the `delete_completed_data_file` unlink-before-ledger-flush gap,
-   `reader.rs:546-549`) that fires with low probability per hop has ~N
+   `reader.rs:557-560`) that fires with low probability per hop has ~N
    independent chances to fire per record. The tail oracle catches a loss at
    *any* hop. More buffers crossed = more bug-finding per injected event.
 
@@ -87,12 +87,12 @@ must drain after a bounded number of laps or the experiment is uninterpretable.
 
 ## SUT-side instrumentation
 
-Reuse the **same** Cluster-A / Cluster-B SUT-side asserts already specified in
-`deployment-topology.md` — every node in the chain is the same instrumented
-Vector binary, so the `total_buffer_size` underflow asserts
-(`ledger.rs:~292`, `reader.rs:~524`) and the writer-progress assert fire on
-whichever node hits the bad state. Add one chain-specific reachability assert so
-the search knows the new lever is working:
+Reuse the **same** Cluster-A / Cluster-B SUT-side asserts already committed —
+every node in the chain is the same instrumented Vector binary, so the three
+committed `total_buffer_size`/record underflow detectors
+(`ledger.rs:313` decrement, `reader.rs:529` delta, `ledger.rs:271`
+get_total_records) fire on whichever node hits the bad state. Add one
+chain-specific reachability assert so the search knows the new lever is working:
 
 ```rust
 // after ensure_ready_for_write blocks on a full buffer (when_full=block):
@@ -103,11 +103,12 @@ antithesis_sdk::assert_sometimes!(
 );
 ```
 
-NOTE: as of this writing **no `assert_*` exists in `lib/vector-buffers/src`**
-(`existing-assertions.md` is still accurate; `grep` count = 0) even though the
-`Dockerfile`/`disk_v2_lossfinder` comments claim a SUT-side underflow assert was
-added. That claim is a **spec-vs-code divergence** (see OQ-5) — the asserts must
-actually be added for any SUT-side signal here.
+NOTE: three SUT-side underflow detectors are committed in `lib/vector-buffers/src`
+under the `antithesis` feature: `assert_always_greater_than_or_equal_to!` at
+ledger.rs:313 (decrement), ledger.rs:271 (get_total_records `- 1`), and
+reader.rs:529 (reader delta). The chain-reachability assert above is still
+absent. The committed asserts are detectors, not guards — they report to
+Antithesis but do not abort the underflowing subtraction.
 
 ## Fault Requirements
 
@@ -161,10 +162,27 @@ Ids are globally unique and immutable as they traverse, so a replayed duplicate
 keeps its id — dedup by id at the collector is sufficient. Confirm no hop
 rewrites or namespaces the id field. `(not yet investigated)`
 
-**OQ-5: The `Dockerfile`/`disk_v2_lossfinder` comments claim a SUT-side
-`assert_always` exists at the `total_buffer_size` underflow site in
-`lib/vector-buffers`, but `grep` finds none.**
-Spec-vs-code divergence. Either the asserts were planned-but-not-landed or the
-comments are aspirational. The chain harness's SUT-side signal depends on these
-existing — resolve before relying on internal asserts (vs. workload-only oracle).
-`(needs follow-up — weeding task)`
+**OQ-5 (RESOLVED, 049eec79b): SUT-side underflow asserts exist at HEAD.** Three
+`assert_always_greater_than_or_equal_to!` detectors are committed under the
+`antithesis` feature — ledger.rs:271 (get_total_records), ledger.rs:313
+(decrement), reader.rs:529 (reader delta). The chain harness can rely on these
+SUT-side signals; they fire on whichever node underflows. (They are detectors,
+not guards — they report but do not abort the subtraction.)
+
+**OQ-6 (Soundness — quiescence-gated conservation):** The conservation
+`assert_always_less_than_or_equal_to!(missing_count, 0)` and the spurious-id
+check fire only inside `if quiescent` (eventually_conservation.rs:165/174/181).
+The target bug is a permanent writer wedge. A wedge that keeps the counters from
+settling for 5 polls within the 240s deadline leaves these checks **skipped** —
+and a skipped `assert_always` is not a failure. Only the online integrity check
+(oracle.rs:118) is unconditional; conservation has no unconditional equivalent.
+A permanent deadlock can therefore evade the conservation oracle entirely.
+`(open — needs an unconditional liveness/quiescence-timeout signal)`
+
+**OQ-7 (Soundness — best-effort ack relay):** The producer records each ack
+obligation by POSTing `/acked` with the HTTP result discarded
+(parallel_driver_produce.rs:71 `let _ = client.post(.../acked)...`). A dropped
+relay over a fault-injected link erases the obligation, so a later genuine loss
+of that id is invisible to `missing = acked - delivered` — the id never entered
+`acked`. This understates `ACKED` and can mask real loss.
+`(open — relay must be durable/retried or the obligation logged before the POST)`

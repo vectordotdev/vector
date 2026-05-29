@@ -60,8 +60,8 @@ mod.rs:270   ledger.synchronize_buffer_usage
 | After `increment_writer_file_id` (`writer.rs:1138`), before first record written | Ledger says writer is on file N+1, but file N+1 is empty | `validate_last_write`: calls `ensure_ready_for_write`, which opens file N+1 (empty → `data_file_size==0`). `validate_last_write` exits early at `writer.rs:852-855` with `ready_to_write=true`. OK. |
 | During `sync_all` of the new file (`writer.rs:1124`) | New file created but not synced; may be 0 bytes on disk | Same as above: empty file → early exit. OK. |
 | After `validate_last_write` sets `should_skip_to_next_file=true`, before `reset()`/`mark_for_skip()` | Old file has invalid last record; ledger not yet rolled | `validate_last_write` starts over: `ready_to_write=false` guard (`writer.rs:840`) prevents double-init. `ensure_ready_for_write` opens next file. **L6 edge**: if next file doesn't exist yet and reader hasn't finished the current file, writer must wait (`writer.rs:1153`). Hang risk if reader is also not yet initialized (ordering: writer init completes before reader init starts per `mod.rs:256-268`). |
-| During `seek_to_next_record` file-deletion loop (`reader.rs:883`) | Reader deleted some files; ledger partially updated | On restart, `update_buffer_size` sums remaining `.dat` files (correct since deleted files are gone). `seek_to_next_record` resumes. OK in theory. |
-| During `update_buffer_size` file-scan (`ledger.rs:674`) | Scan sees partial set of files | Harmless: worst case over-counts (more files than reality due to concurrent creation); `seek_to_next_record` decrements as it reads. Under-count impossible since scan is a snapshot. |
+| During `seek_to_next_record` file-deletion loop (`reader.rs:894`) | Reader deleted some files; ledger partially updated | On restart, `update_buffer_size` sums remaining `.dat` files (correct since deleted files are gone). `seek_to_next_record` resumes. OK in theory. |
+| During `update_buffer_size` file-scan (`ledger.rs:698`) | Scan sees partial set of files | Harmless: worst case over-counts (more files than reality due to concurrent creation); `seek_to_next_record` decrements as it reads. Under-count impossible since scan is a snapshot. |
 
 **L6 init-stall edge (highest risk):**
 `validate_last_write` detects a bad record → `should_skip_to_next_file = true`
@@ -90,7 +90,7 @@ not during init itself — but init "completing" is then followed by an immediat
 permanent stall.
 
 **Advisory lock edge:**
-`load_or_create` at `ledger.rs:573-576` calls `lock.try_lock()`. On Linux,
+`load_or_create` at `ledger.rs:601` calls `lock.try_lock()`. On Linux,
 `fcntl` advisory locks are per-process; if the old Vector process dies via
 SIGKILL, the lock is released by the kernel. However, on some network
 filesystems (NFS, CIFS) the lock may not be released immediately after a crash,
@@ -102,7 +102,9 @@ expires. This is a crash-loop risk on shared/NFS storage.
 specifically during file rotation is the highest-value timing for L6. CPU
 throttle during the init sequence is a secondary lever to widen timing windows.
 
-**Antithesis SDK Assertions (SUT-side, to be added):**
+**Antithesis SDK Assertions (SUT-side):**
+
+The Antithesis SDK is a committed dependency under the `antithesis` feature, and three `assert_always_greater_than_or_equal_to!` underflow detectors already ship (ledger.rs:271, ledger.rs:313, reader.rs:529 — see `existing-assertions.md`). None of them covers the init-completion path, so the assertions below are genuine still-to-add suggestions:
 
 ```rust
 // At the end of from_config_inner (mod.rs:270, after synchronize_buffer_usage):
@@ -116,7 +118,7 @@ antithesis_sdk::assert_sometimes!(
     })
 );
 
-// At the start of update_buffer_size (ledger.rs:653), log seeded size:
+// At the start of update_buffer_size (ledger.rs:680), log seeded size:
 antithesis_sdk::assert_always!(
     total_buffer_size < config.max_buffer_size,
     "update_buffer_size: seeded total_buffer_size within configured max_size",
@@ -142,11 +144,11 @@ returns `Ok` but the system is deadlocked. Confirm by tracing
 write path.
 
 **OQ-2: Is there a bounded-time guarantee on `seek_to_next_record`?**
-`seek_to_next_record` reads records via `next()` (`reader.rs:905`). `next()`
-can block waiting for the writer (`reader.rs:1019` `wait_for_writer()`). During
+`seek_to_next_record` reads records via `next()` (`reader.rs:916`). `next()`
+can block waiting for the writer (`reader.rs:1091` `wait_for_writer()`). During
 init the writer is not yet writing, so `wait_for_writer()` may hang. Trace the
 `next()` path under `is_finalized = (reader_file_id != writer_file_id) ||
-!self.ready_to_read` (`reader.rs:1004`). During seek, `ready_to_read = false`,
+!self.ready_to_read` (`reader.rs:1015`). During seek, `ready_to_read = false`,
 so `is_finalized = true`, so `try_next_record` treats the file as finalized and
 returns `PartialWrite` errors rather than blocking. Confirm this holds for all
 files in the seek path, not just the current writer file.

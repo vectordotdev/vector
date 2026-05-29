@@ -54,9 +54,12 @@ Properties: writer-eventually-makes-progress, total-buffer-size-never-underflows
   quiet period assert COMPOUND: produced-rate≈0 AND delivered-rate≈0 AND buffer
   >~90% AND duration>drain-bound ⇒ assert_unreachable("persistent_deadlock").
   Must use both rates (distinguish deadlock from healthy block backpressure).
-- Phase 2 (precise signal): add antithesis_sdk to lib/vector-buffers; at
-  ledger.rs:~292 decrement assert the value doesn't wrap (assert_always amount<=current);
-  assert_unreachable on underflow. Rebuild Vector (release; no debug trace! panic).
+- Phase 2 (precise signal): DONE. Committed `assert_always_greater_than_or_equal_to!`
+  detectors under the `antithesis` feature at ledger.rs:313 (decrement_total_buffer_size,
+  total_buffer_size >= amount, before the fetch_sub at ledger.rs:319), plus the two
+  siblings ledger.rs:271 (get_total_records) and reader.rs:529 (reader size-delta).
+  Detectors not guards: they report the wrap, the subtraction still runs. Release
+  build still mandatory (no debug trace! panic).
 - Needs many timelines + sustained writes; release build mandatory.
 
 ## G3 — record-id-wraparound empty-buffer 2^64 gauge  [MED-EASY, Phase 1]
@@ -105,8 +108,10 @@ Property: fsync-window-bounded-under-clock-jitter. Needs clock faults.
 ## Notes
 
 - Each launch: `docker compose build` (only if images changed) → snouty validate
-  → snouty launch --json --webhook basic_test --config antithesis/config
-  --duration <mins>. Then triage by run id.
+  → snouty launch --json --config <scenario-dir> --duration <mins>. The committed
+  scenario lives at `tests/antithesis/scenarios/vector_to_vector_e2e_disk` (compose
+  services head/tail/oracle), superseding the earlier `basic_test --config
+  antithesis/config` path/webhook. Then triage by run id.
 - Keep each test on its own gt branch stacked on antithesis-setup-harness.
 - Do NOT fix Vector bugs — demonstrate + make reproducible.
 - Multiple config variants (flush_interval, when_full) → either separate compose

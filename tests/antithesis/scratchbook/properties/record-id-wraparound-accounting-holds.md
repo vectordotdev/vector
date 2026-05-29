@@ -1,8 +1,8 @@
 ---
 slug: record-id-wraparound-accounting-holds
 type: Safety / Always
-status: LATENT BUG — the `- 1` at `ledger.rs:266` is not wrapping; equality case produces u64::MAX
-sut_commit: b7aae737cef5dd37d1445915443a1eb97b584f85
+status: LATENT BUG (now WATCHED) — the `- 1` at `ledger.rs:281` is not wrapping; equality case produces u64::MAX. Reported under the `antithesis` build by the committed detector at ledger.rs:271; the arithmetic itself is still unguarded in production.
+sut_commit: 049eec79b737450c4669b7f8aa1dd814551ec466
 ---
 
 # Property 17: record-id-wraparound-accounting-holds
@@ -21,16 +21,24 @@ Specifically, `get_total_records()` must return 0 when the buffer is empty (all 
 `next_writer_record_id == last_reader_record_id`), and must never return a value close to
 `u64::MAX`.
 
-**The Bug — `ledger.rs:262-267`:**
+**The Bug — `get_total_records` (fn at `ledger.rs:262`, subtraction at `ledger.rs:281`):**
 
 ```rust
 pub fn get_total_records(&self) -> u64 {
     let next_writer_id = self.state().get_next_writer_record_id();
     let last_reader_id = self.state().get_last_reader_record_id();
 
-    next_writer_id.wrapping_sub(last_reader_id) - 1  // <-- outer `-1` is NOT wrapping
+    // committed detector (antithesis feature) at ledger.rs:271 reports when the
+    // wrapped difference drops below 1, i.e. the `- 1` is about to underflow:
+    //   assert_always_greater_than_or_equal_to!(next.wrapping_sub(last), 1u64, ...)
+    next_writer_id.wrapping_sub(last_reader_id) - 1  // ledger.rs:281; outer `-1` is NOT wrapping
 }
 ```
+
+The committed detector at ledger.rs:271 reports the underflow to Antithesis but
+does not abort, so the `- 1` at ledger.rs:281 still wraps to `u64::MAX` on the
+equality case. The arithmetic is unguarded in production builds (the detector is
+`#[cfg(feature = "antithesis")]`).
 
 The function computes `(next_writer_id wrapping_sub last_reader_id) - 1`. The `wrapping_sub`
 is correct for the modular distance between the writer ID and the reader ID — it handles u64
@@ -53,7 +61,7 @@ equal (both pointing at the same boundary). This makes `wrapping_sub(...) = 0`, 
 
 `get_total_records` is called at two sites:
 
-1. **`synchronize_buffer_usage` (`ledger.rs:517`):** Called during initialization after
+1. **`synchronize_buffer_usage` (`ledger.rs:543`):** Called during initialization after
    `seek_to_last_record` and `validate_last_write`. If the buffer is empty on startup (all
    events acked before previous shutdown), `get_total_records()` returns `u64::MAX`. This is
    passed to `increment_received_event_count_and_byte_size(u64::MAX, ...)`, which adds `u64::MAX`
@@ -100,7 +108,7 @@ The fix is: `next_writer_id.wrapping_sub(last_reader_id).wrapping_sub(1)`.
    gauge). Assert the value is close to 0, not `u64::MAX`. This requires only a workload +
    metric scrape and is exercisable without any special test hooks.
 
-SUT-side assertion: add `assert_always!(result <= reasonable_upper_bound, "get_total_records returned impossible value", { "result": result, "writer_id": next_writer_id, "reader_id": last_reader_id })` inside `get_total_records`, where `reasonable_upper_bound` is something like `self.get_total_buffer_size() / min_record_size` or simply `u64::MAX / 2`.
+SUT-side assertion (COMMITTED, ledger.rs:271): `assert_always_greater_than_or_equal_to!(next_writer_id.wrapping_sub(last_reader_id), 1u64, "ledger get_total_records never underflows on a drained buffer", ...)` inside `get_total_records`, gated `#[cfg(feature = "antithesis")]`. This fires on the equality/drained case before the `- 1` at ledger.rs:281 wraps. It is a detector — it reports the impossible value to Antithesis but does not change the arithmetic.
 
 **Why It Matters:**
 
@@ -155,11 +163,11 @@ Antithesis property provides an automatic regression test for the fix.
 
 #### Does the debug-build `synchronize_buffer_usage`/`get_total_records` `0-1` panic occur before release semantics are observable?
 
-**Examined:** `ledger.rs:262–267` (`get_total_records`), `ledger.rs:516–524` (`synchronize_buffer_usage`), `ledger.rs:173–202` (`unsafe_set_writer_next_record_id`, `unsafe_set_reader_last_record_id`).
+**Examined:** `ledger.rs:262–282` (`get_total_records`, including the committed detector at ledger.rs:271), `ledger.rs:543–550` (`synchronize_buffer_usage`), `ledger.rs:174–202` (`unsafe_set_writer_next_record_id`, `unsafe_set_reader_last_record_id`).
 
-**Found:** The arithmetic at ledger.rs:266 is `next_writer_id.wrapping_sub(last_reader_id) - 1`. The `wrapping_sub` is wrapping-safe; the outer `- 1` is plain Rust integer subtraction on `u64`. In a debug build this will panic with "attempt to subtract with overflow" when `wrapping_sub` returns 0 (empty-buffer equality case). `synchronize_buffer_usage` at ledger.rs:517 calls `get_total_records()` unconditionally during initialization; if the buffer is empty, the panic fires before any metric is emitted. In a release build the same operation silently wraps to `u64::MAX` and proceeds to `increment_received_event_count_and_byte_size(u64::MAX, ...)` at ledger.rs:520–523. The debug-vs-release divergence is therefore: **debug → panic at startup on empty buffer; release → silent u64::MAX metric poisoning**. This affects harness build-mode selection: a debug build surfaces the bug as a crash (easier to detect), while a release build surfaces it as a metric anomaly (harder to detect without workload-side assertions).
+**Found:** The arithmetic at ledger.rs:281 is `next_writer_id.wrapping_sub(last_reader_id) - 1`. The `wrapping_sub` is wrapping-safe; the outer `- 1` is plain Rust integer subtraction on `u64`. In a debug build this will panic with "attempt to subtract with overflow" when `wrapping_sub` returns 0 (empty-buffer equality case). The committed `#[cfg(feature = "antithesis")]` detector at ledger.rs:271 reports this case to Antithesis but does not abort, so the panic/wrap still follows. `synchronize_buffer_usage` at ledger.rs:543 calls `get_total_records()` unconditionally during initialization (ledger.rs:544); if the buffer is empty, the panic fires before any metric is emitted. In a release build the same operation silently wraps to `u64::MAX` and proceeds to `increment_received_event_count_and_byte_size(u64::MAX, ...)`. The debug-vs-release divergence is therefore: **debug → panic at startup on empty buffer; release → silent u64::MAX metric poisoning**. This affects harness build-mode selection: a debug build surfaces the bug as a crash (easier to detect), while a release build surfaces it as a metric anomaly (harder to detect without workload-side assertions).
 
-**Found — cfg(test) gating of the u64-wrap helpers:** `unsafe_set_writer_next_record_id` (ledger.rs:173–187) and `unsafe_set_reader_last_record_id` (ledger.rs:189–202) are both annotated `#[cfg(test)]`. They are unavailable in production or Antithesis-production binaries; the near-wraparound test path (injecting IDs near `u64::MAX`) is only exercisable in test builds.
+**Found — cfg(test) gating of the u64-wrap helpers:** `unsafe_set_writer_next_record_id` (ledger.rs:174) and `unsafe_set_reader_last_record_id` (ledger.rs:190) are both annotated `#[cfg(test)]`. They are unavailable in production or Antithesis-production binaries; the near-wraparound test path (injecting IDs near `u64::MAX`) is only exercisable in test builds.
 
 **Not found:** No evidence of a build-profile guard inside `get_total_records` or `synchronize_buffer_usage` that would suppress the panic in a specific configuration.
 
@@ -173,20 +181,21 @@ Antithesis property provides an automatic regression test for the fix.
 scenario (this arithmetic is deterministically reproducible in-process).
 
 **Test A — ledger-level, pure sync (no async, no buffer).** This is the cheapest, most
-direct test of Site 1 (`get_total_records`, ledger.rs:266 `next.wrapping_sub(last) - 1`):
+direct test of Site 1 (`get_total_records`, ledger.rs:281 `next.wrapping_sub(last) - 1`):
+
 - Build a `Ledger` via `Ledger::load_or_create` backed by the `Vec<u8>` mmap
   (`impl WritableMemoryMap for Vec<u8>` at tests/mod.rs:56). There is no bare-struct
   constructor; go through `load_or_create` as known_errors.rs does.
 - Set `next_writer_record_id` / `last_reader_record_id` with the `#[cfg(test)]`
   `unsafe_set_writer_next_record_id` / `unsafe_set_reader_last_record_id` helpers
-  (ledger.rs:173-203; pattern in known_errors.rs).
+  (ledger.rs:174-202; pattern in known_errors.rs).
 - `proptest` over `(next, last)` and assert `get_total_records()` never wraps near
   `u64::MAX`. The drained-after-use state `next == last` ⇒ `0 - 1` ⇒ `u64::MAX` is the
   failing case; fresh state `next=1,last=0 ⇒ 0` is safe.
 
 This site is reachable purely in-process (write N / read N / ack N to drain, OR the
 ledger-level setter approach above) and also fires on reopen via `synchronize_buffer_usage`
-(ledger.rs:517). The setter approach is preferred: smallest, fastest, fully deterministic,
+(ledger.rs:543). The setter approach is preferred: smallest, fastest, fully deterministic,
 needs no async runtime.
 
 **Discipline:** must FAIL on current code (TDD). Debug build ⇒ panic; release ⇒ silent

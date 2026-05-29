@@ -14,13 +14,6 @@
 #[macro_use]
 extern crate tracing;
 
-// Link the Antithesis coverage-instrumentation runtime when the `antithesis`
-// feature is on. The crate is link-only glue (no public API): it provides the
-// sancov callbacks (`__sanitizer_cov_trace_pc_guard*`) and an `.init_array`
-// constructor that loads libvoidstar. An `extern crate` declaration is what
-// pulls it onto the link line so coverage-instrumented (sancov) builds — the
-// vector binary AND the disk_v2 examples — resolve those symbols. Compiled out
-// entirely otherwise, so production Vector never links it.
 #[cfg(feature = "antithesis")]
 extern crate antithesis_instrumentation;
 
@@ -41,6 +34,11 @@ pub mod test;
 pub mod topology;
 
 pub(crate) mod variants;
+
+/// `disk_v2`'s write-buffer size, re-exported under the `antithesis` feature so the
+/// harness can size payloads against the real value instead of hardcoding it.
+#[cfg(feature = "antithesis")]
+pub use variants::disk_v2::common::DEFAULT_WRITE_BUFFER_SIZE as WRITE_BUFFER_SIZE_V2;
 
 use std::fmt::Debug;
 

@@ -2,8 +2,8 @@
 slug: buffer-size-within-max
 type: Safety / Always
 sut_path: lib/vector-buffers/src/variants/disk_v2/
-commit: b7aae737cef5dd37d1445915443a1eb97b584f85
-updated: 2026-05-28
+commit: 049eec79b737450c4669b7f8aa1dd814551ec466
+updated: 2026-06-02
 linked_claims:
   - INV-7 in sut-analysis.md §5 ("Buffer never exceeds max_size")
   - INV-3 in sut-analysis.md §5 (per-record overshoot caveat)
@@ -77,7 +77,7 @@ fn can_write_record(&self, amount: usize) -> bool {
 }
 ```
 
-- `get_total_buffer_size()` loads the `total_buffer_size` atomic (ledger.rs:276-278).
+- `get_total_buffer_size()` loads the `total_buffer_size` atomic (ledger.rs:291-293).
 - `self.unflushed_bytes` is a writer-local counter (not atomic) tracking bytes
   written to the `TrackingBufWriter` not yet flushed to the data file.
 - The combined sum must not exceed `max_buffer_size` for the write to proceed.
@@ -102,7 +102,7 @@ sites with duplicate logic — a maintainability concern if either diverges.
 
 ### Accounting update on write
 
-`track_write` (ledger.rs:386-390) calls `increment_total_buffer_size(record_size)`,
+`track_write` (ledger.rs:410-418) calls `increment_total_buffer_size(record_size)`,
 where `record_size` is the full serialized record length (header + payload).
 
 ```rust
@@ -112,7 +112,7 @@ pub fn track_write(&self, event_count: u64, record_size: u64) {
 }
 ```
 
-The increment uses `fetch_add` with no overflow guard (ledger.rs:282). In theory
+The increment uses `fetch_add` with no overflow guard (ledger.rs:297). In theory
 a record_size could be up to `max_record_size` (128MB); `fetch_add` of 128MB to
 a value near u64::MAX wraps — a separate theoretical overflow path (not observed
 in practice given max_buffer_size is bounded, but worth noting for completeness).
@@ -175,7 +175,7 @@ If (1) holds but (2) fails, report both findings together.
 A non-vacuous violation would require the write-side gate to be bypassed. Known
 paths:
 
-**Path 1: Accounting drift on startup.** `update_buffer_size` (ledger.rs:653-697)
+**Path 1: Accounting drift on startup.** `update_buffer_size` (ledger.rs:680-724)
 adds *all* `.dat` file sizes, including files that the reader has already
 processed but whose deletion race-lost against the restart. If `total_buffer_size`
 is over-seeded, `can_write_record` blocks early (writer thinks buffer is larger
@@ -200,9 +200,14 @@ a live safety risk under config reload.
 
 ---
 
-## SUT-Side Instrumentation (MISSING — must be added)
+## SUT-Side Instrumentation (not yet committed — the SDK is wired and the three #21683 underflow asserts are present; these are additional)
 
-All Antithesis SDK calls below are absent from the codebase.
+The Antithesis SDK is a committed dependency under the `antithesis` feature, and
+three underflow `assert_always_greater_than_or_equal_to!` detectors exist
+(ledger.rs:271 get_total_records, ledger.rs:313 decrement_total_buffer_size,
+reader.rs:529 reader size-delta). See existing-assertions.md for what is
+committed. The write-gate assertions below are not among those three and remain
+genuine still-to-add suggestions.
 
 ### Assertion 1 — Always: write gate is never bypassed
 
@@ -309,6 +314,6 @@ check that the gate is actually working.
   No — drops reduce the size, they don't violate the upper bound. But the metric
   discrepancy means the watchdog should measure files, not metrics.
 
-- **Overflow on `increment_total_buffer_size`:** `fetch_add` at ledger.rs:282
+- **Overflow on `increment_total_buffer_size`:** `fetch_add` at ledger.rs:297
   has no overflow guard. Is `max_buffer_size + max_record_size < u64::MAX`?
   Yes by a wide margin for any practical configuration. Document as out of scope.

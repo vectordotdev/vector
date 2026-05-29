@@ -2,8 +2,8 @@
 slug: fsync-window-bounded-under-clock-jitter
 type: Safety / Always
 sut_path: lib/vector-buffers/src/variants/disk_v2/
-commit: b7aae737cef5dd37d1445915443a1eb97b584f85
-updated: 2026-05-28
+commit: 049eec79b737450c4669b7f8aa1dd814551ec466
+updated: 2026-06-02
 ---
 
 # Property: fsync-window-bounded-under-clock-jitter
@@ -53,10 +53,10 @@ window under clock jitter.
 
 ## Code Verification
 
-### `should_flush` gate (ledger.rs:485-497)
+### `should_flush` gate (ledger.rs:512-524)
 
 ```rust
-// lib/vector-buffers/src/variants/disk_v2/ledger.rs:485-497
+// lib/vector-buffers/src/variants/disk_v2/ledger.rs:512-524
 pub fn should_flush(&self) -> bool {
     let last_flush = self.last_flush.load();
     if last_flush.elapsed() > self.config.flush_interval
@@ -151,10 +151,13 @@ duration. Antithesis can extend this descheduling window arbitrarily.
 
 ---
 
-## SUT-Side Instrumentation (MISSING — must be added)
+## SUT-Side Instrumentation (not yet committed — the SDK is wired and the three #21683 underflow asserts are present; these are additional)
 
-No Antithesis SDK instrumentation exists anywhere in the Vector codebase
-(confirmed: `existing-assertions.md`). All assertions below are missing.
+The Antithesis SDK is a committed dependency under the `antithesis` feature, and
+three underflow `assert_always_greater_than_or_equal_to!` detectors exist
+(ledger.rs:271/313, reader.rs:529; see existing-assertions.md for what is
+committed). None of those covers the fsync window, so the assertions below
+remain genuine still-to-add suggestions.
 
 ### Assertion 1 — Always: elapsed since last sync stays bounded
 

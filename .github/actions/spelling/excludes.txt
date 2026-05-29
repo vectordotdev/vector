@@ -1,8 +1,5 @@
 # See https://github.com/check-spelling/check-spelling/wiki/Configuration-Examples:-excludes
 ^\.github/actions/spelling/
 ^\Qbenches/codecs/moby_dick.txt\E$
-^\Qwebsite/layouts/shortcodes/config/unit-tests.html\E$
-# Antithesis test harness: research notes + exerciser examples carry heavy jargon (sancov, libvoidstar, rkyv, vdbuf, lossfinder, ...)
+# Antithesis test harness and research notes: heavy jargon (sancov, libvoidstar, rkyv, vdbuf, ...)
 ^tests/antithesis/
-^\Qlib/vector-buffers/examples/disk_v2_antithesis.rs\E$
-^\Qlib/vector-buffers/examples/disk_v2_lossfinder.rs\E$

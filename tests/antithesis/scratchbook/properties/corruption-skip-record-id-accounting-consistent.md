@@ -72,9 +72,9 @@ plausibly meet.
 
 ## SUT-side instrumentation
 
-Largely PRESENT: the three underflow `assert_always!` guards added this effort
-(`decrement_total_buffer_size`, `get_total_records`, reader.rs:524) already
-cover hazard (1). MISSING: an assertion tying the abandoned-record-ID gap to
+Largely PRESENT: the three underflow `assert_always_greater_than_or_equal_to!`
+detectors added this effort (`decrement_total_buffer_size` at ledger.rs:313,
+`get_total_records` at ledger.rs:271, reader.rs:529) already cover hazard (1). MISSING: an assertion tying the abandoned-record-ID gap to
 `reader_last_record_id` advancement in `roll_to_next_data_file` (hazard 2 — the
 record-ID gap is currently uninstrumented).
 

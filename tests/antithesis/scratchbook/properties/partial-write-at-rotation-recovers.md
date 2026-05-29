@@ -16,7 +16,7 @@ record returned by `reader.next()` may have:
 
 - A checksum mismatch (garbage payload delivered as valid).
 - A record ID that is non-monotonic relative to the previous delivered ID
-  (would panic at `reader.rs:480-484` `MonotonicityViolation`).
+  (would panic at `reader.rs:482` `MonotonicityViolation`).
 - A record ID synthesized from a torn rkyv footer read (F5: `archived_root`
   reads root pointer from last 8 bytes of buffer — if those bytes are crash-
   left garbage, the pointer may be plausible but wrong, yielding a `Valid`
@@ -144,15 +144,15 @@ reachable over many restarts across all explored timelines.
 
 **`seek_to_next_record` at Rotation:**
 
-During recovery, `seek_to_next_record` at `reader.rs:840-898` uses the same
+During recovery, `seek_to_next_record` at `reader.rs:851-907` uses the same
 `validate_record_archive` (mmap + `check_archived_root`) for its fast-path
 file skip check. F5 can also manifest here: a false-valid last record with a
 wrong `id` may incorrectly satisfy `ledger_last > last_record_id_in_data_file`
-at `reader.rs:879`, causing the reader to delete a file it should not have
+at `reader.rs:890`, causing the reader to delete a file it should not have
 deleted (all remaining unread records in that file are lost).
 
-**`reader.rs:932` `u16 >` comparison (file-ID rollover):**
-`if reader_file_id > writer_file_id` at `reader.rs:932` uses raw `u16`
+**`reader.rs:943` `u16 >` comparison (file-ID rollover):**
+`if reader_file_id > writer_file_id` at `reader.rs:943` uses raw `u16`
 comparison. At `MAX_FILE_ID = 65535`, after rollover the reader file ID wraps
 to 0 while the writer may be at 65535. `0 > 65535 == false`, so the
 `seek_to_next_record` init stall condition is not detected — the reader
@@ -172,7 +172,9 @@ To maximize rotation-boundary hits, configure a small `max_data_file_size`
 (e.g., 1MB or even 256KB) so rotations happen frequently, giving the Antithesis
 scheduler many opportunities.
 
-**Antithesis SDK Assertions (SUT-side, to be added):**
+**Antithesis SDK Assertions (SUT-side):**
+
+The Antithesis SDK is a committed dependency under the `antithesis` feature, and three `assert_always_greater_than_or_equal_to!` underflow detectors already ship (ledger.rs:271, ledger.rs:313, reader.rs:529 — see `existing-assertions.md`). None of them covers the rotation-recovery paths, so the assertions below are genuine still-to-add suggestions:
 
 ```rust
 // In validate_last_write, after RecordStatus::FailedDeserialization or Corrupted:
@@ -250,12 +252,12 @@ concern is whether the `increment_writer_file_id` in `validate_last_write`'s
 skip path causes the `is_finalized` flag in the reader to flip prematurely,
 marking the old file as finalized before all records are written. Trace
 `is_finalized = (reader_file_id != writer_file_id) || !self.ready_to_read`
-(`reader.rs:1004`): after skip, `writer_file_id` increments → `!=` reader's
+(`reader.rs:1015`): after skip, `writer_file_id` increments → `!=` reader's
 file_id → `is_finalized = true`. This correctly signals to `try_next_record`
 that the file is done and partial reads at the end are `PartialWrite` errors,
 not waits. This is correct behavior.
 
-**OQ-4: Is the monotonicity panic at `reader.rs:480-484` reachable via the F5
+**OQ-4: Is the monotonicity panic at `reader.rs:482` reachable via the F5
 path?**
 If F5 produces a garbage `id` that is lower than `self.last_reader_record_id`,
 the `add_marker` call at `reader.rs:478` would return `MonotonicityViolation`,

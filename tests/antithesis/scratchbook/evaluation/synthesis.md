@@ -1,6 +1,6 @@
 ---
 sut_path: /home/ssm-user/src/vector
-commit: dfecb470e
+commit: 049eec79b737450c4669b7f8aa1dd814551ec466
 updated: 2026-06-02
 external_references:
   - path: (internal design doc, not linked)
@@ -76,7 +76,7 @@ new findings are subtle and would have silently undermined the test:
   evaluated jointly with `writer-eventually-makes-progress`; never report alone.
 - **R-D — `record-id-wraparound-accounting-holds` refocused.** The true u64 wrap
   is unreachable on a production binary; the reachable, real bug is the
-  empty-buffer equality case (`wrapping_sub(x,x) - 1 = u64::MAX` at `ledger.rs:266`)
+  empty-buffer equality case (`wrapping_sub(x,x) - 1 = u64::MAX` at `ledger.rs:281`)
   firing on every clean restart of a drained buffer. Property prose refocused to
   the empty-buffer case (workload-observable: drain→restart→gauge≈0); true-wrap
   explicitly descoped. (fit-1, impl-F5)
@@ -91,7 +91,7 @@ new findings are subtle and would have silently undermined the test:
   clock dependence and the delivery-vs-fsync conflation. Resolves the standing
   "what does durably-written mean?" open question. (W-F2, W-C1)
 - **R-G — `total-buffer-size-never-underflows` build note.** The `trace!` at
-  `ledger.rs:295` evaluates `last_total_buffer_size - amount`, which panics in a
+  `ledger.rs:322` evaluates `last_total_buffer_size - amount`, which panics in a
   debug build *before* the release-mode wrap is observable. Harness must use a
   **release build** for this property (and the `trace!` itself should be fixed to
   `wrapping_sub`). (impl-F6)
@@ -186,7 +186,6 @@ see "Residual" below.
   graceful-shutdown drop ordering in `running.rs`; whether sinks emit
   `Errored`/`Rejected` status in practice; whether the tokio runtime drains the
   finalizer task before exit. Tracked per-property in evidence files.
-</content>
 
 ---
 
@@ -202,7 +201,7 @@ here instead.
   (`corruption-is-detected-and-recovered`, a `Sometimes`) but never bounded or
   counted the loss. `dropped-events-are-counted` covers only `drop_newest`/#24606
   (write-side), not the read-side corruption roll.
-- **Grounding:** `roll_to_next_data_file` (reader.rs:711-759) abandons the whole
+- **Grounding:** `roll_to_next_data_file` (reader.rs:705-753) abandons the whole
   file tail, accounting only records read; abandoned records never reach
   `track_dropped_events`. internal doc *internal buffer design notes* (loss window =
   500ms unsynced; synced not lost with e2e acks) and *an internal telemetry-correctness report* (silent loss via `component_discarded_events_total`)

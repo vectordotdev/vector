@@ -134,7 +134,9 @@ If a record's bytes span a file boundary, the reader would read the length delim
 - **`data_file_size` underflow via overflow-then-wrap**: Not realistic at normal sizes, but in a fuzz scenario with `max_data_file_size` set to a small value (near `u64::MIN`), a record that is allowed could overflow the accumulator.
 - **Race between writer file rotation and reader file ID increment**: Not directly a spanning violation, but if the writer increments the file ID (`increment_writer_file_id` at writer.rs:1138) while a record is still being written, the reader might believe the file is finalized while bytes are still being appended. This is not a spanning violation but a timing hazard in the `is_finalized` flag that affects the partial-write detection path.
 
-## SUT-Side Instrumentation Suggestions (ALL MISSING)
+## SUT-Side Instrumentation Suggestions
+
+The Antithesis SDK is a committed dependency under the `antithesis` feature, and three `assert_always_greater_than_or_equal_to!` underflow detectors already ship (ledger.rs:271, ledger.rs:313, reader.rs:529 — see `existing-assertions.md`). None of them guards the record-spanning invariant, so the assertions below are genuine still-to-add suggestions.
 
 **Primary assertion (write side)** — in `RecordWriter::flush_record` (writer.rs:609-633), after `current_data_file_size` is updated, assert the invariant:
 

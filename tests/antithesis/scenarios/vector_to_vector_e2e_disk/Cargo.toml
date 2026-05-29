@@ -1,0 +1,16 @@
+[package]
+name = "vector-to-vector-e2e-disk"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+antithesis-instrumentation = { workspace = true }
+antithesis_sdk = { workspace = true, features = ["full"] }
+axum = { workspace = true, features = ["http1", "tokio"] }
+clap = { workspace = true, features = ["derive"] }
+harness = { path = "../../harness" }
+reqwest = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true, features = ["rt", "macros", "net", "time"] }
+vector-buffers = { workspace = true, features = ["antithesis"] }

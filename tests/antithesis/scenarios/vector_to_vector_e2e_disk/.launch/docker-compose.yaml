@@ -1,0 +1,117 @@
+name: vector-to-vector-e2e-disk
+services:
+  head:
+    build:
+      context: /home/ssm-user/src/vector
+      dockerfile: tests/antithesis/scenarios/vector_to_vector_e2e_disk/Dockerfile
+      target: vector
+    container_name: head
+    entrypoint:
+      - /usr/bin/vector
+      - --config
+      - /etc/vector/head.yaml
+    environment:
+      NO_COLOR: "1"
+      VECTOR_DISK_V2_MAX_DATA_FILE_SIZE: "1048576"
+    hostname: head
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - -fsS
+        - http://localhost:9598/metrics
+      timeout: 3s
+      interval: 5s
+      retries: 30
+      start_period: 10s
+    image: v2v-vector:567780cee
+    init: true
+    networks:
+      default: null
+    platform: linux/amd64
+    volumes:
+      - type: volume
+        source: v2v-buffer-head
+        target: /var/lib/vector
+        volume: {}
+  oracle:
+    build:
+      context: /home/ssm-user/src/vector
+      dockerfile: tests/antithesis/scenarios/vector_to_vector_e2e_disk/Dockerfile
+      target: workload
+    container_name: oracle
+    depends_on:
+      head:
+        condition: service_healthy
+        required: true
+      tail:
+        condition: service_healthy
+        required: true
+    environment:
+      NO_COLOR: "1"
+      ORACLE_URL: http://127.0.0.1:8686
+      VECTOR_METRICS_URL: http://head:9598/metrics
+      VECTOR_METRICS_URLS: http://head:9598/metrics,http://tail:9598/metrics
+      VECTOR_SOURCE_URL: http://head:8080/
+    hostname: oracle
+    image: v2v-oracle:567780cee
+    init: true
+    networks:
+      default: null
+    platform: linux/amd64
+  tail:
+    build:
+      context: /home/ssm-user/src/vector
+      dockerfile: tests/antithesis/scenarios/vector_to_vector_e2e_disk/Dockerfile
+      target: vector
+    container_name: tail
+    entrypoint:
+      - /usr/bin/vector
+      - --config
+      - /etc/vector/tail.yaml
+    environment:
+      NO_COLOR: "1"
+      VECTOR_DISK_V2_MAX_DATA_FILE_SIZE: "1048576"
+    hostname: tail
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - -fsS
+        - http://localhost:9598/metrics
+      timeout: 3s
+      interval: 5s
+      retries: 30
+      start_period: 10s
+    image: v2v-vector:567780cee
+    init: true
+    networks:
+      default: null
+    platform: linux/amd64
+    volumes:
+      - type: volume
+        source: v2v-buffer-tail
+        target: /var/lib/vector
+        volume: {}
+networks:
+  default:
+    name: vector-to-vector-e2e-disk_default
+volumes:
+  v2v-buffer-head:
+    name: vector-to-vector-e2e-disk_v2v-buffer-head
+  v2v-buffer-tail:
+    name: vector-to-vector-e2e-disk_v2v-buffer-tail
+x-node-health:
+  interval: 5s
+  retries: 30
+  start_period: 10s
+  test:
+    - CMD
+    - curl
+    - -fsS
+    - http://localhost:9598/metrics
+  timeout: 3s
+x-vector-build:
+  context: ../../../..
+  dockerfile: tests/antithesis/scenarios/vector_to_vector_e2e_disk/Dockerfile
+  target: vector

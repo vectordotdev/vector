@@ -2,8 +2,8 @@
 slug: buffer-survives-version-upgrade
 type: Safety + Liveness / Sometimes(upgrade_readback_ok) + AlwaysOrUnreachable(compat_flag_rejects_correctly)
 sut_path: lib/vector-buffers/src/variants/disk_v2/
-commit: b7aae737cef5dd37d1445915443a1eb97b584f85
-updated: 2026-05-28
+commit: 049eec79b737450c4669b7f8aa1dd814551ec466
+updated: 2026-06-02
 ---
 
 # Property: buffer-survives-version-upgrade
@@ -207,7 +207,13 @@ path needs confirmation.
 
 ---
 
-## SUT-Side Instrumentation (MISSING — must be added)
+## SUT-Side Instrumentation (not yet committed — the SDK is wired and the three #21683 underflow asserts are present; these are additional)
+
+The Antithesis SDK is a committed dependency under the `antithesis` feature, and
+three underflow `assert_always_greater_than_or_equal_to!` detectors exist
+(ledger.rs:271/313, reader.rs:529; see existing-assertions.md). None covers
+rkyv layout safety or the compatibility-mode flag, so the readback assertions
+below remain genuine still-to-add suggestions.
 
 ### Assertion 1 — Sometimes: same-version readback succeeds (baseline)
 

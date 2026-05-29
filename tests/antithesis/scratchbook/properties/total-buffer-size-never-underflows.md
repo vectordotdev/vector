@@ -2,8 +2,8 @@
 slug: total-buffer-size-never-underflows
 type: Safety / Unreachable
 sut_path: lib/vector-buffers/src/variants/disk_v2/
-commit: b7aae737cef5dd37d1445915443a1eb97b584f85
-updated: 2026-05-28
+commit: 049eec79b737450c4669b7f8aa1dd814551ec466
+updated: 2026-06-02
 linked_bugs:
   - vectordotdev/vector#21683
   - PR #23561 (metrics reporter only — control-path UNFIXED)
@@ -31,7 +31,7 @@ writer forever.
 
 **Antithesis Angle:** Requires a node-kill fault at a file-rotation or
 partial-write boundary, followed by restart. After restart `update_buffer_size`
-(ledger.rs:653-697) re-seeds `total_buffer_size` from the *file sizes* of all
+(ledger.rs:680-724) re-seeds `total_buffer_size` from the *file sizes* of all
 `.dat` files on disk. The reader then seeks forward through partially-written
 records, calling `decrement_total_buffer_size` by *record bytes* — which are
 strictly smaller than the file's on-disk size if the tail was never fully
@@ -52,7 +52,7 @@ and no crash — the pipeline silently stalls.
 
 1. Writer writes a partial record to `buffer-data-N.dat` at the end of a 128MB
    data file, then crashes before `fsync` completes.
-2. On restart, `Ledger::new` calls `update_buffer_size` (ledger.rs:653-697),
+2. On restart, `Ledger::new` calls `update_buffer_size` (ledger.rs:680-724),
    which calls `increment_total_buffer_size(file_size_of_N)` — the *whole* file
    size, including the partial tail.
 3. The reader calls `seek_to_next_record`, which calls `track_read` (reader.rs:448)
@@ -68,29 +68,33 @@ and no crash — the pipeline silently stalls.
    decremented is less than the file size that was added at step 2, so
    `total_buffer_size` is positive and correct so far.
 5. HOWEVER: when `delete_completed_data_file` is called (reader.rs:489) with
-   `bytes_read = Some(self.bytes_read)`, the adjustment at reader.rs:521-535 is:
+   `bytes_read = Some(self.bytes_read)`, the adjustment at reader.rs:521-544 is:
 
    ```rust
-   let size_delta = metadata.len() - bytes_read;  // reader.rs:524
+   let size_delta = metadata.len() - bytes_read;  // reader.rs:535
    ```
 
    This subtraction is plain `u64 -`; if `bytes_read > metadata.len()` (reachable
    if two decrements race or if the file was truncated externally) the subtraction
-   panics in debug or wraps in release. More critically, this delta is then passed
-   to `decrement_total_buffer_size` (reader.rs:538), which itself does:
+   panics in debug or wraps in release. Under the `antithesis` build the
+   committed `assert_always_greater_than_or_equal_to!(metadata.len(), bytes_read, ...)`
+   at reader.rs:529 reports this to Antithesis as a detector before the
+   subtraction. More critically, this delta is then passed to
+   `decrement_total_buffer_size` (reader.rs:549), which itself does:
 
    ```rust
-   // ledger.rs:292
+   // ledger.rs:319
    self.total_buffer_size.fetch_sub(amount, Ordering::AcqRel);
    ```
 
-   with no saturation guard.
+   with no saturation guard (the committed assert at ledger.rs:313 reports the
+   underflow but does not prevent the `fetch_sub`).
 
 ### Path B: double-decrement on skip
 
 When the reader "fast-forwards" (skips an entire file during initialization with
 `bytes_read = None`), `delete_completed_data_file` passes the full `metadata.len()`
-as the decrement amount (reader.rs:522). If the reader had already called
+as the decrement amount (reader.rs:522 `map_or_else` None arm). If the reader had already called
 `track_read` for records inside that file (decrementing by their record bytes),
 those bytes are subtracted twice: once via `track_read` and once via
 `delete_completed_data_file`. The net decrement exceeds the original file-size
@@ -99,8 +103,10 @@ increment, causing underflow.
 ### Raw underflow site
 
 ```rust
-// ledger.rs:291-298  (UNGUARDED — the fix in PR #23561 did NOT touch this)
+// ledger.rs:306-325  (control-path fetch_sub UNGUARDED — the fix in PR #23561 did NOT touch this)
 pub fn decrement_total_buffer_size(&self, amount: u64) {
+    // committed detector (antithesis feature) at ledger.rs:313:
+    //   assert_always_greater_than_or_equal_to!(load(Acquire), amount, ...)
     let last_total_buffer_size = self.total_buffer_size.fetch_sub(amount, Ordering::AcqRel);
     trace!(
         previous_buffer_size = last_total_buffer_size,
@@ -110,8 +116,11 @@ pub fn decrement_total_buffer_size(&self, amount: u64) {
 }
 ```
 
-Note: the `trace!` log at line 295 (`last_total_buffer_size - amount`) also wraps
-and would emit a nonsensical value, making post-hoc diagnosis harder.
+Note: the `trace!` log at line 322 (`last_total_buffer_size - amount`) also wraps
+and would emit a nonsensical value, making post-hoc diagnosis harder. The
+committed assert at ledger.rs:313 is a detector — it reports the underflow to
+Antithesis but does not abort, so the `fetch_sub` and the wrapping `trace!` both
+still execute.
 
 ---
 
@@ -141,7 +150,7 @@ Once `total_buffer_size` wraps to ~u64::MAX, the following chain locks up:
    ```
 
 3. The reader *does* drain and delete files — calling `notify_reader_waiters()`
-   each time (reader.rs:555) — but the writer wakes, re-evaluates `is_buffer_full`
+   each time (reader.rs:566) — but the writer wakes, re-evaluates `is_buffer_full`
    (still true), and blocks again immediately. The wakeups are real; the accounting
    is permanently wrong.
 4. `can_write_record` (writer.rs:793-798) has the same `get_total_buffer_size()`
@@ -154,55 +163,54 @@ the *dashboard* gauge appear normal at 0, hiding the deadlock.
 
 ---
 
-## SUT-Side Instrumentation (MISSING — must be added)
+## SUT-Side Instrumentation
 
-All Antithesis SDK calls below are **absent** from the codebase (confirmed by
-grep over the entire repo). The Antithesis Rust SDK must be added as a dependency.
+The Antithesis Rust SDK is a committed dependency under the `antithesis`
+feature, and three underflow detectors are present. They are **detectors, not
+guards**: each reports to Antithesis via `assert_always_greater_than_or_equal_to!`
+and does NOT abort, so the underflowing subtraction still executes on the next
+line. The control-path arithmetic remains unfixed.
 
-### Assertion 1 — Unreachable guard on the decrement
+### Assertion 1 — decrement underflow detector (COMMITTED, ledger.rs:313)
 
 ```rust
-// ledger.rs, inside decrement_total_buffer_size, before fetch_sub
-let current = self.total_buffer_size.load(Ordering::Acquire);
-antithesis_sdk::assert_unreachable!(
-    "total_buffer_size underflow: amount exceeds current value",
-    &serde_json::json!({
-        "current_total_buffer_size": current,
-        "decrement_amount": amount,
-        "overflow_would_be": current.wrapping_sub(amount),
-    })
-);
-// Alternatively, assert_always! framing:
-antithesis_sdk::assert_always!(
-    amount <= current,
-    "decrement_total_buffer_size: amount must not exceed current value",
-    &serde_json::json!({ "current": current, "amount": amount })
+// ledger.rs:313, inside decrement_total_buffer_size, before fetch_sub
+#[cfg(feature = "antithesis")]
+antithesis_sdk::assert_always_greater_than_or_equal_to!(
+    self.total_buffer_size.load(Ordering::Acquire),
+    amount,
+    "ledger total_buffer_size decrement never underflows"
 );
 ```
 
-Placement: ledger.rs, in `decrement_total_buffer_size`, line ~291, before
-`fetch_sub`.
+Reports when `amount` exceeds the current `total_buffer_size`. The `fetch_sub`
+at ledger.rs:319 still runs and wraps regardless.
 
-### Assertion 2 — Unreachable guard on the reader.rs delta subtraction
+### Assertion 2 — reader delta-subtraction underflow detector (COMMITTED, reader.rs:529)
 
 ```rust
-// reader.rs:521-535, before the plain `-`
-let file_size = metadata.len();
-antithesis_sdk::assert_always!(
-    bytes_read <= file_size,
-    "delete_completed_data_file: bytes_read exceeds on-disk file size",
-    &serde_json::json!({
-        "file_size": file_size,
-        "bytes_read": bytes_read,
-        "data_file_path": data_file_path.to_string_lossy(),
-    })
+// reader.rs:529, inside delete_completed_data_file, before metadata.len() - bytes_read
+#[cfg(feature = "antithesis")]
+antithesis_sdk::assert_always_greater_than_or_equal_to!(
+    metadata.len(),
+    bytes_read,
+    "reader data-file size delta never underflows"
 );
-let size_delta = file_size - bytes_read;  // safe after the assertion
 ```
 
-Placement: reader.rs, inside `delete_completed_data_file`, before line 524.
+Reports when `bytes_read` exceeds the on-disk file size; the plain `u64 -` at
+reader.rs:535 then produces `size_delta` and feeds it to
+`decrement_total_buffer_size`.
 
-### Assertion 3 — Always: post-decrement value is sane
+### Cross-reference — get_total_records `- 1` underflow detector (COMMITTED, ledger.rs:271)
+
+The third committed detector guards the `next_writer_id.wrapping_sub(last_reader_id) - 1`
+at ledger.rs:281 (in `get_total_records`, fn at ledger.rs:262):
+`assert_always_greater_than_or_equal_to!(next_writer_id.wrapping_sub(last_reader_id), 1u64, "ledger get_total_records never underflows on a drained buffer")`
+at ledger.rs:271. A drained buffer where the wrapped difference is 0 makes the
+`- 1` wrap to ~2^64 and report a bogus record count.
+
+### Assertion 3 — Always: post-decrement value is sane (NOT YET COMMITTED)
 
 ```rust
 // ledger.rs, after fetch_sub in decrement_total_buffer_size
@@ -218,7 +226,7 @@ antithesis_sdk::assert_always!(
 );
 ```
 
-### Assertion 4 — Reachable: the underflow recovery path is never needed
+### Assertion 4 — Reachable: the underflow recovery path is never needed (NOT YET COMMITTED)
 
 If a saturation fix is later applied (the correct fix), add an `assert_reachable!`
 at the saturation branch to confirm Antithesis actually triggers the bug
@@ -244,7 +252,7 @@ scenario, so that the fix can be validated with the harness.
 
 - **Is `update_buffer_size` the only re-seed path?** Confirm that there is no
   second call to `increment_total_buffer_size` during reader initialization that
-  could compound the over-seed. (Current reading: only one call at ledger.rs:695.)
+  could compound the over-seed. (Current reading: only one call at ledger.rs:722.)
 
 - **Does the double-decrement via Path B (fast-forward + track_read) actually
   occur in the current code, or is it prevented by the `!self.ready_to_read`
@@ -258,15 +266,16 @@ scenario, so that the fix can be validated with the harness.
   with the Antithesis tenant operator whether node termination is enabled by
   default or must be requested.
 
-- **Does the `trace!` at ledger.rs:295 (`last_total_buffer_size - amount`) panic
+- **Does the `trace!` at ledger.rs:322 (`last_total_buffer_size - amount`) panic
   in debug mode** before the bug can be observed? If running with `debug_assertions`,
   the trace format would panic on the wrapped arithmetic. This affects harness
   build mode selection.
 
 - **PR #23561 scope:** Verify that the metrics reporter fix (using `saturating_sub`
   in `buffer_usage_data.rs`) is the *only* change, and that `decrement_total_buffer_size`
-  in `ledger.rs` is definitively unchanged. (Confirmed at this commit: ledger.rs:292
-  still uses raw `fetch_sub`.)
+  in `ledger.rs` is definitively unchanged. (Confirmed at this commit: ledger.rs:319
+  still uses raw `fetch_sub`; the committed detector at ledger.rs:313 reports but
+  does not saturate.)
 
 - **Fault timing specificity:** How early in a file-write does the crash need to
   occur for the partial record to trigger the mismatch? Does the 500ms fsync
@@ -282,11 +291,11 @@ scenario, so that the fix can be validated with the harness.
 
 **Examined:** `reader.rs:464–539` (`track_read` and `delete_completed_data_file`).
 
-**Found:** The guard at `reader.rs:468` (`if !self.ready_to_read`) short-circuits `track_read` so that only `decrement_total_buffer_size(record_bytes)` fires and `return` is executed — the per-record ack machinery below line 471 is skipped. Crucially, `bytes_read` is still incremented at `reader.rs:467` (`self.bytes_read += record_bytes`) regardless of the `ready_to_read` state. When `delete_completed_data_file` is later called with `bytes_read = Some(self.bytes_read)`, it computes `size_delta = metadata.len() - bytes_read` (reader.rs:524) and calls `decrement_total_buffer_size(size_delta)` (reader.rs:538). The sum of the two decrements — one in `track_read` for each valid record, one in `delete_completed_data_file` for the remaining unread tail — equals exactly `metadata.len()` when the file was fully read; in that case there is no double-decrement.
+**Found:** The guard at `reader.rs:468` (`if !self.ready_to_read`) short-circuits `track_read` so that only `decrement_total_buffer_size(record_bytes)` fires and `return` is executed — the per-record ack machinery below line 471 is skipped. Crucially, `bytes_read` is still incremented at `reader.rs:467` (`self.bytes_read += record_bytes`) regardless of the `ready_to_read` state. When `delete_completed_data_file` is later called with `bytes_read = Some(self.bytes_read)`, it computes `size_delta = metadata.len() - bytes_read` (reader.rs:535) and calls `decrement_total_buffer_size(size_delta)` (reader.rs:549). The sum of the two decrements — one in `track_read` for each valid record, one in `delete_completed_data_file` for the remaining unread tail — equals exactly `metadata.len()` when the file was fully read; in that case there is no double-decrement.
 
-**The separate, unguarded site:** `delete_completed_data_file` at reader.rs:521–538 performs a plain `u64 -` subtraction (`metadata.len() - bytes_read`) with no saturation guard. If `bytes_read > metadata.len()` (reachable if two decrements race, the file was externally truncated, or a caller error passes an over-counted `bytes_read`), the subtraction wraps in release mode or panics in debug mode, and the resulting large `size_delta` is passed directly to `decrement_total_buffer_size` (ledger.rs:292), which calls `fetch_sub` with no bounds check. The `!self.ready_to_read` guard at reader.rs:468 does NOT protect this site — it only guards the per-record `record_acks.add_marker` call. The delete-time subtraction is a distinct, unguarded decrement path.
+**The separate, unguarded site:** `delete_completed_data_file` at reader.rs:521–549 performs a plain `u64 -` subtraction (`metadata.len() - bytes_read` at reader.rs:535) with no saturation guard (the committed detector at reader.rs:529 reports but does not abort). If `bytes_read > metadata.len()` (reachable if two decrements race, the file was externally truncated, or a caller error passes an over-counted `bytes_read`), the subtraction wraps in release mode or panics in debug mode, and the resulting large `size_delta` is passed directly to `decrement_total_buffer_size` at reader.rs:549, which calls `fetch_sub` (ledger.rs:319) with no bounds check. The `!self.ready_to_read` guard at reader.rs:468 does NOT protect this site — it only guards the per-record `record_acks.add_marker` call. The delete-time subtraction is a distinct, unguarded decrement path.
 
-**Conclusion:** Path B double-decrement (fast-forward case where `bytes_read = None` skips all `track_read` calls and `delete_completed_data_file` subtracts the full `metadata.len()`) is guarded by the `None` branch in the `bytes_read.map_or_else` at reader.rs:521 — in that case the full file size is decremented exactly once, not twice. The underflow risk in Path B is therefore not a double-decrement from track_read + delete, but from the re-seed in `update_buffer_size` exceeding what records actually represent, per Path A. The unguarded `metadata.len() - bytes_read` plain subtraction at reader.rs:524 remains a correctness risk for partial-read cases.
+**Conclusion:** Path B double-decrement (fast-forward case where `bytes_read = None` skips all `track_read` calls and `delete_completed_data_file` subtracts the full `metadata.len()`) is guarded by the `None` branch in the `bytes_read.map_or_else` at reader.rs:521 — in that case the full file size is decremented exactly once, not twice. The underflow risk in Path B is therefore not a double-decrement from track_read + delete, but from the re-seed in `update_buffer_size` exceeding what records actually represent, per Path A. The unguarded `metadata.len() - bytes_read` plain subtraction at reader.rs:535 (detected at reader.rs:529) remains a correctness risk for partial-read cases.
 
 ---
 
@@ -298,17 +307,18 @@ scheduler/coverage. (Antithesis keeps the distributed `vector_to_vector_e2e_disk
 conservation experiment + the #24948 SIGHUP reload fault.)
 
 **This site (the byte-count underflow) requires a REOPEN** — it is NOT reachable purely
-in-process. `decrement_total_buffer_size` (ledger.rs:292 `fetch_sub`) and the reader's
-delete-time `metadata.len() - bytes_read` (reader.rs:524) only disagree across a restart:
-`from_config_inner` → `update_buffer_size` (ledger.rs:653-697) re-seeds `total_buffer_size`
+in-process. `decrement_total_buffer_size` (ledger.rs:319 `fetch_sub`) and the reader's
+delete-time `metadata.len() - bytes_read` (reader.rs:535) only disagree across a restart:
+`from_config_inner` → `update_buffer_size` re-seeds `total_buffer_size`
 from the SUM of on-disk `.dat` bytes, then the reader's seek decrements per replayed record
-(reader.rs:469/538). They diverge only when on-disk file size exceeds valid-record bytes —
+(reader.rs delete-time decrement at reader.rs:549). They diverge only when on-disk file size exceeds valid-record bytes —
 a torn / partial tail.
 
 **Test B — `tests/reopen.rs`** (`current_thread` runtime + in-memory `TestFilesystem`):
+
 1. Write / read / ack a generated prefix through the real buffer.
 2. Drop reader + writer + ledger, then drain the spawned finalizer task via `yield_now` so
-   it releases the ledger lock (it holds an `Arc<Ledger>`; basic.rs:161-164, ledger.rs:700-710;
+   it releases the ledger lock (it holds an `Arc<Ledger>`; basic.rs:161-164, ledger.rs:728-737;
    precedent model/mod.rs:890). On `current_thread` the task will not release until polled —
    without this, reopen hits `LedgerLockAlreadyHeld`.
 3. INJECT a torn tail: truncate the last `.dat` by a generated N bytes via `TestFilesystem`

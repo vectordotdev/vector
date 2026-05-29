@@ -47,21 +47,21 @@ silent-loss paths:
   This is the primary liveness test.
 - Events synced to data file but whose data file was deleted after kill but
   before ledger flush: the deleted-file-before-ledger-msync window
-  (`reader.rs:546` unlink, `reader.rs:548-549` ledger flush). On restart the
+  (`reader.rs:557` unlink, `reader.rs:560` ledger flush). On restart the
   reader file ID in the ledger still points at the now-deleted file; the code
   handles this via NotFound→advance. If the events in that file were not yet
   acked, they are genuinely lost. This is the most serious latent loss path for
   this liveness property.
 - `BufferWriter::drop` does not call `flush()` (`writer.rs:1371-1374`): on
   graceful shutdown that skips an explicit flush, up to 256KB is lost silently.
-- Sink-error acks: `spawn_finalizer` at `ledger.rs:701-709` discards
-  `_status`, so `Errored`/`Rejected` delivery still credits the ack. This
+- Sink-error acks: `spawn_finalizer` at `ledger.rs:728` discards
+  `_status` (ledger.rs:731), so `Errored`/`Rejected` delivery still credits the ack. This
   means a downstream error causes silent loss even with e2e acks nominally on.
 
 **Fault Requirements:** Node-termination faults (SIGKILL) required. Confirm
 enabled. The following fault sequences are especially valuable:
 
-- Kill during the `delete_completed_data_file` window (`reader.rs:546-549`):
+- Kill during the `delete_completed_data_file` window (`reader.rs:557-560`):
   unlink done, ledger flush not done.
 - Kill during the page-cache-write-to-fsync window (≤500ms): tests which
   events are in-contract vs. out-of-contract loss.
@@ -92,7 +92,13 @@ Dedup responsibility is at the workload level — the downstream sink deduplicat
 by ID before any downstream business logic, matching the stated contract
 ("downstream must dedup").
 
-**Antithesis SDK Assertions (SUT-side, to be added):**
+**Antithesis SDK Assertions (SUT-side):**
+
+The Antithesis Rust SDK is a committed dependency under the `antithesis`
+feature, and three underflow detectors are present (ledger.rs:271 / ledger.rs:313
+/ reader.rs:529). Those detectors guard the `total_buffer_size`/record-count
+arithmetic, NOT this property's set-membership oracle. The two asserts below are
+NOT committed:
 
 ```rust
 // In handle_pending_acknowledgements, after all acks processed:
@@ -101,14 +107,22 @@ antithesis_sdk::assert_sometimes!(
     "buffer drained to empty after quiet period",
     json!({ "total_buffer_size": self.ledger.get_total_buffer_size() })
 );
+```
 
-// In spawn_finalizer closure (ledger.rs:703-707), instrument the discarded status:
+The drained-events-gauge assert above was judged **unsound** and should not be
+added (see experiment-spec correction #1): `get_total_buffer_size() == 0` is a
+gauge snapshot inside the SUT, not a conservation statement, and a wedged buffer
+can read a corrupted (non-zero or wrapped) gauge while the workload oracle is the
+authoritative drained signal.
+
+```rust
+// In spawn_finalizer closure (ledger.rs:731), instrument the discarded status:
 antithesis_sdk::assert_always!(
     matches!(status, BatchStatus::Delivered),
     "all acked events were successfully delivered (not errored/rejected)",
     json!({ "batch_status": format!("{:?}", status) })
 );
-// NOTE: The above will fail under sink errors — this is intentional; it surfaces
+// NOTE: NOT committed. Would fail under sink errors — intentional; it surfaces
 // the known silent-loss bug (INV-9 in sut-analysis.md).
 ```
 
@@ -140,7 +154,7 @@ loses events, that is a higher-severity bug.
 
 **OQ-2: Does the `OrderedFinalizer` task drain before the tokio runtime shuts
 down on SIGKILL?**
-The finalizer (`ledger.rs:701-709`) is a `tokio::spawn`'d task. On SIGKILL the
+The finalizer (`ledger.rs:728`) is a `tokio::spawn`'d task. On SIGKILL the
 entire process dies — the finalizer task does not get to drain. In-flight
 `BatchNotifier` handles that have been dropped by the sink but whose IDs have
 not yet propagated to `pending_acks` are lost. This means ack-in-flight events
@@ -156,7 +170,7 @@ various ack-flight states simultaneously. A small buffer drains too quickly for
 the fault injection to hit interesting timing windows.
 
 **OQ-4: Sink-error ack discarding — is this in scope for this property?**
-The `_status` discard at `ledger.rs:717` means this property as stated will
+The `_status` discard at `ledger.rs:731` means this property as stated will
 not catch sink-error loss (since the buffer always credits the ack). A separate
 property specifically testing `Errored`/`Rejected` ack propagation is
 recommended. For this property, use a reliable downstream sink stub that always
@@ -164,8 +178,8 @@ returns `Delivered` to avoid conflating the two bugs.
 
 **OQ-5: Does `delete_completed_data_file` → unlink-before-ledger-flush create
 a genuine loss window?**
-`reader.rs:546`: `delete_file` called (unlink). `reader.rs:548`:
-`increment_acked_reader_file_id`. `reader.rs:549`: `ledger.flush()` (msync).
+`reader.rs:557`: `delete_file` called (unlink). `reader.rs:559`:
+`increment_acked_reader_file_id`. `reader.rs:560`: `ledger.flush()` (msync).
 A kill between unlink and ledger flush: on restart, `ledger.state()
 .get_current_reader_file_id()` still points to the deleted file. Code path on
 restart: `seek_to_next_record` fast-path (`reader.rs:840-898`) tries to
@@ -173,3 +187,22 @@ restart: `seek_to_next_record` fast-path (`reader.rs:840-898`) tries to
 slow path reads from the ledger's `reader_current_data_file_id` which is still
 the deleted file. Needs careful trace to confirm no events in the deleted file
 are silently abandoned if they had not been fully acked.
+
+**OQ-6 (Soundness — quiescence-gated conservation):** The conservation
+`assert_always_less_than_or_equal_to!(missing_count, 0)` and the spurious-id
+check fire only inside `if quiescent` (eventually_conservation.rs:165/174/181).
+The target bug is a permanent writer wedge. A wedge that keeps the counters from
+settling for 5 polls within the 240s deadline leaves these checks **skipped** —
+and a skipped `assert_always` is not a failure. Only the online integrity check
+(oracle.rs:118) is unconditional; conservation has no unconditional equivalent.
+A permanent deadlock can therefore evade this property's oracle entirely.
+Needs an unconditional liveness/quiescence-timeout signal.
+
+**OQ-7 (Soundness — best-effort ack relay):** The producer records each
+obligation by POSTing `/acked` with the HTTP result discarded
+(parallel_driver_produce.rs:71 `let _ = client.post(.../acked)...`). A dropped
+relay over a fault-injected link erases the obligation, so a later genuine loss
+of that id is invisible to `missing = acked - delivered` — the id never entered
+the produced/acked set. This is exactly the set-membership oracle this property
+relies on; the relay must be durable/retried, or the obligation must be logged
+before the POST.
