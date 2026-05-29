@@ -1,6 +1,6 @@
 ---
 what: "`series_api_version: v1` option on the `datadog_metrics` sink"
-deprecated_since: "0.58.0"
+deprecated_since: "0.56.0"
 ---
 
 The `series_api_version: v1` option is deprecated in favor of `v2` (the default).

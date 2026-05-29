@@ -1,6 +1,6 @@
 ---
 what: "`azure_monitor_logs` sink"
-deprecated_since: "0.58.0"
+deprecated_since: "0.54.0"
 ---
 
 The `azure_monitor_logs` sink is deprecated in favor of the new `azure_logs_ingestion` sink,
