@@ -14,7 +14,6 @@ use crate::{common::http::ErrorMessage, internal_events::HttpDecompressError};
 pub(crate) const DEFAULT_MAX_DECOMPRESSED_BODY_SIZE: usize = 100 * 1024 * 1024;
 
 /// Collects a request body into [`Bytes`] while enforcing an in-memory size cap.
-#[allow(dead_code)]
 pub(crate) fn limited_body(max_body_size: usize) -> BoxedFilter<(Bytes,)> {
     let max_body_size_header = u64::try_from(max_body_size).unwrap_or(u64::MAX);
 
