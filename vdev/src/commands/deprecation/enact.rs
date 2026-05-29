@@ -3,7 +3,7 @@
 use anyhow::{Result, bail};
 use semver::Version;
 
-use crate::utils::{deprecation, paths};
+use crate::utils::{deprecation, git, paths};
 
 /// Enact a deprecation: record it as removed and delete the deprecation.d fragment
 #[derive(clap::Args, Debug)]
@@ -12,9 +12,10 @@ pub struct Cli {
     /// Filename (slug) in deprecation.d/ to enact, e.g. "azure-monitor-logs-sink"
     slug: String,
 
-    /// The Vector version in which this feature was removed, e.g. "0.58.0"
+    /// The Vector version in which this feature was removed, e.g. "0.58.0".
+    /// Defaults to the next minor after the latest git tag.
     #[arg(long)]
-    version: Version,
+    version: Option<Version>,
 }
 
 impl Cli {
@@ -42,10 +43,18 @@ impl Cli {
             .find(|e| e.filename == filename)
             .ok_or_else(|| anyhow::anyhow!("Could not parse {filename}"))?;
 
+        let version = match self.version {
+            Some(v) => v,
+            None => {
+                let latest = git::latest_release_version()?;
+                Version::new(latest.major, latest.minor + 1, 0)
+            }
+        };
+
         let enacted = deprecation::EnactedEntry {
             what: entry.what.clone(),
             deprecated_since: entry.deprecated_since.to_string(),
-            removed_in: format!("{}.{}.0", self.version.major, self.version.minor),
+            removed_in: format!("{}.{}.0", version.major, version.minor),
             description: entry.description.clone(),
         };
 
