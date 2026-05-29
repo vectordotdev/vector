@@ -22,7 +22,7 @@
   {{- end -}}
 {{- end -}}
 
-{{ if gt (len $fp) 0 }}
+{{ if or (gt (len $fp) 0) (gt (len $fe) 0) }}
 <div class="mt-6 flex flex-col space-y-6">
   {{ range $fp }}
   <div>
@@ -39,11 +39,6 @@
     {{ end }}
   </div>
   {{ end }}
-</div>
-{{ end }}
-
-{{ if gt (len $fe) 0 }}
-<div class="mt-6 flex flex-col space-y-6">
   {{ range $fe }}
   <div class="opacity-75">
     <span class="text-xl font-semibold text-dark dark:text-gray-300">
@@ -60,8 +55,6 @@
   </div>
   {{ end }}
 </div>
-{{ end }}
-
-{{ if and (eq (len $fp) 0) (eq (len $fe) 0) }}
-<p class="text-gray-500 dark:text-gray-400 mt-4">No deprecations in this release.</p>
+{{ else }}
+<p class="mt-4 text-gray-500 dark:text-gray-400">No deprecations in this release.</p>
 {{ end }}
