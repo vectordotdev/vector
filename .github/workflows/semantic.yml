@@ -127,7 +127,6 @@ jobs:
             aws service
             azure service
             confluent service
-            databricks_zerobus sink
             datadog service
             elastic service
             gcp service
@@ -222,6 +221,7 @@ jobs:
             blackhole sink
             clickhouse sink
             console sink
+            databricks_zerobus sink
             datadog_archives sink
             datadog_common sink
             datadog_events sink

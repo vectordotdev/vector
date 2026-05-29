@@ -39,6 +39,8 @@ Vector team member will find this document useful.
 2. **You've read Vector's [docs](https://vector.dev/docs/).**
 3. **You know about the [Vector community](https://vector.dev/community/).
    Please use this for help.**
+4. **You've read our [AI Policy](AI_POLICY.md)** if you plan to use AI tools
+   in your contribution.
 
 ## Your First Contribution
 
