@@ -41,7 +41,7 @@ impl Cli {
         let after = std::fs::read_to_string(&json_path)?;
         if before != after {
             bail!(
-                "{} was modified. Please commit the updated file.",
+                "{} is out of date. Run `cargo vdev deprecation generate` and commit the result.",
                 json_path.display()
             );
         }

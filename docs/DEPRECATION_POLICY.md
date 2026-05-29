@@ -82,7 +82,9 @@ When introducing a deprecation into Vector, the pull request introducing the dep
   the deprecated configuration or feature being used (when possible).
 - Add a deprecation notice file to [`deprecation.d/`](../deprecation.d/) following the format described in
   [`deprecation.d/README.md`](../deprecation.d/README.md). Set `deprecated_since` to the current release version.
-  Run `cargo vdev deprecation show` to view all current notices and `cargo vdev check deprecations` to validate the file.
+  Then run `cargo vdev deprecation generate` to regenerate `website/cue/reference/generated/deprecations.json` and
+  commit both files. Run `cargo vdev deprecation show` to preview all current notices and
+  `cargo vdev check deprecations` to validate.
 
 When removing a deprecation in a subsequent release, the pull request should:
 
@@ -92,4 +94,4 @@ When removing a deprecation in a subsequent release, the pull request should:
   for transitioning if applicable.
 - Copy the same note from the previous step, to a changelog fragment, with type="breaking". See the changelog
   fragment [README.md](../changelog.d/README.md) for details.
-- Delete the file from [`deprecation.d/`](../deprecation.d/)
+- Run `cargo vdev deprecation enact <slug> --version <removed-in-version>` and commit the result.
