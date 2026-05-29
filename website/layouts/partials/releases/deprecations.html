@@ -65,6 +65,11 @@
       <span class="text-xl font-semibold text-dark dark:text-gray-300">
         {{ .what | markdownify }}
       </span>
+      {{ with .removed_in }}
+      <div class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+        Removed in {{ . }}
+      </div>
+      {{ end }}
       {{ with .description }}
       <div class="mt-2.5 prose dark:prose-dark max-w-none">
         {{ . | markdownify }}
