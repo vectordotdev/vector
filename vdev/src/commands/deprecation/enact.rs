@@ -23,7 +23,10 @@ impl Cli {
         let dir = repo_root.join(deprecation::DEPRECATION_DIR);
 
         // Accept "slug", "slug.md"
-        let filename = if self.slug.ends_with(".md") {
+        let filename = if std::path::Path::new(&self.slug)
+            .extension()
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("md"))
+        {
             self.slug.clone()
         } else {
             format!("{}.md", self.slug)
@@ -31,10 +34,7 @@ impl Cli {
 
         let path = dir.join(&filename);
         if !path.exists() {
-            bail!(
-                "No deprecation fragment found at {}",
-                path.display()
-            );
+            bail!("No deprecation fragment found at {}", path.display());
         }
 
         // Parse the fragment to get entry data.

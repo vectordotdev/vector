@@ -71,7 +71,10 @@ impl Cli {
 fn print_announcing_section(next_label: &str, entries: &[&DeprecationEntry]) {
     let header_style = Style::new().underline().white();
     let title = format!("Announced in next release ({next_label})");
-    println!("{}", title.if_supports_color(Stdout, |t| t.style(header_style)));
+    println!(
+        "{}",
+        title.if_supports_color(Stdout, |t| t.style(header_style))
+    );
     println!();
     if entries.is_empty() {
         println!("{}", "(none)".if_supports_color(Stdout, |t| t.dimmed()));
@@ -101,11 +104,9 @@ fn print_entry(e: &DeprecationEntry, highlight_version: bool) {
     println!("{}", e.what.if_supports_color(Stdout, |t| t.bold()));
     let version_str = e.deprecated_since.to_string();
     let version_colored = if highlight_version {
-        owo_colors::OwoColorize::if_supports_color(
-            &version_str,
-            Stdout,
-            |t| t.style(Style::new().bold().red()),
-        )
+        owo_colors::OwoColorize::if_supports_color(&version_str, Stdout, |t| {
+            t.style(Style::new().bold().red())
+        })
         .to_string()
     } else {
         owo_colors::OwoColorize::if_supports_color(&version_str, Stdout, |t| t.bright_cyan())

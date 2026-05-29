@@ -96,11 +96,7 @@ pub(super) fn run(new_version: &Version) -> Result<PathBuf> {
     let changelog_dir = repo_root.join(CHANGELOG_DIR);
     let changelog_entries = read_changelog_fragments(&changelog_dir)?;
 
-    let cue_text = render_release_cue(
-        &new_version,
-        &changelog_entries,
-        &commits,
-    );
+    let cue_text = render_release_cue(&new_version, &changelog_entries, &commits);
     fs::write(&cue_path, cue_text)
         .with_context(|| format!("Failed to write {}", cue_path.display()))?;
 

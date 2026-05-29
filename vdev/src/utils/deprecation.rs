@@ -85,7 +85,10 @@ pub fn partition_by_release(
             planned.push(e);
         }
     }
-    DeprecationPartition { announcing, planned }
+    DeprecationPartition {
+        announcing,
+        planned,
+    }
 }
 
 /// Read and parse all deprecation fragments from the given directory.
@@ -106,11 +109,13 @@ pub fn read_deprecation_fragments(dir: &Path) -> Result<Vec<DeprecationEntry>> {
 }
 
 fn is_deprecation_fragment(path: &Path) -> bool {
-    let name = match path.file_name().and_then(|n| n.to_str()) {
-        Some(n) => n,
-        None => return false,
+    let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+        return false;
     };
-    name != "README.md" && name.ends_with(".md")
+    name != "README.md"
+        && std::path::Path::new(name)
+            .extension()
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("md"))
 }
 
 fn parse_deprecation_fragment(path: &Path) -> Result<DeprecationEntry> {
@@ -204,10 +209,9 @@ fn read_json(repo_root: &Path) -> Result<DeprecationsJson> {
             deprecations_enacted: Vec::new(),
         });
     }
-    let raw = fs::read_to_string(&path)
-        .with_context(|| format!("Failed to read {}", path.display()))?;
-    serde_json::from_str(&raw)
-        .with_context(|| format!("Failed to parse {}", path.display()))
+    let raw =
+        fs::read_to_string(&path).with_context(|| format!("Failed to read {}", path.display()))?;
+    serde_json::from_str(&raw).with_context(|| format!("Failed to parse {}", path.display()))
 }
 
 fn write_json(repo_root: &Path, data: &DeprecationsJson) -> Result<()> {
@@ -216,8 +220,7 @@ fn write_json(repo_root: &Path, data: &DeprecationsJson) -> Result<()> {
         fs::create_dir_all(parent)?;
     }
     let out = serde_json::to_string_pretty(data)? + "\n";
-    fs::write(&path, out)
-        .with_context(|| format!("Failed to write {}", path.display()))
+    fs::write(&path, out).with_context(|| format!("Failed to write {}", path.display()))
 }
 
 /// Append an enacted entry and regenerate the pending section from deprecation.d/.
@@ -250,7 +253,6 @@ fn pending_to_json(entries: &[DeprecationEntry]) -> Vec<PendingJsonEntry> {
         })
         .collect()
 }
-
 
 #[cfg(test)]
 mod tests {
