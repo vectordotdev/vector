@@ -228,6 +228,7 @@ jobs:
               - ".github/workflows/deny.yml"
             deprecations:
               - 'deprecation.d/**'
+              - 'website/cue/reference/generated/deprecations.json'
               - "vdev/**"
               - ".github/workflows/deprecation.yaml"
               - ".github/workflows/changes.yml"
