@@ -221,6 +221,7 @@ jobs:
             blackhole sink
             clickhouse sink
             console sink
+            databricks_zerobus sink
             datadog_archives sink
             datadog_common sink
             datadog_events sink

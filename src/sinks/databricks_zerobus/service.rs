@@ -1,13 +1,19 @@
 //! Zerobus service wrapper for Vector sink integration.
 
 use crate::config::ProxyConfig;
+use crate::event::Event;
+use crate::http::HttpClient;
 use crate::sinks::util::retries::RetryLogic;
+use crate::tls::TlsSettings;
 use databricks_zerobus_ingest_sdk::{ConnectorFactory, ProxyConnector, ZerobusSdk, ZerobusStream};
 use futures::future::BoxFuture;
 use std::sync::Arc;
-use tokio::sync::{Mutex, RwLock};
-use tower::Service;
+use tokio::sync::{Mutex, OnceCell, RwLock};
+use tower::{Layer, Service};
 use tracing::warn;
+use vector_lib::codecs::encoding::{
+    BatchEncoder, BatchOutput, BatchSerializerConfig, ProtoBatchSerializerConfig,
+};
 use vector_lib::finalization::{EventFinalizers, Finalizable};
 use vector_lib::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
 use vector_lib::stream::DriverResponse;
@@ -50,32 +56,55 @@ fn build_connector_factory(proxy: &ProxyConfig) -> Result<ConnectorFactory, Zero
     }))
 }
 
-/// The payload for a Zerobus request.
-///
-/// The zerobus sink only supports proto-encoded records.
-#[derive(Clone, Debug)]
-pub enum ZerobusPayload {
-    /// Pre-encoded protobuf records (one byte buffer per event).
-    Records(Vec<Vec<u8>>),
-}
-
 /// Request type for the Zerobus service.
-#[derive(Clone, Debug)]
+///
+/// Carries the *unencoded* batch — encoding happens inside `Service::call` so
+/// that schema-fetch failures flow through the Tower retry layer. Events live
+/// behind an `Arc` because Tower's retry policy clones the request before
+/// every call (not just on retry), and a deep clone of `Vec<Event>` per call
+/// would be wasteful.
+#[derive(Clone)]
 pub struct ZerobusRequest {
-    pub payload: ZerobusPayload,
+    pub events: Arc<Vec<Event>>,
     pub metadata: RequestMetadata,
     pub finalizers: EventFinalizers,
 }
 
 /// Response type for the Zerobus service.
+///
+/// Carries the final `EventStatus` so the driver can mark finalizers correctly:
+/// `Delivered` on success, `Errored` when the retry budget was exhausted on a
+/// transient failure (asking the source / disk buffer to replay), and `Err`
+/// from `Service::call` reserved for permanent failures (driver maps to
+/// `Rejected`).
 #[derive(Debug)]
 pub struct ZerobusResponse {
     pub events_byte_size: GroupedCountByteSize,
+    pub status: vector_lib::event::EventStatus,
+}
+
+impl ZerobusResponse {
+    const fn delivered(events_byte_size: GroupedCountByteSize) -> Self {
+        Self {
+            events_byte_size,
+            status: vector_lib::event::EventStatus::Delivered,
+        }
+    }
+
+    /// Synthesize a response signalling a transient failure that exhausted the
+    /// retry budget. Carries a telemetry-aware zero `events_byte_size` because
+    /// the driver only consumes `events_sent()` on the `Delivered` path.
+    fn errored() -> Self {
+        Self {
+            events_byte_size: vector_lib::config::telemetry().create_request_count_byte_size(),
+            status: vector_lib::event::EventStatus::Errored,
+        }
+    }
 }
 
 impl DriverResponse for ZerobusResponse {
     fn event_status(&self) -> vector_lib::event::EventStatus {
-        vector_lib::event::EventStatus::Delivered
+        self.status
     }
 
     fn events_sent(&self) -> &GroupedCountByteSize {
@@ -97,18 +126,6 @@ impl MetaDescriptive for ZerobusRequest {
     fn metadata_mut(&mut self) -> &mut RequestMetadata {
         &mut self.metadata
     }
-}
-
-/// Determines what kind of stream the service creates and how payloads are ingested.
-///
-/// The sink only supports proto streams today; this is kept as an enum to
-/// leave room for future stream modes without reshaping all the call sites.
-#[derive(Clone)]
-pub enum StreamMode {
-    /// Proto stream using `ZerobusStream::ingest_records_offset`.
-    Proto {
-        descriptor_proto: Arc<prost_reflect::prost_types::DescriptorProto>,
-    },
 }
 
 /// The active stream.
@@ -257,18 +274,26 @@ impl MockStream {
     }
 }
 
+/// Schema and encoding state derived from the Unity Catalog table.
+pub(super) struct ResolvedSchema {
+    encoder: BatchEncoder,
+    /// SDK-typed (prost-types 0.14) descriptor — held in this form so each
+    /// stream rebuild avoids re-encoding from the prost-reflect 0.13 form.
+    descriptor_proto: Arc<prost_types_014::DescriptorProto>,
+}
+
 /// Service for handling Zerobus requests.
 pub struct ZerobusService {
     sdk: Arc<ZerobusSdk>,
     config: Arc<ZerobusSinkConfig>,
+    http_client: HttpClient,
     stream: Arc<Mutex<Option<Arc<ActiveStream>>>>,
-    stream_mode: StreamMode,
+    schema: Arc<OnceCell<ResolvedSchema>>,
 }
 
 impl ZerobusService {
     pub async fn new(
         config: ZerobusSinkConfig,
-        stream_mode: StreamMode,
         proxy: &ProxyConfig,
     ) -> Result<Self, ZerobusSinkError> {
         let mut builder = ZerobusSdk::builder()
@@ -279,19 +304,37 @@ impl ZerobusService {
             message: format!("Failed to create Zerobus SDK: {}", e),
         })?;
 
+        let http_client = HttpClient::new(TlsSettings::default(), proxy).map_err(|e| {
+            ZerobusSinkError::ConfigError {
+                message: format!("Failed to create HTTP client: {}", e),
+            }
+        })?;
+
         Ok(Self {
             sdk: Arc::new(sdk),
             config: Arc::new(config),
+            http_client,
             stream: Arc::new(Mutex::new(None)),
-            stream_mode,
+            schema: Arc::new(OnceCell::new()),
         })
     }
 
-    /// Resolve the protobuf message descriptor from the schema configuration.
-    pub async fn resolve_descriptor(
+    /// Resolve the protobuf message descriptor from Unity Catalog.
+    ///
+    /// Returns both the prost-reflect `MessageDescriptor` (used by the proto
+    /// batch encoder) and the SDK-typed `DescriptorProto` (used to construct
+    /// Zerobus streams). Returning both avoids re-encoding the descriptor
+    /// every time a stream is rebuilt after a retryable failure.
+    async fn resolve_descriptor(
         config: &ZerobusSinkConfig,
-        proxy: &crate::config::ProxyConfig,
-    ) -> Result<prost_reflect::MessageDescriptor, ZerobusSinkError> {
+        http_client: &HttpClient,
+    ) -> Result<
+        (
+            prost_reflect::MessageDescriptor,
+            prost_types_014::DescriptorProto,
+        ),
+        ZerobusSinkError,
+    > {
         let (client_id, client_secret) = config.auth.credentials();
 
         let table_schema = unity_catalog_schema::fetch_table_schema(
@@ -299,51 +342,94 @@ impl ZerobusService {
             &config.table_name,
             client_id,
             client_secret,
-            proxy,
+            http_client,
         )
         .await?;
 
         unity_catalog_schema::generate_descriptor_from_schema(&table_schema)
     }
 
+    /// Resolve the schema on first use; cache the result.
+    pub(super) async fn ensure_schema(&self) -> Result<&ResolvedSchema, ZerobusSinkError> {
+        self.schema
+            .get_or_try_init(|| async {
+                let (descriptor, sdk_descriptor_proto) =
+                    Self::resolve_descriptor(&self.config, &self.http_client).await?;
+                let descriptor_proto = Arc::new(sdk_descriptor_proto);
+
+                let batch_serializer =
+                    BatchSerializerConfig::ProtoBatch(ProtoBatchSerializerConfig {
+                        descriptor: Some(descriptor),
+                    })
+                    .build_batch_serializer()
+                    .map_err(|e| ZerobusSinkError::ConfigError {
+                        message: format!("Failed to build batch serializer: {}", e),
+                    })?;
+
+                Ok(ResolvedSchema {
+                    encoder: BatchEncoder::new(batch_serializer),
+                    descriptor_proto,
+                })
+            })
+            .await
+    }
+
+    pub(super) fn encode_records(
+        schema: &ResolvedSchema,
+        events: &[Event],
+    ) -> Result<Vec<Vec<u8>>, ZerobusSinkError> {
+        match schema
+            .encoder
+            .encode_batch(events)
+            .map_err(|e| ZerobusSinkError::EncodingError {
+                message: format!("Failed to encode batch: {}", e),
+            })? {
+            BatchOutput::Records(records) => Ok(records),
+            #[cfg(feature = "codecs-arrow")]
+            BatchOutput::Arrow(_) => Err(ZerobusSinkError::EncodingError {
+                message: "The Databricks Zerobus sink only supports proto-batch output.".into(),
+            }),
+        }
+    }
+
     /// Ensure we have an active stream, creating one if necessary.
     ///
-    /// Also used as the healthcheck: eagerly creating a stream verifies
-    /// OAuth credentials, endpoint connectivity, and table validity.
+    /// Also used as the healthcheck: resolving the schema verifies the table
+    /// and credentials against Unity Catalog, and creating the stream verifies
+    /// connectivity to the Zerobus endpoint.
     pub async fn ensure_stream(&self) -> Result<(), ZerobusSinkError> {
-        self.get_or_create_stream().await.map(|_| ())
+        let schema = self.ensure_schema().await?;
+        self.get_or_create_stream(schema).await.map(|_| ())
     }
 
     /// Return an `Arc` handle to the active stream, creating one if needed.
     ///
     /// The lock is held only while checking/creating the stream; callers can
     /// then use the returned `Arc` without holding the lock.
-    async fn get_or_create_stream(&self) -> Result<Arc<ActiveStream>, ZerobusSinkError> {
+    async fn get_or_create_stream(
+        &self,
+        schema: &ResolvedSchema,
+    ) -> Result<Arc<ActiveStream>, ZerobusSinkError> {
         let mut stream_guard = self.stream.lock().await;
 
         if stream_guard.is_none() {
             let (client_id, client_secret) = self.config.auth.credentials();
             let (client_id, client_secret) = (client_id.to_string(), client_secret.to_string());
 
-            let active_stream = match &self.stream_mode {
-                StreamMode::Proto { descriptor_proto } => {
-                    let stream_options = &self.config.stream_options;
-                    let stream = self
-                        .sdk
-                        .stream_builder()
-                        .table(self.config.table_name.clone())
-                        .oauth(client_id, client_secret)
-                        .compiled_proto((**descriptor_proto).clone())
-                        .server_lack_of_ack_timeout_ms(stream_options.server_lack_of_ack_timeout_ms)
-                        .flush_timeout_ms(stream_options.flush_timeout_ms)
-                        .build()
-                        .await
-                        .map_err(|e| ZerobusSinkError::StreamInitError { source: e })?;
-                    ActiveStream::proto(stream)
-                }
-            };
+            let stream_options = &self.config.stream_options;
+            let stream = self
+                .sdk
+                .stream_builder()
+                .table(self.config.table_name.clone())
+                .oauth(client_id, client_secret)
+                .compiled_proto((*schema.descriptor_proto).clone())
+                .server_lack_of_ack_timeout_ms(stream_options.server_lack_of_ack_timeout_ms)
+                .flush_timeout_ms(stream_options.flush_timeout_ms)
+                .build()
+                .await
+                .map_err(|e| ZerobusSinkError::StreamInitError { source: e })?;
 
-            *stream_guard = Some(Arc::new(active_stream));
+            *stream_guard = Some(Arc::new(ActiveStream::proto(stream)));
         }
 
         Ok(Arc::clone(stream_guard.as_ref().unwrap()))
@@ -364,25 +450,20 @@ impl ZerobusService {
         }
     }
 
-    /// Ingest a payload (proto records or Arrow batch).
-    ///
-    /// Obtains an `Arc` handle to the stream (creating one if needed) and
-    /// then releases the lock before calling into the SDK so that concurrent
-    /// ingests are not serialized.
+    /// Send encoded records to an already-resolved stream.
     ///
     /// On retryable errors the active stream is removed from the slot so that
     /// the next attempt (driven by Tower retry) creates a fresh one.
-    pub async fn ingest(
+    async fn ingest(
         &self,
-        payload: ZerobusPayload,
+        stream: Arc<ActiveStream>,
+        records: Vec<Vec<u8>>,
         events_byte_size: GroupedCountByteSize,
     ) -> Result<ZerobusResponse, ZerobusSinkError> {
-        let stream = self.get_or_create_stream().await?;
-
         // Slot lock is not held here — concurrent ingests acquire read guards
         // on the inner `RwLock` and run truly in parallel.
-        let result = match (payload, stream.as_ref()) {
-            (ZerobusPayload::Records(records), ActiveStream::Proto(lock)) => {
+        let result = match stream.as_ref() {
+            ActiveStream::Proto(lock) => {
                 let guard = lock.read().await;
                 let Some(s) = guard.as_ref() else {
                     return Err(ZerobusSinkError::StreamClosed);
@@ -396,11 +477,11 @@ impl ZerobusService {
                 }
             }
             #[cfg(test)]
-            (ZerobusPayload::Records(_), ActiveStream::Mock(mock)) => mock.try_ingest().await,
+            ActiveStream::Mock(mock) => mock.try_ingest().await,
         };
 
         match result {
-            Ok(()) => Ok(ZerobusResponse { events_byte_size }),
+            Ok(()) => Ok(ZerobusResponse::delivered(events_byte_size)),
             Err(e) => {
                 if e.is_retryable() {
                     // Clear the slot so the next attempt creates a fresh stream,
@@ -441,7 +522,12 @@ impl Service<ZerobusRequest> for ZerobusService {
         let events_byte_size =
             std::mem::take(request.metadata_mut()).into_events_estimated_json_encoded_byte_size();
 
-        Box::pin(async move { service.ingest(request.payload, events_byte_size).await })
+        Box::pin(async move {
+            let schema = service.ensure_schema().await?;
+            let records = Self::encode_records(schema, &request.events)?;
+            let stream = service.get_or_create_stream(schema).await?;
+            service.ingest(stream, records, events_byte_size).await
+        })
     }
 }
 
@@ -450,8 +536,9 @@ impl Clone for ZerobusService {
         Self {
             sdk: Arc::clone(&self.sdk),
             config: Arc::clone(&self.config),
+            http_client: self.http_client.clone(),
             stream: Arc::clone(&self.stream),
-            stream_mode: self.stream_mode.clone(),
+            schema: Arc::clone(&self.schema),
         }
     }
 }
@@ -482,13 +569,17 @@ impl ZerobusService {
                 message: format!("Failed to create Zerobus SDK: {}", e),
             })?;
 
+        let http_client = HttpClient::new(TlsSettings::default(), &ProxyConfig::default())
+            .map_err(|e| ZerobusSinkError::ConfigError {
+                message: format!("Failed to create HTTP client: {}", e),
+            })?;
+
         Ok(Self {
             sdk: Arc::new(sdk),
             config: Arc::new(config),
+            http_client,
             stream: Arc::new(Mutex::new(Some(Arc::new(ActiveStream::Mock(mock))))),
-            stream_mode: StreamMode::Proto {
-                descriptor_proto: Arc::new(Default::default()),
-            },
+            schema: Arc::new(OnceCell::new()),
         })
     }
 
@@ -504,15 +595,81 @@ impl RetryLogic for ZerobusRetryLogic {
     type Response = ZerobusResponse;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
-        match error {
-            ZerobusSinkError::ZerobusError { source }
-            | ZerobusSinkError::StreamInitError { source }
-            | ZerobusSinkError::IngestionError { source } => source.is_retryable(),
-            ZerobusSinkError::StreamClosed => true,
-            ZerobusSinkError::ConfigError { .. }
-            | ZerobusSinkError::EncodingError { .. }
-            | ZerobusSinkError::MissingAckOffset => false,
-        }
+        error.is_retryable()
+    }
+}
+
+/// Tower layer that converts retry-budget-exhausted retryable errors into a
+/// successful `ZerobusResponse` carrying `EventStatus::Errored`.
+///
+/// Wraps the retry layer from the outside. When the retry layer returns:
+/// - `Ok(resp)` — pass through unchanged.
+/// - `Err(e)` where `e.is_retryable()` — convert to `Ok(ZerobusResponse::errored())`
+///   so the driver marks finalizers `Errored` (transient — source / disk
+///   buffer may replay) rather than `Rejected` (permanent drop).
+/// - `Err(e)` permanent — propagate so the driver maps to `Rejected`.
+///
+/// Without this layer the driver maps every `Err` from `Service::call` to
+/// `EventStatus::Rejected`, which would drop transient-but-exhausted failures
+/// as if they were permanent.
+#[derive(Clone, Debug, Default)]
+pub struct RetryableErrorAsErroredLayer;
+
+impl<S> Layer<S> for RetryableErrorAsErroredLayer {
+    type Service = RetryableErrorAsErrored<S>;
+
+    fn layer(&self, inner: S) -> Self::Service {
+        RetryableErrorAsErrored { inner }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct RetryableErrorAsErrored<S> {
+    inner: S,
+}
+
+impl<S> Service<ZerobusRequest> for RetryableErrorAsErrored<S>
+where
+    S: Service<ZerobusRequest, Response = ZerobusResponse, Error = crate::Error>,
+    S::Future: Send + 'static,
+{
+    type Response = ZerobusResponse;
+    type Error = crate::Error;
+    type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
+
+    fn poll_ready(
+        &mut self,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Result<(), Self::Error>> {
+        self.inner.poll_ready(cx)
+    }
+
+    fn call(&mut self, req: ZerobusRequest) -> Self::Future {
+        let fut = self.inner.call(req);
+        Box::pin(async move {
+            match fut.await {
+                Ok(resp) => Ok(resp),
+                Err(e) => {
+                    // The Tower stack boxes errors above us (retry, timeout,
+                    // adaptive-concurrency). Downcast to inspect retryability;
+                    // anything that isn't a `ZerobusSinkError` (e.g. a timeout
+                    // `Elapsed`) is conservatively treated as transient.
+                    let retryable = match e.downcast_ref::<ZerobusSinkError>() {
+                        Some(zb) => zb.is_retryable(),
+                        None => true,
+                    };
+                    if retryable {
+                        warn!(
+                            message = "Zerobus retry budget exhausted on transient error; signaling Errored so source or buffer may replay.",
+                            error = %e,
+                        );
+                        Ok(ZerobusResponse::errored())
+                    } else {
+                        Err(e)
+                    }
+                }
+            }
+        })
     }
 }
 
@@ -541,8 +698,12 @@ mod tests {
         }
     }
 
-    fn dummy_payload() -> ZerobusPayload {
-        ZerobusPayload::Records(vec![vec![1, 2, 3]])
+    fn dummy_records() -> Vec<Vec<u8>> {
+        vec![vec![1, 2, 3]]
+    }
+
+    async fn current_stream(service: &ZerobusService) -> Arc<ActiveStream> {
+        Arc::clone(service.stream.lock().await.as_ref().unwrap())
     }
 
     #[tokio::test]
@@ -551,8 +712,13 @@ mod tests {
             .await
             .unwrap();
 
+        let stream = current_stream(&service).await;
         let result = service
-            .ingest(dummy_payload(), GroupedCountByteSize::new_untagged())
+            .ingest(
+                stream,
+                dummy_records(),
+                GroupedCountByteSize::new_untagged(),
+            )
             .await;
 
         assert!(result.is_ok());
@@ -570,8 +736,13 @@ mod tests {
 
         assert!(service.has_active_stream().await);
 
+        let stream = current_stream(&service).await;
         let err = service
-            .ingest(dummy_payload(), GroupedCountByteSize::new_untagged())
+            .ingest(
+                stream,
+                dummy_records(),
+                GroupedCountByteSize::new_untagged(),
+            )
             .await
             .unwrap_err();
 
@@ -590,8 +761,13 @@ mod tests {
 
         assert!(service.has_active_stream().await);
 
+        let stream = current_stream(&service).await;
         let err = service
-            .ingest(dummy_payload(), GroupedCountByteSize::new_untagged())
+            .ingest(
+                stream,
+                dummy_records(),
+                GroupedCountByteSize::new_untagged(),
+            )
             .await
             .unwrap_err();
 
@@ -610,9 +786,14 @@ mod tests {
             .unwrap();
 
         // First ingest succeeds.
+        let stream = current_stream(&service).await;
         assert!(
             service
-                .ingest(dummy_payload(), GroupedCountByteSize::new_untagged())
+                .ingest(
+                    stream,
+                    dummy_records(),
+                    GroupedCountByteSize::new_untagged()
+                )
                 .await
                 .is_ok()
         );
@@ -629,8 +810,13 @@ mod tests {
         }
 
         // Second ingest fails and clears the stream.
+        let stream = current_stream(&service).await;
         let err = service
-            .ingest(dummy_payload(), GroupedCountByteSize::new_untagged())
+            .ingest(
+                stream,
+                dummy_records(),
+                GroupedCountByteSize::new_untagged(),
+            )
             .await
             .unwrap_err();
         assert!(ZerobusRetryLogic.is_retriable_error(&err));
@@ -641,9 +827,14 @@ mod tests {
         *service.stream.lock().await = Some(Arc::new(ActiveStream::Mock(MockStream::succeeding())));
 
         // Third ingest succeeds on the new stream.
+        let stream = current_stream(&service).await;
         assert!(
             service
-                .ingest(dummy_payload(), GroupedCountByteSize::new_untagged())
+                .ingest(
+                    stream,
+                    dummy_records(),
+                    GroupedCountByteSize::new_untagged()
+                )
                 .await
                 .is_ok()
         );
@@ -686,17 +877,27 @@ mod tests {
             .await
             .unwrap();
 
-        // Spawn two concurrent ingests. Each will obtain its own `Arc` clone
-        // from `get_or_create_stream`, then block in the gate.
+        // Spawn two concurrent ingests. Each clones the same stream `Arc`,
+        // then blocks in the gate.
         let s1 = service.clone();
         let t1 = tokio::spawn(async move {
-            s1.ingest(dummy_payload(), GroupedCountByteSize::new_untagged())
-                .await
+            let stream = current_stream(&s1).await;
+            s1.ingest(
+                stream,
+                dummy_records(),
+                GroupedCountByteSize::new_untagged(),
+            )
+            .await
         });
         let s2 = service.clone();
         let t2 = tokio::spawn(async move {
-            s2.ingest(dummy_payload(), GroupedCountByteSize::new_untagged())
-                .await
+            let stream = current_stream(&s2).await;
+            s2.ingest(
+                stream,
+                dummy_records(),
+                GroupedCountByteSize::new_untagged(),
+            )
+            .await
         });
 
         // Wait until both ingests are inside the gate (both `Arc`s alive).
@@ -721,5 +922,103 @@ mod tests {
         );
         // And the slot was cleared so the next ingest creates a fresh stream.
         assert!(!service.has_active_stream().await);
+    }
+
+    fn dummy_request() -> ZerobusRequest {
+        ZerobusRequest {
+            events: Arc::new(vec![]),
+            metadata: RequestMetadata::default(),
+            finalizers: EventFinalizers::default(),
+        }
+    }
+
+    #[tokio::test]
+    async fn retryable_err_after_exhaustion_becomes_ok_errored() {
+        use tower::ServiceExt;
+        let inner = tower::service_fn(|_req: ZerobusRequest| async move {
+            let err: crate::Error = Box::new(ZerobusSinkError::SchemaError {
+                message: "UC 503".to_string(),
+                retryable: true,
+            });
+            Err::<ZerobusResponse, _>(err)
+        });
+        let mut svc = RetryableErrorAsErrored { inner };
+        let resp = svc
+            .ready()
+            .await
+            .unwrap()
+            .call(dummy_request())
+            .await
+            .unwrap();
+        assert_eq!(resp.status, vector_lib::event::EventStatus::Errored);
+    }
+
+    #[tokio::test]
+    async fn non_retryable_err_propagates() {
+        use tower::ServiceExt;
+        let inner = tower::service_fn(|_req: ZerobusRequest| async move {
+            let err: crate::Error = Box::new(ZerobusSinkError::EncodingError {
+                message: "bad".to_string(),
+            });
+            Err::<ZerobusResponse, _>(err)
+        });
+        let mut svc = RetryableErrorAsErrored { inner };
+        let err = svc
+            .ready()
+            .await
+            .unwrap()
+            .call(dummy_request())
+            .await
+            .unwrap_err();
+        let zb = err.downcast_ref::<ZerobusSinkError>().unwrap();
+        assert!(matches!(zb, ZerobusSinkError::EncodingError { .. }));
+    }
+
+    #[tokio::test]
+    async fn unknown_err_treated_as_transient() {
+        use tower::ServiceExt;
+        // Simulate a Tower-layer error that isn't a ZerobusSinkError (e.g.
+        // timeout `Elapsed`): conservatively becomes Errored, not Rejected.
+        #[derive(Debug)]
+        struct Other;
+        impl std::fmt::Display for Other {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(f, "other")
+            }
+        }
+        impl std::error::Error for Other {}
+
+        let inner = tower::service_fn(|_req: ZerobusRequest| async move {
+            let err: crate::Error = Box::new(Other);
+            Err::<ZerobusResponse, _>(err)
+        });
+        let mut svc = RetryableErrorAsErrored { inner };
+        let resp = svc
+            .ready()
+            .await
+            .unwrap()
+            .call(dummy_request())
+            .await
+            .unwrap();
+        assert_eq!(resp.status, vector_lib::event::EventStatus::Errored);
+    }
+
+    #[tokio::test]
+    async fn ok_response_passes_through() {
+        use tower::ServiceExt;
+        let inner = tower::service_fn(|_req: ZerobusRequest| async move {
+            Ok::<_, crate::Error>(ZerobusResponse::delivered(
+                GroupedCountByteSize::new_untagged(),
+            ))
+        });
+        let mut svc = RetryableErrorAsErrored { inner };
+        let resp = svc
+            .ready()
+            .await
+            .unwrap()
+            .call(dummy_request())
+            .await
+            .unwrap();
+        assert_eq!(resp.status, vector_lib::event::EventStatus::Delivered);
     }
 }
