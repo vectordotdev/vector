@@ -1,0 +1,64 @@
+# syntax=docker/dockerfile:1
+#
+# Antithesis harness for finding DATA LOSS in the disk buffer v2.
+#
+# Like Dockerfile.direct, the SUT is a single self-driving exerciser binary that
+# links vector-buffers and drives a real disk_v2 buffer through the public
+# topology API. This image's exerciser (disk_v2_lossfinder) runs a phased
+# scenario loop whose job is to detect *silent data loss*: a record that was
+# accepted and durably flushed (an at-least-once promise) but then never handed
+# back to the reader and never explicitly refused. A non-empty oracle leftover
+# trips an assert_always! (loss is a BUG per owner ruling).
+#
+# Build context is the repo root (see tests/antithesis/config-lossfinder/docker-compose.yaml).
+
+##################################
+# Exerciser — build stage        #
+##################################
+FROM rust:1.92-bookworm AS exerciser-build
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        protobuf-compiler cmake perl build-essential pkg-config libssl-dev clang \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /src
+# Copy the same workspace inputs the main Vector build uses, so the workspace
+# resolves; we only compile the vector-buffers example + its dep subtree.
+COPY Cargo.toml Cargo.lock rust-toolchain.toml build.rs ./
+COPY lib ./lib
+COPY src ./src
+COPY proto ./proto
+COPY benches ./benches
+COPY tests ./tests
+COPY vdev ./vdev
+COPY scripts ./scripts
+# Build the exerciser example with Antithesis LLVM coverage instrumentation
+# (sancov) applied to the target only. The antithesis-instrumentation crate (dep
+# of vector-buffers) provides the libvoidstar loader + sancov callbacks; build-id
+# is required for symbolization.
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/src/target \
+    cargo build --release -p vector-buffers --example disk_v2_lossfinder \
+      --config 'build.target = "x86_64-unknown-linux-gnu"' \
+      --config 'target.x86_64-unknown-linux-gnu.rustflags = ["-Cpasses=sancov-module","-Cllvm-args=-sanitizer-coverage-level=3","-Cllvm-args=-sanitizer-coverage-trace-pc-guard","-Clink-args=-Wl,--build-id"]' \
+    && cp target/x86_64-unknown-linux-gnu/release/examples/disk_v2_lossfinder /usr/local/bin/vdbuf-lossfinder
+
+##################################
+# Exerciser — runtime stage      #
+##################################
+FROM debian:stable-slim AS lossfinder
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=exerciser-build /usr/local/bin/vdbuf-lossfinder /usr/bin/vdbuf-lossfinder
+RUN mkdir -p /var/lib/vdbuf
+# Symbolization: expose the instrumented (unstripped, build-id'd) binary.
+RUN mkdir -p /symbols && ln -s /usr/bin/vdbuf-lossfinder /symbols/vdbuf-lossfinder
+# Observer test commands run in this same container and read the status file.
+COPY tests/antithesis/test/v1/diskbuf_loss /opt/antithesis/test/v1/diskbuf_loss
+ENV NO_COLOR=1 \
+    RUST_LOG=warn \
+    VDBUF_DIR=/var/lib/vdbuf \
+    VDBUF_STATUS=/tmp/vdbuf-status
+# The exerciser self-drives the buffer and emits setup_complete after the first
+# end-to-end delivery. SUT-side assert_always! calls inside the exerciser detect
+# silent data loss. No-ops outside Antithesis.
+ENTRYPOINT ["/usr/bin/vdbuf-lossfinder"]

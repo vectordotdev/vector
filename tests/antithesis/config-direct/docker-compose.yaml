@@ -1,0 +1,39 @@
+name: vdbufdirect
+
+# Single-service harness that tests the disk buffer v2 DIRECTLY. The exerciser
+# is both SUT and workload: it owns a real disk_v2 buffer (advisory-locked, one
+# process per directory) and self-drives randomized writer/reader activity using
+# the Antithesis SDK's RNG. The #21683-class accounting underflows are detected
+# by assert_always! calls SUT-side inside vector-buffers.
+services:
+  exerciser:
+    container_name: vdbuf-exerciser
+    hostname: vdbuf-exerciser
+    platform: linux/amd64
+    init: true
+    build:
+      # Build context is the repo root (three levels up from this file).
+      context: ../../..
+      dockerfile: tests/antithesis/Dockerfile.direct
+      target: exerciser
+    image: vdbuf-exerciser:latest
+    environment:
+      NO_COLOR: "1"
+      RUST_LOG: "warn"
+      VDBUF_DIR: "/var/lib/vdbuf"
+      VDBUF_STATUS: "/tmp/vdbuf-status"
+    volumes:
+      # Persistent named volume so the disk buffer survives container
+      # kill/restart (node-termination faults, when the webhook injects them) —
+      # required for the crash-durability properties to be meaningful.
+      - vdbuf-direct-buffer:/var/lib/vdbuf
+    healthcheck:
+      # Live once the exerciser has delivered at least one record end-to-end.
+      test: ["CMD-SHELL", "grep -q 'delivered=[1-9]' /tmp/vdbuf-status"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+
+volumes:
+  vdbuf-direct-buffer:

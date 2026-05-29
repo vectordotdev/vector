@@ -1,0 +1,48 @@
+name: vdbuf
+
+services:
+  vector:
+    container_name: vdbuf-vector
+    hostname: vdbuf-vector
+    platform: linux/amd64
+    init: true
+    build:
+      context: ../../..
+      dockerfile: tests/antithesis/Dockerfile
+      target: vector
+    image: vdbuf-vector:latest
+    environment:
+      NO_COLOR: "1"
+    volumes:
+      # Persistent named volume so the disk buffer survives container
+      # kill/restart (node-termination faults). This is REQUIRED for the
+      # crash-durability properties to be meaningful.
+      - vdbuf-buffer:/var/lib/vector
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:9598/metrics"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+
+  workload:
+    container_name: vdbuf-workload
+    hostname: vdbuf-workload
+    platform: linux/amd64
+    init: true
+    build:
+      context: ../../..
+      dockerfile: tests/antithesis/Dockerfile
+      target: workload
+    image: vdbuf-workload:latest
+    environment:
+      NO_COLOR: "1"
+      VECTOR_SOURCE_URL: "http://vdbuf-vector:8080/"
+      VECTOR_METRICS_URL: "http://vdbuf-vector:9598/metrics"
+      COLLECTOR_ADDR: "0.0.0.0:8686"
+    depends_on:
+      vector:
+        condition: service_healthy
+
+volumes:
+  vdbuf-buffer:

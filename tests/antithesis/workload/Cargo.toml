@@ -1,0 +1,29 @@
+# Standalone package: keep it out of Vector's parent workspace (this Cargo.toml
+# lives under the repo root next to Vector's workspace manifest).
+[workspace]
+
+[package]
+name = "vdbuf-workload"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[[bin]]
+name = "vdbuf-workload"
+path = "src/main.rs"
+
+[dependencies]
+# Antithesis assertion + lifecycle SDK (assertions, setup_complete).
+antithesis_sdk = "0.2.8"
+# Antithesis LLVM coverage-instrumentation runtime shim (sancov + libvoidstar loader).
+antithesis-instrumentation = "0.1"
+serde_json = "1"
+# Tiny synchronous HTTP server for the sink collector endpoint.
+tiny_http = "0.12"
+# Tiny synchronous HTTP client for producing events + scraping metrics.
+# default-features = false drops TLS (we only speak plaintext HTTP intra-cluster)
+# and keeps the build small/fast.
+ureq = { version = "2", default-features = false }
+
+[profile.release]
+debug = true

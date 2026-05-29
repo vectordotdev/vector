@@ -34,6 +34,8 @@ vector-config = { path = "../vector-config", default-features = false }
 vector-common = { path = "../vector-common", default-features = false, features = ["byte_size_of"] }
 dashmap.workspace = true
 ordered-float.workspace = true
+antithesis_sdk = "0.2.8"
+antithesis-instrumentation = "0.1"
 
 [dev-dependencies]
 clap.workspace = true
@@ -45,6 +47,7 @@ metrics-util = { workspace = true, features = ["debugging"] }
 proptest.workspace = true
 quickcheck.workspace = true
 rand.workspace = true
+serde_json.workspace = true
 serde_yaml.workspace = true
 temp-dir = "0.1.16"
 tokio-test.workspace = true
@@ -57,3 +60,9 @@ harness = false
 
 [[example]]
 name = "buffer_perf"
+
+[[example]]
+name = "disk_v2_antithesis"
+
+[[example]]
+name = "disk_v2_lossfinder"

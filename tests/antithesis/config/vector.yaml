@@ -1,0 +1,52 @@
+# Vector config for the Antithesis disk-buffer-v2 harness.
+# Path:  http_server source (e2e acks) -> http sink with a DISK buffer ->
+#        workload collector. internal_metrics -> prometheus_exporter for
+#        observation + container healthcheck.
+data_dir: /var/lib/vector
+
+sources:
+  in:
+    type: http_server
+    address: 0.0.0.0:8080
+    decoding:
+      codec: json
+    # End-to-end acknowledgements (env-driven). Default true. A fill config sets
+    # VDBUF_SRC_ACKS=false so the source 200s on receipt (no per-event drain
+    # wait) and a fast producer can overfill the buffer to trigger drop_newest.
+    acknowledgements:
+      enabled: ${VDBUF_SRC_ACKS:-true}
+
+  metrics:
+    type: internal_metrics
+    # Scrape often so buffer_* gauges are fresh for the workload's assertions.
+    scrape_interval_secs: 1
+
+sinks:
+  out:
+    type: http
+    inputs: [in]
+    uri: http://vdbuf-workload:8686/ingest
+    method: post
+    encoding:
+      codec: json
+    # Env-driven sink request concurrency (default adaptive). A fill config sets
+    # it to 1 so that when the single in-flight request hangs on a blocked
+    # collector, the sink stops pulling from the disk buffer — letting the buffer
+    # fill to max_size and trigger drop_newest (the precondition for #24606).
+    request:
+      concurrency: ${VDBUF_SINK_CONCURRENCY:-adaptive}
+    # The component under test: disk buffer v2.
+    buffer:
+      type: disk
+      max_size: 268435488 # ~256MB, the enforced minimum
+      # env-driven so a config variant can select drop_newest without rebuilding
+      # the image (default block).
+      when_full: "${VDBUF_WHEN_FULL:-block}"
+    # Honor source acks only after the sink delivers.
+    acknowledgements:
+      enabled: true
+
+  prom:
+    type: prometheus_exporter
+    inputs: [metrics]
+    address: 0.0.0.0:9598

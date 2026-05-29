@@ -1,0 +1,42 @@
+name: vdbufloss
+
+# Single-service harness that finds DATA LOSS in the disk buffer v2. The
+# exerciser is both SUT and workload: it owns a real disk_v2 buffer
+# (advisory-locked, one process per directory) and self-drives a phased scenario
+# loop using the Antithesis SDK's RNG. Silent data loss (a flushed record that is
+# never delivered and never explicitly refused) is detected by assert_always!
+# calls SUT-side inside the exerciser.
+services:
+  lossfinder:
+    container_name: vdbuf-lossfinder
+    hostname: vdbuf-lossfinder
+    platform: linux/amd64
+    init: true
+    build:
+      # Build context is the repo root (three levels up from this file).
+      context: ../../..
+      dockerfile: tests/antithesis/Dockerfile.lossfinder
+      target: lossfinder
+    image: vdbuf-lossfinder:latest
+    environment:
+      NO_COLOR: "1"
+      RUST_LOG: "warn"
+      VDBUF_DIR: "/var/lib/vdbuf"
+      VDBUF_STATUS: "/tmp/vdbuf-status"
+      VDBUF_MAX_SIZE: "268435488"
+      VDBUF_MAX_PAYLOAD: "4096"
+    volumes:
+      # Persistent named volume so the disk buffer survives container
+      # kill/restart (node-termination faults, when the webhook injects them) —
+      # required for the crash-durability properties to be meaningful.
+      - vdbuf-loss-buffer:/var/lib/vdbuf
+    healthcheck:
+      # Live once the exerciser has delivered at least one record end-to-end.
+      test: ["CMD-SHELL", "grep -q 'delivered=[1-9]' /tmp/vdbuf-status"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+
+volumes:
+  vdbuf-loss-buffer:
