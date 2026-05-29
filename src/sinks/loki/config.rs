@@ -225,6 +225,8 @@ impl SinkConfig for LokiConfig {
             }
         }
 
+        let healthcheck_uri = cx.healthcheck.uri.clone();
+
         let client = self.build_client(cx)?;
 
         let config = LokiConfig {
@@ -234,7 +236,7 @@ impl SinkConfig for LokiConfig {
 
         let sink = LokiSink::new(config.clone(), client.clone())?;
 
-        let healthcheck = healthcheck(config, client).boxed();
+        let healthcheck = healthcheck(config, healthcheck_uri, client).boxed();
 
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
