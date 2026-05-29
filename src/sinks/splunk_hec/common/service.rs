@@ -59,12 +59,15 @@ where
         let max_pending_acks = indexer_acknowledgements.max_pending_acks.get();
         let tx = if let Some(ack_client) = ack_client {
             let (tx, rx) = mpsc::channel(128);
-            tokio::spawn(run_acknowledgements(
-                rx,
-                ack_client,
-                Arc::clone(&http_request_builder),
-                indexer_acknowledgements,
-            ).in_current_span());
+            tokio::spawn(
+                run_acknowledgements(
+                    rx,
+                    ack_client,
+                    Arc::clone(&http_request_builder),
+                    indexer_acknowledgements,
+                )
+                .in_current_span(),
+            );
             Some(tx)
         } else {
             None

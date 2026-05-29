@@ -148,12 +148,15 @@ where
         let mut stats = TimingStats::default();
 
         // Spawn the checkpoint writer task
-        let checkpoint_task_handle = tokio::spawn(checkpoint_writer(
-            checkpointer,
-            self.glob_minimum_cooldown,
-            shutdown_checkpointer,
-            self.emitter.clone(),
-        ).in_current_span());
+        let checkpoint_task_handle = tokio::spawn(
+            checkpoint_writer(
+                checkpointer,
+                self.glob_minimum_cooldown,
+                shutdown_checkpointer,
+                self.emitter.clone(),
+            )
+            .in_current_span(),
+        );
 
         // Alright friends, how does this work?
         //

@@ -9,10 +9,10 @@ use std::{
 };
 
 use futures::StreamExt;
-use tracing::Instrument;
 use roaring::RoaringTreemap;
 use serde::{Deserialize, Serialize};
 use tokio::time::interval;
+use tracing::Instrument;
 use vector_lib::{
     configurable::configurable_component, finalization::BatchStatusReceiver,
     finalizer::UnorderedFinalizer,
@@ -107,18 +107,21 @@ impl IndexerAcknowledgement {
         let idle_task_channels = Arc::clone(&channels);
 
         if config.ack_idle_cleanup {
-            tokio::spawn(async move {
-                let mut interval = interval(Duration::from_secs(max_idle_time));
-                loop {
-                    interval.tick().await;
-                    let mut channels = idle_task_channels.lock().await;
-                    let now = Instant::now();
+            tokio::spawn(
+                async move {
+                    let mut interval = interval(Duration::from_secs(max_idle_time));
+                    loop {
+                        interval.tick().await;
+                        let mut channels = idle_task_channels.lock().await;
+                        let now = Instant::now();
 
-                    channels.retain(|_, channel| {
-                        now.duration_since(channel.get_last_used()).as_secs() <= max_idle_time
-                    });
+                        channels.retain(|_, channel| {
+                            now.duration_since(channel.get_last_used()).as_secs() <= max_idle_time
+                        });
+                    }
                 }
-            }.in_current_span());
+                .in_current_span(),
+            );
         }
 
         Self {

@@ -2,12 +2,12 @@ use std::{collections::VecDeque, fmt::Debug, io, sync::Arc};
 
 use itertools::Itertools;
 use snafu::Snafu;
+use tracing::Instrument;
 use vector_lib::{
     event::{ObjectMap, Value},
     internal_event::{ComponentEventsDropped, UNINTENTIONAL},
     lookup::event_path,
 };
-use tracing::Instrument;
 use vrl::path::{OwnedSegment, OwnedTargetPath, PathPrefix};
 
 use super::{config::MAX_PAYLOAD_BYTES, service::LogApiRequest};

@@ -23,6 +23,7 @@ use tonic::{
     metadata::MetadataValue,
     transport::{Certificate, ClientTlsConfig, Endpoint, Identity},
 };
+use tracing::Instrument;
 use vector_lib::{
     byte_size_of::ByteSizeOf,
     codecs::decoding::{DeserializerConfig, FramingConfig},
@@ -34,7 +35,6 @@ use vector_lib::{
     },
     lookup::owned_value_path,
 };
-use tracing::Instrument;
 use vrl::{
     path,
     value::{Kind, kind::Collection},

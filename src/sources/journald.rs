@@ -1057,13 +1057,16 @@ impl Finalizer {
     ) -> Self {
         if acknowledgements {
             let (finalizer, mut ack_stream) = OrderedFinalizer::new(Some(shutdown));
-            tokio::spawn(async move {
-                while let Some((status, cursor)) = ack_stream.next().await {
-                    if status == BatchStatus::Delivered {
-                        checkpointer.lock().await.set(cursor).await;
+            tokio::spawn(
+                async move {
+                    while let Some((status, cursor)) = ack_stream.next().await {
+                        if status == BatchStatus::Delivered {
+                            checkpointer.lock().await.set(cursor).await;
+                        }
                     }
                 }
-            }.in_current_span());
+                .in_current_span(),
+            );
             Self::Async(finalizer)
         } else {
             Self::Sync(checkpointer)

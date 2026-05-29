@@ -179,13 +179,16 @@ impl DatadogTracesConfig {
         // Send the APM stats payloads independently of the sink framework.
         // This is necessary to comply with what the APM stats backend of Datadog expects with
         // respect to receiving stats payloads.
-        tokio::spawn(flush_apm_stats_thread(
-            tripwire,
-            client,
-            compression,
-            endpoints,
-            Arc::clone(&apm_stats_aggregator),
-        ).in_current_span());
+        tokio::spawn(
+            flush_apm_stats_thread(
+                tripwire,
+                client,
+                compression,
+                endpoints,
+                Arc::clone(&apm_stats_aggregator),
+            )
+            .in_current_span(),
+        );
 
         Ok(VectorSink::from_event_streamsink(sink))
     }

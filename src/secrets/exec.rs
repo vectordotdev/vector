@@ -2,10 +2,10 @@ use std::collections::{HashMap, HashSet};
 
 use bytes::BytesMut;
 use futures_util::StreamExt;
-use tracing::Instrument;
 use serde::{Deserialize, Serialize};
 use tokio::{io::AsyncWriteExt, process::Command, time};
 use tokio_util::codec;
+use tracing::Instrument;
 use vector_lib::configurable::{component::GenerateConfig, configurable_component};
 use vrl::value::Value;
 

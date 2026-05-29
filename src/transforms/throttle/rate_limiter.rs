@@ -27,13 +27,16 @@ where
         let rate_limiter = Arc::new(RateLimiter::dashmap_with_clock(quota, clock));
 
         let rate_limiter_clone = Arc::clone(&rate_limiter);
-        let flush_handle = tokio::spawn(async move {
-            let mut interval = tokio::time::interval(flush_keys_interval);
-            loop {
-                interval.tick().await;
-                rate_limiter_clone.retain_recent();
+        let flush_handle = tokio::spawn(
+            async move {
+                let mut interval = tokio::time::interval(flush_keys_interval);
+                loop {
+                    interval.tick().await;
+                    rate_limiter_clone.retain_recent();
+                }
             }
-        }.in_current_span());
+            .in_current_span(),
+        );
 
         Self {
             rate_limiter,
