@@ -52,8 +52,6 @@ releases: {
 		changelog: [#ChangeLogEntry, ...#ChangeLogEntry] | *[]
 		vrl_changelog?: string
 		whats_next: #Any | *[]
-		deprecation_announcements: [#DeprecationEntry, ...#DeprecationEntry] | *[]
-		planned_deprecations: [#DeprecationEntry, ...#DeprecationEntry] | *[]
 	}
 
 	{[Version=string]: #Release & {version: Version}}

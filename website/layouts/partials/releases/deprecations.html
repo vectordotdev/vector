@@ -1,0 +1,67 @@
+{{/* Renders deprecations filtered to a specific version (major.minor match).
+     Params: version (string, e.g. "0.56" or "0.56.0") */}}
+{{- $pending := site.Data.docs.deprecations_pending -}}
+{{- $enacted := site.Data.docs.deprecations_enacted -}}
+{{- $version := .version -}}
+
+{{- $parts  := split $version "." -}}
+{{- $prefix := printf "%s.%s." (index $parts 0) (index $parts 1) -}}
+{{- $exact  := printf "%s.%s"  (index $parts 0) (index $parts 1) -}}
+
+{{- $fp := slice -}}
+{{- range $pending -}}
+  {{- if or (strings.HasPrefix .deprecated_since $prefix) (eq .deprecated_since $exact) -}}
+    {{- $fp = $fp | append . -}}
+  {{- end -}}
+{{- end -}}
+
+{{- $fe := slice -}}
+{{- range $enacted -}}
+  {{- if or (strings.HasPrefix .deprecated_since $prefix) (eq .deprecated_since $exact) -}}
+    {{- $fe = $fe | append . -}}
+  {{- end -}}
+{{- end -}}
+
+{{ if gt (len $fp) 0 }}
+<div class="mt-6 flex flex-col space-y-6">
+  {{ range $fp }}
+  <div>
+    <span class="text-xl font-semibold text-dark dark:text-gray-300">
+      {{ .what | markdownify }}
+    </span>
+    <div class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+      Deprecated since {{ .deprecated_since }}
+    </div>
+    {{ with .description }}
+    <div class="mt-2.5 prose dark:prose-dark max-w-none">
+      {{ . | markdownify }}
+    </div>
+    {{ end }}
+  </div>
+  {{ end }}
+</div>
+{{ end }}
+
+{{ if gt (len $fe) 0 }}
+<div class="mt-6 flex flex-col space-y-6">
+  {{ range $fe }}
+  <div class="opacity-75">
+    <span class="text-xl font-semibold text-dark dark:text-gray-300">
+      {{ .what | markdownify }}
+    </span>
+    <div class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+      Deprecated since {{ .deprecated_since }} &middot; Removed in {{ .removed_in }}
+    </div>
+    {{ with .description }}
+    <div class="mt-2.5 prose dark:prose-dark max-w-none">
+      {{ . | markdownify }}
+    </div>
+    {{ end }}
+  </div>
+  {{ end }}
+</div>
+{{ end }}
+
+{{ if and (eq (len $fp) 0) (eq (len $fe) 0) }}
+<p class="text-gray-500 dark:text-gray-400 mt-4">No deprecations in this release.</p>
+{{ end }}
