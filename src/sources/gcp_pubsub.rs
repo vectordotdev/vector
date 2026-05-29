@@ -877,7 +877,6 @@ mod integration_tests {
         LazyLock::new(|| format!("{}/v1/projects/{}", *gcp::PUBSUB_ADDRESS, PROJECT));
     static ACK_DEADLINE: LazyLock<Duration> = LazyLock::new(|| Duration::from_secs(10)); // Minimum custom deadline allowed by Pub/Sub
 
-    #[ignore = "https://github.com/vectordotdev/vector/issues/24133"]
     #[tokio::test]
     async fn oneshot() {
         assert_source_compliance(&SOURCE_TAGS, async move {
@@ -889,7 +888,6 @@ mod integration_tests {
         .await;
     }
 
-    #[ignore = "https://github.com/vectordotdev/vector/issues/24133"]
     #[tokio::test]
     async fn shuts_down_before_data_received() {
         let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
@@ -902,7 +900,6 @@ mod integration_tests {
         assert_eq!(tester.pull_count(1).await, 1);
     }
 
-    #[ignore = "https://github.com/vectordotdev/vector/issues/24133"]
     #[tokio::test]
     async fn shuts_down_after_data_received() {
         assert_source_compliance(&SOURCE_TAGS, async move {
@@ -926,7 +923,6 @@ mod integration_tests {
         .await;
     }
 
-    #[ignore = "https://github.com/vectordotdev/vector/issues/24133"]
     #[tokio::test]
     async fn streams_data() {
         assert_source_compliance(&SOURCE_TAGS, async move {
@@ -940,7 +936,6 @@ mod integration_tests {
         .await;
     }
 
-    #[ignore = "https://github.com/vectordotdev/vector/issues/24133"]
     #[tokio::test]
     async fn sends_attributes() {
         assert_source_compliance(&SOURCE_TAGS, async move {
@@ -957,7 +952,6 @@ mod integration_tests {
         .await;
     }
 
-    #[ignore = "https://github.com/vectordotdev/vector/issues/24133"]
     #[tokio::test]
     async fn acks_received() {
         assert_source_compliance(&SOURCE_TAGS, async move {
