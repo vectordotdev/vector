@@ -128,6 +128,8 @@ pub enum HistogramName {
     HttpClientRttSeconds,
     HttpClientResponseRttSeconds,
     HttpClientErrorRttSeconds,
+    SourceBufferUtilization,
+    TransformBufferUtilization,
 }
 
 impl HistogramName {
@@ -161,6 +163,8 @@ impl HistogramName {
             Self::HttpClientRttSeconds => "http_client_rtt_seconds",
             Self::HttpClientResponseRttSeconds => "http_client_response_rtt_seconds",
             Self::HttpClientErrorRttSeconds => "http_client_error_rtt_seconds",
+            Self::SourceBufferUtilization => "source_buffer_utilization",
+            Self::TransformBufferUtilization => "transform_buffer_utilization",
         }
     }
 }
@@ -169,6 +173,18 @@ impl HistogramName {
 #[strum(serialize_all = "snake_case")]
 pub enum GaugeName {
     ComponentLatencyMeanSeconds,
+    SourceBufferMaxSizeEvents,
+    SourceBufferMaxSizeBytes,
+    SourceBufferMaxEventSize,
+    SourceBufferMaxByteSize,
+    SourceBufferUtilizationLevel,
+    SourceBufferUtilizationMean,
+    TransformBufferMaxSizeEvents,
+    TransformBufferMaxSizeBytes,
+    TransformBufferMaxEventSize,
+    TransformBufferMaxByteSize,
+    TransformBufferUtilizationLevel,
+    TransformBufferUtilizationMean,
     BufferMaxSizeEvents,
     BufferMaxEventSize,
     BufferMaxSizeBytes,
@@ -200,6 +216,18 @@ impl GaugeName {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::ComponentLatencyMeanSeconds => "component_latency_mean_seconds",
+            Self::SourceBufferMaxSizeEvents => "source_buffer_max_size_events",
+            Self::SourceBufferMaxSizeBytes => "source_buffer_max_size_bytes",
+            Self::SourceBufferMaxEventSize => "source_buffer_max_event_size",
+            Self::SourceBufferMaxByteSize => "source_buffer_max_byte_size",
+            Self::SourceBufferUtilizationLevel => "source_buffer_utilization_level",
+            Self::SourceBufferUtilizationMean => "source_buffer_utilization_mean",
+            Self::TransformBufferMaxSizeEvents => "transform_buffer_max_size_events",
+            Self::TransformBufferMaxSizeBytes => "transform_buffer_max_size_bytes",
+            Self::TransformBufferMaxEventSize => "transform_buffer_max_event_size",
+            Self::TransformBufferMaxByteSize => "transform_buffer_max_byte_size",
+            Self::TransformBufferUtilizationLevel => "transform_buffer_utilization_level",
+            Self::TransformBufferUtilizationMean => "transform_buffer_utilization_mean",
             Self::BufferMaxSizeEvents => "buffer_max_size_events",
             Self::BufferMaxEventSize => "buffer_max_event_size",
             Self::BufferMaxSizeBytes => "buffer_max_size_bytes",
