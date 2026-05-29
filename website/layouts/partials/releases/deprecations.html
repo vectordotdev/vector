@@ -17,7 +17,7 @@
 
 {{- $fe := slice -}}
 {{- range $enacted -}}
-  {{- if or (strings.HasPrefix .deprecated_since $prefix) (eq .deprecated_since $exact) -}}
+  {{- if or (strings.HasPrefix .removed_in $prefix) (eq .removed_in $exact) -}}
     {{- $fe = $fe | append . -}}
   {{- end -}}
 {{- end -}}
