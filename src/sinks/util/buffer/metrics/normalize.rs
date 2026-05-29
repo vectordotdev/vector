@@ -553,6 +553,7 @@ impl MetricSet {
 
         // A capacity policy is only set when inner is Bounded; this should always be true.
         let MetricSetInner::Bounded(ref mut lru) = self.inner else {
+            debug_assert!(false, "capacity policy set but inner is not Bounded");
             return;
         };
 
