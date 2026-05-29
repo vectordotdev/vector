@@ -4,10 +4,7 @@ use std::sync::Arc;
 
 use bytes::Bytes;
 use chrono::Utc;
-use futures::{
-    StreamExt,
-    channel::mpsc::Receiver,
-};
+use futures::{StreamExt, channel::mpsc::Receiver};
 use http::request::Parts;
 use indoc::indoc;
 use vector_lib::{
