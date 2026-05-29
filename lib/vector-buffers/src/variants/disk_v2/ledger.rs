@@ -14,6 +14,7 @@ use crossbeam_utils::atomic::AtomicCell;
 use fslock::LockFile;
 use futures::StreamExt;
 use rkyv::{Archive, Serialize, with::Atomic};
+use tracing::Instrument;
 use snafu::{ResultExt, Snafu};
 use tokio::{fs, io::AsyncWriteExt, sync::Notify};
 use vector_common::finalizer::OrderedFinalizer;
@@ -705,7 +706,7 @@ where
                 self.increment_pending_acks(amount);
                 self.notify_writer_waiters();
             }
-        });
+        }.in_current_span());
         finalizer
     }
 }

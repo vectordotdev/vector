@@ -17,6 +17,7 @@ use tokio_stream::{
     wrappers::{IntervalStream, ReceiverStream},
 };
 use tonic::{Request, Response, Status};
+use tracing::Instrument;
 use vector_lib::tap::{
     controller::{TapController, TapPatterns, TapPayload},
     topology::WatchRx,
@@ -696,7 +697,7 @@ impl observability::Service for ObservabilityService {
                     }
                 }
             }
-        });
+        }.in_current_span());
 
         let stream = FuturesStreamExt::flat_map(ReceiverStream::new(event_rx), |events| {
             stream::iter(events.into_iter().map(Ok))

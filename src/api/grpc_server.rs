@@ -16,6 +16,7 @@ use axum::{
 };
 use tokio::sync::oneshot;
 use tonic::transport::Server as TonicServer;
+use tracing::Instrument;
 use tonic_health::server::{HealthReporter, health_reporter};
 use vector_lib::tap::topology::WatchRx;
 
@@ -118,7 +119,7 @@ impl GrpcServer {
                     bind_addr = %actual_addr,
                 );
             }
-        });
+        }.in_current_span());
 
         info!("GRPC API server started on {}.", actual_addr);
 

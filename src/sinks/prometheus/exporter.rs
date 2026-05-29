@@ -477,7 +477,7 @@ impl PrometheusExporter {
                 .map_err(|error| error!("Server error: {}.", error))?;
 
             Ok::<(), ()>(())
-        });
+        }.in_current_span());
 
         self.server_shutdown_trigger = Some(trigger);
         Ok(())

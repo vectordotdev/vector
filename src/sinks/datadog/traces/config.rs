@@ -5,6 +5,7 @@ use indoc::indoc;
 use snafu::ResultExt;
 use tokio::sync::oneshot::{Sender, channel};
 use tower::ServiceBuilder;
+use tracing::Instrument;
 use vector_lib::{
     config::{AcknowledgementsConfig, proxy::ProxyConfig},
     configurable::configurable_component,
@@ -184,7 +185,7 @@ impl DatadogTracesConfig {
             compression,
             endpoints,
             Arc::clone(&apm_stats_aggregator),
-        ));
+        ).in_current_span());
 
         Ok(VectorSink::from_event_streamsink(sink))
     }

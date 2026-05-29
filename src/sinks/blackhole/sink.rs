@@ -20,6 +20,8 @@ use vector_lib::{
     },
 };
 
+use tracing::Instrument;
+
 use crate::{
     event::{EventArray, EventContainer, EventStatus, Finalizable},
     sinks::{blackhole::config::BlackholeConfig, util::StreamSink},
@@ -79,7 +81,7 @@ impl StreamSink<EventArray> for BlackholeSink {
                     internal_log_rate_limit = false,
                     "Collected events."
                 );
-            });
+            }.in_current_span());
         }
 
         while let Some(mut events) = input.next().await {

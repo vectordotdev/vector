@@ -34,6 +34,7 @@ use vector_lib::{
     },
     lookup::owned_value_path,
 };
+use tracing::Instrument;
 use vrl::{
     path,
     value::{Kind, kind::Collection},
@@ -453,7 +454,7 @@ impl PubsubSource {
         // when it has an idle interval it will mark itself as not
         // busy.
         let busy_flag = Arc::new(AtomicBool::new(false));
-        let task = tokio::spawn(self.clone().run(Arc::clone(&busy_flag)));
+        let task = tokio::spawn(self.clone().run(Arc::clone(&busy_flag)).in_current_span());
         tasks.push(Task { task, busy_flag });
     }
 

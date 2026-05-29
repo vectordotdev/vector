@@ -464,7 +464,7 @@ async fn kafka_source(
                 eof_tx,
             )
             .await;
-        })
+        }.in_current_span())
     };
 
     let client_task = {

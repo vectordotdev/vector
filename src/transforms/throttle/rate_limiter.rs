@@ -1,5 +1,7 @@
 use std::{hash::Hash, sync::Arc, time::Duration};
 
+use tracing::Instrument;
+
 use governor::{
     Quota, RateLimiter, clock, middleware::NoOpMiddleware, state::keyed::DashMapStateStore,
 };
@@ -31,7 +33,7 @@ where
                 interval.tick().await;
                 rate_limiter_clone.retain_recent();
             }
-        });
+        }.in_current_span());
 
         Self {
             rate_limiter,

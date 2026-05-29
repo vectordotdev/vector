@@ -12,6 +12,7 @@ use snafu::ResultExt;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore, mpsc, oneshot};
 use tokio_util::sync::PollSemaphore;
 use tower::Service;
+use tracing::Instrument;
 use uuid::Uuid;
 use vector_lib::{event::EventStatus, request_metadata::MetaDescriptive};
 
@@ -63,7 +64,7 @@ where
                 ack_client,
                 Arc::clone(&http_request_builder),
                 indexer_acknowledgements,
-            ));
+            ).in_current_span());
             Some(tx)
         } else {
             None

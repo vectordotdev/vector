@@ -35,6 +35,8 @@ cfg_if::cfg_if! {
         use windows::Win32::Foundation::{DUPLICATE_SAME_ACCESS, DuplicateHandle, HANDLE};
         use windows::Win32::System::Threading::GetCurrentProcess;
 
+        use tracing::Instrument;
+
         use crate::{
             SourceSender,
             event::{BatchNotifier, BatchStatus, BatchStatusReceiver},
@@ -123,7 +125,7 @@ impl Finalizer {
                     }
                 }
                 debug!(message = "Acknowledgement stream completed.");
-            });
+            }.in_current_span());
 
             Self::Async(finalizer)
         } else {
@@ -371,7 +373,7 @@ impl WindowsEventLogSource {
                     let _ = windows::Win32::Foundation::CloseHandle(handle);
                 }
             }
-        });
+        }.in_current_span());
 
         // Track when we last flushed checkpoints
         let mut last_checkpoint = std::time::Instant::now();

@@ -9,6 +9,7 @@ use std::{
 };
 
 use futures::StreamExt;
+use tracing::Instrument;
 use roaring::RoaringTreemap;
 use serde::{Deserialize, Serialize};
 use tokio::time::interval;
@@ -117,7 +118,7 @@ impl IndexerAcknowledgement {
                         now.duration_since(channel.get_last_used()).as_secs() <= max_idle_time
                     });
                 }
-            });
+            }.in_current_span());
         }
 
         Self {
@@ -223,7 +224,7 @@ impl Channel {
                     }
                 }
             }
-        });
+        }.in_current_span());
 
         Self {
             last_used_timestamp: RwLock::new(Instant::now()),

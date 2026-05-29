@@ -587,7 +587,7 @@ pub fn file_source(
                 }
             }
             send_shutdown.send(())
-        });
+        }.in_current_span());
         (Some(finalizer), shutdown2.map(|_| ()).boxed())
     } else {
         // When not dealing with end-to-end acknowledgements, just

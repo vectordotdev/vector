@@ -224,7 +224,7 @@ fn shutdown_trigger(control_tx: fanout::ControlChannel, sink_id: ComponentKey) -
         } else {
             debug!(message = "Disconnected sink.", ?sink_id);
         }
-    });
+    }.in_current_span());
 
     shutdown_tx
 }
@@ -370,7 +370,7 @@ async fn tap_handler(
                                 while let Some(events) = tap_buffer_rx.next().await {
                                     tap_transformer.try_send(events);
                                 }
-                            });
+                            }.in_current_span());
 
                             // Attempt to connect the sink.
                             //

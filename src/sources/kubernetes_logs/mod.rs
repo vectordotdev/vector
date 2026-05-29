@@ -35,6 +35,7 @@ use vector_lib::{
     internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol},
     lookup::{OwnedTargetPath, lookup_v2::OptionalTargetPath, owned_value_path, path},
 };
+use tracing::Instrument;
 use vrl::value::{Kind, kind::Collection};
 
 use crate::{
@@ -743,7 +744,7 @@ impl Source {
             pod_cacher,
             pod_watcher,
             delay_deletion,
-        )));
+        ).in_current_span()));
 
         // -----------------------------------------------------------------
 
@@ -767,7 +768,7 @@ impl Source {
                 MetaCache::new(),
                 ns_watcher,
                 delay_deletion,
-            )));
+            ).in_current_span()));
         }
 
         // -----------------------------------------------------------------
@@ -792,7 +793,7 @@ impl Source {
             node_cacher,
             node_watcher,
             delay_deletion,
-        )));
+        ).in_current_span()));
 
         let paths_provider = K8sPathsProvider::new(
             pod_state.clone(),

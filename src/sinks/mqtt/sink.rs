@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use futures::{StreamExt, stream::BoxStream};
+use tracing::Instrument;
 
 use super::{
     MqttSinkConfig,
@@ -76,7 +77,7 @@ impl MqttSink {
                     }
                 }
             }
-        });
+        }.in_current_span());
 
         let service = ServiceBuilder::new().service(MqttService {
             client,

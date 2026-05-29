@@ -11,6 +11,7 @@ use tokio::{
     task::JoinHandle,
     time::sleep,
 };
+use tracing::Instrument;
 
 use super::{
     RedisEvent, RedisRequest, RepairChannelSnafu,
@@ -147,7 +148,7 @@ impl RedisConnection {
                     task_conn_tx,
                 )
                 .await
-            })),
+            }.in_current_span())),
         })
     }
 

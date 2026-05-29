@@ -11,6 +11,7 @@ use tokio::{
     time::{self, Duration, Instant, sleep},
 };
 use tokio_stream::wrappers::IntervalStream;
+use tracing::Instrument;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::{
@@ -749,5 +750,5 @@ fn spawn_reader_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
         }
 
         debug!("Finished capturing {} command output.", origin);
-    }));
+    }.in_current_span()));
 }

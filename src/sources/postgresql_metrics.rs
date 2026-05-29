@@ -34,6 +34,8 @@ use vector_lib::{
     metric_tags,
 };
 
+use tracing::Instrument as _;
+
 use crate::{
     config::{SourceConfig, SourceContext, SourceOutput},
     event::metric::{Metric, MetricKind, MetricTags, MetricValue},
@@ -295,7 +297,7 @@ impl PostgresqlClient {
                             endpoint: &self.endpoint,
                         }
                     })?;
-                tokio::spawn(connection);
+                tokio::spawn(connection.in_current_span());
                 client
             }
             None => {
@@ -306,7 +308,7 @@ impl PostgresqlClient {
                         .with_context(|_| ConnectionFailedSnafu {
                             endpoint: &self.endpoint,
                         })?;
-                tokio::spawn(connection);
+                tokio::spawn(connection.in_current_span());
                 client
             }
         };

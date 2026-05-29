@@ -25,6 +25,7 @@ use tokio::{
     time::sleep,
 };
 use tokio_util::codec::FramedRead;
+use tracing::Instrument;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::{CharacterDelimitedDecoder, decoding::BoxedFramingError},
@@ -519,7 +520,7 @@ impl JournaldSource {
         let events_received = register!(EventsReceived);
 
         // Spawn stderr handler task
-        let stderr_handler = tokio::spawn(Self::handle_stderr(stderr_stream));
+        let stderr_handler = tokio::spawn(Self::handle_stderr(stderr_stream).in_current_span());
 
         let batch_size = self.batch_size;
         let result = loop {
@@ -1062,7 +1063,7 @@ impl Finalizer {
                         checkpointer.lock().await.set(cursor).await;
                     }
                 }
-            });
+            }.in_current_span());
             Self::Async(finalizer)
         } else {
             Self::Sync(checkpointer)

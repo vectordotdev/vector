@@ -24,7 +24,7 @@ use tokio::{
     time::sleep,
 };
 
-use tracing::{debug, error, info, trace};
+use tracing::{Instrument, debug, error, info, trace};
 
 use crate::{
     file_watcher::{FileWatcher, RawLineResult},
@@ -153,7 +153,7 @@ where
             self.glob_minimum_cooldown,
             shutdown_checkpointer,
             self.emitter.clone(),
-        ));
+        ).in_current_span());
 
         // Alright friends, how does this work?
         //
