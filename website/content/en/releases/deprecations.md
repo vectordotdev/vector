@@ -4,5 +4,3 @@ description: Active and historical deprecations in Vector. See the [deprecation 
 layout: deprecations
 weight: 100
 ---
-
-[policy]: https://github.com/vectordotdev/vector/blob/master/docs/DEPRECATION_POLICY.md
