@@ -45,7 +45,7 @@ Automated steps include:
 - Pin VRL to latest released version rather than `main`
 - Check if there is a newer version of [Alpine](https://alpinelinux.org/releases/) or [Debian](https://www.debian.org/releases/) available to update the release images in
       `distribution/docker/`. Update if so.
-- Run `cargo vdev build release-cue` to generate a new cue file for the release
+- Generate a new cue file for the release in `website/cue/reference/releases/`
   - Copy VRL changelogs from the VRL version in the last Vector release as a new changelog entry
         ([example](https://github.com/vectordotdev/vector/blob/9c67bba358195f5018febca2f228dfcb2be794b5/website/cue/reference/releases/0.41.0.cue#L33-L64))
 - Update version number in `website/cue/reference/administration/interfaces/kubectl.cue`

@@ -64,6 +64,7 @@ impl OtlpSerializer {
     pub fn new() -> vector_common::Result<Self> {
         let options = Options {
             use_json_names: true,
+            allow_lossy_string_coercion: true,
         };
 
         let logs_descriptor = ProtobufSerializer::new_from_bytes(

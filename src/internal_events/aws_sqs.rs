@@ -6,7 +6,7 @@ use vector_lib::counter;
 #[cfg(any(feature = "sources-aws_s3", feature = "sources-aws_sqs"))]
 use vector_lib::{
     NamedInternalEvent,
-    internal_event::{CounterName, HistogramName, InternalEvent, error_stage, error_type},
+    internal_event::{CounterName, InternalEvent, error_stage, error_type},
 };
 
 #[cfg(feature = "sources-aws_s3")]
@@ -18,6 +18,7 @@ mod s3 {
         SendMessageBatchRequestEntry, SendMessageBatchResultEntry,
     };
     use vector_lib::histogram;
+    use vector_lib::internal_event::HistogramName;
 
     use super::*;
     use crate::sources::aws_s3::sqs::ProcessingError;
