@@ -46,7 +46,7 @@ export AUTOINSTALL ?= false
 # Override to true for a bit more log output in your environment building (more coming!)
 export VERBOSE ?= false
 # Override the container tool. Tries docker first and then tries podman.
-export CONTAINER_TOOL ?= $(shell docker version >/dev/null 2>&1 && echo docker || (podman version >/dev/null 2>&1 && echo podman) || echo unknown)
+CONTAINER_TOOL ?= $(shell docker version >/dev/null 2>&1 && echo docker || (podman version >/dev/null 2>&1 && echo podman) || echo unknown)
 # If we're using podman create pods else if we're using docker create networks.
 export CURRENT_DIR = $(shell pwd)
 
