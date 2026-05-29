@@ -17,7 +17,7 @@ use crate::{
 /// Configuration for the `aws_sqs` sink.
 #[configurable_component(sink(
     "aws_sqs",
-    "Publish observability events to AWS Simple Queue Service topics."
+    "Publish observability events to AWS Simple Queue Service queues."
 ))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
