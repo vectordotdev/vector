@@ -13,17 +13,12 @@
     {
       "what": "`buffer_byte_size` and `buffer_events` gauge metrics",
       "deprecated_since": "0.53.0",
-      "description": "The `buffer_byte_size` and `buffer_events` gauges are deprecated in favor of the\n`buffer_size_bytes` and `buffer_size_events` metrics described in `docs/specs/buffer.md`."
+      "description": "The `buffer_byte_size` and `buffer_events` gauges are deprecated in favor of the\n`buffer_size_bytes` and `buffer_size_events` metrics."
     },
     {
       "what": "`series_api_version: v1` option on the `datadog_metrics` sink",
       "deprecated_since": "0.56.0",
       "description": "The `series_api_version: v1` option is deprecated in favor of `v2` (the default).\nThe v1 series endpoint (`/api/v1/series`) is a legacy endpoint.\n\nUsers should remove `series_api_version: v1` from their configuration or set it to `v2`."
-    },
-    {
-      "what": "FAKE EXAMPLE — `fake_option` on the `fake_sink` sink [remove before merging]",
-      "deprecated_since": "0.56.0",
-      "description": "This is a fake deprecation entry used to test the Deprecation Announcements section on the release page. Remove this file before merging."
     },
     {
       "what": "`encoding` field on HTTP server sources",
@@ -37,6 +32,12 @@
       "deprecated_since": "0.55.0",
       "removed_in": "0.56.0",
       "description": "The `greptimedb_metrics` and `greptimedb_logs` sinks drop support for GreptimeDB v0.x.\nUsers must upgrade their GreptimeDB instance to v1.x before upgrading Vector."
+    },
+    {
+      "what": "FAKE EXAMPLE — `fake_option` on the `fake_sink` sink [remove before merging]",
+      "deprecated_since": "0.56.0",
+      "removed_in": "0.56.0",
+      "description": "This is a fake deprecation entry used to test the Deprecation Announcements section on the release page. Remove this file before merging."
     }
   ]
 }
