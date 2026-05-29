@@ -480,7 +480,7 @@ mod tests {
         );
 
         // Single item, just stored regardless of kind
-        agg.record(counter_a_1.clone());
+        assert_eq!(agg.record(counter_a_1.clone()), None);
         let mut out = vec![];
         // We should flush 1 item counter_a_1
         agg.flush_into(&mut out);
@@ -498,8 +498,8 @@ mod tests {
         assert_eq!(0, out.len());
 
         // Two increments with the same series, should sum into 1
-        agg.record(counter_a_1.clone());
-        agg.record(counter_a_2);
+        assert_eq!(agg.record(counter_a_1.clone()), None);
+        assert_eq!(agg.record(counter_a_2), None);
         out.clear();
         agg.flush_into(&mut out);
         assert_eq!(1, out.len());
@@ -511,8 +511,8 @@ mod tests {
             MetricValue::Counter { value: 44.0 },
         );
         // Two increments with the different series, should get each back as-is
-        agg.record(counter_a_1.clone());
-        agg.record(counter_b_1.clone());
+        assert_eq!(agg.record(counter_a_1.clone()), None);
+        assert_eq!(agg.record(counter_b_1.clone()), None);
         out.clear();
         agg.flush_into(&mut out);
         assert_eq!(2, out.len());
@@ -546,7 +546,7 @@ mod tests {
         );
 
         // Single item, just stored regardless of kind
-        agg.record(gauge_a_1.clone());
+        assert_eq!(agg.record(gauge_a_1.clone()), None);
         let mut out = vec![];
         // We should flush 1 item gauge_a_1
         agg.flush_into(&mut out);
@@ -564,8 +564,8 @@ mod tests {
         assert_eq!(0, out.len());
 
         // Two absolutes with the same series, should get the 2nd (last) back.
-        agg.record(gauge_a_1.clone());
-        agg.record(gauge_a_2.clone());
+        assert_eq!(agg.record(gauge_a_1.clone()), None);
+        assert_eq!(agg.record(gauge_a_2.clone()), None);
         out.clear();
         agg.flush_into(&mut out);
         assert_eq!(1, out.len());
@@ -577,8 +577,8 @@ mod tests {
             MetricValue::Gauge { value: 44.0 },
         );
         // Two increments with the different series, should get each back as-is
-        agg.record(gauge_a_1.clone());
-        agg.record(gauge_b_1.clone());
+        assert_eq!(agg.record(gauge_a_1.clone()), None);
+        assert_eq!(agg.record(gauge_b_1.clone()), None);
         out.clear();
         agg.flush_into(&mut out);
         assert_eq!(2, out.len());
@@ -622,7 +622,7 @@ mod tests {
         );
 
         // Single item, counter should be 1
-        agg.record(gauge_a_1.clone());
+        assert_eq!(agg.record(gauge_a_1.clone()), None);
         let mut out = vec![];
         // We should flush 1 item gauge_a_1
         agg.flush_into(&mut out);
@@ -640,8 +640,8 @@ mod tests {
         assert_eq!(0, out.len());
 
         // Two absolutes with the same series, counter should be 2
-        agg.record(gauge_a_1.clone());
-        agg.record(gauge_a_2.clone());
+        assert_eq!(agg.record(gauge_a_1.clone()), None);
+        assert_eq!(agg.record(gauge_a_2.clone()), None);
         out.clear();
         agg.flush_into(&mut out);
         assert_eq!(1, out.len());
@@ -668,7 +668,7 @@ mod tests {
         );
 
         // Single item, it should be returned as is
-        agg.record(gauge_a_2.clone());
+        assert_eq!(agg.record(gauge_a_2.clone()), None);
         let mut out = vec![];
         // We should flush 1 item gauge_a_2
         agg.flush_into(&mut out);
@@ -686,8 +686,8 @@ mod tests {
         assert_eq!(0, out.len());
 
         // Two absolutes, result should be higher of the 2
-        agg.record(gauge_a_1.clone());
-        agg.record(gauge_a_2.clone());
+        assert_eq!(agg.record(gauge_a_1.clone()), None);
+        assert_eq!(agg.record(gauge_a_2.clone()), None);
         out.clear();
         agg.flush_into(&mut out);
         assert_eq!(1, out.len());
@@ -714,7 +714,7 @@ mod tests {
         );
 
         // Single item, it should be returned as is
-        agg.record(gauge_a_2.clone());
+        assert_eq!(agg.record(gauge_a_2.clone()), None);
         let mut out = vec![];
         // We should flush 1 item gauge_a_2
         agg.flush_into(&mut out);
@@ -732,8 +732,8 @@ mod tests {
         assert_eq!(0, out.len());
 
         // Two absolutes, result should be lower of the 2
-        agg.record(gauge_a_1.clone());
-        agg.record(gauge_a_2.clone());
+        assert_eq!(agg.record(gauge_a_1.clone()), None);
+        assert_eq!(agg.record(gauge_a_2.clone()), None);
         out.clear();
         agg.flush_into(&mut out);
         assert_eq!(1, out.len());
@@ -765,7 +765,7 @@ mod tests {
         );
 
         // Single item, it should be returned as is
-        agg.record(gauge_a_2.clone());
+        assert_eq!(agg.record(gauge_a_2.clone()), None);
         let mut out = vec![];
         // We should flush 1 item gauge_a_2
         agg.flush_into(&mut out);
@@ -783,13 +783,13 @@ mod tests {
         assert_eq!(0, out.len());
 
         // Two absolutes in 2 separate flushes, result should be diff between the 2
-        agg.record(gauge_a_1.clone());
+        assert_eq!(agg.record(gauge_a_1.clone()), None);
         out.clear();
         agg.flush_into(&mut out);
         assert_eq!(1, out.len());
         assert_eq!(&gauge_a_1, &out[0]);
 
-        agg.record(gauge_a_2.clone());
+        assert_eq!(agg.record(gauge_a_2.clone()), None);
         out.clear();
         agg.flush_into(&mut out);
         assert_eq!(1, out.len());
@@ -817,13 +817,13 @@ mod tests {
 
         let mut out = vec![];
         // Two absolutes in 2 separate flushes, result should be second one due to different types
-        agg.record(gauge_a_1.clone());
+        assert_eq!(agg.record(gauge_a_1.clone()), None);
         out.clear();
         agg.flush_into(&mut out);
         assert_eq!(1, out.len());
         assert_eq!(&gauge_a_1, &out[0]);
 
-        agg.record(gauge_a_2.clone());
+        assert_eq!(agg.record(gauge_a_2.clone()), None);
         out.clear();
         agg.flush_into(&mut out);
         assert_eq!(1, out.len());
@@ -861,7 +861,7 @@ mod tests {
         );
 
         // Single item, it should be returned as is
-        agg.record(gauge_a_2.clone());
+        assert_eq!(agg.record(gauge_a_2.clone()), None);
         let mut out = vec![];
         // We should flush 1 item gauge_a_2
         agg.flush_into(&mut out);
@@ -879,9 +879,9 @@ mod tests {
         assert_eq!(0, out.len());
 
         // Three absolutes, result should be mean
-        agg.record(gauge_a_1.clone());
-        agg.record(gauge_a_2.clone());
-        agg.record(gauge_a_3.clone());
+        assert_eq!(agg.record(gauge_a_1.clone()), None);
+        assert_eq!(agg.record(gauge_a_2.clone()), None);
+        assert_eq!(agg.record(gauge_a_3.clone()), None);
         out.clear();
         agg.flush_into(&mut out);
         assert_eq!(1, out.len());
@@ -940,7 +940,7 @@ mod tests {
         );
 
         for gauge in gauges {
-            agg.record(gauge);
+            assert_eq!(agg.record(gauge), None);
         }
         let mut out = vec![];
         agg.flush_into(&mut out);
@@ -988,8 +988,8 @@ mod tests {
         assert_eq!(agg.record(gauge_2.clone()), Some(gauge_2));
 
         // Each is returned individually — no collapsing to latest.
-        agg.record(counter_1);
-        agg.record(counter_2);
+        assert_eq!(agg.record(counter_1), None);
+        assert_eq!(agg.record(counter_2), None);
 
         let mut out = vec![];
         agg.flush_into(&mut out);
@@ -1028,13 +1028,13 @@ mod tests {
         // when types conflict the new values replaces whatever is there
 
         // Start with an counter
-        agg.record(counter.clone());
+        assert_eq!(agg.record(counter.clone()), None);
         // Another will "add" to it
-        agg.record(counter.clone());
+        assert_eq!(agg.record(counter.clone()), None);
         // Then an set will replace it due to a failed update
-        agg.record(set.clone());
+        assert_eq!(agg.record(set.clone()), None);
         // Then a set union would be a noop
-        agg.record(set.clone());
+        assert_eq!(agg.record(set.clone()), None);
         let mut out = vec![];
         // We should flush 1 item counter
         agg.flush_into(&mut out);
@@ -1042,13 +1042,13 @@ mod tests {
         assert_eq!(&set, &out[0]);
 
         // Start out with an set
-        agg.record(set.clone());
+        assert_eq!(agg.record(set.clone()), None);
         // Union with itself, a noop
-        agg.record(set);
+        assert_eq!(agg.record(set), None);
         // Send an counter with the same name, will replace due to a failed update
-        agg.record(counter.clone());
+        assert_eq!(agg.record(counter.clone()), None);
         // Send another counter will "add"
-        agg.record(counter);
+        assert_eq!(agg.record(counter), None);
         let mut out = vec![];
         // We should flush 1 item counter
         agg.flush_into(&mut out);
@@ -1083,13 +1083,13 @@ mod tests {
         // when types conflict the new values replaces whatever is there
 
         // Start with an incremental
-        agg.record(incremental.clone());
+        assert_eq!(agg.record(incremental.clone()), None);
         // Another will "add" to it
-        agg.record(incremental.clone());
+        assert_eq!(agg.record(incremental.clone()), None);
         // Then an absolute will replace it with a failed update
-        agg.record(absolute.clone());
+        assert_eq!(agg.record(absolute.clone()), None);
         // Then another absolute will replace it normally
-        agg.record(absolute.clone());
+        assert_eq!(agg.record(absolute.clone()), None);
         let mut out = vec![];
         // We should flush 1 item incremental
         agg.flush_into(&mut out);
@@ -1097,13 +1097,13 @@ mod tests {
         assert_eq!(&absolute, &out[0]);
 
         // Start out with an absolute
-        agg.record(absolute.clone());
+        assert_eq!(agg.record(absolute.clone()), None);
         // Replace it normally
-        agg.record(absolute);
+        assert_eq!(agg.record(absolute), None);
         // Send an incremental with the same name, will replace due to a failed update
-        agg.record(incremental.clone());
+        assert_eq!(agg.record(incremental.clone()), None);
         // Send another incremental will "add"
-        agg.record(incremental);
+        assert_eq!(agg.record(incremental), None);
         let mut out = vec![];
         // We should flush 1 item incremental
         agg.flush_into(&mut out);
