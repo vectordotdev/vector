@@ -201,6 +201,11 @@ struct PendingJsonEntry {
     description: String,
 }
 
+/// Read only the enacted entries from `DEPRECATIONS_JSON`.
+pub fn read_enacted(repo_root: &Path) -> Result<Vec<EnactedEntry>> {
+    Ok(read_json(repo_root)?.deprecations_enacted)
+}
+
 fn read_json(repo_root: &Path) -> Result<DeprecationsJson> {
     let path = repo_root.join(DEPRECATIONS_JSON);
     if !path.exists() {

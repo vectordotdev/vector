@@ -58,6 +58,19 @@ impl Cli {
             None => "next".to_string(),
         };
 
+        if let Some(ref v) = next_minor {
+            let enacted = deprecation::read_enacted(&repo_root)?;
+            let removing: Vec<&deprecation::EnactedEntry> = enacted
+                .iter()
+                .filter(|e| {
+                    Version::parse(&e.removed_in)
+                        .ok()
+                        .is_some_and(|rv| rv.major == v.major && rv.minor == v.minor)
+                })
+                .collect();
+            print_enacted_section(&next_label, &removing);
+        }
+
         print_announcing_section(&next_label, &announcing);
         if !explicit_version {
             print_section("Previously announced", &planned);
@@ -67,20 +80,16 @@ impl Cli {
     }
 }
 
-/// Print the "Announced in next release" section header with the version label in bold red.
 fn print_announcing_section(next_label: &str, entries: &[&DeprecationEntry]) {
-    let header_style = Style::new().underline().white();
+    let style = Style::new().bold().underline();
     let title = format!("Announced in next release ({next_label})");
-    println!(
-        "{}",
-        title.if_supports_color(Stdout, |t| t.style(header_style))
-    );
+    println!("{}", title.if_supports_color(Stdout, |t| t.style(style)));
     println!();
     if entries.is_empty() {
         println!("{}", "(none)".if_supports_color(Stdout, |t| t.dimmed()));
     } else {
         for e in entries {
-            print_entry(e, true);
+            print_entry(e);
         }
     }
     println!();
@@ -94,28 +103,48 @@ fn print_section(title: &str, entries: &[&DeprecationEntry]) {
         println!("{}", "(none)".if_supports_color(Stdout, |t| t.dimmed()));
     } else {
         for e in entries {
-            print_entry(e, false);
+            print_entry(e);
         }
     }
     println!();
 }
 
-fn print_entry(e: &DeprecationEntry, highlight_version: bool) {
-    println!("{}", e.what.if_supports_color(Stdout, |t| t.bold()));
-    let version_str = e.deprecated_since.to_string();
-    let version_colored = if highlight_version {
-        owo_colors::OwoColorize::if_supports_color(&version_str, Stdout, |t| {
-            t.style(Style::new().bold().red())
-        })
-        .to_string()
+fn print_enacted_section(next_label: &str, entries: &[&deprecation::EnactedEntry]) {
+    let style = Style::new().bold().underline();
+    let title = format!("Removed in {next_label}");
+    println!("{}", title.if_supports_color(Stdout, |t| t.style(style)));
+    println!();
+    if entries.is_empty() {
+        println!("{}", "(none)".if_supports_color(Stdout, |t| t.dimmed()));
     } else {
-        owo_colors::OwoColorize::if_supports_color(&version_str, Stdout, |t| t.bright_cyan())
-            .to_string()
-    };
+        for e in entries {
+            println!("{}", e.what.if_supports_color(Stdout, |t| t.bold()));
+            println!(
+                "  {} {}",
+                "deprecated_since:".if_supports_color(Stdout, |t| t.dimmed()),
+                e.deprecated_since
+                    .if_supports_color(Stdout, |t| t.bright_cyan()),
+            );
+            if !e.description.is_empty() {
+                println!();
+                for line in e.description.lines() {
+                    println!("  {}", line.if_supports_color(Stdout, |t| t.italic()));
+                }
+            }
+            println!();
+        }
+    }
+    println!();
+}
+
+fn print_entry(e: &DeprecationEntry) {
+    println!("{}", e.what.if_supports_color(Stdout, |t| t.bold()));
     println!(
         "  {} {}",
         "deprecated_since:".if_supports_color(Stdout, |t| t.dimmed()),
-        version_colored,
+        e.deprecated_since
+            .to_string()
+            .if_supports_color(Stdout, |t| t.bright_cyan()),
     );
     if !e.description.is_empty() {
         println!();
