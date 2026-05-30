@@ -148,6 +148,62 @@ components: transforms: aws_ec2_metadata: {
 					examples: ["us-east-1"]
 				}
 			}
+			"availability-zone-id": {
+				description: "The `availability-zone-id` that the current EC2 instance is running in. Unlike `availability-zone`, this ID is consistent across AWS accounts."
+				required:    false
+				type: string: {
+					default: null
+					examples: ["use1-az1"]
+				}
+			}
+			"partition": {
+				description: "The AWS partition (from `services/partition`) that the current EC2 instance is running in."
+				required:    false
+				type: string: {
+					default: null
+					examples: ["aws"]
+				}
+			}
+			"domain": {
+				description: "The AWS region domain (from `services/domain`) for the current EC2 instance."
+				required:    false
+				type: string: {
+					default: null
+					examples: ["amazonaws.com"]
+				}
+			}
+			"placement-group-name": {
+				description: "The name of the placement group (from `placement/group-name`) that the current EC2 instance is in, if any."
+				required:    false
+				type: string: {
+					default: null
+					examples: ["my-placement-group"]
+				}
+			}
+			"placement-partition-number": {
+				description: "The number of the partition (from `placement/partition-number`) within the placement group that the current EC2 instance is in, if any."
+				required:    false
+				type: string: {
+					default: null
+					examples: ["1"]
+				}
+			}
+			"host-id": {
+				description: "The ID of the Dedicated Host (from `placement/host-id`) that the current EC2 instance is running on, if any."
+				required:    false
+				type: string: {
+					default: null
+					examples: ["h-0123456789abcdef0"]
+				}
+			}
+			"autoscaling-target-lifecycle-state": {
+				description: "The EC2 Auto Scaling target lifecycle state (from `autoscaling/target-lifecycle-state`) of the current EC2 instance, if it is part of an Auto Scaling group."
+				required:    false
+				type: string: {
+					default: null
+					examples: ["InService"]
+				}
+			}
 			"role-name": {
 				description: "The `role-name` that the current EC2 instance is using."
 				required:    true
