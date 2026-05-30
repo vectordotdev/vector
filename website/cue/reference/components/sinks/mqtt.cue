@@ -65,8 +65,8 @@ components: sinks: mqtt: {
 
 	input: {
 		logs:    true
-		metrics: null
-		traces:  false
+		metrics: true
+		traces:  true
 	}
 
 	telemetry: metrics: {

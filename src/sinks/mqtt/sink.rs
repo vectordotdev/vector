@@ -1,13 +1,16 @@
-use async_trait::async_trait;
-use futures::{StreamExt, stream::BoxStream};
-
 use super::{
     MqttSinkConfig,
     config::MqttQoS,
     request_builder::{MqttEncoder, MqttRequestBuilder},
     service::MqttService,
 };
-use crate::{common::mqtt::MqttConnector, internal_events::MqttConnectionError, sinks::prelude::*};
+use crate::{
+    common::mqtt::{MqttConnector, MqttError, MqttEventLoop},
+    internal_events::MqttConnectionError,
+    sinks::prelude::*,
+};
+use async_trait::async_trait;
+use futures::{StreamExt, stream::BoxStream};
 
 pub struct MqttSink {
     transformer: Transformer,
@@ -16,6 +19,7 @@ pub struct MqttSink {
     topic: Template,
     quality_of_service: MqttQoS,
     retain: bool,
+    publish_properties: Option<rumqttc::v5::mqttbytes::v5::PublishProperties>,
 }
 
 pub(super) struct MqttEvent {
@@ -30,6 +34,13 @@ impl MqttSink {
         let topic = config.topic.clone();
         let encoder = Encoder::<()>::new(serializer);
 
+        let publish_properties = config
+            .publish_properties
+            .as_ref()
+            .map(|v5| v5.to_publish_properties())
+            .transpose()
+            .map_err(|source| MqttError::Configuration { source })?;
+
         Ok(Self {
             transformer,
             encoder,
@@ -37,6 +48,7 @@ impl MqttSink {
             topic,
             quality_of_service: config.quality_of_service,
             retain: config.retain,
+            publish_properties,
         })
     }
 
@@ -57,31 +69,45 @@ impl MqttSink {
     }
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let (client, mut connection) = self.connector.connect();
+        let (client, eventloop) = self.connector.connect();
 
-        // This is necessary to keep the mqtt event loop moving forward.
-        tokio::spawn(async move {
-            loop {
-                // If an error is returned here there is currently no way to tie this back
-                // to the event that was posted which means we can't accurately provide
-                // delivery guarantees.
-                // We need this issue resolved first:
-                // https://github.com/bytebeamio/rumqtt/issues/349
-                match connection.poll().await {
-                    Ok(_) => {}
-                    Err(connection_error) => {
-                        emit!(MqttConnectionError {
-                            error: connection_error
-                        });
+        // Spawn the event loop handler based on protocol version
+        match eventloop {
+            MqttEventLoop::V311(mut connection) => {
+                tokio::spawn(async move {
+                    loop {
+                        match connection.poll().await {
+                            Ok(_) => {}
+                            Err(connection_error) => {
+                                emit!(MqttConnectionError::V311 {
+                                    error: connection_error
+                                });
+                            }
+                        }
                     }
-                }
+                });
             }
-        });
+            MqttEventLoop::V5(mut connection) => {
+                tokio::spawn(async move {
+                    loop {
+                        match connection.poll().await {
+                            Ok(_) => {}
+                            Err(connection_error) => {
+                                emit!(MqttConnectionError::V5 {
+                                    error: connection_error
+                                });
+                            }
+                        }
+                    }
+                });
+            }
+        }
 
         let service = ServiceBuilder::new().service(MqttService {
             client,
             quality_of_service: self.quality_of_service,
             retain: self.retain,
+            publish_properties: self.publish_properties.clone(),
         });
 
         let request_builder = MqttRequestBuilder {
