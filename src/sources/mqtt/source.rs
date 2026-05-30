@@ -19,7 +19,10 @@ use crate::{
     SourceSender,
     common::mqtt::{MqttClient, MqttConnector, MqttEventLoop},
     event::{BatchNotifier, Event},
-    internal_events::{EndpointBytesReceived, StreamClosedError},
+    internal_events::{
+        ConnectionOpen, EndpointBytesReceived, MqttAckError, MqttConnectionError,
+        MqttConnectionShutdown, MqttDirection, MqttSubscribeError, OpenGauge, StreamClosedError,
+    },
     serde::OneOrMany,
     shutdown::ShutdownSignal,
     sources::{mqtt::MqttSourceConfig, util},
@@ -63,7 +66,9 @@ impl MqttSource {
             }
         }
 
-        match (client, eventloop) {
+        let _open_token = OpenGauge::new().open(|count| emit!(ConnectionOpen { count }));
+
+        let result = match (client, eventloop) {
             (MqttClient::V311(client), MqttEventLoop::V311(eventloop)) => {
                 self.run_v3(client, *eventloop, &mut out, shutdown).await
             }
@@ -71,19 +76,25 @@ impl MqttSource {
                 self.run_v5(client, *eventloop, &mut out, shutdown).await
             }
             _ => unreachable!("client and event loop protocol versions must match"),
-        }
+        };
+
+        emit!(MqttConnectionShutdown);
+        result
     }
 
     async fn subscribe_v3(&self, client: &rumqttc::AsyncClient) -> Result<(), ()> {
         match &self.config.topic {
             OneOrMany::One(topic) => {
-                client
-                    .subscribe(topic, QoSV3::AtLeastOnce)
-                    .await
-                    .map_err(|_| ())?;
+                if let Err(error) = client.subscribe(topic, QoSV3::AtLeastOnce).await {
+                    emit!(MqttSubscribeError {
+                        topic: topic.clone(),
+                        error: error.to_string(),
+                    });
+                    return Err(());
+                }
             }
             OneOrMany::Many(topics) => {
-                client
+                if let Err(error) = client
                     .subscribe_many(
                         topics
                             .iter()
@@ -91,7 +102,13 @@ impl MqttSource {
                             .map(|topic| SubscribeFilter::new(topic, QoSV3::AtLeastOnce)),
                     )
                     .await
-                    .map_err(|_| ())?;
+                {
+                    emit!(MqttSubscribeError {
+                        topic: topics.join(","),
+                        error: error.to_string(),
+                    });
+                    return Err(());
+                }
             }
         }
         Ok(())
@@ -100,18 +117,30 @@ impl MqttSource {
     async fn subscribe_v5(&self, client: &rumqttc::v5::AsyncClient) -> Result<(), ()> {
         match &self.config.topic {
             OneOrMany::One(topic) => {
-                client
+                if let Err(error) = client
                     .subscribe(topic, rumqttc::v5::mqttbytes::QoS::AtLeastOnce)
                     .await
-                    .map_err(|_| ())?;
+                {
+                    emit!(MqttSubscribeError {
+                        topic: topic.clone(),
+                        error: error.to_string(),
+                    });
+                    return Err(());
+                }
             }
             OneOrMany::Many(topics) => {
-                client
+                if let Err(error) = client
                     .subscribe_many(topics.iter().cloned().map(|topic| {
                         FilterV5::new(topic, rumqttc::v5::mqttbytes::QoS::AtLeastOnce)
                     }))
                     .await
-                    .map_err(|_| ())?;
+                {
+                    emit!(MqttSubscribeError {
+                        topic: topics.join(","),
+                        error: error.to_string(),
+                    });
+                    return Err(());
+                }
             }
         }
         Ok(())
@@ -128,8 +157,17 @@ impl MqttSource {
             tokio::select! {
                 _ = shutdown.clone() => return Ok(()),
                 mqtt_event = eventloop.poll() => {
-                    if let Ok(MqttEventV3::Incoming(IncomingV3::Publish(publish))) = mqtt_event {
-                        self.process_message_v3(&client, publish, out).await;
+                    match mqtt_event {
+                        Ok(MqttEventV3::Incoming(IncomingV3::Publish(publish))) => {
+                            self.process_message_v3(&client, publish, out).await;
+                        }
+                        Ok(_) => {}
+                        Err(error) => {
+                            emit!(MqttConnectionError::V311 {
+                                direction: MqttDirection::Source,
+                                error,
+                            });
+                        }
                     }
                 }
             }
@@ -147,8 +185,17 @@ impl MqttSource {
             tokio::select! {
                 _ = shutdown.clone() => return Ok(()),
                 mqtt_event = eventloop.poll() => {
-                    if let Ok(MqttEventV5::Incoming(PacketV5::Publish(publish))) = mqtt_event {
-                        self.process_message_v5(&client, publish, out).await;
+                    match mqtt_event {
+                        Ok(MqttEventV5::Incoming(PacketV5::Publish(publish))) => {
+                            self.process_message_v5(&client, publish, out).await;
+                        }
+                        Ok(_) => {}
+                        Err(error) => {
+                            emit!(MqttConnectionError::V5 {
+                                direction: MqttDirection::Source,
+                                error,
+                            });
+                        }
                     }
                 }
             }
@@ -196,7 +243,9 @@ impl MqttSource {
                 if receiver.await == BatchStatus::Delivered
                     && let Err(error) = client.ack(&publish).await
                 {
-                    debug!(message = "Failed to ack MQTT v3 publish.", %error);
+                    emit!(MqttAckError {
+                        error: error.to_string(),
+                    });
                 }
             });
         }
@@ -243,7 +292,9 @@ impl MqttSource {
                 if receiver.await == BatchStatus::Delivered
                     && let Err(error) = client.ack(&publish).await
                 {
-                    debug!(message = "Failed to ack MQTT v5 publish.", %error);
+                    emit!(MqttAckError {
+                        error: error.to_string(),
+                    });
                 }
             });
         }
@@ -408,5 +459,216 @@ impl MqttSource {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use bytes::Bytes;
+    use rumqttc::v5::mqttbytes::v5::{Publish as PublishV5, PublishProperties};
+    use rumqttc::{Publish as PublishV3, QoS as QoSV3};
+    use vector_lib::codecs::decoding::{Deserializer, Framer};
+    use vector_lib::codecs::{BytesDecoderConfig, BytesDeserializerConfig};
+    use vector_lib::config::LogNamespace;
+    use vector_lib::event::{Event, LogEvent, Metric, MetricKind, MetricValue};
+    use vector_lib::lookup::{lookup_v2::OptionalValuePath, owned_value_path};
+
+    use super::MqttSource;
+    use crate::codecs::Decoder;
+    use crate::common::mqtt::{MqttCommonConfig, MqttProtocolVersion, build_connector};
+    use crate::sources::mqtt::MqttSourceConfig;
+
+    fn make_source(common: MqttCommonConfig) -> MqttSource {
+        let connector = build_connector(&common, "vectorSource", false, false).unwrap();
+        // `MqttSourceConfig::default()` leaves the key fields without paths (serde defaults
+        // are only applied during deserialization), so set them explicitly for tests.
+        let config = MqttSourceConfig {
+            common,
+            topic_key: OptionalValuePath::from(owned_value_path!("topic")),
+            protocol_version_key: OptionalValuePath::from(owned_value_path!("protocol_version")),
+            content_type_key: OptionalValuePath::from(owned_value_path!("content_type")),
+            response_topic_key: OptionalValuePath::from(owned_value_path!("response_topic")),
+            correlation_data_key: OptionalValuePath::from(owned_value_path!("correlation_data")),
+            payload_format_indicator_key: OptionalValuePath::from(owned_value_path!(
+                "payload_format_indicator"
+            )),
+            message_expiry_interval_key: OptionalValuePath::from(owned_value_path!(
+                "message_expiry_interval"
+            )),
+            user_properties_key: OptionalValuePath::from(owned_value_path!("user_properties")),
+            ..Default::default()
+        };
+        let decoder = Decoder::new(
+            Framer::Bytes(BytesDecoderConfig::new().build()),
+            Deserializer::Bytes(BytesDeserializerConfig::new().build()),
+        );
+        MqttSource::new(connector, decoder, LogNamespace::Legacy, config, false).unwrap()
+    }
+
+    fn v3_publish(topic: &str) -> PublishV3 {
+        PublishV3::new(topic, QoSV3::AtLeastOnce, Vec::<u8>::new())
+    }
+
+    fn v5_publish(topic: &str) -> PublishV5 {
+        PublishV5::new(
+            topic,
+            rumqttc::v5::mqttbytes::QoS::AtLeastOnce,
+            Vec::<u8>::new(),
+            None,
+        )
+    }
+
+    fn metric_event() -> Event {
+        Event::Metric(Metric::new(
+            "name",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.0 },
+        ))
+    }
+
+    #[test]
+    fn apply_metadata_v3_sets_topic_and_protocol_version() {
+        let source = make_source(MqttCommonConfig {
+            client_id: Some("test".into()),
+            ..Default::default()
+        });
+        let mut event = Event::Log(LogEvent::default());
+        source.apply_metadata_v3(&v3_publish("sensors/room1"), &mut event);
+
+        let log = event.as_log();
+        assert_eq!(
+            log.get("topic").and_then(|v| v.as_str()).as_deref(),
+            Some("sensors/room1"),
+        );
+        assert_eq!(
+            log.get("protocol_version")
+                .and_then(|v| v.as_str())
+                .as_deref(),
+            Some("v311"),
+        );
+    }
+
+    #[test]
+    fn apply_metadata_v3_no_op_on_non_log_events() {
+        let source = make_source(MqttCommonConfig {
+            client_id: Some("test".into()),
+            ..Default::default()
+        });
+        let mut event = metric_event();
+        // Should not panic on a metric event.
+        source.apply_metadata_v3(&v3_publish("t"), &mut event);
+    }
+
+    #[test]
+    fn apply_metadata_v5_sets_topic_and_protocol_version() {
+        let source = make_source(MqttCommonConfig {
+            client_id: Some("test".into()),
+            protocol_version: MqttProtocolVersion::V5,
+            ..Default::default()
+        });
+        let mut event = Event::Log(LogEvent::default());
+        source.apply_metadata_v5(&v5_publish("telemetry/device-1"), &mut event);
+
+        let log = event.as_log();
+        assert_eq!(
+            log.get("topic").and_then(|v| v.as_str()).as_deref(),
+            Some("telemetry/device-1"),
+        );
+        assert_eq!(
+            log.get("protocol_version")
+                .and_then(|v| v.as_str())
+                .as_deref(),
+            Some("v5"),
+        );
+    }
+
+    #[test]
+    fn apply_metadata_v5_sets_all_publish_properties() {
+        let source = make_source(MqttCommonConfig {
+            client_id: Some("test".into()),
+            protocol_version: MqttProtocolVersion::V5,
+            ..Default::default()
+        });
+        let mut publish = v5_publish("t");
+        publish.properties = Some(PublishProperties {
+            payload_format_indicator: Some(1),
+            message_expiry_interval: Some(300),
+            content_type: Some("application/json".into()),
+            response_topic: Some("responses/abc".into()),
+            correlation_data: Some(Bytes::from_static(&[1, 2, 3])),
+            user_properties: vec![("k".into(), "v".into())],
+            topic_alias: None,
+            subscription_identifiers: Vec::new(),
+        });
+        let mut event = Event::Log(LogEvent::default());
+        source.apply_metadata_v5(&publish, &mut event);
+
+        let log = event.as_log();
+        assert_eq!(
+            log.get("content_type").and_then(|v| v.as_str()).as_deref(),
+            Some("application/json"),
+        );
+        assert_eq!(
+            log.get("response_topic")
+                .and_then(|v| v.as_str())
+                .as_deref(),
+            Some("responses/abc"),
+        );
+        assert_eq!(
+            log.get("correlation_data").and_then(|v| v.as_bytes()),
+            Some(&Bytes::from_static(&[1, 2, 3])),
+        );
+        assert_eq!(
+            log.get("payload_format_indicator")
+                .and_then(|v| v.as_integer()),
+            Some(1),
+        );
+        assert_eq!(
+            log.get("message_expiry_interval")
+                .and_then(|v| v.as_integer()),
+            Some(300),
+        );
+        assert_eq!(
+            log.get("user_properties")
+                .and_then(|v| v.as_array())
+                .map(<[_]>::len),
+            Some(1),
+        );
+    }
+
+    #[test]
+    fn apply_metadata_v5_skips_unset_optional_properties() {
+        let source = make_source(MqttCommonConfig {
+            client_id: Some("test".into()),
+            protocol_version: MqttProtocolVersion::V5,
+            ..Default::default()
+        });
+        let mut event = Event::Log(LogEvent::default());
+        source.apply_metadata_v5(&v5_publish("t"), &mut event);
+
+        let log = event.as_log();
+        assert!(log.get("content_type").is_none());
+        assert!(log.get("response_topic").is_none());
+        assert!(log.get("correlation_data").is_none());
+        assert!(log.get("payload_format_indicator").is_none());
+        assert!(log.get("message_expiry_interval").is_none());
+        assert!(log.get("user_properties").is_none());
+        assert_eq!(
+            log.get("protocol_version")
+                .and_then(|v| v.as_str())
+                .as_deref(),
+            Some("v5"),
+        );
+    }
+
+    #[test]
+    fn apply_metadata_v5_no_op_on_non_log_events() {
+        let source = make_source(MqttCommonConfig {
+            client_id: Some("test".into()),
+            protocol_version: MqttProtocolVersion::V5,
+            ..Default::default()
+        });
+        let mut event = metric_event();
+        source.apply_metadata_v5(&v5_publish("t"), &mut event);
     }
 }

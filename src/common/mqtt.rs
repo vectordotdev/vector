@@ -453,7 +453,147 @@ pub fn build_connector(
 
 #[cfg(test)]
 mod tests {
-    use super::{ConfigurationError, MqttPublishProperties, MqttUserProperty};
+    use super::{
+        ConfigurationError, MqttCommonConfig, MqttConnectProperties, MqttProtocolVersion,
+        MqttPublishProperties, MqttUserProperty, build_connector,
+    };
+
+    #[test]
+    fn publish_properties_accept_payload_format_indicator_0_and_1() {
+        for value in [0u8, 1u8] {
+            let properties = MqttPublishProperties {
+                payload_format_indicator: Some(value),
+                ..Default::default()
+            };
+            let actual = properties.to_publish_properties().unwrap();
+            assert_eq!(actual.payload_format_indicator, Some(value));
+        }
+    }
+
+    #[test]
+    fn publish_properties_roundtrip_all_fields() {
+        let properties = MqttPublishProperties {
+            payload_format_indicator: Some(1),
+            message_expiry_interval: Some(60),
+            topic_alias: Some(7),
+            response_topic: Some("responses/abc".into()),
+            correlation_data: Some(vec![1, 2, 3]),
+            content_type: Some("application/json".into()),
+            user_properties: vec![MqttUserProperty {
+                key: "k".into(),
+                value: "v".into(),
+            }],
+        };
+        let actual = properties.to_publish_properties().unwrap();
+        assert_eq!(actual.payload_format_indicator, Some(1));
+        assert_eq!(actual.message_expiry_interval, Some(60));
+        assert_eq!(actual.topic_alias, Some(7));
+        assert_eq!(actual.response_topic.as_deref(), Some("responses/abc"));
+        assert_eq!(
+            actual.correlation_data,
+            Some(bytes::Bytes::from_static(&[1, 2, 3]))
+        );
+        assert_eq!(actual.content_type.as_deref(), Some("application/json"));
+        assert_eq!(
+            actual.user_properties,
+            vec![("k".to_string(), "v".to_string())]
+        );
+    }
+
+    #[test]
+    fn build_connector_v3_default() {
+        let common = MqttCommonConfig {
+            host: "broker.example.com".into(),
+            client_id: Some("test".into()),
+            ..Default::default()
+        };
+        let connector = build_connector(&common, "vectorSource", false, false).unwrap();
+        assert_eq!(connector.protocol_version, MqttProtocolVersion::V311);
+        assert!(connector.options_v3.is_some());
+        assert!(connector.options_v5.is_none());
+        assert!(!connector.options_v3.as_ref().unwrap().manual_acks());
+    }
+
+    #[test]
+    fn build_connector_v5_with_connect_properties() {
+        let common = MqttCommonConfig {
+            host: "broker.example.com".into(),
+            client_id: Some("test".into()),
+            protocol_version: MqttProtocolVersion::V5,
+            connect_properties: Some(MqttConnectProperties {
+                session_expiry_interval: Some(600),
+                topic_alias_max: Some(10),
+                user_properties: vec![MqttUserProperty {
+                    key: "tenant".into(),
+                    value: "vector".into(),
+                }],
+            }),
+            ..Default::default()
+        };
+        let connector = build_connector(&common, "vectorSource", false, false).unwrap();
+        assert_eq!(connector.protocol_version, MqttProtocolVersion::V5);
+        assert!(connector.options_v5.is_some());
+        assert!(connector.options_v3.is_none());
+    }
+
+    #[test]
+    fn build_connector_propagates_manual_acks_v3() {
+        let common = MqttCommonConfig {
+            host: "broker.example.com".into(),
+            client_id: Some("test".into()),
+            ..Default::default()
+        };
+        let connector = build_connector(&common, "vectorSource", false, true).unwrap();
+        assert!(connector.options_v3.as_ref().unwrap().manual_acks());
+    }
+
+    #[test]
+    fn build_connector_propagates_manual_acks_v5() {
+        let common = MqttCommonConfig {
+            host: "broker.example.com".into(),
+            client_id: Some("test".into()),
+            protocol_version: MqttProtocolVersion::V5,
+            ..Default::default()
+        };
+        let connector = build_connector(&common, "vectorSource", false, true).unwrap();
+        // v5 MqttOptions doesn't expose a public getter for manual_acks; building without
+        // panic is sufficient since the same code path is exercised as v3.
+        assert!(connector.options_v5.is_some());
+    }
+
+    #[test]
+    fn build_connector_rejects_incomplete_credentials() {
+        let common = MqttCommonConfig {
+            host: "broker.example.com".into(),
+            client_id: Some("test".into()),
+            user: Some("user".into()),
+            password: None,
+            ..Default::default()
+        };
+        match build_connector(&common, "vectorSource", false, false) {
+            Err(super::MqttError::Configuration {
+                source: ConfigurationError::IncompleteCredentials,
+            }) => {}
+            Ok(_) => panic!("expected IncompleteCredentials error, got Ok"),
+            Err(e) => panic!("expected IncompleteCredentials error, got {e:?}"),
+        }
+    }
+
+    #[test]
+    fn build_connector_rejects_empty_client_id() {
+        let common = MqttCommonConfig {
+            host: "broker.example.com".into(),
+            client_id: Some(String::new()),
+            ..Default::default()
+        };
+        match build_connector(&common, "vectorSource", false, false) {
+            Err(super::MqttError::Configuration {
+                source: ConfigurationError::EmptyClientId,
+            }) => {}
+            Ok(_) => panic!("expected EmptyClientId error, got Ok"),
+            Err(e) => panic!("expected EmptyClientId error, got {e:?}"),
+        }
+    }
 
     #[test]
     fn publish_properties_preserve_binary_and_duplicate_user_properties() {

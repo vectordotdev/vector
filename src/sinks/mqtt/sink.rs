@@ -6,7 +6,9 @@ use super::{
 };
 use crate::{
     common::mqtt::{MqttConnector, MqttError, MqttEventLoop},
-    internal_events::MqttConnectionError,
+    internal_events::{
+        ConnectionOpen, MqttConnectionError, MqttConnectionShutdown, MqttDirection, OpenGauge,
+    },
     sinks::prelude::*,
 };
 use async_trait::async_trait;
@@ -71,6 +73,8 @@ impl MqttSink {
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let (client, eventloop) = self.connector.connect();
 
+        let _open_token = OpenGauge::new().open(|count| emit!(ConnectionOpen { count }));
+
         // Spawn the event loop handler based on protocol version
         match eventloop {
             MqttEventLoop::V311(mut connection) => {
@@ -80,7 +84,8 @@ impl MqttSink {
                             Ok(_) => {}
                             Err(connection_error) => {
                                 emit!(MqttConnectionError::V311 {
-                                    error: connection_error
+                                    direction: MqttDirection::Sink,
+                                    error: connection_error,
                                 });
                             }
                         }
@@ -94,7 +99,8 @@ impl MqttSink {
                             Ok(_) => {}
                             Err(connection_error) => {
                                 emit!(MqttConnectionError::V5 {
-                                    error: connection_error
+                                    direction: MqttDirection::Sink,
+                                    error: connection_error,
                                 });
                             }
                         }
@@ -117,7 +123,7 @@ impl MqttSink {
             },
         };
 
-        input
+        let result = input
             .filter_map(|event| std::future::ready(self.make_mqtt_event(event)))
             .request_builder(default_request_builder_concurrency_limit(), request_builder)
             .filter_map(|request| async move {
@@ -132,7 +138,10 @@ impl MqttSink {
             .into_driver(service)
             .protocol("mqtt")
             .run()
-            .await
+            .await;
+
+        emit!(MqttConnectionShutdown);
+        result
     }
 }
 

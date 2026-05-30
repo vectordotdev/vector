@@ -4,7 +4,7 @@ use vector_lib::codecs::JsonSerializerConfig;
 use crate::{
     codecs::EncodingConfig,
     common::mqtt::{self, MqttCommonConfig, MqttPublishProperties},
-    config::{AcknowledgementsConfig, DataType, Input, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     sinks::{Healthcheck, VectorSink, mqtt::sink::MqttSink, prelude::*},
     template::Template,
 };
@@ -129,7 +129,7 @@ impl SinkConfig for MqttSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::new(DataType::Log | DataType::Metric | DataType::Trace)
+        Input::new(self.encoding.config().input_type())
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
@@ -139,10 +139,68 @@ impl SinkConfig for MqttSinkConfig {
 
 #[cfg(test)]
 mod test {
+    use vector_lib::codecs::{
+        GelfSerializerConfig, JsonSerializerConfig, TextSerializerConfig,
+        encoding::SerializerConfig,
+    };
+    use vector_lib::config::DataType;
+
     use super::*;
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<MqttSinkConfig>();
+    }
+
+    fn config_with_encoding(serializer: SerializerConfig) -> MqttSinkConfig {
+        MqttSinkConfig {
+            encoding: EncodingConfig::from(serializer),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn input_type_follows_encoder_json_accepts_all() {
+        let config = config_with_encoding(JsonSerializerConfig::default().into());
+        let data_type = config.input().data_type();
+        assert!(data_type.contains(DataType::Log));
+        assert!(data_type.contains(DataType::Metric));
+        assert!(data_type.contains(DataType::Trace));
+    }
+
+    #[test]
+    fn input_type_follows_encoder_text_excludes_traces() {
+        let config = config_with_encoding(TextSerializerConfig::default().into());
+        assert_eq!(config.input().data_type(), DataType::Log | DataType::Metric,);
+    }
+
+    #[test]
+    fn input_type_follows_encoder_gelf_logs_only() {
+        let config = config_with_encoding(GelfSerializerConfig::default().into());
+        assert_eq!(config.input().data_type(), DataType::Log);
+    }
+
+    #[test]
+    fn qos_converts_to_v3_rumqttc_variants() {
+        assert!(matches!(QoS::from(MqttQoS::AtMostOnce), QoS::AtMostOnce));
+        assert!(matches!(QoS::from(MqttQoS::AtLeastOnce), QoS::AtLeastOnce));
+        assert!(matches!(QoS::from(MqttQoS::ExactlyOnce), QoS::ExactlyOnce));
+    }
+
+    #[test]
+    fn qos_converts_to_v5_rumqttc_variants() {
+        use rumqttc::v5::mqttbytes::QoS as QoSV5;
+        assert!(matches!(
+            QoSV5::from(MqttQoS::AtMostOnce),
+            QoSV5::AtMostOnce
+        ));
+        assert!(matches!(
+            QoSV5::from(MqttQoS::AtLeastOnce),
+            QoSV5::AtLeastOnce
+        ));
+        assert!(matches!(
+            QoSV5::from(MqttQoS::ExactlyOnce),
+            QoSV5::ExactlyOnce
+        ));
     }
 }
