@@ -17,7 +17,10 @@ pub(crate) mod ddtrace_proto {
     include!(concat!(env!("OUT_DIR"), "/dd_trace.rs"));
 }
 
-use std::{convert::Infallible, fmt::Debug, io::Read, net::SocketAddr, sync::Arc, time::Duration};
+use std::{
+    collections::HashSet, convert::Infallible, fmt::Debug, io::Read, net::SocketAddr, sync::Arc,
+    time::Duration,
+};
 
 use bytes::{Buf, Bytes};
 use chrono::{DateTime, Utc, serde::ts_milliseconds};
@@ -90,6 +93,31 @@ pub struct DatadogAgentConfig {
     #[configurable(metadata(docs::advanced))]
     #[serde(default = "crate::serde::default_true")]
     store_api_key: bool,
+
+    /// A list of API keys that are permitted to send events to this source.
+    ///
+    /// When this list is non-empty, the API key carried by an incoming request (in the URL,
+    /// the `dd-api-key` header, or the `dd-api-key` query parameter) is checked against it.
+    /// When the list is empty (the default), all API keys are accepted and no validation is
+    /// performed.
+    ///
+    /// The behavior when a request carries an API key that is not in this list is controlled by
+    /// `drop_on_invalid_api_key`.
+    #[configurable(metadata(docs::advanced))]
+    #[serde(default)]
+    valid_api_keys: Vec<String>,
+
+    /// Controls what happens when a request carries an API key that is not present in
+    /// `valid_api_keys`.
+    ///
+    /// When set to `true`, requests with an unrecognized API key are rejected with a
+    /// `403 Forbidden` response. When set to `false` (the default), the unrecognized key is
+    /// simply not stored in the event metadata, but the events are still accepted.
+    ///
+    /// This option has no effect when `valid_api_keys` is empty.
+    #[configurable(metadata(docs::advanced))]
+    #[serde(default = "crate::serde::default_false")]
+    drop_on_invalid_api_key: bool,
 
     /// If this is set to `true`, logs are not accepted by the component.
     #[configurable(metadata(docs::advanced))]
@@ -173,6 +201,8 @@ impl GenerateConfig for DatadogAgentConfig {
             address: "0.0.0.0:8080".parse().unwrap(),
             tls: None,
             store_api_key: true,
+            valid_api_keys: Vec::new(),
+            drop_on_invalid_api_key: false,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
             acknowledgements: SourceAcknowledgementsConfig::default(),
@@ -209,6 +239,8 @@ impl SourceConfig for DatadogAgentConfig {
         let tls = MaybeTlsSettings::from_config(self.tls.as_ref(), true)?;
         let source = DatadogAgentSource::new(
             self.store_api_key,
+            self.valid_api_keys.clone(),
+            self.drop_on_invalid_api_key,
             decoder,
             tls.http_protocol_name(),
             logs_schema_definition,
@@ -386,9 +418,41 @@ pub(crate) struct DatadogAgentSource {
 pub struct ApiKeyExtractor {
     matcher: Regex,
     store_api_key: bool,
+    valid_api_keys: Arc<HashSet<String>>,
+    drop_on_invalid_api_key: bool,
+}
+
+/// The result of checking an extracted API key against the configured allow list.
+pub(crate) enum ApiKeyValidation {
+    /// The key is accepted. The contained value is the key to store in the event
+    /// metadata (which may be `None` when `store_api_key` is disabled or no key was present).
+    Accepted(Option<Arc<str>>),
+    /// The request carried an API key that is not in `valid_api_keys` and
+    /// `drop_on_invalid_api_key` is enabled, so the request must be rejected.
+    Rejected,
+}
+
+/// The error returned to the Datadog Agent when a request is rejected because its API key is not
+/// in the configured `valid_api_keys` list and `drop_on_invalid_api_key` is enabled.
+pub(crate) fn invalid_api_key_error() -> ErrorMessage {
+    ErrorMessage::new(
+        StatusCode::FORBIDDEN,
+        "API key is not in the configured `valid_api_keys` list.".to_string(),
+    )
 }
 
 impl ApiKeyExtractor {
+    #[cfg(test)]
+    pub(crate) fn for_test(valid_api_keys: Vec<String>, drop_on_invalid_api_key: bool) -> Self {
+        Self {
+            matcher: Regex::new(r"^/v1/input/(?P<api_key>[[:alnum:]]{32})/??")
+                .expect("static regex always compiles"),
+            store_api_key: true,
+            valid_api_keys: Arc::new(valid_api_keys.into_iter().collect()),
+            drop_on_invalid_api_key,
+        }
+    }
+
     pub fn extract(
         &self,
         path: &str,
@@ -407,11 +471,41 @@ impl ApiKeyExtractor {
             // Try from header next
             .or_else(|| header.map(Arc::from))
     }
+
+    /// Extracts the API key from the request and validates it against `valid_api_keys`.
+    ///
+    /// When `valid_api_keys` is empty, no validation is performed and the extracted key (if any)
+    /// is accepted. Otherwise, the key is checked against the allow list: a missing or
+    /// unrecognized key results in `Rejected` when `drop_on_invalid_api_key` is set, or an
+    /// `Accepted(None)` (the key is not stored) otherwise.
+    pub(crate) fn extract_and_validate(
+        &self,
+        path: &str,
+        header: Option<String>,
+        query_params: Option<String>,
+    ) -> ApiKeyValidation {
+        let api_key = self.extract(path, header, query_params);
+
+        if self.valid_api_keys.is_empty() {
+            return ApiKeyValidation::Accepted(api_key);
+        }
+
+        match &api_key {
+            Some(key) if self.valid_api_keys.contains(key.as_ref()) => {
+                ApiKeyValidation::Accepted(api_key)
+            }
+            _ if self.drop_on_invalid_api_key => ApiKeyValidation::Rejected,
+            _ => ApiKeyValidation::Accepted(None),
+        }
+    }
 }
 
 impl DatadogAgentSource {
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
         store_api_key: bool,
+        valid_api_keys: Vec<String>,
+        drop_on_invalid_api_key: bool,
         decoder: Decoder,
         protocol: &'static str,
         logs_schema_definition: Option<schema::Definition>,
@@ -424,6 +518,8 @@ impl DatadogAgentSource {
                 store_api_key,
                 matcher: Regex::new(r"^/v1/input/(?P<api_key>[[:alnum:]]{32})/??")
                     .expect("static regex always compiles"),
+                valid_api_keys: Arc::new(valid_api_keys.into_iter().collect()),
+                drop_on_invalid_api_key,
             },
             log_schema_host_key: log_schema()
                 .host_key_target_path()

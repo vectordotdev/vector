@@ -14,7 +14,9 @@ use vector_lib::{
 use warp::{Filter, filters::BoxedFilter, path, path::FullPath, reply::Response};
 
 use super::ddmetric_proto::{Metadata, MetricPayload, SketchPayload, metric_payload};
-use super::{ApiKeyQueryParams, DatadogAgentSource, RequestHandler};
+use super::{
+    ApiKeyQueryParams, ApiKeyValidation, DatadogAgentSource, RequestHandler, invalid_api_key_error,
+};
 use crate::{
     common::{
         datadog::{DatadogMetricType, DatadogSeriesMetric},
@@ -70,13 +72,17 @@ fn sketches_service(
                 let events = source
                     .decode(&encoding_header, body, path.as_str())
                     .and_then(|body| {
+                        let api_key = match source.api_key_extractor.extract_and_validate(
+                            path.as_str(),
+                            api_token,
+                            query_params.dd_api_key,
+                        ) {
+                            ApiKeyValidation::Accepted(api_key) => api_key,
+                            ApiKeyValidation::Rejected => return Err(invalid_api_key_error()),
+                        };
                         decode_datadog_sketches(
                             body,
-                            source.api_key_extractor.extract(
-                                path.as_str(),
-                                api_token,
-                                query_params.dd_api_key,
-                            ),
+                            api_key,
                             source.split_metric_namespace,
                             &source.events_received,
                         )
@@ -107,13 +113,17 @@ fn series_v1_service(
                 let events = source
                     .decode(&encoding_header, body, path.as_str())
                     .and_then(|body| {
+                        let api_key = match source.api_key_extractor.extract_and_validate(
+                            path.as_str(),
+                            api_token,
+                            query_params.dd_api_key,
+                        ) {
+                            ApiKeyValidation::Accepted(api_key) => api_key,
+                            ApiKeyValidation::Rejected => return Err(invalid_api_key_error()),
+                        };
                         decode_datadog_series_v1(
                             body,
-                            source.api_key_extractor.extract(
-                                path.as_str(),
-                                api_token,
-                                query_params.dd_api_key,
-                            ),
+                            api_key,
                             // Currently metrics do not have schemas defined, so for now we just pass a
                             // default one.
                             &Arc::new(schema::Definition::default_legacy_namespace()),
@@ -147,13 +157,17 @@ fn series_v2_service(
                 let events = source
                     .decode(&encoding_header, body, path.as_str())
                     .and_then(|body| {
+                        let api_key = match source.api_key_extractor.extract_and_validate(
+                            path.as_str(),
+                            api_token,
+                            query_params.dd_api_key,
+                        ) {
+                            ApiKeyValidation::Accepted(api_key) => api_key,
+                            ApiKeyValidation::Rejected => return Err(invalid_api_key_error()),
+                        };
                         decode_datadog_series_v2(
                             body,
-                            source.api_key_extractor.extract(
-                                path.as_str(),
-                                api_token,
-                                query_params.dd_api_key,
-                            ),
+                            api_key,
                             source.split_metric_namespace,
                             &source.events_received,
                         )

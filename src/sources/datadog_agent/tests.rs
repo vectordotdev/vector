@@ -48,8 +48,9 @@ use crate::{
     schema::Definition,
     serde::{default_decoding, default_framing_message_based},
     sources::datadog_agent::{
-        DatadogAgentConfig, DatadogAgentSource, LOGS, LogMsg, METRICS, TRACES, ddmetric_proto,
-        ddtrace_proto, logs::decode_log_body, metrics::DatadogSeriesRequest,
+        ApiKeyExtractor, ApiKeyValidation, DatadogAgentConfig, DatadogAgentSource, LOGS, LogMsg,
+        METRICS, TRACES, ddmetric_proto, ddtrace_proto, logs::decode_log_body,
+        metrics::DatadogSeriesRequest,
     },
     test_util::{
         addr::{PortGuard, next_addr},
@@ -108,6 +109,8 @@ fn test_decode_log_body() {
 
         let source = DatadogAgentSource::new(
             true,
+            Vec::new(),
+            false,
             decoder,
             "http",
             Some(test_logs_schema_definition()),
@@ -164,6 +167,8 @@ fn test_decode_log_body_parse_ddtags() {
 
     let source = DatadogAgentSource::new(
         true,
+        Vec::new(),
+        false,
         decoder,
         "http",
         Some(test_logs_schema_definition()),
@@ -201,6 +206,8 @@ fn test_decode_log_body_empty_object() {
 
     let source = DatadogAgentSource::new(
         true,
+        Vec::new(),
+        false,
         decoder,
         "http",
         Some(test_logs_schema_definition()),
@@ -1609,6 +1616,8 @@ fn test_config_outputs_with_disabled_data_types() {
             address: "0.0.0.0:8080".parse().unwrap(),
             tls: None,
             store_api_key: true,
+            valid_api_keys: Vec::new(),
+            drop_on_invalid_api_key: false,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
             acknowledgements: Default::default(),
@@ -2053,6 +2062,8 @@ fn test_config_outputs() {
             address: "0.0.0.0:8080".parse().unwrap(),
             tls: None,
             store_api_key: true,
+            valid_api_keys: Vec::new(),
+            drop_on_invalid_api_key: false,
             framing: default_framing_message_based(),
             decoding,
             acknowledgements: Default::default(),
@@ -2780,6 +2791,8 @@ impl ValidatableComponent for DatadogAgentConfig {
             address: "0.0.0.0:9007".parse().unwrap(),
             tls: None,
             store_api_key: false,
+            valid_api_keys: Vec::new(),
+            drop_on_invalid_api_key: false,
             framing: CharacterDelimitedDecoderConfig {
                 character_delimited: CharacterDelimitedDecoderOptions {
                     delimiter: b',',
@@ -2832,3 +2845,48 @@ impl ValidatableComponent for DatadogAgentConfig {
 }
 
 register_validatable_component!(DatadogAgentConfig);
+
+#[test]
+fn api_key_validation() {
+    let valid = "0123456789abcdef0123456789abcdef".to_string();
+    let invalid = "ffffffffffffffffffffffffffffffff".to_string();
+
+    // No `valid_api_keys` configured: any key (or none) is accepted as-is.
+    let extractor = ApiKeyExtractor::for_test(vec![], false);
+    assert!(matches!(
+        extractor.extract_and_validate("/v1/input", Some(invalid.clone()), None),
+        ApiKeyValidation::Accepted(Some(key)) if key.as_ref() == invalid
+    ));
+
+    // Allow list set, key matches (via header): accepted and stored.
+    let extractor = ApiKeyExtractor::for_test(vec![valid.clone()], true);
+    assert!(matches!(
+        extractor.extract_and_validate("/v1/input", Some(valid.clone()), None),
+        ApiKeyValidation::Accepted(Some(key)) if key.as_ref() == valid
+    ));
+
+    // Allow list set, key matches (via URL path): accepted and stored.
+    assert!(matches!(
+        extractor.extract_and_validate(&format!("/v1/input/{valid}"), None, None),
+        ApiKeyValidation::Accepted(Some(key)) if key.as_ref() == valid
+    ));
+
+    // Allow list set, unknown key, drop_on_invalid_api_key = true: rejected.
+    assert!(matches!(
+        extractor.extract_and_validate("/v1/input", Some(invalid.clone()), None),
+        ApiKeyValidation::Rejected
+    ));
+
+    // Allow list set, no key present, drop_on_invalid_api_key = true: rejected.
+    assert!(matches!(
+        extractor.extract_and_validate("/v1/input", None, None),
+        ApiKeyValidation::Rejected
+    ));
+
+    // Allow list set, unknown key, drop_on_invalid_api_key = false: accepted but key not stored.
+    let extractor = ApiKeyExtractor::for_test(vec![valid], false);
+    assert!(matches!(
+        extractor.extract_and_validate("/v1/input", Some(invalid), None),
+        ApiKeyValidation::Accepted(None)
+    ));
+}

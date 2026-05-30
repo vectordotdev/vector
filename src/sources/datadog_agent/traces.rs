@@ -13,7 +13,10 @@ use vector_lib::{
 use vrl::event_path;
 use warp::{Filter, Rejection, Reply, filters::BoxedFilter, path, path::FullPath, reply::Response};
 
-use super::{ApiKeyQueryParams, DatadogAgentSource, RequestHandler, ddtrace_proto};
+use super::{
+    ApiKeyQueryParams, ApiKeyValidation, DatadogAgentSource, RequestHandler, ddtrace_proto,
+    invalid_api_key_error,
+};
 use crate::{
     common::http::ErrorMessage,
     event::{Event, ObjectMap, TraceEvent, Value},
@@ -53,22 +56,21 @@ fn build_trace_filter(
                 let events = source
                     .decode(&encoding_header, body, path.as_str())
                     .and_then(|body| {
-                        handle_dd_trace_payload(
-                            body,
-                            source.api_key_extractor.extract(
-                                path.as_str(),
-                                api_token,
-                                query_params.dd_api_key,
-                            ),
-                            reported_language.as_ref(),
-                            &source,
-                        )
-                        .map_err(|error| {
-                            ErrorMessage::new(
-                                StatusCode::UNPROCESSABLE_ENTITY,
-                                format!("Error decoding Datadog traces: {error:?}"),
-                            )
-                        })
+                        let api_key = match source.api_key_extractor.extract_and_validate(
+                            path.as_str(),
+                            api_token,
+                            query_params.dd_api_key,
+                        ) {
+                            ApiKeyValidation::Accepted(api_key) => api_key,
+                            ApiKeyValidation::Rejected => return Err(invalid_api_key_error()),
+                        };
+                        handle_dd_trace_payload(body, api_key, reported_language.as_ref(), &source)
+                            .map_err(|error| {
+                                ErrorMessage::new(
+                                    StatusCode::UNPROCESSABLE_ENTITY,
+                                    format!("Error decoding Datadog traces: {error:?}"),
+                                )
+                            })
                     });
                 handler.clone().handle_request(events, super::TRACES)
             }
