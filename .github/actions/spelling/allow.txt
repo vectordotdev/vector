@@ -173,6 +173,7 @@ fluentbit
 fluentd
 Foto
 FQDNs
+framestream
 Freescale
 fuchsnj
 FUJITSU
