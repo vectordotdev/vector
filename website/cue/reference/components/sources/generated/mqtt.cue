@@ -1,10 +1,93 @@
 package metadata
 
 generated: components: sources: mqtt: configuration: {
+	acknowledgements: {
+		deprecated: true
+		description: """
+			Controls how acknowledgements are handled by this source.
+
+			This setting is **deprecated** in favor of enabling `acknowledgements` at the [global][global_acks] or sink level.
+
+			Enabling or disabling acknowledgements at the source level has **no effect** on acknowledgement behavior.
+
+			See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
+
+			[global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
+			[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
+			"""
+		required: false
+		type: object: options: enabled: {
+			description: "Whether or not end-to-end acknowledgements are enabled for this source."
+			required:    false
+			type: bool: {}
+		}
+	}
 	client_id: {
 		description: "MQTT client ID."
 		required:    false
 		type: string: {}
+	}
+	connect_properties: {
+		description: "MQTT v5 connection properties. Only used when protocol_version is v5."
+		required:    false
+		type: object: options: {
+			session_expiry_interval: {
+				description: """
+					Session expiry interval in seconds.
+					When set to 0, the session ends when the connection is closed.
+					"""
+				required: false
+				type: uint: {}
+			}
+			topic_alias_max: {
+				description: "Maximum number of topic aliases the client accepts from the server."
+				required:    false
+				type: uint: {}
+			}
+			user_properties: {
+				description: "User properties sent on CONNECT."
+				required:    false
+				type: array: {
+					default: []
+					items: type: object: options: {
+						key: {
+							description: "User property key."
+							required:    true
+							type: string: {}
+						}
+						value: {
+							description: "User property value."
+							required:    true
+							type: string: {}
+						}
+					}
+				}
+			}
+		}
+	}
+	content_type_key: {
+		description: """
+			Overrides the name of the log field used to add the MQTT v5 content type to each event.
+
+			By default, `"content_type"` is used.
+			"""
+		required: false
+		type: string: {
+			default: "content_type"
+			examples: ["content_type"]
+		}
+	}
+	correlation_data_key: {
+		description: """
+			Overrides the name of the log field used to add the MQTT v5 correlation data to each event.
+
+			By default, `"correlation_data"` is used.
+			"""
+		required: false
+		type: string: {
+			default: "correlation_data"
+			examples: ["correlation_data"]
+		}
 	}
 	decoding: {
 		description: """
@@ -507,7 +590,7 @@ generated: components: sources: mqtt: configuration: {
 		}
 	}
 	host: {
-		description: "MQTT server address (The broker’s domain name or IP address)."
+		description: "MQTT server address (The broker's domain name or IP address)."
 		required:    true
 		type: string: examples: ["mqtt.example.com", "127.0.0.1"]
 	}
@@ -517,19 +600,78 @@ generated: components: sources: mqtt: configuration: {
 		type: uint: default: 60
 	}
 	max_packet_size: {
-		description: "Maximum packet size"
+		description: "Maximum packet size."
 		required:    false
 		type: uint: default: 10240
+	}
+	message_expiry_interval_key: {
+		description: """
+			Overrides the name of the log field used to add the MQTT v5 message expiry interval to each event.
+
+			By default, `"message_expiry_interval"` is used.
+			"""
+		required: false
+		type: string: {
+			default: "message_expiry_interval"
+			examples: ["message_expiry_interval"]
+		}
 	}
 	password: {
 		description: "MQTT password."
 		required:    false
 		type: string: {}
 	}
+	payload_format_indicator_key: {
+		description: """
+			Overrides the name of the log field used to add the MQTT v5 payload format indicator to each event.
+
+			By default, `"payload_format_indicator"` is used.
+			"""
+		required: false
+		type: string: {
+			default: "payload_format_indicator"
+			examples: ["payload_format_indicator"]
+		}
+	}
 	port: {
 		description: "TCP port of the MQTT server to connect to."
 		required:    false
 		type: uint: default: 1883
+	}
+	protocol_version: {
+		description: "MQTT protocol version (v3 or v5)."
+		required:    false
+		type: string: {
+			default: "v311"
+			enum: {
+				v311: "MQTT 3.1.1"
+				v5:   "MQTT 5.0"
+			}
+		}
+	}
+	protocol_version_key: {
+		description: """
+			Overrides the name of the log field used to add the MQTT protocol version to each event.
+
+			By default, `"protocol_version"` is used.
+			"""
+		required: false
+		type: string: {
+			default: "protocol_version"
+			examples: ["protocol_version"]
+		}
+	}
+	response_topic_key: {
+		description: """
+			Overrides the name of the log field used to add the MQTT v5 response topic to each event.
+
+			By default, `"response_topic"` is used.
+			"""
+		required: false
+		type: string: {
+			default: "response_topic"
+			examples: ["response_topic"]
+		}
 	}
 	tls: {
 		description: "TLS configuration."
@@ -660,5 +802,17 @@ generated: components: sources: mqtt: configuration: {
 		description: "MQTT username."
 		required:    false
 		type: string: {}
+	}
+	user_properties_key: {
+		description: """
+			Overrides the name of the log field used to add the MQTT v5 user properties to each event.
+
+			By default, `"user_properties"` is used.
+			"""
+		required: false
+		type: string: {
+			default: "user_properties"
+			examples: ["user_properties"]
+		}
 	}
 }

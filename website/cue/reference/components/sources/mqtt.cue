@@ -171,7 +171,7 @@ components: sources: mqtt: {
 		}
 		topic_subscription: {
 			title: "Topic subscriptions"
-			body:  """
+			body: """
 				The `topic` option accepts either a single topic string or a list of topics.
 				All subscriptions are made at MQTT QoS 1 (AtLeastOnce), and MQTT wildcards
 				are supported:
@@ -185,7 +185,7 @@ components: sources: mqtt: {
 		}
 		acknowledgements: {
 			title: "End-to-end acknowledgements"
-			body:  """
+			body: """
 				When `acknowledgements` is enabled, the source switches the MQTT client to manual
 				ack mode and only sends `PubAck` to the broker once Vector has successfully
 				delivered the event downstream. Messages whose downstream processing fails or
@@ -195,7 +195,7 @@ components: sources: mqtt: {
 		}
 		data_transport: {
 			title: "Transporting logs, metrics, and traces"
-			body:  """
+			body: """
 				The source can emit logs, metrics, or traces depending on the chosen decoding
 				codec.
 

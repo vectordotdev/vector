@@ -37,6 +37,44 @@ generated: components: sinks: mqtt: configuration: {
 		required:    false
 		type: string: {}
 	}
+	connect_properties: {
+		description: "MQTT v5 connection properties. Only used when protocol_version is v5."
+		required:    false
+		type: object: options: {
+			session_expiry_interval: {
+				description: """
+					Session expiry interval in seconds.
+					When set to 0, the session ends when the connection is closed.
+					"""
+				required: false
+				type: uint: {}
+			}
+			topic_alias_max: {
+				description: "Maximum number of topic aliases the client accepts from the server."
+				required:    false
+				type: uint: {}
+			}
+			user_properties: {
+				description: "User properties sent on CONNECT."
+				required:    false
+				type: array: {
+					default: []
+					items: type: object: options: {
+						key: {
+							description: "User property key."
+							required:    true
+							type: string: {}
+						}
+						value: {
+							description: "User property value."
+							required:    true
+							type: string: {}
+						}
+					}
+				}
+			}
+		}
+	}
 	encoding: {
 		description: """
 			Encoding configuration.
@@ -473,7 +511,7 @@ generated: components: sinks: mqtt: configuration: {
 		}
 	}
 	host: {
-		description: "MQTT server address (The broker’s domain name or IP address)."
+		description: "MQTT server address (The broker's domain name or IP address)."
 		required:    true
 		type: string: examples: ["mqtt.example.com", "127.0.0.1"]
 	}
@@ -483,7 +521,7 @@ generated: components: sinks: mqtt: configuration: {
 		type: uint: default: 60
 	}
 	max_packet_size: {
-		description: "Maximum packet size"
+		description: "Maximum packet size."
 		required:    false
 		type: uint: default: 10240
 	}
@@ -496,6 +534,76 @@ generated: components: sinks: mqtt: configuration: {
 		description: "TCP port of the MQTT server to connect to."
 		required:    false
 		type: uint: default: 1883
+	}
+	protocol_version: {
+		description: "MQTT protocol version (v3 or v5)."
+		required:    false
+		type: string: {
+			default: "v311"
+			enum: {
+				v311: "MQTT 3.1.1"
+				v5:   "MQTT 5.0"
+			}
+		}
+	}
+	publish_properties: {
+		description: "MQTT v5 publish properties. Only used when protocol_version is v5."
+		required:    false
+		type: object: options: {
+			content_type: {
+				description: "Content type of the payload (e.g. \"application/json\")."
+				required:    false
+				type: string: {}
+			}
+			correlation_data: {
+				description: """
+					Correlation data for request/response pattern.
+
+					This is raw binary data and is encoded as a byte array in configuration.
+					"""
+				required: false
+				type: array: items: type: uint: {}
+			}
+			message_expiry_interval: {
+				description: "Message expiry interval in seconds."
+				required:    false
+				type: uint: {}
+			}
+			payload_format_indicator: {
+				description: "Payload format indicator (0 = unspecified bytes, 1 = UTF-8 encoded)."
+				required:    false
+				type: uint: {}
+			}
+			response_topic: {
+				description: "Response topic for request/response pattern."
+				required:    false
+				type: string: {}
+			}
+			topic_alias: {
+				description: "Topic alias value."
+				required:    false
+				type: uint: {}
+			}
+			user_properties: {
+				description: "User properties as ordered key-value pairs."
+				required:    false
+				type: array: {
+					default: []
+					items: type: object: options: {
+						key: {
+							description: "User property key."
+							required:    true
+							type: string: {}
+						}
+						value: {
+							description: "User property value."
+							required:    true
+							type: string: {}
+						}
+					}
+				}
+			}
+		}
 	}
 	quality_of_service: {
 		description: "Supported Quality of Service types for MQTT."
