@@ -270,8 +270,10 @@ struct LogstashAcker {
     // advances past the current window it is waiting on. If the batch ends in
     // the middle of a window, ACK the last received event in that final ACK
     // domain so clients are not forced to wait for the advertised window size.
-    // Mid-stream WindowSize resets are rejected during decode, so the only
-    // incomplete ACK domain we need to represent here is the final batch tail.
+    // Lumberjack defines WindowSize as a maximum unacked count, so a sender can
+    // legitimately advertise a fresh window after a previously ACKed partial
+    // tail. Within a single ReadyFrames batch, the only incomplete ACK domain
+    // we can represent independently is the final tail we have actually seen.
     acknowledgements: Vec<(LogstashProtocolVersion, u32)>,
 }
 
@@ -379,11 +381,6 @@ pub enum DecodeError {
     UnknownProtocolVersion { version: char },
     #[snafu(display("Unknown logstash protocol message type: {}", frame_type))]
     UnknownFrameType { frame_type: char },
-    #[snafu(display(
-        "Received a new WindowSize frame before consuming the prior window ({} events remaining)",
-        remaining
-    ))]
-    NestedWindowSize { remaining: usize },
     #[snafu(display("Failed to decode JSON frame: {}", source))]
     JsonFrameFailedDecode { source: serde_json::Error },
     #[snafu(display("Failed to decompress compressed frame: {}", source))]
@@ -398,7 +395,6 @@ impl StreamDecodingError for DecodeError {
             IO { .. } => false,
             UnknownProtocolVersion { .. } => false,
             UnknownFrameType { .. } => false,
-            NestedWindowSize { .. } => false,
             JsonFrameFailedDecode { .. } => true,
             DecompressionFailed { .. } => true,
         }
@@ -553,20 +549,17 @@ impl Decoder for LogstashDecoder {
                 // for acks. We preserve this boundary so the acker can emit one ACK per
                 // completed window, even if multiple windows are batched together later.
                 // Filebeat accepts cumulative ACKs, but not ACKs that advance past the
-                // current writer window it is waiting on. If a sender announces a new window
-                // before the current one has been exhausted, we treat that as a protocol
-                // error instead of guessing how to preserve ACK boundaries.
+                // current writer window it is waiting on. WindowSize is a maximum unacked
+                // count, not necessarily an exact count of immediately following frames, so a
+                // sender can legitimately advertise a new window after a previously ACKed
+                // partial tail. If a malformed sender does this before that earlier tail has
+                // actually been ACKed, we tolerate the reset here even though it can collapse
+                // the older incomplete domain into the new one.
                 //
                 // https://github.com/logstash-plugins/logstash-input-beats/blob/master/PROTOCOL.md#window-size-frame-type
                 LogstashDecoderReadState::ReadFrame(_protocol, LogstashFrameType::WindowSize) => {
                     if src.remaining() < 4 {
                         return Ok(None);
-                    }
-
-                    if let Some(remaining) = self.window_events_remaining {
-                        return Err(DecodeError::NestedWindowSize {
-                            remaining: remaining.get(),
-                        });
                     }
 
                     let window_size = src.get_u32() as usize;
@@ -945,18 +938,6 @@ mod test {
         acknowledgements
     }
 
-    fn decode_error(mut src: BytesMut) -> DecodeError {
-        let mut decoder = LogstashDecoder::new();
-
-        loop {
-            match decoder.decode(&mut src) {
-                Ok(Some(_)) => continue,
-                Ok(None) => panic!("expected decoder to fail"),
-                Err(error) => return error,
-            }
-        }
-    }
-
     async fn assert_acknowledgements_for_ready_frames(
         decoded: Vec<(LogstashEventFrame, usize)>,
         expected_sequences: &[u32],
@@ -981,6 +962,20 @@ mod test {
 
         assert!(ready.next().await.is_none());
         assert_eq!(acknowledgements, expected_acknowledgements);
+    }
+
+    fn decode_frames_with_decoder(
+        decoder: &mut LogstashDecoder,
+        mut src: BytesMut,
+    ) -> Vec<(LogstashEventFrame, usize)> {
+        let mut frames = Vec::new();
+
+        while let Some(frame) = decoder.decode(&mut src).unwrap() {
+            frames.push(frame);
+        }
+
+        assert_eq!(src.len(), 0);
+        frames
     }
 
     #[test]
@@ -1046,17 +1041,25 @@ mod test {
         assert_acknowledgements_for_ready_frames(decoded, &[1, 2], &[2]).await;
     }
 
-    #[test]
-    fn nested_window_size_is_a_protocol_error() {
-        let mut req = BytesMut::new();
-        push_window_size(&mut req, 2);
-        push_req(&mut req, 1, &[("message", "first window event")]);
-        push_window_size(&mut req, 1);
+    #[tokio::test]
+    async fn fresh_window_after_acked_partial_tail_is_accepted() {
+        let mut decoder = LogstashDecoder::new();
 
-        match decode_error(req) {
-            DecodeError::NestedWindowSize { remaining } => assert_eq!(remaining, 1),
-            other => panic!("expected NestedWindowSize error, got {other:?}"),
-        }
+        let mut first_batch = BytesMut::new();
+        push_window_size(&mut first_batch, 2);
+        push_req(&mut first_batch, 1, &[("message", "first partial tail")]);
+        let decoded = decode_frames_with_decoder(&mut decoder, first_batch);
+        assert_acknowledgements_for_ready_frames(decoded, &[1], &[1]).await;
+
+        let mut second_batch = BytesMut::new();
+        push_window_size(&mut second_batch, 1);
+        push_req(
+            &mut second_batch,
+            1,
+            &[("message", "fresh window after ack")],
+        );
+        let decoded = decode_frames_with_decoder(&mut decoder, second_batch);
+        assert_acknowledgements_for_ready_frames(decoded, &[1], &[1]).await;
     }
 
     async fn send_req(address: SocketAddr, pairs: &[(&str, &str)], sends_ack: bool) {
