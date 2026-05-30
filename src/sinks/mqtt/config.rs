@@ -118,7 +118,8 @@ impl_generate_config_from_default!(MqttSinkConfig);
 #[typetag::serde(name = "mqtt")]
 impl SinkConfig for MqttSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let connector = mqtt::build_connector(&self.common, "vectorSink", self.clean_session)?;
+        let connector =
+            mqtt::build_connector(&self.common, "vectorSink", self.clean_session, false)?;
         let sink = MqttSink::new(self, connector.clone())?;
 
         Ok((

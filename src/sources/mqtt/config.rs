@@ -1,6 +1,6 @@
 use vector_lib::{
     codecs::decoding::{DeserializerConfig, FramingConfig},
-    config::{LegacyKey, LogNamespace},
+    config::{LegacyKey, LogNamespace, SourceAcknowledgementsConfig},
     configurable::configurable_component,
     lookup::{lookup_v2::OptionalValuePath, owned_value_path},
 };
@@ -11,7 +11,7 @@ use crate::{
     codecs::DecodingConfig,
     common::mqtt::{self, MqttCommonConfig},
     config::{SourceConfig, SourceContext, SourceOutput},
-    serde::{OneOrMany, default_decoding, default_framing_message_based},
+    serde::{OneOrMany, bool_or_struct, default_decoding, default_framing_message_based},
 };
 
 /// Configuration for the `mqtt` source.
@@ -101,6 +101,10 @@ pub struct MqttSourceConfig {
     #[serde(default = "default_user_properties_key")]
     #[configurable(metadata(docs::examples = "user_properties"))]
     pub user_properties_key: OptionalValuePath,
+
+    #[configurable(derived)]
+    #[serde(default, deserialize_with = "bool_or_struct")]
+    pub acknowledgements: SourceAcknowledgementsConfig,
 }
 
 fn default_topic() -> OneOrMany<String> {
@@ -144,15 +148,23 @@ fn default_user_properties_key() -> OptionalValuePath {
 impl SourceConfig for MqttSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<crate::sources::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
+        let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
 
-        let connector = mqtt::build_connector(&self.common, "vectorSource", false)?;
+        let connector =
+            mqtt::build_connector(&self.common, "vectorSource", false, acknowledgements)?;
 
         let decoder =
             DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
                 .build()?;
 
-        let sink = MqttSource::new(connector.clone(), decoder, log_namespace, self.clone())?;
-        Ok(Box::pin(sink.run(cx.out, cx.shutdown)))
+        let source = MqttSource::new(
+            connector.clone(),
+            decoder,
+            log_namespace,
+            self.clone(),
+            acknowledgements,
+        )?;
+        Ok(Box::pin(source.run(cx.out, cx.shutdown)))
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
@@ -255,7 +267,7 @@ impl SourceConfig for MqttSourceConfig {
     }
 
     fn can_acknowledge(&self) -> bool {
-        false
+        true
     }
 }
 

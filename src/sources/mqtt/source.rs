@@ -1,16 +1,16 @@
 use itertools::Itertools;
 use rumqttc::v5::{
-    Event as MqttEventV5,
+    AsyncClient as AsyncClientV5, Event as MqttEventV5,
     mqttbytes::v5::{Filter as FilterV5, Packet as PacketV5, Publish as PublishV5},
 };
 use rumqttc::{
-    Event as MqttEventV3, Incoming as IncomingV3, Publish as PublishV3, QoS as QoSV3,
-    SubscribeFilter,
+    AsyncClient as AsyncClientV3, Event as MqttEventV3, Incoming as IncomingV3,
+    Publish as PublishV3, QoS as QoSV3, SubscribeFilter,
 };
 use vector_lib::{
     codecs::Decoder,
     config::{LegacyKey, LogNamespace},
-    event::Value,
+    event::{BatchStatus, Value},
     internal_event::EventsReceived,
     lookup::path,
 };
@@ -30,6 +30,7 @@ pub struct MqttSource {
     decoder: Decoder,
     log_namespace: LogNamespace,
     config: MqttSourceConfig,
+    acknowledgements: bool,
 }
 
 impl MqttSource {
@@ -38,12 +39,14 @@ impl MqttSource {
         decoder: Decoder,
         log_namespace: LogNamespace,
         config: MqttSourceConfig,
+        acknowledgements: bool,
     ) -> crate::Result<Self> {
         Ok(Self {
             connector,
             decoder,
             log_namespace,
             config,
+            acknowledgements,
         })
     }
 
@@ -60,9 +63,14 @@ impl MqttSource {
             }
         }
 
-        match eventloop {
-            MqttEventLoop::V311(eventloop) => self.run_v3(*eventloop, &mut out, shutdown).await,
-            MqttEventLoop::V5(eventloop) => self.run_v5(*eventloop, &mut out, shutdown).await,
+        match (client, eventloop) {
+            (MqttClient::V311(client), MqttEventLoop::V311(eventloop)) => {
+                self.run_v3(client, *eventloop, &mut out, shutdown).await
+            }
+            (MqttClient::V5(client), MqttEventLoop::V5(eventloop)) => {
+                self.run_v5(client, *eventloop, &mut out, shutdown).await
+            }
+            _ => unreachable!("client and event loop protocol versions must match"),
         }
     }
 
@@ -111,6 +119,7 @@ impl MqttSource {
 
     async fn run_v3(
         &self,
+        client: AsyncClientV3,
         mut eventloop: rumqttc::EventLoop,
         out: &mut SourceSender,
         shutdown: ShutdownSignal,
@@ -119,18 +128,8 @@ impl MqttSource {
             tokio::select! {
                 _ = shutdown.clone() => return Ok(()),
                 mqtt_event = eventloop.poll() => {
-                    match mqtt_event {
-                        Ok(MqttEventV3::Incoming(IncomingV3::Publish(publish))) => {
-                            self.process_message_v3(publish, out).await;
-                        }
-                        Ok(MqttEventV3::Incoming(
-                            IncomingV3::PubAck(_)
-                            | IncomingV3::PubRec(_)
-                            | IncomingV3::PubComp(_),
-                        )) => {
-                            // TODO Handle acknowledgement - https://github.com/vectordotdev/vector/issues/21967
-                        }
-                        _ => {}
+                    if let Ok(MqttEventV3::Incoming(IncomingV3::Publish(publish))) = mqtt_event {
+                        self.process_message_v3(&client, publish, out).await;
                     }
                 }
             }
@@ -139,6 +138,7 @@ impl MqttSource {
 
     async fn run_v5(
         &self,
+        client: AsyncClientV5,
         mut eventloop: rumqttc::v5::EventLoop,
         out: &mut SourceSender,
         shutdown: ShutdownSignal,
@@ -147,25 +147,20 @@ impl MqttSource {
             tokio::select! {
                 _ = shutdown.clone() => return Ok(()),
                 mqtt_event = eventloop.poll() => {
-                    match mqtt_event {
-                        Ok(MqttEventV5::Incoming(PacketV5::Publish(publish))) => {
-                            self.process_message_v5(publish, out).await;
-                        }
-                        Ok(MqttEventV5::Incoming(
-                            PacketV5::PubAck(_)
-                            | PacketV5::PubRec(_)
-                            | PacketV5::PubComp(_),
-                        )) => {
-                            // TODO Handle acknowledgement
-                        }
-                        _ => {}
+                    if let Ok(MqttEventV5::Incoming(PacketV5::Publish(publish))) = mqtt_event {
+                        self.process_message_v5(&client, publish, out).await;
                     }
                 }
             }
         }
     }
 
-    async fn process_message_v3(&self, publish: PublishV3, out: &mut SourceSender) {
+    async fn process_message_v3(
+        &self,
+        client: &AsyncClientV3,
+        publish: PublishV3,
+        out: &mut SourceSender,
+    ) {
         emit!(EndpointBytesReceived {
             byte_size: publish.payload.len(),
             protocol: "mqtt",
@@ -173,7 +168,7 @@ impl MqttSource {
         });
         let events_received = register!(EventsReceived);
 
-        let (batch, _batch_receiver) = BatchNotifier::maybe_new_with_receiver(false);
+        let (batch, batch_receiver) = BatchNotifier::maybe_new_with_receiver(self.acknowledgements);
         let decoded = util::decode_message(
             self.decoder.clone(),
             "mqtt",
@@ -192,10 +187,27 @@ impl MqttSource {
         let count = decoded.len();
         if out.send_batch(decoded).await.is_err() {
             emit!(StreamClosedError { count });
+            return;
+        }
+
+        if let Some(receiver) = batch_receiver {
+            let client = client.clone();
+            tokio::spawn(async move {
+                if receiver.await == BatchStatus::Delivered
+                    && let Err(error) = client.ack(&publish).await
+                {
+                    debug!(message = "Failed to ack MQTT v3 publish.", %error);
+                }
+            });
         }
     }
 
-    async fn process_message_v5(&self, publish: PublishV5, out: &mut SourceSender) {
+    async fn process_message_v5(
+        &self,
+        client: &AsyncClientV5,
+        publish: PublishV5,
+        out: &mut SourceSender,
+    ) {
         emit!(EndpointBytesReceived {
             byte_size: publish.payload.len(),
             protocol: "mqtt",
@@ -203,7 +215,7 @@ impl MqttSource {
         });
         let events_received = register!(EventsReceived);
 
-        let (batch, _batch_receiver) = BatchNotifier::maybe_new_with_receiver(false);
+        let (batch, batch_receiver) = BatchNotifier::maybe_new_with_receiver(self.acknowledgements);
         let decoded = util::decode_message(
             self.decoder.clone(),
             "mqtt",
@@ -222,6 +234,18 @@ impl MqttSource {
         let count = decoded.len();
         if out.send_batch(decoded).await.is_err() {
             emit!(StreamClosedError { count });
+            return;
+        }
+
+        if let Some(receiver) = batch_receiver {
+            let client = client.clone();
+            tokio::spawn(async move {
+                if receiver.await == BatchStatus::Delivered
+                    && let Err(error) = client.ack(&publish).await
+                {
+                    debug!(message = "Failed to ack MQTT v5 publish.", %error);
+                }
+            });
         }
     }
 

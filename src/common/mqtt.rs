@@ -324,8 +324,7 @@ impl MqttConnector {
         }
     }
 
-    /// Healthcheck (no-op due to upstream limitation).
-    /// <https://github.com/bytebeamio/rumqtt/issues/562>
+    /// TODO: Right now there is no way to implement the healthcheck properly: <https://github.com/bytebeamio/rumqtt/issues/562>
     pub async fn healthcheck(&self) -> crate::Result<()> {
         Ok(())
     }
@@ -336,6 +335,7 @@ pub fn build_connector(
     common: &MqttCommonConfig,
     client_id_prefix: &str,
     clean_session: bool,
+    manual_acks: bool,
 ) -> Result<MqttConnector, MqttError> {
     let client_id = common.client_id.clone().unwrap_or_else(|| {
         let hash = rand::rng()
@@ -365,6 +365,7 @@ pub fn build_connector(
             options.set_keep_alive(Duration::from_secs(common.keep_alive.into()));
             options.set_max_packet_size(common.max_packet_size, common.max_packet_size);
             options.set_clean_session(clean_session);
+            options.set_manual_acks(manual_acks);
 
             if let (Some(user), Some(password)) = (&common.user, &common.password) {
                 options.set_credentials(user, password);
@@ -391,6 +392,7 @@ pub fn build_connector(
             let mut options = MqttOptionsV5::new(&client_id, &common.host, common.port);
             options.set_keep_alive(Duration::from_secs(common.keep_alive.into()));
             options.set_clean_start(clean_session);
+            options.set_manual_acks(manual_acks);
 
             if let (Some(user), Some(password)) = (&common.user, &common.password) {
                 options.set_credentials(user, password);
