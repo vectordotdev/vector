@@ -62,10 +62,10 @@ components: sources: mqtt: {
 			description: "An individual MQTT message."
 			fields: {
 				message: {
-					description: "The decoded payload of the MQTT message."
+					description: "The decoded payload of the MQTT message. The exact contents depend on the configured `decoding.codec` (raw bytes, JSON, syslog, etc.)."
 					required:    true
 					type: string: {
-						examples: ["{\"level\":\"info\",\"msg\":\"hello\"}"]
+						examples: ["Hello, world!"]
 						syntax: "literal"
 					}
 				}
@@ -162,13 +162,6 @@ components: sources: mqtt: {
 	}
 
 	how_it_works: {
-		rumqttc: {
-			title: "rumqttc"
-			body:  """
-				The `mqtt` source uses [`rumqttc`](\(urls.rumqttc)) under the hood, a pure-Rust
-				MQTT client supporting both MQTT 3.1.1 and MQTT 5.0.
-				"""
-		}
 		topic_subscription: {
 			title: "Topic subscriptions"
 			body: """

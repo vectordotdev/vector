@@ -156,6 +156,9 @@ impl MqttSource {
         loop {
             tokio::select! {
                 _ = shutdown.clone() => return Ok(()),
+                // If `poll()` returns an error there is currently no way to tie it back
+                // to a specific event, which limits delivery-guarantee accuracy until
+                // https://github.com/bytebeamio/rumqtt/issues/349 is resolved.
                 mqtt_event = eventloop.poll() => {
                     match mqtt_event {
                         Ok(MqttEventV3::Incoming(IncomingV3::Publish(publish))) => {
@@ -184,6 +187,8 @@ impl MqttSource {
         loop {
             tokio::select! {
                 _ = shutdown.clone() => return Ok(()),
+                // See run_v3 for the rumqttc poll-error correlation caveat:
+                // https://github.com/bytebeamio/rumqtt/issues/349
                 mqtt_event = eventloop.poll() => {
                     match mqtt_event {
                         Ok(MqttEventV5::Incoming(PacketV5::Publish(publish))) => {

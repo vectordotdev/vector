@@ -78,13 +78,6 @@ components: sinks: mqtt: {
 	}
 
 	how_it_works: {
-		rumqttc: {
-			title: "rumqttc"
-			body:  """
-				The `mqtt` sink uses [`rumqttc`](\(urls.rumqttc)) under the hood, a pure-Rust
-				MQTT client supporting both MQTT 3.1.1 and MQTT 5.0.
-				"""
-		}
 		protocol_versions: {
 			title: "MQTT 3.1.1 and 5.0 support"
 			body: """

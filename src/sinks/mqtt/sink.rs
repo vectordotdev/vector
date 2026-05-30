@@ -75,7 +75,12 @@ impl MqttSink {
 
         let _open_token = OpenGauge::new().open(|count| emit!(ConnectionOpen { count }));
 
-        // Spawn the event loop handler based on protocol version
+        // Spawn the event loop handler based on protocol version.
+        //
+        // If an error is returned from `poll()` there is currently no way to tie it back
+        // to the event that was posted, which means we can't accurately provide
+        // delivery guarantees. We need this issue resolved first:
+        // https://github.com/bytebeamio/rumqtt/issues/349
         match eventloop {
             MqttEventLoop::V311(mut connection) => {
                 tokio::spawn(async move {

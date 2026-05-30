@@ -378,7 +378,6 @@ urls: {
 	mongodb_command_server_status:              "https://docs.mongodb.com/manual/reference/command/serverStatus/"
 	mongodb_connection_string_uri_format:       "https://docs.mongodb.com/manual/reference/connection-string/"
 	mqtt:                                       "https://mqtt.org/"
-	rumqttc:                                    "\(github)/bytebeamio/rumqtt"
 	musl_builder_docker_image:                  "\(vector_repo)/blob/master/scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile"
 	native_proto_schema:                        "\(vector_repo)/blob/master/lib/vector-core/proto/event.proto"
 	native_json_schema:                         "\(vector_repo)/blob/master/lib/codecs/tests/data/native_encoding/schema.cue"
