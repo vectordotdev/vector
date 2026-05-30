@@ -1,1 +1,3 @@
 Added MQTT v5 protocol support to the `mqtt` source and `mqtt` sink, selectable via a new `protocol_version` option (defaults to `v311` for backward compatibility). The sink now exposes v5 publish properties (payload format indicator, message expiry, topic alias, response topic, correlation data, content type, user properties) under a new `publish_properties` config section, and the source surfaces incoming v5 properties as event metadata (content type, response topic, correlation data, payload format indicator, message expiry interval, user properties, protocol version). The `mqtt` sink now also accepts metrics and traces in addition to logs.
+
+authors: vitalvas
