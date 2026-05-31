@@ -302,7 +302,12 @@ impl GcsSinkConfig {
 
         let batch_settings = self.batch.into_batcher_settings()?;
 
-        let partitioner = self.key_partitioner()?;
+        let offset = self
+            .timezone
+            .or(cx.globals.timezone)
+            .and_then(timezone_to_offset);
+
+        let partitioner = self.key_partitioner(offset)?;
 
         let protocol = get_http_scheme_from_uri(&base_url.parse::<Uri>().unwrap());
 
@@ -317,10 +322,11 @@ impl GcsSinkConfig {
         Ok(VectorSink::from_event_streamsink(sink))
     }
 
-    fn key_partitioner(&self) -> crate::Result<KeyPartitioner> {
+    fn key_partitioner(&self, offset: Option<FixedOffset>) -> crate::Result<KeyPartitioner> {
         Ok(KeyPartitioner::new(
             Template::try_from(self.key_prefix.as_deref().unwrap_or("date=%F/"))
-                .context(KeyPrefixTemplateSnafu)?,
+                .context(KeyPrefixTemplateSnafu)?
+                .with_tz_offset(offset),
             None,
         ))
     }
@@ -554,12 +560,57 @@ mod tests {
             ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
         };
         let key = sink_config
-            .key_partitioner()
+            .key_partitioner(None)
             .unwrap()
             .partition(&Event::Log(event))
             .expect("key wasn't provided");
 
         assert_eq!(key, "key: value");
+    }
+
+    #[test]
+    fn gcs_key_prefix_honors_timezone_offset() {
+        // Regression test for #25090: the `timezone` option must be applied to
+        // strftime specifiers in `key_prefix`, matching the `aws_s3` sink.
+        use chrono::{FixedOffset, TimeZone, Utc};
+
+        let mut event = LogEvent::from("message");
+        // 2026-04-01T00:30:00Z is still 2026-03-31 in a UTC-08:00 zone and
+        // already 2026-04-01 in a UTC+08:00 zone.
+        let timestamp = Utc.with_ymd_and_hms(2026, 4, 1, 0, 30, 0).unwrap();
+        event.insert("timestamp", timestamp);
+
+        let sink_config = GcsSinkConfig {
+            key_prefix: Some("%Y%m%d/".into()),
+            ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
+        };
+
+        // Positive offset (e.g. Asia/Taipei, UTC+08:00) rolls the date forward.
+        let plus_eight = FixedOffset::east_opt(8 * 3600);
+        let key = sink_config
+            .key_partitioner(plus_eight)
+            .unwrap()
+            .partition(&Event::Log(event.clone()))
+            .expect("key wasn't provided");
+        assert_eq!(key, "20260401/");
+
+        // Negative offset (e.g. America/Los_Angeles, UTC-08:00) keeps the
+        // previous calendar day.
+        let minus_eight = FixedOffset::west_opt(8 * 3600);
+        let key = sink_config
+            .key_partitioner(minus_eight)
+            .unwrap()
+            .partition(&Event::Log(event.clone()))
+            .expect("key wasn't provided");
+        assert_eq!(key, "20260331/");
+
+        // No timezone configured falls back to UTC.
+        let key = sink_config
+            .key_partitioner(None)
+            .unwrap()
+            .partition(&Event::Log(event))
+            .expect("key wasn't provided");
+        assert_eq!(key, "20260401/");
     }
 
     fn request_settings(sink_config: &GcsSinkConfig, context: SinkContext) -> RequestSettings {
@@ -584,7 +635,7 @@ mod tests {
         };
         let log = LogEvent::default().into();
         let key = sink_config
-            .key_partitioner()
+            .key_partitioner(None)
             .unwrap()
             .partition(&log)
             .expect("key wasn't provided");
