@@ -449,19 +449,8 @@ impl DnstapParser {
         }
 
         if let Some(query_address) = dnstap_message.query_address.as_ref() {
-            let source_address = if socket_family == 1 {
-                if query_address.len() < 4 {
-                    return Err(Error::from("Cannot parse query_address"));
-                }
-                let address_buffer: [u8; 4] = query_address[0..4].try_into()?;
-                IpAddr::V4(Ipv4Addr::from(address_buffer))
-            } else {
-                if query_address.len() < 16 {
-                    return Err(Error::from("Cannot parse query_address"));
-                }
-                let address_buffer: [u8; 16] = query_address[0..16].try_into()?;
-                IpAddr::V6(Ipv6Addr::from(address_buffer))
-            };
+            let source_address = parse_dnstap_address(socket_family, query_address)
+                .ok_or_else(|| Error::from("Cannot parse query_address"))?;
 
             DnstapParser::insert(
                 event,
@@ -481,19 +470,8 @@ impl DnstapParser {
         }
 
         if let Some(response_address) = dnstap_message.response_address.as_ref() {
-            let response_addr = if socket_family == 1 {
-                if response_address.len() < 4 {
-                    return Err(Error::from("Cannot parse response_address"));
-                }
-                let address_buffer: [u8; 4] = response_address[0..4].try_into()?;
-                IpAddr::V4(Ipv4Addr::from(address_buffer))
-            } else {
-                if response_address.len() < 16 {
-                    return Err(Error::from("Cannot parse response_address"));
-                }
-                let address_buffer: [u8; 16] = response_address[0..16].try_into()?;
-                IpAddr::V6(Ipv6Addr::from(address_buffer))
-            };
+            let response_addr = parse_dnstap_address(socket_family, response_address)
+                .ok_or_else(|| Error::from("Cannot parse response_address"))?;
 
             DnstapParser::insert(
                 event,
@@ -996,6 +974,36 @@ impl DnstapParser {
     }
 }
 
+/// Parse a dnstap socket address (`query_address`/`response_address`) into an [`IpAddr`].
+///
+/// The dnstap spec says an `INET` (IPv4) address is 4 octets and an `INET6` address is
+/// 16 octets, but in practice some producers (notably CoreDNS, which relies on Go's
+/// `net.IP`) emit the client address as a 16-byte IPv4-mapped IPv6 value (`::ffff:a.b.c.d`)
+/// while still reporting `socket_family = INET`. The previous logic keyed the address
+/// width off `socket_family` alone and so truncated such buffers to their first 4 (zero)
+/// bytes, rendering the address as `0.0.0.0` (issue #25181). We now detect the mapped form
+/// and unwrap it to IPv4 so the real client IP is preserved. Returns `None` when the buffer
+/// is too short for the indicated family (callers map that to a parse error).
+fn parse_dnstap_address(socket_family: i32, address: &[u8]) -> Option<IpAddr> {
+    if socket_family == SocketFamily::Inet as i32 {
+        // Some producers send a 16-byte IPv4-mapped IPv6 address even when socket_family
+        // reports INET; unwrap it to IPv4 so the real client address is preserved.
+        if address.len() >= 16 {
+            let buf: [u8; 16] = address[0..16].try_into().ok()?;
+            if let Some(v4) = Ipv6Addr::from(buf).to_ipv4_mapped() {
+                return Some(IpAddr::V4(v4));
+            }
+        }
+        // Standard IPv4 address: leading 4 octets.
+        let buf: [u8; 4] = address.get(0..4)?.try_into().ok()?;
+        return Some(IpAddr::V4(Ipv4Addr::from(buf)));
+    }
+
+    // INET6 (or any other reported family): 16-octet IPv6 address.
+    let buf: [u8; 16] = address.get(0..16)?.try_into().ok()?;
+    Some(IpAddr::V6(Ipv6Addr::from(buf)))
+}
+
 fn to_socket_family_name(socket_family: i32) -> Result<&'static str> {
     if socket_family == SocketFamily::Inet as i32 {
         Ok("INET")
@@ -1432,6 +1440,37 @@ mod tests {
             };
             assert!(test_one_input(2, message).is_err());
         }
+    }
+
+    #[test]
+    fn test_parse_dnstap_address_handles_ipv4_mapped_inet() {
+        // Standard 4-byte IPv4 address reported as INET.
+        assert_eq!(
+            parse_dnstap_address(1, &[10, 221, 7, 182]),
+            Some(IpAddr::V4(Ipv4Addr::new(10, 221, 7, 182)))
+        );
+
+        // Regression for #25181: CoreDNS (via Go's net.IP) can report socket_family = INET
+        // while sending the address as a 16-byte IPv4-mapped IPv6 value (::ffff:10.221.7.182).
+        // Previously only the leading 4 (zero) bytes were read, yielding 0.0.0.0.
+        let mapped = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff, 10, 221, 7, 182];
+        assert_eq!(
+            parse_dnstap_address(1, &mapped),
+            Some(IpAddr::V4(Ipv4Addr::new(10, 221, 7, 182)))
+        );
+
+        // A genuine 16-byte IPv6 address reported as INET6 is preserved as-is.
+        let v6 = [
+            0x20, 0x01, 0x05, 0x02, 0x70, 0x94, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x30,
+        ];
+        assert_eq!(
+            parse_dnstap_address(2, &v6),
+            Some(IpAddr::V6("2001:502:7094::30".parse().unwrap()))
+        );
+
+        // Too-short buffers still fail to parse.
+        assert_eq!(parse_dnstap_address(1, &[1, 2]), None);
+        assert_eq!(parse_dnstap_address(2, &[1, 2, 3, 4]), None);
     }
 
     #[test]
