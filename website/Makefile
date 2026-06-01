@@ -31,7 +31,7 @@ generate-vrl-docs:
 		$(if $(findstring true,$(CI)),--vector-sha $(GITHUB_SHA),)
 
 generate-deprecations-json:
-	$(VDEV) check deprecations
+	$(VDEV) deprecation generate
 
 structured-data: generate-vrl-docs generate-deprecations-json cue-build config-examples
 
