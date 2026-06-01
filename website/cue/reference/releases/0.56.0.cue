@@ -11,8 +11,8 @@ releases: "0.56.0": {
 
 		## Release highlights
 
-		- Added a new `databricks_zerobus` sink that streams log data to Databricks Unity Catalog tables via the Zerobus ingestion service. Supports OAuth 2.0 authentication, automatic schema fetching from Unity Catalog, and protobuf batch encoding.
-		- Added a new `delay` transform, that delays each event by a fixed duration. Events can also
+		- Added a new `databricks_zerobus` sink that streams log data to Databricks Unity Catalog tables through the Zerobus ingestion service. The sink supports OAuth 2.0 authentication, automatic schema fetching from Unity Catalog, and protobuf batch encoding.
+		- Added a new `delay` transform that delays each event by a fixed duration. Events can also
 		  be delayed based on a condition which includes VRL transforms.
 		- HTTP-based sinks that use the shared retry helpers now support a `retry_strategy` configuration
 		option to control which HTTP response codes are retried. The `http` sink also includes a new
@@ -25,7 +25,7 @@ releases: "0.56.0": {
 		  cardinality tracking.
 		- Parquet batch encoding in the `aws_s3` sink is now available out of the box in official release
 		  binaries for all users.
-		- Fixed a CPU regression introduced in 0.50.0 affecting all sinks that use metric normalization such as `prometheus_remote_write`, `aws_cloudwatch_metrics`, `statsd` and others.
+		- Fixed a CPU regression introduced in 0.50.0 affecting all sinks that use metric normalization such as `prometheus_remote_write`, `aws_cloudwatch_metrics`, `statsd`, and others.
 		- Restored support for installing Vector on RHEL 8, Rocky Linux 8, AlmaLinux 8, and CentOS
 		  Stream 8, which had been broken since 0.55.0 due to an inadvertent glibc requirement bump.
 		- Unit tests now support an optional `expected_event_count` field on test outputs, allowing assertions on the number of events emitted by a transform.
@@ -118,7 +118,7 @@ releases: "0.56.0": {
 		{
 			type: "fix"
 			description: #"""
-				Fixed a CPU regression introduced in 0.50.0 affecting all sinks that use metric normalization such as `prometheus_remote_write`, `aws_cloudwatch_metrics`, `statsd` and others.
+				Fixed a CPU regression introduced in 0.50.0 affecting all sinks that use metric normalization such as `prometheus_remote_write`, `aws_cloudwatch_metrics`, `statsd`, and others.
 
 				The only exception is the `incremental_to_absolute` transform when `max_bytes` or `max_events` are configured, where the overhead is expected and necessary for eviction to work correctly.
 				"""#
@@ -127,7 +127,7 @@ releases: "0.56.0": {
 		{
 			type: "feat"
 			description: #"""
-				Added a new `databricks_zerobus` sink that streams log data to Databricks Unity Catalog tables via the Zerobus ingestion service. Supports OAuth 2.0 authentication, automatic schema fetching from Unity Catalog, and protobuf batch encoding.
+				Added a new `databricks_zerobus` sink that streams log data to Databricks Unity Catalog tables through the Zerobus ingestion service. The sink supports OAuth 2.0 authentication, automatic schema fetching from Unity Catalog, and protobuf batch encoding.
 				"""#
 			contributors: ["flaviocruz"]
 		},
@@ -136,7 +136,7 @@ releases: "0.56.0": {
 			description: #"""
 				The shared gRPC decompression layer now rejects request frames that set the
 				compressed flag without a negotiated `grpc-encoding` (e.g. `identity` or a
-				missing header). Previously such malformed frames were silently decoded as
+				missing header). Previously, such malformed frames were silently decoded as
 				gzip, which could mask client/server compression-negotiation bugs.
 				"""#
 			contributors: ["jpds"]
@@ -155,10 +155,9 @@ releases: "0.56.0": {
 		{
 			type: "fix"
 			description: #"""
-				Fixed issue during in place reload of a sink with a disk buffer configured, where
+				Fixed an issue during in-place reload of a sink with a disk buffer configured, where
 				the component would stall for batch.timeout_sec before gracefully reloading.
-				This fix also resolves issues Vector had where it would ignore SIGINT during
-				cases where the pipeline stall had occurred.
+				This fix also resolves an issue where Vector ignored SIGINT when a pipeline stall occurred.
 				"""#
 			contributors: ["graphcareful"]
 		},
@@ -225,7 +224,7 @@ releases: "0.56.0": {
 		{
 			type: "feat"
 			description: #"""
-				Added a new `delay` transform, that delays each event by a fixed duration.
+				Added a new `delay` transform that delays each event by a fixed duration.
 				"""#
 			contributors: ["esensar", "Quad9DNS"]
 		},
@@ -239,8 +238,8 @@ releases: "0.56.0": {
 		{
 			type: "fix"
 			description: #"""
-				The `aggregate` transform now correctly passes through/ignores metrics whose kind is not supported
-				by the configured mode. Prior to this change these metrics would be silently dropped, contrary to
+				The `aggregate` transform now correctly passes through or ignores metrics whose kind is not supported
+				by the configured mode. Prior to this change, these metrics would be silently dropped, contrary to
 				the officially documented behavior. For example, `absolute` metrics flowing through a `sum`-mode aggregate
 				transform are now forwarded to the next step in the pipeline unchanged rather than being dropped:
 
@@ -257,7 +256,7 @@ releases: "0.56.0": {
 		{
 			type: "fix"
 			description: #"""
-				The `aws_s3` and `clickhouse` sinks now correctly advertise only the `batch_encoding.codec` values they actually support: `parquet` for `aws_s3` and `arrow_stream` for `clickhouse`. Previously the documentation and configuration schema listed both codecs for both sinks, even though picking the wrong one produced a startup error.
+				The `aws_s3` and `clickhouse` sinks now correctly advertise only the `batch_encoding.codec` values they actually support: `parquet` for `aws_s3` and `arrow_stream` for `clickhouse`. Previously, the documentation and configuration schema listed both codecs for both sinks, even though picking the wrong one produced a startup error.
 				"""#
 			contributors: ["flaviofcruz"]
 		},
@@ -277,8 +276,7 @@ releases: "0.56.0": {
 				defined inside Vector rather than pulled from an external crate. The
 				line formats (`apache_common`, `apache_error`, `json`, `syslog`,
 				`bsd_syslog`) are unchanged. If any of your tests or downstream
-				pipelines assert on specific generated usernames or TLDs, please
-				update those expectations.
+				pipelines assert on specific generated usernames or TLDs, update those expectations.
 				"""#
 			contributors: ["pront"]
 		},
@@ -288,7 +286,7 @@ releases: "0.56.0": {
 				Fixed a bug in the topology builder causing component metrics registered at build
 				time to miss the component tags if the component build function awaits non-trivially.
 
-				This notably affected sinks using a disk buffer, and source or sinks performing
+				This notably affected sinks using a disk buffer, and sources or sinks performing
 				IO work in the build function.
 				"""#
 			contributors: ["gwenaskell"]
