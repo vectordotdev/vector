@@ -1,10 +1,21 @@
 package metadata
 
 releases: "0.56.0": {
-	date:     "2026-06-01"
+	date:     "2026-06-02"
 	codename: ""
 
 	whats_next: []
+
+	description: """
+		The [COSE team](https://opensource.datadoghq.com/about/#the-community-open-source-engineering-team) is excited to announce version `0.56.0`!
+
+		## Release highlights
+
+		- TODO
+
+		## Breaking Changes
+		- The `greptimedb_metrics` and `greptimedb_logs` sinks now require GreptimeDB v1.x. Users running GreptimeDB v0.x must upgrade their GreptimeDB instance before upgrading Vector.
+		"""
 
 	changelog: [
 		{
@@ -13,7 +24,7 @@ releases: "0.56.0": {
 				HTTP-based sinks that use the shared retry helpers now support a `retry_strategy` configuration
 				option to control which HTTP response codes are retried. The `http` sink also includes a new
 				example showing how to retry only specific transient status codes.
-				
+
 				Issue: https://github.com/vectordotdev/vector/issues/10870
 				"""#
 			contributors: ["ndrsg"]
@@ -26,7 +37,7 @@ releases: "0.56.0": {
 				such as invalid HTTP request construction or an invalid proxy URI are not. Setting
 				`retry_strategy` to `none` disables retries for these transport errors and for request
 				timeouts, in addition to status-code-based retries.
-				
+
 				Issue: https://github.com/vectordotdev/vector/issues/10870
 				"""#
 			contributors: ["ndrsg"]
@@ -35,9 +46,9 @@ releases: "0.56.0": {
 			type: "fix"
 			description: #"""
 				The default `/etc/vector/vector.yaml` config file is no longer installed by the Debian, RPM, Alpine, and distroless-static Docker packages. The previous default ran a `demo_logs` source and printed synthesized syslog lines to stdout, which then surfaced in journald or `/var/log/` on hosts running Vector as a service and was a common source of confusion.
-				
+
 				New installs will now have no active config on disk. Provide your own configuration at `/etc/vector/vector.yaml` (or pass `--config <path>`) before starting Vector. A reference example is shipped at `/usr/share/vector/examples/vector.yaml`, and more sample configs remain at `/etc/vector/examples/`.
-				
+
 				Existing installs are unaffected on upgrade: package managers preserve the on-disk `/etc/vector/vector.yaml` if you already had one.
 				"""#
 			contributors: ["pront"]
@@ -54,12 +65,12 @@ releases: "0.56.0": {
 			description: #"""
 				The `vector` sink now supports `zstd` compression in addition to `gzip`. This provides better
 				compression ratios and performance for Vector-to-Vector communication.
-				
+
 				The compression configuration has been enhanced to support multiple algorithms while maintaining
 				full backward compatibility:
-				
+
 				## Legacy boolean syntax (still supported)
-				
+
 				```yaml
 				sinks:
 				  my_vector:
@@ -69,9 +80,9 @@ releases: "0.56.0": {
 				    # or
 				    compression: false  # No compression
 				```
-				
+
 				## New string syntax
-				
+
 				```yaml
 				sinks:
 				  my_vector:
@@ -80,7 +91,7 @@ releases: "0.56.0": {
 				    compression: "zstd"  # Use zstd compression
 				    # Supported values: "none", "gzip", "zstd"
 				```
-				
+
 				The Vector source automatically accepts both gzip and zstd compressed data, enabling seamless
 				communication between Vector instances using different compression algorithms.
 				"""#
@@ -90,7 +101,7 @@ releases: "0.56.0": {
 			type: "fix"
 			description: #"""
 				Fixed a CPU regression introduced in 0.50.0 affecting all sinks that use metric normalization such as `prometheus_remote_write`, `aws_cloudwatch_metrics`, `statsd` and others.
-				
+
 				The only exception is the `incremental_to_absolute` transform when `max_bytes` or `max_events` are configured, where the overhead is expected and necessary for eviction to work correctly.
 				"""#
 			contributors: ["thomasqueirozb"]
@@ -98,7 +109,7 @@ releases: "0.56.0": {
 		{
 			type: "feat"
 			description: #"""
-				Add a new `databricks_zerobus` sink that streams log data to Databricks Unity Catalog tables via the Zerobus ingestion service. Supports OAuth 2.0 authentication, automatic schema fetching from Unity Catalog, and protobuf batch encoding.
+				Added a new `databricks_zerobus` sink that streams log data to Databricks Unity Catalog tables via the Zerobus ingestion service. Supports OAuth 2.0 authentication, automatic schema fetching from Unity Catalog, and protobuf batch encoding.
 				"""#
 			contributors: ["flaviocruz"]
 		},
@@ -150,7 +161,8 @@ releases: "0.56.0": {
 		{
 			type: "fix"
 			description: #"""
-				The error log + metric that `splunk_hec` source emit on missing/invalid auth header now specifies "authentication_failed" as error_type.
+				The error log + metric that the `splunk_hec` source emits on missing or invalid auth
+				headers now specifies "authentication_failed" as the `error_type`.
 				"""#
 			contributors: ["20agbekodo"]
 		},
@@ -213,13 +225,13 @@ releases: "0.56.0": {
 				by the configured mode. Prior to this change these metrics would be silently dropped, contrary to
 				the officially documented behavior. For example, `absolute` metrics flowing through a `sum`-mode aggregate
 				transform are now forwarded to the next step in the pipeline unchanged rather than being dropped:
-				
+
 				```text
 				{kind: incremental, type: counter, name: "http.requests", value: 10}  → summed into aggregate
 				{kind: absolute,    type: gauge,   name: "cpu.usage",     value: 0.83} → previously dropped, now passes through unchanged
 				{kind: incremental, type: counter, name: "http.requests", value: 5}   → summed into aggregate
 				```
-				
+
 				If you want to preserve the previous drop behavior, add a `filter` transform before the aggregate transform to discard the unwanted metric kind.
 				"""#
 			contributors: ["ArunPiduguDD"]
@@ -257,7 +269,7 @@ releases: "0.56.0": {
 			description: #"""
 				Fixed a bug in the topology builder causing component metrics registered at build
 				time to miss the component tags if the component build function awaits non-trivially.
-				
+
 				This notably affected sinks using a disk buffer, and source or sinks performing
 				IO work in the build function.
 				"""#
@@ -302,9 +314,9 @@ releases: "0.56.0": {
 			type: "enhancement"
 			description: #"""
 				The `splunk_hec` source now accepts optional per-endpoint codec configuration via `event: { framing, decoding }` and `raw: { framing, decoding }`. When `decoding` is set on an endpoint, Vector applies a second decoding pass after the HEC envelope is parsed: on `/services/collector/event` the envelope's `event` field is fed through the codec, and on `/services/collector/raw` the request body is fed through the codec directly. A single payload can fan out to multiple events.
-				
+
 				For example, to decode JSON payloads in `/event` requests while splitting `/raw` bodies on newlines:
-				
+
 				```yaml
 				sources:
 				  hec:
@@ -335,7 +347,7 @@ releases: "0.56.0": {
 		{
 			type: "enhancement"
 			description: #"""
-				Reduce the memory usage of the `tag_cardinality_limit` transform when running in `exact` mode by allocating less unused memory on initialization.
+				Reduced the memory usage of the `tag_cardinality_limit` transform when running in `exact` mode by allocating less unused memory on initialization.
 				"""#
 			contributors: ["ArunPiduguDD"]
 		},
@@ -343,7 +355,7 @@ releases: "0.56.0": {
 			type: "enhancement"
 			description: #"""
 				The `tag_cardinality_limit` transform gained two new configuration capabilities:
-				
+
 				- **Per-tag overrides** (`per_tag_limits`): configure cardinality limits per tag key within a metric, or exclude individual tags from tracking.
 				- **Metric exclusion**: opt entire metrics out of cardinality tracking via `mode: excluded` in `per_metric_limits`.
 				"""#
@@ -353,7 +365,7 @@ releases: "0.56.0": {
 			type: "enhancement"
 			description: #"""
 				The `tag_cardinality_limit` transform gained two new settings:
-				
+
 				- **`tracking_scope`**: isolate tag tracking per metric (`per_metric`) instead of sharing a single bucket across all metrics (`global`, the default).
 				- **`max_tracked_keys`**: cap the total number of tag keys tracked to bound memory usage.
 				"""#
@@ -363,7 +375,7 @@ releases: "0.56.0": {
 			type: "fix"
 			description: #"""
 				TCP-based sources that emit acknowledgements (`fluent`, `logstash`) no longer log a spurious `Error writing acknowledgement, dropping connection.` at ERROR level when the ack write fails because the peer cleanly closed its TLS session (for example, during a rolling pod restart). These graceful shutdowns now log at WARN and no longer increment `component_errors_total{error_code="ack_failed", ...}`, preventing operator dashboards/alerts from firing on routine peer disconnects. Genuine ack write failures are still logged at ERROR and continue to increment `component_errors_total`.
-				
+
 				The `connection_shutdown_total{mode="tcp"}` counter is now incremented exactly once per accepted source connection when its per-connection task exits, pairing with `ConnectionOpen` — regardless of cause (TLS handshake failure, shutdown signal during handshake, graceful peer EOF, decoder failure, downstream closed, ack write failure, tripwire, max connection duration). Previously it was not emitted by TCP sources at all.
 				"""#
 			contributors: ["taylorchandleryoung"]
@@ -372,50 +384,50 @@ releases: "0.56.0": {
 
 	vrl_changelog: #"""
 		### [0.33.0 (2026-05-28)]
-		
+
 		#### New Features
-		
+
 		- VRL string literals now support `\u{HEX}` Unicode escape sequences. Any valid Unicode scalar value can be expressed, e.g. `"hello\u{1F30E}world"`. Invalid sequences (empty braces, non-hex digits, surrogate codepoints, or values above U+10FFFF) are reported as a compile-time error.
-		
+
 		(https://github.com/vectordotdev/vrl/pull/1771)
 		- `parse_regex` now accepts dynamic regex patterns (variables and runtime expressions), consistent with `parse_regex_all`. When the pattern is a literal, return type information remains precise based on named capture groups.
-		
+
 		(https://github.com/vectordotdev/vrl/pull/1774)
-		
+
 		#### Enhancements
-		
+
 		- Updated user agent data for `parse_user_agent` function
-		
+
 		(https://github.com/vectordotdev/vrl/pull/1776)
 		- Protobuf encoding now coerces compatible scalar types into the target field type: integers and strings are accepted for `bool` fields (using the same parsing as `to_bool`), and integers are accepted for `float`/`double` fields. Previously these inputs failed encoding and required explicit conversion in VRL.
-		
+
 		(https://github.com/vectordotdev/vrl/pull/1763)
 		- Added an optional `allow_lossy_string_coercion` argument to `encode_proto`. VRL's protobuf encoding stringifies `Boolean`, `Integer`, `Float`, and `Timestamp` values when assigned to a protobuf `string` field as a convenience for callers handling loosely typed input. The [protobuf JSON mapping](https://protobuf.dev/programming-guides/json/) only accepts a JSON string for a `string` field, so callers who want strict spec-compliant encoding can now pass `allow_lossy_string_coercion: false`. The default stays `true`, so today's behavior is unchanged.
-		
+
 		(https://github.com/vectordotdev/vrl/pull/1764)
 		- Improved performance of `parse_regex`/`parse_regex_all` by pre-computing capture group names and indices at compile time. Users may see anywhere from 4% to 13% speedups in some cases.
-		
+
 		(https://github.com/vectordotdev/vrl/pull/1773)
 		- Improved performance of `parse_regex_all` by reusing the compiled regex across invocations.
-		
+
 		(https://github.com/vectordotdev/vrl/pull/1775)
-		
+
 		#### Fixes
-		
+
 		- The compiler now reports every unhandled-error in a single compilation pass instead of stopping at the first one. For example:
-		
+
 		```coffee
 		{
 		push(.x, 1)
 		.b = push(.y, 2)
 		}
 		```
-		
+
 		now reports both `push(.x, 1)` (unhandled error) and `.b = push(.y, 2)` (unhandled fallible assignment) in one go. Previously you'd only see the second one, fix it, recompile, and only then discover the first.
-		
+
 		(https://github.com/vectordotdev/vrl/pull/1759)
 		- Fixed a confusing compile error where a fallible call earlier in a block could cause a later, unrelated assignment to be reported as the problem. For example:
-		
+
 		```coffee
 		{
 		.a = 1
@@ -423,33 +435,33 @@ releases: "0.56.0": {
 		.b = 2             # but the compiler used to flag this line
 		}
 		```
-		
+
 		The error is now reported on the actual fallible expression, so adding `!` or the `, err =` form fixes it where you'd expect. This also fixes the same shape inside closure bodies, e.g. inside `for_each`/`map_values`.
-		
+
 		(https://github.com/vectordotdev/vrl/pull/453)
 		- Fixed a false positive in the unused-variable diagnostic (`E900`) where a variable used before being reassigned (shadowed) was incorrectly flagged as unused at its original assignment.
-		
+
 		(https://github.com/vectordotdev/vrl/pull/1743)
 		- `encode_proto` and `parse_proto` now support proto maps whose keys are integers or booleans, not just strings. Because VRL object keys are always strings, integer and boolean keys are written in their string form:
-		
+
 		```coffee
 		encode_proto({ "by_id": { "42": "alice" } }, "schema.desc", "MyMessage")
 		```
-		
+
 		Previously `parse_proto` errored on these maps and `encode_proto` silently dropped the field. Note that `encode_proto` will now return an error if a key string can't be parsed into the schema's key type (for example, `"abc"` against a `map<int32, ...>`).
-		
+
 		(https://github.com/vectordotdev/vrl/pull/1762)
 		- Fixed a typo in enum variant that made it impossible to use `SCREAMING_SNAKE` in casing functions such as `pascalcase`, `camelcase` and others.
-		
+
 		`pascalcase("hello", original_case: "SCREAMING_SNAKE")` now compiles properly.
-		
+
 		(https://github.com/vectordotdev/vrl/pull/1770)
 		- Allowed the `else` keyword (and `else if`) to appear on a new line after the closing `}` of an `if`-block. Previously the trailing newline terminated the if-expression at the parser level, forcing `else` to share a line with `}`.
-		
+
 		authors: pront
-		
+
 		(https://github.com/vectordotdev/vrl/pull/1756)
-		
+
 		"""#
 
 	commits: [
