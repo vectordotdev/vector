@@ -241,21 +241,7 @@ pub fn get_hostname() -> std::io::Result<String> {
     })
 }
 
-/// Spawn a future on the current tokio runtime, propagating the current tracing span into the
-/// spawned task.  This ensures that any logs or internal metrics emitted by the task retain the
-/// component tags (component_id, component_kind, component_type) of the caller.
-///
-/// Prefer this over `tokio::spawn(future.in_current_span())` to keep call sites concise.
-#[track_caller]
-pub(crate) fn spawn_in_current_span<T>(
-    task: impl std::future::Future<Output = T> + Send + 'static,
-) -> tokio::task::JoinHandle<T>
-where
-    T: Send + 'static,
-{
-    use tracing::Instrument as _;
-    tokio::spawn(task.in_current_span())
-}
+pub(crate) use vector_lib::spawn_in_current_span;
 
 /// Spawn a task with the given name. The name is only used if
 /// built with [`tokio_unstable`][tokio_unstable].

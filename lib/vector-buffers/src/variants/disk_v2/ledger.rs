@@ -16,7 +16,6 @@ use futures::StreamExt;
 use rkyv::{Archive, Serialize, with::Atomic};
 use snafu::{ResultExt, Snafu};
 use tokio::{fs, io::AsyncWriteExt, sync::Notify};
-use tracing::Instrument;
 use vector_common::finalizer::OrderedFinalizer;
 
 use super::{
@@ -701,15 +700,12 @@ where
     #[must_use]
     pub(super) fn spawn_finalizer(self: Arc<Self>) -> OrderedFinalizer<u64> {
         let (finalizer, mut stream) = OrderedFinalizer::new(None);
-        tokio::spawn(
-            async move {
-                while let Some((_status, amount)) = stream.next().await {
-                    self.increment_pending_acks(amount);
-                    self.notify_writer_waiters();
-                }
+        vector_common::spawn_in_current_span(async move {
+            while let Some((_status, amount)) = stream.next().await {
+                self.increment_pending_acks(amount);
+                self.notify_writer_waiters();
             }
-            .in_current_span(),
-        );
+        });
         finalizer
     }
 }
