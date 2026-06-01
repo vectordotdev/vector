@@ -274,7 +274,10 @@ struct LogstashAcker {
     // legitimately advertise a fresh window after a previously ACKed partial
     // tail. Within a single ReadyFrames batch, the only incomplete ACK domain
     // we can represent independently is the final tail we have actually seen.
-    acknowledgements: Vec<(LogstashProtocolVersion, u32)>,
+    // We expect most batches to need only one ACK point, either for a single
+    // completed window or for one partial tail. Multiple ACKs are only needed
+    // when ReadyFrames coalesces multiple logical windows into one batch.
+    acknowledgements: SmallVec<[(LogstashProtocolVersion, u32); 1]>,
 }
 
 impl LogstashAcker {
