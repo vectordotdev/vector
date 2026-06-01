@@ -279,17 +279,14 @@ struct LogstashAcker {
 
 impl LogstashAcker {
     fn new(frames: &[LogstashEventFrame]) -> Self {
-        let mut acknowledgements = frames
+        let acknowledgements = frames
             .iter()
-            .filter(|frame| frame.window_end)
-            .map(|frame| (frame.protocol, frame.sequence_number))
-            .collect::<Vec<_>>();
-
-        if let Some(frame) = frames.last()
-            && !frame.window_end
-        {
-            acknowledgements.push((frame.protocol, frame.sequence_number));
-        }
+            .enumerate()
+            // ACK each completed writer window and the last frame in a partial batch if ReadyFrames
+            // flushes before the current window is complete.
+            .filter(|(index, frame)| frame.window_end || index + 1 == frames.len())
+            .map(|(_, frame)| (frame.protocol, frame.sequence_number))
+            .collect();
 
         Self { acknowledgements }
     }
