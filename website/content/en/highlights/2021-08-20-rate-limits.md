@@ -23,9 +23,10 @@ have no rate limiting and a maximum number of concurrent requests of 1024.
 To configure a request rate limit or maximum concurrency on a HTTP-based sink,
 you can set the `request` parameters like:
 
-```toml
-request.concurrency = 5 # limit to 5 in-flight requests
-request.rate_limit_num = 10 # limit to 10 requests / second
+```yaml
+request:
+  concurrency: 5 # limit to 5 in-flight requests
+  rate_limit_num: 10 # limit to 10 requests / second
 ```
 
 If you haven't already, we recommend trying out our [adaptive concurrency

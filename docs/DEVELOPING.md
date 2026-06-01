@@ -1,8 +1,6 @@
 # Developing
 
 - [Setup](#setup)
-  - [Using a Docker or Podman environment](#using-a-docker-or-podman-environment)
-  - [Bring your own toolbox](#bring-your-own-toolbox)
 - [The basics](#the-basics)
   - [Directory structure](#directory-structure)
   - [Makefile](#makefile)
@@ -41,100 +39,17 @@
 
 ## Setup
 
-We're super excited to have you interested in working on Vector! Before you start you should pick how you want to develop.
-
-For small or first-time contributions, we recommend the Docker method. Prefer to do it yourself? That's fine too!
-
-### Using a Docker or Podman environment
-
-> **Targets:** You can use this method to produce AARCH64, Arm6/7, as well as x86/64 Linux builds.
-
-Since not everyone has a full working native environment, we took our environment and stuffed it into a Docker (or Podman) container!
-
-This is ideal for users who want it to "Just work" and just want to start contributing. It's also what we use for our CI, so you know if it breaks we can't do anything else until we fix it. 😉
-
-**Before you go further, install Docker or Podman through your official package manager, or from the [Docker](https://docs.docker.com/get-docker/) or [Podman](https://podman.io/) sites.**
-
-```bash
-# Optional: Only if you use `podman`
-export CONTAINER_TOOL="podman"
-```
-
-If your Linux environment runs SELinux in Enforcing mode, you will need to relabel the vector source code checkout with `container_home_t` context. Otherwise, the container environment cannot read/write the code:
-
-```bash
-cd your/checkout/of/vector/
-sudo semanage fcontext -a "${PWD}(/.*)?" -t container_file_t
-sudo restorecon . -R
-```
-
-By default, `make environment` style tasks will do a `docker pull` from GitHub's container repository, you can **optionally** build your own environment while you make your morning coffee ☕:
-
-```bash
-# Optional: Only if you want to go make a coffee
-make environment-prepare
-```
-
-Now that you have your coffee, you can enter the shell!
-
-```bash
-# Enter a shell with optimized mounts for interactive processes.
-# Inside here, you can use Vector like you have full toolchain (See below!)
-make environment
-# Try out a specific container tool. (Docker/Podman)
-make environment CONTAINER_TOOL="podman"
-# Add extra cli opts
-make environment CLI_OPTS="--publish 3000:2000"
-```
-
-Now you can use the jobs detailed in **"Bring your own toolbox"** below.
-
-Want to run from outside of the environment? _Clever. Good thinking._ You can run any of the following:
-
-```bash
-# Validate your code can compile
-make check ENVIRONMENT=true
-# Validate your code actually does compile (in dev mode)
-make build-dev ENVIRONMENT=true
-# Validate your tests pass
-make test SCOPE="sources::example" ENVIRONMENT=true
-# Validate tests (that do not require other services) pass
-make test ENVIRONMENT=true
-# Validate your tests pass (starting required services in Docker)
-make test-integration SCOPE="sources::example" ENVIRONMENT=true
-# Validate your tests pass against a live service.
-make test-integration SCOPE="sources::example" AUTOSPAWN=false ENVIRONMENT=true
-# Validate all tests pass (starting required services in Docker)
-make test-integration ENVIRONMENT=true
-# Run your benchmarks
-make bench SCOPE="transforms::example" ENVIRONMENT=true
-# Format your code before pushing!
-make fmt ENVIRONMENT=true
-```
-
-We use explicit environment opt-in as many contributors choose to keep their Rust toolchain local.
-
-### Bring your own toolbox
-
-> **Targets:** This option is required for MSVC/Mac/FreeBSD toolchains. It can be used to build for any environment or OS.
+We're super excited to have you interested in working on Vector!
 
 To build Vector on your own host will require a fairly complete development environment!
 
 Loosely, you'll need the following:
 
 - **To build Vector:** Have working Rustup, Protobuf tools, C++/C build tools (LLVM, GCC, or MSVC), Python, and Perl, `make` (the GNU one preferably), `bash`, `cmake`, `GNU coreutils`, and `autotools`.
-  - You may also need to install `libsasl2` if you are compiling with default features or with any `kafka`-related features.
-    - Installing libsasl2 on Ubuntu
-      - Run `sudo apt-get install -y libsasl2-dev`
-    - Installing libsasl2 on MacOS
-      - Run `brew install cyrus-sasl`
-      - You will need to set the following environment variables:
-
-        ```bash
-        export LDFLAGS="-L$(brew --prefix cyrus-sasl)/lib $LDFLAGS"
-        export CPPFLAGS="-I$(brew --prefix cyrus-sasl)/include $CPPFLAGS"
-        export PKG_CONFIG_PATH="$(brew --prefix cyrus-sasl)/lib/pkgconfig:$PKG_CONFIG_PATH"
-        ```
+  - The `default` feature does not enable Kerberos/GSSAPI SASL for kafka, so local dev builds (`cargo build`, `make build`) have no extra system prerequisites beyond the C build tools above.
+  - To enable GSSAPI for kafka, choose one of:
+    - `gssapi`: dynamically links against system `libsasl2`. Requires `libsasl2-dev` (Ubuntu: `sudo apt-get install -y libsasl2-dev`) or `cyrus-sasl` (macOS: `brew install cyrus-sasl`) installed.
+    - `gssapi-vendored` (or `vendored`, which includes it): builds `libsasl2` and `krb5` from bundled source. No system install needed. Linux only; the bundled path does not currently link on macOS arm64.
 
 - **To run `make test`:** Install [`cargo-nextest`](https://nexte.st/)
 - **To run integration tests:** Have `docker` available, or a real live version of that service. (Use `AUTOSPAWN=false`)
@@ -142,7 +57,13 @@ Loosely, you'll need the following:
 - **To run `make check-licenses` or `make build-licenses`:** Have `dd-rust-license-tool` [installed](https://github.com/DataDog/rust-license-tool).
 - **To run `make generate-docs`:** Have `cue` [installed](https://cuelang.org/docs/install/).
 
-If you find yourself needing to run something inside the Docker environment described above, that's totally fine, they won't collide or hurt each other. In this case, you'd just run `make environment-generate`.
+**Tooling shortcut:** Once the system-level dependencies above are in place, you can install the Rust and npm tooling (`cargo-nextest`, `cargo-deny`, `dd-rust-license-tool`, `vdev`, `markdownlint-cli2`, `prettier`, and others) in one shot:
+
+```bash
+bash scripts/environment/prepare.sh
+```
+
+This is the same script CI uses to provision its toolchain, so what you get locally matches what CI installs.
 
 We're interested in reducing our dependencies if simple options exist. Got an idea? Try it out, we'd love to hear of your successes and failures!
 
@@ -154,8 +75,7 @@ cargo check
 make check
 # Validate your code actually does compile (in dev mode)
 cargo build
-make build-dev
-# Validate your tests pass
+# Validate your test pass
 cargo test sources::example
 make test SCOPE="sources::example"
 # Validate tests (that do not require other services) pass

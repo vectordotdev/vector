@@ -34,6 +34,12 @@ pub trait RetryLogic: Clone + Send + Sync + 'static {
     /// implementors to specify what kinds of errors can be retried.
     fn is_retriable_error(&self, error: &Self::Error) -> bool;
 
+    /// When the Service call times out, this function allows implementors to
+    /// specify if the timeout should be retried.
+    fn is_retriable_timeout(&self) -> bool {
+        true
+    }
+
     /// When the Service call returns an `Ok` response, this function allows
     /// implementors to specify additional logic to determine if the success response
     /// is actually an error. This is particularly useful when the downstream service
@@ -197,10 +203,18 @@ where
                         None
                     }
                 } else if error.downcast_ref::<Elapsed>().is_some() {
-                    warn!(
-                        "Request timed out. If this happens often while the events are actually reaching their destination, try decreasing `batch.max_bytes` and/or using `compression` if applicable. Alternatively `request.timeout_secs` can be increased."
-                    );
-                    Some(self.build_retry())
+                    if self.logic.is_retriable_timeout() {
+                        warn!(
+                            "Request timed out. If this happens often while the events are actually reaching their destination, try decreasing `batch.max_bytes` and/or using `compression` if applicable. Alternatively `request.timeout_secs` can be increased."
+                        );
+                        Some(self.build_retry())
+                    } else {
+                        error!(
+                            message =
+                                "Request timed out and is not retriable; dropping the request."
+                        );
+                        None
+                    }
                 } else {
                     error!(
                         message = "Unexpected error type; dropping the request.",
@@ -338,6 +352,27 @@ mod tests {
         assert_eq!(fut.await.unwrap(), "world");
     }
 
+    #[tokio::test]
+    async fn timeout_error_no_retry() {
+        trace_init();
+
+        let policy = FibonacciRetryPolicy::new(
+            5,
+            Duration::from_secs(1),
+            Duration::from_secs(10),
+            NoTimeoutRetryLogic,
+            JitterMode::None,
+        );
+
+        let (mut svc, mut handle) = mock::spawn_layer(RetryLayer::new(policy));
+
+        assert_ready_ok!(svc.poll_ready());
+
+        let mut fut = task::spawn(svc.call("hello"));
+        assert_request_eq!(handle, "hello").send_error(Elapsed::new());
+        assert_ready_err!(fut.poll());
+    }
+
     #[test]
     fn backoff_grows_to_max() {
         let mut policy = FibonacciRetryPolicy::new(
@@ -422,6 +457,23 @@ mod tests {
 
         fn is_retriable_error(&self, error: &Self::Error) -> bool {
             error.0
+        }
+    }
+
+    #[derive(Debug, Clone)]
+    struct NoTimeoutRetryLogic;
+
+    impl RetryLogic for NoTimeoutRetryLogic {
+        type Error = Error;
+        type Request = &'static str;
+        type Response = &'static str;
+
+        fn is_retriable_error(&self, error: &Self::Error) -> bool {
+            error.0
+        }
+
+        fn is_retriable_timeout(&self) -> bool {
+            false
         }
     }
 

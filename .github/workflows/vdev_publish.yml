@@ -1,16 +1,16 @@
 name: Publish vdev
 on:
   push:
-    tags: [ "vdev-v*.*.*" ]
+    tags: ["vdev-v*.*.*"]
 
 permissions:
-  contents: read  # Restrictive default
+  contents: read # Restrictive default
 
 jobs:
   build:
     runs-on: ${{ matrix.os }}
     permissions:
-      contents: write   # Required to upload release assets
+      contents: write # Required to upload release assets
     strategy:
       matrix:
         include:
@@ -18,21 +18,17 @@ jobs:
             target: aarch64-apple-darwin
           - os: ubuntu-24.04
             target: x86_64-unknown-linux-gnu
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
 
     steps:
       - name: Checkout Vector
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Bootstrap runner environment (Ubuntu)
-        if: startsWith(matrix.os, 'ubuntu')
-        run: |
-          sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
-
-      - name: Bootstrap runner environment (macOS)
-        if: startsWith(matrix.os, 'macos')
-        run: bash scripts/environment/bootstrap-macos.sh
-
-      - run: bash scripts/environment/prepare.sh --modules=rustup
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
+          vdev: false
 
       - name: Build
         working-directory: vdev
@@ -63,3 +59,24 @@ jobs:
           files: ${{ env.ASSET }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish:
+    runs-on: ubuntu-24.04
+    needs: build
+    env:
+      DISABLE_MOLD: true
+    steps:
+      - name: Checkout Vector
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
+          vdev: false
+          mold: false
+
+      - name: Publish to crates.io
+        working-directory: vdev
+        run: cargo publish
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}

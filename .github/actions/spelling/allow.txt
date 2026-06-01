@@ -1,6 +1,7 @@
 acmecorp
 Acro
 addonmanager
+Agentic
 Ainol
 aiohttp
 Airis
@@ -154,6 +155,7 @@ Evercoss
 exactlyonce
 Explay
 Fabro
+fakedata
 fakeintake
 FAQs
 fargate
@@ -208,8 +210,10 @@ greptime
 greptimecloud
 greptimedb
 GSM
+gssapi
 gvisor
 gws
+gzip'd
 hadoop
 Haier
 Haipad
@@ -284,6 +288,7 @@ keybinds
 Kingcom
 Kolkata
 konqueror
+krb
 Kruno
 Ktouch
 KTtech
@@ -304,6 +309,7 @@ lenovo
 levenstein
 Lexibook
 LGE
+LLMs
 Lifetab
 Lifetouch
 linkerd
@@ -460,6 +466,7 @@ rumqttc
 Salesforce
 Samsung
 SBT
+schema'd
 scriptblock
 Sega
 Segoe
@@ -507,6 +514,7 @@ timeseries
 timespan
 timestamped
 Tizen
+TLDs
 Tmobile
 tobz
 Tomtec
@@ -570,3 +578,4 @@ CLAUDE
 grpcurl
 linting
 lexers
+binstalled

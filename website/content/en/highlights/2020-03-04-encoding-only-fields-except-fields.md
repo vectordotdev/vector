@@ -23,11 +23,13 @@ Vector has deprecated the root-level `encoding` option in favor of new
 
 Upgrading is easy:
 
-```toml title="vector.toml"
- [sinks.my-sink]
-   type = "..."
--  encoding = "json"
-+  encoding.codec = "json"
-+  encoding.except_fields = ["_meta"] # optional
-+  encoding.timestamp_format = "rfc3339" # optional
+```yaml title="vector.yaml"
+ sinks:
+   my-sink:
+     type: "..."
+-    encoding: "json"
++    encoding:
++      codec: "json"
++      except_fields: ["_meta"] # optional
++      timestamp_format: "rfc3339" # optional
 ```

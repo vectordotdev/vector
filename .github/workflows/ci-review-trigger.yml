@@ -17,11 +17,22 @@
 # /ci-run-test-docs           : runs make test-docs
 # /ci-run-deny                : runs Deny - Linux
 # /ci-run-component-features  : runs Component Features - Linux
-# /ci-run-cross               : runs Cross
 # /ci-run-unit-mac            : runs Unit - Mac
 # /ci-run-unit-windows        : runs Unit - Windows
-# /ci-run-environment         : runs Environment Suite
 # /ci-run-k8s                 : runs K8s E2E Suite
+# /ci-run-packaging           : builds and verifies packages (without publishing to Docker/S3/GitHub)
+#
+# The following triggers are available but do NOT run as part of /ci-run-all:
+# /ci-run-cross               : runs Cross (covered by /ci-run-packaging)
+# /ci-run-coverage            : runs full coverage suite (unit + int + e2e)
+# /ci-run-regression          : runs Regression Detection Suite. The comparison ref is
+#                               the review's commit. An optional baseline ref can be
+#                               passed as an argument, otherwise the baseline defaults
+#                               to the SHA from 7 days ago. Examples:
+#                                 /ci-run-regression
+#                                 /ci-run-regression origin/master
+#                                 /ci-run-regression v0.55.0
+#                               Not included in `/ci-run-all` because it is expensive.
 
 name: CI Review Trigger
 
@@ -31,6 +42,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 env:
   DD_ENV: "ci"
@@ -54,19 +66,21 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     if: |
-        startsWith(github.event.review.body, '/ci-run-all')
-        || startsWith(github.event.review.body, '/ci-run-cli')
-        || startsWith(github.event.review.body, '/ci-run-test-vector-api')
-        || startsWith(github.event.review.body, '/ci-run-test-behavior')
-        || startsWith(github.event.review.body, '/ci-run-check-examples')
-        || startsWith(github.event.review.body, '/ci-run-test-docs')
-        || startsWith(github.event.review.body, '/ci-run-deny')
-        || startsWith(github.event.review.body, '/ci-run-component-features')
-        || startsWith(github.event.review.body, '/ci-run-cross')
-        || startsWith(github.event.review.body, '/ci-run-unit-mac')
-        || startsWith(github.event.review.body, '/ci-run-unit-windows')
-        || startsWith(github.event.review.body, '/ci-run-environment')
-        || startsWith(github.event.review.body, '/ci-run-k8s')
+      startsWith(github.event.review.body, '/ci-run-all')
+      || startsWith(github.event.review.body, '/ci-run-cli')
+      || startsWith(github.event.review.body, '/ci-run-test-vector-api')
+      || startsWith(github.event.review.body, '/ci-run-test-behavior')
+      || startsWith(github.event.review.body, '/ci-run-check-examples')
+      || startsWith(github.event.review.body, '/ci-run-test-docs')
+      || startsWith(github.event.review.body, '/ci-run-deny')
+      || startsWith(github.event.review.body, '/ci-run-component-features')
+      || startsWith(github.event.review.body, '/ci-run-coverage')
+      || startsWith(github.event.review.body, '/ci-run-cross')
+      || startsWith(github.event.review.body, '/ci-run-unit-mac')
+      || startsWith(github.event.review.body, '/ci-run-unit-windows')
+      || startsWith(github.event.review.body, '/ci-run-k8s')
+      || startsWith(github.event.review.body, '/ci-run-packaging')
+      || startsWith(github.event.review.body, '/ci-run-regression')
     steps:
       - name: Generate authentication token
         id: generate_token
@@ -79,7 +93,7 @@ jobs:
         uses: tspascoal/get-user-teams-membership@57e9f42acd78f4d0f496b3be4368fc5f62696662 # v3.0.0
         with:
           username: ${{ github.actor }}
-          team: 'Vector'
+          team: "Vector"
           GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
 
       - name: Validate author membership
@@ -156,7 +170,7 @@ jobs:
 
   cross:
     needs: validate
-    if: startsWith(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-cross')
+    if: contains(github.event.review.body, '/ci-run-cross')
     uses: ./.github/workflows/cross.yml
     with:
       ref: ${{ github.event.review.commit_id }}
@@ -178,18 +192,69 @@ jobs:
       ref: ${{ github.event.review.commit_id }}
     secrets: inherit
 
-  environment:
-    needs: validate
-    if: startsWith(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-environment')
-    uses: ./.github/workflows/environment.yml
-    with:
-      ref: ${{ github.event.review.commit_id }}
-    secrets: inherit
-
   k8s:
     needs: validate
     if: startsWith(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-k8s')
     uses: ./.github/workflows/k8s_e2e.yml
     with:
       ref: ${{ github.event.review.commit_id }}
+    secrets: inherit
+
+  # Parse an optional baseline ref from a `/ci-run-regression <ref>` comment line.
+  # The captured ref is passed to the regression workflow; an empty value lets it
+  # fall back to its default (the SHA from 7 days ago).
+  regression-parse:
+    needs: validate
+    if: startsWith(github.event.review.body, '/ci-run-regression')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      baseline-sha: ${{ steps.parse.outputs.baseline }}
+    steps:
+      - name: Parse baseline ref from review body
+        id: parse
+        env:
+          REVIEW_BODY: ${{ github.event.review.body }}
+        run: |
+          # The body starts with `/ci-run-regression`; take the second whitespace-
+          # delimited token on the first line as the optional baseline ref.
+          read -r _ BASELINE _ <<< "${REVIEW_BODY}"
+          echo "Parsed baseline ref: '${BASELINE}'"
+          echo "baseline=${BASELINE}" >> "$GITHUB_OUTPUT"
+
+  regression:
+    needs: [validate, regression-parse]
+    if: startsWith(github.event.review.body, '/ci-run-regression')
+    permissions:
+      contents: read # Required to checkout code
+      id-token: write # Required for AWS OIDC token exchange in regression.yml
+    uses: ./.github/workflows/regression.yml
+    with:
+      baseline-sha: ${{ needs.regression-parse.outputs.baseline-sha }}
+      comparison-sha: ${{ github.event.review.commit_id }}
+    secrets: inherit
+
+  coverage:
+    needs: validate
+    if: contains(github.event.review.body, '/ci-run-coverage')
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    uses: ./.github/workflows/coverage.yml
+    with:
+      ref: ${{ github.event.review.commit_id }}
+    secrets: inherit
+
+  packaging:
+    needs: validate
+    if: startsWith(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-packaging')
+    permissions:
+      contents: write
+      packages: write
+    uses: ./.github/workflows/publish.yml
+    with:
+      git_ref: ${{ github.event.review.commit_id }}
+      channel: custom
+      skip_publish: true
     secrets: inherit
