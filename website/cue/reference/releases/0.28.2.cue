@@ -1,7 +1,7 @@
 package metadata
 
 releases: "0.28.2": {
-	date:     "2023-04-05"
+	date: "2023-04-05"
 
 	description: """
 		This patch release contains a few fixes for regressions in 0.28.0 and 0.27.0.

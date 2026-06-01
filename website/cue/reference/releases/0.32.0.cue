@@ -1,7 +1,7 @@
 package metadata
 
 releases: "0.32.0": {
-	date:     "2023-08-15"
+	date: "2023-08-15"
 
 	description: """
 		The Vector team is pleased to announce version 0.32.0!

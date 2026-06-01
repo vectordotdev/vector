@@ -1,7 +1,7 @@
 package metadata
 
 releases: "0.21.0": {
-	date:     "2022-04-11"
+	date: "2022-04-11"
 
 	known_issues: [
 		"The `kubernetes_logs` source can panic when while processing Kubernetes watcher events when there is an error. [#12245](https://github.com/vectordotdev/vector/issues/12245). Fixed in `0.21.1`.",

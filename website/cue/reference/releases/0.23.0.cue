@@ -1,7 +1,7 @@
 package metadata
 
 releases: "0.23.0": {
-	date:     "2022-07-11"
+	date: "2022-07-11"
 
 	whats_next: [
 		{
