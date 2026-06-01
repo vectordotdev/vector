@@ -7,7 +7,6 @@ components: sources: http_server: {
 	alias: "http"
 
 	classes: {
-		commonly_used: false
 		delivery:      "at_least_once"
 		deployment_roles: ["aggregator", "sidecar"]
 		development:   "stable"

@@ -10,7 +10,6 @@ components: sources: demo_logs: {
 		"""
 
 	classes: {
-		commonly_used: false
 		delivery:      "at_least_once"
 		deployment_roles: ["daemon", "sidecar"]
 		development:   "stable"

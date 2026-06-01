@@ -4,7 +4,6 @@ components: sinks: webhdfs: {
 	title: "WebHDFS"
 
 	classes: {
-		commonly_used: false
 		delivery:      "at_least_once"
 
 		development:   "beta"

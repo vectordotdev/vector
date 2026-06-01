@@ -7,7 +7,6 @@ components: sources: opentelemetry: {
 	title: "OpenTelemetry"
 
 	classes: {
-		commonly_used: false
 		delivery:      "at_least_once"
 		deployment_roles: ["daemon", "aggregator"]
 		development:   "beta"

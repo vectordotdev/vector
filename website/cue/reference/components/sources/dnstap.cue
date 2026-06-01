@@ -4,7 +4,6 @@ components: sources: dnstap: {
 	title: "Dnstap"
 
 	classes: {
-		commonly_used: false
 		delivery:      "best_effort"
 		deployment_roles: ["daemon"]
 		development:   "beta"

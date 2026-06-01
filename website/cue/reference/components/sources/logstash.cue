@@ -6,7 +6,6 @@ components: sources: logstash: {
 	title: "Logstash"
 
 	classes: {
-		commonly_used: true
 		delivery:      "best_effort"
 		deployment_roles: ["sidecar", "aggregator"]
 		development:   "stable"

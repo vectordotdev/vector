@@ -4,7 +4,6 @@ components: sinks: aws_kinesis_firehose: components._aws & {
 	title: "AWS Kinesis Firehose"
 
 	classes: {
-		commonly_used: false
 		delivery:      "at_least_once"
 		development:   "stable"
 		egress_method: "batch"

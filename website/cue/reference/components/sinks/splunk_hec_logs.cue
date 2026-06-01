@@ -5,7 +5,6 @@ components: sinks: splunk_hec_logs: {
 	alias: "splunk_hec"
 
 	classes: {
-		commonly_used: true
 		delivery:      "at_least_once"
 		development:   "stable"
 		egress_method: "batch"

@@ -9,7 +9,6 @@ components: sources: aws_ecs_metrics: {
 		"""
 
 	classes: {
-		commonly_used: false
 		delivery:      "at_least_once"
 		deployment_roles: ["sidecar"]
 		development:   "stable"

@@ -4,7 +4,6 @@ components: sources: file_descriptor: {
 	title: "File Descriptor"
 
 	classes: {
-		commonly_used: false
 		delivery:      "at_least_once"
 		deployment_roles: ["sidecar"]
 		development:   "stable"

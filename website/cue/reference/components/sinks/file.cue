@@ -4,7 +4,6 @@ components: sinks: file: {
 	title: "File"
 
 	classes: {
-		commonly_used: false
 		delivery:      "at_least_once"
 
 		development:   "stable"

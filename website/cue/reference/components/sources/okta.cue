@@ -5,7 +5,6 @@ components: sources: okta: {
 	title: "Okta"
 
 	classes: {
-		commonly_used: true
 		delivery:      "best_effort"
 		deployment_roles: ["aggregator"]
 		development:   "beta"

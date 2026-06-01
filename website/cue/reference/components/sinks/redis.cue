@@ -3,7 +3,6 @@ package metadata
 components: sinks: redis: {
 	title: "Redis"
 	classes: {
-		commonly_used: false
 		delivery:      "best_effort"
 		development:   "stable"
 		egress_method: "batch"

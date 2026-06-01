@@ -12,7 +12,6 @@ components: sources: heroku_logs: {
 	alias: "logplex"
 
 	classes: {
-		commonly_used: false
 		delivery:      "at_least_once"
 		deployment_roles: ["aggregator"]
 		development:   "stable"

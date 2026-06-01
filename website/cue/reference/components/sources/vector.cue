@@ -10,7 +10,6 @@ components: sources: vector: {
 		"""
 
 	classes: {
-		commonly_used: false
 		delivery:      "at_least_once"
 		deployment_roles: ["aggregator"]
 		development:   "stable"

@@ -9,7 +9,6 @@ components: sources: static_metrics: {
 		"""
 
 	classes: {
-		commonly_used: true
 		delivery:      "at_least_once"
 		deployment_roles: ["aggregator", "daemon", "sidecar"]
 		development:   "stable"
