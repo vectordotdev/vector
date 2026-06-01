@@ -4,7 +4,7 @@ components: sources: stdin: {
 	title: "STDIN"
 
 	classes: {
-		delivery:      "at_least_once"
+		delivery: "at_least_once"
 		deployment_roles: ["sidecar"]
 		development:   "stable"
 		egress_method: "stream"

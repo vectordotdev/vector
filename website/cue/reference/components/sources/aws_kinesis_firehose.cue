@@ -6,7 +6,7 @@ components: sources: aws_kinesis_firehose: {
 	title: "AWS Kinesis Firehose"
 
 	classes: {
-		delivery:      "at_least_once"
+		delivery: "at_least_once"
 		deployment_roles: ["aggregator"]
 		development:   "stable"
 		egress_method: "batch"

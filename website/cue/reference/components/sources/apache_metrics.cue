@@ -4,7 +4,7 @@ components: sources: apache_metrics: {
 	title: "Apache HTTP Server (HTTPD) Metrics"
 
 	classes: {
-		delivery:      "at_least_once"
+		delivery: "at_least_once"
 		deployment_roles: ["daemon", "sidecar"]
 		development:   "stable"
 		egress_method: "batch"

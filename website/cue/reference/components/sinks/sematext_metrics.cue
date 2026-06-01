@@ -4,8 +4,8 @@ components: sinks: sematext_metrics: {
 	title: "Sematext Metrics"
 
 	classes: {
-		delivery:      "at_least_once"
-		development:   "stable"
+		delivery:    "at_least_once"
+		development: "stable"
 		service_providers: ["Sematext"]
 		egress_method: "batch"
 		stateful:      true

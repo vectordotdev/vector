@@ -4,7 +4,7 @@ components: sources: http_client: {
 	title: "HTTP Client"
 
 	classes: {
-		delivery:      "at_least_once"
+		delivery: "at_least_once"
 		deployment_roles: ["daemon", "sidecar", "aggregator"]
 		development:   "beta"
 		egress_method: "batch"

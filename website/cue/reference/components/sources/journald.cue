@@ -4,7 +4,7 @@ components: sources: journald: {
 	title: "Journald"
 
 	classes: {
-		delivery:      "at_least_once"
+		delivery: "at_least_once"
 		deployment_roles: ["daemon"]
 		development:   "stable"
 		egress_method: "batch"

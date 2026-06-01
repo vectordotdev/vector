@@ -4,7 +4,7 @@ components: sinks: webhdfs: {
 	title: "WebHDFS"
 
 	classes: {
-		delivery:      "at_least_once"
+		delivery: "at_least_once"
 
 		development:   "beta"
 		egress_method: "stream"

@@ -4,7 +4,7 @@ components: sources: pulsar: {
 	title: "Apache Pulsar"
 
 	classes: {
-		delivery:      "at_least_once"
+		delivery: "at_least_once"
 		deployment_roles: ["aggregator"]
 		development:   "beta"
 		egress_method: "stream"

@@ -6,7 +6,7 @@ components: sources: file: {
 	title: "File"
 
 	classes: {
-		delivery:      "best_effort"
+		delivery: "best_effort"
 		deployment_roles: ["daemon", "sidecar"]
 		development:   "stable"
 		egress_method: "stream"

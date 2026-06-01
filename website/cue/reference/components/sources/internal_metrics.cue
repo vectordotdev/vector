@@ -9,7 +9,7 @@ components: sources: internal_metrics: {
 		"""
 
 	classes: {
-		delivery:      "at_least_once"
+		delivery: "at_least_once"
 		deployment_roles: ["aggregator", "daemon", "sidecar"]
 		development:   "stable"
 		egress_method: "batch"

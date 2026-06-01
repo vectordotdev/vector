@@ -5,7 +5,7 @@ components: sources: docker_logs: {
 	alias: "docker"
 
 	classes: {
-		delivery:      "best_effort"
+		delivery: "best_effort"
 		deployment_roles: ["daemon"]
 		development:   "stable"
 		egress_method: "stream"

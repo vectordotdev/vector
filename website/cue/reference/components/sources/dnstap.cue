@@ -4,7 +4,7 @@ components: sources: dnstap: {
 	title: "Dnstap"
 
 	classes: {
-		delivery:      "best_effort"
+		delivery: "best_effort"
 		deployment_roles: ["daemon"]
 		development:   "beta"
 		egress_method: "stream"
