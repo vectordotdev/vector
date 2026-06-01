@@ -45,8 +45,18 @@ jobs:
 
       - uses: ./.github/actions/setup
         with:
-          vdev: true
+          vdev: false
+          rust: true
           mold: false
 
+      - name: Cache vdev build
+        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+        with:
+          path: target/debug/vdev
+          key: ${{ runner.os }}-vdev-${{ hashFiles('vdev/src/**', 'vdev/Cargo.toml', 'Cargo.lock') }}
+
+      - name: Build vdev from source
+        run: cargo build -p vdev
+
       - name: Check deprecation fragments
-        run: vdev check deprecations
+        run: ./target/debug/vdev check deprecations
