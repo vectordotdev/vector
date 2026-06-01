@@ -131,6 +131,7 @@ dockercmd
 Dockerfiles
 doha
 DOOV
+DOQ
 Douban
 downsides
 downwardapi
