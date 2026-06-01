@@ -32,6 +32,7 @@ releases: "0.56.0": {
 		- Fixed a CPU regression introduced in 0.50.0 affecting all sinks that use metric normalization such as `prometheus_remote_write`, `aws_cloudwatch_metrics`, `statsd` and others.
 		- Restored support for installing Vector on RHEL 8, Rocky Linux 8, AlmaLinux 8, and CentOS
 		  Stream 8, which had been broken since 0.55.0 due to an inadvertent glibc requirement bump.
+		- Unit tests now support an optional `expected_event_count` field on test outputs, allowing assertions on the number of events emitted by a transform.
 
 		## Breaking Changes
 
