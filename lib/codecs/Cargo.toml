@@ -25,11 +25,8 @@ parquet = { version = "56.2.0", default-features = false, features = [
 async-trait.workspace = true
 bytes.workspace = true
 chrono.workspace = true
-chrono-tz.workspace = true
-rust_decimal.workspace = true
 csv-core = { version = "0.1.13", default-features = false }
 derivative.workspace = true
-derive_more = { version = "2.1.1", optional = true, features = ["from", "display"] }
 dyn-clone = { version = "1", default-features = false }
 flate2.workspace = true
 futures.workspace = true
@@ -47,7 +44,6 @@ regex.workspace = true
 serde.workspace = true
 serde_with.workspace = true
 serde_json.workspace = true
-serde-aux = { version = "4.5", optional = true }
 smallvec = { version = "1", default-features = false, features = ["union"] }
 snafu.workspace = true
 strum = { workspace = true, optional = true }
@@ -80,5 +76,5 @@ vrl.workspace = true
 arrow = ["dep:arrow", "arrow/chrono-tz"]
 parquet = ["dep:parquet", "arrow"]
 opentelemetry = ["dep:opentelemetry-proto"]
-syslog = ["dep:syslog_loose", "dep:strum", "dep:derive_more", "dep:serde-aux", "dep:toml"]
+syslog = ["dep:syslog_loose", "dep:strum", "dep:toml"]
 test = []

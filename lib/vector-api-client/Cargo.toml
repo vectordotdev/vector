@@ -14,7 +14,6 @@ prost.workspace = true
 prost-types.workspace = true
 
 # Async
-futures.workspace = true
 tokio = { workspace = true, features = ["macros", "rt", "sync"] }
 tokio-stream = { workspace = true, features = ["sync"] }
 
