@@ -196,6 +196,25 @@ impl TableRegistry {
             None => true,
         }
     }
+
+    /// Checks if the table is stateful.
+    /// If in doubt (the table isn't in our list) we return false.
+    pub fn is_stateful(&self, table: &str) -> bool {
+        match &**self.tables.load() {
+            Some(tables) => tables
+                .get(table)
+                .map(|table| table.stateful())
+                .unwrap_or(false),
+            None => false,
+        }
+    }
+
+    pub fn get(&self, table: &str) -> Option<Box<dyn Table + Send + Sync>> {
+        match &**self.tables.load() {
+            Some(tables) => tables.get(table).cloned(),
+            None => None,
+        }
+    }
 }
 
 impl std::fmt::Debug for TableRegistry {

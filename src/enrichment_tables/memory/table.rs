@@ -382,9 +382,38 @@ impl Table for Memory {
         Vec::new()
     }
 
-    /// Doesn't need reload, data is written directly
+    /// Has to be reloaded always, because a new component is created to insert data into it
     fn needs_reload(&self) -> bool {
-        false
+        true
+    }
+
+    fn stateful(&self) -> bool {
+        true
+    }
+
+    fn take_state(
+        &mut self,
+        other: Box<dyn Table + Send + Sync>,
+    ) -> Result<(), (Box<dyn Table + Send + Sync>, Error)> {
+        if !other.as_any().is::<Memory>() {
+            return Err((other, Error::TableTypeMismatch));
+        }
+        // Type checked already
+        let other_memory = other.into_any().downcast::<Memory>().unwrap();
+        self.write_handle = other_memory.write_handle;
+        self.read_handle = other_memory.read_handle;
+        self.read_handle_factory = other_memory.read_handle_factory;
+        self.expired_items_sender = other_memory.expired_items_sender;
+        self.expired_items_receiver = other_memory.expired_items_receiver;
+        Ok(())
+    }
+
+    fn into_any(self: Box<Self>) -> Box<dyn std::any::Any> {
+        self
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
     }
 }
 

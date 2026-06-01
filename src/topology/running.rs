@@ -803,6 +803,21 @@ impl RunningTopology {
                 }
             }
 
+            for key in diff
+                .enrichment_tables
+                .changed_and_added()
+                .filter_map(|key| {
+                    self.config
+                        .enrichment_table(key)
+                        .and_then(|t| t.as_sink(key).map(|(key, _)| key))
+                })
+            {
+                if let Some(task) = new_pieces.tasks.get(&key) {
+                    self.component_type_names
+                        .insert(key.clone(), task.typetag().to_string());
+                }
+            }
+
             for (key, input) in &new_pieces.inputs {
                 self.inputs_tap_metadata
                     .insert(key.clone(), input.1.clone());
@@ -965,7 +980,10 @@ impl RunningTopology {
         for input in inputs {
             let output = self.outputs.get_mut(&input).expect("unknown output");
 
-            if diff.contains(&input.component) || inputs_to_add.contains(&input) {
+            if diff.contains(&input.component)
+                || diff.is_changed(key)
+                || inputs_to_add.contains(&input)
+            {
                 // If the input we're connecting to is changing, that means its outputs will have been
                 // recreated, so instead of replacing a paused sink, we have to add it to this new
                 // output for the first time, since there's nothing to actually replace at this point.

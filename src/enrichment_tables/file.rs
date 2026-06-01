@@ -674,6 +674,25 @@ impl Table for File {
             .and_then(|metadata| metadata.modified()),
             Ok(modified) if modified > self.last_modified)
     }
+
+    fn stateful(&self) -> bool {
+        false
+    }
+
+    fn take_state(
+        &mut self,
+        _other: Box<dyn Table + Send + Sync>,
+    ) -> Result<(), (Box<dyn Table + Send + Sync>, Error)> {
+        panic!("File table is not stateful, can't use take_state")
+    }
+
+    fn into_any(self: Box<Self>) -> Box<dyn std::any::Any> {
+        self
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }
 
 impl std::fmt::Debug for File {
