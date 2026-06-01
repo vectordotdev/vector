@@ -35,27 +35,32 @@ impl Cli {
         }
 
         // Reject any fragment with a deprecated_since newer than the next minor release.
-        if let Ok(latest) = git::latest_release_version() {
-            let next_minor = Version::new(latest.major, latest.minor + 1, 0);
-            let future: Vec<_> = entries
-                .iter()
-                .filter(|e| e.deprecated_since.0 > next_minor)
-                .collect();
-            if !future.is_empty() {
-                for e in &future {
-                    eprintln!(
-                        "  future  {} (deprecated_since: {}, next release: {}.{})",
-                        e.filename, e.deprecated_since, next_minor.major, next_minor.minor
+        match git::latest_release_version() {
+            Ok(latest) => {
+                let next_minor = Version::new(latest.major, latest.minor + 1, 0);
+                let future: Vec<_> = entries
+                    .iter()
+                    .filter(|e| e.deprecated_since.0 > next_minor)
+                    .collect();
+                if !future.is_empty() {
+                    for e in &future {
+                        eprintln!(
+                            "  future  {} (deprecated_since: {}, next release: {}.{})",
+                            e.filename, e.deprecated_since, next_minor.major, next_minor.minor
+                        );
+                    }
+                    bail!(
+                        "{} fragment(s) have a deprecated_since version newer than the next release ({}.{}). \
+                         Update deprecated_since to {} or earlier.",
+                        future.len(),
+                        next_minor.major,
+                        next_minor.minor,
+                        next_minor
                     );
                 }
-                bail!(
-                    "{} fragment(s) have a deprecated_since version newer than the next release ({}.{}). \
-                     Update deprecated_since to {} or earlier.",
-                    future.len(),
-                    next_minor.major,
-                    next_minor.minor,
-                    next_minor
-                );
+            }
+            Err(e) => {
+                bail!("could not determine latest release version: {e}");
             }
         }
 

@@ -1,5 +1,6 @@
 {{/* Renders deprecations for a specific release version (major.minor match).
-     Enacted removals (removed_in == version) appear first, then newly announced pending entries (deprecated_since == version).
+     Enacted removals (removed_in == version) appear first, then newly announced entries (deprecated_since == version).
+     Enacted entries whose deprecated_since matches are included in announcements for historical context.
      Params: version (string, e.g. "0.56" or "0.56.0") */}}
 {{- $pending := site.Data.docs.deprecations_pending -}}
 {{- $enacted := site.Data.docs.deprecations_enacted -}}
@@ -15,12 +16,20 @@
     {{- $announced = $announced | append . -}}
   {{- end -}}
 {{- end -}}
+{{- /* Also include enacted entries first announced in this release for historical context. */ -}}
+{{- range $enacted -}}
+  {{- if or (strings.HasPrefix .deprecated_since $prefix) (eq .deprecated_since $exact) -}}
+    {{- $announced = $announced | append . -}}
+  {{- end -}}
+{{- end -}}
 
 {{- $announced = sort $announced "deprecated_since" "desc" -}}
 
 {{- $removed := slice -}}
 {{- range $enacted -}}
-  {{- if or (strings.HasPrefix .removed_in $prefix) (eq .removed_in $exact) -}}
+  {{- /* Exact match, or prefix match only when page version is two-part (no patch). */ -}}
+  {{- if or (eq .removed_in $version)
+            (and (eq $version $exact) (strings.HasPrefix .removed_in $prefix)) -}}
     {{- $removed = $removed | append . -}}
   {{- end -}}
 {{- end -}}
