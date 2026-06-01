@@ -34,7 +34,6 @@ use vector_lib::{
     metric_tags,
 };
 
-
 use crate::{
     config::{SourceConfig, SourceContext, SourceOutput},
     event::metric::{Metric, MetricKind, MetricTags, MetricValue},

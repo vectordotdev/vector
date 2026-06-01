@@ -20,7 +20,6 @@ use vector_lib::{
     },
 };
 
-
 use crate::{
     event::{EventArray, EventContainer, EventStatus, Finalizable},
     sinks::{blackhole::config::BlackholeConfig, util::StreamSink},
