@@ -2,7 +2,6 @@ package metadata
 
 releases: "0.16.0": {
 	date:     "2021-08-24"
-	codename: ""
 
 	description: """
 	**Note: this release contains a regression for disk buffers. If you are using disk buffers, please install 0.16.1 instead.**

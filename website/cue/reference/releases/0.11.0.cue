@@ -2,7 +2,6 @@ package metadata
 
 releases: "0.11.0": {
 	date:     "2020-12-01"
-	codename: "Kubernetes Pipes"
 	description: """
 		The Vector team is pleased to announce 0.11.0. This release
 		is focused on Kubernetes. In addition to the new,

@@ -2,7 +2,6 @@ package metadata
 
 releases: "0.5.0": {
 	date:     "2019-10-10"
-	codename: "Platform Mingling"
 
 	whats_next: []
 

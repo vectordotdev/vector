@@ -2,7 +2,6 @@ package metadata
 
 releases: "0.29.1": {
 	date:     "2023-04-20"
-	codename: ""
 
 	description: """
 		This patch release contains a fix for a regression in 0.29.0 and fixes a few issues with the release artifacts.

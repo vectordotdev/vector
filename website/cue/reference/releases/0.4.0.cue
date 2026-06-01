@@ -2,7 +2,6 @@ package metadata
 
 releases: "0.4.0": {
 	date:     "2019-09-24"
-	codename: "Hello World Again"
 
 	whats_next: []
 

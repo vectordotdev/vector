@@ -2,7 +2,6 @@ package metadata
 
 releases: "0.10.0": {
 	date:     "2020-07-23"
-	codename: "Lamport Clock"
 
 	whats_next: [
 		{

@@ -2,7 +2,6 @@ package metadata
 
 releases: "0.46.1": {
 	date:     "2025-04-14"
-	codename: ""
 
 	description: """
 		Resolved a regression affecting AWS integrations introduced in version 0.46.0.

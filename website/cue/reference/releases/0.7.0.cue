@@ -2,7 +2,6 @@ package metadata
 
 releases: "0.7.0": {
 	date:     "2020-01-22"
-	codename: "The Great Omelet"
 
 	whats_next: []
 
