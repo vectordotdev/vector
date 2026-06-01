@@ -100,7 +100,7 @@ jobs:
       - name: Upload merged coverage artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: merged-lcov
+          name: coverage-lcov-merged-report
           path: merged-lcov.info
           retention-days: 90
 
