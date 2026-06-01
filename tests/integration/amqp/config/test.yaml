@@ -1,17 +1,17 @@
 features:
-- amqp-integration-tests
+  - amqp-integration-tests
 
-test_filter: '::amqp::'
+test_filter: "::amqp::"
 
 matrix:
-  version: ['3.8']
+  version: ["3.8"]
 
 # changes to these files/paths will invoke the integration test in CI
 # expressions are evaluated using https://github.com/micromatch/picomatch
 paths:
-- "src/amqp.rs"
-- "src/internal_events/amqp.rs"
-- "src/sinks/amqp/**"
-- "src/sources/amqp.rs"
-- "src/sources/util/**"
-- "src/sinks/util/**"
+  - "src/amqp.rs"
+  - "src/internal_events/amqp.rs"
+  - "src/sinks/amqp/**"
+  - "src/sources/amqp.rs"
+  - "src/sources/util/**"
+  - "src/sinks/util/**"

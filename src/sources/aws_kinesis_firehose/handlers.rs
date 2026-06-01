@@ -6,11 +6,10 @@ use chrono::Utc;
 use flate2::read::MultiGzDecoder;
 use futures::StreamExt;
 use snafu::{ResultExt, Snafu};
-use tokio_util::codec::FramedRead;
 use vector_common::constants::GZIP_MAGIC;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
-    codecs::StreamDecodingError,
+    codecs::{DecoderFramedRead, StreamDecodingError},
     config::{LegacyKey, LogNamespace},
     event::BatchNotifier,
     finalization::AddBatchNotifier,
@@ -68,7 +67,7 @@ pub(super) async fn firehose(
             .map_err(reject::custom)?;
         context.bytes_received.emit(ByteSize(bytes.len()));
 
-        let mut stream = FramedRead::new(bytes.as_ref(), context.decoder.clone());
+        let mut stream = DecoderFramedRead::new(bytes.as_ref(), context.decoder.clone());
         loop {
             match stream.next().await {
                 Some(Ok((mut events, _byte_size))) => {

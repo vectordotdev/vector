@@ -24,7 +24,7 @@ FEATURES="${FEATURES:-"default"}"
 NATIVE_BUILD="${NATIVE_BUILD:-"true"}"
 TARGET="${TARGET:?"You must specify a target triple, ex: arm64-apple-darwin"}"
 
-CHANNEL=${CHANNEL:-"$(cargo vdev release channel)"}
+CHANNEL=${CHANNEL:-"$(${VDEV:-cargo vdev} release channel)"}
 if [ "$CHANNEL" == "nightly" ]; then
   FEATURES="$FEATURES nightly"
 fi

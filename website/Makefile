@@ -1,5 +1,7 @@
 CUE = ../scripts/cue.sh
 
+export CI ?= false
+
 # Override to specify which network address to use in Hugo/HTTP servers for binding
 export SERVER_BIND ?= 127.0.0.1
 # Override to specify which port to use in Hugo/HTTP servers for listening
@@ -22,7 +24,13 @@ cue-%:
 config-examples:
 	yarn config-examples
 
-structured-data: cue-build config-examples
+VDEV ?= cargo vdev
+
+generate-vrl-docs:
+	$(VDEV) build vrl-docs --output-dir cue/reference/remap/functions \
+		$(if $(findstring true,$(CI)),--vector-sha $(GITHUB_SHA),)
+
+structured-data: generate-vrl-docs cue-build config-examples
 
 serve: clean setup cargo-data structured-data
 	hugo server \

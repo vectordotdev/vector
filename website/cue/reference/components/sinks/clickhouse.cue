@@ -153,7 +153,6 @@ components: sinks: clickhouse: {
 				types are unsupported:
 				- `FIXED_SIZE_BINARY`
 				- `JSON`
-				- `UUID`
 				- `ENUM`
 
 				#### Timezone Handling

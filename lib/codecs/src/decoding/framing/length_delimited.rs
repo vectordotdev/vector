@@ -1,5 +1,4 @@
 use bytes::{Bytes, BytesMut};
-use derivative::Derivative;
 use tokio_util::codec::Decoder;
 use vector_config::configurable_component;
 
@@ -8,8 +7,7 @@ use crate::common::length_delimited::LengthDelimitedCoderOptions;
 
 /// Config used to build a `LengthDelimitedDecoder`.
 #[configurable_component]
-#[derive(Debug, Clone, Derivative)]
-#[derivative(Default)]
+#[derive(Debug, Clone, Default)]
 pub struct LengthDelimitedDecoderConfig {
     /// Options for the length delimited decoder.
     #[serde(skip_serializing_if = "vector_core::serde::is_default")]

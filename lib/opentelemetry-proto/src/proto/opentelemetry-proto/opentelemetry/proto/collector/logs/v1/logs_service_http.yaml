@@ -3,8 +3,7 @@
 type: google.api.Service
 config_version: 3
 http:
- rules:
- - selector: opentelemetry.proto.collector.logs.v1.LogsService.Export
-   post: /v1/logs
-   body: "*"
-
+  rules:
+    - selector: opentelemetry.proto.collector.logs.v1.LogsService.Export
+      post: /v1/logs
+      body: "*"

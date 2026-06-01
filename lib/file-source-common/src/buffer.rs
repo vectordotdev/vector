@@ -1,5 +1,5 @@
 use crate::FilePosition;
-use std::{cmp::min, io, pin::Pin};
+use std::{cmp::min, io};
 
 use bstr::Finder;
 use bytes::BytesMut;
@@ -34,7 +34,7 @@ pub struct ReadResult {
 /// GiB/s range for buffers of length 1KiB. For buffers any smaller than this
 /// the overhead of setup dominates our benchmarks.
 pub async fn read_until_with_max_size<'a, R: AsyncBufRead + ?Sized + Unpin>(
-    reader: Pin<Box<&'a mut R>>,
+    reader: &'a mut R,
     position: &'a mut FilePosition,
     delim: &'a [u8],
     buf: &'a mut BytesMut,
@@ -45,7 +45,6 @@ pub async fn read_until_with_max_size<'a, R: AsyncBufRead + ?Sized + Unpin>(
     let delim_finder = Finder::new(delim);
     let delim_len = delim.len();
     let mut discarded_for_size_and_truncated = Vec::new();
-    let mut reader = Box::new(reader);
 
     // Used to track partial delimiter matches across buffer boundaries.
     // Data is read in chunks from the reader (see `fill_buf` below).
@@ -294,7 +293,7 @@ mod test {
             let mut reader = BufReader::new(Cursor::new(&chunk));
 
             match read_until_with_max_size(
-                Box::pin(&mut reader),
+                &mut reader,
                 &mut position,
                 &delimiter,
                 &mut buffer,
@@ -425,7 +424,7 @@ mod test {
         for (i, expected_line) in expected_lines.iter().enumerate() {
             let mut buffer = BytesMut::new();
             let result = read_until_with_max_size(
-                Box::pin(&mut reader),
+                &mut reader,
                 &mut position,
                 delimiter,
                 &mut buffer,

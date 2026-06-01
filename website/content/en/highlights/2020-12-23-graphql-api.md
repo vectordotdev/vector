@@ -11,6 +11,8 @@ badges:
   domains: ["api"]
 ---
 
+{{< grpc-migration-warning >}}
+
 Vector now has a [GraphQL] API that you can use for a variety of purposes:
 
 * To view Vector's internal metrics
@@ -26,10 +28,10 @@ The GraphQL API for Vector is **disabled by default**. We want to keep Vector's
 behavior as predictable and secure as possible, so we chose to make the feature
 opt-in. To enable the API, add this to your Vector config:
 
-```toml
-[api]
-enabled = true
-address = "127.0.0.1:8686" # optional. Change IP/port if required
+```yaml
+api:
+  enabled: true
+  address: "127.0.0.1:8686" # optional. Change IP/port if required
 ```
 
 ## Read more

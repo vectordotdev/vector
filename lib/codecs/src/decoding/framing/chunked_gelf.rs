@@ -54,7 +54,7 @@ impl ChunkedGelfDecoderConfig {
 #[derivative(Default)]
 pub struct ChunkedGelfDecoderOptions {
     /// The timeout, in seconds, for a message to be fully received. If the timeout is reached, the
-    /// decoder drops all the received chunks of the timed out message.
+    /// decoder drops all received chunks for the timed-out message.
     #[serde(default = "default_timeout_secs")]
     #[derivative(Default(value = "default_timeout_secs()"))]
     pub timeout_secs: f64,
@@ -66,15 +66,15 @@ pub struct ChunkedGelfDecoderOptions {
     #[serde(default, skip_serializing_if = "vector_core::serde::is_default")]
     pub pending_messages_limit: Option<usize>,
 
-    /// The maximum length of a single GELF message, in bytes. Messages longer than this length will
-    /// be dropped. If this option is not set, the decoder does not limit the length of messages and
+    /// The maximum length of a single GELF message, in bytes. Messages longer than this length are
+    /// dropped. If this option is not set, the decoder does not limit the length of messages and
     /// the per-message memory is unbounded.
     ///
-    /// **Note**: A message can be composed of multiple chunks and this limit is applied to the whole
+    /// **Note**: A message can be composed of multiple chunks, and this limit applies to the whole
     /// message, not to individual chunks.
     ///
-    /// This limit takes only into account the message's payload and the GELF header bytes are excluded from the calculation.
-    /// The message's payload is the concatenation of all the chunks' payloads.
+    /// This limit takes into account only the message payload. GELF header bytes are excluded from the calculation.
+    /// The message payload is the concatenation of all chunk payloads.
     #[serde(default, skip_serializing_if = "vector_core::serde::is_default")]
     pub max_length: Option<usize>,
 
@@ -85,11 +85,10 @@ pub struct ChunkedGelfDecoderOptions {
 
 /// Decompression options for ChunkedGelfDecoder.
 #[configurable_component]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Derivative)]
-#[derivative(Default)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum ChunkedGelfDecompressionConfig {
     /// Automatically detect the decompression method based on the magic bytes of the message.
-    #[derivative(Default)]
+    #[default]
     Auto,
     /// Use Gzip decompression.
     Gzip,

@@ -28,7 +28,7 @@ This RFC proposes a new API for the `lua` transform.
 
 Currently, the [`lua` transform](https://vector.dev/docs/reference/transforms/lua/) has some limitations in its API. In particular, the following features are missing:
 
-*   **Nested Fields**
+* **Nested Fields**
 
     Currently accessing nested fields is possible using the field path notation:
 
@@ -44,7 +44,7 @@ Currently, the [`lua` transform](https://vector.dev/docs/reference/transforms/lu
 
     See [#706](https://github.com/vectordotdev/vector/issues/706) and [#1406](https://github.com/vectordotdev/vector/issues/1406).
 
-*   **Setup Code**
+* **Setup Code**
 
     Some scripts require expensive setup steps, for example, loading of modules or invoking shell commands. These steps should not be part of the main transform code.
 
@@ -79,7 +79,7 @@ Currently, the [`lua` transform](https://vector.dev/docs/reference/transforms/lu
 
     See [#1864](https://github.com/vectordotdev/vector/issues/1864).
 
-*   **Control Flow**
+* **Control Flow**
 
     It should be possible to define channels for output events, similarly to how it is done in [`swimlanes`](https://vector.dev/docs/reference/transforms/swimlanes/) transform.
 
@@ -136,7 +136,7 @@ This example is a log to metric transform which produces metric events from inco
 
 1. There is an internal counter which is increased on each incoming log event.
 2. The log events are discarded.
-2. Each 10 seconds the transform produces a metric event with the count of received log events.
+3. Each 10 seconds the transform produces a metric event with the count of received log events.
 4. Edge cases are handled in the following way:
    1. If there are no incoming invents, the metric event with the counter equal to 0 still has to be produced.
    2. On Vector's shutdown the transform has to produce the final metric event with the count of received events since the last flush.
@@ -645,10 +645,10 @@ The mapping between Vector data types and Lua data types is the following:
 
 | Vector Type | Lua Type | Comment |
 | :----------- | :-------- | :------- |
-| [`String`](https://vector.dev/docs/architecture/data-model/log/#strings) | [`string`](https://www.lua.org/pil/2.4.html) ||
-| [`Integer`](https://vector.dev/docs/architecture/data-model/log/#ints) | [`integer`](https://docs.rs/mlua/0.6.0/mlua/type.Integer.html) ||
-| [`Float`](https://vector.dev/docs/architecture/data-model/log/#floats) | [`number`](https://docs.rs/mlua/0.6.0/mlua/type.Number.html) ||
-| [`Boolean`](https://vector.dev/docs/architecture/data-model/log/#booleans) | [`boolean`](https://www.lua.org/pil/2.2.html) ||
+| [`String`](https://vector.dev/docs/architecture/data-model/log/#strings) | [`string`](https://www.lua.org/pil/2.4.html) | |
+| [`Integer`](https://vector.dev/docs/architecture/data-model/log/#ints) | [`integer`](https://docs.rs/mlua/0.6.0/mlua/type.Integer.html) | |
+| [`Float`](https://vector.dev/docs/architecture/data-model/log/#floats) | [`number`](https://docs.rs/mlua/0.6.0/mlua/type.Number.html) | |
+| [`Boolean`](https://vector.dev/docs/architecture/data-model/log/#booleans) | [`boolean`](https://www.lua.org/pil/2.2.html) | |
 | [`Timestamp`](https://vector.dev/docs/architecture/data-model/log/#timestamps) | [`userdata`](https://www.lua.org/pil/28.1.html) | There is no dedicated timestamp type in Lua. However, there is a standard library function [`os.date`](https://www.lua.org/manual/5.1/manual.html#pdf-os.date) which returns a table with fields `year`, `month`, `day`, `hour`, `min`, `sec`, and some others. Other standard library functions, such as [`os.time`](https://www.lua.org/manual/5.1/manual.html#pdf-os.time), support tables with these fields as arguments. Because of that, Vector timestamps passed to the transform are represented as `userdata` with the same set of accessible fields. In order to have one-to-one correspondence between Vector timestamps and Lua timestamps, `os.date` function from the standard library is patched to return not a table, but `userdata` with the same set of fields as it usually would return instead. This approach makes it possible to have both compatibility with the standard library functions and a dedicated data type for timestamps. |
 | [`Null`](https://vector.dev/docs/architecture/data-model/log/#null-values) | empty string | In Lua setting a table field to `nil` means deletion of this field. Furthermore, setting an array element to `nil` leads to deletion of this element. In order to avoid inconsistencies, already present `Null` values are visible represented as empty strings from Lua code, and it is impossible to create a new `Null` value in the user-defined code. |
 | [`Map`](https://vector.dev/docs/architecture/data-model/log/#maps) | [`userdata`](https://www.lua.org/pil/28.1.html) or [`table`](https://www.lua.org/pil/2.5.html) | Maps which are parts of events passed to the transform from Vector have `userdata` type. User-created maps have `table` type. Both types are converted to Vector's `Map` type when they are emitted from the transform. |

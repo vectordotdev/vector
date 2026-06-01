@@ -243,14 +243,6 @@ impl Policy for SharedKeyAuthorizationPolicy {
         let (ms_date, ms_version) = self.ensure_ms_headers(request)?;
         // Build string to sign
         let sts = self.build_string_to_sign(request, &ms_date, &ms_version)?;
-        // // Debug string-to-sign for troubleshooting (safe: does not include key)
-        // let compact = sts.replace('\n', "\\n");
-        // tracing::debug!(
-        //     method = %request.method().as_str(),
-        //     url = %request.url(),
-        //     string_to_sign = %compact,
-        //     "Azure shared key string_to_sign."
-        // );
         let signature = self.sign(&sts)?;
 
         // Authorization: SharedKey {account}:{signature}

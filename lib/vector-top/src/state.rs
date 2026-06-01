@@ -21,7 +21,7 @@ use crate::dashboard::columns;
 
 type IdentifiedMetric = (ComponentKey, i64);
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SentEventsMetric {
     pub key: ComponentKey,
     pub total: i64,
@@ -33,18 +33,18 @@ pub enum EventType {
     InitializeState(State),
     UptimeChanged(f64),
     ReceivedBytesTotals(Vec<IdentifiedMetric>),
-    /// Interval + identified metric
-    ReceivedBytesThroughputs(i64, Vec<IdentifiedMetric>),
+    /// Throughput values already normalized to per-second by the server
+    ReceivedBytesThroughputs(Vec<IdentifiedMetric>),
     ReceivedEventsTotals(Vec<IdentifiedMetric>),
-    /// Interval in ms + identified metric
-    ReceivedEventsThroughputs(i64, Vec<IdentifiedMetric>),
+    /// Throughput values already normalized to per-second by the server
+    ReceivedEventsThroughputs(Vec<IdentifiedMetric>),
     SentBytesTotals(Vec<IdentifiedMetric>),
-    /// Interval + identified metric
-    SentBytesThroughputs(i64, Vec<IdentifiedMetric>),
+    /// Throughput values already normalized to per-second by the server
+    SentBytesThroughputs(Vec<IdentifiedMetric>),
     // Identified overall metric + output-specific metrics
     SentEventsTotals(Vec<SentEventsMetric>),
-    /// Interval in ms + identified overall metric + output-specific metrics
-    SentEventsThroughputs(i64, Vec<SentEventsMetric>),
+    /// Throughput values already normalized to per-second by the server
+    SentEventsThroughputs(Vec<SentEventsMetric>),
     ErrorsTotals(Vec<IdentifiedMetric>),
     #[cfg(feature = "allocation-tracing")]
     AllocatedBytes(Vec<IdentifiedMetric>),
@@ -122,6 +122,10 @@ pub struct State {
     pub sort_state: SortState,
     pub filter_state: FilterState,
     pub ui: UiState,
+    /// Set to `true` once we receive the first `AllocatedBytes` event,
+    /// indicating the connected Vector instance has allocation tracing active.
+    #[cfg(feature = "allocation-tracing")]
+    pub allocation_tracing_active: bool,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -343,6 +347,8 @@ impl State {
             ui: UiState::default(),
             sort_state: SortState::default(),
             filter_state: FilterState::default(),
+            #[cfg(feature = "allocation-tracing")]
+            allocation_tracing_active: false,
         }
     }
 
@@ -437,11 +443,10 @@ pub async fn updater(mut event_rx: EventRx, mut state: State) -> StateRx {
                         }
                     }
                 }
-                EventType::ReceivedBytesThroughputs(interval, rows) => {
+                EventType::ReceivedBytesThroughputs(rows) => {
                     for (key, v) in rows {
                         if let Some(r) = state.components.get_mut(&key) {
-                            r.received_bytes_throughput_sec =
-                                (v as f64 * (1000.0 / interval as f64)) as i64;
+                            r.received_bytes_throughput_sec = v;
                         }
                     }
                 }
@@ -452,11 +457,10 @@ pub async fn updater(mut event_rx: EventRx, mut state: State) -> StateRx {
                         }
                     }
                 }
-                EventType::ReceivedEventsThroughputs(interval, rows) => {
+                EventType::ReceivedEventsThroughputs(rows) => {
                     for (key, v) in rows {
                         if let Some(r) = state.components.get_mut(&key) {
-                            r.received_events_throughput_sec =
-                                (v as f64 * (1000.0 / interval as f64)) as i64;
+                            r.received_events_throughput_sec = v;
                         }
                     }
                 }
@@ -467,11 +471,10 @@ pub async fn updater(mut event_rx: EventRx, mut state: State) -> StateRx {
                         }
                     }
                 }
-                EventType::SentBytesThroughputs(interval, rows) => {
+                EventType::SentBytesThroughputs(rows) => {
                     for (key, v) in rows {
                         if let Some(r) = state.components.get_mut(&key) {
-                            r.sent_bytes_throughput_sec =
-                                (v as f64 * (1000.0 / interval as f64)) as i64;
+                            r.sent_bytes_throughput_sec = v;
                         }
                     }
                 }
@@ -488,17 +491,15 @@ pub async fn updater(mut event_rx: EventRx, mut state: State) -> StateRx {
                         }
                     }
                 }
-                EventType::SentEventsThroughputs(interval, rows) => {
+                EventType::SentEventsThroughputs(rows) => {
                     for m in rows {
                         if let Some(r) = state.components.get_mut(&m.key) {
-                            r.sent_events_throughput_sec =
-                                (m.total as f64 * (1000.0 / interval as f64)) as i64;
+                            r.sent_events_throughput_sec = m.total;
                             for (id, v) in m.outputs {
-                                let throughput = (v as f64 * (1000.0 / interval as f64)) as i64;
                                 r.outputs
                                     .entry(id)
                                     .or_insert_with(OutputMetrics::default)
-                                    .sent_events_throughput_sec = throughput;
+                                    .sent_events_throughput_sec = v;
                             }
                         }
                     }

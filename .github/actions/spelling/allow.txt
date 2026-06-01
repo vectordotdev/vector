@@ -1,6 +1,7 @@
 acmecorp
 Acro
 addonmanager
+Agentic
 Ainol
 aiohttp
 Airis
@@ -60,6 +61,7 @@ Bedove
 Benss
 bigendian
 bindir
+binstall
 binfmt
 bitcast
 bitcode
@@ -137,6 +139,7 @@ dsmith
 DVB
 ede
 emoji
+emojis
 emqx
 enableable
 Enot
@@ -145,11 +148,14 @@ EPC
 esbuild
 esensar
 etld
+eventcreate
 eventloop
+Evt
 Evercoss
 exactlyonce
 Explay
 Fabro
+fakedata
 fakeintake
 FAQs
 fargate
@@ -204,8 +210,10 @@ greptime
 greptimecloud
 greptimedb
 GSM
+gssapi
 gvisor
 gws
+gzip'd
 hadoop
 Haier
 Haipad
@@ -280,6 +288,7 @@ keybinds
 Kingcom
 Kolkata
 konqueror
+krb
 Kruno
 Ktouch
 KTtech
@@ -300,6 +309,7 @@ lenovo
 levenstein
 Lexibook
 LGE
+LLMs
 Lifetab
 Lifetouch
 linkerd
@@ -456,6 +466,7 @@ rumqttc
 Salesforce
 Samsung
 SBT
+schema'd
 scriptblock
 Sega
 Segoe
@@ -497,11 +508,13 @@ Telstra
 Tencent
 Texet
 Thl
+timediff
 timeframe
 timeseries
 timespan
 timestamped
 Tizen
+TLDs
 Tmobile
 tobz
 Tomtec
@@ -557,3 +570,12 @@ zstandard
 ZTE
 Zync
 sighup
+CPPFLAGS
+LDFLAGS
+libsasl
+pkgconfig
+CLAUDE
+grpcurl
+linting
+lexers
+binstalled

@@ -9,7 +9,7 @@ sources:
     type: "internal_metrics"
 
   fluent:
-    type:    "fluent"
+    type: "fluent"
     address: "0.0.0.0:8282"
 
 ##
@@ -24,16 +24,16 @@ sources:
 
 sinks:
   prometheus:
-    type:    "prometheus_exporter"
-    inputs: [ "internal_metrics" ]
+    type: "prometheus_exporter"
+    inputs: ["internal_metrics"]
     address: "0.0.0.0:9090"
 
   elasticsearch:
-    type:        "elasticsearch"
-    inputs: [ "fluent" ]
-    endpoint:    "http://0.0.0.0:8080"
-    mode:        "bulk"
-    pipeline:    "pipeline-name"
+    type: "elasticsearch"
+    inputs: ["fluent"]
+    endpoint: "http://0.0.0.0:8080"
+    mode: "bulk"
+    pipeline: "pipeline-name"
     compression: "none"
     bulk:
       index: "vector-%F"

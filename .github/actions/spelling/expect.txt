@@ -16,6 +16,7 @@ appname
 aqf
 architecting
 archs
+ASIM
 assertverify
 atag
 aton
@@ -123,12 +124,14 @@ customizability
 CVS
 cwl
 daschl
+databricks
 dataflows
 datafuselabs
 datasources
 datid
 datname
 DBserver
+dcr
 ddagent
 ddev
 ddmetrics
@@ -168,11 +171,13 @@ duser
 dynamicwireless
 dyno
 ebfcee
+ector
 edenhill
 edns
 eeyun
 efgh
 Elhage
+elopment
 emerg
 endianess
 endler
@@ -346,6 +351,7 @@ mezmo
 mfoo
 mgmt
 MIDP
+mij
 mingrammer
 mkto
 mlua
@@ -375,6 +381,7 @@ mycie
 mycorp
 mydatabase
 mylabel
+mylogstorage
 mypod
 myvalue
 Namazu
@@ -599,6 +606,7 @@ transitioning
 Trauring
 Treemap
 trialled
+Trino
 Trivago
 trivy
 trl
@@ -644,6 +652,7 @@ wayfor
 wday
 webgraphviz
 websites
+websockets
 wensite
 whostheboss
 willreturn
@@ -670,6 +679,7 @@ ytt
 YXRR
 yyy
 zieme
+zerobus
 zoog
 zork
 zorp

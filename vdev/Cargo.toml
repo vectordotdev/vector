@@ -1,6 +1,6 @@
 [package]
 name = "vdev"
-version = "0.1.0"
+version = "0.3.3"
 edition = "2024"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 license = "MPL-2.0"
@@ -26,25 +26,32 @@ directories = "6.0.0"
 glob.workspace = true
 hex = "0.4.3"
 indexmap.workspace = true
-indicatif = { version = "0.18.0", features = ["improved_unicode"] }
+indicatif = { version = "0.18.4", features = ["improved_unicode"] }
 itertools.workspace = true
-log = "0.4.27"
+log = "0.4.29"
 # watch https://github.com/epage/anstyle for official interop with Clap
-owo-colors = { version = "4.2.2", features = ["supports-colors"] }
-paste.workspace = true
+owo-colors = { version = "4.2.3", features = ["supports-colors"] }
+pastey.workspace = true
 regex.workspace = true
 reqwest = { workspace = true, features = ["blocking"] }
 serde.workspace = true
-serde_json.workspace = true
+serde_json = { workspace = true, features = ["preserve_order"] }
 serde_yaml.workspace = true
 sha2 = "0.10.9"
 tempfile.workspace = true
 toml.workspace = true
-toml_edit = "0.22"
+toml_edit = "0.23"
 semver.workspace = true
+strum.workspace = true
 indoc.workspace = true
 git2 = { version = "0.20.4" }
 cfg-if.workspace = true
+convert_case.workspace = true
+# Used by check-events to walk Rust source via syn's AST. The extra features
+# are vdev-local; they do not propagate into the `vector` package's build.
+syn = { workspace = true, features = ["full", "visit", "extra-traits", "printing", "parsing"] }
+proc-macro2 = { workspace = true, features = ["span-locations"] }
+quote.workspace = true
 
 [package.metadata.binstall]
 pkg-url = "{ repo }/releases/download/vdev-v{ version }/{ name }-{ target }-v{ version }.tgz"
