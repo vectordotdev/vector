@@ -1,8 +1,7 @@
-use metrics::counter;
-use vector_lib::NamedInternalEvent;
 use vector_lib::{
+    NamedInternalEvent, counter,
     internal_event::{
-        ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+        ComponentEventsDropped, CounterName, InternalEvent, UNINTENTIONAL, error_stage, error_type,
     },
     json_size::JsonSize,
 };
@@ -20,8 +19,9 @@ impl InternalEvent for KubernetesEventsReceived {
             byte_size = %self.byte_size,
         );
 
-        counter!("component_received_events_total").increment(1);
-        counter!("component_received_event_bytes_total").increment(self.byte_size.get() as u64);
+        counter!(CounterName::ComponentReceivedEventsTotal).increment(1);
+        counter!(CounterName::ComponentReceivedEventBytesTotal)
+            .increment(self.byte_size.get() as u64);
     }
 }
 
@@ -39,7 +39,7 @@ impl<E: std::fmt::Display> InternalEvent for KubernetesEventsWatchError<E> {
             stage = error_stage::RECEIVING,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_type" => error_type::READER_FAILED,
             "stage" => error_stage::RECEIVING,
         )
@@ -65,7 +65,7 @@ impl<E: std::fmt::Display> InternalEvent for KubernetesEventsSerializationError<
             stage = error_stage::PROCESSING,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::PROCESSING,
         )
@@ -125,7 +125,7 @@ impl<E: std::fmt::Display> InternalEvent for KubernetesEventsLeaderElectionError
             stage = error_stage::RECEIVING,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_type" => error_type::READER_FAILED,
             "stage" => error_stage::RECEIVING,
         )
