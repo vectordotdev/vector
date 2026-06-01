@@ -124,6 +124,8 @@ urls: {
 	cue:                                        "https://cuelang.org/"
 	csv:                                        "\(wikipedia)/wiki/Comma-separated_values"
 	dag:                                        "\(wikipedia)/wiki/Directed_acyclic_graph"
+	databricks:                                 "https://www.databricks.com"
+	databricks_unity_catalog:                   "https://docs.databricks.com/en/data-governance/unity-catalog/index.html"
 	databend:                                   "https://databend.rs"
 	databend_rest:                              "https://databend.rs/doc/integrations/api/rest"
 	databend_cloud:                             "https://www.databend.com"

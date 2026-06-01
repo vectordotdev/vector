@@ -4,7 +4,6 @@ components: sinks: nats: {
 	title: "NATS"
 
 	classes: {
-		commonly_used: false
 		delivery:      "best_effort"
 		development:   "stable"
 		egress_method: "stream"

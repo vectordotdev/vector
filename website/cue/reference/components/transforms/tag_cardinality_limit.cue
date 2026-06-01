@@ -16,15 +16,12 @@ components: transforms: tag_cardinality_limit: {
 		"""
 
 	classes: {
-		commonly_used: false
 		development:   "beta"
 		egress_method: "stream"
 		stateful:      true
 	}
 
-	features: {
-		filter: {}
-	}
+	features: filter: {}
 
 	support: {
 		requirements: []
@@ -51,11 +48,7 @@ components: transforms: tag_cardinality_limit: {
 		traces: false
 	}
 
-	output: {
-		metrics: "": {
-			description: "The modified input `metric` event."
-		}
-	}
+	output: metrics: "": description: "The modified input `metric` event."
 
 	examples: [
 		{
@@ -74,41 +67,27 @@ components: transforms: tag_cardinality_limit: {
 				{metric: {
 					kind: "incremental"
 					name: "logins"
-					counter: {
-						value: 2.0
-					}
-					tags: {
-						user_id: "user_id_1"
-					}
+					counter: value: 2.0
+					tags: user_id:  "user_id_1"
 				}},
 				{metric: {
 					kind: "incremental"
 					name: "logins"
-					counter: {
-						value: 2.0
-					}
-					tags: {
-						user_id: "user_id_2"
-					}
+					counter: value: 2.0
+					tags: user_id:  "user_id_2"
 				}},
 			]
 			output: [
 				{metric: {
 					kind: "incremental"
 					name: "logins"
-					counter: {
-						value: 2.0
-					}
-					tags: {
-						user_id: "user_id_1"
-					}
+					counter: value: 2.0
+					tags: user_id:  "user_id_1"
 				}},
 				{metric: {
 					kind: "incremental"
 					name: "logins"
-					counter: {
-						value: 2.0
-					}
+					counter: value: 2.0
 					tags: {}
 				}},
 			]
@@ -182,6 +161,62 @@ components: transforms: tag_cardinality_limit: {
 				will reset the cache. This means that new values will be passed through until
 				the cardinality limit is reached again. See [intended usage](#intended-usage)
 				for more info.
+				"""
+		}
+
+		per_tag_limits: {
+			title: "Per-tag overrides"
+			body: """
+				`per_tag_limits` lets you override the cardinality settings for individual
+				tag keys instead of changing the metric-level `value_limit`. It is supported
+				at two scopes — the top level (applies to every metric that does not match a
+				`per_metric_limits` entry) and inside a `per_metric_limits.<name>` block
+				(applies only to that metric).
+
+				Each entry uses one of two `mode` values:
+
+				- `mode: limit_override` — track the tag with its own `value_limit`,
+				  independent of the surrounding metric's `value_limit`.
+				- `mode: excluded` — bypass cardinality tracking for this tag entirely.
+				  Values pass through unchanged on every event, are not counted against any
+				  `value_limit`, and are never added to the cache.
+
+				```yaml
+				type: tag_cardinality_limit
+				value_limit: 500
+				mode: exact
+
+				# Applies to every metric that does NOT match a per_metric_limits entry below.
+				per_tag_limits:
+				  kube_pod_name:
+				    # High cardinality is intentional for this tag — never track it.
+				    mode: excluded
+				  request_id:
+				    # Tighten the cap for this tag without lowering the metric-level limit.
+				    mode: limit_override
+				    value_limit: 50
+
+				per_metric_limits:
+				  http_requests_total:
+				    value_limit: 1000
+				    mode: exact
+				    # This metric has its own per-tag rules. The top-level per_tag_limits
+				    # above is IGNORED for http_requests_total — `kube_pod_name` on this
+				    # metric is therefore tracked against value_limit=1000.
+				    per_tag_limits:
+				      trace_id:
+				        mode: excluded
+				```
+
+				Precedence is "nearest wins":
+
+				1. If the metric matches a `per_metric_limits` entry, only that entry's
+				   `per_tag_limits` is consulted; the top-level `per_tag_limits` is ignored
+				   for that metric. (This mirrors how a per-metric `value_limit` shadows the
+				   global `value_limit`.)
+				2. Otherwise, the top-level `per_tag_limits` is consulted.
+				3. Tags not listed in the applicable `per_tag_limits` fall back to the
+				   surrounding metric's `value_limit` (per-metric, or global).
 				"""
 		}
 	}

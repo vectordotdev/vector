@@ -13,14 +13,18 @@ permissions:
 jobs:
   static-analysis:
     runs-on: ubuntu-latest
-    env:
-      DD_API_KEY: ${{ secrets.DD_API_KEY }}
-      DD_APP_KEY: ${{ secrets.DD_APP_KEY }}
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
+      - id: dd-token
+        uses: ./.github/actions/dd-token
+        with:
+          policy: public-vectordotdev-vector-static-analysis
+
       - name: Datadog Static Analyzer
-        if: ${{ env.DD_API_KEY != '' }}
         uses: DataDog/datadog-static-analyzer-github-action@8340f18875fcefca86844b5f947ce2431387e552 # v3.0.0
         with:
           dd_api_key: ${{ env.DD_API_KEY }}
