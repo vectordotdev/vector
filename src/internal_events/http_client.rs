@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use http::{
     Request, Response,
-    header::{self, HeaderMap, HeaderValue},
+    header::{self, HeaderMap, HeaderName, HeaderValue},
 };
 use hyper::{Error, body::HttpBody};
 use vector_lib::{
@@ -17,13 +17,21 @@ pub struct AboutToSendHttpRequest<'a, T> {
 
 fn remove_sensitive(headers: &HeaderMap<HeaderValue>) -> HeaderMap<HeaderValue> {
     let mut headers = headers.clone();
-    for name in &[
+    let sensitive: &[HeaderName] = &[
         header::AUTHORIZATION,
         header::PROXY_AUTHORIZATION,
+        header::PROXY_AUTHENTICATE,
+        header::WWW_AUTHENTICATE,
         header::COOKIE,
         header::SET_COOKIE,
-    ] {
-        if let Some(value) = headers.get_mut(name) {
+        HeaderName::from_static("cookie2"),
+        HeaderName::from_static("dd-api-key"),
+        HeaderName::from_static("x-honeycomb-team"),
+        HeaderName::from_static("x-api-key"),
+        HeaderName::from_static("api-key"),
+    ];
+    for (name, value) in headers.iter_mut() {
+        if sensitive.contains(name) {
             value.set_sensitive(true);
         }
     }
@@ -112,5 +120,80 @@ impl<B: HttpBody> std::fmt::Display for FormatBody<'_, B> {
             (lower, Some(upper)) if lower == upper => write!(fmt, "[{lower} bytes]"),
             (lower, Some(upper)) => write!(fmt, "[{lower}..={upper} bytes]"),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use http::header::{self, HeaderMap, HeaderName, HeaderValue};
+
+    use super::remove_sensitive;
+
+    fn is_sensitive(map: &HeaderMap, name: &HeaderName) -> Vec<bool> {
+        map.get_all(name)
+            .iter()
+            .map(HeaderValue::is_sensitive)
+            .collect()
+    }
+
+    #[test]
+    fn marks_single_sensitive_header() {
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            header::AUTHORIZATION,
+            HeaderValue::from_static("Bearer token"),
+        );
+        let result = remove_sensitive(&headers);
+        assert!(
+            is_sensitive(&result, &header::AUTHORIZATION)
+                .iter()
+                .all(|&s| s)
+        );
+    }
+
+    #[test]
+    fn marks_all_duplicate_sensitive_headers() {
+        let x_api_key: HeaderName = HeaderName::from_static("x-api-key");
+        let mut headers = HeaderMap::new();
+        headers.insert(x_api_key.clone(), HeaderValue::from_static("key-one"));
+        headers.append(x_api_key.clone(), HeaderValue::from_static("key-two"));
+        headers.append(x_api_key.clone(), HeaderValue::from_static("key-three"));
+
+        let result = remove_sensitive(&headers);
+        let sensitive_flags = is_sensitive(&result, &x_api_key);
+        assert_eq!(sensitive_flags.len(), 3);
+        assert!(
+            sensitive_flags.iter().all(|&s| s),
+            "not all duplicate x-api-key values were marked sensitive: {sensitive_flags:?}"
+        );
+    }
+
+    #[test]
+    fn header_name_matching_is_case_insensitive() {
+        // HeaderName normalizes to lowercase, so mixed-case variants are identical.
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            HeaderName::from_static("x-api-key"),
+            HeaderValue::from_static("secret"),
+        );
+        let result = remove_sensitive(&headers);
+        // Lookup with the mixed-case form resolves to the same normalized name.
+        let mixed_case = HeaderName::from_bytes(b"X-Api-Key").unwrap();
+        assert!(is_sensitive(&result, &mixed_case).iter().all(|&s| s));
+    }
+
+    #[test]
+    fn does_not_mark_non_sensitive_headers() {
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            header::CONTENT_TYPE,
+            HeaderValue::from_static("application/json"),
+        );
+        let result = remove_sensitive(&headers);
+        assert!(
+            is_sensitive(&result, &header::CONTENT_TYPE)
+                .iter()
+                .all(|&s| !s)
+        );
     }
 }
