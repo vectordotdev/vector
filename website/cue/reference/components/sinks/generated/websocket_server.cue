@@ -71,7 +71,7 @@ generated: components: sinks: websocket_server: configuration: {
 					custom: """
 						Custom authentication using VRL code.
 
-						Takes in request and validates it using VRL code.
+						Takes in request and validates it using VRL code. The VRL program must return a boolean.
 						"""
 				}
 			}

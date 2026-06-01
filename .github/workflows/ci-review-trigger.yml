@@ -19,7 +19,6 @@
 # /ci-run-component-features  : runs Component Features - Linux
 # /ci-run-unit-mac            : runs Unit - Mac
 # /ci-run-unit-windows        : runs Unit - Windows
-# /ci-run-environment         : runs Environment Suite
 # /ci-run-k8s                 : runs K8s E2E Suite
 # /ci-run-packaging           : builds and verifies packages (without publishing to Docker/S3/GitHub)
 #
@@ -79,7 +78,6 @@ jobs:
       || startsWith(github.event.review.body, '/ci-run-cross')
       || startsWith(github.event.review.body, '/ci-run-unit-mac')
       || startsWith(github.event.review.body, '/ci-run-unit-windows')
-      || startsWith(github.event.review.body, '/ci-run-environment')
       || startsWith(github.event.review.body, '/ci-run-k8s')
       || startsWith(github.event.review.body, '/ci-run-packaging')
       || startsWith(github.event.review.body, '/ci-run-regression')
@@ -190,14 +188,6 @@ jobs:
     needs: validate
     if: startsWith(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-unit-windows')
     uses: ./.github/workflows/unit_windows.yml
-    with:
-      ref: ${{ github.event.review.commit_id }}
-    secrets: inherit
-
-  environment:
-    needs: validate
-    if: startsWith(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-environment')
-    uses: ./.github/workflows/environment.yml
     with:
       ref: ${{ github.event.review.commit_id }}
     secrets: inherit
