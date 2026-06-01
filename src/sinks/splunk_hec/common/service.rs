@@ -12,7 +12,6 @@ use snafu::ResultExt;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore, mpsc, oneshot};
 use tokio_util::sync::PollSemaphore;
 use tower::Service;
-use tracing::Instrument;
 use uuid::Uuid;
 use vector_lib::{event::EventStatus, request_metadata::MetaDescriptive};
 
@@ -59,15 +58,12 @@ where
         let max_pending_acks = indexer_acknowledgements.max_pending_acks.get();
         let tx = if let Some(ack_client) = ack_client {
             let (tx, rx) = mpsc::channel(128);
-            tokio::spawn(
-                run_acknowledgements(
-                    rx,
-                    ack_client,
-                    Arc::clone(&http_request_builder),
-                    indexer_acknowledgements,
-                )
-                .in_current_span(),
-            );
+            crate::spawn_in_current_span(run_acknowledgements(
+                rx,
+                ack_client,
+                Arc::clone(&http_request_builder),
+                indexer_acknowledgements,
+            ));
             Some(tx)
         } else {
             None

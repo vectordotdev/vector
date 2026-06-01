@@ -323,7 +323,7 @@ where
                     this.lingers.remove(partition);
 
                     let batch = batch.finish();
-                    let future = tokio::spawn(this.service.call(batch).in_current_span());
+                    let future = crate::spawn_in_current_span(this.service.call(batch));
 
                     if let Some(map) = this.in_flight.as_mut() {
                         map.insert(partition.clone(), future.map(|_| ()).fuse().boxed());

@@ -17,7 +17,6 @@ use hyper::header::AUTHORIZATION;
 use smpl_jwt::Jwt;
 use snafu::{ResultExt, Snafu};
 use tokio::sync::watch;
-use tracing::Instrument;
 use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
 
 use crate::{
@@ -195,7 +194,7 @@ impl GcpAuthenticator {
 
     pub fn spawn_regenerate_token(&self) -> watch::Receiver<()> {
         let (sender, receiver) = watch::channel(());
-        tokio::spawn(self.clone().token_regenerator(sender).in_current_span());
+        crate::spawn_in_current_span(self.clone().token_regenerator(sender));
         receiver
     }
 

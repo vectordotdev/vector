@@ -11,7 +11,6 @@ use tokio::{
     task::JoinHandle,
     time::sleep,
 };
-use tracing::Instrument;
 
 use super::{
     RedisEvent, RedisRequest, RepairChannelSnafu,
@@ -140,18 +139,15 @@ impl RedisConnection {
         Ok(Self::Sentinel {
             connection_send: conn_tx,
             connection_recv: conn_rx,
-            repair_task: Arc::new(tokio::spawn(
-                async move {
-                    Self::repair_connection_manager_task(
-                        sentinel,
-                        service_name,
-                        node_connection_info,
-                        task_conn_tx,
-                    )
-                    .await
-                }
-                .in_current_span(),
-            )),
+            repair_task: Arc::new(crate::spawn_in_current_span(async move {
+                Self::repair_connection_manager_task(
+                    sentinel,
+                    service_name,
+                    node_connection_info,
+                    task_conn_tx,
+                )
+                .await
+            })),
         })
     }
 

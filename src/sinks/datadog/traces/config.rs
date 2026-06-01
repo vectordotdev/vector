@@ -5,7 +5,6 @@ use indoc::indoc;
 use snafu::ResultExt;
 use tokio::sync::oneshot::{Sender, channel};
 use tower::ServiceBuilder;
-use tracing::Instrument;
 use vector_lib::{
     config::{AcknowledgementsConfig, proxy::ProxyConfig},
     configurable::configurable_component,
@@ -179,16 +178,13 @@ impl DatadogTracesConfig {
         // Send the APM stats payloads independently of the sink framework.
         // This is necessary to comply with what the APM stats backend of Datadog expects with
         // respect to receiving stats payloads.
-        tokio::spawn(
-            flush_apm_stats_thread(
-                tripwire,
-                client,
-                compression,
-                endpoints,
-                Arc::clone(&apm_stats_aggregator),
-            )
-            .in_current_span(),
-        );
+        crate::spawn_in_current_span(flush_apm_stats_thread(
+            tripwire,
+            client,
+            compression,
+            endpoints,
+            Arc::clone(&apm_stats_aggregator),
+        ));
 
         Ok(VectorSink::from_event_streamsink(sink))
     }

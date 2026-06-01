@@ -466,21 +466,18 @@ impl PrometheusExporter {
         let tls = MaybeTlsSettings::from_config(tls.as_ref(), true)?;
         let listener = tls.bind(&address).await?;
 
-        tokio::spawn(
-            async move {
-                info!(message = "Building HTTP server.", address = %address);
+        crate::spawn_in_current_span(async move {
+            info!(message = "Building HTTP server.", address = %address);
 
-                Server::builder(hyper::server::accept::from_stream(listener.accept_stream()))
-                    .serve(new_service)
-                    .with_graceful_shutdown(tripwire.then(crate::shutdown::tripwire_handler))
-                    .instrument(span)
-                    .await
-                    .map_err(|error| error!("Server error: {}.", error))?;
+            Server::builder(hyper::server::accept::from_stream(listener.accept_stream()))
+                .serve(new_service)
+                .with_graceful_shutdown(tripwire.then(crate::shutdown::tripwire_handler))
+                .instrument(span)
+                .await
+                .map_err(|error| error!("Server error: {}.", error))?;
 
-                Ok::<(), ()>(())
-            }
-            .in_current_span(),
-        );
+            Ok::<(), ()>(())
+        });
 
         self.server_shutdown_trigger = Some(trigger);
         Ok(())

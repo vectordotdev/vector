@@ -11,7 +11,6 @@ use tokio::{
     time::{self, Duration, Instant, sleep},
 };
 use tokio_stream::wrappers::IntervalStream;
-use tracing::Instrument;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::{
@@ -725,33 +724,30 @@ fn spawn_reader_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
     sender: Sender<((SmallVec<[Event; 1]>, usize), &'static str)>,
 ) {
     // Start the green background thread for collecting
-    drop(tokio::spawn(
-        async move {
-            debug!("Start capturing {} command output.", origin);
+    drop(crate::spawn_in_current_span(async move {
+        debug!("Start capturing {} command output.", origin);
 
-            let mut stream = DecoderFramedRead::new(reader, decoder);
-            while let Some(result) = stream.next().await {
-                match result {
-                    Ok(next) => {
-                        if sender.send((next, origin)).await.is_err() {
-                            // If the receive half of the channel is closed, either due to close being
-                            // called or the Receiver handle dropping, the function returns an error.
-                            emit!(ExecChannelClosedError);
-                            break;
-                        }
+        let mut stream = DecoderFramedRead::new(reader, decoder);
+        while let Some(result) = stream.next().await {
+            match result {
+                Ok(next) => {
+                    if sender.send((next, origin)).await.is_err() {
+                        // If the receive half of the channel is closed, either due to close being
+                        // called or the Receiver handle dropping, the function returns an error.
+                        emit!(ExecChannelClosedError);
+                        break;
                     }
-                    Err(error) => {
-                        // Error is logged by `vector_lib::codecs::Decoder`, no further
-                        // handling is needed here.
-                        if !error.can_continue() {
-                            break;
-                        }
+                }
+                Err(error) => {
+                    // Error is logged by `vector_lib::codecs::Decoder`, no further
+                    // handling is needed here.
+                    if !error.can_continue() {
+                        break;
                     }
                 }
             }
-
-            debug!("Finished capturing {} command output.", origin);
         }
-        .in_current_span(),
-    ));
+
+        debug!("Finished capturing {} command output.", origin);
+    }));
 }

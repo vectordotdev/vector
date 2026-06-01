@@ -17,7 +17,6 @@ use tokio_stream::{
     wrappers::{IntervalStream, ReceiverStream},
 };
 use tonic::{Request, Response, Status};
-use tracing::Instrument;
 use vector_lib::tap::{
     controller::{TapController, TapPatterns, TapPayload},
     topology::WatchRx,
@@ -677,30 +676,27 @@ impl observability::Service for ObservabilityService {
 
         let watch_rx = self.watch_rx.clone();
 
-        tokio::spawn(
-            async move {
-                let _tap_controller = TapController::new(watch_rx, tap_tx, patterns);
-                let mut tap_rx = ReceiverStream::new(tap_rx);
-                let mut interval = time::interval(time::Duration::from_millis(interval_ms));
-                let mut reservoir = Reservoir::new(limit);
+        crate::spawn_in_current_span(async move {
+            let _tap_controller = TapController::new(watch_rx, tap_tx, patterns);
+            let mut tap_rx = ReceiverStream::new(tap_rx);
+            let mut interval = time::interval(time::Duration::from_millis(interval_ms));
+            let mut reservoir = Reservoir::new(limit);
 
-                loop {
-                    select! {
-                        Some(tap_payload) = tokio_stream::StreamExt::next(&mut tap_rx) => {
-                            if reservoir.handle_payload(tap_payload, &event_tx).await.is_err() {
-                                break;
-                            }
+            loop {
+                select! {
+                    Some(tap_payload) = tokio_stream::StreamExt::next(&mut tap_rx) => {
+                        if reservoir.handle_payload(tap_payload, &event_tx).await.is_err() {
+                            break;
                         }
-                        _ = interval.tick() => {
-                            if event_tx.is_closed() || reservoir.flush(&event_tx).await.is_err() {
-                                break;
-                            }
+                    }
+                    _ = interval.tick() => {
+                        if event_tx.is_closed() || reservoir.flush(&event_tx).await.is_err() {
+                            break;
                         }
                     }
                 }
             }
-            .in_current_span(),
-        );
+        });
 
         let stream = FuturesStreamExt::flat_map(ReceiverStream::new(event_rx), |events| {
             stream::iter(events.into_iter().map(Ok))

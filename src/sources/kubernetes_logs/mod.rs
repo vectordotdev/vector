@@ -21,7 +21,6 @@ use kube::{
 };
 use lifecycle::Lifecycle;
 use serde_with::serde_as;
-use tracing::Instrument;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf, TimeZone,
     codecs::{BytesDeserializer, BytesDeserializerConfig},
@@ -739,9 +738,8 @@ impl Source {
         let pod_state = pod_store_w.as_reader();
         let pod_cacher = MetaCache::new();
 
-        reflectors.push(tokio::spawn(
-            custom_reflector(pod_store_w, pod_cacher, pod_watcher, delay_deletion)
-                .in_current_span(),
+        reflectors.push(crate::spawn_in_current_span(
+            custom_reflector(pod_store_w, pod_cacher, pod_watcher, delay_deletion),
         ));
 
         // -----------------------------------------------------------------
@@ -761,9 +759,8 @@ impl Source {
             )
             .backoff(watcher::DefaultBackoff::default());
 
-            reflectors.push(tokio::spawn(
-                custom_reflector(ns_store_w, MetaCache::new(), ns_watcher, delay_deletion)
-                    .in_current_span(),
+            reflectors.push(crate::spawn_in_current_span(
+                custom_reflector(ns_store_w, MetaCache::new(), ns_watcher, delay_deletion),
             ));
         }
 
@@ -784,9 +781,8 @@ impl Source {
         let node_state = node_store_w.as_reader();
         let node_cacher = MetaCache::new();
 
-        reflectors.push(tokio::spawn(
-            custom_reflector(node_store_w, node_cacher, node_watcher, delay_deletion)
-                .in_current_span(),
+        reflectors.push(crate::spawn_in_current_span(
+            custom_reflector(node_store_w, node_cacher, node_watcher, delay_deletion),
         ));
 
         let paths_provider = K8sPathsProvider::new(

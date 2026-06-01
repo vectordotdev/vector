@@ -5,7 +5,6 @@ use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use tokio::{io::AsyncWriteExt, process::Command, time};
 use tokio_util::codec;
-use tracing::Instrument;
 use vector_lib::configurable::{component::GenerateConfig, configurable_component};
 use vrl::value::Value;
 
@@ -180,7 +179,7 @@ async fn query_backend(
         .ok_or("unable to acquire stdout")?;
 
     let query = serde_json::to_vec(&query)?;
-    tokio::spawn(async move { stdin.write_all(&query).await }.in_current_span());
+    crate::spawn_in_current_span(async move { stdin.write_all(&query).await });
 
     let timeout = time::sleep(time::Duration::from_secs(timeout));
     tokio::pin!(timeout);

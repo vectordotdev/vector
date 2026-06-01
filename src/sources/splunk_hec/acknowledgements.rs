@@ -12,7 +12,6 @@ use futures::StreamExt;
 use roaring::RoaringTreemap;
 use serde::{Deserialize, Serialize};
 use tokio::time::interval;
-use tracing::Instrument;
 use vector_lib::{
     configurable::configurable_component, finalization::BatchStatusReceiver,
     finalizer::UnorderedFinalizer,
@@ -107,21 +106,18 @@ impl IndexerAcknowledgement {
         let idle_task_channels = Arc::clone(&channels);
 
         if config.ack_idle_cleanup {
-            tokio::spawn(
-                async move {
-                    let mut interval = interval(Duration::from_secs(max_idle_time));
-                    loop {
-                        interval.tick().await;
-                        let mut channels = idle_task_channels.lock().await;
-                        let now = Instant::now();
+            crate::spawn_in_current_span(async move {
+                let mut interval = interval(Duration::from_secs(max_idle_time));
+                loop {
+                    interval.tick().await;
+                    let mut channels = idle_task_channels.lock().await;
+                    let now = Instant::now();
 
-                        channels.retain(|_, channel| {
-                            now.duration_since(channel.get_last_used()).as_secs() <= max_idle_time
-                        });
-                    }
+                    channels.retain(|_, channel| {
+                        now.duration_since(channel.get_last_used()).as_secs() <= max_idle_time
+                    });
                 }
-                .in_current_span(),
-            );
+            });
         }
 
         Self {
@@ -210,7 +206,7 @@ impl Channel {
         let ack_ids_status = Arc::new(Mutex::new(RoaringTreemap::new()));
         let finalizer_ack_ids_status = Arc::clone(&ack_ids_status);
         let (ack_event_finalizer, mut ack_stream) = UnorderedFinalizer::new(Some(shutdown));
-        tokio::spawn(async move {
+        crate::spawn_in_current_span(async move {
             while let Some((status, ack_id)) = ack_stream.next().await {
                 if status == BatchStatus::Delivered {
                     let mut ack_ids_status = finalizer_ack_ids_status.lock().unwrap();
@@ -227,7 +223,7 @@ impl Channel {
                     }
                 }
             }
-        }.in_current_span());
+        });
 
         Self {
             last_used_timestamp: RwLock::new(Instant::now()),

@@ -35,8 +35,6 @@ cfg_if::cfg_if! {
         use windows::Win32::Foundation::{DUPLICATE_SAME_ACCESS, DuplicateHandle, HANDLE};
         use windows::Win32::System::Threading::GetCurrentProcess;
 
-        use tracing::Instrument;
-
         use crate::{
             SourceSender,
             event::{BatchNotifier, BatchStatus, BatchStatusReceiver},
@@ -103,7 +101,7 @@ impl Finalizer {
                 OrderedFinalizer::<FinalizerEntry>::new(Some(shutdown.clone()));
 
             // Spawn background task to process acknowledgments and update checkpoints
-            tokio::spawn(async move {
+            crate::spawn_in_current_span(async move {
                 while let Some((status, entry)) = ack_stream.next().await {
                     if status == BatchStatus::Delivered {
                         if let Err(e) = checkpointer.set_batch(entry.bookmarks.clone()).await {
@@ -125,7 +123,7 @@ impl Finalizer {
                     }
                 }
                 debug!(message = "Acknowledgement stream completed.");
-            }.in_current_span());
+            });
 
             Self::Async(finalizer)
         } else {
@@ -363,7 +361,7 @@ impl WindowsEventLogSource {
             }
         };
         let shutdown_watcher = shutdown.clone();
-        tokio::spawn(async move {
+        crate::spawn_in_current_span(async move {
             shutdown_watcher.await;
             unsafe {
                 let handle =
@@ -373,7 +371,7 @@ impl WindowsEventLogSource {
                     let _ = windows::Win32::Foundation::CloseHandle(handle);
                 }
             }
-        }.in_current_span());
+        });
 
         // Track when we last flushed checkpoints
         let mut last_checkpoint = std::time::Instant::now();

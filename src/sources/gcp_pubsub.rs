@@ -23,7 +23,6 @@ use tonic::{
     metadata::MetadataValue,
     transport::{Certificate, ClientTlsConfig, Endpoint, Identity},
 };
-use tracing::Instrument;
 use vector_lib::{
     byte_size_of::ByteSizeOf,
     codecs::decoding::{DeserializerConfig, FramingConfig},
@@ -454,7 +453,7 @@ impl PubsubSource {
         // when it has an idle interval it will mark itself as not
         // busy.
         let busy_flag = Arc::new(AtomicBool::new(false));
-        let task = tokio::spawn(self.clone().run(Arc::clone(&busy_flag)).in_current_span());
+        let task = crate::spawn_in_current_span(self.clone().run(Arc::clone(&busy_flag)));
         tasks.push(Task { task, busy_flag });
     }
 

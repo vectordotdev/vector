@@ -20,7 +20,6 @@ use vector_lib::{
     },
 };
 
-use tracing::Instrument;
 
 use crate::{
     event::{EventArray, EventContainer, EventStatus, Finalizable},
@@ -59,32 +58,29 @@ impl StreamSink<EventArray> for BlackholeSink {
 
         if self.config.print_interval_secs.as_secs() > 0 {
             let interval_dur = self.config.print_interval_secs;
-            tokio::spawn(
-                async move {
-                    let mut print_interval = interval(interval_dur);
-                    loop {
-                        select! {
-                            _ = print_interval.tick() => {
-                                info!(
-                                    events = total_events.load(Ordering::Relaxed),
-                                    raw_bytes_collected = total_raw_bytes.load(Ordering::Relaxed),
-                                    internal_log_rate_limit = false,
-                                    "Collected events."
-                                );
-                            },
-                            _ = tripwire.changed() => break,
-                        }
+            crate::spawn_in_current_span(async move {
+                let mut print_interval = interval(interval_dur);
+                loop {
+                    select! {
+                        _ = print_interval.tick() => {
+                            info!(
+                                events = total_events.load(Ordering::Relaxed),
+                                raw_bytes_collected = total_raw_bytes.load(Ordering::Relaxed),
+                                internal_log_rate_limit = false,
+                                "Collected events."
+                            );
+                        },
+                        _ = tripwire.changed() => break,
                     }
-
-                    info!(
-                        events = total_events.load(Ordering::Relaxed),
-                        raw_bytes_collected = total_raw_bytes.load(Ordering::Relaxed),
-                        internal_log_rate_limit = false,
-                        "Collected events."
-                    );
                 }
-                .in_current_span(),
-            );
+
+                info!(
+                    events = total_events.load(Ordering::Relaxed),
+                    raw_bytes_collected = total_raw_bytes.load(Ordering::Relaxed),
+                    internal_log_rate_limit = false,
+                    "Collected events."
+                );
+            });
         }
 
         while let Some(mut events) = input.next().await {

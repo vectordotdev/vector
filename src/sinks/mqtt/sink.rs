@@ -1,6 +1,5 @@
 use async_trait::async_trait;
 use futures::{StreamExt, stream::BoxStream};
-use tracing::Instrument;
 
 use super::{
     MqttSinkConfig,
@@ -61,26 +60,23 @@ impl MqttSink {
         let (client, mut connection) = self.connector.connect();
 
         // This is necessary to keep the mqtt event loop moving forward.
-        tokio::spawn(
-            async move {
-                loop {
-                    // If an error is returned here there is currently no way to tie this back
-                    // to the event that was posted which means we can't accurately provide
-                    // delivery guarantees.
-                    // We need this issue resolved first:
-                    // https://github.com/bytebeamio/rumqtt/issues/349
-                    match connection.poll().await {
-                        Ok(_) => {}
-                        Err(connection_error) => {
-                            emit!(MqttConnectionError {
-                                error: connection_error
-                            });
-                        }
+        crate::spawn_in_current_span(async move {
+            loop {
+                // If an error is returned here there is currently no way to tie this back
+                // to the event that was posted which means we can't accurately provide
+                // delivery guarantees.
+                // We need this issue resolved first:
+                // https://github.com/bytebeamio/rumqtt/issues/349
+                match connection.poll().await {
+                    Ok(_) => {}
+                    Err(connection_error) => {
+                        emit!(MqttConnectionError {
+                            error: connection_error
+                        });
                     }
                 }
             }
-            .in_current_span(),
-        );
+        });
 
         let service = ServiceBuilder::new().service(MqttService {
             client,
