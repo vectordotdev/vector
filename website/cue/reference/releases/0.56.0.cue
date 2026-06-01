@@ -19,16 +19,12 @@ releases: "0.56.0": {
 		example showing how to retry only specific transient status codes.
 		- The `vector` sink now supports `zstd` compression in addition to `gzip`. This provides better
 		 compression ratios and performance for Vector-to-Vector communication.
-		 Users should switch from `compression: true` to `compression: gzip` or the newly added
-		 `compression: zstd`. Support for `compression: boolean` will be dropped in a later release.
-		- The `splunk_hec` source now accepts optional per-endpoint codec configuration.
 		- The `tag_cardinality_limit` transform received major enhancements: per-tag cardinality
 		  overrides (`per_tag_limits`), per-metric tracking isolation (`tracking_scope: per_metric`),
 		  a global key cap (`max_tracked_keys`), and the ability to opt entire metrics out of
 		  cardinality tracking.
-		- Parquet batch encoding in the `aws_s3` sink now works out of the box in official release
-		  binaries; previously it required compiling Vector from source with the `codecs-parquet`
-		  feature flag.
+		- Parquet batch encoding in the `aws_s3` sink is now available out of the box in official release
+		  binaries for all users.
 		- Fixed a CPU regression introduced in 0.50.0 affecting all sinks that use metric normalization such as `prometheus_remote_write`, `aws_cloudwatch_metrics`, `statsd` and others.
 		- Restored support for installing Vector on RHEL 8, Rocky Linux 8, AlmaLinux 8, and CentOS
 		  Stream 8, which had been broken since 0.55.0 due to an inadvertent glibc requirement bump.
