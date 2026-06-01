@@ -935,18 +935,26 @@ mod test {
         acknowledgements
     }
 
+    fn decoded_sequence_numbers(decoded: &[(LogstashEventFrame, usize)]) -> Vec<u32> {
+        decoded
+            .iter()
+            .map(|(frame, _)| frame.sequence_number)
+            .collect::<Vec<_>>()
+    }
+
+    fn assert_decoded_sequences(
+        decoded: &[(LogstashEventFrame, usize)],
+        expected_sequences: &[u32],
+    ) {
+        assert_eq!(decoded_sequence_numbers(decoded), expected_sequences);
+    }
+
     async fn assert_acknowledgements_for_ready_frames(
         decoded: Vec<(LogstashEventFrame, usize)>,
         expected_sequences: &[u32],
         expected_acknowledgements: &[u32],
     ) {
-        assert_eq!(
-            decoded
-                .iter()
-                .map(|(frame, _)| frame.sequence_number)
-                .collect::<Vec<_>>(),
-            expected_sequences
-        );
+        assert_decoded_sequences(&decoded, expected_sequences);
 
         let stream = stream::iter(decoded.into_iter().map(Ok::<_, DecodeError>));
         let mut ready = ReadyFrames::with_capacity(stream, 16);
@@ -961,6 +969,15 @@ mod test {
         assert_eq!(acknowledgements, expected_acknowledgements);
     }
 
+    fn decode_frames_and_assert_sequences(
+        src: BytesMut,
+        expected_sequences: &[u32],
+    ) -> Vec<(LogstashEventFrame, usize)> {
+        let decoded = decode_frames(src);
+        assert_decoded_sequences(&decoded, expected_sequences);
+        decoded
+    }
+
     fn decode_frames_with_decoder(
         decoder: &mut LogstashDecoder,
         mut src: BytesMut,
@@ -973,6 +990,16 @@ mod test {
 
         assert_eq!(src.len(), 0);
         frames
+    }
+
+    fn decode_frames_with_decoder_and_assert_sequences(
+        decoder: &mut LogstashDecoder,
+        src: BytesMut,
+        expected_sequences: &[u32],
+    ) -> Vec<(LogstashEventFrame, usize)> {
+        let decoded = decode_frames_with_decoder(decoder, src);
+        assert_decoded_sequences(&decoded, expected_sequences);
+        decoded
     }
 
     #[test]
@@ -996,7 +1023,7 @@ mod test {
         push_req(&mut req, 1, &[("message", "second window first")]);
         push_req(&mut req, 2, &[("message", "second window second")]);
 
-        let decoded = decode_frames(req);
+        let decoded = decode_frames_and_assert_sequences(req, &[1, 1, 2]);
         assert_acknowledgements_for_ready_frames(decoded, &[1, 1, 2], &[1, 2]).await;
     }
 
@@ -1010,7 +1037,7 @@ mod test {
         push_req(&mut req, 3, &[("message", "second window first")]);
         push_req(&mut req, 4, &[("message", "second window second")]);
 
-        let decoded = decode_frames(req);
+        let decoded = decode_frames_and_assert_sequences(req, &[1, 2, 3, 4]);
         assert_acknowledgements_for_ready_frames(decoded, &[1, 2, 3, 4], &[2, 4]).await;
     }
 
@@ -1020,7 +1047,7 @@ mod test {
         push_window_size(&mut req, 4);
         push_req(&mut req, 1, &[("message", "only event in partial window")]);
 
-        let decoded = decode_frames(req);
+        let decoded = decode_frames_and_assert_sequences(req, &[1]);
         assert_acknowledgements_for_ready_frames(decoded, &[1], &[1]).await;
     }
 
@@ -1034,8 +1061,34 @@ mod test {
         let mut req = BytesMut::new();
         push_compressed(&mut req, &inner);
 
-        let decoded = decode_frames(req);
+        let decoded = decode_frames_and_assert_sequences(req, &[1, 2]);
         assert_acknowledgements_for_ready_frames(decoded, &[1, 2], &[2]).await;
+    }
+
+    #[tokio::test]
+    async fn single_window_split_across_ready_frames_keeps_progressive_acks() {
+        let mut req = BytesMut::new();
+        push_window_size(&mut req, 4);
+        push_req(&mut req, 1, &[("message", "first")]);
+        push_req(&mut req, 2, &[("message", "second")]);
+        push_req(&mut req, 3, &[("message", "third")]);
+        push_req(&mut req, 4, &[("message", "fourth")]);
+
+        let decoded = decode_frames_and_assert_sequences(req, &[1, 2, 3, 4]);
+
+        let stream = stream::iter(decoded.into_iter().map(Ok::<_, DecodeError>));
+        let mut ready = ReadyFrames::with_capacity(stream, 2);
+        let mut acknowledgements = Vec::new();
+
+        while let Some(result) = ready.next().await {
+            let (frames, _byte_size) = result.unwrap();
+            let ack = LogstashAcker::new(&frames)
+                .build_ack(TcpSourceAck::Ack)
+                .unwrap();
+            acknowledgements.push(decode_acknowledgements(ack));
+        }
+
+        assert_eq!(acknowledgements, vec![vec![2], vec![4]]);
     }
 
     #[tokio::test]
@@ -1045,7 +1098,8 @@ mod test {
         let mut first_batch = BytesMut::new();
         push_window_size(&mut first_batch, 2);
         push_req(&mut first_batch, 1, &[("message", "first partial tail")]);
-        let decoded = decode_frames_with_decoder(&mut decoder, first_batch);
+        let decoded =
+            decode_frames_with_decoder_and_assert_sequences(&mut decoder, first_batch, &[1]);
         assert_acknowledgements_for_ready_frames(decoded, &[1], &[1]).await;
 
         let mut second_batch = BytesMut::new();
@@ -1055,7 +1109,8 @@ mod test {
             1,
             &[("message", "fresh window after ack")],
         );
-        let decoded = decode_frames_with_decoder(&mut decoder, second_batch);
+        let decoded =
+            decode_frames_with_decoder_and_assert_sequences(&mut decoder, second_batch, &[1]);
         assert_acknowledgements_for_ready_frames(decoded, &[1], &[1]).await;
     }
 
