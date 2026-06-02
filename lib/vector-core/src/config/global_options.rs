@@ -84,7 +84,11 @@ pub struct GlobalOptions {
     /// This is used if a component does not have its own specific log schema. All events use a log
     /// schema, whether or not the default is used, to assign event fields on incoming events.
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
-    #[configurable(metadata(docs::common = false, docs::required = false))]
+    #[configurable(metadata(
+        docs::common = false,
+        docs::required = false,
+        docs::warnings = "These settings are ignored when `schema.log_namespace` is set to `true`."
+    ))]
     pub log_schema: LogSchema,
 
     /// Telemetry options.
