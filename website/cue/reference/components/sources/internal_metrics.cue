@@ -57,7 +57,7 @@ components: sources: internal_metrics: {
 			description:       "The number of active endpoints this component is sending data to."
 			type:              "gauge"
 			default_namespace: "vector"
-			tags:              _internal_metrics_tags
+			tags:              _component_tags
 		}
 		active_clients: {
 			description:       "Number of clients attached to a component."
