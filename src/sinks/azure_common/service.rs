@@ -48,7 +48,7 @@ impl Service<AzureBlobRequest> for AzureBlobService {
                 blob_content_encoding: request.content_encoding.map(|e| e.to_string()),
                 ..Default::default()
             }
-            .with_if_not_exists();
+            .if_not_exists();
 
             let result = blob_client
                 .upload(

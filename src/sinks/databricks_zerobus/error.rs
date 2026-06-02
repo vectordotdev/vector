@@ -38,6 +38,35 @@ pub enum ZerobusSinkError {
     /// will create a fresh stream via `get_or_create_stream`.
     #[snafu(display("Zerobus stream was closed concurrently"))]
     StreamClosed,
+
+    /// Resolving the table schema from Unity Catalog failed. `retryable`
+    /// distinguishes transient failures (network, 5xx, 408, 429) from
+    /// permanent ones (404, 401, 403, ...).
+    #[snafu(display("Schema resolution failed: {}", message))]
+    SchemaError { message: String, retryable: bool },
+}
+
+impl ZerobusSinkError {
+    /// Whether this error should be retried.
+    pub fn is_retryable(&self) -> bool {
+        match self {
+            Self::ZerobusError { source }
+            | Self::StreamInitError { source }
+            | Self::IngestionError { source } => source.is_retryable(),
+            Self::StreamClosed => true,
+            Self::SchemaError { retryable, .. } => *retryable,
+            Self::ConfigError { .. } | Self::EncodingError { .. } | Self::MissingAckOffset => false,
+        }
+    }
+
+    /// Event status to apply to a batch's finalizers when this error occurs.
+    pub fn event_status(&self) -> EventStatus {
+        if self.is_retryable() {
+            EventStatus::Errored
+        } else {
+            EventStatus::Rejected
+        }
+    }
 }
 
 impl From<ZerobusError> for ZerobusSinkError {
@@ -46,24 +75,9 @@ impl From<ZerobusError> for ZerobusSinkError {
     }
 }
 
-/// Convert Zerobus errors to Vector event status.
 impl From<ZerobusSinkError> for EventStatus {
     fn from(error: ZerobusSinkError) -> Self {
-        match error {
-            ZerobusSinkError::ConfigError { .. }
-            | ZerobusSinkError::EncodingError { .. }
-            | ZerobusSinkError::MissingAckOffset => EventStatus::Rejected,
-            ZerobusSinkError::StreamClosed => EventStatus::Errored,
-            ZerobusSinkError::ZerobusError { source }
-            | ZerobusSinkError::StreamInitError { source }
-            | ZerobusSinkError::IngestionError { source } => {
-                if source.is_retryable() {
-                    EventStatus::Errored
-                } else {
-                    EventStatus::Rejected
-                }
-            }
-        }
+        error.event_status()
     }
 }
 
@@ -169,5 +183,25 @@ mod tests {
             message: "bad".to_string(),
         };
         assert!(!logic.is_retriable_error(&error));
+    }
+
+    #[test]
+    fn retryable_schema_error_maps_to_errored() {
+        let error = ZerobusSinkError::SchemaError {
+            message: "UC 503".to_string(),
+            retryable: true,
+        };
+        assert!(ZerobusRetryLogic.is_retriable_error(&error));
+        assert_eq!(EventStatus::from(error), EventStatus::Errored);
+    }
+
+    #[test]
+    fn non_retryable_schema_error_maps_to_rejected() {
+        let error = ZerobusSinkError::SchemaError {
+            message: "UC 404".to_string(),
+            retryable: false,
+        };
+        assert!(!ZerobusRetryLogic.is_retriable_error(&error));
+        assert_eq!(EventStatus::from(error), EventStatus::Rejected);
     }
 }
