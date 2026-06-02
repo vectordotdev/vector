@@ -665,7 +665,7 @@ components: sources: internal_metrics: {
 		}
 		open_files: {
 			description:       "The total number of open files."
-			type:              "counter"
+			type:              "gauge"
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
@@ -997,9 +997,7 @@ components: sources: internal_metrics: {
 			description:       "The maximum number of bytes the buffer that feeds into a transform can hold."
 			type:              "gauge"
 			default_namespace: "vector"
-			tags: _component_tags & {
-				output: _output
-			}
+			tags:              _component_tags
 			deprecated:         true
 			deprecated_message: "This metric has been deprecated in favor of [`transform_buffer_max_size_bytes`](#transform_buffer_max_size_bytes)."
 		}
@@ -1007,9 +1005,7 @@ components: sources: internal_metrics: {
 			description:       "The maximum number of events the buffer that feeds into a transform can hold."
 			type:              "gauge"
 			default_namespace: "vector"
-			tags: _component_tags & {
-				output: _output
-			}
+			tags:              _component_tags
 			deprecated:         true
 			deprecated_message: "This metric has been deprecated in favor of [`transform_buffer_max_size_events`](#transform_buffer_max_size_events)."
 		}
@@ -1017,41 +1013,31 @@ components: sources: internal_metrics: {
 			description:       "The maximum number of bytes the buffer that feeds into a transform can hold."
 			type:              "gauge"
 			default_namespace: "vector"
-			tags: _component_tags & {
-				output: _output
-			}
+			tags:              _component_tags
 		}
 		transform_buffer_max_size_events: {
 			description:       "The maximum number of events the buffer that feeds into a transform can hold."
 			type:              "gauge"
 			default_namespace: "vector"
-			tags: _component_tags & {
-				output: _output
-			}
+			tags:              _component_tags
 		}
 		transform_buffer_utilization: {
 			description:       "The utilization level of the buffer that feeds into a transform."
 			type:              "histogram"
 			default_namespace: "vector"
-			tags: _component_tags & {
-				output: _output
-			}
+			tags:              _component_tags
 		}
 		transform_buffer_utilization_level: {
 			description:       "The current utilization level of the buffer that feeds into a transform."
 			type:              "gauge"
 			default_namespace: "vector"
-			tags: _component_tags & {
-				output: _output
-			}
+			tags:              _component_tags
 		}
 		transform_buffer_utilization_mean: {
 			description:       "The mean utilization level of the buffer that feeds into a transform. This value is smoothed over time using an exponentially weighted moving average (EWMA)."
 			type:              "gauge"
 			default_namespace: "vector"
-			tags: _component_tags & {
-				output: _output
-			}
+			tags:              _component_tags
 		}
 		uptime_seconds: {
 			description:       "The total number of seconds the Vector instance has been up."
