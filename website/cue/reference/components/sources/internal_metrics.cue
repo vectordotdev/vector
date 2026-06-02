@@ -1185,11 +1185,11 @@ components: sources: internal_metrics: {
 			description: "The specific error code emitted for a buffer read failure."
 			required:    true
 			enum: {
-				"deser_failed":               "The buffer record could not be deserialized."
-				"checksum_mismatch":          "The buffer record checksum did not match the expected value."
-				"decode_failed":              "The buffer record could not be decoded."
+				"deser_failed":                "The buffer record could not be deserialized."
+				"checksum_mismatch":           "The buffer record checksum did not match the expected value."
+				"decode_failed":               "The buffer record could not be decoded."
 				"incompatible_record_version": "The buffer record version is incompatible with this reader."
-				"partial_write":              "The buffer contained a partially written record."
+				"partial_write":               "The buffer contained a partially written record."
 			}
 		}
 		_buffer_stage: {
