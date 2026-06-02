@@ -1006,18 +1006,18 @@ components: sources: internal_metrics: {
 			}
 		}
 		transform_buffer_max_byte_size: {
-			description:       "The maximum number of bytes the buffer that feeds into a transform can hold."
-			type:              "gauge"
-			default_namespace: "vector"
-			tags:              _component_tags
+			description:        "The maximum number of bytes the buffer that feeds into a transform can hold."
+			type:               "gauge"
+			default_namespace:  "vector"
+			tags:               _component_tags
 			deprecated:         true
 			deprecated_message: "This metric has been deprecated in favor of [`transform_buffer_max_size_bytes`](#transform_buffer_max_size_bytes)."
 		}
 		transform_buffer_max_event_size: {
-			description:       "The maximum number of events the buffer that feeds into a transform can hold."
-			type:              "gauge"
-			default_namespace: "vector"
-			tags:              _component_tags
+			description:        "The maximum number of events the buffer that feeds into a transform can hold."
+			type:               "gauge"
+			default_namespace:  "vector"
+			tags:               _component_tags
 			deprecated:         true
 			deprecated_message: "This metric has been deprecated in favor of [`transform_buffer_max_size_events`](#transform_buffer_max_size_events)."
 		}
