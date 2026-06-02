@@ -32,7 +32,8 @@ use crate::{
 pub struct AggregateConfig {
     /// The interval between flushes, in milliseconds.
     ///
-    /// During this time frame, metrics (beta) with the same series data (name, namespace, tags, and so on) are aggregated.
+    /// Must be greater than zero. During this time frame, metrics (beta) with the same series data
+    /// (name, namespace, tags, and so on) are aggregated.
     #[serde(default = "default_interval_ms")]
     #[configurable(metadata(docs::human_name = "Flush Interval"))]
     pub interval_ms: u64,
@@ -45,17 +46,20 @@ pub struct AggregateConfig {
     /// Time source to use for aggregation windows.
     ///
     /// When set to `event_time`, events are grouped into buckets based on their timestamps rather than
-    /// when they are processed. Events arriving out of order (after their bucket has been flushed) are rejected.
+    /// when they are processed. Events are rejected when their window has ended (per
+    /// `allowed_lateness_ms`) or when their bucket was already emitted (watermark).
     #[serde(default = "default_time_source")]
     #[configurable(derived)]
     pub time_source: TimeSource,
 
     /// Grace period for late-arriving events when using event-time aggregation.
     ///
-    /// Each bucket is held open for this many milliseconds past the end of its window so late
-    /// events still land in the correct bucket. Once a bucket is emitted it is closed
-    /// permanently; any later events whose timestamp falls inside it are dropped and counted
-    /// via `component_discarded_events_total`.
+    /// Each bucket accepts events until the system clock reaches
+    /// `bucket_end + allowed_lateness_ms`, where `bucket_end` is the exclusive end of the
+    /// event-time window. That cutoff is enforced when events are recorded, not only when a
+    /// periodic flush runs. Once a bucket is emitted it is closed permanently; any later
+    /// events whose timestamp falls inside it are dropped and counted via
+    /// `component_discarded_events_total`.
     ///
     /// Set to 0 for strict ordering (no late events allowed). Only applies when `time_source`
     /// is set to `event_time`.
@@ -98,8 +102,8 @@ pub enum TimeSource {
 
     /// Use event timestamps for aggregation windows.
     ///
-    /// Events are grouped into buckets based on their timestamps. Events arriving out of order
-    /// (after their bucket has been flushed) are rejected.
+    /// Events are grouped into buckets based on their timestamps. Events are rejected when
+    /// their window has ended or their bucket was already emitted.
     EventTime,
 }
 

@@ -207,8 +207,11 @@ components: transforms: aggregate: {
 					body: """
 						Vector tracks a *watermark* — the exclusive end of the most recently emitted bucket.
 						Events whose bucket has already been emitted are dropped and counted via
-						`component_discarded_events_total`. Use `allowed_lateness_ms` to delay closing each
-						bucket so late events still have a chance to land in the right window.
+						`component_discarded_events_total`. Use `allowed_lateness_ms` to extend how long
+						each bucket accepts events after its window ends (`bucket_end + allowed_lateness_ms`,
+						compared to the system clock). That cutoff applies when *recording* an event, not
+						only when the periodic flush runs, so `allowed_lateness_ms = 0` enforces strict
+						lateness even if the flush interval is long or misaligned.
 
 						Events whose `(kind, value)` shape is incompatible with the configured `mode` (for
 						example an `incremental` event arriving at a `mean`-configured aggregator) pass
