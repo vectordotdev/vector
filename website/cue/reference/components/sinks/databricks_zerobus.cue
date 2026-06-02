@@ -92,8 +92,8 @@ components: sinks: databricks_zerobus: {
 				Columns are nullable by default. If the target table declares a column
 				`NOT NULL`, then every event in a batch must provide a non-null value for
 				that column; otherwise the entire batch fails encoding and is dropped
-				(an error is logged naming the offending column). Prefer nullable columns
-				for fields that are not always present.
+				and an error is logged naming the offending column. Prefer nullable columns
+				for fields that may be absent or null in some events.
 				"""
 		}
 
