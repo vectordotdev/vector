@@ -1207,6 +1207,7 @@ components: sources: internal_metrics: {
 				"match_failed":                "The match operation failed."
 				"out_of_order":                "The event was out of order."
 				"parse_failed":                "The parsing operation failed."
+				"reader_failed":               "The buffer reader failed."
 				"read_failed":                 "The file read operation failed."
 				"render_error":                "The rendering operation failed."
 				"stream_closed":               "The downstream was closed, forwarding the event(s) failed."
