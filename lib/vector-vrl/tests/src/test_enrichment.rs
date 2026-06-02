@@ -59,6 +59,25 @@ impl enrichment::Table for TestEnrichmentTable {
     fn needs_reload(&self) -> bool {
         false
     }
+
+    fn stateful(&self) -> bool {
+        false
+    }
+
+    fn take_state(
+        &mut self,
+        other: Box<dyn enrichment::Table + Send + Sync>,
+    ) -> Result<(), (Box<dyn enrichment::Table + Send + Sync>, enrichment::Error)> {
+        panic!("Unsupported")
+    }
+
+    fn into_any(self: Box<Self>) -> Box<dyn std::any::Any> {
+        self
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }
 
 pub(crate) fn test_enrichment_table() -> enrichment::TableRegistry {

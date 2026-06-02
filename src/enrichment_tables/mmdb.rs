@@ -36,6 +36,7 @@ impl EnrichmentTableConfig for MmdbConfig {
     async fn build(
         &self,
         _: &crate::config::GlobalOptions,
+        _: Option<Box<dyn Table + Send + Sync>>,
     ) -> crate::Result<Box<dyn Table + Send + Sync>> {
         Ok(Box::new(Mmdb::new(self.clone())?))
     }

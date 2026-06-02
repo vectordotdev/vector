@@ -192,7 +192,19 @@ impl<'a> Builder<'a> {
                     None
                 };
 
-                let mut table = match table_outer.inner.build(&self.config.global).await {
+                let mut prev_table = None;
+                if !self.diff.enrichment_tables.is_added(name)
+                    && let Some(existing_table) = ENRICHMENT_TABLES.get(&table_name)
+                    && existing_table.stateful()
+                {
+                    prev_table = Some(existing_table)
+                }
+
+                let mut table = match table_outer
+                    .inner
+                    .build(&self.config.global, prev_table)
+                    .await
+                {
                     Ok(table) => table,
                     Err(error) => {
                         self.errors
@@ -216,21 +228,6 @@ impl<'a> Builder<'a> {
                                     %error);
                                 continue 'tables;
                             }
-                        }
-                    }
-                }
-
-                if !self.diff.enrichment_tables.is_added(name)
-                    && let Some(existing_table) = ENRICHMENT_TABLES.get(&table_name)
-                    && existing_table.stateful()
-                    && table.stateful()
-                {
-                    match table.take_state(existing_table) {
-                        Ok(()) => (),
-                        Err((existing, err)) => {
-                            error!(message = "Unable to move the state to the new table.", table = ?name.to_string(), %err);
-                            enrichment_tables.insert(table_name, existing);
-                            continue 'tables;
                         }
                     }
                 }
@@ -988,7 +985,7 @@ pub async fn reload_enrichment_tables(config: &Config) {
         {
             let indexes = Some(ENRICHMENT_TABLES.index_fields(&table_name));
 
-            let mut table = match table_outer.inner.build(&config.global).await {
+            let mut table = match table_outer.inner.build(&config.global, None).await {
                 Ok(table) => table,
                 Err(error) => {
                     error!("Enrichment table \"{name}\" reload failed: {error}");

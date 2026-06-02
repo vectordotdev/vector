@@ -101,6 +101,7 @@ impl EnrichmentTableConfig for GeoipConfig {
     async fn build(
         &self,
         _: &crate::config::GlobalOptions,
+        _: Option<Box<dyn Table + Send + Sync>>,
     ) -> crate::Result<Box<dyn Table + Send + Sync>> {
         Ok(Box::new(Geoip::new(self.clone())?))
     }

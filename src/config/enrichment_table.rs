@@ -124,6 +124,7 @@ pub trait EnrichmentTableConfig: NamedComponent + core::fmt::Debug + Send + Sync
     async fn build(
         &self,
         globals: &GlobalOptions,
+        prev_table: Option<Box<dyn vector_lib::enrichment::Table + Send + Sync>>,
     ) -> crate::Result<Box<dyn vector_lib::enrichment::Table + Send + Sync>>;
 
     fn sink_config(
