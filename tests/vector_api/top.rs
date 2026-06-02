@@ -454,16 +454,16 @@ async fn gcp_pubsub_spawned_task_errors_carry_component_span() {
     while tokio::time::Instant::now() < deadline {
         match tokio::time::timeout(std::time::Duration::from_millis(500), stream.next()).await {
             Ok(Some(Ok(msg))) => {
-                if msg.component_id == "gcp" {
-                    if let Some(Value::Total(total)) = msg.value {
-                        assert!(
-                            total.value > 0,
-                            "Expected a positive component_errors_total for 'gcp', got {}",
-                            total.value
-                        );
-                        found = true;
-                        break;
-                    }
+                if msg.component_id == "gcp"
+                    && let Some(Value::Total(total)) = msg.value
+                {
+                    assert!(
+                        total.value > 0,
+                        "Expected a positive component_errors_total for 'gcp', got {}",
+                        total.value
+                    );
+                    found = true;
+                    break;
                 }
             }
             Ok(Some(Err(e))) => panic!("Stream error: {e}"),
