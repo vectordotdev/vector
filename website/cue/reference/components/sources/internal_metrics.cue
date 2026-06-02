@@ -320,7 +320,10 @@ components: sources: internal_metrics: {
 			description:        "The number of bytes currently in the buffer."
 			type:               "gauge"
 			default_namespace:  "vector"
-			tags:               _component_tags
+			tags: _component_tags & {
+				buffer_id: _buffer_id
+				stage:     _buffer_stage
+			}
 			deprecated:         true
 			deprecated_message: "This metric has been deprecated in favor of [`buffer_size_bytes`](#buffer_size_bytes)."
 		}
@@ -328,7 +331,10 @@ components: sources: internal_metrics: {
 			description:        "The number of events currently in the buffer."
 			type:               "gauge"
 			default_namespace:  "vector"
-			tags:               _component_tags
+			tags: _component_tags & {
+				buffer_id: _buffer_id
+				stage:     _buffer_stage
+			}
 			deprecated:         true
 			deprecated_message: "This metric has been deprecated in favor of [`buffer_size_events`](#buffer_size_events)."
 		}
@@ -336,25 +342,45 @@ components: sources: internal_metrics: {
 			description:       "The number of bytes currently in the buffer."
 			type:              "gauge"
 			default_namespace: "vector"
-			tags:              _component_tags
+			tags: _component_tags & {
+				buffer_id: _buffer_id
+				stage:     _buffer_stage
+			}
 		}
 		buffer_size_events: {
 			description:       "The number of events currently in the buffer."
 			type:              "gauge"
 			default_namespace: "vector"
-			tags:              _component_tags
+			tags: _component_tags & {
+				buffer_id: _buffer_id
+				stage:     _buffer_stage
+			}
 		}
 		buffer_discarded_events_total: {
 			description:       "The number of events dropped by this non-blocking buffer."
 			type:              "counter"
 			default_namespace: "vector"
-			tags:              _component_tags
+			tags: _component_tags & {
+				buffer_id: _buffer_id
+				stage:     _buffer_stage
+				intentional: {
+					description: "True if the events were discarded intentionally, like a `filter` transform, or false if due to an error."
+					required:    true
+				}
+			}
 		}
 		buffer_discarded_bytes_total: {
 			description:       "The number of bytes dropped by this non-blocking buffer."
 			type:              "counter"
 			default_namespace: "vector"
-			tags:              _component_tags
+			tags: _component_tags & {
+				buffer_id: _buffer_id
+				stage:     _buffer_stage
+				intentional: {
+					description: "True if the events were discarded intentionally, like a `filter` transform, or false if due to an error."
+					required:    true
+				}
+			}
 		}
 		buffer_errors_total: {
 			description:       "The total number of errors encountered by this buffer."
@@ -370,31 +396,45 @@ components: sources: internal_metrics: {
 			description:       "The number of bytes received by this buffer."
 			type:              "counter"
 			default_namespace: "vector"
-			tags:              _component_tags
+			tags: _component_tags & {
+				buffer_id: _buffer_id
+				stage:     _buffer_stage
+			}
 		}
 		buffer_received_events_total: {
 			description:       "The number of events received by this buffer."
 			type:              "counter"
 			default_namespace: "vector"
-			tags:              _component_tags
+			tags: _component_tags & {
+				buffer_id: _buffer_id
+				stage:     _buffer_stage
+			}
 		}
 		buffer_send_duration_seconds: {
 			description:       "The duration spent sending a payload to this buffer."
 			type:              "histogram"
 			default_namespace: "vector"
-			tags:              _component_tags
+			tags: _component_tags & {
+				stage: _buffer_stage
+			}
 		}
 		buffer_sent_bytes_total: {
 			description:       "The number of bytes sent by this buffer."
 			type:              "counter"
 			default_namespace: "vector"
-			tags:              _component_tags
+			tags: _component_tags & {
+				buffer_id: _buffer_id
+				stage:     _buffer_stage
+			}
 		}
 		buffer_sent_events_total: {
 			description:       "The number of events sent by this buffer."
 			type:              "counter"
 			default_namespace: "vector"
-			tags:              _component_tags
+			tags: _component_tags & {
+				buffer_id: _buffer_id
+				stage:     _buffer_stage
+			}
 		}
 		component_discarded_events_total: {
 			description:       "The number of events dropped by this component."
@@ -1160,6 +1200,14 @@ components: sources: internal_metrics: {
 			description: "The Vector component type."
 			required:    true
 			examples: ["file", "http", "honeycomb", "splunk_hec"]
+		}
+		_buffer_id: {
+			description: "The unique identifier of the buffer."
+			required:    true
+		}
+		_buffer_stage: {
+			description: "The numbered stage within the buffer pipeline."
+			required:    true
 		}
 		_endpoint: {
 			description: "The absolute path of originating file."
