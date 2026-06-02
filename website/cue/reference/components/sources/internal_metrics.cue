@@ -53,6 +53,12 @@ components: sources: internal_metrics: {
 		}
 
 		// Instance-level "process" metrics
+		active_endpoints: {
+			description:       "The number of active endpoints this component is sending data to."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags:              _internal_metrics_tags
+		}
 		active_clients: {
 			description:       "Number of clients attached to a component."
 			type:              "gauge"
@@ -164,6 +170,24 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
+		adaptive_concurrency_back_pressure: {
+			description:       "A histogram of whether back-pressure was applied during the current window."
+			type:              "histogram"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		adaptive_concurrency_past_rtt_mean: {
+			description:       "The mean round-trip time (RTT) from the past window."
+			type:              "histogram"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		adaptive_concurrency_reached_limit: {
+			description:       "A histogram of whether the concurrency limit was reached during the current window."
+			type:              "histogram"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
 		checkpoints_total: {
 			description:       "The total number of files checkpointed."
 			type:              "counter"
@@ -250,6 +274,18 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
+		k8s_event_namespace_annotation_failures_total: {
+			description:       "The total number of failures to annotate a Kubernetes event with namespace metadata."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		k8s_event_node_annotation_failures_total: {
+			description:       "The total number of failures to annotate a Kubernetes event with node metadata."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
 		events_discarded_total: {
 			description:       "The total number of events discarded by this component."
 			type:              "counter"
@@ -313,6 +349,22 @@ components: sources: internal_metrics: {
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags
+		}
+		buffer_discarded_bytes_total: {
+			description:       "The number of bytes dropped by this non-blocking buffer."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		buffer_errors_total: {
+			description:       "The total number of errors encountered by this buffer."
+			type:              "counter"
+			default_namespace: "vector"
+			tags: _component_tags & {
+				error_code: _error_code
+				error_type: _error_type
+				stage:      _stage
+			}
 		}
 		buffer_received_bytes_total: {
 			description:       "The number of bytes received by this buffer."
@@ -676,6 +728,28 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
+		http_client_errors_total: {
+			description:       "The total number of HTTP request errors."
+			type:              "counter"
+			default_namespace: "vector"
+			tags: _component_tags & {
+				error_kind: {
+					description: "The type of error returned by the HTTP client."
+					required:    true
+				}
+			}
+		}
+		http_client_error_rtt_seconds: {
+			description:       "The round-trip time (RTT) of failed HTTP requests."
+			type:              "histogram"
+			default_namespace: "vector"
+			tags: _component_tags & {
+				error_kind: {
+					description: "The type of error returned by the HTTP client."
+					required:    true
+				}
+			}
+		}
 		http_requests_total: {
 			description:       "The total number of HTTP requests issued by this component."
 			type:              "counter"
@@ -840,6 +914,12 @@ components: sources: internal_metrics: {
 					required:    true
 				}
 			}
+		}
+		sqs_message_defer_succeeded_total: {
+			description:       "The total number of SQS messages successfully deferred."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
 		}
 		sqs_message_delete_succeeded_total: {
 			description:       "The total number of successful deletions of SQS messages."
