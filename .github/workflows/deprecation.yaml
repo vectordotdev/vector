@@ -1,0 +1,53 @@
+name: Deprecation Fragments
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: "Git ref to checkout"
+        required: false
+        type: string
+
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Git ref to checkout"
+        required: false
+        type: string
+
+  pull_request:
+  merge_group:
+    types: [checks_requested]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.number || github.sha }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    if: ${{ github.event_name == 'pull_request' }}
+    uses: ./.github/workflows/changes.yml
+    secrets: inherit
+
+  check-deprecations:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    if: ${{ always() && (github.event_name != 'pull_request' || needs.changes.outputs.deprecations == 'true') }}
+    needs: [changes]
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-tags: true
+
+      - uses: ./.github/actions/setup
+        with:
+          vdev: true
+          mold: false
+
+      - name: Check deprecation fragments
+        run: vdev check deprecations

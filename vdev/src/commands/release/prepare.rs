@@ -119,9 +119,13 @@ impl Prepare {
     /// Steps 1 & 2
     fn create_release_branches(&self) -> Result<()> {
         debug!("create_release_branches");
-        // Step 1: Create a new release branch
-        git::run_and_check_output(&["fetch"])?;
-        git::checkout_main_branch()?;
+
+        if !self.dry_run {
+            // Step 1: Sync with remote and start from master.
+            git::run_and_check_output(&["fetch"])?;
+            git::checkout_main_branch()?;
+        }
+        // In dry-run mode the branches are created from whatever branch is currently checked out.
 
         git::checkout_or_create_branch(self.release_branch.as_str())?;
         if !self.dry_run {
@@ -442,12 +446,17 @@ fn format_vrl_changelog_block(changelog: &str) -> String {
 fn insert_block_after_changelog(original: &str, block: &str) -> String {
     let mut result = Vec::new();
     let mut inserted = false;
+    let mut in_changelog = false;
 
     for line in original.lines() {
         result.push(line.to_string());
 
-        // Insert *after* the line containing only the closing `]` (end of changelog array)
-        if !inserted && line.trim() == "]" {
+        if line.trim_start().starts_with("changelog:") {
+            in_changelog = true;
+        }
+
+        // Insert after the closing `]` of the changelog array specifically.
+        if !inserted && in_changelog && line.trim() == "]" {
             result.push(String::new()); // empty line before
             result.push(block.to_string());
             inserted = true;

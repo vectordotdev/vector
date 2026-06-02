@@ -1,0 +1,51 @@
+{{- $version := .Get "version" -}}
+{{ if $version }}
+  {{ partial "releases/deprecations.html" (dict "version" $version) }}
+{{ else }}
+  {{- $pending := site.Data.docs.deprecations_pending -}}
+  {{- $enacted := site.Data.docs.deprecations_enacted -}}
+
+  {{ if gt (len $pending) 0 }}
+  <div class="mt-6 flex flex-col space-y-6">
+    {{ range $pending }}
+    <div>
+      <span class="text-xl font-semibold text-dark dark:text-gray-300">
+        {{ .what | markdownify }}
+      </span>
+      <div class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+        Deprecated since {{ .deprecated_since }}
+      </div>
+      {{ with .description }}
+      <div class="mt-2.5 prose dark:prose-dark max-w-none">
+        {{ . | markdownify }}
+      </div>
+      {{ end }}
+    </div>
+    {{ end }}
+  </div>
+  {{ end }}
+
+  {{ if gt (len $enacted) 0 }}
+  <div class="mt-10 flex flex-col space-y-6">
+    {{ range $enacted }}
+    <div class="opacity-75">
+      <span class="text-xl font-semibold text-dark dark:text-gray-300">
+        {{ .what | markdownify }}
+      </span>
+      <div class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+        Deprecated since {{ .deprecated_since }} &middot; Removed in {{ .removed_in }}
+      </div>
+      {{ with .description }}
+      <div class="mt-2.5 prose dark:prose-dark max-w-none">
+        {{ . | markdownify }}
+      </div>
+      {{ end }}
+    </div>
+    {{ end }}
+  </div>
+  {{ end }}
+
+  {{ if and (eq (len $pending) 0) (eq (len $enacted) 0) }}
+  <p class="text-gray-500 dark:text-gray-400">No deprecations at this time.</p>
+  {{ end }}
+{{ end }}

@@ -31,6 +31,22 @@ const ALLOWED_TYPES: &[&str] = &[
     "revert",
 ];
 
+/// Generate the release CUE file for a given version without switching branches.
+#[derive(clap::Args, Debug)]
+#[command()]
+pub(super) struct Cli {
+    /// The new Vector version to generate the CUE file for.
+    #[arg(long)]
+    version: Version,
+}
+
+impl Cli {
+    pub(super) fn exec(self) -> Result<()> {
+        run(&self.version)?;
+        Ok(())
+    }
+}
+
 /// Generate the release CUE file for the given new version. Returns the path that was written.
 pub(super) fn run(new_version: &Version) -> Result<PathBuf> {
     let repo_root = paths::find_repo_root()?;
@@ -365,6 +381,25 @@ struct ConventionalParts {
 
 impl ConventionalParts {
     fn parse(message: &str) -> Self {
+        // Git revert commits have the form `Revert "<original subject>"` and are
+        // not conventional commits. Treat them as type="revert" so they pass
+        // validation without requiring a scope.
+        if let Some(inner) = message.strip_prefix("Revert \"") {
+            let description = inner.trim_end_matches('"').to_string();
+            let pr_number = Regex::new(r"\(#([0-9]+)\)$")
+                .unwrap()
+                .captures(&description)
+                .and_then(|c| c.get(1))
+                .and_then(|m| m.as_str().parse::<u64>().ok());
+            return ConventionalParts {
+                r#type: Some("revert".to_string()),
+                scopes: vec![],
+                breaking_change: false,
+                description,
+                pr_number,
+            };
+        }
+
         let re = Regex::new(
             r"^(?P<type>[a-z]*)(\((?P<scope>[a-zA-Z0-9_, ]*)\))?(?P<breaking>!)?: (?P<desc>.*?)( \(#(?P<pr>[0-9]+)\))?$",
         )
@@ -618,6 +653,32 @@ mod tests {
         let p = ConventionalParts::parse("Merge branch 'foo'");
         assert!(p.r#type.is_none());
         assert_eq!(p.description, "Merge branch 'foo'");
+    }
+
+    #[test]
+    fn parse_revert_commit() {
+        let p = ConventionalParts::parse(
+            "Revert \"chore(ci): wire deprecation check into changelog.yaml (#42)\"",
+        );
+        assert_eq!(p.r#type.as_deref(), Some("revert"));
+        assert!(p.scopes.is_empty());
+        assert!(!p.breaking_change);
+        assert_eq!(p.pr_number, Some(42));
+        // Must pass validation (revert doesn't require a scope)
+        let c = super::Commit {
+            sha: "abc".into(),
+            author: "a".into(),
+            date: "d".into(),
+            description: p.description.clone(),
+            r#type: p.r#type,
+            scopes: p.scopes,
+            breaking_change: p.breaking_change,
+            pr_number: p.pr_number,
+            files_count: 0,
+            insertions_count: 0,
+            deletions_count: 0,
+        };
+        assert!(c.validate().is_ok());
     }
 
     #[test]

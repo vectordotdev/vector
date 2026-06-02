@@ -39,6 +39,6 @@ ENTRYPOINT ["/bin/sh", "-c", \
    fi && \
    yarn && \
    cp -f /app/Cargo.lock data/cargo-lock.toml && \
-   rm -f data/docs.json && find cue -name '*.cue' | xargs cue export --all-errors --outfile data/docs.json && \
+   rm -f data/docs.json && { find cue -name '*.cue'; find cue -path '*/generated/*.json' 2>/dev/null || true; } | xargs cue export --all-errors --outfile data/docs.json && \
    yarn config-examples && \
    hugo server --bind 0.0.0.0 --port 1313 --buildDrafts --buildFuture --environment development"]
