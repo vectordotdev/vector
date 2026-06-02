@@ -563,6 +563,12 @@ impl RunningTopology {
             .sinks
             .to_change
             .iter()
+            .chain(diff.enrichment_tables.to_change.iter().filter(|key| {
+                self.config
+                    .enrichment_table(key)
+                    .and_then(|t| t.as_sink(key))
+                    .is_some()
+            }))
             .filter(|&key| {
                 if diff.components_to_reload.contains(key) {
                     return false;
@@ -592,10 +598,15 @@ impl RunningTopology {
             .iter()
             .filter(|key| {
                 !reuse_buffers.contains(*key)
-                    && self
+                    && (self
                         .config
                         .sink(key)
                         .is_some_and(|s| s.buffer.has_disk_stage())
+                        || self
+                            .config
+                            .enrichment_table(key)
+                            .and_then(|t| t.as_sink(key))
+                            .is_some_and(|(_, s)| s.buffer.has_disk_stage()))
             })
             .cloned()
             .collect::<HashSet<_>>();
@@ -751,6 +762,7 @@ impl RunningTopology {
             for key in removed_sinks {
                 // Sinks only have inputs
                 self.inputs_tap_metadata.remove(key);
+                self.component_type_names.remove(key);
             }
 
             let removed_sources = diff.enrichment_tables.to_remove.iter().filter_map(|key| {
@@ -761,6 +773,7 @@ impl RunningTopology {
             for key in removed_sources {
                 // Sources only have outputs
                 self.outputs_tap_metadata.remove(&key);
+                self.component_type_names.remove(&key);
             }
 
             for key in diff.sources.changed_and_added() {
@@ -784,6 +797,8 @@ impl RunningTopology {
                 if let Some(task) = new_pieces.tasks.get(&key) {
                     self.outputs_tap_metadata
                         .insert(key.clone(), ("source", task.typetag().to_string()));
+                    self.component_type_names
+                        .insert(key.clone(), task.typetag().to_string());
                 }
             }
 
@@ -980,10 +995,7 @@ impl RunningTopology {
         for input in inputs {
             let output = self.outputs.get_mut(&input).expect("unknown output");
 
-            if diff.contains(&input.component)
-                || diff.is_changed(key)
-                || inputs_to_add.contains(&input)
-            {
+            if diff.contains(&input.component) || inputs_to_add.contains(&input) {
                 // If the input we're connecting to is changing, that means its outputs will have been
                 // recreated, so instead of replacing a paused sink, we have to add it to this new
                 // output for the first time, since there's nothing to actually replace at this point.
