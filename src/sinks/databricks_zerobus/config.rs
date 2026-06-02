@@ -109,6 +109,14 @@ pub struct ZerobusSinkConfig {
     #[configurable(derived)]
     pub auth: DatabricksAuthentication,
 
+    /// Custom identifier appended to the `user-agent` header sent to Databricks.
+    ///
+    /// The header always includes `Vector/<version>`; when set, this value is
+    /// appended after it (e.g. `my-service/1.2`).
+    #[serde(default)]
+    #[configurable(metadata(docs::examples = "my-service/1.2"))]
+    pub user_agent: Option<String>,
+
     #[configurable(derived)]
     #[serde(default)]
     pub stream_options: ZerobusStreamOptions,
@@ -140,6 +148,7 @@ impl GenerateConfig for ZerobusSinkConfig {
                 client_id: SensitiveString::from("${DATABRICKS_CLIENT_ID}".to_string()),
                 client_secret: SensitiveString::from("${DATABRICKS_CLIENT_SECRET}".to_string()),
             },
+            user_agent: None,
             stream_options: ZerobusStreamOptions::default(),
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
@@ -246,6 +255,17 @@ impl ZerobusSinkConfig {
 
         Ok(())
     }
+
+    /// The user-agent suffix to hand the Zerobus SDK: `Vector/<version>`
+    /// alone, or with the user's configured `user_agent` appended. The SDK
+    /// prepends its own `zerobus-sdk-rs/<version>` prefix to this value.
+    pub fn user_agent_suffix(&self) -> String {
+        let vector = format!("Vector/{}", crate::vector_version());
+        match self.user_agent.as_deref().filter(|s| !s.is_empty()) {
+            Some(ua) => format!("{vector} {ua}"),
+            None => vector,
+        }
+    }
 }
 
 // Default value functions
@@ -271,6 +291,7 @@ mod tests {
                 client_id: SensitiveString::from("test-client-id".to_string()),
                 client_secret: SensitiveString::from("test-client-secret".to_string()),
             },
+            user_agent: None,
             stream_options: ZerobusStreamOptions::default(),
             batch: Default::default(),
             request: Default::default(),
@@ -417,5 +438,41 @@ mod tests {
             .expect("batch settings should build");
 
         assert_eq!(settings.size_limit, 10_000_000);
+    }
+
+    #[test]
+    fn test_user_agent_suffix_without_user_value() {
+        let config = create_test_config();
+        let suffix = config.user_agent_suffix();
+        assert!(
+            suffix.starts_with("Vector/"),
+            "expected Vector/<version> prefix, got {suffix:?}"
+        );
+        // No user value configured, so nothing is appended.
+        assert!(!suffix.contains(' '), "unexpected appended value in {suffix:?}");
+    }
+
+    #[test]
+    fn test_user_agent_suffix_with_user_value() {
+        let mut config = create_test_config();
+        config.user_agent = Some("my-service/1.2".to_string());
+        let suffix = config.user_agent_suffix();
+        assert!(
+            suffix.starts_with("Vector/"),
+            "expected Vector/<version> prefix, got {suffix:?}"
+        );
+        assert!(
+            suffix.ends_with(" my-service/1.2"),
+            "expected user value appended, got {suffix:?}"
+        );
+    }
+
+    #[test]
+    fn test_user_agent_suffix_empty_user_value_ignored() {
+        let mut config = create_test_config();
+        config.user_agent = Some(String::new());
+        let suffix = config.user_agent_suffix();
+        // An empty string is treated the same as no value: no trailing space.
+        assert!(!suffix.contains(' '), "empty user_agent should be ignored, got {suffix:?}");
     }
 }
