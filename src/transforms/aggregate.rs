@@ -1291,6 +1291,60 @@ mod tests {
     }
 
     #[test]
+    fn passes_through_ignored_kind() {
+        // Sum mode aggregates incremental, passes through absolute without collapsing.
+        let mut agg = Aggregate::new(&AggregateConfig {
+            interval_ms: 1000_u64,
+            mode: AggregationMode::Sum,
+            time_source: TimeSource::SystemTime,
+            allowed_lateness_ms: 0,
+            use_system_time_for_missing_timestamps: false,
+            max_future_ms: 10_000,
+        })
+        .unwrap();
+
+        let counter_1 = make_metric(
+            "counter_a",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 10.0 },
+        );
+        let counter_2 = make_metric(
+            "counter_a",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 5.0 },
+        );
+        let counter_summed = make_metric(
+            "counter_a",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 15.0 },
+        );
+        let gauge_1 = make_metric(
+            "gauge_a",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 42.0 },
+        );
+        let gauge_2 = make_metric(
+            "gauge_a",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 99.0 },
+        );
+
+        // Absolute metrics pass through immediately (not held until flush).
+        assert_eq!(agg.record(gauge_1.clone()), Some(gauge_1));
+        assert_eq!(agg.record(gauge_2.clone()), Some(gauge_2));
+
+        // Each is returned individually — no collapsing to latest.
+        assert_eq!(agg.record(counter_1), None);
+        assert_eq!(agg.record(counter_2), None);
+
+        let mut out = vec![];
+        agg.flush_into(&mut out);
+        // Only the summed incremental counter appears at flush; the gauges already passed through.
+        assert_eq!(1, out.len());
+        assert_eq!(&counter_summed, &out[0]);
+    }
+
+    #[test]
     fn absolute_auto() {
         let mut agg = Aggregate::new(&AggregateConfig {
             interval_ms: 1000_u64,
