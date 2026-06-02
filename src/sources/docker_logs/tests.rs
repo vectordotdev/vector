@@ -12,11 +12,13 @@ mod integration_tests {
     /// is not present even though it is not used.
     fn exclude_self() {
         let (tx, _rx) = SourceSender::new_test();
+        let checkpoints = Arc::new(CheckpointsView::default());
         let mut source = DockerLogsSource::new(
             DockerLogsConfig::default(),
             tx,
             ShutdownSignal::noop(),
             LogNamespace::Legacy,
+            checkpoints,
         )
         .unwrap();
         source.hostname = Some("451062c59603".to_owned());
@@ -40,10 +42,12 @@ mod integration_tests {
     use futures::{FutureExt, stream::TryStreamExt};
     use itertools::Itertools as _;
     use similar_asserts::assert_eq;
+    use std::path::Path;
     use vrl::value;
 
     use crate::{
         SourceSender,
+        config::ComponentKey,
         event::Event,
         sources::docker_logs::{CONTAINER, CREATED_AT, IMAGE, NAME, *},
         test_util::{
@@ -69,6 +73,10 @@ mod integration_tests {
     }
 
     async fn source_with_config(config: DockerLogsConfig) -> impl Stream<Item = Event> + Unpin {
+        let mut config = config;
+        let dir = tempfile::tempdir().expect("Failed to create temp dir");
+        config.data_dir = Some(dir.keep());
+        config.since_now = true;
         let (sender, recv) = SourceSender::new_test();
         let source = config
             .build(SourceContext::new_test(sender, None))
@@ -78,6 +86,37 @@ mod integration_tests {
         tokio::spawn(async move { source.await.unwrap() });
 
         recv
+    }
+
+    /// Source that can be shutdown with a persistent data directory
+    async fn source_with_shutdown(
+        config: DockerLogsConfig,
+        data_dir: &Path,
+    ) -> (
+        impl Stream<Item = Event> + Unpin,
+        tokio::task::JoinHandle<Result<(), ()>>,
+        crate::shutdown::SourceShutdownCoordinator,
+    ) {
+        let mut config = config;
+        config.data_dir = Some(data_dir.to_path_buf());
+        let source_id = ComponentKey::from("docker_logs_test");
+        let (sender, recv) = SourceSender::new_test();
+        let (context, shutdown) = SourceContext::new_shutdown(&source_id, sender);
+        let source = config.build(context).await.unwrap();
+        let handle = tokio::spawn(source);
+        (recv, handle, shutdown)
+    }
+
+    /// Shut down a source cleanly and wait for it to finish.
+    async fn shutdown_source(
+        mut shutdown: crate::shutdown::SourceShutdownCoordinator,
+        handle: tokio::task::JoinHandle<Result<(), ()>>,
+    ) {
+        let source_id = ComponentKey::from("docker_logs_test");
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+        let shutdown_complete = shutdown.shutdown_source(&source_id, deadline);
+        assert!(shutdown_complete.await, "source did not shut down in time");
+        handle.await.unwrap().unwrap();
     }
 
     /// Users should ensure to remove container before exiting.
@@ -975,5 +1014,80 @@ mod integration_tests {
             assert_eq!(actual_messages, expected_messages);
         })
         .await;
+    }
+
+    #[tokio::test]
+    async fn checkpoint_persists_across_restarts() {
+        trace_init();
+
+        let name = "vector_test_checkpoint_restart";
+        let docker = docker(None, None).unwrap();
+        let data_dir = tempfile::tempdir().expect("Failed to create temp dir");
+
+        // Long-running container producing numbered lines 1 second apart
+        // so each line has a distinct second-level timestamp (Docker's
+        // `since` parameter has second-level precision).
+        pull_busybox(&docker).await;
+        let id = cmd_container(
+            name,
+            None,
+            vec![
+                "sh",
+                "-c",
+                "i=0; while true; do echo line_$i; sleep 1; i=$((i+1)); done",
+            ],
+            &docker,
+            false,
+        )
+        .await;
+        container_start(&id, &docker).await.unwrap();
+
+        let config = DockerLogsConfig {
+            include_containers: Some(vec![name.to_owned()]),
+            since_now: true,
+            ..DockerLogsConfig::default()
+        };
+
+        // Start source and collect events.
+        let (out1, handle1, shutdown1) =
+            source_with_shutdown(config.clone(), data_dir.path()).await;
+        let events1 = collect_n(out1, 3).await;
+        let last_line_run1: i32 = events1.last().unwrap().as_log()
+            [log_schema().message_key().unwrap().to_string()]
+        .to_string_lossy()
+        .strip_prefix("line_")
+        .expect("unexpected message format")
+        .parse()
+        .unwrap();
+
+        // Shut down the source, this should create the checkpoint.
+        shutdown_source(shutdown1, handle1).await;
+
+        // Let the container generates more logs.
+        tokio::time::sleep(Duration::from_secs(3)).await;
+
+        // Start a second source using the same data directory.
+        let (out2, handle2, shutdown2) = source_with_shutdown(config, data_dir.path()).await;
+        let events2 = collect_n(out2, 3).await;
+        let first_line_run2: i32 = events2.first().unwrap().as_log()
+            [log_schema().message_key().unwrap().to_string()]
+        .to_string_lossy()
+        .strip_prefix("line_")
+        .expect("unexpected message format")
+        .parse()
+        .unwrap();
+
+        // Shut down the source and stop the container.
+        shutdown_source(shutdown2, handle2).await;
+        _ = container_kill(&id, &docker).await;
+        container_remove(&id, &docker).await;
+
+        // Check we don't have a discontinuity. This may be a bit fragile since Docker's `since`
+        // parameter has second-level precision.
+        assert_eq!(
+            last_line_run1 + 1,
+            first_line_run2,
+            "Discontinuity between last line number of first run and first line number of second run"
+        )
     }
 }
