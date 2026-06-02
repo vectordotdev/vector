@@ -211,9 +211,9 @@ components: transforms: aggregate: {
 						bucket so late events still have a chance to land in the right window.
 
 						Events whose `(kind, value)` shape is incompatible with the configured `mode` (for
-						example an `incremental` event arriving at a `mean`-configured aggregator) are dropped
-						without affecting the watermark or other in-flight buckets, so a single stray event
-						cannot starve valid data for earlier windows.
+						example an `incremental` event arriving at a `mean`-configured aggregator) pass
+						through unchanged, matching system-time behavior, without creating buckets or
+						affecting the watermark.
 						"""
 				},
 				{
