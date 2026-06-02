@@ -1125,6 +1125,7 @@ vector-api-tests = [
   "api",
   "api-client-minimal",
   "sources-demo_logs",
+  "sources-gcp_pubsub",
   "transforms-log_to_metric",
   "transforms-remap",
   "transforms-route",
