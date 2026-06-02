@@ -353,7 +353,18 @@ impl Aggregate {
         let (series, mut data, metadata) = metric.into_parts();
 
         if self.time_source == TimeSource::EventTime {
-            // Handle missing timestamp
+            // Mirror the system-time passthrough arms before any timestamp gating.
+            if Self::passes_through_unchanged(self.config.mode, &data) {
+                return Some(Event::Metric(Metric::from_parts(series, data, metadata)));
+            }
+
+            // Mean/Stdev ignore absolute non-gauge values (no passthrough, no bucket).
+            if Self::is_silently_ignored(self.config.mode, &data) {
+                emit!(AggregateEventRecorded);
+                return None;
+            }
+
+            // Handle missing timestamp — only required for metrics that are bucketed.
             let ts = match timestamp {
                 Some(ts) => ts,
                 None => {
@@ -371,7 +382,7 @@ impl Aggregate {
             // event-time "latest" selection can compare timestamps reliably.
             data.time.timestamp = Some(ts);
 
-            // Check for future timestamps
+            // Check for future timestamps (bucketed metrics only; passthrough is above).
             if self.config.max_future_ms > 0 {
                 let now = Utc::now();
                 // Range-validated in `Aggregate::new` to fit in i64.
@@ -389,13 +400,6 @@ impl Aggregate {
                     });
                     return None;
                 }
-            }
-
-            // Incompatible (kind, value) pairs pass through immediately, matching
-            // system-time mode and the per-mode documentation — without creating
-            // buckets or touching the watermark.
-            if !Self::will_be_stored(self.config.mode, &data) {
-                return Some(Event::Metric(Metric::from_parts(series, data, metadata)));
             }
 
             let bucket_key = self.bucket_key(ts);
@@ -418,6 +422,10 @@ impl Aggregate {
                 return None;
             }
 
+            debug_assert!(
+                Self::will_be_stored(self.config.mode, &data),
+                "only storable metrics reach event-time bucketing"
+            );
             self.record_into_bucket(bucket_key, series, data, metadata);
             emit!(AggregateEventRecorded);
             return None;
@@ -462,6 +470,29 @@ impl Aggregate {
         None
     }
 
+    /// Returns `true` for the system-time passthrough arms in `record()` — metrics
+    /// that are forwarded downstream immediately without being aggregated.
+    const fn passes_through_unchanged(mode: AggregationMode, data: &MetricData) -> bool {
+        matches!(
+            (mode, data.kind),
+            (AggregationMode::Sum, MetricKind::Absolute)
+                | (AggregationMode::Latest, MetricKind::Incremental)
+                | (AggregationMode::Diff, MetricKind::Incremental)
+                | (AggregationMode::Max, MetricKind::Incremental)
+                | (AggregationMode::Min, MetricKind::Incremental)
+                | (AggregationMode::Mean, MetricKind::Incremental)
+                | (AggregationMode::Stdev, MetricKind::Incremental)
+        )
+    }
+
+    /// Returns `true` for metrics that system-time accepts but does not store or
+    /// pass through — currently absolute non-gauge values in `Mean`/`Stdev`.
+    const fn is_silently_ignored(mode: AggregationMode, data: &MetricData) -> bool {
+        matches!(mode, AggregationMode::Mean | AggregationMode::Stdev)
+            && matches!(data.kind, MetricKind::Absolute)
+            && !matches!(data.value, MetricValue::Gauge { value: _ })
+    }
+
     /// Returns `true` iff a record with the given `kind`/`value` would be
     /// stored under `mode`. Mirrors the per-mode filters in `record_sum`,
     /// `record_comparison`, the `Latest`/`Diff` Absolute-only path, and the
@@ -473,6 +504,10 @@ impl Aggregate {
     /// must therefore avoid materialising buckets for events that the mode
     /// would silently no-op on, otherwise a stray incompatible event could
     /// reject valid in-order events for earlier buckets.
+    ///
+    /// Passthrough and silently-ignored metrics are handled in `record()` before
+    /// this is relevant; callers that reach `record_into_bucket` must already
+    /// be storable (`debug_assert!` in tests).
     const fn will_be_stored(mode: AggregationMode, data: &MetricData) -> bool {
         match mode {
             // `Auto` stores both kinds (sum incremental, latest absolute).
@@ -2195,7 +2230,7 @@ interval_ms = 999999
             time_source: TimeSource::EventTime,
             allowed_lateness_ms: 0,
             use_system_time_for_missing_timestamps: false,
-            max_future_ms: 10000,
+            max_future_ms: 0,
         })
         .unwrap();
 
@@ -2247,7 +2282,7 @@ interval_ms = 999999
             time_source: TimeSource::EventTime,
             allowed_lateness_ms: 0,
             use_system_time_for_missing_timestamps: false,
-            max_future_ms: 10000,
+            max_future_ms: 600_000,
         })
         .unwrap();
 
@@ -2471,7 +2506,7 @@ interval_ms = 999999
             time_source: TimeSource::EventTime,
             allowed_lateness_ms: 0,
             use_system_time_for_missing_timestamps: false,
-            max_future_ms: 10000,
+            max_future_ms: 600_000,
         })
         .unwrap();
 
@@ -2597,6 +2632,86 @@ interval_ms = 999999
     }
 
     #[test]
+    fn event_time_passthrough_without_timestamp() {
+        let mut agg = Aggregate::new(&AggregateConfig {
+            interval_ms: 10_000_u64,
+            mode: AggregationMode::Sum,
+            time_source: TimeSource::EventTime,
+            allowed_lateness_ms: 0,
+            use_system_time_for_missing_timestamps: false,
+            max_future_ms: 10_000,
+        })
+        .unwrap();
+
+        let absolute_no_ts = make_metric(
+            "gauge_passthrough",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 42.0 },
+        );
+        assert!(
+            agg.record(absolute_no_ts.clone()).is_some(),
+            "sum-mode absolute must pass through without a timestamp"
+        );
+        assert!(agg.event_time_buckets.is_empty());
+
+        let mut agg = Aggregate::new(&AggregateConfig {
+            interval_ms: 10_000_u64,
+            mode: AggregationMode::Mean,
+            time_source: TimeSource::EventTime,
+            allowed_lateness_ms: 0,
+            use_system_time_for_missing_timestamps: false,
+            max_future_ms: 10_000,
+        })
+        .unwrap();
+
+        let incremental_no_ts = make_metric(
+            "counter_passthrough",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 7.0 },
+        );
+        assert!(
+            agg.record(incremental_no_ts).is_some(),
+            "mean-mode incremental must pass through without a timestamp"
+        );
+        assert!(
+            agg.event_time_buckets.is_empty() && agg.event_time_multi_buckets.is_empty()
+        );
+    }
+
+    #[test]
+    fn event_time_mean_absolute_non_gauge_is_silently_ignored() {
+        let mut agg = Aggregate::new(&AggregateConfig {
+            interval_ms: 10_000_u64,
+            mode: AggregationMode::Mean,
+            time_source: TimeSource::EventTime,
+            allowed_lateness_ms: 0,
+            use_system_time_for_missing_timestamps: false,
+            max_future_ms: 10_000,
+        })
+        .unwrap();
+
+        let mut values = std::collections::BTreeSet::new();
+        values.insert("a".into());
+        let set_metric = make_metric_with_timestamp(
+            "set_series",
+            MetricKind::Absolute,
+            MetricValue::Set { values },
+            open_bucket_timestamp(10_000),
+        );
+
+        assert!(
+            agg.record(set_metric).is_none(),
+            "absolute non-gauge in mean mode must not pass through"
+        );
+        assert!(agg.event_time_buckets.is_empty());
+        assert!(agg.event_time_multi_buckets.is_empty());
+
+        let mut out = vec![];
+        agg.flush_final(&mut out);
+        assert!(out.is_empty(), "silently ignored metrics must not flush");
+    }
+
+    #[test]
     fn event_time_allowed_lateness_delays_flush_for_current_bucket() {
         let interval_ms = 5000_u64;
         let allowed_lateness_ms = 3000_u64;
@@ -2649,7 +2764,7 @@ interval_ms = 999999
             time_source: TimeSource::EventTime,
             allowed_lateness_ms: 10_000,
             use_system_time_for_missing_timestamps: false,
-            max_future_ms: 10000,
+            max_future_ms: 600_000,
         })
         .unwrap();
 
@@ -3051,7 +3166,7 @@ time_source = "event_time"
             time_source: TimeSource::EventTime,
             allowed_lateness_ms: 0,
             use_system_time_for_missing_timestamps: false,
-            max_future_ms: 10000,
+            max_future_ms: 600_000,
         })
         .unwrap();
 
@@ -3164,7 +3279,7 @@ time_source = "event_time"
             time_source: TimeSource::EventTime,
             allowed_lateness_ms: 0,
             use_system_time_for_missing_timestamps: false,
-            max_future_ms: 10000,
+            max_future_ms: 600_000,
         })
         .unwrap();
 

@@ -213,20 +213,22 @@ components: transforms: aggregate: {
 						only when the periodic flush runs, so `allowed_lateness_ms = 0` enforces strict
 						lateness even if the flush interval is long or misaligned.
 
-						Events whose `(kind, value)` shape is incompatible with the configured `mode` (for
-						example an `incremental` event arriving at a `mean`-configured aggregator) pass
-						through unchanged, matching system-time behavior, without creating buckets or
-						affecting the watermark.
+						Metrics the configured `mode` does not aggregate (for example an `incremental`
+						event in `mean` mode, or an `absolute` event in `sum` mode) pass through
+						unchanged, matching system-time behavior, without creating buckets or affecting
+						the watermark. Absolute non-gauge values in `mean` or `stdev` mode are ignored
+						(not passed through), also matching system-time behavior.
 						"""
 				},
 				{
 					title: "Missing and Future Timestamps"
 					body: """
-						By default, events with no timestamp are dropped. Set
+						By default, metrics that will be bucketed and have no timestamp are dropped. Metrics
+						that pass through unchanged (see above) do not require a timestamp. Set
 						`use_system_time_for_missing_timestamps` to `true` to fall back to the current system
-						time instead. Events whose timestamp is more than `max_future_ms` ahead of the system
-						clock are also dropped as a clock-skew guard. All such drops surface in
-						`component_discarded_events_total` with a reason tag.
+						time for bucketed metrics instead. Bucketed events whose timestamp is more than
+						`max_future_ms` ahead of the system clock are dropped as a clock-skew guard. All such
+						drops surface in `component_discarded_events_total` with a reason tag.
 						"""
 				},
 				{
