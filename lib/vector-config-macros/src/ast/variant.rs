@@ -1,4 +1,4 @@
-use darling::{FromAttributes, error::Accumulator, util::Flag};
+use darling::{FromAttributes, error::Accumulator, util::Override};
 use proc_macro2::{Ident, TokenStream};
 use quote::ToTokens;
 use serde_derive_internals::ast as serde_ast;
@@ -149,7 +149,20 @@ impl<'a> Variant<'a> {
     /// standard `#[deprecated]` attribute, neither automatically applying it nor deriving the
     /// deprecation status of a variant when it is present.
     pub fn deprecated(&self) -> bool {
-        self.attrs.deprecated.is_present()
+        self.attrs.deprecated.is_some()
+    }
+
+    /// The deprecation message, if one has been set.
+    ///
+    /// Set via `#[configurable(deprecated = "message")]`.
+    pub fn deprecated_message(&self) -> Option<&String> {
+        self.attrs
+            .deprecated
+            .as_ref()
+            .and_then(|message| match message {
+                Override::Inherit => None,
+                Override::Explicit(message) => Some(message),
+            })
     }
 
     /// Whether or not this variant is visible during either serialization or deserialization.
@@ -186,7 +199,7 @@ impl ToTokens for Variant<'_> {
 struct Attributes {
     title: Option<String>,
     description: Option<String>,
-    deprecated: Flag,
+    deprecated: Option<Override<String>>,
     #[darling(skip)]
     visible: bool,
     #[darling(multiple)]
