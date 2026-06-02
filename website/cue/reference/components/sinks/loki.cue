@@ -157,7 +157,5 @@ components: sinks: loki: {
 		}
 	}
 
-	telemetry: metrics: {
-		streams_total: components.sources.internal_metrics.output.metrics.streams_total
-	}
+	telemetry: metrics: {}
 }

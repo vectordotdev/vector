@@ -202,20 +202,6 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
-		connection_read_errors_total: {
-			description:       "The total number of errors reading datagram."
-			type:              "counter"
-			default_namespace: "vector"
-			tags: _component_tags & {
-				mode: {
-					description: ""
-					required:    true
-					enum: {
-						udp: "User Datagram Protocol"
-					}
-				}
-			}
-		}
 		container_processed_events_total: {
 			description:       "The total number of container events processed."
 			type:              "counter"
@@ -725,12 +711,6 @@ components: sources: internal_metrics: {
 				status: _status
 			}
 		}
-		invalid_record_total: {
-			description:       "The total number of invalid records that have been discarded."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _component_tags
-		}
 		lua_memory_used_bytes: {
 			description:       "The total memory currently being used by the Lua runtime."
 			type:              "gauge"
@@ -754,18 +734,6 @@ components: sources: internal_metrics: {
 			type:              "gauge"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
-		}
-		protobuf_decode_errors_total: {
-			description:       "The total number of [Protocol Buffers](\(urls.protobuf)) errors thrown during communication between Vector instances."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _component_tags
-		}
-		send_errors_total: {
-			description:       "The total number of errors sending messages."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _component_tags
 		}
 		source_lag_time_seconds: {
 			description:       "The difference between the timestamp recorded in each event and the time when it was ingested, expressed as fractional seconds."
@@ -851,12 +819,6 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
-		streams_total: {
-			description:       "The total number of streams."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _component_tags
-		}
 		s3_object_processing_failed_duration_seconds: {
 			description:       "The time taken to process an S3 object that failed, in seconds."
 			type:              "histogram"
@@ -924,12 +886,6 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
-		stdin_reads_failed_total: {
-			description:       "The total number of errors reading from stdin."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _component_tags
-		}
 		tag_value_limit_exceeded_total: {
 			description: """
 				The total number of events discarded because the tag has been rejected after
@@ -956,12 +912,6 @@ components: sources: internal_metrics: {
 					required: false
 				}
 			}
-		}
-		timestamp_parse_errors_total: {
-			description:       "The total number of errors encountered parsing [RFC 3339](\(urls.rfc_3339)) timestamps."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _component_tags
 		}
 		transform_buffer_max_byte_size: {
 			description:       "The maximum number of bytes the buffer that feeds into a transform can hold."
@@ -1028,20 +978,6 @@ components: sources: internal_metrics: {
 			type:              "gauge"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
-		}
-		utf8_convert_errors_total: {
-			description:       "The total number of errors converting bytes to a UTF-8 string in UDP mode."
-			type:              "counter"
-			default_namespace: "vector"
-			tags: _component_tags & {
-				mode: {
-					description: "The connection mode used by the component."
-					required:    true
-					enum: {
-						udp: "User Datagram Protocol"
-					}
-				}
-			}
 		}
 		utilization: {
 			description:       "A ratio from 0 to 1 of the load on a component. A value of 0 would indicate a completely idle component that is simply waiting for input. A value of 1 would indicate a that is never idle. This value is updated every 5 seconds."
@@ -1123,22 +1059,6 @@ components: sources: internal_metrics: {
 			description: """
 				The total number of times the Windows service has been uninstalled.
 				"""
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _internal_metrics_tags
-		}
-
-		// config metrics
-		config_reload_rejected: {
-			description:       "Number of configuration reload attempts that were rejected."
-			type:              "counter"
-			default_namespace: "vector"
-			tags: _internal_metrics_tags & {
-				reason: _reason
-			}
-		}
-		config_reloaded: {
-			description:       "Number of times a new configuration was loaded successfully."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
