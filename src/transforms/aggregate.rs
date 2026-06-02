@@ -119,28 +119,28 @@ pub enum AggregationMode {
     #[default]
     Auto,
 
-    /// Sums incremental metrics, ignores absolute
+    /// Sums incremental metrics; absolute metrics pass through unchanged.
     Sum,
 
-    /// Returns the latest value for absolute metrics, ignores incremental
+    /// Returns the latest value for absolute metrics; incremental metrics pass through unchanged.
     Latest,
 
     /// Counts metrics for incremental and absolute metrics
     Count,
 
-    /// Returns difference between latest value for absolute, ignores incremental
+    /// Returns difference between latest value for absolute; incremental metrics pass through unchanged.
     Diff,
 
-    /// Max value of absolute metric, ignores incremental
+    /// Max value of absolute metric; incremental metrics pass through unchanged.
     Max,
 
-    /// Min value of absolute metric, ignores incremental
+    /// Min value of absolute metric; incremental metrics pass through unchanged.
     Min,
 
-    /// Mean value of absolute metric, ignores incremental
+    /// Mean value of absolute metric; incremental metrics pass through unchanged.
     Mean,
 
-    /// Stdev value of absolute metric, ignores incremental
+    /// Stdev value of absolute metric; incremental metrics pass through unchanged.
     Stdev,
 }
 
@@ -150,32 +150,32 @@ enum InnerMode {
     #[default]
     Auto,
 
-    /// Sums incremental metrics, ignores absolute
+    /// Sums incremental metrics; absolute metrics pass through unchanged.
     Sum,
 
-    /// Returns the latest value for absolute metrics, ignores incremental
+    /// Returns the latest value for absolute metrics; incremental metrics pass through unchanged.
     Latest,
 
     /// Counts metrics for incremental and absolute metrics
     Count,
 
-    /// Returns difference between latest value for absolute, ignores incremental
+    /// Returns difference between latest value for absolute; incremental metrics pass through unchanged.
     Diff {
         prev_map: HashMap<MetricSeries, MetricEntry>,
     },
 
-    /// Max value of absolute metric, ignores incremental
+    /// Max value of absolute metric; incremental metrics pass through unchanged.
     Max,
 
-    /// Min value of absolute metric, ignores incremental
+    /// Min value of absolute metric; incremental metrics pass through unchanged.
     Min,
 
-    /// Mean value of absolute metric, ignores incremental
+    /// Mean value of absolute metric; incremental metrics pass through unchanged.
     Mean {
         multi_map: HashMap<MetricSeries, Vec<MetricEntry>>,
     },
 
-    /// Stdev value of absolute metric, ignores incremental
+    /// Stdev value of absolute metric; incremental metrics pass through unchanged.
     Stdev {
         multi_map: HashMap<MetricSeries, Vec<MetricEntry>>,
     },
@@ -324,7 +324,7 @@ impl Aggregate {
         }
     }
 
-    pub fn record(&mut self, event: Event) {
+    pub fn record(&mut self, event: Event) -> Option<Event> {
         let metric = event.into_metric();
         let timestamp = metric.timestamp();
         let (series, mut data, metadata) = metric.into_parts();
@@ -340,7 +340,7 @@ impl Aggregate {
                         emit!(AggregateEventDropped {
                             reason: "Event missing timestamp required for event-time aggregation."
                         });
-                        return;
+                        return None;
                     }
                 }
             };
@@ -364,7 +364,7 @@ impl Aggregate {
                     emit!(AggregateEventDropped {
                         reason: "Event timestamp too far in the future."
                     });
-                    return;
+                    return None;
                 }
             }
 
@@ -375,7 +375,7 @@ impl Aggregate {
                 emit!(AggregateEventDropped {
                     reason: "Event timestamp is too late; bucket already flushed."
                 });
-                return;
+                return None;
             }
 
             // `record_into_bucket` emits its own `AggregateEventDropped`
@@ -384,44 +384,38 @@ impl Aggregate {
             if self.record_into_bucket(bucket_key, series, data, metadata) {
                 emit!(AggregateEventRecorded);
             }
-            return;
+            return None;
         }
-        match self.config.mode {
-            AggregationMode::Auto => match data.kind {
-                MetricKind::Incremental => Self::record_sum(&mut self.map, series, data, metadata),
-                MetricKind::Absolute => {
-                    self.map.insert(series, (data, metadata));
-                }
-            },
-            AggregationMode::Sum => Self::record_sum(&mut self.map, series, data, metadata),
-            AggregationMode::Latest | AggregationMode::Diff => match data.kind {
-                MetricKind::Incremental => (),
-                MetricKind::Absolute => {
-                    self.map.insert(series, (data, metadata));
-                }
-            },
-            AggregationMode::Count => Self::record_count(&mut self.map, series, data, metadata),
-            AggregationMode::Max | AggregationMode::Min => {
-                Self::record_comparison(&mut self.map, series, data, metadata, self.config.mode)
+
+        match (&mut self.mode, data.kind) {
+            (InnerMode::Sum, MetricKind::Absolute)
+            | (InnerMode::Latest | InnerMode::Diff { .. }, MetricKind::Incremental)
+            | (InnerMode::Max | InnerMode::Min, MetricKind::Incremental)
+            | (InnerMode::Mean { .. } | InnerMode::Stdev { .. }, MetricKind::Incremental) => {
+                return Some(Event::Metric(Metric::from_parts(series, data, metadata)));
             }
-            AggregationMode::Mean | AggregationMode::Stdev => {
-                if let InnerMode::Mean { multi_map } | InnerMode::Stdev { multi_map } =
-                    &mut self.mode
-                {
-                    match data.kind {
-                        MetricKind::Incremental => (),
-                        MetricKind::Absolute => {
-                            if matches!(data.value, MetricValue::Gauge { value: _ }) {
-                                match multi_map.entry(series) {
-                                    Entry::Occupied(mut entry) => {
-                                        let existing = entry.get_mut();
-                                        existing.push((data, metadata));
-                                    }
-                                    Entry::Vacant(entry) => {
-                                        entry.insert(vec![(data, metadata)]);
-                                    }
-                                }
-                            }
+            (InnerMode::Auto | InnerMode::Sum, MetricKind::Incremental) => {
+                self.record_sum(series, data, metadata);
+            }
+            (InnerMode::Auto, MetricKind::Absolute)
+            | (InnerMode::Latest | InnerMode::Diff { .. }, MetricKind::Absolute) => {
+                self.map.insert(series, (data, metadata));
+            }
+            (InnerMode::Count, _) => {
+                self.record_count(series, data, metadata);
+            }
+            (InnerMode::Max | InnerMode::Min, MetricKind::Absolute) => {
+                self.record_comparison(series, data, metadata);
+            }
+            (
+                InnerMode::Mean { multi_map } | InnerMode::Stdev { multi_map },
+                MetricKind::Absolute,
+            ) => {
+                if matches!(data.value, MetricValue::Gauge { value: _ }) {
+                    match multi_map.entry(series) {
+                        Entry::Occupied(mut entry) => entry.get_mut().push((data, metadata)),
+                        Entry::Vacant(entry) => {
+                            entry.insert(vec![(data, metadata)]);
                         }
                     }
                 }
@@ -429,6 +423,7 @@ impl Aggregate {
         }
 
         emit!(AggregateEventRecorded);
+        None
     }
 
     /// Returns `true` iff a record with the given `kind`/`value` would be
@@ -494,7 +489,7 @@ impl Aggregate {
                 let bucket = self.event_time_buckets.entry(bucket_key).or_default();
                 match data.kind {
                     MetricKind::Incremental => {
-                        Self::record_sum(bucket, series, data, metadata);
+                        Self::record_sum_in_map(bucket, series, data, metadata);
                     }
                     MetricKind::Absolute => match bucket.entry(series) {
                         Entry::Vacant(entry) => {
@@ -519,7 +514,7 @@ impl Aggregate {
             }
             AggregationMode::Sum => {
                 let bucket = self.event_time_buckets.entry(bucket_key).or_default();
-                Self::record_sum(bucket, series, data, metadata);
+                Self::record_sum_in_map(bucket, series, data, metadata);
             }
             AggregationMode::Latest | AggregationMode::Diff => {
                 // `data.kind == Absolute` is guaranteed by `will_be_stored`.
@@ -544,11 +539,11 @@ impl Aggregate {
             }
             AggregationMode::Count => {
                 let bucket = self.event_time_buckets.entry(bucket_key).or_default();
-                Self::record_count(bucket, series, data, metadata);
+                Self::record_count_in_map(bucket, series, data, metadata);
             }
             AggregationMode::Max | AggregationMode::Min => {
                 let bucket = self.event_time_buckets.entry(bucket_key).or_default();
-                Self::record_comparison(bucket, series, data, metadata, mode);
+                Self::record_comparison_in_map(bucket, series, data, metadata, mode);
             }
             AggregationMode::Mean | AggregationMode::Stdev => {
                 // `will_be_stored` has already guaranteed Absolute + Gauge.
@@ -573,14 +568,14 @@ impl Aggregate {
         true
     }
 
-    fn record_sum(
-        bucket: &mut HashMap<MetricSeries, MetricEntry>,
+    fn record_sum_in_map(
+        map: &mut HashMap<MetricSeries, MetricEntry>,
         series: MetricSeries,
         data: MetricData,
         metadata: EventMetadata,
     ) {
         match data.kind {
-            MetricKind::Incremental => match bucket.entry(series) {
+            MetricKind::Incremental => match map.entry(series) {
                 Entry::Occupied(mut entry) => {
                     let existing = entry.get_mut();
                     // In order to update (add) the new and old kind's must match
@@ -599,14 +594,32 @@ impl Aggregate {
         }
     }
 
-    fn record_count(
-        bucket: &mut HashMap<MetricSeries, MetricEntry>,
+    fn record_sum(&mut self, series: MetricSeries, data: MetricData, metadata: EventMetadata) {
+        match self.map.entry(series) {
+            Entry::Occupied(mut entry) => {
+                let existing = entry.get_mut();
+                // In order to update (add) the new and old kind's must match
+                if existing.0.kind == data.kind && existing.0.update(&data) {
+                    existing.1.merge(metadata);
+                } else {
+                    emit!(AggregateUpdateFailed);
+                    *existing = (data, metadata);
+                }
+            }
+            Entry::Vacant(entry) => {
+                entry.insert((data, metadata));
+            }
+        }
+    }
+
+    fn record_count_in_map(
+        map: &mut HashMap<MetricSeries, MetricEntry>,
         series: MetricSeries,
         mut data: MetricData,
         metadata: EventMetadata,
     ) {
         let mut count_data = data.clone();
-        let existing = bucket.entry(series).or_insert_with(|| {
+        let existing = map.entry(series).or_insert_with(|| {
             *data.value_mut() = MetricValue::Counter { value: 0f64 };
             (data.clone(), metadata.clone())
         });
@@ -618,8 +631,17 @@ impl Aggregate {
         }
     }
 
-    fn record_comparison(
-        bucket: &mut HashMap<MetricSeries, MetricEntry>,
+    fn record_count(
+        &mut self,
+        series: MetricSeries,
+        data: MetricData,
+        metadata: EventMetadata,
+    ) {
+        Self::record_count_in_map(&mut self.map, series, data, metadata);
+    }
+
+    fn record_comparison_in_map(
+        map: &mut HashMap<MetricSeries, MetricEntry>,
         series: MetricSeries,
         data: MetricData,
         metadata: EventMetadata,
@@ -627,7 +649,7 @@ impl Aggregate {
     ) {
         match data.kind {
             MetricKind::Incremental => (),
-            MetricKind::Absolute => match bucket.entry(series) {
+            MetricKind::Absolute => match map.entry(series) {
                 Entry::Occupied(mut entry) => {
                     let existing = entry.get_mut();
                     // In order to update (add) the new and old kind's must match
@@ -655,6 +677,42 @@ impl Aggregate {
                     entry.insert((data, metadata));
                 }
             },
+        }
+    }
+
+    fn record_comparison(
+        &mut self,
+        series: MetricSeries,
+        data: MetricData,
+        metadata: EventMetadata,
+    ) {
+        match self.map.entry(series) {
+            Entry::Occupied(mut entry) => {
+                let existing = entry.get_mut();
+                // In order to update (add) the new and old kind's must match
+                if existing.0.kind == data.kind {
+                    if let MetricValue::Gauge {
+                        value: existing_value,
+                    } = existing.0.value()
+                        && let MetricValue::Gauge { value: new_value } = data.value()
+                    {
+                        let should_update = match self.mode {
+                            InnerMode::Max => new_value > existing_value,
+                            InnerMode::Min => new_value < existing_value,
+                            _ => false,
+                        };
+                        if should_update {
+                            *existing = (data, metadata);
+                        }
+                    }
+                } else {
+                    emit!(AggregateUpdateFailed);
+                    *existing = (data, metadata);
+                }
+            }
+            Entry::Vacant(entry) => {
+                entry.insert((data, metadata));
+            }
         }
     }
 
@@ -940,7 +998,11 @@ impl TaskTransform<Event> for Aggregate {
                                 self.flush_final(&mut output);
                                 done = true;
                             }
-                            Some(event) => self.record(event),
+                            Some(event) => {
+                                if let Some(passthrough) = self.record(event) {
+                                    output.push(passthrough);
+                                }
+                            }
                         }
                     }
                 };
