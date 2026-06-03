@@ -28,7 +28,6 @@ use smallvec::SmallVec;
 use snafu::{ResultExt, Snafu};
 use tokio::{pin, select};
 use tokio_util::codec::FramedRead;
-use tracing::Instrument;
 use vector_lib::{
     codecs::decoding::FramingError,
     config::{LegacyKey, LogNamespace, log_schema},
@@ -358,7 +357,7 @@ impl Ingestor {
                 acknowledgements,
             );
             let fut = process.run();
-            let handle = tokio::spawn(fut.in_current_span());
+            let handle = crate::spawn_in_current_span(fut);
             handles.push(handle);
         }
 

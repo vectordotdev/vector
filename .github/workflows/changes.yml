@@ -228,7 +228,6 @@ jobs:
               - "vdev/**"
               - ".github/workflows/changes.yml"
             component_docs:
-              - 'scripts/generate-component-docs.rb'
               - "vdev/**"
               - 'website/cue/**/*.cue'
               - 'docs/generated/**'

@@ -27,9 +27,12 @@ impl<'a, const INTENTIONAL: bool> From<&'a str> for ComponentEventsDropped<'a, I
     }
 }
 
+// ComponentEventsDropped is the foundation type the `registered_event!` macro
+// abstracts over, so we have to implement RegisterInternalEvent by hand here.
 impl<'a, const INTENTIONAL: bool> RegisterInternalEvent
     for ComponentEventsDropped<'a, INTENTIONAL>
 {
+    // ## skip check-validity-events ##
     type Handle = DroppedHandle<'a, INTENTIONAL>;
     fn register(self) -> Self::Handle {
         Self::Handle {

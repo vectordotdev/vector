@@ -2,7 +2,10 @@ use anyhow::Result;
 use clap::Args;
 use std::collections::BTreeMap;
 
-use crate::{testing::runner::get_agent_test_runner, utils::platform};
+use crate::{
+    testing::runner::{LocalTestRunner, TestRunner as _},
+    utils::platform,
+};
 
 /// Execute tests
 #[derive(Args, Debug)]
@@ -10,10 +13,6 @@ use crate::{testing::runner::get_agent_test_runner, utils::platform};
 pub struct Cli {
     /// Extra test command arguments
     args: Option<Vec<String>>,
-
-    /// Whether to run tests in a container
-    #[arg(short = 'C', long)]
-    container: bool,
 
     /// Environment variables in the form KEY[=VALUE]
     #[arg(short, long)]
@@ -34,8 +33,6 @@ fn parse_env(env: Vec<String>) -> BTreeMap<String, Option<String>> {
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        let runner = get_agent_test_runner(self.container)?;
-
         let mut args = vec!["--workspace".to_string()];
 
         if let Some(mut extra_args) = self.args {
@@ -47,7 +44,7 @@ impl Cli {
             args.extend(["--features".to_string(), features.to_string()]);
         }
 
-        runner.test(
+        LocalTestRunner.test(
             &parse_env(self.env.unwrap_or_default()),
             &BTreeMap::default(),
             None,
