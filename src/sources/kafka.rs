@@ -710,13 +710,13 @@ impl ConsumerStateInner<Consuming> {
     }
 
     fn finalize_batch(
-        batch: Option<(FinalizerEntry, BatchStatusReceiver)>,
+        batch: Vec<(FinalizerEntry, BatchStatusReceiver)>,
         finalizer: Option<&OrderedFinalizer<FinalizerEntry>>,
     ) {
-        if let Some((msg, receiver)) = batch
-            && let Some(f) = finalizer.as_ref()
-        {
-            f.add(msg, receiver);
+        if let Some(f) = finalizer.as_ref() {
+            for (msg, receiver) in batch {
+                f.add(msg, receiver);
+            }
         }
     }
 }
@@ -989,37 +989,46 @@ async fn parse_message(
     out: &mut SourceSender,
     acknowledgements: bool,
     log_namespace: LogNamespace,
-) -> Option<(FinalizerEntry, BatchStatusReceiver)> {
-    let (batch, receiver) = BatchNotifier::new_with_receiver();
-    let last: FinalizerEntry = messages.last()?.into();
-    let size = messages.len();
-    let (count, streams) = messages
+) -> Vec<(FinalizerEntry, BatchStatusReceiver)> {
+    let streams = messages
         .into_iter()
-        .filter_map(|msg| parse_stream(msg, decoder.clone(), keys, log_namespace))
-        .fold(
-            (0usize, Vec::with_capacity(size)),
-            |(lc, mut ls), (rc, rs)| {
-                ls.push(rs);
-                (lc + rc, ls)
-            },
-        );
-    let mut batch_stream = futures::stream::iter(streams).flatten().map(|event| {
-        // All acknowledgements flow through the normal Finalizer stream so
-        // that they can be handled in one place, but are only tied to the
-        // batch when acknowledgements are enabled
-        if acknowledgements {
-            event.with_batch_notifier(&batch)
-        } else {
-            event
+        .filter_map(|msg| {
+            let entry = FinalizerEntry::from(&msg);
+            parse_stream(msg, decoder.clone(), keys, log_namespace)
+                .map(|(count, stream)| (entry, count, stream))
+        })
+        .map(|(entry, count, s)| {
+            let (batch, receiver) = BatchNotifier::new_with_receiver();
+            (
+                entry,
+                count,
+                receiver,
+                s.map(move |event| {
+                    // All acknowledgements flow through the normal Finalizer stream so
+                    // that they can be handled in one place, but are only tied to the
+                    // batch when acknowledgements are enabled
+                    if acknowledgements {
+                        event.with_batch_notifier(&batch)
+                    } else {
+                        event
+                    }
+                }),
+            )
+        });
+
+    let mut entries = Vec::default();
+    for (entry, count, receiver, mut stream) in streams {
+        match out.send_event_stream(&mut stream).await {
+            Err(_) => {
+                emit!(StreamClosedError { count });
+            }
+            Ok(_) => {
+                drop(stream);
+                entries.push((entry, receiver));
+            }
         }
-    });
-    match out.send_event_stream(&mut batch_stream).await {
-        Err(_) => {
-            emit!(StreamClosedError { count });
-            None
-        }
-        Ok(_) => Some((last, receiver)),
     }
+    entries
 }
 
 // Turn the received message into a stream of parsed events.
