@@ -20,7 +20,7 @@ pub use decoding::{
     LengthDelimitedDecoder, LengthDelimitedDecoderConfig, NativeDeserializer,
     NativeDeserializerConfig, NativeJsonDeserializer, NativeJsonDeserializerConfig,
     NewlineDelimitedDecoder, NewlineDelimitedDecoderConfig, OctetCountingDecoder,
-    OctetCountingDecoderConfig, StreamDecodingError, VarintLengthDelimitedDecoder,
+    OctetCountingDecoderConfig, OversizedAction, StreamDecodingError, VarintLengthDelimitedDecoder,
     VarintLengthDelimitedDecoderConfig,
 };
 #[cfg(feature = "syslog")]

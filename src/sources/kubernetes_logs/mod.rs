@@ -23,7 +23,7 @@ use lifecycle::Lifecycle;
 use serde_with::serde_as;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf, TimeZone,
-    codecs::{BytesDeserializer, BytesDeserializerConfig},
+    codecs::{BytesDeserializer, BytesDeserializerConfig, OversizedAction},
     config::{LegacyKey, LogNamespace},
     configurable::configurable_component,
     file_source::file_server::{
@@ -203,15 +203,29 @@ pub struct Config {
     #[configurable(metadata(docs::type_unit = "bytes"))]
     max_line_bytes: usize,
 
-    /// The maximum number of bytes a line can contain - after merging - before being discarded.
+    /// The maximum number of bytes a line can contain after merging partial events.
     ///
     /// This protects against malformed lines or tailing incorrect files.
+    /// The behavior when a merged line exceeds this limit is controlled by
+    /// `max_merged_line_action`: `drop` (default) discards the line, `truncate` truncates
+    /// it to this limit and appends a `..TRUNCATED` suffix.
     ///
     /// Note that, if auto_partial_merge is false, this config will be ignored. Also, if max_line_bytes is too small to reach the continuation character, then this
-    /// config will have no practical impact (the same is true of `auto_partial_merge`). Finally, the smaller of `max_merged_line_bytes` and `max_line_bytes` will apply
-    /// if auto_partial_merge is true, so if this is set to be 1 MiB, for example, but `max_line_bytes` is set to ~2.5 MiB, then every line greater than 1 MiB will be dropped.
+    /// config will have no practical impact (the same is true of `auto_partial_merge`). When auto_partial_merge is true, the smaller of
+    /// `max_merged_line_bytes` and `max_line_bytes` will apply to avoid wasted I/O reading lines that would be truncated or dropped.
     #[configurable(metadata(docs::type_unit = "bytes"))]
     max_merged_line_bytes: Option<usize>,
+
+    /// The behavior when a merged line exceeds `max_merged_line_bytes`.
+    ///
+    /// When set to `drop` (the default), the entire oversized merged line is discarded.
+    /// When set to `truncate`, the line is truncated to `max_merged_line_bytes` bytes and
+    /// emitted as a partial event. Any remaining partial events for that line are discarded.
+    ///
+    /// This option has no effect if `max_merged_line_bytes` is not set.
+    #[serde(default)]
+    #[configurable(derived)]
+    max_merged_line_action: OversizedAction,
 
     /// The number of lines to read for generating the checksum.
     ///
@@ -316,6 +330,7 @@ impl Default for Config {
             oldest_first: default_oldest_first(),
             max_line_bytes: default_max_line_bytes(),
             max_merged_line_bytes: None,
+            max_merged_line_action: OversizedAction::Drop,
             fingerprint_lines: default_fingerprint_lines(),
             glob_minimum_cooldown_ms: default_glob_minimum_cooldown_ms(),
             ingestion_timestamp_field: None,
@@ -577,6 +592,7 @@ struct Source {
     oldest_first: bool,
     max_line_bytes: usize,
     max_merged_line_bytes: Option<usize>,
+    max_merged_line_action: OversizedAction,
     fingerprint_lines: usize,
     glob_minimum_cooldown: Duration,
     use_apiserver_cache: bool,
@@ -666,6 +682,7 @@ impl Source {
             oldest_first: config.oldest_first,
             max_line_bytes: config.max_line_bytes,
             max_merged_line_bytes: config.max_merged_line_bytes,
+            max_merged_line_action: config.max_merged_line_action,
             fingerprint_lines: config.fingerprint_lines,
             glob_minimum_cooldown,
             use_apiserver_cache: config.use_apiserver_cache,
@@ -703,6 +720,7 @@ impl Source {
             oldest_first,
             max_line_bytes,
             max_merged_line_bytes,
+            max_merged_line_action,
             fingerprint_lines,
             glob_minimum_cooldown,
             use_apiserver_cache,
@@ -932,7 +950,13 @@ impl Source {
         let (events_count, _) = events.size_hint();
 
         let mut stream = if auto_partial_merge {
-            merge_partial_events(events, log_namespace, max_merged_line_bytes).left_stream()
+            merge_partial_events(
+                events,
+                log_namespace,
+                max_merged_line_bytes,
+                max_merged_line_action,
+            )
+            .left_stream()
         } else {
             events.right_stream()
         };
