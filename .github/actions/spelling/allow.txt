@@ -84,6 +84,7 @@ Celkon
 Ceph
 Chromecast
 Citrix
+Confluent
 cksum
 Cloudflare
 Cloudfone
@@ -109,6 +110,7 @@ dalek
 dammam
 Danew
 databend
+datum
 datacenter
 datadog
 datadoghq
@@ -161,6 +163,7 @@ FAQs
 fargate
 FDO
 fibonacci
+Flink
 Figma
 fileapi
 filebeat
@@ -384,6 +387,7 @@ nslookup
 nsupdate
 ntapi
 ntfs
+OCF
 Odys
 onig
 opendal
@@ -458,6 +462,7 @@ Rowling
 rpmbuild
 rpms
 RPZ
+Rabin
 RRSIGs
 rstest
 rsyslog
@@ -491,6 +496,7 @@ Sogou
 solarwinds
 Soref
 sortedset
+Spark
 splunk
 ssh
 staticuser
