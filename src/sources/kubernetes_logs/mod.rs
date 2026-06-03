@@ -210,9 +210,16 @@ pub struct Config {
     /// `max_merged_line_action`: `drop` (default) discards the line, `truncate` truncates
     /// it to this limit and appends a `..TRUNCATED` suffix.
     ///
-    /// Note that, if auto_partial_merge is false, this config will be ignored. Also, if max_line_bytes is too small to reach the continuation character, then this
-    /// config will have no practical impact (the same is true of `auto_partial_merge`). When auto_partial_merge is true, the smaller of
-    /// `max_merged_line_bytes` and `max_line_bytes` will apply to avoid wasted I/O reading lines that would be truncated or dropped.
+    /// Note that, if `auto_partial_merge` is false, this config will be ignored. Also, if
+    /// `max_line_bytes` is too small to reach the continuation character, then this config
+    /// will have no practical impact (the same is true of `auto_partial_merge`).
+    ///
+    /// When `max_merged_line_action` is `drop`, the smaller of `max_merged_line_bytes` and
+    /// `max_line_bytes` is used as the file-level read limit to avoid wasted I/O.
+    /// When `max_merged_line_action` is `truncate`, individual lines up to `max_line_bytes`
+    /// are allowed through so the merger can truncate the combined result. Note that
+    /// `max_line_bytes` still applies at the file level and always drops individual lines
+    /// that exceed it; truncation at that level is not currently supported.
     #[configurable(metadata(docs::type_unit = "bytes"))]
     max_merged_line_bytes: Option<usize>,
 
@@ -826,13 +833,12 @@ impl Source {
 
         let ignore_before = calculate_ignore_before(ignore_older_secs);
 
-        let mut resolved_max_line_bytes = max_line_bytes;
-        if auto_partial_merge {
-            resolved_max_line_bytes = min(
-                max_line_bytes,
-                max_merged_line_bytes.unwrap_or(max_line_bytes),
-            );
-        }
+        let resolved_max_line_bytes = resolve_max_line_bytes(
+            max_line_bytes,
+            max_merged_line_bytes,
+            auto_partial_merge,
+            max_merged_line_action,
+        );
 
         // TODO: maybe more of the parameters have to be configurable.
 
@@ -1191,10 +1197,27 @@ fn prepare_label_selector(selector: &str) -> String {
     format!("{BUILT_IN},{selector}")
 }
 
+fn resolve_max_line_bytes(
+    max_line_bytes: usize,
+    max_merged_line_bytes: Option<usize>,
+    auto_partial_merge: bool,
+    max_merged_line_action: OversizedAction,
+) -> usize {
+    if auto_partial_merge && max_merged_line_action == OversizedAction::Drop {
+        min(
+            max_line_bytes,
+            max_merged_line_bytes.unwrap_or(max_line_bytes),
+        )
+    } else {
+        max_line_bytes
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use similar_asserts::assert_eq;
     use vector_lib::{
+        codecs::OversizedAction,
         config::LogNamespace,
         lookup::{OwnedTargetPath, owned_value_path},
         schema::Definition,
@@ -1611,5 +1634,60 @@ mod tests {
                 )
             )
         )
+    }
+
+    #[test]
+    fn resolve_max_line_bytes_caps_in_drop_mode() {
+        let result = super::resolve_max_line_bytes(
+            1_000_000,     // max_line_bytes
+            Some(100_000), // max_merged_line_bytes
+            true,          // auto_partial_merge
+            OversizedAction::Drop,
+        );
+        assert_eq!(result, 100_000);
+    }
+
+    #[test]
+    fn resolve_max_line_bytes_no_cap_in_truncate_mode() {
+        let result = super::resolve_max_line_bytes(
+            1_000_000,     // max_line_bytes
+            Some(100_000), // max_merged_line_bytes
+            true,          // auto_partial_merge
+            OversizedAction::Truncate,
+        );
+        assert_eq!(result, 1_000_000);
+    }
+
+    #[test]
+    fn resolve_max_line_bytes_no_cap_without_auto_partial_merge() {
+        let result = super::resolve_max_line_bytes(
+            1_000_000,     // max_line_bytes
+            Some(100_000), // max_merged_line_bytes
+            false,         // auto_partial_merge
+            OversizedAction::Drop,
+        );
+        assert_eq!(result, 1_000_000);
+    }
+
+    #[test]
+    fn resolve_max_line_bytes_no_merged_limit_set() {
+        let result = super::resolve_max_line_bytes(
+            1_000_000, // max_line_bytes
+            None,      // max_merged_line_bytes
+            true,      // auto_partial_merge
+            OversizedAction::Drop,
+        );
+        assert_eq!(result, 1_000_000);
+    }
+
+    #[test]
+    fn resolve_max_line_bytes_merged_larger_than_line() {
+        let result = super::resolve_max_line_bytes(
+            100_000,       // max_line_bytes
+            Some(500_000), // max_merged_line_bytes > max_line_bytes
+            true,          // auto_partial_merge
+            OversizedAction::Drop,
+        );
+        assert_eq!(result, 100_000);
     }
 }
