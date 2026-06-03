@@ -528,7 +528,14 @@ impl<'a> Builder<'a> {
             // tokio tasks the transform spawns at construction time. On platforms
             // without per-thread CPU time, `register_counter` returns a noop
             // handle and the metric is silently omitted.
-            cpu_ns: crate::cpu_time::register_counter(),
+            //
+            // `None` when `measure_cpu_usage` is false (the default): no counter
+            // is registered and no per-poll `ThreadTime` measurement takes place.
+            cpu_ns: if transform.measure_cpu_usage {
+                Some(crate::cpu_time::register_counter())
+            } else {
+                None
+            },
         };
 
         let node = TransformNode::from_parts(key.clone(), &context, transform, &input_definitions);
@@ -792,15 +799,29 @@ impl<'a> Builder<'a> {
             LatencyRecorder::new(self.config.global.latency_ewma_alpha),
             node.cpu_ns.clone(),
         );
+
         // Attribute the runner task's per-poll CPU time (driver loop +,
         // for the inline variant, the transform body) to the component. The
         // concurrent variant additionally spawns transform invocations onto
         // their own tasks with `spawn_timed`, which feed the same counter.
-        let cpu_ns = node.cpu_ns.clone();
+        // When `cpu_ns` is `None` the futures are returned as-is — no
+        // `ThreadTime` sampling takes place.
         let transform = if node.enable_concurrency {
-            runner.run_concurrently().cpu_timed(cpu_ns).boxed()
+            let fut = runner.run_concurrently();
+
+            if let Some(cpu_ns) = node.cpu_ns {
+                fut.cpu_timed(cpu_ns).boxed()
+            } else {
+                fut.boxed()
+            }
         } else {
-            runner.run_inline().cpu_timed(cpu_ns).boxed()
+            let fut = runner.run_inline();
+
+            if let Some(cpu_ns) = node.cpu_ns {
+                fut.cpu_timed(cpu_ns).boxed()
+            } else {
+                fut.boxed()
+            }
         };
 
         let transform = async move {
@@ -912,9 +933,13 @@ impl<'a> Builder<'a> {
                     Err(TaskError::wrapped(e))
                 }
             }
-        }
-        .cpu_timed(cpu_ns)
-        .boxed();
+        };
+
+        let transform = if let Some(cpu_ns) = cpu_ns {
+            transform.cpu_timed(cpu_ns).boxed()
+        } else {
+            transform.boxed()
+        };
 
         let mut outputs = HashMap::new();
         outputs.insert(OutputId::from(&key), control);
@@ -1165,7 +1190,7 @@ struct TransformNode {
     input_details: Input,
     outputs: Vec<TransformOutput>,
     enable_concurrency: bool,
-    cpu_ns: Counter,
+    cpu_ns: Option<Counter>,
 }
 
 impl TransformNode {
@@ -1195,7 +1220,7 @@ struct Runner {
     timer_tx: UtilizationComponentSender,
     latency_recorder: LatencyRecorder,
     events_received: Registered<EventsReceived>,
-    cpu_ns: Counter,
+    cpu_ns: Option<Counter>,
 }
 
 impl Runner {
@@ -1206,7 +1231,7 @@ impl Runner {
         input_type: DataType,
         outputs: TransformOutputs,
         latency_recorder: LatencyRecorder,
-        cpu_ns: Counter,
+        cpu_ns: Option<Counter>,
     ) -> Self {
         Self {
             transform,

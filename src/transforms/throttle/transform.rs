@@ -27,7 +27,7 @@ pub struct Throttle<C: clock::Clock<Instant = I>, I: clock::Reference> {
     exclude: Option<Condition>,
     pub clock: C,
     internal_metrics: ThrottleInternalMetricsConfig,
-    pub cpu_ns: Counter,
+    pub cpu_ns: Option<Counter>,
 }
 
 impl<C, I> Throttle<C, I>

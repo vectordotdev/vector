@@ -4,7 +4,6 @@ use std::{
     task::{Context, Poll},
     time::Duration,
 };
-use tracing::Instrument;
 
 use metrics::Counter;
 use pin_project::pin_project;
@@ -269,11 +268,17 @@ pub(crate) trait CpuTimedExt: Future + Sized {
 
 impl<F: Future> CpuTimedExt for F {}
 
-/// Spawns `future` on the current tokio runtime with CPU-time accounting
-/// attached, equivalent to:
+/// Spawns `future` on the current tokio runtime, attaching CPU-time
+/// accounting when `counter` is [`Some`].  When [`None`], the future is
+/// spawned as-is with no per-poll overhead.
+///
+/// Equivalent to:
 ///
 /// ```ignore
-/// tokio::spawn(future.cpu_timed(counter))
+/// // Some(counter):
+/// crate::spawn_in_current_span(future.cpu_timed(counter))
+/// // None:
+/// crate::spawn_in_current_span(future)
 /// ```
 ///
 /// Use this when spawning background tasks (e.g. a transform's housekeeping
@@ -283,12 +288,18 @@ impl<F: Future> CpuTimedExt for F {}
 /// measurement.
 ///
 /// The current tracing span is attached to the spawned task.
-pub(crate) fn spawn_timed<F>(future: F, counter: Counter) -> tokio::task::JoinHandle<F::Output>
+pub(crate) fn spawn_timed<F>(
+    future: F,
+    counter: Option<Counter>,
+) -> tokio::task::JoinHandle<F::Output>
 where
     F: Future + Send + 'static,
     F::Output: Send + 'static,
 {
-    tokio::spawn(future.in_current_span().cpu_timed(counter))
+    match counter {
+        Some(c) => crate::spawn_in_current_span(future.cpu_timed(c)),
+        None => crate::spawn_in_current_span(future),
+    }
 }
 
 /// Registers the `component_cpu_usage_ns_total` counter for the calling
