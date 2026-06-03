@@ -1,3 +1,19 @@
+//! Per-component CPU-time measurement primitives.
+//!
+//! This module provides the building blocks for attributing CPU time to
+//! individual Vector components at runtime:
+//!
+//! - [`ThreadTime`] — a lightweight snapshot of thread CPU time, backed by
+//!   `CLOCK_THREAD_CPUTIME_ID` on Linux/macOS, `GetThreadTimes` on Windows,
+//!   and a zero no-op on other platforms.
+//! - [`CpuTimedFuture`] / [`CpuTimedExt`] — a [`Future`] adapter that
+//!   brackets every `poll` call with a [`ThreadTime`] sample and accumulates
+//!   the delta into a [`metrics::Counter`].
+//! - [`spawn_timed`] — convenience wrapper that spawns a future on the
+//!   current tokio runtime with optional CPU-time accounting attached.
+//! - `register_counter` — registers the `component_cpu_usage_ns_total` metrics
+//!   counter for a component (available on Linux, macOS, and Windows only).
+
 use std::{
     future::Future,
     pin::Pin,
@@ -39,18 +55,18 @@ use pin_project::pin_project;
 /// because `transform_all` is synchronous and non-yielding: between the two
 /// measurement points the worker thread runs only transform code, with no
 /// `.await` points that could interleave other tokio tasks.
-pub(crate) struct ThreadTime(Inner);
+pub struct ThreadTime(Inner);
 
 impl ThreadTime {
     /// Captures the current thread CPU time.
     #[inline]
-    pub(crate) fn now() -> Self {
+    pub fn now() -> Self {
         ThreadTime(Inner::now())
     }
 
     /// Returns the CPU time elapsed since this snapshot was taken.
     #[inline]
-    pub(crate) fn elapsed(&self) -> Duration {
+    pub fn elapsed(&self) -> Duration {
         self.0.elapsed()
     }
 }
@@ -231,7 +247,7 @@ impl Inner {
 ///
 /// Construct it via [`CpuTimedExt::cpu_timed`].
 #[pin_project]
-pub(crate) struct CpuTimedFuture<F> {
+pub struct CpuTimedFuture<F> {
     #[pin]
     inner: F,
     counter: Counter,
@@ -257,7 +273,9 @@ impl<F: Future> Future for CpuTimedFuture<F> {
 /// ```
 ///
 /// Mirrors the style of [`tracing::Instrument::in_current_span`].
-pub(crate) trait CpuTimedExt: Future + Sized {
+pub trait CpuTimedExt: Future + Sized {
+    /// Wraps this future in a [`CpuTimedFuture`] that increments `counter` by
+    /// the thread CPU time consumed on each `poll`.
     fn cpu_timed(self, counter: Counter) -> CpuTimedFuture<Self> {
         CpuTimedFuture {
             inner: self,
@@ -288,10 +306,7 @@ impl<F: Future> CpuTimedExt for F {}
 /// measurement.
 ///
 /// The current tracing span is attached to the spawned task.
-pub(crate) fn spawn_timed<F>(
-    future: F,
-    counter: Option<Counter>,
-) -> tokio::task::JoinHandle<F::Output>
+pub fn spawn_timed<F>(future: F, counter: Option<Counter>) -> tokio::task::JoinHandle<F::Output>
 where
     F: Future + Send + 'static,
     F::Output: Send + 'static,
@@ -325,12 +340,17 @@ where
 /// (concurrent execution path). Compare against `utilization` to separate
 /// CPU cost from pipeline back-pressure.
 #[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
-pub(crate) fn register_counter() -> Counter {
+pub fn register_counter() -> Counter {
     vector_lib::counter!(vector_lib::internal_event::CounterName::ComponentCpuUsageNsTotal)
 }
 
+/// Registers the `component_cpu_usage_ns_total` counter for the calling
+/// component on platforms where thread CPU time is available (Linux, macOS,
+/// Windows). On other platforms it returns [`Counter::noop()`] — the metric
+/// is **not** emitted at all, rather than reporting wall-clock or zero values
+/// that would be misleading to compare against supported platforms.
 #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
-pub(crate) fn register_counter() -> Counter {
+pub fn register_counter() -> Counter {
     Counter::noop()
 }
 
