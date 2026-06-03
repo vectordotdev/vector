@@ -242,6 +242,8 @@ pub fn get_hostname() -> std::io::Result<String> {
     })
 }
 
+pub(crate) use vector_lib::spawn_in_current_span;
+
 /// Spawn a task with the given name. The name is only used if
 /// built with [`tokio_unstable`][tokio_unstable].
 ///

@@ -1310,8 +1310,7 @@ impl Runner {
                                         t.transform_all(events, &mut outputs_buf);
                                     }
                                     outputs_buf
-                                }
-                                .in_current_span(),
+                                },
                                 self.cpu_ns.clone(),
                             );
                             in_flight.push_back(task);

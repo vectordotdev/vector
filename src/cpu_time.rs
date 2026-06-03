@@ -4,6 +4,7 @@ use std::{
     task::{Context, Poll},
     time::Duration,
 };
+use tracing::Instrument;
 
 use metrics::Counter;
 use pin_project::pin_project;
@@ -280,12 +281,14 @@ impl<F: Future> CpuTimedExt for F {}
 /// future with [`tracing::Instrument`] (or similar adapters) before passing
 /// it in if you want those adapters' per-poll work included in the CPU-time
 /// measurement.
+///
+/// The current tracing span is attached to the spawned task.
 pub(crate) fn spawn_timed<F>(future: F, counter: Counter) -> tokio::task::JoinHandle<F::Output>
 where
     F: Future + Send + 'static,
     F::Output: Send + 'static,
 {
-    tokio::spawn(future.cpu_timed(counter))
+    tokio::spawn(future.in_current_span().cpu_timed(counter))
 }
 
 /// Registers the `component_cpu_usage_ns_total` counter for the calling

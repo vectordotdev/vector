@@ -379,7 +379,7 @@ impl AzureBlobSinkConfig {
             .await
             .expect("Failed to download blob");
         let body_bytes = downloaded
-            .into_body()
+            .body
             .collect()
             .await
             .expect("Failed to read blob body");

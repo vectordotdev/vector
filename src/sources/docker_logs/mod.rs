@@ -22,7 +22,6 @@ use chrono::{DateTime, FixedOffset, Local, ParseError, Utc};
 use futures::{Stream, StreamExt};
 use serde_with::serde_as;
 use tokio::sync::mpsc;
-use tracing_futures::Instrument;
 use vector_lib::{
     codecs::{BytesDeserializer, BytesDeserializerConfig},
     config::{LegacyKey, LogNamespace},
@@ -740,39 +739,36 @@ impl EventStreamBuilder {
     /// Spawn a task to runs event stream until shutdown.
     fn start(&self, id: ContainerId, backoff: Option<Duration>) -> ContainerState {
         let this = self.clone();
-        tokio::spawn(
-            async move {
-                if let Some(duration) = backoff {
-                    tokio::time::sleep(duration).await;
-                }
+        crate::spawn_in_current_span(async move {
+            if let Some(duration) = backoff {
+                tokio::time::sleep(duration).await;
+            }
 
-                match this
-                    .core
-                    .docker
-                    .inspect_container(id.as_str(), None::<InspectContainerOptions>)
-                    .await
-                {
-                    Ok(details) => match ContainerMetadata::from_details(details) {
-                        Ok(metadata) => {
-                            let info = ContainerLogInfo::new(id, metadata, this.core.now_timestamp);
-                            this.run_event_stream(info).await;
-                            return;
-                        }
-                        Err(error) => emit!(DockerLogsTimestampParseError {
-                            error,
-                            container_id: id.as_str()
-                        }),
-                    },
-                    Err(error) => emit!(DockerLogsContainerMetadataFetchError {
+            match this
+                .core
+                .docker
+                .inspect_container(id.as_str(), None::<InspectContainerOptions>)
+                .await
+            {
+                Ok(details) => match ContainerMetadata::from_details(details) {
+                    Ok(metadata) => {
+                        let info = ContainerLogInfo::new(id, metadata, this.core.now_timestamp);
+                        this.run_event_stream(info).await;
+                        return;
+                    }
+                    Err(error) => emit!(DockerLogsTimestampParseError {
                         error,
                         container_id: id.as_str()
                     }),
-                }
-
-                this.finish(Err((id, ErrorPersistence::Transient)));
+                },
+                Err(error) => emit!(DockerLogsContainerMetadataFetchError {
+                    error,
+                    container_id: id.as_str()
+                }),
             }
-            .in_current_span(),
-        );
+
+            this.finish(Err((id, ErrorPersistence::Transient)));
+        });
 
         ContainerState::new_running()
     }
@@ -781,7 +777,7 @@ impl EventStreamBuilder {
     fn restart(&self, container: &mut ContainerState) {
         if let Some(info) = container.take_info() {
             let this = self.clone();
-            tokio::spawn(this.run_event_stream(info).in_current_span());
+            crate::spawn_in_current_span(this.run_event_stream(info));
         }
     }
 

@@ -157,7 +157,7 @@ dashmap = { version = "6.1.0", default-features = false }
 derivative = { version = "2.2.0", default-features = false }
 exitcode = { version = "1.1.2", default-features = false }
 flate2 = { version = "1.1.2", default-features = false, features = ["zlib-rs"] }
-futures = { version = "0.3.31", default-features = false, features = ["std"] }
+futures = { version = "0.3.32", default-features = false, features = ["std"] }
 futures-util = { version = "0.3.29", default-features = false }
 glob = { version = "0.3.3", default-features = false }
 hickory-proto = { version = "0.26.1", default-features = false, features = ["dnssec-ring"] }
@@ -226,7 +226,7 @@ strum = { version = "0.28", features = ["derive"] }
 [dependencies]
 cfg-if.workspace = true
 reqwest.workspace = true
-reqwest_13 = { package = "reqwest", version = "0.13", default-features = false, features = ["json", "rustls-no-provider"] }
+reqwest_13 = { package = "reqwest", version = "0.13", default-features = false, features = ["json", "native-tls", "rustls-no-provider"] }
 clap.workspace = true
 clap_complete.workspace = true
 indoc.workspace = true
@@ -306,11 +306,11 @@ aws-smithy-runtime-api = { version = "1.7.3", default-features = false, optional
 aws-smithy-types = { version = "1.2.11", default-features = false, features = ["rt-tokio"], optional = true }
 
 # Azure
-azure_core = { version = "0.33", features = ["reqwest", "hmac_openssl"], optional = true }
-azure_identity = { version = "0.33", features = ["client_certificate"], optional = true }
+azure_core = { version = "1.0", default-features = false, features = ["reqwest", "hmac_openssl"], optional = true }
+azure_identity = { version = "1.0", default-features = false, features = ["client_certificate"], optional = true }
 
 # Azure Storage
-azure_storage_blob = { version = "0.10.1", optional = true }
+azure_storage_blob = { version = "1.0", default-features = false, optional = true }
 
 # OpenDAL
 opendal = { version = "0.54", default-features = false, features = ["services-webhdfs"], optional = true }
@@ -477,7 +477,7 @@ rdkafka = { workspace = true, features = ["cmake_build"], optional = true }
 
 [target.'cfg(unix)'.dependencies]
 nix = { version = "0.31", default-features = false, features = ["socket", "signal", "fs"] }
-tikv-jemallocator = { version = "0.6.0", default-features = false, features = ["unprefixed_malloc_on_supported_platforms"], optional = true }
+tikv-jemallocator = { version = "0.7.0", default-features = false, features = ["unprefixed_malloc_on_supported_platforms"], optional = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 procfs = { version = "0.18.0", default-features = false }
@@ -1127,6 +1127,7 @@ vector-api-tests = [
   "api",
   "api-client-minimal",
   "sources-demo_logs",
+  "sources-gcp_pubsub",
   "transforms-log_to_metric",
   "transforms-remap",
   "transforms-route",
