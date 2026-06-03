@@ -18,6 +18,7 @@ use crate::{
     transforms::{
         tag_cardinality_limit::config::{
             BloomFilterConfig, InternalMetricsConfig, Mode, default_cache_size,
+            default_ttl_generations,
         },
         test::create_topology,
     },
@@ -46,17 +47,25 @@ fn make_metric(tags: MetricTags) -> Event {
     make_metric_with_name(tags, "event")
 }
 
+/// Default `Inner` for tests: no TTL, default generations. Used as a base for
+/// the `make_transform_*` helpers and any test that constructs `Inner` literally.
+fn default_inner(value_limit: usize, action: LimitExceededAction, mode: Mode) -> Inner {
+    Inner {
+        value_limit,
+        limit_exceeded_action: action,
+        mode,
+        internal_metrics: InternalMetricsConfig::default(),
+        ttl_secs: None,
+        ttl_generations: default_ttl_generations(),
+    }
+}
+
 fn make_transform_hashset(
     value_limit: usize,
     limit_exceeded_action: LimitExceededAction,
 ) -> Config {
     Config {
-        global: Inner {
-            value_limit,
-            limit_exceeded_action,
-            mode: Mode::Exact,
-            internal_metrics: InternalMetricsConfig::default(),
-        },
+        global: default_inner(value_limit, limit_exceeded_action, Mode::Exact),
         tracking_scope: TrackingScope::default(),
         max_tracked_keys: None,
         per_metric_limits: HashMap::new(),
@@ -66,14 +75,13 @@ fn make_transform_hashset(
 
 fn make_transform_bloom(value_limit: usize, limit_exceeded_action: LimitExceededAction) -> Config {
     Config {
-        global: Inner {
+        global: default_inner(
             value_limit,
             limit_exceeded_action,
-            mode: Mode::Probabilistic(BloomFilterConfig {
+            Mode::Probabilistic(BloomFilterConfig {
                 cache_size_per_key: default_cache_size(),
             }),
-            internal_metrics: InternalMetricsConfig::default(),
-        },
+        ),
         tracking_scope: TrackingScope::default(),
         max_tracked_keys: None,
         per_metric_limits: HashMap::new(),
@@ -87,12 +95,7 @@ fn make_transform_hashset_with_per_metric_limits(
     per_metric_limits: HashMap<String, PerMetricConfig>,
 ) -> Config {
     Config {
-        global: Inner {
-            value_limit,
-            limit_exceeded_action,
-            mode: Mode::Exact,
-            internal_metrics: InternalMetricsConfig::default(),
-        },
+        global: default_inner(value_limit, limit_exceeded_action, Mode::Exact),
         tracking_scope: TrackingScope::default(),
         max_tracked_keys: None,
         per_metric_limits,
@@ -106,14 +109,13 @@ fn make_transform_bloom_with_per_metric_limits(
     per_metric_limits: HashMap<String, PerMetricConfig>,
 ) -> Config {
     Config {
-        global: Inner {
+        global: default_inner(
             value_limit,
             limit_exceeded_action,
-            mode: Mode::Probabilistic(BloomFilterConfig {
+            Mode::Probabilistic(BloomFilterConfig {
                 cache_size_per_key: default_cache_size(),
             }),
-            internal_metrics: InternalMetricsConfig::default(),
-        },
+        ),
         tracking_scope: TrackingScope::default(),
         max_tracked_keys: None,
         per_metric_limits,
@@ -128,12 +130,7 @@ fn make_transform_with_global_per_tag_limits(
     per_tag_limits: HashMap<String, PerTagConfig>,
 ) -> Config {
     Config {
-        global: Inner {
-            value_limit,
-            limit_exceeded_action,
-            mode,
-            internal_metrics: InternalMetricsConfig::default(),
-        },
+        global: default_inner(value_limit, limit_exceeded_action, mode),
         tracking_scope: TrackingScope::default(),
         max_tracked_keys: None,
         per_metric_limits: HashMap::new(),
@@ -445,6 +442,8 @@ fn override_inner_hashset(value_limit: usize, action: LimitExceededAction) -> Ov
         limit_exceeded_action: action,
         mode: OverrideMode::Exact,
         internal_metrics: InternalMetricsConfig::default(),
+        ttl_secs: None,
+        ttl_generations: default_ttl_generations(),
     }
 }
 
@@ -456,6 +455,8 @@ fn override_inner_bloom(value_limit: usize, action: LimitExceededAction) -> Over
             cache_size_per_key: default_cache_size(),
         }),
         internal_metrics: InternalMetricsConfig::default(),
+        ttl_secs: None,
+        ttl_generations: default_ttl_generations(),
     }
 }
 
@@ -757,18 +758,15 @@ fn max_tracked_keys_unlimited_by_default() {
     }
 }
 
-/// Regression: with `value_limit: 0`, `limit_exceeded_action: drop_event`, and
-/// `max_tracked_keys` exhausted, the documented untracked-passthrough behavior must
-/// still apply. `tag_limit_exceeded` previously rejected *any* missing-bucket lookup
-/// when `value_limit == 0`, causing events to be dropped before `record_tag_value`
-/// could detect the allocation cap. New (metric, tag-key) pairs that cannot be
-/// allocated must instead pass through unchecked.
+/// With `value_limit: 0`, `limit_exceeded_action: drop_event`, and
+/// `max_tracked_keys` exhausted, new (metric, tag-key) pairs that cannot be
+/// allocated must pass through unchecked rather than dropping the event.
 #[test]
 fn max_tracked_keys_passthrough_with_zero_value_limit_drop_event() {
-    // metric_a uses a normal per-metric override with room for a value, so the first
-    // event reserves the only allocation slot. metric_b inherits the global config,
-    // which combines `value_limit: 0` + `drop_event` — the corner case that originally
-    // dropped events even when the pair couldn't be tracked.
+    // metric_a uses a per-metric override with room for a value, so the first
+    // event reserves the only allocation slot. metric_b inherits the global
+    // config — `value_limit: 0` + `drop_event` — which exercises the
+    // missing-bucket passthrough path under cap exhaustion.
     let config = make_transform_hashset_with_per_metric_limits(
         0,
         LimitExceededAction::DropEvent,
@@ -866,6 +864,8 @@ fn make_per_metric(
             limit_exceeded_action: action,
             mode: OverrideMode::Exact,
             internal_metrics: InternalMetricsConfig::default(),
+            ttl_secs: None,
+            ttl_generations: default_ttl_generations(),
         },
     }
 }
@@ -879,6 +879,8 @@ fn make_per_metric_excluded(per_tag_limits: HashMap<String, PerTagConfig>) -> Pe
             limit_exceeded_action: LimitExceededAction::DropTag,
             mode: OverrideMode::Excluded,
             internal_metrics: InternalMetricsConfig::default(),
+            ttl_secs: None,
+            ttl_generations: default_ttl_generations(),
         },
     }
 }
@@ -1388,12 +1390,7 @@ fn global_per_tag_limit_override_caps_at_explicit_value() {
 #[test]
 fn global_per_tag_overridden_by_per_metric_entry() {
     let config = Config {
-        global: Inner {
-            value_limit: 2,
-            limit_exceeded_action: LimitExceededAction::DropTag,
-            mode: Mode::Exact,
-            internal_metrics: InternalMetricsConfig::default(),
-        },
+        global: default_inner(2, LimitExceededAction::DropTag, Mode::Exact),
         tracking_scope: TrackingScope::default(),
         max_tracked_keys: None,
         per_metric_limits: HashMap::from([(
@@ -1437,6 +1434,236 @@ fn global_per_tag_overridden_by_per_metric_entry() {
             "globally-excluded tag should pass through on unmatched metrics"
         );
     }
+}
+
+// Transform-level TTL coverage focuses on the *config surface* (defaults,
+// deserialization, the public `contains_no_refresh` contract). The behavioral
+// TTL tests, where we need to drive `Instant`s, live in `tag_value_set.rs`.
+
+#[test]
+fn ttl_defaults_off() {
+    let cfg = make_transform_hashset(2, LimitExceededAction::DropTag);
+    assert!(
+        cfg.global.ttl_secs.is_none(),
+        "default config must not enable TTL"
+    );
+    assert_eq!(
+        cfg.global.ttl_generations,
+        default_ttl_generations(),
+        "default generations should match the documented default"
+    );
+}
+
+#[test]
+fn ttl_global_yaml_deserializes() {
+    let yaml = r#"
+value_limit: 5
+mode: exact
+ttl_secs: 3600
+ttl_generations: 6
+"#;
+    let parsed: Config = serde_yaml::from_str(yaml).expect("yaml should deserialize");
+    assert_eq!(parsed.global.ttl_secs, Some(3600));
+    assert_eq!(parsed.global.ttl_generations, 6);
+}
+
+#[test]
+fn ttl_per_metric_yaml_deserializes() {
+    let yaml = r#"
+value_limit: 5
+mode: exact
+ttl_secs: 3600
+per_metric_limits:
+  hot_metric:
+    mode: probabilistic
+    cache_size_per_key: 1024
+    value_limit: 100
+    ttl_secs: 600
+    ttl_generations: 3
+"#;
+    let parsed: Config = serde_yaml::from_str(yaml).expect("yaml should deserialize");
+    assert_eq!(parsed.global.ttl_secs, Some(3600));
+    let pm = parsed.per_metric_limits.get("hot_metric").unwrap();
+    assert_eq!(pm.config.ttl_secs, Some(600));
+    assert_eq!(pm.config.ttl_generations, 3);
+}
+
+/// Pins the basic contract of `contains_no_refresh`: it must return `true`
+/// for a value that was just inserted, across every backend variant. The
+/// "no-refresh" timing semantic (the actual *DropEvent* contract) is verified
+/// in `tag_value_set.rs::tests::{ttl_exact,rolling_bloom}_contains_no_refresh_*`,
+/// where the `Instant`-driven storage methods can be exercised directly.
+///
+/// Note: this test does NOT verify that `tag_limit_exceeded` calls
+/// `contains_no_refresh` (and not `contains`) — that wiring is enforced by
+/// code review of the (private) match arm in `mod.rs::tag_limit_exceeded`.
+#[test]
+fn contains_no_refresh_finds_inserted_values_on_all_backends() {
+    use super::tag_value_set::AcceptedTagValueSet;
+    use crate::event::metric::TagValueSet;
+
+    let v1 = TagValueSet::from(["v1".to_string()]);
+    let bloom_mode = Mode::Probabilistic(BloomFilterConfig {
+        cache_size_per_key: default_cache_size(),
+    });
+
+    for (label, mut set) in [
+        (
+            "exact no-ttl",
+            AcceptedTagValueSet::new(&Mode::Exact, None, 4),
+        ),
+        (
+            "bloom no-ttl",
+            AcceptedTagValueSet::new(&bloom_mode, None, 4),
+        ),
+        (
+            "exact ttl",
+            AcceptedTagValueSet::new(&Mode::Exact, Some(60), 4),
+        ),
+        (
+            "bloom ttl",
+            AcceptedTagValueSet::new(&bloom_mode, Some(60), 4),
+        ),
+    ] {
+        set.insert(v1.clone());
+        assert!(
+            set.contains_no_refresh(&v1),
+            "{label}: should find inserted value"
+        );
+    }
+}
+
+/// `ttl_secs: 0` must select the **non-TTL** backend (same as `None`). If we
+/// ever flipped this to "expire immediately" — i.e. a TTL backend with
+/// `Duration::ZERO` — the 1-second `sweep_interval` floor would mask the bug
+/// in any externally-observable behavior, but the cache would still degrade
+/// silently the moment a sweep boundary was crossed.
+#[test]
+fn ttl_zero_disables_ttl() {
+    use super::tag_value_set::AcceptedTagValueSet;
+
+    let bloom_mode = Mode::Probabilistic(BloomFilterConfig {
+        cache_size_per_key: default_cache_size(),
+    });
+    for (label, set) in [
+        (
+            "exact ttl=0",
+            AcceptedTagValueSet::new(&Mode::Exact, Some(0), 4),
+        ),
+        (
+            "bloom ttl=0",
+            AcceptedTagValueSet::new(&bloom_mode, Some(0), 4),
+        ),
+        (
+            "exact ttl=None",
+            AcceptedTagValueSet::new(&Mode::Exact, None, 4),
+        ),
+        (
+            "bloom ttl=None",
+            AcceptedTagValueSet::new(&bloom_mode, None, 4),
+        ),
+    ] {
+        assert!(
+            !set.ttl_enabled(),
+            "{label}: must select the non-TTL backend"
+        );
+    }
+
+    // Sanity: TTL with a positive value DOES select the TTL backend.
+    let ttl_set = AcceptedTagValueSet::new(&Mode::Exact, Some(60), 4);
+    assert!(ttl_set.ttl_enabled(), "ttl=Some(60) should enable TTL");
+}
+
+#[test]
+fn ttl_existing_yaml_unchanged() {
+    // A pre-TTL config must continue to parse without any TTL fields and
+    // produce ttl_secs=None — that's the backwards-compat contract.
+    let yaml = r#"
+value_limit: 5
+mode: probabilistic
+cache_size_per_key: 2048
+"#;
+    let parsed: Config = serde_yaml::from_str(yaml).expect("yaml should deserialize");
+    assert!(parsed.global.ttl_secs.is_none());
+    assert_eq!(parsed.global.ttl_generations, default_ttl_generations());
+}
+
+/// Once `max_tracked_keys` is reached, buckets emptied by TTL eviction are
+/// reclaimed so new `(metric, tag-key)` pairs can still be tracked.
+#[test]
+fn max_tracked_keys_reclaims_empty_buckets() {
+    use super::tag_value_set::AcceptedTagValueSet;
+
+    let mut config = make_transform_hashset(10, LimitExceededAction::DropTag);
+    config.max_tracked_keys = Some(1);
+    let mut transform = TagCardinalityLimit::new(config);
+
+    // Pre-seed an empty bucket so the transform sees its slot as used.
+    let metric_key: Option<MetricId> = None;
+    let stale_set = AcceptedTagValueSet::new(&Mode::Exact, None, default_ttl_generations());
+    let mut inner = hashbrown::HashMap::new();
+    inner.insert("stale_tag".to_string(), stale_set);
+    transform.accepted_tags.insert(metric_key.clone(), inner);
+    transform.tracked_keys_count = 1;
+
+    assert!(
+        !transform.can_allocate_new_key(),
+        "should be at cap before reclaim"
+    );
+
+    let value = TagValueSet::from(["v".to_string()]);
+    let result = transform.try_accept_tag(metric_key.as_ref(), "fresh_tag", &value);
+    assert_eq!(
+        result,
+        AcceptResult::Tracked,
+        "fresh tag must be tracked after the stale bucket is reclaimed"
+    );
+    let inner_after = transform.accepted_tags.get(&metric_key).unwrap();
+    assert!(
+        inner_after.contains_key("fresh_tag"),
+        "fresh_tag must be present after reclaim"
+    );
+    assert!(
+        !inner_after.contains_key("stale_tag"),
+        "stale_tag bucket must be dropped by reclaim"
+    );
+    assert_eq!(
+        transform.tracked_keys_count, 1,
+        "tracked_keys_count must reflect the swap (1 dropped + 1 added)"
+    );
+}
+
+/// With `value_limit: 0` + `drop_event` + `max_tracked_keys` full but with a
+/// reclaimable empty bucket, `tag_limit_exceeded` must reclaim before deciding
+/// — otherwise the pre-check returns "not exceeded" (cap appears full → fall
+/// through to untracked passthrough) while `record_tag_value` then reclaims
+/// and admits a value that should have been rejected.
+#[test]
+fn tag_limit_exceeded_reclaims_before_value_limit_zero_check() {
+    use super::tag_value_set::AcceptedTagValueSet;
+
+    let mut config = make_transform_hashset(0, LimitExceededAction::DropEvent);
+    config.max_tracked_keys = Some(1);
+    let mut transform = TagCardinalityLimit::new(config);
+
+    let metric_key: Option<MetricId> = None;
+    let stale_set = AcceptedTagValueSet::new(&Mode::Exact, None, default_ttl_generations());
+    let mut inner = hashbrown::HashMap::new();
+    inner.insert("stale_tag".to_string(), stale_set);
+    transform.accepted_tags.insert(metric_key.clone(), inner);
+    transform.tracked_keys_count = 1;
+
+    assert!(
+        !transform.can_allocate_new_key(),
+        "should be at cap before reclaim"
+    );
+
+    let value = TagValueSet::from(["v".to_string()]);
+    assert!(
+        transform.tag_limit_exceeded(metric_key.as_ref(), "fresh_tag", &value),
+        "value_limit: 0 with a reclaimable empty bucket must flag the new \
+         tag as exceeded; otherwise record_tag_value would silently admit it"
+    );
 }
 
 /// Global per-tag YAML syntax mirrors per-metric `per_tag_limits`: `mode: limit_override`
