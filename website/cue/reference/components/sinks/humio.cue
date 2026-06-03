@@ -4,7 +4,6 @@ components: sinks: _humio: {
 	_humio_encoding: enabled: false
 
 	classes: {
-		commonly_used: false
 		delivery:      "at_least_once"
 		development:   "stable"
 		egress_method: "batch"

@@ -194,7 +194,7 @@ impl GcpAuthenticator {
 
     pub fn spawn_regenerate_token(&self) -> watch::Receiver<()> {
         let (sender, receiver) = watch::channel(());
-        tokio::spawn(self.clone().token_regenerator(sender));
+        crate::spawn_in_current_span(self.clone().token_regenerator(sender));
         receiver
     }
 
