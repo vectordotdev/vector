@@ -377,7 +377,34 @@ pub fn generate_descriptor_from_schema(
         );
     }
 
-    Ok((message_descriptor, sdk_message_proto))
+    // Return the pool-resolved DescriptorProto rather than the raw SDK proto.
+    //
+    // `sdk_message_proto` (from `descriptor_from_uc_schema`) contains relative
+    // type names for nested-message fields (e.g. `type_name: "Metadata"`).
+    // After `DescriptorPool::from_file_descriptor_set` the pool resolves those
+    // to fully-qualified names (e.g. `type_name: ".catalog.Row.Metadata"`).
+    // `message_descriptor.descriptor_proto()` exposes the resolved form.
+    //
+    // SDK ≥ 2.0.1 passes the `DescriptorProto` straight to the Databricks
+    // server, which rejects unresolved relative type names with
+    // "Proto not self-contained for field '…' with type name '…'".
+    // Re-encoding through the wire format bridges prost-types 0.13 → 0.14.
+    let resolved_013 = message_descriptor.descriptor_proto().clone();
+    let resolved_encoded =
+        <prost_reflect::prost_types::DescriptorProto as prost_reflect::prost::Message>::encode_to_vec(
+            &resolved_013,
+        );
+    let resolved_014 = <prost_types_014::DescriptorProto as prost_014::Message>::decode(
+        resolved_encoded.as_slice(),
+    )
+    .map_err(|e| ZerobusSinkError::ConfigError {
+        message: format!(
+            "Failed to re-encode resolved DescriptorProto to prost-types 0.14: {}",
+            e
+        ),
+    })?;
+
+    Ok((message_descriptor, resolved_014))
 }
 
 /// Default prefix for package name segments that start with a non-letter.
@@ -509,6 +536,47 @@ mod tests {
             proto_text.contains("message Field008"),
             "Proto should have Field008 nested message"
         );
+    }
+
+    /// Regression test: the DescriptorProto returned by
+    /// `generate_descriptor_from_schema` must have fully-qualified (absolute)
+    /// type names for all message-type fields.
+    ///
+    /// Before the fix, the raw SDK `DescriptorProto` was returned with relative
+    /// type names (e.g. `"Metadata"`). The Databricks server rejects those with
+    /// "Proto not self-contained for field '…' with type name '…'".
+    /// After the fix, the pool-resolved form is returned, where type names are
+    /// absolute FQNs starting with `.` (e.g. `".test_catalog.Row.Metadata"`).
+    #[test]
+    fn test_returned_descriptor_proto_has_fqn_type_names() {
+        let json = include_str!("tests/fixtures/nested_structs_complete_schema.json");
+        let schema: UnityCatalogTableSchema =
+            serde_json::from_str(json).expect("Failed to parse nested_structs_complete schema");
+
+        let (_descriptor, sdk_proto) =
+            generate_descriptor_from_schema(&schema).expect("Failed to generate descriptor");
+
+        fn check_fqn_recursive(desc_proto: &prost_types_014::DescriptorProto) {
+            for field in &desc_proto.field {
+                if let Some(type_name) = &field.type_name
+                    && !type_name.is_empty()
+                {
+                    assert!(
+                        type_name.starts_with('.'),
+                        "field '{}' has relative type_name '{}'; expected a fully-qualified \
+                             name starting with '.' — this indicates the raw (unresolved) SDK \
+                             DescriptorProto was returned instead of the pool-resolved one",
+                        field.name.as_deref().unwrap_or("<unknown>"),
+                        type_name,
+                    );
+                }
+            }
+            for nested in &desc_proto.nested_type {
+                check_fqn_recursive(nested);
+            }
+        }
+
+        check_fqn_recursive(&sdk_proto);
     }
 
     #[test]
