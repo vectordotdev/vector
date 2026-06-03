@@ -358,6 +358,10 @@ impl<'a> SendGroup<'a> {
 
     fn try_detach_send(&mut self, id: &ComponentKey) -> bool {
         if let Some(send) = self.sends.remove(id) {
+            // Deliberately not instrumented with the current span: this drains a send to a sink
+            // that has just been detached from the topology, so it is unrelated to the upstream
+            // component that owns this fanout. Attaching the current span would mis-tag this
+            // task's logs with the upstream component's identity rather than the detached sink's.
             tokio::spawn(async move {
                 if let Err(e) = send.await {
                     warn!(

@@ -23,6 +23,12 @@ If you encounter any issues please [report them here](https://github.com/vectord
 
 {{< /requirement >}}
 
+{{< warning >}}
+Enabling log namespacing does not work when disk buffers are used. Avoid combining
+`schema.log_namespace: true` with disk buffers until
+[#18574](https://github.com/vectordotdev/vector/issues/18574) is resolved.
+{{< /warning >}}
+
 ## Background
 
 Vector traditionally stored metadata (like `host`, `timestamp`, and `source_type`) as top-level

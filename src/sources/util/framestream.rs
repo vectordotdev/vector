@@ -908,7 +908,7 @@ async fn spawn_event_handling_tasks(
 ) -> JoinHandle<()> {
     wait_for_task_quota(&active_task_nums, max_frame_handling_tasks).await;
 
-    tokio::spawn(async move {
+    crate::spawn_in_current_span(async move {
         future::ready({
             if let Some(evt) = event_handler.handle_event(received_from, event_data)
                 && event_sink.send_event(evt).await.is_err()
