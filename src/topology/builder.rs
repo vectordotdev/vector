@@ -1297,12 +1297,12 @@ impl Runner {
 
                             let mut t = self.transform.clone();
                             let mut outputs_buf = self.outputs.new_buf_with_capacity(len);
-                            let task = tokio::spawn(async move {
+                            let task = crate::spawn_in_current_span(async move {
                                 for events in input_arrays {
                                     t.transform_all(events, &mut outputs_buf);
                                 }
                                 outputs_buf
-                            }.in_current_span());
+                            });
                             in_flight.push_back(task);
                         }
                         None => {
