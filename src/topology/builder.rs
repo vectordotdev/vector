@@ -981,7 +981,8 @@ pub async fn reload_enrichment_tables(config: &Config) {
     'tables: for (name, table_outer) in config.enrichment_tables.iter() {
         let table_name = name.to_string();
         if ENRICHMENT_TABLES.needs_reload(&table_name)
-            && !ENRICHMENT_TABLES.is_stateful(&table_name)
+            // Tables that can act as sinks are reloaded through topology
+            && table_outer.as_sink(name).is_none()
         {
             let indexes = Some(ENRICHMENT_TABLES.index_fields(&table_name));
 
