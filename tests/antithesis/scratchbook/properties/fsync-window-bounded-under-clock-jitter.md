@@ -100,43 +100,28 @@ The page-cache path (`writer.flush()`) always runs. The durable path
 `force_full_flush=true`. Under clock jitter, `sync_all` can be suppressed
 indefinitely.
 
-### `force_full_flush` is clock-independent (writer.rs:1120-1130)
+### `force_full_flush` is clock-independent
 
 File rotation calls `flush_inner(force_full_flush=true)` directly, bypassing
-`should_flush()`:
-
-```rust
-// writer.rs:~1124 (inside rotate_data_file)
-data_file.sync_all().await?;
-```
-
-This is the only clock-independent durability checkpoint. If the workload
-generates insufficient write volume to trigger rotation, the only durability
-interval is the `should_flush()` timer — which is suppressed under clock jitter.
-
-### `DEFAULT_FLUSH_INTERVAL` (common.rs:31)
-
-```rust
-// lib/vector-buffers/src/variants/disk_v2/common.rs:31
-pub const DEFAULT_FLUSH_INTERVAL: Duration = Duration::from_millis(500);
-```
+`should_flush()` — the ONLY clock-independent durability checkpoint. With
+insufficient write volume to rotate, the only durability interval is the
+`should_flush()` timer, suppressed under clock jitter. `DEFAULT_FLUSH_INTERVAL`
+is 500ms.
 
 ### Mitigation: `flush_interval=0` removes clock dependence
 
-When `flush_interval = Duration::ZERO`, the condition
-`last_flush.elapsed() > Duration::ZERO` evaluates to `true` after any
-measurable time elapses, effectively making every `flush_inner()` call a
-`sync_all`. Setting `flush_interval=0` in the harness configuration removes
-the clock-jitter attack surface for other durability properties (e.g.,
-`durable-unacked-events-survive-crash`) but is not the production default.
+With `flush_interval = ZERO`, `last_flush.elapsed() > ZERO` is true after any
+elapsed time, making every `flush_inner()` a `sync_all` — removing the clock
+attack surface (recommended oracle setup for `durable-unacked-events-survive-crash`),
+though not the production default.
 
 ### CAS winner descheduling extension
 
 `should_flush()` uses `AtomicCell::compare_exchange`: exactly one concurrent
-caller wins the CAS and becomes responsible for calling `sync_all()`. If that
-caller is descheduled between the CAS win (`is_ok()`) and the actual
-`sync_all()` call, all other callers see `should_flush()=false` for the
-duration. Antithesis can extend this descheduling window arbitrarily.
+caller wins the CAS and owns the `sync_all()`. If that caller is descheduled
+between the CAS win and the `sync_all()`, all others see `should_flush()=false`
+for the duration — a second, clock-independent suppression window Antithesis can
+extend via CPU throttle. (A second distinct sub-scenario; combined here.)
 
 ---
 
@@ -144,99 +129,42 @@ duration. Antithesis can extend this descheduling window arbitrarily.
 
 | Fault | Effect |
 |---|---|
-| Clock jitter (slow virtual clock) | `Instant::elapsed()` advances slowly; `should_flush()` rarely/never true; `sync_all` suppressed. |
-| CPU throttle + slow clock | Writer thread descheduled after CAS win; sync_all delayed past 500ms window. |
-| Crash during suppressed window | Loss extends to all data since last file rotation, not just last 500ms. |
-| Low write volume (no rotation) | No `force_full_flush` path; clock jitter can suppress sync indefinitely. |
+| Clock jitter (slow virtual clock) | `Instant::elapsed()` advances slowly; `should_flush()` rarely true; `sync_all` suppressed. |
+| CPU throttle + slow clock | Writer descheduled after CAS win; `sync_all` delayed past the window. |
+| Crash during suppressed window | Loss extends to all data since the last file rotation, not the last 500ms. |
+| Low write volume (no rotation) | No `force_full_flush`; clock jitter suppresses sync indefinitely (unbounded loss). |
 
 ---
 
-## SUT-Side Instrumentation (not yet committed — the SDK is wired and the three #21683 underflow asserts are present; these are additional)
+## SUT-Side Instrumentation and coverage
 
-The Antithesis SDK is a committed dependency under the `antithesis` feature, and
-three underflow `assert_always_greater_than_or_equal_to!` detectors exist
-(ledger.rs:271/313, reader.rs:529; see existing-assertions.md for what is
-committed). None of those covers the fsync window, so the assertions below
-remain genuine still-to-add suggestions.
+The committed underflow detectors do not cover the fsync window (see `_shelved.md`
+header). Uncommitted candidates: an `assert_always!(elapsed_since_sync <= bound)`
+at the end of `flush_inner` after `sync_all` (fires only when `sync_all` ran, so
+it cannot see total suppression), plus a workload-side check that keeps a shadow
+`last_sync` from an Antithesis clock source (not Rust `Instant`) and asserts a
+bounded gap, fed by an emitted event/trace at the `sync_all` callsite — needed
+because total suppression is invisible from inside the SUT.
 
-### Assertion 1 — Always: elapsed since last sync stays bounded
-
-Placed at the end of `flush_inner`, after the `sync_all` branch:
-
-```rust
-// writer.rs, inside flush_inner, after sync_all completes
-let elapsed_since_sync = self.ledger.last_flush.load().elapsed();
-// This assertion fires on every flush_inner call that DID do sync_all.
-// The bound is set generously to detect extended suppression.
-antithesis_sdk::assert_always!(
-    elapsed_since_sync <= MAX_ACCEPTABLE_SYNC_GAP,
-    "fsync window bounded: elapsed since last sync must be within configurable bound",
-    &serde_json::json!({
-        "elapsed_ms": elapsed_since_sync.as_millis(),
-        "flush_interval_ms": self.config.flush_interval.as_millis(),
-        "bound_ms": MAX_ACCEPTABLE_SYNC_GAP.as_millis(),
-    })
-);
-```
-
-Note: this assertion only fires when `sync_all` executes. A complementary
-workload-side check is needed to detect complete suppression (when
-`flush_inner` runs but `sync_all` is never called over a long window).
-
-### Assertion 2 — Workload-side: monotone sync timestamp
-
-The workload maintains a shadow `last_sync_wall_time` (from an
-Antithesis-provided clock source, not Rust's `Instant`) and asserts that
-`now - last_sync_wall_time <= K * flush_interval` periodically, even under
-clock jitter. This requires a workload-observable hook (tracing event or
-metric emitted when `sync_all` is called).
-
-Candidate: emit a `tracing::info!` event at the `sync_all` callsite:
-
-```rust
-// writer.rs, after sync_all succeeds
-info!(timestamp = ?std::time::SystemTime::now(), "sync_all completed");
-```
-
-The workload monitors this trace event and asserts bounded gaps.
-
----
-
-## Relationship to Other Properties
-
-+ `durable-unacked-events-survive-crash`: that property assumes a bounded
-  loss window. Clock jitter extends it, potentially causing events that would
-  survive under normal timing to be lost. Setting `flush_interval=0` in the
-  harness is the recommended oracle setup for that property.
-+ `writer-eventually-makes-progress`: independent — the deadlock path is
-  arithmetic, not clock-driven.
+Cross-link: `durable-unacked-events-survive-crash` assumes a bounded loss window
+that clock jitter extends; `flush_interval=0` (every flush = fsync) removes this
+attack surface and is the recommended oracle setup there.
+`writer-eventually-makes-progress` is independent (its deadlock is arithmetic,
+not clock-driven).
 
 ---
 
 ## Open Questions
 
-+ Does Antithesis virtual-time affect `Instant::now()` / `Instant::elapsed()`
-  in Rust's standard library on the target runtime? The answer is yes for
-  Antithesis's standard virtual-time instrumentation, but confirm that
-  `crossbeam_utils::atomic::AtomicCell<Instant>` operations in the CAS path
-  also see virtual time (they likely do since they use the underlying
-  `Instant` type).
-
-+ What is the maximum loss window under clock jitter before the FIRST file
-  rotation if write volume is low (e.g., 1 event/second, `max_data_file_size`
-  = 128MB)? At default sizes, rotation never fires; loss window is unbounded
-  under indefinite clock jitter with no incoming writes to trigger rotation.
-  Worth confirming against the GA doc's "500ms" claim.
-
-+ Is there a watchdog / health check in Vector that would alert the operator
-  to a suppressed fsync? Currently: no, the only observability is the
-  `buffer_byte_size` gauge (masked by the #23561 fix) and tracing at TRACE
-  level.
-
-+ Antithesis clock-fault availability: confirm whether clock jitter is
-  enabled in the target tenant or must be explicitly requested, since this
-  property is meaningless without it.
-
-+ The CAS-winner descheduling scenario is a second, distinct sub-property.
-  Should it be split into its own slug, or is the combined framing sufficient
-  for one evidence file?
++ **Confirm Antithesis virtual-time reaches `Instant::elapsed()`** on the target
+  runtime (expected yes) AND the `AtomicCell<Instant>` CAS path (likely, same
+  underlying `Instant`).
++ **Unbounded-before-first-rotation:** at default 128 MiB files and low write
+  volume, rotation never fires, so indefinite clock jitter makes the loss window
+  unbounded — directly contradicts the GA "500ms" claim. The shrunk 2 MiB file
+  knob (experiment-spec) forces frequent rotation, capping the de-facto window.
++ **No fsync watchdog exists** — the only signal is the `buffer_byte_size` gauge
+  (masked by the 23561 fix) and TRACE-level logging.
++ **Clock-fault availability** — this property is meaningless without clock
+  jitter enabled in the tenant; confirm (grind-plan G8 marks it LATER, clock
+  fault).

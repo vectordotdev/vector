@@ -10,10 +10,10 @@
 ## Code reality
 
 The contract is **at-least-once**, by design. Crash-replay (the buffer re-reads
-records whose downstream ack wasn't durably recorded) and sink retries (a request
-that succeeded but whose response was lost is retried) both re-deliver. tail's
-`vector` source does **no deduplication**. So the same payload id can arrive at the
-collector more than once.
+records whose downstream ack wasn't durably recorded) and sink retries (a succeeded
+request whose response was lost is retried) both re-deliver. The tail's `vector`
+source does **no deduplication**, so the same payload id can arrive at the collector
+more than once.
 
 ## Divergence
 

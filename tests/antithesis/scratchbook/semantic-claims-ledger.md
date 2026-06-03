@@ -9,16 +9,16 @@ external_references: []
 
 Doctrine (2026-06-02): discuss the program's **claimed/understood semantics first**,
 then show where code reality diverges — demonstrating that divergence is the goal.
-This ledger is the semantics-first index over the property catalog: each row is a
-claim as people *state* it about the `vector_to_vector_e2e_disk` topology (head
-`http_server`+acks → `disk_v2`(block) → `vector` sink+acks → tail `vector`+acks →
-`disk_v2`(block) → `http` sink+acks → collector; both nodes "durable"), the code
-reality, and how to exhibit the gap in Antithesis.
+Semantics-first index over the property catalog: each row is a claim as people
+*state* it about the `vector_to_vector_e2e_disk` topology (head `http_server`+acks →
+`disk_v2`(block) → `vector` sink+acks → tail `vector`+acks → `disk_v2`(block) →
+`http` sink+acks → collector; both nodes "durable"), the code reality, and how to
+exhibit the gap in Antithesis.
 
-Assertion doctrine for exhibition: pair `assert_always(invariant)` (carries the
-counterexample) with an `assert_unreachable("<the bad state>")` **loss magnet** on
-the confirmed-violation branch so the search engine actively *hunts* the divergence
-instead of passively checking for it.
+Exhibition doctrine: pair `assert_always(invariant)` (carries the counterexample)
+with an `assert_unreachable("<the bad state>")` **loss magnet** on the
+confirmed-violation branch so the search engine *hunts* the divergence rather than
+passively checking for it.
 
 | # | Claim (as stated) | Code reality | Divergence | Catalog property / how to exhibit |
 |---|---|---|---|---|
@@ -35,7 +35,7 @@ instead of passively checking for it.
 | C11 | "e2e acks ⇒ exactly-once (no duplicates)." | At-least-once by design: crash-replay and sink retries re-deliver (tail source has no dedup). | NOT a bug — but people conflate at-least-once with exactly-once. Duplicates are expected. | **NEW `delivery-is-at-least-once-not-exactly-once`** (clarifying, marked not-a-defect). Exhibit: `assert_sometimes(duplicate observed)` — also our anti-vacuity guard. |
 | C12 | "Events come out in the order they went in." | disk_v2 is FIFO by *ingestion* order, but concurrent ingest races the writer `Mutex` and egress reorders (`FuturesUnordered`, adaptive concurrency). | NOT a strong product promise — order is not preserved end-to-end. Documented here so the oracle never assumes it (we use sets, not order). | No assertion (would be a false red). Recorded so harness authors don't build order-based checks. |
 
-The mission's headline is **C1 + C2 + C6 + C10**: build the advertised "durable
-chain" exactly as people describe and force it to drop data Vector said "ack" to.
-C3–C5, C7–C9 are the supporting divergences already in the catalog. C11–C12 are
-understanding-gaps, not defects — recorded so the oracle stays sound.
+Headline is **C1 + C2 + C6 + C10**: build the advertised "durable chain" exactly as
+people describe and force it to drop data Vector said "ack" to. C3–C5, C7–C9 are
+supporting divergences already in the catalog. C11–C12 are understanding-gaps, not
+defects — recorded so the oracle stays sound.

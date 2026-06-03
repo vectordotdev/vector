@@ -1,268 +1,53 @@
 ---
 sut_path: /home/ssm-user/src/vector
-commit: 049eec79b737450c4669b7f8aa1dd814551ec466
-updated: 2026-06-02
-external_references:
-  - path: lib/vector-buffers/src/variants/disk_v2/mod.rs
-    why: Confirms the buffer is single-process (intra-Vector reader+writer over an mmap'd ledger)
-  - path: https://antithesis.com/docs/environment/fault_injection
-    why: Faults are pod-level; node-termination "may lose all modified data and boot fresh from image" — drives one-pod-per-node + persistent-volume-per-node
-  - path: (internal design doc, not linked)
-    why: Disk buffer is configured per-sink; e2e acks require a supporting source; at-least-once semantics
-  - path: (internal design doc, not linked)
-    why: Existing chaos test crashes the worker with SIGKILL x3 + e2e acks — the topology must support repeated kill/restart
-  - path: distribution/docker/
-    why: Existing Vector Dockerfiles to reuse/adapt for the SUT container
+commit: 2dae1f421
+updated: 2026-06-03
 ---
 
-# Deployment Topology: Disk Buffer v2
+# Deployment Topology: Disk Buffer v2 — design rationale
 
-## Key fact driving the design
+The shipped `tests/antithesis/scenarios/vector_to_vector_e2e_disk/`
+(docker-compose.yaml + head.yaml + tail.yaml + README.md) is the **source of
+truth** for ports, volumes, sizes, and the env knob. This stub keeps only the
+rationale not captured there. (Cross-reference values: `head` is an `http_server`
+source on 8080 → `vector` sink to `tail:6000`; `tail` is a `vector` source →
+`http` sink to the oracle on 8686; both buffers `when_full: block`, `max_size:
+8388608` (8 MiB), metrics on 9598, per-node persistent volume at `/var/lib/vector`,
+`VECTOR_DISK_V2_MAX_DATA_FILE_SIZE=2097152` (2 MiB) to force rotation.)
 
-The disk buffer is **single-process**: the reader, writer, and finalizer all run
-inside one Vector process, coordinating through an `mmap`'d ledger and the local
-filesystem. There is **no network, no peer, no quorum**. Therefore:
+## Why each node is its own pod
 
-- The strong fault levers are **node termination (kill/restart)**, **node hang**,
-  **CPU throttling**, **clock jitter**, and **filesystem state across restart** —
-  NOT network partitions or bad-node faults (those are irrelevant to the buffer).
-- The topology is minimal: **one SUT container + one workload/client container.**
-  No dependency containers are needed (no S3/Kafka/Postgres) — the buffer's only
-  "dependency" is the local filesystem.
+Antithesis faults are **pod-level** (`environment/fault_injection`): two processes
+in one pod never see network faults between them. To make the inter-node `vector`
+links partitionable — the point of the conservation chain — each Vector node must
+be its own container/pod. Co-locating two silently disables the partition lever.
+(The disk buffer is single-process, so partitions never touch it directly; the
+chain shape turns a partition into buffer pressure on a `block`-mode buffer.)
 
-## Topology A — single SUT + workload (SUPERSEDED)
+## Start small, earn the ring
 
-> SUPERSEDED by the committed Topology B (the head/tail/oracle chain, N=2).
-> The shipped compose under `tests/antithesis/scenarios/vector_to_vector_e2e_disk`
-> uses services `head`, `tail`, `oracle` — see Topology B below. This single-SUT
-> sketch is kept for the design rationale only.
+Shipped **N=2, no loop** (head → tail → oracle collector): a real conservation
+oracle, two buffer crossings, no self-deadlock risk. The **ring** (close tail→head,
+add lap-drain) is a stress upgrade to earn once the chain is green — the lap-drain
+keeps a `block`-mode ring from self-deadlocking on legitimate backpressure (a false
+positive). Still absent: an `assert_sometimes!` proving a writer actually parked on
+a full `block`-mode buffer, confirming the partition-fills-buffer lever is
+exercised, not just configured.
 
-```text
-+-----------------------------+         events (HTTP, e2e-ack-capable source)
-|  workload (client)          |  ----------------------------------------->  +-----------------------------+
-|  - produces unique event IDs|                                              |  vector (SUT)               |
-|  - HTTP collector endpoint  |  <-----------------------------------------  |  source -> sink(disk buffer)|
-|  - tracks produced/delivered|         sink delivers here (HTTP sink)        |  data_dir on PERSISTENT vol |
-|  - emits Antithesis asserts |                                              +-----------------------------+
-|  - test template /opt/...   |                                                      |  Antithesis injects
-+-----------------------------+                                                      |  node-kill / hang /
-                                                                                     |  CPU-throttle / clock
-                                                                                     v  faults HERE
-                                                                            +-----------------------------+
-                                                                            | persistent volume           |
-                                                                            | <data_dir>/buffer/v2/<id>/  |
-                                                                            +-----------------------------+
-```
+## Persistent volume is mandatory
 
-## Containers
+Each node's `data_dir` must survive node-termination restart. If a modeled crash
+recreates the container with a fresh filesystem, that hop's buffer is wiped and
+every crash-recovery property passes vacuously (or fails spuriously). Confirm how
+the tenant's node-termination interacts with filesystem persistence.
 
-### 1. `vector` — Service (the SUT)
+## Open questions
 
-- **Image:** adapt an existing Dockerfile from `distribution/docker/` (Debian or
-  Distroless). Two build variants:
-  - **Baseline build:** stock Vector — exercises all workload-observable
-    properties (durability, at-least-once, deadlock-via-throughput-stall, metric
-    correctness, recovery).
-  - **Instrumented build (recommended for the deadlock/corruption cluster):**
-    Vector built with the **Antithesis Rust SDK** added as a dependency to
-    `lib/vector-buffers`, with the missing SUT-side assertions inserted (see
-    "SUT-side instrumentation" below). This is the only way to directly assert
-    the internal states (`total-buffer-size-never-underflows`,
-    `record-id-monotonicity-holds`, `partial-write-at-rotation-recovers`,
-    `graceful-shutdown-flushes-all`/`unflushed_bytes==0`) that are invisible from
-    the workload.
-- **Runs:** a single `vector` process with a config:
-  - `source`: an e2e-ack-capable source the workload can push to. Prefer
-    `datadog_agent` or `http_server` with `acknowledgements: true` (needed for
-    `every-written-event-eventually-delivered` and the durable-survival
-    properties). Keep one source.
-  - `sink`: an `http` sink with `buffer: { type: disk, max_size: <~256MB+>,
-    when_full: block }`, posting to the workload's collector. A second
-    config/run uses `when_full: drop_newest` for `dropped-events-are-counted`.
-  - Internal metrics exposed (e.g. `internal_metrics` → `prometheus_exporter`)
-    so the workload can read `buffer_*` / `component_discarded_events_total` for
-    the metric-correctness properties.
-- **CRITICAL — persistent buffer storage:** the disk-buffer `data_dir` MUST be on
-  storage that **survives the container's kill/restart**. Disk-buffer durability
-  is the whole point; if Antithesis node-termination recreates the container with
-  a fresh filesystem, the buffer is wiped and every crash-recovery property
-  passes vacuously (or fails spuriously). Mount `<data_dir>` on a persistent
-  volume. **Confirm with the user how their tenant's node-termination interacts
-  with filesystem persistence.**
-- **Faults target this container:** node kill/restart (required by Categories
-  2–6), node hang, CPU throttle (widens fsync/lock-contention windows), clock
-  jitter (perturbs the 500ms `should_flush` deadline).
-- **Replica count:** 1. (No replication; more instances add nothing.)
-- **Tuning for bug-finding:** set a small `max_data_file_size` (e.g. 1MB) and a
-  small `max_size` to maximize file-rotation frequency and reach the rotation/
-  partial-write window faster; optionally set `flush_interval` low to widen the
-  durably-written set, or high to widen the loss window — test both.
-
-### 2. `workload` — Client (the test driver)
-
-- **Image:** a small Rust (or Go) container with the **Antithesis Rust SDK** (to
-  match the SUT language and emit assertions). Includes the test template at
-  `/opt/antithesis/test/v1/{name}/`.
-- **Runs:**
-  1. Starts an HTTP **collector** endpoint (the sink's destination) that records
-     every delivered event ID (counting duplicates).
-  2. Emits `setup_complete` once it and Vector are ready.
-  3. Sleeps so Antithesis can run test-template commands.
-- **Test-template commands** drive: produce a stream of uniquely-IDed events to
-  Vector's source; periodically (via `ANTITHESIS_STOP_FAULTS` quiet periods)
-  drain and assert liveness/at-least-once; inspect Vector's metrics; toggle the
-  collector to return errors (for `sink-failure-not-silently-acked`); trigger a
-  config reload (custom fault, for `config-reload-no-silent-loss`).
-- **Assertions emitted here** (workload-observable properties): at-least-once
-  set-difference, no-loss-on-graceful-shutdown, drop accounting vs metric, writer
-  throughput resumes after recovery (deadlock signal), buffer gauges return to ~0
-  on drained restart.
-- **Replica count:** 1.
-
-## SUT-side instrumentation (for the instrumented build)
-
-The Antithesis SDK is a committed dependency of `lib/vector-buffers` under the
-`antithesis` feature, and three #21683 underflow detectors are already present.
-For the internal-state properties:
-
-- COMMITTED: `assert_always_greater_than_or_equal_to!` at the three underflow
-  sites — `ledger.rs:313` (`decrement_total_buffer_size`, `total_buffer_size >=
-  amount`, before the `fetch_sub` at `ledger.rs:319`), `reader.rs:529`
-  (`metadata.len() >= bytes_read`, before the delta at `reader.rs:535`), and
-  `ledger.rs:271` (`get_total_records`, the wrapped-id difference is `>= 1`).
-  All three back `total-buffer-size-never-underflows`. They are detectors,
-  not guards: they report the wrap, the subtraction still runs.
-- `assert_sometimes!(writer_unblocked_after_full)` after `ensure_ready_for_write`
-  exits its wait loop; `assert_unreachable!` on repeated no-progress wakeups
-  (`writer-eventually-makes-progress`).
-- `assert_unreachable!` at the monotonicity panic `reader.rs:~482`
-  (`record-id-monotonicity-holds`).
-- `assert_always_or_unreachable!` at the record-emission point `reader.rs:~1131`
-  (`no-corrupted-record-delivered`) and `assert_sometimes!` in the
-  `is_bad_read` branch `reader.rs:~1035` (`corruption-is-detected-and-recovered`).
-- `assert_sometimes!(torn_tail_recovered)` in the `validate_last_write`
-  recovery branches (`partial-write-at-rotation-recovers`).
-- `assert_always!(unflushed_bytes == 0)` inside `close()`
-  (`graceful-shutdown-flushes-all`).
-
-These assertions are no-ops outside Antithesis, so the instrumented build is safe
-to run normally.
-
-## Custom faults required
-
-- **Config reload** (`config-reload-no-silent-loss`): a custom fault that sends
-  `SIGHUP` to the Vector process (or swaps the config file and triggers reload),
-  fired under sustained load.
-- **Downstream sink error** (`sink-failure-not-silently-acked`): the workload's
-  collector returns 5xx for a window, or a custom fault toggles it.
-
-## SDKs
-
-- **Workload:** Antithesis Rust SDK (or Go SDK) — required to emit assertions and
-  `setup_complete`, and to draw random numbers for the producer.
-- **SUT:** Antithesis Rust SDK only for the instrumented build.
-
-## Simplicity note
-
-Two containers, one network link, no external dependency services. Every
-container is justified: the SUT runs the buffer; the workload produces/observes
-and asserts. We deliberately exclude S3/Kafka/etc. — the disk buffer has no such
-dependency. The only non-obvious requirement is the **persistent volume for the
-buffer data_dir**, which is essential for crash-durability testing to be
-meaningful.
-
-## Open Questions
-
-- How does the target Antithesis tenant's node-termination fault interact with
-  container filesystem persistence? (Determines whether the buffer survives a
-  modeled crash — essential.)
-- Are node-termination and clock faults enabled in the tenant? (Categories 2–6
-  need kill/restart.)
-- Which e2e-ack-capable source is easiest to drive from the workload —
-  `http_server`, `datadog_agent`, or `socket`? (Affects workload protocol.)
-- Is config reload feasible as a custom fault (SIGHUP) in the harness, or must the
-  workload drive it via Vector's API?
-
----
-
-## Topology B — Multi-node conservation chain (for `multi-hop-conservation-no-loss`)
-
-The single-SUT topology above is intra-process: network faults never touch the
-buffer. The **conservation chain** the user asked for ("what goes in comes back
-out") is a deliberately different shape that turns network faults into buffer
-pressure.
-
-Shipped as N=2: `head` → `tail`, with the `oracle` container driving and
-collecting. Ports: 8080 head HTTP source, 6000 head→tail inter-node `vector`,
-9598 metrics (both nodes), 8686 oracle.
-
-```text
- oracle injector (parallel_driver xN)                              oracle collector
- mints unique ids, logs ACKED  --HTTP:8080-->  [head]  --vector proto:6000-->  [tail]
-                                                 src                            src
-                                                 |                              |
-                                               disk_v2                        disk_v2
-                                               block+acks                     block+acks
-                                                 |                              |
-                                               vsink ---vector proto:6000-----> |
-                                                                                |
-                                                              [tail] --HTTP--> oracle (logs DELIVERED)
-```
-
-### Why each node is its own pod
-
-Antithesis faults are **pod-level** (`environment/fault_injection`): two
-processes in one pod never see network faults between them. To make the
-inter-node `vector` links partitionable — the whole point of the chain — **each
-Vector node must be its own container/pod.** Co-locating two nodes would silently
-disable the new fault lever.
-
-### Containers
-
-- **`head` and `tail`** (shipped N=2) — two copies of the **same instrumented
-  Vector image**. Config per node:
-  - `source`: `head` takes an `http_server` source on `0.0.0.0:8080` for
-    injection; `tail` takes a `vector` source on `0.0.0.0:6000` (native protocol,
-    `acknowledgements: true`).
-  - `sink`: `head`'s sink is `vector` → `tail:6000`; `tail`'s sink is `http` →
-    oracle. Each carries `buffer: { type: disk, when_full: block, max_size:
-    8388608 }` (8 MiB, 8 data files) with `acknowledgements` wired through. Both
-    expose metrics on `0.0.0.0:9598`.
-  - Per-node **persistent volume** for `data_dir` (mandatory — fresh-boot
-    restart otherwise wipes that hop's buffer → spurious loss). Volumes
-    `v2v-buffer-head` / `v2v-buffer-tail` at `/var/lib/vector`.
-  - `VECTOR_DISK_V2_MAX_DATA_FILE_SIZE=1048576` (1 MiB) on **both** nodes to force
-    rotation; the committed `assert_always_greater_than_or_equal_to!` underflow
-    detectors fire on whichever node hits the bad state.
-- **`oracle`** — head injector (`parallel_driver_`, N concurrent) + collector
-  (long-lived `serve`) + `eventually_conservation` drain-and-check, listening on
-  8686. Globally-unique ids, shared `ACKED`/`DELIVERED` logs, dedup at collector.
-
-### Faults
-
-Node-kill/restart per node (independent), **partition between adjacent node
-pods** (the new lever — fills a buffer under `block`), CPU throttle, clock
-jitter. Each node killed/partitioned independently maximizes the cross-hop loss
-surface.
-
-### Start small
-
-Shipped as **N=2, no loop** (head → tail → oracle collector): real conservation
-oracle, two buffer crossings, no self-deadlock risk. Earn the **ring** (close
-tail→head + lap-drain) as a stress upgrade once the chain is green — the lap-drain
-is required to keep a `block`-mode ring from self-deadlocking on legitimate
-backpressure (a false positive). See `properties/multi-hop-conservation-no-loss.md`.
-
-Still-absent suggestion: an `assert_sometimes!(blocked_on_full_buffer)` on the
-chain (after a writer parks on a full `block`-mode buffer) would prove the
-partition-fills-buffer lever is actually exercised, not just configured. Not yet
-committed.
-
-### New open questions (Topology B)
-
-- e2e-ack transitivity across `vector` hops (OQ-1 in the property file) — decides
-  whether the head ack means durable-to-tail or durable-at-hop-0.
+- e2e-ack transitivity across `vector` hops: does a head ack mean durable-to-tail
+  or durable-at-hop-0? (see `properties/ack-is-per-hop-not-transitive.md`.)
 - Does mid-chain `block` backpressure propagate to the head injector, or get
   absorbed by an upstream source buffer?
-- Quiescence signal for the `eventually_` oracle: every node's buffer gauge ~0
-  AND collector count stable for K seconds (not a fixed sleep).
+- Quiescence signal for the `eventually_` oracle: every node's buffer gauge ~0 AND
+  collector count stable for K seconds (not a fixed sleep).
+- Node-termination and clock faults enabled in the target tenant? Nearly every
+  crash-class property needs them.

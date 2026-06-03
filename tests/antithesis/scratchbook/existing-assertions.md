@@ -1,122 +1,82 @@
 ---
 sut_path: /home/ssm-user/src/vector
-commit: 049eec79b737450c4669b7f8aa1dd814551ec466
-updated: 2026-06-02
+commit: 2dae1f421
+updated: 2026-06-03
 external_references:
-  - path: lib/vector-buffers/
-    why: Scanned the crate (and whole repo) for Antithesis SDK imports and assertion calls
+  - path: lib/vector-buffers/src/variants/disk_v2/
+    why: Committed SUT-side assertions, behind the `antithesis` feature
   - path: tests/antithesis/scenarios/vector_to_vector_e2e_disk/
-    why: The committed harness now carries workload-side and oracle-side assertions
+    why: Committed harness carrying workload-side and oracle-side assertions
   - path: https://github.com/vectordotdev/vector/issues/21683
-    why: The total_buffer_size underflow / writer-deadlock bug the SUT-side assertions target
+    why: The total_buffer_size underflow / writer-deadlock the SUT assertions target
 ---
 
 # Existing Antithesis SDK Assertions
 
-## Summary
+Every assertion below is an Antithesis SDK macro: they **report, not panic** (a
+detector, not a guard — the watched arithmetic still runs on the next line). The
+SUT-side ones compile only under `--features antithesis`; production is unchanged.
 
-**Instrumentation now exists.** An earlier pass recorded zero Antithesis SDK
-usage anywhere in the repo. That is no longer true: the `blt/antithesis-research`
-branch committed both SUT-side assertions (in `lib/vector-buffers`, behind the
-`antithesis` feature) and a full harness of workload/oracle assertions (in
-`tests/antithesis/scenarios/vector_to_vector_e2e_disk`). This file is the
-reconciled inventory at commit `049eec79b`.
+## SUT-side (`lib/vector-buffers/src/variants/disk_v2/`, `#[cfg(feature = "antithesis")]`)
 
-Every assertion below is the Antithesis SDK macro form. Per the SDK, these
-report to Antithesis and **do not panic** — they are detectors, not guards. The
-SUT-side ones are compiled only under `--features antithesis`; production builds
-are unchanged.
+Listed by symbol/message — grep the message. 11 sites, not the 3 an earlier pass
+recorded. The three `assert_always_greater_than_or_equal_to!` underflow witnesses
+are the #21683 family:
 
-## SUT-side assertions (`lib/vector-buffers`, `#[cfg(feature = "antithesis")]`)
+- `ledger.rs` `get_total_records` — "ledger get_total_records never underflows on
+  a drained buffer" (`next_writer_id.wrapping_sub(last_reader_id) >= 1`).
+- `ledger.rs` `decrement_total_buffer_size` — "ledger total_buffer_size decrement
+  never underflows" (`total_buffer_size >= amount`, before the `fetch_sub`).
+- `reader.rs` `delete_completed_data_file` — "reader data-file size delta never
+  underflows" (`metadata.len() >= bytes_read`).
 
-All three are `assert_always_greater_than_or_equal_to!`, each placed immediately
-before the unguarded subtraction it watches. They are the in-process witnesses
-for the #21683 underflow family.
+The remaining sites mark reachability and rare-state coverage:
 
-| File:line | Watches | Message |
-| --- | --- | --- |
-| `ledger.rs:271` | `get_total_records`'s `… - 1` (wrapped-id difference must be ≥ 1) | "ledger get_total_records never underflows on a drained buffer" |
-| `ledger.rs:313` | `decrement_total_buffer_size`'s `fetch_sub(amount)` | "ledger total_buffer_size decrement never underflows" |
-| `reader.rs:529` | the `metadata.len() - bytes_read` size-delta in the file-deletion path | "reader data-file size delta never underflows" |
+- `ledger.rs` reopen path — `assert_sometimes!` "the buffer reopens with
+  pre-existing on-disk records".
+- `reader.rs` monotonicity check — `assert_unreachable!` "reader never sees a
+  record id that breaks monotonicity".
+- `reader.rs` bad-read branch — `assert_sometimes!` "the reader skips a torn or
+  corrupted record and rolls the file".
+- `reader.rs` emission point — `assert_always_or_unreachable!` "no corrupted or
+  empty record is delivered to the reader" (`record_bytes > 8`).
+- `writer.rs` rotation gate — `assert_always_or_unreachable!` "a record never spans
+  two data files".
+- `writer.rs` full-buffer wait — `assert_sometimes!` "the writer blocks on a full
+  buffer".
+- `writer.rs` rotation — `assert_sometimes!` "the writer rolls to a new data file".
+- `writer.rs` flush — `assert_sometimes!` "a record at or over the write-buffer
+  size is written".
 
-Detector-not-guard caveat (from code review): because the macros report rather
-than abort, the underflowing arithmetic still executes on the line after a
-failing assertion — Antithesis records the violation, the wrap still happens.
-The `ledger.rs:313` check loads `total_buffer_size` separately from the
-subsequent `fetch_sub`; given disk_v2's single-reader/single-writer model with
-increment-only concurrency from the writer, this TOCTOU cannot mask a real
-underflow (a concurrent increment only makes the subtraction safer). See
-`properties/total-buffer-size-never-underflows.md`.
+TOCTOU note: the `decrement_total_buffer_size` check loads `total_buffer_size`
+separately from the `fetch_sub`. Under disk_v2's single-writer model (writer only
+increments) a concurrent increment only makes the subtraction safer, so this cannot
+mask a real underflow.
 
-## Harness assertions (`tests/antithesis/scenarios/vector_to_vector_e2e_disk/src/bin`)
+## Harness-side (`vector_to_vector_e2e_disk/src/bin`, always compiled with SDK `full`)
 
-Workload/oracle side, always compiled (the harness crate always depends on the
-SDK with `full`).
+- **oracle.rs** — `assert_always!(was_issued)` online integrity / no-spurious on
+  every `/ingest`; `assert_reachable!` first end-to-end delivery; `assert_reachable!`
+  oracle up after SUT readiness. Calls `lifecycle::setup_complete(...)` once the SUT
+  metrics endpoint answers.
+- **parallel_driver_produce.rs** — `assert_reachable!` the e2e-ack path is exercised.
+- **eventually_conservation.rs** — `assert_unreachable!` oracle reachable at
+  judgment; `assert_always_less_than_or_equal_to!(missing_count, 0)` conservation
+  (every acked id came back); `assert_unreachable!` redundant loss flag;
+  `assert_always_less_than_or_equal_to!(spurious_count, 0)` no invented/corrupted
+  ids; `assert_sometimes_greater_than!(acked, 100)` coverage;
+  `assert_sometimes_greater_than!(delivered_total, delivered)` at-least-once replay
+  ran; `assert_always!(progressed)` liveness (a fresh event still round-trips).
 
-**oracle.rs** — the conservation judge (separate process from the SUT):
+## Soundness notes (what a green run means)
 
-| Line | Macro | Property |
-| --- | --- | --- |
-| `oracle.rs:118` | `assert_always!(was_issued, …)` | online integrity / no-spurious; fires on every `/ingest` |
-| `oracle.rs:128` | `assert_reachable!` | first end-to-end delivery is reached |
-| `oracle.rs:202` | `assert_reachable!` | oracle came up after SUT readiness |
-
-**parallel_driver_produce.rs** — the producer driver:
-
-| Line | Macro | Property |
-| --- | --- | --- |
-| `parallel_driver_produce.rs:105` | `assert_reachable!` | the e2e-ack path is exercised |
-
-**eventually_conservation.rs** — end-of-test conservation + liveness:
-
-| Line | Macro | Property |
-| --- | --- | --- |
-| `eventually_conservation.rs:157` | `assert_unreachable!` | oracle must be reachable at judgment time |
-| `eventually_conservation.rs:165` | `assert_always_less_than_or_equal_to!(missing_count, 0, …)` | conservation: every acked id came back (**gated on quiescence**) |
-| `eventually_conservation.rs:174` | `assert_unreachable!` | redundant loss flag (**gated on quiescence**) |
-| `eventually_conservation.rs:181` | `assert_always_less_than_or_equal_to!(spurious_count, 0, …)` | no invented/corrupted ids (**gated on quiescence**) |
-| `eventually_conservation.rs:190` | `assert_sometimes_greater_than!(acked, 100, …)` | coverage: a large set was acked and conserved |
-| `eventually_conservation.rs:196` | `assert_sometimes_greater_than!(delivered_total, delivered, …)` | coverage: the at-least-once replay path ran |
-| `eventually_conservation.rs:218` | `assert_always!(progressed, …)` | liveness: a fresh event still round-trips |
-
-Lifecycle: `oracle.rs:201` calls `lifecycle::setup_complete(...)` after the SUT
-metrics endpoint answers; all three binaries call `antithesis_init()` first.
-
-## Soundness notes carried from code review (2026-06-02)
-
-These affect what a green run means and are tracked as open questions on the
-conservation properties:
-
-- **Quiescence-gated conservation.** The `missing_count`/`spurious_count`
-  `assert_always_*` checks fire only inside `if quiescent`. The target bug is a
-  permanent writer wedge; a wedge that prevents the counters from settling for
-  5 polls within the 240s deadline leaves these checks *skipped* (a skipped
-  `assert_always` is not a failure). Only the online `oracle.rs:118` spurious
-  check is unconditional — conservation has no unconditional equivalent. See
-  `properties/multi-hop-conservation-no-loss.md`.
-- **Best-effort ack relay.** `parallel_driver_produce.rs` records the obligation
-  by POSTing `/acked` with the HTTP result discarded (`let _ =`). A dropped
-  relay over a fault-injected link erases the obligation, so a later genuine
-  loss of that id is invisible to `missing = acked - delivered`. See
-  `properties/every-written-event-eventually-delivered.md`.
-
-## Anchors still useful for future instrumentation
-
-- `tracing` (`trace!`/`debug!`/`error!`) marks where invariants already matter —
-  e.g. the wrapping `trace!` in `decrement_total_buffer_size` itself.
-- `metrics`-based internal events (`internal_events.rs`, `buffer_usage_data.rs`)
-  are the existing observability surface; #21683 lives in the gap between these
-  metrics and reality (PR #23561 saturated only the reporter gauge).
-- `debug_assert!`/`assert!` plus the `proptest` + model tests under
-  `variants/disk_v2/tests/` show where the authors already considered invariants
-  worth checking.
-
-## Assumptions / Open Questions
-
-- The SUT-side assertions are the committed form (`assert_always_greater_than_or_equal_to!`),
-  not the `assert_unreachable!`/`assert_always!(amount <= current)` framing that
-  earlier evidence files proposed. Evidence files have been reconciled to the
-  committed form; do not re-propose them as "missing."
-- Whether to add a fourth SUT-side `assert_reachable!` at the underflow-recovery
-  branch once a real saturation fix lands (to confirm Antithesis triggers the
-  scenario) remains open — see `properties/total-buffer-size-never-underflows.md`.
+- **Quiescence-gated conservation.** The `missing_count`/`spurious_count` checks
+  fire only inside `if quiescent`. The target bug is a permanent writer wedge; a
+  wedge preventing the counters from settling within the deadline leaves these
+  checks *skipped* (a skipped `assert_always` is not a failure). Only the online
+  `oracle.rs` spurious check is unconditional — conservation has no unconditional
+  equivalent.
+- **Best-effort ack relay.** `parallel_driver_produce.rs` records the obligation by
+  POSTing `/acked` with the HTTP result discarded (`let _ =`). A dropped relay over
+  a fault-injected link erases the obligation, so a later genuine loss of that id is
+  invisible to `missing = acked - delivered`.

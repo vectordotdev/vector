@@ -4,75 +4,60 @@
 
 **Type:** Liveness / Sometimes (at-least-once) — `Sometimes(all_produced_delivered)`
 
-**Property:** With end-to-end (e2e) acks enabled, every event accepted by the
-source (written into the disk buffer) is eventually delivered downstream at
-least once across crashes. Duplicates are allowed; silent loss is not. This is
-the at-least-once contract the product sells.
+**Property:** With e2e acks enabled, every event accepted by the source (written
+into the disk buffer) is eventually delivered downstream at least once across
+crashes. Duplicates allowed, silent loss not — the at-least-once contract the
+product sells.
 
-**Invariant:** Let `PRODUCED` be the set of unique IDs of all events the
-workload submitted to Vector's source. After faults and a quiet period
-(no new events produced, no in-flight acks), every ID in `PRODUCED` must appear
-at least once in `DELIVERED` (the set of IDs observed at the downstream sink).
-`|DELIVERED| ≥ |PRODUCED|` is expected (duplicates from crash+replay); the
-violation is any ID in `PRODUCED \ DELIVERED`.
+**Invariant:** Let `PRODUCED` be the unique IDs the workload submitted to the
+source. After faults and a quiet period (no new events, no in-flight acks), every
+ID in `PRODUCED` appears at least once in `DELIVERED` (IDs at the downstream sink).
+`|DELIVERED| ≥ |PRODUCED|` is expected (crash+replay duplicates); the violation is
+any ID in `PRODUCED \ DELIVERED`.
 
 **Antithesis Angle:**
 
-1. Workload assigns each event a globally unique ID (e.g., a monotonic counter
-   embedded in the event payload). It records every submitted ID in `PRODUCED`.
-2. The downstream sink (a workload-controlled stub or a log sink with
-   structured output) records every received ID in `DELIVERED`.
-3. Antithesis injects faults at arbitrary timing: SIGKILL during write, during
-   fsync, during read, during ack, during file deletion, during rotation.
-   Vector restarts after each kill and resumes.
-4. After the quiet period (workload stops producing, Vector drains to empty,
-   writer is closed), the workload compares `PRODUCED` and `DELIVERED`.
-5. `Sometimes(all_produced_delivered)` fires when `PRODUCED ⊆ DELIVERED` is
-   reached — i.e., the system successfully delivered all events at least once
-   in at least one timeline explored by Antithesis.
-6. A workload-level hard assertion (`assert_always`) fires if
-   `PRODUCED \ DELIVERED` is non-empty after the quiet period — this is the
-   primary falsification signal.
+1. Workload assigns each event a unique ID (monotonic counter in the payload) and
+   records it in `PRODUCED`.
+2. The downstream sink (workload stub or structured log sink) records every
+   received ID in `DELIVERED`.
+3. Antithesis injects SIGKILL at arbitrary timing — during write, fsync, read,
+   ack, file deletion, rotation. Vector restarts and resumes after each.
+4. After the quiet period (production stopped, buffer drained, writer closed) the
+   workload compares the sets.
+5. `Sometimes(all_produced_delivered)` fires when `PRODUCED ⊆ DELIVERED` in at
+   least one explored timeline.
+6. A hard `assert_always` fires if `PRODUCED \ DELIVERED` is non-empty at
+   quiescence — the primary falsification signal.
 
-**Why It Matters:** This is the product's headline durability guarantee. A
-customer enabling disk buffers + e2e acks is explicitly opting into at-least-
-once delivery. If even one event is silently dropped across a crash, the
-contract is broken. Silent loss is the hardest failure mode to detect in
-production (no error, no alert, dashboards may show normal throughput). Known
-silent-loss paths:
+**Why It Matters:** The headline durability guarantee. A customer enabling disk
+buffers + e2e acks opts into at-least-once. One event silently dropped across a
+crash breaks the contract, and silent loss is the hardest production failure to
+detect (no error, no alert, normal-looking throughput). Known silent-loss paths:
 
-- Events in the `TrackingBufWriter` 256KB in-memory buffer on crash (not yet
-  page-cache flushed): in-contract loss for events not yet synced.
-- Events synced to data file but not yet acked: must survive crash via replay.
-  This is the primary liveness test.
-- Events synced to data file but whose data file was deleted after kill but
-  before ledger flush: the deleted-file-before-ledger-msync window
-  (`reader.rs:557` unlink, `reader.rs:560` ledger flush). On restart the
-  reader file ID in the ledger still points at the now-deleted file; the code
-  handles this via NotFound→advance. If the events in that file were not yet
-  acked, they are genuinely lost. This is the most serious latent loss path for
-  this liveness property.
-- `BufferWriter::drop` does not call `flush()` (`writer.rs:1371-1374`): on
-  graceful shutdown that skips an explicit flush, up to 256KB is lost silently.
-- Sink-error acks: `spawn_finalizer` at `ledger.rs:728` discards
-  `_status` (ledger.rs:731), so `Errored`/`Rejected` delivery still credits the ack. This
-  means a downstream error causes silent loss even with e2e acks nominally on.
+- `TrackingBufWriter` 256KB buffer on crash (not yet page-cache flushed):
+  in-contract loss for unsynced events.
+- Synced-but-unacked events: must survive crash via replay — the primary liveness
+  test.
+- Deleted-file-before-ledger-msync window: `delete_completed_data_file` unlinks the
+  file then `ledger.flush` separately. A kill between leaves the ledger reader file
+  id pointing at a deleted file; restart handles it via NotFound→advance, but
+  unacked events in that file are lost — the most serious latent loss path.
+- `BufferWriter::drop` does not flush (close only): graceful shutdown skipping an
+  explicit flush loses up to 256 KiB (#24948 vector, owned by config-reload).
+- Sink-error acks: `spawn_finalizer` discards `_status`, so `Errored`/`Rejected`
+  still credits the ack → silent loss (owned by `sink-failure-not-silently-acked`).
 
-**Fault Requirements:** Node-termination faults (SIGKILL) required. Confirm
-enabled. The following fault sequences are especially valuable:
+**Fault Requirements:** SIGKILL required (confirm enabled). Valuable sequences:
 
-- Kill during the `delete_completed_data_file` window (`reader.rs:557-560`):
-  unlink done, ledger flush not done.
-- Kill during the page-cache-write-to-fsync window (≤500ms): tests which
-  events are in-contract vs. out-of-contract loss.
-- Kill during file rotation: `ensure_ready_for_write` partial rotation
-  (`writer.rs:1047-1154`).
-- CPU throttle: stretches the 500ms window, increasing the expected-loss set.
+- Kill in the `delete_completed_data_file` window: unlink done, ledger flush not.
+- Kill in the page-cache-write-to-fsync window (≤500ms): in- vs out-of-contract loss.
+- Kill during file rotation: `ensure_ready_for_write` partial rotation.
+- CPU throttle: stretches the 500ms window, growing the expected-loss set.
 
 **Workload Implementation Notes:**
 
-The key design decision for this property is how to handle the `PRODUCED vs
-DELIVERED` comparison when duplicates are expected. The recommended approach:
+Handling `PRODUCED vs DELIVERED` when duplicates are expected:
 
 ```
 PRODUCED: Set<u64>  -- all IDs submitted to Vector source
@@ -88,121 +73,46 @@ duplicate_count = |DELIVERED| - |DELIVERED_SET|
 log("duplicate deliveries observed: {}", duplicate_count)
 ```
 
-Dedup responsibility is at the workload level — the downstream sink deduplicates
-by ID before any downstream business logic, matching the stated contract
-("downstream must dedup").
+Dedup is at the workload level — the downstream sink dedups by ID before any
+business logic, matching the contract.
 
-**Antithesis SDK Assertions (SUT-side):**
-
-The Antithesis Rust SDK is a committed dependency under the `antithesis`
-feature, and three underflow detectors are present (ledger.rs:271 / ledger.rs:313
-/ reader.rs:529). Those detectors guard the `total_buffer_size`/record-count
-arithmetic, NOT this property's set-membership oracle. The two asserts below are
-NOT committed:
-
-```rust
-// In handle_pending_acknowledgements, after all acks processed:
-antithesis_sdk::assert_sometimes!(
-    self.ledger.get_total_buffer_size() == 0,
-    "buffer drained to empty after quiet period",
-    json!({ "total_buffer_size": self.ledger.get_total_buffer_size() })
-);
-```
-
-The drained-events-gauge assert above was judged **unsound** and should not be
-added (see experiment-spec correction #1): `get_total_buffer_size() == 0` is a
-gauge snapshot inside the SUT, not a conservation statement, and a wedged buffer
-can read a corrupted (non-zero or wrapped) gauge while the workload oracle is the
-authoritative drained signal.
-
-```rust
-// In spawn_finalizer closure (ledger.rs:731), instrument the discarded status:
-antithesis_sdk::assert_always!(
-    matches!(status, BatchStatus::Delivered),
-    "all acked events were successfully delivered (not errored/rejected)",
-    json!({ "batch_status": format!("{:?}", status) })
-);
-// NOTE: NOT committed. Would fail under sink errors — intentional; it surfaces
-// the known silent-loss bug (INV-9 in sut-analysis.md).
-```
-
-**Workload-level milestone assertion:**
-
-```rust
-antithesis_sdk::assert_sometimes!(
-    produced_set.difference(&delivered_set).next().is_none(),
-    "all produced events eventually delivered (at-least-once contract satisfied)",
-    json!({
-        "produced_count": produced_set.len(),
-        "delivered_count": delivered_set.len(),
-    })
-);
-```
+SUT-side: the committed underflow detectors guard the arithmetic, not this
+set-membership oracle. A `get_total_buffer_size() == 0` "drained" SUT assert was
+judged UNSOUND (a wedged buffer can read a corrupted gauge; the workload oracle is
+the authoritative drained signal — experiment-spec correction #1) and must not be
+added. The verdict is the workload `assert_sometimes!(produced ⊆ delivered)` plus
+the hard `assert_always` on `produced \ delivered` empty at quiescence.
 
 ---
 
 ## Open Questions
 
-**OQ-1: Does the topology's shutdown path call `writer.flush()` explicitly
-before dropping the writer?**
-`BufferWriter::drop` calls only `close()` (marks writer done + notifies). If
-the topology calls `drop` without a preceding `flush()`, in-buffer events are
-lost silently. This is specifically the internal config-reload incident vector (#24948). The
-liveness property must be tested with both graceful shutdown (should see zero
-loss) and SIGKILL (at-most-500ms-unsynced loss). If graceful shutdown also
-loses events, that is a higher-severity bug.
+**OQ-1: finalizer drain vs SIGKILL.** On SIGKILL the `spawn_finalizer` task dies
+undrained; ack-in-flight events (sink dropped the notifier, id not yet in
+`pending_acks`) must replay on restart. If the lazily-flushed `reader_last_record`
+was already persisted past them, they cannot replay — lost. The interaction of
+finalizer lifecycle, lazy `reader_last_record` flush, and SIGKILL timing is the
+most subtle loss path. (Finalizer detail in `_shelved.md`.)
 
-**OQ-2: Does the `OrderedFinalizer` task drain before the tokio runtime shuts
-down on SIGKILL?**
-The finalizer (`ledger.rs:728`) is a `tokio::spawn`'d task. On SIGKILL the
-entire process dies — the finalizer task does not get to drain. In-flight
-`BatchNotifier` handles that have been dropped by the sink but whose IDs have
-not yet propagated to `pending_acks` are lost. This means ack-in-flight events
-must be replayed on restart (they were not ledger-decremented). If the reader's
-`reader_last_record` was already persisted past those events (lazy ledger
-flush), the events cannot be replayed — they are lost. This interaction between
-the finalizer task lifecycle, the lazy ledger flush of `reader_last_record`, and
-SIGKILL timing is the most subtle loss path for this property.
+**OQ-2: sink-error ack discarding** is out of scope (the `_status` discard always
+credits the ack); use a reliable `Delivered` sink stub to avoid conflating with
+`sink-failure-not-silently-acked`.
 
-**OQ-3: What is the maximum number of in-flight acks at a given moment?**
-The workload should size `max_size` and batch sizes to keep many events in
-various ack-flight states simultaneously. A small buffer drains too quickly for
-the fault injection to hit interesting timing windows.
+**OQ-3: keep many acks in flight** — size `max_size`/batches so events sit in
+varied ack-flight states; a small buffer drains before faults hit timing windows.
 
-**OQ-4: Sink-error ack discarding — is this in scope for this property?**
-The `_status` discard at `ledger.rs:731` means this property as stated will
-not catch sink-error loss (since the buffer always credits the ack). A separate
-property specifically testing `Errored`/`Rejected` ack propagation is
-recommended. For this property, use a reliable downstream sink stub that always
-returns `Delivered` to avoid conflating the two bugs.
+**OQ-6 (Soundness — quiescence-gated conservation):** Conservation
+`assert_always_less_than_or_equal_to!(missing_count, 0)` and the spurious-id check
+fire only inside `if quiescent` (eventually_conservation.rs:165/174/181). The
+target bug is a permanent writer wedge; a wedge that keeps counters from settling
+for 5 polls within the 240s deadline leaves these checks **skipped**, and a
+skipped `assert_always` is not a failure. Only the online integrity check
+(oracle.rs:118) is unconditional. A permanent deadlock can therefore evade this
+oracle entirely — needs an unconditional liveness/quiescence-timeout signal.
 
-**OQ-5: Does `delete_completed_data_file` → unlink-before-ledger-flush create
-a genuine loss window?**
-`reader.rs:557`: `delete_file` called (unlink). `reader.rs:559`:
-`increment_acked_reader_file_id`. `reader.rs:560`: `ledger.flush()` (msync).
-A kill between unlink and ledger flush: on restart, `ledger.state()
-.get_current_reader_file_id()` still points to the deleted file. Code path on
-restart: `seek_to_next_record` fast-path (`reader.rs:840-898`) tries to
-`open_mmap_readable` the file → `NotFound` → falls through to slow path. The
-slow path reads from the ledger's `reader_current_data_file_id` which is still
-the deleted file. Needs careful trace to confirm no events in the deleted file
-are silently abandoned if they had not been fully acked.
-
-**OQ-6 (Soundness — quiescence-gated conservation):** The conservation
-`assert_always_less_than_or_equal_to!(missing_count, 0)` and the spurious-id
-check fire only inside `if quiescent` (eventually_conservation.rs:165/174/181).
-The target bug is a permanent writer wedge. A wedge that keeps the counters from
-settling for 5 polls within the 240s deadline leaves these checks **skipped** —
-and a skipped `assert_always` is not a failure. Only the online integrity check
-(oracle.rs:118) is unconditional; conservation has no unconditional equivalent.
-A permanent deadlock can therefore evade this property's oracle entirely.
-Needs an unconditional liveness/quiescence-timeout signal.
-
-**OQ-7 (Soundness — best-effort ack relay):** The producer records each
-obligation by POSTing `/acked` with the HTTP result discarded
-(parallel_driver_produce.rs:71 `let _ = client.post(.../acked)...`). A dropped
-relay over a fault-injected link erases the obligation, so a later genuine loss
-of that id is invisible to `missing = acked - delivered` — the id never entered
-the produced/acked set. This is exactly the set-membership oracle this property
-relies on; the relay must be durable/retried, or the obligation must be logged
+**OQ-7 (Soundness — best-effort ack relay):** The producer records each obligation
+by POSTing `/acked` with the HTTP result discarded (parallel_driver_produce.rs:71).
+A dropped relay over a fault-injected link erases the obligation, so a later
+genuine loss of that id is invisible to `missing = acked - delivered` — the id
+never entered the set. The relay must be durable/retried, or the obligation logged
 before the POST.
