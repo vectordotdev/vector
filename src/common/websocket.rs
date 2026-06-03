@@ -8,17 +8,9 @@ use std::{
 
 use snafu::{ResultExt, Snafu};
 use tokio::{net::TcpStream, time};
-use tokio_tungstenite::{
-    WebSocketStream, client_async_with_config,
-    tungstenite::{
-        client::{IntoClientRequest, uri_mode},
-        error::{Error as TungsteniteError, ProtocolError, UrlError},
-        handshake::client::Request,
-        protocol::WebSocketConfig,
-        stream::Mode as UriMode,
-    },
-};
+use url::Url;
 use vector_config_macros::configurable_component;
+use yawc::{HttpRequest, Options as WsOptions, WebSocket};
 
 use crate::{
     common::backoff::ExponentialBackoff,
@@ -33,7 +25,7 @@ use crate::{
 #[snafu(visibility(pub))]
 pub enum WebSocketError {
     #[snafu(display("Creating WebSocket client failed: {}", source))]
-    CreateFailed { source: TungsteniteError },
+    CreateFailed { source: yawc::WebSocketError },
     #[snafu(display("Connect error: {}", source))]
     ConnectError { source: TlsError },
     #[snafu(display("Unable to resolve DNS: {}", source))]
@@ -42,15 +34,19 @@ pub enum WebSocketError {
     NoAddresses,
     #[snafu(display("Connection attempt timed out"))]
     ConnectionTimedOut,
+    #[snafu(display("Invalid URI: {}", source))]
+    InvalidUri { source: url::ParseError },
 }
 
 #[derive(Clone)]
 pub(crate) struct WebSocketConnector {
     uri: String,
+    url: Url,
     host: String,
     port: u16,
     tls: MaybeTlsSettings,
     auth: Option<Auth>,
+    compression: Option<WebSocketCompression>,
 }
 
 impl WebSocketConnector {
@@ -58,32 +54,27 @@ impl WebSocketConnector {
         uri: String,
         tls: MaybeTlsSettings,
         auth: Option<Auth>,
+        compression: Option<WebSocketCompression>,
     ) -> Result<Self, WebSocketError> {
-        let request = (&uri).into_client_request().context(CreateFailedSnafu)?;
-        let (host, port) = Self::extract_host_and_port(&request).context(CreateFailedSnafu)?;
+        let url = Url::parse(&uri).context(InvalidUriSnafu)?;
+        let host = url
+            .host_str()
+            .ok_or(WebSocketError::NoAddresses)?
+            .to_string();
+        let port = url.port_or_known_default().unwrap_or(match url.scheme() {
+            "wss" => 443,
+            _ => 80,
+        });
 
         Ok(Self {
             uri,
+            url,
             host,
             port,
             tls,
             auth,
+            compression,
         })
-    }
-
-    fn extract_host_and_port(request: &Request) -> Result<(String, u16), TungsteniteError> {
-        let host = request
-            .uri()
-            .host()
-            .ok_or(TungsteniteError::Url(UrlError::NoHostName))?
-            .to_string();
-        let mode = uri_mode(request.uri())?;
-        let port = request.uri().port_u16().unwrap_or(match mode {
-            UriMode::Tls => 443,
-            UriMode::Plain => 80,
-        });
-
-        Ok((host, port))
     }
 
     async fn tls_connect(&self) -> Result<MaybeTlsStream<TcpStream>, WebSocketError> {
@@ -101,28 +92,43 @@ impl WebSocketConnector {
             .context(ConnectSnafu)
     }
 
-    async fn connect(&self) -> Result<WebSocketStream<MaybeTlsStream<TcpStream>>, WebSocketError> {
-        let mut request = (&self.uri)
-            .into_client_request()
-            .context(CreateFailedSnafu)?;
-
-        if let Some(auth) = &self.auth {
-            auth.apply(&mut request);
+    fn build_options(&self) -> WsOptions {
+        let mut options = WsOptions::default();
+        if let Some(ref compression) = self.compression {
+            options = options.with_compression_level(flate2::Compression::new(compression.level));
         }
+        options
+    }
 
+    async fn connect(
+        &self,
+    ) -> Result<WebSocket<MaybeTlsStream<TcpStream>>, WebSocketError> {
         let maybe_tls = self.tls_connect().await?;
 
-        let ws_config = WebSocketConfig::default();
+        let mut builder = HttpRequest::builder();
 
-        let (ws_stream, _response) = client_async_with_config(request, maybe_tls, Some(ws_config))
+        // Apply auth headers by building a temporary http 0.2 request, applying auth, then
+        // copying headers to the yawc HttpRequestBuilder (http 1.x)
+        if let Some(auth) = &self.auth {
+            let mut tmp_request = http::Request::builder()
+                .uri(&self.uri)
+                .body(())
+                .expect("failed to build temp request");
+            auth.apply(&mut tmp_request);
+            for (key, value) in tmp_request.headers() {
+                builder = builder.header(key.as_str(), value.to_str().unwrap_or(""));
+            }
+        }
+
+        let options = self.build_options();
+
+        WebSocket::handshake_with_request(self.url.clone(), maybe_tls, options, builder)
             .await
-            .context(CreateFailedSnafu)?;
-
-        Ok(ws_stream)
+            .context(CreateFailedSnafu)
     }
 
     #[cfg(feature = "sinks-websocket")]
-    pub(crate) async fn connect_backoff(&self) -> WebSocketStream<MaybeTlsStream<TcpStream>> {
+    pub(crate) async fn connect_backoff(&self) -> WebSocket<MaybeTlsStream<TcpStream>> {
         let mut backoff = ExponentialBackoff::default();
 
         loop {
@@ -147,7 +153,7 @@ impl WebSocketConnector {
     pub(crate) async fn connect_backoff_with_timeout(
         &self,
         timeout_duration: Duration,
-    ) -> WebSocketStream<MaybeTlsStream<TcpStream>> {
+    ) -> WebSocket<MaybeTlsStream<TcpStream>> {
         let mut backoff = ExponentialBackoff::default();
 
         loop {
@@ -183,15 +189,6 @@ impl WebSocketConnector {
     }
 }
 
-pub(crate) const fn is_closed(error: &TungsteniteError) -> bool {
-    matches!(
-        error,
-        TungsteniteError::ConnectionClosed
-            | TungsteniteError::AlreadyClosed
-            | TungsteniteError::Protocol(ProtocolError::ResetWithoutClosingHandshake)
-    )
-}
-
 pub(crate) struct PingInterval {
     interval: Option<time::Interval>,
 }
@@ -213,6 +210,24 @@ impl PingInterval {
     pub(crate) async fn tick(&mut self) -> time::Instant {
         std::future::poll_fn(|cx| self.poll_tick(cx)).await
     }
+}
+
+/// WebSocket compression configuration.
+///
+/// When enabled, negotiates RFC 7692 permessage-deflate compression
+/// with the remote peer to reduce bandwidth usage.
+#[configurable_component]
+#[derive(Clone, Debug)]
+pub struct WebSocketCompression {
+    /// Compression level (0-9). Higher values produce better compression at the cost of more CPU.
+    ///
+    /// Defaults to 6 (balanced).
+    #[serde(default = "default_compression_level")]
+    pub level: u32,
+}
+
+const fn default_compression_level() -> u32 {
+    6
 }
 
 /// Shared websocket configuration for sources and sinks.
@@ -259,6 +274,14 @@ pub struct WebSocketCommonConfig {
     /// HTTP Authentication.
     #[configurable(derived)]
     pub auth: Option<Auth>,
+
+    /// Compression configuration for WebSocket connections.
+    ///
+    /// When enabled, negotiates RFC 7692 permessage-deflate compression
+    /// with the remote peer to reduce bandwidth usage.
+    #[configurable(derived)]
+    #[serde(default)]
+    pub compression: Option<WebSocketCompression>,
 }
 
 impl Default for WebSocketCommonConfig {
@@ -269,6 +292,7 @@ impl Default for WebSocketCommonConfig {
             ping_timeout: None,
             tls: None,
             auth: None,
+            compression: None,
         }
     }
 }

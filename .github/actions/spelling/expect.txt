@@ -433,6 +433,7 @@ parallelizable
 pascalcase
 PEMS
 percpu
+permessage
 pgo
 PIDs
 PII
