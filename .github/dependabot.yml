@@ -25,10 +25,6 @@ updates:
       aws:
         patterns:
           - "aws-*"
-      aws-security:
-        applies-to: security-updates
-        patterns:
-          - "aws-*"
       azure:
         patterns:
           - "azure_*"
@@ -86,6 +82,15 @@ updates:
       zstd:
         patterns:
           - "zstd*"
+
+      cargo-other:
+        applies-to: version-updates
+        patterns:
+          - "*"
+      cargo-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
   - package-ecosystem: "docker"
     directory: "/distribution/docker/alpine"
     schedule:
@@ -172,6 +177,22 @@ updates:
     commit-message:
       prefix: "chore(website deps)"
     open-pull-requests-limit: 50
+    groups:
+      npm_and_yarn:
+        patterns:
+          - "*"
+  - package-ecosystem: "npm"
+    directory: "/scripts/environment/npm-tools"
+    schedule:
+      interval: "monthly"
+      time: "05:00" # UTC
+    labels:
+      - "domain: deps"
+      - "no-changelog"
+    commit-message:
+      prefix: "chore(deps)"
+    # Disable version updates; security updates bypass this limit
+    open-pull-requests-limit: 0
     groups:
       npm_and_yarn:
         patterns:

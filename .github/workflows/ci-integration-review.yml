@@ -41,7 +41,6 @@ env:
   TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}
   CONTAINER_TOOL: "docker"
   DD_ENV: "ci"
-  DD_API_KEY: ${{ secrets.DD_API_KEY }}
   RUST_BACKTRACE: full
   VECTOR_LOG: vector=debug
   VERBOSE: true
@@ -100,6 +99,7 @@ jobs:
     timeout-minutes: 90
     permissions:
       contents: read
+      id-token: write
       packages: read # Required to pull test runner image from GHCR
     strategy:
       fail-fast: false
@@ -160,6 +160,9 @@ jobs:
           submodules: "recursive"
           ref: ${{ github.event.review.commit_id }}
 
+      - uses: ./.github/actions/dd-token
+        if: steps.run_condition.outputs.should_run == 'true'
+
       - uses: ./.github/actions/setup
         with:
           vdev: true
@@ -174,7 +177,7 @@ jobs:
 
       - name: Integration Tests - ${{ matrix.service }}
         if: steps.run_condition.outputs.should_run == 'true'
-        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
         with:
           timeout_minutes: 30
           max_attempts: 3
@@ -191,6 +194,7 @@ jobs:
     permissions:
       contents: read
       packages: read # Required to pull test runner image from GHCR
+      id-token: write
     strategy:
       fail-fast: false
       matrix:
@@ -214,6 +218,9 @@ jobs:
           submodules: "recursive"
           ref: ${{ github.event.review.commit_id }}
 
+      - uses: ./.github/actions/dd-token
+        if: steps.run_condition.outputs.should_run == 'true'
+
       - uses: ./.github/actions/setup
         with:
           vdev: true
@@ -228,7 +235,7 @@ jobs:
 
       - name: E2E Tests - ${{ matrix.service }}
         if: steps.run_condition.outputs.should_run == 'true'
-        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
         with:
           timeout_minutes: 35
           max_attempts: 3

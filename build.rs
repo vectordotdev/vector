@@ -104,13 +104,30 @@ fn git_short_hash() -> std::io::Result<String> {
     })
 }
 
+#[cfg(not(feature = "nightly"))]
+fn git_path(path: &str) -> std::io::Result<String> {
+    let output_result = Command::new("git")
+        .args(["rev-parse", "--git-path", path])
+        .output();
+
+    output_result.map(|output| {
+        String::from_utf8(output.stdout)
+            .expect("valid UTF-8")
+            .trim_end_matches(['\r', '\n'])
+            .to_owned()
+    })
+}
+
 fn main() {
     // Always rerun if the build script itself changes.
     println!("cargo:rerun-if-changed=build.rs");
 
     // re-run if the HEAD has changed. This is only necessary for non-release and nightly builds.
     #[cfg(not(feature = "nightly"))]
-    println!("cargo:rerun-if-changed=.git/HEAD");
+    println!(
+        "cargo:rerun-if-changed={}",
+        git_path("HEAD").expect("git HEAD path detection failed")
+    );
 
     #[cfg(feature = "protobuf-build")]
     {

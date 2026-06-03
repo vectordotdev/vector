@@ -10,7 +10,6 @@ components: sinks: vector: {
 		"""
 
 	classes: {
-		commonly_used: false
 		delivery:      "best_effort"
 		development:   "stable"
 		egress_method: "batch"

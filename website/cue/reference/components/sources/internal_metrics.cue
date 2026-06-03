@@ -9,8 +9,7 @@ components: sources: internal_metrics: {
 		"""
 
 	classes: {
-		commonly_used: true
-		delivery:      "at_least_once"
+		delivery: "at_least_once"
 		deployment_roles: ["aggregator", "daemon", "sidecar"]
 		development:   "stable"
 		egress_method: "batch"
@@ -770,6 +769,18 @@ components: sources: internal_metrics: {
 		}
 		source_lag_time_seconds: {
 			description:       "The difference between the timestamp recorded in each event and the time when it was ingested, expressed as fractional seconds."
+			type:              "histogram"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		source_send_batch_latency_seconds: {
+			description:       "The time elapsed blocking on the downstream channel to accept an entire batch of events received at the source"
+			type:              "histogram"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		source_send_latency_seconds: {
+			description:       "The time elapsed blocking on the downstream channel to accept a single chunk from a batch of events received at the source"
 			type:              "histogram"
 			default_namespace: "vector"
 			tags:              _component_tags

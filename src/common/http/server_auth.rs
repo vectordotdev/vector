@@ -12,6 +12,7 @@ use vector_config::configurable_component;
 use vector_lib::{
     TimeZone, compile_vrl,
     event::{Event, LogEvent, VrlTarget},
+    lookup::OwnedTargetPath,
     sensitive_string::SensitiveString,
 };
 use vector_vrl_metrics::MetricsStorage;
@@ -64,7 +65,7 @@ pub enum HttpServerAuthConfig {
 
     /// Custom authentication using VRL code.
     ///
-    /// Takes in request and validates it using VRL code.
+    /// Takes in request and validates it using VRL code. The VRL program must return a boolean.
     Custom {
         /// The VRL boolean expression.
         source: String,
@@ -181,7 +182,9 @@ impl HttpServerAuthConfig {
                 let mut config = CompileConfig::default();
                 config.set_custom(enrichment_tables.clone());
                 config.set_custom(metrics_storage.clone());
-                config.set_read_only();
+                // Lock the event body (.field) as read-only, but leave metadata (%field) writable
+                // so the VRL program can enrich authenticated events via %field = value.
+                config.set_read_only_path(OwnedTargetPath::event_root(), true);
 
                 let CompilationResult {
                     program,
@@ -212,7 +215,9 @@ impl HttpServerAuthConfig {
 pub enum HttpServerAuthMatcher {
     /// Matcher for comparing exact value of Authorization header
     AuthHeader(HeaderValue, &'static str),
-    /// Matcher for running VRL script for requests, to allow for custom validation
+    /// Matcher for running VRL script for requests, to allow for custom validation.
+    /// Metadata (`%field`) writes in the program are extracted and returned to the caller
+    /// for injection into authenticated events.
     Vrl {
         /// Compiled VRL script
         program: Program,
@@ -220,18 +225,19 @@ pub enum HttpServerAuthMatcher {
 }
 
 impl HttpServerAuthMatcher {
-    /// Compares passed headers to the matcher
+    /// Validates the request. Returns `Ok(Some(enrichment))` when auth passes and the VRL program
+    /// wrote `%field` values; returns `Ok(None)` when auth passes with no metadata enrichment.
     pub fn handle_auth(
         &self,
         address: Option<&SocketAddr>,
         headers: &HeaderMap<HeaderValue>,
         path: &str,
-    ) -> Result<(), ErrorMessage> {
+    ) -> Result<Option<ObjectMap>, ErrorMessage> {
         match self {
             HttpServerAuthMatcher::AuthHeader(expected, err_message) => {
                 if let Some(header) = headers.get(AUTHORIZATION) {
                     if expected == header {
-                        Ok(())
+                        Ok(None)
                     } else {
                         Err(ErrorMessage::new(
                             StatusCode::UNAUTHORIZED,
@@ -257,7 +263,7 @@ impl HttpServerAuthMatcher {
         headers: &HeaderMap<HeaderValue>,
         path: &str,
         program: &Program,
-    ) -> Result<(), ErrorMessage> {
+    ) -> Result<Option<ObjectMap>, ErrorMessage> {
         let mut target = VrlTarget::new(
             Event::Log(LogEvent::from_map(
                 ObjectMap::from([
@@ -293,16 +299,22 @@ impl HttpServerAuthMatcher {
             warn!("Handling auth failed: {}", e);
             ErrorMessage::new(StatusCode::UNAUTHORIZED, "Auth failed".to_owned())
         })? {
-            vrl::core::Value::Boolean(result) => {
-                if result {
-                    Ok(())
+            vrl::core::Value::Boolean(true) => {
+                let enrichment = if let VrlTarget::LogEvent(_, metadata) = &target {
+                    metadata
+                        .value()
+                        .as_object()
+                        .filter(|m| !m.is_empty())
+                        .cloned()
                 } else {
-                    Err(ErrorMessage::new(
-                        StatusCode::UNAUTHORIZED,
-                        "Auth failed".to_owned(),
-                    ))
-                }
+                    None
+                };
+                Ok(enrichment)
             }
+            vrl::core::Value::Boolean(false) => Err(ErrorMessage::new(
+                StatusCode::UNAUTHORIZED,
+                "Auth failed".to_owned(),
+            )),
             _ => Err(ErrorMessage::new(
                 StatusCode::UNAUTHORIZED,
                 "Invalid return value".to_owned(),
@@ -778,5 +790,76 @@ mod tests {
         let error = result.unwrap_err();
         assert_eq!(401, error.code());
         assert_eq!("Auth failed", error.message());
+    }
+
+    // Backward-compat: existing `custom` scripts that don't write metadata still work and return
+    // Ok(None) — no enrichment, no change in behavior.
+    #[test]
+    fn custom_auth_matcher_returns_none_enrichment_when_no_metadata_written() {
+        let custom_auth = HttpServerAuthConfig::Custom {
+            source: r#".headers.authorization == "Bearer token""#.to_string(),
+        };
+
+        let matcher = custom_auth
+            .build(&Default::default(), &Default::default())
+            .unwrap();
+
+        let mut headers = HeaderMap::new();
+        headers.insert(AUTHORIZATION, HeaderValue::from_static("Bearer token"));
+        let (_guard, addr) = next_addr();
+        let result = matcher.handle_auth(Some(&addr), &headers, "/");
+
+        assert!(result.is_ok());
+        assert_eq!(
+            None,
+            result.unwrap(),
+            "no metadata written => no enrichment"
+        );
+    }
+
+    // Existing `custom` scripts that write metadata via `%field = value` now enrich events.
+    #[test]
+    fn custom_auth_matcher_returns_enrichment_when_metadata_written() {
+        let custom_auth = HttpServerAuthConfig::Custom {
+            source: indoc! {r#"
+                %tenant_id = "acme"
+                true
+                "#}
+            .to_string(),
+        };
+
+        let matcher = custom_auth
+            .build(&Default::default(), &Default::default())
+            .unwrap();
+
+        let headers = HeaderMap::new();
+        let (_guard, addr) = next_addr();
+        let result = matcher.handle_auth(Some(&addr), &headers, "/");
+
+        assert!(result.is_ok());
+        let enrichment = result.unwrap().expect("expected enrichment map");
+        assert_eq!(
+            enrichment.get("tenant_id").cloned(),
+            Some(vrl::core::Value::from("acme")),
+        );
+    }
+
+    // Existing `custom` scripts still cannot mutate event body fields.
+    #[test]
+    fn custom_auth_build_fails_when_event_body_write_attempted() {
+        let custom_auth = HttpServerAuthConfig::Custom {
+            source: indoc! {r#"
+                .new_field = "value"
+                true
+                "#}
+            .to_string(),
+        };
+
+        assert!(
+            custom_auth
+                .build(&Default::default(), &Default::default())
+                .is_err(),
+            "writing to event body (.field) must be rejected at compile time"
+        );
     }
 }

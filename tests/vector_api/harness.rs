@@ -97,7 +97,10 @@ impl TestHarness {
         let mut cmd =
             Command::cargo_bin("vector").map_err(|e| format!("Failed to get cargo bin: {e}"))?;
 
-        cmd.arg("-c").arg(&config_path);
+        cmd.arg("-c")
+            .arg(&config_path)
+            .arg("--graceful-shutdown-limit-secs")
+            .arg("1");
 
         if watch_mode {
             cmd.arg("-w");
@@ -131,6 +134,11 @@ impl TestHarness {
     /// Returns mutable reference to the API client
     pub fn api_client(&mut self) -> &mut Client {
         &mut self.api_client
+    }
+
+    /// Returns the TCP port the API server is bound to
+    pub fn api_port(&self) -> u16 {
+        self.api_port
     }
 
     /// Reloads Vector configuration by sending SIGHUP or using watch mode

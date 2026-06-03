@@ -16,6 +16,9 @@ mod native;
 mod native_json;
 #[cfg(feature = "opentelemetry")]
 mod otlp;
+#[cfg(feature = "parquet")]
+mod parquet;
+mod proto_batch;
 mod protobuf;
 mod raw_message;
 #[cfg(feature = "syslog")]
@@ -24,6 +27,10 @@ mod text;
 
 use std::fmt::Debug;
 
+#[cfg(feature = "parquet")]
+pub use self::parquet::{
+    ParquetCompression, ParquetSchemaMode, ParquetSerializer, ParquetSerializerConfig,
+};
 #[cfg(feature = "arrow")]
 pub use arrow::{
     ArrowEncodingError, ArrowStreamSerializer, ArrowStreamSerializerConfig, SchemaProvider,
@@ -39,6 +46,7 @@ pub use native::{NativeSerializer, NativeSerializerConfig};
 pub use native_json::{NativeJsonSerializer, NativeJsonSerializerConfig};
 #[cfg(feature = "opentelemetry")]
 pub use otlp::{OtlpSerializer, OtlpSerializerConfig};
+pub use proto_batch::{ProtoBatchEncodingError, ProtoBatchSerializer, ProtoBatchSerializerConfig};
 pub use protobuf::{ProtobufSerializer, ProtobufSerializerConfig, ProtobufSerializerOptions};
 pub use raw_message::{RawMessageSerializer, RawMessageSerializerConfig};
 #[cfg(feature = "syslog")]
