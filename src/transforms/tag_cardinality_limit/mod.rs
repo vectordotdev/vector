@@ -87,19 +87,42 @@ impl TagCardinalityLimit {
     /// `max_tracked_keys`. Called lazily on cap-hit paths so steady-state
     /// overhead is zero. `len()` is called on every set because, for TTL
     /// backends, it also drives the lazy sweep that may empty the bucket.
+    ///
+    /// Intentionally empty `value_limit: 0` buckets are kept: they enforce that
+    /// every value for that tag is rejected without storing state.
     fn reclaim_empty_buckets(&mut self) {
         let mut reclaimed = 0usize;
-        self.accepted_tags.retain(|_, inner| {
-            inner.retain(|_, set| {
-                if set.len() == 0 {
-                    reclaimed += 1;
-                    false
-                } else {
-                    true
-                }
-            });
-            !inner.is_empty()
-        });
+        let empty_buckets: Vec<(Option<MetricId>, String)> = self
+            .accepted_tags
+            .iter_mut()
+            .flat_map(|(metric_key, inner)| {
+                inner.iter_mut().filter_map(|(tag_key, set)| {
+                    if set.len() != 0 {
+                        return None;
+                    }
+                    Some((metric_key.clone(), tag_key.clone()))
+                })
+            })
+            .collect();
+
+        let keys_to_drop: Vec<_> = empty_buckets
+            .into_iter()
+            .filter(|(metric_key, tag_key)| {
+                !matches!(
+                    self.get_config_for_metric_tag(metric_key.as_ref(), tag_key),
+                    TagSettings::Tracked(cfg) if cfg.value_limit == 0
+                )
+            })
+            .collect();
+
+        for (metric_key, tag_key) in keys_to_drop {
+            if let Some(inner) = self.accepted_tags.get_mut(&metric_key)
+                && inner.remove(&tag_key).is_some()
+            {
+                reclaimed += 1;
+            }
+        }
+        self.accepted_tags.retain(|_, inner| !inner.is_empty());
         if reclaimed > 0 {
             self.tracked_keys_count = self.tracked_keys_count.saturating_sub(reclaimed);
             emit!(TagCardinalityTrackedKeys {

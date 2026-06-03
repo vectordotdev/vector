@@ -45,6 +45,23 @@ fn saturating_add(instant: Instant, duration: Duration) -> Instant {
     instant
 }
 
+/// Compute time-slice count and duration so `slice * generations == ttl` exactly.
+///
+/// Caps `generations` to at most one slice per second of TTL (so each slice is
+/// `>= 1s` when `ttl >= 1s`) and to the caller's `ttl_generations` request.
+/// Uses `Duration` division for `slice` so non-divisible TTLs (e.g. 10s / 4)
+/// still sum to the configured window. `ttl.as_secs()` is kept in `u64` when
+/// deriving the per-second cap so values `>= 2^32` seconds are not truncated
+/// to zero by a premature `u32` cast.
+fn compute_ttl_slices(ttl: Duration, ttl_generations: u8) -> (u32, Duration) {
+    let requested = u32::from(ttl_generations.max(1));
+    let ttl_secs = ttl.as_secs().max(1);
+    let max_for_ttl = ttl_secs.min(u32::MAX as u64) as u32;
+    let generations = requested.min(max_for_ttl).max(1);
+    let slice = ttl / generations;
+    (generations, slice)
+}
+
 /// Container for storing the set of accepted values for a given tag key.
 #[derive(Debug)]
 pub struct AcceptedTagValueSet {
@@ -97,7 +114,7 @@ impl BloomFilterStorage {
 
 /// `HashMap`-backed exact cache with per-value last-seen timestamps.
 ///
-/// At most once per `sweep_interval` (= `ttl / effective_generations`),
+/// At most once per `sweep_interval` (= `ttl / generations`, after capping),
 /// `retain` drops every entry whose `last_seen` is older than `ttl`. The
 /// sweep runs lazily inside `insert`/`contains`/`len` — no background task.
 struct TtlExactStorage {
@@ -109,13 +126,10 @@ struct TtlExactStorage {
 
 impl TtlExactStorage {
     fn new(ttl: Duration, generations: u8) -> Self {
-        // Cap effective generations so `sweep_interval >= 1s` and
-        // `sweep_interval * effective == ttl`. Eviction precision is then
+        // Cap generations so `sweep_interval >= 1s` and
+        // `sweep_interval * generations == ttl`. Eviction precision is then
         // `[ttl, ttl + sweep_interval)`.
-        let requested = generations.max(1) as u32;
-        let max_for_ttl = ttl.as_secs().max(1) as u32;
-        let effective = requested.min(max_for_ttl).max(1);
-        let sweep_interval = ttl / effective;
+        let (_generations, sweep_interval) = compute_ttl_slices(ttl, generations);
         Self {
             map: HashMap::new(),
             ttl,
@@ -131,6 +145,14 @@ impl TtlExactStorage {
         self.sweep(now);
     }
 
+    /// Drop entries whose own `last_seen` is outside the TTL window. Runs even
+    /// when `maybe_sweep` is not yet due so a lazy sweep interval cannot leave
+    /// expired values visible to `contains` / `len`.
+    fn purge_expired_entries(&mut self, now: Instant) {
+        self.map
+            .retain(|_, last_seen| now.duration_since(*last_seen) <= self.ttl);
+    }
+
     fn sweep(&mut self, now: Instant) {
         let ttl = self.ttl;
         let before = self.map.len();
@@ -142,8 +164,12 @@ impl TtlExactStorage {
     }
 
     fn contains(&mut self, value: &TagValueSet) -> bool {
-        let now = Instant::now();
+        self.contains_with_now(value, Instant::now())
+    }
+
+    fn contains_with_now(&mut self, value: &TagValueSet, now: Instant) -> bool {
         self.maybe_sweep(now);
+        self.purge_expired_entries(now);
         // Refresh lease on every sighting so continuously-seen values don't blink out.
         if let Some(slot) = self.map.get_mut(value) {
             *slot = now;
@@ -158,20 +184,26 @@ impl TtlExactStorage {
     /// `DropEvent` pre-check paths where we must not mutate cache state for
     /// events that are about to be dropped.
     fn contains_no_refresh(&mut self, value: &TagValueSet) -> bool {
-        let now = Instant::now();
+        self.contains_no_refresh_with_now(value, Instant::now())
+    }
+
+    fn contains_no_refresh_with_now(&mut self, value: &TagValueSet, now: Instant) -> bool {
         self.maybe_sweep(now);
+        self.purge_expired_entries(now);
         self.map.contains_key(value)
     }
 
     fn insert(&mut self, value: TagValueSet) {
         let now = Instant::now();
         self.maybe_sweep(now);
+        self.purge_expired_entries(now);
         self.map.insert(value, now);
     }
 
     fn len(&mut self) -> usize {
         let now = Instant::now();
         self.maybe_sweep(now);
+        self.purge_expired_entries(now);
         self.map.len()
     }
 }
@@ -194,18 +226,14 @@ struct RollingBloomStorage {
 
 impl RollingBloomStorage {
     fn new(cache_size_per_key: usize, generations: u8, ttl: Duration) -> Self {
-        // Cap effective generations so `slice >= 1s` and
-        // `slice * effective_generations == ttl`.
-        let requested = generations.max(1) as u32;
-        let max_for_ttl = ttl.as_secs().max(1) as u32;
-        let effective = requested.min(max_for_ttl).max(1);
-        let slice = ttl / effective;
-        let mut shards = VecDeque::with_capacity(effective as usize);
+        // Cap generations so `slice >= 1s` and `slice * generations == ttl`.
+        let (generations, slice) = compute_ttl_slices(ttl, generations);
+        let mut shards = VecDeque::with_capacity(generations as usize);
         shards.push_back(BloomFilterStorage::new(cache_size_per_key));
         let now = Instant::now();
         Self {
             shards,
-            generations: effective as u8,
+            generations: generations as u8,
             slice,
             cache_size_per_key,
             next_rotate: saturating_add(now, slice),
@@ -456,6 +484,29 @@ mod tests {
     }
 
     #[test]
+    fn ttl_exact_contains_does_not_refresh_expired_entry() {
+        // Between sweeps, `contains` must not extend a value whose own
+        // `last_seen + ttl` has passed, even if `maybe_sweep` has not run yet.
+        let ttl = Duration::from_secs(60);
+        let mut s = TtlExactStorage::new(ttl, 4);
+        let t0 = Instant::now();
+        s.map.insert(v("a"), t0);
+        s.last_sweep = t0;
+        let t50 = t0 + Duration::from_secs(50);
+        s.sweep(t50);
+        assert!(s.map.contains_key(&v("a")), "still within ttl at t=50");
+        let t61 = t0 + Duration::from_secs(61);
+        assert!(
+            !s.contains_with_now(&v("a"), t61),
+            "expired value must not be refreshed into the window"
+        );
+        assert!(
+            !s.map.contains_key(&v("a")),
+            "expired entry must be purged on access"
+        );
+    }
+
+    #[test]
     fn ttl_exact_refresh_on_contains_extends_lease() {
         // Short sleep guarantees `Instant::now()` is strictly after `t_insert`
         // on every platform.
@@ -601,10 +652,18 @@ mod tests {
 
     #[test]
     fn rolling_bloom_window_matches_ttl_exactly() {
-        // `slice * effective_generations == ttl` must hold for every valid
-        // (ttl_secs, generations).
-        for (ttl_secs, generations) in [(1u64, 4u8), (2, 8), (3, 4), (60, 4), (3600, 4), (86400, 6)]
-        {
+        // `slice * generations == ttl` must hold for every valid
+        // (ttl_secs, ttl_generations), including non-divisible TTLs (e.g. 10 / 4).
+        for (ttl_secs, generations) in [
+            (1u64, 4u8),
+            (2, 8),
+            (3, 4),
+            (10, 4),
+            (60, 4),
+            (3600, 4),
+            (86400, 6),
+            (4294967296, 4),
+        ] {
             let s = RollingBloomStorage::new(
                 default_cache_size(),
                 generations,
@@ -620,6 +679,65 @@ mod tests {
                 "ttl_secs={ttl_secs}, generations={generations}: slice must be >= 1s",
             );
         }
+    }
+
+    #[test]
+    fn compute_ttl_slices_non_divisible_ttl_uses_fractional_slices() {
+        // Integer seconds division would yield 10/4=2s slices and an ~8s window;
+        // Duration division must preserve the full 10s contract.
+        let (_, slice) = compute_ttl_slices(Duration::from_secs(10), 4);
+        assert_eq!(slice, Duration::from_millis(2500));
+        assert_eq!(slice * 4, Duration::from_secs(10));
+    }
+
+    #[test]
+    fn compute_ttl_slices_large_ttl_secs_avoids_u32_truncation() {
+        // `ttl.as_secs() as u32` wraps at 2^32, collapsing the generation cap
+        // to 1 and changing rotation cadence.
+        let ttl = Duration::from_secs(4294967296);
+        let (generations, slice) = compute_ttl_slices(ttl, 4);
+        assert_eq!(generations, 4, "requested generations must not collapse to 1");
+        assert_eq!(slice * generations, ttl);
+
+        let rolling = RollingBloomStorage::new(default_cache_size(), 4, ttl);
+        assert_eq!(rolling.generations, 4);
+        assert_eq!(rolling.slice * u32::from(rolling.generations), ttl);
+
+        let exact = TtlExactStorage::new(ttl, 4);
+        assert_eq!(exact.sweep_interval * 4, ttl);
+    }
+
+    #[test]
+    fn rolling_bloom_hot_value_survives_rotation_after_contains_refresh() {
+        // If refresh skipped insert when the newest shard already matched via
+        // false positive, the value could vanish once the older shard rotated
+        // out. Pollute the newest shard heavily so FP hits are likely, then
+        // verify a front-shard-only value survives rotation after `contains()`
+        // refresh.
+        const TINY: usize = 128;
+        let mut s = RollingBloomStorage::new(TINY, 2, Duration::from_secs(120));
+        let hot = v("hot-value-survivor");
+        s.shards.back_mut().unwrap().insert(&hot);
+        let t0 = Instant::now();
+        s.next_rotate = t0 + Duration::from_secs(1);
+        s.rotate_if_needed(t0 + Duration::from_secs(2));
+        assert!(
+            s.shards.front().unwrap().contains(&hot),
+            "after one rotation hot must live in the front shard"
+        );
+        for i in 0..512 {
+            s.shards.back_mut().unwrap().insert(&v(&format!("pollute-{i}")));
+        }
+        assert!(s.contains(&hot), "must hit the front shard and refresh");
+        assert!(
+            s.shards.back().unwrap().contains(&hot),
+            "refresh must unconditionally seed the newest shard"
+        );
+        s.rotate_if_needed(t0 + Duration::from_secs(62));
+        assert!(
+            s.contains_no_refresh(&hot),
+            "hot must survive after the front shard carrying the original copy rotates out"
+        );
     }
 
     #[test]

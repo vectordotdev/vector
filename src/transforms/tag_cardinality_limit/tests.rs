@@ -1633,13 +1633,11 @@ fn max_tracked_keys_reclaims_empty_buckets() {
     );
 }
 
-/// With `value_limit: 0` + `drop_event` + `max_tracked_keys` full but with a
-/// reclaimable empty bucket, `tag_limit_exceeded` must reclaim before deciding
-/// — otherwise the pre-check returns "not exceeded" (cap appears full → fall
-/// through to untracked passthrough) while `record_tag_value` then reclaims
-/// and admits a value that should have been rejected.
+/// With `value_limit: 0` + `max_tracked_keys` at cap, an intentionally empty
+/// enforcement bucket must not be reclaimed, so additional tag keys pass through
+/// unchecked rather than stealing the slot.
 #[test]
-fn tag_limit_exceeded_reclaims_before_value_limit_zero_check() {
+fn max_tracked_keys_preserves_zero_limit_enforcement_bucket() {
     use super::tag_value_set::AcceptedTagValueSet;
 
     let mut config = make_transform_hashset(0, LimitExceededAction::DropEvent);
@@ -1647,22 +1645,37 @@ fn tag_limit_exceeded_reclaims_before_value_limit_zero_check() {
     let mut transform = TagCardinalityLimit::new(config);
 
     let metric_key: Option<MetricId> = None;
-    let stale_set = AcceptedTagValueSet::new(&Mode::Exact, None, default_ttl_generations());
+    let zero_limit_bucket = AcceptedTagValueSet::new(&Mode::Exact, None, default_ttl_generations());
     let mut inner = hashbrown::HashMap::new();
-    inner.insert("stale_tag".to_string(), stale_set);
+    inner.insert("enforced_tag".to_string(), zero_limit_bucket);
     transform.accepted_tags.insert(metric_key.clone(), inner);
     transform.tracked_keys_count = 1;
 
-    assert!(
-        !transform.can_allocate_new_key(),
-        "should be at cap before reclaim"
-    );
-
     let value = TagValueSet::from(["v".to_string()]);
     assert!(
-        transform.tag_limit_exceeded(metric_key.as_ref(), "fresh_tag", &value),
-        "value_limit: 0 with a reclaimable empty bucket must flag the new \
-         tag as exceeded; otherwise record_tag_value would silently admit it"
+        !transform.tag_limit_exceeded(metric_key.as_ref(), "fresh_tag", &value),
+        "cap-full zero-limit bucket must not be reclaimed; new key is untracked"
+    );
+    let result = transform.try_accept_tag(metric_key.as_ref(), "fresh_tag", &value);
+    assert_eq!(
+        result,
+        AcceptResult::Untracked,
+        "fresh tag must pass through unchecked when the zero-limit slot is preserved"
+    );
+    assert!(
+        transform
+            .accepted_tags
+            .get(&metric_key)
+            .unwrap()
+            .contains_key("enforced_tag"),
+        "zero-limit enforcement bucket must remain allocated"
+    );
+    assert!(
+        !transform
+            .accepted_tags
+            .get(&metric_key)
+            .unwrap()
+            .contains_key("fresh_tag"),
     );
 }
 
