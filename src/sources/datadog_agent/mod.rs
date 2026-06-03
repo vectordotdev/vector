@@ -43,6 +43,7 @@ use vector_lib::{
     internal_event::{EventsReceived, Registered},
     lookup::owned_value_path,
     schema::meaning,
+    sensitive_string::SensitiveString,
     source_sender::SendError,
     tls::MaybeTlsIncomingStream,
 };
@@ -105,7 +106,7 @@ pub struct DatadogAgentConfig {
     /// `drop_on_invalid_api_key`.
     #[configurable(metadata(docs::advanced))]
     #[serde(default)]
-    valid_api_keys: Vec<String>,
+    valid_api_keys: Vec<SensitiveString>,
 
     /// Controls what happens when a request carries an API key that is not present in
     /// `valid_api_keys`.
@@ -444,10 +445,19 @@ pub(crate) fn invalid_api_key_error() -> ErrorMessage {
 impl ApiKeyExtractor {
     #[cfg(test)]
     pub(crate) fn for_test(valid_api_keys: Vec<String>, drop_on_invalid_api_key: bool) -> Self {
+        Self::for_test_with_store_api_key(valid_api_keys, drop_on_invalid_api_key, true)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn for_test_with_store_api_key(
+        valid_api_keys: Vec<String>,
+        drop_on_invalid_api_key: bool,
+        store_api_key: bool,
+    ) -> Self {
         Self {
             matcher: Regex::new(r"^/v1/input/(?P<api_key>[[:alnum:]]{32})/??")
                 .expect("static regex always compiles"),
-            store_api_key: true,
+            store_api_key,
             valid_api_keys: Arc::new(valid_api_keys.into_iter().collect()),
             drop_on_invalid_api_key,
         }
@@ -459,9 +469,6 @@ impl ApiKeyExtractor {
         header: Option<String>,
         query_params: Option<String>,
     ) -> Option<Arc<str>> {
-        if !self.store_api_key {
-            return None;
-        }
         // Grab from URL first
         self.matcher
             .captures(path)
@@ -487,12 +494,12 @@ impl ApiKeyExtractor {
         let api_key = self.extract(path, header, query_params);
 
         if self.valid_api_keys.is_empty() {
-            return ApiKeyValidation::Accepted(api_key);
+            return ApiKeyValidation::Accepted(api_key.filter(|_| self.store_api_key));
         }
 
         match &api_key {
             Some(key) if self.valid_api_keys.contains(key.as_ref()) => {
-                ApiKeyValidation::Accepted(api_key)
+                ApiKeyValidation::Accepted(api_key.filter(|_| self.store_api_key))
             }
             _ if self.drop_on_invalid_api_key => ApiKeyValidation::Rejected,
             _ => ApiKeyValidation::Accepted(None),
@@ -504,7 +511,7 @@ impl DatadogAgentSource {
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
         store_api_key: bool,
-        valid_api_keys: Vec<String>,
+        valid_api_keys: Vec<SensitiveString>,
         drop_on_invalid_api_key: bool,
         decoder: Decoder,
         protocol: &'static str,
@@ -518,7 +525,12 @@ impl DatadogAgentSource {
                 store_api_key,
                 matcher: Regex::new(r"^/v1/input/(?P<api_key>[[:alnum:]]{32})/??")
                     .expect("static regex always compiles"),
-                valid_api_keys: Arc::new(valid_api_keys.into_iter().collect()),
+                valid_api_keys: Arc::new(
+                    valid_api_keys
+                        .into_iter()
+                        .map(|key| key.inner().to_owned())
+                        .collect(),
+                ),
                 drop_on_invalid_api_key,
             },
             log_schema_host_key: log_schema()
@@ -562,6 +574,21 @@ impl DatadogAgentSource {
         }
 
         filters.ok_or_else(|| "At least one of the supported data type shall be enabled".into())
+    }
+
+    pub(crate) fn validate_api_key(
+        &self,
+        path: &str,
+        header: Option<String>,
+        query_params: Option<String>,
+    ) -> Result<Option<Arc<str>>, ErrorMessage> {
+        match self
+            .api_key_extractor
+            .extract_and_validate(path, header, query_params)
+        {
+            ApiKeyValidation::Accepted(api_key) => Ok(api_key),
+            ApiKeyValidation::Rejected => Err(invalid_api_key_error()),
+        }
     }
 
     pub(crate) fn decode(

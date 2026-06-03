@@ -330,6 +330,30 @@ async fn source_with_sender(
     (logs_output, metrics_output, address, guard)
 }
 
+async fn source_with_api_key_validation() -> (SocketAddr, PortGuard) {
+    let (sender, _recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
+    let (guard, address) = next_addr();
+    let config = toml::from_str::<DatadogAgentConfig>(&format!(
+        indoc! { r#"
+            address = "{}"
+            compression = "none"
+            valid_api_keys = ["{}"]
+            drop_on_invalid_api_key = true
+            trace_proto = "v1v2"
+        "#},
+        address, DD_API_KEY
+    ))
+    .unwrap();
+    let schema_definitions =
+        HashMap::from([(Some(LOGS.to_owned()), test_logs_schema_definition())]);
+    let context = SourceContext::new_test(sender, Some(schema_definitions));
+    tokio::spawn(async move {
+        config.build(context).await.unwrap().await.unwrap();
+    });
+    wait_for_tcp(address).await;
+    (address, guard)
+}
+
 async fn send_with_path(address: SocketAddr, body: &str, headers: HeaderMap, path: &str) -> u16 {
     timeout(
         HTTP_REQUEST_TIMEOUT,
@@ -2865,7 +2889,15 @@ fn api_key_validation() {
         ApiKeyValidation::Accepted(Some(key)) if key.as_ref() == valid
     ));
 
+    // Allow list set, key matches, but storage disabled: accepted for validation, not stored.
+    let extractor = ApiKeyExtractor::for_test_with_store_api_key(vec![valid.clone()], true, false);
+    assert!(matches!(
+        extractor.extract_and_validate("/v1/input", Some(valid.clone()), None),
+        ApiKeyValidation::Accepted(None)
+    ));
+
     // Allow list set, key matches (via URL path): accepted and stored.
+    let extractor = ApiKeyExtractor::for_test(vec![valid.clone()], true);
     assert!(matches!(
         extractor.extract_and_validate(&format!("/v1/input/{valid}"), None, None),
         ApiKeyValidation::Accepted(Some(key)) if key.as_ref() == valid
@@ -2889,4 +2921,31 @@ fn api_key_validation() {
         extractor.extract_and_validate("/v1/input", Some(invalid), None),
         ApiKeyValidation::Accepted(None)
     ));
+}
+
+#[tokio::test]
+async fn api_key_validation_rejects_before_decode() {
+    let (addr, _guard) = source_with_api_key_validation().await;
+    let mut headers = HeaderMap::new();
+    headers.insert("dd-api-key", "invalid".parse().unwrap());
+    headers.insert("content-encoding", "br".parse().unwrap());
+
+    assert_eq!(
+        403,
+        send_with_path(addr, "not used", headers, DD_API_LOGS_V2_PATH).await
+    );
+}
+
+#[tokio::test]
+async fn api_key_validation_applies_to_trace_stats() {
+    let (addr, _guard) = source_with_api_key_validation().await;
+
+    assert_eq!(
+        403,
+        send_with_path(addr, "", HeaderMap::new(), "/api/v0.2/stats").await
+    );
+    assert_eq!(
+        200,
+        send_with_path(addr, "", dd_api_key_headers(), "/api/v0.2/stats").await
+    );
 }

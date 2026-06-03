@@ -14,9 +14,7 @@ use vector_lib::{
 use warp::{Filter, filters::BoxedFilter, path, path::FullPath, reply::Response};
 
 use super::ddmetric_proto::{Metadata, MetricPayload, SketchPayload, metric_payload};
-use super::{
-    ApiKeyQueryParams, ApiKeyValidation, DatadogAgentSource, RequestHandler, invalid_api_key_error,
-};
+use super::{ApiKeyQueryParams, DatadogAgentSource, RequestHandler};
 use crate::{
     common::{
         datadog::{DatadogMetricType, DatadogSeriesMetric},
@@ -70,22 +68,18 @@ fn sketches_service(
                   query_params: ApiKeyQueryParams,
                   body: Bytes| {
                 let events = source
-                    .decode(&encoding_header, body, path.as_str())
-                    .and_then(|body| {
-                        let api_key = match source.api_key_extractor.extract_and_validate(
-                            path.as_str(),
-                            api_token,
-                            query_params.dd_api_key,
-                        ) {
-                            ApiKeyValidation::Accepted(api_key) => api_key,
-                            ApiKeyValidation::Rejected => return Err(invalid_api_key_error()),
-                        };
-                        decode_datadog_sketches(
-                            body,
-                            api_key,
-                            source.split_metric_namespace,
-                            &source.events_received,
-                        )
+                    .validate_api_key(path.as_str(), api_token, query_params.dd_api_key)
+                    .and_then(|api_key| {
+                        source
+                            .decode(&encoding_header, body, path.as_str())
+                            .and_then(|body| {
+                                decode_datadog_sketches(
+                                    body,
+                                    api_key,
+                                    source.split_metric_namespace,
+                                    &source.events_received,
+                                )
+                            })
                     });
                 handler.clone().handle_request(events, super::METRICS)
             }
@@ -111,25 +105,21 @@ fn series_v1_service(
                   query_params: ApiKeyQueryParams,
                   body: Bytes| {
                 let events = source
-                    .decode(&encoding_header, body, path.as_str())
-                    .and_then(|body| {
-                        let api_key = match source.api_key_extractor.extract_and_validate(
-                            path.as_str(),
-                            api_token,
-                            query_params.dd_api_key,
-                        ) {
-                            ApiKeyValidation::Accepted(api_key) => api_key,
-                            ApiKeyValidation::Rejected => return Err(invalid_api_key_error()),
-                        };
-                        decode_datadog_series_v1(
-                            body,
-                            api_key,
-                            // Currently metrics do not have schemas defined, so for now we just pass a
-                            // default one.
-                            &Arc::new(schema::Definition::default_legacy_namespace()),
-                            source.split_metric_namespace,
-                            &source.events_received,
-                        )
+                    .validate_api_key(path.as_str(), api_token, query_params.dd_api_key)
+                    .and_then(|api_key| {
+                        source
+                            .decode(&encoding_header, body, path.as_str())
+                            .and_then(|body| {
+                                decode_datadog_series_v1(
+                                    body,
+                                    api_key,
+                                    // Currently metrics do not have schemas defined, so for now we just pass a
+                                    // default one.
+                                    &Arc::new(schema::Definition::default_legacy_namespace()),
+                                    source.split_metric_namespace,
+                                    &source.events_received,
+                                )
+                            })
                     });
                 handler.clone().handle_request(events, super::METRICS)
             }
@@ -155,22 +145,18 @@ fn series_v2_service(
                   query_params: ApiKeyQueryParams,
                   body: Bytes| {
                 let events = source
-                    .decode(&encoding_header, body, path.as_str())
-                    .and_then(|body| {
-                        let api_key = match source.api_key_extractor.extract_and_validate(
-                            path.as_str(),
-                            api_token,
-                            query_params.dd_api_key,
-                        ) {
-                            ApiKeyValidation::Accepted(api_key) => api_key,
-                            ApiKeyValidation::Rejected => return Err(invalid_api_key_error()),
-                        };
-                        decode_datadog_series_v2(
-                            body,
-                            api_key,
-                            source.split_metric_namespace,
-                            &source.events_received,
-                        )
+                    .validate_api_key(path.as_str(), api_token, query_params.dd_api_key)
+                    .and_then(|api_key| {
+                        source
+                            .decode(&encoding_header, body, path.as_str())
+                            .and_then(|body| {
+                                decode_datadog_series_v2(
+                                    body,
+                                    api_key,
+                                    source.split_metric_namespace,
+                                    &source.events_received,
+                                )
+                            })
                     });
                 handler.clone().handle_request(events, super::METRICS)
             }

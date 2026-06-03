@@ -1,1 +1,3 @@
 The `datadog_agent` source now supports validating incoming Datadog API keys. The new `valid_api_keys` option accepts a list of permitted API keys, and `drop_on_invalid_api_key` controls whether requests carrying an unrecognized key are rejected with a `403 Forbidden` response (when `true`) or accepted with the key simply not stored (when `false`, the default). When `valid_api_keys` is empty (the default), no validation is performed and all API keys are accepted, preserving existing behavior.
+
+authors: xfocus3

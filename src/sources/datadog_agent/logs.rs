@@ -15,10 +15,7 @@ use vector_lib::{
 use vrl::core::Value;
 use warp::{Filter, filters::BoxedFilter, path as warp_path, path::FullPath, reply::Response};
 
-use super::{
-    ApiKeyQueryParams, ApiKeyValidation, DatadogAgentConfig, DatadogAgentSource, LogMsg,
-    RequestHandler, invalid_api_key_error,
-};
+use super::{ApiKeyQueryParams, DatadogAgentConfig, DatadogAgentSource, LogMsg, RequestHandler};
 use crate::{
     common::{datadog::DDTAGS, http::ErrorMessage},
     event::Event,
@@ -44,17 +41,11 @@ pub(super) fn build_warp_filter(
                   query_params: ApiKeyQueryParams,
                   body: Bytes| {
                 let events = source
-                    .decode(&encoding_header, body, path.as_str())
-                    .and_then(|body| {
-                        let api_key = match source.api_key_extractor.extract_and_validate(
-                            path.as_str(),
-                            api_token,
-                            query_params.dd_api_key,
-                        ) {
-                            ApiKeyValidation::Accepted(api_key) => api_key,
-                            ApiKeyValidation::Rejected => return Err(invalid_api_key_error()),
-                        };
-                        decode_log_body(body, api_key, &source)
+                    .validate_api_key(path.as_str(), api_token, query_params.dd_api_key)
+                    .and_then(|api_key| {
+                        source
+                            .decode(&encoding_header, body, path.as_str())
+                            .and_then(|body| decode_log_body(body, api_key, &source))
                     });
                 handler.clone().handle_request(events, super::LOGS)
             },
