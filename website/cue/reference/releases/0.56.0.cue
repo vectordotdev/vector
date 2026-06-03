@@ -416,7 +416,7 @@ releases: "0.56.0": {
 		- VRL string literals now support `\u{HEX}` Unicode escape sequences. Any valid Unicode scalar value can be expressed, e.g. `"hello\u{1F30E}world"`. Invalid sequences (empty braces, non-hex digits, surrogate codepoints, or values above U+10FFFF) are reported as a compile-time error.
 
 		(https://github.com/vectordotdev/vrl/pull/1771)
-		~- `parse_regex` now accepts dynamic regex patterns (variables and runtime expressions), consistent with `parse_regex_all`. When the pattern is a literal, return type information remains precise based on named capture groups.~
+		- ~`parse_regex` now accepts dynamic regex patterns (variables and runtime expressions), consistent with `parse_regex_all`. When the pattern is a literal, return type information remains precise based on named capture groups.~
 
 		~(https://github.com/vectordotdev/vrl/pull/1774)~
 
@@ -431,7 +431,7 @@ releases: "0.56.0": {
 		- Added an optional `allow_lossy_string_coercion` argument to `encode_proto`. VRL's protobuf encoding stringifies `Boolean`, `Integer`, `Float`, and `Timestamp` values when assigned to a protobuf `string` field as a convenience for callers handling loosely typed input. The [protobuf JSON mapping](https://protobuf.dev/programming-guides/json/) only accepts a JSON string for a `string` field, so callers who want strict spec-compliant encoding can now pass `allow_lossy_string_coercion: false`. The default stays `true`, so today's behavior is unchanged.
 
 		(https://github.com/vectordotdev/vrl/pull/1764)
-		~- Improved performance of `parse_regex`/`parse_regex_all` by pre-computing capture group names and indices at compile time. Users may see anywhere from 4% to 13% speedups in some cases.~
+		- ~Improved performance of `parse_regex`/`parse_regex_all` by pre-computing capture group names and indices at compile time. Users may see anywhere from 4% to 13% speedups in some cases.~
 
 		~(https://github.com/vectordotdev/vrl/pull/1773)~
 		- Improved performance of `parse_regex_all` by reusing the compiled regex across invocations.
