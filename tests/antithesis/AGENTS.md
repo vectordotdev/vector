@@ -38,8 +38,9 @@ The fault profile is the single source of truth: change a shot's faults by editi
 ```sh
 cd tests/antithesis/scenarios
 ./launch.sh vector_to_vector_e2e_disk          # 30-minute run with the pinned profile
-DURATION=60 ./launch.sh vector_to_vector_e2e_disk   # override duration (minutes)
-DRY_RUN=1 ./launch.sh vector_to_vector_e2e_disk     # print the exact command, submit nothing
+./launch.sh vector_e2e                          # the no-disk, single-node counterpart
+DURATION=60 ./launch.sh vector_e2e              # override duration (minutes)
+DRY_RUN=1 ./launch.sh vector_e2e                # print the exact command, submit nothing
 ```
 
 The launcher reads tenant and registry from the environment (snouty's variables):
@@ -48,15 +49,15 @@ The launcher reads tenant and registry from the environment (snouty's variables)
 - `ANTITHESIS_API_KEY` (or `ANTITHESIS_USERNAME` + `ANTITHESIS_PASSWORD`)
 - `ANTITHESIS_REPOSITORY`
 
-`DESCRIPTION`, `TEST_NAME`, `FAULT_NODES`, and `WEBHOOK` are overridable; the
+`DESCRIPTION`, `TEST_NAME`, `FAULT_NODES`, and `WEBHOOK` are overridable. The
 running git commit is stamped into the description automatically so a shot records
 the code it tested. Extra snouty flags pass straight through, e.g.
-`./launch.sh vector_to_vector_e2e_disk --recipients you@example.com`.
+`./launch.sh vector_e2e --recipients you@example.com`.
 
 The pinned profile submits to the `persistent_storage` webhook and faults the
-scenario's SUT nodes (`head` and `tail` for the disk scenario) with node
-termination, hang, and throttle, plus `cpu_mod` and `clock_jitter`. The `oracle`
-is left out of termination and hang **only** — its obligation ledger lives in
-memory, so killing or freezing it would erase the run's source of truth. It is
-deliberately still subject to network faults so the egress delivery path is
-exercised.
+scenario's SUT nodes (`head` and `tail` for the disk scenario, `vector` for
+`vector_e2e`) with node termination, hang, and throttle, plus `cpu_mod` and
+`clock_jitter`. The `oracle` is never faulted with termination or hang — its
+obligation ledger lives in memory, so killing or freezing it would erase the run's
+source of truth. It is deliberately still subject to network faults so the egress
+delivery path is exercised.
