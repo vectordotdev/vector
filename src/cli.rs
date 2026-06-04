@@ -296,11 +296,6 @@ impl RootOpts {
             }
         }
 
-        #[cfg(unix)]
-        if self.raise_fd_limit {
-            raise_file_descriptor_limit();
-        }
-
         crate::metrics::init_global().expect("metrics initialization failed");
     }
 }
@@ -315,7 +310,7 @@ impl RootOpts {
 /// On macOS, the hard limit can be RLIM_INFINITY, so we first try the hard limit,
 /// then fall back to the kernel-enforced `kern.maxfilesperproc` (typically 10240).
 #[cfg(unix)]
-fn raise_file_descriptor_limit() {
+pub(crate) fn raise_file_descriptor_limit() {
     use nix::sys::resource::{Resource, getrlimit, setrlimit};
     use tracing::{info, warn};
 
@@ -525,53 +520,61 @@ pub fn handle_config_errors(errors: Vec<String>) -> exitcode::ExitCode {
 #[cfg(test)]
 mod tests {
     #[cfg(unix)]
-    static RLIMIT_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    fn run_in_subprocess(test_name: &str) {
+        let exe = std::env::current_exe().unwrap();
+        let output = std::process::Command::new(exe)
+            .env("__VECTOR_SUBPROCESS_TEST", "1")
+            .args(["--exact", test_name, "--nocapture"])
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "subprocess test failed:\nstdout: {}\nstderr: {}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr),
+        );
+    }
 
     #[test]
     #[cfg(unix)]
     fn test_raise_file_descriptor_limit() {
+        if std::env::var("__VECTOR_SUBPROCESS_TEST").is_err() {
+            run_in_subprocess("cli::tests::test_raise_file_descriptor_limit");
+            return;
+        }
+
         use nix::sys::resource::{Resource, getrlimit, setrlimit};
 
-        let _lock = RLIMIT_MUTEX.lock().unwrap();
-
-        // Save original limits
         let (original_soft, hard) = getrlimit(Resource::RLIMIT_NOFILE).unwrap();
-
-        // Lower the soft limit to simulate a constrained environment
         let lowered = std::cmp::min(original_soft, 256);
         if lowered < hard {
             setrlimit(Resource::RLIMIT_NOFILE, lowered, hard).unwrap();
 
-            // Verify it was lowered
             let (soft_before, _) = getrlimit(Resource::RLIMIT_NOFILE).unwrap();
             assert_eq!(soft_before, lowered);
 
-            // Call the function under test
             super::raise_file_descriptor_limit();
 
-            // Verify the soft limit was raised above the lowered value
             let (soft_after, _) = getrlimit(Resource::RLIMIT_NOFILE).unwrap();
             assert!(
                 soft_after > lowered,
                 "Expected soft limit to be raised above {lowered}, got {soft_after}"
             );
-
-            // Restore original limits
-            setrlimit(Resource::RLIMIT_NOFILE, original_soft, hard).unwrap();
         }
     }
 
     #[test]
     #[cfg(unix)]
     fn test_raise_file_descriptor_limit_already_at_max() {
+        if std::env::var("__VECTOR_SUBPROCESS_TEST").is_err() {
+            run_in_subprocess("cli::tests::test_raise_file_descriptor_limit_already_at_max");
+            return;
+        }
+
         use nix::sys::resource::{Resource, getrlimit, setrlimit};
 
-        let _lock = RLIMIT_MUTEX.lock().unwrap();
+        let (_, hard) = getrlimit(Resource::RLIMIT_NOFILE).unwrap();
 
-        // Save original limits
-        let (original_soft, hard) = getrlimit(Resource::RLIMIT_NOFILE).unwrap();
-
-        // Set soft = hard so there's nothing to raise
         if setrlimit(Resource::RLIMIT_NOFILE, hard, hard).is_err() {
             #[cfg(target_os = "macos")]
             if let Some(maxfiles) = super::macos_maxfilesperproc() {
@@ -581,14 +584,10 @@ mod tests {
 
         let (soft_before, _) = getrlimit(Resource::RLIMIT_NOFILE).unwrap();
 
-        // Call the function — should be a no-op
         super::raise_file_descriptor_limit();
 
         let (soft_after, _) = getrlimit(Resource::RLIMIT_NOFILE).unwrap();
         assert_eq!(soft_before, soft_after);
-
-        // Restore original limits
-        setrlimit(Resource::RLIMIT_NOFILE, original_soft, hard).unwrap();
     }
 
     #[test]
