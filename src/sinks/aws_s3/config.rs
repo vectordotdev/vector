@@ -303,6 +303,16 @@ impl S3SinkConfig {
 
         let key_prefix = Template::try_from(self.key_prefix.clone())?.with_tz_offset(offset);
 
+        let key_template = self
+            .key
+            .as_ref()
+            .map(|k| Template::try_from(k.as_str()).map(|t| t.with_tz_offset(offset)))
+            .transpose()?;
+
+        if key_template.is_some() {
+            self.warn_on_key_field_conflicts();
+        }
+
         let ssekms_key_id = self
             .options
             .ssekms_key_id
@@ -311,7 +321,8 @@ impl S3SinkConfig {
             .map(|ssekms_key_id| Template::try_from(ssekms_key_id.as_str()))
             .transpose()?;
 
-        let partitioner = S3KeyPartitioner::new(key_prefix, ssekms_key_id, None);
+        let partitioner =
+            S3KeyPartitioner::new(key_prefix, ssekms_key_id, None).with_key_template(key_template);
 
         let transformer = self.encoding.transformer();
 
@@ -380,6 +391,28 @@ impl S3SinkConfig {
         let sink = S3Sink::new(service, request_options, partitioner, batch_settings);
 
         Ok(VectorSink::from_event_streamsink(sink))
+    }
+
+    fn warn_on_key_field_conflicts(&self) {
+        let mut overridden = Vec::with_capacity(4);
+        if self.key_prefix != default_key_prefix() {
+            overridden.push("key_prefix");
+        }
+        if self.filename_time_format != default_filename_time_format() {
+            overridden.push("filename_time_format");
+        }
+        if !self.filename_append_uuid {
+            overridden.push("filename_append_uuid");
+        }
+        if self.filename_extension.is_some() {
+            overridden.push("filename_extension");
+        }
+        if !overridden.is_empty() {
+            warn!(
+                message = "`key` is set on the `aws_s3` sink, so the following fields are ignored.",
+                ignored_fields = ?overridden,
+            );
+        }
     }
 
     pub fn build_healthcheck(&self, client: S3Client) -> crate::Result<Healthcheck> {
