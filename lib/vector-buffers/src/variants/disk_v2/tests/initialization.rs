@@ -5,13 +5,13 @@ use tracing::Instrument;
 
 use crate::{
     buffer_usage_data::BufferUsageHandle,
-    test::{acknowledge, install_tracing_helpers, with_temp_dir, SizedRecord},
+    test::{SizedRecord, acknowledge, install_tracing_helpers, with_temp_dir},
     variants::disk_v2::{
+        Buffer, DiskBufferConfigBuilder,
         tests::{
             create_buffer_v2_with_max_data_file_size, create_default_buffer_v2,
             get_minimum_data_file_size_for_record_payload, set_file_length,
         },
-        Buffer, DiskBufferConfigBuilder,
     },
 };
 
@@ -192,8 +192,9 @@ async fn reader_doesnt_block_when_ahead_of_last_record_in_current_data_file() {
 
 #[tokio::test]
 async fn reopen_recovers_when_reader_resume_data_file_is_missing() {
-    // Failing demonstration of SMPTNG-749: a crash that loses the reader's
-    // un-fsync'd file-id advance leaves disk_v2 unable to reopen, crash-looping.
+    // Regression test for SMPTNG-749: a crash that loses the reader's un-fsync'd
+    // file-id advance leaves a deleted data file the ledger still resumes from.
+    // Reopen must skip it and recover instead of crash-looping.
     //
     // `reader::delete_completed_data_file` is not atomic, performing the following operations:
     //
@@ -205,8 +206,8 @@ async fn reopen_recovers_when_reader_resume_data_file_is_missing() {
     // it is SIGKILL'ed for instance -- then the dat file will be gone but the
     // reader will be made to open a missing file and will crash.
     //
-    // This test demonstrates one instance of this crash. In the scenario below
-    // the reader is at data file 0 and the writer at 1. That is:
+    // This test stages one instance of that crash and asserts the reopen recovers.
+    // In the scenario below the reader is at data file 0 and the writer at 1. That is:
     //
     //   1. writer writes 2 records -- data-0, data-1 -- leaving the system
     //      in state reader=0, writer=1.

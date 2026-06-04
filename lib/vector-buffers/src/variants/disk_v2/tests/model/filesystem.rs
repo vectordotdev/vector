@@ -352,4 +352,8 @@ impl Filesystem for TestFilesystem {
             Err(io_err_not_found())
         }
     }
+
+    async fn sync_directory(&self, _path: &Path) -> io::Result<()> {
+        Ok(())
+    }
 }

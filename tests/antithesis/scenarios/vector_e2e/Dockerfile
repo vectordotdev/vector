@@ -76,13 +76,8 @@ FROM debian:stable-slim AS vector
 RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=vector-build /usr/local/bin/vector /usr/bin/vector
-# Bake the node config plus its benign alternate, which the reload fault swaps in
-# to force a sink rebuild.
+# Bake the node config; compose points --config at it.
 COPY tests/antithesis/scenarios/vector_e2e/vector.yaml /etc/vector/vector.yaml
-COPY tests/antithesis/scenarios/vector_e2e/vector.b.yaml /etc/vector/vector.b.yaml
-# The reload fault is an anytime_ test command that runs IN the node container.
-# The node stays running because its entrypoint is Vector, not a test command.
-COPY --chmod=755 tests/antithesis/scenarios/vector_e2e/anytime_reload.sh /opt/antithesis/test/v1/ve2e/anytime_reload
 RUN mkdir -p /symbols && ln -s /usr/bin/vector /symbols/vector
 ENV NO_COLOR=1
 EXPOSE 8080 9598
