@@ -440,6 +440,37 @@ mod tests {
         crate::test_util::test_generate_config::<S3SinkConfig>();
     }
 
+    #[test]
+    fn parses_key_field() {
+        let config: S3SinkConfig = toml::from_str(
+            r#"
+            bucket = "test-bucket"
+            key = "logs/{{ host }}/%F.log"
+
+            [encoding]
+            codec = "text"
+            "#,
+        )
+        .unwrap();
+
+        assert_eq!(config.key.as_deref(), Some("logs/{{ host }}/%F.log"));
+    }
+
+    #[test]
+    fn key_defaults_to_none() {
+        let config: S3SinkConfig = toml::from_str(
+            r#"
+            bucket = "test-bucket"
+
+            [encoding]
+            codec = "text"
+            "#,
+        )
+        .unwrap();
+
+        assert!(config.key.is_none());
+    }
+
     /// Correct TOML shape: `batch_encoding.codec = "parquet"` with `schema_mode = "auto_infer"`.
     #[cfg(feature = "codecs-parquet")]
     #[test]
