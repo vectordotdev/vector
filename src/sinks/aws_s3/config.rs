@@ -98,7 +98,7 @@ pub struct S3SinkConfig {
     /// [chrono_strftime_specifiers]: https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
     #[serde(default)]
     #[configurable(metadata(docs::templateable))]
-    #[configurable(metadata(docs::examples = "logs/{{ host }}/%F.log"))]
+    #[configurable(metadata(docs::examples = "logs/{{ host }}/%F-{{ message_id }}.json"))]
     #[configurable(metadata(docs::examples = "{{ application_id }}/%Y/%m/%d/%H-%M-%S.json"))]
     pub key: Option<String>,
 

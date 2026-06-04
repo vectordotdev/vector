@@ -1036,7 +1036,7 @@ generated: components: sinks: aws_s3: configuration: {
 			"""
 		required: false
 		type: string: {
-			examples: ["logs/{{ host }}/%F.log", "{{ application_id }}/%Y/%m/%d/%H-%M-%S.json"]
+			examples: ["logs/{{ host }}/%F-{{ message_id }}.json", "{{ application_id }}/%Y/%m/%d/%H-%M-%S.json"]
 			syntax: "template"
 		}
 	}
