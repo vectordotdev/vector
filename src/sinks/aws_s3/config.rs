@@ -71,12 +71,36 @@ pub struct S3SinkConfig {
     /// Prefixes are useful for partitioning objects, such as by creating an object key that
     /// stores objects under a particular directory. If using a prefix for this purpose, it must end
     /// in `/` to act as a directory path. A trailing `/` is **not** automatically added.
+    ///
+    /// Ignored when `key` is set.
     #[serde(default = "default_key_prefix")]
     #[configurable(metadata(docs::templateable))]
     #[configurable(metadata(docs::examples = "date=%F/hour=%H"))]
     #[configurable(metadata(docs::examples = "year=%Y/month=%m/day=%d"))]
     #[configurable(metadata(docs::examples = "application_id={{ application_id }}/date=%F"))]
     pub key_prefix: String,
+
+    /// The full S3 object key template.
+    ///
+    /// When set, this template is rendered for each event and used as the complete object key —
+    /// no timestamp, UUID, or filename extension is appended. The template supports both event
+    /// field substitution (`{{ field }}`) and [`strftime`][chrono_strftime_specifiers] specifiers.
+    ///
+    /// This option takes precedence over `key_prefix`, `filename_time_format`,
+    /// `filename_append_uuid`, and `filename_extension`; those fields are ignored when `key` is
+    /// set. Because Vector does not append a uniqueness token, the user is responsible for
+    /// ensuring keys are unique enough for their workload — events that render to the same key
+    /// overwrite each other in S3.
+    ///
+    /// Events are partitioned across S3 requests by the rendered key, so high-cardinality
+    /// templates produce one S3 request per distinct key value.
+    ///
+    /// [chrono_strftime_specifiers]: https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
+    #[serde(default)]
+    #[configurable(metadata(docs::templateable))]
+    #[configurable(metadata(docs::examples = "logs/{{ host }}/%F.log"))]
+    #[configurable(metadata(docs::examples = "{{ application_id }}/%Y/%m/%d/%H-%M-%S.json"))]
+    pub key: Option<String>,
 
     /// The timestamp format for the time component of the object key.
     ///
@@ -93,6 +117,8 @@ pub struct S3SinkConfig {
     ///
     /// When set to an empty string, no timestamp is appended to the key prefix.
     ///
+    /// Ignored when `key` is set.
+    ///
     /// [chrono_strftime_specifiers]: https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
     #[serde(default = "default_filename_time_format")]
     pub filename_time_format: String,
@@ -105,6 +131,8 @@ pub struct S3SinkConfig {
     ///
     /// This ensures there are no name collisions, and can be useful in high-volume workloads where
     /// object keys must be unique.
+    ///
+    /// Ignored when `key` is set.
     #[serde(default = "crate::serde::default_true")]
     #[configurable(metadata(docs::human_name = "Append UUID to Filename"))]
     pub filename_append_uuid: bool,
@@ -112,6 +140,8 @@ pub struct S3SinkConfig {
     /// The filename extension to use in the object key.
     ///
     /// This overrides setting the extension based on the configured `compression`.
+    ///
+    /// Ignored when `key` is set.
     #[configurable(metadata(docs::examples = "json"))]
     pub filename_extension: Option<String>,
 
@@ -199,6 +229,7 @@ impl GenerateConfig for S3SinkConfig {
         toml::Value::try_from(Self {
             bucket: "".to_owned(),
             key_prefix: default_key_prefix(),
+            key: None,
             filename_time_format: default_filename_time_format(),
             filename_append_uuid: true,
             filename_extension: None,
@@ -431,6 +462,7 @@ mod tests {
         let config = S3SinkConfig {
             bucket: "test".to_string(),
             key_prefix: super::default_key_prefix(),
+            key: None,
             filename_time_format: super::default_filename_time_format(),
             filename_append_uuid: true,
             filename_extension: None,

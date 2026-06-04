@@ -719,6 +719,7 @@ fn config(bucket: &str, batch_size: usize, timeout_secs: f64) -> S3SinkConfig {
     S3SinkConfig {
         bucket: bucket.to_string(),
         key_prefix: random_string(10) + "/date=%F",
+        key: None,
         filename_time_format: default_filename_time_format(),
         filename_append_uuid: true,
         filename_extension: None,
