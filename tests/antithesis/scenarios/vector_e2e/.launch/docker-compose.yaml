@@ -1,0 +1,72 @@
+name: vector-e2e
+services:
+  oracle:
+    build:
+      context: /home/ssm-user/src/vector
+      dockerfile: tests/antithesis/scenarios/vector_e2e/Dockerfile
+      target: workload
+    container_name: oracle
+    depends_on:
+      vector:
+        condition: service_healthy
+        required: true
+    environment:
+      NO_COLOR: "1"
+      ORACLE_URL: http://127.0.0.1:8686
+      SCENARIO_NAME: vector_e2e
+      VECTOR_METRICS_URL: http://vector:9598/metrics
+      VECTOR_METRICS_URLS: http://vector:9598/metrics
+      VECTOR_SOURCE_URL: http://vector:8080/
+    hostname: oracle
+    image: ve2e-oracle:3cce5aa6e-dirty
+    init: true
+    networks:
+      default: null
+    platform: linux/amd64
+  vector:
+    build:
+      context: /home/ssm-user/src/vector
+      dockerfile: tests/antithesis/scenarios/vector_e2e/Dockerfile
+      target: vector
+    container_name: vector
+    entrypoint:
+      - /usr/bin/vector
+      - --config
+      - /etc/vector/vector.yaml
+    environment:
+      NO_COLOR: "1"
+      VECTOR_CONFIG: /etc/vector/vector.yaml
+      VECTOR_CONFIG_ALT: /etc/vector/vector.b.yaml
+    hostname: vector
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - -fsS
+        - http://localhost:9598/metrics
+      timeout: 3s
+      interval: 5s
+      retries: 30
+      start_period: 10s
+    image: ve2e-vector:3cce5aa6e-dirty
+    init: true
+    networks:
+      default: null
+    platform: linux/amd64
+networks:
+  default:
+    name: vector-e2e_default
+x-node-health:
+  interval: 5s
+  retries: 30
+  start_period: 10s
+  test:
+    - CMD
+    - curl
+    - -fsS
+    - http://localhost:9598/metrics
+  timeout: 3s
+x-vector-build:
+  context: ../../../..
+  dockerfile: tests/antithesis/scenarios/vector_e2e/Dockerfile
+  target: vector
