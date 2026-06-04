@@ -40,6 +40,22 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 			}
 		}
 	}
+	max_tracked_keys: {
+		description: """
+			Maximum number of distinct (metric, tag-key) pairs to track across the entire
+			transform. When this cap is reached, additional tag keys on new metrics or new
+			tag keys on existing metrics are not tracked, and tag values for those pairs
+			pass through unchecked. Users can detect this via the
+			`tag_cardinality_untracked_events_total` counter and the
+			`tag_cardinality_tracked_keys` gauge.
+
+			When unset (default), there is no cap and the transform tracks all pairs it
+			encounters. In `global` tracking scope mode, this limit still applies (the
+			metric key is set to `None` unless there is a per-metric override).
+			"""
+		required: false
+		type: uint: {}
+	}
 	mode: {
 		description: "Controls the approach taken for tracking tag cardinality."
 		required:    true
@@ -110,20 +126,12 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 					description: "Controls the approach taken for tracking tag cardinality."
 					required:    true
 					type: string: enum: {
-						exact: """
-																			Tracks cardinality exactly.
-
-																			This mode has higher memory requirements than `probabilistic`, but never falsely outputs
-																			metrics with new tags after the limit has been hit.
+						exact: "Tracks cardinality exactly. See `Mode::Exact` for details."
+						excluded: """
+																			Skip cardinality tracking for this metric. All tag values pass through and nothing is
+																			limited. Other fields in this per-metric configuration are ignored when this is selected.
 																			"""
-						probabilistic: """
-																			Tracks cardinality probabilistically.
-
-																			This mode has lower memory requirements than `exact`, but may occasionally allow metric
-																			events to pass through the transform even when they contain new tags that exceed the
-																			configured limit. The rate at which this happens can be controlled by changing the value of
-																			`cache_size_per_key`.
-																			"""
+						probabilistic: "Tracks cardinality probabilistically. See `Mode::Probabilistic` for details."
 					}
 				}
 				namespace: {
@@ -131,11 +139,104 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 					required:    false
 					type: string: {}
 				}
+				per_tag_limits: {
+					description: """
+						Per-tag-key overrides scoped to this metric. Each entry sets a `mode`:
+						- `mode: limit_override` + `value_limit: N` — track with a per-tag cap.
+						- `mode: excluded` — opt this tag out of tracking entirely.
+
+						All other settings (tracking algorithm, `limit_exceeded_action`, etc.)
+						are inherited from the enclosing per-metric configuration.
+						Tags not listed here use the per-metric configuration.
+						"""
+					required: false
+					type: object: options: "*": {
+						description: "An individual tag configuration."
+						required:    true
+						type: object: options: {
+							mode: {
+								description: "Controls how this tag key is handled."
+								required:    true
+								type: string: enum: {
+									excluded: """
+																											Opt this tag out of cardinality tracking entirely. All values pass through
+																											without being recorded or checked against any `value_limit`.
+																											"""
+									limit_override: """
+																											Track this tag with a per-tag value limit. The enclosing per-metric tracking
+																											algorithm and all other settings still apply.
+																											"""
+								}
+							}
+							value_limit: {
+								description:   "Maximum number of distinct values to accept for this tag key."
+								relevant_when: "mode = \"limit_override\""
+								required:      true
+								type: uint: {}
+							}
+						}
+					}
+				}
 				value_limit: {
-					description: "How many distinct values to accept for any given key."
+					description: "How many distinct values to accept for any given key. Ignored when `mode: excluded`."
 					required:    false
 					type: uint: default: 500
 				}
+			}
+		}
+	}
+	per_tag_limits: {
+		description: """
+			Global per-tag-key overrides, applied to every metric that does not match a
+			`per_metric_limits` entry. Each entry sets `mode: limit_override` (with a
+			per-tag `value_limit`) or `mode: excluded` (bypass tracking for that tag).
+
+			See the "Per-tag overrides" section under "How it works" for a worked example
+			and the precedence rules.
+			"""
+		required: false
+		type: object: options: "*": {
+			description: "An individual tag configuration."
+			required:    true
+			type: object: options: {
+				mode: {
+					description: "Controls how this tag key is handled."
+					required:    true
+					type: string: enum: {
+						excluded: """
+																			Opt this tag out of cardinality tracking entirely. All values pass through
+																			without being recorded or checked against any `value_limit`.
+																			"""
+						limit_override: """
+																			Track this tag with a per-tag value limit. The enclosing per-metric tracking
+																			algorithm and all other settings still apply.
+																			"""
+					}
+				}
+				value_limit: {
+					description:   "Maximum number of distinct values to accept for this tag key."
+					relevant_when: "mode = \"limit_override\""
+					required:      true
+					type: uint: {}
+				}
+			}
+		}
+	}
+	tracking_scope: {
+		description: "Controls how tag tracking state is partitioned across metrics."
+		required:    false
+		type: string: {
+			default: "global"
+			enum: {
+				global: """
+					All metrics share a single tracking bucket. Tag values pool across metrics
+					and the global `value_limit` caps the combined set.
+					"""
+				per_metric: """
+					Every distinct metric gets its own tracking bucket, providing tag
+					cardinality limiting for each metric in isolation at the cost of higher
+					memory usage.
+					"""
 			}
 		}
 	}

@@ -29,6 +29,7 @@ use crate::{
             DATA_VOLUME_SINK_TAGS, SINK_TAGS, assert_data_volume_sink_compliance,
             assert_sink_compliance,
         },
+        compression::is_zstd,
         map_event_batch_stream,
     },
 };
@@ -142,10 +143,14 @@ async fn start_test(events: Vec<Event>) -> (Vec<Event>, Receiver<(http::request:
 }
 
 fn decompress_payload(payload: Vec<u8>) -> std::io::Result<Vec<u8>> {
-    let mut decompressor = ZlibDecoder::new(&payload[..]);
-    let mut decompressed = Vec::new();
-    let result = std::io::copy(&mut decompressor, &mut decompressed);
-    result.map(|_| decompressed)
+    if is_zstd(&payload) {
+        zstd::decode_all(&payload[..])
+    } else {
+        let mut decompressor = ZlibDecoder::new(&payload[..]);
+        let mut decompressed = Vec::new();
+        std::io::copy(&mut decompressor, &mut decompressed)?;
+        Ok(decompressed)
+    }
 }
 
 #[tokio::test]

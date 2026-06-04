@@ -25,7 +25,7 @@ where
         let rate_limiter = Arc::new(RateLimiter::dashmap_with_clock(quota, clock));
 
         let rate_limiter_clone = Arc::clone(&rate_limiter);
-        let flush_handle = tokio::spawn(async move {
+        let flush_handle = crate::spawn_in_current_span(async move {
             let mut interval = tokio::time::interval(flush_keys_interval);
             loop {
                 interval.tick().await;

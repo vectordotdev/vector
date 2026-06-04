@@ -1,16 +1,16 @@
-version: '3'
+version: "3"
 
 services:
   postgres:
     image: docker.io/postgres:${CONFIG_VERSION}
     command: /postgres-init.sh
     environment:
-    - POSTGRES_USER=vector
-    - POSTGRES_PASSWORD=vector
+      - POSTGRES_USER=vector
+      - POSTGRES_PASSWORD=vector
     volumes:
-    - socket:/var/run/postgresql
-    - ../data/postgres-init.sh:/postgres-init.sh:ro
-    - ../../../data/ca:/certs:ro
+      - socket:/var/run/postgresql
+      - ../data/postgres-init.sh:/postgres-init.sh:ro
+      - ../../../data/ca:/certs:ro
 
 volumes:
   # Use external volume 'postgres_socket' that's shared with the test runner

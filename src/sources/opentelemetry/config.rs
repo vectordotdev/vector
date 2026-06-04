@@ -19,7 +19,7 @@ use crate::{
 };
 use futures::FutureExt;
 use futures_util::{TryFutureExt, future::join};
-use tonic::{codec::CompressionEncoding, transport::server::RoutesBuilder};
+use tonic::transport::server::RoutesBuilder;
 use vector_config::indexmap::IndexSet;
 use vector_lib::{
     codecs::decoding::{OtlpDeserializer, OtlpSignalType},
@@ -202,13 +202,14 @@ pub struct HttpConfig {
     #[serde(default)]
     pub keepalive: KeepaliveConfig,
 
-    /// A list of HTTP headers to include in the log event.
+    /// A list of HTTP headers to include in the event.
     ///
     /// Accepts the wildcard (`*`) character for headers matching a specified pattern.
     ///
-    /// Specifying "*" results in all headers included in the log event.
+    /// Specifying "*" results in all headers included in the event.
     ///
-    /// These headers are not included in the JSON payload if a field with a conflicting name exists.
+    /// For log events in legacy namespace mode, headers are not included if a field with a conflicting name exists.
+    /// For metrics and traces, headers are always added to event metadata.
     #[serde(default)]
     #[configurable(metadata(docs::examples = "User-Agent"))]
     #[configurable(metadata(docs::examples = "X-My-Custom-Header"))]
@@ -284,6 +285,9 @@ impl SourceConfig for OpentelemetryConfig {
         let metrics_deserializer = self.get_signal_deserializer(OtlpSignalType::Metrics)?;
         let traces_deserializer = self.get_signal_deserializer(OtlpSignalType::Traces)?;
 
+        // Compression negotiation (gzip, zstd) is handled centrally by
+        // `DecompressionAndMetricsLayer` in `sources::util::grpc`, so these
+        // services deliberately do not call `.accept_compressed(..)`.
         let log_service = LogsServiceServer::new(Service {
             pipeline: cx.out.clone(),
             acknowledgements,
@@ -291,7 +295,6 @@ impl SourceConfig for OpentelemetryConfig {
             events_received: events_received.clone(),
             deserializer: logs_deserializer.clone(),
         })
-        .accept_compressed(CompressionEncoding::Gzip)
         .max_decoding_message_size(usize::MAX);
 
         let metrics_service = MetricsServiceServer::new(Service {
@@ -301,7 +304,6 @@ impl SourceConfig for OpentelemetryConfig {
             events_received: events_received.clone(),
             deserializer: metrics_deserializer.clone(),
         })
-        .accept_compressed(CompressionEncoding::Gzip)
         .max_decoding_message_size(usize::MAX);
 
         let trace_service = TraceServiceServer::new(Service {
@@ -311,7 +313,6 @@ impl SourceConfig for OpentelemetryConfig {
             events_received: events_received.clone(),
             deserializer: traces_deserializer.clone(),
         })
-        .accept_compressed(CompressionEncoding::Gzip)
         .max_decoding_message_size(usize::MAX);
 
         let mut builder = RoutesBuilder::default();
@@ -327,7 +328,7 @@ impl SourceConfig for OpentelemetryConfig {
             cx.shutdown.clone(),
         )
         .map_err(|error| {
-            error!(message = "Source future failed.", %error);
+            error!(message = "OpenTelemetry source gRPC server failed.", %error);
         });
 
         let http_tls_settings = MaybeTlsSettings::from_config(self.http.tls.as_ref(), true)?;
@@ -354,7 +355,10 @@ impl SourceConfig for OpentelemetryConfig {
             filters,
             cx.shutdown,
             self.http.keepalive.clone(),
-        );
+        )
+        .map_err(|error| {
+            error!(message = "OpenTelemetry source HTTP server failed.", %error);
+        });
 
         Ok(join(grpc_source, http_source).map(|_| Ok(())).boxed())
     }

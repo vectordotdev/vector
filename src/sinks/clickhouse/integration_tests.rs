@@ -18,7 +18,7 @@ use serde::Deserialize;
 use serde_json::Value;
 use tokio::time::{Duration, timeout};
 use vector_lib::{
-    codecs::encoding::{ArrowStreamSerializerConfig, BatchSerializerConfig},
+    codecs::encoding::ArrowStreamSerializerConfig,
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent},
     lookup::PathPrefix,
 };
@@ -28,7 +28,7 @@ use crate::{
     codecs::{TimestampFormat, Transformer},
     config::{SinkConfig, SinkContext, log_schema},
     sinks::{
-        clickhouse::config::ClickhouseConfig,
+        clickhouse::config::{ClickhouseBatchEncoding, ClickhouseConfig},
         util::{BatchConfig, Compression, TowerRequestConfig},
     },
     test_util::{
@@ -502,7 +502,7 @@ async fn insert_events_arrow_format() {
         table: table.clone().try_into().unwrap(),
         compression: Compression::None,
         format: crate::sinks::clickhouse::config::Format::ArrowStream,
-        batch_encoding: Some(BatchSerializerConfig::ArrowStream(Default::default())),
+        batch_encoding: Some(ClickhouseBatchEncoding::ArrowStream(Default::default())),
         batch,
         request: TowerRequestConfig {
             retry_attempts: 1,
@@ -574,7 +574,7 @@ async fn insert_events_arrow_with_schema_fetching() {
         table: table.clone().try_into().unwrap(),
         compression: Compression::None,
         format: crate::sinks::clickhouse::config::Format::ArrowStream,
-        batch_encoding: Some(BatchSerializerConfig::ArrowStream(Default::default())),
+        batch_encoding: Some(ClickhouseBatchEncoding::ArrowStream(Default::default())),
         batch,
         request: TowerRequestConfig {
             retry_attempts: 1,
@@ -657,7 +657,7 @@ async fn test_complex_types() {
         table: table.clone().try_into().unwrap(),
         compression: Compression::None,
         format: crate::sinks::clickhouse::config::Format::ArrowStream,
-        batch_encoding: Some(BatchSerializerConfig::ArrowStream(arrow_config)),
+        batch_encoding: Some(ClickhouseBatchEncoding::ArrowStream(arrow_config)),
         batch,
         request: TowerRequestConfig {
             retry_attempts: 1,
@@ -1231,7 +1231,7 @@ async fn test_missing_required_field_emits_null_constraint_error() {
         table: table.clone().try_into().unwrap(),
         compression: Compression::None,
         format: crate::sinks::clickhouse::config::Format::ArrowStream,
-        batch_encoding: Some(BatchSerializerConfig::ArrowStream(Default::default())),
+        batch_encoding: Some(ClickhouseBatchEncoding::ArrowStream(Default::default())),
         batch,
         request: TowerRequestConfig {
             retry_attempts: 1,
@@ -1323,7 +1323,7 @@ async fn arrow_schema_excludes_non_insertable_columns() {
         table: table.clone().try_into().unwrap(),
         compression: Compression::None,
         format: crate::sinks::clickhouse::config::Format::ArrowStream,
-        batch_encoding: Some(BatchSerializerConfig::ArrowStream(
+        batch_encoding: Some(ClickhouseBatchEncoding::ArrowStream(
             ArrowStreamSerializerConfig::default(),
         )),
         batch,

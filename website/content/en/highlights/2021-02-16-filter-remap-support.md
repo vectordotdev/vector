@@ -24,20 +24,26 @@ Previously, the `filter` transform required you to specify conditions using
 The example configuration below shows the same `filter` transform using the old
 system (`check_fields`) and the new system (`remap`):
 
-```toml
-[transforms.filter_out_non_critical]
-type = "filter"
-inputs = ["http-server-logs"]f
+```yaml
+transforms:
+  filter_out_non_critical:
+    type: "filter"
+    inputs: ["http-server-logs"]
 
-# Using check_fields
-condition.type = "check_fields"
-condition.message.status_code.ne = 200
-condition.message.severity.ne = "info"
-condition.message.severity.ne = "debug"
+    # Using check_fields
+    condition:
+      type: "check_fields"
+      message:
+        status_code:
+          ne: 200
+        severity:
+          ne: "info"
+          # ne: "debug"
 
-# Using remap
-condition.type = "remap"
-condition.source = '.status_code != 200 && !includes(["info", "debug"], .severity)'
+    # Using remap
+    condition:
+      type: "remap"
+      source: '.status_code != 200 && !includes(["info", "debug"], .severity)'
 ```
 
 [filter]: /docs/reference/configuration/transforms/filter

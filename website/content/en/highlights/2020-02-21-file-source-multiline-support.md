@@ -34,16 +34,16 @@ foobar.rb:6:in `/': divided by 0 (ZeroDivisionError)
 
 You can merge them with the following config:
 
-```toml title="vector.toml"
-[sources.my_file_source]
-  type = "file"
-  # ...
-
-  [sources.my_file_source.multiline]
-    start_pattern = "^[^\\s]"
-    mode = "continue_through"
-    condition_pattern = "^[\\s]+from"
-    timeout_ms = 1000
+```yaml title="vector.yaml"
+sources:
+  my_file_source:
+    type: "file"
+    # ...
+    multiline:
+      start_pattern: "^[^\\s]"
+      mode: "continue_through"
+      condition_pattern: "^[\\s]+from"
+      timeout_ms: 1000
 ```
 
 And if this doesn't do it, you can always fall back to the [`lua` transform][docs.transforms.lua].

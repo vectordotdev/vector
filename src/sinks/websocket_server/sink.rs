@@ -37,7 +37,6 @@ use tokio_tungstenite::tungstenite::{
     handshake::server::{ErrorResponse, Request, Response},
 };
 use tokio_util::codec::Encoder as _;
-use tracing::Instrument;
 use url::Url;
 use uuid::Uuid;
 use vector_lib::{
@@ -129,20 +128,17 @@ impl WebSocketListenerSink {
         let open_gauge = OpenGauge::new();
 
         while let Ok(stream) = listener.accept().await {
-            tokio::spawn(
-                Self::handle_connection(
-                    auth.clone(),
-                    message_buffering.clone(),
-                    subprotocol.clone(),
-                    Arc::clone(&peers),
-                    Arc::clone(&client_checkpoints),
-                    Arc::clone(&buffer),
-                    stream,
-                    extra_tags_config.clone(),
-                    open_gauge.clone(),
-                )
-                .in_current_span(),
-            );
+            crate::spawn_in_current_span(Self::handle_connection(
+                auth.clone(),
+                message_buffering.clone(),
+                subprotocol.clone(),
+                Arc::clone(&peers),
+                Arc::clone(&client_checkpoints),
+                Arc::clone(&buffer),
+                stream,
+                extra_tags_config.clone(),
+                open_gauge.clone(),
+            ));
         }
     }
 
@@ -360,19 +356,16 @@ impl StreamSink<Event> for WebSocketListenerSink {
         )));
         let client_checkpoints = Arc::new(Mutex::new(HashMap::default()));
 
-        tokio::spawn(
-            Self::handle_connections(
-                self.auth,
-                self.message_buffering.clone(),
-                self.subprotocol.clone(),
-                Arc::clone(&peers),
-                self.extra_tags_config,
-                Arc::clone(&client_checkpoints),
-                Arc::clone(&message_buffer),
-                listener,
-            )
-            .in_current_span(),
-        );
+        crate::spawn_in_current_span(Self::handle_connections(
+            self.auth,
+            self.message_buffering.clone(),
+            self.subprotocol.clone(),
+            Arc::clone(&peers),
+            self.extra_tags_config,
+            Arc::clone(&client_checkpoints),
+            Arc::clone(&message_buffer),
+            listener,
+        ));
 
         while input.as_mut().peek().await.is_some() {
             let mut event = input.next().await.unwrap();

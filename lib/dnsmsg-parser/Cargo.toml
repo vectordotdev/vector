@@ -15,7 +15,7 @@ hickory-proto.workspace = true
 snafu.workspace = true
 
 [dev-dependencies]
-criterion = "0.7"
+criterion.workspace = true
 
 [lib]
 bench = false

@@ -4,7 +4,6 @@ components: sinks: aws_sns: components._aws & {
 	title: "Amazon Simple Notification Service (SNS)"
 
 	classes: {
-		commonly_used: false
 		delivery:      "at_least_once"
 		development:   "stable"
 		egress_method: "stream"

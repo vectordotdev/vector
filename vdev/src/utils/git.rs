@@ -34,21 +34,6 @@ pub fn checkout_or_create_branch(branch_name: &str) -> Result<()> {
     Ok(())
 }
 
-pub fn merge_branch(branch_name: &str) -> Result<()> {
-    let _output = run_and_check_output(&["merge", "--ff", branch_name])?;
-    Ok(())
-}
-
-pub fn tag_version(version: &str) -> Result<()> {
-    let _output = run_and_check_output(&["tag", "--annotate", version, "--message", version])?;
-    Ok(())
-}
-
-pub fn push_branch(branch_name: &str) -> Result<()> {
-    let _output = run_and_check_output(&["push", "origin", branch_name])?;
-    Ok(())
-}
-
 pub fn changed_files() -> Result<Vec<String>> {
     let mut files = HashSet::new();
 
@@ -136,6 +121,11 @@ pub fn commit(commit_message: &str) -> Result<String> {
     Command::new("git")
         .args(["commit", "--all", "--message", commit_message])
         .check_output()
+}
+
+/// Removes a file from the index (and working tree) using `git rm`.
+pub fn rm(path: &str) -> Result<String> {
+    Command::new("git").args(["rm", path]).check_output()
 }
 
 /// Pushes changes from the current repo
