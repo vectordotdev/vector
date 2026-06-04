@@ -59,9 +59,10 @@ echo
 VECTOR_PID=""
 LADING_PID=""
 cleanup() {
-    [[ -n "$VECTOR_PID" ]] && kill "$VECTOR_PID" 2>/dev/null || true
-    [[ -n "$LADING_PID" ]] && kill "$LADING_PID" 2>/dev/null || true
-    wait 2>/dev/null || true
+    local pids=()
+    [[ -n "$VECTOR_PID" ]] && { kill "$VECTOR_PID" 2>/dev/null; pids+=("$VECTOR_PID"); }
+    [[ -n "$LADING_PID" ]] && { kill "$LADING_PID" 2>/dev/null; pids+=("$LADING_PID"); }
+    [[ ${#pids[@]} -gt 0 ]] && wait "${pids[@]}" 2>/dev/null || true
 }
 trap cleanup EXIT INT TERM
 
@@ -106,11 +107,13 @@ inferno-collapse-sample "$RUN_DIR/sample.txt" > "$RUN_DIR/sample.folded"
 inferno-flamegraph --title "Vector regex parsing ($LABEL)" \
     "$RUN_DIR/sample.folded" > "$RUN_DIR/flamegraph.svg"
 
-# Stop Vector and lading so captures are flushed
-kill "$VECTOR_PID" "$LADING_PID" 2>/dev/null || true
+# Stop both processes and wait for them to exit before continuing.
+# Must wait explicitly here — bash stalls at script exit until all tracked
+# background jobs change state, causing a silent hang if we skip the wait.
+kill "$LADING_PID" "$VECTOR_PID" 2>/dev/null || true
+wait "$LADING_PID" "$VECTOR_PID" 2>/dev/null || true
 VECTOR_PID=""
 LADING_PID=""
-sleep 1
 
 echo
 echo "==> Analysis"
