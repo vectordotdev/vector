@@ -109,6 +109,17 @@ vector --verbose --config=/etc/vector/vector.yaml
 {{< /tab >}}
 {{< /tabs >}}
 
+If full debug logging is too noisy, use `VECTOR_LOG` target filters to focus on the module that owns the failing
+component:
+
+```shell
+VECTOR_LOG=info,vector::sources::file=debug,vector::sinks::aws_s3=trace vector --config=/etc/vector/vector.yaml
+```
+
+The first directive sets the default level for the process. Later directives increase or decrease verbosity for
+specific Vector modules. This is often enough to inspect a failing source or sink without enabling `trace` logs
+globally. For more detail, see [Monitoring and observing Vector][monitoring].
+
 ## 5. Get help
 
 At this point, we recommend reaching out to the community for help.
@@ -123,4 +134,5 @@ At this point, we recommend reaching out to the community for help.
 [urls.new_feature_request]: https://github.com/vectordotdev/vector/issues/new?assignees=&labels=type%3A+feature&template=feature.yml
 [urls.vector_chat]: https://chat.vector.dev
 [urls.vector_issues]: https://github.com/vectordotdev/vector/issues
+[monitoring]: /docs/administration/monitoring/#targeted-filters
 [Vector tap]: /guides/level-up/vector-tap-guide

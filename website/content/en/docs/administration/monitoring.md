@@ -86,6 +86,23 @@ command-line flags or the `VECTOR_LOG` environment variable. The table below det
 | `-qqq` flag | Disables logging |
 | `VECTOR_LOG=<level>` environment variable | Set the log level. Must be one of `trace`, `debug`, `info`, `warn`, `error`, `off`. |
 
+#### Targeted filters
+
+`VECTOR_LOG` can also use comma-separated [`tracing_subscriber` target filters][tracing_subscriber_targets] when you only
+need additional detail from part of Vector. Start with a global level, then add more specific module targets:
+
+```shell
+VECTOR_LOG=info,vector::sources::file=debug,vector::sinks::aws_s3=trace vector --config=/etc/vector/vector.yaml
+```
+
+This keeps most internal logs at `info`, emits `debug` logs from the file source implementation, and emits `trace` logs
+from the AWS S3 sink implementation. Targeted filters are useful when you know which component type is failing but do
+not want to run the whole process at `debug` or `trace`.
+
+For component-level investigation, capture Vector logs with the [`internal_logs`][internal_logs] source. Internal log
+events include metadata such as `metadata.target`, `metadata.module_path`, and `metadata.level`, which you can filter or
+route in your topology after they enter the pipeline.
+
 #### Stack traces
 
 You can enable full error backtraces by setting the `RUST_BACKTRACE=full` environment variable. More on this in the
@@ -147,6 +164,7 @@ IO and disrupting the service. The trade-off is that repetitive logs aren't logg
 [stderr]: https://en.wikipedia.org/wiki/Standard_streams#Standard_error_(stderr)
 [topology]: /docs/introduction/concepts/#topology
 [transform]: /transforms
+[tracing_subscriber_targets]: https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/targets/struct.Targets.html
 [troubleshooting]: /guides/level-up/troubleshooting
 [vrl]: /docs/reference/vrl
 [debugging_guide]: /guides/developer/debugging#visualizing-and-querying-internal-metrics

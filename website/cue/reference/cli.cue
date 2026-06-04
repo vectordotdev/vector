@@ -618,7 +618,14 @@ cli: {
 			type: string: default: null
 		}
 		VECTOR_LOG: {
-			description: "Vector's log level. Each log level includes messages from higher priority levels."
+			description: """
+				Vector's log level. Each log level includes messages from higher priority levels.
+
+				`VECTOR_LOG` also accepts comma-separated `tracing_subscriber` target filters. Start with a
+				global level, then add module-specific directives to increase or decrease verbosity for part
+				of Vector. For example, `VECTOR_LOG=info,vector::sources::file=debug,vector::sinks::aws_s3=trace`
+				keeps most logs at `info` while enabling more detail for the file source and AWS S3 sink.
+				"""
 			type: string: {
 				default: "INFO"
 				enum: {
