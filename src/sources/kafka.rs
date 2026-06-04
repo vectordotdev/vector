@@ -6,14 +6,16 @@ use std::{
         Arc, OnceLock, Weak,
         mpsc::{SyncSender, sync_channel},
     },
+    task::{Context, Poll},
     time::Duration,
 };
 
 use async_stream::stream;
 use bytes::Bytes;
 use chrono::{DateTime, TimeZone, Utc};
-use futures::{Stream, StreamExt};
+use futures::{Stream, StreamExt, stream::Fuse};
 use futures_util::future::OptionFuture;
+use pin_project::pin_project;
 use rdkafka::{
     ClientConfig, ClientContext, Statistics, Timestamp, TopicPartitionList,
     consumer::{
@@ -595,10 +597,10 @@ impl ConsumerStateInner<Consuming> {
         let log_namespace = self.log_namespace;
         let mut out = self.out.clone();
 
-        let (end_tx, mut end_signal) = oneshot::channel::<()>();
+        let (end_tx, end_signal) = oneshot::channel::<()>();
 
         let handle = join_set.spawn(async move {
-            let mut messages = p.stream().ready_chunks(CHUNK_SIZE);
+            let mut messages = ReadyChunksUntilCondition::new(p.stream().take_until(end_signal), CHUNK_SIZE, move |msg: &Result<BorrowedMessage<'_>, KafkaError>| msg.as_ref().is_err_and(|err| matches!(err, rdkafka::error::KafkaError::PartitionEOF(_))));
             let (finalizer, mut ack_stream) = OrderedFinalizer::<FinalizerEntry>::new(None);
 
             // finalizer is the entry point for new pending acknowledgements;
@@ -614,11 +616,6 @@ impl ConsumerStateInner<Consuming> {
                     // unbounded memory growth caused by those acks being handled slower than
                     // incoming messages when the load is high.
                     biased;
-
-                    // is_some() checks prevent polling end_signal after it completes
-                    _ = &mut end_signal, if finalizer.is_some() => {
-                        finalizer.take();
-                    },
 
                     ack = ack_stream.next() => match ack {
                         Some((status, entry)) => {
@@ -637,7 +634,9 @@ impl ConsumerStateInner<Consuming> {
                     },
 
                     message = messages.next(), if finalizer.is_some() => match message {
-                        None => unreachable!("MessageStream never calls Ready(None)"),
+                        None => {
+                            finalizer.take();
+                        },
                         Some(msgs) => {
                             let mut oks = Vec::default();
                             let mut errors = Vec::default();
@@ -645,10 +644,6 @@ impl ConsumerStateInner<Consuming> {
                                 match msg {
                                     Ok(msg) => oks.push(msg),
                                     Err(err) => {
-                                        if matches!(err, rdkafka::error::KafkaError::PartitionEOF(_)) && exit_eof {
-                                            errors.push(err);
-                                            break;
-                                        }
                                         errors.push(err);
                                     }
                                 }
@@ -1614,6 +1609,92 @@ impl TryFrom<BorrowedMessage<'_>> for OwnedMessage {
                 headers: value.headers().map(BorrowedHeaders::detach),
             }),
         }
+    }
+}
+
+/// A combination of `ready_chunks` and `take_while`
+/// Takes a chunk of items until a condition is reached
+/// (the item passing the condition is included too)
+#[derive(Debug)]
+#[must_use = "streams do nothing unless polled"]
+#[pin_project]
+struct ReadyChunksUntilCondition<St: Stream, F> {
+    #[pin]
+    stream: Fuse<St>,
+    cap: usize,
+    condition: F,
+}
+
+impl<St, F> ReadyChunksUntilCondition<St, F>
+where
+    St: Stream,
+    F: FnMut(&St::Item) -> bool,
+{
+    pub(super) fn new(stream: St, capacity: usize, condition: F) -> Self {
+        assert!(capacity > 0);
+
+        Self {
+            stream: stream.fuse(),
+            cap: capacity,
+            condition,
+        }
+    }
+}
+
+impl<St, F> Stream for ReadyChunksUntilCondition<St, F>
+where
+    St: Stream,
+    F: FnMut(&St::Item) -> bool,
+{
+    type Item = Vec<St::Item>;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let mut this = self.project();
+
+        let mut items: Vec<St::Item> = Vec::new();
+
+        loop {
+            match this.stream.as_mut().poll_next(cx) {
+                // Flush all collected data if underlying stream doesn't contain
+                // more ready values
+                Poll::Pending => {
+                    return if items.is_empty() {
+                        Poll::Pending
+                    } else {
+                        Poll::Ready(Some(items))
+                    };
+                }
+
+                // Push the ready item into the buffer and check whether it is full or if the
+                // item passes the condition.
+                // If so, replace our buffer with a new and empty one and return
+                // the full one.
+                Poll::Ready(Some(item)) => {
+                    let should_stop = (this.condition)(&item);
+                    if items.is_empty() {
+                        items.reserve(*this.cap);
+                    }
+                    items.push(item);
+                    if items.len() >= *this.cap || should_stop {
+                        return Poll::Ready(Some(items));
+                    }
+                }
+
+                // Since the underlying stream ran out of values, return what we
+                // have buffered, if we have anything.
+                Poll::Ready(None) => {
+                    let last = if items.is_empty() { None } else { Some(items) };
+
+                    return Poll::Ready(last);
+                }
+            }
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let (lower, upper) = self.stream.size_hint();
+        let lower = lower / self.cap;
+        (lower, upper)
     }
 }
 
