@@ -312,6 +312,7 @@ pub enum ElasticsearchApiVersion {
     V7,
     /// Use the Elasticsearch 8.x API.
     V8,
+    #[serde(rename = "os3")]
     /// Use the Opensearch 3.x API
     OS3,
 }
