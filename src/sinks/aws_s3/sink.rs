@@ -74,34 +74,36 @@ impl RequestBuilder<(S3PartitionKey, Vec<Event>)> for S3RequestOptions {
         request_metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        let filename = {
-            let formatted_ts = match self.filename_tz_offset {
-                Some(offset) => Utc::now()
-                    .with_timezone(&offset)
-                    .format(self.filename_time_format.as_str()),
-                None => Utc::now()
-                    .with_timezone(&Utc)
-                    .format(self.filename_time_format.as_str()),
-            };
-
-            if self.filename_append_uuid {
-                format!("{formatted_ts}-{}", Uuid::new_v4().hyphenated())
-            } else {
-                formatted_ts.to_string()
-            }
-        };
-
         let ssekms_key_id = s3metadata.partition_key.ssekms_key_id.clone();
         let mut s3_options = self.api_options.clone();
         s3_options.ssekms_key_id = ssekms_key_id;
 
-        let extension = self
-            .filename_extension
-            .as_ref()
-            .cloned()
-            .unwrap_or_else(|| self.compression.extension().into());
+        if !s3metadata.partition_key.is_full_key {
+            let filename = {
+                let formatted_ts = match self.filename_tz_offset {
+                    Some(offset) => Utc::now()
+                        .with_timezone(&offset)
+                        .format(self.filename_time_format.as_str()),
+                    None => Utc::now()
+                        .with_timezone(&Utc)
+                        .format(self.filename_time_format.as_str()),
+                };
 
-        s3metadata.s3_key = format_s3_key(&s3metadata.s3_key, &filename, &extension);
+                if self.filename_append_uuid {
+                    format!("{formatted_ts}-{}", Uuid::new_v4().hyphenated())
+                } else {
+                    formatted_ts.to_string()
+                }
+            };
+
+            let extension = self
+                .filename_extension
+                .as_ref()
+                .cloned()
+                .unwrap_or_else(|| self.compression.extension().into());
+
+            s3metadata.s3_key = format_s3_key(&s3metadata.s3_key, &filename, &extension);
+        }
 
         S3Request {
             body: payload.into_payload(),
