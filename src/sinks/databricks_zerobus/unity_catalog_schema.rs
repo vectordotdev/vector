@@ -6,7 +6,7 @@
 
 use bytes::Buf;
 use databricks_zerobus_ingest_sdk::schema::descriptor_from_uc_schema;
-use http::{Request, Uri};
+use http::{Request, StatusCode, Uri};
 use http_body::Body as HttpBody;
 use hyper::Body;
 use percent_encoding::{NON_ALPHANUMERIC, percent_encode};
@@ -14,9 +14,22 @@ use prost_reflect::prost_types;
 use serde::Deserialize;
 
 use super::error::ZerobusSinkError;
-use crate::config::ProxyConfig;
 use crate::http::HttpClient;
-use crate::tls::TlsSettings;
+
+/// Whether a Unity Catalog HTTP response status should be retried.
+///
+/// Delegates to the canonical Vector HTTP retry policy
+/// [`crate::sinks::util::http::RetryStrategy::Default`] so this sink stays in
+/// lock-step with other HTTP-based sinks: 5xx (except 501 Not Implemented),
+/// 408 (Request Timeout), and 429 (Too Many Requests) are transient; 4xx
+/// otherwise (404, 401, 403, ...) and 501 are permanent.
+fn status_is_retryable(status: StatusCode) -> bool {
+    use crate::sinks::util::{http::RetryStrategy, retries::RetryAction};
+    matches!(
+        RetryStrategy::Default.retry_action::<()>(status),
+        RetryAction::Retry(_) | RetryAction::RetryPartial(_)
+    )
+}
 
 // Alias the SDK types under the names the rest of the sink already uses.
 #[cfg(test)]
@@ -35,17 +48,10 @@ pub async fn fetch_table_schema(
     table_name: &str,
     client_id: &str,
     client_secret: &str,
-    proxy: &ProxyConfig,
+    http_client: &HttpClient,
 ) -> Result<UnityCatalogTableSchema, ZerobusSinkError> {
-    let http_client = HttpClient::new(TlsSettings::default(), proxy).map_err(|e| {
-        ZerobusSinkError::ConfigError {
-            message: format!("Failed to create HTTP client: {}", e),
-        }
-    })?;
-
-    // First, get OAuth token
     let token = get_oauth_token(
-        &http_client,
+        http_client,
         unity_catalog_endpoint,
         client_id,
         client_secret,
@@ -82,8 +88,9 @@ pub async fn fetch_table_schema(
     let response = http_client
         .send(request)
         .await
-        .map_err(|e| ZerobusSinkError::ConfigError {
+        .map_err(|e| ZerobusSinkError::SchemaError {
             message: format!("Failed to fetch table schema: {}", e),
+            retryable: true,
         })?;
 
     let status = response.status();
@@ -95,11 +102,12 @@ pub async fn fetch_table_schema(
             .map(|c| c.to_bytes())
             .unwrap_or_default();
         let error_text = String::from_utf8_lossy(&body_bytes);
-        return Err(ZerobusSinkError::ConfigError {
+        return Err(ZerobusSinkError::SchemaError {
             message: format!(
                 "Unity Catalog API returned error {}: {}",
                 status, error_text
             ),
+            retryable: status_is_retryable(status),
         });
     }
 
@@ -108,8 +116,9 @@ pub async fn fetch_table_schema(
         .collect()
         .await
         .map(|c| c.to_bytes())
-        .map_err(|e| ZerobusSinkError::ConfigError {
+        .map_err(|e| ZerobusSinkError::SchemaError {
             message: format!("Failed to read response body: {}", e),
+            retryable: true,
         })?;
 
     let schema: UnityCatalogTableSchema =
@@ -157,8 +166,9 @@ async fn get_oauth_token(
     let response = http_client
         .send(request)
         .await
-        .map_err(|e| ZerobusSinkError::ConfigError {
+        .map_err(|e| ZerobusSinkError::SchemaError {
             message: format!("Failed to get OAuth token: {}", e),
+            retryable: true,
         })?;
 
     let status = response.status();
@@ -170,8 +180,9 @@ async fn get_oauth_token(
             .map(|c| c.to_bytes())
             .unwrap_or_default();
         let error_text = String::from_utf8_lossy(&body_bytes);
-        return Err(ZerobusSinkError::ConfigError {
+        return Err(ZerobusSinkError::SchemaError {
             message: format!("OAuth token request failed {}: {}", status, error_text),
+            retryable: status_is_retryable(status),
         });
     }
 
@@ -180,8 +191,9 @@ async fn get_oauth_token(
         .collect()
         .await
         .map(|c| c.to_bytes())
-        .map_err(|e| ZerobusSinkError::ConfigError {
+        .map_err(|e| ZerobusSinkError::SchemaError {
             message: format!("Failed to read OAuth response body: {}", e),
+            retryable: true,
         })?;
 
     let token_response: OAuthTokenResponse =
@@ -301,15 +313,37 @@ fn format_kind_type(kind: &prost_reflect::Kind) -> String {
 /// wrapper adds the `FileDescriptorProto` / `DescriptorPool` plumbing that
 /// Vector needs to get a `prost_reflect::MessageDescriptor` usable for
 /// dynamic message encoding.
+///
+/// Returns both the `MessageDescriptor` (for dynamic encoding via prost-reflect)
+/// and the SDK-typed `DescriptorProto` (prost-types 0.14, used when constructing
+/// the Zerobus stream). Returning both lets us avoid re-encoding the descriptor
+/// on every stream rebuild.
 pub fn generate_descriptor_from_schema(
     schema: &UnityCatalogTableSchema,
-) -> Result<prost_reflect::MessageDescriptor, ZerobusSinkError> {
-    let message_proto =
+) -> Result<
+    (
+        prost_reflect::MessageDescriptor,
+        prost_types_014::DescriptorProto,
+    ),
+    ZerobusSinkError,
+> {
+    let sdk_message_proto =
         descriptor_from_uc_schema(schema).map_err(|e| ZerobusSinkError::ConfigError {
             message: format!("Failed to convert Unity Catalog schema to protobuf: {}", e),
         })?;
 
-    let message_name = message_proto.name().to_string();
+    // The SDK returns a prost-types 0.14 DescriptorProto, but prost-reflect (used
+    // below to build the descriptor pool) is on prost-types 0.13. Re-encode through
+    // the protobuf wire format to bridge the two versions.
+    let message_name = sdk_message_proto.name().to_string();
+    let encoded = prost_014::Message::encode_to_vec(&sdk_message_proto);
+    let message_proto =
+        <prost_reflect::prost_types::DescriptorProto as prost_reflect::prost::Message>::decode(
+            encoded.as_slice(),
+        )
+        .map_err(|e| ZerobusSinkError::ConfigError {
+            message: format!("Failed to re-decode SDK DescriptorProto: {}", e),
+        })?;
     let package_name = sanitize_package_name(&schema.catalog_name);
 
     let file_proto = prost_types::FileDescriptorProto {
@@ -343,7 +377,7 @@ pub fn generate_descriptor_from_schema(
         );
     }
 
-    Ok(message_descriptor)
+    Ok((message_descriptor, sdk_message_proto))
 }
 
 /// Default prefix for package name segments that start with a non-letter.
@@ -380,6 +414,24 @@ fn sanitize_package_name(name: &str) -> String {
 mod tests {
     use super::*;
 
+    #[test]
+    fn status_is_retryable_matches_canonical_policy() {
+        // Transient — must retry.
+        assert!(status_is_retryable(StatusCode::INTERNAL_SERVER_ERROR));
+        assert!(status_is_retryable(StatusCode::BAD_GATEWAY));
+        assert!(status_is_retryable(StatusCode::SERVICE_UNAVAILABLE));
+        assert!(status_is_retryable(StatusCode::GATEWAY_TIMEOUT));
+        assert!(status_is_retryable(StatusCode::REQUEST_TIMEOUT));
+        assert!(status_is_retryable(StatusCode::TOO_MANY_REQUESTS));
+        // Permanent — must not retry. 501 in particular: the server doesn't
+        // support the requested functionality; retry won't change that.
+        assert!(!status_is_retryable(StatusCode::NOT_IMPLEMENTED));
+        assert!(!status_is_retryable(StatusCode::NOT_FOUND));
+        assert!(!status_is_retryable(StatusCode::UNAUTHORIZED));
+        assert!(!status_is_retryable(StatusCode::FORBIDDEN));
+        assert!(!status_is_retryable(StatusCode::BAD_REQUEST));
+    }
+
     /// Smoke test: the wrapper calls into the SDK and builds a usable
     /// `MessageDescriptor` via the descriptor pool.
     #[test]
@@ -408,7 +460,7 @@ mod tests {
             ],
         };
 
-        let descriptor =
+        let (descriptor, _sdk_proto) =
             generate_descriptor_from_schema(&schema).expect("descriptor should be generated");
         assert_eq!(descriptor.fields().len(), 2);
         assert!(descriptor.get_field_by_name("id").is_some());
@@ -424,7 +476,7 @@ mod tests {
         let schema: UnityCatalogTableSchema =
             serde_json::from_str(json).expect("Failed to parse nested_structs_complete schema");
 
-        let descriptor =
+        let (descriptor, _sdk_proto) =
             generate_descriptor_from_schema(&schema).expect("Failed to generate descriptor");
 
         let proto_text = format_descriptor_as_proto(&descriptor);

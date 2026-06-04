@@ -416,6 +416,7 @@ impl ConventionalParts {
 struct ChangelogEntry {
     /// Mapped CUE type ("chore" | "fix" | "feat" | "enhancement").
     cue_type: String,
+    breaking: bool,
     description: String,
     contributors: Vec<String>,
 }
@@ -451,6 +452,7 @@ fn parse_changelog_fragment(path: &Path) -> Result<ChangelogEntry> {
         );
     }
     let fragment_type = parts[1];
+    let breaking = fragment_type == "breaking";
     let cue_type = match fragment_type {
         "breaking" | "deprecation" => "chore",
         "security" | "fix" => "fix",
@@ -478,6 +480,7 @@ fn parse_changelog_fragment(path: &Path) -> Result<ChangelogEntry> {
 
     Ok(ChangelogEntry {
         cue_type: cue_type.to_string(),
+        breaking,
         description,
         contributors,
     })
@@ -542,6 +545,9 @@ fn render_changelog(entries: &[ChangelogEntry]) -> String {
             let mut s = String::new();
             s.push_str("\t\t{\n");
             writeln!(s, "\t\t\ttype: {}", json!(e.cue_type)).unwrap();
+            if e.breaking {
+                s.push_str("\t\t\tbreaking: true\n");
+            }
             s.push_str("\t\t\tdescription: #\"\"\"\n");
             for line in e.description.lines() {
                 writeln!(s, "\t\t\t\t{line}").unwrap();
@@ -666,6 +672,9 @@ mod tests {
 
         // No-author entries get empty contributor list.
         assert!(entries[1].contributors.is_empty());
+        // Breaking fragments must be marked as such.
+        assert!(entries[1].breaking);
+        assert!(!entries[0].breaking);
     }
 
     #[test]
@@ -680,11 +689,13 @@ mod tests {
         let entries = vec![
             ChangelogEntry {
                 cue_type: "feat".into(),
+                breaking: false,
                 description: "Adds a thing.\nMulti-line.".into(),
                 contributors: vec!["alice".into()],
             },
             ChangelogEntry {
                 cue_type: "fix".into(),
+                breaking: false,
                 description: "Fixed it.".into(),
                 contributors: vec![],
             },
