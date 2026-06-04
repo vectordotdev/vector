@@ -28,8 +28,15 @@ generated: components: sinks: databricks_zerobus: configuration: {
 		}
 	}
 	auth: {
-		description: "Databricks authentication configuration."
-		required:    true
+		description: """
+			Databricks authentication configuration.
+
+			See the [Databricks Zerobus documentation][zerobus_service_principal] to create a service
+			principal and grant it permissions to write to the target table.
+
+			[zerobus_service_principal]: https://docs.databricks.com/aws/en/ingestion/zerobus-ingest#create-a-service-principal-and-grant-permissions
+			"""
+		required: true
 		type: object: options: {
 			client_id: {
 				description: "OAuth 2.0 client ID."
