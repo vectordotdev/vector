@@ -144,7 +144,8 @@ mod tests {
     fn options(filename_extension: Option<String>, append_uuid: bool) -> S3RequestOptions {
         let framer = FramingConfig::NewlineDelimited.build();
         let serializer = TextSerializerConfig::default().build().into();
-        let encoder = EncoderKind::Framed(Box::new(VectorEncoder::<Framer>::new(framer, serializer)));
+        let encoder =
+            EncoderKind::Framed(Box::new(VectorEncoder::<Framer>::new(framer, serializer)));
 
         S3RequestOptions {
             bucket: "bucket".to_string(),
