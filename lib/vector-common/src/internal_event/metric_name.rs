@@ -93,12 +93,12 @@ pub enum CounterName {
     SqsS3EventRecordIgnoredTotal,
     ComponentAllocatedBytesTotal,
     ComponentDeallocatedBytesTotal,
-    MemoryEnrichmentTableFailedInsertions,
-    MemoryEnrichmentTableFailedReads,
+    MemoryEnrichmentTableFailedInsertionsTotal,
+    MemoryEnrichmentTableFailedReadsTotal,
     MemoryEnrichmentTableFlushesTotal,
     MemoryEnrichmentTableInsertionsTotal,
     MemoryEnrichmentTableReadsTotal,
-    MemoryEnrichmentTableTtlExpirations,
+    MemoryEnrichmentTableTtlExpirationsTotal,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Display, AsRefStr, EnumIter)]
@@ -354,16 +354,20 @@ impl CounterName {
             Self::SqsS3EventRecordIgnoredTotal => "sqs_s3_event_record_ignored_total",
             Self::ComponentAllocatedBytesTotal => "component_allocated_bytes_total",
             Self::ComponentDeallocatedBytesTotal => "component_deallocated_bytes_total",
-            Self::MemoryEnrichmentTableFailedInsertions => {
-                "memory_enrichment_table_failed_insertions"
+            Self::MemoryEnrichmentTableFailedInsertionsTotal => {
+                "memory_enrichment_table_failed_insertions_total"
             }
-            Self::MemoryEnrichmentTableFailedReads => "memory_enrichment_table_failed_reads",
+            Self::MemoryEnrichmentTableFailedReadsTotal => {
+                "memory_enrichment_table_failed_reads_total"
+            }
             Self::MemoryEnrichmentTableFlushesTotal => "memory_enrichment_table_flushes_total",
             Self::MemoryEnrichmentTableInsertionsTotal => {
                 "memory_enrichment_table_insertions_total"
             }
             Self::MemoryEnrichmentTableReadsTotal => "memory_enrichment_table_reads_total",
-            Self::MemoryEnrichmentTableTtlExpirations => "memory_enrichment_table_ttl_expirations",
+            Self::MemoryEnrichmentTableTtlExpirationsTotal => {
+                "memory_enrichment_table_ttl_expirations_total"
+            }
         }
     }
 }
