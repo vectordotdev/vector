@@ -133,6 +133,7 @@ async fn config(
         timestamp_key: None,
         auto_extract_timestamp: None,
         endpoint_target: EndpointTarget::Event,
+        force_default_token: false,
     }
 }
 

@@ -319,6 +319,7 @@ mod tests {
             EndpointTarget::default(),
             String::from(""),
             Compression::default(),
+            false,
         );
         HecAckClient::new(retry_limit, client, Arc::new(http_request_builder))
     }

@@ -2140,6 +2140,7 @@ mod tests {
             timestamp_key: None,
             auto_extract_timestamp: None,
             endpoint_target: Default::default(),
+            force_default_token: false,
         }
         .build(SinkContext::default())
         .await
