@@ -17,6 +17,9 @@ service ObservabilityService {
   // Check whether allocation tracing is active on this instance
   rpc GetAllocationTracingStatus(GetAllocationTracingStatusRequest) returns (GetAllocationTracingStatusResponse);
 
+  // Get capabilities of the Vector instance: allocation tracing status and all registered metric names with their kinds
+  rpc GetCapabilities(GetCapabilitiesRequest) returns (GetCapabilitiesResponse);
+
   // ========== Real-time Metric Streams ==========
   // All streaming RPCs send periodic updates at the specified interval
 
@@ -52,6 +55,29 @@ message GetAllocationTracingStatusRequest {}
 
 message GetAllocationTracingStatusResponse {
   bool enabled = 1;
+}
+
+// ========== Capabilities Messages ==========
+
+message GetCapabilitiesRequest {}
+
+message GetCapabilitiesResponse {
+  // Whether allocation tracing is active on this instance
+  bool allocation_tracing_enabled = 1;
+  // All metrics known to this build of Vector, in enum declaration order
+  repeated AvailableMetric available_metrics = 2;
+}
+
+message AvailableMetric {
+  string name = 1;
+  InternalMetricKind kind = 2;
+}
+
+enum InternalMetricKind {
+  INTERNAL_METRIC_KIND_UNSPECIFIED = 0;
+  INTERNAL_METRIC_KIND_COUNTER = 1;
+  INTERNAL_METRIC_KIND_GAUGE = 2;
+  INTERNAL_METRIC_KIND_HISTOGRAM = 3;
 }
 
 // ========== Component Messages ==========

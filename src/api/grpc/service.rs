@@ -22,6 +22,9 @@ use vector_lib::tap::{
     topology::WatchRx,
 };
 
+use crate::proto::observability::InternalMetricKind as ProtoInternalMetricKind;
+use vector_common::internal_event::{InternalMetricKind, all_metrics};
+
 use crate::event::{Metric, MetricValue};
 use crate::metrics::Controller;
 use crate::proto::observability::{
@@ -431,6 +434,33 @@ impl observability::Service for ObservabilityService {
         let enabled = false;
         Ok(Response::new(GetAllocationTracingStatusResponse {
             enabled,
+        }))
+    }
+
+    async fn get_capabilities(
+        &self,
+        _request: Request<GetCapabilitiesRequest>,
+    ) -> Result<Response<GetCapabilitiesResponse>, Status> {
+        #[cfg(feature = "allocation-tracing")]
+        let allocation_tracing_enabled =
+            crate::internal_telemetry::allocations::is_allocation_tracing_enabled();
+        #[cfg(not(feature = "allocation-tracing"))]
+        let allocation_tracing_enabled = false;
+
+        let available_metrics = all_metrics()
+            .map(|(name, kind)| AvailableMetric {
+                name: name.to_string(),
+                kind: match kind {
+                    InternalMetricKind::Counter => ProtoInternalMetricKind::Counter as i32,
+                    InternalMetricKind::Gauge => ProtoInternalMetricKind::Gauge as i32,
+                    InternalMetricKind::Histogram => ProtoInternalMetricKind::Histogram as i32,
+                },
+            })
+            .collect();
+
+        Ok(Response::new(GetCapabilitiesResponse {
+            allocation_tracing_enabled,
+            available_metrics,
         }))
     }
 
