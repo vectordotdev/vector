@@ -1,0 +1,17 @@
+projects:
+  - id: testproject
+    datasets:
+      - id: testdataset
+        tables:
+          - id: integration
+            columns:
+              - name: time
+                type: INTEGER
+              - name: count
+                type: INTEGER
+              - name: percentile
+                type: FLOAT
+              - name: message
+                type: STRING
+              - name: user
+                type: STRING
