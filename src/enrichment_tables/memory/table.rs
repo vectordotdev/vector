@@ -488,6 +488,7 @@ mod tests {
 
     use super::*;
     use crate::{
+        config::EnrichmentTableConfig,
         enrichment_tables::memory::{
             config::MemorySourceConfig, internal_events::InternalMetricsConfig,
         },
@@ -521,6 +522,43 @@ mod tests {
                 ("value".into(), Value::from(5)),
             ])),
             memory.find_table_row(Case::Sensitive, &[condition], None, None, None)
+        );
+    }
+
+    #[tokio::test]
+    async fn extract_state_preserves_data() {
+        let memory = Memory::new(Default::default());
+        memory.handle_value(ObjectMap::from([("test_key".into(), Value::from(5))]));
+
+        let condition = Condition::Equals {
+            field: "key",
+            value: Value::from("test_key"),
+        };
+
+        let expected = ObjectMap::from([
+            ("key".into(), Value::from("test_key")),
+            ("ttl".into(), Value::from(memory.config.ttl)),
+            ("value".into(), Value::from(5)),
+        ]);
+        assert_eq!(
+            Ok(expected.clone()),
+            memory.find_table_row(
+                Case::Sensitive,
+                std::slice::from_ref(&condition),
+                None,
+                None,
+                None
+            )
+        );
+
+        // Now build a new table using old state
+        let new_memory = MemoryConfig::default()
+            .build(&Default::default(), memory.extract_state())
+            .await
+            .unwrap();
+        assert_eq!(
+            Ok(expected),
+            new_memory.find_table_row(Case::Sensitive, &[condition], None, None, None)
         );
     }
 
