@@ -79,8 +79,6 @@ pub enum Error {
     Internal { source: InternalError },
     #[snafu(display("Table {table} not loaded"))]
     TableNotLoaded { table: String },
-    #[snafu(display("Table configuration is not compatible for reload"))]
-    IncompatibleTableConfig,
     #[snafu(display("Table type changed with configuration change, state lost"))]
     TableTypeMismatch,
 }
