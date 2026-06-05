@@ -45,6 +45,7 @@ components: transforms: aws_ecs_metadata: {
 	env_vars: {
 		ECS_CONTAINER_METADATA_URI_V4: {
 			description: "The Amazon ECS task metadata endpoint version 4 base URI."
+			type: string: {}
 		}
 		http_proxy:  env_vars._http_proxy
 		HTTP_PROXY:  env_vars._http_proxy
