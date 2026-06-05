@@ -414,6 +414,7 @@ OKD
 oneof
 ONEZONE
 opcounters
+openmetrics
 openstring
 opinsights
 oplog
