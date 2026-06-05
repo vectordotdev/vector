@@ -16,6 +16,8 @@ mod aws;
 mod aws_cloudwatch_logs;
 #[cfg(feature = "transforms-aws_ec2_metadata")]
 mod aws_ec2_metadata;
+#[cfg(feature = "transforms-aws_ecs_metadata")]
+mod aws_ecs_metadata;
 #[cfg(feature = "sources-aws_ecs_metrics")]
 mod aws_ecs_metrics;
 #[cfg(any(
@@ -173,6 +175,8 @@ pub(crate) use self::aws::*;
 pub(crate) use self::aws_cloudwatch_logs::*;
 #[cfg(feature = "transforms-aws_ec2_metadata")]
 pub(crate) use self::aws_ec2_metadata::*;
+#[cfg(feature = "transforms-aws_ecs_metadata")]
+pub(crate) use self::aws_ecs_metadata::*;
 #[cfg(feature = "sources-aws_ecs_metrics")]
 pub(crate) use self::aws_ecs_metrics::*;
 #[cfg(any(
