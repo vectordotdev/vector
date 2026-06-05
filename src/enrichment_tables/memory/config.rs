@@ -138,18 +138,16 @@ const fn default_scan_interval() -> NonZeroU64 {
 impl MemoryConfig {
     pub(super) async fn get_or_build_memory(
         &self,
-        prev_table: Option<Box<dyn Table + Send + Sync>>,
+        prev_state: Option<Box<dyn std::any::Any + Send + Sync>>,
     ) -> Memory {
         let mut boxed_memory = self.memory.lock().await;
         *boxed_memory
             .get_or_insert_with(|| {
-                let mut memory = Memory::new(self.clone());
-                if let Some(prev) = prev_table {
-                    if let Err((_, err)) = memory.take_state(prev) {
-                        error!(message = "Unable to move the state to the new table.", %err);
-                    }
+                if let Some(prev) = prev_state {
+                    Box::new(Memory::from_previous_state(self.clone(), prev))
+                } else {
+                    Box::new(Memory::new(self.clone()))
                 }
-                Box::new(memory)
             })
             .clone()
     }
@@ -159,9 +157,9 @@ impl EnrichmentTableConfig for MemoryConfig {
     async fn build(
         &self,
         _globals: &crate::config::GlobalOptions,
-        prev_table: Option<Box<dyn Table + Send + Sync>>,
+        prev_state: Option<Box<dyn std::any::Any + Send + Sync>>,
     ) -> crate::Result<Box<dyn Table + Send + Sync>> {
-        Ok(Box::new(self.get_or_build_memory(prev_table).await))
+        Ok(Box::new(self.get_or_build_memory(prev_state).await))
     }
 
     fn sink_config(

@@ -142,6 +142,25 @@ impl Memory {
         }
     }
 
+    /// Creates a new [Memory] based on the provided config and previous state.
+    pub fn from_previous_state(
+        config: MemoryConfig,
+        prev_state: Box<dyn std::any::Any + Send + Sync>,
+    ) -> Self {
+        if let Ok(prev_memory) = prev_state.downcast::<Memory>() {
+            Self {
+                config,
+                read_handle_factory: prev_memory.read_handle_factory,
+                read_handle: prev_memory.read_handle,
+                write_handle: prev_memory.write_handle,
+                expired_items_sender: prev_memory.expired_items_sender,
+                expired_items_receiver: prev_memory.expired_items_receiver,
+            }
+        } else {
+            Self::new(config)
+        }
+    }
+
     pub(super) fn get_read_handle(&self) -> &evmap::ReadHandle<String, MemoryEntry> {
         self.read_handle
             .get_or(|| self.read_handle_factory.handle())
@@ -387,33 +406,8 @@ impl Table for Memory {
         true
     }
 
-    fn stateful(&self) -> bool {
-        true
-    }
-
-    fn take_state(
-        &mut self,
-        other: Box<dyn Table + Send + Sync>,
-    ) -> Result<(), (Box<dyn Table + Send + Sync>, Error)> {
-        if !other.as_any().is::<Memory>() {
-            return Err((other, Error::TableTypeMismatch));
-        }
-        // Type checked already
-        let other_memory = other.into_any().downcast::<Memory>().unwrap();
-        self.write_handle = other_memory.write_handle;
-        self.read_handle = other_memory.read_handle;
-        self.read_handle_factory = other_memory.read_handle_factory;
-        self.expired_items_sender = other_memory.expired_items_sender;
-        self.expired_items_receiver = other_memory.expired_items_receiver;
-        Ok(())
-    }
-
-    fn into_any(self: Box<Self>) -> Box<dyn std::any::Any> {
-        self
-    }
-
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
+    fn extract_state(&self) -> Option<Box<dyn std::any::Any + Send + Sync>> {
+        Some(Box::new(self.clone()))
     }
 }
 
@@ -1052,7 +1046,7 @@ mod tests {
             export_expired_items: false,
             source_key: "test".to_string(),
         });
-        let memory = memory_config.get_or_build_memory().await;
+        let memory = memory_config.get_or_build_memory(None).await;
         memory.handle_value(ObjectMap::from([("test_key".into(), Value::from(5))]));
 
         let mut events: Vec<Event> = run_and_assert_source_compliance(

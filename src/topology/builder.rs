@@ -192,17 +192,16 @@ impl<'a> Builder<'a> {
                     None
                 };
 
-                let mut prev_table = None;
+                let mut prev_state = None;
                 if !self.diff.enrichment_tables.is_added(name)
                     && let Some(existing_table) = ENRICHMENT_TABLES.get(&table_name)
-                    && existing_table.stateful()
                 {
-                    prev_table = Some(existing_table)
+                    prev_state = existing_table.extract_state();
                 }
 
                 let mut table = match table_outer
                     .inner
-                    .build(&self.config.global, prev_table)
+                    .build(&self.config.global, prev_state)
                     .await
                 {
                     Ok(table) => table,

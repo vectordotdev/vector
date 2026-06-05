@@ -36,7 +36,7 @@ impl EnrichmentTableConfig for MmdbConfig {
     async fn build(
         &self,
         _: &crate::config::GlobalOptions,
-        _: Option<Box<dyn Table + Send + Sync>>,
+        _: Option<Box<dyn std::any::Any + Send + Sync>>,
     ) -> crate::Result<Box<dyn Table + Send + Sync>> {
         Ok(Box::new(Mmdb::new(self.clone())?))
     }
@@ -164,25 +164,6 @@ impl Table for Mmdb {
         matches!(fs::metadata(&self.config.path)
             .and_then(|metadata| metadata.modified()),
             Ok(modified) if modified > self.last_modified)
-    }
-
-    fn stateful(&self) -> bool {
-        false
-    }
-
-    fn take_state(
-        &mut self,
-        _other: Box<dyn Table + Send + Sync>,
-    ) -> Result<(), (Box<dyn Table + Send + Sync>, Error)> {
-        panic!("MMDB table is not stateful, can't use take_state")
-    }
-
-    fn into_any(self: Box<Self>) -> Box<dyn std::any::Any> {
-        self
-    }
-
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
     }
 }
 

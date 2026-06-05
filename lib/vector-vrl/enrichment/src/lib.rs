@@ -8,8 +8,6 @@ pub mod tables;
 mod test_util;
 mod vrl_util;
 
-use std::any::Any;
-
 use dyn_clone::DynClone;
 use indoc::indoc;
 use snafu::Snafu;
@@ -146,19 +144,10 @@ pub trait Table: DynClone {
     /// Returns true if the underlying data has changed and the table needs reloading.
     fn needs_reload(&self) -> bool;
 
-    /// Returns true if this table holds state that needs to be moved in case of reload.
-    fn stateful(&self) -> bool;
-
-    /// Moves state from other table into this table and return back the other table if the move has
-    /// failed.
-    fn take_state(
-        &mut self,
-        other: Box<dyn Table + Send + Sync>,
-    ) -> Result<(), (Box<dyn Table + Send + Sync>, Error)>;
-
-    fn into_any(self: Box<Self>) -> Box<dyn Any>;
-
-    fn as_any(&self) -> &dyn Any;
+    /// Extracts state from this table
+    fn extract_state(&self) -> Option<Box<dyn std::any::Any + Send + Sync>> {
+        None
+    }
 }
 
 dyn_clone::clone_trait_object!(Table);
