@@ -12,3 +12,39 @@ This doc is generated using:
 1. The template in layouts/docs/component.html
 2. The relevant CUE data in cue/reference/components/...
 */}}
+
+## Ingest Modes
+
+The Databend sink supports staged batch loading by default. Set `load_mode` to
+`streaming` to use Databend's streaming load API for normal inserts.
+
+For staged loads, `copy_options.on_error` controls Databend COPY error handling.
+It defaults to `abort`. Set it to `continue` to skip bad rows and continue
+loading the rest of the staged file:
+
+```yaml
+sinks:
+  databend:
+    type: databend
+    inputs: ["logs"]
+    endpoint: "databend://root:@127.0.0.1:8000/default?sslmode=disable"
+    table: "events"
+    copy_options:
+      on_error: continue
+```
+
+Set `primary_key` to use `REPLACE INTO ... ON (...)` with staged loading. When
+`primary_key` is empty, the sink uses normal insert mode.
+
+```yaml
+sinks:
+  databend:
+    type: databend
+    inputs: ["logs"]
+    endpoint: "databend://root:@127.0.0.1:8000/default?sslmode=disable"
+    table: "events"
+    primary_key: ["id", "source"]
+```
+
+Databend does not currently support replace with streaming load, so
+`primary_key` cannot be used with `load_mode: streaming`.

@@ -12,7 +12,7 @@ use super::{
     compression::DatabendCompression,
     encoding::{DatabendEncodingConfig, DatabendMissingFieldAS, DatabendSerializerConfig},
     request_builder::DatabendRequestBuilder,
-    service::{DatabendRetryLogic, DatabendService},
+    service::{DatabendRetryLogic, DatabendService, DatabendServiceSettings},
     sink::DatabendSink,
 };
 use crate::{
@@ -29,6 +29,78 @@ use crate::{
     tls::TlsConfig,
     vector_version,
 };
+
+fn default_stage() -> String {
+    "~".to_string()
+}
+
+fn default_stage_path_prefix() -> String {
+    "vector".to_string()
+}
+
+/// Databend load API to use for this sink.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum DatabendLoadMode {
+    /// Upload each batch to a stage, then load it into the table.
+    #[default]
+    Staged,
+
+    /// Stream each batch directly through Databend's `/v1/streaming_load` endpoint.
+    Streaming,
+}
+
+/// COPY options used by staged Databend loads.
+#[configurable_component]
+#[derive(Clone, Debug)]
+#[serde(default)]
+pub struct DatabendCopyOptions {
+    /// Whether to remove loaded files from the stage after a successful load.
+    pub purge: bool,
+
+    /// Whether to load files even if Databend has loaded them before.
+    pub force: bool,
+
+    /// Whether to disable variant type checks while loading.
+    pub disable_variant_check: bool,
+
+    /// How Databend handles errors while loading staged files.
+    pub on_error: DatabendCopyOnError,
+}
+
+impl Default for DatabendCopyOptions {
+    fn default() -> Self {
+        Self {
+            purge: true,
+            force: false,
+            disable_variant_check: false,
+            on_error: DatabendCopyOnError::Abort,
+        }
+    }
+}
+
+/// COPY `ON_ERROR` behavior.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum DatabendCopyOnError {
+    /// Abort the load when an error is encountered.
+    #[default]
+    Abort,
+
+    /// Continue loading other rows when an error is encountered.
+    Continue,
+}
+
+impl DatabendCopyOnError {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Abort => "abort",
+            Self::Continue => "continue",
+        }
+    }
+}
 
 /// Configuration for the `databend` sink.
 #[configurable_component(sink("databend", "Deliver log data to a Databend database."))]
@@ -70,6 +142,29 @@ pub struct DatabendConfig {
     #[configurable(derived)]
     #[serde(default)]
     pub compression: DatabendCompression,
+
+    /// The Databend load API to use.
+    #[serde(default)]
+    pub load_mode: DatabendLoadMode,
+
+    /// The user stage to upload staged batch files into.
+    #[serde(default = "default_stage")]
+    pub stage: String,
+
+    /// Path prefix used under `stage` for staged batch files.
+    #[serde(default = "default_stage_path_prefix")]
+    pub stage_path_prefix: String,
+
+    /// COPY options for staged loads.
+    #[serde(default)]
+    pub copy_options: DatabendCopyOptions,
+
+    /// Columns used for `REPLACE INTO ... ON (...)`.
+    ///
+    /// When empty, Databend uses normal insert mode. When non-empty, Databend uses replace mode.
+    /// Configure it to match the target table's logical key.
+    #[serde(default)]
+    pub primary_key: Vec<String>,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -158,6 +253,10 @@ impl SinkConfig for DatabendConfig {
                 file_format_options.insert("compression", "NONE");
                 Compression::None
             }
+            DatabendCompression::Zstd => {
+                file_format_options.insert("compression", "ZSTD");
+                Compression::zstd_default()
+            }
         };
         let encoding: EncodingConfig = self.encoding.clone().into();
         let serializer = match self.encoding.config() {
@@ -178,14 +277,44 @@ impl SinkConfig for DatabendConfig {
         let transformer = encoding.transformer();
 
         let mut copy_options = BTreeMap::new();
-        copy_options.insert("purge", "true");
+        copy_options.insert(
+            "purge",
+            if self.copy_options.purge {
+                "true"
+            } else {
+                "false"
+            },
+        );
+        copy_options.insert(
+            "force",
+            if self.copy_options.force {
+                "true"
+            } else {
+                "false"
+            },
+        );
+        copy_options.insert(
+            "disable_variant_check",
+            if self.copy_options.disable_variant_check {
+                "true"
+            } else {
+                "false"
+            },
+        );
+        copy_options.insert("on_error", self.copy_options.on_error.as_str());
 
         let client = DatabendAPIClient::new(&endpoint, Some(ua)).await?;
         let service = DatabendService::new(
             client,
-            self.table.clone(),
-            file_format_options,
-            copy_options,
+            DatabendServiceSettings {
+                table: self.table.clone(),
+                load_mode: self.load_mode,
+                stage: self.stage.clone(),
+                stage_path_prefix: self.stage_path_prefix.clone(),
+                file_format_options,
+                copy_options,
+                primary_key: self.primary_key.clone(),
+            },
         )?;
         let service = ServiceBuilder::new()
             .settings(request_settings, DatabendRetryLogic)
@@ -209,7 +338,7 @@ impl SinkConfig for DatabendConfig {
 }
 
 async fn select_one(client: Arc<DatabendAPIClient>) -> crate::Result<()> {
-    client.query_all("SELECT 1").await?;
+    client.query_all("SELECT 1", None).await?;
     Ok(())
 }
 
@@ -265,5 +394,51 @@ mod tests {
             DatabendSerializerConfig::Csv(_)
         ));
         assert!(matches!(cfg.compression, DatabendCompression::Gzip));
+    }
+
+    #[test]
+    fn parse_config_with_ingest_options() {
+        let cfg = toml::from_str::<DatabendConfig>(
+            r#"
+            endpoint = "databend://localhost:8000/mydatabase?sslmode=disable"
+            table = "mytable"
+            compression = "zstd"
+            load_mode = "streaming"
+            stage = "ingest_stage"
+            stage_path_prefix = "kafka"
+            copy_options.purge = false
+            copy_options.force = true
+            copy_options.disable_variant_check = true
+            copy_options.on_error = "continue"
+            primary_key = ["id", "source"]
+        "#,
+        )
+        .unwrap();
+
+        assert!(matches!(cfg.compression, DatabendCompression::Zstd));
+        assert!(matches!(cfg.load_mode, DatabendLoadMode::Streaming));
+        assert_eq!(cfg.stage, "ingest_stage");
+        assert_eq!(cfg.stage_path_prefix, "kafka");
+        assert!(!cfg.copy_options.purge);
+        assert!(cfg.copy_options.force);
+        assert!(cfg.copy_options.disable_variant_check);
+        assert!(matches!(
+            cfg.copy_options.on_error,
+            DatabendCopyOnError::Continue
+        ));
+        assert_eq!(cfg.primary_key, ["id", "source"]);
+    }
+
+    #[test]
+    fn parse_config_with_default_primary_key_empty() {
+        let cfg = toml::from_str::<DatabendConfig>(
+            r#"
+            endpoint = "databend://localhost:8000/mydatabase?sslmode=disable"
+            table = "mytable"
+        "#,
+        )
+        .unwrap();
+
+        assert!(cfg.primary_key.is_empty());
     }
 }
