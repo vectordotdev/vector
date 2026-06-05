@@ -69,6 +69,8 @@ const LOG_DRIVER_KEY: &str = "log-driver";
 const SNAPSHOTTER_KEY: &str = "snapshotter";
 const RESTART_COUNT_KEY: &str = "restart-count";
 
+// Keep defaults focused on stable identity and provenance fields to avoid adding
+// status, lifecycle, or platform-specific fields unless explicitly requested.
 static DEFAULT_FIELD_ALLOWLIST: &[&str] = &[
     CLUSTER_KEY,
     TASK_ARN_KEY,
@@ -269,6 +271,9 @@ impl TransformConfig for EcsMetadata {
             refresh_timeout,
         );
 
+        // Initial retries absorb ECS metadata endpoint startup races before
+        // `required` decides whether startup may continue. Periodic refreshes
+        // use the normal interval and keep the last successful snapshot.
         if let Err(error) = client
             .refresh_metadata_with_retries(initial_retry_attempts, initial_retry_backoff)
             .await
@@ -568,6 +573,8 @@ fn extract_field<'a>(
     }
 }
 
+// This transform currently exposes only scalar metadata. Nested ECS structures
+// can be added later, but need an explicit flattening and schema policy first.
 fn scalar<'a>(value: &'a JsonValue, key: &str) -> Option<&'a JsonValue> {
     value
         .get(key)
