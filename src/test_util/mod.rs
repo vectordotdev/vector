@@ -23,6 +23,8 @@ use futures::{FutureExt, SinkExt, Stream, StreamExt, TryStreamExt, stream, task:
 use openssl::ssl::{SslConnector, SslFiletype, SslMethod, SslVerifyMode};
 use rand::{Rng, rng};
 use rand_distr::Alphanumeric;
+#[cfg(unix)]
+use tokio::net::UnixStream;
 use tokio::{
     io::{AsyncRead, AsyncWrite, AsyncWriteExt, Result as IoResult},
     net::{TcpListener, TcpStream, ToSocketAddrs},
@@ -532,6 +534,19 @@ where
     wait_for(move || {
         let addr = addr.clone();
         async move { TcpStream::connect(addr).await.is_ok() }
+    })
+    .await
+}
+
+#[cfg(unix)]
+// Wait (for 5 secs) for a Unix socket to be reachable
+pub async fn wait_for_unix_socket<A>(addr: A)
+where
+    A: AsRef<Path> + Clone + Send + 'static,
+{
+    wait_for(move || {
+        let addr = addr.clone();
+        async move { UnixStream::connect(addr).await.is_ok() }
     })
     .await
 }

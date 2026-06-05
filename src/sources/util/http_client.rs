@@ -23,6 +23,8 @@ use vector_lib::{
     shutdown::ShutdownSignal,
 };
 
+#[cfg(unix)]
+use crate::unix_http::UnixHttpClient;
 use crate::{
     SourceSender,
     http::{Auth, HttpClient, QueryParameterValue, QueryParameters},
@@ -160,12 +162,17 @@ pub(crate) async fn call<
     // proxy and tls settings.
     let client =
         HttpClient::new(inputs.tls.clone(), &inputs.proxy).expect("Building HTTP client failed");
+
+    #[cfg(unix)]
+    let unix_client = UnixHttpClient::new(inputs.tls.clone(), &inputs.proxy)
+        .expect("Building UNIX HTTP client failed");
+
     let mut stream = IntervalStream::new(tokio::time::interval(inputs.interval))
         .take_until(inputs.shutdown)
         .map(move |_| stream::iter(inputs.urls.clone()))
         .flatten()
         .map(move |base_url| {
-            let client = client.clone();
+            let scheme = base_url.scheme_str().map(String::from);
             let endpoint = base_url.to_string();
 
             let context_builder = context_builder.clone();
@@ -218,79 +225,86 @@ pub(crate) async fn call<
                 auth.apply(&mut request);
             }
 
-            tokio::time::timeout(inputs.timeout, client.send(request))
-                .then(move |result| async move {
-                    match result {
-                        Ok(Ok(response)) => Ok(response),
-                        Ok(Err(error)) => Err(error.into()),
-                        Err(_) => Err(format!(
-                            "Timeout error: request exceeded {}s",
-                            inputs.timeout.as_secs_f64()
-                        )
-                        .into()),
-                    }
-                })
-                .and_then(|response| async move {
-                    let (header, body) = response.into_parts();
-                    let body = http_body::Body::collect(body).await?.to_bytes();
-                    emit!(EndpointBytesReceived {
-                        byte_size: body.len(),
-                        protocol: "http",
-                        endpoint: endpoint.as_str(),
-                    });
-                    Ok((header, body))
-                })
-                .into_stream()
-                .filter_map(move |response| {
-                    ready(match response {
-                        Ok((header, body)) if header.status == hyper::StatusCode::OK => {
-                            context.on_response(&url, &header, &body).map(|mut events| {
-                                let byte_size = if events.is_empty() {
-                                    // We need to explicitly set the byte size
-                                    // to 0 since
-                                    // `estimated_json_encoded_size_of` returns
-                                    // at least 1 for an empty collection. For
-                                    // the purposes of the
-                                    // HttpClientEventsReceived event, we should
-                                    // emit 0 when there aren't any usable
-                                    // metrics.
-                                    JsonSize::zero()
-                                } else {
-                                    events.estimated_json_encoded_size_of()
-                                };
+            tokio::time::timeout(
+                inputs.timeout,
+                match scheme == Some(String::from("unix")) {
+                    #[cfg(unix)]
+                    true => unix_client.clone().send(request),
+                    _ => client.clone().send(request),
+                },
+            )
+            .then(move |result| async move {
+                match result {
+                    Ok(Ok(response)) => Ok(response),
+                    Ok(Err(error)) => Err(error.into()),
+                    Err(_) => Err(format!(
+                        "Timeout error: request exceeded {}s",
+                        inputs.timeout.as_secs_f64()
+                    )
+                    .into()),
+                }
+            })
+            .and_then(|response| async move {
+                let (header, body) = response.into_parts();
+                let body = http_body::Body::collect(body).await?.to_bytes();
+                emit!(EndpointBytesReceived {
+                    byte_size: body.len(),
+                    protocol: "http",
+                    endpoint: endpoint.as_str(),
+                });
+                Ok((header, body))
+            })
+            .into_stream()
+            .filter_map(move |response| {
+                ready(match response {
+                    Ok((header, body)) if header.status == hyper::StatusCode::OK => {
+                        context.on_response(&url, &header, &body).map(|mut events| {
+                            let byte_size = if events.is_empty() {
+                                // We need to explicitly set the byte size
+                                // to 0 since
+                                // `estimated_json_encoded_size_of` returns
+                                // at least 1 for an empty collection. For
+                                // the purposes of the
+                                // HttpClientEventsReceived event, we should
+                                // emit 0 when there aren't any usable
+                                // metrics.
+                                JsonSize::zero()
+                            } else {
+                                events.estimated_json_encoded_size_of()
+                            };
 
-                                emit!(HttpClientEventsReceived {
-                                    byte_size,
-                                    count: events.len(),
-                                    url: url.to_string()
-                                });
-
-                                // We'll enrich after receiving the events so
-                                // that the byte sizes are accurate.
-                                context.enrich_events(&mut events);
-
-                                stream::iter(events)
-                            })
-                        }
-                        Ok((header, _)) => {
-                            context.on_http_response_error(&url, &header);
-                            emit!(HttpClientHttpResponseError {
-                                code: header.status,
-                                url: url.to_string(),
-                            });
-                            None
-                        }
-                        Err(error) => {
-                            emit!(HttpClientHttpError {
-                                error,
+                            emit!(HttpClientEventsReceived {
+                                byte_size,
+                                count: events.len(),
                                 url: url.to_string()
                             });
-                            None
-                        }
-                    })
+
+                            // We'll enrich after receiving the events so
+                            // that the byte sizes are accurate.
+                            context.enrich_events(&mut events);
+
+                            stream::iter(events)
+                        })
+                    }
+                    Ok((header, _)) => {
+                        context.on_http_response_error(&url, &header);
+                        emit!(HttpClientHttpResponseError {
+                            code: header.status,
+                            url: url.to_string(),
+                        });
+                        None
+                    }
+                    Err(error) => {
+                        emit!(HttpClientHttpError {
+                            error,
+                            url: url.to_string()
+                        });
+                        None
+                    }
                 })
-                .flatten()
-                .boxed()
+            })
+            .flatten()
+            .boxed()
         })
         .flatten_unordered(None)
         .boxed();
