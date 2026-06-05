@@ -58,7 +58,7 @@ pub struct FileSinkConfig {
     ))]
     #[configurable(metadata(docs::examples = "/tmp/vector-%Y-%m-%d.log.zst"))]
     #[configurable(metadata(
-        docs::warnings = "The rendered path can resolve to any location on the filesystem. Vector will write to it if the process has permission."
+        docs::warnings = "The rendered path is not sanitized. If event fields used in the template originate from untrusted sources, the resulting path may resolve outside the intended directory. Operators are responsible for ensuring that fields used in path templates come from trusted sources."
     ))]
     pub path: Template,
 

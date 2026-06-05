@@ -590,7 +590,7 @@ generated: components: sinks: file: configuration: {
 			examples: ["/tmp/vector-%Y-%m-%d.log", "/tmp/application-{{ application_id }}-%Y-%m-%d.log", "/tmp/vector-%Y-%m-%d.log.zst"]
 			syntax: "template"
 		}
-		warnings: ["The rendered path can resolve to any location on the filesystem. Vector will write to it if the process has permission."]
+		warnings: ["The rendered path is not sanitized. If event fields used in the template originate from untrusted sources, the resulting path may resolve outside the intended directory. Operators are responsible for ensuring that fields used in path templates come from trusted sources."]
 	}
 	timezone: {
 		description: """
