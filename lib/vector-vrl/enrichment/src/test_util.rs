@@ -69,25 +69,6 @@ impl Table for DummyEnrichmentTable {
     fn needs_reload(&self) -> bool {
         false
     }
-
-    fn stateful(&self) -> bool {
-        false
-    }
-
-    fn take_state(
-        &mut self,
-        other: Box<dyn Table + Send + Sync>,
-    ) -> Result<(), (Box<dyn Table + Send + Sync>, Error)> {
-        panic!("Unsupported")
-    }
-
-    fn into_any(self: Box<Self>) -> Box<dyn std::any::Any> {
-        self
-    }
-
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
 }
 
 /// Create a table registry with dummy data
