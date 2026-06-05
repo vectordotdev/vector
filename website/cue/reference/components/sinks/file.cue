@@ -58,6 +58,18 @@ components: sinks: file: {
 	}
 
 	how_it_works: {
+		path_template_trust: {
+			title: "Path Templates and Untrusted Input"
+			body: """
+				The `path` option supports Vector's template syntax, allowing event fields to be
+				interpolated into the output path. Vector does not sanitize or restrict the rendered
+				path. If the interpolated fields originate from untrusted sources (for example, a
+				field set by a remote client), the resulting path may resolve outside the intended
+				directory. Operators are responsible for ensuring that fields used in path templates
+				come from trusted sources.
+				"""
+		}
+
 		dir_and_file_creation: {
 			title: "File & Directory Creation"
 			body: """
