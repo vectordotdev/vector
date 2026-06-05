@@ -404,6 +404,8 @@ impl MetadataClient {
                     emit!(AwsEcsMetadataRefreshSuccessful);
                 }
                 Err(error) => {
+                    // Keep the last successful metadata snapshot on transient endpoint
+                    // failures so enrichment does not disappear between refreshes.
                     emit!(AwsEcsMetadataRefreshError { error });
                 }
             }
@@ -440,6 +442,8 @@ impl MetadataClient {
         let target_container_name = match self.container_name.clone() {
             Some(container_name) => container_name,
             None => {
+                // `/task` supplies task-level fields, but the current container
+                // endpoint is needed to select Vector's container by default.
                 let current_container = self.get_metadata("").await?;
                 json_string(&current_container, "Name")
                     .ok_or_else(|| crate::Error::from(MissingCurrentContainerNameError))?
@@ -453,6 +457,8 @@ impl MetadataClient {
 
         let mut new_state = vec![];
         for (field, key) in &self.keys.keys {
+            // ECS launch types and platform versions expose slightly different
+            // v4 fields; configured fields that are valid but absent are omitted.
             if let Some(value) = extract_field(field, &task, container) {
                 new_state.push((key.clone(), json_to_value(value)));
             }
@@ -470,6 +476,8 @@ impl MetadataClient {
 
         let req = Request::get(&url).body(Body::empty())?;
 
+        // Headers can arrive while the response body stalls, so the refresh
+        // timeout must cover sending, status validation, and body collection.
         let body = tokio::time::timeout(self.refresh_timeout, async {
             let res = self
                 .client
@@ -593,6 +601,7 @@ fn json_to_value(value: &JsonValue) -> Value {
 }
 
 fn value_to_metric_tag(value: &Value) -> String {
+    // Metric tags are strings even when log enrichment preserves scalar types.
     match value {
         Value::Bytes(value) => String::from_utf8_lossy(value).to_string(),
         Value::Integer(value) => value.to_string(),
