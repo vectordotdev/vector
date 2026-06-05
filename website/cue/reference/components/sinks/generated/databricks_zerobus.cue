@@ -284,6 +284,14 @@ generated: components: sinks: databricks_zerobus: configuration: {
 			"""
 		required: false
 		type: object: options: {
+			compression: {
+				description: "Optional Arrow IPC compression for Flight payloads. Defaults to no compression."
+				required:    false
+				type: string: enum: {
+					lz4_frame: "LZ4 frame compression."
+					zstd:      "Zstandard compression."
+				}
+			}
 			flush_timeout_ms: {
 				description: "Timeout in milliseconds for flush operations."
 				required:    false

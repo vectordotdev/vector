@@ -1,0 +1,1 @@
+The `databricks_zerobus` sink now supports optional Arrow IPC compression for Arrow Flight payloads via `stream_options.compression`. Set it to `lz4_frame` or `zstd` to compress batches before they are sent; it defaults to no compression.

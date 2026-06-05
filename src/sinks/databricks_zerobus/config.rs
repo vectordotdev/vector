@@ -46,6 +46,26 @@ impl DatabricksAuthentication {
     }
 }
 
+/// Arrow IPC compression codec for Zerobus Arrow Flight payloads.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum Compression {
+    /// LZ4 frame compression.
+    Lz4Frame,
+    /// Zstandard compression.
+    Zstd,
+}
+
+impl From<Compression> for arrow::ipc::CompressionType {
+    fn from(value: Compression) -> Self {
+        match value {
+            Compression::Lz4Frame => arrow::ipc::CompressionType::LZ4_FRAME,
+            Compression::Zstd => arrow::ipc::CompressionType::ZSTD,
+        }
+    }
+}
+
 /// Zerobus stream configuration options.
 ///
 /// This is a thin wrapper around the SDK's `StreamConfigurationOptions` with Vector-specific
@@ -63,6 +83,10 @@ pub struct ZerobusStreamOptions {
     #[serde(default = "default_server_ack_timeout_ms")]
     #[configurable(metadata(docs::examples = 60000))]
     pub server_lack_of_ack_timeout_ms: u64,
+
+    /// Optional Arrow IPC compression for Flight payloads. Defaults to no compression.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub compression: Option<Compression>,
 }
 
 impl Default for ZerobusStreamOptions {
@@ -70,6 +94,7 @@ impl Default for ZerobusStreamOptions {
         Self {
             flush_timeout_ms: default_flush_timeout_ms(),
             server_lack_of_ack_timeout_ms: default_server_ack_timeout_ms(),
+            compression: None,
         }
     }
 }
@@ -401,6 +426,33 @@ mod tests {
         } else {
             panic!("Expected ConfigError for empty OAuth client_id");
         }
+    }
+
+    #[test]
+    fn test_stream_options_compression_deserializes() {
+        let opts: ZerobusStreamOptions =
+            serde_json::from_str(r#"{"compression":"zstd"}"#).expect("should parse zstd");
+        assert_eq!(opts.compression, Some(Compression::Zstd));
+
+        let opts: ZerobusStreamOptions =
+            serde_json::from_str(r#"{"compression":"lz4_frame"}"#).expect("should parse lz4_frame");
+        assert_eq!(opts.compression, Some(Compression::Lz4Frame));
+
+        // Omitting the field leaves compression disabled.
+        let opts: ZerobusStreamOptions = serde_json::from_str("{}").expect("should parse empty");
+        assert_eq!(opts.compression, None);
+    }
+
+    #[test]
+    fn test_compression_maps_to_arrow_ipc() {
+        assert_eq!(
+            arrow::ipc::CompressionType::from(Compression::Lz4Frame),
+            arrow::ipc::CompressionType::LZ4_FRAME,
+        );
+        assert_eq!(
+            arrow::ipc::CompressionType::from(Compression::Zstd),
+            arrow::ipc::CompressionType::ZSTD,
+        );
     }
 
     /// When `batch.max_bytes` is `None` (user omitted the field or set it to `null`),
