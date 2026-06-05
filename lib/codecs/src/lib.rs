@@ -25,15 +25,17 @@ pub use decoding::{
 };
 #[cfg(feature = "syslog")]
 pub use decoding::{SyslogDeserializer, SyslogDeserializerConfig};
+#[cfg(feature = "arrow")]
+pub use encoding::{BatchEncoder, BatchSerializer};
 pub use encoding::{
-    BatchEncoder, BatchSerializer, BytesEncoder, BytesEncoderConfig, CharacterDelimitedEncoder,
-    CharacterDelimitedEncoderConfig, CsvSerializer, CsvSerializerConfig, Encoder, EncoderKind,
-    EncodingConfig, EncodingConfigWithFraming, GelfSerializer, GelfSerializerConfig,
-    JsonSerializer, JsonSerializerConfig, LengthDelimitedEncoder, LengthDelimitedEncoderConfig,
-    LogfmtSerializer, LogfmtSerializerConfig, NativeJsonSerializer, NativeJsonSerializerConfig,
-    NativeSerializer, NativeSerializerConfig, NewlineDelimitedEncoder,
-    NewlineDelimitedEncoderConfig, RawMessageSerializer, RawMessageSerializerConfig, SinkType,
-    TextSerializer, TextSerializerConfig, TimestampFormat, Transformer,
+    BytesEncoder, BytesEncoderConfig, CharacterDelimitedEncoder, CharacterDelimitedEncoderConfig,
+    CsvSerializer, CsvSerializerConfig, Encoder, EncoderKind, EncodingConfig,
+    EncodingConfigWithFraming, GelfSerializer, GelfSerializerConfig, JsonSerializer,
+    JsonSerializerConfig, LengthDelimitedEncoder, LengthDelimitedEncoderConfig, LogfmtSerializer,
+    LogfmtSerializerConfig, NativeJsonSerializer, NativeJsonSerializerConfig, NativeSerializer,
+    NativeSerializerConfig, NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig,
+    RawMessageSerializer, RawMessageSerializerConfig, SinkType, TextSerializer,
+    TextSerializerConfig, TimestampFormat, Transformer,
 };
 pub use gelf::{VALID_FIELD_REGEX, gelf_fields};
 pub use ready_frames::ReadyFrames;
