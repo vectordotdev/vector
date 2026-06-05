@@ -66,6 +66,7 @@ const CONTAINER_STARTED_AT_KEY: &str = "container-started-at";
 const CONTAINER_FINISHED_AT_KEY: &str = "container-finished-at";
 const CONTAINER_TYPE_KEY: &str = "container-type";
 const LOG_DRIVER_KEY: &str = "log-driver";
+const SNAPSHOTTER_KEY: &str = "snapshotter";
 const RESTART_COUNT_KEY: &str = "restart-count";
 
 static DEFAULT_FIELD_ALLOWLIST: &[&str] = &[
@@ -113,6 +114,7 @@ static FIELD_CATALOG: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
         CONTAINER_FINISHED_AT_KEY,
         CONTAINER_TYPE_KEY,
         LOG_DRIVER_KEY,
+        SNAPSHOTTER_KEY,
         RESTART_COUNT_KEY,
     ]
     .into_iter()
@@ -433,14 +435,16 @@ impl MetadataClient {
     }
 
     async fn refresh_metadata(&mut self) -> Result<(), crate::Error> {
-        let current_container = self.get_metadata("").await?;
         let task = self.get_metadata("/task").await?;
 
-        let target_container_name = self
-            .container_name
-            .clone()
-            .or_else(|| json_string(&current_container, "Name"))
-            .ok_or_else(|| crate::Error::from(MissingCurrentContainerNameError))?;
+        let target_container_name = match self.container_name.clone() {
+            Some(container_name) => container_name,
+            None => {
+                let current_container = self.get_metadata("").await?;
+                json_string(&current_container, "Name")
+                    .ok_or_else(|| crate::Error::from(MissingCurrentContainerNameError))?
+            }
+        };
 
         let container =
             find_container(&task, &target_container_name).ok_or_else(|| MissingContainerError {
@@ -550,6 +554,7 @@ fn extract_field<'a>(
         CONTAINER_FINISHED_AT_KEY => scalar(container, "FinishedAt"),
         CONTAINER_TYPE_KEY => scalar(container, "Type"),
         LOG_DRIVER_KEY => scalar(container, "LogDriver"),
+        SNAPSHOTTER_KEY => scalar(container, "Snapshotter"),
         RESTART_COUNT_KEY => scalar(container, "RestartCount"),
         _ => None,
     }
@@ -788,6 +793,7 @@ mod test {
                 "Type": "NORMAL",
                 "ContainerARN": "arn:aws:ecs:us-east-1:123456789012:container/example/abc/vector",
                 "LogDriver": "awslogs",
+                "Snapshotter": "overlayfs",
                 "RestartCount": 2
             },
             {
@@ -798,7 +804,8 @@ mod test {
                 "ImageID": "sha256:app",
                 "ExitCode": 0,
                 "Type": "NORMAL",
-                "ContainerARN": "arn:aws:ecs:us-east-1:123456789012:container/example/abc/app"
+                "ContainerARN": "arn:aws:ecs:us-east-1:123456789012:container/example/abc/app",
+                "Snapshotter": "soci"
             }
         ]
     }"#;
@@ -871,6 +878,32 @@ mod test {
                         .body(body)
                         .unwrap(),
                 )
+            }))
+        });
+
+        tokio::spawn(Server::bind(&addr).serve(make_svc));
+        format!("http://{addr}")
+    }
+
+    async fn start_task_only_metadata_server() -> String {
+        let (_guard, addr) = next_addr();
+
+        let make_svc = make_service_fn(move |_| async move {
+            Ok::<_, Infallible>(service_fn(move |req| async move {
+                match req.uri().path() {
+                    "/task" => Ok::<_, Infallible>(
+                        Response::builder()
+                            .status(StatusCode::OK)
+                            .body(Body::from(TASK_METADATA))
+                            .unwrap(),
+                    ),
+                    _ => Ok::<_, Infallible>(
+                        Response::builder()
+                            .status(StatusCode::SERVICE_UNAVAILABLE)
+                            .body(Body::from("current container unavailable"))
+                            .unwrap(),
+                    ),
+                }
             }))
         });
 
@@ -1042,6 +1075,7 @@ mod test {
                     CONTAINER_ID_KEY.into(),
                     CONTAINER_EXIT_CODE_KEY.into(),
                     FAULT_INJECTION_ENABLED_KEY.into(),
+                    SNAPSHOTTER_KEY.into(),
                 ],
                 ..Default::default()
             };
@@ -1071,12 +1105,34 @@ mod test {
                 log.get(event_path!(FAULT_INJECTION_ENABLED_KEY)),
                 Some(&Value::from(false))
             );
+            assert_eq!(
+                log.get(event_path!(SNAPSHOTTER_KEY)),
+                Some(&Value::from("soci"))
+            );
 
             drop(tx);
             topology.stop().await;
             assert_eq!(out.recv().await, None);
         })
         .await;
+    }
+
+    #[tokio::test]
+    async fn container_name_override_skips_current_container_request() {
+        let endpoint = start_task_only_metadata_server().await;
+        let transform_config = EcsMetadata {
+            endpoint: Some(endpoint),
+            container_name: Some("app".into()),
+            initial_retry_attempts: 1,
+            ..Default::default()
+        };
+
+        assert!(
+            transform_config
+                .build(&TransformContext::default())
+                .await
+                .is_ok()
+        );
     }
 
     #[tokio::test]
