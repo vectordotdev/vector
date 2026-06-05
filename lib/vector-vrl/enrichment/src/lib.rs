@@ -77,8 +77,6 @@ pub enum Error {
     Internal { source: InternalError },
     #[snafu(display("Table {table} not loaded"))]
     TableNotLoaded { table: String },
-    #[snafu(display("Table type changed with configuration change, state lost"))]
-    TableTypeMismatch,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Snafu)]
