@@ -90,8 +90,12 @@ pub struct ZerobusSinkConfig {
     /// Zerobus ingest endpoint.
     ///
     /// [zerobus_endpoint]: https://docs.databricks.com/aws/en/ingestion/zerobus-ingest#get-your-workspace-url-and-zerobus-ingest-endpoint
-    #[configurable(metadata(docs::examples = "https://1234567890123456.zerobus.us-west-2.cloud.databricks.com"))]
-    #[configurable(metadata(docs::examples = "https://6543210987654321.zerobus.us-east-1.cloud.databricks.com"))]
+    #[configurable(metadata(
+        docs::examples = "https://1234567890123456.zerobus.us-west-2.cloud.databricks.com"
+    ))]
+    #[configurable(metadata(
+        docs::examples = "https://6543210987654321.zerobus.us-east-1.cloud.databricks.com"
+    ))]
     pub ingestion_endpoint: String,
 
     /// The Unity Catalog table name to write to.
@@ -114,9 +118,7 @@ pub struct ZerobusSinkConfig {
     /// Zerobus ingest endpoint.
     ///
     /// [zerobus_endpoint]: https://docs.databricks.com/aws/en/ingestion/zerobus-ingest#get-your-workspace-url-and-zerobus-ingest-endpoint
-    #[configurable(metadata(
-        docs::examples = "https://dbc-a1b2c3d4-e5f6.cloud.databricks.com"
-    ))]
+    #[configurable(metadata(docs::examples = "https://dbc-a1b2c3d4-e5f6.cloud.databricks.com"))]
     #[configurable(metadata(docs::examples = "https://dbc-f6e5d4c3-b2a1.cloud.databricks.com"))]
     pub unity_catalog_endpoint: String,
 
@@ -153,7 +155,8 @@ pub struct ZerobusSinkConfig {
 impl GenerateConfig for ZerobusSinkConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            ingestion_endpoint: "https://1234567890123456.zerobus.us-west-2.cloud.databricks.com".to_string(),
+            ingestion_endpoint: "https://1234567890123456.zerobus.us-west-2.cloud.databricks.com"
+                .to_string(),
             table_name: "main.default.logs".to_string(),
             unity_catalog_endpoint: "https://dbc-a1b2c3d4-e5f6.cloud.databricks.com".to_string(),
             auth: DatabricksAuthentication::OAuth {
