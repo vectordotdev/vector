@@ -248,6 +248,11 @@ impl FrameStreamReader {
                             self.send_control_frame(Self::make_frame(ControlHeader::Finish, None));
                         }
                         self.state.control_state = ControlState::Stopped; //stream is now done
+                        // Close the write side of the connection after STOP/FINISH.
+                        // Per the FrameStream protocol, the server should initiate TCP close
+                        // after sending FINISH. Without this, sockets accumulate in CLOSE_WAIT
+                        // because the client may wait for the server to close first.
+                        self.close_sink();
                     }
                     _ => error!("Got wrong control frame, expected STOP."),
                 }
@@ -364,6 +369,15 @@ impl FrameStreamReader {
 
         if let Err(e) = block_on(self.response_sink.lock().unwrap().send_all(&mut stream)) {
             error!("Encountered error '{:#?}' while sending control frame.", e);
+        }
+    }
+
+    fn close_sink(&mut self) {
+        if let Err(e) = block_on(self.response_sink.lock().unwrap().close()) {
+            error!(
+                "Encountered error '{:#?}' while closing connection after FINISH.",
+                e
+            );
         }
     }
 }
