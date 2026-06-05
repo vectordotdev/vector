@@ -36,7 +36,9 @@ use crate::{
     },
     net,
     shutdown::ShutdownSignal,
-    sources::util::net::{SocketListenAddr, TcpNullAcker, TcpSource, try_bind_udp_socket},
+    sources::util::net::{
+        DisconnectMode, SocketListenAddr, TcpNullAcker, TcpSource, try_bind_udp_socket,
+    },
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsSourceConfig},
 };
@@ -100,6 +102,10 @@ pub enum Mode {
 
         /// The maximum number of TCP connections that are allowed at any given time.
         connection_limit: Option<u32>,
+
+        #[configurable(derived)]
+        #[serde(default)]
+        disconnect_mode: DisconnectMode,
     },
 
     /// Listen on UDP.
@@ -155,6 +161,7 @@ impl Default for SyslogConfig {
                 tls: None,
                 receive_buffer_bytes: None,
                 connection_limit: None,
+                disconnect_mode: DisconnectMode::Drain,
             },
             host_key: None,
             max_length: crate::serde::default_max_length(),
@@ -188,6 +195,7 @@ impl SourceConfig for SyslogConfig {
                 tls,
                 receive_buffer_bytes,
                 connection_limit,
+                disconnect_mode,
             } => {
                 let source = SyslogTcpSource {
                     max_length: self.max_length,
@@ -209,6 +217,7 @@ impl SourceConfig for SyslogConfig {
                     tls_client_metadata_key,
                     receive_buffer_bytes,
                     None,
+                    disconnect_mode,
                     cx,
                     false.into(),
                     connection_limit,
@@ -1146,6 +1155,7 @@ mod test {
                 tls: None,
                 receive_buffer_bytes: None,
                 connection_limit: None,
+                disconnect_mode: DisconnectMode::Drain,
             });
 
             let key = ComponentKey::from("in");
@@ -1357,6 +1367,7 @@ mod test {
                 tls: None,
                 receive_buffer_bytes: None,
                 connection_limit: None,
+                disconnect_mode: DisconnectMode::Drain,
             });
 
             let key = ComponentKey::from("in");
