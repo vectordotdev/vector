@@ -766,7 +766,45 @@ mod test {
         "DockerName": "vector"
     }"#;
 
-    const TASK_METADATA: &str = r#"{
+    const TASK_METADATA_EC2: &str = r#"{
+        "Cluster": "default",
+        "TaskARN": "arn:aws:ecs:us-east-1:123456789012:task/default/ec2",
+        "Family": "ec2-task",
+        "Revision": "3",
+        "ServiceName": "vector-service",
+        "DesiredStatus": "RUNNING",
+        "KnownStatus": "RUNNING",
+        "PullStartedAt": "2026-06-05T01:00:00Z",
+        "PullStoppedAt": "2026-06-05T01:00:01Z",
+        "AvailabilityZone": "us-east-1a",
+        "VPCID": "vpc-1234567890abcdef0",
+        "LaunchType": "EC2",
+        "Containers": [
+            {
+                "DockerId": "task-id-1111111111",
+                "Name": "vector",
+                "DockerName": "vector",
+                "Image": "public.ecr.aws/vector/vector:latest",
+                "ImageID": "sha256:vector-ec2",
+                "DesiredStatus": "RUNNING",
+                "KnownStatus": "RUNNING",
+                "Type": "NORMAL",
+                "ContainerARN": "arn:aws:ecs:us-east-1:123456789012:container/default/ec2/vector",
+                "LogDriver": "awslogs",
+                "RestartCount": 0
+            },
+            {
+                "DockerId": "pause-container-id",
+                "Name": "~internal~ecs~pause",
+                "DockerName": "ecs-internal-pause",
+                "Image": "amazon/amazon-ecs-pause:0.1.0",
+                "ImageID": "sha256:pause",
+                "Type": "CNI_PAUSE"
+            }
+        ]
+    }"#;
+
+    const TASK_METADATA_FARGATE: &str = r#"{
         "Cluster": "arn:aws:ecs:us-east-1:123456789012:cluster/example",
         "TaskARN": "arn:aws:ecs:us-east-1:123456789012:task/example/abc",
         "Family": "vector-task",
@@ -778,7 +816,6 @@ mod test {
         "PullStoppedAt": "2026-06-05T01:00:01Z",
         "AvailabilityZone": "us-east-1a",
         "LaunchType": "FARGATE",
-        "FaultInjectionEnabled": false,
         "Containers": [
             {
                 "DockerId": "task-id-1111111111",
@@ -809,6 +846,45 @@ mod test {
             }
         ]
     }"#;
+
+    const TASK_METADATA_MANAGED_INSTANCES: &str = r#"{
+        "Cluster": "arn:aws:ecs:us-east-1:123456789012:cluster/managed",
+        "TaskARN": "arn:aws:ecs:us-east-1:123456789012:task/managed/def",
+        "Family": "managed-task",
+        "Revision": "11",
+        "ServiceName": "managed-service",
+        "DesiredStatus": "RUNNING",
+        "KnownStatus": "RUNNING",
+        "Limits": { "CPU": 1, "Memory": 3072 },
+        "PullStartedAt": "2026-06-05T01:00:00Z",
+        "PullStoppedAt": "2026-06-05T01:00:01Z",
+        "AvailabilityZone": "us-east-1b",
+        "LaunchType": "MANAGED_INSTANCES",
+        "Containers": [
+            {
+                "DockerId": "task-id-1111111111",
+                "Name": "vector",
+                "DockerName": "vector",
+                "Image": "public.ecr.aws/vector/vector:latest",
+                "ImageID": "sha256:vector-managed",
+                "DesiredStatus": "RUNNING",
+                "KnownStatus": "RUNNING",
+                "Type": "NORMAL",
+                "ContainerARN": "arn:aws:ecs:us-east-1:123456789012:container/managed/def/vector",
+                "LogDriver": "awslogs",
+                "Snapshotter": "overlayfs",
+                "RestartCount": 1
+            }
+        ],
+        "ClockDrift": {
+            "ClockErrorBound": 0.14120749999999999,
+            "ReferenceTimestamp": "2026-06-05T01:10:00Z",
+            "ClockSynchronizationStatus": "SYNCHRONIZED"
+        },
+        "FaultInjectionEnabled": false
+    }"#;
+
+    const TASK_METADATA: &str = TASK_METADATA_FARGATE;
 
     async fn start_metadata_server() -> String {
         start_metadata_server_with_failures(0).await
@@ -1074,7 +1150,6 @@ mod test {
                     CONTAINER_NAME_KEY.into(),
                     CONTAINER_ID_KEY.into(),
                     CONTAINER_EXIT_CODE_KEY.into(),
-                    FAULT_INJECTION_ENABLED_KEY.into(),
                     SNAPSHOTTER_KEY.into(),
                 ],
                 ..Default::default()
@@ -1100,10 +1175,6 @@ mod test {
             assert_eq!(
                 log.get(event_path!(CONTAINER_EXIT_CODE_KEY)),
                 Some(&Value::from(0))
-            );
-            assert_eq!(
-                log.get(event_path!(FAULT_INJECTION_ENABLED_KEY)),
-                Some(&Value::from(false))
             );
             assert_eq!(
                 log.get(event_path!(SNAPSHOTTER_KEY)),
@@ -1281,6 +1352,44 @@ mod test {
         .await;
     }
 
+    #[test]
+    fn extracts_fields_from_all_documented_launch_type_examples() {
+        for (task_metadata, launch_type, snapshotter, fault_injection_enabled) in [
+            (TASK_METADATA_EC2, "EC2", None, None),
+            (TASK_METADATA_FARGATE, "FARGATE", Some("overlayfs"), None),
+            (
+                TASK_METADATA_MANAGED_INSTANCES,
+                "MANAGED_INSTANCES",
+                Some("overlayfs"),
+                Some(false),
+            ),
+        ] {
+            let task: JsonValue = serde_json::from_str(task_metadata).unwrap();
+            let container = find_container(&task, "vector").unwrap();
+
+            assert_eq!(
+                extract_field(LAUNCH_TYPE_KEY, &task, container).map(json_to_value),
+                Some(Value::from(launch_type))
+            );
+            assert_eq!(
+                extract_field(CONTAINER_NAME_KEY, &task, container).map(json_to_value),
+                Some(Value::from("vector"))
+            );
+            assert!(
+                extract_field(TASK_ARN_KEY, &task, container).is_some(),
+                "{launch_type} example should include a task ARN"
+            );
+            assert_eq!(
+                extract_field(SNAPSHOTTER_KEY, &task, container).map(json_to_value),
+                snapshotter.map(Value::from)
+            );
+            assert_eq!(
+                extract_field(FAULT_INJECTION_ENABLED_KEY, &task, container).map(json_to_value),
+                fault_injection_enabled.map(Value::from)
+            );
+        }
+    }
+
     #[tokio::test]
     #[serial]
     async fn default_endpoint_uses_environment() {
@@ -1345,7 +1454,7 @@ mod test {
             let endpoint = start_metadata_server().await;
             let transform_config = EcsMetadata {
                 endpoint: Some(endpoint),
-                fields: vec![RESTART_COUNT_KEY.into(), FAULT_INJECTION_ENABLED_KEY.into()],
+                fields: vec![RESTART_COUNT_KEY.into()],
                 ..Default::default()
             };
 
@@ -1361,10 +1470,7 @@ mod test {
                 metric.tag_value("aws.ecs.restart-count"),
                 Some("2".to_string())
             );
-            assert_eq!(
-                metric.tag_value("aws.ecs.fault-injection-enabled"),
-                Some("false".to_string())
-            );
+            assert_eq!(value_to_metric_tag(&Value::from(false)), "false");
 
             drop(tx);
             topology.stop().await;
