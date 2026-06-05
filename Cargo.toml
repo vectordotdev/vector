@@ -143,7 +143,7 @@ async-trait = { version = "0.1.89", default-features = false }
 base64 = { version = "0.22.1", default-features = false }
 bytes = { version = "1.11.1", default-features = false, features = ["serde"] }
 cfg-if = { version = "1.0.4", default-features = false }
-chrono = { version = "0.4.44", default-features = false, features = ["clock", "serde"] }
+chrono = { version = "0.4.45", default-features = false, features = ["clock", "serde"] }
 chrono-tz = { version = "0.10.4", default-features = false, features = ["serde"] }
 clap = { version = "4.5.60", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
 clap_complete = "4.6.5"
@@ -173,7 +173,7 @@ metrics-util = { version = "0.18.0", default-features = false, features = ["regi
 nom = { version = "8.0.0", default-features = false }
 ordered-float = { version = "4.6.0", default-features = false }
 pastey = { version = "0.2", default-features = false }
-pin-project = { version = "1.1.11", default-features = false }
+pin-project = { version = "1.1.13", default-features = false }
 proptest = { version = "1.11" }
 proptest-derive = { version = "0.6.0" }
 prost = { version = "0.12", default-features = false, features = ["std"] }
@@ -192,7 +192,7 @@ serde = { version = "1.0.219", default-features = false, features = ["alloc", "d
 serde_json = { version = "1.0.149", default-features = false, features = ["preserve_order", "raw_value", "std"] }
 serde_with = { version = "3.20.0", default-features = false, features = ["std", "macros", "chrono_0_4"] }
 serde_yaml = { version = "0.9.34", default-features = false }
-snafu = { version = "0.9.0", default-features = false, features = ["futures", "std"] }
+snafu = { version = "0.9.1", default-features = false, features = ["futures", "std"] }
 socket2 = { version = "0.5.10", default-features = false }
 tempfile = "3.27.0"
 tokio = { version = "1.49.0", default-features = false }
