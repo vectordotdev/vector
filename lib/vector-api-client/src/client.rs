@@ -9,10 +9,11 @@ use crate::{
     error::{Error, Result},
     proto::{
         GetAllocationTracingStatusRequest, GetAllocationTracingStatusResponse,
-        GetComponentsRequest, GetComponentsResponse, GetMetaRequest, GetMetaResponse, MetricName,
-        StreamComponentAllocatedBytesRequest, StreamComponentAllocatedBytesResponse,
-        StreamComponentMetricsRequest, StreamComponentMetricsResponse, StreamHeartbeatRequest,
-        StreamHeartbeatResponse, StreamOutputEventsRequest, StreamOutputEventsResponse,
+        GetComponentsRequest, GetComponentsResponse, GetMetaRequest, GetMetaResponse, MetricMode,
+        MetricName, RawComponentMetricValue, StreamComponentAllocatedBytesRequest,
+        StreamComponentAllocatedBytesResponse, StreamComponentMetricsRequest,
+        StreamComponentMetricsResponse, StreamHeartbeatRequest, StreamHeartbeatResponse,
+        StreamOutputEventsRequest, StreamOutputEventsResponse, StreamRawComponentMetricsRequest,
         StreamUptimeRequest, StreamUptimeResponse,
         observability_service_client::ObservabilityServiceClient,
     },
@@ -182,6 +183,30 @@ impl Client {
             .stream_component_metrics(StreamComponentMetricsRequest {
                 interval_ms,
                 metric: metric as i32,
+            })
+            .await?;
+        Ok(response.into_inner().map(|r| r.map_err(Error::from)))
+    }
+
+    /// Stream per-component values for any named internal metric.
+    ///
+    /// # Arguments
+    ///
+    /// * `metric_name` - Internal metric name (e.g. `"component_discarded_events_total"`, `"utilization"`)
+    /// * `mode` - Whether to stream cumulative totals or per-second throughput
+    /// * `interval_ms` - Update interval in milliseconds
+    pub async fn stream_raw_component_metrics(
+        &mut self,
+        metric_name: impl Into<String>,
+        mode: MetricMode,
+        interval_ms: i32,
+    ) -> Result<impl Stream<Item = Result<RawComponentMetricValue>>> {
+        let client = self.ensure_connected()?;
+        let response = client
+            .stream_raw_component_metrics(StreamRawComponentMetricsRequest {
+                interval_ms,
+                metric_name: metric_name.into(),
+                mode: mode as i32,
             })
             .await?;
         Ok(response.into_inner().map(|r| r.map_err(Error::from)))

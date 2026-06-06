@@ -46,6 +46,19 @@ pub enum EventType {
     /// Throughput values already normalized to per-second by the server
     SentEventsThroughputs(Vec<SentEventsMetric>),
     ErrorsTotals(Vec<IdentifiedMetric>),
+    DiscardedEventsTotals(Vec<IdentifiedMetric>),
+    /// Throughput values already normalized to per-second by the server
+    DiscardedEventsThroughputs(Vec<IdentifiedMetric>),
+    /// Buffer utilization as a ratio 0.0–1.0 per component
+    BufferUtilizations(Vec<(ComponentKey, f64)>),
+    /// Buffer fill as a ratio 0.0–1.0 per component (buffer_size_events / buffer_max_size_events)
+    BufferFills(Vec<(ComponentKey, f64)>),
+    /// Buffer-level dropped event totals per component (buffer_discarded_events_total by buffer_id)
+    BufferDiscardedTotals(Vec<IdentifiedMetric>),
+    /// Buffer-level dropped event throughputs (per-second) per component
+    BufferDiscardedThroughputs(Vec<IdentifiedMetric>),
+    /// Internal channel fill ratio (0.0–1.0) for sources and transforms
+    ChannelFills(Vec<(ComponentKey, f64)>),
     #[cfg(feature = "allocation-tracing")]
     AllocatedBytes(Vec<IdentifiedMetric>),
     ComponentAdded(ComponentRow),
@@ -144,6 +157,26 @@ pub enum SortColumn {
     Errors = 11,
     #[cfg(feature = "allocation-tracing")]
     MemoryUsed = 12,
+    #[cfg(not(feature = "allocation-tracing"))]
+    Discarded = 12,
+    #[cfg(feature = "allocation-tracing")]
+    Discarded = 13,
+    #[cfg(not(feature = "allocation-tracing"))]
+    BufferUtil = 13,
+    #[cfg(feature = "allocation-tracing")]
+    BufferUtil = 14,
+    #[cfg(not(feature = "allocation-tracing"))]
+    BufferFill = 14,
+    #[cfg(feature = "allocation-tracing")]
+    BufferFill = 15,
+    #[cfg(not(feature = "allocation-tracing"))]
+    BufDropped = 15,
+    #[cfg(feature = "allocation-tracing")]
+    BufDropped = 16,
+    #[cfg(not(feature = "allocation-tracing"))]
+    ChanFill = 16,
+    #[cfg(feature = "allocation-tracing")]
+    ChanFill = 17,
 }
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -165,6 +198,11 @@ impl SortColumn {
             SortColumn::EventsOut | SortColumn::EventsOutTotal => header == columns::EVENTS_OUT,
             SortColumn::BytesOut | SortColumn::BytesOutTotal => header == columns::BYTES_OUT,
             SortColumn::Errors => header == columns::ERRORS,
+            SortColumn::Discarded => header == columns::DISCARDED,
+            SortColumn::BufferUtil => header == columns::UTIL,
+            SortColumn::BufferFill => header == columns::FILL,
+            SortColumn::BufDropped => header == columns::BUF_DROPPED,
+            SortColumn::ChanFill => header == columns::CHAN_FILL,
             #[cfg(feature = "allocation-tracing")]
             SortColumn::MemoryUsed => header == columns::MEMORY_USED,
         }
@@ -186,6 +224,11 @@ impl SortColumn {
             columns::ERRORS,
             #[cfg(feature = "allocation-tracing")]
             columns::MEMORY_USED,
+            columns::DISCARDED,
+            columns::BUF_DROPPED,
+            columns::CHAN_FILL,
+            columns::UTIL,
+            columns::FILL,
         ]
     }
 }
@@ -220,6 +263,26 @@ impl From<usize> for SortColumn {
             11 => SortColumn::Errors,
             #[cfg(feature = "allocation-tracing")]
             12 => SortColumn::MemoryUsed,
+            #[cfg(not(feature = "allocation-tracing"))]
+            12 => SortColumn::Discarded,
+            #[cfg(feature = "allocation-tracing")]
+            13 => SortColumn::Discarded,
+            #[cfg(not(feature = "allocation-tracing"))]
+            13 => SortColumn::BufferUtil,
+            #[cfg(feature = "allocation-tracing")]
+            14 => SortColumn::BufferUtil,
+            #[cfg(not(feature = "allocation-tracing"))]
+            14 => SortColumn::BufferFill,
+            #[cfg(feature = "allocation-tracing")]
+            15 => SortColumn::BufferFill,
+            #[cfg(not(feature = "allocation-tracing"))]
+            15 => SortColumn::BufDropped,
+            #[cfg(feature = "allocation-tracing")]
+            16 => SortColumn::BufDropped,
+            #[cfg(not(feature = "allocation-tracing"))]
+            16 => SortColumn::ChanFill,
+            #[cfg(feature = "allocation-tracing")]
+            17 => SortColumn::ChanFill,
             _ => SortColumn::Id,
         }
     }
@@ -408,6 +471,18 @@ pub struct ComponentRow {
     #[cfg(feature = "allocation-tracing")]
     pub allocated_bytes: i64,
     pub errors: i64,
+    pub discarded_events_total: i64,
+    pub discarded_events_throughput_sec: i64,
+    pub buffer_discarded_total: i64,
+    pub buffer_discarded_throughput_sec: i64,
+    /// Internal channel fill ratio (source/transform channel, 0.0–1.0).
+    /// `None` for sinks (they have no internal input channel tracked here).
+    pub channel_fill: Option<f64>,
+    /// Buffer utilization ratio (0.0–1.0), `None` if not reported for this component.
+    pub buffer_utilization: Option<f64>,
+    /// Buffer fill ratio (buffer_size_events / buffer_max_size_events, 0.0–1.0).
+    /// `None` if this component has no configured buffer (e.g. sources, transforms).
+    pub buffer_fill: Option<f64>,
 }
 
 impl ComponentRow {
@@ -416,6 +491,28 @@ impl ComponentRow {
     pub fn has_displayable_outputs(&self) -> bool {
         self.outputs.len() > 1
             || (self.outputs.len() == 1 && !self.outputs.contains_key(DEFAULT_OUTPUT))
+    }
+
+    /// Buffer utilization as a fixed-point integer (scaled by 1_000_000) for `Ord`-based sorting.
+    /// Returns 0 when utilization is not available.
+    pub fn buffer_util_ord(&self) -> u64 {
+        self.buffer_utilization
+            .map(|v| (v * 1_000_000.0) as u64)
+            .unwrap_or(0)
+    }
+
+    /// Buffer fill as a fixed-point integer (scaled by 1_000_000) for `Ord`-based sorting.
+    /// Returns 0 when fill is not available.
+    pub fn buffer_fill_ord(&self) -> u64 {
+        self.buffer_fill
+            .map(|v| (v * 1_000_000.0) as u64)
+            .unwrap_or(0)
+    }
+
+    pub fn channel_fill_ord(&self) -> u64 {
+        self.channel_fill
+            .map(|v| (v * 1_000_000.0) as u64)
+            .unwrap_or(0)
     }
 }
 
@@ -508,6 +605,55 @@ pub async fn updater(mut event_rx: EventRx, mut state: State) -> StateRx {
                     for (key, v) in rows {
                         if let Some(r) = state.components.get_mut(&key) {
                             r.errors = v;
+                        }
+                    }
+                }
+                EventType::DiscardedEventsTotals(rows) => {
+                    for (key, v) in rows {
+                        if let Some(r) = state.components.get_mut(&key) {
+                            r.discarded_events_total = v;
+                        }
+                    }
+                }
+                EventType::DiscardedEventsThroughputs(rows) => {
+                    for (key, v) in rows {
+                        if let Some(r) = state.components.get_mut(&key) {
+                            r.discarded_events_throughput_sec = v;
+                        }
+                    }
+                }
+                EventType::BufferUtilizations(rows) => {
+                    for (key, v) in rows {
+                        if let Some(r) = state.components.get_mut(&key) {
+                            r.buffer_utilization = Some(v);
+                        }
+                    }
+                }
+                EventType::BufferFills(rows) => {
+                    for (key, v) in rows {
+                        if let Some(r) = state.components.get_mut(&key) {
+                            r.buffer_fill = Some(v);
+                        }
+                    }
+                }
+                EventType::BufferDiscardedTotals(rows) => {
+                    for (key, v) in rows {
+                        if let Some(r) = state.components.get_mut(&key) {
+                            r.buffer_discarded_total = v;
+                        }
+                    }
+                }
+                EventType::BufferDiscardedThroughputs(rows) => {
+                    for (key, v) in rows {
+                        if let Some(r) = state.components.get_mut(&key) {
+                            r.buffer_discarded_throughput_sec = v;
+                        }
+                    }
+                }
+                EventType::ChannelFills(rows) => {
+                    for (key, v) in rows {
+                        if let Some(r) = state.components.get_mut(&key) {
+                            r.channel_fill = Some(v);
                         }
                     }
                 }

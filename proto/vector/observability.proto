@@ -33,6 +33,12 @@ service ObservabilityService {
   // Replaces the former 9 per-metric streaming RPCs with a single unified endpoint.
   rpc StreamComponentMetrics(StreamComponentMetricsRequest) returns (stream StreamComponentMetricsResponse);
 
+  // Stream per-component values for any named internal metric.
+  // Accepts any metric name from Vector's internal registry (e.g. "component_discarded_events_total",
+  // "utilization"). Gauge metrics are returned as-is (float); counters support both TOTAL and
+  // THROUGHPUT modes.
+  rpc StreamRawComponentMetrics(StreamRawComponentMetricsRequest) returns (stream RawComponentMetricValue);
+
   // ========== Event Tapping ==========
 
   // Stream events from components matching the specified patterns (replaces vector tap)
@@ -97,6 +103,30 @@ message ComponentMetrics {
 message StreamComponentAllocatedBytesRequest {
   // Update interval in milliseconds
   int32 interval_ms = 1;
+}
+
+// Mode for streaming raw metrics: cumulative total or per-second throughput.
+enum MetricMode {
+  METRIC_MODE_UNSPECIFIED = 0;
+  METRIC_MODE_TOTAL = 1;
+  METRIC_MODE_THROUGHPUT = 2;
+}
+
+message StreamRawComponentMetricsRequest {
+  // Update interval in milliseconds
+  int32 interval_ms = 1;
+  // Internal metric name (e.g. "component_discarded_events_total", "utilization")
+  string metric_name = 2;
+  // Whether to stream cumulative totals or per-second throughput. Defaults to TOTAL.
+  MetricMode mode = 3;
+}
+
+// Per-component value for a raw (arbitrarily named) metric.
+// Gauge metrics are returned as their native float value; counter totals and
+// throughputs are also returned as float for a uniform response type.
+message RawComponentMetricValue {
+  string component_id = 1;
+  double value = 2;
 }
 
 // Identifies which per-component metric to stream via StreamComponentMetrics.

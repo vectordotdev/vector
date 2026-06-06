@@ -25,7 +25,8 @@ use vector_lib::tap::{
 use crate::event::{Metric, MetricValue};
 use crate::metrics::Controller;
 use crate::proto::observability::{
-    self, Component as ProtoComponent, ComponentType, EventNotification, TappedEvent, *,
+    self, Component as ProtoComponent, ComponentType, EventNotification, MetricMode,
+    RawComponentMetricValue, StreamRawComponentMetricsRequest, TappedEvent, *,
 };
 
 type BoxStream<T> = Pin<Box<dyn Stream<Item = Result<T, Status>> + Send>>;
@@ -41,14 +42,23 @@ fn get_metric_value(metric: &Metric) -> Option<f64> {
 
 /// Helper function to filter metrics by name and group by component_id tag
 fn filter_and_group_metrics(metrics: &[Metric], metric_name: &str) -> HashMap<String, f64> {
+    filter_and_group_metrics_by_tag(metrics, metric_name, "component_id")
+}
+
+/// Filter metrics by name and group summed values by an arbitrary tag.
+fn filter_and_group_metrics_by_tag(
+    metrics: &[Metric],
+    metric_name: &str,
+    tag: &str,
+) -> HashMap<String, f64> {
     let mut result = HashMap::new();
 
     for metric in metrics.iter().filter(|m| m.name() == metric_name) {
         if let Some(tags) = metric.tags()
-            && let Some(component_id) = tags.get("component_id")
+            && let Some(tag_value) = tags.get(tag)
             && let Some(value) = get_metric_value(metric)
         {
-            *result.entry(component_id.to_string()).or_insert(0.0) += value;
+            *result.entry(tag_value.to_string()).or_insert(0.0) += value;
         }
     }
 
@@ -240,6 +250,179 @@ fn metric_throughput_stream(
                                 },
                             )),
                         })
+                    })
+                    .collect::<Vec<_>>(),
+            )
+        })
+        .flatten(),
+    ))
+}
+
+/// Builds a stream that emits raw totals grouped by an arbitrary tag.
+///
+/// Most metrics use `"component_id"`; buffer-level metrics (e.g. `buffer_discarded_events_total`)
+/// are tagged with `"buffer_id"` instead, which equals the component key.
+fn raw_metric_totals_stream_by_tag(
+    duration: Duration,
+    metric_name: String,
+    tag: &'static str,
+) -> Result<BoxStream<RawComponentMetricValue>, Status> {
+    let controller = get_controller()?;
+    Ok(Box::pin(
+        tokio_stream::StreamExt::map(IntervalStream::new(interval(duration)), move |_| {
+            let metrics = controller.capture_metrics();
+            let values = filter_and_group_metrics_by_tag(&metrics, &metric_name, tag);
+            tokio_stream::iter(
+                values
+                    .into_iter()
+                    .map(|(component_id, value)| {
+                        Ok(RawComponentMetricValue {
+                            component_id,
+                            value,
+                        })
+                    })
+                    .collect::<Vec<_>>(),
+            )
+        })
+        .flatten(),
+    ))
+}
+
+fn raw_metric_totals_stream(
+    duration: Duration,
+    metric_name: String,
+) -> Result<BoxStream<RawComponentMetricValue>, Status> {
+    raw_metric_totals_stream_by_tag(duration, metric_name, "component_id")
+}
+
+/// Builds a stream that emits raw throughputs grouped by an arbitrary tag.
+fn raw_metric_throughput_stream_by_tag(
+    duration: Duration,
+    metric_name: String,
+    tag: &'static str,
+) -> Result<BoxStream<RawComponentMetricValue>, Status> {
+    let controller = get_controller()?;
+    let interval_secs = duration.as_secs_f64();
+    let previous_values = Arc::new(Mutex::new(HashMap::new()));
+    Ok(Box::pin(
+        tokio_stream::StreamExt::map(IntervalStream::new(interval(duration)), move |_| {
+            let metrics = controller.capture_metrics();
+            let current_values = filter_and_group_metrics_by_tag(&metrics, &metric_name, tag);
+            let mut prev = match previous_values.lock() {
+                Ok(guard) => guard,
+                Err(poisoned) => {
+                    error!("Mutex poisoned for raw metric throughput, recovering.");
+                    poisoned.into_inner()
+                }
+            };
+            let throughputs = calculate_throughput(&current_values, &prev, interval_secs);
+            *prev = current_values;
+            tokio_stream::iter(
+                throughputs
+                    .into_iter()
+                    .map(|(component_id, value)| {
+                        Ok(RawComponentMetricValue {
+                            component_id,
+                            value,
+                        })
+                    })
+                    .collect::<Vec<_>>(),
+            )
+        })
+        .flatten(),
+    ))
+}
+
+fn raw_metric_throughput_stream(
+    duration: Duration,
+    metric_name: String,
+) -> Result<BoxStream<RawComponentMetricValue>, Status> {
+    raw_metric_throughput_stream_by_tag(duration, metric_name, "component_id")
+}
+
+/// Builds a stream that emits per-component buffer fill ratio (0.0–1.0).
+///
+/// Buffer metrics are tagged with `buffer_id` (= component key) rather than `component_id`,
+/// so this function uses a dedicated grouping helper. Values are summed across all buffer stages
+/// before computing the ratio, so multi-stage (overflow) buffers are reflected correctly.
+fn buffer_fill_stream(duration: Duration) -> Result<BoxStream<RawComponentMetricValue>, Status> {
+    let controller = get_controller()?;
+    Ok(Box::pin(
+        tokio_stream::StreamExt::map(IntervalStream::new(interval(duration)), move |_| {
+            let metrics = controller.capture_metrics();
+            let sizes =
+                filter_and_group_metrics_by_tag(&metrics, "buffer_size_events", "buffer_id");
+            let maxes =
+                filter_and_group_metrics_by_tag(&metrics, "buffer_max_size_events", "buffer_id");
+
+            tokio_stream::iter(
+                sizes
+                    .into_iter()
+                    .filter_map(|(buffer_id, size)| {
+                        let max = *maxes.get(&buffer_id)?;
+                        if max <= 0.0 {
+                            return None;
+                        }
+                        Some(Ok(RawComponentMetricValue {
+                            component_id: buffer_id,
+                            value: (size / max).clamp(0.0, 1.0),
+                        }))
+                    })
+                    .collect::<Vec<_>>(),
+            )
+        })
+        .flatten(),
+    ))
+}
+
+/// Builds a stream that emits internal channel fill ratios (0.0–1.0) per component.
+///
+/// Covers both source output channels (`source_buffer_*`) and transform input channels
+/// (`transform_buffer_*`). Both are tagged with `component_id` via the tracing context
+/// (unlike sink buffers which use `buffer_id`), so standard grouping applies.
+/// Values are summed across outputs before computing the ratio for multi-output sources.
+fn channel_fill_stream(duration: Duration) -> Result<BoxStream<RawComponentMetricValue>, Status> {
+    let controller = get_controller()?;
+    Ok(Box::pin(
+        tokio_stream::StreamExt::map(IntervalStream::new(interval(duration)), move |_| {
+            let metrics = controller.capture_metrics();
+
+            // Merge source and transform channel occupancy and capacity under component_id.
+            let mut sizes: HashMap<String, f64> = HashMap::new();
+            let mut maxes: HashMap<String, f64> = HashMap::new();
+            for (id, v) in
+                filter_and_group_metrics(&metrics, "source_buffer_utilization_level")
+                    .into_iter()
+                    .chain(
+                        filter_and_group_metrics(&metrics, "transform_buffer_utilization_level")
+                            .into_iter(),
+                    )
+            {
+                *sizes.entry(id).or_insert(0.0) += v;
+            }
+            for (id, v) in
+                filter_and_group_metrics(&metrics, "source_buffer_max_size_events")
+                    .into_iter()
+                    .chain(
+                        filter_and_group_metrics(&metrics, "transform_buffer_max_size_events")
+                            .into_iter(),
+                    )
+            {
+                *maxes.entry(id).or_insert(0.0) += v;
+            }
+
+            tokio_stream::iter(
+                sizes
+                    .into_iter()
+                    .filter_map(|(component_id, size)| {
+                        let max = *maxes.get(&component_id)?;
+                        if max <= 0.0 {
+                            return None;
+                        }
+                        Some(Ok(RawComponentMetricValue {
+                            component_id,
+                            value: (size / max).clamp(0.0, 1.0),
+                        }))
                     })
                     .collect::<Vec<_>>(),
             )
@@ -630,6 +813,55 @@ impl observability::Service for ObservabilityService {
             }
             MetricName::SentBytesThroughput => {
                 metric_throughput_stream(duration, "component_sent_bytes_total")?
+            }
+        };
+
+        Ok(Response::new(stream))
+    }
+
+    type StreamRawComponentMetricsStream = BoxStream<RawComponentMetricValue>;
+
+    async fn stream_raw_component_metrics(
+        &self,
+        request: Request<StreamRawComponentMetricsRequest>,
+    ) -> Result<Response<Self::StreamRawComponentMetricsStream>, Status> {
+        let req = request.into_inner();
+        let duration = Duration::from_millis(validate_interval_ms(req.interval_ms)?);
+
+        if req.metric_name.is_empty() {
+            return Err(Status::invalid_argument("metric_name must not be empty"));
+        }
+
+        // "buffer_fill" is a synthetic derived metric: buffer_size_events / buffer_max_size_events
+        // grouped by buffer_id (= component key). Mode is ignored since it is always a ratio.
+        if req.metric_name == "buffer_fill" {
+            return Ok(Response::new(buffer_fill_stream(duration)?));
+        }
+
+        // Internal channel fill: source_buffer_* and transform_buffer_* grouped by component_id.
+        if req.metric_name == "channel_fill" {
+            return Ok(Response::new(channel_fill_stream(duration)?));
+        }
+
+        // Buffer-level drop counters are tagged with buffer_id, not component_id.
+        if req.metric_name == "buffer_discarded_events_total" {
+            let mode = MetricMode::try_from(req.mode).unwrap_or(MetricMode::Unspecified);
+            let stream = match mode {
+                MetricMode::Throughput => {
+                    raw_metric_throughput_stream_by_tag(duration, req.metric_name, "buffer_id")?
+                }
+                MetricMode::Unspecified | MetricMode::Total => {
+                    raw_metric_totals_stream_by_tag(duration, req.metric_name, "buffer_id")?
+                }
+            };
+            return Ok(Response::new(stream));
+        }
+
+        let mode = MetricMode::try_from(req.mode).unwrap_or(MetricMode::Unspecified);
+        let stream = match mode {
+            MetricMode::Throughput => raw_metric_throughput_stream(duration, req.metric_name)?,
+            MetricMode::Unspecified | MetricMode::Total => {
+                raw_metric_totals_stream(duration, req.metric_name)?
             }
         };
 
