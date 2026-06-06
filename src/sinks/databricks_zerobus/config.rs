@@ -85,27 +85,49 @@ pub struct ZerobusSinkConfig {
     /// The Zerobus ingestion endpoint URL.
     ///
     /// This should be the full URL to the Zerobus ingestion service.
-    #[configurable(metadata(docs::examples = "https://ingest.dev.databricks.com"))]
-    #[configurable(metadata(docs::examples = "https://ingest.prod.databricks.com"))]
+    ///
+    /// See the [Databricks Zerobus documentation][zerobus_endpoint] to find your workspace URL and
+    /// Zerobus ingest endpoint.
+    ///
+    /// [zerobus_endpoint]: https://docs.databricks.com/aws/en/ingestion/zerobus-ingest#get-your-workspace-url-and-zerobus-ingest-endpoint
+    #[configurable(metadata(
+        docs::examples = "https://1234567890123456.zerobus.us-west-2.cloud.databricks.com"
+    ))]
+    #[configurable(metadata(
+        docs::examples = "https://6543210987654321.zerobus.us-east-1.cloud.databricks.com"
+    ))]
     pub ingestion_endpoint: String,
 
     /// The Unity Catalog table name to write to.
     ///
     /// This should be in the format `catalog.schema.table`.
-    #[configurable(metadata(docs::examples = "logging_platform.my_team.logs"))]
+    ///
+    /// See the [Databricks Zerobus documentation][zerobus_table] to create or identify the target
+    /// table.
+    ///
+    /// [zerobus_table]: https://docs.databricks.com/aws/en/ingestion/zerobus-ingest#create-or-identify-the-target-table
+    #[configurable(metadata(docs::examples = "main.default.logs"))]
     #[configurable(metadata(docs::examples = "main.default.vector_logs"))]
     pub table_name: String,
 
     /// The Unity Catalog endpoint URL.
     ///
     /// This is used for authentication and table metadata.
-    #[configurable(metadata(
-        docs::examples = "https://dbc-e2f0eb31-2b0e.staging.cloud.databricks.com"
-    ))]
-    #[configurable(metadata(docs::examples = "https://your-workspace.cloud.databricks.com"))]
+    ///
+    /// See the [Databricks Zerobus documentation][zerobus_endpoint] to find your workspace URL and
+    /// Zerobus ingest endpoint.
+    ///
+    /// [zerobus_endpoint]: https://docs.databricks.com/aws/en/ingestion/zerobus-ingest#get-your-workspace-url-and-zerobus-ingest-endpoint
+    #[configurable(metadata(docs::examples = "https://dbc-a1b2c3d4-e5f6.cloud.databricks.com"))]
+    #[configurable(metadata(docs::examples = "https://dbc-f6e5d4c3-b2a1.cloud.databricks.com"))]
     pub unity_catalog_endpoint: String,
 
     /// Databricks authentication configuration.
+    ///
+    /// See the [Databricks Zerobus documentation][zerobus_service_principal] to create a service
+    /// principal and grant it permissions to write to the target table.
+    ///
+    /// [zerobus_service_principal]: https://docs.databricks.com/aws/en/ingestion/zerobus-ingest#create-a-service-principal-and-grant-permissions
     #[configurable(derived)]
     pub auth: DatabricksAuthentication,
 
@@ -133,9 +155,10 @@ pub struct ZerobusSinkConfig {
 impl GenerateConfig for ZerobusSinkConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            ingestion_endpoint: "https://ingest.dev.databricks.com".to_string(),
-            table_name: "catalog.schema.table".to_string(),
-            unity_catalog_endpoint: "https://your-workspace.cloud.databricks.com".to_string(),
+            ingestion_endpoint: "https://1234567890123456.zerobus.us-west-2.cloud.databricks.com"
+                .to_string(),
+            table_name: "main.default.logs".to_string(),
+            unity_catalog_endpoint: "https://dbc-a1b2c3d4-e5f6.cloud.databricks.com".to_string(),
             auth: DatabricksAuthentication::OAuth {
                 client_id: SensitiveString::from("${DATABRICKS_CLIENT_ID}".to_string()),
                 client_secret: SensitiveString::from("${DATABRICKS_CLIENT_SECRET}".to_string()),
@@ -232,11 +255,13 @@ impl ZerobusSinkConfig {
         }
 
         if let Some(max_bytes) = self.batch.max_bytes {
-            // Zerobus SDK limits max bytes to 10MB. This cap is a conservative safety limit:
-            // it's measured against Vector's pre-serialization sizing, not the protobuf bytes
-            // the SDK actually sends. Vector's pre-serialization size is generally larger than
-            // the SDK's protobuf-encoded size, so enforcing the 10MB cap here ensures the SDK's
-            // 10MB limit cannot be exceeded at runtime.
+            // Zerobus SDK limits max bytes to 10MB. This cap is a coarse safety
+            // limit: it's measured against Vector's pre-serialization (estimated
+            // JSON) sizing, not the encoded Arrow bytes the SDK actually sends.
+            // The two differ — for numeric-heavy schemas the encoded Arrow batch
+            // can be larger than the source events — so a batch configured right
+            // at the boundary may still exceed the SDK's limit; lower max_bytes to
+            // leave headroom if you see SDK-side size errors.
             if max_bytes > 10_000_000 {
                 return Err(ZerobusSinkError::ConfigError {
                     message: "max_bytes must be less than or equal to 10MB".to_string(),
