@@ -181,9 +181,11 @@ impl Deserializer for OtlpDeserializer {
                     }
                 }
                 OtlpSignalType::Traces => {
-                    // TODO: <https://github.com/vectordotdev/vector/issues/25045>
+                    // Always use LogNamespace::Vector for traces to avoid spurious timestamp injection.
+                    // The log_namespace concept is logs-specific and doesn't apply to trace events.
+                    // See: https://github.com/vectordotdev/vector/issues/25045
                     if let Ok(mut events) =
-                        self.traces_deserializer.parse(bytes.clone(), log_namespace)
+                        self.traces_deserializer.parse(bytes.clone(), LogNamespace::Vector)
                         && let Some(Event::Log(log)) = events.first()
                         && log.get(RESOURCE_SPANS_JSON_FIELD).is_some()
                     {
@@ -435,5 +437,40 @@ mod tests {
         let log_bytes = create_logs_request_bytes();
         let result = deserializer.parse(log_bytes, LogNamespace::Legacy);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn deserialize_traces_with_legacy_namespace_should_not_inject_timestamp() {
+        use vector_core::config::log_schema;
+
+        // This test verifies the fix for issue #25045
+        // When log_namespace is Legacy, the ProtobufDeserializer injects a timestamp
+        // into log events, but this behavior should NOT apply to trace events.
+        let deserializer = OtlpDeserializer::default();
+        let trace_bytes = create_traces_request_bytes();
+
+        // Parse with Legacy namespace
+        let events = deserializer
+            .parse(trace_bytes, LogNamespace::Legacy)
+            .unwrap();
+
+        assert_eq!(events.len(), 1);
+        assert!(matches!(events[0], Event::Trace(_)));
+
+        let trace = events[0].as_trace();
+
+        // Verify that no spurious timestamp was injected
+        // The timestamp field should not exist at the root level
+        if let Some(timestamp_key) = log_schema().timestamp_key_target_path() {
+            assert!(
+                trace.get(timestamp_key).is_none(),
+                "Trace event should not have spurious timestamp field '{}' injected when using LogNamespace::Legacy",
+                timestamp_key
+            );
+        }
+
+        // The trace should still have the OTLP trace data
+        assert!(trace.get(RESOURCE_SPANS_JSON_FIELD).is_some());
+        validate_trace_ids(trace.value());
     }
 }
