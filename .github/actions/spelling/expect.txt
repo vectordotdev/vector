@@ -151,6 +151,7 @@ demoing
 demux
 dependant
 dereferenceable
+deser
 desync
 developerguide
 DFm
@@ -641,6 +642,7 @@ versionable
 viceversa
 visualising
 VMs
+vnd
 vrl
 vsize
 vts
