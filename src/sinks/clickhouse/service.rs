@@ -146,8 +146,8 @@ fn set_uri_query(
             "query",
             format!(
                 "INSERT INTO \"{}\".\"{}\" FORMAT {}",
-                database,
-                table.replace('\"', "\\\""),
+                database.replace('\\', "\\\\").replace('"', "\"\""),
+                table.replace('\\', "\\\\").replace('"', "\"\""),
                 format
             )
             .as_str(),
@@ -249,7 +249,7 @@ mod tests {
             "http://localhost:80/?\
                                      input_format_import_nested_json=1&\
                                      input_format_skip_unknown_fields=0&\
-                                     query=INSERT+INTO+%22my_database%22.%22my_%5C%22table%5C%22%22+FORMAT+JSONEachRow"
+                                     query=INSERT+INTO+%22my_database%22.%22my_%22%22table%22%22%22+FORMAT+JSONEachRow"
         );
 
         let uri = set_uri_query(
@@ -269,7 +269,7 @@ mod tests {
                                      input_format_import_nested_json=1&\
                                      input_format_skip_unknown_fields=1&\
                                      date_time_input_format=best_effort&\
-                                     query=INSERT+INTO+%22my_database%22.%22my_%5C%22table%5C%22%22+FORMAT+JSONAsObject"
+                                     query=INSERT+INTO+%22my_database%22.%22my_%22%22table%22%22%22+FORMAT+JSONAsObject"
         );
 
         let uri = set_uri_query(
@@ -288,7 +288,7 @@ mod tests {
             "http://localhost:80/?\
                                      input_format_import_nested_json=1&\
                                      date_time_input_format=best_effort&\
-                                     query=INSERT+INTO+%22my_database%22.%22my_%5C%22table%5C%22%22+FORMAT+JSONAsObject"
+                                     query=INSERT+INTO+%22my_database%22.%22my_%22%22table%22%22%22+FORMAT+JSONAsObject"
         );
 
         let uri = set_uri_query(
@@ -317,8 +317,74 @@ mod tests {
                                      async_insert=1&\
                                      wait_for_async_insert=1&\
                                      wait_for_async_insert_timeout=500&\
-                                     query=INSERT+INTO+%22my_database%22.%22my_%5C%22table%5C%22%22+FORMAT+JSONAsObject"
+                                     query=INSERT+INTO+%22my_database%22.%22my_%22%22table%22%22%22+FORMAT+JSONAsObject"
         );
+    }
+
+    #[test]
+    fn identifier_escaping() {
+        fn rendered_query(database: &str, table: &str) -> String {
+            let uri = set_uri_query(
+                &"http://localhost:80".parse().unwrap(),
+                database,
+                table,
+                Format::JsonEachRow,
+                None,
+                false,
+                false,
+                QuerySettingsConfig::default(),
+            )
+            .unwrap();
+            url::form_urlencoded::parse(uri.query().unwrap_or_default().as_bytes())
+                .find(|(k, _)| k == "query")
+                .map(|(_, v)| v.into_owned())
+                .unwrap_or_default()
+        }
+
+        // (database, table, expected SQL fragment)
+        let cases: &[(&str, &str, &str)] = &[
+            // plain identifiers pass through unchanged
+            (
+                "my_db",
+                "my_table",
+                r#"INSERT INTO "my_db"."my_table" FORMAT JSONEachRow"#,
+            ),
+            // `"` in table is doubled (SQL standard)
+            (
+                "my_db",
+                r#"my_"table""#,
+                r#"INSERT INTO "my_db"."my_""table""" FORMAT JSONEachRow"#,
+            ),
+            // `"` in database is doubled
+            (
+                r#"my_"db""#,
+                "my_table",
+                r#"INSERT INTO "my_""db"""."my_table" FORMAT JSONEachRow"#,
+            ),
+            // injection payload: attacker sets database to `valid_db"."other_table" --`
+            // without fix: INSERT INTO "valid_db"."other_table" --"."my_table" ...
+            // with fix:    the `"` chars are doubled, neutralising the breakout
+            (
+                r#"valid_db"."other_table" --"#,
+                "my_table",
+                r#"INSERT INTO "valid_db"".""other_table"" --"."my_table" FORMAT JSONEachRow"#,
+            ),
+            // backslash before `"` must be doubled first so ClickHouse cannot
+            // interpret `\"` as an escaped quote rather than a closing delimiter
+            (
+                "db_with_\\\"",
+                "my_table",
+                "INSERT INTO \"db_with_\\\\\"\"\".\"my_table\" FORMAT JSONEachRow",
+            ),
+        ];
+
+        for (db, table, expected) in cases {
+            assert_eq!(
+                rendered_query(db, table),
+                *expected,
+                "failed for db={db:?} table={table:?}"
+            );
+        }
     }
 
     #[test]
