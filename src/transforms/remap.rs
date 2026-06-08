@@ -1601,6 +1601,7 @@ mod tests {
         out.primary.into_events().next()
     }
 
+    #[allow(clippy::result_large_err)]
     fn transform_one_fallible(
         ft: &mut dyn SyncTransform,
         event: Event,

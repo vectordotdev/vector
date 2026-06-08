@@ -145,6 +145,7 @@ impl From<Trace> for super::TraceEvent {
 }
 
 impl From<MetricValue> for super::MetricValue {
+    #[allow(clippy::too_many_lines)]
     fn from(value: MetricValue) -> Self {
         match value {
             MetricValue::Counter(counter) => Self::Counter {
@@ -200,6 +201,76 @@ impl From<MetricValue> for super::MetricValue {
                     sketch: ddsketch.into(),
                 },
             },
+            MetricValue::NativeHistogram(h) => {
+                use super::metric::{
+                    NativeHistogramBuckets, NativeHistogramCount, NativeHistogramResetHint,
+                    NativeHistogramSpan,
+                };
+                use native_histogram::{Count, ResetHint, ZeroCount};
+
+                let count = match h.count {
+                    Some(Count::CountInt(v)) => NativeHistogramCount::Integer(v),
+                    Some(Count::CountFloat(v)) => NativeHistogramCount::Float(v),
+                    None => NativeHistogramCount::Integer(0),
+                };
+                let zero_count = match h.zero_count {
+                    Some(ZeroCount::ZeroCountInt(v)) => NativeHistogramCount::Integer(v),
+                    Some(ZeroCount::ZeroCountFloat(v)) => NativeHistogramCount::Float(v),
+                    None => NativeHistogramCount::Integer(0),
+                };
+                let positive_buckets = if !h.positive_deltas.is_empty() {
+                    NativeHistogramBuckets::IntegerDeltas(h.positive_deltas)
+                } else if !h.positive_counts.is_empty() {
+                    NativeHistogramBuckets::FloatCounts(h.positive_counts)
+                } else if count.is_float() {
+                    NativeHistogramBuckets::FloatCounts(Vec::new())
+                } else {
+                    NativeHistogramBuckets::IntegerDeltas(Vec::new())
+                };
+                let negative_buckets = if !h.negative_deltas.is_empty() {
+                    NativeHistogramBuckets::IntegerDeltas(h.negative_deltas)
+                } else if !h.negative_counts.is_empty() {
+                    NativeHistogramBuckets::FloatCounts(h.negative_counts)
+                } else if count.is_float() {
+                    NativeHistogramBuckets::FloatCounts(Vec::new())
+                } else {
+                    NativeHistogramBuckets::IntegerDeltas(Vec::new())
+                };
+                let reset_hint =
+                    match ResetHint::try_from(h.reset_hint).unwrap_or(ResetHint::Unknown) {
+                        ResetHint::Unknown => NativeHistogramResetHint::Unknown,
+                        ResetHint::Yes => NativeHistogramResetHint::Yes,
+                        ResetHint::No => NativeHistogramResetHint::No,
+                        ResetHint::Gauge => NativeHistogramResetHint::Gauge,
+                    };
+
+                Self::NativeHistogram {
+                    count,
+                    sum: h.sum,
+                    schema: h.schema,
+                    zero_threshold: h.zero_threshold,
+                    zero_count,
+                    positive_spans: h
+                        .positive_spans
+                        .into_iter()
+                        .map(|s| NativeHistogramSpan {
+                            offset: s.offset,
+                            length: s.length,
+                        })
+                        .collect(),
+                    positive_buckets,
+                    negative_spans: h
+                        .negative_spans
+                        .into_iter()
+                        .map(|s| NativeHistogramSpan {
+                            offset: s.offset,
+                            length: s.length,
+                        })
+                        .collect(),
+                    negative_buckets,
+                    reset_hint,
+                }
+            }
         }
     }
 }
@@ -357,6 +428,7 @@ impl From<super::Metric> for Metric {
 }
 
 impl From<super::MetricValue> for MetricValue {
+    #[allow(clippy::too_many_lines)]
     fn from(value: super::MetricValue) -> Self {
         match value {
             super::MetricValue::Counter { value } => Self::Counter(Counter { value }),
@@ -412,6 +484,73 @@ impl From<super::MetricValue> for MetricValue {
                     })
                 }
             },
+            super::MetricValue::NativeHistogram {
+                count,
+                sum,
+                schema,
+                zero_threshold,
+                zero_count,
+                positive_spans,
+                positive_buckets,
+                negative_spans,
+                negative_buckets,
+                reset_hint,
+            } => {
+                use super::metric::{
+                    NativeHistogramBuckets, NativeHistogramCount, NativeHistogramResetHint,
+                };
+                use native_histogram::{Count, ResetHint, ZeroCount};
+
+                let proto_count = match count {
+                    NativeHistogramCount::Integer(v) => Count::CountInt(v),
+                    NativeHistogramCount::Float(v) => Count::CountFloat(v),
+                };
+                let proto_zero_count = match zero_count {
+                    NativeHistogramCount::Integer(v) => ZeroCount::ZeroCountInt(v),
+                    NativeHistogramCount::Float(v) => ZeroCount::ZeroCountFloat(v),
+                };
+                let proto_reset_hint = match reset_hint {
+                    NativeHistogramResetHint::Unknown => ResetHint::Unknown,
+                    NativeHistogramResetHint::Yes => ResetHint::Yes,
+                    NativeHistogramResetHint::No => ResetHint::No,
+                    NativeHistogramResetHint::Gauge => ResetHint::Gauge,
+                };
+                let (positive_deltas, positive_counts) = match positive_buckets {
+                    NativeHistogramBuckets::IntegerDeltas(d) => (d, Vec::new()),
+                    NativeHistogramBuckets::FloatCounts(c) => (Vec::new(), c),
+                };
+                let (negative_deltas, negative_counts) = match negative_buckets {
+                    NativeHistogramBuckets::IntegerDeltas(d) => (d, Vec::new()),
+                    NativeHistogramBuckets::FloatCounts(c) => (Vec::new(), c),
+                };
+
+                Self::NativeHistogram(NativeHistogram {
+                    count: Some(proto_count),
+                    sum,
+                    schema,
+                    zero_threshold,
+                    zero_count: Some(proto_zero_count),
+                    positive_spans: positive_spans
+                        .into_iter()
+                        .map(|s| native_histogram::BucketSpan {
+                            offset: s.offset,
+                            length: s.length,
+                        })
+                        .collect(),
+                    positive_deltas,
+                    positive_counts,
+                    negative_spans: negative_spans
+                        .into_iter()
+                        .map(|s| native_histogram::BucketSpan {
+                            offset: s.offset,
+                            length: s.length,
+                        })
+                        .collect(),
+                    negative_deltas,
+                    negative_counts,
+                    reset_hint: proto_reset_hint as i32,
+                })
+            }
         }
     }
 }
