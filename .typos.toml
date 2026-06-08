@@ -22,6 +22,11 @@ Ede = "Ede"
 EDE = "EDE"
 # "DELETEs" (plural of the HTTP verb DELETE) contains "DELET" which typos flags
 DELET = "DELET"
+# Intentional misspelling used as an example in the VRL error diagnostics RFC
+strng = "strng"
+# Historical PR titles preserved verbatim in release notes
+wilcards = "wilcards"
+typs = "typs"
 # GitHub handles used in changelog/release `authors:` lines
 pront = "pront"
 aso = "aso"
