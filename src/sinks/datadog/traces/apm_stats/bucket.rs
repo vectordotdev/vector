@@ -176,7 +176,10 @@ impl Bucket {
         aggkey: AggregationKey,
         payload_tags: &[String],
     ) {
-        if !payload_tags.is_empty() {
+        // The Datadog trace-agent only carries container tags forward when the payload can
+        // be tied to a concrete container ID. Otherwise different containers can collapse
+        // into the same payload key and inherit unrelated tags.
+        if !payload_tags.is_empty() && !aggkey.payload_key.container_id.is_empty() {
             self.payload_tags
                 .entry(aggkey.payload_key.clone())
                 .or_insert_with(|| payload_tags.to_vec());

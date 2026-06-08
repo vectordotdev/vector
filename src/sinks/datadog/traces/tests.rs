@@ -357,6 +357,44 @@ async fn stats_payload_has_container_tags() {
 }
 
 #[tokio::test]
+async fn stats_payload_ignores_container_tags_without_container_id() {
+    let mut tagged_trace = TraceEvent::default();
+    tagged_trace.insert(
+        event_path!("tags"),
+        json!({
+            "_dd.tags.container": "location:container_location"
+        }),
+    );
+    tagged_trace.insert(
+        event_path!("spans"),
+        Value::Array(vec![Value::from(simple_span("foo".to_string()))]),
+    );
+
+    let mut untagged_trace = TraceEvent::default();
+    untagged_trace.insert(
+        event_path!("spans"),
+        Value::Array(vec![Value::from(simple_span("bar".to_string()))]),
+    );
+
+    let mut agg = Aggregator::new(Arc::from("a_key"));
+    let pkey = default_partition_key();
+    agg.handle_trace(&pkey, &tagged_trace);
+    agg.handle_trace(&pkey, &untagged_trace);
+
+    let flush = agg.flush(true);
+    assert_eq!(flush.len(), 1);
+
+    let csp = &flush[0];
+    assert!(
+        csp.tags.is_empty(),
+        "expected no tags in stats payload without container_id, got {:?}",
+        csp.tags
+    );
+    assert_eq!(csp.stats.len(), 1);
+    assert_eq!(csp.stats[0].stats.len(), 2);
+}
+
+#[tokio::test]
 async fn stats_payload_ignores_tags_from_non_stats_traces() {
     let mut non_stats_span = simple_span("foo".to_string());
     non_stats_span.insert("metrics".into(), Value::Object(ObjectMap::new()));
