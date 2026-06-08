@@ -355,7 +355,7 @@ struct ConventionalParts {
 impl ConventionalParts {
     fn parse(message: &str) -> Self {
         let re = Regex::new(
-            r"^(?P<type>[a-z]*)(\((?P<scope>[a-zA-Z0-9_, ]*)\))?(?P<breaking>!)?: (?P<desc>.*?)( \(#(?P<pr>[0-9]+)\))?$",
+            r"^(?P<type>[a-z]*)(\((?P<scope>[a-zA-Z0-9_, -]*)\))?(?P<breaking>!)?: (?P<desc>.*?)( \(#(?P<pr>[0-9]+)\))?$",
         )
         .unwrap();
 
@@ -723,7 +723,7 @@ mod tests {
 
     #[test]
     fn commit_validate_scope_is_optional_for_all_types() {
-        for t in &["feat", "enhancement", "fix", "chore", "docs"] {
+        for t in ALLOWED_TYPES {
             let c = Commit {
                 sha: "x".into(),
                 author: "a".into(),

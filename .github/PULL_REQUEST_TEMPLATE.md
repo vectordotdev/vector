@@ -60,9 +60,9 @@ Changes to CI, website, playground and similar are generally not considered user
 
   <type>(<scope>)!: <description>
 
-  * `type` = chore, enhancement, feat, fix, docs, revert
+  * `type` = chore, enhancement, feat, fix, docs, revert, perf
   * `!` = OPTIONAL: signals a breaking change
-  * `scope` = Optional but appreciated; free-form (e.g. component name, subsystem)
+  * `scope` = Optional but appreciated; letters, digits, spaces, hyphens, underscores (e.g. `kafka source`, `amazon-linux`)
   * `description` = short description of the change
 
 Examples:
