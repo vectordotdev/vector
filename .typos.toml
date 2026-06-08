@@ -22,6 +22,8 @@ extend-exclude = [
 ede = "ede"
 Ede = "Ede"
 EDE = "EDE"
+# "DELETEs" (plural of the HTTP verb DELETE) contains "DELET" which typos flags
+DELET = "DELET"
 # GitHub handles used in changelog/release `authors:` lines
 pront = "pront"
 aso = "aso"
