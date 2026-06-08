@@ -1,0 +1,96 @@
+[files]
+extend-exclude = [
+  # Binary/fuzz test data
+  "lib/codecs/tests/data/",
+  # Classic novel used in benchmarks
+  "benches/codecs/moby_dick.txt",
+  # Third-party license files
+  "licenses/",
+  "LICENSE-3rdparty.csv",
+  # Historical release notes — typos in old entries are not worth fixing
+  "website/cue/reference/releases/",
+  # Historical RFCs — immutable design documents
+  "rfcs/",
+  # Old test artifacts
+  "testing/",
+  # External data files
+  "lib/vector-vrl/tests/resources/public_suffix_list.dat",
+  # GCP integration test fixtures — contain base64-encoded PEM certificate data
+  "tests/integration/gcp/config/",
+  # Integration test log fixtures — contain binary/sampled log data
+  "tests/data/",
+  # Generated documentation
+  "docs/generated/",
+  "website/cue/reference/generated/",
+  "website/cue/reference/components/sinks/generated/",
+  "website/cue/reference/components/sources/generated/",
+  "website/cue/reference/components/transforms/generated/",
+  "website/cue/reference/components/generated/",
+]
+
+[default.extend-words]
+# DNS Extended DNS Error (EDE) field/code names
+ede = "ede"
+Ede = "Ede"
+EDE = "EDE"
+# GitHub handle used in changelog `authors:` lines
+pront = "pront"
+# AWS example strings contain "randomEXAMPLEidString" intentionally
+EXAMPL = "EXAMPL"
+# Ratatui — Rust TUI library (not "ratatouille")
+ratatui = "ratatui"
+Ratatui = "Ratatui"
+# Singular loop variable for iterating over a `series` collection
+serie = "serie"
+# flate2 — Rust compression crate
+flate = "flate"
+# COSE — team name
+COSE = "COSE"
+cose = "cose"
+# AIMD — Additive Increase Multiplicative Decrease (congestion algorithm)
+AIMD = "AIMD"
+aimd = "aimd"
+# macOS release name "Big Sur"
+Sur = "Sur"
+# "mis-" prefix in hyphenated compound words e.g. "mis-tag", "mis-set"
+mis = "mis"
+# Intentional test strings e.g. "host:fo  o"
+fo = "fo"
+FO = "FO"
+# Fake API key / token example values contain arbitrary uppercase substrings
+BA = "BA"
+# Short benchmark route names ("ba", "ca", ...) and RPM `-ba` build flag
+ba = "ba"
+# Intentional escape-sequence test data e.g. "val=ue", "val,ue"
+ue = "ue"
+# CSS class `.nd` (NameDecorator in syntax highlighter)
+nd = "nd"
+# NDJson — Newline-Delimited JSON
+ND = "ND"
+# Part of an AWS X-Ray trace ID e.g. "877c68cace58bea2..."
+cace = "cace"
+# Random document ID in an Elasticsearch retry test
+Rto = "Rto"
+# Appears inside a fake AWS session token example value
+IZ = "IZ"
+# Field name used as test fixture key
+anumber = "anumber"
+# Base64-encoded DNS wire-format test vectors
+Aci = "Aci"
+ODY = "ODY"
+Ot = "Ot"
+Yoh = "Yoh"
+# Inside a base64-encoded JWT in an Azure auth test
+Jod = "Jod"
+# Part of an AWS X-Ray trace ID e.g. "...7faec17c6afe396b"
+afe = "afe"
+# Short test message value
+hel = "hel"
+# Idiomatic English: "no ifs, ands, or buts"
+ands = "ands"
+# Part of proper noun "InfraGard" (FBI program)
+Gard = "Gard"
+# Heading "macoS" is an unconventional but intentional casing of "macOS"
+maco = "maco"
+# Past tense of "seek" in file I/O context ("buffered reader is seeked back to 0")
+seeked = "seeked"
