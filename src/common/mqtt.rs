@@ -252,6 +252,21 @@ pub enum ConfigurationError {
     /// Credentials provided were incomplete
     #[snafu(display("Username and password must be either both or neither provided."))]
     IncompleteCredentials,
+    /// Acknowledgements require a stable, user-supplied `client_id`.
+    #[snafu(display(
+        "End-to-end acknowledgements require a stable `client_id`. The auto-generated \
+         random client ID changes on every restart, which breaks broker-side redelivery \
+         of unacknowledged QoS 1 messages. Set `client_id` explicitly."
+    ))]
+    AcknowledgementsRequireClientId,
+    /// MQTT v5 acknowledgements require a non-zero `session_expiry_interval`.
+    #[snafu(display(
+        "End-to-end acknowledgements with MQTT v5 require a non-zero \
+         `connect_properties.session_expiry_interval`. Without it the broker discards the \
+         session as soon as the network connection closes, losing redelivery state for \
+         unacknowledged messages."
+    ))]
+    AcknowledgementsRequireV5SessionExpiry,
 }
 
 /// Protocol-aware MQTT client wrapper.
@@ -337,6 +352,31 @@ pub fn build_connector(
     clean_session: bool,
     manual_acks: bool,
 ) -> Result<MqttConnector, MqttError> {
+    // Manual acks rely on broker-side redelivery, which is tied to the prior session's
+    // client ID. A randomly-generated client ID on each restart strands unacknowledged
+    // messages in an orphan session, so reject configs that combine acks with an
+    // auto-generated client ID.
+    if manual_acks && common.client_id.as_deref().is_none_or(str::is_empty) {
+        return Err(ConfigurationError::AcknowledgementsRequireClientId)
+            .context(ConfigurationSnafu);
+    }
+
+    // MQTT v5 sessions are discarded when the connection closes unless
+    // `session_expiry_interval` is non-zero, even with `clean_start = false`.
+    // Reject the combination so a crash between receipt and ack doesn't lose redelivery
+    // state.
+    if manual_acks && common.protocol_version == MqttProtocolVersion::V5 {
+        let session_expiry = common
+            .connect_properties
+            .as_ref()
+            .and_then(|p| p.session_expiry_interval)
+            .unwrap_or(0);
+        if session_expiry == 0 {
+            return Err(ConfigurationError::AcknowledgementsRequireV5SessionExpiry)
+                .context(ConfigurationSnafu);
+        }
+    }
+
     let client_id = common.client_id.clone().unwrap_or_else(|| {
         let hash = rand::rng()
             .sample_iter(&rand_distr::Alphanumeric)
@@ -553,6 +593,10 @@ mod tests {
             host: "broker.example.com".into(),
             client_id: Some("test".into()),
             protocol_version: MqttProtocolVersion::V5,
+            connect_properties: Some(MqttConnectProperties {
+                session_expiry_interval: Some(3600),
+                ..Default::default()
+            }),
             ..Default::default()
         };
         let connector = build_connector(&common, "vectorSource", false, true).unwrap();
@@ -593,6 +637,104 @@ mod tests {
             Ok(_) => panic!("expected EmptyClientId error, got Ok"),
             Err(e) => panic!("expected EmptyClientId error, got {e:?}"),
         }
+    }
+
+    #[test]
+    fn build_connector_rejects_manual_acks_without_explicit_client_id() {
+        let common = MqttCommonConfig {
+            host: "broker.example.com".into(),
+            client_id: None,
+            ..Default::default()
+        };
+        match build_connector(&common, "vectorSource", false, true) {
+            Err(super::MqttError::Configuration {
+                source: ConfigurationError::AcknowledgementsRequireClientId,
+            }) => {}
+            Ok(_) => panic!("expected AcknowledgementsRequireClientId error, got Ok"),
+            Err(e) => panic!("expected AcknowledgementsRequireClientId error, got {e:?}"),
+        }
+    }
+
+    #[test]
+    fn build_connector_rejects_manual_acks_with_empty_client_id() {
+        let common = MqttCommonConfig {
+            host: "broker.example.com".into(),
+            client_id: Some(String::new()),
+            ..Default::default()
+        };
+        match build_connector(&common, "vectorSource", false, true) {
+            Err(super::MqttError::Configuration {
+                source: ConfigurationError::AcknowledgementsRequireClientId,
+            }) => {}
+            Ok(_) => panic!("expected AcknowledgementsRequireClientId error, got Ok"),
+            Err(e) => panic!("expected AcknowledgementsRequireClientId error, got {e:?}"),
+        }
+    }
+
+    #[test]
+    fn build_connector_allows_manual_acks_with_explicit_client_id_v3() {
+        let common = MqttCommonConfig {
+            host: "broker.example.com".into(),
+            client_id: Some("persistent-vector".into()),
+            ..Default::default()
+        };
+        let connector = build_connector(&common, "vectorSource", false, true).unwrap();
+        assert!(connector.options_v3.as_ref().unwrap().manual_acks());
+    }
+
+    #[test]
+    fn build_connector_rejects_manual_acks_v5_without_session_expiry() {
+        let common = MqttCommonConfig {
+            host: "broker.example.com".into(),
+            client_id: Some("persistent-vector".into()),
+            protocol_version: MqttProtocolVersion::V5,
+            connect_properties: None,
+            ..Default::default()
+        };
+        match build_connector(&common, "vectorSource", false, true) {
+            Err(super::MqttError::Configuration {
+                source: ConfigurationError::AcknowledgementsRequireV5SessionExpiry,
+            }) => {}
+            Ok(_) => panic!("expected AcknowledgementsRequireV5SessionExpiry error, got Ok"),
+            Err(e) => panic!("expected AcknowledgementsRequireV5SessionExpiry error, got {e:?}"),
+        }
+    }
+
+    #[test]
+    fn build_connector_rejects_manual_acks_v5_with_zero_session_expiry() {
+        let common = MqttCommonConfig {
+            host: "broker.example.com".into(),
+            client_id: Some("persistent-vector".into()),
+            protocol_version: MqttProtocolVersion::V5,
+            connect_properties: Some(MqttConnectProperties {
+                session_expiry_interval: Some(0),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        match build_connector(&common, "vectorSource", false, true) {
+            Err(super::MqttError::Configuration {
+                source: ConfigurationError::AcknowledgementsRequireV5SessionExpiry,
+            }) => {}
+            Ok(_) => panic!("expected AcknowledgementsRequireV5SessionExpiry error, got Ok"),
+            Err(e) => panic!("expected AcknowledgementsRequireV5SessionExpiry error, got {e:?}"),
+        }
+    }
+
+    #[test]
+    fn build_connector_allows_manual_acks_v5_with_session_expiry() {
+        let common = MqttCommonConfig {
+            host: "broker.example.com".into(),
+            client_id: Some("persistent-vector".into()),
+            protocol_version: MqttProtocolVersion::V5,
+            connect_properties: Some(MqttConnectProperties {
+                session_expiry_interval: Some(3600),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let connector = build_connector(&common, "vectorSource", false, true).unwrap();
+        assert!(connector.options_v5.is_some());
     }
 
     #[test]
