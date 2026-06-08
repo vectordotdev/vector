@@ -17,9 +17,6 @@ use crate::utils::{git, paths};
 const RELEASES_DIR: &str = "website/cue/reference/releases";
 const CHANGELOG_DIR: &str = "changelog.d";
 
-/// Conventional-commit types that require a scope.
-const TYPES_REQUIRING_SCOPES: &[&str] = &["feat", "enhancement", "fix"];
-
 /// Allowed conventional-commit types.
 const ALLOWED_TYPES: &[&str] = &[
     "chore",
@@ -229,14 +226,6 @@ impl Commit {
                 self.sha,
                 t,
                 ALLOWED_TYPES
-            );
-        }
-        if TYPES_REQUIRING_SCOPES.contains(&t) && self.scopes.is_empty() {
-            bail!(
-                "Commit {} of type '{}' requires a scope. Description: {}",
-                self.sha,
-                t,
-                self.description
             );
         }
         Ok(())
