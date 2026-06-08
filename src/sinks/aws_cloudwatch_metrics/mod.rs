@@ -204,7 +204,12 @@ impl MetricNormalize for AwsCloudwatchMetricNormalize {
     fn normalize(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
         match metric.value() {
             MetricValue::Gauge { .. } => state.make_absolute(metric),
-            _ => state.make_incremental(metric),
+            MetricValue::Counter { .. }
+            | MetricValue::Distribution { .. }
+            | MetricValue::Set { .. } => {
+                state.make_incremental_consume_dropped_finalizers(metric, true)
+            }
+            _ => None,
         }
     }
 }
