@@ -193,10 +193,8 @@ impl<'a> Builder<'a> {
                 };
 
                 let mut prev_state = None;
-                if !self.diff.enrichment_tables.is_added(name)
-                    && let Some(existing_table) = ENRICHMENT_TABLES.get(&table_name)
-                {
-                    prev_state = existing_table.extract_state();
+                if !self.diff.enrichment_tables.is_added(name) {
+                    prev_state = ENRICHMENT_TABLES.extract_state(&table_name);
                 }
 
                 let mut table = match table_outer

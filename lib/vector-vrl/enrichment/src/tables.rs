@@ -197,10 +197,15 @@ impl TableRegistry {
         }
     }
 
-    pub fn get(&self, table: &str) -> Option<Box<dyn Table + Send + Sync>> {
+    /// Extracts state from the table if available.
+    pub fn extract_state(&self, table: &str) -> Option<Box<dyn std::any::Any + Send + Sync>> {
         match &**self.tables.load() {
-            Some(tables) => tables.get(table).cloned(),
-            None => None,
+            Some(tables) => {
+                tables.get(table).and_then(|t| t.extract_state())
+            }
+            None => {
+                None
+            }
         }
     }
 }
