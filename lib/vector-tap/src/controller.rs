@@ -214,7 +214,7 @@ impl TapController {
 fn shutdown_trigger(control_tx: fanout::ControlChannel, sink_id: ComponentKey) -> ShutdownTx {
     let (shutdown_tx, shutdown_rx) = oneshot::channel();
 
-    tokio::spawn(async move {
+    vector_common::spawn_in_current_span(async move {
         _ = shutdown_rx.await;
         if control_tx
             .send(fanout::ControlMessage::Remove(sink_id.clone()))
@@ -366,7 +366,7 @@ async fn tap_handler(
                             );
                             let mut tap_transformer = TapTransformer::new(tx.clone(), output.clone());
 
-                            tokio::spawn(async move {
+                            vector_common::spawn_in_current_span(async move {
                                 while let Some(events) = tap_buffer_rx.next().await {
                                     tap_transformer.try_send(events);
                                 }

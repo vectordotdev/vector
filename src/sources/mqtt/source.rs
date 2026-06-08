@@ -244,7 +244,7 @@ impl MqttSource {
 
         if let Some(receiver) = batch_receiver {
             let client = client.clone();
-            tokio::spawn(async move {
+            crate::spawn_in_current_span(async move {
                 if receiver.await == BatchStatus::Delivered
                     && let Err(error) = client.ack(&publish).await
                 {
@@ -293,7 +293,7 @@ impl MqttSource {
 
         if let Some(receiver) = batch_receiver {
             let client = client.clone();
-            tokio::spawn(async move {
+            crate::spawn_in_current_span(async move {
                 if receiver.await == BatchStatus::Delivered
                     && let Err(error) = client.ack(&publish).await
                 {

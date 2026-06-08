@@ -75,7 +75,8 @@ impl MqttSink {
 
         let _open_token = OpenGauge::new().open(|count| emit!(ConnectionOpen { count }));
 
-        // Spawn the event loop handler based on protocol version.
+        // Spawn the event loop handler based on protocol version. This is necessary to
+        // keep the MQTT event loop moving forward.
         //
         // If an error is returned from `poll()` there is currently no way to tie it back
         // to the event that was posted, which means we can't accurately provide
@@ -83,7 +84,7 @@ impl MqttSink {
         // https://github.com/bytebeamio/rumqtt/issues/349
         match eventloop {
             MqttEventLoop::V311(mut connection) => {
-                tokio::spawn(async move {
+                crate::spawn_in_current_span(async move {
                     loop {
                         match connection.poll().await {
                             Ok(_) => {}
@@ -98,7 +99,7 @@ impl MqttSink {
                 });
             }
             MqttEventLoop::V5(mut connection) => {
-                tokio::spawn(async move {
+                crate::spawn_in_current_span(async move {
                     loop {
                         match connection.poll().await {
                             Ok(_) => {}

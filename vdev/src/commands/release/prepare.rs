@@ -433,8 +433,8 @@ fn format_vrl_changelog_block(changelog: &str) -> String {
         .collect::<Vec<_>>()
         .join("\n");
 
-    let opening = "\tvrl_changelog: \"\"\"";
-    let closing = format!("{double_tab}\"\"\"");
+    let opening = "\tvrl_changelog: #\"\"\"";
+    let closing = format!("{double_tab}\"\"\"#");
 
     format!("{opening}\n{body}\n{closing}")
 }
@@ -547,11 +547,11 @@ mod tests {
         let vrl_changelog_block = format_vrl_changelog_block(vrl_changelog);
 
         let expected = concat!(
-            "\tvrl_changelog: \"\"\"\n",
+            "\tvrl_changelog: #\"\"\"\n",
             "\t\t#### [0.2.0]\n",
             "\t\t- Feature\n",
             "\t\t- Fix\n",
-            "\t\t\"\"\""
+            "\t\t\"\"\"#"
         );
 
         assert_eq!(vrl_changelog_block, expected);

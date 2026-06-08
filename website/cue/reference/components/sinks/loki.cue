@@ -4,7 +4,6 @@ components: sinks: loki: {
 	title: "Loki"
 
 	classes: {
-		commonly_used: true
 		delivery:      "at_least_once"
 		development:   "stable"
 		egress_method: "batch"
@@ -158,7 +157,5 @@ components: sinks: loki: {
 		}
 	}
 
-	telemetry: metrics: {
-		streams_total: components.sources.internal_metrics.output.metrics.streams_total
-	}
+	telemetry: metrics: {}
 }
