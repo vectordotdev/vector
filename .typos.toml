@@ -4,8 +4,8 @@ extend-exclude = [
   "lib/codecs/tests/data/",
   # Classic novel used in benchmarks
   "benches/codecs/moby_dick.txt",
-  # Third-party license files
-  "licenses/",
+  # OpenSSL license is a verbatim upstream copy with typos in the original text
+  "licenses/OpenSSL",
   "LICENSE-3rdparty.csv",
   # Old test artifacts
   "testing/",
