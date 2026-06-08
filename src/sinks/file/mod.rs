@@ -58,7 +58,7 @@ pub struct FileSinkConfig {
     ))]
     #[configurable(metadata(docs::examples = "/tmp/vector-%Y-%m-%d.log.zst"))]
     #[configurable(metadata(
-        docs::warnings = "The rendered path is resolved as-is and not sanitized in any way. Operators should ensure that the Vector process can only write to the desired locations."
+        docs::warnings = "The rendered path is resolved as-is and is not sanitized. Operators should ensure that the Vector process can only write to the desired locations."
     ))]
     pub path: Template,
 
