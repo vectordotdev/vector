@@ -473,7 +473,7 @@ miniz_oxide,https://github.com/Frommi/miniz_oxide/tree/master/miniz_oxide,MIT OR
 mio,https://github.com/tokio-rs/mio,MIT,"Carl Lerche <me@carllerche.com>, Thomas de Zeeuw <thomasdezeeuw@gmail.com>, Tokio Contributors <team@tokio.rs>"
 mlua,https://github.com/mlua-rs/mlua,MIT,"Aleksandr Orlenko <zxteam@pm.me>, kyren <catherine@kyju.org>"
 mlua-sys,https://github.com/mlua-rs/mlua,MIT,Aleksandr Orlenko <zxteam@pm.me>
-mlua_derive,https://github.com/khvzak/mlua,MIT,Aleksandr Orlenko <zxteam@pm.me>
+mlua_derive,https://github.com/mlua-rs/mlua,MIT,Aleksandr Orlenko <zxteam@pm.me>
 moka,https://github.com/moka-rs/moka,MIT OR Apache-2.0,The moka Authors
 mongocrypt,https://github.com/mongodb/libmongocrypt-rust,Apache-2.0,"Abraham Egnor <abraham.egnor@mongodb.com>, Isabel Atkinson <isabel.atkinson@mongodb.com>"
 mongocrypt-sys,https://github.com/mongodb/libmongocrypt-rust,Apache-2.0,"Abraham Egnor <abraham.egnor@mongodb.com>, Isabel Atkinson <isabel.atkinson@mongodb.com>"
