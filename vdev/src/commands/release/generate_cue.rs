@@ -737,7 +737,10 @@ mod tests {
                 insertions_count: 0,
                 deletions_count: 0,
             };
-            assert!(c.validate().is_ok(), "type '{t}' should be valid without a scope");
+            assert!(
+                c.validate().is_ok(),
+                "type '{t}' should be valid without a scope"
+            );
         }
     }
 
