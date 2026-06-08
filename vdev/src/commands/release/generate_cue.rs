@@ -17,9 +17,6 @@ use crate::utils::{git, paths};
 const RELEASES_DIR: &str = "website/cue/reference/releases";
 const CHANGELOG_DIR: &str = "changelog.d";
 
-/// Conventional-commit types that require a scope.
-const TYPES_REQUIRING_SCOPES: &[&str] = &["feat", "enhancement", "fix"];
-
 /// Allowed conventional-commit types.
 const ALLOWED_TYPES: &[&str] = &[
     "chore",
@@ -231,14 +228,6 @@ impl Commit {
                 ALLOWED_TYPES
             );
         }
-        if TYPES_REQUIRING_SCOPES.contains(&t) && self.scopes.is_empty() {
-            bail!(
-                "Commit {} of type '{}' requires a scope. Description: {}",
-                self.sha,
-                t,
-                self.description
-            );
-        }
         Ok(())
     }
 
@@ -366,7 +355,7 @@ struct ConventionalParts {
 impl ConventionalParts {
     fn parse(message: &str) -> Self {
         let re = Regex::new(
-            r"^(?P<type>[a-z]*)(\((?P<scope>[a-zA-Z0-9_, ]*)\))?(?P<breaking>!)?: (?P<desc>.*?)( \(#(?P<pr>[0-9]+)\))?$",
+            r"^(?P<type>[a-z]*)(\((?P<scope>[a-zA-Z0-9_, -]*)\))?(?P<breaking>!)?: (?P<desc>.*?)( \(#(?P<pr>[0-9]+)\))?$",
         )
         .unwrap();
 
@@ -416,6 +405,7 @@ impl ConventionalParts {
 struct ChangelogEntry {
     /// Mapped CUE type ("chore" | "fix" | "feat" | "enhancement").
     cue_type: String,
+    breaking: bool,
     description: String,
     contributors: Vec<String>,
 }
@@ -451,6 +441,7 @@ fn parse_changelog_fragment(path: &Path) -> Result<ChangelogEntry> {
         );
     }
     let fragment_type = parts[1];
+    let breaking = fragment_type == "breaking";
     let cue_type = match fragment_type {
         "breaking" | "deprecation" => "chore",
         "security" | "fix" => "fix",
@@ -478,6 +469,7 @@ fn parse_changelog_fragment(path: &Path) -> Result<ChangelogEntry> {
 
     Ok(ChangelogEntry {
         cue_type: cue_type.to_string(),
+        breaking,
         description,
         contributors,
     })
@@ -542,6 +534,9 @@ fn render_changelog(entries: &[ChangelogEntry]) -> String {
             let mut s = String::new();
             s.push_str("\t\t{\n");
             writeln!(s, "\t\t\ttype: {}", json!(e.cue_type)).unwrap();
+            if e.breaking {
+                s.push_str("\t\t\tbreaking: true\n");
+            }
             s.push_str("\t\t\tdescription: #\"\"\"\n");
             for line in e.description.lines() {
                 writeln!(s, "\t\t\t\t{line}").unwrap();
@@ -666,6 +661,9 @@ mod tests {
 
         // No-author entries get empty contributor list.
         assert!(entries[1].contributors.is_empty());
+        // Breaking fragments must be marked as such.
+        assert!(entries[1].breaking);
+        assert!(!entries[0].breaking);
     }
 
     #[test]
@@ -680,11 +678,13 @@ mod tests {
         let entries = vec![
             ChangelogEntry {
                 cue_type: "feat".into(),
+                breaking: false,
                 description: "Adds a thing.\nMulti-line.".into(),
                 contributors: vec!["alice".into()],
             },
             ChangelogEntry {
                 cue_type: "fix".into(),
+                breaking: false,
                 description: "Fixed it.".into(),
                 contributors: vec![],
             },
@@ -722,28 +722,26 @@ mod tests {
     }
 
     #[test]
-    fn commit_validate_requires_scope_for_certain_types() {
-        let mut c = Commit {
-            sha: "x".into(),
-            author: "a".into(),
-            date: "d".into(),
-            description: "no scope".into(),
-            r#type: Some("feat".into()),
-            scopes: vec![],
-            breaking_change: false,
-            pr_number: None,
-            files_count: 0,
-            insertions_count: 0,
-            deletions_count: 0,
-        };
-        assert!(c.validate().is_err());
-        c.scopes = vec!["api".into()];
-        assert!(c.validate().is_ok());
-
-        // chore/docs don't need scopes
-        c.r#type = Some("chore".into());
-        c.scopes = vec![];
-        assert!(c.validate().is_ok());
+    fn commit_validate_scope_is_optional_for_all_types() {
+        for t in ALLOWED_TYPES {
+            let c = Commit {
+                sha: "x".into(),
+                author: "a".into(),
+                date: "d".into(),
+                description: "no scope".into(),
+                r#type: Some((*t).into()),
+                scopes: vec![],
+                breaking_change: false,
+                pr_number: None,
+                files_count: 0,
+                insertions_count: 0,
+                deletions_count: 0,
+            };
+            assert!(
+                c.validate().is_ok(),
+                "type '{t}' should be valid without a scope"
+            );
+        }
     }
 
     #[test]

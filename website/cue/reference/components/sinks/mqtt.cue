@@ -4,7 +4,6 @@ components: sinks: mqtt: {
 	title: "MQTT"
 
 	classes: {
-		commonly_used: false
 		delivery:      "best_effort"
 		development:   "beta"
 		egress_method: "stream"

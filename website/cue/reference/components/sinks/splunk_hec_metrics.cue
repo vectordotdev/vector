@@ -4,7 +4,6 @@ components: sinks: splunk_hec_metrics: {
 	title: "Splunk HEC metrics"
 
 	classes: {
-		commonly_used: false
 		delivery:      "at_least_once"
 		development:   "stable"
 		egress_method: "batch"
