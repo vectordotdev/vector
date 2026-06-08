@@ -444,21 +444,29 @@ impl MetadataClient {
     async fn refresh_metadata(&mut self) -> Result<(), crate::Error> {
         let task = self.get_metadata("/task").await?;
 
-        let target_container_name = match self.container_name.clone() {
-            Some(container_name) => container_name,
-            None => {
-                // `/task` supplies task-level fields, but the current container
-                // endpoint is needed to select Vector's container by default.
-                let current_container = self.get_metadata("").await?;
-                json_string(&current_container, "Name")
-                    .ok_or_else(|| crate::Error::from(MissingCurrentContainerNameError))?
-            }
-        };
-
         let container =
-            find_container(&task, &target_container_name).ok_or_else(|| MissingContainerError {
-                name: target_container_name.clone(),
-            })?;
+            if self
+                .keys
+                .keys
+                .iter()
+                .any(|(field, _)| is_container_field(field))
+            {
+                Some(match self.container_name.clone() {
+                    Some(container_name) => find_container_by_name(&task, &container_name)
+                        .ok_or_else(|| MissingContainerError {
+                            name: container_name.clone(),
+                        })?,
+                    None => {
+                        // `/task` supplies task-level fields, but the current container
+                        // endpoint is needed to select Vector's container by default
+                        // when any configured field is container-scoped.
+                        let current_container = self.get_metadata("").await?;
+                        find_current_container(&task, &current_container)?
+                    }
+                })
+            } else {
+                None
+            };
 
         let mut new_state = vec![];
         for (field, key) in &self.keys.keys {
@@ -509,6 +517,10 @@ impl MetadataClient {
 }
 
 fn validate_fields(fields: &[String]) -> Result<(), crate::Error> {
+    if fields.is_empty() {
+        return Err(EmptyFieldsError.into());
+    }
+
     if let Some(field) = fields
         .iter()
         .find(|field| !FIELD_CATALOG.contains(field.as_str()))
@@ -526,17 +538,61 @@ fn resolve_endpoint(configured: Option<String>) -> Option<String> {
     configured.or_else(|| env::var(METADATA_URI_V4_ENV).ok())
 }
 
-fn find_container<'a>(task: &'a JsonValue, name: &str) -> Option<&'a JsonValue> {
+fn find_container_by_name<'a>(task: &'a JsonValue, name: &str) -> Option<&'a JsonValue> {
     task.get("Containers")?
         .as_array()?
         .iter()
         .find(|container| json_string(container, "Name").as_deref() == Some(name))
 }
 
+fn find_container_by_docker_id<'a>(task: &'a JsonValue, docker_id: &str) -> Option<&'a JsonValue> {
+    task.get("Containers")?
+        .as_array()?
+        .iter()
+        .find(|container| json_string(container, "DockerId").as_deref() == Some(docker_id))
+}
+
+fn find_current_container<'a>(
+    task: &'a JsonValue,
+    current_container: &JsonValue,
+) -> Result<&'a JsonValue, crate::Error> {
+    if let Some(container) = json_string(current_container, "DockerId")
+        .and_then(|docker_id| find_container_by_docker_id(task, &docker_id))
+    {
+        return Ok(container);
+    }
+
+    let name = json_string(current_container, "Name")
+        .ok_or_else(|| crate::Error::from(MissingCurrentContainerNameError))?;
+    find_container_by_name(task, &name).ok_or_else(|| MissingContainerError { name }.into())
+}
+
+fn is_container_field(field: &str) -> bool {
+    matches!(
+        field,
+        CONTAINER_ID_KEY
+            | CONTAINER_NAME_KEY
+            | DOCKER_NAME_KEY
+            | CONTAINER_ARN_KEY
+            | IMAGE_KEY
+            | IMAGE_ID_KEY
+            | CONTAINER_DESIRED_STATUS_KEY
+            | CONTAINER_KNOWN_STATUS_KEY
+            | CONTAINER_EXIT_CODE_KEY
+            | CONTAINER_CREATED_AT_KEY
+            | CONTAINER_STARTED_AT_KEY
+            | CONTAINER_FINISHED_AT_KEY
+            | CONTAINER_TYPE_KEY
+            | LOG_DRIVER_KEY
+            | SNAPSHOTTER_KEY
+            | RESTART_COUNT_KEY
+    )
+}
+
 fn extract_field<'a>(
     field: &str,
     task: &'a JsonValue,
-    container: &'a JsonValue,
+    container: Option<&'a JsonValue>,
 ) -> Option<&'a JsonValue> {
     match field {
         CLUSTER_KEY => scalar(task, "Cluster"),
@@ -553,22 +609,28 @@ fn extract_field<'a>(
         LAUNCH_TYPE_KEY => scalar(task, "LaunchType"),
         EXECUTION_STOPPED_AT_KEY => scalar(task, "ExecutionStoppedAt"),
         FAULT_INJECTION_ENABLED_KEY => scalar(task, "FaultInjectionEnabled"),
-        CONTAINER_ID_KEY => scalar(container, "DockerId"),
-        CONTAINER_NAME_KEY => scalar(container, "Name"),
-        DOCKER_NAME_KEY => scalar(container, "DockerName"),
-        CONTAINER_ARN_KEY => scalar(container, "ContainerARN"),
-        IMAGE_KEY => scalar(container, "Image"),
-        IMAGE_ID_KEY => scalar(container, "ImageID"),
-        CONTAINER_DESIRED_STATUS_KEY => scalar(container, "DesiredStatus"),
-        CONTAINER_KNOWN_STATUS_KEY => scalar(container, "KnownStatus"),
-        CONTAINER_EXIT_CODE_KEY => scalar(container, "ExitCode"),
-        CONTAINER_CREATED_AT_KEY => scalar(container, "CreatedAt"),
-        CONTAINER_STARTED_AT_KEY => scalar(container, "StartedAt"),
-        CONTAINER_FINISHED_AT_KEY => scalar(container, "FinishedAt"),
-        CONTAINER_TYPE_KEY => scalar(container, "Type"),
-        LOG_DRIVER_KEY => scalar(container, "LogDriver"),
-        SNAPSHOTTER_KEY => scalar(container, "Snapshotter"),
-        RESTART_COUNT_KEY => scalar(container, "RestartCount"),
+        CONTAINER_ID_KEY => container.and_then(|container| scalar(container, "DockerId")),
+        CONTAINER_NAME_KEY => container.and_then(|container| scalar(container, "Name")),
+        DOCKER_NAME_KEY => container.and_then(|container| scalar(container, "DockerName")),
+        CONTAINER_ARN_KEY => container.and_then(|container| scalar(container, "ContainerARN")),
+        IMAGE_KEY => container.and_then(|container| scalar(container, "Image")),
+        IMAGE_ID_KEY => container.and_then(|container| scalar(container, "ImageID")),
+        CONTAINER_DESIRED_STATUS_KEY => {
+            container.and_then(|container| scalar(container, "DesiredStatus"))
+        }
+        CONTAINER_KNOWN_STATUS_KEY => {
+            container.and_then(|container| scalar(container, "KnownStatus"))
+        }
+        CONTAINER_EXIT_CODE_KEY => container.and_then(|container| scalar(container, "ExitCode")),
+        CONTAINER_CREATED_AT_KEY => container.and_then(|container| scalar(container, "CreatedAt")),
+        CONTAINER_STARTED_AT_KEY => container.and_then(|container| scalar(container, "StartedAt")),
+        CONTAINER_FINISHED_AT_KEY => {
+            container.and_then(|container| scalar(container, "FinishedAt"))
+        }
+        CONTAINER_TYPE_KEY => container.and_then(|container| scalar(container, "Type")),
+        LOG_DRIVER_KEY => container.and_then(|container| scalar(container, "LogDriver")),
+        SNAPSHOTTER_KEY => container.and_then(|container| scalar(container, "Snapshotter")),
+        RESTART_COUNT_KEY => container.and_then(|container| scalar(container, "RestartCount")),
         _ => None,
     }
 }
@@ -714,6 +776,17 @@ impl fmt::Display for MissingContainerError {
 }
 
 impl error::Error for MissingContainerError {}
+
+#[derive(Debug)]
+struct EmptyFieldsError;
+
+impl fmt::Display for EmptyFieldsError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "ECS metadata fields must not be empty")
+    }
+}
+
+impl error::Error for EmptyFieldsError {}
 
 #[derive(Debug)]
 struct UnknownFieldError {
@@ -1003,6 +1076,38 @@ mod test {
         format!("http://{addr}")
     }
 
+    async fn start_metadata_server_with_current_container(
+        current_container: &'static str,
+    ) -> String {
+        let (_guard, addr) = next_addr();
+
+        let make_svc = make_service_fn(move |_| async move {
+            Ok::<_, Infallible>(service_fn(move |req| async move {
+                let body = match req.uri().path() {
+                    "/" => current_container,
+                    "/task" => TASK_METADATA,
+                    _ => "",
+                };
+
+                let status = if body.is_empty() {
+                    StatusCode::NOT_FOUND
+                } else {
+                    StatusCode::OK
+                };
+
+                Ok::<_, Infallible>(
+                    Response::builder()
+                        .status(status)
+                        .body(Body::from(body))
+                        .unwrap(),
+                )
+            }))
+        });
+
+        tokio::spawn(Server::bind(&addr).serve(make_svc));
+        format!("http://{addr}")
+    }
+
     fn make_metric() -> Metric {
         Metric::new(
             "event",
@@ -1146,6 +1251,90 @@ mod test {
 
             let event = out.recv().await.unwrap();
             assert_event_data_eq!(event.into_metric(), expected_metric);
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn default_container_match_uses_docker_id_before_name() {
+        const CURRENT_CONTAINER_WITH_MISMATCHED_NAME: &str = r#"{
+            "DockerId": "task-id-1111111111",
+            "Name": "not-the-task-container-name",
+            "DockerName": "not-the-task-container-name"
+        }"#;
+
+        assert_transform_compliance(async {
+            let endpoint = start_metadata_server_with_current_container(
+                CURRENT_CONTAINER_WITH_MISMATCHED_NAME,
+            )
+            .await;
+            let transform_config = EcsMetadata {
+                endpoint: Some(endpoint),
+                fields: vec![CONTAINER_NAME_KEY.into(), CONTAINER_ID_KEY.into()],
+                ..Default::default()
+            };
+
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) =
+                create_topology(ReceiverStream::new(rx), transform_config).await;
+
+            tx.send(LogEvent::default().into()).await.unwrap();
+
+            let event = out.recv().await.unwrap();
+            let log = event.into_log();
+            assert_eq!(
+                log.get(event_path!("aws", "ecs", "container-name")),
+                Some(&Value::from("vector"))
+            );
+            assert_eq!(
+                log.get(event_path!("aws", "ecs", "container-id")),
+                Some(&Value::from("task-id-1111111111"))
+            );
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn default_container_match_falls_back_to_name() {
+        const CURRENT_CONTAINER_WITHOUT_DOCKER_ID: &str = r#"{
+            "Name": "vector",
+            "DockerName": "vector"
+        }"#;
+
+        assert_transform_compliance(async {
+            let endpoint =
+                start_metadata_server_with_current_container(CURRENT_CONTAINER_WITHOUT_DOCKER_ID)
+                    .await;
+            let transform_config = EcsMetadata {
+                endpoint: Some(endpoint),
+                fields: vec![CONTAINER_NAME_KEY.into(), CONTAINER_ID_KEY.into()],
+                ..Default::default()
+            };
+
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) =
+                create_topology(ReceiverStream::new(rx), transform_config).await;
+
+            tx.send(LogEvent::default().into()).await.unwrap();
+
+            let event = out.recv().await.unwrap();
+            let log = event.into_log();
+            assert_eq!(
+                log.get(event_path!("aws", "ecs", "container-name")),
+                Some(&Value::from("vector"))
+            );
+            assert_eq!(
+                log.get(event_path!("aws", "ecs", "container-id")),
+                Some(&Value::from("task-id-1111111111"))
+            );
 
             drop(tx);
             topology.stop().await;
@@ -1316,6 +1505,21 @@ mod test {
     }
 
     #[tokio::test]
+    async fn empty_fields_is_error() {
+        let transform_config = EcsMetadata {
+            fields: vec![],
+            ..Default::default()
+        };
+
+        let error = match transform_config.build(&TransformContext::default()).await {
+            Ok(_) => panic!("expected empty fields to fail"),
+            Err(error) => error,
+        };
+
+        assert_eq!(error.to_string(), "ECS metadata fields must not be empty");
+    }
+
+    #[tokio::test]
     async fn missing_container_is_error() {
         let endpoint = start_metadata_server().await;
         let transform_config = EcsMetadata {
@@ -1368,6 +1572,45 @@ mod test {
         .await;
     }
 
+    #[tokio::test]
+    async fn task_only_fields_skip_current_container_request() {
+        assert_transform_compliance(async {
+            let endpoint = start_task_only_metadata_server().await;
+            let transform_config = EcsMetadata {
+                endpoint: Some(endpoint),
+                fields: vec![CLUSTER_KEY.into(), TASK_ARN_KEY.into()],
+                initial_retry_attempts: 1,
+                ..Default::default()
+            };
+
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) =
+                create_topology(ReceiverStream::new(rx), transform_config).await;
+
+            tx.send(LogEvent::default().into()).await.unwrap();
+
+            let event = out.recv().await.unwrap();
+            let log = event.into_log();
+            assert_eq!(
+                log.get(event_path!("aws", "ecs", "cluster")),
+                Some(&Value::from(
+                    "arn:aws:ecs:us-east-1:123456789012:cluster/example"
+                ))
+            );
+            assert_eq!(
+                log.get(event_path!("aws", "ecs", "task-arn")),
+                Some(&Value::from(
+                    "arn:aws:ecs:us-east-1:123456789012:task/example/abc"
+                ))
+            );
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        })
+        .await;
+    }
+
     #[test]
     fn extracts_fields_from_all_documented_launch_type_examples() {
         for (task_metadata, launch_type, snapshotter, fault_injection_enabled) in [
@@ -1381,26 +1624,27 @@ mod test {
             ),
         ] {
             let task: JsonValue = serde_json::from_str(task_metadata).unwrap();
-            let container = find_container(&task, "vector").unwrap();
+            let container = find_container_by_name(&task, "vector").unwrap();
 
             assert_eq!(
-                extract_field(LAUNCH_TYPE_KEY, &task, container).map(json_to_value),
+                extract_field(LAUNCH_TYPE_KEY, &task, Some(container)).map(json_to_value),
                 Some(Value::from(launch_type))
             );
             assert_eq!(
-                extract_field(CONTAINER_NAME_KEY, &task, container).map(json_to_value),
+                extract_field(CONTAINER_NAME_KEY, &task, Some(container)).map(json_to_value),
                 Some(Value::from("vector"))
             );
             assert!(
-                extract_field(TASK_ARN_KEY, &task, container).is_some(),
+                extract_field(TASK_ARN_KEY, &task, Some(container)).is_some(),
                 "{launch_type} example should include a task ARN"
             );
             assert_eq!(
-                extract_field(SNAPSHOTTER_KEY, &task, container).map(json_to_value),
+                extract_field(SNAPSHOTTER_KEY, &task, Some(container)).map(json_to_value),
                 snapshotter.map(Value::from)
             );
             assert_eq!(
-                extract_field(FAULT_INJECTION_ENABLED_KEY, &task, container).map(json_to_value),
+                extract_field(FAULT_INJECTION_ENABLED_KEY, &task, Some(container))
+                    .map(json_to_value),
                 fault_injection_enabled.map(Value::from)
             );
         }
