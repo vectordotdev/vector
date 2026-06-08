@@ -175,7 +175,7 @@ branches, this means that only the pull request title must conform to this
 format. Vector performs a pull request check to verify the pull request title
 in case you forget.
 
-A scope is optional but appreciated — use it to identify the component or subsystem (e.g. `feat(kafka source): ...`).
+A scope is optional but appreciated. Use it to identify the component or subsystem affected, for example `feat(kafka source): ...` or `fix(loki sink): ...`.
 
 The following are all good examples of pull request titles:
 
