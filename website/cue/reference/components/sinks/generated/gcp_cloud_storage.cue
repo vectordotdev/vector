@@ -190,7 +190,7 @@ generated: components: sinks: gcp_cloud_storage: configuration: {
 				type: string: {}
 			}
 			schema_mode: {
-				description: "Controls how events with fields not present in the schema are handled."
+				description: "Controls how events that contain fields not present in the schema are handled."
 				required:    false
 				type: string: {
 					default: "relaxed"
