@@ -637,8 +637,8 @@ pub async fn build_client(
             .build()
             .map_err(|e| format!("Failed to build reqwest client: {e}"))?,
     )));
-    let client = BlobContainerClient::from_url(url, credential, Some(options))
-        .map_err(|e| format!("{e}"))?;
+    let client =
+        BlobContainerClient::new(url, credential, Some(options)).map_err(|e| format!("{e}"))?;
     Ok(Arc::new(client))
 }
 

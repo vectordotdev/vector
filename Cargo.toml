@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.56.0"
+version = "0.57.0"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2024"
 description = "A lightweight and ultra-fast tool for building observability pipelines"
@@ -157,7 +157,7 @@ dashmap = { version = "6.1.0", default-features = false }
 derivative = { version = "2.2.0", default-features = false }
 exitcode = { version = "1.1.2", default-features = false }
 flate2 = { version = "1.1.2", default-features = false, features = ["zlib-rs"] }
-futures = { version = "0.3.31", default-features = false, features = ["std"] }
+futures = { version = "0.3.32", default-features = false, features = ["std"] }
 futures-util = { version = "0.3.29", default-features = false }
 glob = { version = "0.3.3", default-features = false }
 hickory-proto = { version = "0.26.1", default-features = false, features = ["dnssec-ring"] }
@@ -226,7 +226,7 @@ strum = { version = "0.28", features = ["derive"] }
 [dependencies]
 cfg-if.workspace = true
 reqwest.workspace = true
-reqwest_13 = { package = "reqwest", version = "0.13", default-features = false, features = ["json", "rustls-no-provider"] }
+reqwest_13 = { package = "reqwest", version = "0.13", default-features = false, features = ["json", "native-tls", "rustls-no-provider"] }
 clap.workspace = true
 clap_complete.workspace = true
 indoc.workspace = true
@@ -306,11 +306,11 @@ aws-smithy-runtime-api = { version = "1.7.3", default-features = false, optional
 aws-smithy-types = { version = "1.2.11", default-features = false, features = ["rt-tokio"], optional = true }
 
 # Azure
-azure_core = { version = "0.33", features = ["reqwest", "hmac_openssl"], optional = true }
-azure_identity = { version = "0.33", features = ["client_certificate"], optional = true }
+azure_core = { version = "1.0", default-features = false, features = ["reqwest", "hmac_openssl"], optional = true }
+azure_identity = { version = "1.0", default-features = false, features = ["client_certificate"], optional = true }
 
 # Azure Storage
-azure_storage_blob = { version = "0.10.1", optional = true }
+azure_storage_blob = { version = "1.0", default-features = false, optional = true }
 
 # OpenDAL
 opendal = { version = "0.54", default-features = false, features = ["services-webhdfs"], optional = true }
@@ -336,7 +336,7 @@ prost-reflect = { workspace = true, optional = true }
 prost-types = { workspace = true, optional = true }
 
 # Databricks Zerobus
-databricks-zerobus-ingest-sdk = { git = "https://github.com/databricks/zerobus-sdk-rs", rev = "273efe09130a7554e6b34d20b95df50289e58524", optional = true }
+databricks-zerobus-ingest-sdk = { version = "2.0.1", optional = true, features = ["arrow-flight"] }
 
 # GCP
 goauth = { version = "0.16.0", optional = true }
@@ -357,10 +357,9 @@ greptimedb-ingester = { version = "0.17.0", default-features = false, optional =
 # External libs
 arc-swap = { workspace = true, default-features = false, optional = true }
 async-compression = { version = "0.4.27", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
-apache-avro = { version = "0.16.0", default-features = false, optional = true }
-arrow = { version = "56.2.0", default-features = false, features = ["ipc"], optional = true }
-arrow-schema = { version = "56.2.0", default-features = false, optional = true }
-parquet = { version = "56.2.0", default-features = false, features = [
+arrow = { version = "58.2.0", default-features = false, features = ["ipc"], optional = true }
+arrow-schema = { version = "58.2.0", default-features = false, optional = true }
+parquet = { version = "58.2.0", default-features = false, features = [
   "arrow",
   "snap",
   "zstd",
@@ -413,8 +412,8 @@ listenfd = { version = "1.0.2", default-features = false, optional = true }
 lru = { version = "0.16.3", default-features = false }
 maxminddb = { version = "0.27.0", default-features = false, optional = true, features = ["simdutf8"] }
 md-5 = { version = "0.10", default-features = false, optional = true }
-mongodb = { version = "3.3.0", default-features = false, optional = true, features = ["compat-3-0-0", "dns-resolver", "rustls-tls"] }
-async-nats = { version = "0.46.0", default-features = false, optional = true, features = ["ring", "websockets", "jetstream", "nkeys"] }
+mongodb = { version = "3.7.0", default-features = false, optional = true, features = ["compat-3-0-0", "dns-resolver", "rustls-tls"] }
+async-nats = { version = "0.49.0", default-features = false, optional = true, features = ["ring", "websockets", "jetstream", "nkeys"] }
 nkeys = { version = "0.4.5", default-features = false, optional = true }
 nom = { workspace = true, optional = true }
 notify = { version = "8.1.0", default-features = false, features = ["macos_fsevent"] }
@@ -472,7 +471,7 @@ rdkafka = { workspace = true, features = ["cmake_build"], optional = true }
 
 [target.'cfg(unix)'.dependencies]
 nix = { version = "0.31", default-features = false, features = ["socket", "signal", "fs"] }
-tikv-jemallocator = { version = "0.6.0", default-features = false, features = ["unprefixed_malloc_on_supported_platforms"], optional = true }
+tikv-jemallocator = { version = "0.7.0", default-features = false, features = ["unprefixed_malloc_on_supported_platforms"], optional = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 procfs = { version = "0.18.0", default-features = false }
@@ -761,7 +760,7 @@ sources-prometheus = ["sources-prometheus-scrape", "sources-prometheus-remote-wr
 sources-prometheus-scrape = ["sinks-prometheus", "sources-utils-http-client", "vector-lib/prometheus"]
 sources-prometheus-remote-write = ["sinks-prometheus", "sources-utils-http", "vector-lib/prometheus"]
 sources-prometheus-pushgateway = ["sinks-prometheus", "sources-utils-http", "vector-lib/prometheus"]
-sources-pulsar = ["dep:apache-avro", "dep:pulsar"]
+sources-pulsar = ["dep:pulsar"]
 sources-redis = ["dep:redis"]
 sources-socket = ["sources-utils-net", "tokio-util/net"]
 sources-splunk_hec = ["dep:roaring"]
@@ -791,6 +790,7 @@ transforms = ["transforms-logs", "transforms-metrics"]
 transforms-logs = [
   "transforms-aws_ec2_metadata",
   "transforms-dedupe",
+  "transforms-delay",
   "transforms-filter",
   "transforms-window",
   "transforms-log_to_metric",
@@ -814,11 +814,13 @@ transforms-metrics = [
   "transforms-remap",
   "transforms-tag_cardinality_limit",
   "transforms-throttle",
+  "transforms-delay",
 ]
 
 transforms-aggregate = []
 transforms-aws_ec2_metadata = ["dep:arc-swap"]
 transforms-dedupe = ["transforms-impl-dedupe"]
+transforms-delay = []
 transforms-filter = []
 transforms-incremental_to_absolute = []
 transforms-window = []
@@ -928,7 +930,7 @@ sinks-chronicle = []
 sinks-clickhouse = ["dep:nom", "dep:rust_decimal", "codecs-arrow"]
 sinks-console = []
 sinks-databend = ["dep:databend-client"]
-sinks-databricks-zerobus = ["dep:databricks-zerobus-ingest-sdk", "dep:prost-reflect", "dep:base64"]
+sinks-databricks-zerobus = ["dep:databricks-zerobus-ingest-sdk", "codecs-arrow"]
 sinks-datadog_events = []
 sinks-datadog_logs = []
 sinks-datadog_metrics = ["protobuf-build", "dep:prost", "dep:prost-reflect"]
@@ -956,7 +958,7 @@ sinks-opentelemetry = ["sinks-http", "codecs-opentelemetry"]
 sinks-papertrail = ["dep:syslog"]
 sinks-prometheus = ["dep:base64", "dep:prost", "vector-lib/prometheus"]
 sinks-postgres = ["dep:sqlx"]
-sinks-pulsar = ["dep:apache-avro", "dep:pulsar"]
+sinks-pulsar = ["dep:pulsar"]
 sinks-redis = ["dep:redis"]
 sinks-sematext = ["sinks-elasticsearch", "sinks-influxdb"]
 sinks-socket = ["sinks-utils-udp"]
@@ -1119,6 +1121,7 @@ vector-api-tests = [
   "api",
   "api-client-minimal",
   "sources-demo_logs",
+  "sources-gcp_pubsub",
   "transforms-log_to_metric",
   "transforms-remap",
   "transforms-route",

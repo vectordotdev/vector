@@ -1,6 +1,7 @@
 acmecorp
 Acro
 addonmanager
+Agentic
 Ainol
 aiohttp
 Airis
@@ -309,6 +310,7 @@ lenovo
 levenstein
 Lexibook
 LGE
+LLMs
 Lifetab
 Lifetouch
 linkerd
