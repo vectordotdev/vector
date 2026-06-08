@@ -33,7 +33,7 @@ generator:
           109,
           113,
           127,
-          131,
+          131
         ]
       target_uri: "http://127.0.0.1:4317/opentelemetry.proto.collector.logs.v1.LogsService/Export"
       bytes_per_second: "100 Mb"
