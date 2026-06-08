@@ -172,7 +172,7 @@ generated: components: sinks: gcp_cloud_storage: configuration: {
 						}
 					}
 					level: {
-						description:   "Compression level (1–21). This is the range Vector supports; higher values compress more but are slower."
+						description:   "Compression level (1–21). This is the range Vector supports; higher values provide more compression but are slower."
 						relevant_when: "algorithm = \"zstd\" or algorithm = \"gzip\""
 						required:      true
 						type: uint: {}
