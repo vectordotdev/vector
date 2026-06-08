@@ -15,7 +15,7 @@ components: sinks: mqtt: {
 		auto_generated:   true
 		acknowledgements: true
 		buffer: enabled:      true
-		healthcheck: enabled: true
+		healthcheck: enabled: false
 		send: {
 			compression: enabled: false
 			encoding: {
@@ -101,8 +101,8 @@ components: sinks: mqtt: {
 			body: """
 				The sink accepts logs, metrics, and traces. The set of event types actually
 				accepted is derived from the chosen encoding codec and validated at
-				configuration load time, so misrouted events are rejected with a clear error
-				instead of silently dropped.
+				configuration load time, so unsupported event types are rejected with a
+				clear error instead of silently dropped.
 
 				Codec compatibility:
 
