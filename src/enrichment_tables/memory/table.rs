@@ -407,6 +407,8 @@ impl Table for Memory {
     }
 
     fn extract_state(&self) -> Option<Box<dyn std::any::Any + Send + Sync>> {
+        let writer = self.write_handle.lock().expect("mutex poisoned");
+        self.flush(writer);
         Some(Box::new(self.clone()))
     }
 }

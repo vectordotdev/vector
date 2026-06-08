@@ -421,12 +421,29 @@ impl RunningTopology {
     ) -> HashMap<ComponentKey, BuiltBuffer> {
         // First, we shutdown any changed/removed sources. This ensures that we can allow downstream
         // components to terminate naturally by virtue of the flow of events stopping.
-        if diff.sources.any_changed_or_removed() {
+        if diff.sources.any_changed_or_removed() || diff.enrichment_tables.any_changed_or_removed()
+        {
             let timeout = Duration::from_secs(30);
             let mut source_shutdown_handles = Vec::new();
 
+            let to_remove_table_sources = diff
+                .enrichment_tables
+                .to_remove
+                .iter()
+                .filter_map(|key| {
+                    self.config
+                        .enrichment_table(key)
+                        .and_then(|t| t.as_source(key))
+                        .map(|(key, _)| key.clone())
+                })
+                .collect::<Vec<_>>();
             let deadline = Instant::now() + timeout;
-            for key in &diff.sources.to_remove {
+            for key in diff
+                .sources
+                .to_remove
+                .iter()
+                .chain(to_remove_table_sources.iter())
+            {
                 debug!(component_id = %key, "Removing source.");
 
                 let previous = self.tasks.remove(key).unwrap();
@@ -437,7 +454,23 @@ impl RunningTopology {
                     .push(self.shutdown_coordinator.shutdown_source(key, deadline));
             }
 
-            for key in &diff.sources.to_change {
+            let to_change_table_sources = diff
+                .enrichment_tables
+                .to_change
+                .iter()
+                .filter_map(|key| {
+                    self.config
+                        .enrichment_table(key)
+                        .and_then(|t| t.as_source(key))
+                        .map(|(key, _)| key.clone())
+                })
+                .collect::<Vec<_>>();
+            for key in diff
+                .sources
+                .to_change
+                .iter()
+                .chain(to_change_table_sources.iter())
+            {
                 debug!(component_id = %key, "Changing source.");
 
                 self.remove_outputs(key);

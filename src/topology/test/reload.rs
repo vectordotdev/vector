@@ -6,21 +6,31 @@ use std::{
 };
 
 use futures::StreamExt;
-use tokio::time::sleep;
+use tokio::{sync::oneshot::channel, time::sleep};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use vector_lib::{
     buffers::{BufferConfig, BufferType, MemoryBufferSize, WhenFull},
     config::ComponentKey,
+    event::{Event, EventContainer, LogEvent},
 };
 
 use crate::{
-    config::Config,
+    config::{Config, unit_test::UnitTestSourceConfig},
+    enrichment_tables::{
+        EnrichmentTables,
+        memory::{MemoryConfig, MemorySourceConfig},
+    },
     sinks::prometheus::exporter::PrometheusExporterConfig,
     sources::{
         internal_metrics::InternalMetricsConfig, prometheus::PrometheusRemoteWriteConfig,
         splunk_hec::SplunkConfig,
     },
-    test_util::{self, addr::next_addr, mock::basic_sink, start_topology, temp_dir, wait_for_tcp},
+    test_util::{
+        self,
+        addr::next_addr,
+        mock::{basic_sink, oneshot_sink},
+        start_topology, temp_dir, wait_for_tcp,
+    },
     topology::ReloadError::*,
 };
 
@@ -448,6 +458,125 @@ async fn topology_disk_buffer_config_change_chained_does_not_stall() {
     tokio::select! {
         _ = wait_for_tcp(address) => {},
         _ = crash_stream.next() => panic!("topology crashed after reload"),
+    }
+}
+
+#[tokio::test]
+async fn topology_reload_preserves_enrichment_table_state() {
+    // Changing an enrichment table that has state and supports state preservation should preserve
+    // the state after reload, even if it was changed (if the state is still valid after the chaange).
+    test_util::trace_init();
+
+    let source_event = Event::Log(LogEvent::from("test"));
+    let (old_tx, old_rx) = channel();
+
+    let mut old_config = Config::builder();
+    let mut old_memory_config = MemoryConfig::default();
+    old_memory_config.source_config = Some(MemorySourceConfig {
+        export_interval: Some(NonZeroU64::new(1).unwrap()),
+        source_key: "memory_test_source".to_string(),
+        export_batch_size: None,
+        remove_after_export: false,
+        export_expired_items: false,
+    });
+    old_memory_config.ttl = 100;
+    old_config.add_enrichment_table(
+        "memory_test",
+        &["in"],
+        EnrichmentTables::Memory(old_memory_config),
+    );
+    old_config.add_source(
+        "in",
+        UnitTestSourceConfig {
+            events: vec![source_event.clone()],
+        },
+    );
+    old_config.add_sink("out", &["memory_test_source"], oneshot_sink(old_tx));
+
+    let (new_tx, new_rx) = channel();
+    let mut new_config = Config::builder();
+    let mut new_memory_config = MemoryConfig::default();
+    new_memory_config.source_config = Some(MemorySourceConfig {
+        export_interval: Some(NonZeroU64::new(1).unwrap()),
+        source_key: "memory_test_source".to_string(),
+        export_batch_size: None,
+        remove_after_export: false,
+        export_expired_items: false,
+    });
+    new_memory_config.ttl = 101;
+    new_config.add_enrichment_table(
+        "memory_test",
+        // No input to ensure old state is read and not new
+        &[],
+        EnrichmentTables::Memory(new_memory_config),
+    );
+    new_config.add_source("in_2", UnitTestSourceConfig { events: vec![] });
+    new_config.add_sink("out_2", &["memory_test_source"], oneshot_sink(new_tx));
+
+    let (mut topology, crash) = start_topology(old_config.build().unwrap(), false).await;
+    let mut crash_stream = UnboundedReceiverStream::new(crash);
+
+    // Make sure the topology is fully running: other components, etc.
+    sleep(Duration::from_secs(2)).await;
+
+    // let message = result
+    //     .lines()
+    //     .filter_map(|l| serde_json::from_str::<ObjectMap>(l).ok())
+    //     .find(|entry| {
+    //         entry
+    //             .get("key")
+    //             .is_some_and(|k| k.as_str().is_some_and(|k| k == "message"))
+    //     })
+    //     .and_then(|entry| {
+    //         entry
+    //             .get("value")
+    //             .cloned()
+    //             .map(|m| m.to_string_lossy().into_owned())
+    //     });
+    // assert_eq!(message.unwrap(), log_msg);
+    tokio::select! {
+        events = old_rx => {
+            let events = events.expect("must get event to output");
+            let events = events.into_events().collect::<Vec<_>>();
+            assert_eq!(events.len(), 2);
+            let message = events.into_iter().filter_map(|e| e.into_log().value().clone().into_object()).find(|e| e.get("key").is_some_and(|k| k.as_str().is_some_and(|k| k == "message")))
+                .and_then(|entry| {
+                    entry
+                        .get("value")
+                        .cloned()
+                        .map(|m| m.to_string_lossy().into_owned())
+                });
+            assert_eq!(message.unwrap(), "test");
+        }
+        _ = crash_stream.next() => panic!(),
+    }
+
+    // Now reload the topology with the new configuration, and ensure the table still has the same state
+    topology
+        .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
+        .await
+        .unwrap();
+
+    // Give the old topology configuration a chance to shutdown cleanly, etc.
+    sleep(Duration::from_secs(2)).await;
+    tokio::select! {
+        events = new_rx => {
+            let events = events.expect("must get event to output");
+            let events = events.into_events().collect::<Vec<_>>();
+            assert_eq!(events.len(), 2);
+            let message = events.into_iter().filter_map(|e| e.into_log().value().clone().into_object()).find(|e| e.get("key").is_some_and(|k| k.as_str().is_some_and(|k| k == "message")))
+                .and_then(|entry| {
+                    entry
+                        .get("value")
+                        .cloned()
+                        .map(|m| m.to_string_lossy().into_owned())
+                });
+            assert_eq!(message.unwrap(), "test");
+        },
+        _ = tokio::time::sleep(Duration::from_secs(10)) => {
+            panic!("Never received the events")
+        }
+        _ = crash_stream.next() => panic!(),
     }
 }
 
