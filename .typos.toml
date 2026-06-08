@@ -22,8 +22,9 @@ extend-exclude = [
 ede = "ede"
 Ede = "Ede"
 EDE = "EDE"
-# GitHub handle used in changelog `authors:` lines
+# GitHub handles used in changelog/release `authors:` lines
 pront = "pront"
+aso = "aso"
 # The old (misspelled) websocket log field name, referenced intentionally in its changelog entry
 protcol = "protcol"
 # AWS example strings contain "randomEXAMPLEidString" intentionally

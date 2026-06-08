@@ -265,7 +265,7 @@ releases: "0.50.0": {
 		authors: stigglor (https://github.com/vectordotdev/vrl/pull/1473)
 		- Added an optional `strict_mode` parameter to `parse_aws_alb_log`. When set to `false`, the parser ignores any newly added/trailing fields in AWS ALB logs instead of failing. Defaults to `true` to preserve current behavior.
 		
-		authors: anas-also (https://github.com/vectordotdev/vrl/pull/1482)
+		authors: anas-aso (https://github.com/vectordotdev/vrl/pull/1482)
 		- Added a new array function `pop` that removes the last item from an array.
 		
 		authors: jlambatl (https://github.com/vectordotdev/vrl/pull/1501)
