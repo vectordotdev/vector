@@ -1,3 +1,3 @@
-Fixed a typo in a structured log field emitted by the `websocket` source: the field was previously named `protcol` and is now correctly named `protocol`. Users filtering on this trace-level field should update their queries accordingly.
+Fixed a typo in the `WebSocketMessageReceived` internal event emitted by the `websocket` source: the `protocol` field was previously misspelled as `protcol`. Users filtering on this field in trace-level logs should update their queries accordingly.
 
 authors: pront
