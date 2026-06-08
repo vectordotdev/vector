@@ -108,6 +108,17 @@ pub fn simple_trace_event(resource: String) -> TraceEvent {
     t
 }
 
+fn default_partition_key() -> PartitionKey {
+    PartitionKey {
+        api_key: None,
+        env: None,
+        hostname: None,
+        agent_version: None,
+        target_tps: None,
+        error_tps: None,
+    }
+}
+
 fn validate_simple_span(span: dd_proto::Span, resource: String) {
     assert_eq!(span.service, "a_service");
     assert_eq!(span.name, "a_name");
@@ -329,25 +340,90 @@ async fn stats_payload_has_container_tags() {
     );
 
     let mut agg = Aggregator::new(Arc::from("a_key"));
-    let pkey = PartitionKey {
-        api_key: None,
-        env: None,
-        hostname: None,
-        agent_version: None,
-        target_tps: None,
-        error_tps: None,
-    };
+    let pkey = default_partition_key();
     agg.handle_trace(&pkey, &t);
 
     let flush = agg.flush(true);
     assert_eq!(flush.len(), 1);
-    assert_eq!(agg.get_payload_tags_len(), 0);
 
     let csp = &flush[0];
     assert_eq!(csp.env, "container_env");
     assert_eq!(csp.container_id, "container123");
     assert!(
         csp.tags.iter().any(|t| t == "location:container_location"),
+        "expected location:container_location in stats payload tags, got {:?}",
+        csp.tags
+    );
+}
+
+#[tokio::test]
+async fn stats_payload_ignores_tags_from_non_stats_traces() {
+    let mut non_stats_span = simple_span("foo".to_string());
+    non_stats_span.insert("metrics".into(), Value::Object(ObjectMap::new()));
+
+    let mut stale_trace = TraceEvent::default();
+    stale_trace.insert(
+        event_path!("tags"),
+        json!({
+            "_dd.tags.container": "location:stale_location"
+        }),
+    );
+    stale_trace.insert(
+        event_path!("spans"),
+        Value::Array(vec![Value::from(non_stats_span)]),
+    );
+
+    let mut measurable_trace = TraceEvent::default();
+    measurable_trace.insert(
+        event_path!("spans"),
+        Value::Array(vec![Value::from(simple_span("foo".to_string()))]),
+    );
+
+    let mut agg = Aggregator::new(Arc::from("a_key"));
+    let pkey = default_partition_key();
+    agg.handle_trace(&pkey, &stale_trace);
+    agg.handle_trace(&pkey, &measurable_trace);
+
+    let flush = agg.flush(true);
+    assert_eq!(flush.len(), 1);
+    assert!(
+        flush[0].tags.is_empty(),
+        "expected no tags in stats payload, got {:?}",
+        flush[0].tags
+    );
+}
+
+#[tokio::test]
+async fn stats_payload_has_container_tags_with_span_env() {
+    let mut span = simple_span("foo".to_string());
+    let Some(Value::Object(meta)) = span.get_mut("meta") else {
+        panic!("expected span meta to be an object");
+    };
+    meta.insert("env".into(), Value::from("span_env"));
+
+    let mut t = TraceEvent::default();
+    t.insert(
+        event_path!("tags"),
+        json!({
+            "_dd.tags.container": "env:container_env,location:container_location"
+        }),
+    );
+    t.insert(event_path!("container_id"), "container123");
+    t.insert(event_path!("spans"), Value::Array(vec![Value::from(span)]));
+
+    let mut agg = Aggregator::new(Arc::from("a_key"));
+    let pkey = default_partition_key();
+    agg.handle_trace(&pkey, &t);
+
+    let flush = agg.flush(true);
+    assert_eq!(flush.len(), 1);
+
+    let csp = &flush[0];
+    assert_eq!(csp.env, "span_env");
+    assert!(
+        csp.tags
+            .iter()
+            .any(|tag| tag == "location:container_location"),
         "expected location:container_location in stats payload tags, got {:?}",
         csp.tags
     );

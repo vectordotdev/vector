@@ -52,6 +52,11 @@ impl GroupedStats {
     }
 }
 
+pub(crate) struct PayloadBucketEntry {
+    pub(crate) stats: ClientStatsBucket,
+    pub(crate) tags: Vec<String>,
+}
+
 /// Convert agent sketch variant to ./proto/dd_sketch_full.proto
 fn encode_sketch(agent_sketch: &AgentDDSketch) -> Vec<u8> {
     // AgentDDSketch partitions the set of real numbers into intervals like [gamma^(n), gamma^(n+1)[,
@@ -119,25 +124,44 @@ pub(crate) struct Bucket {
     pub(crate) start: u64,
     pub(crate) duration: u64,
     pub(crate) data: BTreeMap<AggregationKey, GroupedStats>,
+    payload_tags: BTreeMap<PayloadAggregationKey, Vec<String>>,
 }
 
 impl Bucket {
-    pub(crate) fn export(&self) -> BTreeMap<PayloadAggregationKey, ClientStatsBucket> {
-        let mut m = BTreeMap::<PayloadAggregationKey, ClientStatsBucket>::new();
+    pub(crate) const fn new(start: u64, duration: u64) -> Self {
+        Self {
+            start,
+            duration,
+            data: BTreeMap::new(),
+            payload_tags: BTreeMap::new(),
+        }
+    }
+
+    pub(crate) fn export(&self) -> BTreeMap<PayloadAggregationKey, PayloadBucketEntry> {
+        let mut m = BTreeMap::<PayloadAggregationKey, PayloadBucketEntry>::new();
         self.data.iter().for_each(|(k, v)| {
             let b = v.export(k);
             match m.get_mut(&k.payload_key) {
                 None => {
-                    let sb = ClientStatsBucket {
-                        start: self.start,
-                        duration: self.duration,
-                        agent_time_shift: 0,
-                        stats: vec![b],
-                    };
-                    m.insert(k.payload_key.clone(), sb);
+                    m.insert(
+                        k.payload_key.clone(),
+                        PayloadBucketEntry {
+                            stats: ClientStatsBucket {
+                                start: self.start,
+                                duration: self.duration,
+                                agent_time_shift: 0,
+                                stats: vec![b],
+                            },
+                            tags: self
+                                .payload_tags
+                                .get(&k.payload_key)
+                                .cloned()
+                                .unwrap_or_default(),
+                        },
+                    );
                 }
                 Some(s) => {
-                    s.stats.push(b);
+                    s.stats.stats.push(b);
                 }
             };
         });
@@ -150,7 +174,14 @@ impl Bucket {
         weight: f64,
         is_top: bool,
         aggkey: AggregationKey,
+        payload_tags: &[String],
     ) {
+        if !payload_tags.is_empty() {
+            self.payload_tags
+                .entry(aggkey.payload_key.clone())
+                .or_insert_with(|| payload_tags.to_vec());
+        }
+
         match self.data.get_mut(&aggkey) {
             Some(gs) => Bucket::update(span, weight, is_top, gs),
             None => {
