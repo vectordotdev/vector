@@ -195,7 +195,7 @@ generated: components: sinks: gcp_cloud_storage: configuration: {
 				type: string: {
 					default: "relaxed"
 					enum: {
-						auto_infer: "Auto infer schema based on the batch. No schema file needed."
+						auto_infer: "Automatically infer schema based on the batch. No schema file is needed."
 						relaxed:    "Missing fields become null. Extra fields are silently dropped."
 						strict:     "Missing fields become null. Extra fields cause an error."
 					}
