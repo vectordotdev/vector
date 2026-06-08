@@ -7,8 +7,6 @@ extend-exclude = [
   # OpenSSL license is a verbatim upstream copy with typos in the original text
   "licenses/OpenSSL",
   "LICENSE-3rdparty.csv",
-  # Old test artifacts
-  "testing/",
   # External data files
   "lib/vector-vrl/tests/resources/public_suffix_list.dat",
   # GCP integration test fixtures — contain base64-encoded PEM certificate data
