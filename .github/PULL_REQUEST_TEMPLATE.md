@@ -62,7 +62,7 @@ Changes to CI, website, playground and similar are generally not considered user
 
   * `type` = chore, enhancement, feat, fix, docs, revert
   * `!` = OPTIONAL: signals a breaking change
-  * `scope` = Optional when `type` is "chore" or "docs", available scopes https://github.com/vectordotdev/vector/blob/master/.github/workflows/semantic.yml#L31
+  * `scope` = Optional but appreciated; free-form (e.g. component name, subsystem)
   * `description` = short description of the change
 
 Examples:

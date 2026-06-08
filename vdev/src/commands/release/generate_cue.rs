@@ -722,28 +722,23 @@ mod tests {
     }
 
     #[test]
-    fn commit_validate_requires_scope_for_certain_types() {
-        let mut c = Commit {
-            sha: "x".into(),
-            author: "a".into(),
-            date: "d".into(),
-            description: "no scope".into(),
-            r#type: Some("feat".into()),
-            scopes: vec![],
-            breaking_change: false,
-            pr_number: None,
-            files_count: 0,
-            insertions_count: 0,
-            deletions_count: 0,
-        };
-        assert!(c.validate().is_err());
-        c.scopes = vec!["api".into()];
-        assert!(c.validate().is_ok());
-
-        // chore/docs don't need scopes
-        c.r#type = Some("chore".into());
-        c.scopes = vec![];
-        assert!(c.validate().is_ok());
+    fn commit_validate_scope_is_optional_for_all_types() {
+        for t in &["feat", "enhancement", "fix", "chore", "docs"] {
+            let c = Commit {
+                sha: "x".into(),
+                author: "a".into(),
+                date: "d".into(),
+                description: "no scope".into(),
+                r#type: Some((*t).into()),
+                scopes: vec![],
+                breaking_change: false,
+                pr_number: None,
+                files_count: 0,
+                insertions_count: 0,
+                deletions_count: 0,
+            };
+            assert!(c.validate().is_ok(), "type '{t}' should be valid without a scope");
+        }
     }
 
     #[test]
