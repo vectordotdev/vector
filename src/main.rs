@@ -1,5 +1,7 @@
 #![deny(warnings)]
 
+// touch: trigger source-change filter so CI Rust workflows run for the
+// rust-cache exploration PR. Revert before merging. (bump 2)
 extern crate vector;
 use std::process::ExitCode;
 

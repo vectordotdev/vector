@@ -134,17 +134,31 @@ runs:
       run: echo "::add-matcher::.github/matchers/rust.json"
       shell: bash
 
-    - name: Cache Cargo registry, index, and git DB
+    # Caches ~/.cargo (registry + git + cargo-installed bin) AND target/ build
+    # artifacts. Master pushes save the cache; PRs read it but don't write
+    # back. PRs only recompile what their changes invalidate (Cargo
+    # fingerprints), so unchanged deps (rdkafka-sys, openssl-sys, …) are
+    # reused as-is from master's cache.
+    #
+    # `shared-key` partitions by OS. Swatinem still appends the rustc hash
+    # and Cargo.lock hash, so a new ~2-3 GB entry is created per Cargo.lock
+    # change. With master-only saves and LRU eviction of old entries, this
+    # should keep the 10 GB GHA cache budget under control; if not, consider
+    # `add-rust-environment-hash-key: false` to drop those suffixes.
+    - name: Cache Cargo + target/
       if: ${{ inputs.cargo-cache == 'true' || env.NEEDS_RUST == 'true' }}
-      uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+      uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
       with:
-        path: |
-          ~/.cargo/registry/index/
-          ~/.cargo/registry/cache/
-          ~/.cargo/git/db/
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-cargo-
+        # No `shared-key`: let Swatinem partition by job-id (its default).
+        # Sharing one key across jobs caused races — the lightest job
+        # (check-fmt) consistently won the save lock, persisting an
+        # almost-empty target/ and locking out heavier jobs (check-clippy,
+        # Build) from saving their actual artifacts.
+        prefix-key: "v1-vector"
+        # TEMP: save on all refs while prototyping so this branch seeds the
+        # cache. Restore to `${{ github.ref == 'refs/heads/master' }}` before
+        # merging.
+        save-if: true
 
     - name: Install mold
       if: ${{ runner.os == 'Linux' && env.DISABLE_MOLD != 'true' && inputs.mold == 'true' }}
