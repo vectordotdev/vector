@@ -91,18 +91,18 @@ no-op expression can cause follow-up expressions to become invalid as well.
 Take this VRL program:
 
 ```coffee
-foo = to_strng(15)
+foo = to_string(15)
 upcase(foo)
 ```
 
-There's a typo (`to_strng` instead of `to_string`), which causes the following
+There's a typo (`to_string` instead of `to_string`), which causes the following
 diagnostic message:
 
 ```text
 error[E105]: call to undefined function
   ┌─ :1:7
   │
-1 │ foo = to_strng(15)
+1 │ foo = to_string(15)
   │       ^^^^^^^^
   │       │
   │       undefined function
@@ -110,7 +110,7 @@ error[E105]: call to undefined function
 ```
 
 However, because the compiler wants to continue compiling the rest of the
-program, it replaced the faulty `to_strng(15)` expression with a `null`
+program, it replaced the faulty `to_string(15)` expression with a `null`
 expression, before continuing with the compilation. This results in the
 follow-up expression `upcase(foo)` to fail, because `upcase` only accepts
 strings as its type, which would be the case if the operator had correctly used

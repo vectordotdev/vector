@@ -7,10 +7,6 @@ extend-exclude = [
   # Third-party license files
   "licenses/",
   "LICENSE-3rdparty.csv",
-  # Historical release notes — typos in old entries are not worth fixing
-  "website/cue/reference/releases/",
-  # Historical RFCs — immutable design documents
-  "rfcs/",
   # Old test artifacts
   "testing/",
   # External data files
@@ -19,13 +15,6 @@ extend-exclude = [
   "tests/integration/gcp/config/",
   # Integration test log fixtures — contain binary/sampled log data
   "tests/data/",
-  # Generated documentation
-  "docs/generated/",
-  "website/cue/reference/generated/",
-  "website/cue/reference/components/sinks/generated/",
-  "website/cue/reference/components/sources/generated/",
-  "website/cue/reference/components/transforms/generated/",
-  "website/cue/reference/components/generated/",
 ]
 
 [default.extend-words]
@@ -35,6 +24,8 @@ Ede = "Ede"
 EDE = "EDE"
 # GitHub handle used in changelog `authors:` lines
 pront = "pront"
+# The old (misspelled) websocket log field name, referenced intentionally in its changelog entry
+protcol = "protcol"
 # AWS example strings contain "randomEXAMPLEidString" intentionally
 EXAMPL = "EXAMPL"
 # Ratatui — Rust TUI library (not "ratatouille")
@@ -94,3 +85,5 @@ Gard = "Gard"
 maco = "maco"
 # Past tense of "seek" in file I/O context ("buffered reader is seeked back to 0")
 seeked = "seeked"
+# French phrase "raison d'être" used in RFCs
+raison = "raison"
