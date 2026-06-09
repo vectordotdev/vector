@@ -1,6 +1,7 @@
 acmecorp
 Acro
 addonmanager
+Agentic
 Ainol
 aiohttp
 Airis
@@ -117,6 +118,7 @@ DEBHELPER
 debian
 DECT
 demuxing
+deser
 dfs
 discriminants
 distro
@@ -209,6 +211,7 @@ greptime
 greptimecloud
 greptimedb
 GSM
+gssapi
 gvisor
 gws
 gzip'd
@@ -286,6 +289,7 @@ keybinds
 Kingcom
 Kolkata
 konqueror
+krb
 Kruno
 Ktouch
 KTtech
@@ -306,6 +310,7 @@ lenovo
 levenstein
 Lexibook
 LGE
+LLMs
 Lifetab
 Lifetouch
 linkerd
@@ -574,3 +579,4 @@ CLAUDE
 grpcurl
 linting
 lexers
+binstalled

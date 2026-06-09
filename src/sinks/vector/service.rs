@@ -13,7 +13,7 @@ use vector_lib::{
     stream::DriverResponse,
 };
 
-use super::VectorSinkError;
+use super::{VectorSinkError, compression::VectorCompression};
 use crate::{
     Error,
     event::{EventFinalizers, EventStatus, Finalizable},
@@ -70,7 +70,7 @@ impl VectorService {
     pub fn new(
         hyper_client: hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>,
         uri: Uri,
-        compression: bool,
+        compression: VectorCompression,
     ) -> Self {
         let (protocol, endpoint) = uri::protocol_endpoint(uri.clone());
         let mut proto_client = proto_vector::Client::new(HyperSvc {
@@ -78,9 +78,10 @@ impl VectorService {
             client: hyper_client,
         });
 
-        if compression {
-            proto_client = proto_client.send_compressed(tonic::codec::CompressionEncoding::Gzip);
+        if let Some(encoding) = compression.as_tonic_encoding() {
+            proto_client = proto_client.send_compressed(encoding);
         }
+
         Self {
             client: proto_client,
             protocol,

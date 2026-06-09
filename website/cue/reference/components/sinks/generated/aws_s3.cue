@@ -260,52 +260,28 @@ generated: components: sinks: aws_s3: configuration: {
 		description: """
 			Batch encoding configuration for columnar formats.
 
-			When set, events are encoded together as a batch in a columnar format (for example, Parquet)
+			When set, events are encoded together as a batch in a columnar format (Parquet)
 			instead of the standard per-event framing-based encoding. The columnar format handles
 			its own internal compression, so the top-level `compression` setting is bypassed.
-
-			Only the `parquet` codec is supported by the AWS S3 sink.
 			"""
 		required: false
 		type: object: options: {
-			allow_nullable_fields: {
-				description: """
-					Allow null values for non-nullable fields in the schema.
-
-					When enabled, missing or incompatible values are encoded as null, even for fields
-					marked as non-nullable in the Arrow schema. This is useful when working with downstream
-					systems that can handle null values through defaults, computed columns, or other mechanisms.
-
-					When disabled (default), missing values for non-nullable fields results in encoding errors. This is to
-					help ensure all required data is present before sending it to the sink.
-					"""
-				relevant_when: "codec = \"arrow_stream\""
-				required:      false
-				type: bool: default: false
-			}
 			codec: {
-				description: "The codec to use for batch encoding events."
-				required:    true
-				type: string: enum: {
-					arrow_stream: """
-						Encodes events in [Apache Arrow][apache_arrow] IPC streaming format.
+				description: """
+					Encodes events in [Apache Parquet][apache_parquet] columnar format.
 
-						This is the streaming variant of the Arrow IPC format, which writes
-						a continuous stream of record batches.
+					[apache_parquet]: https://parquet.apache.org/
+					"""
+				required: true
+				type: string: enum: parquet: """
+					Encodes events in [Apache Parquet][apache_parquet] columnar format.
 
-						[apache_arrow]: https://arrow.apache.org/
-						"""
-					parquet: """
-						Encodes events in [Apache Parquet][apache_parquet] columnar format.
-
-						[apache_parquet]: https://parquet.apache.org/
-						"""
-				}
+					[apache_parquet]: https://parquet.apache.org/
+					"""
 			}
 			compression: {
-				description:   "Compression codec applied per column page inside the Parquet file."
-				relevant_when: "codec = \"parquet\""
-				required:      false
+				description: "Compression codec applied per column page inside the Parquet file."
+				required:    false
 				type: object: options: {
 					algorithm: {
 						description: "Compression codec applied per column page inside the Parquet file."
@@ -336,14 +312,12 @@ generated: components: sinks: aws_s3: configuration: {
 					Required unless `schema_mode` is `auto_infer`. The file must contain a valid
 					Parquet message type definition.
 					"""
-				relevant_when: "codec = \"parquet\""
-				required:      false
+				required: false
 				type: string: {}
 			}
 			schema_mode: {
-				description:   "Controls how events with fields not present in the schema are handled."
-				relevant_when: "codec = \"parquet\""
-				required:      false
+				description: "Controls how events with fields not present in the schema are handled."
+				required:    false
 				type: string: {
 					default: "relaxed"
 					enum: {

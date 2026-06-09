@@ -39,6 +39,8 @@ Vector team member will find this document useful.
 2. **You've read Vector's [docs](https://vector.dev/docs/).**
 3. **You know about the [Vector community](https://vector.dev/community/).
    Please use this for help.**
+4. **You've read our [AI Policy](AI_POLICY.md)** if you plan to use AI tools
+   in your contribution.
 
 ## Your First Contribution
 
@@ -173,8 +175,7 @@ branches, this means that only the pull request title must conform to this
 format. Vector performs a pull request check to verify the pull request title
 in case you forget.
 
-A list of allowed sub-categories is defined in the
-[semantic.yml workflow](https://github.com/vectordotdev/vector/blob/master/.github/workflows/semantic.yml#L21).
+A scope is optional but appreciated. Use it to identify the component or subsystem affected, for example `feat(kafka source): ...` or `fix(loki sink): ...`.
 
 The following are all good examples of pull request titles:
 

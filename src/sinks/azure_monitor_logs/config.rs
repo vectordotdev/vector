@@ -16,7 +16,10 @@ use crate::{
     http::{HttpClient, get_http_scheme_from_uri},
     sinks::{
         prelude::*,
-        util::{RealtimeSizeBasedDefaultBatchSettings, UriSerde, http::HttpStatusRetryLogic},
+        util::{
+            RealtimeSizeBasedDefaultBatchSettings, UriSerde,
+            http::{HttpStatusRetryLogic, RetryStrategy},
+        },
     },
 };
 
@@ -113,6 +116,10 @@ pub struct AzureMonitorLogsConfig {
         skip_serializing_if = "crate::serde::is_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    pub retry_strategy: RetryStrategy,
 }
 
 impl Default for AzureMonitorLogsConfig {
@@ -129,6 +136,7 @@ impl Default for AzureMonitorLogsConfig {
             time_generated_key: None,
             tls: None,
             acknowledgements: Default::default(),
+            retry_strategy: Default::default(),
         }
     }
 }
@@ -181,8 +189,10 @@ impl AzureMonitorLogsConfig {
         )?;
         let healthcheck = service.healthcheck();
 
-        let retry_logic =
-            HttpStatusRetryLogic::new(|res: &AzureMonitorLogsResponse| res.http_status);
+        let retry_logic = HttpStatusRetryLogic::new(
+            |res: &AzureMonitorLogsResponse| res.http_status,
+            self.retry_strategy.clone(),
+        );
         let request_settings = self.request.into_settings();
         let service = ServiceBuilder::new()
             .settings(request_settings, retry_logic)
