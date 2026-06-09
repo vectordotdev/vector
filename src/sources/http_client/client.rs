@@ -37,8 +37,8 @@ use crate::{
         http::HttpMethod,
         http_client,
         http_client::{
-            GenericHttpClientInputs, HttpClientBuilder, build_url, call, default_interval,
-            default_timeout, warn_if_interval_too_low,
+            GenericHttpClientInputs, HttpClientBuilder, Redirects, build_url, call,
+            default_interval, default_timeout, warn_if_interval_too_low,
         },
     },
     tls::{TlsConfig, TlsSettings},
@@ -122,6 +122,11 @@ pub struct HttpClientConfig {
     /// `application/json` unless explicitly overridden in the `headers` configuration.
     #[serde(default)]
     pub body: Option<ParameterValue>,
+
+    /// HTTP redirect configuration.
+    #[serde(default)]
+    #[configurable(metadata(docs::advanced))]
+    pub redirects: Redirects,
 
     /// TLS configuration.
     #[configurable(derived)]
@@ -224,6 +229,7 @@ impl Default for HttpClientConfig {
             headers: HashMap::new(),
             method: default_http_method(),
             body: None,
+            redirects: Redirects::default(),
             tls: None,
             auth: None,
             log_namespace: None,
@@ -376,6 +382,7 @@ impl SourceConfig for HttpClientConfig {
             interval: self.interval,
             timeout: self.timeout,
             headers: self.headers.clone(),
+            redirects: self.redirects.clone(),
             content_type,
             auth: self.auth.clone(),
             tls,
