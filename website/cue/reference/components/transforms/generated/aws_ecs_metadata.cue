@@ -24,7 +24,7 @@ generated: components: transforms: aws_ecs_metadata: configuration: {
 		}
 	}
 	initial_retry_attempts: {
-		description: "The number of initial metadata refresh attempts before the transform starts."
+		description: "The number of times to attempt fetching metadata at startup before Vector begins processing events."
 		required:    false
 		type: uint: default: 3
 	}
@@ -104,7 +104,7 @@ generated: components: transforms: aws_ecs_metadata: configuration: {
 		}
 	}
 	refresh_interval_secs: {
-		description: "The interval between querying for updated metadata, in seconds."
+		description: "Interval between metadata refresh requests, in seconds."
 		required:    false
 		type: uint: {
 			default: 10
@@ -120,7 +120,7 @@ generated: components: transforms: aws_ecs_metadata: configuration: {
 		}
 	}
 	required: {
-		description: "Requires the transform to be able to successfully query the ECS metadata before starting to process the data."
+		description: "Requires the transform to successfully query the ECS metadata endpoint before processing events."
 		required:    false
 		type: bool: default: true
 	}

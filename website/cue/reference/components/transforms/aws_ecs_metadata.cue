@@ -33,8 +33,8 @@ components: transforms: aws_ecs_metadata: {
 		]
 		warnings: [
 			"""
-				Do not enable this transform if you are running Vector as an Aggregator, metadata
-				will be sourced from the Aggregator task's metadata endpoint and not the client's.
+				Do not enable this transform if you are running Vector as an Aggregator.  Metadata
+				will be sourced from the Aggregator task's metadata endpoint and not the originating task's endpoint.
 				""",
 		]
 		notices: []

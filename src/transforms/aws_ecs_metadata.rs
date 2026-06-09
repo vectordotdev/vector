@@ -154,7 +154,7 @@ pub struct EcsMetadata {
     ))]
     namespace: Option<OptionalTargetPath>,
 
-    /// The interval between querying for updated metadata, in seconds.
+    /// Interval between metadata refresh requests, in seconds.
     #[serde(default = "default_refresh_interval_secs")]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
     #[derivative(Default(value = "default_refresh_interval_secs()"))]
@@ -172,7 +172,7 @@ pub struct EcsMetadata {
     #[derivative(Default(value = "default_refresh_timeout_secs()"))]
     refresh_timeout_secs: Duration,
 
-    /// The number of initial metadata refresh attempts before the transform starts.
+    /// The number of times to attempt fetching metadata at startup before Vector begins processing events.
     #[serde(default = "default_initial_retry_attempts")]
     #[derivative(Default(value = "default_initial_retry_attempts()"))]
     initial_retry_attempts: usize,
@@ -187,7 +187,7 @@ pub struct EcsMetadata {
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     proxy: ProxyConfig,
 
-    /// Requires the transform to be able to successfully query the ECS metadata before starting to process the data.
+    /// Requires the transform to successfully query the ECS metadata endpoint before processing events.
     #[serde(default = "default_required")]
     #[derivative(Default(value = "default_required()"))]
     required: bool,
