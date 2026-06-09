@@ -84,6 +84,9 @@ pub fn interpolate_toml_table_with_env_vars(
 }
 
 /// Returns a new TOML `Table` with all string values interpolated.
+///
+/// Structural nodes — keys, integers, booleans, arrays, tables — are left
+/// untouched. Only string leaf values are passed through `interpolate_fn`.
 pub fn interpolate_toml_table(
     table: &Table,
     vars: &HashMap<String, String>,
@@ -93,20 +96,12 @@ pub fn interpolate_toml_table(
     let mut errors = Vec::new();
 
     for (key, value) in table {
-        let new_key = match interpolate_fn(key, vars) {
-            Ok(k) => k,
-            Err(errs) => {
-                errors.extend(errs);
-                key.clone()
-            }
-        };
-
         let new_value = match interpolate_toml_value(value, vars, &mut errors, interpolate_fn) {
             Some(v) => v,
             None => value.clone(),
         };
 
-        result.insert(new_key, new_value);
+        result.insert(key.clone(), new_value);
     }
 
     if errors.is_empty() {
@@ -123,18 +118,11 @@ fn interpolate_toml_value(
     interpolate_fn: InterpolateFn,
 ) -> Option<Value> {
     match value {
+        // Interpolation only replaces string contents; the result stays a string.
+        // The downstream schema-coercion pass (schema_coercion.rs) converts string
+        // values to declared scalar types (int/float/bool) where the schema requires.
         Value::String(s) => match interpolate_fn(s, vars) {
-            Ok(new) => {
-                if let Ok(i) = new.parse::<i64>() {
-                    Some(Value::Integer(i))
-                } else if let Ok(f) = new.parse::<f64>() {
-                    Some(Value::Float(f))
-                } else if let Ok(b) = new.parse::<bool>() {
-                    Some(Value::Boolean(b))
-                } else {
-                    Some(Value::String(new))
-                }
-            }
+            Ok(new) => Some(Value::String(new)),
             Err(errs) => {
                 errors.extend(errs);
                 None
@@ -279,7 +267,7 @@ mod test {
             [sources.demo_logs_1]
             type = "demo_logs"
             format = "json"
-            interval = 60
+            interval = "60"
 
             [transforms.t0]
             inputs = ["demo_logs_1"]

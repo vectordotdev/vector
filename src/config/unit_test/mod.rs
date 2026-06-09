@@ -100,7 +100,7 @@ pub async fn build_unit_tests_main(
     signal_handler: &mut signal::SignalHandler,
 ) -> Result<Vec<UnitTest>, Vec<String>> {
     init_log_schema_from_paths(paths, false)?;
-    let mut secrets_backends_loader = loading::load_secret_backends_from_paths(paths)?;
+    let mut secrets_backends_loader = loading::load_secret_backends_from_paths(paths, true)?;
     let config_builder = if secrets_backends_loader.has_secrets_to_retrieve() {
         let resolved_secrets = secrets_backends_loader
             .retrieve(&mut signal_handler.subscribe())

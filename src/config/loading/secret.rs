@@ -45,6 +45,8 @@ pub(crate) struct SecretBackendOuter {
 pub struct SecretBackendLoader {
     backends: IndexMap<ComponentKey, SecretBackends>,
     pub(crate) secret_keys: HashMap<String, HashSet<String>>,
+    #[serde(skip)]
+    interpolate_env: bool,
 }
 
 impl SecretBackendLoader {
@@ -52,7 +54,13 @@ impl SecretBackendLoader {
         Self {
             backends: IndexMap::new(),
             secret_keys: HashMap::new(),
+            interpolate_env: true,
         }
+    }
+
+    pub(crate) const fn with_interpolate_env(mut self, interpolate_env: bool) -> Self {
+        self.interpolate_env = interpolate_env;
+        self
     }
 
     pub(crate) async fn retrieve(
@@ -91,6 +99,10 @@ impl SecretBackendLoader {
 }
 
 impl Process for SecretBackendLoader {
+    fn should_interpolate_env(&self) -> bool {
+        self.interpolate_env
+    }
+
     fn postprocess(&mut self, table: Table) -> Result<Table, Vec<String>> {
         collect_secret_keys_from_table(&table, &mut self.secret_keys);
         Ok(table)
@@ -340,9 +352,11 @@ mod tests {
         let log_fields = &result["inputs"]["log_fields"];
         let log_fields = log_fields.as_table().expect("log_fields is a table");
 
+        // Interpolation leaves string leaves as strings; schema_coercion converts
+        // them to declared scalar types downstream.
         assert_eq!(log_fields["str"], Value::String("hello".into()));
-        assert_eq!(log_fields["int"], Value::Integer(42));
-        assert_eq!(log_fields["float"], Value::Float(3.14));
-        assert_eq!(log_fields["bool"], Value::Boolean(true));
+        assert_eq!(log_fields["int"], Value::String("42".into()));
+        assert_eq!(log_fields["float"], Value::String("3.14".into()));
+        assert_eq!(log_fields["bool"], Value::String("true".into()));
     }
 }

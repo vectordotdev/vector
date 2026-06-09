@@ -300,13 +300,38 @@ fn merge_with_value(res: &mut Table, name: String, value: toml::Value) -> Result
     Ok(())
 }
 
-/// Deserialize a TOML `Table` into a `T`.
+/// Deserialize a TOML `Table` into a `T`, walking the root `ConfigBuilder`
+/// JSON Schema to coerce string scalars to their declared types and to detect
+/// unknown fields with full field paths.
 pub(super) fn deserialize_table<T: serde::de::DeserializeOwned>(
     table: Table,
 ) -> Result<T, Vec<String>> {
-    let mut table_json = serde_json::to_value(table)
+    deserialize_table_inner(table, None)
+}
+
+/// Deserialize a hinted component sub-table (e.g. the `sources` map from a
+/// namespaced directory) against the root schema by temporarily wrapping it
+/// under `wrapper_key`, then extracting the inner value after coercion. This
+/// gives the namespaced path the same schema coverage as the inline form.
+pub(super) fn deserialize_table_wrapped<T: serde::de::DeserializeOwned>(
+    table: Table,
+    wrapper_key: &str,
+) -> Result<T, Vec<String>> {
+    deserialize_table_inner(table, Some(wrapper_key))
+}
+
+fn deserialize_table_inner<T: serde::de::DeserializeOwned>(
+    table: Table,
+    wrapper_key: Option<&str>,
+) -> Result<T, Vec<String>> {
+    let inner_json = serde_json::to_value(table)
         .map_err(|err| err.to_string())
         .map_err(|err| vec![err])?;
+
+    let mut table_json = match wrapper_key {
+        Some(key) => serde_json::json!({ key: inner_json }),
+        None => inner_json,
+    };
 
     let schema = generate_root_schema::<ConfigBuilder>().map_err(|e| vec![format!("{e:?}")])?;
     let schema_json = serde_json::to_value(schema).map_err(|err| vec![err.to_string()])?;
@@ -318,7 +343,15 @@ pub(super) fn deserialize_table<T: serde::de::DeserializeOwned>(
     )
     .map_err(|err| vec![err.to_string()])?;
 
-    serde::Deserialize::deserialize(table_json).map_err(|err| vec![err.to_string()])
+    let to_deserialize = match wrapper_key {
+        Some(key) => table_json
+            .as_object_mut()
+            .and_then(|m| m.remove(key))
+            .ok_or_else(|| vec![format!("internal: missing wrapper key '{key}'")])?,
+        None => table_json,
+    };
+
+    serde::Deserialize::deserialize(to_deserialize).map_err(|err| vec![err.to_string()])
 }
 
 fn string_from_input<R: Read>(mut input: R) -> Result<String, Vec<String>> {

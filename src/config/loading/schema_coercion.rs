@@ -444,14 +444,16 @@ fn coerce_object(
         .and_then(|v| v.as_bool())
         == Some(false);
     let known_for_unevaluated: Option<HashSet<String>> = if unevaluated_props_false {
-        let type_is_known = obj
-            .get("type")
-            .and_then(|t| t.as_str())
+        let type_val = obj.get("type").and_then(|t| t.as_str());
+        let type_is_known = type_val
             .map(|tv| schema_contains_type_discriminant(schema, definitions, tv))
             .unwrap_or(false); // no `type` field → not a component config → skip check
         if type_is_known {
             let mut set = HashSet::new();
-            collect_known_properties(schema, definitions, &mut set);
+            // Filter `oneOf` variants by the value's discriminant so properties
+            // valid in *other* variants (e.g. a Kafka-only field on an HTTP sink)
+            // still trigger the unknown-field check.
+            collect_known_properties(schema, definitions, type_val, &mut set);
             Some(set)
         } else {
             None
@@ -499,14 +501,19 @@ fn coerce_object(
             result?;
         } else {
             if let Some(ref known) = known_for_unevaluated
-                && !known.contains(key_str) {
-                    path_components.truncate(initial_len);
-                    return UnexpectedPropertySnafu {
-                        path: path_components.join("."),
-                        key: key_str.to_string(),
-                    }
-                    .fail();
-                }
+                && !known.contains(key_str)
+            {
+                // Vector's generated JSON Schema currently does not emit
+                // `#[serde(alias = "...")]` aliases (TODO in vector-config),
+                // so a key absent from the schema may still be a legitimate
+                // serde alias. Warn here for visibility; serde performs the
+                // authoritative unknown-field check downstream where it has
+                // alias information.
+                warn!(
+                    message = "Unknown field in config, deferring to serde for alias resolution.",
+                    path = %path_components.join("."),
+                );
+            }
             path_components.truncate(initial_len);
         }
     }
@@ -637,10 +644,17 @@ fn coerce_one_of(
     Ok(())
 }
 
-/// Collect all property names declared in `schema`, recursively through `$ref`, `allOf`,
-/// `anyOf`, and `oneOf`. Used to detect unknown fields in objects whose schema declares
-/// `properties` but no `additionalProperties`.
-fn collect_known_properties<'a>(schema: &'a Value, definitions: Option<&'a Value>, out: &mut HashSet<String>) {
+/// Collect property names declared in `schema`, recursively through `$ref`, `allOf`,
+/// `anyOf`, and `oneOf`. When `discriminant` is `Some`, `oneOf` traversal is filtered
+/// to only the variant whose `properties.type.const` matches — so unknown-field
+/// detection on a tagged-union component doesn't accept fields that are valid only
+/// in *other* variants.
+fn collect_known_properties<'a>(
+    schema: &'a Value,
+    definitions: Option<&'a Value>,
+    discriminant: Option<&str>,
+    out: &mut HashSet<String>,
+) {
     let resolved = if let Some(ref_str) = schema.get("$ref").and_then(|r| r.as_str()) {
         let key = ref_str.strip_prefix("#/definitions/").unwrap_or("");
         match definitions.and_then(|d| d.get(key)) {
@@ -655,10 +669,38 @@ fn collect_known_properties<'a>(schema: &'a Value, definitions: Option<&'a Value
         out.extend(props.keys().cloned());
     }
 
-    for kw in ["allOf", "anyOf", "oneOf"] {
+    for kw in ["allOf", "anyOf"] {
         if let Some(variants) = resolved.get(kw).and_then(|v| v.as_array()) {
             for sub in variants {
-                collect_known_properties(sub, definitions, out);
+                collect_known_properties(sub, definitions, discriminant, out);
+            }
+        }
+    }
+
+    if let Some(variants) = resolved.get("oneOf").and_then(|v| v.as_array()) {
+        match discriminant {
+            Some(disc) => {
+                // Only collect properties from the variant whose `type` const matches.
+                // If no variant matches (e.g. untagged or non-component oneOf), fall back
+                // to including all variants so callers don't get false positives.
+                let matched: Vec<&Value> = variants
+                    .iter()
+                    .filter(|v| schema_matches_type_discriminant(v, definitions, disc))
+                    .collect();
+                if matched.is_empty() {
+                    for sub in variants {
+                        collect_known_properties(sub, definitions, discriminant, out);
+                    }
+                } else {
+                    for sub in matched {
+                        collect_known_properties(sub, definitions, discriminant, out);
+                    }
+                }
+            }
+            None => {
+                for sub in variants {
+                    collect_known_properties(sub, definitions, discriminant, out);
+                }
             }
         }
     }
@@ -1005,7 +1047,10 @@ mod test {
     }
 
     #[test]
-    fn test_unknown_field_in_known_component_is_an_error() {
+    fn test_unknown_field_in_known_component_passes_through() {
+        // Unknown fields are intentionally non-fatal in the coercion pass while
+        // `vector-config` does not emit `#[serde(alias = ...)]` aliases. The
+        // pass logs a warning and defers to serde, which has alias info.
         let mut input = json!({
             "sources": {
                 "source0": {
@@ -1020,11 +1065,9 @@ mod test {
             serde_json::to_value(generate_root_schema::<ConfigBuilder>().unwrap()).unwrap();
         let result = coerce(&mut input, &schema, schema.get("definitions"), &mut Vec::new());
 
-        assert!(result.is_err(), "expected error for unknown field, got ok");
-        let msg = result.unwrap_err().to_string();
         assert!(
-            msg.contains("totally_unknown_field"),
-            "error message should name the unknown field, got: {msg}"
+            result.is_ok(),
+            "unknown field should pass coercion (serde validates downstream), got: {result:?}"
         );
     }
 

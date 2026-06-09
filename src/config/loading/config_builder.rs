@@ -3,7 +3,10 @@ use std::collections::HashMap;
 use indexmap::IndexMap;
 use toml::value::Table;
 
-use super::{ComponentHint, Process, deserialize_table, interpolate_toml_table_with_secrets, loader};
+use super::{
+    ComponentHint, Process, deserialize_table, deserialize_table_wrapped,
+    interpolate_toml_table_with_secrets, loader,
+};
 use crate::config::{
     ComponentKey, ConfigBuilder, EnrichmentTableOuter, SinkOuter, SourceOuter, TestDefinition,
     TransformOuter,
@@ -60,26 +63,38 @@ impl Process for ConfigBuilderLoader {
     fn merge(&mut self, table: Table, hint: Option<ComponentHint>) -> Result<(), Vec<String>> {
         match hint {
             Some(ComponentHint::Source) => {
-                self.builder.sources.extend(deserialize_table::<
-                    IndexMap<ComponentKey, SourceOuter>,
-                >(table)?);
+                self.builder
+                    .sources
+                    .extend(deserialize_table_wrapped::<
+                        IndexMap<ComponentKey, SourceOuter>,
+                    >(table, "sources")?);
             }
             Some(ComponentHint::Sink) => {
-                self.builder.sinks.extend(
-                    deserialize_table::<IndexMap<ComponentKey, SinkOuter<_>>>(table)?,
-                );
+                self.builder
+                    .sinks
+                    .extend(deserialize_table_wrapped::<
+                        IndexMap<ComponentKey, SinkOuter<_>>,
+                    >(table, "sinks")?);
             }
             Some(ComponentHint::Transform) => {
-                self.builder.transforms.extend(deserialize_table::<
-                    IndexMap<ComponentKey, TransformOuter<_>>,
-                >(table)?);
+                self.builder
+                    .transforms
+                    .extend(deserialize_table_wrapped::<
+                        IndexMap<ComponentKey, TransformOuter<_>>,
+                    >(table, "transforms")?);
             }
             Some(ComponentHint::EnrichmentTable) => {
-                self.builder.enrichment_tables.extend(deserialize_table::<
-                    IndexMap<ComponentKey, EnrichmentTableOuter<_>>,
-                >(table)?);
+                self.builder
+                    .enrichment_tables
+                    .extend(deserialize_table_wrapped::<
+                        IndexMap<ComponentKey, EnrichmentTableOuter<_>>,
+                    >(table, "enrichment_tables")?);
             }
             Some(ComponentHint::Test) => {
+                // Tests are loaded as a name -> TestDefinition map from
+                // namespaced dirs and converted to Vec<TestDefinition> at the
+                // builder; the schema represents tests as a Vec, so this branch
+                // skips the wrap-and-coerce path that the component hints use.
                 self.builder.tests.extend(
                     deserialize_table::<IndexMap<String, TestDefinition<String>>>(table)?
                         .into_iter()

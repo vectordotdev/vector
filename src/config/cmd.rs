@@ -55,6 +55,14 @@ pub struct Opts {
         value_delimiter(',')
     )]
     pub config_dirs: Vec<PathBuf>,
+
+    /// Disable interpolation of environment variables in configuration files.
+    #[arg(
+        long,
+        env = "VECTOR_DISABLE_ENV_VAR_INTERPOLATION",
+        default_value = "false"
+    )]
+    pub disable_env_var_interpolation: bool,
 }
 
 impl Opts {
@@ -167,7 +175,7 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
     // Start by serializing to a `ConfigBuilder`. This will leverage validation in config
     // builder fields which we'll use to error out if required.
     let (paths, builder) = match process_paths(&paths) {
-        Some(paths) => match load_builder_from_paths(&paths, true) {
+        Some(paths) => match load_builder_from_paths(&paths, !opts.disable_env_var_interpolation) {
             Ok(builder) => (paths, builder),
             Err(errs) => return handle_config_errors(errs),
         },

@@ -144,7 +144,8 @@ pub async fn load_from_paths_with_provider_and_secrets(
     interpolate_env: bool,
 ) -> Result<Config, Vec<String>> {
     // Load secret backends first
-    let mut secrets_backends_loader = load_secret_backends_from_paths(config_paths)?;
+    let mut secrets_backends_loader =
+        load_secret_backends_from_paths(config_paths, interpolate_env)?;
     // And then, if needed, retrieve secrets from configured backends
     let mut builder = if secrets_backends_loader.has_secrets_to_retrieve() {
         debug!(message = "Secret placeholders found, retrieving secrets from configured backends.");
@@ -250,8 +251,12 @@ pub fn load_source_from_paths(
 /// Uses `SecretBackendLoader` to process `ConfigPaths`, deserializing to a `SecretBackends`.
 pub fn load_secret_backends_from_paths(
     config_paths: &[ConfigPath],
+    interpolate_env: bool,
 ) -> Result<SecretBackendLoader, Vec<String>> {
-    loader_from_paths(SecretBackendLoader::new(), config_paths)
+    loader_from_paths(
+        SecretBackendLoader::new().with_interpolate_env(interpolate_env),
+        config_paths,
+    )
 }
 
 pub fn load_from_str(input: &str, format: Format) -> Result<Config, Vec<String>> {
