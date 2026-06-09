@@ -203,12 +203,7 @@ impl Aggregator {
             .map(|s| s.split(',').map(|t| t.trim().to_string()).collect())
             .unwrap_or_default();
         let payload_aggkey = PayloadAggregationKey {
-            // prefer env from container tags but fallback if not present
-            env: container_tags
-                .iter()
-                .find_map(|tag| tag.strip_prefix("env:"))
-                .map(|s| s.to_string())
-                .unwrap_or_else(|| partition_key.env.clone().unwrap_or_default()),
+            env: partition_key.env.clone().unwrap_or_default(),
             hostname: partition_key.hostname.clone().unwrap_or_default(),
             version: trace
                 .get(event_path!("app_version"))

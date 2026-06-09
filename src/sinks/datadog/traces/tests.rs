@@ -340,15 +340,23 @@ async fn stats_payload_has_container_tags() {
     );
 
     let mut agg = Aggregator::new(Arc::from("a_key"));
-    let pkey = default_partition_key();
+    let pkey = PartitionKey {
+        env: Some("trace_env".to_string()),
+        ..default_partition_key()
+    };
     agg.handle_trace(&pkey, &t);
 
     let flush = agg.flush(true);
     assert_eq!(flush.len(), 1);
 
     let csp = &flush[0];
-    assert_eq!(csp.env, "container_env");
+    assert_eq!(csp.env, "trace_env");
     assert_eq!(csp.container_id, "container123");
+    assert!(
+        csp.tags.iter().any(|t| t == "env:container_env"),
+        "expected env:container_env in stats payload tags, got {:?}",
+        csp.tags
+    );
     assert!(
         csp.tags.iter().any(|t| t == "location:container_location"),
         "expected location:container_location in stats payload tags, got {:?}",
@@ -458,6 +466,11 @@ async fn stats_payload_has_container_tags_with_span_env() {
 
     let csp = &flush[0];
     assert_eq!(csp.env, "span_env");
+    assert!(
+        csp.tags.iter().any(|tag| tag == "env:container_env"),
+        "expected env:container_env in stats payload tags, got {:?}",
+        csp.tags
+    );
     assert!(
         csp.tags
             .iter()
