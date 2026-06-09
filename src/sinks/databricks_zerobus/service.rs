@@ -441,17 +441,15 @@ impl ZerobusService {
             // own recovery budget is exhausted. Both layers are at-least-once, so
             // a reconnect may re-send unacknowledged batches.
             let stream_options = &self.config.stream_options;
-            let mut builder = self
+            let builder = self
                 .sdk
                 .stream_builder()
                 .table(self.config.table_name.clone())
                 .oauth(client_id, client_secret)
                 .arrow(Arc::clone(&schema.arrow_schema))
                 .server_lack_of_ack_timeout_ms(stream_options.server_lack_of_ack_timeout_ms)
-                .flush_timeout_ms(stream_options.flush_timeout_ms);
-            if let Some(compression) = stream_options.compression {
-                builder = builder.ipc_compression(Some(compression.into()));
-            }
+                .flush_timeout_ms(stream_options.flush_timeout_ms)
+                .ipc_compression(stream_options.compression.into());
             let stream = builder
                 .build_arrow()
                 .await

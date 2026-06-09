@@ -48,20 +48,24 @@ impl DatabricksAuthentication {
 
 /// Arrow IPC compression codec for Zerobus Arrow Flight payloads.
 #[configurable_component]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum Compression {
+    /// No compression.
+    #[default]
+    None,
     /// LZ4 frame compression.
     Lz4Frame,
     /// Zstandard compression.
     Zstd,
 }
 
-impl From<Compression> for arrow::ipc::CompressionType {
+impl From<Compression> for Option<arrow::ipc::CompressionType> {
     fn from(value: Compression) -> Self {
         match value {
-            Compression::Lz4Frame => arrow::ipc::CompressionType::LZ4_FRAME,
-            Compression::Zstd => arrow::ipc::CompressionType::ZSTD,
+            Compression::None => None,
+            Compression::Lz4Frame => Some(arrow::ipc::CompressionType::LZ4_FRAME),
+            Compression::Zstd => Some(arrow::ipc::CompressionType::ZSTD),
         }
     }
 }
@@ -84,9 +88,10 @@ pub struct ZerobusStreamOptions {
     #[configurable(metadata(docs::examples = 60000))]
     pub server_lack_of_ack_timeout_ms: u64,
 
-    /// Optional Arrow IPC compression for Flight payloads. Defaults to no compression.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub compression: Option<Compression>,
+    /// Arrow IPC compression for Flight payloads. Defaults to no compression.
+    #[configurable(derived)]
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
+    pub compression: Compression,
 }
 
 impl Default for ZerobusStreamOptions {
@@ -94,7 +99,7 @@ impl Default for ZerobusStreamOptions {
         Self {
             flush_timeout_ms: default_flush_timeout_ms(),
             server_lack_of_ack_timeout_ms: default_server_ack_timeout_ms(),
-            compression: None,
+            compression: Compression::None,
         }
     }
 }
@@ -432,26 +437,34 @@ mod tests {
     fn test_stream_options_compression_deserializes() {
         let opts: ZerobusStreamOptions =
             serde_json::from_str(r#"{"compression":"zstd"}"#).expect("should parse zstd");
-        assert_eq!(opts.compression, Some(Compression::Zstd));
+        assert_eq!(opts.compression, Compression::Zstd);
 
         let opts: ZerobusStreamOptions =
             serde_json::from_str(r#"{"compression":"lz4_frame"}"#).expect("should parse lz4_frame");
-        assert_eq!(opts.compression, Some(Compression::Lz4Frame));
+        assert_eq!(opts.compression, Compression::Lz4Frame);
+
+        let opts: ZerobusStreamOptions =
+            serde_json::from_str(r#"{"compression":"none"}"#).expect("should parse none");
+        assert_eq!(opts.compression, Compression::None);
 
         // Omitting the field leaves compression disabled.
         let opts: ZerobusStreamOptions = serde_json::from_str("{}").expect("should parse empty");
-        assert_eq!(opts.compression, None);
+        assert_eq!(opts.compression, Compression::None);
     }
 
     #[test]
     fn test_compression_maps_to_arrow_ipc() {
         assert_eq!(
-            arrow::ipc::CompressionType::from(Compression::Lz4Frame),
-            arrow::ipc::CompressionType::LZ4_FRAME,
+            Option::<arrow::ipc::CompressionType>::from(Compression::None),
+            None,
         );
         assert_eq!(
-            arrow::ipc::CompressionType::from(Compression::Zstd),
-            arrow::ipc::CompressionType::ZSTD,
+            Option::<arrow::ipc::CompressionType>::from(Compression::Lz4Frame),
+            Some(arrow::ipc::CompressionType::LZ4_FRAME),
+        );
+        assert_eq!(
+            Option::<arrow::ipc::CompressionType>::from(Compression::Zstd),
+            Some(arrow::ipc::CompressionType::ZSTD),
         );
     }
 
