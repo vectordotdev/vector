@@ -170,6 +170,7 @@ libc = { version = "0.2", default-features = false, features = ["std"] }
 metrics = "0.24.2"
 metrics-tracing-context = { version = "0.17.0", default-features = false }
 metrics-util = { version = "0.18.0", default-features = false, features = ["registry"] }
+mlua = { version = "0.11", default-features = false, features = ["lua54", "send", "vendored"] }
 nom = { version = "8.0.0", default-features = false }
 ordered-float = { version = "4.6.0", default-features = false }
 pastey = { version = "0.2", default-features = false }
@@ -336,11 +337,7 @@ prost-reflect = { workspace = true, optional = true }
 prost-types = { workspace = true, optional = true }
 
 # Databricks Zerobus
-databricks-zerobus-ingest-sdk = { version = "2.0.1", optional = true }
-# The SDK returns prost-types 0.14 DescriptorProto values; prost-reflect (used by the rest
-# of the sink) is on prost-types 0.13. We bridge the two via wire-format re-encoding.
-prost-014 = { package = "prost", version = "0.14", optional = true }
-prost-types-014 = { package = "prost-types", version = "0.14", optional = true }
+databricks-zerobus-ingest-sdk = { version = "2.0.1", optional = true, features = ["arrow-flight"] }
 
 # GCP
 goauth = { version = "0.16.0", optional = true }
@@ -361,9 +358,9 @@ greptimedb-ingester = { version = "0.17.0", default-features = false, optional =
 # External libs
 arc-swap = { workspace = true, default-features = false, optional = true }
 async-compression = { version = "0.4.27", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
-arrow = { version = "56.2.0", default-features = false, features = ["ipc"], optional = true }
-arrow-schema = { version = "56.2.0", default-features = false, optional = true }
-parquet = { version = "56.2.0", default-features = false, features = [
+arrow = { version = "58.2.0", default-features = false, features = ["ipc"], optional = true }
+arrow-schema = { version = "58.2.0", default-features = false, optional = true }
+parquet = { version = "58.2.0", default-features = false, features = [
   "arrow",
   "snap",
   "zstd",
@@ -463,7 +460,7 @@ arr_macro = { version = "0.2.1" }
 heim = { git = "https://github.com/vectordotdev/heim.git", branch = "update-deps", default-features = false, features = ["disk"] }
 
 # make sure to update the external docs when the Lua version changes
-mlua = { version = "0.10.5", default-features = false, features = ["lua54", "send", "vendored", "macros"], optional = true }
+mlua = { workspace = true, features = ["macros"], optional = true }
 sysinfo = "0.37.2"
 byteorder = "1.5.0"
 
@@ -934,7 +931,7 @@ sinks-chronicle = []
 sinks-clickhouse = ["dep:nom", "dep:rust_decimal", "codecs-arrow"]
 sinks-console = []
 sinks-databend = ["dep:databend-client"]
-sinks-databricks-zerobus = ["dep:databricks-zerobus-ingest-sdk", "dep:prost-reflect", "dep:prost-014", "dep:prost-types-014", "dep:base64"]
+sinks-databricks-zerobus = ["dep:databricks-zerobus-ingest-sdk", "codecs-arrow"]
 sinks-datadog_events = []
 sinks-datadog_logs = []
 sinks-datadog_metrics = ["protobuf-build", "dep:prost", "dep:prost-reflect"]
