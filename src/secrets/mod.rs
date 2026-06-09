@@ -96,6 +96,6 @@ mod tests {
             "type": "file",
             "path": "/tmp/foo"
         }));
-        eprintln!("flat parse: {ok:?}");
+        assert!(ok.is_ok(), "expected flat SecretBackends to parse, got: {ok:?}");
     }
 }
