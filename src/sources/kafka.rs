@@ -46,7 +46,7 @@ use vector_lib::{
     },
     config::{LegacyKey, LogNamespace},
     configurable::configurable_component,
-    event::{BatchStatus, BatchStatusReceiver},
+    event::BatchStatus,
     finalizer::OrderedFinalizer,
     lookup::{OwnedValuePath, lookup_v2::OptionalValuePath, owned_value_path, path},
     source_sender::CHUNK_SIZE,
@@ -657,8 +657,7 @@ impl ConsumerStateInner<Consuming> {
                                 // And we want to ignore empty messages
                                 b.try_into().ok()
                             ).collect();
-                            let batch_result = parse_message(msgs, &decoder, &keys, &mut out, acknowledgements, log_namespace).await;
-                            Self::finalize_batch(batch_result, finalizer.as_ref());
+                            parse_message(msgs, &decoder, &keys, &mut out, finalizer.as_ref(), acknowledgements, log_namespace).await;
 
                             for error in errors  {
                                 match error {
@@ -702,17 +701,6 @@ impl ConsumerStateInner<Consuming> {
 
     pub const fn keep_consuming(self, deadline: OptionDeadline) -> (OptionDeadline, ConsumerState) {
         (deadline, ConsumerState::Consuming(self))
-    }
-
-    fn finalize_batch(
-        batch: Vec<(FinalizerEntry, BatchStatusReceiver)>,
-        finalizer: Option<&OrderedFinalizer<FinalizerEntry>>,
-    ) {
-        if let Some(f) = finalizer.as_ref() {
-            for (msg, receiver) in batch {
-                f.add(msg, receiver);
-            }
-        }
     }
 }
 
@@ -982,9 +970,10 @@ async fn parse_message(
     decoder: &Decoder,
     keys: &Keys,
     out: &mut SourceSender,
+    finalizer: Option<&OrderedFinalizer<FinalizerEntry>>,
     acknowledgements: bool,
     log_namespace: LogNamespace,
-) -> Vec<(FinalizerEntry, BatchStatusReceiver)> {
+) {
     let streams = messages
         .into_iter()
         .filter_map(|msg| {
@@ -1011,7 +1000,6 @@ async fn parse_message(
             )
         });
 
-    let mut entries = Vec::default();
     for (entry, count, receiver, mut stream) in streams {
         match out.send_event_stream(&mut stream).await {
             Err(_) => {
@@ -1019,11 +1007,12 @@ async fn parse_message(
             }
             Ok(_) => {
                 drop(stream);
-                entries.push((entry, receiver));
+                if let Some(f) = finalizer.as_ref() {
+                    f.add(entry, receiver);
+                }
             }
         }
     }
-    entries
 }
 
 // Turn the received message into a stream of parsed events.
