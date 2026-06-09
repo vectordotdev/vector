@@ -1,17 +1,15 @@
 #![allow(missing_docs)]
 
-use std::{fmt, fs::remove_dir_all, path::PathBuf};
+use std::{collections::HashMap, fmt, fs::remove_dir_all, path::PathBuf};
 
 use clap::Parser;
 use colored::*;
 use exitcode::ExitCode;
 
 use crate::{
-    config::{self, Config, ConfigDiff, loading::ConfigBuilderLoader},
-    topology::{
-        self,
-        builder::{TopologyPieces, TopologyPiecesBuilder},
-    },
+    config::{self, Config, ConfigDiff},
+    extra_context::ExtraContext,
+    topology::{self, builder::TopologyPieces},
 };
 
 const TEMPORARY_DIRECTORY: &str = "validate_tmp";
@@ -78,14 +76,6 @@ pub struct Opts {
         value_delimiter(',')
     )]
     pub config_dirs: Vec<PathBuf>,
-
-    /// Disable interpolation of environment variables in configuration files.
-    #[arg(
-        long,
-        env = "VECTOR_DISABLE_ENV_VAR_INTERPOLATION",
-        default_value = "false"
-    )]
-    pub disable_env_var_interpolation: bool,
 }
 
 impl Opts {
@@ -151,9 +141,7 @@ pub fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
         fmt.title(format!("Failed to load {:?}", &paths_list));
         fmt.sub_error(errors);
     };
-    let builder = ConfigBuilderLoader::default()
-        .interpolate_env(!opts.disable_env_var_interpolation)
-        .load_from_paths(&paths)
+    let builder = config::load_builder_from_paths(&paths, true)
         .map_err(&mut report_error)
         .ok()?;
     config::init_log_schema(builder.global.log_schema.clone(), true);
@@ -183,11 +171,10 @@ pub fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
 async fn validate_environment(opts: &Opts, config: &Config, fmt: &mut Formatter) -> bool {
     let diff = ConfigDiff::initial(config);
 
-    let mut pieces = match validate_components(config, &diff, fmt).await {
-        Some(pieces) => pieces,
-        _ => {
-            return false;
-        }
+    let mut pieces = if let Some(pieces) = validate_components(config, &diff, fmt).await {
+        pieces
+    } else {
+        return false;
     };
     opts.skip_healthchecks || validate_healthchecks(opts, config, &diff, &mut pieces, fmt).await
 }
@@ -197,7 +184,9 @@ async fn validate_components(
     diff: &ConfigDiff,
     fmt: &mut Formatter,
 ) -> Option<TopologyPieces> {
-    match TopologyPiecesBuilder::new(config, diff).build().await {
+    match topology::TopologyPieces::build(config, diff, HashMap::new(), ExtraContext::default(), None)
+        .await
+    {
         Ok(pieces) => {
             fmt.success("Component configuration");
             Some(pieces)
@@ -241,17 +230,17 @@ async fn validate_healthchecks(
                     .healthcheck()
                     .enabled
                 {
-                    fmt.success(format!("Health check \"{id}\""));
+                    fmt.success(format!("Health check \"{}\"", id));
                 } else {
-                    fmt.warning(format!("Health check disabled for \"{id}\""));
+                    fmt.warning(format!("Health check disabled for \"{}\"", id));
                     validated &= !opts.deny_warnings;
                 }
             }
-            Ok(Err(e)) => failed(format!("Health check for \"{id}\" failed: {e}")),
+            Ok(Err(e)) => failed(format!("Health check for \"{}\" failed: {}", id, e)),
             Err(error) if error.is_cancelled() => {
-                failed(format!("Health check for \"{id}\" was cancelled"))
+                failed(format!("Health check for \"{}\" was cancelled", id))
             }
-            Err(_) => failed(format!("Health check for \"{id}\" panicked")),
+            Err(_) => failed(format!("Health check for \"{}\" panicked", id)),
         }
         trace!("Healthcheck for {id} done.");
     }

@@ -3,8 +3,9 @@ use std::path::PathBuf;
 use clap::Parser;
 use serde_json::Value;
 
-use super::{ConfigBuilder, load_source_from_paths, loading::ConfigBuilderLoader, process_paths};
-use crate::{cli::handle_config_errors, config};
+use super::{load_builder_from_paths, load_source_from_paths, process_paths, ConfigBuilder};
+use crate::cli::handle_config_errors;
+use crate::config;
 
 #[derive(Parser, Debug, Clone)]
 #[command(rename_all = "kebab-case")]
@@ -54,14 +55,6 @@ pub struct Opts {
         value_delimiter(',')
     )]
     pub config_dirs: Vec<PathBuf>,
-
-    /// Disable interpolation of environment variables in configuration files.
-    #[arg(
-        long,
-        env = "VECTOR_DISABLE_ENV_VAR_INTERPOLATION",
-        default_value = "false"
-    )]
-    pub disable_env_var_interpolation: bool,
 }
 
 impl Opts {
@@ -174,15 +167,10 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
     // Start by serializing to a `ConfigBuilder`. This will leverage validation in config
     // builder fields which we'll use to error out if required.
     let (paths, builder) = match process_paths(&paths) {
-        Some(paths) => {
-            match ConfigBuilderLoader::default()
-                .interpolate_env(!opts.disable_env_var_interpolation)
-                .load_from_paths(&paths)
-            {
-                Ok(builder) => (paths, builder),
-                Err(errs) => return handle_config_errors(errs),
-            }
-        }
+        Some(paths) => match load_builder_from_paths(&paths, true) {
+            Ok(builder) => (paths, builder),
+            Err(errs) => return handle_config_errors(errs),
+        },
         None => return exitcode::CONFIG,
     };
 
@@ -208,8 +196,8 @@ mod tests {
 
     use proptest::{num, prelude::*, sample};
     use rand::{
-        SeedableRng,
         prelude::{SliceRandom, StdRng},
+        SeedableRng,
     };
     use serde_json::json;
     use similar_asserts::assert_eq;
@@ -217,12 +205,14 @@ mod tests {
         SinkDescription, SourceDescription, TransformDescription,
     };
 
-    use super::merge_json;
+    use crate::config::{interpolate, Format};
     use crate::{
-        config::{ConfigBuilder, Format, cmd::serialize_to_json, vars},
+        config::{cmd::serialize_to_json, ConfigBuilder},
         generate,
-        generate::{TransformInputsStrategy, generate_example},
+        generate::{generate_example, TransformInputsStrategy},
     };
+
+    use super::merge_json;
 
     #[test]
     fn test_array_override() {
@@ -252,14 +242,15 @@ mod tests {
             r#"
             [sources.in]
             type = "demo_logs"
-            format = "${{{env_var}}}"
+            format = "${{{}}}"
 
             [sinks.out]
             type = "blackhole"
-            inputs = ["${{{env_var_in_arr}}}"]
-        "#
+            inputs = ["${{{}}}"]
+        "#,
+            env_var, env_var_in_arr
         );
-        let interpolated_config_source = vars::interpolate(
+        let interpolated_config_source = interpolate(
             config_source.as_ref(),
             &HashMap::from([
                 (env_var.to_string(), "syslog".to_string()),
@@ -328,18 +319,18 @@ mod tests {
             "{}/{}/{}",
             sources
                 .iter()
-                .map(|source| format!("{source}:{source}"))
+                .map(|source| format!("{}:{}", source, source))
                 .collect::<Vec<_>>()
                 .join(","),
             transforms
                 .iter()
-                .map(|transform| format!("{transform}:{transform}"))
+                .map(|transform| format!("{}:{}", transform, transform))
                 .chain(vec!["manually-added-remap:remap".to_string()])
                 .collect::<Vec<_>>()
                 .join(","),
             sinks
                 .iter()
-                .map(|sink| format!("{sink}:{sink}"))
+                .map(|sink| format!("{}:{}", sink, sink))
                 .collect::<Vec<_>>()
                 .join(","),
         );

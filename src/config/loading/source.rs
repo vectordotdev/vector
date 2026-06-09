@@ -1,5 +1,3 @@
-use std::io::Read;
-
 use serde_toml_merge::merge_into_table;
 use toml::{map::Map, value::Table};
 
@@ -9,28 +7,25 @@ pub struct SourceLoader {
     table: Table,
 }
 
-impl SourceLoader {
-    pub fn new() -> Self {
-        Self { table: Map::new() }
-    }
-}
-
 impl Default for SourceLoader {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl Process for SourceLoader {
-    /// Prepares input by simply reading bytes to a string. Unlike other loaders, there's no
-    /// interpolation of environment variables. This is on purpose to preserve the original config.
-    fn prepare<R: Read>(&mut self, mut input: R) -> Result<String, Vec<String>> {
-        let mut source_string = String::new();
-        input
-            .read_to_string(&mut source_string)
-            .map_err(|e| vec![e.to_string()])?;
+impl SourceLoader {
+    pub fn new() -> Self {
+        Self { table: Map::new() }
+    }
+}
 
-        Ok(source_string)
+impl Process for SourceLoader {
+    fn should_interpolate_env(&self) -> bool {
+        false
+    }
+
+    fn postprocess(&mut self, table: Table) -> Result<Table, Vec<String>> {
+        Ok(table)
     }
 
     /// Merge values by combining with the internal TOML `Table`.

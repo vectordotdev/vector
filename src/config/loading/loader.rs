@@ -1,10 +1,13 @@
+use std::collections::HashMap;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 
+use super::{component_name, interpolate_toml_table_with_env_vars, open_file, read_dir, Format};
+use crate::config::loading::schema_coercion::coerce;
+use crate::config::{format, ConfigBuilder};
 use serde_toml_merge::merge_into_table;
 use toml::value::{Table, Value};
-
-use super::{Format, component_name, open_file, read_dir};
-use crate::config::format;
+use vector_config::schema::generate_root_schema;
 
 /// Provides a hint to the loading system of the type of components that should be found
 /// when traversing an explicitly named directory.
@@ -44,26 +47,36 @@ impl ComponentHint {
 // because there are numerous internal functions for dealing with (non)recursive loading that
 // rely on `&self` but don't need overriding and would be confusingly named in a public API.
 pub(super) mod process {
-    use std::io::Read;
-
     use super::*;
+    use std::io::Read;
 
     /// This trait contains methods that deserialize files/folders. There are a few methods
     /// in here with subtly different names that can be hidden from public view, hence why
     /// this is nested in a private mod.
     pub trait Process {
-        /// Prepares input for serialization. This can be a useful step to interpolate
-        /// environment variables or perform some other pre-processing on the input.
-        fn prepare<R: Read>(&mut self, input: R) -> Result<String, Vec<String>>;
+        /// This is invoked after input deserialization. This can be a useful step to interpolate
+        /// environment variables or perform some other post-processing on the table.
+        fn postprocess(&mut self, table: Table) -> Result<Table, Vec<String>>;
 
-        /// Calls into the `prepare` method, and deserializes a `Read` to a `T`.
-        fn load<R: std::io::Read, T>(&mut self, input: R, format: Format) -> Result<T, Vec<String>>
-        where
-            T: serde::de::DeserializeOwned,
-        {
-            let value = self.prepare(input)?;
+        /// Returns whether environment variable interpolation should be applied.
+        /// Default is true; override to disable.
+        fn should_interpolate_env(&self) -> bool {
+            true
+        }
 
-            format::deserialize(&value, format)
+        /// Deserializes the input using the given format and runs postprocessing on the result.
+        ///
+        /// This reads the input into a string, deserializes it into a `Table`, and then
+        /// applies `postprocess` to the resulting table.
+        fn load<R: Read>(&mut self, input: R, format: Format) -> Result<Table, Vec<String>> {
+            let value = string_from_input(input)?;
+            let table: Table = format::deserialize(&value, format)?;
+            let table = if self.should_interpolate_env() {
+                resolve_environment_variables(table)?
+            } else {
+                table
+            };
+            self.postprocess(table)
         }
 
         /// Helper method used by other methods to recursively handle file/dir loading, merging
@@ -100,7 +113,8 @@ pub(super) mod process {
                     }
                     Err(err) => {
                         errors.push(format!(
-                            "Could not read entry in config dir: {path:?}, {err}."
+                            "Could not read entry in config dir: {:?}, {}.",
+                            path, err
                         ));
                     }
                 };
@@ -136,17 +150,16 @@ pub(super) mod process {
             if recurse {
                 for entry in folders {
                     if let Ok(name) = component_name(&entry)
-                        && !result.contains_key(&name)
-                    {
-                        match self.load_dir(&entry, true) {
-                            Ok(table) => {
-                                result.insert(name, Value::Table(table));
-                            }
-                            Err(errs) => {
-                                errors.extend(errs);
+                        && !result.contains_key(&name) {
+                            match self.load_dir(&entry, true) {
+                                Ok(table) => {
+                                    result.insert(name, Value::Table(table));
+                                }
+                                Err(errs) => {
+                                    errors.extend(errs);
+                                }
                             }
                         }
-                    }
                 }
             }
 
@@ -163,9 +176,10 @@ pub(super) mod process {
             path: &Path,
             format: Format,
         ) -> Result<Option<(String, Table)>, Vec<String>> {
-            match (component_name(path), open_file(path)) {
-                (Ok(name), Some(file)) => self.load(file, format).map(|value| Some((name, value))),
-                _ => Ok(None),
+            if let (Ok(name), Some(file)) = (component_name(path), open_file(path)) {
+                self.load(file, format).map(|value| Some((name, value)))
+            } else {
+                Ok(None)
             }
         }
 
@@ -178,11 +192,9 @@ pub(super) mod process {
         ) -> Result<Option<(String, Table)>, Vec<String>> {
             if let Some((name, mut table)) = self.load_file(path, format)? {
                 if let Some(subdir) = path.parent().map(|p| p.join(&name))
-                    && subdir.is_dir()
-                    && subdir.exists()
-                {
-                    self.load_dir_into(&subdir, &mut table, true)?;
-                }
+                    && subdir.is_dir() && subdir.exists() {
+                        self.load_dir_into(&subdir, &mut table, true)?;
+                    }
                 Ok(Some((name, table)))
             } else {
                 Ok(None)
@@ -212,17 +224,6 @@ where
 {
     /// Consumes Self, and returns the final, deserialized `T`.
     fn take(self) -> T;
-
-    fn load_from_str<R: std::io::Read>(
-        &mut self,
-        input: R,
-        format: Format,
-    ) -> Result<(), Vec<String>> {
-        if let Some(table) = self.load(input, format)? {
-            self.merge(table, None)?;
-        }
-        Ok(())
-    }
 
     /// Deserializes a file with the provided format, and makes the result available via `take`.
     /// Returns a vector of non-fatal warnings on success, or a vector of error strings on failure.
@@ -303,7 +304,51 @@ fn merge_with_value(res: &mut Table, name: String, value: toml::Value) -> Result
 pub(super) fn deserialize_table<T: serde::de::DeserializeOwned>(
     table: Table,
 ) -> Result<T, Vec<String>> {
-    Value::Table(table)
-        .try_into()
-        .map_err(|e| vec![e.to_string()])
+    let mut table_json = serde_json::to_value(table)
+        .map_err(|err| err.to_string())
+        .map_err(|err| vec![err])?;
+
+    let schema = generate_root_schema::<ConfigBuilder>().map_err(|e| vec![format!("{e:?}")])?;
+    let schema_json = serde_json::to_value(schema).map_err(|err| vec![err.to_string()])?;
+    coerce(
+        &mut table_json,
+        &schema_json,
+        schema_json.get("definitions"),
+        &mut Vec::new(),
+    )
+    .map_err(|err| vec![err.to_string()])?;
+
+    serde::Deserialize::deserialize(table_json).map_err(|err| vec![err.to_string()])
+}
+
+fn string_from_input<R: Read>(mut input: R) -> Result<String, Vec<String>> {
+    let mut source_string = String::new();
+    input
+        .read_to_string(&mut source_string)
+        .map_err(|e| vec![e.to_string()])?;
+    Ok(source_string)
+}
+
+pub fn load<R: Read, T>(input: R, format: Format, interpolate_env: bool) -> Result<T, Vec<String>>
+where
+    T: serde::de::DeserializeOwned,
+{
+    let value = string_from_input(input)?;
+    let table = format::deserialize(&value, format)?;
+    let table = if interpolate_env {
+        resolve_environment_variables(table)?
+    } else {
+        table
+    };
+    deserialize_table(table)
+}
+
+pub fn resolve_environment_variables(table: Table) -> Result<Table, Vec<String>> {
+    let mut vars = std::env::vars().collect::<HashMap<_, _>>();
+    if !vars.contains_key("HOSTNAME")
+        && let Ok(hostname) = crate::get_hostname() {
+            vars.insert("HOSTNAME".into(), hostname);
+        }
+
+    interpolate_toml_table_with_env_vars(&table, &vars)
 }
