@@ -1,6 +1,6 @@
-use std::collections::HashSet;
 use serde_json::{Number, Value};
 use snafu::{OptionExt, Snafu};
+use std::collections::HashSet;
 
 const NULL_JSON_TYPE: &str = "null";
 const BOOL_JSON_TYPE: &str = "boolean";
@@ -221,17 +221,19 @@ fn handle_enum(
 
         // String → Bool
         if let Ok(b) = s_trimmed.parse::<bool>()
-            && enum_vals.iter().any(|opt| opt.as_bool() == Some(b)) {
-                *value = Value::Bool(b);
-                return Ok(());
-            }
+            && enum_vals.iter().any(|opt| opt.as_bool() == Some(b))
+        {
+            *value = Value::Bool(b);
+            return Ok(());
+        }
 
         // String → Number
         if let Some(n) = parse_number(s_trimmed)
-            && enum_vals.iter().any(|opt| opt.as_number() == Some(&n)) {
-                *value = Value::Number(n);
-                return Ok(());
-            }
+            && enum_vals.iter().any(|opt| opt.as_number() == Some(&n))
+        {
+            *value = Value::Number(n);
+            return Ok(());
+        }
 
         // String → Null
         if s_trimmed.eq_ignore_ascii_case("null") && enum_vals.iter().any(|opt| opt.is_null()) {
@@ -291,17 +293,19 @@ fn handle_const(
 
         // String → Bool
         if let Ok(b) = s_trimmed.parse::<bool>()
-            && const_val.as_bool() == Some(b) {
-                *value = Value::Bool(b);
-                return Ok(());
-            }
+            && const_val.as_bool() == Some(b)
+        {
+            *value = Value::Bool(b);
+            return Ok(());
+        }
 
         // String → Number
         if let Some(n) = parse_number(s_trimmed)
-            && const_val.as_number() == Some(&n) {
-                *value = Value::Number(n);
-                return Ok(());
-            }
+            && const_val.as_number() == Some(&n)
+        {
+            *value = Value::Number(n);
+            return Ok(());
+        }
 
         // String → Null
         if s_trimmed.eq_ignore_ascii_case("null") && const_val.is_null() {
@@ -738,9 +742,9 @@ fn schema_matches_type_discriminant(
         && all_of
             .iter()
             .any(|sub| schema_matches_type_discriminant(sub, definitions, expected))
-        {
-            return true;
-        }
+    {
+        return true;
+    }
 
     false
 }
@@ -771,17 +775,17 @@ fn schema_contains_type_discriminant(
         && all_of
             .iter()
             .any(|sub| schema_contains_type_discriminant(sub, definitions, expected))
-        {
-            return true;
-        }
+    {
+        return true;
+    }
 
     if let Some(one_of) = resolved.get("oneOf").and_then(|v| v.as_array())
         && one_of
             .iter()
             .any(|variant| schema_matches_type_discriminant(variant, definitions, expected))
-        {
-            return true;
-        }
+    {
+        return true;
+    }
 
     false
 }
@@ -811,7 +815,6 @@ fn coerce_any_of(
 
 /// Parse a string into a serde_json Number (integer only). Returns None if not a valid integer.
 fn parse_integer(input: &str) -> Option<Number> {
-
     if let Ok(i) = input.trim().parse::<i64>() {
         Some(Number::from(i))
     } else if let Ok(u) = input.trim().parse::<u64>() {
@@ -853,15 +856,19 @@ fn coerce_integer(value: &mut Value, path_components: &mut [String]) -> Result<(
         }
 
         if let Some(f) = n.as_f64()
-            && f.fract() == 0.0 && f >= (i64::MIN as f64) && f <= (i64::MAX as f64) {
-                *value = Value::Number(Number::from(f as i64));
-                return Ok(());
-            }
-    } else if let Value::String(s) = value
-        && let Some(n) = parse_integer(s) {
-            *value = Value::Number(n);
+            && f.fract() == 0.0
+            && f >= (i64::MIN as f64)
+            && f <= (i64::MAX as f64)
+        {
+            *value = Value::Number(Number::from(f as i64));
             return Ok(());
         }
+    } else if let Value::String(s) = value
+        && let Some(n) = parse_integer(s)
+    {
+        *value = Value::Number(n);
+        return Ok(());
+    }
 
     fail_expected!(Integer, value, path_components)
 }
@@ -872,10 +879,11 @@ fn coerce_number(value: &mut Value, path_components: &mut [String]) -> Result<()
     }
 
     if let Value::String(s) = value
-        && let Some(n) = parse_number(s) {
-            *value = Value::Number(n);
-            return Ok(());
-        }
+        && let Some(n) = parse_number(s)
+    {
+        *value = Value::Number(n);
+        return Ok(());
+    }
 
     fail_expected!(Number, value, path_components)
 }
@@ -916,8 +924,8 @@ const fn get_json_type(val: &Value) -> &'static str {
 
 #[cfg(all(test, feature = "sources-demo_logs",))]
 mod test {
-    use crate::config::loading::schema_coercion::coerce;
     use crate::config::ConfigBuilder;
+    use crate::config::loading::schema_coercion::coerce;
     use serde_json::json;
     use vector_config::schema::generate_root_schema;
 
@@ -1063,7 +1071,12 @@ mod test {
 
         let schema =
             serde_json::to_value(generate_root_schema::<ConfigBuilder>().unwrap()).unwrap();
-        let result = coerce(&mut input, &schema, schema.get("definitions"), &mut Vec::new());
+        let result = coerce(
+            &mut input,
+            &schema,
+            schema.get("definitions"),
+            &mut Vec::new(),
+        );
 
         assert!(
             result.is_ok(),
@@ -1084,8 +1097,16 @@ mod test {
 
         let schema =
             serde_json::to_value(generate_root_schema::<ConfigBuilder>().unwrap()).unwrap();
-        let result = coerce(&mut input, &schema, schema.get("definitions"), &mut Vec::new());
+        let result = coerce(
+            &mut input,
+            &schema,
+            schema.get("definitions"),
+            &mut Vec::new(),
+        );
 
-        assert!(result.is_ok(), "unknown component type should pass through coercion, got: {result:?}");
+        assert!(
+            result.is_ok(),
+            "unknown component type should pass through coercion, got: {result:?}"
+        );
     }
 }

@@ -96,6 +96,9 @@ mod tests {
             "type": "file",
             "path": "/tmp/foo"
         }));
-        assert!(ok.is_ok(), "expected flat SecretBackends to parse, got: {ok:?}");
+        assert!(
+            ok.is_ok(),
+            "expected flat SecretBackends to parse, got: {ok:?}"
+        );
     }
 }

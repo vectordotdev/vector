@@ -152,7 +152,7 @@ mod test {
     use crate::config::loading::{
         interpolate_toml_table_with_env_vars, interpolate_toml_table_with_secrets,
     };
-    use crate::config::{format, Format};
+    use crate::config::{Format, format};
     use indoc::indoc;
     use std::collections::HashMap;
     use toml::Value;

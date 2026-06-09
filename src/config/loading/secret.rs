@@ -7,15 +7,15 @@ use futures::TryFutureExt;
 use indexmap::IndexMap;
 use regex::{Captures, Regex};
 use serde::{Deserialize, Serialize};
-use toml::value::Table;
 use toml::Value;
+use toml::value::Table;
 use vector_lib::config::ComponentKey;
 
 use crate::config::loading::interpolate_toml_table;
 use crate::{
     config::{
-        loading::{deserialize_table, process::Process, ComponentHint, Loader},
         SecretBackend,
+        loading::{ComponentHint, Loader, deserialize_table, process::Process},
     },
     secrets::SecretBackends,
     signal,

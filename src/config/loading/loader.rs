@@ -2,9 +2,9 @@ use std::collections::HashMap;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
-use super::{component_name, interpolate_toml_table_with_env_vars, open_file, read_dir, Format};
+use super::{Format, component_name, interpolate_toml_table_with_env_vars, open_file, read_dir};
 use crate::config::loading::schema_coercion::coerce;
-use crate::config::{format, ConfigBuilder};
+use crate::config::{ConfigBuilder, format};
 use serde_toml_merge::merge_into_table;
 use toml::value::{Table, Value};
 use vector_config::schema::generate_root_schema;
@@ -150,16 +150,17 @@ pub(super) mod process {
             if recurse {
                 for entry in folders {
                     if let Ok(name) = component_name(&entry)
-                        && !result.contains_key(&name) {
-                            match self.load_dir(&entry, true) {
-                                Ok(table) => {
-                                    result.insert(name, Value::Table(table));
-                                }
-                                Err(errs) => {
-                                    errors.extend(errs);
-                                }
+                        && !result.contains_key(&name)
+                    {
+                        match self.load_dir(&entry, true) {
+                            Ok(table) => {
+                                result.insert(name, Value::Table(table));
+                            }
+                            Err(errs) => {
+                                errors.extend(errs);
                             }
                         }
+                    }
                 }
             }
 
@@ -192,9 +193,11 @@ pub(super) mod process {
         ) -> Result<Option<(String, Table)>, Vec<String>> {
             if let Some((name, mut table)) = self.load_file(path, format)? {
                 if let Some(subdir) = path.parent().map(|p| p.join(&name))
-                    && subdir.is_dir() && subdir.exists() {
-                        self.load_dir_into(&subdir, &mut table, true)?;
-                    }
+                    && subdir.is_dir()
+                    && subdir.exists()
+                {
+                    self.load_dir_into(&subdir, &mut table, true)?;
+                }
                 Ok(Some((name, table)))
             } else {
                 Ok(None)
@@ -379,9 +382,10 @@ where
 pub fn resolve_environment_variables(table: Table) -> Result<Table, Vec<String>> {
     let mut vars = std::env::vars().collect::<HashMap<_, _>>();
     if !vars.contains_key("HOSTNAME")
-        && let Ok(hostname) = crate::get_hostname() {
-            vars.insert("HOSTNAME".into(), hostname);
-        }
+        && let Ok(hostname) = crate::get_hostname()
+    {
+        vars.insert("HOSTNAME".into(), hostname);
+    }
 
     interpolate_toml_table_with_env_vars(&table, &vars)
 }

@@ -22,7 +22,7 @@ pub use secret::*;
 pub use source::*;
 use vector_lib::configurable::NamedComponent;
 
-use super::{builder::ConfigBuilder, validation, Config, ConfigPath, Format, FormatHint};
+use super::{Config, ConfigPath, Format, FormatHint, builder::ConfigBuilder, validation};
 use crate::{config::ProviderConfig, signal};
 
 pub static CONFIG_PATHS: Mutex<Vec<ConfigPath>> = Mutex::new(Vec::new());
@@ -374,9 +374,9 @@ mod tests {
     use std::path::PathBuf;
 
     use super::load_builder_from_paths;
-    use crate::config::ConfigPath;
     #[cfg(all(feature = "sinks-aws_s3", feature = "sources-file"))]
     use crate::config::ComponentKey;
+    use crate::config::ConfigPath;
 
     #[cfg(all(feature = "sinks-aws_s3", feature = "sources-file"))]
     #[test]
@@ -387,15 +387,21 @@ mod tests {
             .join("success");
         let configs = vec![ConfigPath::Dir(path)];
         let builder = load_builder_from_paths(&configs, true).unwrap();
-        assert!(builder
-            .transforms
-            .contains_key(&ComponentKey::from("apache_parser")));
-        assert!(builder
-            .sources
-            .contains_key(&ComponentKey::from("apache_logs")));
-        assert!(builder
-            .sinks
-            .contains_key(&ComponentKey::from("es_cluster")));
+        assert!(
+            builder
+                .transforms
+                .contains_key(&ComponentKey::from("apache_parser"))
+        );
+        assert!(
+            builder
+                .sources
+                .contains_key(&ComponentKey::from("apache_logs"))
+        );
+        assert!(
+            builder
+                .sinks
+                .contains_key(&ComponentKey::from("es_cluster"))
+        );
         assert_eq!(builder.tests.len(), 2);
     }
 

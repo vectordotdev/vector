@@ -63,25 +63,19 @@ impl Process for ConfigBuilderLoader {
     fn merge(&mut self, table: Table, hint: Option<ComponentHint>) -> Result<(), Vec<String>> {
         match hint {
             Some(ComponentHint::Source) => {
-                self.builder
-                    .sources
-                    .extend(deserialize_table_wrapped::<
-                        IndexMap<ComponentKey, SourceOuter>,
-                    >(table, "sources")?);
+                self.builder.sources.extend(deserialize_table_wrapped::<
+                    IndexMap<ComponentKey, SourceOuter>,
+                >(table, "sources")?);
             }
             Some(ComponentHint::Sink) => {
-                self.builder
-                    .sinks
-                    .extend(deserialize_table_wrapped::<
-                        IndexMap<ComponentKey, SinkOuter<_>>,
-                    >(table, "sinks")?);
+                self.builder.sinks.extend(deserialize_table_wrapped::<
+                    IndexMap<ComponentKey, SinkOuter<_>>,
+                >(table, "sinks")?);
             }
             Some(ComponentHint::Transform) => {
-                self.builder
-                    .transforms
-                    .extend(deserialize_table_wrapped::<
-                        IndexMap<ComponentKey, TransformOuter<_>>,
-                    >(table, "transforms")?);
+                self.builder.transforms.extend(deserialize_table_wrapped::<
+                    IndexMap<ComponentKey, TransformOuter<_>>,
+                >(table, "transforms")?);
             }
             Some(ComponentHint::EnrichmentTable) => {
                 self.builder
