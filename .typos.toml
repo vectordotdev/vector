@@ -1,4 +1,5 @@
 [files]
+ignore-hidden = false
 extend-exclude = [
   # Binary/fuzz test data
   "lib/codecs/tests/data/",
@@ -9,6 +10,10 @@ extend-exclude = [
   "LICENSE-3rdparty.csv",
   # External data files
   "lib/vector-vrl/tests/resources/public_suffix_list.dat",
+  # Git object store — binary data
+  ".git/",
+  # Legacy check-spelling word lists — intentional non-words, no longer used by CI
+  ".github/actions/spelling/",
   # GCP integration test fixtures — contain base64-encoded PEM certificate data
   "tests/integration/gcp/config/",
   # Integration test log fixtures — contain binary/sampled log data
@@ -93,3 +98,5 @@ maco = "maco"
 seeked = "seeked"
 # French phrase "raison d'être" used in RFCs
 raison = "raison"
+# TextMate scope name — historical upstream misspelling, must match exactly
+repitition = "repitition"
