@@ -185,7 +185,29 @@ where
                 for (_file_id, watcher) in &mut fp_map {
                     watcher.set_file_findable(false); // assume not findable until found
                 }
+
+                // Reverse lookup: path → fingerprint, to skip fingerprinting files we're already watching
+                let watched_paths: HashMap<PathBuf, (FileFingerprint, u64)> = fp_map
+                    .iter()
+                    .map(|(fp, watcher)| (watcher.path.clone(), (*fp, watcher.get_file_position())))
+                    .collect();
+
                 for path in self.paths_provider.paths().into_iter() {
+                    // Fast path: skip fingerprinting if we're already watching this path
+                    // and the file hasn't been truncated (size >= our read position).
+                    if let Some((file_id, file_position)) = watched_paths.get(&path)
+                        && let Ok(metadata) = fs::metadata(&path).await
+                        && metadata.len() >= *file_position
+                        && let Some(watcher) = fp_map.get_mut(file_id)
+                    {
+                        watcher.set_file_findable(true);
+                        trace!(
+                            message = "Continue watching file.",
+                            path = ?path,
+                        );
+                        continue;
+                    }
+
                     if let Some(file_id) = self
                         .fingerprinter
                         .fingerprint_or_emit(&path, &mut known_small_files, &self.emitter)
