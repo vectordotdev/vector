@@ -468,6 +468,45 @@ mod tests {
         );
     }
 
+    /// Guards the `arrow/ipc_compression` feature: lz4/zstd error at runtime unless
+    /// arrow is built with the codecs. arrow-ipc only validates when writing a
+    /// compressed buffer, so this round-trips a batch through each codec.
+    #[test]
+    fn test_arrow_ipc_compression_codecs_are_enabled() {
+        use std::sync::Arc;
+
+        use arrow::array::Int32Array;
+        use arrow::datatypes::{DataType, Field, Schema};
+        use arrow::ipc::writer::{IpcWriteOptions, StreamWriter};
+        use arrow::record_batch::RecordBatch;
+
+        let schema = Arc::new(Schema::new(vec![Field::new("n", DataType::Int32, false)]));
+        let batch = RecordBatch::try_new(
+            Arc::clone(&schema),
+            vec![Arc::new(Int32Array::from((0..1024).collect::<Vec<_>>()))],
+        )
+        .expect("batch should build");
+
+        for codec in [Compression::Lz4Frame, Compression::Zstd] {
+            let compression: Option<arrow::ipc::CompressionType> = codec.into();
+            let options = IpcWriteOptions::default()
+                .try_with_compression(compression)
+                .unwrap_or_else(|e| panic!("{codec:?} not enabled in arrow build: {e}"));
+
+            let mut buf = Vec::new();
+            let mut writer = StreamWriter::try_new_with_options(&mut buf, &schema, options)
+                .unwrap_or_else(|e| panic!("writer for {codec:?} should build: {e}"));
+            writer
+                .write(&batch)
+                .unwrap_or_else(|e| panic!("writing compressed batch for {codec:?} failed: {e}"));
+            writer
+                .finish()
+                .unwrap_or_else(|e| panic!("finishing stream for {codec:?} failed: {e}"));
+
+            assert!(!buf.is_empty(), "{codec:?} produced no output");
+        }
+    }
+
     /// When `batch.max_bytes` is `None` (user omitted the field or set it to `null`),
     /// `into_batcher_settings()` must merge it against
     /// `RealtimeSizeBasedDefaultBatchSettings::MAX_BYTES` (10MB) — never unbounded.
