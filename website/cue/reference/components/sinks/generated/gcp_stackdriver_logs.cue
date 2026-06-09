@@ -141,6 +141,24 @@ generated: components: sinks: gcp_stackdriver_logs: configuration: {
 		required: true
 		type: string: {}
 	}
+	insert_id_key: {
+		description: """
+			The field of the log event from which to take the outgoing log's `insertId` field.
+
+			The named field is removed from the log event if present, and its value is used as the
+			unique identifier for the log entry. The insertId is used by GCP to de-duplicate log
+			entries and to order entries with the same logName and timestamp.
+
+			If no insertId key is specified, the insertId field is omitted from the LogEntry and the
+			GCP Logging API assigns its own unique identifier in this field.
+
+			See the [GCP LogEntry insertId documentation][insertid_docs] for more details.
+
+			[insertid_docs]: https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry#FIELDS.insert_id
+			"""
+		required: false
+		type: string: examples: ["insert_id"]
+	}
 	labels: {
 		description: "A map of key, value pairs that provides additional information about the log entry."
 		required:    false
