@@ -78,7 +78,7 @@ releases: "0.22.1": {
 
 	commits: [
 		{sha: "9cedaea345b4a4d05220de60887f5115230e99c4", date: "2022-06-02 01:30:35 UTC", description: "Fixup Docker quickstart instructions", pr_number: 12915, scopes: [], type: "docs", breaking_change: false, author: "Spencer Gilbert", files_count: 1, insertions_count: 5, deletions_count: 6},
-		{sha: "e2f96300eaaf0fda6817578290fccda17106ddf8", date: "2022-06-03 06:24:09 UTC", description: "typoes", pr_number: 12941, scopes: [], type: "docs", breaking_change: false, author: "Tshepang Mbambo", files_count: 1, insertions_count: 2, deletions_count: 2},
+		{sha: "e2f96300eaaf0fda6817578290fccda17106ddf8", date: "2022-06-03 06:24:09 UTC", description: "typos", pr_number: 12941, scopes: [], type: "docs", breaking_change: false, author: "Tshepang Mbambo", files_count: 1, insertions_count: 2, deletions_count: 2},
 		{sha: "f7239176a9e0b3f909e4c4ac5884f9be2dba0ff5", date: "2022-06-02 22:48:26 UTC", description: "Fix contributor links on releases", pr_number: 12945, scopes: ["docs"], type: "fix", breaking_change: false, author: "Jesse Szwedko", files_count: 1, insertions_count: 1, deletions_count: 1},
 		{sha: "466e30c9a343af4f44b608422eebdde9b69b997c", date: "2022-06-07 00:26:36 UTC", description: "Remove notice from parse_logfmt intended for encoding", pr_number: 12967, scopes: [], type: "docs", breaking_change: false, author: "Spencer Gilbert", files_count: 1, insertions_count: 0, deletions_count: 1},
 		{sha: "7c509190ee450847a73406648bd7235782f67baf", date: "2022-06-06 22:51:15 UTC", description: "Add note about making metrics unique", pr_number: 12975, scopes: ["internal_metrics source"], type: "docs", breaking_change: false, author: "Jesse Szwedko", files_count: 1, insertions_count: 15, deletions_count: 0},
