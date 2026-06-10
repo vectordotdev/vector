@@ -125,6 +125,15 @@ pub struct RootOpts {
     #[arg(short, long, env = "VECTOR_REQUIRE_HEALTHY")]
     pub require_healthy: Option<bool>,
 
+    /// The directory used for persisting Vector state data.
+    ///
+    /// This overrides the `data_dir` global option set in the configuration file. It is
+    /// useful for keeping deployment-specific paths out of the configuration file, for
+    /// example when validating a configuration in a CI environment where the configured
+    /// `data_dir` may not exist.
+    #[arg(long, env = "VECTOR_DATA_DIR")]
+    pub data_dir: Option<PathBuf>,
+
     /// Number of threads to use for processing (default is number of available cores)
     #[arg(short, long, env = "VECTOR_THREADS")]
     pub threads: Option<usize>,
@@ -423,4 +432,25 @@ pub fn handle_config_errors(errors: Vec<String>) -> exitcode::ExitCode {
     }
 
     exitcode::CONFIG
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+
+    use clap::Parser;
+
+    use super::RootOpts;
+
+    #[test]
+    fn data_dir_defaults_to_none() {
+        let opts = RootOpts::try_parse_from(["vector"]).unwrap();
+        assert_eq!(opts.data_dir, None);
+    }
+
+    #[test]
+    fn data_dir_parsed_from_flag() {
+        let opts = RootOpts::try_parse_from(["vector", "--data-dir", "/tmp/vector"]).unwrap();
+        assert_eq!(opts.data_dir, Some(PathBuf::from("/tmp/vector")));
+    }
 }

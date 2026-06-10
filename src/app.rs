@@ -85,6 +85,7 @@ impl ApplicationConfig {
             &config_paths,
             watcher_conf,
             opts.require_healthy,
+            opts.data_dir.clone(),
             opts.allow_empty_config,
             !opts.disable_env_var_interpolation,
             graceful_shutdown_duration,
@@ -555,10 +556,12 @@ pub fn build_runtime(threads: Option<usize>, thread_name: &str) -> Result<Runtim
     Ok(rt_builder.build().expect("Unable to create async runtime"))
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn load_configs(
     config_paths: &[ConfigPath],
     watcher_conf: Option<config::watcher::WatcherConfig>,
     require_healthy: Option<bool>,
+    data_dir: Option<PathBuf>,
     allow_empty_config: bool,
     interpolate_env: bool,
     graceful_shutdown_duration: Option<Duration>,
@@ -648,6 +651,13 @@ pub async fn load_configs(
         info!("Health checks are disabled.");
     }
     config.healthchecks.set_require_healthy(require_healthy);
+    if let Some(data_dir) = data_dir {
+        debug!(
+            message = "Overriding data_dir from command line.",
+            ?data_dir
+        );
+        config.global.data_dir = Some(data_dir);
+    }
     config.graceful_shutdown_duration = graceful_shutdown_duration;
 
     Ok(config)
