@@ -449,7 +449,10 @@ mod tests {
             "expected Vector/<version> prefix, got {suffix:?}"
         );
         // No user value configured, so nothing is appended.
-        assert!(!suffix.contains(' '), "unexpected appended value in {suffix:?}");
+        assert!(
+            !suffix.contains(' '),
+            "unexpected appended value in {suffix:?}"
+        );
     }
 
     #[test]
@@ -473,6 +476,9 @@ mod tests {
         config.user_agent = Some(String::new());
         let suffix = config.user_agent_suffix();
         // An empty string is treated the same as no value: no trailing space.
-        assert!(!suffix.contains(' '), "empty user_agent should be ignored, got {suffix:?}");
+        assert!(
+            !suffix.contains(' '),
+            "empty user_agent should be ignored, got {suffix:?}"
+        );
     }
 }
