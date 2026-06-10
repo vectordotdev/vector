@@ -682,7 +682,7 @@ mod tests {
             r#"
             version = "2"
             hooks.process = """function (event, emit)
-                if event["log"]["non-existant"] == nil then
+                if event["log"]["non-existent"] == nil then
                   event["log"]["result"] = "empty"
                 else
                   event["log"]["result"] = "found"

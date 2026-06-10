@@ -870,6 +870,7 @@ mod tests {
             .expect("should not fail");
     }
 
+    #[cfg(debug_assertions)]
     #[tokio::test]
     #[should_panic(expected = "Fanout received empty event batch from upstream component")]
     async fn fanout_panics_on_empty_event_array_in_debug_builds() {

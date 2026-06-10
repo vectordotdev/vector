@@ -315,7 +315,7 @@ pub enum SubCommand {
     /// where a configuration is split into multiple files, the schema would apply to those files
     /// only when concatenated together.
     ///
-    /// By default all output is writen to stdout. The `output_path` option can be used to redirect to a file.
+    /// By default all output is written to stdout. The `output_path` option can be used to redirect to a file.
     GenerateSchema(generate_schema::Opts),
 
     /// Generate shell completion, then exit.
