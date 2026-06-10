@@ -170,12 +170,9 @@ impl CuckooMemoryTable {
                 };
 
                 if filter.get_configuration() != built_config {
-                    // TODO: Should this stop the build from succeeding? The import will be lost,
-                    // because it will be overwritter very soon.
-                    warn!(
-                        "Stored cuckoo filter configuration doesn't match with new configuration. Ignoring the import.",
+                    return Err(
+                        format!("Stored cuckoo filter configuration doesn't match with new configuration. If this is intended, remove the persisted state file ({}).", path.to_str().unwrap_or("")).into(),
                     );
-                    break 'import CuckooFilter::new_random_exportable(built_config);
                 }
 
                 filter
