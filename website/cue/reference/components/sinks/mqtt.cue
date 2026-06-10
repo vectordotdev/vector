@@ -80,7 +80,7 @@ components: sinks: mqtt: {
 		protocol_versions: {
 			title: "MQTT 3.1.1 and 5.0 support"
 			body: """
-				The sink supports both MQTT 3.1.1 (default) and MQTT 5.0, selected via the
+				The sink supports both MQTT 3.1.1 (default) and MQTT 5.0, selected using the
 				`protocol_version` configuration option. MQTT 5.0 unlocks additional features
 				such as message expiry, topic aliases, response topics, correlation data,
 				content type, payload format indicators, and user properties.
@@ -90,7 +90,7 @@ components: sinks: mqtt: {
 			title: "MQTT v5 publish properties"
 			body: """
 				When `protocol_version` is set to `v5`, the sink can attach MQTT 5.0 publish
-				properties to outgoing messages via the `publish_properties` section. Supported
+				properties to outgoing messages through the `publish_properties` section. Supported
 				properties include the payload format indicator, message expiry interval, topic
 				alias, response topic, correlation data, content type, and user properties.
 				These properties are ignored when `protocol_version` is `v311`.

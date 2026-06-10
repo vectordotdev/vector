@@ -120,7 +120,7 @@ components: sources: mqtt: {
 					}
 				}
 				payload_format_indicator: {
-					description: "MQTT v5 payload format indicator. 0 indicates unspecified bytes and 1 indicates UTF-8 encoded data. Absent for v3.1.1 messages or v5 messages without the property set."
+					description: "MQTT v5 payload format indicator. 0 indicates unspecified bytes, and 1 indicates UTF-8 encoded data. Absent for v3.1.1 messages or v5 messages without the property set."
 					required:    false
 					common:      false
 					type: uint: {
@@ -168,8 +168,8 @@ components: sources: mqtt: {
 				All subscriptions are made at MQTT QoS 1 (AtLeastOnce), and MQTT wildcards
 				are supported:
 
-				- `+` matches exactly one topic level (for example `sensors/+/temperature`)
-				- `#` matches zero or more trailing levels (for example `sensors/#`)
+				- `+` matches exactly one topic level (for example, `sensors/+/temperature`)
+				- `#` matches zero or more trailing levels (for example, `sensors/#`)
 
 				Subscribing to multiple topics in a single source shares one MQTT connection
 				and one decoder configuration.

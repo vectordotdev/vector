@@ -185,7 +185,7 @@ pub struct MqttCommonConfig {
     #[serde(default)]
     pub protocol_version: MqttProtocolVersion,
 
-    /// MQTT v5 connection properties. Only used when protocol_version is v5.
+    /// MQTT v5 connection properties. Only applicable when `protocol_version` is `v5`.
     #[configurable(derived)]
     #[serde(default)]
     pub connect_properties: Option<MqttConnectProperties>,

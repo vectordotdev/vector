@@ -42,7 +42,7 @@ pub struct MqttSinkConfig {
     #[serde(default = "default_qos")]
     pub quality_of_service: MqttQoS,
 
-    /// MQTT v5 publish properties. Only used when protocol_version is v5.
+    /// MQTT v5 publish properties. Only applicable when `protocol_version` is `v5`.
     #[configurable(derived)]
     #[serde(default)]
     pub publish_properties: Option<MqttPublishProperties>,

@@ -28,7 +28,7 @@ generated: components: sources: mqtt: configuration: {
 		type: string: {}
 	}
 	connect_properties: {
-		description: "MQTT v5 connection properties. Only used when protocol_version is v5."
+		description: "MQTT v5 connection properties. Only applicable when `protocol_version` is `v5`."
 		required:    false
 		type: object: options: {
 			session_expiry_interval: {
