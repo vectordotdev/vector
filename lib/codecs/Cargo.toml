@@ -14,8 +14,8 @@ path = "tests/bin/generate-avro-fixtures.rs"
 
 [dependencies]
 apache-avro = { version = "0.20.0", default-features = false }
-arrow = { version = "56.2.0", default-features = false, features = ["ipc", "json"], optional = true }
-parquet = { version = "56.2.0", default-features = false, features = [
+arrow = { version = "58.2.0", default-features = false, features = ["ipc", "json"], optional = true }
+parquet = { version = "58.2.0", default-features = false, features = [
     "arrow",
     "snap",
     "zstd",

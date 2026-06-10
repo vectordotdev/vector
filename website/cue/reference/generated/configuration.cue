@@ -529,6 +529,8 @@ generated: configuration: {
 					description: """
 						Controls how metadata is stored in log events.
 
+						This feature is in beta and behavior may change.
+
 						When set to `false` (legacy mode), metadata fields like `host`, `timestamp`, and `source_type`
 						are stored as top-level fields alongside your log data.
 
@@ -1594,7 +1596,8 @@ generated: configuration: {
 				"""
 			common:   false
 			required: false
-			group:    "schema"
+			warnings: ["These settings are ignored when `schema.log_namespace` is set to `true`."]
+			group: "schema"
 		}
 		metrics_storage_refresh_period: {
 			type: float: {}

@@ -676,7 +676,7 @@ impl observability::Service for ObservabilityService {
 
         let watch_rx = self.watch_rx.clone();
 
-        tokio::spawn(async move {
+        crate::spawn_in_current_span(async move {
             let _tap_controller = TapController::new(watch_rx, tap_tx, patterns);
             let mut tap_rx = ReceiverStream::new(tap_rx);
             let mut interval = time::interval(time::Duration::from_millis(interval_ms));

@@ -1,6 +1,7 @@
 acmecorp
 Acro
 addonmanager
+Agentic
 Ainol
 aiohttp
 Airis
@@ -117,6 +118,7 @@ DEBHELPER
 debian
 DECT
 demuxing
+deser
 dfs
 discriminants
 distro
@@ -308,6 +310,7 @@ lenovo
 levenstein
 Lexibook
 LGE
+LLMs
 Lifetab
 Lifetouch
 linkerd
