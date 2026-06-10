@@ -20,18 +20,21 @@ use ratatui::{
         ScrollbarOrientation, ScrollbarState, Table, TableState, Wrap,
     },
 };
-use tokio::sync::oneshot;
+use tokio::{sync::oneshot, time};
+use tokio_stream::{StreamExt, wrappers::IntervalStream};
 use unit_prefix::NumberPrefix;
 
 use crate::{
     input::{InputMode, handle_input},
-    state::{ComponentRow, FilterColumn, FilterMenuState, SortColumn},
+    state::{ComponentRow, FilterColumn, FilterMenuState, SortColumn, State},
 };
 
 use super::{
     events::capture_key_press,
     state::{self, ConnectionStatus},
 };
+
+const INTERVAL_FPS_60: u64 = 16;
 
 pub const fn is_allocation_tracing_enabled() -> bool {
     cfg!(feature = "allocation-tracing")
@@ -635,6 +638,7 @@ pub async fn init_dashboard<'a>(
     human_metrics: bool,
     ui_event_tx: state::UiEventTx,
     mut state_rx: state::StateRx,
+    starting_state: State,
     mut shutdown_rx: oneshot::Receiver<()>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Capture key presses, to determine when to quit
@@ -659,19 +663,29 @@ pub async fn init_dashboard<'a>(
     let widgets = Widgets::new(title, url, interval, human_metrics);
     let mut input_mode = InputMode::Top;
 
+    let mut latest_state = starting_state;
+    let mut should_refresh_ui = false;
+    let mut draw_interval =
+        IntervalStream::new(time::interval(Duration::from_millis(INTERVAL_FPS_60)));
+
     loop {
         tokio::select! {
             Some(state) = state_rx.recv() => {
-                if state.ui.filter_visible {
+                latest_state = state;
+                should_refresh_ui = true;
+            },
+            Some(_) = draw_interval.next(), if should_refresh_ui => {
+                if latest_state.ui.filter_visible {
                     input_mode = InputMode::FilterInput;
-                } else if state.ui.sort_visible {
+                } else if latest_state.ui.sort_visible {
                     input_mode = InputMode::SortMenu;
-                } else if state.ui.help_visible {
+                } else if latest_state.ui.help_visible {
                     input_mode = InputMode::HelpMenu;
                 } else {
                     input_mode = InputMode::Top;
                 }
-                terminal.draw(|f| widgets.draw(f, state))?;
+                terminal.draw(|f| widgets.draw(f, latest_state.clone()))?;
+                should_refresh_ui = false;
             },
             k = key_press_rx.recv() => {
                 let k = k.unwrap();

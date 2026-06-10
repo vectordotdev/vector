@@ -438,7 +438,7 @@ pub async fn updater(
 
                 // Higher priority for UI events, to prevent visible freezes
                 Some(event_type) = ui_event_rx.recv() => {
-                    handle_ui_event(event_type, &mut state)
+                    handle_ui_event(event_type, &mut state);
                 },
 
                 ev = event_rx.recv() => {
