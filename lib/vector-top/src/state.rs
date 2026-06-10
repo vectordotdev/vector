@@ -12,7 +12,7 @@ use ratatui::{
     widgets::ListState,
 };
 use regex::Regex;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, watch};
 use vector_common::internal_event::DEFAULT_OUTPUT;
 
 use vector_common::config::ComponentKey;
@@ -375,7 +375,7 @@ pub type EventTx = mpsc::Sender<EventType>;
 pub type EventRx = mpsc::Receiver<EventType>;
 pub type UiEventRx = mpsc::Receiver<UiEventType>;
 pub type UiEventTx = mpsc::Sender<UiEventType>;
-pub type StateRx = mpsc::Receiver<State>;
+pub type StateRx = watch::Receiver<State>;
 
 #[derive(Debug, Clone, Default)]
 pub struct OutputMetrics {
@@ -429,7 +429,7 @@ pub async fn updater(
     mut ui_event_rx: UiEventRx,
     mut state: State,
 ) -> StateRx {
-    let (tx, rx) = mpsc::channel(20);
+    let (tx, rx) = watch::channel(state.clone());
 
     tokio::spawn(async move {
         loop {
@@ -556,7 +556,7 @@ pub async fn updater(
             }
 
             // Send updated map to listeners
-            _ = tx.send(state.clone()).await;
+            _ = tx.send(state.clone());
         }
     });
 
