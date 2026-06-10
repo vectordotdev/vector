@@ -152,7 +152,8 @@ to the declared type.
 Structural uses of interpolation are not valid TOML or JSON and are not supported in the new
 model. This includes table headers (`[${SECTION}]`), map keys (`${KEY} = ...`), and inline
 arrays (`inputs = [${VECTOR_INPUTS}]`). These patterns are rare in practice and need to be
-replaced with literal values.
+replaced with literal values. The implementation will follow Vector's deprecation policy to give
+users time to migrate.
 
 ### Improved security
 
