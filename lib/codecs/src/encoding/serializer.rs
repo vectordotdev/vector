@@ -10,7 +10,6 @@ use super::format::{ArrowStreamSerializer, ArrowStreamSerializerConfig};
 use super::format::{OtlpSerializer, OtlpSerializerConfig};
 #[cfg(feature = "parquet")]
 use super::format::{ParquetSerializer, ParquetSerializerConfig};
-use super::format::{ProtoBatchSerializer, ProtoBatchSerializerConfig};
 #[cfg(feature = "syslog")]
 use super::format::{SyslogSerializer, SyslogSerializerConfig};
 use super::{
@@ -147,6 +146,10 @@ impl Default for SerializerConfig {
 }
 
 /// Batch serializer configuration.
+///
+/// Only available when the `arrow` feature is enabled (the `parquet` feature
+/// implies `arrow`); all batch serializers produce columnar Arrow/Parquet output.
+#[cfg(feature = "arrow")]
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(tag = "codec", rename_all = "snake_case")]
@@ -160,7 +163,6 @@ pub enum BatchSerializerConfig {
     /// a continuous stream of record batches.
     ///
     /// [apache_arrow]: https://arrow.apache.org/
-    #[cfg(feature = "arrow")]
     #[serde(rename = "arrow_stream")]
     ArrowStream(ArrowStreamSerializerConfig),
     /// Encodes events in [Apache Parquet][apache_parquet] columnar format.
@@ -169,24 +171,15 @@ pub enum BatchSerializerConfig {
     #[cfg(feature = "parquet")]
     #[serde(rename = "parquet")]
     Parquet(ParquetSerializerConfig),
-
-    /// Encodes each event individually as a [Protocol Buffers][protobuf] message.
-    ///
-    /// Each event in the batch is serialized to protobuf bytes independently,
-    /// producing a list of byte buffers (one per event).
-    ///
-    /// [protobuf]: https://protobuf.dev/
-    #[serde(rename = "proto_batch")]
-    ProtoBatch(ProtoBatchSerializerConfig),
 }
 
+#[cfg(feature = "arrow")]
 impl BatchSerializerConfig {
     /// Build the batch serializer from this configuration.
     pub fn build_batch_serializer(
         &self,
     ) -> Result<super::BatchSerializer, Box<dyn std::error::Error + Send + Sync + 'static>> {
         match self {
-            #[cfg(feature = "arrow")]
             BatchSerializerConfig::ArrowStream(arrow_config) => {
                 let serializer = ArrowStreamSerializer::new(arrow_config.clone())?;
                 Ok(super::BatchSerializer::Arrow(serializer))
@@ -196,32 +189,24 @@ impl BatchSerializerConfig {
                 let serializer = ParquetSerializer::new(parquet_config.clone())?;
                 Ok(super::BatchSerializer::Parquet(Box::new(serializer)))
             }
-            BatchSerializerConfig::ProtoBatch(proto_config) => {
-                let serializer = ProtoBatchSerializer::new(proto_config.clone())?;
-                Ok(super::BatchSerializer::ProtoBatch(serializer))
-            }
         }
     }
 
     /// The data type of events that are accepted by this batch serializer.
     pub fn input_type(&self) -> DataType {
         match self {
-            #[cfg(feature = "arrow")]
             BatchSerializerConfig::ArrowStream(arrow_config) => arrow_config.input_type(),
             #[cfg(feature = "parquet")]
             BatchSerializerConfig::Parquet(parquet_config) => parquet_config.input_type(),
-            BatchSerializerConfig::ProtoBatch(proto_config) => proto_config.input_type(),
         }
     }
 
     /// The schema required by the batch serializer.
     pub fn schema_requirement(&self) -> schema::Requirement {
         match self {
-            #[cfg(feature = "arrow")]
             BatchSerializerConfig::ArrowStream(arrow_config) => arrow_config.schema_requirement(),
             #[cfg(feature = "parquet")]
             BatchSerializerConfig::Parquet(parquet_config) => parquet_config.schema_requirement(),
-            BatchSerializerConfig::ProtoBatch(proto_config) => proto_config.schema_requirement(),
         }
     }
 }

@@ -62,6 +62,10 @@ environment variable example.
 Vector prevents security issues related to environment variable interpolation by rejecting environment variables that contain newline
 characters. This also prevents injection of multi-line configuration blocks.
 
+Vector does not validate or escape other characters in interpolated values. Values containing config-structural characters such as
+`"`, `{`, `}`, `[`, or `]` are substituted verbatim before the config file is parsed, and may affect the resulting parsed structure.
+Operators are responsible for controlling the content of interpolated environment variables.
+
 If you need to inject multi-line configuration blocks, use a config pre-processing step with a tool like `envsubst`.
 This approach gives you more control over the configuration and allows you to inspect the result before passing it to Vector:
 
