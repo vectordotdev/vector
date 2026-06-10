@@ -15,10 +15,9 @@ does this error mean?" with a serde message that names neither the field nor the
 error: unknown field `retries`, expected one of `encoding`, `batch`, ...
 ```
 
-There is no file path, no line number, no field path like `sinks.my_sink.retries`. This is a
-known pain point with open issues that cannot be cleanly fixed under the current architecture,
-because the config is fully deserialized in one shot by serde before any path context is
-available.
+There is no field path like `sinks.my_sink.retries`. This is a known pain point with open issues
+that cannot be cleanly fixed under the current architecture, because the config is fully
+deserialized in one shot by serde before any path context is available.
 
 Producing actionable, field-path-aware errors for unknown fields and type mismatches is a
 first-class goal of this RFC.
@@ -92,7 +91,7 @@ The validate/coerce pass walks the tree using Vector's own JSON Schema
 (`generate_root_schema::<ConfigBuilder>()`) and:
 
 - Coerces `"42"` to `42`, `"true"` to `true` where the schema declares a non-string type
-- Detects unknown fields and reports them with their full path
+- Warns on unknown fields with their full path (see Design Decisions for the current limitation)
 - Detects type mismatches and reports them with their full path and the expected type
 
 This gives each stage a clean contract:
@@ -100,7 +99,7 @@ This gives each stage a clean contract:
 - The parser sees raw text, unmodified.
 - The interpolation layer sees a typed tree and operates only on strings.
 - The validation pass has the full field path and can produce actionable errors.
-- Downstream deserialization receives a well-typed tree that will not produce serde errors.
+- Downstream deserialization receives a well-typed tree with fewer opportunities for confusing serde errors.
 
 ## Benefits
 
@@ -146,12 +145,14 @@ string to the declared type.
 
 ### Migration
 
-The common case is mechanical: wrap unquoted placeholders in string positions in quotes
-(`count = "${MY_COUNT}"`) and the coercion pass converts the value to the declared type.
+The common case is mechanical: wrap unquoted placeholders in quotes
+(`count = "${MY_COUNT}"`, `port = "SECRET[db.port]"`) and the coercion pass converts the value
+to the declared type.
 
-Structural uses of interpolation — table headers (`[${SECTION}]`), map keys (`${KEY} = ...`),
-or unquoted booleans/arrays — are not valid TOML or JSON and are not supported in the new model.
-These patterns are rare in practice; configs that use them need to be restructured.
+Structural uses of interpolation are not valid TOML or JSON and are not supported in the new
+model. This includes table headers (`[${SECTION}]`), map keys (`${KEY} = ...`), and inline
+arrays (`inputs = [${VECTOR_INPUTS}]`). These patterns are rare in practice; configs that use
+them need to be restructured to use fixed keys or split into separate config files.
 
 ### Improved security
 
@@ -179,6 +180,8 @@ and the config loading pipeline becomes easier to extend and test going forward.
    shared fields (`inputs`, `proxy`, `graph`).
 3. **`loader.rs`**: `Process::load()` default: parse, interpolate env vars, run `postprocess`
    for secret substitution, then validate and coerce. All steps operate on the parsed tree.
+   Secret placeholder collection and backend fetching are unchanged; only substitution moves
+   from raw text to string leaves in the parsed tree.
 4. Public API signatures unchanged (`load_from_paths`, etc.).
 
 ## Design Decisions
