@@ -12,8 +12,6 @@ extend-exclude = [
   "lib/vector-vrl/tests/resources/public_suffix_list.dat",
   # Git object store — binary data
   ".git/",
-  # Legacy check-spelling word lists — intentional non-words, no longer used by CI
-  ".github/actions/spelling/",
   # GCP integration test fixtures — contain base64-encoded PEM certificate data
   "tests/integration/gcp/config/",
   # Integration test log fixtures — contain binary/sampled log data
