@@ -46,6 +46,30 @@ impl DatabricksAuthentication {
     }
 }
 
+/// Arrow IPC compression codec for Zerobus Arrow Flight payloads.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum Compression {
+    /// No compression.
+    #[default]
+    None,
+    /// LZ4 frame compression.
+    Lz4Frame,
+    /// Zstandard compression.
+    Zstd,
+}
+
+impl From<Compression> for Option<arrow::ipc::CompressionType> {
+    fn from(value: Compression) -> Self {
+        match value {
+            Compression::None => None,
+            Compression::Lz4Frame => Some(arrow::ipc::CompressionType::LZ4_FRAME),
+            Compression::Zstd => Some(arrow::ipc::CompressionType::ZSTD),
+        }
+    }
+}
+
 /// Zerobus stream configuration options.
 ///
 /// This is a thin wrapper around the SDK's `StreamConfigurationOptions` with Vector-specific
@@ -63,6 +87,11 @@ pub struct ZerobusStreamOptions {
     #[serde(default = "default_server_ack_timeout_ms")]
     #[configurable(metadata(docs::examples = 60000))]
     pub server_lack_of_ack_timeout_ms: u64,
+
+    /// Arrow IPC compression for Flight payloads. Defaults to no compression.
+    #[configurable(derived)]
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
+    pub compression: Compression,
 }
 
 impl Default for ZerobusStreamOptions {
@@ -70,6 +99,7 @@ impl Default for ZerobusStreamOptions {
         Self {
             flush_timeout_ms: default_flush_timeout_ms(),
             server_lack_of_ack_timeout_ms: default_server_ack_timeout_ms(),
+            compression: Compression::None,
         }
     }
 }
@@ -423,6 +453,80 @@ mod tests {
             assert!(message.contains("OAuth client_id cannot be empty"));
         } else {
             panic!("Expected ConfigError for empty OAuth client_id");
+        }
+    }
+
+    #[test]
+    fn test_stream_options_compression_deserializes() {
+        let opts: ZerobusStreamOptions =
+            serde_json::from_str(r#"{"compression":"zstd"}"#).expect("should parse zstd");
+        assert_eq!(opts.compression, Compression::Zstd);
+
+        let opts: ZerobusStreamOptions =
+            serde_json::from_str(r#"{"compression":"lz4_frame"}"#).expect("should parse lz4_frame");
+        assert_eq!(opts.compression, Compression::Lz4Frame);
+
+        let opts: ZerobusStreamOptions =
+            serde_json::from_str(r#"{"compression":"none"}"#).expect("should parse none");
+        assert_eq!(opts.compression, Compression::None);
+
+        // Omitting the field leaves compression disabled.
+        let opts: ZerobusStreamOptions = serde_json::from_str("{}").expect("should parse empty");
+        assert_eq!(opts.compression, Compression::None);
+    }
+
+    #[test]
+    fn test_compression_maps_to_arrow_ipc() {
+        assert_eq!(
+            Option::<arrow::ipc::CompressionType>::from(Compression::None),
+            None,
+        );
+        assert_eq!(
+            Option::<arrow::ipc::CompressionType>::from(Compression::Lz4Frame),
+            Some(arrow::ipc::CompressionType::LZ4_FRAME),
+        );
+        assert_eq!(
+            Option::<arrow::ipc::CompressionType>::from(Compression::Zstd),
+            Some(arrow::ipc::CompressionType::ZSTD),
+        );
+    }
+
+    /// Guards the `arrow/ipc_compression` feature: lz4/zstd error at runtime unless
+    /// arrow is built with the codecs. arrow-ipc only validates when writing a
+    /// compressed buffer, so this round-trips a batch through each codec.
+    #[test]
+    fn test_arrow_ipc_compression_codecs_are_enabled() {
+        use std::sync::Arc;
+
+        use arrow::array::Int32Array;
+        use arrow::datatypes::{DataType, Field, Schema};
+        use arrow::ipc::writer::{IpcWriteOptions, StreamWriter};
+        use arrow::record_batch::RecordBatch;
+
+        let schema = Arc::new(Schema::new(vec![Field::new("n", DataType::Int32, false)]));
+        let batch = RecordBatch::try_new(
+            Arc::clone(&schema),
+            vec![Arc::new(Int32Array::from((0..1024).collect::<Vec<_>>()))],
+        )
+        .expect("batch should build");
+
+        for codec in [Compression::Lz4Frame, Compression::Zstd] {
+            let compression: Option<arrow::ipc::CompressionType> = codec.into();
+            let options = IpcWriteOptions::default()
+                .try_with_compression(compression)
+                .unwrap_or_else(|e| panic!("{codec:?} not enabled in arrow build: {e}"));
+
+            let mut buf = Vec::new();
+            let mut writer = StreamWriter::try_new_with_options(&mut buf, &schema, options)
+                .unwrap_or_else(|e| panic!("writer for {codec:?} should build: {e}"));
+            writer
+                .write(&batch)
+                .unwrap_or_else(|e| panic!("writing compressed batch for {codec:?} failed: {e}"));
+            writer
+                .finish()
+                .unwrap_or_else(|e| panic!("finishing stream for {codec:?} failed: {e}"));
+
+            assert!(!buf.is_empty(), "{codec:?} produced no output");
         }
     }
 
