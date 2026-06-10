@@ -270,8 +270,8 @@ releases: "0.32.0": {
 				- `CHACHA20-POLY1305`
 				- `XCHACHA20-POLY1305`
 				- `XSALSA20-POLY1305`
-				- `AES-*-CTR-BE` (to disambiguate endianess of `AES-*-CTR`)
-				- `AES-*-CTR-LE` (to disambiguate endianess of `AES-*-CTR`)
+				- `AES-*-CTR-BE` (to disambiguate endianness of `AES-*-CTR`)
+				- `AES-*-CTR-LE` (to disambiguate endianness of `AES-*-CTR`)
 				"""
 			contributors: ["alisa101rs"]
 			pr_numbers: [18150]

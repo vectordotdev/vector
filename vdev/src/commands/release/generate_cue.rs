@@ -275,7 +275,7 @@ fn fetch_commits_since(last_version: &Version) -> Result<Vec<Commit>> {
     for line in log_output.lines().rev() {
         let parts: Vec<&str> = line.splitn(4, '\t').collect();
         if parts.len() != 4 {
-            warn!("Skipping unparseable git log line: {line}");
+            warn!("Skipping unparsable git log line: {line}");
             continue;
         }
         let sha = parts[0].to_string();
@@ -603,7 +603,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_conventional_unparseable_fallthrough() {
+    fn parse_conventional_unparsable_fallthrough() {
         let p = ConventionalParts::parse("Merge branch 'foo'");
         assert!(p.r#type.is_none());
         assert_eq!(p.description, "Merge branch 'foo'");
@@ -763,7 +763,7 @@ mod tests {
     }
 
     #[test]
-    fn commit_validate_rejects_unparseable_subject() {
+    fn commit_validate_rejects_unparsable_subject() {
         // A non-conventional subject must abort the release path rather than
         // silently land in the published CUE with type=null.
         let c = Commit {
@@ -779,7 +779,7 @@ mod tests {
             insertions_count: 0,
             deletions_count: 0,
         };
-        let err = c.validate().expect_err("must reject unparseable subject");
+        let err = c.validate().expect_err("must reject unparsable subject");
         let msg = format!("{err}");
         assert!(
             msg.contains("conventional-commit format"),
