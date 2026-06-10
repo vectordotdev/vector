@@ -136,8 +136,20 @@ impl CuckooMemoryTable {
         }
 
         if cuckoo_config.ttl_enabled {
+            let ttl_val: u32 = u32::try_from(ttl_val)?;
+            let needed_bits = ttl_val.ilog2() + 1;
+            if needed_bits as usize > cuckoo_config.ttl_bits.get() {
+                return Err(
+                    format!(
+                    "`ttl_bits` ({}) must be set to at least {} to support the default `ttl` value ({}) at the configured scan interval ({}).",
+                    cuckoo_config.ttl_bits.get(),
+                        needed_bits,
+                    config.ttl,
+                    config.scan_interval.get()).into(),
+                );
+            }
             builder = builder.with_ttl(TtlConfig {
-                ttl: u32::try_from(ttl_val)?.try_into()?,
+                ttl: ttl_val.try_into()?,
                 ttl_bits: cuckoo_config.ttl_bits.get().try_into()?,
             });
         }
