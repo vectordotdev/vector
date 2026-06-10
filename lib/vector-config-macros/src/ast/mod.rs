@@ -13,6 +13,19 @@ use syn::Expr;
 pub use variant::Variant;
 use vector_config_common::constants;
 
+/// A `FromMeta` wrapper that accepts any expression and stores it as a raw token stream.
+///
+/// Used for attribute fields that must accept macro invocations, path expressions, or other
+/// non-literal values that `darling` cannot natively parse (e.g. `tags = metric_tags!(...)`).
+#[derive(Clone, Debug)]
+pub struct AnyExpr(pub proc_macro2::TokenStream);
+
+impl FromMeta for AnyExpr {
+    fn from_expr(expr: &syn::Expr) -> darling::Result<Self> {
+        Ok(AnyExpr(expr.to_token_stream()))
+    }
+}
+
 const INVALID_VALUE_EXPR: &str =
     "got function call-style literal value but could not parse as expression";
 

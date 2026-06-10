@@ -26,6 +26,7 @@ pub const DOCS_META_OPTIONAL: &str = "docs::optional";
 pub const DOCS_META_COMMON: &str = "docs::common";
 pub const DOCS_META_REQUIRED: &str = "docs::required";
 pub const DOCS_META_SYNTAX_OVERRIDE: &str = "docs::syntax_override";
+pub const DOCS_META_TAGS: &str = "docs::tags";
 pub const DOCS_META_TEMPLATEABLE: &str = "docs::templateable";
 pub const DOCS_META_TYPE_OVERRIDE: &str = "docs::type_override";
 pub const DOCS_META_TYPE_UNIT: &str = "docs::type_unit";

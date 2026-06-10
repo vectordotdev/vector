@@ -2,9 +2,10 @@ use darling::{FromAttributes, error::Accumulator, util::Override};
 use proc_macro2::{Ident, TokenStream};
 use quote::ToTokens;
 use serde_derive_internals::ast as serde_ast;
+use vector_config_common::constants;
 
 use super::{
-    Field, LazyCustomAttribute, Metadata, Style, Tagging,
+    AnyExpr, Field, LazyCustomAttribute, Metadata, Style, Tagging,
     util::{DarlingResultIterator, has_flag_attribute, try_extract_doc_title_description},
 };
 
@@ -179,12 +180,20 @@ impl<'a> Variant<'a> {
     /// Attributes can take the shape of flags (`#[configurable(metadata(im_a_teapot))]`) or
     /// key/value pairs (`#[configurable(metadata(status = "beta"))]`) to allow rich, semantic
     /// metadata to be attached directly to variants.
+    ///
+    /// The `tags` shorthand (`#[configurable(tags = metric_tags!(...))]`) is also included here
+    /// as a `docs::tags` key/value custom attribute.
     pub fn metadata(&self) -> impl Iterator<Item = LazyCustomAttribute> {
+        let tags_attr = self.attrs.tags.as_ref().map(|AnyExpr(ts)| {
+            LazyCustomAttribute::kv(constants::DOCS_META_TAGS, ts.clone())
+        });
+
         self.attrs
             .metadata
             .clone()
             .into_iter()
             .flat_map(|metadata| metadata.attributes())
+            .chain(tags_attr)
     }
 }
 
@@ -200,6 +209,11 @@ struct Attributes {
     title: Option<String>,
     description: Option<String>,
     deprecated: Option<Override<String>>,
+    /// Shorthand for `#[configurable(metadata(docs::tags = <expr>))]`.
+    ///
+    /// Accepts any expression that evaluates to a `serde_json::Value`, typically a
+    /// `metric_tags!(...)` invocation.
+    tags: Option<AnyExpr>,
     #[darling(skip)]
     visible: bool,
     #[darling(multiple)]
