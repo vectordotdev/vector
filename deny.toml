@@ -48,4 +48,5 @@ ignore = [
   { id = "RUSTSEC-2026-0099", reason = "rustls-webpki 0.102/0.101 is vulnerable - tonic upgrade (https://github.com/vectordotdev/vector/issues/19179)" },
   { id = "RUSTSEC-2024-0436", reason = "paste crate is unmaintained - transitive dependency via parquet v56.2.0, no safe upgrade available" },
   { id = "RUSTSEC-2026-0104", reason = "rustls-webpki 0.102/0.101 CRL parsing panic - tonic upgrade (https://github.com/vectordotdev/vector/issues/19179); 0.103 already patched to 0.103.13" },
+  { id = "RUSTSEC-2026-0173", reason = "proc-macro-error2 is unmaintained - transitive dep via mlua_derive v0.11.0; unblocked when mlua upgrades its derive macro" },
 ]

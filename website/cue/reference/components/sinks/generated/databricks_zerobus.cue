@@ -28,8 +28,15 @@ generated: components: sinks: databricks_zerobus: configuration: {
 		}
 	}
 	auth: {
-		description: "Databricks authentication configuration."
-		required:    true
+		description: """
+			Databricks authentication configuration.
+
+			See the [Databricks Zerobus documentation][zerobus_service_principal] to create a service
+			principal and grant it permissions to write to the target table.
+
+			[zerobus_service_principal]: https://docs.databricks.com/aws/en/ingestion/zerobus-ingest#create-a-service-principal-and-grant-permissions
+			"""
+		required: true
 		type: object: options: {
 			client_id: {
 				description: "OAuth 2.0 client ID."
@@ -85,9 +92,14 @@ generated: components: sinks: databricks_zerobus: configuration: {
 			The Zerobus ingestion endpoint URL.
 
 			This should be the full URL to the Zerobus ingestion service.
+
+			See the [Databricks Zerobus documentation][zerobus_endpoint] to find your workspace URL and
+			Zerobus ingest endpoint.
+
+			[zerobus_endpoint]: https://docs.databricks.com/aws/en/ingestion/zerobus-ingest#get-your-workspace-url-and-zerobus-ingest-endpoint
 			"""
 		required: true
-		type: string: examples: ["https://ingest.dev.databricks.com", "https://ingest.prod.databricks.com"]
+		type: string: examples: ["https://1234567890123456.zerobus.us-west-2.cloud.databricks.com", "https://6543210987654321.zerobus.us-east-1.cloud.databricks.com"]
 	}
 	request: {
 		description: """
@@ -284,6 +296,18 @@ generated: components: sinks: databricks_zerobus: configuration: {
 			"""
 		required: false
 		type: object: options: {
+			compression: {
+				description: "Arrow IPC compression for Flight payloads. Defaults to no compression."
+				required:    false
+				type: string: {
+					default: "none"
+					enum: {
+						lz4_frame: "LZ4 frame compression."
+						none:      "No compression."
+						zstd:      "Zstandard compression."
+					}
+				}
+			}
 			flush_timeout_ms: {
 				description: "Timeout in milliseconds for flush operations."
 				required:    false
@@ -307,17 +331,27 @@ generated: components: sinks: databricks_zerobus: configuration: {
 			The Unity Catalog table name to write to.
 
 			This should be in the format `catalog.schema.table`.
+
+			See the [Databricks Zerobus documentation][zerobus_table] to create or identify the target
+			table.
+
+			[zerobus_table]: https://docs.databricks.com/aws/en/ingestion/zerobus-ingest#create-or-identify-the-target-table
 			"""
 		required: true
-		type: string: examples: ["logging_platform.my_team.logs", "main.default.vector_logs"]
+		type: string: examples: ["main.default.logs", "main.default.vector_logs"]
 	}
 	unity_catalog_endpoint: {
 		description: """
 			The Unity Catalog endpoint URL.
 
 			This is used for authentication and table metadata.
+
+			See the [Databricks Zerobus documentation][zerobus_endpoint] to find your workspace URL and
+			Zerobus ingest endpoint.
+
+			[zerobus_endpoint]: https://docs.databricks.com/aws/en/ingestion/zerobus-ingest#get-your-workspace-url-and-zerobus-ingest-endpoint
 			"""
 		required: true
-		type: string: examples: ["https://dbc-e2f0eb31-2b0e.staging.cloud.databricks.com", "https://your-workspace.cloud.databricks.com"]
+		type: string: examples: ["https://dbc-a1b2c3d4-e5f6.cloud.databricks.com", "https://dbc-f6e5d4c3-b2a1.cloud.databricks.com"]
 	}
 }

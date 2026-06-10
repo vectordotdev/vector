@@ -634,7 +634,7 @@ mod test {
     }
 
     #[test]
-    fn test_source_definitons_vector() {
+    fn test_source_definitions_vector() {
         let definition = schema::Definition::default_for_namespace(&[LogNamespace::Vector].into())
             .with_metadata_field(
                 &owned_value_path!("vector", "zork"),
