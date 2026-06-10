@@ -561,27 +561,27 @@ where
         Box::pin(async move {
             let mut response = future.await?;
             match version {
-                Version::HTTP_09 | Version::HTTP_10 | Version::HTTP_11 => {
-                    if start_reference.elapsed() >= max_connection_age {
-                        debug!(
-                            message = "Closing connection due to max connection age.",
-                            ?max_connection_age,
-                            connection_age = ?start_reference.elapsed(),
-                            ?peer_addr,
-                        );
-                        // Tell the client to close this connection.
-                        // Hyper will automatically close the connection after the response is sent.
-                        response.headers_mut().insert(
-                            hyper::header::CONNECTION,
-                            hyper::header::HeaderValue::from_static("close"),
-                        );
-                    }
+                Version::HTTP_09 | Version::HTTP_10 | Version::HTTP_11
+                    if start_reference.elapsed() >= max_connection_age =>
+                {
+                    debug!(
+                        message = "Closing connection due to max connection age.",
+                        ?max_connection_age,
+                        connection_age = ?start_reference.elapsed(),
+                        ?peer_addr,
+                    );
+                    // Tell the client to close this connection.
+                    // Hyper will automatically close the connection after the response is sent.
+                    response.headers_mut().insert(
+                        hyper::header::CONNECTION,
+                        hyper::header::HeaderValue::from_static("close"),
+                    );
                 }
+                Version::HTTP_09 | Version::HTTP_10 | Version::HTTP_11 => (),
                 // TODO need to send GOAWAY frame
                 Version::HTTP_2 => (),
                 // TODO need to send GOAWAY frame
                 Version::HTTP_3 => (),
-                _ => (),
             }
             Ok(response)
         })

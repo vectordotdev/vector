@@ -407,14 +407,12 @@ mod tests {
                                     let hdr = req.headers().get("Authorization");
                                     if let Some(h) = hdr {
                                         match a {
-                                            Auth::Bearer { token } => {
-                                                if format!("Bearer {}", token.inner())
-                                                    != h.to_str().unwrap()
-                                                {
-                                                    return Err(
-                                                        http::Response::<Option<String>>::new(None),
-                                                    );
-                                                }
+                                            Auth::Bearer { token }
+                                                if format!("Bearer {}", token.inner()) != h.to_str().unwrap() =>
+                                            {
+                                                return Err(
+                                                    http::Response::<Option<String>>::new(None),
+                                                );
                                             }
                                             Auth::Basic {
                                                 user: _user,
