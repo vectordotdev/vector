@@ -408,6 +408,12 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _buffer_tags
 		}
+		component_cpu_usage_ns_total: {
+			description:       "The CPU time consumed by a component in nanoseconds. Available for transforms only. Emitted only on Linux, macOS, and Windows."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
 		component_discarded_events_total: {
 			description:       "The number of events dropped by this component."
 			type:              "counter"
@@ -1085,7 +1091,7 @@ components: sources: internal_metrics: {
 					required:    true
 				}
 				revision: {
-					description: "Revision identifer, related to versioned releases."
+					description: "Revision identifier, related to versioned releases."
 					required:    true
 				}
 			}
