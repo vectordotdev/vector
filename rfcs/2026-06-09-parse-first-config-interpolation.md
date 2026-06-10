@@ -151,8 +151,8 @@ to the declared type.
 
 Structural uses of interpolation are not valid TOML or JSON and are not supported in the new
 model. This includes table headers (`[${SECTION}]`), map keys (`${KEY} = ...`), and inline
-arrays (`inputs = [${VECTOR_INPUTS}]`). These patterns are rare in practice; configs that use
-them need to be restructured to use fixed keys or split into separate config files.
+arrays (`inputs = [${VECTOR_INPUTS}]`). These patterns are rare in practice and need to be
+replaced with literal values.
 
 ### Improved security
 
