@@ -1,3 +1,3 @@
-Fixed incorrect SQL identifier escaping in the `clickhouse` sink. The `database` identifier was not escaped at all, and the `table` identifier used `\"` instead of the SQL-standard `""` doubling. Both identifiers now use correct SQL-standard escaping, preventing a crafted name from breaking out of the quoted identifier.
+Fixed SQL injection via identifier names in the `clickhouse` sink. The `database` and `table` config values are now passed as ClickHouse query parameters with the `Identifier` type (`{database:Identifier}.{table:Identifier}`), letting the server handle quoting rather than relying on client-side string escaping.
 
-authors: pront
+authors: pront, thomasqueirozb

@@ -141,17 +141,18 @@ fn set_uri_query(
     insert_random_shard: bool,
     query_settings: QuerySettingsConfig,
 ) -> crate::Result<Uri> {
+    // Use ClickHouse query parameters with the Identifier type (introduced in 21.12) so
+    // the server handles identifier quoting — no client-side escaping required.
     let query = url::form_urlencoded::Serializer::new(String::new())
         .append_pair(
             "query",
-            format!(
-                "INSERT INTO \"{}\".\"{}\" FORMAT {}",
-                database.replace('\\', "\\\\").replace('"', "\"\""),
-                table.replace('\\', "\\\\").replace('"', "\"\""),
+            &format!(
+                "INSERT INTO {{database:Identifier}}.{{table:Identifier}} FORMAT {}",
                 format
-            )
-            .as_str(),
+            ),
         )
+        .append_pair("param_database", database)
+        .append_pair("param_table", table)
         .finish();
 
     let mut uri = uri.to_string();
@@ -211,6 +212,12 @@ mod tests {
     use super::super::config::AsyncInsertSettingsConfig;
     use super::*;
 
+    fn parse_query_params(uri: &Uri) -> std::collections::HashMap<String, String> {
+        url::form_urlencoded::parse(uri.query().unwrap_or_default().as_bytes())
+            .map(|(k, v)| (k.into_owned(), v.into_owned()))
+            .collect()
+    }
+
     #[test]
     fn encode_valid() {
         let uri = set_uri_query(
@@ -230,7 +237,9 @@ mod tests {
                                      input_format_import_nested_json=1&\
                                      input_format_skip_unknown_fields=0&\
                                      date_time_input_format=best_effort&\
-                                     query=INSERT+INTO+%22my_database%22.%22my_table%22+FORMAT+JSONEachRow"
+                                     query=INSERT+INTO+%7Bdatabase%3AIdentifier%7D.%7Btable%3AIdentifier%7D+FORMAT+JSONEachRow&\
+                                     param_database=my_database&\
+                                     param_table=my_table"
         );
 
         let uri = set_uri_query(
@@ -249,7 +258,9 @@ mod tests {
             "http://localhost:80/?\
                                      input_format_import_nested_json=1&\
                                      input_format_skip_unknown_fields=0&\
-                                     query=INSERT+INTO+%22my_database%22.%22my_%22%22table%22%22%22+FORMAT+JSONEachRow"
+                                     query=INSERT+INTO+%7Bdatabase%3AIdentifier%7D.%7Btable%3AIdentifier%7D+FORMAT+JSONEachRow&\
+                                     param_database=my_database&\
+                                     param_table=my_%22table%22"
         );
 
         let uri = set_uri_query(
@@ -269,7 +280,9 @@ mod tests {
                                      input_format_import_nested_json=1&\
                                      input_format_skip_unknown_fields=1&\
                                      date_time_input_format=best_effort&\
-                                     query=INSERT+INTO+%22my_database%22.%22my_%22%22table%22%22%22+FORMAT+JSONAsObject"
+                                     query=INSERT+INTO+%7Bdatabase%3AIdentifier%7D.%7Btable%3AIdentifier%7D+FORMAT+JSONAsObject&\
+                                     param_database=my_database&\
+                                     param_table=my_%22table%22"
         );
 
         let uri = set_uri_query(
@@ -288,7 +301,9 @@ mod tests {
             "http://localhost:80/?\
                                      input_format_import_nested_json=1&\
                                      date_time_input_format=best_effort&\
-                                     query=INSERT+INTO+%22my_database%22.%22my_%22%22table%22%22%22+FORMAT+JSONAsObject"
+                                     query=INSERT+INTO+%7Bdatabase%3AIdentifier%7D.%7Btable%3AIdentifier%7D+FORMAT+JSONAsObject&\
+                                     param_database=my_database&\
+                                     param_table=my_%22table%22"
         );
 
         let uri = set_uri_query(
@@ -317,13 +332,15 @@ mod tests {
                                      async_insert=1&\
                                      wait_for_async_insert=1&\
                                      wait_for_async_insert_timeout=500&\
-                                     query=INSERT+INTO+%22my_database%22.%22my_%22%22table%22%22%22+FORMAT+JSONAsObject"
+                                     query=INSERT+INTO+%7Bdatabase%3AIdentifier%7D.%7Btable%3AIdentifier%7D+FORMAT+JSONAsObject&\
+                                     param_database=my_database&\
+                                     param_table=my_%22table%22"
         );
     }
 
     #[test]
-    fn identifier_escaping() {
-        fn rendered_query(database: &str, table: &str) -> String {
+    fn identifier_params() {
+        fn params(database: &str, table: &str) -> (String, String, String) {
             let uri = set_uri_query(
                 &"http://localhost:80".parse().unwrap(),
                 database,
@@ -335,56 +352,41 @@ mod tests {
                 QuerySettingsConfig::default(),
             )
             .unwrap();
-            url::form_urlencoded::parse(uri.query().unwrap_or_default().as_bytes())
-                .find(|(k, _)| k == "query")
-                .map(|(_, v)| v.into_owned())
-                .unwrap_or_default()
+            let p = parse_query_params(&uri);
+            (
+                p["query"].clone(),
+                p["param_database"].clone(),
+                p["param_table"].clone(),
+            )
         }
 
-        // (database, table, expected SQL fragment)
-        let cases: &[(&str, &str, &str)] = &[
-            // plain identifiers pass through unchanged
-            (
-                "my_db",
-                "my_table",
-                r#"INSERT INTO "my_db"."my_table" FORMAT JSONEachRow"#,
-            ),
-            // `"` in table is doubled (SQL standard)
-            (
-                "my_db",
-                r#"my_"table""#,
-                r#"INSERT INTO "my_db"."my_""table""" FORMAT JSONEachRow"#,
-            ),
-            // `"` in database is doubled
-            (
-                r#"my_"db""#,
-                "my_table",
-                r#"INSERT INTO "my_""db"""."my_table" FORMAT JSONEachRow"#,
-            ),
-            // injection payload: attacker sets database to `valid_db"."other_table" --`
-            // without fix: INSERT INTO "valid_db"."other_table" --"."my_table" ...
-            // with fix:    the `"` chars are doubled, neutralising the breakout
-            (
-                r#"valid_db"."other_table" --"#,
-                "my_table",
-                r#"INSERT INTO "valid_db"".""other_table"" --"."my_table" FORMAT JSONEachRow"#,
-            ),
-            // backslash before `"` must be doubled first so ClickHouse cannot
-            // interpret `\"` as an escaped quote rather than a closing delimiter
-            (
-                "db_with_\\\"",
-                "my_table",
-                "INSERT INTO \"db_with_\\\\\"\"\".\"my_table\" FORMAT JSONEachRow",
-            ),
-        ];
+        // The query template is always the same fixed string regardless of identifier content.
+        let template = "INSERT INTO {database:Identifier}.{table:Identifier} FORMAT JSONEachRow";
 
-        for (db, table, expected) in cases {
-            assert_eq!(
-                rendered_query(db, table),
-                *expected,
-                "failed for db={db:?} table={table:?}"
-            );
-        }
+        // Plain identifiers are passed through as-is.
+        let (q, db, tbl) = params("my_db", "my_table");
+        assert_eq!(q, template);
+        assert_eq!(db, "my_db");
+        assert_eq!(tbl, "my_table");
+
+        // Special characters are passed as raw values; ClickHouse handles quoting.
+        let (q, db, tbl) = params("my_db", r#"my_"table""#);
+        assert_eq!(q, template);
+        assert_eq!(db, "my_db");
+        assert_eq!(tbl, r#"my_"table""#);
+
+        // Injection payload: the database and table params are independent URL parameters,
+        // so there is no SQL to break out of.
+        let (q, db, tbl) = params(r#"valid_db"."other_table" --"#, "my_table");
+        assert_eq!(q, template);
+        assert_eq!(db, r#"valid_db"."other_table" --"#);
+        assert_eq!(tbl, "my_table");
+
+        // Backslash and quotes together.
+        let (q, db, tbl) = params("db_with_\\\"", "my_table");
+        assert_eq!(q, template);
+        assert_eq!(db, "db_with_\\\"");
+        assert_eq!(tbl, "my_table");
     }
 
     #[test]
