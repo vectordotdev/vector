@@ -108,6 +108,6 @@ releases: "0.21.1": {
 		{sha: "b142d3d1a721f5714cdf583edca006899a310931", date: "2022-04-22 09:19:20 UTC", description: "Use user-provided array values in vector config --include-defaults", pr_number: 12337, scopes: ["cli"], type: "fix", breaking_change: false, author: "Will", files_count: 1, insertions_count: 4, deletions_count: 13},
 		{sha: "cbf7d6c7f872a06586fafd783ebbc269baea7b46", date: "2022-04-22 09:37:58 UTC", description: "Implement `Serialize`/`Display` for `OwnedPath`", pr_number: 12306, scopes: ["config"], type: "fix", breaking_change: false, author: "Pablo Sichert", files_count: 2, insertions_count: 92, deletions_count: 3},
 		{sha: "c672d1bb238ab68f9e335bf153449dcd50fc1496", date: "2022-04-22 03:03:53 UTC", description: "Fix merge conflict for AWS auth changes", pr_number: 12344, scopes: ["ci"], type: "fix", breaking_change: false, author: "Jesse Szwedko", files_count: 5, insertions_count: 24, deletions_count: 20},
-		{sha: "6110d517b9f22962bd4f9cfd6a5da979de341b37", date: "2022-04-16 06:46:58 UTC", description: "typoes", pr_number: 12238, scopes: [], type: "docs", breaking_change: false, author: "Tshepang Lekhonkhobe", files_count: 1, insertions_count: 2, deletions_count: 2},
+		{sha: "6110d517b9f22962bd4f9cfd6a5da979de341b37", date: "2022-04-16 06:46:58 UTC", description: "typos", pr_number: 12238, scopes: [], type: "docs", breaking_change: false, author: "Tshepang Lekhonkhobe", files_count: 1, insertions_count: 2, deletions_count: 2},
 	]
 }
