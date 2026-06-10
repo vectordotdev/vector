@@ -5,7 +5,7 @@ use serde_derive_internals::ast as serde_ast;
 use vector_config_common::constants;
 
 use super::{
-    AnyExpr, Field, LazyCustomAttribute, Metadata, Style, Tagging,
+    TagsTokens, Field, LazyCustomAttribute, Metadata, Style, Tagging,
     util::{DarlingResultIterator, has_flag_attribute, try_extract_doc_title_description},
 };
 
@@ -184,8 +184,13 @@ impl<'a> Variant<'a> {
     /// The `tags` shorthand (`#[configurable(tags = metric_tags!(...))]`) is also included here
     /// as a `docs::tags` key/value custom attribute.
     pub fn metadata(&self) -> impl Iterator<Item = LazyCustomAttribute> {
-        let tags_attr = self.attrs.tags.as_ref().map(|AnyExpr(ts)| {
-            LazyCustomAttribute::kv(constants::DOCS_META_TAGS, ts.clone())
+        let tags_attr = self.attrs.tags.as_ref().map(|TagsTokens(ts)| {
+            // Wrap the raw tokens in a `crate::metric_tags! { … }` call so the caller only needs
+            // to write the tag-set body, not the macro name.  `crate::` refers to the callsite
+            // crate at expansion time, which is where `metric_tags!` must be defined (e.g.
+            // `vector-common` re-exports the macro via `#[macro_export]`).
+            let value = quote::quote! { crate::metric_tags! { #ts } };
+            LazyCustomAttribute::kv(constants::DOCS_META_TAGS, value)
         });
 
         self.attrs
@@ -209,11 +214,11 @@ struct Attributes {
     title: Option<String>,
     description: Option<String>,
     deprecated: Option<Override<String>>,
-    /// Shorthand for `#[configurable(metadata(docs::tags = <expr>))]`.
+    /// Shorthand for `#[configurable(metadata(docs::tags = metric_tags! { ... }))]`.
     ///
-    /// Accepts any expression that evaluates to a `serde_json::Value`, typically a
-    /// `metric_tags!(...)` invocation.
-    tags: Option<AnyExpr>,
+    /// Accepts `tags(...)` or `tags { ... }` list forms; the contents are the
+    /// raw tokens forwarded verbatim to `metric_tags! { ... }` in the generated code.
+    tags: Option<TagsTokens>,
     #[darling(skip)]
     visible: bool,
     #[darling(multiple)]

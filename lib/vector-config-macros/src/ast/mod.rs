@@ -13,16 +13,31 @@ use syn::Expr;
 pub use variant::Variant;
 use vector_config_common::constants;
 
-/// A `FromMeta` wrapper that accepts any expression and stores it as a raw token stream.
+/// A `FromMeta` wrapper for the `tags(...)` / `tags { ... }` attribute shorthand.
 ///
-/// Used for attribute fields that must accept macro invocations, path expressions, or other
-/// non-literal values that `darling` cannot natively parse (e.g. `tags = metric_tags!(...)`).
+/// Overrides `from_meta` directly so that darling never attempts to parse the tokens inside the
+/// list as `NestedMeta` items (which would fail for spread syntax like `..CONSTANT`).  The raw
+/// token stream is captured as-is and later wrapped in a `metric_tags! { ... }` invocation by
+/// the code generator.
+///
+/// Accepted forms on a variant:
+/// ```text
+/// #[configurable(tags(..COMPONENT_TAGS))]
+/// #[configurable(tags { ..COMPONENT_TAGS, "key": { "description": "…", "required": true } })]
+/// #[configurable(tags())]
+/// ```
 #[derive(Clone, Debug)]
-pub struct AnyExpr(pub proc_macro2::TokenStream);
+pub struct TagsTokens(pub proc_macro2::TokenStream);
 
-impl FromMeta for AnyExpr {
-    fn from_expr(expr: &syn::Expr) -> darling::Result<Self> {
-        Ok(AnyExpr(expr.to_token_stream()))
+impl FromMeta for TagsTokens {
+    fn from_meta(item: &syn::Meta) -> darling::Result<Self> {
+        match item {
+            syn::Meta::List(list) => Ok(TagsTokens(list.tokens.clone())),
+            _ => Err(darling::Error::unsupported_format(
+                "expected `tags(...)` or `tags { ... }` list form",
+            )
+            .with_span(item)),
+        }
     }
 }
 
