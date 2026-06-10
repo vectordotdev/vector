@@ -205,7 +205,17 @@ impl Output {
                 .map(|mut event| {
                     #[cfg(debug_assertions)]
                     let before = std::mem::discriminant(&event);
+
+                    // Move finalizers out before calling the closure to prevent
+                    // double-counting if the closure mutates the event in-place.
+                    // Clone the remaining metadata so we can restore secrets and
+                    // source_event_id if the closure does a same-variant whole-event
+                    // replacement (which resets metadata to defaults).
+                    let original_finalizers = event.metadata_mut().take_finalizers();
+                    let original_meta = event.metadata().clone();
+
                     f(&mut event);
+
                     // Contract: closure must not change the event's variant.
                     #[cfg(debug_assertions)]
                     debug_assert_eq!(
@@ -214,6 +224,15 @@ impl Output {
                         "PostProcessor::HardCoded closure changed the event variant; \
                          this violates the variant-preservation contract"
                     );
+
+                    // Restore metadata that would be lost on a whole-event replacement.
+                    // merge() fills in secrets and source_event_id from the original when
+                    // those fields are absent on the post-closure event. merge_finalizers()
+                    // re-attaches the finalizers taken above (original_meta has empty
+                    // finalizers at this point, so merge() itself adds nothing for them).
+                    event.metadata_mut().merge(original_meta);
+                    event.metadata_mut().merge_finalizers(original_finalizers);
+
                     // Attach runtime schema metadata after the closure.
                     if let Some(log_definition) = &self.log_definition {
                         event.metadata_mut().set_schema_definition(log_definition);
