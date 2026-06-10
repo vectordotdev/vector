@@ -153,6 +153,9 @@ make check-scripts
 
 ./scripts/check_changelog_fragments.sh
 
+# Spell-check the codebase (fast, requires typos-cli: cargo install typos-cli)
+typos
+
 # The following check is very slow.
 # make check-component-features
 ```
