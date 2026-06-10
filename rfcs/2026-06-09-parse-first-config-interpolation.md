@@ -45,10 +45,11 @@ This creates compounding tech debt:
   to construct raw config strings rather than value trees. Adding new features requires
   understanding the interaction between two layers that should be independent.
 
-- **Type coercion is implicit and fragile.** When a secret replaces a TOML integer
-  (`port = SECRET[db.port]`), the raw text passes through and serde has to silently coerce the
-  resulting string to the declared field type. This is not documented, not tested systematically,
-  and breaks in ways that are hard to diagnose.
+- **Type coercion is implicit and fragile.** When a placeholder appears in a non-string position
+  (`port = SECRET[db.port]`), the substituted text must be syntactically valid TOML/JSON at that
+  position. This works only because substitution runs before the format parser sees the document.
+  The constraint is undocumented, not tested systematically, and breaks in ways that are hard to
+  diagnose.
 
 - **The `--disable-env-var-interpolation` flag has no clean extension point.** The flag itself
   is a useful and intentional control, but the raw-text pipeline gives it nowhere to grow.
@@ -143,6 +144,15 @@ editors and linters works correctly against them. The migration is mechanical: w
 placeholder in quotes (`count = "${MY_COUNT}"`) and let the new coercion pass convert the
 string to the declared type.
 
+### Migration
+
+The common case is mechanical: wrap unquoted placeholders in string positions in quotes
+(`count = "${MY_COUNT}"`) and the coercion pass converts the value to the declared type.
+
+Structural uses of interpolation — table headers (`[${SECTION}]`), map keys (`${KEY} = ...`),
+or unquoted booleans/arrays — are not valid TOML or JSON and are not supported in the new model.
+These patterns are rare in practice; configs that use them need to be restructured.
+
 ### Improved security
 
 Substituted values that contain structural characters (newlines, quotes, braces) remain string
@@ -176,10 +186,10 @@ and the config loading pipeline becomes easier to extend and test going forward.
 **Coercion failures are hard errors.** The alternative is a soft warning that falls back to
 passing the raw string to serde, but that is not meaningfully safer. `serde_json` does not
 perform implicit string-to-number or string-to-bool coercion, so a `u64` field receiving
-`Value::String("42")` already fails today. There is no known class of configs that currently
-works via implicit coercion and would be broken by a hard error in the new pass. Failing early
-with a field-path-aware error is strictly better than surfacing a confusing serde error or
-silently loading a misconfigured value.
+`Value::String("42")` will fail at the serde layer. There is no known class of configs that
+currently works and would be broken by a hard error in the new pass. Failing early with a
+field-path-aware error is strictly better than surfacing a confusing serde error or silently
+loading a misconfigured value.
 
 **Unknown-field detection uses `unevaluatedProperties: false`, not `additionalProperties: false`.**
 Vector component schemas do not set `additionalProperties: false` (serde's `deny_unknown_fields`
