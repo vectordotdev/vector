@@ -582,6 +582,7 @@ where
                 Version::HTTP_2 => (),
                 // TODO need to send GOAWAY frame
                 Version::HTTP_3 => (),
+                _ => (),
             }
             Ok(response)
         })
