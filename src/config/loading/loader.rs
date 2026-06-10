@@ -70,7 +70,8 @@ pub(super) mod process {
         /// applies `postprocess` to the resulting table.
         fn load<R: Read>(&mut self, input: R, format: Format) -> Result<Table, Vec<String>> {
             let value = string_from_input(input)?;
-            let table: Table = format::deserialize(&value, format)?;
+            let table: Table = format::deserialize(&value, format)
+                .map_err(|errs| annotate_unquoted_placeholders(errs, &value, format))?;
             let table = if self.should_interpolate_env() {
                 resolve_environment_variables(table)?
             } else {
@@ -388,4 +389,139 @@ pub fn resolve_environment_variables(table: Table) -> Result<Table, Vec<String>>
     }
 
     interpolate_toml_table_with_env_vars(&table, &vars)
+}
+
+/// If a parse error came from a TOML or JSON config that contains an unquoted
+/// `${VAR}` or `SECRET[...]` placeholder, prepend a hint to the error explaining
+/// the migration. Configs of this shape worked under the pre-parse interpolation
+/// pipeline, but they are not valid TOML/JSON syntax and now fail at parse time.
+fn annotate_unquoted_placeholders(
+    errors: Vec<String>,
+    source: &str,
+    format: Format,
+) -> Vec<String> {
+    if !matches!(format, Format::Toml | Format::Json) {
+        return errors;
+    }
+
+    let Some((line_no, line, placeholder)) = find_unquoted_placeholder(source) else {
+        return errors;
+    };
+
+    let hint = format!(
+        "Config contains an unquoted placeholder `{placeholder}` at line {line_no}:\n  \
+         {line}\n\
+         Wrap the placeholder in quotes so it parses as a string. Vector will coerce \
+         the value to the declared field type at load time.\n  \
+         Example: `field = \"{placeholder}\"`"
+    );
+
+    let mut annotated = Vec::with_capacity(errors.len() + 1);
+    annotated.push(hint);
+    annotated.extend(errors);
+    annotated
+}
+
+/// Scan `source` for the first occurrence of `${...}` or `SECRET[...]` that is not
+/// immediately surrounded by quote characters on the same line. Returns the
+/// 1-based line number, the line text (trimmed of trailing newline), and the matched
+/// placeholder text.
+fn find_unquoted_placeholder(source: &str) -> Option<(usize, &str, String)> {
+    for (idx, line) in source.lines().enumerate() {
+        if let Some(p) = scan_line_for_unquoted_placeholder(line) {
+            return Some((idx + 1, line, p));
+        }
+    }
+    None
+}
+
+fn scan_line_for_unquoted_placeholder(line: &str) -> Option<String> {
+    let bytes = line.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        // ${...}
+        if bytes[i] == b'$'
+            && i + 1 < bytes.len()
+            && bytes[i + 1] == b'{'
+            && let Some(end) = line[i + 2..].find('}')
+        {
+            let placeholder_end = i + 2 + end + 1;
+            let placeholder = &line[i..placeholder_end];
+            if !is_wrapped_in_quotes(line, i, placeholder_end) {
+                return Some(placeholder.to_string());
+            }
+            i = placeholder_end;
+            continue;
+        }
+
+        // SECRET[...]
+        if line[i..].starts_with("SECRET[")
+            && let Some(end) = line[i + 7..].find(']')
+        {
+            let placeholder_end = i + 7 + end + 1;
+            let placeholder = &line[i..placeholder_end];
+            if !is_wrapped_in_quotes(line, i, placeholder_end) {
+                return Some(placeholder.to_string());
+            }
+            i = placeholder_end;
+            continue;
+        }
+
+        i += 1;
+    }
+    None
+}
+
+fn is_wrapped_in_quotes(line: &str, start: usize, end: usize) -> bool {
+    let bytes = line.as_bytes();
+    let prev = start.checked_sub(1).map(|p| bytes[p]);
+    let next = bytes.get(end).copied();
+    matches!(prev, Some(b'"') | Some(b'\'')) && matches!(next, Some(b'"') | Some(b'\''))
+}
+
+#[cfg(test)]
+mod placeholder_hint_tests {
+    use super::{Format, annotate_unquoted_placeholders, find_unquoted_placeholder};
+
+    #[test]
+    fn finds_unquoted_env_var_in_toml() {
+        let src = "[sources.in]\ntype = \"demo_logs\"\ncount = ${MY_COUNT}\n";
+        let (line, _, placeholder) = find_unquoted_placeholder(src).expect("should detect");
+        assert_eq!(line, 3);
+        assert_eq!(placeholder, "${MY_COUNT}");
+    }
+
+    #[test]
+    fn ignores_quoted_env_var() {
+        let src = "[sources.in]\ntype = \"demo_logs\"\ncount = \"${MY_COUNT}\"\n";
+        assert!(find_unquoted_placeholder(src).is_none());
+    }
+
+    #[test]
+    fn finds_unquoted_secret_in_json() {
+        let src = "{\"port\": SECRET[vault.port]}\n";
+        let (_, _, placeholder) = find_unquoted_placeholder(src).expect("should detect");
+        assert_eq!(placeholder, "SECRET[vault.port]");
+    }
+
+    #[test]
+    fn ignores_secret_inside_string_value() {
+        let src = "{\"key\": \"SECRET[vault.api_key]\"}\n";
+        assert!(find_unquoted_placeholder(src).is_none());
+    }
+
+    #[test]
+    fn annotation_only_applied_to_toml_or_json() {
+        let errs = vec!["some parse error".to_string()];
+        // YAML is unaffected even if the source happens to contain a bare ${VAR}.
+        let yaml_src = "count: ${MY_COUNT}\n";
+        let yaml = annotate_unquoted_placeholders(errs.clone(), yaml_src, Format::Yaml);
+        assert_eq!(yaml, errs);
+
+        // TOML gets the hint prepended.
+        let toml_src = "count = ${MY_COUNT}\n";
+        let toml = annotate_unquoted_placeholders(errs.clone(), toml_src, Format::Toml);
+        assert_eq!(toml.len(), errs.len() + 1);
+        assert!(toml[0].contains("Wrap the placeholder in quotes"));
+    }
 }
