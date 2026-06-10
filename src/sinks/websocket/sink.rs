@@ -414,6 +414,7 @@ mod tests {
                                                     http::Response::<Option<String>>::new(None),
                                                 );
                                             }
+                                            Auth::Bearer { .. } => {}
                                             Auth::Basic {
                                                 user: _user,
                                                 password: _password,
