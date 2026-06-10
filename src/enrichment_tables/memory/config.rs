@@ -190,7 +190,12 @@ impl EnrichmentTableConfig for MemoryConfig {
         _globals: &crate::config::GlobalOptions,
     ) -> crate::Result<Box<dyn Table + Send + Sync>> {
         match &self.filter {
-            Some(TableFilter::Cuckoo(_)) => Ok(Box::new(self.get_or_build_cuckoo().await?)),
+            Some(TableFilter::Cuckoo(_)) => {
+                if self.source_config.is_some() {
+                    return Err("Source functionality is not supported for cuckoo filter".into());
+                }
+                Ok(Box::new(self.get_or_build_cuckoo().await?))
+            }
             None => Ok(Box::new(self.get_or_build_memory().await)),
         }
     }
@@ -209,6 +214,10 @@ impl EnrichmentTableConfig for MemoryConfig {
         let Some(source_config) = &self.source_config else {
             return None;
         };
+        // Filters can't be used as a source
+        if self.filter.is_some() {
+            return None;
+        }
         Some((
             source_config.source_key.clone().into(),
             Box::new(self.clone()),
