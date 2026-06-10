@@ -717,10 +717,8 @@ impl<'ast> Visit<'ast> for Scanner<'_> {
                 event.skip.validity_check |= raw_block.contains("## skip check-validity-events ##");
 
                 match trait_name {
-                    "InternalEvent" => {
-                        if !registers_inside {
-                            event.internal_impl = true;
-                        }
+                    "InternalEvent" if !registers_inside => {
+                        event.internal_impl = true;
                     }
                     "RegisterInternalEvent" => {
                         event.register_impl = Some(event_name.clone());
