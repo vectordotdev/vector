@@ -11,7 +11,7 @@ use std::{
         atomic::{AtomicUsize, Ordering},
     },
     task::{Context, Poll},
-    time::{Duration, SystemTime},
+    time::{Duration, Instant, SystemTime},
 };
 
 pub use auth::{AwsAuthentication, ImdsAuthentication};
@@ -37,8 +37,7 @@ use aws_smithy_runtime_api::client::{
 use aws_smithy_types::body::SdkBody;
 use aws_types::sdk_config::SharedHttpClient;
 use bytes::Bytes;
-use futures_util::FutureExt;
-use http::HeaderMap;
+use http::{HeaderMap, header::HeaderValue};
 use http_body::{Body, combinators::BoxBody};
 use pin_project::pin_project;
 use regex::RegexSet;
@@ -49,7 +48,13 @@ pub use timeout::AwsTimeout;
 use crate::{
     config::ProxyConfig,
     http::{build_proxy_connector, build_tls_connector, status},
-    internal_events::AwsBytesSent,
+    internal_events::{
+        AwsBytesSent,
+        http_client::{
+            AboutToSendHttpRequest, GotHttpResponse, GotHttpWarning, HttpRequestTelemetry,
+            HttpResponseTelemetry,
+        },
+    },
     tls::{MaybeTlsSettings, TlsConfig},
 };
 
@@ -350,12 +355,77 @@ struct AwsConnector<T> {
     region: Region,
 }
 
+// ── Telemetry trait implementations for the AWS SDK HTTP types ────────────────
+//
+// `HttpRequest` and `HttpResponse` are the SDK's own structs (not `http::Request`
+// / `http::Response`), so they cannot implement the hyper-specific body/version
+// accessors.  The required method impls (method/uri and status) are enough for
+// metric labels; the optional rich-logging fields fall back to `None`.
+
+impl HttpRequestTelemetry for HttpRequest {
+    fn method(&self) -> &str {
+        self.method()
+    }
+
+    fn uri(&self) -> String {
+        self.uri().to_string()
+    }
+
+    fn headers(&self) -> HeaderMap<HeaderValue> {
+        smithy_headers_to_map(self.headers())
+    }
+
+    fn body_size_hint(&self) -> (u64, Option<u64>) {
+        let hint = Body::size_hint(self.body());
+        (hint.lower(), hint.upper())
+    }
+}
+
+impl HttpResponseTelemetry for HttpResponse {
+    fn status_u16(&self) -> u16 {
+        self.status().as_u16()
+    }
+
+    fn headers(&self) -> HeaderMap<HeaderValue> {
+        smithy_headers_to_map(self.headers())
+    }
+
+    fn body_size_hint(&self) -> (u64, Option<u64>) {
+        let hint = Body::size_hint(self.body());
+        (hint.lower(), hint.upper())
+    }
+}
+
+/// Converts the AWS SDK's string-pair header iterator into an `http::HeaderMap`.
+/// Sanitization (marking sensitive headers) is handled by the trait's default
+/// `sanitized_headers` method.
+fn smithy_headers_to_map(
+    headers: &aws_smithy_runtime_api::http::Headers,
+) -> HeaderMap<HeaderValue> {
+    let mut map = HeaderMap::with_capacity(headers.len());
+    for (name, value) in headers {
+        let Ok(header_name) = http::HeaderName::from_bytes(name.as_bytes()) else {
+            continue;
+        };
+        let Ok(header_value) = HeaderValue::from_str(value) else {
+            continue;
+        };
+        map.insert(header_name, header_value);
+    }
+    map
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 impl<T> HttpConnector for AwsConnector<T>
 where
     T: HttpConnector,
 {
     fn call(&self, req: HttpRequest) -> HttpConnectorFuture {
-        let bytes_sent = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let bytes_sent = Arc::new(AtomicUsize::new(0));
+
+        emit!(AboutToSendHttpRequest { request: &req });
+
         let req = req.map(|body| {
             let bytes_sent = Arc::clone(&bytes_sent);
             body.map_preserve_contents(move |body| {
@@ -367,17 +437,32 @@ where
         let fut = self.http.call(req);
         let region = self.region.clone();
 
-        HttpConnectorFuture::new(fut.inspect(move |result| {
+        HttpConnectorFuture::new(async move {
+            let before = Instant::now();
+            let result = fut.await;
+            let roundtrip = before.elapsed();
             let byte_size = bytes_sent.load(Ordering::Relaxed);
-            if let Ok(result) = result
-                && result.status().is_success()
-            {
-                emit!(AwsBytesSent {
-                    byte_size,
-                    region: Some(region),
-                });
+
+            match &result {
+                Ok(response) => {
+                    if response.status().is_success() {
+                        emit!(AwsBytesSent {
+                            byte_size,
+                            region: Some(region),
+                        });
+                    }
+                    emit!(GotHttpResponse {
+                        response,
+                        roundtrip
+                    });
+                }
+                Err(error) => {
+                    emit!(GotHttpWarning { error, roundtrip });
+                }
             }
-        }))
+
+            result
+        })
     }
 }
 
