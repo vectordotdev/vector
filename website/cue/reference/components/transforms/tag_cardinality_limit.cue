@@ -16,7 +16,6 @@ components: transforms: tag_cardinality_limit: {
 		"""
 
 	classes: {
-		commonly_used: false
 		development:   "beta"
 		egress_method: "stream"
 		stateful:      true

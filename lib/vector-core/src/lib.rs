@@ -39,6 +39,7 @@ pub mod serde;
 pub mod sink;
 pub mod source;
 pub mod source_sender;
+pub mod span_fields;
 pub mod tcp;
 #[cfg(test)]
 mod test_util;
@@ -83,3 +84,10 @@ macro_rules! register {
         vector_lib::internal_event::register($event)
     };
 }
+
+pub use span_fields::SpanField;
+
+// Re-export `inventory` so `register_extra_span_field!` can resolve `submit!` through this
+// crate without forcing downstream callers to declare `inventory` as a direct dependency.
+#[doc(hidden)]
+pub use inventory as __inventory;
