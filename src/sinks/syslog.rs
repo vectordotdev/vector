@@ -1,4 +1,4 @@
-use bytes::{BufMut, BytesMut};
+use bytes::BytesMut;
 use vector_lib::{
     codecs::{
         NewlineDelimitedEncoder, SyslogSerializerConfig, SyslogSerializerOptions, encoding::Framer,
@@ -143,14 +143,15 @@ impl tokio_util::codec::Encoder<()> for OctetCountingEncoder {
     type Error = BoxedFramingError;
 
     fn encode(&mut self, _: (), buffer: &mut BytesMut) -> Result<(), Self::Error> {
-        let payload_len = buffer.len();
-        let payload = buffer.split();
-        let payload_len_str = payload_len.to_string();
+        use std::fmt::Write;
 
-        buffer.reserve(payload_len_str.len() + 1 + payload.len());
-        buffer.put_slice(payload_len_str.as_bytes());
-        buffer.put_u8(b' ');
-        buffer.unsplit(payload);
+        // The buffer holds exactly one serialized message; prepend its byte
+        // length and a space. Writing the digits via `fmt::Write` avoids a
+        // `to_string` allocation per frame.
+        let payload = buffer.split();
+        buffer.reserve(21 + payload.len());
+        write!(buffer, "{} ", payload.len()).expect("writing to BytesMut should never fail");
+        buffer.extend_from_slice(&payload);
 
         Ok(())
     }
@@ -593,6 +594,10 @@ mod tests {
 
         let (_guard, addr) = next_addr();
         let receiver = std::net::UdpSocket::bind(addr).expect("Failed to bind UDP socket");
+        // Fail instead of hanging the runtime if the datagram never arrives.
+        receiver
+            .set_read_timeout(Some(Duration::from_secs(10)))
+            .expect("Failed to set read timeout");
 
         let config = SyslogSinkConfig {
             mode: Mode::Udp(UdpMode {
@@ -697,9 +702,7 @@ mod tests {
         };
 
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
-        let event = Event::Log(
-            LogEvent::from("ack-tcp-test").with_batch_notifier(&batch),
-        );
+        let event = Event::Log(LogEvent::from("ack-tcp-test").with_batch_notifier(&batch));
         drop(batch);
 
         assert_sink_compliance(&SINK_TAGS, async move {
@@ -726,6 +729,10 @@ mod tests {
 
         let (_guard, addr) = next_addr();
         let receiver = std::net::UdpSocket::bind(addr).expect("Failed to bind UDP socket");
+        // Fail instead of hanging the runtime if the datagram never arrives.
+        receiver
+            .set_read_timeout(Some(Duration::from_secs(10)))
+            .expect("Failed to set read timeout");
 
         let config = SyslogSinkConfig {
             mode: Mode::Udp(UdpMode {
@@ -736,9 +743,7 @@ mod tests {
         };
 
         let (batch, mut ack_receiver) = BatchNotifier::new_with_receiver();
-        let event = Event::Log(
-            LogEvent::from("ack-udp-test").with_batch_notifier(&batch),
-        );
+        let event = Event::Log(LogEvent::from("ack-udp-test").with_batch_notifier(&batch));
         drop(batch);
 
         let context = SinkContext::default();
@@ -783,11 +788,7 @@ mod tests {
         let (sink, _healthcheck) = config.build(context).await.unwrap();
 
         let (_, events) = random_lines_with_stream(1000, 10000, None);
-        let sink_handle = tokio::spawn(run_and_assert_sink_compliance(
-            sink,
-            events,
-            &SINK_TAGS,
-        ));
+        let sink_handle = tokio::spawn(run_and_assert_sink_compliance(sink, events, &SINK_TAGS));
 
         // First listener: drain a handful of events then drop the connection.
         let mut count = 20usize;

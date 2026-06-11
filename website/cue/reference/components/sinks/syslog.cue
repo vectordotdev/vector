@@ -4,7 +4,6 @@ components: sinks: syslog: {
 	title: "Syslog"
 
 	classes: {
-		commonly_used: true
 		delivery:      "best_effort"
 		development:   "beta"
 		egress_method: "stream"

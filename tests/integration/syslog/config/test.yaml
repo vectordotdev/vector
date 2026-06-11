@@ -22,6 +22,8 @@ matrix:
 
 paths:
   - "lib/codecs/src/encoding/format/syslog.rs"
+  - "lib/codecs/src/encoding/encoder.rs"
+  - "lib/codecs/src/encoding/framing/**"
   - "src/sinks/syslog.rs"
   - "src/sinks/syslog/**"
   - "src/sinks/util/**"

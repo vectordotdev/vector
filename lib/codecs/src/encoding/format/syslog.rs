@@ -5,7 +5,7 @@ use serde_json;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::fmt::Write;
-use strum::{EnumString, FromRepr, VariantNames};
+use strum::FromRepr;
 use tokio_util::codec::Encoder;
 use tracing::debug;
 use vector_config::configurable_component;
@@ -108,34 +108,37 @@ impl<'a> ConfigDecanter<'a> {
         let mut app_name = self.get_value(&config.app_name).unwrap_or_else(|| {
             self.log
                 .get_by_meaning("service")
-                .map(|v| v.to_string_lossy().to_string())
+                .map(|v| v.to_string_lossy().into_owned())
                 .unwrap_or_else(|| "vector".to_owned())
         });
         let mut proc_id = self.get_value(&config.proc_id);
         let mut msg_id = self.get_value(&config.msg_id);
-        let mut hostname = self.log.get_host().map(|v| v.to_string_lossy().to_string());
+        let hostname = self
+            .log
+            .get_host()
+            .map(|v| v.to_string_lossy().into_owned());
 
         match config.rfc {
             SyslogRFC::Rfc3164 => {
-                // RFC 3164: TAG field (app_name and proc_id) must be ASCII printable
-                app_name = sanitize_to_ascii(&app_name).into_owned();
-                if let Some(pid) = &mut proc_id {
-                    *pid = sanitize_to_ascii(pid).into_owned();
-                }
-                hostname = hostname
-                    .and_then(|host| sanitize_printusascii_field(&host, HOSTNAME_MAX_LENGTH));
+                // RFC 3164: the TAG (app_name and proc_id) must be printable
+                // US-ASCII without spaces, since a space terminates the TAG on
+                // most receivers. RFC 3164 has no NILVALUE, so an app_name
+                // that is empty after sanitization falls back to the default.
+                app_name = sanitize_printusascii_field(app_name, RFC3164_TAG_MAX_LENGTH)
+                    .unwrap_or_else(|| "vector".to_owned());
+                proc_id = proc_id
+                    .and_then(|pid| sanitize_printusascii_field(pid, RFC3164_TAG_MAX_LENGTH));
             }
             SyslogRFC::Rfc5424 => {
-                app_name = sanitize_printusascii_field(&app_name, APP_NAME_MAX_LENGTH)
+                app_name = sanitize_printusascii_field(app_name, APP_NAME_MAX_LENGTH)
                     .unwrap_or_else(|| NIL_VALUE.to_owned());
                 proc_id =
-                    proc_id.and_then(|pid| sanitize_printusascii_field(&pid, PROC_ID_MAX_LENGTH));
-                msg_id =
-                    msg_id.and_then(|mid| sanitize_printusascii_field(&mid, MSG_ID_MAX_LENGTH));
-                hostname = hostname
-                    .and_then(|host| sanitize_printusascii_field(&host, HOSTNAME_MAX_LENGTH));
+                    proc_id.and_then(|pid| sanitize_printusascii_field(pid, PROC_ID_MAX_LENGTH));
+                msg_id = msg_id.and_then(|mid| sanitize_printusascii_field(mid, MSG_ID_MAX_LENGTH));
             }
         }
+        let hostname =
+            hostname.and_then(|host| sanitize_printusascii_field(host, HOSTNAME_MAX_LENGTH));
 
         SyslogMessage {
             pri: Pri {
@@ -156,14 +159,14 @@ impl<'a> ConfigDecanter<'a> {
 
     fn get_value(&self, path: &Option<ConfigTargetPath>) -> Option<String> {
         path.as_ref()
-            .and_then(|p| self.log.get(p).cloned())
-            .map(|v| v.to_string_lossy().to_string())
+            .and_then(|p| self.log.get(p))
+            .map(|v| v.to_string_lossy().into_owned())
     }
 
     fn get_structured_data(&self) -> Option<StructuredData> {
         self.log
             .get("structured_data")
-            .and_then(|v| v.clone().into_object())
+            .and_then(|v| v.as_object().cloned())
             .map(StructuredData::from)
     }
 
@@ -177,7 +180,7 @@ impl<'a> ConfigDecanter<'a> {
     fn get_payload(&self) -> String {
         self.log
             .get_message()
-            .map(|v| v.to_string_lossy().to_string())
+            .map(|v| v.to_string_lossy().into_owned())
             .unwrap_or_default()
     }
 
@@ -212,9 +215,9 @@ const PROC_ID_MAX_LENGTH: usize = 128;
 const MSG_ID_MAX_LENGTH: usize = 32;
 const SD_NAME_MAX_LENGTH: usize = 32;
 
-/// Replaces invalid characters with '_'
+/// Replaces invalid characters with `replacement`
 #[inline]
-fn sanitize_with<F>(s: &str, is_valid: F) -> Cow<'_, str>
+fn sanitize_with<F>(s: &str, is_valid: F, replacement: char) -> Cow<'_, str>
 where
     F: Fn(char) -> bool,
 {
@@ -224,7 +227,7 @@ where
             let mut result = String::with_capacity(s.len());
             result.push_str(&s[..first_invalid_idx]); // Copy valid prefix
             for c in s[first_invalid_idx..].chars() {
-                result.push(if is_valid(c) { c } else { '_' });
+                result.push(if is_valid(c) { c } else { replacement });
             }
 
             Cow::Owned(result)
@@ -232,19 +235,14 @@ where
     }
 }
 
-/// Sanitize a string to ASCII printable characters (space to tilde, ASCII 32-126)
-/// Used for RFC 3164 TAG field (app_name and proc_id)
-/// Invalid characters are replaced with '_'
+/// Sanitize a PRINTUSASCII header field, replacing spaces and control
+/// characters with underscores and returning `None` for empty fields.
 #[inline]
-fn sanitize_to_ascii(s: &str) -> Cow<'_, str> {
-    sanitize_with(s, |c| (' '..='~').contains(&c))
-}
-
-/// Sanitize an RFC 5424 PRINTUSASCII field, replacing spaces and control
-/// characters with underscores and treating empty fields as NILVALUE.
-#[inline]
-fn sanitize_printusascii_field(s: &str, max_chars: usize) -> Option<String> {
-    let mut sanitized = sanitize_with(s, |c| c.is_ascii_graphic()).into_owned();
+fn sanitize_printusascii_field(s: String, max_chars: usize) -> Option<String> {
+    let mut sanitized = match sanitize_with(&s, |c| c.is_ascii_graphic(), '_') {
+        Cow::Borrowed(_) => s, // Already clean, reuse the caller's allocation
+        Cow::Owned(owned) => owned,
+    };
     truncate_chars(&mut sanitized, max_chars);
 
     if sanitized.is_empty() {
@@ -260,9 +258,11 @@ fn sanitize_printusascii_field(s: &str, max_chars: usize) -> Option<String> {
 /// Invalid characters are replaced with '_'
 #[inline]
 fn sanitize_name(name: &str) -> Cow<'_, str> {
-    sanitize_with(name, |c| {
-        c.is_ascii_graphic() && !matches!(c, '=' | ']' | '"')
-    })
+    sanitize_with(
+        name,
+        |c| c.is_ascii_graphic() && !matches!(c, '=' | ']' | '"'),
+        '_',
+    )
 }
 
 /// Escape PARAM-VALUE according to RFC 5424
@@ -309,6 +309,27 @@ fn sanitize_sd_name(name: &str) -> Option<String> {
     } else {
         Some(sanitized)
     }
+}
+
+/// Joins an already-sanitized leaf name onto a (possibly empty) dotted prefix,
+/// keeping the result within `SD_NAME_MAX_LENGTH` characters. The prefix is
+/// truncated rather than the leaf so that sibling keys under a long path stay
+/// distinguishable.
+fn join_sd_name(prefix: &str, leaf: String) -> String {
+    if prefix.is_empty() {
+        return leaf;
+    }
+
+    let prefix_budget = SD_NAME_MAX_LENGTH.saturating_sub(leaf.chars().count() + 1);
+    if prefix_budget == 0 {
+        return leaf;
+    }
+
+    let mut joined = prefix.to_owned();
+    truncate_chars(&mut joined, prefix_budget);
+    joined.push('.');
+    joined.push_str(&leaf);
+    joined
 }
 
 fn deduped_key<V>(map: &BTreeMap<String, V>, base: String) -> String {
@@ -428,7 +449,7 @@ impl SyslogMessage {
     fn encode(&self, rfc: &SyslogRFC) -> String {
         let mut result = String::with_capacity(256);
 
-        let _ = write!(result, "{}", self.pri.encode());
+        let _ = write!(result, "<{}>", self.pri.prival());
 
         if *rfc == SyslogRFC::Rfc5424 {
             result.push_str(SYSLOG_V1);
@@ -454,49 +475,46 @@ impl SyslogMessage {
         result.push(' ');
 
         match rfc {
-            SyslogRFC::Rfc3164 => result.push_str(&self.tag.encode_rfc_3164()),
-            SyslogRFC::Rfc5424 => result.push_str(&self.tag.encode_rfc_5424()),
-        }
-        result.push(' ');
+            SyslogRFC::Rfc3164 => {
+                result.push_str(&self.tag.encode_rfc_3164());
 
-        if *rfc == SyslogRFC::Rfc3164 {
-            // RFC 3164 does not support structured data
-            if self
-                .structured_data
-                .as_ref()
-                .is_some_and(|sd| !sd.elements.is_empty())
-            {
-                debug!(
-                    "Structured data present but ignored - RFC 3164 does not support structured data. Consider using RFC 5424 instead."
-                );
+                // RFC 3164 does not support structured data
+                if self
+                    .structured_data
+                    .as_ref()
+                    .is_some_and(|sd| !sd.elements.is_empty())
+                {
+                    debug!(
+                        "Structured data present but ignored - RFC 3164 does not support structured data. Consider using RFC 5424 instead."
+                    );
+                }
+
+                if !self.message.is_empty() {
+                    result.push(' ');
+                    result.push_str(&Self::sanitize_rfc3164_message(&self.message));
+                }
             }
-        } else {
-            if let Some(sd) = &self.structured_data {
-                result.push_str(&sd.encode());
-            } else {
-                result.push_str(NIL_VALUE);
-            }
-            if !self.message.is_empty() {
+            SyslogRFC::Rfc5424 => {
+                result.push_str(&self.tag.encode_rfc_5424());
                 result.push(' ');
-            }
-        }
 
-        if !self.message.is_empty() {
-            if *rfc == SyslogRFC::Rfc3164 {
-                result.push_str(&Self::sanitize_rfc3164_message(&self.message));
-            } else {
-                result.push_str(&self.message);
+                match &self.structured_data {
+                    Some(sd) => result.push_str(&sd.encode()),
+                    None => result.push_str(NIL_VALUE),
+                }
+
+                if !self.message.is_empty() {
+                    result.push(' ');
+                    result.push_str(&self.message);
+                }
             }
         }
 
         result
     }
 
-    fn sanitize_rfc3164_message(message: &str) -> String {
-        message
-            .chars()
-            .map(|ch| if (' '..='~').contains(&ch) { ch } else { ' ' })
-            .collect()
+    fn sanitize_rfc3164_message(message: &str) -> Cow<'_, str> {
+        sanitize_with(message, |ch| (' '..='~').contains(&ch), ' ')
     }
 }
 
@@ -509,19 +527,28 @@ struct Tag {
 
 impl Tag {
     fn encode_rfc_3164(&self) -> String {
-        let mut tag = if let Some(proc_id) = self.proc_id.as_deref() {
-            format!("{}[{}]:", self.app_name, proc_id)
-        } else {
-            format!("{}:", self.app_name)
-        };
-        if tag.chars().count() > RFC3164_TAG_MAX_LENGTH {
-            truncate_chars(&mut tag, RFC3164_TAG_MAX_LENGTH);
-            if !tag.ends_with(':') {
-                tag.pop();
-                tag.push(':');
+        // The TAG is limited to `RFC3164_TAG_MAX_LENGTH` characters, including
+        // the terminating ':'. When the full tag does not fit, truncate the
+        // app_name and keep "[proc_id]" intact; if even that is impossible,
+        // drop the proc_id entirely rather than emit a corrupted, unbalanced
+        // "app[123:" tag.
+        if let Some(proc_id) = self.proc_id.as_deref() {
+            let tag = format!("{}[{}]:", self.app_name, proc_id);
+            if tag.chars().count() <= RFC3164_TAG_MAX_LENGTH {
+                return tag;
+            }
+
+            let bracket_chars = proc_id.chars().count() + "[]:".len();
+            if bracket_chars < RFC3164_TAG_MAX_LENGTH {
+                let mut app_name = self.app_name.clone();
+                truncate_chars(&mut app_name, RFC3164_TAG_MAX_LENGTH - bracket_chars);
+                return format!("{app_name}[{proc_id}]:");
             }
         }
-        tag
+
+        let mut app_name = self.app_name.clone();
+        truncate_chars(&mut app_name, RFC3164_TAG_MAX_LENGTH - 1);
+        format!("{app_name}:")
     }
 
     fn encode_rfc_5424(&self) -> String {
@@ -564,6 +591,7 @@ impl From<ObjectMap> for StructuredData {
         for (sd_id, value) in fields {
             let sd_id_str: String = sd_id.into();
             let Some(final_id) = sanitize_sd_name(&sd_id_str) else {
+                debug!("Dropping structured-data element whose SD-ID is empty after sanitization.");
                 continue;
             };
             let final_id = deduped_key(&elements, final_id);
@@ -592,17 +620,11 @@ fn flatten_object(obj: ObjectMap, prefix: String, result: &mut BTreeMap<String, 
     for (key, value) in obj {
         let key_str: String = key.into();
         let Some(sanitized_key) = sanitize_sd_name(&key_str) else {
+            debug!("Dropping structured-data param whose name is empty after sanitization.");
             continue;
         };
 
-        let mut full_key = prefix.clone();
-        if !full_key.is_empty() {
-            full_key.push('.');
-        }
-        full_key.push_str(&sanitized_key);
-        let Some(full_key) = sanitize_sd_name(&full_key) else {
-            continue;
-        };
+        let full_key = join_sd_name(&prefix, sanitized_key);
 
         match value {
             Value::Object(nested) => {
@@ -631,15 +653,17 @@ struct Pri {
 impl Pri {
     // The last paragraph describes how to compose the enums into `PRIVAL`:
     // https://datatracker.ietf.org/doc/html/rfc5424#section-6.2.1
-    fn encode(&self) -> String {
-        let pri_val = (self.facility as u8 * 8) + self.severity as u8;
-        format!("<{pri_val}>")
+    fn prival(&self) -> u8 {
+        (self.facility as u8 * 8) + self.severity as u8
     }
 }
 
 /// Syslog facility
-#[derive(Default, Debug, EnumString, FromRepr, VariantNames, Copy, Clone, PartialEq, Eq)]
-#[strum(serialize_all = "kebab-case")]
+///
+/// Facility and severity names (including aliases) are resolved at runtime by
+/// `parse_facility`/`parse_severity`, which are the single source of truth for
+/// recognized spellings.
+#[derive(Default, Debug, FromRepr, Copy, Clone, PartialEq, Eq)]
 #[configurable_component]
 pub enum Facility {
     /// Kern
@@ -672,7 +696,6 @@ pub enum Facility {
     /// Security
     Security = 13,
     /// Log alert
-    #[strum(serialize = "log-alert", serialize = "alert", serialize = "console")]
     LogAlert = 14,
     /// SolarisCron
     SolarisCron = 15,
@@ -695,8 +718,7 @@ pub enum Facility {
 }
 
 /// Syslog severity
-#[derive(Default, Debug, EnumString, FromRepr, VariantNames, Copy, Clone, PartialEq, Eq)]
-#[strum(serialize_all = "kebab-case")]
+#[derive(Default, Debug, FromRepr, Copy, Clone, PartialEq, Eq)]
 #[configurable_component]
 pub enum Severity {
     /// Emergency
@@ -739,7 +761,15 @@ mod tests {
     }
 
     fn create_simple_log() -> LogEvent {
-        let mut log = LogEvent::from("original message");
+        create_simple_log_with_message("original message")
+    }
+
+    // Sets the message at construction time instead of overwriting the
+    // literal "message" field afterwards: the decoder tests in this crate
+    // mutate the process-global log schema's message key, so path-based
+    // message overrides race with them under parallel test execution.
+    fn create_simple_log_with_message(message: &str) -> LogEvent {
+        let mut log = LogEvent::from(message);
         log.insert(
             event_path!("timestamp"),
             NaiveDate::from_ymd_opt(2025, 8, 28)
@@ -944,11 +974,8 @@ mod tests {
         )
         .unwrap();
 
-        let mut log = create_simple_log();
-        log.insert(
-            event_path!("message"),
-            "A\nB\tC, Привіт D, E\u{0007}F", //newline, tab, unicode
-        );
+        //newline, tab, unicode
+        let log = create_simple_log_with_message("A\nB\tC, Привіт D, E\u{0007}F");
 
         let output = run_encode(config, Event::Log(log));
         let expected_message = "A B C,        D, E F";
@@ -1070,9 +1097,109 @@ mod tests {
         );
         log.insert(event_path!("proc_id"), "1234567890");
 
+        let output = run_encode(config.clone(), Event::Log(log));
+        // The app_name is truncated so that "[proc_id]:" stays intact and the
+        // whole tag fits in 32 characters.
+        let expected_tag = " this-is-a-very-very[1234567890]: ";
+        assert!(output.contains(expected_tag), "got: {output}");
+
+        // Without a proc_id the app_name itself is truncated to fit.
+        let mut log = create_simple_log();
+        log.insert(
+            event_path!("app_name"),
+            "this-is-a-very-very-long-application-name",
+        );
         let output = run_encode(config, Event::Log(log));
-        let expected_tag = "this-is-a-very-very-long-applic:";
-        assert!(output.contains(expected_tag));
+        let expected_tag = " this-is-a-very-very-long-applic: ";
+        assert!(output.contains(expected_tag), "got: {output}");
+    }
+
+    #[test]
+    fn test_rfc3164_tag_oversized_proc_id_dropped() {
+        let config = toml::from_str::<SyslogSerializerConfig>(
+            r#"
+        [syslog]
+        rfc = "rfc3164"
+        app_name = ".app_name"
+        proc_id = ".proc_id"
+    "#,
+        )
+        .unwrap();
+
+        // "[proc_id]:" alone cannot fit in the 32-char tag, so the proc_id is
+        // dropped entirely instead of being truncated into a wrong value.
+        let mut log = create_simple_log();
+        log.insert(event_path!("app_name"), "myapp");
+        log.insert(event_path!("proc_id"), "a".repeat(30));
+
+        let output = run_encode(config.clone(), Event::Log(log));
+        assert!(output.contains(" myapp: "), "got: {output}");
+        assert!(!output.contains('['), "got: {output}");
+
+        // An empty proc_id is treated as absent rather than emitting "[]".
+        let mut log = create_simple_log();
+        log.insert(event_path!("app_name"), "myapp");
+        log.insert(event_path!("proc_id"), "");
+
+        let output = run_encode(config, Event::Log(log));
+        assert!(output.contains(" myapp: "), "got: {output}");
+        assert!(!output.contains('['), "got: {output}");
+    }
+
+    #[test]
+    fn test_rfc3164_tag_space_sanitization() {
+        let config = toml::from_str::<SyslogSerializerConfig>(
+            r#"
+        [syslog]
+        rfc = "rfc3164"
+        app_name = ".app"
+    "#,
+        )
+        .unwrap();
+
+        // A space would terminate the TAG early on most receivers.
+        let mut log = create_simple_log();
+        log.insert(event_path!("app"), "my app");
+
+        let output = run_encode(config, Event::Log(log));
+        assert!(output.contains(" my_app: "), "got: {output}");
+    }
+
+    #[test]
+    fn test_rfc3164_empty_app_name_falls_back_to_default() {
+        let config = toml::from_str::<SyslogSerializerConfig>(
+            r#"
+        [syslog]
+        rfc = "rfc3164"
+        app_name = ".app"
+    "#,
+        )
+        .unwrap();
+
+        // RFC 3164 has no NILVALUE; an empty app_name must not produce a bare
+        // ":" tag.
+        let mut log = create_simple_log();
+        log.insert(event_path!("app"), "");
+
+        let output = run_encode(config, Event::Log(log));
+        assert!(output.contains(" vector: "), "got: {output}");
+    }
+
+    #[test]
+    fn test_rfc3164_empty_message_no_trailing_space() {
+        let config = toml::from_str::<SyslogSerializerConfig>(
+            r#"
+        [syslog]
+        rfc = "rfc3164"
+    "#,
+        )
+        .unwrap();
+
+        let log = create_simple_log_with_message("");
+
+        let output = run_encode(config, Event::Log(log));
+        let expected = "<14>Aug 28 18:30:00 test-host.com vector:";
+        assert_eq!(output, expected);
     }
 
     #[test]
@@ -1135,8 +1262,7 @@ mod tests {
         )
         .unwrap();
 
-        let mut log = create_simple_log();
-        log.insert(event_path!("message"), "");
+        let mut log = create_simple_log_with_message("");
         log.insert(event_path!("structured_data"), value!({}));
 
         let output = run_encode(config, Event::Log(log));
@@ -1410,6 +1536,81 @@ mod tests {
         assert!(output.contains(&format!(r#"{truncated_key}="first""#)));
         assert!(output.contains(&format!(r#"{deduped_key}="second""#)));
         assert!(!output.contains(&"a".repeat(50)));
+    }
+
+    #[test]
+    fn test_structured_data_long_prefix_preserves_leaf_names() {
+        let config = toml::from_str::<SyslogSerializerConfig>(
+            r#"
+            [syslog]
+            rfc = "rfc5424"
+        "#,
+        )
+        .unwrap();
+
+        // A nested prefix at the 32-char PARAM-NAME limit: the prefix is
+        // truncated instead of the leaf, so sibling keys stay distinguishable.
+        let long_prefix = "a".repeat(32);
+        let leaf: ObjectMap = [("x".into(), Value::from(1)), ("y".into(), Value::from(2))]
+            .into_iter()
+            .collect();
+        let nested: ObjectMap = [(long_prefix.into(), Value::Object(leaf))]
+            .into_iter()
+            .collect();
+        let sd: ObjectMap = [("el".into(), Value::Object(nested))].into_iter().collect();
+
+        let mut log = create_simple_log();
+        log.insert(event_path!("structured_data"), Value::Object(sd));
+
+        let output = run_encode(config, Event::Log(log));
+        let truncated_prefix = "a".repeat(30);
+        assert!(
+            output.contains(&format!(r#"{truncated_prefix}.x="1""#)),
+            "got: {output}"
+        );
+        assert!(
+            output.contains(&format!(r#"{truncated_prefix}.y="2""#)),
+            "got: {output}"
+        );
+    }
+
+    #[test]
+    fn test_structured_data_prefix_truncation_collision_deduped() {
+        let config = toml::from_str::<SyslogSerializerConfig>(
+            r#"
+            [syslog]
+            rfc = "rfc5424"
+        "#,
+        )
+        .unwrap();
+
+        // Two distinct prefixes that only differ past the truncation point
+        // collide after joining; the dedup suffix must keep both params.
+        let prefix_a = "a".repeat(32);
+        let prefix_b = format!("{}b", "a".repeat(31));
+        let leaf_a: ObjectMap = [("v".into(), Value::from(1))].into_iter().collect();
+        let leaf_b: ObjectMap = [("v".into(), Value::from(2))].into_iter().collect();
+        let nested: ObjectMap = [
+            (prefix_a.into(), Value::Object(leaf_a)),
+            (prefix_b.into(), Value::Object(leaf_b)),
+        ]
+        .into_iter()
+        .collect();
+        let sd: ObjectMap = [("el".into(), Value::Object(nested))].into_iter().collect();
+
+        let mut log = create_simple_log();
+        log.insert(event_path!("structured_data"), Value::Object(sd));
+
+        let output = run_encode(config, Event::Log(log));
+        let truncated = "a".repeat(30);
+        assert!(
+            output.contains(&format!(r#"{truncated}.v="1""#)),
+            "got: {output}"
+        );
+        assert!(
+            output.contains(&format!(r#"{truncated}_1="2""#)),
+            "got: {output}"
+        );
     }
 
     #[test]

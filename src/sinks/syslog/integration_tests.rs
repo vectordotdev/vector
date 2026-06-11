@@ -103,21 +103,26 @@ async fn wait_for_log_contains(file_name: &str, needle: &str) -> String {
 }
 
 fn assert_received_syslog(contents: &str, pri_prefix: &str, message: &str) {
+    // Assert against the specific line carrying this test's unique message:
+    // the receiver log files are shared between tests (and across local runs),
+    // so whole-file substring checks could be satisfied by another test's
+    // output.
+    let line = contents
+        .lines()
+        .find(|line| line.contains(message))
+        .unwrap_or_else(|| panic!("expected message {message:?} in rsyslog output:\n{contents}"));
+
     assert!(
-        contents.contains(pri_prefix),
-        "expected PRI prefix {pri_prefix:?} in rsyslog output:\n{contents}"
+        line.contains(pri_prefix),
+        "expected PRI prefix {pri_prefix:?} in received line:\n{line}"
     );
     assert!(
-        contents.contains("vector-integration-host"),
-        "expected host in rsyslog output:\n{contents}"
+        line.contains("vector-integration-host"),
+        "expected host in received line:\n{line}"
     );
     assert!(
-        contents.contains("vector-integration-app"),
-        "expected app name in rsyslog output:\n{contents}"
-    );
-    assert!(
-        contents.contains(message),
-        "expected message {message:?} in rsyslog output:\n{contents}"
+        line.contains("vector-integration-app"),
+        "expected app name in received line:\n{line}"
     );
 }
 
