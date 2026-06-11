@@ -133,6 +133,12 @@ arrays (`inputs = [${VECTOR_INPUTS}]`). These patterns are rare in practice and 
 replaced with literal values. The implementation will follow Vector's deprecation policy to give
 users time to migrate.
 
+A second silent-change case applies to YAML keys and TOML quoted keys: `${KEY}: value` is valid
+YAML (and `"${KEY}" = value` is valid TOML), so neither produces a parse error. Since keys are
+never walked by the interpolation pass, the key remains the literal string `${KEY}` rather than
+the substituted value. The implementation will detect placeholders in key position and warn,
+directing users to replace them with literal key names.
+
 One YAML-specific case requires attention: `inputs: [${VECTOR_INPUTS}]` is valid YAML syntax
 (an array containing one string element), so it does not produce a parse error under the new
 model. However, the behavior changes silently — today the raw-text substitution of
