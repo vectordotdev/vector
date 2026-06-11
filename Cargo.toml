@@ -190,8 +190,8 @@ reqwest = { version = "0.11", features = ["json"] }
 rust_decimal = { version = "1.40.0", default-features = false, features = ["std"] }
 semver = { version = "1.0.28", default-features = false, features = ["serde", "std"] }
 serde = { version = "1.0.219", default-features = false, features = ["alloc", "derive", "rc"] }
-serde_json = { version = "1.0.149", default-features = false, features = ["preserve_order", "raw_value", "std"] }
-serde_with = { version = "3.20.0", default-features = false, features = ["std", "macros", "chrono_0_4"] }
+serde_json = { version = "1.0.150", default-features = false, features = ["preserve_order", "raw_value", "std"] }
+serde_with = { version = "3.21.0", default-features = false, features = ["std", "macros", "chrono_0_4"] }
 serde_yaml = { version = "0.9.34", default-features = false }
 snafu = { version = "0.9.0", default-features = false, features = ["futures", "std"] }
 socket2 = { version = "0.5.10", default-features = false }
@@ -473,7 +473,8 @@ quick-xml = { version = "0.31", default-features = false, features = ["serialize
 rdkafka = { workspace = true, features = ["cmake_build"], optional = true }
 
 [target.'cfg(unix)'.dependencies]
-nix = { version = "0.31", default-features = false, features = ["socket", "signal", "fs"] }
+libc.workspace = true
+nix = { version = "0.31", default-features = false, features = ["socket", "signal", "fs", "resource"] }
 tikv-jemallocator = { version = "0.7.0", default-features = false, features = ["unprefixed_malloc_on_supported_platforms"], optional = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]

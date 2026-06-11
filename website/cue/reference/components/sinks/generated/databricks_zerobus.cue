@@ -354,4 +354,14 @@ generated: components: sinks: databricks_zerobus: configuration: {
 		required: true
 		type: string: examples: ["https://dbc-a1b2c3d4-e5f6.cloud.databricks.com", "https://dbc-f6e5d4c3-b2a1.cloud.databricks.com"]
 	}
+	user_agent: {
+		description: """
+			Custom identifier appended to the `user-agent` header sent to Databricks.
+
+			The header always includes `Vector/<version>`; when set, this value is
+			appended after it (e.g. `my-service/1.2`).
+			"""
+		required: false
+		type: string: examples: ["my-service/1.2"]
+	}
 }

@@ -197,7 +197,7 @@ fn fmt_helper(
     data_type: DataType,
 ) -> fmt::Result {
     match maybe_port {
-        Some(port) => write!(f, "port: \"{port}\",",),
+        Some(port) => write!(f, "port: \"{port}\","),
         None => write!(f, "port: None,"),
     }?;
     write!(f, " types: {data_type}")
