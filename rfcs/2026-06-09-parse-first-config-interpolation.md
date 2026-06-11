@@ -1,11 +1,49 @@
 # RFC 2026-06-09 - Parse-First Config Interpolation
 
+Parse the config document into a native value tree first, apply `${VAR}` and `SECRET[...]`
+substitution only to string leaves, and run a JSON-Schema-driven coercion pass to convert
+string scalars to declared types before serde runs.
+
+## Context
+
+- Secret management design: [RFC 11552](2022-02-24-11552-dd-agent-style-secret-management.md)
+- [#23910](https://github.com/vectordotdev/vector/pull/23910) — added `--disable-env-var-interpolation`
+- [#24088](https://github.com/vectordotdev/vector/pull/24088) — prevented multiline env var interpolation
+- [#21282](https://github.com/vectordotdev/vector/pull/21282) — file/directory secret backends
+
+## Cross cutting concerns
+
+- `vector-config` schema generation (`generate_root_schema::<ConfigBuilder>()`) must remain
+  accurate for the coercion pass to be correct.
+- All secret backends implement `SecretBackend::retrieve(...) -> HashMap<String, String>`;
+  any future backend must continue to honour this contract.
+
+## Scope
+
+### In scope
+
+- Moving env-var and secret substitution from raw-text regex passes to tree-walks over
+  `String` leaves in the parsed value tree.
+- Moving secret placeholder collection to the same tree-walk, replacing the raw-text scan.
+- Adding a validate/coerce pass that uses Vector's JSON Schema to coerce string scalars to
+  declared types and warn on unknown fields with their full path.
+- Migration guidance for users relying on pre-parse substitution behaviour.
+
+### Out of scope
+
+- Emitting `#[serde(alias)]` entries into the generated JSON Schema (tracked TODO in
+  `vector-config/src/lib.rs`). Until that is done, unknown-field detection remains a warning
+  rather than a hard error.
+- Adding a `--disable-secret-interpolation` CLI flag (natural follow-up once the tree-walk is
+  in place).
+- Migrating the HTTP config provider to the new pipeline (separate follow-up).
+
 ## Motivation
 
 Vector's config loading pipeline has two deeply entangled problems that together make this one of
 the hardest areas of the codebase to work on.
 
-### 1. User friendly configuration errors
+### 1. User-facing configuration errors
 
 When a Vector config is invalid, serde reports a type error or an unknown-field error with no
 indication of where in the config the problem is. Users routinely open GitHub issues like "what
@@ -18,9 +56,6 @@ error: unknown field `retries`, expected one of `encoding`, `batch`, ...
 There is no field path like `sinks.my_sink.retries`. This is a known pain point with open issues
 that cannot be cleanly fixed under the current architecture, because the config is fully
 deserialized in one shot by serde before any path context is available.
-
-Producing actionable, field-path-aware errors for unknown fields and type mismatches is a
-first-class goal of this RFC.
 
 ### 2. Hard to maintain code
 
@@ -60,11 +95,52 @@ This creates compounding tech debt:
 These pain points have made contributors hesitant to touch this code. Non-trivial improvements
 stall because they require untangling parsing and substitution first.
 
-## Proposed Solution
+## Proposal
 
-Parse the config document into a native value tree first, then apply substitution only to
-`String`-typed leaf nodes. Add a structured validation/coercion pass between substitution and
-final deserialization.
+### User Experience
+
+**Better error messages.** Today:
+
+```text
+error: unknown field `retries`, expected one of `encoding`, `batch`, `request`, ...
+```
+
+After this change:
+
+```text
+error: unknown field at sinks.my_sink.retries
+```
+
+```text
+error: expected integer at sources.my_source.count, found string "not-a-number"
+```
+
+Users get a field path including the component name, making errors immediately actionable.
+
+**Spec-compliant configs.** Today, `count = ${MY_COUNT}` works in Vector but is not valid TOML.
+After this change, configs are real TOML, JSON, and YAML, so off-the-shelf editors and linters
+work correctly against them.
+
+**Migration.** The common case is mechanical: wrap unquoted placeholders in quotes
+(`count = "${MY_COUNT}"`, `port = "SECRET[db.port]"`) and the coercion pass converts the value
+to the declared type.
+
+Structural uses of interpolation are not valid TOML or JSON and are not supported in the new
+model. This includes table headers (`[${SECTION}]`), map keys (`${KEY} = ...`), and inline
+arrays (`inputs = [${VECTOR_INPUTS}]`). These patterns are rare in practice and need to be
+replaced with literal values. The implementation will follow Vector's deprecation policy to give
+users time to migrate.
+
+One YAML-specific case requires attention: `inputs: [${VECTOR_INPUTS}]` is valid YAML syntax
+(an array containing one string element), so it does not produce a parse error under the new
+model. However, the behavior changes silently — today the raw-text substitution of
+`source_a, source_b` produces a two-element array; after this change it produces a one-element
+array containing the literal string `"source_a, source_b"`. Users relying on this pattern must
+replace it with explicit literal values.
+
+### Implementation
+
+#### Pipeline
 
 ```text
 raw text
@@ -73,13 +149,13 @@ raw text
   -> interpolate env vars
   -> fetch secrets
   -> interpolate secrets
-  -> validate/coerce
+  -> coerce full tree
   -> deserialize
 ```
 
 Both `${VAR}` and `SECRET[backend.key]` placeholders use the same string-leaf substitution
-mechanism, applied in separate stages. Substitution operates on `toml::Value::String` leaves only. Objects and arrays are walked
-recursively until string leaves are reached; integers, booleans, and keys are never touched:
+mechanism, applied in separate stages. Objects and arrays are walked recursively until string
+leaves are reached; integers, booleans, and keys are never touched:
 
 ```text
           value tree                        after interpolation
@@ -97,105 +173,10 @@ recursively until string leaves are reached; integers, booleans, and keys are ne
                          interpolation pass
 ```
 
-The validate/coerce pass walks the tree using Vector's own JSON Schema
-(`generate_root_schema::<ConfigBuilder>()`) and:
-
-- Coerces `"42"` to `42`, `"true"` to `true` where the schema declares a non-string type
-- Warns on unknown fields with their full path (see Design Decisions for the current limitation)
-- Detects type mismatches and reports them with their full path and the expected type
-
-This gives each stage a clean contract:
-
-- The parser sees raw text, unmodified.
-- The interpolation layer sees a typed tree and operates only on strings.
-- The validation pass has the full field path and can produce actionable errors.
-- Downstream deserialization receives a well-typed tree with fewer opportunities for confusing serde errors.
-
-## Benefits
-
-### User-facing error quality
-
-Today:
-
-```text
-error: unknown field `retries`, expected one of `encoding`, `batch`, `request`, ...
-```
-
-After this change:
-
-```text
-error: unknown field at sinks.my_sink.retries
-```
-
-```text
-error: expected integer at sources.my_source.count, found string "not-a-number"
-```
-
-Users get a field path. The path includes the component name, making it immediately actionable.
-This directly addresses a category of open issues where users cannot diagnose their own config
-errors without asking in community channels.
-
-### Improved developer experience
-
-- Interpolation and parsing become independently testable.
-- Secret backend extensibility (richer types, per-field policies) no longer requires touching
-  the parser layer.
-- The `--disable-env-var-interpolation` flag has a clean extension point: skip the tree-walk,
-  rather than stripping regex matches from raw text.
-
-### Spec-compliant configs
-
-Today, a config like `count = ${MY_COUNT}` works in Vector but is not valid TOML. The TOML and
-JSON specifications have no variable-substitution syntax, so configs that rely on the pre-parse
-shortcut cannot be linted, formatted, or syntax-highlighted by any off-the-shelf TOML/JSON tool.
-After this change, Vector configs are real TOML, JSON, and YAML, so the broader ecosystem of
-editors and linters works correctly against them. The migration is mechanical: wrap the
-placeholder in quotes (`count = "${MY_COUNT}"`) and let the new coercion pass convert the
-string to the declared type.
-
-### Migration
-
-The common case is mechanical: wrap unquoted placeholders in quotes
-(`count = "${MY_COUNT}"`, `port = "SECRET[db.port]"`) and the coercion pass converts the value
-to the declared type.
-
-Structural uses of interpolation are not valid TOML or JSON and are not supported in the new
-model. This includes table headers (`[${SECTION}]`), map keys (`${KEY} = ...`), and inline
-arrays (`inputs = [${VECTOR_INPUTS}]`). These patterns are rare in practice and need to be
-replaced with literal values. The implementation will follow Vector's deprecation policy to give
-users time to migrate.
-
-One YAML-specific case requires attention: `inputs: [${VECTOR_INPUTS}]` is valid YAML syntax
-(an array containing one string element), so it does not produce a parse error under the new
-model. However, the behavior changes silently — today the raw-text substitution of
-`source_a, source_b` produces a two-element array; after this change it produces a one-element
-array containing the literal string `"source_a, source_b"`. Users relying on this pattern must
-replace it with explicit literal values.
-
-### Improved security
-
-Substituted values that contain structural characters (newlines, quotes, braces) remain string
-scalars. They cannot grow new config keys or sections. This eliminates a config injection surface
-that is difficult to close under the current architecture.
-
-## Trade-offs
-
-The **validate/coerce pass** adds implementation complexity upfront. It uses Vector's own JSON
-Schema (`generate_root_schema::<ConfigBuilder>()`) to infer expected types and detect unknown
-fields, which requires handling discriminated-union types (`oneOf` with a `type` tag) and
-`additionalProperties`-style open maps correctly.
-
-This is a one-off cost. Once the pass is in place it tracks the generated schema automatically,
-and the config loading pipeline becomes easier to extend and test going forward.
-
-## Implementation Sketch
+#### Files
 
 1. **`interpolation.rs`**: env-var and secret regex applied to `toml::Value::String` leaves only.
-2. **`schema_coercion.rs`**: recursive JSON Schema walker that coerces scalar types. Unknown-field
-   detection and path-aware error reporting are implemented via `unevaluatedProperties: false`
-   handling on Vector's outer wrapper schemas (`SourceOuter`, `SinkOuter`, `EnrichmentTableOuter`,
-   etc.), which have visibility into the full union of valid properties for a component including
-   shared fields (`inputs`, `proxy`, `graph`).
+2. **`schema_coercion.rs`**: recursive JSON Schema walker that coerces scalar types.
 3. **`loader.rs`**: `Process::load()` default: parse, interpolate env vars, run `postprocess`
    for secret substitution, then validate and coerce. All steps operate on the parsed tree.
    Secret placeholder collection moves to a tree-walk over string leaves as well, replacing the
@@ -205,46 +186,71 @@ and the config loading pipeline becomes easier to extend and test going forward.
 
 ## Design Decisions
 
-**Secret backends always return strings.** The `SecretBackend` trait is defined as
-`retrieve(...) -> HashMap<String, String>`. Every backend (exec, file, directory, AWS Secrets
-Manager) returns string values regardless of the field type the secret will populate. This is
-an explicit design choice, modeled on Datadog Agent secret management behavior
-([RFC 11552](2022-02-24-11552-dd-agent-style-secret-management.md)). The coercion pass is
-therefore the only place where a secret value destined for a numeric or boolean field is
-converted to the declared type.
+### Secret backends always return strings
 
-**Coercion failures are hard errors.** The alternative is a soft warning that falls back to
-passing the raw string to serde, but that is not meaningfully safer. `serde_json` does not
-perform implicit string-to-number or string-to-bool coercion, so a `u64` field receiving
-`Value::String("42")` will fail at the serde layer. There is no known class of configs that
-currently works and would be broken by a hard error in the new pass. Failing early with a
-field-path-aware error is strictly better than surfacing a confusing serde error or silently
-loading a misconfigured value.
+The `SecretBackend` trait is defined as `retrieve(...) -> HashMap<String, String>`. Every backend
+(exec, file, directory, AWS Secrets Manager) returns string values regardless of the field type
+the secret will populate. This is an explicit design choice, modeled on Datadog Agent secret
+management behavior ([RFC 11552](2022-02-24-11552-dd-agent-style-secret-management.md)). The
+coercion pass is therefore the only place where a secret value destined for a numeric or boolean
+field is converted to the declared type.
 
-**Unknown-field detection uses `unevaluatedProperties: false`, not `additionalProperties: false`.**
-Vector component schemas do not set `additionalProperties: false` (serde's `deny_unknown_fields`
-is not reflected in the generated JSON Schema). However, the outer wrapper schemas
-(`SourceOuter`, `SinkOuter`, etc.) do set `unevaluatedProperties: false`, which has the same
-semantic. The coercion pass checks for unknown fields at this level, where it has access to the
-complete union of valid properties across the component config and its shared wrapper fields.
+### Coercion failures are hard errors
 
-**Unknown-field detection is currently non-fatal.** `vector-config` does not yet emit
-`#[serde(alias = "...")]` aliases into the generated JSON Schema (tracked TODO in
-`vector-config/src/lib.rs`). Until aliases are represented, a key missing from the schema may
-still be a legitimate serde alias. The coercion pass logs a warning at the unknown-field path
-and defers the authoritative check to serde, which has alias information. When aliases are
-emitted in the schema, this can be tightened to a hard error per the original RFC intent.
+The alternative is a soft warning that falls back to passing the raw string to serde, but that is
+not meaningfully safer. `serde_json` does not perform implicit string-to-number or string-to-bool
+coercion, so a `u64` field receiving `Value::String("42")` will fail at the serde layer. There is
+no known class of configs that currently works and would be broken by a hard error in the new
+pass. Failing early with a field-path-aware error is strictly better than surfacing a confusing
+serde error or silently loading a misconfigured value.
 
-**Unknown-field checking is skipped for unrecognized component types.** When a component's `type`
-value does not match any compiled variant (for example, the component is feature-gated and not
-built), the check is suppressed. The component's fields are not in the schema and cannot be
-validated. Suppressing avoids false positives and preserves the existing behavior of passing
-unrecognized components through to serde, which produces the "unknown variant" error with its
-own context.
+### Unknown-field detection is currently non-fatal
 
-## Alternatives Considered
+`vector-config` does not yet emit `#[serde(alias = "...")]` aliases into the generated JSON
+Schema (tracked TODO in `vector-config/src/lib.rs`). Until aliases are represented, a key missing
+from the schema may still be a legitimate serde alias. The coercion pass logs a warning at the
+unknown-field path and defers the authoritative check to serde, which has alias information. When
+aliases are emitted in the schema, this can be tightened to a hard error per the original RFC
+intent.
 
-**Option A: `CoercingDeserializer` wrapping serde.**
+### Unknown-field checking is skipped for unrecognized component types
+
+When a component's `type` value does not match any compiled variant (for example, the component
+is feature-gated and not built), the check is suppressed. The component's fields are not in the
+schema and cannot be validated. Suppressing avoids false positives and preserves the existing
+behavior of passing unrecognized components through to serde, which produces the "unknown variant"
+error with its own context.
+
+## Rationale
+
+- Field-path-aware errors directly address a category of open issues where users cannot diagnose
+  their own config errors without asking in community channels.
+- Interpolation and parsing become independently testable.
+- Secret backend extensibility (richer types, per-field policies) no longer requires touching
+  the parser layer.
+- Substituted values that contain structural characters (newlines, quotes, braces) remain string
+  scalars and cannot grow new config keys or sections, eliminating a config injection surface.
+
+## Drawbacks
+
+The validate/coerce pass adds implementation complexity upfront. It uses Vector's own JSON
+Schema (`generate_root_schema::<ConfigBuilder>()`) to infer expected types and detect unknown
+fields, which requires handling discriminated-union types (`oneOf` with a `type` tag) and
+`additionalProperties`-style open maps correctly.
+
+This is a one-off cost. Once the pass is in place it tracks the generated schema automatically,
+and the config loading pipeline becomes easier to extend and test going forward.
+
+## Prior Art
+
+The Datadog Agent uses the same exec-based secret backend model with string-only return values
+([RFC 11552](2022-02-24-11552-dd-agent-style-secret-management.md)). Vector's `SecretBackend`
+trait was designed to be compatible with this protocol.
+
+## Alternatives
+
+### Option A: `CoercingDeserializer` wrapping serde
+
 A custom `Deserializer` implementation that intercepts `visit_str` calls and coerces the value to
 the type the downstream `Visitor` requests. This keeps all type information inside serde and
 avoids a separate schema-walking pass. The approach works for simple structs but breaks for
@@ -253,7 +259,8 @@ internally-tagged enums (`#[serde(tag = "type")]`): serde buffers the entire map
 nested field types and cannot coerce them. Vector's component configs are pervasively tagged
 enums, so this option does not generalize.
 
-**Option B: Run a JSON Schema validator instead of writing a custom pass.**
+### Option B: Run a JSON Schema validator instead of writing a custom pass
+
 Run an off-the-shelf JSON Schema validator (for example, the `jsonschema` crate) over the value
 tree before deserialization and surface its errors. Validators report structural conformance well
 and already produce path-aware errors, but they do not perform coercion: a `"42"` string in an
@@ -262,7 +269,8 @@ their declared scalar types is the whole point of the new pass, so a validator a
 substitute. It also cannot account for Vector's custom serde logic (untagged unions, aliases)
 that intentionally diverges from the raw JSON Schema.
 
-**Option C: `serde_path_to_error` (or equivalent) on top of serde.**
+### Option C: `serde_path_to_error` (or equivalent) on top of serde
+
 The `serde_path_to_error` crate annotates serde errors with the field path at which they
 occurred, which would solve the "no file/field path" half of the motivation without a
 schema-walking pass. It does not solve coercion (string-to-int from env vars still fails at
@@ -270,3 +278,21 @@ serde), so it is at best a partial fix. It also inherits the same `Content`-buff
 as Option A on internally-tagged enums: once serde buffers the map for variant dispatch, the path
 information is lost for nested fields. Vector's tagged-enum-heavy schema is exactly where
 path-aware errors are most needed, so this approach degrades in the cases that matter most.
+
+## Outstanding Questions
+
+None blocking merge.
+
+## Plan Of Attack
+
+- [ ] Announce deprecation of structural interpolation patterns and the pre-parse substitution behaviour.
+- [ ] Wait for the deprecation period to elapse.
+- [ ] Implementation PR: parse-first pipeline, coercion pass, tree-walk secret collection.
+- [ ] Release.
+
+## Future Improvements
+
+- Emit `#[serde(alias)]` entries into the generated JSON Schema, enabling unknown-field
+  detection to be promoted from a warning to a hard error.
+- Add `--disable-secret-interpolation` CLI flag as a tree-walk filter.
+- Migrate the HTTP config provider to the parse-first pipeline.
