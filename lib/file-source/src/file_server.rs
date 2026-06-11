@@ -151,7 +151,7 @@ where
         let checkpoints = checkpointer.view();
 
         for (_key, path, file_id) in existing_files {
-            self.watch_new_file(path, file_id, &mut fp_map, &checkpoints, true)
+            self.watch_new_file(path, file_id, &mut fp_map, &checkpoints, true, false)
                 .await;
         }
         self.emitter.emit_files_open(fp_map.len());
@@ -266,11 +266,15 @@ where
                                 while eviction_idx < eviction_candidates.len() {
                                     let evict_id = eviction_candidates[eviction_idx];
                                     eviction_idx += 1;
-                                    // Skip recently-rotated files still within rotate_wait —
-                                    // their open FD is the only way to drain remaining bytes.
+                                    // Skip recently-rotated files whose open FD is the
+                                    // only way to drain remaining bytes. We identify them
+                                    // by last_seen being older than the glob interval
+                                    // (meaning the file was NOT found in the previous
+                                    // cycle) but younger than rotate_wait.
                                     if let Some(candidate) = fp_map.get(&evict_id) {
-                                        if !candidate.file_findable()
-                                            && candidate.last_seen().elapsed() <= self.rotate_wait
+                                        let since_seen = candidate.last_seen().elapsed();
+                                        if since_seen > self.glob_minimum_cooldown * 2
+                                            && since_seen <= self.rotate_wait
                                         {
                                             continue;
                                         }
@@ -290,11 +294,14 @@ where
                                     }
                                 }
                                 if !evicted {
+                                    if let Some(ts) = evicted_files.get_mut(&file_id) {
+                                        *ts = time::Instant::now();
+                                    }
                                     continue; // skip this file, retry next glob cycle
                                 }
                             }
-                            evicted_files.remove(&file_id);
-                            self.watch_new_file(path, file_id, &mut fp_map, &checkpoints, false)
+                            let was_evicted = evicted_files.remove(&file_id).is_some();
+                            self.watch_new_file(path, file_id, &mut fp_map, &checkpoints, false, was_evicted)
                                 .await;
                             self.emitter.emit_files_open(fp_map.len());
                         }
@@ -513,6 +520,7 @@ where
         fp_map: &mut IndexMap<FileFingerprint, FileWatcher>,
         checkpoints: &CheckpointsView,
         startup: bool,
+        force_checkpoint: bool,
     ) {
         // Determine the initial _requested_ starting point in the file. This can be overridden
         // once the file is actually opened and we determine it is compressed, older than we're
@@ -531,7 +539,11 @@ where
         // `kubernetes_logs` source returns the files well after start-up, once it has populated
         // them from the k8s metadata, so we now just always use the checkpoints unless opted out.
         // https://github.com/vectordotdev/vector/issues/7139
-        let read_from = if !self.ignore_checkpoints {
+        //
+        // force_checkpoint overrides ignore_checkpoints for evicted files —
+        // their checkpoint is an internal offset, not a persisted one the user
+        // opted out of.
+        let read_from = if !self.ignore_checkpoints || force_checkpoint {
             checkpoints
                 .get(file_id)
                 .map(ReadFrom::Checkpoint)
