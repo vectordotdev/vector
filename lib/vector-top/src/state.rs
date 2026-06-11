@@ -122,6 +122,10 @@ pub struct State {
     pub sort_state: SortState,
     pub filter_state: FilterState,
     pub ui: UiState,
+    /// Set to `true` once we receive the first `AllocatedBytes` event,
+    /// indicating the connected Vector instance has allocation tracing active.
+    #[cfg(feature = "allocation-tracing")]
+    pub allocation_tracing_active: bool,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -343,6 +347,8 @@ impl State {
             ui: UiState::default(),
             sort_state: SortState::default(),
             filter_state: FilterState::default(),
+            #[cfg(feature = "allocation-tracing")]
+            allocation_tracing_active: false,
         }
     }
 

@@ -466,7 +466,7 @@ impl PrometheusExporter {
         let tls = MaybeTlsSettings::from_config(tls.as_ref(), true)?;
         let listener = tls.bind(&address).await?;
 
-        tokio::spawn(async move {
+        crate::spawn_in_current_span(async move {
             info!(message = "Building HTTP server.", address = %address);
 
             Server::builder(hyper::server::accept::from_stream(listener.accept_stream()))

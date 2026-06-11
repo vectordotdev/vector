@@ -4,7 +4,6 @@ components: sinks: websocket: {
 	title: "WebSocket"
 
 	classes: {
-		commonly_used: false
 		delivery:      "best_effort"
 		development:   "beta"
 		egress_method: "stream"

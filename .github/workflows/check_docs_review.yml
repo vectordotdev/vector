@@ -1,0 +1,50 @@
+name: Check Docs Review
+
+on:
+  pull_request_review:
+    types: [submitted]
+
+permissions:
+  contents: read
+
+env:
+  LABEL_NAME: "docs review on hold"
+
+jobs:
+  check:
+    if: github.event.review.state == 'approved'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check association and label
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const association = context.payload.review.author_association;
+            core.info(`Author association: ${association}`);
+
+            const allowed = ['MEMBER', 'OWNER'];
+            if (!allowed.includes(association)) {
+              core.info(`Association "${association}" not in allowed list, skipping`);
+              return;
+            }
+
+            const labelName = process.env.LABEL_NAME;
+            const { data: labels } = await github.rest.issues.listLabelsOnIssue({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+            });
+            if (!labels.some(l => l.name === labelName)) {
+              core.info(`Label "${labelName}" not found, skipping`);
+              return;
+            }
+
+            require('fs').writeFileSync('pr-number', String(context.payload.pull_request.number));
+
+      - name: Upload PR number
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: docs-review-pr
+          path: pr-number
+          if-no-files-found: ignore

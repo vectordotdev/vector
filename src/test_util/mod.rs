@@ -152,7 +152,7 @@ pub async fn send_encodable<I, E: From<std::io::Error> + std::fmt::Debug>(
 
     let mut sink = FramedWrite::new(stream, encoder);
 
-    let mut lines = stream::iter(lines.into_iter()).map(Ok);
+    let mut lines = stream::iter(lines).map(Ok);
     sink.send_all(&mut lines).await.unwrap();
 
     let stream = sink.get_mut();
@@ -552,6 +552,19 @@ where
 {
     let value = value.as_ref();
     wait_for(|| ready(unblock(value.load(Ordering::SeqCst)))).await
+}
+
+pub async fn wait_for_atomic_usize_timeout_ms<T, F>(value: T, unblock: F, timeout_ms: u64)
+where
+    T: AsRef<AtomicUsize>,
+    F: Fn(usize) -> bool,
+{
+    let value = value.as_ref();
+    wait_for_duration(
+        || ready(unblock(value.load(Ordering::SeqCst))),
+        Duration::from_millis(timeout_ms),
+    )
+    .await
 }
 
 // Retries a func every `retry` duration until given an Ok(T); panics after `until` elapses

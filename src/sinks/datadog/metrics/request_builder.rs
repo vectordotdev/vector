@@ -38,7 +38,7 @@ impl RequestBuilderError {
             // single metric/event at a time.
             Self::FailedToEncode { source } => (source.to_string(), source.as_error_type(), 1),
             Self::FailedToSplit { dropped_events } => (
-                "A split payload was still too big to encode/compress withing size limits."
+                "A split payload was still too big to encode/compress within size limits."
                     .to_string(),
                 "split_failed",
                 dropped_events,

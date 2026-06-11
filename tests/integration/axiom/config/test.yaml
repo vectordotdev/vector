@@ -1,7 +1,7 @@
 features:
-- axiom-integration-tests
+  - axiom-integration-tests
 
-test_filter: '::axiom::'
+test_filter: "::axiom::"
 
 runner:
   env:
@@ -16,6 +16,6 @@ matrix:
 # changes to these files/paths will invoke the integration test in CI
 # expressions are evaluated using https://github.com/micromatch/picomatch
 paths:
-- "src/sinks/axiom.rs"
-- "src/sinks/util/**"
-- "tests/integration/axiom/**"
+  - "src/sinks/axiom.rs"
+  - "src/sinks/util/**"
+  - "tests/integration/axiom/**"

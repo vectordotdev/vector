@@ -371,6 +371,13 @@ impl Default for BufferConfig {
 }
 
 impl BufferConfig {
+    /// Returns true if any stage in this buffer configuration uses disk-based storage.
+    pub fn has_disk_stage(&self) -> bool {
+        self.stages()
+            .iter()
+            .any(|stage| matches!(stage, BufferType::DiskV2 { .. }))
+    }
+
     /// Gets all of the configured stages for this buffer.
     pub fn stages(&self) -> &[BufferType] {
         match self {

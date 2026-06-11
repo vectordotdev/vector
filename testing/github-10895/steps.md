@@ -17,7 +17,7 @@ also create a buffer.
 
 ## Test Case(s)
 
-1. Establish a baseline of ther "old to new" migration behavior from 0.18.1 to 0.19.1:
+1. Establish a baseline of the "old to new" migration behavior from 0.18.1 to 0.19.1:
     - Run the 0.18.1 binary with a clean data directory and ensure it creates the old-style buffer
     data directory, but don't send any data through.
     - Run the PR binary and ensure that it renames the old-style buffer data directory to the

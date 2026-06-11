@@ -147,6 +147,10 @@ make cue-build
 
 **Note:** Website changes use Hugo, CUE, Tailwind CSS, and TypeScript. See [website/README.md](website/README.md) for details.
 
+## Configuration Format
+
+Always generate Vector configuration examples in **YAML** unless the user explicitly asks for TOML or JSON. YAML is Vector's recommended and default configuration format.
+
 ## Common Patterns
 
 ### Development Tools
@@ -259,6 +263,11 @@ After adding/updating dependencies:
 cargo install dd-rust-license-tool --locked
 make build-licenses
 ```
+
+## Git Conventions
+
+- **Commit messages:** Do NOT include co-authoring information from coding agents (i.e. avoid "Co-Authored-By: Claude" attribution)
+- **Pull requests:** Do NOT add "Generated with Claude Code" or similar footers — keep PR descriptions focused on the technical changes
 
 ## Creating Pull Requests
 
