@@ -1,46 +1,9 @@
 use serde_json::{Value, json};
 use std::sync::LazyLock;
 
-/// Compose a metric tag set, optionally extending a base.
-///
-/// # Forms
-///
-/// ```rust,ignore
-/// // Extend a base tag set with additional tags (returns Value):
-/// metric_tags! {
-///     ..COMPONENT_TAGS,
-///     "topic_id": {"description": "The Kafka topic id.", "required": true},
-/// }
-///
-/// // Simple reference to a base tag set (returns &Value):
-/// metric_tags!(..COMPONENT_TAGS)
-///
-/// // Empty tag set (returns Value):
-/// metric_tags!()
-/// ```
-#[macro_export]
-macro_rules! metric_tags {
-    // Extend a base tag set with additional tags.
-    (.. $base:expr, $($rest:tt)+) => {
-        $crate::internal_event::metric_tags::merge_lazy(
-            &$base,
-            ::serde_json::json!({ $($rest)* })
-        )
-    };
-    // Reference a base tag set (clones so the return type is Value in all forms).
-    (.. $base:expr $(,)?) => {
-        (*$base).clone()
-    };
-    // Empty tag set.
-    () => {
-        ::serde_json::json!({})
-    };
-}
-
 /// Clones `base` (a `LazyLock<Value>`) and inserts all fields from `extra`.
 ///
-/// Intended for static initializers: `LazyLock::new(|| merge_lazy(&BASE, json!({...})))`.
-/// For inline annotations prefer the [`metric_tags!`] macro.
+/// Used by the static tag-set initializers below.
 #[must_use]
 pub fn merge_lazy(base: &LazyLock<Value>, extra: Value) -> Value {
     let mut result = (**base).clone();

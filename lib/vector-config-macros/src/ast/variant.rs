@@ -5,7 +5,7 @@ use serde_derive_internals::ast as serde_ast;
 use vector_config_common::constants;
 
 use super::{
-    TagsTokens, Field, LazyCustomAttribute, Metadata, Style, Tagging,
+    Field, LazyCustomAttribute, Metadata, Style, Tagging, TagsTokens,
     util::{DarlingResultIterator, has_flag_attribute, try_extract_doc_title_description},
 };
 
@@ -181,12 +181,14 @@ impl<'a> Variant<'a> {
     /// key/value pairs (`#[configurable(metadata(status = "beta"))]`) to allow rich, semantic
     /// metadata to be attached directly to variants.
     ///
-    /// The `tags` shorthand (`#[configurable(tags = metric_tags!(...))]`) is also included here
+    /// The `tags` shorthand (`#[configurable(tags(...))]`) is also included here
     /// as a `docs::tags` key/value custom attribute.
     pub fn metadata(&self) -> impl Iterator<Item = LazyCustomAttribute> {
-        let tags_attr = self.attrs.tags.as_ref().map(|t| {
-            LazyCustomAttribute::kv(constants::DOCS_META_TAGS, t.to_value_tokens())
-        });
+        let tags_attr = self
+            .attrs
+            .tags
+            .as_ref()
+            .map(|t| LazyCustomAttribute::kv(constants::DOCS_META_TAGS, t.to_value_tokens()));
 
         self.attrs
             .metadata
@@ -209,10 +211,10 @@ struct Attributes {
     title: Option<String>,
     description: Option<String>,
     deprecated: Option<Override<String>>,
-    /// Shorthand for `#[configurable(metadata(docs::tags = metric_tags! { ... }))]`.
+    /// Shorthand for `#[configurable(metadata(docs::tags = ...))]`.
     ///
-    /// Accepts `tags(...)` or `tags { ... }` list forms; the contents are the
-    /// raw tokens forwarded verbatim to `metric_tags! { ... }` in the generated code.
+    /// Accepts `tags(...)` or `tags { ... }` list forms; the spread body is
+    /// parsed by the proc macro and expanded inline to a `serde_json::Value` expression.
     tags: Option<TagsTokens>,
     #[darling(skip)]
     visible: bool,

@@ -42,9 +42,7 @@ impl FromMeta for TagsTokens {
 }
 
 impl TagsTokens {
-    /// Returns the captured tag body tokens as a `serde_json::Value` expression that uses
-    /// only `::vector_config`-rooted paths, removing any coupling to `metric_tags!` or
-    /// `merge_lazy` from the callsite crate.
+    /// Returns the captured tag body tokens as a `serde_json::Value` expression.
     ///
     /// The three forms produce:
     /// - `tags()` → `::vector_config::json!({})`
@@ -352,7 +350,7 @@ impl FromMeta for Metadata {
                             key: path_to_string(&nv.path),
                             value: path.to_token_stream(),
                         }),
-                        // Accept macro invocations such as `metric_tags!{...}` or `json!({...})`.
+                        // Accept macro invocations such as `json!({...})` or similar.
                         Expr::Macro(mac) => Some(LazyCustomAttribute::KeyValue {
                             key: path_to_string(&nv.path),
                             value: mac.to_token_stream(),
