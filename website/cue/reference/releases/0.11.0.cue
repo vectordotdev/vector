@@ -1,6 +1,6 @@
 package metadata
 
-releases: "0.11.0": {
+releases: "0.11.0": {// Kubernetes Pipes
 	date: "2020-12-01"
 	description: """
 		The Vector team is pleased to announce 0.11.0. This release

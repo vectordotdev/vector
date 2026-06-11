@@ -1,6 +1,6 @@
 package metadata
 
-releases: "0.10.0": {
+releases: "0.10.0": {// Lamport Clock
 	date: "2020-07-23"
 
 	whats_next: [

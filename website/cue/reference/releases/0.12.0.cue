@@ -1,6 +1,6 @@
 package metadata
 
-releases: "0.12.0": {
+releases: "0.12.0": {// Vector Remap Language
 	date:        "2021-03-10"
 	description: """
 		The Vector team is pleased to announce 0.12.0. This release	introduces the [**Vector Remap Language**](\(urls.vrl_reference)),
