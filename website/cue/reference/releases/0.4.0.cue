@@ -1,8 +1,7 @@
 package metadata
 
-releases: "0.4.0": {
-	date:     "2019-09-24"
-	codename: "Hello World Again"
+releases: "0.4.0": {// Hello World Again
+	date: "2019-09-24"
 
 	whats_next: []
 
