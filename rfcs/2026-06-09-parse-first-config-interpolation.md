@@ -147,8 +147,7 @@ raw text
   -> parse
   -> value tree
   -> interpolate env vars
-  -> fetch secrets
-  -> interpolate secrets
+  -> resolve secrets (coerce secret subtree, fetch, substitute)
   -> coerce full tree
   -> deserialize
 ```
@@ -176,7 +175,9 @@ leaves are reached; integers, booleans, and keys are never touched:
 #### Files
 
 1. **`interpolation.rs`**: env-var and secret regex applied to `toml::Value::String` leaves only.
-2. **`schema_coercion.rs`**: recursive JSON Schema walker that coerces scalar types.
+2. **`schema_coercion.rs`**: recursive JSON Schema walker that coerces scalar types. Runs twice:
+   once as part of secret resolution (secret backend configs may use env var placeholders), and
+   once on the full tree after secret substitution.
 3. **`loader.rs`**: `Process::load()` default: parse, interpolate env vars, run `postprocess`
    for secret substitution, then validate and coerce. All steps operate on the parsed tree.
    Secret placeholder collection moves to a tree-walk over string leaves as well, replacing the
