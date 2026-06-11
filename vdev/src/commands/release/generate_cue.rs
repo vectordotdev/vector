@@ -514,7 +514,6 @@ fn render_release_cue(
          \n\
          releases: \"{version}\": {{\n\
          \tdate:     \"{date}\"\n\
-         \tcodename: \"\"\n\
          \n\
          \twhats_next: []\n\
          \n\
