@@ -175,6 +175,7 @@ where
         // exponential fashion to some hard-coded cap. To reduce time using glob,
         // we do not re-scan for major file changes (new files, moves, deletes),
         // or write new checkpoints, on every iteration.
+        let mut evicted_files: HashMap<FileFingerprint, time::Instant> = HashMap::new();
         let mut next_glob_time = time::Instant::now();
         loop {
             // Glob find files to follow, but not too often.
@@ -265,6 +266,15 @@ where
                                 while eviction_idx < eviction_candidates.len() {
                                     let evict_id = eviction_candidates[eviction_idx];
                                     eviction_idx += 1;
+                                    // Skip recently-rotated files still within rotate_wait —
+                                    // their open FD is the only way to drain remaining bytes.
+                                    if let Some(candidate) = fp_map.get(&evict_id) {
+                                        if !candidate.file_findable()
+                                            && candidate.last_seen().elapsed() <= self.rotate_wait
+                                        {
+                                            continue;
+                                        }
+                                    }
                                     if let Some(watcher) = fp_map.shift_remove(&evict_id) {
                                         info!(
                                             message = "Evicting least recently read file due to max_open_files limit.",
@@ -274,10 +284,7 @@ where
                                         );
                                         self.emitter
                                             .emit_file_unwatched(&watcher.path, watcher.reached_eof());
-                                        // Do NOT call checkpoints.set_dead() here — the file
-                                        // is evicted temporarily, not gone. Its checkpoint
-                                        // must survive so we resume from the right offset
-                                        // if the file reappears in a later glob cycle.
+                                        evicted_files.insert(evict_id, time::Instant::now());
                                         evicted = true;
                                         break;
                                     }
@@ -286,6 +293,7 @@ where
                                     continue; // skip this file, retry next glob cycle
                                 }
                             }
+                            evicted_files.remove(&file_id);
                             self.watch_new_file(path, file_id, &mut fp_map, &checkpoints, false)
                                 .await;
                             self.emitter.emit_files_open(fp_map.len());
@@ -415,6 +423,16 @@ where
                     watcher.set_dead();
                 }
             }
+
+            // Expire checkpoints for evicted files that were never rediscovered.
+            evicted_files.retain(|fid, evicted_at| {
+                if evicted_at.elapsed() > self.rotate_wait {
+                    checkpoints.set_dead(*fid);
+                    false
+                } else {
+                    true
+                }
+            });
 
             // A FileWatcher is dead when the underlying file has disappeared.
             // If the FileWatcher is dead we don't retain it; it will be deallocated.

@@ -251,6 +251,10 @@ pub struct FileConfig {
     ///
     /// If not set, Vector auto-derives a default from the OS file descriptor limit
     /// (80% of RLIMIT_NOFILE on Unix). Set to `0` to disable the limit entirely.
+    ///
+    /// Note: when end-to-end acknowledgements are enabled, evicting a file behaves
+    /// like a Vector restart — some lines may be re-delivered if the sink has not yet
+    /// acknowledged them. This is consistent with Vector's at-least-once guarantee.
     #[serde(default)]
     #[configurable(metadata(docs::examples = 512))]
     #[configurable(metadata(docs::examples = 8192))]
