@@ -850,6 +850,8 @@ generated: components: sinks: aws_s3: configuration: {
 
 			This ensures there are no name collisions, and can be useful in high-volume workloads where
 			object keys must be unique.
+
+			Ignored when `key` is set.
 			"""
 		required: false
 		type: bool: default: true
@@ -859,6 +861,8 @@ generated: components: sinks: aws_s3: configuration: {
 			The filename extension to use in the object key.
 
 			This overrides setting the extension based on the configured `compression`.
+
+			Ignored when `key` is set.
 			"""
 		required: false
 		type: string: examples: [
@@ -881,6 +885,8 @@ generated: components: sinks: aws_s3: configuration: {
 			languages.
 
 			When set to an empty string, no timestamp is appended to the key prefix.
+
+			Ignored when `key` is set.
 
 			[chrono_strftime_specifiers]: https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
 			"""
@@ -1009,6 +1015,31 @@ generated: components: sinks: aws_s3: configuration: {
 		required: false
 		type: string: examples: ["79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be", "person@email.com", "http://acs.amazonaws.com/groups/global/AllUsers"]
 	}
+	key: {
+		description: """
+			The full S3 object key template.
+
+			When set, this template is rendered for each event and used as the complete object key —
+			no timestamp, UUID, or filename extension is appended. The template supports both event
+			field substitution (`{{ field }}`) and [`strftime`][chrono_strftime_specifiers] specifiers.
+
+			This option takes precedence over `key_prefix`, `filename_time_format`,
+			`filename_append_uuid`, and `filename_extension`; those fields are ignored when `key` is
+			set. Because Vector does not append a uniqueness token, the user is responsible for
+			ensuring keys are unique enough for their workload — events that render to the same key
+			overwrite each other in S3.
+
+			Events are partitioned across S3 requests by the rendered key, so high-cardinality
+			templates produce one S3 request per distinct key value.
+
+			[chrono_strftime_specifiers]: https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
+			"""
+		required: false
+		type: string: {
+			examples: ["logs/{{ host }}/%F-{{ message_id }}.json", "{{ application_id }}/%Y/%m/%d/%H-%M-%S.json"]
+			syntax: "template"
+		}
+	}
 	key_prefix: {
 		description: """
 			A prefix to apply to all object keys.
@@ -1016,6 +1047,8 @@ generated: components: sinks: aws_s3: configuration: {
 			Prefixes are useful for partitioning objects, such as by creating an object key that
 			stores objects under a particular directory. If using a prefix for this purpose, it must end
 			in `/` to act as a directory path. A trailing `/` is **not** automatically added.
+
+			Ignored when `key` is set.
 			"""
 		required: false
 		type: string: {
