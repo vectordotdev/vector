@@ -52,8 +52,10 @@ This creates compounding tech debt:
 
 - **The `--disable-env-var-interpolation` flag has no clean extension point.** The flag itself
   is a useful and intentional control, but the raw-text pipeline gives it nowhere to grow.
-  Extending the same idea to secrets, or to field-level suppression, would require rethinking
-  the pipeline first.
+  An equivalent `--disable-secret-interpolation` flag, for example, would require threading a
+  new boolean through the loading stack and adding another regex pass over raw text. Under the
+  new pipeline it becomes a flag that skips the secret tree-walk, with no raw string handling
+  needed.
 
 These pain points have made contributors hesitant to touch this code. Non-trivial improvements
 stall because they require untangling parsing and substitution first.
@@ -65,11 +67,19 @@ Parse the config document into a native value tree first, then apply substitutio
 final deserialization.
 
 ```text
-raw text -> parse -> value tree -> interpolate -> validate/coerce -> deserialize
+raw text
+  -> parse
+  -> value tree
+  -> interpolate env vars
+  -> fetch secrets
+  -> interpolate secrets
+  -> validate/coerce
+  -> deserialize
 ```
 
-Substitution operates on `toml::Value::String` leaves only. Structural nodes (objects, arrays,
-integers, booleans, keys) are never touched:
+Both `${VAR}` and `SECRET[backend.key]` placeholders use the same string-leaf substitution
+mechanism, applied in separate stages. Substitution operates on `toml::Value::String` leaves only. Objects and arrays are walked
+recursively until string leaves are reached; integers, booleans, and keys are never touched:
 
 ```text
           value tree                        after interpolation
@@ -186,6 +196,14 @@ and the config loading pipeline becomes easier to extend and test going forward.
 4. Public API signatures unchanged (`load_from_paths`, etc.).
 
 ## Design Decisions
+
+**Secret backends always return strings.** The `SecretBackend` trait is defined as
+`retrieve(...) -> HashMap<String, String>`. Every backend (exec, file, directory, AWS Secrets
+Manager) returns string values regardless of the field type the secret will populate. This is
+an explicit design choice, modeled on Datadog Agent secret management behavior
+([RFC 11552](2022-02-24-11552-dd-agent-style-secret-management.md)). The coercion pass is
+therefore the only place where a secret value destined for a numeric or boolean field is
+converted to the declared type.
 
 **Coercion failures are hard errors.** The alternative is a soft warning that falls back to
 passing the raw string to serde, but that is not meaningfully safer. `serde_json` does not
