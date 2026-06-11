@@ -300,9 +300,12 @@ where
                                     continue; // skip this file, retry next glob cycle
                                 }
                             }
-                            let was_evicted = evicted_files.remove(&file_id).is_some();
+                            let was_evicted = evicted_files.contains_key(&file_id);
                             self.watch_new_file(path, file_id, &mut fp_map, &checkpoints, false, was_evicted)
                                 .await;
+                            if fp_map.contains_key(&file_id) {
+                                evicted_files.remove(&file_id);
+                            }
                             self.emitter.emit_files_open(fp_map.len());
                         }
                     }
