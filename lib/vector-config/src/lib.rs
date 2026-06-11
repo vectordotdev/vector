@@ -122,10 +122,10 @@ pub use serde_json::json;
 /// or any other helper from the callsite crate.
 #[doc(hidden)]
 pub fn merge_tags(mut base: serde_json::Value, extra: serde_json::Value) -> serde_json::Value {
-    if let serde_json::Value::Object(ref mut m) = base {
-        if let serde_json::Value::Object(e) = extra {
-            m.extend(e);
-        }
+    if let serde_json::Value::Object(ref mut m) = base
+        && let serde_json::Value::Object(e) = extra
+    {
+        m.extend(e);
     }
     base
 }

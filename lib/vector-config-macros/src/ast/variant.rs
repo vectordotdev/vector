@@ -3,6 +3,7 @@ use proc_macro2::{Ident, TokenStream};
 use quote::ToTokens;
 use serde_derive_internals::ast as serde_ast;
 use vector_config_common::constants;
+use vector_config_common::constants::VALID_METRIC_UNITS;
 
 use super::{
     Field, LazyCustomAttribute, Metadata, Style, Tagging, TagsTokens,
@@ -182,7 +183,8 @@ impl<'a> Variant<'a> {
     /// metadata to be attached directly to variants.
     ///
     /// The `tags` shorthand (`#[configurable(tags(...))]`) is also included here
-    /// as a `docs::tags` key/value custom attribute.
+    /// as a `docs::tags` key/value custom attribute. The `unit` shorthand
+    /// (`#[configurable(unit = "byte")]`) is included as `docs::unit`.
     pub fn metadata(&self) -> impl Iterator<Item = LazyCustomAttribute> {
         let tags_attr = self
             .attrs
@@ -190,12 +192,18 @@ impl<'a> Variant<'a> {
             .as_ref()
             .map(|t| LazyCustomAttribute::kv(constants::DOCS_META_TAGS, t.to_value_tokens()));
 
+        let unit_attr = self.attrs.unit.as_deref().map(|u| {
+            let u = u.to_string();
+            LazyCustomAttribute::kv(constants::DOCS_META_UNIT, quote::quote!(#u))
+        });
+
         self.attrs
             .metadata
             .clone()
             .into_iter()
             .flat_map(|metadata| metadata.attributes())
             .chain(tags_attr)
+            .chain(unit_attr)
     }
 }
 
@@ -216,6 +224,10 @@ struct Attributes {
     /// Accepts `tags(...)` or `tags { ... }` list forms; the spread body is
     /// parsed by the proc macro and expanded inline to a `serde_json::Value` expression.
     tags: Option<TagsTokens>,
+    /// Canonical Datadog metric unit. Must be one of the values in [`VALID_METRIC_UNITS`].
+    ///
+    /// Example: `#[configurable(unit = "event")]`
+    unit: Option<String>,
     #[darling(skip)]
     visible: bool,
     #[darling(multiple)]
@@ -237,6 +249,16 @@ impl Attributes {
         let (doc_title, doc_description) = try_extract_doc_title_description(forwarded_attrs);
         self.title = self.title.or(doc_title);
         self.description = self.description.or(doc_description);
+
+        // Validate the unit against the canonical Datadog unit list.
+        if let Some(ref unit) = self.unit
+            && !VALID_METRIC_UNITS.contains(&unit.as_str())
+        {
+            let valid = VALID_METRIC_UNITS.join(", ");
+            return Err(darling::Error::custom(format!(
+                "unknown metric unit `{unit}`; valid units are: {valid}"
+            )));
+        }
 
         Ok(self)
     }

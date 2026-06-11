@@ -18,28 +18,28 @@ use super::metric_tags::{
 pub enum CounterName {
     /// The number of events accepted by this component either from tagged
     /// origins like file and uri, or cumulatively from other origins.
-    #[configurable(tags(..COMPONENT_RECEIVED_EVENTS_TOTAL_TAGS))]
+    #[configurable(unit = "event", tags(..COMPONENT_RECEIVED_EVENTS_TOTAL_TAGS))]
     ComponentReceivedEventsTotal,
 
     /// The number of event bytes accepted by this component either from
     /// tagged origins like file and uri, or cumulatively from other origins.
-    #[configurable(tags(..COMPONENT_RECEIVED_EVENTS_TAGS))]
+    #[configurable(unit = "byte", tags(..COMPONENT_RECEIVED_EVENTS_TAGS))]
     ComponentReceivedEventBytesTotal,
 
     /// The number of raw bytes accepted by this component from source origins.
-    #[configurable(tags(..COMPONENT_RECEIVED_EVENTS_TAGS))]
+    #[configurable(unit = "byte", tags(..COMPONENT_RECEIVED_EVENTS_TAGS))]
     ComponentReceivedBytesTotal,
 
     /// The total number of events emitted by this component.
-    #[configurable(tags(..COMPONENT_TAGS_OUTPUT))]
+    #[configurable(unit = "event", tags(..COMPONENT_TAGS_OUTPUT))]
     ComponentSentEventsTotal,
 
     /// The total number of event bytes emitted by this component.
-    #[configurable(tags(..COMPONENT_TAGS_OUTPUT))]
+    #[configurable(unit = "byte", tags(..COMPONENT_TAGS_OUTPUT))]
     ComponentSentEventBytesTotal,
 
     /// The number of raw bytes sent by this component to destination sinks.
-    #[configurable(tags {
+    #[configurable(unit = "byte", tags {
         ..COMPONENT_TAGS,
         "endpoint": {"description": "The endpoint to which the bytes were sent. For HTTP, this will be the host and path only, excluding the query string.", "required": false},
         "file": {"description": "The absolute path of the destination file.", "required": false},
@@ -49,271 +49,271 @@ pub enum CounterName {
     ComponentSentBytesTotal,
 
     /// The number of events dropped by this component.
-    #[configurable(tags {
+    #[configurable(unit = "event", tags {
         ..COMPONENT_TAGS,
         "intentional": {"description": "True if the events were discarded intentionally, like a `filter` transform, or false if due to an error.", "required": true}
     })]
     ComponentDiscardedEventsTotal,
 
     /// The total number of errors encountered by this component.
-    #[configurable(tags(..COMPONENT_TAGS_ERROR_TYPE_STAGE))]
+    #[configurable(unit = "error", tags(..COMPONENT_TAGS_ERROR_TYPE_STAGE))]
     ComponentErrorsTotal,
 
     /// The total number of events for which this source responded with a timeout error.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "event", tags(..COMPONENT_TAGS))]
     ComponentTimedOutEventsTotal,
 
     /// The total number of requests for which this source responded with a timeout error.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "request", tags(..COMPONENT_TAGS))]
     ComponentTimedOutRequestsTotal,
 
     /// The number of events received by this buffer.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "event", tags(..COMPONENT_TAGS))]
     BufferReceivedEventsTotal,
 
     /// The number of bytes received by this buffer.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "byte", tags(..COMPONENT_TAGS))]
     BufferReceivedBytesTotal,
 
     /// The number of events sent by this buffer.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "event", tags(..COMPONENT_TAGS))]
     BufferSentEventsTotal,
 
     /// The number of bytes sent by this buffer.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "byte", tags(..COMPONENT_TAGS))]
     BufferSentBytesTotal,
 
     /// The number of events dropped by this buffer.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "event", tags(..COMPONENT_TAGS))]
     BufferDiscardedEventsTotal,
 
     /// The number of bytes dropped by this buffer.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "byte", tags(..COMPONENT_TAGS))]
     BufferDiscardedBytesTotal,
 
     /// The total number of buffer errors encountered.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "error", tags(..COMPONENT_TAGS))]
     BufferErrorsTotal,
 
     // Internal events from src/internal_events/
     /// The number of events recorded by the aggregate transform.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "event", tags(..COMPONENT_TAGS))]
     AggregateEventsRecordedTotal,
 
     /// The number of failed metric updates, `incremental` adds, encountered by the aggregate transform.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "occurrence", tags(..COMPONENT_TAGS))]
     AggregateFailedUpdates,
 
     /// The number of flushes done by the aggregate transform.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "occurrence", tags(..COMPONENT_TAGS))]
     AggregateFlushesTotal,
 
     /// The number of times the Vector API has been started.
-    #[configurable(tags(..INTERNAL_METRICS_TAGS))]
+    #[configurable(unit = "occurrence", tags(..INTERNAL_METRICS_TAGS))]
     ApiStartedTotal,
 
     /// The total number of files checkpointed.
-    #[configurable(tags(..INTERNAL_METRICS_TAGS))]
+    #[configurable(unit = "file", tags(..INTERNAL_METRICS_TAGS))]
     CheckpointsTotal,
 
     /// The total number of errors identifying files via checksum.
-    #[configurable(tags(..INTERNAL_METRICS_TAGS_FILE))]
+    #[configurable(unit = "error", tags(..INTERNAL_METRICS_TAGS_FILE))]
     ChecksumErrorsTotal,
 
     /// The total number of metrics collections completed for this component.
-    #[configurable(tags(..INTERNAL_METRICS_TAGS))]
+    #[configurable(unit = "occurrence", tags(..INTERNAL_METRICS_TAGS))]
     CollectCompletedTotal,
 
     /// The total number of times a command has been executed.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "execution", tags(..COMPONENT_TAGS))]
     CommandExecutedTotal,
 
     /// The total number of times a connection has been established.
-    #[configurable(tags(..INTERNAL_METRICS_TAGS))]
+    #[configurable(unit = "connection", tags(..INTERNAL_METRICS_TAGS))]
     ConnectionEstablishedTotal,
 
     /// The total number of errors sending data via the connection.
-    #[configurable(tags(..INTERNAL_METRICS_TAGS))]
+    #[configurable(unit = "error", tags(..INTERNAL_METRICS_TAGS))]
     ConnectionSendErrorsTotal,
 
     /// The total number of times the connection has been shut down.
-    #[configurable(tags(..INTERNAL_METRICS_TAGS))]
+    #[configurable(unit = "connection", tags(..INTERNAL_METRICS_TAGS))]
     ConnectionShutdownTotal,
 
     /// The total number of container events processed.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "event", tags(..COMPONENT_TAGS))]
     ContainerProcessedEventsTotal,
 
     /// The total number of times Vector stopped watching for container logs.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "occurrence", tags(..COMPONENT_TAGS))]
     ContainersUnwatchedTotal,
 
     /// The total number of times Vector started watching for container logs.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "occurrence", tags(..COMPONENT_TAGS))]
     ContainersWatchedTotal,
 
     /// The total number of byte order marks (BOM) removed from incoming data.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "occurrence", tags(..COMPONENT_TAGS))]
     DecoderBomRemovalsTotal,
 
     /// The total number of warnings when replacing malformed characters during decoding.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "occurrence", tags(..COMPONENT_TAGS))]
     DecoderMalformedReplacementWarningsTotal,
 
     /// The total number of bytes loaded into Doris.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "byte", tags(..COMPONENT_TAGS))]
     DorisBytesLoadedTotal,
 
     /// The total number of rows filtered by Doris during stream load.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "row", tags(..COMPONENT_TAGS))]
     DorisRowsFilteredTotal,
 
     /// The total number of rows successfully loaded into Doris.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "row", tags(..COMPONENT_TAGS))]
     DorisRowsLoadedTotal,
 
     /// The total number of warnings when replacing unmappable characters during encoding.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "occurrence", tags(..COMPONENT_TAGS))]
     EncoderUnmappableReplacementWarningsTotal,
 
     /// The total number of events discarded by this component.
-    #[configurable(tags(..INTERNAL_METRICS_TAGS_REASON))]
+    #[configurable(unit = "event", tags(..INTERNAL_METRICS_TAGS_REASON))]
     EventsDiscardedTotal,
 
     /// The total number of files Vector has found to watch.
-    #[configurable(tags(..INTERNAL_METRICS_TAGS_FILE))]
+    #[configurable(unit = "file", tags(..INTERNAL_METRICS_TAGS_FILE))]
     FilesAddedTotal,
 
     /// The total number of files deleted.
-    #[configurable(tags(..INTERNAL_METRICS_TAGS_FILE))]
+    #[configurable(unit = "file", tags(..INTERNAL_METRICS_TAGS_FILE))]
     FilesDeletedTotal,
 
     /// The total number of times Vector has resumed watching a file.
-    #[configurable(tags(..INTERNAL_METRICS_TAGS_FILE))]
+    #[configurable(unit = "occurrence", tags(..INTERNAL_METRICS_TAGS_FILE))]
     FilesResumedTotal,
 
     /// The total number of times Vector has stopped watching a file.
-    #[configurable(tags(..INTERNAL_METRICS_TAGS_FILE))]
+    #[configurable(unit = "occurrence", tags(..INTERNAL_METRICS_TAGS_FILE))]
     FilesUnwatchedTotal,
 
     /// The total number of gRPC messages received.
-    #[configurable(tags(..COMPONENT_TAGS_GRPC_METHOD_SERVICE))]
+    #[configurable(unit = "message", tags(..COMPONENT_TAGS_GRPC_METHOD_SERVICE))]
     GrpcServerMessagesReceivedTotal,
 
     /// The total number of gRPC messages sent.
-    #[configurable(tags(..COMPONENT_TAGS_GRPC_ALL))]
+    #[configurable(unit = "message", tags(..COMPONENT_TAGS_GRPC_ALL))]
     GrpcServerMessagesSentTotal,
 
     /// The total number of HTTP client errors encountered.
-    #[configurable(tags(..COMPONENT_TAGS_HTTP_ERROR_KIND))]
+    #[configurable(unit = "error", tags(..COMPONENT_TAGS_HTTP_ERROR_KIND))]
     HttpClientErrorsTotal,
 
     /// The total number of sent HTTP requests, tagged with the request method.
-    #[configurable(tags(..COMPONENT_TAGS_HTTP_METHOD))]
+    #[configurable(unit = "request", tags(..COMPONENT_TAGS_HTTP_METHOD))]
     HttpClientRequestsSentTotal,
 
     /// The total number of HTTP requests, tagged with the response code.
-    #[configurable(tags(..COMPONENT_TAGS_HTTP_STATUS))]
+    #[configurable(unit = "response", tags(..COMPONENT_TAGS_HTTP_STATUS))]
     HttpClientResponsesTotal,
 
     /// The total number of HTTP requests received.
-    #[configurable(tags(..COMPONENT_TAGS_HTTP_METHOD_PATH))]
+    #[configurable(unit = "request", tags(..COMPONENT_TAGS_HTTP_METHOD_PATH))]
     HttpServerRequestsReceivedTotal,
 
     /// The total number of HTTP responses sent.
-    #[configurable(tags(..COMPONENT_TAGS_HTTP_ALL))]
+    #[configurable(unit = "response", tags(..COMPONENT_TAGS_HTTP_ALL))]
     HttpServerResponsesSentTotal,
 
     /// Total number of message bytes (including framing) received from Kafka brokers.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "byte", tags(..COMPONENT_TAGS))]
     KafkaConsumedMessagesBytesTotal,
 
     /// Total number of messages consumed, not including ignored messages (due to offset, etc), from Kafka brokers.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "message", tags(..COMPONENT_TAGS))]
     KafkaConsumedMessagesTotal,
 
     /// Total number of message bytes (including framing, such as per-Message framing and MessageSet/batch framing) transmitted to Kafka brokers.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "byte", tags(..COMPONENT_TAGS))]
     KafkaProducedMessagesBytesTotal,
 
     /// Total number of messages transmitted (produced) to Kafka brokers.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "message", tags(..COMPONENT_TAGS))]
     KafkaProducedMessagesTotal,
 
     /// Total number of bytes transmitted to Kafka brokers.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "byte", tags(..COMPONENT_TAGS))]
     KafkaRequestsBytesTotal,
 
     /// Total number of requests sent to Kafka brokers.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "request", tags(..COMPONENT_TAGS))]
     KafkaRequestsTotal,
 
     /// Total number of bytes received from Kafka brokers.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "byte", tags(..COMPONENT_TAGS))]
     KafkaResponsesBytesTotal,
 
     /// Total number of responses received from Kafka brokers.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "response", tags(..COMPONENT_TAGS))]
     KafkaResponsesTotal,
 
     /// The total number of failed efforts to refresh AWS EC2 metadata.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "occurrence", tags(..COMPONENT_TAGS))]
     MetadataRefreshFailedTotal,
 
     /// The total number of AWS EC2 metadata refreshes.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "occurrence", tags(..COMPONENT_TAGS))]
     MetadataRefreshSuccessfulTotal,
 
     /// The total number of errors encountered while parsing.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "error", tags(..COMPONENT_TAGS))]
     ParseErrorsTotal,
 
     /// The total number of times the Vector instance has quit.
-    #[configurable(tags(..INTERNAL_METRICS_TAGS))]
+    #[configurable(unit = "occurrence", tags(..INTERNAL_METRICS_TAGS))]
     QuitTotal,
 
     /// The total number of times the Vector instance has been reloaded.
-    #[configurable(tags(..INTERNAL_METRICS_TAGS))]
+    #[configurable(unit = "occurrence", tags(..INTERNAL_METRICS_TAGS))]
     ReloadedTotal,
 
     /// The total number of events whose timestamps were rewritten to maintain ordering.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "event", tags(..COMPONENT_TAGS))]
     RewrittenTimestampEventsTotal,
 
     /// The total number of successful deferrals of SQS messages.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "message", tags(..COMPONENT_TAGS))]
     SqsMessageDeferSucceededTotal,
 
     /// The total number of successful deletions of SQS messages.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "message", tags(..COMPONENT_TAGS))]
     SqsMessageDeleteSucceededTotal,
 
     /// The total number of SQS messages successfully processed.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "message", tags(..COMPONENT_TAGS))]
     SqsMessageProcessingSucceededTotal,
 
     /// The total number of times successfully receiving SQS messages.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "message", tags(..COMPONENT_TAGS))]
     SqsMessageReceiveSucceededTotal,
 
     /// The total number of received SQS messages.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "message", tags(..COMPONENT_TAGS))]
     SqsMessageReceivedMessagesTotal,
 
     /// The number of stale events that Vector has flushed.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "event", tags(..COMPONENT_TAGS))]
     StaleEventsFlushedTotal,
 
     /// The total number of times the Vector instance has been started.
-    #[configurable(tags(..INTERNAL_METRICS_TAGS))]
+    #[configurable(unit = "occurrence", tags(..INTERNAL_METRICS_TAGS))]
     StartedTotal,
 
     /// The total number of times the Vector instance has been stopped.
-    #[configurable(tags(..INTERNAL_METRICS_TAGS))]
+    #[configurable(unit = "occurrence", tags(..INTERNAL_METRICS_TAGS))]
     StoppedTotal,
 
     /// The total number of events whose tag keys are no longer tracked because `max_tracked_keys` was reached. These events pass through the transform unchecked.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "event", tags(..COMPONENT_TAGS))]
     TagCardinalityUntrackedEventsTotal,
 
     /// The total number of events discarded because the tag has been rejected after
@@ -321,7 +321,7 @@ pub enum CounterName {
     /// is enabled in the `tag_cardinality_limit` transform, this metric includes
     /// `metric_name` and `tag_key` labels. By default, this metric has no labels to
     /// keep cardinality low.
-    #[configurable(tags {
+    #[configurable(unit = "event", tags {
         ..COMPONENT_TAGS,
         "metric_name": {"description": "The name of the metric whose tag value limit was exceeded. Only present when `internal_metrics.include_extended_tags` is enabled.", "required": false},
         "tag_key": {"description": "The key of the tag whose value limit was exceeded. Only present when `internal_metrics.include_extended_tags` is enabled.", "required": false}
@@ -330,55 +330,55 @@ pub enum CounterName {
 
     /// The total number of times new values for a key have been rejected because the
     /// value limit has been reached.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "occurrence", tags(..COMPONENT_TAGS))]
     ValueLimitReachedTotal,
 
     /// The total number of bytes sent over WebSocket connections.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "byte", tags(..COMPONENT_TAGS))]
     WebsocketBytesSentTotal,
 
     /// The total number of messages sent over WebSocket connections.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "message", tags(..COMPONENT_TAGS))]
     WebsocketMessagesSentTotal,
 
     /// The total number of times the Windows service has been installed.
-    #[configurable(tags(..INTERNAL_METRICS_TAGS))]
+    #[configurable(unit = "occurrence", tags(..INTERNAL_METRICS_TAGS))]
     WindowsServiceInstallTotal,
 
     /// The total number of times the Windows service has been restarted.
-    #[configurable(tags(..INTERNAL_METRICS_TAGS))]
+    #[configurable(unit = "occurrence", tags(..INTERNAL_METRICS_TAGS))]
     WindowsServiceRestartTotal,
 
     /// The total number of times the Windows service has been started.
-    #[configurable(tags(..INTERNAL_METRICS_TAGS))]
+    #[configurable(unit = "occurrence", tags(..INTERNAL_METRICS_TAGS))]
     WindowsServiceStartTotal,
 
     /// The total number of times the Windows service has been stopped.
-    #[configurable(tags(..INTERNAL_METRICS_TAGS))]
+    #[configurable(unit = "occurrence", tags(..INTERNAL_METRICS_TAGS))]
     WindowsServiceStopTotal,
 
     /// The total number of times the Windows service has been uninstalled.
-    #[configurable(tags(..INTERNAL_METRICS_TAGS))]
+    #[configurable(unit = "occurrence", tags(..INTERNAL_METRICS_TAGS))]
     WindowsServiceUninstallTotal,
 
     /// The total number of failures to annotate Kubernetes events with namespace metadata.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "occurrence", tags(..COMPONENT_TAGS))]
     K8sEventNamespaceAnnotationFailuresTotal,
 
     /// The total number of failures to annotate Kubernetes events with node metadata.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "occurrence", tags(..COMPONENT_TAGS))]
     K8sEventNodeAnnotationFailuresTotal,
 
     /// The total number of edge cases encountered while picking format of the Kubernetes log message.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "occurrence", tags(..COMPONENT_TAGS))]
     K8sFormatPickerEdgeCasesTotal,
 
     /// The total number of failures to parse a message as a JSON object.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "occurrence", tags(..COMPONENT_TAGS))]
     K8sDockerFormatParseFailuresTotal,
 
     /// The total number of times an S3 record in an SQS message was ignored (for an event that was not `ObjectCreated`).
-    #[configurable(tags {
+    #[configurable(unit = "event", tags {
         ..COMPONENT_TAGS,
         "ignore_type": {
             "description": "The reason for ignoring the S3 record",
@@ -389,55 +389,58 @@ pub enum CounterName {
     SqsS3EventRecordIgnoredTotal,
 
     /// The total number of bytes allocated by this component.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "byte", tags(..COMPONENT_TAGS))]
     ComponentAllocatedBytesTotal,
 
     /// The total number of bytes deallocated by this component.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "byte", tags(..COMPONENT_TAGS))]
     ComponentDeallocatedBytesTotal,
 
     /// The total number of failed insertions into the in-memory enrichment table.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "occurrence", tags(..COMPONENT_TAGS))]
     MemoryEnrichmentTableFailedInsertions,
 
     /// The total number of failed reads from the in-memory enrichment table.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "occurrence", tags(..COMPONENT_TAGS))]
     MemoryEnrichmentTableFailedReads,
 
     /// The total number of flushes of the in-memory enrichment table.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "flush", tags(..COMPONENT_TAGS))]
     MemoryEnrichmentTableFlushesTotal,
 
     /// The total number of successful insertions into the in-memory enrichment table.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "occurrence", tags(..COMPONENT_TAGS))]
     MemoryEnrichmentTableInsertionsTotal,
 
     /// The total number of successful reads from the in-memory enrichment table.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "read", tags(..COMPONENT_TAGS))]
     MemoryEnrichmentTableReadsTotal,
 
     /// The total number of entries evicted from the in-memory enrichment table due to TTL expiration.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "eviction", tags(..COMPONENT_TAGS))]
     MemoryEnrichmentTableTtlExpirations,
+
+    /// The total number of nanoseconds of CPU time consumed by this component.
+    #[configurable(unit = "nanosecond", tags(..COMPONENT_TAGS))]
     ComponentCpuUsageNsTotal,
 
     /// The total number of errors reading datagram.
-    #[configurable(tags {
+    #[configurable(unit = "error", tags {
         ..COMPONENT_TAGS,
         "mode": {"description": "The connection mode used by the component.", "required": true, "enum": {"udp": "User Datagram Protocol"}}
     })]
     ConnectionReadErrorsTotal,
 
     /// The total number of metrics emitted from the internal metrics registry. This metric is deprecated in favor of `internal_metrics_cardinality`.
-    #[configurable(tags())]
+    #[configurable(unit = "unit", tags())]
     InternalMetricsCardinalityTotal,
 
     /// Number of configuration reload attempts that were rejected.
-    #[configurable(tags(..INTERNAL_METRICS_TAGS_REASON))]
+    #[configurable(unit = "occurrence", tags(..INTERNAL_METRICS_TAGS_REASON))]
     ConfigReloadRejected,
 
     /// The total number of errors converting bytes to a UTF-8 string in UDP mode.
-    #[configurable(tags {
+    #[configurable(unit = "error", tags {
         ..COMPONENT_TAGS,
         "mode": {"description": "The connection mode used by the component.", "required": true, "enum": {"udp": "User Datagram Protocol"}}
     })]
@@ -454,106 +457,106 @@ pub enum HistogramName {
     ///
     /// Note that this is separate than sink-level batching. It is mostly useful for low level debugging
     /// performance issues in Vector due to small internal batches.
-    #[configurable(tags(..COMPONENT_RECEIVED_EVENTS_TAGS))]
+    #[configurable(unit = "event", tags(..COMPONENT_RECEIVED_EVENTS_TAGS))]
     ComponentReceivedEventsCount,
 
     /// The size in bytes of each event received by the source.
-    #[configurable(tags(..COMPONENT_RECEIVED_EVENTS_TAGS))]
+    #[configurable(unit = "byte", tags(..COMPONENT_RECEIVED_EVENTS_TAGS))]
     ComponentReceivedBytes,
 
     /// The duration spent sending a payload to this buffer.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "second", tags(..COMPONENT_TAGS))]
     BufferSendDurationSeconds,
 
     /// The elapsed time, in fractional seconds, that an event spends in a single transform.
     ///
     /// This includes both the time spent queued in the transform's input buffer and the time spent
     /// executing the transform itself.
-    #[configurable(tags(..INTERNAL_METRICS_TAGS))]
+    #[configurable(unit = "second", tags(..INTERNAL_METRICS_TAGS))]
     ComponentLatencySeconds,
 
     /// The difference between the timestamp recorded in each event and the time when it was ingested, expressed as fractional seconds.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "second", tags(..COMPONENT_TAGS))]
     SourceLagTimeSeconds,
 
     /// The time elapsed blocking on the downstream channel to accept a single chunk from a batch of events received at the source.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "second", tags(..COMPONENT_TAGS))]
     SourceSendLatencySeconds,
 
     /// The time elapsed blocking on the downstream channel to accept an entire batch of events received at the source.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "second", tags(..COMPONENT_TAGS))]
     SourceSendBatchLatencySeconds,
 
     /// The average round-trip time (RTT) for the current window.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "second", tags(..COMPONENT_TAGS))]
     AdaptiveConcurrencyAveragedRtt,
 
     /// A boolean sample (1.0 if back pressure was observed during the current window, 0.0 otherwise).
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "fraction", tags(..COMPONENT_TAGS))]
     AdaptiveConcurrencyBackPressure,
 
     /// The number of outbound requests currently awaiting a response.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "request", tags(..COMPONENT_TAGS))]
     AdaptiveConcurrencyInFlight,
 
     /// The concurrency limit that the adaptive concurrency feature has decided on for this current window.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "unit", tags(..COMPONENT_TAGS))]
     AdaptiveConcurrencyLimit,
 
     /// The observed round-trip time (RTT) for requests.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "second", tags(..COMPONENT_TAGS))]
     AdaptiveConcurrencyObservedRtt,
 
     /// The mean round-trip time (RTT) from past windows, used as the baseline for adaptive concurrency decisions.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "second", tags(..COMPONENT_TAGS))]
     AdaptiveConcurrencyPastRttMean,
 
     /// A boolean sample (1.0 if the concurrency limit was reached during the most recent limit update, 0.0 otherwise).
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "fraction", tags(..COMPONENT_TAGS))]
     AdaptiveConcurrencyReachedLimit,
 
     /// The time taken to process an S3 object that succeeded, in seconds.
-    #[configurable(tags(..S3_OBJECT_PROCESSING_TAGS))]
+    #[configurable(unit = "second", tags(..S3_OBJECT_PROCESSING_TAGS))]
     S3ObjectProcessingSucceededDurationSeconds,
 
     /// The time taken to process an S3 object that failed, in seconds.
-    #[configurable(tags(..S3_OBJECT_PROCESSING_TAGS))]
+    #[configurable(unit = "second", tags(..S3_OBJECT_PROCESSING_TAGS))]
     S3ObjectProcessingFailedDurationSeconds,
 
     /// The duration spent collecting metrics for this component.
-    #[configurable(tags(..INTERNAL_METRICS_TAGS))]
+    #[configurable(unit = "second", tags(..INTERNAL_METRICS_TAGS))]
     CollectDurationSeconds,
 
     /// The command execution duration in seconds.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "second", tags(..COMPONENT_TAGS))]
     CommandExecutionDurationSeconds,
 
     /// The duration spent handling a gRPC request.
-    #[configurable(tags(..COMPONENT_TAGS_GRPC_ALL))]
+    #[configurable(unit = "second", tags(..COMPONENT_TAGS_GRPC_ALL))]
     GrpcServerHandlerDurationSeconds,
 
     /// The duration spent handling an HTTP request.
-    #[configurable(tags(..COMPONENT_TAGS_HTTP_ALL))]
+    #[configurable(unit = "second", tags(..COMPONENT_TAGS_HTTP_ALL))]
     HttpServerHandlerDurationSeconds,
 
     /// The round-trip time (RTT) of HTTP requests.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "second", tags(..COMPONENT_TAGS))]
     HttpClientRttSeconds,
 
     /// The round-trip time (RTT) of HTTP requests, tagged with the response code.
-    #[configurable(tags(..COMPONENT_TAGS_HTTP_STATUS))]
+    #[configurable(unit = "second", tags(..COMPONENT_TAGS_HTTP_STATUS))]
     HttpClientResponseRttSeconds,
 
     /// The round-trip time (RTT) of HTTP requests that resulted in an error.
-    #[configurable(tags(..COMPONENT_TAGS_HTTP_ERROR_KIND))]
+    #[configurable(unit = "second", tags(..COMPONENT_TAGS_HTTP_ERROR_KIND))]
     HttpClientErrorRttSeconds,
 
     /// The utilization level of the source buffer. The outputs of the source send data to this buffer.
-    #[configurable(tags(..COMPONENT_TAGS_OUTPUT))]
+    #[configurable(unit = "fraction", tags(..COMPONENT_TAGS_OUTPUT))]
     SourceBufferUtilization,
 
     /// The utilization level of the buffer that feeds into a transform.
-    #[configurable(tags(..COMPONENT_TAGS_OUTPUT))]
+    #[configurable(unit = "fraction", tags(..COMPONENT_TAGS_OUTPUT))]
     TransformBufferUtilization,
 }
 
@@ -605,87 +608,89 @@ pub enum GaugeName {
     /// This includes both the time spent queued in the transform's input buffer and the time spent
     /// executing the transform itself. This value is smoothed over time using an exponentially
     /// weighted moving average (EWMA).
-    #[configurable(tags(..INTERNAL_METRICS_TAGS))]
+    #[configurable(unit = "second", tags(..INTERNAL_METRICS_TAGS))]
     ComponentLatencyMeanSeconds,
 
     /// The maximum number of events the source buffer can hold. The outputs of the source send data to this buffer.
     #[configurable(
         deprecated = "This metric has been deprecated in favor of [`source_buffer_max_size_events`](#source_buffer_max_size_events)."
     )]
-    #[configurable(tags(..COMPONENT_TAGS_OUTPUT))]
+    #[configurable(unit = "event", tags(..COMPONENT_TAGS_OUTPUT))]
     SourceBufferMaxEventSize,
 
     /// The maximum number of bytes the source buffer can hold. The outputs of the source send data to this buffer.
     #[configurable(
         deprecated = "This metric has been deprecated in favor of [`source_buffer_max_size_bytes`](#source_buffer_max_size_bytes)."
     )]
-    #[configurable(tags(..COMPONENT_TAGS_OUTPUT))]
+    #[configurable(unit = "byte", tags(..COMPONENT_TAGS_OUTPUT))]
     SourceBufferMaxByteSize,
 
     /// The maximum number of events the source buffer can hold. The outputs of the source send data to this buffer.
-    #[configurable(tags(..COMPONENT_TAGS_OUTPUT))]
+    #[configurable(unit = "event", tags(..COMPONENT_TAGS_OUTPUT))]
     SourceBufferMaxSizeEvents,
 
     /// The maximum number of bytes the source buffer can hold. The outputs of the source send data to this buffer.
-    #[configurable(tags(..COMPONENT_TAGS_OUTPUT))]
+    #[configurable(unit = "byte", tags(..COMPONENT_TAGS_OUTPUT))]
     SourceBufferMaxSizeBytes,
 
     /// The current utilization level of the source buffer. The outputs of the source send data to this buffer.
-    #[configurable(tags(..COMPONENT_TAGS_OUTPUT))]
+    #[configurable(unit = "fraction", tags(..COMPONENT_TAGS_OUTPUT))]
     SourceBufferUtilizationLevel,
 
     /// The mean utilization level of the source buffer. The outputs of the source send data to this buffer. The mean utilization is smoothed over time using an exponentially weighted moving average (EWMA).
-    #[configurable(tags(..COMPONENT_TAGS_OUTPUT))]
+    #[configurable(unit = "fraction", tags(..COMPONENT_TAGS_OUTPUT))]
     SourceBufferUtilizationMean,
 
     /// The maximum number of events the buffer that feeds into a transform can hold.
     #[configurable(
         deprecated = "This metric has been deprecated in favor of [`transform_buffer_max_size_events`](#transform_buffer_max_size_events)."
     )]
-    #[configurable(tags(..COMPONENT_TAGS_OUTPUT))]
+    #[configurable(unit = "event", tags(..COMPONENT_TAGS_OUTPUT))]
     TransformBufferMaxEventSize,
 
     /// The maximum number of bytes the buffer that feeds into a transform can hold.
     #[configurable(
         deprecated = "This metric has been deprecated in favor of [`transform_buffer_max_size_bytes`](#transform_buffer_max_size_bytes)."
     )]
-    #[configurable(tags(..COMPONENT_TAGS_OUTPUT))]
+    #[configurable(unit = "byte", tags(..COMPONENT_TAGS_OUTPUT))]
     TransformBufferMaxByteSize,
 
     /// The maximum number of events the buffer that feeds into a transform can hold.
-    #[configurable(tags(..COMPONENT_TAGS_OUTPUT))]
+    #[configurable(unit = "event", tags(..COMPONENT_TAGS_OUTPUT))]
     TransformBufferMaxSizeEvents,
 
     /// The maximum number of bytes the buffer that feeds into a transform can hold.
-    #[configurable(tags(..COMPONENT_TAGS_OUTPUT))]
+    #[configurable(unit = "byte", tags(..COMPONENT_TAGS_OUTPUT))]
     TransformBufferMaxSizeBytes,
 
     /// The current utilization level of the buffer that feeds into a transform.
-    #[configurable(tags(..COMPONENT_TAGS_OUTPUT))]
+    #[configurable(unit = "fraction", tags(..COMPONENT_TAGS_OUTPUT))]
     TransformBufferUtilizationLevel,
 
     /// The mean utilization level of the buffer that feeds into a transform. This value is smoothed over time using an exponentially weighted moving average (EWMA).
-    #[configurable(tags(..COMPONENT_TAGS_OUTPUT))]
+    #[configurable(unit = "fraction", tags(..COMPONENT_TAGS_OUTPUT))]
     TransformBufferUtilizationMean,
 
     /// The maximum number of events in the buffer.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "event", tags(..COMPONENT_TAGS))]
     BufferMaxSizeEvents,
 
     /// The maximum size in events that the buffer can store.
     #[configurable(
         deprecated = "This metric has been deprecated in favor of [`buffer_max_size_events`](#buffer_max_size_events).",
+        unit = "event",
         tags(..COMPONENT_TAGS)
     )]
     BufferMaxEventSize,
 
     /// The maximum number of bytes in the buffer.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "byte", tags(..COMPONENT_TAGS))]
     BufferMaxSizeBytes,
 
     /// The maximum size in bytes that the buffer can store.
     #[configurable(
         deprecated = "This metric has been deprecated in favor of [`buffer_max_size_bytes`](#buffer_max_size_bytes).",
+        unit = "byte",
         tags(..COMPONENT_TAGS)
     )]
     BufferMaxByteSize,
@@ -694,42 +699,42 @@ pub enum GaugeName {
     #[configurable(
         deprecated = "This metric has been deprecated in favor of [`buffer_size_events`](#buffer_size_events)."
     )]
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "event", tags(..COMPONENT_TAGS))]
     BufferEvents,
 
     /// The number of events currently in the buffer.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "event", tags(..COMPONENT_TAGS))]
     BufferSizeEvents,
 
     /// The number of bytes currently in the buffer.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "byte", tags(..COMPONENT_TAGS))]
     BufferSizeBytes,
 
     /// The number of bytes currently in the buffer.
     #[configurable(
         deprecated = "This metric has been deprecated in favor of [`buffer_size_bytes`](#buffer_size_bytes)."
     )]
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "byte", tags(..COMPONENT_TAGS))]
     BufferByteSize,
 
     /// A ratio from 0 to 1 of the load on a component. A value of 0 would indicate a completely idle component that is simply waiting for input. A value of 1 would indicate a that is never idle. This value is updated every 5 seconds.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "fraction", tags(..COMPONENT_TAGS))]
     Utilization,
 
     /// The number of bytes currently allocated by this component.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "byte", tags(..COMPONENT_TAGS))]
     ComponentAllocatedBytes,
 
     /// The total number of open files.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "file", tags(..COMPONENT_TAGS))]
     OpenFiles,
 
     /// The total number of seconds the Vector instance has been up.
-    #[configurable(tags(..INTERNAL_METRICS_TAGS))]
+    #[configurable(unit = "second", tags(..INTERNAL_METRICS_TAGS))]
     UptimeSeconds,
 
     /// Has a fixed value of 1.0. Contains build information such as Rust and Vector versions.
-    #[configurable(tags {
+    #[configurable(unit = "unit", tags {
         ..INTERNAL_METRICS_TAGS,
         "debug": {"description": "Whether this is a debug build of Vector", "required": true},
         "version": {"description": "Vector version.", "required": true},
@@ -740,15 +745,15 @@ pub enum GaugeName {
     BuildInfo,
 
     /// Current number of messages in producer queues.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "message", tags(..COMPONENT_TAGS))]
     KafkaQueueMessages,
 
     /// Current total size of messages in producer queues.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "byte", tags(..COMPONENT_TAGS))]
     KafkaQueueMessagesBytes,
 
     /// The Kafka consumer lag.
-    #[configurable(tags {
+    #[configurable(unit = "message", tags {
         ..COMPONENT_TAGS,
         "topic_id": {"description": "The Kafka topic id.", "required": true},
         "partition_id": {"description": "The Kafka partition id.", "required": true}
@@ -756,39 +761,39 @@ pub enum GaugeName {
     KafkaConsumerLag,
 
     /// The total memory currently being used by the Lua runtime.
-    #[configurable(tags(..INTERNAL_METRICS_TAGS))]
+    #[configurable(unit = "byte", tags(..INTERNAL_METRICS_TAGS))]
     LuaMemoryUsedBytes,
 
     /// The number of current open connections to Vector.
-    #[configurable(tags(..INTERNAL_METRICS_TAGS))]
+    #[configurable(unit = "connection", tags(..INTERNAL_METRICS_TAGS))]
     OpenConnections,
 
     /// The number of currently active endpoints.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "unit", tags(..COMPONENT_TAGS))]
     ActiveEndpoints,
 
     /// The number of outstanding Splunk HEC indexer acknowledgement acks.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "response", tags(..COMPONENT_TAGS))]
     SplunkPendingAcks,
 
     /// Number of clients attached to a component.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "unit", tags(..COMPONENT_TAGS))]
     ActiveClients,
 
     /// The number of objects currently stored in the in-memory enrichment table.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "item", tags(..COMPONENT_TAGS))]
     MemoryEnrichmentTableObjectsCount,
 
     /// The total size in bytes of all objects stored in the in-memory enrichment table.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "byte", tags(..COMPONENT_TAGS))]
     MemoryEnrichmentTableByteSize,
 
     /// The number of tag keys currently being tracked by the tag cardinality limit transform.
-    #[configurable(tags(..COMPONENT_TAGS))]
+    #[configurable(unit = "key", tags(..COMPONENT_TAGS))]
     TagCardinalityTrackedKeys,
 
     /// The total number of metrics emitted from the internal metrics registry.
-    #[configurable(tags())]
+    #[configurable(unit = "unit", tags())]
     InternalMetricsCardinality,
 }
 

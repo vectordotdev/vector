@@ -122,6 +122,11 @@ fn collect_metric_entries(metric_schemas: &Value) -> std::collections::BTreeMap<
                 );
                 continue;
             };
+            let unit = variant
+                .get("_metadata")
+                .and_then(|m| m.get("docs::unit"))
+                .and_then(Value::as_str)
+                .map(str::to_owned);
             let deprecated = variant
                 .get("deprecated")
                 .and_then(Value::as_bool)
@@ -132,6 +137,9 @@ fn collect_metric_entries(metric_schemas: &Value) -> std::collections::BTreeMap<
                 "default_namespace": "vector",
                 "tags": tags,
             });
+            if let Some(u) = unit {
+                entry["unit"] = json!(u);
+            }
             if deprecated {
                 entry["deprecated"] = json!(true);
                 if let Some(msg) = variant
