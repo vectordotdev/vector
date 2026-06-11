@@ -114,6 +114,11 @@ pub enum AwsAuthentication {
     /// Additionally, the specific credential profile to use can be set.
     /// The file format must match the credentials file format outlined in
     /// <https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html>.
+    ///
+    /// Unlike the default behavior, this provider will periodically re-read
+    /// the credentials file to pick up rotated credentials. This is useful
+    /// for long-running processes in Kubernetes environments where credentials
+    /// are rotated by external processes (e.g., IRSA, credential rotation).
     File {
         /// Path to the credentials file.
         #[configurable(metadata(docs::examples = "/my/aws/credentials"))]
@@ -134,6 +139,22 @@ pub enum AwsAuthentication {
         /// [aws_region]: https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints
         #[configurable(metadata(docs::examples = "us-west-2"))]
         region: Option<String>,
+
+        /// Interval in seconds between credential file re-reads.
+        ///
+        /// The provider will re-read the credentials file at this interval
+        /// to pick up any rotated credentials. This is useful for long-running
+        /// processes where credentials may be rotated externally.
+        ///
+        /// Minimum value is 30 seconds. Values below the minimum will be
+        /// clamped to 30 seconds.
+        ///
+        /// Default: 300 seconds (5 minutes).
+        #[configurable(metadata(docs::type_unit = "seconds"))]
+        #[configurable(metadata(docs::examples = 300))]
+        #[configurable(metadata(docs::human_name = "Refresh Interval"))]
+        #[serde(default = "default_refresh_interval_secs")]
+        refresh_interval_secs: u64,
     },
 
     /// Assume the given role ARN.
@@ -209,6 +230,10 @@ pub enum AwsAuthentication {
 
 fn default_profile() -> String {
     DEFAULT_PROFILE_NAME.to_string()
+}
+
+fn default_refresh_interval_secs() -> u64 {
+    super::refreshing_file_credentials::DEFAULT_REFRESH_INTERVAL.as_secs()
 }
 
 impl AwsAuthentication {
@@ -310,26 +335,22 @@ impl AwsAuthentication {
                 credentials_file,
                 profile,
                 region,
+                refresh_interval_secs,
             } => {
                 let connector = super::connector(proxy, tls_options)?;
-
-                // The SDK uses the default profile out of the box, but doesn't provide an optional
-                // type in the builder. We can just hardcode it so that everything works.
-                let profile_files = EnvConfigFiles::builder()
-                    .with_file(EnvConfigFileKind::Credentials, credentials_file)
-                    .build();
-
                 let auth_region = region.clone().map(Region::new).unwrap_or(service_region);
-                let provider_config = ProviderConfig::empty()
-                    .with_region(Option::from(auth_region))
-                    .with_http_client(connector);
 
-                let profile_provider = ProfileFileCredentialsProvider::builder()
-                    .profile_files(profile_files)
-                    .profile_name(profile)
-                    .configure(&provider_config)
+                // Use RefreshingFileCredentialsProvider to handle credential rotation
+                // in long-running processes (e.g., IRSA token refresh in Kubernetes)
+                let refreshing_provider = super::refreshing_file_credentials::RefreshingFileCredentialsProvider::builder()
+                    .credentials_file(credentials_file)
+                    .profile(profile)
+                    .region(auth_region)
+                    .http_client(connector)
+                    .refresh_interval(Duration::from_secs(*refresh_interval_secs))
                     .build();
-                Ok(SharedCredentialsProvider::new(profile_provider))
+
+                Ok(SharedCredentialsProvider::new(refreshing_provider))
             }
             AwsAuthentication::Role {
                 assume_role,
@@ -718,10 +739,12 @@ mod tests {
                 credentials_file,
                 profile,
                 region,
+                refresh_interval_secs,
             } => {
                 assert_eq!(&credentials_file, "/path/to/file");
                 assert_eq!(&profile, "foo");
                 assert_eq!(region.unwrap(), "us-west-2");
+                assert_eq!(refresh_interval_secs, 300); // default
             }
             _ => panic!(),
         }
@@ -737,10 +760,38 @@ mod tests {
             AwsAuthentication::File {
                 credentials_file,
                 profile,
+                refresh_interval_secs,
                 ..
             } => {
                 assert_eq!(&credentials_file, "/path/to/file");
                 assert_eq!(profile, "default".to_string());
+                assert_eq!(refresh_interval_secs, 300); // default
+            }
+            _ => panic!(),
+        }
+    }
+
+    #[test]
+    fn parsing_file_with_refresh_interval() {
+        let config = toml::from_str::<ComponentConfig>(
+            r#"
+            auth.credentials_file = "/path/to/file"
+            auth.profile = "prod"
+            auth.refresh_interval_secs = 600
+        "#,
+        )
+        .unwrap();
+
+        match config.auth {
+            AwsAuthentication::File {
+                credentials_file,
+                profile,
+                refresh_interval_secs,
+                ..
+            } => {
+                assert_eq!(&credentials_file, "/path/to/file");
+                assert_eq!(&profile, "prod");
+                assert_eq!(refresh_interval_secs, 600);
             }
             _ => panic!(),
         }
