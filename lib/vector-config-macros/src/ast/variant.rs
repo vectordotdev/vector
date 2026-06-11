@@ -184,13 +184,8 @@ impl<'a> Variant<'a> {
     /// The `tags` shorthand (`#[configurable(tags = metric_tags!(...))]`) is also included here
     /// as a `docs::tags` key/value custom attribute.
     pub fn metadata(&self) -> impl Iterator<Item = LazyCustomAttribute> {
-        let tags_attr = self.attrs.tags.as_ref().map(|TagsTokens(ts)| {
-            // Wrap the raw tokens in a `crate::metric_tags! { … }` call so the caller only needs
-            // to write the tag-set body, not the macro name.  `crate::` refers to the callsite
-            // crate at expansion time, which is where `metric_tags!` must be defined (e.g.
-            // `vector-common` re-exports the macro via `#[macro_export]`).
-            let value = quote::quote! { crate::metric_tags! { #ts } };
-            LazyCustomAttribute::kv(constants::DOCS_META_TAGS, value)
+        let tags_attr = self.attrs.tags.as_ref().map(|t| {
+            LazyCustomAttribute::kv(constants::DOCS_META_TAGS, t.into_value_tokens())
         });
 
         self.attrs

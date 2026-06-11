@@ -110,6 +110,25 @@ pub mod indexmap {
 }
 
 pub use serde_json;
+// Explicit re-export of the `json!` macro so generated code can reference it as
+// `::vector_config::json!(...)` without requiring a direct `serde_json` dependency at the
+// callsite.
+pub use serde_json::json;
+
+/// Merges all fields from `extra` into `base` (both must be JSON objects).
+///
+/// Used exclusively by code generated from `#[configurable(tags { ..BASE, ... })]` so that the
+/// merge logic is fully self-contained within `vector_config` and does not require `merge_lazy`
+/// or any other helper from the callsite crate.
+#[doc(hidden)]
+pub fn merge_tags(mut base: serde_json::Value, extra: serde_json::Value) -> serde_json::Value {
+    if let serde_json::Value::Object(ref mut m) = base {
+        if let serde_json::Value::Object(e) = extra {
+            m.extend(e);
+        }
+    }
+    base
+}
 
 pub mod component;
 mod configurable;

@@ -17,14 +17,14 @@ use vector_config_common::constants;
 ///
 /// Overrides `from_meta` directly so that darling never attempts to parse the tokens inside the
 /// list as `NestedMeta` items (which would fail for spread syntax like `..CONSTANT`).  The raw
-/// token stream is captured as-is and later wrapped in a `metric_tags! { ... }` invocation by
-/// the code generator.
+/// token stream is captured and later converted to a fully self-contained `serde_json::Value`
+/// expression by [`TagsTokens::into_value_tokens`], using only paths rooted at `::vector_config`.
 ///
 /// Accepted forms on a variant:
 /// ```text
+/// #[configurable(tags())]
 /// #[configurable(tags(..COMPONENT_TAGS))]
 /// #[configurable(tags { ..COMPONENT_TAGS, "key": { "description": "…", "required": true } })]
-/// #[configurable(tags())]
 /// ```
 #[derive(Clone, Debug)]
 pub struct TagsTokens(pub proc_macro2::TokenStream);
@@ -37,6 +37,93 @@ impl FromMeta for TagsTokens {
                 "expected `tags(...)` or `tags { ... }` list form",
             )
             .with_span(item)),
+        }
+    }
+}
+
+impl TagsTokens {
+    /// Converts the captured tag body tokens into a `serde_json::Value` expression that uses
+    /// only `::vector_config`-rooted paths, removing any coupling to `metric_tags!` or
+    /// `merge_lazy` from the callsite crate.
+    ///
+    /// The three forms produce:
+    /// - `tags()` → `::vector_config::json!({})`
+    /// - `tags(..BASE)` → `(*BASE).clone()`
+    /// - `tags { ..BASE, "k": v }` → `::vector_config::merge_tags((*BASE).clone(), ::vector_config::json!({ "k": v }))`
+    pub fn into_value_tokens(&self) -> proc_macro2::TokenStream {
+        match syn::parse2::<TagsBody>(self.0.clone()) {
+            Ok(body) => body.into_value_tokens(),
+            Err(e) => e.to_compile_error(),
+        }
+    }
+}
+
+/// Parsed representation of the body inside `tags(...)` / `tags { ... }`.
+struct TagsBody {
+    /// The base tag-set to spread, taken from `..EXPR` at the start of the body.
+    base: Option<syn::Expr>,
+    /// Any additional JSON-object entries that follow the optional spread.
+    extra: proc_macro2::TokenStream,
+}
+
+impl syn::parse::Parse for TagsBody {
+    fn parse(input: syn::parse::ParseStream<'_>) -> syn::Result<Self> {
+        if input.is_empty() {
+            return Ok(TagsBody {
+                base: None,
+                extra: proc_macro2::TokenStream::new(),
+            });
+        }
+
+        if input.peek(syn::Token![..]) {
+            let _: syn::Token![..] = input.parse()?;
+            let base: syn::Expr = input.parse()?;
+            // Consume an optional trailing comma that separates the base from extra entries.
+            if input.peek(syn::Token![,]) {
+                let _: syn::Token![,] = input.parse()?;
+            }
+            let extra: proc_macro2::TokenStream = input.parse()?;
+            Ok(TagsBody {
+                base: Some(base),
+                extra,
+            })
+        } else {
+            // No spread prefix — treat all tokens as JSON object entries.
+            let extra: proc_macro2::TokenStream = input.parse()?;
+            Ok(TagsBody { base: None, extra })
+        }
+    }
+}
+
+impl TagsBody {
+    fn into_value_tokens(self) -> proc_macro2::TokenStream {
+        let extra_empty = self.extra.is_empty();
+        match (self.base, extra_empty) {
+            // tags()
+            (None, true) => quote::quote! {
+                ::vector_config::json!({})
+            },
+            // tags { "k": v }
+            (None, false) => {
+                let extra = self.extra;
+                quote::quote! {
+                    ::vector_config::json!({ #extra })
+                }
+            }
+            // tags(..BASE)
+            (Some(base), true) => quote::quote! {
+                (*#base).clone()
+            },
+            // tags { ..BASE, "k": v }
+            (Some(base), false) => {
+                let extra = self.extra;
+                quote::quote! {
+                    ::vector_config::merge_tags(
+                        (*#base).clone(),
+                        ::vector_config::json!({ #extra }),
+                    )
+                }
+            }
         }
     }
 }
