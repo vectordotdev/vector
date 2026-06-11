@@ -110,7 +110,7 @@ x unknown field `retries`, expected one of `print_interval_secs`, `rate`, `ackno
 After this change, the coerce pass emits a warning with the full field path before serde runs:
 
 ```text
-warning: unknown field at sinks.my_sink.retries
+warning: unknown `field` at sinks.my_sink.retries
 ```
 
 ```text
