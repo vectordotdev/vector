@@ -27,7 +27,7 @@ arr_macro_impl,https://github.com/JoshMcguigan/arr_macro,MIT OR Apache-2.0,Josh 
 arrayvec,https://github.com/bluss/arrayvec,MIT OR Apache-2.0,bluss
 arrow,https://github.com/apache/arrow-rs,Apache-2.0,Apache Arrow <dev@arrow.apache.org>
 arrow-arith,https://github.com/apache/arrow-rs,Apache-2.0,Apache Arrow <dev@arrow.apache.org>
-arrow-array,https://github.com/apache/arrow-rs,Apache-2.0,Apache Arrow <dev@arrow.apache.org>
+arrow-array,https://github.com/apache/arrow-rs,Apache-2.0 AND MIT,Apache Arrow <dev@arrow.apache.org>
 arrow-buffer,https://github.com/apache/arrow-rs,Apache-2.0,Apache Arrow <dev@arrow.apache.org>
 arrow-cast,https://github.com/apache/arrow-rs,Apache-2.0,Apache Arrow <dev@arrow.apache.org>
 arrow-csv,https://github.com/apache/arrow-rs,Apache-2.0,Apache Arrow <dev@arrow.apache.org>
@@ -316,6 +316,7 @@ half,https://github.com/starkat99/half-rs,MIT OR Apache-2.0,Kathryn Long <squees
 hash_hasher,https://github.com/Fraser999/Hash-Hasher,Apache-2.0 OR MIT,Fraser Hutchison <fraser@astria.org>
 hashbag,https://github.com/jonhoo/hashbag,MIT OR Apache-2.0,Jon Gjengset <jon@thesquareplanet.com>
 hashbrown,https://github.com/rust-lang/hashbrown,MIT OR Apache-2.0,Amanieu d'Antras <amanieu@gmail.com>
+hashbrown,https://github.com/rust-lang/hashbrown,MIT OR Apache-2.0,The hashbrown Authors
 hashlink,https://github.com/kyren/hashlink,MIT OR Apache-2.0,kyren <kerriganw@gmail.com>
 hdrhistogram,https://github.com/HdrHistogram/HdrHistogram_rust,MIT OR Apache-2.0,"Jon Gjengset <jon@thesquareplanet.com>, Marshall Pierce <marshall@mpierce.org>"
 headers,https://github.com/hyperium/headers,MIT,Sean McArthur <sean@seanmonstar.com>
@@ -472,7 +473,7 @@ miniz_oxide,https://github.com/Frommi/miniz_oxide/tree/master/miniz_oxide,MIT OR
 mio,https://github.com/tokio-rs/mio,MIT,"Carl Lerche <me@carllerche.com>, Thomas de Zeeuw <thomasdezeeuw@gmail.com>, Tokio Contributors <team@tokio.rs>"
 mlua,https://github.com/mlua-rs/mlua,MIT,"Aleksandr Orlenko <zxteam@pm.me>, kyren <catherine@kyju.org>"
 mlua-sys,https://github.com/mlua-rs/mlua,MIT,Aleksandr Orlenko <zxteam@pm.me>
-mlua_derive,https://github.com/khvzak/mlua,MIT,Aleksandr Orlenko <zxteam@pm.me>
+mlua_derive,https://github.com/mlua-rs/mlua,MIT,Aleksandr Orlenko <zxteam@pm.me>
 moka,https://github.com/moka-rs/moka,MIT OR Apache-2.0,The moka Authors
 mongocrypt,https://github.com/mongodb/libmongocrypt-rust,Apache-2.0,"Abraham Egnor <abraham.egnor@mongodb.com>, Isabel Atkinson <isabel.atkinson@mongodb.com>"
 mongocrypt-sys,https://github.com/mongodb/libmongocrypt-rust,Apache-2.0,"Abraham Egnor <abraham.egnor@mongodb.com>, Isabel Atkinson <isabel.atkinson@mongodb.com>"
@@ -514,7 +515,7 @@ oauth2,https://github.com/ramosbugs/oauth2-rs,MIT OR Apache-2.0,"Alex Crichton <
 objc,http://github.com/SSheldon/rust-objc,MIT,Steven Sheldon
 objc2-core-foundation,https://github.com/madsmtm/objc2,Zlib OR Apache-2.0 OR MIT,The objc2-core-foundation Authors
 objc2-io-kit,https://github.com/madsmtm/objc2,Zlib OR Apache-2.0 OR MIT,The objc2-io-kit Authors
-octseq,https://github.com/NLnetLabs/octets/,BSD-3-Clause,NLnet Labs <rust-team@nlnetlabs.nl>
+octseq,https://github.com/NLnetLabs/octets,BSD-3-Clause,NLnet Labs <rust-team@nlnetlabs.nl>
 ofb,https://github.com/RustCrypto/block-modes,MIT OR Apache-2.0,RustCrypto Developers
 once_cell,https://github.com/matklad/once_cell,MIT OR Apache-2.0,Aleksey Kladov <aleksey.kladov@gmail.com>
 onig,https://github.com/iwillspeak/rust-onig,MIT,"Will Speak <will@willspeak.me>, Ivan Ivashchenko <defuz@me.com>"

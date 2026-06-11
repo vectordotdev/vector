@@ -126,7 +126,7 @@ releases: "0.49.0": {
 		{
 			type: "fix"
 			description: """
-				VRL programs can now read the `interval_ms` field. This field was previously writeable but not readable.
+				VRL programs can now read the `interval_ms` field. This field was previously writable but not readable.
 				"""
 			contributors: ["thomasqueirozb"]
 		},

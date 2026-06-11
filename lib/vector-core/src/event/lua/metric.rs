@@ -163,7 +163,7 @@ impl IntoLua for LuaMetric {
             }
             MetricValue::Set { values } => {
                 let set = lua.create_table()?;
-                set.raw_set("values", lua.create_sequence_from(values.into_iter())?)?;
+                set.raw_set("values", lua.create_sequence_from(values)?)?;
                 tbl.raw_set("set", set)?;
             }
             MetricValue::Distribution { samples, statistic } => {
