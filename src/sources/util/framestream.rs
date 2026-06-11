@@ -1304,7 +1304,7 @@ mod test {
         sock_sink: &mut S,
         frames: Vec<Result<Bytes, std::io::Error>>,
     ) {
-        let mut stream = stream::iter(frames.into_iter());
+        let mut stream = stream::iter(frames);
         //send and send_all consume the sink
         _ = sock_sink.send_all(&mut stream).await;
     }

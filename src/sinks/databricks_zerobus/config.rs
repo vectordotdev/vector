@@ -46,6 +46,30 @@ impl DatabricksAuthentication {
     }
 }
 
+/// Arrow IPC compression codec for Zerobus Arrow Flight payloads.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum Compression {
+    /// No compression.
+    #[default]
+    None,
+    /// LZ4 frame compression.
+    Lz4Frame,
+    /// Zstandard compression.
+    Zstd,
+}
+
+impl From<Compression> for Option<arrow::ipc::CompressionType> {
+    fn from(value: Compression) -> Self {
+        match value {
+            Compression::None => None,
+            Compression::Lz4Frame => Some(arrow::ipc::CompressionType::LZ4_FRAME),
+            Compression::Zstd => Some(arrow::ipc::CompressionType::ZSTD),
+        }
+    }
+}
+
 /// Zerobus stream configuration options.
 ///
 /// This is a thin wrapper around the SDK's `StreamConfigurationOptions` with Vector-specific
@@ -63,6 +87,11 @@ pub struct ZerobusStreamOptions {
     #[serde(default = "default_server_ack_timeout_ms")]
     #[configurable(metadata(docs::examples = 60000))]
     pub server_lack_of_ack_timeout_ms: u64,
+
+    /// Arrow IPC compression for Flight payloads. Defaults to no compression.
+    #[configurable(derived)]
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
+    pub compression: Compression,
 }
 
 impl Default for ZerobusStreamOptions {
@@ -70,6 +99,7 @@ impl Default for ZerobusStreamOptions {
         Self {
             flush_timeout_ms: default_flush_timeout_ms(),
             server_lack_of_ack_timeout_ms: default_server_ack_timeout_ms(),
+            compression: Compression::None,
         }
     }
 }
@@ -85,29 +115,59 @@ pub struct ZerobusSinkConfig {
     /// The Zerobus ingestion endpoint URL.
     ///
     /// This should be the full URL to the Zerobus ingestion service.
-    #[configurable(metadata(docs::examples = "https://ingest.dev.databricks.com"))]
-    #[configurable(metadata(docs::examples = "https://ingest.prod.databricks.com"))]
+    ///
+    /// See the [Databricks Zerobus documentation][zerobus_endpoint] to find your workspace URL and
+    /// Zerobus ingest endpoint.
+    ///
+    /// [zerobus_endpoint]: https://docs.databricks.com/aws/en/ingestion/zerobus-ingest#get-your-workspace-url-and-zerobus-ingest-endpoint
+    #[configurable(metadata(
+        docs::examples = "https://1234567890123456.zerobus.us-west-2.cloud.databricks.com"
+    ))]
+    #[configurable(metadata(
+        docs::examples = "https://6543210987654321.zerobus.us-east-1.cloud.databricks.com"
+    ))]
     pub ingestion_endpoint: String,
 
     /// The Unity Catalog table name to write to.
     ///
     /// This should be in the format `catalog.schema.table`.
-    #[configurable(metadata(docs::examples = "logging_platform.my_team.logs"))]
+    ///
+    /// See the [Databricks Zerobus documentation][zerobus_table] to create or identify the target
+    /// table.
+    ///
+    /// [zerobus_table]: https://docs.databricks.com/aws/en/ingestion/zerobus-ingest#create-or-identify-the-target-table
+    #[configurable(metadata(docs::examples = "main.default.logs"))]
     #[configurable(metadata(docs::examples = "main.default.vector_logs"))]
     pub table_name: String,
 
     /// The Unity Catalog endpoint URL.
     ///
     /// This is used for authentication and table metadata.
-    #[configurable(metadata(
-        docs::examples = "https://dbc-e2f0eb31-2b0e.staging.cloud.databricks.com"
-    ))]
-    #[configurable(metadata(docs::examples = "https://your-workspace.cloud.databricks.com"))]
+    ///
+    /// See the [Databricks Zerobus documentation][zerobus_endpoint] to find your workspace URL and
+    /// Zerobus ingest endpoint.
+    ///
+    /// [zerobus_endpoint]: https://docs.databricks.com/aws/en/ingestion/zerobus-ingest#get-your-workspace-url-and-zerobus-ingest-endpoint
+    #[configurable(metadata(docs::examples = "https://dbc-a1b2c3d4-e5f6.cloud.databricks.com"))]
+    #[configurable(metadata(docs::examples = "https://dbc-f6e5d4c3-b2a1.cloud.databricks.com"))]
     pub unity_catalog_endpoint: String,
 
     /// Databricks authentication configuration.
+    ///
+    /// See the [Databricks Zerobus documentation][zerobus_service_principal] to create a service
+    /// principal and grant it permissions to write to the target table.
+    ///
+    /// [zerobus_service_principal]: https://docs.databricks.com/aws/en/ingestion/zerobus-ingest#create-a-service-principal-and-grant-permissions
     #[configurable(derived)]
     pub auth: DatabricksAuthentication,
+
+    /// Custom identifier appended to the `user-agent` header sent to Databricks.
+    ///
+    /// The header always includes `Vector/<version>`; when set, this value is
+    /// appended after it (e.g. `my-service/1.2`).
+    #[serde(default)]
+    #[configurable(metadata(docs::examples = "my-service/1.2"))]
+    pub user_agent: Option<String>,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -133,13 +193,15 @@ pub struct ZerobusSinkConfig {
 impl GenerateConfig for ZerobusSinkConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            ingestion_endpoint: "https://ingest.dev.databricks.com".to_string(),
-            table_name: "catalog.schema.table".to_string(),
-            unity_catalog_endpoint: "https://your-workspace.cloud.databricks.com".to_string(),
+            ingestion_endpoint: "https://1234567890123456.zerobus.us-west-2.cloud.databricks.com"
+                .to_string(),
+            table_name: "main.default.logs".to_string(),
+            unity_catalog_endpoint: "https://dbc-a1b2c3d4-e5f6.cloud.databricks.com".to_string(),
             auth: DatabricksAuthentication::OAuth {
                 client_id: SensitiveString::from("${DATABRICKS_CLIENT_ID}".to_string()),
                 client_secret: SensitiveString::from("${DATABRICKS_CLIENT_SECRET}".to_string()),
             },
+            user_agent: None,
             stream_options: ZerobusStreamOptions::default(),
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
@@ -248,6 +310,17 @@ impl ZerobusSinkConfig {
 
         Ok(())
     }
+
+    /// The user-agent suffix to hand the Zerobus SDK: `Vector/<version>`
+    /// alone, or with the user's configured `user_agent` appended. The SDK
+    /// prepends its own `zerobus-sdk-rs/<version>` prefix to this value.
+    pub fn user_agent_suffix(&self) -> String {
+        let vector = format!("Vector/{}", crate::vector_version());
+        match self.user_agent.as_deref().filter(|s| !s.is_empty()) {
+            Some(ua) => format!("{vector} {ua}"),
+            None => vector,
+        }
+    }
 }
 
 // Default value functions
@@ -273,6 +346,7 @@ mod tests {
                 client_id: SensitiveString::from("test-client-id".to_string()),
                 client_secret: SensitiveString::from("test-client-secret".to_string()),
             },
+            user_agent: None,
             stream_options: ZerobusStreamOptions::default(),
             batch: Default::default(),
             request: Default::default(),
@@ -403,6 +477,80 @@ mod tests {
         }
     }
 
+    #[test]
+    fn test_stream_options_compression_deserializes() {
+        let opts: ZerobusStreamOptions =
+            serde_json::from_str(r#"{"compression":"zstd"}"#).expect("should parse zstd");
+        assert_eq!(opts.compression, Compression::Zstd);
+
+        let opts: ZerobusStreamOptions =
+            serde_json::from_str(r#"{"compression":"lz4_frame"}"#).expect("should parse lz4_frame");
+        assert_eq!(opts.compression, Compression::Lz4Frame);
+
+        let opts: ZerobusStreamOptions =
+            serde_json::from_str(r#"{"compression":"none"}"#).expect("should parse none");
+        assert_eq!(opts.compression, Compression::None);
+
+        // Omitting the field leaves compression disabled.
+        let opts: ZerobusStreamOptions = serde_json::from_str("{}").expect("should parse empty");
+        assert_eq!(opts.compression, Compression::None);
+    }
+
+    #[test]
+    fn test_compression_maps_to_arrow_ipc() {
+        assert_eq!(
+            Option::<arrow::ipc::CompressionType>::from(Compression::None),
+            None,
+        );
+        assert_eq!(
+            Option::<arrow::ipc::CompressionType>::from(Compression::Lz4Frame),
+            Some(arrow::ipc::CompressionType::LZ4_FRAME),
+        );
+        assert_eq!(
+            Option::<arrow::ipc::CompressionType>::from(Compression::Zstd),
+            Some(arrow::ipc::CompressionType::ZSTD),
+        );
+    }
+
+    /// Guards the `arrow/ipc_compression` feature: lz4/zstd error at runtime unless
+    /// arrow is built with the codecs. arrow-ipc only validates when writing a
+    /// compressed buffer, so this round-trips a batch through each codec.
+    #[test]
+    fn test_arrow_ipc_compression_codecs_are_enabled() {
+        use std::sync::Arc;
+
+        use arrow::array::Int32Array;
+        use arrow::datatypes::{DataType, Field, Schema};
+        use arrow::ipc::writer::{IpcWriteOptions, StreamWriter};
+        use arrow::record_batch::RecordBatch;
+
+        let schema = Arc::new(Schema::new(vec![Field::new("n", DataType::Int32, false)]));
+        let batch = RecordBatch::try_new(
+            Arc::clone(&schema),
+            vec![Arc::new(Int32Array::from((0..1024).collect::<Vec<_>>()))],
+        )
+        .expect("batch should build");
+
+        for codec in [Compression::Lz4Frame, Compression::Zstd] {
+            let compression: Option<arrow::ipc::CompressionType> = codec.into();
+            let options = IpcWriteOptions::default()
+                .try_with_compression(compression)
+                .unwrap_or_else(|e| panic!("{codec:?} not enabled in arrow build: {e}"));
+
+            let mut buf = Vec::new();
+            let mut writer = StreamWriter::try_new_with_options(&mut buf, &schema, options)
+                .unwrap_or_else(|e| panic!("writer for {codec:?} should build: {e}"));
+            writer
+                .write(&batch)
+                .unwrap_or_else(|e| panic!("writing compressed batch for {codec:?} failed: {e}"));
+            writer
+                .finish()
+                .unwrap_or_else(|e| panic!("finishing stream for {codec:?} failed: {e}"));
+
+            assert!(!buf.is_empty(), "{codec:?} produced no output");
+        }
+    }
+
     /// When `batch.max_bytes` is `None` (user omitted the field or set it to `null`),
     /// `into_batcher_settings()` must merge it against
     /// `RealtimeSizeBasedDefaultBatchSettings::MAX_BYTES` (10MB) — never unbounded.
@@ -419,5 +567,47 @@ mod tests {
             .expect("batch settings should build");
 
         assert_eq!(settings.size_limit, 10_000_000);
+    }
+
+    #[test]
+    fn test_user_agent_suffix_without_user_value() {
+        let config = create_test_config();
+        let suffix = config.user_agent_suffix();
+        assert!(
+            suffix.starts_with("Vector/"),
+            "expected Vector/<version> prefix, got {suffix:?}"
+        );
+        // No user value configured, so nothing is appended.
+        assert!(
+            !suffix.contains(' '),
+            "unexpected appended value in {suffix:?}"
+        );
+    }
+
+    #[test]
+    fn test_user_agent_suffix_with_user_value() {
+        let mut config = create_test_config();
+        config.user_agent = Some("my-service/1.2".to_string());
+        let suffix = config.user_agent_suffix();
+        assert!(
+            suffix.starts_with("Vector/"),
+            "expected Vector/<version> prefix, got {suffix:?}"
+        );
+        assert!(
+            suffix.ends_with(" my-service/1.2"),
+            "expected user value appended, got {suffix:?}"
+        );
+    }
+
+    #[test]
+    fn test_user_agent_suffix_empty_user_value_ignored() {
+        let mut config = create_test_config();
+        config.user_agent = Some(String::new());
+        let suffix = config.user_agent_suffix();
+        // An empty string is treated the same as no value: no trailing space.
+        assert!(
+            !suffix.contains(' '),
+            "empty user_agent should be ignored, got {suffix:?}"
+        );
     }
 }
