@@ -165,6 +165,13 @@ arrays (`inputs = [${VECTOR_INPUTS}]`). These patterns are rare in practice and 
 replaced with literal values. The implementation will follow Vector's deprecation policy to give
 users time to migrate.
 
+One YAML-specific case requires attention: `inputs: [${VECTOR_INPUTS}]` is valid YAML syntax
+(an array containing one string element), so it does not produce a parse error under the new
+model. However, the behavior changes silently — today the raw-text substitution of
+`source_a, source_b` produces a two-element array; after this change it produces a one-element
+array containing the literal string `"source_a, source_b"`. Users relying on this pattern must
+replace it with explicit literal values.
+
 ### Improved security
 
 Substituted values that contain structural characters (newlines, quotes, braces) remain string
@@ -191,8 +198,9 @@ and the config loading pipeline becomes easier to extend and test going forward.
    shared fields (`inputs`, `proxy`, `graph`).
 3. **`loader.rs`**: `Process::load()` default: parse, interpolate env vars, run `postprocess`
    for secret substitution, then validate and coerce. All steps operate on the parsed tree.
-   Secret placeholder collection and backend fetching are unchanged; only substitution moves
-   from raw text to string leaves in the parsed tree.
+   Secret placeholder collection moves to a tree-walk over string leaves as well, replacing the
+   current raw-text regex scan. This means `SECRET[...]` in YAML comments, map keys, or other
+   non-string positions is no longer collected or sent to the backend.
 4. Public API signatures unchanged (`load_from_paths`, etc.).
 
 ## Design Decisions
