@@ -185,7 +185,7 @@ impl<'a> Variant<'a> {
     /// as a `docs::tags` key/value custom attribute.
     pub fn metadata(&self) -> impl Iterator<Item = LazyCustomAttribute> {
         let tags_attr = self.attrs.tags.as_ref().map(|t| {
-            LazyCustomAttribute::kv(constants::DOCS_META_TAGS, t.into_value_tokens())
+            LazyCustomAttribute::kv(constants::DOCS_META_TAGS, t.to_value_tokens())
         });
 
         self.attrs

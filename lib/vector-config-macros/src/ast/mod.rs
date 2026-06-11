@@ -42,7 +42,7 @@ impl FromMeta for TagsTokens {
 }
 
 impl TagsTokens {
-    /// Converts the captured tag body tokens into a `serde_json::Value` expression that uses
+    /// Returns the captured tag body tokens as a `serde_json::Value` expression that uses
     /// only `::vector_config`-rooted paths, removing any coupling to `metric_tags!` or
     /// `merge_lazy` from the callsite crate.
     ///
@@ -50,7 +50,7 @@ impl TagsTokens {
     /// - `tags()` → `::vector_config::json!({})`
     /// - `tags(..BASE)` → `(*BASE).clone()`
     /// - `tags { ..BASE, "k": v }` → `::vector_config::merge_tags((*BASE).clone(), ::vector_config::json!({ "k": v }))`
-    pub fn into_value_tokens(&self) -> proc_macro2::TokenStream {
+    pub fn to_value_tokens(&self) -> proc_macro2::TokenStream {
         match syn::parse2::<TagsBody>(self.0.clone()) {
             Ok(body) => body.into_value_tokens(),
             Err(e) => e.to_compile_error(),
