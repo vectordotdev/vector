@@ -102,20 +102,28 @@ stall because they require untangling parsing and substitution first.
 **Better error messages.** Today:
 
 ```text
-error: unknown field `retries`, expected one of `encoding`, `batch`, `request`, ...
+x unknown field `retries`, expected one of `print_interval_secs`, `rate`, `acknowledgements`
+
+  in `sinks.my_sink`
 ```
 
-After this change:
+After this change, the coerce pass emits a warning with the full field path before serde runs:
 
 ```text
-error: unknown field at sinks.my_sink.retries
+warning: unknown field at sinks.my_sink.retries
 ```
 
 ```text
 error: expected integer at sources.my_source.count, found string "not-a-number"
 ```
 
-Users get a field path including the component name, making errors immediately actionable.
+Unknown-field detection is a warning today because many Vector fields carry `#[serde(alias)]`
+annotations (`host`, `token`, `namespace`, `url`, and others) that are not yet reflected in the
+generated JSON Schema. A field absent from the schema may still be a valid alias, so the coerce
+pass warns and defers the authoritative check to serde. Once aliases are emitted in the schema,
+unknown-field detection becomes a hard error with the full path, replacing the serde message
+entirely. Type-mismatch detection (`expected integer`, `expected boolean`) is a hard error from
+the start, since there is no equivalent ambiguity there.
 
 **Spec-compliant configs.** Today, `count = ${MY_COUNT}` works in Vector but is not valid TOML.
 After this change, configs are real TOML, JSON, and YAML, so off-the-shelf editors and linters
