@@ -107,23 +107,17 @@ x unknown field `retries`, expected one of `print_interval_secs`, `rate`, `ackno
   in `sinks.my_sink`
 ```
 
-After this change, the coerce pass emits a warning with the full field path before serde runs:
+After this change:
 
 ```text
-warning: unknown `field` at sinks.my_sink.retries
+x unknown `field` at sinks.my_sink.retries
 ```
 
 ```text
-error: expected integer at sources.my_source.count, found string "not-a-number"
+x expected integer at sources.my_source.count, found string "not-a-number"
 ```
 
-Unknown-field detection is a warning today because many Vector fields carry `#[serde(alias)]`
-annotations (`host`, `token`, `namespace`, `url`, and others) that are not yet reflected in the
-generated JSON Schema. A field absent from the schema may still be a valid alias, so the coerce
-pass warns and defers the authoritative check to serde. Once aliases are emitted in the schema,
-unknown-field detection becomes a hard error with the full path, replacing the serde message
-entirely. Type-mismatch detection (`expected integer`, `expected boolean`) is a hard error from
-the start, since there is no equivalent ambiguity there.
+Users get a single, clean error with the full field path.
 
 **Spec-compliant configs.** Today, `count = ${MY_COUNT}` works in Vector but is not valid TOML.
 After this change, configs are real TOML, JSON, and YAML, so off-the-shelf editors and linters
@@ -216,11 +210,13 @@ serde error or silently loading a misconfigured value.
 ### Unknown-field detection is currently non-fatal
 
 `vector-config` does not yet emit `#[serde(alias = "...")]` aliases into the generated JSON
-Schema (tracked TODO in `vector-config/src/lib.rs`). Until aliases are represented, a key missing
-from the schema may still be a legitimate serde alias. The coercion pass logs a warning at the
-unknown-field path and defers the authoritative check to serde, which has alias information. When
-aliases are emitted in the schema, this can be tightened to a hard error per the original RFC
-intent.
+Schema (tracked TODO in `vector-config/src/lib.rs`). Many Vector fields carry user-facing aliases
+(`host`, `token`, `namespace`, `url`, and others), so a key absent from the schema may still be a
+valid alias that serde accepts. The coerce pass collects unknown-field paths at debug level and
+defers the authoritative check to serde. If serde subsequently errors on that field, Vector
+surfaces the path-aware message from the coerce pass instead of the raw serde output — giving
+users one clean error. When aliases are emitted in the schema, the coerce pass can hard-error
+directly without waiting for serde.
 
 ### Unknown-field checking is skipped for unrecognized component types
 
