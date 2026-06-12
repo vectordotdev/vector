@@ -272,13 +272,13 @@ mod tests {
             site: "tomato.com".into(),
         };
 
-        let overriden = local.with_globals(global).unwrap();
+        let overridden = local.with_globals(global).unwrap();
 
-        assert_eq!(None, overriden.endpoint);
-        assert_eq!("potato.com".to_string(), overriden.site);
+        assert_eq!(None, overridden.endpoint);
+        assert_eq!("potato.com".to_string(), overridden.site);
         assert_eq!(
             SensitiveString::from("key".to_string()),
-            overriden.default_api_key
+            overridden.default_api_key
         );
     }
 
@@ -290,13 +290,13 @@ mod tests {
             site: "tomato.com".into(),
         };
 
-        let overriden = local.with_globals(global).unwrap();
+        let overridden = local.with_globals(global).unwrap();
 
-        assert_eq!(None, overriden.endpoint);
-        assert_eq!("tomato.com".to_string(), overriden.site);
+        assert_eq!(None, overridden.endpoint);
+        assert_eq!("tomato.com".to_string(), overridden.site);
         assert_eq!(
             SensitiveString::from("more key".to_string()),
-            overriden.default_api_key
+            overridden.default_api_key
         );
     }
 

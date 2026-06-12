@@ -1,8 +1,7 @@
 package metadata
 
 releases: "0.23.3": {
-	date:     "2022-08-10"
-	codename: ""
+	date: "2022-08-10"
 
 	whats_next: []
 
@@ -49,7 +48,7 @@ releases: "0.23.3": {
 	]
 
 	commits: [
-		{sha: "d72f1d8963538e29af1689aebb47ef8fa3db84ef", date: "2022-07-12 06:01:39 UTC", description: "typoes", pr_number: 13489, scopes: [], type: "docs", breaking_change: false, author: "Tshepang Mbambo", files_count: 4, insertions_count: 5, deletions_count: 5},
+		{sha: "d72f1d8963538e29af1689aebb47ef8fa3db84ef", date: "2022-07-12 06:01:39 UTC", description: "typos", pr_number: 13489, scopes: [], type: "docs", breaking_change: false, author: "Tshepang Mbambo", files_count: 4, insertions_count: 5, deletions_count: 5},
 		{sha: "c05afb2200c74a3bf84c70b34be06e3c36732644", date: "2022-07-12 06:02:25 UTC", description: "typo", pr_number: 13488, scopes: [], type: "docs", breaking_change: false, author: "Tshepang Mbambo", files_count: 1, insertions_count: 1, deletions_count: 1},
 		{sha: "1d19df127f5e73721525aebcbd2f63e81ce40aa5", date: "2022-07-11 23:11:16 UTC", description: "Correct length_delimited header documentation", pr_number: 13491, scopes: ["codecs"], type: "docs", breaking_change: false, author: "Jesse Szwedko", files_count: 2, insertions_count: 2, deletions_count: 2},
 		{sha: "1126a5e12d90cc8045f5ebeb322bbb026ed3072a", date: "2022-07-12 05:53:53 UTC", description: "Correct changelog entry", pr_number: 13509, scopes: ["gcp_pubsub source"], type: "docs", breaking_change: false, author: "Jesse Szwedko", files_count: 1, insertions_count: 1, deletions_count: 1},
