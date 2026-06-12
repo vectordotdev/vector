@@ -42,13 +42,13 @@ type EventsDroppedError = ComponentEventsDropped<'static, UNINTENTIONAL>;
 pub enum ParquetCompression {
     /// Zstd compression. Level must be between 1 and 21.
     Zstd {
-        /// Compression level (1–21). This is the range Vector supports; higher values compress more but are slower.
+        /// Compression level (1–21). This is the range Vector supports; higher values provide more compression but are slower.
         #[configurable(validation(range(min = 1, max = 21)))]
         level: u8,
     },
     /// Gzip compression. Level must be between 1 and 9.
     Gzip {
-        /// Compression level (1–9). This is the range Vector supports; higher values compress more but are slower.
+        /// Compression level (1–9). This is the range Vector supports; higher values provide more compression but are slower.
         #[configurable(validation(range(min = 1, max = 9)))]
         level: u8,
     },
@@ -93,7 +93,7 @@ pub enum ParquetSchemaMode {
     Relaxed,
     /// Missing fields become null. Extra fields cause an error.
     Strict,
-    /// Auto infer schema based on the batch. No schema file needed.
+    /// Automatically infer schema based on the batch. No schema file is needed.
     AutoInfer,
 }
 
@@ -118,7 +118,7 @@ pub struct ParquetSerializerConfig {
     #[configurable(derived)]
     pub compression: ParquetCompression,
 
-    /// Controls how events with fields not present in the schema are handled.
+    /// Controls how events that contain fields not present in the schema are handled.
     #[serde(default)]
     #[configurable(derived)]
     pub schema_mode: ParquetSchemaMode,
