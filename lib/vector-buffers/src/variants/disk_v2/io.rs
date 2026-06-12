@@ -85,6 +85,14 @@ pub trait Filesystem: Send + Sync {
     /// If an I/O error occurred when attempting to delete the file, an error variant will be
     /// returned describing the underlying error.
     async fn delete_file(&self, path: &Path) -> io::Result<()>;
+
+    /// Durably persists the entries of the directory at `path`.
+    ///
+    /// # Errors
+    ///
+    /// If an I/O error occurred when attempting to synchronize the directory, an error variant will
+    /// be returned describing the underlying error.
+    async fn sync_directory(&self, path: &Path) -> io::Result<()>;
 }
 
 pub trait AsyncFile: AsyncRead + AsyncWrite + Send + Sync {
@@ -96,13 +104,10 @@ pub trait AsyncFile: AsyncRead + AsyncWrite + Send + Sync {
     /// will be returned describing the underlying error.
     async fn metadata(&self) -> io::Result<Metadata>;
 
-    /// Attempts to synchronize all OS-internal data, and metadata, to disk.
-    ///
-    /// This function will attempt to ensure that all in-memory data reaches the filesystem before returning.
-    ///
-    /// This can be used to handle errors that would otherwise only be caught when the File is closed. Dropping a file will ignore errors in synchronizing this in-memory data.
+    /// Synchronize all OS-internal data, and metadata, to disk.
     ///
     /// # Errors
+    ///
     /// If an I/O error occurred when attempting to synchronize the file data and metadata to disk,
     /// an error variant will be returned describing the underlying error.
     async fn sync_all(&self) -> io::Result<()>;
@@ -163,6 +168,22 @@ impl Filesystem for ProductionFilesystem {
 
     async fn delete_file(&self, path: &Path) -> io::Result<()> {
         tokio::fs::remove_file(path).await
+    }
+
+    async fn sync_directory(&self, path: &Path) -> io::Result<()> {
+        // A directory can be opened read-only and fsync'd to persist its entries. This is the
+        // POSIX-blessed way to make a create or unlink durable. Windows has no directory fsync,
+        // and disk_v2's durability story is Unix-centric, so this is a no-op there.
+        #[cfg(unix)]
+        {
+            let dir = tokio::fs::File::open(path).await?;
+            dir.sync_all().await
+        }
+        #[cfg(not(unix))]
+        {
+            let _ = path;
+            Ok(())
+        }
     }
 }
 

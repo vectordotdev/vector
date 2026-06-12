@@ -263,6 +263,10 @@ where
 
         let mut reader = BufferReader::new(Arc::clone(&ledger), finalizer);
         reader
+            .reconcile_reader_position()
+            .await
+            .context(ReaderSeekFailedSnafu)?;
+        reader
             .seek_to_next_record()
             .await
             .context(ReaderSeekFailedSnafu)?;

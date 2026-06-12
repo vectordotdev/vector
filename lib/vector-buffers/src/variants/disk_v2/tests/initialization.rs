@@ -1,11 +1,18 @@
 use std::time::Duration;
 
-use tokio::time::timeout;
+use tokio::{fs, time::timeout};
 use tracing::Instrument;
 
 use crate::{
+    buffer_usage_data::BufferUsageHandle,
     test::{SizedRecord, acknowledge, install_tracing_helpers, with_temp_dir},
-    variants::disk_v2::tests::{create_default_buffer_v2, set_file_length},
+    variants::disk_v2::{
+        Buffer, DiskBufferConfigBuilder,
+        tests::{
+            create_buffer_v2_with_max_data_file_size, create_default_buffer_v2,
+            get_minimum_data_file_size_for_record_payload, set_file_length,
+        },
+    },
 };
 
 #[tokio::test]
@@ -180,5 +187,155 @@ async fn reader_doesnt_block_when_ahead_of_last_record_in_current_data_file() {
     });
 
     let parent = trace_span!("reader_doesnt_block_when_ahead_of_last_record_in_current_data_file");
+    fut.instrument(parent.or_current()).await;
+}
+
+#[tokio::test]
+async fn reopen_recovers_when_reader_resume_data_file_is_missing() {
+    // Regression test for SMPTNG-749: a crash that loses the reader's un-fsync'd
+    // file-id advance leaves a deleted data file the ledger still resumes from.
+    // Reopen must skip it and recover instead of crash-looping.
+    //
+    // `reader::delete_completed_data_file` is not atomic, performing the following operations:
+    //
+    //  * unlink dat file
+    //  * update ack'd reader file ID in ledger
+    //  * sync ledger
+    //
+    // If the final sync is not made before the Vector process terminates -- if
+    // it is SIGKILL'ed for instance -- then the dat file will be gone but the
+    // reader will be made to open a missing file and will crash.
+    //
+    // This test stages one instance of that crash and asserts the reopen recovers.
+    // In the scenario below the reader is at data file 0 and the writer at 1. That is:
+    //
+    //   1. writer writes 2 records -- data-0, data-1 -- leaving the system
+    //      in state reader=0, writer=1.
+    //   2. reader reads and acks data-0; delete runs unlink(data-0) -> set
+    //      reader=1 -> CRASH
+    //   3. on restart reader=0 != writer=1, read(data-0) -> ENOENT ->
+    //      ReaderSeekFailed
+    //
+    // The test stages the crash in step 2 without a real crash, copying
+    // buffer.db from step 1, running the real read+ack+delete and then
+    // restoring buffer.db, as if the disk buffer had been booted cold after a
+    // crash.
+    let _a = install_tracing_helpers();
+
+    let fut = with_temp_dir(|dir| {
+        let data_dir = dir.to_path_buf();
+
+        async move {
+            let record = SizedRecord::new(64);
+            // We size things so that one record write per data file means the
+            // writer will roll to the next dat file.
+            let max_data_file_size = get_minimum_data_file_size_for_record_payload(&record);
+
+            let (mut writer, mut reader, ledger) =
+                create_buffer_v2_with_max_data_file_size::<_, SizedRecord>(
+                    data_dir.clone(),
+                    max_data_file_size,
+                )
+                .await;
+
+            // Write two records, one per data file, so file 0 fills and the writer
+            // rolls ahead onto file 1.
+            for _ in 0..2 {
+                writer
+                    .write_record(record.clone())
+                    .await
+                    .expect("write should not fail");
+                writer.flush().await.expect("flush should not fail");
+            }
+            writer.close();
+
+            // We can't actually SIGKILL this process, so snapshot buffer.db while the
+            // ledger still resumes from file 0; this copy is the durable state a crash
+            // leaves (see the comment header above).
+            let ledger_db = data_dir.join("buffer.db");
+            ledger.flush().expect("ledger flush should not fail");
+            let durable_snapshot = fs::read(&ledger_db).await.expect("snapshot buffer.db");
+
+            // Read and acknowledge file 0's record, then file 1's, which rolls the
+            // reader off file 0. The next read processes those acks and runs the real
+            // delete_completed_data_file, unlinking file 0 and draining the buffer.
+            acknowledge(
+                reader
+                    .next()
+                    .await
+                    .expect("should not fail to read record")
+                    .expect("file 0 record"),
+            )
+            .await;
+            acknowledge(
+                reader
+                    .next()
+                    .await
+                    .expect("should not fail to read record")
+                    .expect("file 1 record"),
+            )
+            .await;
+            assert!(
+                reader.next().await.expect("read should not fail").is_none(),
+                "the buffer drains after both records"
+            );
+
+            // Simulate the crash.
+            //
+            // We drop down reader, writer and ledger and then replace the
+            // ledger_db with the snapshot we took earlier, simulating a ledger
+            // shutdown that managed to unlink the reader file but not fsync its
+            // private storage.
+            drop(reader);
+            drop(writer);
+            drop(ledger);
+            fs::write(&ledger_db, &durable_snapshot)
+                .await
+                .expect("failed to restore buffer.db");
+
+            // Simulate the reboot: reopen the disk buffer. It resumes from the unlinked
+            // data-0 and fails to open.
+            let build_config = || {
+                DiskBufferConfigBuilder::from_path(data_dir.clone())
+                    .max_data_file_size(max_data_file_size)
+                    .max_record_size(usize::try_from(max_data_file_size).unwrap())
+                    .build()
+                    .expect("config build should not fail")
+            };
+            let first =
+                Buffer::<SizedRecord>::from_config_inner(build_config(), BufferUsageHandle::noop())
+                    .await;
+            // Consume `first` so the internals are all consumed, locks are
+            // released and so forth.
+            let first_err = first.err();
+
+            // Simulate another reboot.
+            //
+            // We re-write the ledger to simulate what happens when disk buffer
+            // is on a durable store but not co-local to the machine. If the
+            // disk and compute are co-local then the mmap with the right
+            // indexes _may_ be present in OS page cache and _may_ restart
+            // properly on the next restart. This will not be true if everything
+            // is cold, which is what we simulate.
+            //
+            // Try removing this fs::write. Depending on how busy your system is
+            // you may find that this second attempt does not crash.
+            fs::write(&ledger_db, &durable_snapshot)
+                .await
+                .expect("failed to restore buffer.db");
+            let second =
+                Buffer::<SizedRecord>::from_config_inner(build_config(), BufferUsageHandle::noop())
+                    .await;
+            let second_err = second.err();
+
+            assert!(
+                first_err.is_none() && second_err.is_none(),
+                "SMPTNG-749: every reboot must recover (crash-loop); \
+                 first={first_err:?} second={second_err:?}",
+            );
+        }
+    });
+
+    let parent = trace_span!("reopen_recovers_when_reader_resume_data_file_is_missing_smptng_749");
     fut.instrument(parent.or_current()).await;
 }
