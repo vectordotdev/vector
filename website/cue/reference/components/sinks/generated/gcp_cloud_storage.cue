@@ -172,7 +172,7 @@ generated: components: sinks: gcp_cloud_storage: configuration: {
 						}
 					}
 					level: {
-						description:   "Compression level (1–21). This is the range Vector supports; higher values compress more but are slower."
+						description:   "Compression level (1–21). This is the range Vector supports; higher values provide more compression but are slower."
 						relevant_when: "algorithm = \"zstd\" or algorithm = \"gzip\""
 						required:      true
 						type: uint: {}
@@ -190,12 +190,12 @@ generated: components: sinks: gcp_cloud_storage: configuration: {
 				type: string: {}
 			}
 			schema_mode: {
-				description: "Controls how events with fields not present in the schema are handled."
+				description: "Controls how events that contain fields not present in the schema are handled."
 				required:    false
 				type: string: {
 					default: "relaxed"
 					enum: {
-						auto_infer: "Auto infer schema based on the batch. No schema file needed."
+						auto_infer: "Automatically infer schema based on the batch. No schema file is needed."
 						relaxed:    "Missing fields become null. Extra fields are silently dropped."
 						strict:     "Missing fields become null. Extra fields cause an error."
 					}
