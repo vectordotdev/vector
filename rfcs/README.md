@@ -78,10 +78,10 @@ more info navigating your solution.
 
 1. Search GitHub for [previous issues](https://github.com/vectordotdev/vector/issues) and
    [RFCs](https://github.com/vectordotdev/vector/tree/master/rfcs) on this topic.
-2. If an RFC issue does not exist, [open one](https://github.com/vectordotdev/vector/issues/new/choose).
-3. Use the issue to obtain consensus that an RFC is necessary.
+2. If you are unsure whether an RFC is the right path forward, consider
+   [opening an issue](https://github.com/vectordotdev/vector/issues/new/choose) first to get community input.
    - The change might be quickly rejected.
-   - The change might be on our long term roadmap and get deferred.
+   - The change might already be planned and get deferred.
    - The change might be blocked by other work.
 
 ### Creating an RFC
