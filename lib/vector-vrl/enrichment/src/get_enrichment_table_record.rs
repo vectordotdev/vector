@@ -102,7 +102,7 @@ impl Function for GetEnrichmentTableRecord {
     }
 
     fn parameters(&self) -> &'static [Parameter] {
-        &PARAMETERS
+        PARAMETERS
     }
 
     fn examples(&self) -> &'static [Example] {
