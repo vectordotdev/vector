@@ -86,12 +86,11 @@ more info navigating your solution.
 
 ### Creating an RFC
 
-1. Create a new branch
-2. Copy the [`rfcs/_YYYY-MM-DD-issue#-title.md`](rfcs/_YYYY-MM-DD-issue%23-title.md) template with the appropriate
-   name. Be sure to use the issue number you created above. (e.g., `rfcs/2020-02-10-445-internal-observability.md`)
-3. Fill in your RFC, pay attention the bullets and guidelines. Do not omit any sections.
-4. Work with the Vector team to land on a confident solution. Allocate time for code-level spikes if necessary.
-5. Submit your RFC as a pull request and tag reviewers for approval.
+1. Copy the [`rfcs/_YYYY-MM-DD-issue#-title.md`](rfcs/_YYYY-MM-DD-issue%23-title.md) template with the appropriate
+   name. (e.g., `rfcs/2020-02-10-445-internal-observability.md`)
+2. Fill in your RFC, pay attention the bullets and guidelines. Do not omit any sections.
+3. Work with the Vector team to land on a confident solution. Allocate time for code-level spikes if necessary.
+4. Submit your RFC as a pull request and tag reviewers for approval.
 
 ### Getting an RFC accepted
 
