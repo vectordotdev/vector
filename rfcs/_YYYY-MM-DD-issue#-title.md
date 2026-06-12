@@ -20,7 +20,7 @@ One paragraph description of the change.
 
 - List work that is completely out of scope. Use this to keep discussions focused. Please note the "future changes" section at the bottom.
 
-## Pain
+## Motivation
 
 - What internal or external *pain* are we solving?
 - Do not cover benefits of your change, this is covered in the "Rationale" section.
