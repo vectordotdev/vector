@@ -1,0 +1,15 @@
+[package]
+name = "drain-log"
+version = "0.1.0"
+edition = "2021"
+authors = ["Vector Contributors <vector@datadoghq.com>"]
+description = "Log template extraction via the Drain algorithm with LRU cluster eviction. Adapted from drain3 (akshatagarwl)."
+license = "Apache-2.0"
+publish = false
+
+[dependencies]
+bon = "3.9.1"
+fastrand = "2.4.1"
+snafu = "0.8"
+string-interner = { version = "0.15", features = ["backends"] }
+smallvec = "1.13"
