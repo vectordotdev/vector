@@ -1071,7 +1071,7 @@ components: sources: internal_metrics: {
 					required:    true
 				}
 				revision: {
-					description: "Revision identifer, related to versioned releases."
+					description: "Revision identifier, related to versioned releases."
 					required:    true
 				}
 			}

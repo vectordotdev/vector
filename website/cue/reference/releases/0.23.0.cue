@@ -1,8 +1,7 @@
 package metadata
 
 releases: "0.23.0": {
-	date:     "2022-07-11"
-	codename: ""
+	date: "2022-07-11"
 
 	whats_next: [
 		{
@@ -762,7 +761,7 @@ releases: "0.23.0": {
 		{sha: "7de5db5818841d51ea3617f2540cd8bfc0c63f56", date: "2022-07-01 05:50:13 UTC", description: "Bump AWS SDK to 0.15.0", pr_number: 13401, scopes: ["deps"], type: "chore", breaking_change: false, author: "Jesse Szwedko", files_count: 2, insertions_count: 65, deletions_count: 66},
 		{sha: "0ad9a3aa2bc6342b31f5888aab2efd0411912d5a", date: "2022-07-02 03:17:24 UTC", description: "Expand typedef updates upgrade guide section", pr_number: 13413, scopes: ["docs"], type: "chore", breaking_change: false, author: "Nathan Fox", files_count: 1, insertions_count: 47, deletions_count: 1},
 		{sha: "ea170f1b8b3dc66af0b84bda8a8b0780bb4eaea4", date: "2022-07-02 03:49:21 UTC", description: "tighten up logic around not overrunning maximum buffer size", pr_number: 13356, scopes: ["buffers"], type: "fix", breaking_change: false, author: "Toby Lawrence", files_count: 19, insertions_count: 893, deletions_count: 274},
-		{sha: "90df3359b80827fd7e1894c2852f1f4a8eb626d2", date: "2022-07-02 01:51:17 UTC", description: "Correct the documentatation of API key handling", pr_number: 13416, scopes: ["datadog provider"], type: "docs", breaking_change: false, author: "Jesse Szwedko", files_count: 5, insertions_count: 15, deletions_count: 28},
+		{sha: "90df3359b80827fd7e1894c2852f1f4a8eb626d2", date: "2022-07-02 01:51:17 UTC", description: "Correct the documentation of API key handling", pr_number: 13416, scopes: ["datadog provider"], type: "docs", breaking_change: false, author: "Jesse Szwedko", files_count: 5, insertions_count: 15, deletions_count: 28},
 		{sha: "be38265ba1e3e5e066c9684e97afe86614885a59", date: "2022-07-02 12:33:29 UTC", description: "Document changes to sink encoding", pr_number: 13331, scopes: ["codecs", "sinks"], type: "docs", breaking_change: false, author: "Pablo Sichert", files_count: 17, insertions_count: 198, deletions_count: 73},
 		{sha: "749de22a240d4a1fdff59d4fd90b1b9bed052f46", date: "2022-07-06 12:25:30 UTC", description: "Fix superfluous `flatten` attribute in `encoding` key", pr_number: 13445, scopes: ["websocket sink", "pulsar sink"], type: "fix", breaking_change: false, author: "Pablo Sichert", files_count: 2, insertions_count: 0, deletions_count: 2},
 		{sha: "cd05453b66b1e854823ee729dc523ec6ce725921", date: "2022-07-08 04:40:59 UTC", description: "Restrict sink input types", pr_number: 13418, scopes: ["sinks", "codecs"], type: "fix", breaking_change: false, author: "Jesse Szwedko", files_count: 20, insertions_count: 69, deletions_count: 42},

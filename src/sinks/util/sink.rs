@@ -1112,7 +1112,7 @@ mod tests {
             .unwrap();
 
         let output = sent_requests.lock().unwrap();
-        // We sended '0' partition first and delayed sending only first request, first 10 events,
+        // We sent '0' partition first and delayed sending only first request, first 10 events,
         // which should delay sending the second batch of events in the same partition until
         // the first one succeeds.
         assert_eq!(
