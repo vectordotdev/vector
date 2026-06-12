@@ -307,3 +307,8 @@ None blocking merge.
   detection to be promoted from a warning to a hard error.
 - Add `--disable-secret-interpolation` CLI flag as a tree-walk filter.
 - Migrate the HTTP config provider to the parse-first pipeline.
+- Replace `toml::Value` with `serde_json::Value` as the internal value tree type
+  ([#19963](https://github.com/vectordotdev/vector/issues/19963)). The parse-first pipeline makes
+  this a bounded interface change: the value tree is the canonical intermediate representation, so
+  the node type can be swapped without touching raw-text handling. This addresses the long-standing
+  lack of a null type in `toml::Value`.
