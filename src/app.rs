@@ -214,6 +214,11 @@ impl Application {
             opts.root.internal_log_rate_limit,
         );
 
+        #[cfg(unix)]
+        if opts.root.raise_fd_limit {
+            crate::cli::raise_file_descriptor_limit();
+        }
+
         // Set global color preference for downstream modules
         crate::set_global_color(color);
 

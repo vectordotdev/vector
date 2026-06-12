@@ -154,7 +154,7 @@ impl RunningTopology {
 
         // We need to give some time to the sources to gracefully shutdown, so
         // we will merge them with other tasks.
-        for (key, task) in self.tasks.into_iter().chain(self.source_tasks.into_iter()) {
+        for (key, task) in self.tasks.into_iter().chain(self.source_tasks) {
             let task = task.map(map_closure).shared();
 
             wait_handles.push(task.clone());
@@ -582,8 +582,8 @@ impl RunningTopology {
                     .map(|(key, value)| ((false, key), value)),
             ),
         )
-        .into_iter()
-        .flat_map(|(_, components)| components)
+        .into_values()
+        .flatten()
         .collect::<HashSet<_>>();
         // Existing conflicting sinks
         let conflicting_sinks = conflicts

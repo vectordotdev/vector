@@ -153,6 +153,9 @@ make check-scripts
 
 ./scripts/check_changelog_fragments.sh
 
+# Spell-check the codebase (fast, requires typos-cli: cargo install typos-cli)
+typos
+
 # The following check is very slow.
 # make check-component-features
 ```
@@ -175,8 +178,7 @@ branches, this means that only the pull request title must conform to this
 format. Vector performs a pull request check to verify the pull request title
 in case you forget.
 
-A list of allowed sub-categories is defined in the
-[semantic.yml workflow](https://github.com/vectordotdev/vector/blob/master/.github/workflows/semantic.yml#L21).
+A scope is optional but appreciated. Use it to identify the component or subsystem affected, for example `feat(kafka source): ...` or `fix(loki sink): ...`.
 
 The following are all good examples of pull request titles:
 
