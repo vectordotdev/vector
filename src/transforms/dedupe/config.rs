@@ -418,7 +418,7 @@ mod tests {
 
             tokio::time::sleep(Duration::from_millis(101)).await;
 
-            // Third time the event is a dupe but enought time has passed to accept it.
+            // Third time the event is a dupe but enough time has passed to accept it.
             tx.send(event1.clone()).await.unwrap();
             let new_event = out.recv().await.unwrap();
 

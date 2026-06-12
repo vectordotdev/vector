@@ -4,7 +4,6 @@ components: sinks: kafka: {
 	title: "Kafka"
 
 	classes: {
-		commonly_used: true
 		delivery:      "at_least_once"
 		development:   "stable"
 		egress_method: "dynamic"

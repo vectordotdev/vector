@@ -4,7 +4,6 @@ components: sinks: gcp_stackdriver_metrics: {
 	title: "GCP Cloud Monitoring (formerly Stackdriver) Metrics"
 
 	classes: {
-		commonly_used: true
 		delivery:      "at_least_once"
 		development:   "beta"
 		egress_method: "batch"

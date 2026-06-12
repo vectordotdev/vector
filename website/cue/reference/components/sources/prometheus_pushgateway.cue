@@ -4,8 +4,7 @@ components: sources: prometheus_pushgateway: {
 	title: "Prometheus Pushgateway"
 
 	classes: {
-		commonly_used: false
-		delivery:      "at_least_once"
+		delivery: "at_least_once"
 		deployment_roles: ["daemon", "sidecar"]
 		development:   "beta"
 		egress_method: "batch"

@@ -6,8 +6,7 @@ components: sources: socket: {
 	title: "Socket"
 
 	classes: {
-		commonly_used: true
-		delivery:      "best_effort"
+		delivery: "best_effort"
 		deployment_roles: ["aggregator", "sidecar"]
 		development:   "stable"
 		egress_method: "stream"
