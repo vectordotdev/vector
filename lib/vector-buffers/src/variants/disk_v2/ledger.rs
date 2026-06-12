@@ -471,7 +471,7 @@ where
         );
 
         trace!(
-            unacked_reader_file_id_offset = result.map(|n| n - 1).unwrap_or(0),
+            unacked_reader_file_id_offset = result.map_or(0, |n| n - 1),
             acked_reader_file_id_offset = new_reader_file_id,
             "Incremented acknowledged reader file ID offset with corresponding unacknowledged decrement."
         );
@@ -700,7 +700,7 @@ where
     #[must_use]
     pub(super) fn spawn_finalizer(self: Arc<Self>) -> OrderedFinalizer<u64> {
         let (finalizer, mut stream) = OrderedFinalizer::new(None);
-        tokio::spawn(async move {
+        vector_common::spawn_in_current_span(async move {
             while let Some((_status, amount)) = stream.next().await {
                 self.increment_pending_acks(amount);
                 self.notify_writer_waiters();

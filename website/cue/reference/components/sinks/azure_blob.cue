@@ -4,7 +4,6 @@ components: sinks: azure_blob: {
 	title: "Azure Blob Storage"
 
 	classes: {
-		commonly_used: true
 		delivery:      "at_least_once"
 		development:   "stable"
 		egress_method: "batch"

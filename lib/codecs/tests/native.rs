@@ -206,7 +206,7 @@ fn rebuild_proto_fixtures() {
 fn fixtures_match(suffix: &str) {
     let json_entries = list_fixtures("json", suffix);
     let proto_entries = list_fixtures("proto", suffix);
-    for (json_path, proto_path) in json_entries.into_iter().zip(proto_entries.into_iter()) {
+    for (json_path, proto_path) in json_entries.into_iter().zip(proto_entries) {
         // Make sure we're looking at the matching files for each format
         assert_eq!(
             json_path.file_stem().unwrap(),
@@ -224,7 +224,7 @@ fn decoding_matches(suffix: &str) {
     let json_entries = list_fixtures("json", suffix);
     let proto_entries = list_fixtures("proto", suffix);
 
-    for (json_path, proto_path) in json_entries.into_iter().zip(proto_entries.into_iter()) {
+    for (json_path, proto_path) in json_entries.into_iter().zip(proto_entries) {
         let (_, json_event) = load_deserialize(&json_path, &json_deserializer);
 
         let (_, proto_event) = load_deserialize(&proto_path, &proto_deserializer);

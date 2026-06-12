@@ -84,7 +84,11 @@ pub struct GlobalOptions {
     /// This is used if a component does not have its own specific log schema. All events use a log
     /// schema, whether or not the default is used, to assign event fields on incoming events.
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
-    #[configurable(metadata(docs::common = false, docs::required = false))]
+    #[configurable(metadata(
+        docs::common = false,
+        docs::required = false,
+        docs::warnings = "These settings are ignored when `schema.log_namespace` is set to `true`."
+    ))]
     pub log_schema: LogSchema,
 
     /// Telemetry options.
@@ -213,9 +217,8 @@ impl GlobalOptions {
         if !data_dir.exists() {
             return Err(DataDirError::DoesNotExist { data_dir }.into());
         }
-        let readonly = std::fs::metadata(&data_dir)
-            .map(|meta| meta.permissions().readonly())
-            .unwrap_or(true);
+        let readonly =
+            std::fs::metadata(&data_dir).map_or(true, |meta| meta.permissions().readonly());
         if readonly {
             return Err(DataDirError::NotWritable { data_dir }.into());
         }

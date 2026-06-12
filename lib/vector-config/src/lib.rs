@@ -87,7 +87,7 @@
 // Basically, we're always documenting these shared types fully, but sometimes their title is
 // written in an intentionally generic way, and we may want to spice up the wording so it's
 // context-specific i.e. we're using predefined ACLs for new objects, or using it for new firewall
-// rules, or ... so on and so forth. and by concating the existing description on the shared type,
+// rules, or ... so on and so forth. and by concatenating the existing description on the shared type,
 // we can continue to include high-quality doc comments with contextual links, examples, etc and
 // avoid duplication.
 //

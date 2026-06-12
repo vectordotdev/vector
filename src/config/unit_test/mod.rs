@@ -442,7 +442,7 @@ async fn build_unit_test(
         .enrichment_tables
         .iter()
         .filter_map(|(key, c)| c.as_sink(key).map(|(_, sink)| sink.inputs))
-        .for_each(|i| valid_components.extend(i.into_iter()));
+        .for_each(|i| valid_components.extend(i));
 
     // Remove all transforms that are not relevant to the current test
     config_builder.transforms = config_builder

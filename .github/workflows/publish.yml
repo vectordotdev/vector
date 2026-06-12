@@ -273,7 +273,7 @@ jobs:
 
   deb-verify:
     name: Verify DEB Packages
-    runs-on: ubuntu-24.04
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 5
     needs:
       - generate-publish-metadata
@@ -284,6 +284,9 @@ jobs:
       DD_PKG_VERSION: "latest"
     strategy:
       matrix:
+        runner:
+          - ubuntu-24.04
+          - ubuntu-24.04-arm
         container:
           - ubuntu:20.04
           - ubuntu:22.04
@@ -304,25 +307,29 @@ jobs:
           make
       - name: Install dd-pkg for linting
         run: |
-          curl -sSL "https://dd-package-tools.s3.amazonaws.com/dd-pkg/${DD_PKG_VERSION}/dd-pkg_Linux_x86_64.tar.gz" | tar -xz -C /usr/local/bin dd-pkg
+          ARCH=$(uname -m)
+          case "$ARCH" in aarch64) ARCH_DL=arm64 ;; *) ARCH_DL="$ARCH" ;; esac
+          curl -sSL "https://dd-package-tools.s3.amazonaws.com/dd-pkg/${DD_PKG_VERSION}/dd-pkg_Linux_${ARCH_DL}.tar.gz" | tar -xz -C /usr/local/bin dd-pkg
       - name: Fix Git safe directories issue when in containers (actions/checkout#760)
         run: git config --global --add safe.directory /__w/vector/vector
       - name: Checkout Vector
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ inputs.git_ref }}
-      - name: Download staged package artifacts (x86_64-unknown-linux-gnu)
+      - name: Set artifact name
+        run: echo "ARTIFACT=$(uname -m)-unknown-linux-gnu" >> "$GITHUB_ENV"
+      - name: Download staged package artifacts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu
+          name: vector-${{ env.VECTOR_VERSION }}-${{ env.ARTIFACT }}
           path: target/artifacts
       - name: Verify install of DEB package.
         run: |
-          ./scripts/verify-install.sh target/artifacts/vector_${{ env.VECTOR_VERSION }}-1_amd64.deb
+          ./scripts/verify-install.sh "target/artifacts/vector_${{ env.VECTOR_VERSION }}-1_$(dpkg --print-architecture).deb"
 
   rpm-verify:
     name: Verify RPM Packages
-    runs-on: ubuntu-24.04
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 10
     needs:
       - generate-publish-metadata
@@ -333,6 +340,9 @@ jobs:
       DD_PKG_VERSION: "latest"
     strategy:
       matrix:
+        runner:
+          - ubuntu-24.04
+          - ubuntu-24.04-arm
         container:
           # Lowest supported glibc tier (EL8 family, glibc 2.28). Catches glibc-floor regressions.
           - "almalinux:8@sha256:ca871b110064fe81bff0250ed5cc56fbb0a9840715f09811c33bbf9d72cef56c"
@@ -358,21 +368,25 @@ jobs:
           fi
       - name: Install dd-pkg for linting
         run: |
-          curl -sSL "https://dd-package-tools.s3.amazonaws.com/dd-pkg/${DD_PKG_VERSION}/dd-pkg_Linux_x86_64.tar.gz" | tar -xz -C /usr/local/bin dd-pkg
+          ARCH=$(uname -m)
+          case "$ARCH" in aarch64) ARCH_DL=arm64 ;; *) ARCH_DL="$ARCH" ;; esac
+          curl -sSL "https://dd-package-tools.s3.amazonaws.com/dd-pkg/${DD_PKG_VERSION}/dd-pkg_Linux_${ARCH_DL}.tar.gz" | tar -xz -C /usr/local/bin dd-pkg
       - name: Fix Git safe directories issue when in containers (actions/checkout#760)
         run: git config --global --add safe.directory /__w/vector/vector
       - name: Checkout Vector
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ inputs.git_ref }}
-      - name: Download staged package artifacts (x86_64-unknown-linux-gnu)
+      - name: Set artifact name
+        run: echo "ARTIFACT=$(uname -m)-unknown-linux-gnu" >> "$GITHUB_ENV"
+      - name: Download staged package artifacts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu
+          name: vector-${{ env.VECTOR_VERSION }}-${{ env.ARTIFACT }}
           path: target/artifacts
       - name: Verify install of RPM package.
         run: |
-          ./scripts/verify-install.sh target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm
+          ./scripts/verify-install.sh "target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.$(uname -m).rpm"
 
   macos-verify:
     name: Verify macOS Package
@@ -438,7 +452,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3.7.0
+        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4.0.0
         with:
           platforms: all
       - name: Set up Docker Buildx
