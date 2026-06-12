@@ -75,12 +75,10 @@ impl SinkEncoder<Vec<Event>> for HttpEncoder {
         }
 
         match (self.encoder.serializer(), self.encoder.framer()) {
-            (Json(_), NewlineDelimited(_)) => {
-                if !body.is_empty() {
-                    // Remove trailing newline for backwards-compatibility
-                    // with Vector `0.20.x`.
-                    body.truncate(body.len() - 1);
-                }
+            (Json(_), NewlineDelimited(_)) if !body.is_empty() => {
+                // Remove trailing newline for backwards-compatibility
+                // with Vector `0.20.x`.
+                body.truncate(body.len() - 1);
             }
             (Json(_), CharacterDelimited(CharacterDelimitedEncoder { delimiter: b',' })) => {
                 if !body.is_empty() {

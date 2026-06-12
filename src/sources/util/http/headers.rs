@@ -43,7 +43,7 @@ pub fn add_headers(
                     }
                 }
             }
-            // Add all headers that match against wildcard pattens specified
+            // Add all headers that match against wildcard patterns specified
             // in the `headers` config option to the event.
             HttpConfigParamKind::Glob(header_pattern) => {
                 for header_name in headers.keys() {
