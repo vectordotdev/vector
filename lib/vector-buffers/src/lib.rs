@@ -32,6 +32,11 @@ pub mod topology;
 
 pub(crate) mod variants;
 
+/// `disk_v2`'s write-buffer size, re-exported under `test-util` so the harness can
+/// size payloads against the real value instead of hardcoding it.
+#[cfg(feature = "test-util")]
+pub use variants::disk_v2::common::DEFAULT_WRITE_BUFFER_SIZE as WRITE_BUFFER_SIZE_V2;
+
 use std::fmt::Debug;
 
 #[cfg(test)]

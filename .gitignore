@@ -62,6 +62,7 @@ volumes/
 # Environment variable files (can contain secrets)
 *.env
 .env.*
+!tests/antithesis/scenarios/*/launch.env
 
 # LLM tools
 copilot-instructions.md
@@ -71,3 +72,9 @@ local/
 
 # vscode
 .vscode/
+
+# antithesis scratchbook (private knowledge store)
+/tests/antithesis/scratchbook/
+
+# stray rlib build artifacts
+*.rlib
