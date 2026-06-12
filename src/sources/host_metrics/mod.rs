@@ -40,6 +40,7 @@ mod network;
 mod process;
 #[cfg(target_os = "linux")]
 mod tcp;
+mod temperature;
 
 /// Collector types.
 #[serde_as]
@@ -78,6 +79,9 @@ pub enum Collector {
 
     /// Metrics related to TCP connections.
     TCP,
+
+    /// Metrics related to component temperatures.
+    Temperature,
 }
 
 /// Filtering configuration.
@@ -186,7 +190,7 @@ pub fn default_namespace() -> Option<String> {
     Some(String::from("host"))
 }
 
-const fn example_collectors() -> [&'static str; 9] {
+const fn example_collectors() -> [&'static str; 10] {
     [
         "cgroups",
         "cpu",
@@ -197,6 +201,7 @@ const fn example_collectors() -> [&'static str; 9] {
         "memory",
         "network",
         "tcp",
+        "temperature",
     ]
 }
 
@@ -419,6 +424,9 @@ impl HostMetrics {
         #[cfg(target_os = "linux")]
         if self.config.has_collector(Collector::TCP) {
             self.tcp_metrics(&mut buffer).await;
+        }
+        if self.config.has_collector(Collector::Temperature) {
+            self.temperature_metrics(&mut buffer).await;
         }
 
         let metrics = buffer.metrics;

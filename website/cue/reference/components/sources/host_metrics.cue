@@ -193,6 +193,11 @@ components: sources: host_metrics: {
 			}
 		}
 
+		// Host temperature
+		temperature_celsius: _host & _temperature_gauge & {description: "The current temperature reported by a hardware component, in degrees Celsius."}
+		temperature_max_celsius: _host & _temperature_gauge & {description: "The highest temperature recorded for a hardware component, in degrees Celsius."}
+		temperature_critical_celsius: _host & _temperature_gauge & {description: "The temperature at which a hardware component is considered critical, in degrees Celsius."}
+
 		// Helpers
 		_host: {
 			default_namespace: "host"
@@ -304,6 +309,18 @@ components: sources: host_metrics: {
 					description: "The connection state."
 					required:    true
 					examples: ["established", "time_wait"]
+				}
+			}
+		}
+
+		_temperature_gauge: {
+			type: "gauge"
+			tags: _host_metrics_tags & {
+				collector: examples: ["temperature"]
+				component: {
+					description: "The label of the hardware component the temperature was read from."
+					required:    true
+					examples: ["Core 0", "coretemp Package id 0", "nvme Composite"]
 				}
 			}
 		}
