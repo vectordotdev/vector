@@ -9,6 +9,7 @@ env:
   ELASTICSEARCH_AWS_ADDRESS: http://localstack:4571
   ELASTICSEARCH_HTTPS_ADDRESS: https://elasticsearch-secure:9200
   ELASTICSEARCH_HTTP_ADDRESS: http://elasticsearch:9200
+  ELASTICSEARCH_USERNAME: elastic
 
 matrix:
   version: [7.13.1]
