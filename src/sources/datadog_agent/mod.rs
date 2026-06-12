@@ -216,7 +216,7 @@ impl SourceConfig for DatadogAgentConfig {
             self.parse_ddtags,
             self.split_metric_namespace,
         );
-        let listener = tls.bind(&self.address).await?;
+        let listener = tls.bind(&self.address).await?.with_keepalive(self.keepalive.tcp_keepalive);
         let handler = RequestHandler {
             acknowledgements: cx.do_acknowledgements(self.acknowledgements),
             multiple_outputs: self.multiple_outputs,

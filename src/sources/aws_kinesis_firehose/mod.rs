@@ -179,7 +179,7 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
         );
 
         let tls = MaybeTlsSettings::from_config(self.tls.as_ref(), true)?;
-        let listener = tls.bind(&self.address).await?;
+        let listener = tls.bind(&self.address).await?.with_keepalive(self.keepalive.tcp_keepalive);
 
         let keepalive_settings = self.keepalive.clone();
         let shutdown = cx.shutdown;
