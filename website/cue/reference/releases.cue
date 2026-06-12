@@ -30,7 +30,6 @@ releases: {
 
 	#Release: {
 		version:      string
-		codename?:    string
 		date:         string
 		description?: string
 		known_issues: [string, ...string] | *[]

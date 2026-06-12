@@ -92,7 +92,7 @@ impl Framework {
         )
     }
 
-    /// Exect a `kubectl --version`command returning a K8sVersion Struct
+    /// Execute a `kubectl --version` command returning a K8sVersion Struct
     /// containing all version information  of the running Kubernetes test cluster.
     pub async fn kubernetes_version(&self) -> Result<kubernetes_version::K8sVersion> {
         kubernetes_version::get(&self.interface.kubectl_command).await

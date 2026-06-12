@@ -2,6 +2,7 @@ use std::{collections::VecDeque, fmt::Debug, io, sync::Arc};
 
 use itertools::Itertools;
 use snafu::Snafu;
+use tracing::Instrument;
 use vector_lib::{
     event::{ObjectMap, Value},
     internal_event::{ComponentEventsDropped, UNINTENTIONAL},
@@ -393,12 +394,19 @@ where
             .concurrent_map(default_request_builder_concurrency_limit(), move |input| {
                 let builder = Arc::clone(&builder);
 
-                Box::pin(async move {
-                    let (api_key, events) = input;
-                    let api_key = api_key.unwrap_or_else(|| Arc::clone(&builder.default_api_key));
+                // `concurrent_map` spawns this future on a detached task. The closure itself runs
+                // within `run_inner`'s span, so `in_current_span` captures the sink span here and
+                // re-enters it on the spawned task to preserve the sink's automatic component tags.
+                Box::pin(
+                    async move {
+                        let (api_key, events) = input;
+                        let api_key =
+                            api_key.unwrap_or_else(|| Arc::clone(&builder.default_api_key));
 
-                    builder.build_request(events, api_key)
-                })
+                        builder.build_request(events, api_key)
+                    }
+                    .in_current_span(),
+                )
             })
             .filter_map(|request| async move {
                 match request {

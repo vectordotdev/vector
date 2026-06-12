@@ -323,7 +323,7 @@ where
                     this.lingers.remove(partition);
 
                     let batch = batch.finish();
-                    let future = tokio::spawn(this.service.call(batch));
+                    let future = crate::spawn_in_current_span(this.service.call(batch));
 
                     if let Some(map) = this.in_flight.as_mut() {
                         map.insert(partition.clone(), future.map(|_| ()).fuse().boxed());
@@ -1112,7 +1112,7 @@ mod tests {
             .unwrap();
 
         let output = sent_requests.lock().unwrap();
-        // We sended '0' partition first and delayed sending only first request, first 10 events,
+        // We sent '0' partition first and delayed sending only first request, first 10 events,
         // which should delay sending the second batch of events in the same partition until
         // the first one succeeds.
         assert_eq!(
