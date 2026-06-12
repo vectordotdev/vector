@@ -339,7 +339,7 @@ where
         if max_record_size <= MINIMUM_MAX_RECORD_SIZE {
             return Err(BuildError::InvalidParameter {
                 param_name: "max_record_size",
-                reason: format!("must be greater than or equal to {MINIMUM_MAX_RECORD_SIZE} bytes",),
+                reason: format!("must be greater than or equal to {MINIMUM_MAX_RECORD_SIZE} bytes"),
             });
         }
 

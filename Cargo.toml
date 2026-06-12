@@ -190,8 +190,8 @@ reqwest = { version = "0.11", features = ["json"] }
 rust_decimal = { version = "1.40.0", default-features = false, features = ["std"] }
 semver = { version = "1.0.28", default-features = false, features = ["serde", "std"] }
 serde = { version = "1.0.219", default-features = false, features = ["alloc", "derive", "rc"] }
-serde_json = { version = "1.0.149", default-features = false, features = ["preserve_order", "raw_value", "std"] }
-serde_with = { version = "3.20.0", default-features = false, features = ["std", "macros", "chrono_0_4"] }
+serde_json = { version = "1.0.150", default-features = false, features = ["preserve_order", "raw_value", "std"] }
+serde_with = { version = "3.21.0", default-features = false, features = ["std", "macros", "chrono_0_4"] }
 serde_yaml = { version = "0.9.34", default-features = false }
 snafu = { version = "0.9.0", default-features = false, features = ["futures", "std"] }
 socket2 = { version = "0.5.10", default-features = false }
@@ -410,6 +410,7 @@ itertools.workspace = true
 k8s-openapi = { version = "0.27.0", default-features = false, features = ["v1_31"], optional = true }
 kube = { version = "3.0.1", default-features = false, features = ["client", "openssl-tls", "runtime"], optional = true }
 listenfd = { version = "1.0.2", default-features = false, optional = true }
+libc.workspace = true
 lru = { version = "0.16.3", default-features = false }
 maxminddb = { version = "0.27.0", default-features = false, optional = true, features = ["simdutf8"] }
 md-5 = { version = "0.10", default-features = false, optional = true }
@@ -465,13 +466,15 @@ sysinfo = "0.37.2"
 byteorder = "1.5.0"
 
 [target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.52", features = ["Win32_Foundation", "Win32_System_Threading"] }
 windows-service = "0.8.0"
 windows = { version = "0.58", features = ["Win32_System_EventLog", "Win32_Foundation", "Win32_System_Com", "Win32_Security", "Win32_Security_Authorization", "Win32_System_Threading", "Win32_Storage_FileSystem"], optional = true }
 quick-xml = { version = "0.31", default-features = false, features = ["serialize"], optional = true }
 rdkafka = { workspace = true, features = ["cmake_build"], optional = true }
 
 [target.'cfg(unix)'.dependencies]
-nix = { version = "0.31", default-features = false, features = ["socket", "signal", "fs"] }
+libc.workspace = true
+nix = { version = "0.31", default-features = false, features = ["socket", "signal", "fs", "resource"] }
 tikv-jemallocator = { version = "0.7.0", default-features = false, features = ["unprefixed_malloc_on_supported_platforms"], optional = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
@@ -931,7 +934,7 @@ sinks-chronicle = []
 sinks-clickhouse = ["dep:nom", "dep:rust_decimal", "codecs-arrow"]
 sinks-console = []
 sinks-databend = ["dep:databend-client"]
-sinks-databricks-zerobus = ["dep:databricks-zerobus-ingest-sdk", "codecs-arrow"]
+sinks-databricks-zerobus = ["dep:databricks-zerobus-ingest-sdk", "codecs-arrow", "arrow/ipc_compression"]
 sinks-datadog_events = []
 sinks-datadog_logs = []
 sinks-datadog_metrics = ["protobuf-build", "dep:prost", "dep:prost-reflect"]

@@ -471,7 +471,7 @@ where
         );
 
         trace!(
-            unacked_reader_file_id_offset = result.map(|n| n - 1).unwrap_or(0),
+            unacked_reader_file_id_offset = result.map_or(0, |n| n - 1),
             acked_reader_file_id_offset = new_reader_file_id,
             "Incremented acknowledged reader file ID offset with corresponding unacknowledged decrement."
         );

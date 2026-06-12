@@ -197,7 +197,7 @@ fn fmt_helper(
     data_type: DataType,
 ) -> fmt::Result {
     match maybe_port {
-        Some(port) => write!(f, "port: \"{port}\",",),
+        Some(port) => write!(f, "port: \"{port}\","),
         None => write!(f, "port: None,"),
     }?;
     write!(f, " types: {data_type}")
@@ -634,7 +634,7 @@ mod test {
     }
 
     #[test]
-    fn test_source_definitons_vector() {
+    fn test_source_definitions_vector() {
         let definition = schema::Definition::default_for_namespace(&[LogNamespace::Vector].into())
             .with_metadata_field(
                 &owned_value_path!("vector", "zork"),

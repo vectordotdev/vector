@@ -896,7 +896,7 @@ async fn receive_histogram_delta_metric() {
 }
 
 #[tokio::test]
-async fn receive_expontential_histogram_metric() {
+async fn receive_exponential_histogram_metric() {
     assert_source_compliance(&SOURCE_TAGS, async {
         let env = build_otlp_test_env(METRICS, None).await;
 
