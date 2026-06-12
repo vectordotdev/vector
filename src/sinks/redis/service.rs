@@ -1,7 +1,7 @@
 use std::task::{Context, Poll};
 
 use super::{
-    RedisRequest, RedisSinkError,
+    DataType, RedisRequest, RedisSinkError,
     config::{ListMethod, SortedSetMethod},
     sink::{ConnectionState, RedisConnection},
 };
@@ -72,6 +72,7 @@ impl Service<RedisRequest> for RedisService {
         }
 
         let byte_size = kvs.metadata.events_byte_size();
+        let data_type = self.data_type;
 
         Box::pin(async move {
             let ConnectionState {
@@ -82,6 +83,7 @@ impl Service<RedisRequest> for RedisService {
             match pipe.query_async(&mut conn).await {
                 Ok(event_status) => Ok(RedisResponse {
                     event_status,
+                    data_type,
                     events_byte_size: kvs.metadata.into_events_estimated_json_encoded_byte_size(),
                     byte_size,
                 }),
@@ -96,13 +98,17 @@ impl Service<RedisRequest> for RedisService {
 
 pub struct RedisResponse {
     pub event_status: Vec<bool>,
+    pub data_type: DataType,
     pub events_byte_size: GroupedCountByteSize,
     pub byte_size: usize,
 }
 
 impl RedisResponse {
     pub(super) fn is_successful(&self) -> bool {
-        self.event_status.iter().all(|x| *x)
+        // For Channel (pub/sub), PUBLISH returns the number of subscribers that received the
+        // message. Zero subscribers is valid — the consumer may have momentarily dropped its
+        // subscription — so we never treat it as a failure.
+        matches!(self.data_type, DataType::Channel) || self.event_status.iter().all(|x| *x)
     }
 }
 
