@@ -5,13 +5,13 @@ use std::{
     time,
 };
 
-use vector_common::compression::gzip_multiple_decoder;
 use crc::Crc;
 use serde::{Deserialize, Serialize};
 use tokio::{
     fs::{self, File},
     io::{AsyncBufRead, AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncSeekExt, BufReader},
 };
+use vector_common::compression::gzip_multiple_decoder;
 use vector_common::constants::GZIP_MAGIC;
 
 use crate::{

@@ -1,11 +1,11 @@
 use std::convert::TryInto;
 
 use async_compression::tokio::bufread;
-use vector_common::compression::gzip_multiple_decoder;
 use aws_smithy_types::byte_stream::ByteStream;
 use futures::{TryStreamExt, stream, stream::StreamExt};
 use snafu::Snafu;
 use tokio_util::io::StreamReader;
+use vector_common::compression::gzip_multiple_decoder;
 use vector_lib::{
     codecs::{
         NewlineDelimitedDecoderConfig,
