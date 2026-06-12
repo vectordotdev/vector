@@ -151,6 +151,15 @@ pub struct HecLogsSinkConfig {
     #[configurable(metadata(docs::advanced))]
     #[serde(default = "default_endpoint_target")]
     pub endpoint_target: EndpointTarget,
+
+    /// Always use the configured `default_token`, ignoring any per-event passthrough token.
+    ///
+    /// When set to `true`, the `default_token` takes precedence over any `splunk_hec_token`
+    /// stored in event metadata (e.g. forwarded by a Splunk HEC source). Useful when a
+    /// custom output token should never be overridden by tokens sourced upstream.
+    #[configurable(metadata(docs::advanced))]
+    #[serde(default)]
+    pub force_default_token: bool,
 }
 
 const fn default_endpoint_target() -> EndpointTarget {
@@ -177,6 +186,7 @@ impl GenerateConfig for HecLogsSinkConfig {
             timestamp_key: None,
             auto_extract_timestamp: None,
             endpoint_target: EndpointTarget::Event,
+            force_default_token: false,
         })
         .unwrap()
     }
@@ -238,6 +248,7 @@ impl HecLogsSinkConfig {
             self.endpoint_target,
             self.default_token.inner().to_owned(),
             self.compression,
+            self.force_default_token,
         ));
         let http_service = ServiceBuilder::new()
             .settings(request_settings, HttpRetryLogic::default())
@@ -334,6 +345,7 @@ mod tests {
                 timestamp_key: None,
                 auto_extract_timestamp: None,
                 endpoint_target: EndpointTarget::Raw,
+                force_default_token: false,
             };
 
             let endpoint = format!("{endpoint}/services/collector/raw");

@@ -274,6 +274,7 @@ mod tests {
             EndpointTarget::default(),
             String::from(token),
             compression,
+            false,
         );
 
         let request = http_request_builder
@@ -317,6 +318,7 @@ mod tests {
             EndpointTarget::default(),
             String::from(token),
             compression,
+            false,
         );
 
         let request = http_request_builder
@@ -363,6 +365,7 @@ mod tests {
             EndpointTarget::default(),
             String::from(token),
             compression,
+            false,
         );
 
         let err = http_request_builder

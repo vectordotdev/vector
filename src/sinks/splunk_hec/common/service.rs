@@ -186,6 +186,8 @@ pub struct HttpRequestBuilder {
     // A Splunk channel must be a GUID/UUID formatted value
     // https://docs.splunk.com/Documentation/Splunk/8.2.3/Data/AboutHECIDXAck#About_channels_and_sending_data
     pub channel: String,
+    /// When true, always use `default_token` and ignore any per-event passthrough token.
+    pub force_default_token: bool,
 }
 
 #[derive(Default)]
@@ -202,6 +204,7 @@ impl HttpRequestBuilder {
         endpoint_target: EndpointTarget,
         default_token: String,
         compression: Compression,
+        force_default_token: bool,
     ) -> Self {
         let channel = Uuid::new_v4().hyphenated().to_string();
         Self {
@@ -210,6 +213,7 @@ impl HttpRequestBuilder {
             default_token,
             compression,
             channel,
+            force_default_token,
         }
     }
 
@@ -253,7 +257,11 @@ impl HttpRequestBuilder {
                 "Authorization",
                 format!(
                     "Splunk {}",
-                    passthrough_token.unwrap_or_else(|| self.default_token.as_str().into())
+                    if self.force_default_token {
+                        self.default_token.as_str().into()
+                    } else {
+                        passthrough_token.unwrap_or_else(|| self.default_token.as_str().into())
+                    }
                 ),
             )
             .header("X-Splunk-Request-Channel", self.channel.as_str());
@@ -326,6 +334,7 @@ mod tests {
             EndpointTarget::default(),
             String::from(TOKEN),
             Compression::default(),
+            false,
         ));
         let http_service = build_http_batch_service(
             client.clone(),

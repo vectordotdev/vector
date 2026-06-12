@@ -119,6 +119,15 @@ pub struct HecMetricsSinkConfig {
     #[configurable(derived)]
     #[serde(default)]
     pub acknowledgements: HecClientAcknowledgementsConfig,
+
+    /// Always use the configured `default_token`, ignoring any per-event passthrough token.
+    ///
+    /// When set to `true`, the `default_token` takes precedence over any `splunk_hec_token`
+    /// stored in event metadata (e.g. forwarded by a Splunk HEC source). Useful when a
+    /// custom output token should never be overridden by tokens sourced upstream.
+    #[configurable(metadata(docs::advanced))]
+    #[serde(default)]
+    pub force_default_token: bool,
 }
 
 impl GenerateConfig for HecMetricsSinkConfig {
@@ -136,6 +145,7 @@ impl GenerateConfig for HecMetricsSinkConfig {
             request: TowerRequestConfig::default(),
             tls: None,
             acknowledgements: Default::default(),
+            force_default_token: false,
         })
         .unwrap()
     }
@@ -183,6 +193,7 @@ impl HecMetricsSinkConfig {
             EndpointTarget::default(),
             self.default_token.inner().to_owned(),
             self.compression,
+            self.force_default_token,
         ));
         let http_service = ServiceBuilder::new()
             .settings(request_settings, HttpRetryLogic::default())

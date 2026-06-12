@@ -235,6 +235,7 @@ async fn splunk_passthrough_token() {
         timestamp_key: None,
         auto_extract_timestamp: None,
         endpoint_target: EndpointTarget::Event,
+        force_default_token: false,
     };
     let cx = SinkContext::default();
 
@@ -266,6 +267,54 @@ async fn splunk_passthrough_token() {
             "Splunk token"
         ]
     )
+}
+
+#[tokio::test]
+async fn splunk_force_default_token() {
+    let (_guard, addr) = next_addr();
+    let config = HecLogsSinkConfig {
+        default_token: "token".to_string().into(),
+        endpoint: format!("http://{addr}"),
+        host_key: None,
+        indexed_fields: Vec::new(),
+        index: None,
+        sourcetype: None,
+        source: None,
+        encoding: JsonSerializerConfig::default().into(),
+        compression: Compression::None,
+        batch: Default::default(),
+        request: Default::default(),
+        tls: None,
+        acknowledgements: Default::default(),
+        timestamp_nanos_key: None,
+        timestamp_key: None,
+        auto_extract_timestamp: None,
+        endpoint_target: EndpointTarget::Event,
+        force_default_token: true,
+    };
+    let cx = SinkContext::default();
+
+    let (sink, _) = config.build(cx).await.unwrap();
+
+    let (rx, _trigger, server) = build_test_server(addr);
+    tokio::spawn(server);
+
+    let events = vec![
+        get_event_with_token("message-1", "passthrough-token-1"),
+        get_event_with_token("message-2", "passthrough-token-2"),
+        Event::Log(LogEvent::from("default token will be used")),
+    ];
+
+    sink.run_events(events).await.unwrap();
+
+    let tokens = rx
+        .take(3)
+        .map(|r| r.0.headers.get("Authorization").unwrap().clone())
+        .collect::<Vec<_>>()
+        .await;
+
+    // All requests must use the configured default_token, ignoring per-event tokens.
+    assert!(tokens.iter().all(|t| t == "Splunk token"));
 }
 
 #[test]
