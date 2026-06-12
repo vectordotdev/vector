@@ -141,10 +141,16 @@ directing users to replace them with literal key names.
 
 One YAML-specific case requires attention: `inputs: [${VECTOR_INPUTS}]` is valid YAML syntax
 (an array containing one string element), so it does not produce a parse error under the new
-model. However, the behavior changes silently — today the raw-text substitution of
-`source_a, source_b` produces a two-element array; after this change it produces a one-element
-array containing the literal string `"source_a, source_b"`. Users relying on this pattern must
-replace it with explicit literal values.
+model. However, the behavior changes silently — today `VECTOR_INPUTS=source_a, source_b`
+produces a two-element array; after this change it produces `["source_a, source_b"]`, causing a
+confusing "unknown component" error at topology build time. The deprecation PR will attempt to
+detect this and emit a hint.
+
+For any migration that is difficult to do manually — unquoted placeholders, structural patterns,
+or multi-value array expansions — `envsubst` is a universal escape hatch for env var
+interpolation. Running `envsubst < vector.yaml > vector.expanded.yaml` produces a fully static
+config that is valid under both the current and new loading behaviour. `SECRET[...]` placeholders are
+unaffected by `envsubst` and still require the quoted-string migration.
 
 ### Implementation
 
@@ -296,9 +302,11 @@ None blocking merge.
 
 ## Plan Of Attack
 
-- [ ] Announce deprecation of structural interpolation patterns and the pre-parse substitution behaviour.
+- [ ] Deprecation PR: announce the deprecation and emit best-effort warnings for placeholders that
+      will need changes. Old behaviour remains unchanged.
 - [ ] Wait for the deprecation period to elapse.
 - [ ] Implementation PR: parse-first pipeline, coercion pass, tree-walk secret collection.
+      Removes the warning-only scan added above.
 - [ ] Release.
 
 ## Future Improvements
