@@ -662,7 +662,7 @@ pub async fn init_dashboard<'a>(
     loop {
         tokio::select! {
             Ok(()) = state_rx.changed() => {
-                let state = state_rx.borrow();
+                let state = state_rx.borrow_and_update().clone();
                 if state.ui.filter_visible {
                     input_mode = InputMode::FilterInput;
                 } else if state.ui.sort_visible {
@@ -672,7 +672,7 @@ pub async fn init_dashboard<'a>(
                 } else {
                     input_mode = InputMode::Top;
                 }
-                terminal.draw(|f| widgets.draw(f, state.clone()))?;
+                terminal.draw(|f| widgets.draw(f, state))?;
             },
             k = key_press_rx.recv() => {
                 let k = k.unwrap();
