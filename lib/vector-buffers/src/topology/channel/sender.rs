@@ -40,18 +40,18 @@ impl<T> SenderAdapter<T>
 where
     T: Bufferable,
 {
-    pub(crate) async fn send(&mut self, item: T) -> crate::Result<()> {
+    pub(crate) async fn send(&mut self, mut item: T) -> crate::Result<()> {
         match self {
             Self::InMemory(tx) => tx.send(item).await.map_err(Into::into),
             Self::DiskV2(writer) => {
+                item.pre_encode_drop_unencodable();
+                if item.event_count() == 0 {
+                    return Ok(());
+                }
+
                 let mut writer = writer.lock().await;
 
                 writer.write_record(item).await.map(|_| ()).map_err(|e| {
-                    // TODO: Could some errors be handled and not be unrecoverable? Right now,
-                    // encoding should theoretically be recoverable -- encoded value was too big, or
-                    // error during encoding -- but the traits don't allow for recovering the
-                    // original event value because we have to consume it to do the encoding... but
-                    // that might not always be the case.
                     error!("Disk buffer writer has encountered an unrecoverable error.");
 
                     e.into()
@@ -60,21 +60,21 @@ where
         }
     }
 
-    pub(crate) async fn try_send(&mut self, item: T) -> crate::Result<Option<T>> {
+    pub(crate) async fn try_send(&mut self, mut item: T) -> crate::Result<Option<T>> {
         match self {
             Self::InMemory(tx) => tx
                 .try_send(item)
                 .map(|()| None)
                 .or_else(|e| Ok(Some(e.into_inner()))),
             Self::DiskV2(writer) => {
+                item.pre_encode_drop_unencodable();
+                if item.event_count() == 0 {
+                    return Ok(None);
+                }
+
                 let mut writer = writer.lock().await;
 
                 writer.try_write_record(item).await.map_err(|e| {
-                    // TODO: Could some errors be handled and not be unrecoverable? Right now,
-                    // encoding should theoretically be recoverable -- encoded value was too big, or
-                    // error during encoding -- but the traits don't allow for recovering the
-                    // original event value because we have to consume it to do the encoding... but
-                    // that might not always be the case.
                     error!("Disk buffer writer has encountered an unrecoverable error.");
 
                     e.into()
