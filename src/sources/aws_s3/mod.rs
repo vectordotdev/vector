@@ -8,7 +8,9 @@ use tokio_util::io::StreamReader;
 use vector_lib::{
     codecs::{
         NewlineDelimitedDecoderConfig,
-        decoding::{DeserializerConfig, FramingConfig, NewlineDelimitedDecoderOptions},
+        decoding::{
+            DeserializerConfig, FramingConfig, NewlineDelimitedDecoderOptions, OversizedAction,
+        },
     },
     config::{LegacyKey, LogNamespace},
     configurable::configurable_component,
@@ -142,7 +144,10 @@ pub struct AwsS3Config {
 const fn default_framing() -> FramingConfig {
     // This is used for backwards compatibility. It used to be the only (hardcoded) option.
     FramingConfig::NewlineDelimited(NewlineDelimitedDecoderConfig {
-        newline_delimited: NewlineDelimitedDecoderOptions { max_length: None },
+        newline_delimited: NewlineDelimitedDecoderOptions {
+            max_length: None,
+            oversized_action: OversizedAction::Drop,
+        },
     })
 }
 
