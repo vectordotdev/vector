@@ -1,3 +1,4 @@
+use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 
 use azure_storage_blob::BlobContainerClient;
@@ -148,6 +149,31 @@ pub struct AzureBlobSinkConfig {
     #[serde(default = "Compression::gzip_default")]
     pub compression: Compression,
 
+    /// The set of [blob index tags][blob_index_tags] to apply to created blobs.
+    ///
+    /// Each entry becomes a tag in the `x-ms-tags` header. Azure enforces its own limits
+    /// (currently up to 10 tags per blob, with restricted character sets for keys and values);
+    /// invalid configurations are rejected by the service.
+    ///
+    /// [blob_index_tags]: https://learn.microsoft.com/azure/storage/blobs/storage-blob-index-how-to
+    #[configurable(metadata(docs::additional_props_description = "A single tag."))]
+    #[configurable(metadata(docs::examples = "example_tags()"))]
+    #[serde(default)]
+    pub tags: Option<BTreeMap<String, String>>,
+
+    /// The set of [custom metadata][blob_metadata] `key:value` pairs to apply to created blobs.
+    ///
+    /// Each entry becomes an `x-ms-meta-{key}` header. Azure enforces its own limits on names
+    /// and combined size (currently 8 KiB total); invalid configurations are rejected by the
+    /// service. Names must be valid C# identifiers, and non-ASCII values must be
+    /// Base64-encoded by the user.
+    ///
+    /// [blob_metadata]: https://learn.microsoft.com/rest/api/storageservices/set-blob-metadata
+    #[configurable(metadata(docs::additional_props_description = "A key/value pair."))]
+    #[configurable(metadata(docs::advanced))]
+    #[serde(default)]
+    pub metadata: Option<HashMap<String, String>>,
+
     #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<BulkSizeBasedDefaultBatchSettings>,
@@ -186,6 +212,8 @@ impl GenerateConfig for AzureBlobSinkConfig {
             blob_append_uuid: Some(true),
             encoding: (Some(NewlineDelimitedEncoderConfig::new()), JsonSerializerConfig::default()).into(),
             compression: Compression::gzip_default(),
+            tags: None,
+            metadata: None,
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
             acknowledgements: Default::default(),
@@ -193,6 +221,14 @@ impl GenerateConfig for AzureBlobSinkConfig {
         })
         .unwrap()
     }
+}
+
+fn example_tags() -> HashMap<String, String> {
+    HashMap::<_, _>::from_iter([
+        ("Project".to_string(), "Blue".to_string()),
+        ("Classification".to_string(), "confidential".to_string()),
+        ("PHI".to_string(), "True".to_string()),
+    ])
 }
 
 #[async_trait::async_trait]
@@ -300,6 +336,8 @@ impl AzureBlobSinkConfig {
             blob_append_uuid,
             encoder: (transformer, encoder),
             compression: self.compression,
+            tags: self.tags.clone(),
+            metadata: self.metadata.clone(),
         };
 
         let sink = AzureBlobSink::new(
