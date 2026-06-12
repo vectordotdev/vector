@@ -31,6 +31,12 @@ extern crate tracing;
 #[macro_use]
 extern crate vector_lib;
 
+#[cfg(any(
+    feature = "antithesis-scenario-memory",
+    feature = "antithesis-scenario-disk"
+))]
+extern crate antithesis_instrumentation as _;
+
 pub use indoc::indoc;
 // re-export codecs for convenience
 pub use vector_lib::codecs;
