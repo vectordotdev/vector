@@ -71,6 +71,153 @@ pub fn run(schema_path: &Path) -> Result<()> {
     // is now rendered as a top-level field with `group: "api"`.
     render_and_import_generated_top_level_config_schema(&mut context, &root_schema)?;
 
+    // 4. Generate internal_metric_descriptions.cue from the metric name enums
+    //    injected into the schema by `vector generate-schema`.
+    if let Some(metric_schemas) = root_schema.get("_metric_schemas") {
+        generate_internal_metric_descriptions(&mut context, metric_schemas)?;
+    }
+
+    Ok(())
+}
+
+/// Collects all metric variants from `metric_schemas` into an alphabetically-sorted JSON map.
+fn collect_metric_entries(metric_schemas: &Value) -> std::collections::BTreeMap<String, Value> {
+    let mut metrics = std::collections::BTreeMap::new();
+    for (metric_type, schema) in [
+        ("counter", metric_schemas.get("counters")),
+        ("histogram", metric_schemas.get("histograms")),
+        ("gauge", metric_schemas.get("gauges")),
+    ] {
+        let Some(schema) = schema else { continue };
+        for variant in schema
+            .get("oneOf")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+        {
+            let Some(name) = variant.get("const").and_then(Value::as_str) else {
+                continue;
+            };
+            let title = variant.get("title").and_then(Value::as_str);
+            let body = variant.get("description").and_then(Value::as_str);
+            let desc_owned;
+            let desc = match (title, body) {
+                (Some(t), Some(b)) => {
+                    desc_owned = format!("{t}\n\n{b}");
+                    desc_owned.as_str()
+                }
+                (Some(t), None) => t,
+                (None, Some(b)) => b,
+                (None, None) => continue,
+            };
+            let tags = if let Some(v @ Value::Object(_)) =
+                variant.get("_metadata").and_then(|m| m.get("docs::tags"))
+            {
+                v.clone()
+            } else {
+                warn!(
+                    "metric variant '{}' has no docs::tags metadata — \
+                     add #[configurable(metadata(docs::tags = ...))] to the enum variant",
+                    name
+                );
+                continue;
+            };
+            let unit = variant
+                .get("_metadata")
+                .and_then(|m| m.get("docs::unit"))
+                .and_then(Value::as_str)
+                .map(str::to_owned);
+            let deprecated = variant
+                .get("deprecated")
+                .and_then(Value::as_bool)
+                .unwrap_or(false);
+            let mut entry = json!({
+                "description": desc,
+                "type": metric_type,
+                "default_namespace": "vector",
+                "tags": tags,
+            });
+            if let Some(u) = unit {
+                entry["unit"] = json!(u);
+            }
+            if deprecated {
+                entry["deprecated"] = json!(true);
+                if let Some(msg) = variant
+                    .get("_metadata")
+                    .and_then(|m| m.get("deprecated_message"))
+                    .and_then(Value::as_str)
+                {
+                    entry["deprecated_message"] = json!(msg);
+                }
+            }
+            metrics.insert(name.to_owned(), entry);
+        }
+    }
+    metrics
+}
+
+fn generate_internal_metric_descriptions(
+    context: &mut SchemaContext,
+    metric_schemas: &Value,
+) -> Result<()> {
+    let out_path =
+        PathBuf::from("website/cue/reference/generated/internal_metric_descriptions.cue");
+
+    let metrics_value: serde_json::Map<String, Value> =
+        collect_metric_entries(metric_schemas).into_iter().collect();
+
+    let data = json!({
+        "components": {
+            "sources": {
+                "internal_metrics": {
+                    "output": {
+                        "metrics": Value::Object(metrics_value)
+                    }
+                }
+            }
+        }
+    });
+
+    let json_str = serde_json::to_string_pretty(&data)?;
+    let json_file = write_to_temp_file("internal-metric-descriptions-", ".json", &json_str)?;
+
+    if let Some(parent) = out_path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+
+    let status = Command::new(&context.cue_binary_path)
+        .args([
+            "import",
+            "-f",
+            "-o",
+            out_path.to_str().unwrap(),
+            "-p",
+            "metadata",
+            json_file.to_str().unwrap(),
+        ])
+        .status()?;
+
+    if !status.success() {
+        bail!(
+            "Failed to import internal metric descriptions as valid CUE \
+             (cue exit status {status}). JSON written to {json_path}.",
+            json_path = json_file.display()
+        );
+    }
+
+    // Prepend the auto-generated header so editors know not to edit the file directly.
+    let generated = fs::read_to_string(&out_path)?;
+    let header = "// Auto-generated by `vdev build component-docs`.\n\
+                  // Do not edit manually — update the doc comment (or #[configurable(deprecated)]\n\
+                  // attribute) on the relevant CounterName / HistogramName / GaugeName variant in\n\
+                  // lib/vector-common/src/internal_event/metric_name.rs instead,\n\
+                  // then re-run `make generate-component-docs`.\n";
+    fs::write(&out_path, format!("{header}{generated}"))?;
+
+    info!(
+        "[✓]   Wrote internal metric descriptions to '{}'.",
+        out_path.display()
+    );
     Ok(())
 }
 

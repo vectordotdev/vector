@@ -474,6 +474,8 @@ components: {
 		name?:              Name
 		type?:              #MetricType
 		default_namespace?: string
+		// Canonical Datadog metric unit (https://docs.datadoghq.com/metrics/units/).
+		unit?: string
 	}
 
 	#OutputData: {
