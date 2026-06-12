@@ -34,6 +34,12 @@ vector-config = { path = "../vector-config", default-features = false }
 vector-common = { path = "../vector-common", default-features = false, features = ["byte_size_of"] }
 dashmap.workspace = true
 ordered-float.workspace = true
+antithesis_sdk = { workspace = true, optional = true, features = ["full"] }
+serde_json = { workspace = true, optional = true }
+
+[features]
+antithesis-disk-asserts = ["dep:antithesis_sdk", "dep:serde_json"]
+test-util = []
 
 [dev-dependencies]
 clap.workspace = true
@@ -45,6 +51,7 @@ metrics-util = { workspace = true, features = ["debugging"] }
 proptest.workspace = true
 quickcheck.workspace = true
 rand.workspace = true
+serde_json.workspace = true
 serde_yaml.workspace = true
 temp-dir = "0.1.16"
 tokio-test.workspace = true
