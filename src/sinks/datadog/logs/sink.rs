@@ -197,9 +197,11 @@ pub fn position_reserved_attr_event_root(
             let rename_attr = format!("_RESERVED_{meaning}");
             let rename_path = event_path!(rename_attr.as_str());
             warn!(
-                message = "Semantic meaning is defined, but the event path already exists. Renaming to not overwrite.",
+                message = "Field with semantic meaning conflicts with an existing field at the expected destination. The existing one was renamed to not overwrite.",
                 meaning = meaning,
-                renamed = &rename_attr,
+                source_path = %current_path,
+                destination_path = expected_field_name,
+                renamed_existing_to = %rename_attr,
             );
             log.rename_key(desired_path, rename_path);
         }
