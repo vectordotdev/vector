@@ -980,9 +980,14 @@ where
         //
         // Essentially, we defer the actual skipping to avoid deadlocking here trying to open a
         // data file we might not be able to open yet.
+        //
+        // We also mark the current file as abandoned so that readers can immediately detect the
+        // partial write as a PartialWrite error rather than busy-spinning waiting for data that
+        // will never come (the writer will be writing to the next file, not this one).
         if should_skip_to_next_file {
             self.reset();
             self.mark_for_skip();
+            self.ledger.mark_current_file_abandoned();
         }
 
         self.ready_to_write = true;
@@ -1133,9 +1138,12 @@ where
                 self.data_file_size = data_file_size;
 
                 // If we opened the "next" data file, we need to increment the current writer
-                // file ID now to signal that the writer has moved on.
+                // file ID now to signal that the writer has moved on.  We also clear the
+                // "current file abandoned" flag here, since we've now committed to a new file
+                // and any partial write on the old file has been handled.
                 if should_open_next {
                     self.ledger.state().increment_writer_file_id();
+                    self.ledger.clear_current_file_abandoned();
                     self.ledger.notify_writer_waiters();
 
                     debug!(
