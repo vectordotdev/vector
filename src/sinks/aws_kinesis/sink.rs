@@ -125,7 +125,7 @@ pub(crate) fn process_log(
     })
 }
 
-fn gen_partition_key() -> String {
+pub(crate) fn gen_partition_key() -> String {
     random::<[char; 16]>()
         .iter()
         .fold(String::new(), |mut s, c| {
