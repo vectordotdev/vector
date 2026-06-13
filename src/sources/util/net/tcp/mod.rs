@@ -54,9 +54,12 @@ pub async fn try_bind_tcp_listener(
     match addr {
         SocketListenAddr::SocketAddr(addr) => tls.bind(&addr).await.map_err(Into::into),
         SocketListenAddr::SystemdFd(offset) => match listenfd.take_tcp_listener(offset)? {
-            Some(listener) => TcpListener::from_std(listener)
-                .map(Into::into)
-                .map_err(Into::into),
+            Some(listener) => {
+                listener.set_nonblocking(true)?;
+                TcpListener::from_std(listener)
+                    .map(Into::into)
+                    .map_err(Into::into)
+            }
             None => {
                 Err(io::Error::new(io::ErrorKind::AddrInUse, "systemd fd already consumed").into())
             }
