@@ -979,6 +979,14 @@ where
             // detect, and calculate a valid delta from.
             if self.ledger.is_writer_done() {
                 let total_buffer_size = self.ledger.get_total_buffer_size();
+                // This check is ok if sink is not using batching but will be
+                // problematic in batched sink like aws s3. Consider following:
+                // There is not enough data for batch to complete so `PartitionedBatcher` keep waiting for more data from this reader.
+                // Until batch completes and sink is done with data there would be no acknowledgements so handling acknowledgements
+                // is not going to reduce the buffer size, so this value is not going to zero.
+                // That is causing a cycling dependency scenario.
+                // So additional check below is added that if attempt to read records returns None and writer is also done
+                // we are done.
                 if total_buffer_size == 0 {
                     return Ok(None);
                 }
@@ -1075,6 +1083,20 @@ where
                     self.roll_to_next_data_file();
                     force_check_pending_data_files = true;
                     continue;
+                }
+
+                // We caught up with latest file and no more data is coming.
+                // The check on top about writer is done has issue when used with batched sink.
+                // This also has issue because sink will be terminated and acknowledgements from sink will not be processed.
+                // causing data to still remain in buffer and re-processed again if vector starts again with this buffer/sink configuration.
+                // So trade off is data loss vs data duplication.
+
+                // The comprehensive solution would be to be able to send different sentinel from this point signaling end of data to
+                // batch partitioner, which batch partitioner can use to flush but not signal termination to the sink.
+                // While sentinel passed from top of loop will be used by batch partitioner to signal termination to the sink.
+
+                if self.ledger.is_writer_done() {
+                    return Ok(None);
                 }
 
                 self.ledger.wait_for_writer().await;
