@@ -112,7 +112,7 @@ where
 /// Generalized interface for describing and building enrichment table components.
 #[enum_dispatch]
 pub trait EnrichmentTableConfig: NamedComponent + core::fmt::Debug + Send + Sync {
-    /// Builds the enrichment table with the given globals.
+    /// Builds the enrichment table with the given globals and previous table state.
     ///
     /// If the enrichment table is built successfully, `Ok(...)` is returned containing the
     /// enrichment table.
@@ -124,6 +124,7 @@ pub trait EnrichmentTableConfig: NamedComponent + core::fmt::Debug + Send + Sync
     async fn build(
         &self,
         globals: &GlobalOptions,
+        prev_state: Option<Box<dyn std::any::Any + Send + Sync>>,
     ) -> crate::Result<Box<dyn vector_lib::enrichment::Table + Send + Sync>>;
 
     fn sink_config(

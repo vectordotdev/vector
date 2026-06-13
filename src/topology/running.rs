@@ -421,12 +421,29 @@ impl RunningTopology {
     ) -> HashMap<ComponentKey, BuiltBuffer> {
         // First, we shutdown any changed/removed sources. This ensures that we can allow downstream
         // components to terminate naturally by virtue of the flow of events stopping.
-        if diff.sources.any_changed_or_removed() {
+        if diff.sources.any_changed_or_removed() || diff.enrichment_tables.any_changed_or_removed()
+        {
             let timeout = Duration::from_secs(30);
             let mut source_shutdown_handles = Vec::new();
 
+            let to_remove_table_sources = diff
+                .enrichment_tables
+                .to_remove
+                .iter()
+                .filter_map(|key| {
+                    self.config
+                        .enrichment_table(key)
+                        .and_then(|t| t.as_source(key))
+                        .map(|(key, _)| key.clone())
+                })
+                .collect::<Vec<_>>();
             let deadline = Instant::now() + timeout;
-            for key in &diff.sources.to_remove {
+            for key in diff
+                .sources
+                .to_remove
+                .iter()
+                .chain(to_remove_table_sources.iter())
+            {
                 debug!(component_id = %key, "Removing source.");
 
                 let previous = self.tasks.remove(key).unwrap();
@@ -437,7 +454,23 @@ impl RunningTopology {
                     .push(self.shutdown_coordinator.shutdown_source(key, deadline));
             }
 
-            for key in &diff.sources.to_change {
+            let to_change_table_sources = diff
+                .enrichment_tables
+                .to_change
+                .iter()
+                .filter_map(|key| {
+                    self.config
+                        .enrichment_table(key)
+                        .and_then(|t| t.as_source(key))
+                        .map(|(key, _)| key.clone())
+                })
+                .collect::<Vec<_>>();
+            for key in diff
+                .sources
+                .to_change
+                .iter()
+                .chain(to_change_table_sources.iter())
+            {
                 debug!(component_id = %key, "Changing source.");
 
                 self.remove_outputs(key);
@@ -563,6 +596,12 @@ impl RunningTopology {
             .sinks
             .to_change
             .iter()
+            .chain(diff.enrichment_tables.to_change.iter().filter(|key| {
+                self.config
+                    .enrichment_table(key)
+                    .and_then(|t| t.as_sink(key))
+                    .is_some()
+            }))
             .filter(|&key| {
                 if diff.components_to_reload.contains(key) {
                     return false;
@@ -592,10 +631,15 @@ impl RunningTopology {
             .iter()
             .filter(|key| {
                 !reuse_buffers.contains(*key)
-                    && self
+                    && (self
                         .config
                         .sink(key)
                         .is_some_and(|s| s.buffer.has_disk_stage())
+                        || self
+                            .config
+                            .enrichment_table(key)
+                            .and_then(|t| t.as_sink(key))
+                            .is_some_and(|(_, s)| s.buffer.has_disk_stage()))
             })
             .cloned()
             .collect::<HashSet<_>>();
@@ -751,6 +795,7 @@ impl RunningTopology {
             for key in removed_sinks {
                 // Sinks only have inputs
                 self.inputs_tap_metadata.remove(key);
+                self.component_type_names.remove(key);
             }
 
             let removed_sources = diff.enrichment_tables.to_remove.iter().filter_map(|key| {
@@ -761,6 +806,7 @@ impl RunningTopology {
             for key in removed_sources {
                 // Sources only have outputs
                 self.outputs_tap_metadata.remove(&key);
+                self.component_type_names.remove(&key);
             }
 
             for key in diff.sources.changed_and_added() {
@@ -784,6 +830,8 @@ impl RunningTopology {
                 if let Some(task) = new_pieces.tasks.get(&key) {
                     self.outputs_tap_metadata
                         .insert(key.clone(), ("source", task.typetag().to_string()));
+                    self.component_type_names
+                        .insert(key.clone(), task.typetag().to_string());
                 }
             }
 
@@ -798,6 +846,21 @@ impl RunningTopology {
 
             for key in diff.sinks.changed_and_added() {
                 if let Some(task) = new_pieces.tasks.get(key) {
+                    self.component_type_names
+                        .insert(key.clone(), task.typetag().to_string());
+                }
+            }
+
+            for key in diff
+                .enrichment_tables
+                .changed_and_added()
+                .filter_map(|key| {
+                    self.config
+                        .enrichment_table(key)
+                        .and_then(|t| t.as_sink(key).map(|(key, _)| key))
+                })
+            {
+                if let Some(task) = new_pieces.tasks.get(&key) {
                     self.component_type_names
                         .insert(key.clone(), task.typetag().to_string());
                 }

@@ -136,10 +136,19 @@ const fn default_scan_interval() -> NonZeroU64 {
 }
 
 impl MemoryConfig {
-    pub(super) async fn get_or_build_memory(&self) -> Memory {
+    pub(super) async fn get_or_build_memory(
+        &self,
+        prev_state: Option<Box<dyn std::any::Any + Send + Sync>>,
+    ) -> Memory {
         let mut boxed_memory = self.memory.lock().await;
         *boxed_memory
-            .get_or_insert_with(|| Box::new(Memory::new(self.clone())))
+            .get_or_insert_with(|| {
+                if let Some(prev) = prev_state {
+                    Box::new(Memory::from_previous_state(self.clone(), prev))
+                } else {
+                    Box::new(Memory::new(self.clone()))
+                }
+            })
             .clone()
     }
 }
@@ -148,8 +157,9 @@ impl EnrichmentTableConfig for MemoryConfig {
     async fn build(
         &self,
         _globals: &crate::config::GlobalOptions,
+        prev_state: Option<Box<dyn std::any::Any + Send + Sync>>,
     ) -> crate::Result<Box<dyn Table + Send + Sync>> {
-        Ok(Box::new(self.get_or_build_memory().await))
+        Ok(Box::new(self.get_or_build_memory(prev_state).await))
     }
 
     fn sink_config(
@@ -177,7 +187,7 @@ impl EnrichmentTableConfig for MemoryConfig {
 #[typetag::serde(name = "memory_enrichment_table")]
 impl SinkConfig for MemoryConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let sink = VectorSink::from_event_streamsink(self.get_or_build_memory().await);
+        let sink = VectorSink::from_event_streamsink(self.get_or_build_memory(None).await);
 
         Ok((sink, future::ok(()).boxed()))
     }
@@ -195,7 +205,7 @@ impl SinkConfig for MemoryConfig {
 #[typetag::serde(name = "memory_enrichment_table")]
 impl SourceConfig for MemoryConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
-        let memory = self.get_or_build_memory().await;
+        let memory = self.get_or_build_memory(None).await;
 
         let log_namespace = cx.log_namespace(self.log_namespace);
 

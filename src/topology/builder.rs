@@ -28,6 +28,7 @@ use vector_lib::{
             },
         },
     },
+    enrichment::Table,
     internal_event::{self, CountByteSize, EventsSent, InternalEventHandle as _, Registered},
     latency::LatencyRecorder,
     schema::Definition,
@@ -179,7 +180,7 @@ impl<'a> Builder<'a> {
     /// Loads, or reloads the enrichment tables.
     /// The tables are stored in the `ENRICHMENT_TABLES` global variable.
     async fn load_enrichment_tables(&mut self) -> &'static vector_lib::enrichment::TableRegistry {
-        let mut enrichment_tables = HashMap::new();
+        let mut enrichment_tables: HashMap<String, Box<dyn Table + Send + Sync>> = HashMap::new();
 
         // Build enrichment tables
         'tables: for (name, table_outer) in self.config.enrichment_tables.iter() {
@@ -193,7 +194,16 @@ impl<'a> Builder<'a> {
                     None
                 };
 
-                let mut table = match table_outer.inner.build(&self.config.global).await {
+                let mut prev_state = None;
+                if !self.diff.enrichment_tables.is_added(name) {
+                    prev_state = ENRICHMENT_TABLES.extract_state(&table_name);
+                }
+
+                let mut table = match table_outer
+                    .inner
+                    .build(&self.config.global, prev_state)
+                    .await
+                {
                     Ok(table) => table,
                     Err(error) => {
                         self.errors
@@ -1002,15 +1012,19 @@ async fn run_source_output_pump(
     Ok(TaskOutput::Source)
 }
 
+/// Reloads file based enrichment tables - not stateful ones
 pub async fn reload_enrichment_tables(config: &Config) {
     let mut enrichment_tables = HashMap::new();
     // Build enrichment tables
     'tables: for (name, table_outer) in config.enrichment_tables.iter() {
         let table_name = name.to_string();
-        if ENRICHMENT_TABLES.needs_reload(&table_name) {
+        if ENRICHMENT_TABLES.needs_reload(&table_name)
+            // Tables that can act as sinks are reloaded through topology
+            && table_outer.as_sink(name).is_none()
+        {
             let indexes = Some(ENRICHMENT_TABLES.index_fields(&table_name));
 
-            let mut table = match table_outer.inner.build(&config.global).await {
+            let mut table = match table_outer.inner.build(&config.global, None).await {
                 Ok(table) => table,
                 Err(error) => {
                     error!("Enrichment table \"{name}\" reload failed: {error}");

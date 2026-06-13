@@ -616,11 +616,19 @@ pub async fn load_configs(
         for (name, table) in config.enrichment_tables() {
             let files = table.inner.files_to_watch();
             let component_config = ComponentConfig::new(
-                files.into_iter().cloned().collect(),
+                files.clone().into_iter().cloned().collect(),
                 name.clone(),
                 ComponentType::EnrichmentTable,
             );
             watched_component_paths.push(component_config);
+            if table.as_sink(name).is_some() {
+                let sink_component_config = ComponentConfig::new(
+                    files.into_iter().cloned().collect(),
+                    name.clone(),
+                    ComponentType::Sink,
+                );
+                watched_component_paths.push(sink_component_config);
+            }
         }
 
         info!(
