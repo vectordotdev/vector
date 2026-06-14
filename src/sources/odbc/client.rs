@@ -2,7 +2,7 @@ use crate::config::{SourceContext, log_schema};
 use crate::internal_events::{OdbcEventsReceived, OdbcFailedError, OdbcQueryExecuted};
 use crate::sinks::prelude::*;
 use crate::sources::odbc::config::OdbcConfig;
-use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, TimeZone, Utc};
+use chrono::{NaiveDate, NaiveDateTime, NaiveTime, Utc};
 use chrono_tz::Tz;
 use futures::pin_mut;
 use futures_util::StreamExt;
@@ -463,12 +463,11 @@ fn map_value(data_type: &odbc_api::DataType, value: Option<&[u8]>, tz: Tz) -> Va
             std::str::from_utf8(value)
                 .ok()
                 .and_then(|s| NaiveTime::from_str(s).ok())
-                .map(|time| {
-                    let datetime = NaiveDateTime::new(NaiveDate::default(), time);
-                    let tz = tz.offset_from_utc_datetime(&datetime);
-                    Value::Timestamp(
-                        DateTime::<Tz>::from_naive_utc_and_offset(datetime, tz).to_utc(),
-                    )
+                .and_then(|time| {
+                    NaiveDateTime::new(NaiveDate::default(), time)
+                        .and_local_timezone(tz)
+                        .single()
+                        .map(|dt| Value::Timestamp(dt.with_timezone(&Utc)))
                 })
                 .unwrap_or(Value::Null)
         }
@@ -482,12 +481,11 @@ fn map_value(data_type: &odbc_api::DataType, value: Option<&[u8]>, tz: Tz) -> Va
             std::str::from_utf8(value)
                 .ok()
                 .and_then(|s| chrono::NaiveDate::from_str(s).ok())
-                .map(|date| {
-                    let datetime = NaiveDateTime::new(date, NaiveTime::default());
-                    let tz = tz.offset_from_utc_datetime(&datetime);
-                    Value::Timestamp(
-                        DateTime::<Tz>::from_naive_utc_and_offset(datetime, tz).to_utc(),
-                    )
+                .and_then(|date| {
+                    NaiveDateTime::new(date, NaiveTime::default())
+                        .and_local_timezone(tz)
+                        .single()
+                        .map(|dt| Value::Timestamp(dt.with_timezone(&Utc)))
                 })
                 .unwrap_or(Value::Null)
         }
