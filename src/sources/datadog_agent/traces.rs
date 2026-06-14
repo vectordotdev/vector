@@ -23,8 +23,8 @@ pub(super) fn build_warp_filter(
     handler: RequestHandler,
     source: DatadogAgentSource,
 ) -> BoxedFilter<(Response,)> {
-    build_trace_filter(handler, source)
-        .or(build_stats_filter())
+    build_trace_filter(handler, source.clone())
+        .or(build_stats_filter(source))
         .unify()
         .boxed()
 }
@@ -33,33 +33,40 @@ fn build_trace_filter(
     handler: RequestHandler,
     source: DatadogAgentSource,
 ) -> BoxedFilter<(Response,)> {
+    // Helper filter: extract path, api-key header, reported-language header, query params, validate API key
+    // Returns (FullPath, Option<Arc<str>>, Option<String>, DatadogAgentSource)
+    let validate_and_extract = {
+        let src = source.clone();
+        warp::path::full()
+            .and(warp::header::optional::<String>("dd-api-key"))
+            .and(warp::header::optional::<String>("X-Datadog-Reported-Languages"))
+            .and(warp::query::<ApiKeyQueryParams>())
+            .and_then(move |path: FullPath, api_token: Option<String>, reported_language: Option<String>, query_params: ApiKeyQueryParams| {
+                let source = src.clone();
+                async move {
+                    let api_key = source
+                        .validate_api_key(path.as_str(), api_token, query_params.dd_api_key)?;
+                    Ok::<_, Rejection>((path, api_key, reported_language, source))
+                }
+            })
+    };
+
     warp::post()
         .and(path!("api" / "v0.2" / "traces" / ..))
-        .and(warp::path::full())
+        .and(validate_and_extract)
         .and(warp::header::optional::<String>("content-encoding"))
-        .and(warp::header::optional::<String>("dd-api-key"))
-        .and(warp::header::optional::<String>(
-            "X-Datadog-Reported-Languages",
-        ))
-        .and(warp::query::<ApiKeyQueryParams>())
         .and(warp::body::bytes())
         .and_then({
-            move |path: FullPath,
+            move |_, extracted: (FullPath, Option<Arc<str>>, Option<String>, DatadogAgentSource),
                   encoding_header: Option<String>,
-                  api_token: Option<String>,
-                  reported_language: Option<String>,
-                  query_params: ApiKeyQueryParams,
                   body: Bytes| {
+                let (path, api_key, reported_language, source) = extracted;
                 let events = source
                     .decode(&encoding_header, body, path.as_str())
                     .and_then(|body| {
                         handle_dd_trace_payload(
                             body,
-                            source.api_key_extractor.extract(
-                                path.as_str(),
-                                api_token,
-                                query_params.dd_api_key,
-                            ),
+                            api_key,
                             reported_language.as_ref(),
                             &source,
                         )
@@ -76,15 +83,23 @@ fn build_trace_filter(
         .boxed()
 }
 
-fn build_stats_filter() -> BoxedFilter<(Response,)> {
+fn build_stats_filter(source: DatadogAgentSource) -> BoxedFilter<(Response,)> {
     warp::post()
         .and(path!("api" / "v0.2" / "stats" / ..))
-        .and_then(|| {
-            // APM stats are discarded on purpose, they will be computed in the `datadog_traces` sink
-            // thus we simply reply with a 200/OK response.
-            let response: Result<Response, Rejection> = Ok(warp::reply().into_response());
-            future::ready(response)
-        })
+        .and(warp::path::full())
+        .and(warp::header::optional::<String>("dd-api-key"))
+        .and(warp::query::<ApiKeyQueryParams>())
+        .and_then(
+            move |path: FullPath, api_token: Option<String>, query_params: ApiKeyQueryParams| {
+                let response: Result<Response, Rejection> = source
+                    .validate_api_key(path.as_str(), api_token, query_params.dd_api_key)
+                    // APM stats are discarded on purpose, they will be computed in the
+                    // `datadog_traces` sink thus we simply reply with a 200/OK response.
+                    .map(|_| warp::reply().into_response())
+                    .map_err(warp::reject::custom);
+                future::ready(response)
+            },
+        )
         .boxed()
 }
 
