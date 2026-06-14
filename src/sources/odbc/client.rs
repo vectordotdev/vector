@@ -174,15 +174,17 @@ impl Context {
 
         // Load the last-run metadata from disk when available.
         // If the file is missing, fall back to the initial parameters or the latest query result.
-        let stmt_params = self
-            .cfg
-            .last_run_metadata_path
-            .as_ref()
-            .and_then(|path| load_params(path, self.cfg.tracking_columns.as_ref()))
-            .unwrap_or(
-                order_params(map.unwrap_or_default(), self.cfg.tracking_columns.as_ref())
+        // Unreadable or corrupt metadata is treated as an error to avoid replaying old rows.
+        let stmt_params = if let Some(path) = &self.cfg.last_run_metadata_path {
+            match load_params(path, self.cfg.tracking_columns.as_ref())? {
+                Some(params) => params,
+                None => order_params(map.unwrap_or_default(), self.cfg.tracking_columns.as_ref())
                     .unwrap_or_default(),
-            );
+            }
+        } else {
+            order_params(map.unwrap_or_default(), self.cfg.tracking_columns.as_ref())
+                .unwrap_or_default()
+        };
         let cfg = self.cfg.clone();
 
         let rows = execute_query(
@@ -368,12 +370,21 @@ pub fn execute_query(
 
 /// Loads the previously saved result and returns it as SQL parameters.
 /// Parameters are generated in the order specified by `columns_order`.
-fn load_params(path: &str, columns_order: Option<&Vec<String>>) -> Option<Vec<VarCharBox>> {
-    let file = File::open(path).ok()?;
+///
+/// Returns `Ok(None)` only when the metadata file does not exist.
+fn load_params(
+    path: &str,
+    columns_order: Option<&Vec<String>>,
+) -> Result<Option<Vec<VarCharBox>>, OdbcError> {
+    let file = match File::open(path) {
+        Ok(file) => file,
+        Err(source) if source.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(source) => return Err(OdbcError::Io { source }),
+    };
     let reader = BufReader::new(file);
-    let map: ObjectMap = serde_json::from_reader(reader).ok()?;
+    let map: ObjectMap = serde_json::from_reader(reader).context(JsonSnafu)?;
 
-    order_params(map, columns_order)
+    Ok(order_params(map, columns_order))
 }
 
 /// Orders the parameters of a given `ObjectMap` based on an optional column order.
