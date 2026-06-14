@@ -1,6 +1,5 @@
-use metrics::counter;
-use vector_common::internal_event::{InternalEvent, error_stage, error_type};
-use vector_lib::NamedInternalEvent;
+use vector_common::internal_event::{CounterName, InternalEvent, error_stage, error_type};
+use vector_lib::{NamedInternalEvent, counter};
 
 #[derive(Debug, NamedInternalEvent)]
 pub struct OdbcEventsReceived {
@@ -14,12 +13,12 @@ impl InternalEvent for OdbcEventsReceived {
             count = %self.count,
         );
         counter!(
-            "component_received_events_total",
+            CounterName::ComponentReceivedEventsTotal,
             "protocol" => "odbc"
         )
         .increment(self.count as u64);
         counter!(
-            "component_received_event_bytes_total",
+            CounterName::ComponentReceivedEventBytesTotal,
             "protocol" => "odbc"
         )
         .increment(0);
@@ -40,7 +39,7 @@ impl InternalEvent for OdbcFailedError<'_> {
             stage = error_stage::RECEIVING,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "statement" => self.statement.to_owned(),
             "error_type" => error_type::COMMAND_FAILED,
             "stage" => error_stage::RECEIVING,
@@ -62,6 +61,6 @@ impl InternalEvent for OdbcQueryExecuted<'_> {
             statement = %self.statement,
             elapsedMs = %self.elapsed
         );
-        counter!("component_executed_events_total").increment(1);
+        counter!(CounterName::ComponentExecutedEventsTotal).increment(1);
     }
 }
