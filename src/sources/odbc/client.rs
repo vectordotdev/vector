@@ -70,6 +70,9 @@ pub enum OdbcError {
     Decode {
         source: vector_lib::codecs::decoding::Error,
     },
+
+    #[snafu(display("Blocking ODBC task failed: {source}"))]
+    BlockingTask { source: tokio::task::JoinError },
 }
 
 impl OdbcError {
@@ -80,6 +83,7 @@ impl OdbcError {
             Self::SendError { .. } => error_type::WRITER_FAILED,
             Self::Json { .. } | Self::Decode { .. } => error_type::PARSER_FAILED,
             Self::ConfigError { .. } => error_type::CONFIGURATION_FAILED,
+            Self::BlockingTask { .. } => error_type::REQUEST_FAILED,
         }
     }
 
@@ -211,17 +215,25 @@ impl Context {
                 .unwrap_or_default()
         };
         let cfg = self.cfg.clone();
+        let timeout = cfg.statement_timeout;
+        let tz = cfg.odbc_default_timezone;
+        let batch_size = cfg.odbc_batch_size;
+        let max_str_limit = cfg.odbc_max_str_limit;
 
-        let rows = execute_query(
-            env,
-            &conn_str,
-            &stmt_str,
-            stmt_params,
-            cfg.statement_timeout,
-            cfg.odbc_default_timezone,
-            cfg.odbc_batch_size,
-            cfg.odbc_max_str_limit,
-        )?;
+        let rows = tokio::task::spawn_blocking(move || {
+            execute_query(
+                env,
+                &conn_str,
+                &stmt_str,
+                stmt_params,
+                timeout,
+                tz,
+                batch_size,
+                max_str_limit,
+            )
+        })
+        .await
+        .context(BlockingTaskSnafu)??;
 
         let mut events = self.decode_rows(&rows)?;
         self.enrich_events(&mut events);
