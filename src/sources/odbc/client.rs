@@ -450,14 +450,6 @@ fn map_value(data_type: &odbc_api::DataType, value: Option<&[u8]>, tz: Tz) -> Va
                 return Value::Null;
             };
 
-            // tinyint(1) -> Value::Boolean
-            if *data_type == odbc_api::DataType::TinyInt
-                && value.len() == 1
-                && (value[0] == b'0' || value[0] == b'1')
-            {
-                return Value::Boolean(value[0] == b'1');
-            }
-
             std::str::from_utf8(value)
                 .ok()
                 .and_then(|s| s.parse::<i64>().ok())

@@ -466,7 +466,7 @@ INSERT INTO number_columns (
         Value::Integer(-9223372036854775808)
     );
     match get_db_type() {
-        DbType::MariaDb => assert_eq!(*row.get("boolean_col").unwrap(), Value::Boolean(false)),
+        DbType::MariaDb => assert_eq!(*row.get("boolean_col").unwrap(), Value::Integer(0)),
         DbType::Postgres => assert_eq!(
             *row.get("boolean_col").unwrap(),
             Value::Bytes(Bytes::from_static(b"0"))
@@ -511,7 +511,7 @@ INSERT INTO number_columns (
         Value::Integer(9223372036854775807)
     );
     match get_db_type() {
-        DbType::MariaDb => assert_eq!(*row.get("boolean_col").unwrap(), Value::Boolean(true)),
+        DbType::MariaDb => assert_eq!(*row.get("boolean_col").unwrap(), Value::Integer(1)),
         DbType::Postgres => assert_eq!(
             *row.get("boolean_col").unwrap(),
             Value::Bytes(Bytes::from_static(b"1"))
