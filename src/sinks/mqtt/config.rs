@@ -1,20 +1,12 @@
-use std::time::Duration;
-
-use rand::Rng;
-use rumqttc::{MqttOptions, QoS, TlsConfiguration, Transport};
-use snafu::ResultExt;
+use rumqttc::QoS;
 use vector_lib::codecs::JsonSerializerConfig;
 
 use crate::{
     codecs::EncodingConfig,
-    common::mqtt::{
-        ConfigurationError, ConfigurationSnafu, MqttCommonConfig, MqttConnector, MqttError,
-        TlsSnafu,
-    },
+    common::mqtt::{self, MqttCommonConfig, MqttPublishProperties},
     config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     sinks::{Healthcheck, VectorSink, mqtt::sink::MqttSink, prelude::*},
     template::Template,
-    tls::MaybeTlsSettings,
 };
 
 /// Configuration for the `mqtt` sink
@@ -49,6 +41,11 @@ pub struct MqttSinkConfig {
     #[configurable(derived)]
     #[serde(default = "default_qos")]
     pub quality_of_service: MqttQoS,
+
+    /// MQTT v5 publish properties. Only applicable when `protocol_version` is `v5`.
+    #[configurable(derived)]
+    #[serde(default)]
+    pub publish_properties: Option<MqttPublishProperties>,
 }
 
 /// Supported Quality of Service types for MQTT.
@@ -78,6 +75,16 @@ impl From<MqttQoS> for QoS {
     }
 }
 
+impl From<MqttQoS> for rumqttc::v5::mqttbytes::QoS {
+    fn from(value: MqttQoS) -> Self {
+        match value {
+            MqttQoS::AtLeastOnce => rumqttc::v5::mqttbytes::QoS::AtLeastOnce,
+            MqttQoS::AtMostOnce => rumqttc::v5::mqttbytes::QoS::AtMostOnce,
+            MqttQoS::ExactlyOnce => rumqttc::v5::mqttbytes::QoS::ExactlyOnce,
+        }
+    }
+}
+
 const fn default_clean_session() -> bool {
     false
 }
@@ -95,12 +102,12 @@ impl Default for MqttSinkConfig {
         Self {
             common: MqttCommonConfig::default(),
             clean_session: default_clean_session(),
-
             topic: Template::try_from("vector").expect("Cannot parse as a template"),
             retain: default_retain(),
             encoding: JsonSerializerConfig::default().into(),
             acknowledgements: AcknowledgementsConfig::default(),
             quality_of_service: MqttQoS::default(),
+            publish_properties: None,
         }
     }
 }
@@ -111,7 +118,8 @@ impl_generate_config_from_default!(MqttSinkConfig);
 #[typetag::serde(name = "mqtt")]
 impl SinkConfig for MqttSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let connector = self.build_connector()?;
+        let connector =
+            mqtt::build_connector(&self.common, "vectorSink", self.clean_session, false)?;
         let sink = MqttSink::new(self, connector.clone())?;
 
         Ok((
@@ -121,7 +129,7 @@ impl SinkConfig for MqttSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        Input::new(self.encoding.config().input_type())
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
@@ -129,57 +137,70 @@ impl SinkConfig for MqttSinkConfig {
     }
 }
 
-impl MqttSinkConfig {
-    fn build_connector(&self) -> Result<MqttConnector, MqttError> {
-        let client_id = self.common.client_id.clone().unwrap_or_else(|| {
-            let hash = rand::rng()
-                .sample_iter(&rand_distr::Alphanumeric)
-                .take(6)
-                .map(char::from)
-                .collect::<String>();
-            format!("vectorSink{hash}")
-        });
-
-        if client_id.is_empty() {
-            return Err(ConfigurationError::EmptyClientId).context(ConfigurationSnafu);
-        }
-        let tls =
-            MaybeTlsSettings::from_config(self.common.tls.as_ref(), false).context(TlsSnafu)?;
-        let mut options = MqttOptions::new(&client_id, &self.common.host, self.common.port);
-        options.set_keep_alive(Duration::from_secs(self.common.keep_alive.into()));
-        options.set_max_packet_size(self.common.max_packet_size, self.common.max_packet_size);
-        options.set_clean_session(self.clean_session);
-        match (&self.common.user, &self.common.password) {
-            (Some(user), Some(password)) => {
-                options.set_credentials(user, password);
-            }
-            (None, None) => {}
-            _ => {
-                return Err(MqttError::Configuration {
-                    source: ConfigurationError::InvalidCredentials,
-                });
-            }
-        }
-        if let Some(tls) = tls.tls() {
-            let ca = tls.authorities_pem().flatten().collect();
-            let client_auth = tls.identity_pem();
-            let alpn = Some(vec!["mqtt".into()]);
-            options.set_transport(Transport::Tls(TlsConfiguration::Simple {
-                ca,
-                client_auth,
-                alpn,
-            }));
-        }
-        Ok(MqttConnector::new(options))
-    }
-}
-
 #[cfg(test)]
 mod test {
+    use vector_lib::codecs::{
+        GelfSerializerConfig, JsonSerializerConfig, TextSerializerConfig,
+        encoding::SerializerConfig,
+    };
+    use vector_lib::config::DataType;
+
     use super::*;
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<MqttSinkConfig>();
+    }
+
+    fn config_with_encoding(serializer: SerializerConfig) -> MqttSinkConfig {
+        MqttSinkConfig {
+            encoding: EncodingConfig::from(serializer),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn input_type_follows_encoder_json_accepts_all() {
+        let config = config_with_encoding(JsonSerializerConfig::default().into());
+        let data_type = config.input().data_type();
+        assert!(data_type.contains(DataType::Log));
+        assert!(data_type.contains(DataType::Metric));
+        assert!(data_type.contains(DataType::Trace));
+    }
+
+    #[test]
+    fn input_type_follows_encoder_text_excludes_traces() {
+        let config = config_with_encoding(TextSerializerConfig::default().into());
+        assert_eq!(config.input().data_type(), DataType::Log | DataType::Metric,);
+    }
+
+    #[test]
+    fn input_type_follows_encoder_gelf_logs_only() {
+        let config = config_with_encoding(GelfSerializerConfig::default().into());
+        assert_eq!(config.input().data_type(), DataType::Log);
+    }
+
+    #[test]
+    fn qos_converts_to_v3_rumqttc_variants() {
+        assert!(matches!(QoS::from(MqttQoS::AtMostOnce), QoS::AtMostOnce));
+        assert!(matches!(QoS::from(MqttQoS::AtLeastOnce), QoS::AtLeastOnce));
+        assert!(matches!(QoS::from(MqttQoS::ExactlyOnce), QoS::ExactlyOnce));
+    }
+
+    #[test]
+    fn qos_converts_to_v5_rumqttc_variants() {
+        use rumqttc::v5::mqttbytes::QoS as QoSV5;
+        assert!(matches!(
+            QoSV5::from(MqttQoS::AtMostOnce),
+            QoSV5::AtMostOnce
+        ));
+        assert!(matches!(
+            QoSV5::from(MqttQoS::AtLeastOnce),
+            QoSV5::AtLeastOnce
+        ));
+        assert!(matches!(
+            QoSV5::from(MqttQoS::ExactlyOnce),
+            QoSV5::ExactlyOnce
+        ));
     }
 }
