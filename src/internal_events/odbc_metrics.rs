@@ -40,7 +40,6 @@ impl InternalEvent for OdbcFailedError<'_> {
         );
         counter!(
             CounterName::ComponentErrorsTotal,
-            "statement" => self.statement.to_owned(),
             "error_type" => error_type::COMMAND_FAILED,
             "stage" => error_stage::RECEIVING,
         )
