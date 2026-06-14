@@ -120,10 +120,6 @@ impl Context {
                     break;
                 }
                 next = schedule.next() => {
-                    emit!(OdbcEventsReceived {
-                        count: 1,
-                    });
-
                     let instant = Instant::now();
                     if let Ok(result) = self.process(prev_result.clone()).await {
 
@@ -202,9 +198,11 @@ impl Context {
         let mut events = self.decode_rows(&rows)?;
         self.enrich_events(&mut events);
 
-        if !events.is_empty() {
+        let event_count = events.len();
+        if event_count > 0 {
             let mut out = out.clone();
             out.send_batch(events).await.context(SendSnafu)?;
+            emit!(OdbcEventsReceived { count: event_count });
         }
 
         if let Some(last) = rows.last() {
