@@ -11,7 +11,7 @@ use vector_lib::{
     internal_event::{CountByteSize, InternalEventHandle as _, Registered},
     metrics::AgentDDSketch,
 };
-use warp::{Filter, filters::BoxedFilter, path, path::FullPath, reply::Response};
+use warp::{Filter, filters::BoxedFilter, path, path::FullPath, reject::Rejection, reply::Response};
 
 use super::ddmetric_proto::{Metadata, MetricPayload, SketchPayload, metric_payload};
 use super::{ApiKeyQueryParams, DatadogAgentSource, RequestHandler};
@@ -54,32 +54,42 @@ fn sketches_service(
     handler: RequestHandler,
     source: DatadogAgentSource,
 ) -> BoxedFilter<(Response,)> {
+    // Helper filter: extract path, api-key header, query params, validate API key
+    // Returns (FullPath, Option<Arc<str>>, DatadogAgentSource)
+    let validate_and_extract = {
+        let src = source.clone();
+        warp::path::full()
+            .and(warp::header::optional::<String>("dd-api-key"))
+            .and(warp::query::<ApiKeyQueryParams>())
+            .and_then(move |path: FullPath, api_token: Option<String>, query_params: ApiKeyQueryParams| {
+                let source = src.clone();
+                async move {
+                    let api_key = source
+                        .validate_api_key(path.as_str(), api_token, query_params.dd_api_key)?;
+                    Ok::<_, Rejection>((path, api_key, source))
+                }
+            })
+    };
+
     warp::post()
         .and(path!("api" / "beta" / "sketches" / ..))
-        .and(warp::path::full())
+        .and(validate_and_extract)
         .and(warp::header::optional::<String>("content-encoding"))
-        .and(warp::header::optional::<String>("dd-api-key"))
-        .and(warp::query::<ApiKeyQueryParams>())
         .and(warp::body::bytes())
         .and_then({
-            move |path: FullPath,
+            move |_, extracted: (FullPath, Option<Arc<str>>, DatadogAgentSource),
                   encoding_header: Option<String>,
-                  api_token: Option<String>,
-                  query_params: ApiKeyQueryParams,
                   body: Bytes| {
+                let (path, api_key, source) = extracted;
                 let events = source
-                    .validate_api_key(path.as_str(), api_token, query_params.dd_api_key)
-                    .and_then(|api_key| {
-                        source
-                            .decode(&encoding_header, body, path.as_str())
-                            .and_then(|body| {
-                                decode_datadog_sketches(
-                                    body,
-                                    api_key,
-                                    source.split_metric_namespace,
-                                    &source.events_received,
-                                )
-                            })
+                    .decode(&encoding_header, body, path.as_str())
+                    .and_then(|body| {
+                        decode_datadog_sketches(
+                            body,
+                            api_key,
+                            source.split_metric_namespace,
+                            &source.events_received,
+                        )
                     });
                 handler.clone().handle_request(events, super::METRICS)
             }
@@ -91,35 +101,45 @@ fn series_v1_service(
     handler: RequestHandler,
     source: DatadogAgentSource,
 ) -> BoxedFilter<(Response,)> {
+    // Helper filter: extract path, api-key header, query params, validate API key
+    // Returns (FullPath, Option<Arc<str>>, DatadogAgentSource)
+    let validate_and_extract = {
+        let src = source.clone();
+        warp::path::full()
+            .and(warp::header::optional::<String>("dd-api-key"))
+            .and(warp::query::<ApiKeyQueryParams>())
+            .and_then(move |path: FullPath, api_token: Option<String>, query_params: ApiKeyQueryParams| {
+                let source = src.clone();
+                async move {
+                    let api_key = source
+                        .validate_api_key(path.as_str(), api_token, query_params.dd_api_key)?;
+                    Ok::<_, Rejection>((path, api_key, source))
+                }
+            })
+    };
+
     warp::post()
         .and(path!("api" / "v1" / "series" / ..))
-        .and(warp::path::full())
+        .and(validate_and_extract)
         .and(warp::header::optional::<String>("content-encoding"))
-        .and(warp::header::optional::<String>("dd-api-key"))
-        .and(warp::query::<ApiKeyQueryParams>())
         .and(warp::body::bytes())
         .and_then({
-            move |path: FullPath,
+            move |_, extracted: (FullPath, Option<Arc<str>>, DatadogAgentSource),
                   encoding_header: Option<String>,
-                  api_token: Option<String>,
-                  query_params: ApiKeyQueryParams,
                   body: Bytes| {
+                let (path, api_key, source) = extracted;
                 let events = source
-                    .validate_api_key(path.as_str(), api_token, query_params.dd_api_key)
-                    .and_then(|api_key| {
-                        source
-                            .decode(&encoding_header, body, path.as_str())
-                            .and_then(|body| {
-                                decode_datadog_series_v1(
-                                    body,
-                                    api_key,
-                                    // Currently metrics do not have schemas defined, so for now we just pass a
-                                    // default one.
-                                    &Arc::new(schema::Definition::default_legacy_namespace()),
-                                    source.split_metric_namespace,
-                                    &source.events_received,
-                                )
-                            })
+                    .decode(&encoding_header, body, path.as_str())
+                    .and_then(|body| {
+                        decode_datadog_series_v1(
+                            body,
+                            api_key,
+                            // Currently metrics do not have schemas defined, so for now we just pass a
+                            // default one.
+                            &Arc::new(schema::Definition::default_legacy_namespace()),
+                            source.split_metric_namespace,
+                            &source.events_received,
+                        )
                     });
                 handler.clone().handle_request(events, super::METRICS)
             }
@@ -131,32 +151,42 @@ fn series_v2_service(
     handler: RequestHandler,
     source: DatadogAgentSource,
 ) -> BoxedFilter<(Response,)> {
+    // Helper filter: extract path, api-key header, query params, validate API key
+    // Returns (FullPath, Option<Arc<str>>, DatadogAgentSource)
+    let validate_and_extract = {
+        let src = source.clone();
+        warp::path::full()
+            .and(warp::header::optional::<String>("dd-api-key"))
+            .and(warp::query::<ApiKeyQueryParams>())
+            .and_then(move |path: FullPath, api_token: Option<String>, query_params: ApiKeyQueryParams| {
+                let source = src.clone();
+                async move {
+                    let api_key = source
+                        .validate_api_key(path.as_str(), api_token, query_params.dd_api_key)?;
+                    Ok::<_, Rejection>((path, api_key, source))
+                }
+            })
+    };
+
     warp::post()
         .and(path!("api" / "v2" / "series" / ..))
-        .and(warp::path::full())
+        .and(validate_and_extract)
         .and(warp::header::optional::<String>("content-encoding"))
-        .and(warp::header::optional::<String>("dd-api-key"))
-        .and(warp::query::<ApiKeyQueryParams>())
         .and(warp::body::bytes())
         .and_then({
-            move |path: FullPath,
+            move |_, extracted: (FullPath, Option<Arc<str>>, DatadogAgentSource),
                   encoding_header: Option<String>,
-                  api_token: Option<String>,
-                  query_params: ApiKeyQueryParams,
                   body: Bytes| {
+                let (path, api_key, source) = extracted;
                 let events = source
-                    .validate_api_key(path.as_str(), api_token, query_params.dd_api_key)
-                    .and_then(|api_key| {
-                        source
-                            .decode(&encoding_header, body, path.as_str())
-                            .and_then(|body| {
-                                decode_datadog_series_v2(
-                                    body,
-                                    api_key,
-                                    source.split_metric_namespace,
-                                    &source.events_received,
-                                )
-                            })
+                    .decode(&encoding_header, body, path.as_str())
+                    .and_then(|body| {
+                        decode_datadog_series_v2(
+                            body,
+                            api_key,
+                            source.split_metric_namespace,
+                            &source.events_received,
+                        )
                     });
                 handler.clone().handle_request(events, super::METRICS)
             }

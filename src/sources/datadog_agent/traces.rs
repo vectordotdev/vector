@@ -33,42 +33,49 @@ fn build_trace_filter(
     handler: RequestHandler,
     source: DatadogAgentSource,
 ) -> BoxedFilter<(Response,)> {
+    // Helper filter: extract path, api-key header, reported-language header, query params, validate API key
+    // Returns (FullPath, Option<Arc<str>>, Option<String>, DatadogAgentSource)
+    let validate_and_extract = {
+        let src = source.clone();
+        warp::path::full()
+            .and(warp::header::optional::<String>("dd-api-key"))
+            .and(warp::header::optional::<String>("X-Datadog-Reported-Languages"))
+            .and(warp::query::<ApiKeyQueryParams>())
+            .and_then(move |path: FullPath, api_token: Option<String>, reported_language: Option<String>, query_params: ApiKeyQueryParams| {
+                let source = src.clone();
+                async move {
+                    let api_key = source
+                        .validate_api_key(path.as_str(), api_token, query_params.dd_api_key)?;
+                    Ok::<_, Rejection>((path, api_key, reported_language, source))
+                }
+            })
+    };
+
     warp::post()
         .and(path!("api" / "v0.2" / "traces" / ..))
-        .and(warp::path::full())
+        .and(validate_and_extract)
         .and(warp::header::optional::<String>("content-encoding"))
-        .and(warp::header::optional::<String>("dd-api-key"))
-        .and(warp::header::optional::<String>(
-            "X-Datadog-Reported-Languages",
-        ))
-        .and(warp::query::<ApiKeyQueryParams>())
         .and(warp::body::bytes())
         .and_then({
-            move |path: FullPath,
+            move |_, extracted: (FullPath, Option<Arc<str>>, Option<String>, DatadogAgentSource),
                   encoding_header: Option<String>,
-                  api_token: Option<String>,
-                  reported_language: Option<String>,
-                  query_params: ApiKeyQueryParams,
                   body: Bytes| {
+                let (path, api_key, reported_language, source) = extracted;
                 let events = source
-                    .validate_api_key(path.as_str(), api_token, query_params.dd_api_key)
-                    .and_then(|api_key| {
-                        source
-                            .decode(&encoding_header, body, path.as_str())
-                            .and_then(|body| {
-                                handle_dd_trace_payload(
-                                    body,
-                                    api_key,
-                                    reported_language.as_ref(),
-                                    &source,
-                                )
-                                .map_err(|error| {
-                                    ErrorMessage::new(
-                                        StatusCode::UNPROCESSABLE_ENTITY,
-                                        format!("Error decoding Datadog traces: {error:?}"),
-                                    )
-                                })
-                            })
+                    .decode(&encoding_header, body, path.as_str())
+                    .and_then(|body| {
+                        handle_dd_trace_payload(
+                            body,
+                            api_key,
+                            reported_language.as_ref(),
+                            &source,
+                        )
+                        .map_err(|error| {
+                            ErrorMessage::new(
+                                StatusCode::UNPROCESSABLE_ENTITY,
+                                format!("Error decoding Datadog traces: {error:?}"),
+                            )
+                        })
                     });
                 handler.clone().handle_request(events, super::TRACES)
             }
