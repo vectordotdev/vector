@@ -11,13 +11,14 @@ use futures_util::StreamExt;
 use itertools::Itertools;
 use odbc_api::buffers::TextRowSet;
 use odbc_api::parameter::VarCharBox;
-use odbc_api::{ConnectionOptions, Cursor, Environment, IntoParameter, ResultSetMetadata};
+use odbc_api::{
+    ConnectionOptions, Cursor, Environment, IntoParameter, ResultSetMetadata, environment,
+};
 use snafu::{OptionExt, ResultExt, Snafu};
 use std::fs;
 use std::fs::File;
 use std::io::BufReader;
 use std::str::FromStr;
-use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::select;
 use tokio_util::codec::Decoder as _;
@@ -68,7 +69,7 @@ pub enum OdbcError {
 
 pub(crate) struct Context {
     cfg: OdbcConfig,
-    env: Arc<Environment>,
+    env: &'static Environment,
     cx: SourceContext,
     decoder: Decoder,
     log_namespace: LogNamespace,
@@ -81,11 +82,11 @@ impl Context {
         decoder: Decoder,
         log_namespace: LogNamespace,
     ) -> Result<Self, OdbcError> {
-        let env = Environment::new().context(DbSnafu)?;
+        let env = environment().context(DbSnafu)?;
 
         Ok(Self {
             cfg,
-            env: Arc::new(env),
+            env,
             cx,
             decoder,
             log_namespace,
@@ -170,7 +171,7 @@ impl Context {
             cause: "No statement",
         })?;
         let out = self.cx.out.clone();
-        let env = Arc::clone(&self.env);
+        let env = self.env;
 
         // Load the last-run metadata from disk when available.
         // If the file is missing, fall back to the initial parameters or the latest query result.
@@ -188,7 +189,7 @@ impl Context {
         let cfg = self.cfg.clone();
 
         let rows = execute_query(
-            &env,
+            env,
             &conn_str,
             &stmt_str,
             stmt_params,

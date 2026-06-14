@@ -108,7 +108,7 @@ async fn query_executed_with_init_params() {
     const LAST_RUN_METADATA_PATH: &str = "odbc_tracking-integration-tests.json";
 
     let conn_str = get_conn_str();
-    let env = odbc_api::Environment::new().unwrap();
+    let env = odbc_api::environment().unwrap();
     let conn = env
         .connect_with_connection_string(&conn_str, get_conn_opt())
         .unwrap();
@@ -207,7 +207,7 @@ async fn query_executed_with_filepath() {
     const LAST_RUN_METADATA_PATH: &str = "odbc_tracking-integration-tests.json";
 
     let conn_str = get_conn_str();
-    let env = odbc_api::Environment::new().unwrap();
+    let env = odbc_api::environment().unwrap();
     let conn = env
         .connect_with_connection_string(&conn_str, get_conn_opt())
         .unwrap();
@@ -306,7 +306,7 @@ INSERT INTO odbc_table (name, datetime) VALUES
 #[tokio::test]
 async fn query_number_types() {
     let conn_str = get_conn_str();
-    let env = odbc_api::Environment::new().unwrap();
+    let env = odbc_api::environment().unwrap();
     let conn = env
         .connect_with_connection_string(&conn_str, get_conn_opt())
         .unwrap();
@@ -427,7 +427,7 @@ INSERT INTO number_columns (
         .unwrap();
 
     let rows = execute_query(
-        &env,
+        env,
         &conn_str,
         "SELECT * FROM number_columns;",
         vec![],
@@ -542,7 +542,7 @@ INSERT INTO number_columns (
 #[tokio::test]
 async fn query_string_types() {
     let conn_str = get_conn_str();
-    let env = odbc_api::Environment::new().unwrap();
+    let env = odbc_api::environment().unwrap();
     let conn = env
         .connect_with_connection_string(&conn_str, get_conn_opt())
         .unwrap();
@@ -611,7 +611,7 @@ INSERT INTO string_columns (
         .unwrap();
 
     let rows = execute_query(
-        &env,
+        env,
         &conn_str,
         "SELECT * FROM string_columns;",
         vec![],
@@ -659,7 +659,7 @@ INSERT INTO string_columns (
 #[tokio::test]
 async fn query_timestamp_columns() {
     let conn_str = get_conn_str();
-    let env = odbc_api::Environment::new().unwrap();
+    let env = odbc_api::environment().unwrap();
     let conn = env
         .connect_with_connection_string(&conn_str, ConnectionOptions::default())
         .unwrap();
@@ -717,7 +717,7 @@ VALUES (
         .unwrap();
 
     let rows = execute_query(
-        &env,
+        env,
         &conn_str,
         "SELECT * FROM timestamp_columns;",
         vec![],
