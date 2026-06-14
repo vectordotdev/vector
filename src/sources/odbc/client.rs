@@ -125,14 +125,7 @@ impl Context {
     pub(crate) async fn run_schedule(self: Box<Self>) -> Result<(), ()> {
         let shutdown = self.cx.shutdown.clone();
 
-        let Some(ref schedule) = self.cfg.schedule else {
-            error!(
-                message = "Missing required `schedule` for ODBC source; the source is shutting down without running SQL."
-            );
-            return Err(());
-        };
-
-        let schedule = schedule.clone().stream(self.cfg.schedule_timezone);
+        let schedule = self.cfg.schedule.clone().stream(self.cfg.schedule_timezone);
         pin_mut!(schedule);
 
         let _ = register!(BytesReceived::from(Protocol::NONE));

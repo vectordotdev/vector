@@ -93,7 +93,7 @@ async fn scheduled_query_executed() {
     run_and_assert_source_compliance(
         OdbcConfig {
             connection_string: SensitiveString::from(conn_str),
-            schedule: Some("*/1 * * * * *".into()),
+            schedule: "*/1 * * * * *".into(),
             statement: Some("SELECT 1".to_string()),
             iterations: Some(1),
             ..Default::default()
@@ -165,7 +165,7 @@ INSERT INTO odbc_table (name, datetime) VALUES
     let events = run_and_assert_source_compliance(
         OdbcConfig {
             connection_string: SensitiveString::from(conn_str),
-            schedule: Some("*/1 * * * * *".into()),
+            schedule: "*/1 * * * * *".into(),
             statement: Some("SELECT * FROM odbc_table WHERE id > ? LIMIT 1;".to_string()),
             statement_init_params: Some(params),
             tracking_columns: Some(vec!["id".to_string()]),
@@ -268,7 +268,7 @@ INSERT INTO odbc_table (name, datetime) VALUES
     let events = run_and_assert_source_compliance(
         OdbcConfig {
             connection_string_filepath: Some(CONNECTION_STRING_FILE_PATH.to_string()),
-            schedule: Some("*/1 * * * * *".into()),
+            schedule: "*/1 * * * * *".into(),
             statement_filepath: Some(STATEMENT_FILE_PATH.to_string()),
             statement_init_params: Some(params),
             tracking_columns: Some(vec!["id".to_string()]),

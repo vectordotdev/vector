@@ -83,7 +83,7 @@ pub struct OdbcConfig {
 
     /// Cron expression used to schedule database queries. This field is required.
     #[configurable(derived)]
-    pub schedule: Option<OdbcSchedule>,
+    pub schedule: OdbcSchedule,
 
     /// The timezone to use for the `schedule`.
     /// Typically the timezone used when evaluating the cron expression.
@@ -213,12 +213,16 @@ const fn default_odbc_max_str_limit() -> usize {
     4096
 }
 
+fn default_schedule() -> OdbcSchedule {
+    "0 * * * * *".into()
+}
+
 impl Default for OdbcConfig {
     fn default() -> Self {
         Self {
             connection_string: SensitiveString::default(),
             connection_string_filepath: None,
-            schedule: None,
+            schedule: default_schedule(),
             schedule_timezone: Tz::UTC,
             statement: None,
             statement_timeout: Duration::from_secs(3),
