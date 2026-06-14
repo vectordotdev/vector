@@ -26,6 +26,7 @@ pub struct OdbcConfig {
     #[configurable(metadata(
         docs::examples = "driver={MariaDB Unicode};server=<ip or host>;port=<port number>;database=<database name>;uid=<user>;pwd=<password>"
     ))]
+    #[serde(default)]
     pub connection_string: String,
 
     /// The path to the file that contains the connection string.
