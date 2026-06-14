@@ -14,4 +14,4 @@ matrix:
 # expressions are evaluated using https://github.com/micromatch/picomatch
 paths:
   - "src/sources/odbc/**"
-  - "tests/integration/odbc/**"
+  - "tests/integration/odbc-mariadb/**"
