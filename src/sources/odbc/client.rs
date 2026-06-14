@@ -23,7 +23,7 @@ use std::time::{Duration, Instant};
 use tokio::select;
 use tokio_util::codec::Decoder as _;
 use vector_common::internal_event::{BytesReceived, Protocol};
-use vector_lib::codecs::{Decoder, StreamDecodingError};
+use vector_lib::codecs::Decoder;
 use vector_lib::emit;
 use vector_lib::source_sender::SendError;
 use vrl::prelude::*;
@@ -65,6 +65,11 @@ pub enum OdbcError {
 
     #[snafu(display("Configuration error: {cause}"))]
     ConfigError { cause: &'static str },
+
+    #[snafu(display("Decode error: {source}"))]
+    Decode {
+        source: vector_lib::codecs::decoding::Error,
+    },
 }
 
 pub(crate) struct Context {
@@ -232,12 +237,8 @@ impl Context {
                 Ok(Some((next, _))) => events.extend(next),
                 Ok(None) => break,
                 Err(error) => {
-                    // Error is logged by `vector_lib::codecs::Decoder`, no further handling
-                    // is needed here.
-                    if !error.can_continue() {
-                        break;
-                    }
-                    break;
+                    // tracking metadata is not advanced past rows that were not decoded.
+                    return Err(OdbcError::Decode { source: error });
                 }
             }
         }
