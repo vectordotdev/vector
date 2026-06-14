@@ -1,5 +1,7 @@
-use vector_common::internal_event::{CounterName, InternalEvent, error_stage, error_type};
+use vector_common::internal_event::{CounterName, InternalEvent};
 use vector_lib::{NamedInternalEvent, counter};
+
+use crate::sources::odbc::OdbcError;
 
 #[derive(Debug, NamedInternalEvent)]
 pub struct OdbcEventsReceived {
@@ -28,20 +30,25 @@ impl InternalEvent for OdbcEventsReceived {
 #[derive(Debug, NamedInternalEvent)]
 pub struct OdbcFailedError<'a> {
     pub statement: &'a str,
+    pub error: OdbcError,
 }
 
 impl InternalEvent for OdbcFailedError<'_> {
     fn emit(self) {
+        let error_type = self.error.error_type();
+        let stage = self.error.error_stage();
+
         error!(
             message = "Unable to execute statement.",
             statement = %self.statement,
-            error_type = error_type::COMMAND_FAILED,
-            stage = error_stage::RECEIVING,
+            error = %self.error,
+            error_type = error_type,
+            stage = stage,
         );
         counter!(
             CounterName::ComponentErrorsTotal,
-            "error_type" => error_type::COMMAND_FAILED,
-            "stage" => error_stage::RECEIVING,
+            "error_type" => error_type,
+            "stage" => stage,
         )
         .increment(1);
     }

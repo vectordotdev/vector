@@ -22,7 +22,7 @@ use std::str::FromStr;
 use std::time::{Duration, Instant};
 use tokio::select;
 use tokio_util::codec::Decoder as _;
-use vector_common::internal_event::{BytesReceived, Protocol};
+use vector_common::internal_event::{BytesReceived, Protocol, error_stage, error_type};
 use vector_lib::codecs::Decoder;
 use vector_lib::emit;
 use vector_lib::source_sender::SendError;
@@ -70,6 +70,26 @@ pub enum OdbcError {
     Decode {
         source: vector_lib::codecs::decoding::Error,
     },
+}
+
+impl OdbcError {
+    pub(crate) const fn error_type(&self) -> &'static str {
+        match self {
+            Self::Db { .. } => error_type::REQUEST_FAILED,
+            Self::Io { .. } => error_type::IO_FAILED,
+            Self::SendError { .. } => error_type::WRITER_FAILED,
+            Self::Json { .. } | Self::Decode { .. } => error_type::PARSER_FAILED,
+            Self::ConfigError { .. } => error_type::CONFIGURATION_FAILED,
+        }
+    }
+
+    pub(crate) const fn error_stage(&self) -> &'static str {
+        match self {
+            Self::SendError { .. } => error_stage::SENDING,
+            Self::Json { .. } | Self::Decode { .. } => error_stage::PROCESSING,
+            _ => error_stage::RECEIVING,
+        }
+    }
 }
 
 pub(crate) struct Context {
@@ -126,21 +146,24 @@ impl Context {
                 }
                 next = schedule.next() => {
                     let instant = Instant::now();
-                    if let Ok(result) = self.process(prev_result.clone()).await {
+                    match self.process(prev_result.clone()).await {
+                        Ok(result) => {
+                            // Update the cached result when the query returns rows.
+                            if result.is_some() {
+                                prev_result = result;
+                            }
 
-                        // Update the cached result when the query returns rows.
-                        if result.is_some() {
-                            prev_result = result;
+                            emit!(OdbcQueryExecuted {
+                                statement: &self.cfg.statement.clone().unwrap_or_default(),
+                                elapsed: instant.elapsed().as_millis(),
+                            });
                         }
-
-                        emit!(OdbcQueryExecuted {
-                          statement: &self.cfg.statement.clone().unwrap_or_default(),
-                          elapsed: instant.elapsed().as_millis()
-                        })
-                    } else {
-                        emit!(OdbcFailedError {
-                            statement: &self.cfg.statement.clone().unwrap_or_default(),
-                        })
+                        Err(error) => {
+                            emit!(OdbcFailedError {
+                                statement: &self.cfg.statement.clone().unwrap_or_default(),
+                                error,
+                            });
+                        }
                     }
 
                     // When no further schedule is defined, run once and then stop.

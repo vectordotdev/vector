@@ -59,6 +59,8 @@
 
 #[cfg(feature = "sources-odbc")]
 mod client;
+#[cfg(feature = "sources-odbc")]
+pub(crate) use client::OdbcError;
 mod config;
 #[cfg(all(test, feature = "odbc-integration-tests"))]
 mod integration_tests;
