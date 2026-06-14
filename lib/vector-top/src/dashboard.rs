@@ -170,9 +170,9 @@ static HEADER: [&str; NUM_COLUMNS] = [
     columns::BYTES_IN,
     columns::EVENTS_OUT,
     columns::BYTES_OUT,
-    columns::ERRORS,
     #[cfg(feature = "allocation-tracing")]
     columns::MEMORY_USED,
+    columns::ERRORS,
 ];
 
 struct Widgets<'a> {
@@ -348,13 +348,17 @@ impl<'a> Widgets<'a> {
                     r.sent_bytes_throughput_sec,
                     self.human_metrics,
                 ),
+                #[cfg(feature = "allocation-tracing")]
+                if state.allocation_tracing_active {
+                    r.allocated_bytes.human_format_bytes()
+                } else {
+                    "disabled".to_string()
+                },
                 if self.human_metrics {
                     r.errors.human_format()
                 } else {
                     r.errors.thousands_format()
                 },
-                #[cfg(feature = "allocation-tracing")]
-                r.allocated_bytes.human_format_bytes(),
             ];
 
             data.extend_from_slice(&formatted_metrics);
@@ -383,26 +387,26 @@ impl<'a> Widgets<'a> {
             &[
                 Constraint::Percentage(13), // ID
                 Constraint::Percentage(8),  // Output
-                Constraint::Percentage(4),  // Kind
+                Constraint::Percentage(5),  // Kind
                 Constraint::Percentage(9),  // Type
                 Constraint::Percentage(10), // Events In
                 Constraint::Percentage(12), // Bytes In
                 Constraint::Percentage(10), // Events Out
                 Constraint::Percentage(12), // Bytes Out
-                Constraint::Percentage(8),  // Errors
-                Constraint::Percentage(14), // Allocated Bytes
+                Constraint::Percentage(14), // Memory Used
+                Constraint::Percentage(7),  // Errors
             ]
         } else {
             &[
                 Constraint::Percentage(13), // ID
                 Constraint::Percentage(12), // Output
-                Constraint::Percentage(9),  // Kind
+                Constraint::Percentage(10), // Kind
                 Constraint::Percentage(6),  // Type
                 Constraint::Percentage(12), // Events In
                 Constraint::Percentage(14), // Bytes In
                 Constraint::Percentage(12), // Events Out
                 Constraint::Percentage(14), // Bytes Out
-                Constraint::Percentage(8),  // Errors
+                Constraint::Percentage(7),  // Errors
             ]
         };
         let w = Table::new(items, widths)
@@ -629,7 +633,7 @@ pub async fn init_dashboard<'a>(
     url: &'a str,
     interval: u32,
     human_metrics: bool,
-    event_tx: state::EventTx,
+    ui_event_tx: state::UiEventTx,
     mut state_rx: state::StateRx,
     mut shutdown_rx: oneshot::Receiver<()>,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -657,7 +661,8 @@ pub async fn init_dashboard<'a>(
 
     loop {
         tokio::select! {
-            Some(state) = state_rx.recv() => {
+            Ok(()) = state_rx.changed() => {
+                let state = state_rx.borrow_and_update().clone();
                 if state.ui.filter_visible {
                     input_mode = InputMode::FilterInput;
                 } else if state.ui.sort_visible {
@@ -671,7 +676,7 @@ pub async fn init_dashboard<'a>(
             },
             k = key_press_rx.recv() => {
                 let k = k.unwrap();
-                if handle_input(input_mode, k, &event_tx, &terminal).await {
+                if handle_input(input_mode, k, &ui_event_tx, &terminal).await {
                     _ = key_press_kill_tx.send(());
                     break;
                 }

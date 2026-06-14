@@ -4,38 +4,19 @@ ARG BUILD=false
 
 FROM docker.io/rust:${RUST_VERSION}-slim-trixie
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    cmake \
-    curl \
-    git \
-    clang \
-    libclang-dev \
-    libsasl2-dev \
-    libssl-dev \
-    libxxhash-dev \
-    odbcinst \
-    odbc-mariadb \
-    odbc-postgresql \
-    zlib1g-dev \
-    zlib1g \
-    unixodbc \
-    unixodbc-dev \
-    unzip \
-    mold \
-  && rm -rf /var/lib/apt/lists/*
+COPY scripts/environment/install-debian-build-deps.sh /
+RUN bash /install-debian-build-deps.sh
 
 COPY tests/data/ca/certs /certs
 
 COPY scripts/environment/install-protoc.sh /
 COPY scripts/environment/prepare.sh /
 COPY scripts/environment/binstall.sh /
-COPY scripts/environment/release-flags.sh /
 
 WORKDIR /vector
 COPY rust-toolchain.toml .
 
-RUN bash /prepare.sh --modules=cargo-nextest
+RUN bash /prepare.sh --modules=cargo-nextest,cargo-llvm-cov
 RUN bash /install-protoc.sh
 
 COPY . .

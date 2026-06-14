@@ -14,7 +14,7 @@ see which components support specific guarantees.
 
 ## Acknowledgement guarantees
 
-Vector supports end-to-end acknowledgement for the majority of its
+Vector supports [end-to-end acknowledgements][e2e_acks] for the majority of its
 sources and sinks. This is a system which tracks the delivery status of
 an event through the lifetime of that event as it travels from the
 originating source to any number of destination sinks. Support for this
@@ -61,12 +61,13 @@ delivery?](#faq-at-least-once) FAQ below).
 In order to achieve at-least-once delivery between restarts,
 your sink must be configured to use disk-based buffers:
 
-```toml title="vector.toml"
-[sinks.my_sink_id]
-  [sinks.my_sink_id.buffer]
-    type = "disk"
-    when_full = "block"
-    max_size = 104900000 # 100MiB
+```yaml title="vector.yaml"
+sinks:
+  my_sink_id:
+    buffer:
+      type: "disk"
+      when_full: "block"
+      max_size: 104900000 # 100MiB
 ```
 
 Refer to each [sink's][sinks] documentation for further guidance on its buffer options.
@@ -120,7 +121,11 @@ will provide ample time to transition and, when possible, strive to retain backw
 
 One of the unique advantages of the metrics and logging use cases is that data is usually used for diagnostic purposes only. Therefore, losing the occasional event has little impact on your business. This affords you the opportunity to provision your pipeline towards performance, simplicity, and cost reduction. On the other hand, if you're using your data to perform business critical functions, then data loss is not acceptable and therefore requires "at-least-once" delivery.
 
-To clarify, even though a source or sink is marked as "best effort" it doesn't mean Vector takes delivery lightly. In fact, once data is within the boundary of Vector it won't be lost if you've configured on-disk buffers. Data loss for "best-effort" sources and sinks is almost always due to the limitations of the underlying protocol.
+To clarify, even though a source or sink is marked as "best effort" it doesn't mean Vector takes
+delivery lightly. For stronger delivery guarantees, use components that support
+[end-to-end acknowledgements][e2e_acks] and configure disk buffers where events need to survive
+restarts. Disk buffers improve durability for events that have been written to them, but they do not
+by themselves guarantee end-to-end delivery.
 
 ### Does Vector support exactly-once delivery?
 
@@ -133,4 +138,5 @@ filters.
 
 [bugs]: https://github.com/vectordotdev/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22type%3A+bug%22
 [components]: /components
+[e2e_acks]: /docs/architecture/end-to-end-acknowledgements
 [event]: /docs/architecture/data-model

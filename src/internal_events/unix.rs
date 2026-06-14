@@ -2,11 +2,10 @@
 
 use std::{io::Error, path::Path};
 
-use metrics::counter;
-use vector_lib::NamedInternalEvent;
 use vector_lib::internal_event::{
-    ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+    ComponentEventsDropped, CounterName, InternalEvent, UNINTENTIONAL, error_stage, error_type,
 };
+use vector_lib::{NamedInternalEvent, counter};
 
 use crate::internal_events::SocketOutgoingConnectionError;
 
@@ -18,7 +17,7 @@ pub struct UnixSocketConnectionEstablished<'a> {
 impl InternalEvent for UnixSocketConnectionEstablished<'_> {
     fn emit(self) {
         debug!(message = "Connected.", path = ?self.path);
-        counter!("connection_established_total", "mode" => "unix").increment(1);
+        counter!(CounterName::ConnectionEstablishedTotal, "mode" => "unix").increment(1);
     }
 }
 
@@ -59,7 +58,7 @@ impl<E: std::fmt::Display> InternalEvent for UnixSocketError<'_, E> {
             stage = error_stage::PROCESSING,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_type" => error_type::CONNECTION_FAILED,
             "stage" => error_stage::PROCESSING,
         )
@@ -84,7 +83,7 @@ impl<E: std::fmt::Display> InternalEvent for UnixSocketSendError<'_, E> {
             stage = error_stage::SENDING,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_type" => error_type::WRITER_FAILED,
             "stage" => error_stage::SENDING,
         )
@@ -112,7 +111,7 @@ impl InternalEvent for UnixSendIncompleteError {
             stage = error_stage::SENDING,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_type" => error_type::WRITER_FAILED,
             "stage" => error_stage::SENDING,
         )
@@ -139,7 +138,7 @@ impl InternalEvent for UnixSocketFileDeleteError<'_> {
             stage = error_stage::PROCESSING,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_code" => "delete_socket_file",
             "error_type" => error_type::WRITER_FAILED,
             "stage" => error_stage::PROCESSING,

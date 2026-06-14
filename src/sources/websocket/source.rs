@@ -657,7 +657,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn websocket_source_exits_on_rejected_intial_messsage() {
+    async fn websocket_source_exits_on_rejected_initial_message() {
         let server_addr = start_reject_initial_message_server().await;
 
         let mut config = make_config(&server_addr);

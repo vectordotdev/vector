@@ -12,7 +12,7 @@ use ratatui::{
     widgets::ListState,
 };
 use regex::Regex;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, watch};
 use vector_common::internal_event::DEFAULT_OUTPUT;
 
 use vector_common::config::ComponentKey;
@@ -51,7 +51,6 @@ pub enum EventType {
     ComponentAdded(ComponentRow),
     ComponentRemoved(ComponentKey),
     ConnectionUpdated(ConnectionStatus),
-    Ui(UiEventType),
 }
 
 #[derive(Debug)]
@@ -122,6 +121,10 @@ pub struct State {
     pub sort_state: SortState,
     pub filter_state: FilterState,
     pub ui: UiState,
+    /// Set to `true` once we receive the first `AllocatedBytes` event,
+    /// indicating the connected Vector instance has allocation tracing active.
+    #[cfg(feature = "allocation-tracing")]
+    pub allocation_tracing_active: bool,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -343,6 +346,8 @@ impl State {
             ui: UiState::default(),
             sort_state: SortState::default(),
             filter_state: FilterState::default(),
+            #[cfg(feature = "allocation-tracing")]
+            allocation_tracing_active: false,
         }
     }
 
@@ -368,7 +373,9 @@ impl State {
 
 pub type EventTx = mpsc::Sender<EventType>;
 pub type EventRx = mpsc::Receiver<EventType>;
-pub type StateRx = mpsc::Receiver<State>;
+pub type UiEventRx = mpsc::Receiver<UiEventType>;
+pub type UiEventTx = mpsc::Sender<UiEventType>;
+pub type StateRx = watch::Receiver<State>;
 
 #[derive(Debug, Clone, Default)]
 pub struct OutputMetrics {
@@ -413,123 +420,143 @@ impl ComponentRow {
     }
 }
 
-/// Takes the receiver `EventRx` channel, and returns a `StateRx` state receiver. This
+/// Takes the receiver `EventRx` and `UiEventRx` channels, and returns a `StateRx` state receiver. This
 /// represents the single destination for handling subscriptions and returning 'immutable' state
 /// for re-rendering the dashboard. This approach uses channels vs. mutexes.
-pub async fn updater(mut event_rx: EventRx, mut state: State) -> StateRx {
-    let (tx, rx) = mpsc::channel(20);
+/// UI and other events are handled separately, to ensure one doesn't block the other.
+pub async fn updater(
+    mut event_rx: EventRx,
+    mut ui_event_rx: UiEventRx,
+    mut state: State,
+) -> StateRx {
+    let (tx, rx) = watch::channel(state.clone());
 
     tokio::spawn(async move {
-        while let Some(event_type) = event_rx.recv().await {
-            match event_type {
-                EventType::InitializeState(new_state) => {
-                    let old_state = state;
-                    state = new_state;
-                    // Keep filters, sort and UI states
-                    state.filter_state = old_state.filter_state;
-                    state.sort_state = old_state.sort_state;
-                    state.ui = old_state.ui;
-                }
-                EventType::ReceivedBytesTotals(rows) => {
-                    for (key, v) in rows {
-                        if let Some(r) = state.components.get_mut(&key) {
-                            r.received_bytes_total = v;
-                        }
-                    }
-                }
-                EventType::ReceivedBytesThroughputs(rows) => {
-                    for (key, v) in rows {
-                        if let Some(r) = state.components.get_mut(&key) {
-                            r.received_bytes_throughput_sec = v;
-                        }
-                    }
-                }
-                EventType::ReceivedEventsTotals(rows) => {
-                    for (key, v) in rows {
-                        if let Some(r) = state.components.get_mut(&key) {
-                            r.received_events_total = v;
-                        }
-                    }
-                }
-                EventType::ReceivedEventsThroughputs(rows) => {
-                    for (key, v) in rows {
-                        if let Some(r) = state.components.get_mut(&key) {
-                            r.received_events_throughput_sec = v;
-                        }
-                    }
-                }
-                EventType::SentBytesTotals(rows) => {
-                    for (key, v) in rows {
-                        if let Some(r) = state.components.get_mut(&key) {
-                            r.sent_bytes_total = v;
-                        }
-                    }
-                }
-                EventType::SentBytesThroughputs(rows) => {
-                    for (key, v) in rows {
-                        if let Some(r) = state.components.get_mut(&key) {
-                            r.sent_bytes_throughput_sec = v;
-                        }
-                    }
-                }
-                EventType::SentEventsTotals(rows) => {
-                    for m in rows {
-                        if let Some(r) = state.components.get_mut(&m.key) {
-                            r.sent_events_total = m.total;
-                            for (id, v) in m.outputs {
-                                r.outputs
-                                    .entry(id)
-                                    .or_insert_with(OutputMetrics::default)
-                                    .sent_events_total = v;
+        loop {
+            tokio::select! {
+                biased;
+
+                // Higher priority for UI events, to prevent visible freezes
+                Some(event_type) = ui_event_rx.recv() => {
+                    handle_ui_event(event_type, &mut state);
+                },
+
+                ev = event_rx.recv() => {
+                    if let Some(event_type) = ev {
+                        match event_type {
+                            EventType::InitializeState(new_state) => {
+                                let old_state = state;
+                                state = new_state;
+                                // Keep filters, sort and UI states
+                                state.filter_state = old_state.filter_state;
+                                state.sort_state = old_state.sort_state;
+                                state.ui = old_state.ui;
+                            }
+                            EventType::ReceivedBytesTotals(rows) => {
+                                for (key, v) in rows {
+                                    if let Some(r) = state.components.get_mut(&key) {
+                                        r.received_bytes_total = v;
+                                    }
+                                }
+                            }
+                            EventType::ReceivedBytesThroughputs(rows) => {
+                                for (key, v) in rows {
+                                    if let Some(r) = state.components.get_mut(&key) {
+                                        r.received_bytes_throughput_sec = v;
+                                    }
+                                }
+                            }
+                            EventType::ReceivedEventsTotals(rows) => {
+                                for (key, v) in rows {
+                                    if let Some(r) = state.components.get_mut(&key) {
+                                        r.received_events_total = v;
+                                    }
+                                }
+                            }
+                            EventType::ReceivedEventsThroughputs(rows) => {
+                                for (key, v) in rows {
+                                    if let Some(r) = state.components.get_mut(&key) {
+                                        r.received_events_throughput_sec = v;
+                                    }
+                                }
+                            }
+                            EventType::SentBytesTotals(rows) => {
+                                for (key, v) in rows {
+                                    if let Some(r) = state.components.get_mut(&key) {
+                                        r.sent_bytes_total = v;
+                                    }
+                                }
+                            }
+                            EventType::SentBytesThroughputs(rows) => {
+                                for (key, v) in rows {
+                                    if let Some(r) = state.components.get_mut(&key) {
+                                        r.sent_bytes_throughput_sec = v;
+                                    }
+                                }
+                            }
+                            EventType::SentEventsTotals(rows) => {
+                                for m in rows {
+                                    if let Some(r) = state.components.get_mut(&m.key) {
+                                        r.sent_events_total = m.total;
+                                        for (id, v) in m.outputs {
+                                            r.outputs
+                                                .entry(id)
+                                                .or_insert_with(OutputMetrics::default)
+                                                .sent_events_total = v;
+                                        }
+                                    }
+                                }
+                            }
+                            EventType::SentEventsThroughputs(rows) => {
+                                for m in rows {
+                                    if let Some(r) = state.components.get_mut(&m.key) {
+                                        r.sent_events_throughput_sec = m.total;
+                                        for (id, v) in m.outputs {
+                                            r.outputs
+                                                .entry(id)
+                                                .or_insert_with(OutputMetrics::default)
+                                                .sent_events_throughput_sec = v;
+                                        }
+                                    }
+                                }
+                            }
+                            EventType::ErrorsTotals(rows) => {
+                                for (key, v) in rows {
+                                    if let Some(r) = state.components.get_mut(&key) {
+                                        r.errors = v;
+                                    }
+                                }
+                            }
+                            #[cfg(feature = "allocation-tracing")]
+                            EventType::AllocatedBytes(rows) => {
+                                for (key, v) in rows {
+                                    if let Some(r) = state.components.get_mut(&key) {
+                                        r.allocated_bytes = v;
+                                    }
+                                }
+                            }
+                            EventType::ComponentAdded(c) => {
+                                _ = state.components.insert(c.key.clone(), c);
+                            }
+                            EventType::ComponentRemoved(key) => {
+                                _ = state.components.remove(&key);
+                            }
+                            EventType::ConnectionUpdated(status) => {
+                                state.connection_status = status;
+                            }
+                            EventType::UptimeChanged(uptime) => {
+                                state.uptime = Duration::from_secs_f64(uptime);
                             }
                         }
+                    } else {
+                        break;
                     }
-                }
-                EventType::SentEventsThroughputs(rows) => {
-                    for m in rows {
-                        if let Some(r) = state.components.get_mut(&m.key) {
-                            r.sent_events_throughput_sec = m.total;
-                            for (id, v) in m.outputs {
-                                r.outputs
-                                    .entry(id)
-                                    .or_insert_with(OutputMetrics::default)
-                                    .sent_events_throughput_sec = v;
-                            }
-                        }
-                    }
-                }
-                EventType::ErrorsTotals(rows) => {
-                    for (key, v) in rows {
-                        if let Some(r) = state.components.get_mut(&key) {
-                            r.errors = v;
-                        }
-                    }
-                }
-                #[cfg(feature = "allocation-tracing")]
-                EventType::AllocatedBytes(rows) => {
-                    for (key, v) in rows {
-                        if let Some(r) = state.components.get_mut(&key) {
-                            r.allocated_bytes = v;
-                        }
-                    }
-                }
-                EventType::ComponentAdded(c) => {
-                    _ = state.components.insert(c.key.clone(), c);
-                }
-                EventType::ComponentRemoved(key) => {
-                    _ = state.components.remove(&key);
-                }
-                EventType::ConnectionUpdated(status) => {
-                    state.connection_status = status;
-                }
-                EventType::UptimeChanged(uptime) => {
-                    state.uptime = Duration::from_secs_f64(uptime);
-                }
-                EventType::Ui(ui_event_type) => handle_ui_event(ui_event_type, &mut state),
+                },
+
             }
 
             // Send updated map to listeners
-            _ = tx.send(state.clone()).await;
+            _ = tx.send(state.clone());
         }
     });
 
