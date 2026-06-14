@@ -1,7 +1,9 @@
-use crate::config::{SourceContext, log_schema};
+use crate::config::{LogNamespace, SourceContext, log_schema};
+use crate::event::Event;
 use crate::internal_events::{OdbcEventsReceived, OdbcFailedError, OdbcQueryExecuted};
 use crate::sinks::prelude::*;
 use crate::sources::odbc::config::OdbcConfig;
+use bytes::BytesMut;
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime, Utc};
 use chrono_tz::Tz;
 use futures::pin_mut;
@@ -18,7 +20,9 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::select;
+use tokio_util::codec::Decoder as _;
 use vector_common::internal_event::{BytesReceived, Protocol};
+use vector_lib::codecs::{Decoder, StreamDecodingError};
 use vector_lib::emit;
 use vector_lib::source_sender::SendError;
 use vrl::prelude::*;
@@ -66,16 +70,25 @@ pub(crate) struct Context {
     cfg: OdbcConfig,
     env: Arc<Environment>,
     cx: SourceContext,
+    decoder: Decoder,
+    log_namespace: LogNamespace,
 }
 
 impl Context {
-    pub(crate) fn new(cfg: OdbcConfig, cx: SourceContext) -> Result<Self, OdbcError> {
+    pub(crate) fn new(
+        cfg: OdbcConfig,
+        cx: SourceContext,
+        decoder: Decoder,
+        log_namespace: LogNamespace,
+    ) -> Result<Self, OdbcError> {
         let env = Environment::new().context(DbSnafu)?;
 
         Ok(Self {
             cfg,
             env: Arc::new(env),
             cx,
+            decoder,
+            log_namespace,
         })
     }
 
@@ -157,7 +170,6 @@ impl Context {
             cause: "No statement",
         })?;
         let out = self.cx.out.clone();
-        let log_schema = log_schema();
         let env = Arc::clone(&self.env);
 
         // Load the last-run metadata from disk when available.
@@ -184,20 +196,13 @@ impl Context {
             cfg.odbc_max_str_limit,
         )?;
 
-        // Example with query results: `{"message":[{ ... }],"timestamp":"2025-10-21T00:00:00.05275Z"}`
-        // Example with no query results: `{"message":[],"timestamp":"2025-10-21T00:00:00.05275Z"}`
-        let mut event = LogEvent::default();
-        event.maybe_insert(
-            log_schema.timestamp_key_target_path(),
-            Value::Timestamp(Utc::now()),
-        );
-        event.maybe_insert(
-            log_schema.message_key_target_path(),
-            Value::Array(rows.clone()),
-        );
+        let mut events = self.decode_rows(&rows)?;
+        self.enrich_events(&mut events);
 
-        let mut out = out.clone();
-        out.send_event(event).await.context(SendSnafu)?;
+        if !events.is_empty() {
+            let mut out = out.clone();
+            out.send_batch(events).await.context(SendSnafu)?;
+        }
 
         if let Some(last) = rows.last() {
             let Some(tracking_columns) = cfg.tracking_columns else {
@@ -213,6 +218,47 @@ impl Context {
         }
 
         Ok(None)
+    }
+
+    fn decode_rows(&self, rows: &Rows) -> Result<Vec<Event>, OdbcError> {
+        let payload = serde_json::to_vec(rows).context(JsonSnafu)?;
+        let mut buf = BytesMut::from(payload.as_slice());
+        let mut events = Vec::new();
+        let mut decoder = self.decoder.clone();
+
+        loop {
+            match decoder.decode_eof(&mut buf) {
+                Ok(Some((next, _))) => events.extend(next),
+                Ok(None) => break,
+                Err(error) => {
+                    // Error is logged by `vector_lib::codecs::Decoder`, no further handling
+                    // is needed here.
+                    if !error.can_continue() {
+                        break;
+                    }
+                    break;
+                }
+            }
+        }
+
+        Ok(events)
+    }
+
+    fn enrich_events(&self, events: &mut [Event]) {
+        let now = Utc::now();
+
+        for event in events {
+            let Event::Log(log) = event else {
+                continue;
+            };
+
+            self.log_namespace
+                .insert_standard_vector_source_metadata(log, OdbcConfig::NAME, now);
+
+            if let Some(timestamp_key) = log_schema().timestamp_key_target_path() {
+                log.try_insert(timestamp_key, now);
+            }
+        }
     }
 }
 

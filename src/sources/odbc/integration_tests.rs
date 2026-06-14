@@ -40,10 +40,27 @@ const fn get_conn_opt() -> ConnectionOptions {
 
 fn get_value_from_event<'a>(event: &'a Event, key: &str) -> Option<Cow<'a, str>> {
     let log = event.as_log();
+
+    if let Some(value) = log.get(key) {
+        return value.as_str();
+    }
+
     let msg = log.get_message()?;
-    let arr_msg = msg.as_array_unwrap();
-    let value = arr_msg[0].get(key);
-    value?.as_str()
+    if let Some(arr) = msg.as_array() {
+        return arr.first()?.get(key)?.as_str();
+    }
+
+    let json: serde_json::Value = if let Some(bytes) = msg.as_bytes() {
+        serde_json::from_slice(bytes.as_ref()).ok()?
+    } else {
+        serde_json::from_str(msg.as_str()?.as_ref()).ok()?
+    };
+
+    json.as_array()?
+        .first()?
+        .get(key)?
+        .as_str()
+        .map(|value| Cow::Owned(value.to_owned()))
 }
 
 #[tokio::test]

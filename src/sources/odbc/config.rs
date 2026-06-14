@@ -1,5 +1,5 @@
 use crate::config::{LogNamespace, SourceConfig, SourceContext, SourceOutput, log_schema};
-use crate::serde::default_decoding;
+use crate::serde::{default_decoding, default_framing_message_based};
 use crate::sources::Source;
 use crate::sources::odbc::client::Context;
 use crate::sources::odbc::schedule::OdbcSchedule;
@@ -10,7 +10,7 @@ use serde_with::serde_as;
 use std::fs;
 use std::time::Duration;
 use vector_config_macros::configurable_component;
-use vector_lib::codecs::decoding::DeserializerConfig;
+use vector_lib::codecs::{DecodingConfig, decoding::DeserializerConfig};
 use vrl::prelude::{Kind, ObjectMap};
 
 /// Configuration for the `odbc` source.
@@ -179,6 +179,14 @@ impl OdbcConfig {
             .and_then(|path| fs::read_to_string(path).ok())
             .or_else(|| self.statement.clone())
     }
+
+    pub fn get_decoding_config(&self, log_namespace: LogNamespace) -> DecodingConfig {
+        DecodingConfig::new(
+            default_framing_message_based(),
+            self.decoding.clone(),
+            log_namespace,
+        )
+    }
 }
 
 impl_generate_config_from_default!(OdbcConfig);
@@ -231,7 +239,9 @@ impl Default for OdbcConfig {
 #[typetag::serde(name = "odbc")]
 impl SourceConfig for OdbcConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
-        let guard = Context::new(self.clone(), cx)?;
+        let log_namespace = cx.log_namespace(self.log_namespace);
+        let decoder = self.get_decoding_config(log_namespace).build()?;
+        let guard = Context::new(self.clone(), cx, decoder, log_namespace)?;
         let context = Box::new(guard);
         Ok(context.run_schedule().boxed())
     }
