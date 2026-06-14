@@ -1,5 +1,5 @@
 use metrics::counter;
-use vector_common::internal_event::{InternalEvent, error_type};
+use vector_common::internal_event::{InternalEvent, error_stage, error_type};
 use vector_lib::NamedInternalEvent;
 
 #[derive(Debug, NamedInternalEvent)]
@@ -36,12 +36,14 @@ impl InternalEvent for OdbcFailedError<'_> {
         error!(
             message = "Unable to execute statement.",
             statement = %self.statement,
-            error = error_type::COMMAND_FAILED
+            error_type = error_type::COMMAND_FAILED,
+            stage = error_stage::RECEIVING,
         );
         counter!(
             "component_errors_total",
             "statement" => self.statement.to_owned(),
-            "error_type" => error_type::COMMAND_FAILED
+            "error_type" => error_type::COMMAND_FAILED,
+            "stage" => error_stage::RECEIVING,
         )
         .increment(1);
     }
