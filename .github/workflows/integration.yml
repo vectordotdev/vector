@@ -128,6 +128,8 @@ jobs:
             "mongodb",
             "nats",
             "nginx",
+            "odbc-mariadb",
+            "odbc-postgresql",
             "opentelemetry",
             "postgres",
             "prometheus",
