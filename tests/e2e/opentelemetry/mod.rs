@@ -69,6 +69,7 @@ where
         vrl_value,
         &vrl::protobuf::encode::Options {
             use_json_names: true,
+            allow_lossy_string_coercion: true,
         },
     )
     .map_err(|e| format!("Failed to encode VRL value to protobuf: {e}"))?;

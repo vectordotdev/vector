@@ -573,7 +573,7 @@ where
         //
         // The `drop_on_{error, abort}` transform config allows operators to remove events from the
         // main output if they're failed or aborted, in which case we can skip the cloning, since
-        // any mutations made by VRL will be ignored regardless. If they hav configured
+        // any mutations made by VRL will be ignored regardless. If they have configured
         // `reroute_dropped`, however, we still need to do the clone to ensure that we can forward
         // the event to the `dropped` output.
         let forward_on_error = !self.drop_on_error || self.reroute_dropped;
@@ -1572,12 +1572,12 @@ mod tests {
         COMPONENT_MULTIPLE_OUTPUTS_TESTS.assert(&["output"]);
     }
 
-    struct CollectedOuput {
+    struct CollectedOutput {
         primary: OutputBuffer,
         named: HashMap<String, OutputBuffer>,
     }
 
-    fn collect_outputs(ft: &mut dyn SyncTransform, event: Event) -> CollectedOuput {
+    fn collect_outputs(ft: &mut dyn SyncTransform, event: Event) -> CollectedOutput {
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             vec![
                 TransformOutput::new(DataType::all_bits(), HashMap::new()),
@@ -1588,7 +1588,7 @@ mod tests {
 
         ft.transform(event, &mut outputs);
 
-        CollectedOuput {
+        CollectedOutput {
             primary: outputs.take_primary(),
             named: outputs.take_all_named(),
         }

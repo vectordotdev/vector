@@ -30,11 +30,12 @@ components.
 
 For example, with the component config:
 
-```toml
-[transforms.parse_nginx]
-type = "remap"
-inputs = []
-source = ""
+```yaml
+transforms:
+  parse_nginx:
+    type: "remap"
+    inputs: []
+    source: ""
 ```
 
 The `parse_nginx` part of the config is now only referred to as `ID` in the documentation.
@@ -57,19 +58,22 @@ limitations and is only useful for backward compatibility with older clients.
 We no longer allow you to set the encoding of the payloads in the Datadog logs
 sink. For instance, if your configuration looks like so:
 
-```toml
-[sinks.dd_logs_egress]
-type = "datadog_logs"
-inputs = ["datadog_agent"]
-encoding.codec = "json"
+```yaml
+sinks:
+  dd_logs_egress:
+    type: "datadog_logs"
+    inputs: ["datadog_agent"]
+    encoding:
+      codec: "json"
 ```
 
 You should remove `encoding.codec` entirely, leaving you with:
 
-```toml
-[sinks.dd_logs_egress]
-type = "datadog_logs"
-inputs = ["datadog_agent"]
+```yaml
+sinks:
+  dd_logs_egress:
+    type: "datadog_logs"
+    inputs: ["datadog_agent"]
 ```
 
 Encoding fields other than `codec` are still valid.

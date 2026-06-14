@@ -25,11 +25,13 @@ inspired by TCP congestion control algorithms.
 This feature, like all Vector features, will begin its life in public beta and
 be available on an opt-in basis. To get it, enable it for each sink:
 
-```toml
-[sinks.my-sink]
-type = "..." # any http-based sink
-request.concurrency = "adaptive"
-# and remove the request.rate_limit_* settings
+```yaml
+sinks:
+  my-sink:
+    type: "..." # any http-based sink
+    request:
+      concurrency: "adaptive"
+    # and remove the request.rate_limit_* settings
 ```
 
 [announcement]: /blog/adaptive-request-concurrency/

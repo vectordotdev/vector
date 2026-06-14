@@ -66,6 +66,63 @@ pub mod trigger;
 #[macro_use]
 extern crate tracing;
 
+/// Typed wrapper around `metrics::counter!` that only accepts [`internal_event::CounterName`].
+#[macro_export]
+macro_rules! counter {
+    ($name:expr) => {{
+        let _name: $crate::internal_event::CounterName = $name;
+        #[allow(clippy::disallowed_macros)]
+        {
+            metrics::counter!(_name.as_str())
+        }
+    }};
+    ($name:expr, $($rest:tt)*) => {{
+        let _name: $crate::internal_event::CounterName = $name;
+        #[allow(clippy::disallowed_macros)]
+        {
+            metrics::counter!(_name.as_str(), $($rest)*)
+        }
+    }};
+}
+
+/// Typed wrapper around `metrics::histogram!` that only accepts [`internal_event::HistogramName`].
+#[macro_export]
+macro_rules! histogram {
+    ($name:expr) => {{
+        let _name: $crate::internal_event::HistogramName = $name;
+        #[allow(clippy::disallowed_macros)]
+        {
+            metrics::histogram!(_name.as_str())
+        }
+    }};
+    ($name:expr, $($rest:tt)*) => {{
+        let _name: $crate::internal_event::HistogramName = $name;
+        #[allow(clippy::disallowed_macros)]
+        {
+            metrics::histogram!(_name.as_str(), $($rest)*)
+        }
+    }};
+}
+
+/// Typed wrapper around `metrics::gauge!` that only accepts [`internal_event::GaugeName`].
+#[macro_export]
+macro_rules! gauge {
+    ($name:expr) => {{
+        let _name: $crate::internal_event::GaugeName = $name;
+        #[allow(clippy::disallowed_macros)]
+        {
+            metrics::gauge!(_name.as_str())
+        }
+    }};
+    ($name:expr, $($rest:tt)*) => {{
+        let _name: $crate::internal_event::GaugeName = $name;
+        #[allow(clippy::disallowed_macros)]
+        {
+            metrics::gauge!(_name.as_str(), $($rest)*)
+        }
+    }};
+}
+
 /// Vector's basic error type, dynamically dispatched and safe to send across
 /// threads.
 pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
@@ -73,3 +130,19 @@ pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 /// Vector's basic result type, defined in terms of [`Error`] and generic over
 /// `T`.
 pub type Result<T> = std::result::Result<T, Error>;
+
+/// Spawn a future on the current tokio runtime, propagating the current tracing span into the
+/// spawned task.  This ensures that any logs or internal metrics emitted by the task retain the
+/// component tags (`component_id`, `component_kind`, `component_type`) of the caller.
+///
+/// Prefer this over `tokio::spawn(future.in_current_span())` to keep call sites concise.
+#[track_caller]
+pub fn spawn_in_current_span<T>(
+    task: impl std::future::Future<Output = T> + Send + 'static,
+) -> tokio::task::JoinHandle<T>
+where
+    T: Send + 'static,
+{
+    use tracing::Instrument as _;
+    tokio::spawn(task.in_current_span())
+}

@@ -334,8 +334,8 @@ impl Metric {
     /// Returns `true` if `name` tag is present, and matches the provided `value`
     pub fn tag_matches(&self, name: &str, value: &str) -> bool {
         self.tags()
-            .filter(|t| t.get(name).filter(|v| *v == value).is_some())
-            .is_some()
+            .as_ref()
+            .is_some_and(|t| t.get(name).as_ref().is_some_and(|v| *v == value))
     }
 
     /// Returns the string value of a tag, if it exists

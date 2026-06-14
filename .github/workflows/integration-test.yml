@@ -23,7 +23,6 @@ env:
   TEST_APPSIGNAL_PUSH_API_KEY: ${{ secrets.TEST_APPSIGNAL_PUSH_API_KEY }}
   CONTAINER_TOOL: "docker"
   DD_ENV: "ci"
-  DD_API_KEY: ${{ secrets.DD_API_KEY }}
   RUST_BACKTRACE: full
   VECTOR_LOG: vector=debug
   VERBOSE: true
@@ -34,6 +33,9 @@ jobs:
   test-integration:
     runs-on: ubuntu-24.04
     timeout-minutes: 40
+    permissions:
+      contents: read
+      id-token: write
     if: inputs.if || github.event_name == 'workflow_dispatch'
     steps:
       - name: (PR comment) Get PR branch
@@ -50,6 +52,8 @@ jobs:
       - name: Checkout branch
         if: ${{ github.event_name != 'issue_comment' }}
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: ./.github/actions/dd-token
 
       - run: bash scripts/environment/prepare.sh --modules=rustup,datadog-ci
 
