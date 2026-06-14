@@ -14,7 +14,7 @@ components: sources: odbc: {
 
 	features: {
 		auto_generated:   true
-		acknowledgements: true
+		acknowledgements: false
 		collect: {
 			checkpoint: enabled: false
 			from: {
