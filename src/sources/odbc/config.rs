@@ -11,6 +11,7 @@ use std::fs;
 use std::time::Duration;
 use vector_config_macros::configurable_component;
 use vector_lib::codecs::{DecodingConfig, decoding::DeserializerConfig};
+use vector_lib::sensitive_string::SensitiveString;
 use vrl::prelude::{Kind, ObjectMap};
 
 /// Configuration for the `odbc` source.
@@ -27,7 +28,7 @@ pub struct OdbcConfig {
         docs::examples = "driver={MariaDB Unicode};server=<ip or host>;port=<port number>;database=<database name>;uid=<user>;pwd=<password>"
     ))]
     #[serde(default)]
-    pub connection_string: String,
+    pub connection_string: SensitiveString,
 
     /// The path to the file that contains the connection string.
     /// If this is not set or the file at that path does not exist, the `connection_string` field is used instead.
@@ -169,7 +170,7 @@ impl OdbcConfig {
         self.connection_string_filepath
             .as_ref()
             .and_then(|path| fs::read_to_string(path).ok())
-            .unwrap_or(self.connection_string.clone())
+            .unwrap_or_else(|| self.connection_string.inner().to_string())
     }
 
     /// Returns the SQL statement to execute.
@@ -215,7 +216,7 @@ const fn default_odbc_max_str_limit() -> usize {
 impl Default for OdbcConfig {
     fn default() -> Self {
         Self {
-            connection_string: "".to_string(),
+            connection_string: SensitiveString::default(),
             connection_string_filepath: None,
             schedule: None,
             schedule_timezone: Tz::UTC,

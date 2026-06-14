@@ -11,6 +11,7 @@ use std::borrow::Cow;
 use std::fs;
 use std::time::Duration;
 use vector_lib::event::Event;
+use vector_lib::sensitive_string::SensitiveString;
 use vrl::prelude::*;
 use vrl::value::Value;
 
@@ -91,7 +92,7 @@ async fn scheduled_query_executed() {
     let conn_str = get_conn_str();
     run_and_assert_source_compliance(
         OdbcConfig {
-            connection_string: conn_str,
+            connection_string: SensitiveString::from(conn_str),
             schedule: Some("*/1 * * * * *".into()),
             statement: Some("SELECT 1".to_string()),
             iterations: Some(1),
@@ -163,7 +164,7 @@ INSERT INTO odbc_table (name, datetime) VALUES
 
     let events = run_and_assert_source_compliance(
         OdbcConfig {
-            connection_string: conn_str,
+            connection_string: SensitiveString::from(conn_str),
             schedule: Some("*/1 * * * * *".into()),
             statement: Some("SELECT * FROM odbc_table WHERE id > ? LIMIT 1;".to_string()),
             statement_init_params: Some(params),
