@@ -212,6 +212,7 @@ impl Application {
             opts.root.log_format,
             opts.log_level(),
             opts.root.internal_log_rate_limit,
+            opts.root.internal_logs_source_rate_limit,
         );
 
         #[cfg(unix)]
@@ -658,14 +659,20 @@ pub async fn load_configs(
     Ok(config)
 }
 
-pub fn init_logging(color: bool, format: LogFormat, log_level: &str, rate: u64) {
+pub fn init_logging(
+    color: bool,
+    format: LogFormat,
+    log_level: &str,
+    rate: u64,
+    broadcast_rate_limit: Option<NonZeroU64>,
+) {
     let level = get_log_levels(log_level);
     let json = match format {
         LogFormat::Text => false,
         LogFormat::Json => true,
     };
 
-    trace::init(color, json, &level, rate);
+    trace::init(color, json, &level, rate, broadcast_rate_limit);
     debug!(
         message = "Internal log rate limit configured.",
         internal_log_rate_secs = rate,

@@ -57,7 +57,13 @@ fn metrics_layer_enabled() -> bool {
     !matches!(std::env::var("DISABLE_INTERNAL_METRICS_TRACING_INTEGRATION"), Ok(x) if x == "true")
 }
 
-pub fn init(color: bool, json: bool, levels: &str, internal_log_rate_limit: u64) {
+pub fn init(
+    color: bool,
+    json: bool,
+    levels: &str,
+    internal_log_rate_limit: u64,
+    broadcast_rate_limit: Option<std::num::NonZeroU64>,
+) {
     let fmt_filter = tracing_subscriber::filter::Targets::from_str(levels).expect(
         "logging filter targets were not formatted correctly or did not specify a valid level",
     );
@@ -65,14 +71,27 @@ pub fn init(color: bool, json: bool, levels: &str, internal_log_rate_limit: u64)
     let metrics_layer =
         metrics_layer_enabled().then(|| MetricsLayer::new().with_filter(LevelFilter::INFO));
 
-    // BroadcastLayer should NOT be rate limited because it feeds the internal_logs source,
-    // which users rely on to capture ALL internal Vector logs for debugging/monitoring.
-    // Console output (stdout/stderr) has its own separate rate limiting below.
-    let broadcast_layer = BroadcastLayer::new().with_filter(fmt_filter.clone());
+    // The broadcast layer feeds the internal_logs source. By default it is NOT rate limited so
+    // that users can capture ALL internal Vector logs for debugging/monitoring. Rate limiting can
+    // be opted into by passing `Some(rate)` for `broadcast_rate_limit`.
+    //
+    // Two separate `Option<Layer>` values are used rather than a single branch because
+    // `RateLimitedLayer<BroadcastLayer<S>>` and `BroadcastLayer<S>` are distinct types.
+    // `tracing_subscriber` implements `Layer` for `Option<L>`, so exactly one of these will be
+    // `Some` and contribute an active layer while the other is a no-op `None`.
+    let rate_limited_broadcast = broadcast_rate_limit.map(|rate| {
+        RateLimitedLayer::new(BroadcastLayer::new())
+            .with_default_limit(rate.get())
+            .with_filter(fmt_filter.clone())
+    });
+    let unlimited_broadcast = broadcast_rate_limit
+        .is_none()
+        .then(|| BroadcastLayer::new().with_filter(fmt_filter.clone()));
 
     let subscriber = tracing_subscriber::registry()
         .with(metrics_layer)
-        .with(broadcast_layer);
+        .with(rate_limited_broadcast)
+        .with(unlimited_broadcast);
 
     #[cfg(feature = "tokio-console")]
     let subscriber = {
@@ -387,5 +406,112 @@ impl tracing::field::Visit for SpanFields {
 
     fn record_debug(&mut self, field: &tracing_core::Field, value: &dyn std::fmt::Debug) {
         self.record(field, format!("{value:?}"));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{str::FromStr, time::Duration};
+
+    use serial_test::serial;
+    use tracing::info;
+    use tracing_subscriber::layer::SubscriberExt;
+
+    use futures::StreamExt as _;
+
+    use super::*;
+
+    /// Verifies that `RateLimitedLayer<BroadcastLayer>` — the configuration produced by
+    /// `init` when `broadcast_rate_limit` is `Some` — suppresses repeated identical log
+    /// events within the rate-limit window and emits a summary once the window expires.
+    ///
+    /// All `info!` calls share the same call site (they are inside the loop), so the
+    /// `RateLimitedLayer` treats them as one event for suppression purposes.
+    ///
+    /// The test uses `tracing::subscriber::with_default` rather than `init` to avoid
+    /// touching the process-global subscriber, and `spawn_blocking` so that the
+    /// synchronous `std::thread::sleep` — needed because `tracing-limit` uses
+    /// `std::time::Instant` when compiled as a library dependency — does not block the
+    /// async executor.
+    #[tokio::test]
+    #[serial]
+    async fn broadcast_rate_limits_repeated_messages() {
+        let trace_sub = TraceSubscription::subscribe();
+        // Disable early buffering so events flow directly to the broadcast channel
+        // rather than being held in the startup buffer.
+        stop_early_buffering();
+
+        let filter =
+            tracing_subscriber::filter::Targets::from_str("info").expect("valid filter string");
+        let subscriber = tracing_subscriber::registry().with(
+            RateLimitedLayer::new(BroadcastLayer::new())
+                .with_default_limit(1) // 1-second window
+                .with_filter(filter),
+        );
+
+        tokio::task::spawn_blocking(move || {
+            tracing::subscriber::with_default(subscriber, || {
+                for i in 0..4u32 {
+                    if i == 3 {
+                        // Wait for the 1-second window to expire so that the 4th call
+                        // triggers a summary message before being emitted normally.
+                        std::thread::sleep(Duration::from_millis(1100));
+                    }
+                    info!("Rate limited broadcast message.");
+                }
+            });
+        })
+        .await
+        .expect("blocking task panicked");
+
+        // All sends happened synchronously inside spawn_blocking above, so items are
+        // already in the broadcast ring buffer. We drain the stream until we have the
+        // 4 expected matching messages, with a generous timeout to guard against
+        // unexpected delays on heavily loaded machines.
+        //
+        // Limitation: the "suppressed N times" summary fires on the *next* arriving
+        // event after the window expires, not at window expiry itself.
+        const EXPECTED: usize = 4;
+        let mut stream = trace_sub.into_stream();
+        let messages: Vec<String> = tokio::time::timeout(Duration::from_secs(5), async {
+            let mut collected = Vec::with_capacity(EXPECTED);
+            loop {
+                let event = stream
+                    .next()
+                    .await
+                    .expect("broadcast stream ended unexpectedly");
+                if let Some(msg) = event.get("message") {
+                    let msg = msg.to_string_lossy().into_owned();
+                    if msg.contains("Rate limited broadcast message") {
+                        collected.push(msg);
+                        if collected.len() == EXPECTED {
+                            break;
+                        }
+                    }
+                }
+            }
+            collected
+        })
+        .await
+        .expect("timed out waiting for rate-limited broadcast messages");
+
+        // Expected sequence:
+        //   [0] First occurrence  → emitted normally.
+        //   [1] Second occurrence → suppression warning emitted, original dropped.
+        //   (Third occurrence is silently dropped; nothing appears in broadcast.)
+        //   [2] Fourth occurrence (after window) → summary "suppressed 2 times" emitted.
+        //   [3] Fourth occurrence → emitted normally after the window resets.
+        assert_eq!(messages[0], "Rate limited broadcast message.");
+        assert!(
+            messages[1].contains("is being suppressed to avoid flooding."),
+            "expected suppression warning, got: {}",
+            messages[1]
+        );
+        assert!(
+            messages[2].contains("has been suppressed 2 times."),
+            "expected summary, got: {}",
+            messages[2]
+        );
+        assert_eq!(messages[3], "Rate limited broadcast message.");
     }
 }
