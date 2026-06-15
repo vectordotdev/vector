@@ -21,6 +21,10 @@ impl InternalEvent for DatadogLogsReservedAttributeConflict<'_> {
             destination_path = self.destination_path,
             renamed_existing_to = self.renamed_existing_to,
         );
-        counter!(CounterName::DatadogLogsReservedAttributeConflictsTotal).increment(1);
+        counter!(
+            CounterName::DatadogLogsReservedAttributeConflictsTotal,
+            "meaning" => self.meaning,
+        )
+        .increment(1);
     }
 }
