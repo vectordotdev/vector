@@ -330,31 +330,31 @@ impl PostProcessor for InsertFieldProcessor {
 
 /// Processor that counts calls per event type to verify typed dispatch.
 struct DispatchCountProcessor {
-    log_count: Arc<AtomicUsize>,
-    metric_count: Arc<AtomicUsize>,
-    trace_count: Arc<AtomicUsize>,
+    logs: Arc<AtomicUsize>,
+    metrics: Arc<AtomicUsize>,
+    traces: Arc<AtomicUsize>,
 }
 
 impl PostProcessor for DispatchCountProcessor {
     fn process_log(&self, _event: &mut LogEvent) {
-        self.log_count.fetch_add(1, Ordering::SeqCst);
+        self.logs.fetch_add(1, Ordering::SeqCst);
     }
 
     fn process_metric(&self, _event: &mut Metric) {
-        self.metric_count.fetch_add(1, Ordering::SeqCst);
+        self.metrics.fetch_add(1, Ordering::SeqCst);
     }
 
     fn process_trace(&self, _event: &mut TraceEvent) {
-        self.trace_count.fetch_add(1, Ordering::SeqCst);
+        self.traces.fetch_add(1, Ordering::SeqCst);
     }
 }
 
 /// Build a sender with the given post-processor using the `set_post_processor` modifier.
 fn make_sender_with_post_processor(
-    pp: Arc<dyn PostProcessor>,
+    pp: &Arc<dyn PostProcessor>,
 ) -> (SourceSender, impl futures::Stream<Item = Event> + Unpin) {
     let (mut sender, rx) = SourceSender::new_test_sender_with_options(TEST_BUFFER_SIZE, None);
-    sender.set_post_processor(&pp);
+    sender.set_post_processor(pp);
     let stream = rx.into_stream().flat_map(into_event_stream);
     (sender, stream)
 }
@@ -391,7 +391,8 @@ async fn post_processor_mutates_log_events() {
         call_count: Arc::clone(&call_count),
     };
 
-    let (mut sender, mut stream) = make_sender_with_post_processor(Arc::new(pp));
+    let pp: Arc<dyn PostProcessor> = Arc::new(pp);
+    let (mut sender, mut stream) = make_sender_with_post_processor(&pp);
 
     let mut log = LogEvent::default();
     log.insert(event_path!("original"), "yes");
@@ -426,17 +427,18 @@ async fn post_processor_dispatches_by_event_type() {
     // Verify that each event type is routed to the correct trait method.
     metrics::init_test();
 
-    let log_count = Arc::new(AtomicUsize::new(0));
-    let metric_count = Arc::new(AtomicUsize::new(0));
-    let trace_count = Arc::new(AtomicUsize::new(0));
+    let logs = Arc::new(AtomicUsize::new(0));
+    let metrics = Arc::new(AtomicUsize::new(0));
+    let traces = Arc::new(AtomicUsize::new(0));
 
     let pp = DispatchCountProcessor {
-        log_count: Arc::clone(&log_count),
-        metric_count: Arc::clone(&metric_count),
-        trace_count: Arc::clone(&trace_count),
+        logs: Arc::clone(&logs),
+        metrics: Arc::clone(&metrics),
+        traces: Arc::clone(&traces),
     };
 
-    let (mut sender, _stream) = make_sender_with_post_processor(Arc::new(pp));
+    let pp: Arc<dyn PostProcessor> = Arc::new(pp);
+    let (mut sender, _stream) = make_sender_with_post_processor(&pp);
 
     sender
         .send_event(Event::Log(LogEvent::default()))
@@ -456,18 +458,14 @@ async fn post_processor_dispatches_by_event_type() {
         .expect("trace send should succeed");
     drop(sender);
 
+    assert_eq!(logs.load(Ordering::SeqCst), 1, "process_log called once");
     assert_eq!(
-        log_count.load(Ordering::SeqCst),
-        1,
-        "process_log called once"
-    );
-    assert_eq!(
-        metric_count.load(Ordering::SeqCst),
+        metrics.load(Ordering::SeqCst),
         1,
         "process_metric called once"
     );
     assert_eq!(
-        trace_count.load(Ordering::SeqCst),
+        traces.load(Ordering::SeqCst),
         1,
         "process_trace called once"
     );
