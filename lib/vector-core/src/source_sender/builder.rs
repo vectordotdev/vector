@@ -1,4 +1,4 @@
-use std::{collections::HashMap, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use vector_buffers::topology::channel::LimitedReceiver;
 use vector_common::histogram;
@@ -17,7 +17,7 @@ pub struct Builder {
     output_metrics: OutputMetrics,
     timeout: Option<Duration>,
     ewma_half_life_seconds: Option<f64>,
-    post_processor: Option<PostProcessor>,
+    post_processor: Option<Arc<dyn PostProcessor>>,
 }
 
 impl Default for Builder {
@@ -60,21 +60,21 @@ impl Builder {
     /// Attach a post-processing step that will be applied to every event on **all** outputs
     /// (default and named ports) produced by this builder.
     ///
-    /// The processor runs after schema metadata has been attached to each event, immediately
-    /// before the event is placed on the output channel. See [`PostProcessor`] for the available
-    /// variants and their error-handling semantics.
+    /// The processor runs before schema metadata is attached to each event, immediately
+    /// before the event is placed on the output channel. See [`PostProcessor`] for the trait
+    /// definition and its contract.
     ///
-    /// This method may be called before or after [`add_source_output`][Self::add_source_output];
-    /// outputs already added will be updated retroactively so that all outputs — regardless of
-    /// call order — share the same post-processor.
+    /// This method can be called before or after [`add_source_output`][Self::add_source_output];
+    /// outputs already added will be updated retroactively so that all outputs share the same
+    /// post-processor regardless of call order.
     #[must_use]
-    pub fn with_post_processor(mut self, post_processor: PostProcessor) -> Self {
+    pub fn with_post_processor(mut self, post_processor: Arc<dyn PostProcessor>) -> Self {
         // Retroactively apply to any outputs already created so that call order does not matter.
         if let Some(output) = &mut self.default_output {
-            output.set_post_processor(&post_processor);
+            output.set_post_processor(Arc::clone(&post_processor));
         }
         for output in self.named_outputs.values_mut() {
-            output.set_post_processor(&post_processor);
+            output.set_post_processor(Arc::clone(&post_processor));
         }
         self.post_processor = Some(post_processor);
         self
@@ -100,8 +100,11 @@ impl Builder {
                     output_id,
                     self.timeout,
                     self.ewma_half_life_seconds,
-                    self.post_processor.clone(),
                 );
+                let output = match &self.post_processor {
+                    Some(pp) => output.with_post_processor(Arc::clone(pp)),
+                    None => output,
+                };
                 self.default_output = Some(output);
                 rx
             }
@@ -114,8 +117,11 @@ impl Builder {
                     output_id,
                     self.timeout,
                     self.ewma_half_life_seconds,
-                    self.post_processor.clone(),
                 );
+                let output = match &self.post_processor {
+                    Some(pp) => output.with_post_processor(Arc::clone(pp)),
+                    None => output,
+                };
                 self.named_outputs.insert(name, output);
                 rx
             }

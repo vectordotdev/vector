@@ -312,11 +312,49 @@ fn assert_buffer_metrics(buffer_size: usize, level: usize) {
 
 // ── PostProcessor tests ──────────────────────────────────────────────────────
 
-/// Helper: build a SourceSender with the given PostProcessor and return (sender, event stream).
+/// Processor that inserts a boolean field into every log event, counting calls.
+struct InsertFieldProcessor {
+    call_count: Arc<AtomicUsize>,
+}
+
+impl PostProcessor for InsertFieldProcessor {
+    fn process_log(&self, event: &mut LogEvent) {
+        self.call_count.fetch_add(1, Ordering::SeqCst);
+        event.insert(event_path!("post_processed"), true);
+    }
+
+    fn process_metric(&self, _event: &mut Metric) {}
+
+    fn process_trace(&self, _event: &mut TraceEvent) {}
+}
+
+/// Processor that counts calls per event type to verify typed dispatch.
+struct DispatchCountProcessor {
+    log_count: Arc<AtomicUsize>,
+    metric_count: Arc<AtomicUsize>,
+    trace_count: Arc<AtomicUsize>,
+}
+
+impl PostProcessor for DispatchCountProcessor {
+    fn process_log(&self, _event: &mut LogEvent) {
+        self.log_count.fetch_add(1, Ordering::SeqCst);
+    }
+
+    fn process_metric(&self, _event: &mut Metric) {
+        self.metric_count.fetch_add(1, Ordering::SeqCst);
+    }
+
+    fn process_trace(&self, _event: &mut TraceEvent) {
+        self.trace_count.fetch_add(1, Ordering::SeqCst);
+    }
+}
+
+/// Build a sender with the given post-processor using the `set_post_processor` modifier.
 fn make_sender_with_post_processor(
-    pp: PostProcessor,
+    pp: Arc<dyn PostProcessor>,
 ) -> (SourceSender, impl futures::Stream<Item = Event> + Unpin) {
-    let (sender, rx) = SourceSender::new_test_with_post_processor(pp);
+    let (mut sender, rx) = SourceSender::new_test_sender_with_options(TEST_BUFFER_SIZE, None);
+    sender.set_post_processor(&pp);
     let stream = rx.into_stream().flat_map(into_event_stream);
     (sender, stream)
 }
@@ -344,21 +382,16 @@ async fn post_processor_none_is_noop() {
 }
 
 #[tokio::test]
-async fn post_processor_hard_coded_mutates_events() {
-    // A HardCoded processor should mutate every event that flows through.
+async fn post_processor_mutates_log_events() {
+    // A processor should mutate every log event that flows through.
     metrics::init_test();
 
     let call_count = Arc::new(AtomicUsize::new(0));
-    let call_count_clone = Arc::clone(&call_count);
+    let pp = InsertFieldProcessor {
+        call_count: Arc::clone(&call_count),
+    };
 
-    let pp = PostProcessor::HardCoded(Arc::new(move |event: &mut Event| {
-        call_count_clone.fetch_add(1, Ordering::SeqCst);
-        if let Event::Log(log) = event {
-            log.insert(event_path!("post_processed"), true);
-        }
-    }));
-
-    let (mut sender, mut stream) = make_sender_with_post_processor(pp);
+    let (mut sender, mut stream) = make_sender_with_post_processor(Arc::new(pp));
 
     let mut log = LogEvent::default();
     log.insert(event_path!("original"), "yes");
@@ -388,53 +421,42 @@ async fn post_processor_hard_coded_mutates_events() {
     );
 }
 
-/// Verify that a closure which preserves the variant (mutates fields but does not change log →
-/// metric etc.) passes the debug_assert contract without panicking.
 #[tokio::test]
-async fn post_processor_variant_preserved_does_not_panic() {
-    // This test documents the contract: same-variant mutation is always safe.
-    let pp = PostProcessor::HardCoded(Arc::new(|event: &mut Event| {
-        // Mutate fields but keep the same variant.
-        if let Event::Log(log) = event {
-            log.insert(event_path!("contract"), "ok");
-        }
-    }));
+async fn post_processor_dispatches_by_event_type() {
+    // Verify that each event type is routed to the correct trait method.
+    metrics::init_test();
 
-    let (mut sender, mut stream) = make_sender_with_post_processor(pp);
+    let log_count = Arc::new(AtomicUsize::new(0));
+    let metric_count = Arc::new(AtomicUsize::new(0));
+    let trace_count = Arc::new(AtomicUsize::new(0));
 
-    let mut log = LogEvent::default();
-    log.insert(event_path!("x"), 1_i64);
+    let pp = DispatchCountProcessor {
+        log_count: Arc::clone(&log_count),
+        metric_count: Arc::clone(&metric_count),
+        trace_count: Arc::clone(&trace_count),
+    };
+
+    let (mut sender, _stream) = make_sender_with_post_processor(Arc::new(pp));
+
     sender
-        .send_event(Event::Log(log))
+        .send_event(Event::Log(LogEvent::default()))
         .await
-        .expect("send should succeed");
+        .expect("log send should succeed");
+    sender
+        .send_event(Event::Metric(Metric::new(
+            "m",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 1.0 },
+        )))
+        .await
+        .expect("metric send should succeed");
+    sender
+        .send_event(Event::Trace(TraceEvent::default()))
+        .await
+        .expect("trace send should succeed");
     drop(sender);
 
-    let event = stream.next().await.expect("expected one event");
-    assert_eq!(
-        event.as_log().get(event_path!("contract")),
-        Some(&vrl::value::Value::from("ok")),
-        "mutation inside same variant must be visible downstream"
-    );
-}
-
-/// In debug builds, a closure that changes the event variant must panic.
-#[tokio::test]
-#[cfg(debug_assertions)]
-#[should_panic(expected = "PostProcessor::HardCoded closure changed the event variant")]
-async fn post_processor_variant_change_panics_in_debug() {
-    let pp = PostProcessor::HardCoded(Arc::new(|event: &mut Event| {
-        // Intentionally violate the contract: replace a Log with a Metric.
-        *event = Event::Metric(Metric::new(
-            "bad",
-            MetricKind::Absolute,
-            MetricValue::Gauge { value: 0.0 },
-        ));
-    }));
-
-    let (mut sender, _stream) = make_sender_with_post_processor(pp);
-
-    let log = LogEvent::default();
-    // This should panic inside send_event due to the debug_assert.
-    sender.send_event(Event::Log(log)).await.ok();
+    assert_eq!(log_count.load(Ordering::SeqCst), 1, "process_log called once");
+    assert_eq!(metric_count.load(Ordering::SeqCst), 1, "process_metric called once");
+    assert_eq!(trace_count.load(Ordering::SeqCst), 1, "process_trace called once");
 }

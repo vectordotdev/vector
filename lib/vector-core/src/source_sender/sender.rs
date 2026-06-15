@@ -20,6 +20,8 @@ use vector_common::{
     json_size::JsonSize,
 };
 
+use std::sync::Arc;
+
 use super::{Builder, Output, PostProcessor, SendError};
 #[cfg(any(test, feature = "test"))]
 use super::{
@@ -104,17 +106,14 @@ impl SourceSender {
         Builder::default()
     }
 
-    /// Attach a post-processing step to every output on this sender.
-    ///
-    /// The processor runs after schema metadata has been attached to each event, immediately
-    /// before the event is placed on the output channel. Replaces any previously set
-    /// post-processor.
-    pub fn set_post_processor(&mut self, pp: &PostProcessor) {
+    /// Attach a post-processing step to every output on this sender, replacing any previously set
+    /// one.
+    pub fn set_post_processor(&mut self, pp: &Arc<dyn PostProcessor>) {
         if let Some(output) = &mut self.default_output {
-            output.set_post_processor(pp);
+            output.set_post_processor(Arc::clone(pp));
         }
         for output in self.named_outputs.values_mut() {
-            output.set_post_processor(pp);
+            output.set_post_processor(Arc::clone(pp));
         }
     }
 
@@ -138,37 +137,6 @@ impl SourceSender {
             output_id,
             timeout,
             None,
-            None,
-        );
-        (
-            Self {
-                default_output: Some(default_output),
-                named_outputs: Default::default(),
-            },
-            rx,
-        )
-    }
-
-    #[cfg(any(test, feature = "test"))]
-    pub fn new_test_with_post_processor(
-        post_processor: super::PostProcessor,
-    ) -> (Self, LimitedReceiver<SourceSenderItem>) {
-        let lag_time = Some(histogram!(LAG_TIME_NAME));
-        let send_latency = Some(histogram!(SEND_LATENCY_NAME));
-        let send_batch_latency = Some(histogram!(SEND_BATCH_LATENCY_NAME));
-        let output_id = OutputId {
-            component: "test".to_string().into(),
-            port: None,
-        };
-        let (default_output, rx) = Output::new_with_buffer(
-            TEST_BUFFER_SIZE,
-            DEFAULT_OUTPUT.to_owned(),
-            OutputMetrics::new(lag_time, send_latency, send_batch_latency),
-            None,
-            output_id,
-            None,
-            None,
-            Some(post_processor),
         );
         (
             Self {
@@ -247,7 +215,6 @@ impl SourceSender {
             OutputMetrics::default(),
             None,
             output_id,
-            None,
             None,
             None,
         );

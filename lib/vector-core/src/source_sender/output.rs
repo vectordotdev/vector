@@ -28,7 +28,7 @@ use super::{CHUNK_SIZE, PostProcessor, SendError, SourceSenderItem};
 use crate::{
     EstimatedJsonEncodedSizeOf,
     config::{OutputId, log_schema},
-    event::{Event, EventArray, EventContainer as _, EventRef, array},
+    event::{Event, EventArray, EventContainer as _, EventMutRef, EventRef},
     schema::Definition,
 };
 
@@ -94,7 +94,7 @@ pub(super) struct Output {
     id: Arc<OutputId>,
     timeout: Option<Duration>,
     /// Optional post-processing step applied to every event before it is placed on the channel.
-    post_processor: Option<PostProcessor>,
+    post_processor: Option<Arc<dyn PostProcessor>>,
 }
 
 #[derive(Clone, Default)]
@@ -131,7 +131,6 @@ impl fmt::Debug for Output {
 }
 
 impl Output {
-    #[expect(clippy::too_many_arguments)]
     pub(super) fn new_with_buffer(
         n: usize,
         output: String,
@@ -140,7 +139,6 @@ impl Output {
         output_id: OutputId,
         timeout: Option<Duration>,
         ewma_half_life_seconds: Option<f64>,
-        post_processor: Option<PostProcessor>,
     ) -> (Self, LimitedReceiver<SourceSenderItem>) {
         let limit = MemoryBufferSize::MaxEvents(NonZeroUsize::new(n).unwrap());
         let channel_metrics =
@@ -156,10 +154,16 @@ impl Output {
                 log_definition,
                 id: Arc::new(output_id),
                 timeout,
-                post_processor,
+                post_processor: None,
             },
             rx,
         )
+    }
+
+    /// Attach a post-processing step to this output, replacing any previously set one.
+    pub(super) fn with_post_processor(mut self, pp: Arc<dyn PostProcessor>) -> Self {
+        self.post_processor = Some(pp);
+        self
     }
 
     pub(super) async fn send(
@@ -182,114 +186,37 @@ impl Output {
             .iter_events()
             .for_each(|event| self.emit_lag_time(event, reference));
 
-        if let Some(PostProcessor::HardCoded(ref f)) = self.post_processor {
-            // The post-processor contract: the closure MUST NOT change an event's variant
-            // (log → log, metric → metric, trace → trace). This is enforced below with a
-            // debug_assert on std::mem::discriminant before and after each call.
-            //
-            // Because `iter_events_mut` yields `EventMutRef` (&mut LogEvent / &mut Metric /
-            // &mut TraceEvent) rather than `&mut Event`, we must consume the array into owned
-            // `Event` values so the closure receives the required `&mut Event`. This is the
-            // irreducible cost of the `Some` path; the `None` path below remains allocation-free.
-            //
-            // Metadata (upstream_id, schema_definition) is attached AFTER the closure so that if
-            // the closure replaces the whole Event value the new value still carries the correct
-            // source attribution.
-            //
-            // Because the variant-preservation contract guarantees the processed Vec contains only
-            // events of the same type as the input, `events_into_arrays(...).next()` yields
-            // exactly one sub-array — the same guarantee as the None fast path. No multi-array
-            // loop or shared deadline is needed.
-            let processed: Vec<Event> = events
-                .into_events()
-                .map(|mut event| {
-                    #[cfg(debug_assertions)]
-                    let before = std::mem::discriminant(&event);
-
-                    // Move finalizers out before calling the closure to prevent
-                    // double-counting if the closure mutates the event in-place.
-                    // Clone the remaining metadata so we can restore secrets and
-                    // source_event_id if the closure does a same-variant whole-event
-                    // replacement (which resets metadata to defaults).
-                    let original_finalizers = event.metadata_mut().take_finalizers();
-                    let original_meta = event.metadata().clone();
-
-                    f(&mut event);
-
-                    // Contract: closure must not change the event's variant.
-                    #[cfg(debug_assertions)]
-                    debug_assert_eq!(
-                        before,
-                        std::mem::discriminant(&event),
-                        "PostProcessor::HardCoded closure changed the event variant; \
-                         this violates the variant-preservation contract"
-                    );
-
-                    // Restore metadata that would be lost on a whole-event replacement.
-                    // merge() fills in secrets and source_event_id from the original when
-                    // those fields are absent on the post-closure event. merge_finalizers()
-                    // re-attaches the finalizers taken above (original_meta has empty
-                    // finalizers at this point, so merge() itself adds nothing for them).
-                    event.metadata_mut().merge(original_meta);
-                    event.metadata_mut().merge_finalizers(original_finalizers);
-
-                    // Attach runtime schema metadata after the closure.
-                    if let Some(log_definition) = &self.log_definition {
-                        event.metadata_mut().set_schema_definition(log_definition);
-                    }
-                    event.metadata_mut().set_upstream_id(Arc::clone(&self.id));
-                    event
-                })
-                .collect();
-
-            if processed.is_empty() {
-                return Ok(());
-            }
-
-            // Variant-preservation contract ensures all processed events have the same type
-            // as the original batch, so events_into_arrays produces exactly one sub-array.
-            let events = array::events_into_arrays(processed.into_iter(), None)
-                .next()
-                .expect("non-empty processed Vec must yield at least one EventArray");
-
-            let byte_size = events.estimated_json_encoded_size_of();
-            let count = events.len();
-
-            let send_start = Instant::now();
-            let send_result = self.send_with_timeout(events, send_reference).await;
-            if let Some(send_latency) = &self.metrics.send_latency {
-                send_latency.record(send_start.elapsed().as_secs_f64());
-            }
-            send_result?;
-
-            self.events_sent.emit(CountByteSize(count, byte_size));
-            unsent_event_count.decr(count);
-        } else {
-            // Fast path: no post-processor — apply metadata in place without any allocation.
-            events.iter_events_mut().for_each(|mut event| {
-                // attach runtime schema definitions from the source
-                if let Some(log_definition) = &self.log_definition {
-                    event.metadata_mut().set_schema_definition(log_definition);
-                }
-                event.metadata_mut().set_upstream_id(Arc::clone(&self.id));
+        // Apply post-processor with typed dispatch. Each method receives a reference to the
+        // concrete event type, making it impossible at the type level to change the variant.
+        if let Some(ref pp) = self.post_processor {
+            events.iter_events_mut().for_each(|event| match event {
+                EventMutRef::Log(log) => pp.process_log(log),
+                EventMutRef::Metric(metric) => pp.process_metric(metric),
+                EventMutRef::Trace(trace) => pp.process_trace(trace),
             });
-
-            let byte_size = events.estimated_json_encoded_size_of();
-            let count = events.len();
-
-            let send_start = Instant::now();
-
-            let send_result = self.send_with_timeout(events, send_reference).await;
-
-            if let Some(send_latency) = &self.metrics.send_latency {
-                send_latency.record(send_start.elapsed().as_secs_f64());
-            }
-
-            send_result?;
-
-            self.events_sent.emit(CountByteSize(count, byte_size));
-            unsent_event_count.decr(count);
         }
+
+        // Attach runtime schema metadata after the post-processor so that processor mutations
+        // are always preserved even if the processor replaces the inner event value.
+        events.iter_events_mut().for_each(|mut event| {
+            if let Some(log_definition) = &self.log_definition {
+                event.metadata_mut().set_schema_definition(log_definition);
+            }
+            event.metadata_mut().set_upstream_id(Arc::clone(&self.id));
+        });
+
+        let byte_size = events.estimated_json_encoded_size_of();
+        let count = events.len();
+
+        let send_start = Instant::now();
+        let send_result = self.send_with_timeout(events, send_reference).await;
+        if let Some(send_latency) = &self.metrics.send_latency {
+            send_latency.record(send_start.elapsed().as_secs_f64());
+        }
+        send_result?;
+
+        self.events_sent.emit(CountByteSize(count, byte_size));
+        unsent_event_count.decr(count);
         Ok(())
     }
 
@@ -360,7 +287,7 @@ impl Output {
         let mut unsent_event_count = UnsentEventCount::new(events.len());
         let send_batch_start = Instant::now();
 
-        for events in array::events_into_arrays(events, Some(CHUNK_SIZE)) {
+        for events in crate::event::array::events_into_arrays(events, Some(CHUNK_SIZE)) {
             self.send_inner(events, &mut unsent_event_count, reference)
                 .await
                 .inspect_err(|error| {
@@ -386,8 +313,8 @@ impl Output {
     }
 
     /// Attach a post-processing step to this output, replacing any previously set one.
-    pub(super) fn set_post_processor(&mut self, pp: &PostProcessor) {
-        self.post_processor = Some(pp.clone());
+    pub(super) fn set_post_processor(&mut self, pp: Arc<dyn PostProcessor>) {
+        self.post_processor = Some(pp);
     }
 
     /// Calculate the difference between the reference time and the
