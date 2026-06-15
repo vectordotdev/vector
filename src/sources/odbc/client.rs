@@ -424,7 +424,9 @@ fn order_params(map: ObjectMap, columns_order: Option<&Vec<String>>) -> Option<V
     if columns_order.is_none() || columns_order.iter().len() == 0 {
         let params = map
             .iter()
-            .map(|p| p.1.to_string().into_parameter())
+            .filter_map(|(_, value)| {
+                value_to_sql_parameter(value).map(|param| param.into_parameter())
+            })
             .collect_vec();
         return Some(params);
     }
@@ -441,7 +443,7 @@ fn order_params(map: ObjectMap, columns_order: Option<&Vec<String>>) -> Option<V
         .into_iter()
         .filter_map(|col| {
             let value = map.get(col)?;
-            Some(value.to_string().into_parameter())
+            value_to_sql_parameter(value).map(|param| param.into_parameter())
         })
         .collect_vec();
 
@@ -590,5 +592,26 @@ fn map_value(data_type: &odbc_api::DataType, value: Option<&[u8]>, tz: Tz) -> Va
 
             Value::Boolean(value[0] == 1 || value[0] == b'1')
         }
+    }
+}
+
+/// Converts a scalar VRL value to raw text for ODBC parameter binding.
+///
+/// Unlike `Value::to_string()`, this does not use VRL literal syntax (e.g. quoted
+/// strings or `t'…'` timestamps).
+fn value_to_sql_parameter(value: &Value) -> Option<String> {
+    match value {
+        Value::Integer(i) => Some(i.to_string()),
+        Value::Float(f) => Some(f.to_string()),
+        Value::Boolean(b) => Some(b.to_string()),
+        Value::Bytes(b) => std::str::from_utf8(b).ok().map(str::to_owned),
+        Value::Timestamp(t) => Some(t.to_rfc3339()),
+        Value::Null => None,
+        other => serde_json::to_value(other).ok().and_then(|v| match v {
+            serde_json::Value::String(s) => Some(s),
+            serde_json::Value::Number(n) => Some(n.to_string()),
+            serde_json::Value::Bool(b) => Some(b.to_string()),
+            _ => None,
+        }),
     }
 }
