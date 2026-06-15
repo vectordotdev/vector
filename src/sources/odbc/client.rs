@@ -187,7 +187,7 @@ impl Context {
 
     /// Executes the scheduled ODBC query, sends the result as an event, and updates tracking metadata.
     async fn process(&self, map: Option<ObjectMap>) -> Result<Option<ObjectMap>, OdbcError> {
-        let conn_str = self.cfg.connection_string_or_file();
+        let conn_str = self.cfg.connection_string_or_file().context(IoSnafu)?;
         let stmt_str = self.cfg.statement_or_file().context(ConfigSnafu {
             cause: "No statement",
         })?;

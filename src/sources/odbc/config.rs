@@ -166,11 +166,18 @@ pub struct OdbcConfig {
 impl OdbcConfig {
     /// Returns the connection string to use for ODBC.
     /// If the `connection_string_filepath` is set, read the file and return its content.
-    pub fn connection_string_or_file(&self) -> String {
-        self.connection_string_filepath
-            .as_ref()
-            .and_then(|path| fs::read_to_string(path).ok())
-            .unwrap_or_else(|| self.connection_string.inner().to_string())
+    pub fn connection_string_or_file(&self) -> Result<String, std::io::Error> {
+        if let Some(path) = &self.connection_string_filepath {
+            match fs::read_to_string(path) {
+                Ok(content) => Ok(content),
+                Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+                    Ok(self.connection_string.inner().to_string())
+                }
+                Err(err) => Err(err),
+            }
+        } else {
+            Ok(self.connection_string.inner().to_string())
+        }
     }
 
     /// Returns the SQL statement to execute.
@@ -245,7 +252,7 @@ impl Default for OdbcConfig {
 #[typetag::serde(name = "odbc")]
 impl SourceConfig for OdbcConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
-        if self.connection_string_or_file().trim().is_empty() {
+        if self.connection_string_or_file()?.trim().is_empty() {
             return Err(
                 "either a non-empty `connection_string` or a readable `connection_string_filepath` must be provided".into(),
             );
