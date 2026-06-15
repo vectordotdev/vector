@@ -22,7 +22,7 @@ use std::str::FromStr;
 use std::time::{Duration, Instant};
 use tokio::select;
 use tokio_util::codec::Decoder as _;
-use vector_common::internal_event::{BytesReceived, Protocol, error_stage, error_type};
+use vector_common::internal_event::{BytesReceived, Protocol};
 use vector_lib::EstimatedJsonEncodedSizeOf;
 use vector_lib::codecs::Decoder;
 use vector_lib::emit;
@@ -71,26 +71,6 @@ pub enum OdbcError {
 
     #[snafu(display("Blocking ODBC task failed: {source}"))]
     BlockingTask { source: tokio::task::JoinError },
-}
-
-impl OdbcError {
-    pub(crate) const fn error_type(&self) -> &'static str {
-        match self {
-            Self::Db { .. } => error_type::REQUEST_FAILED,
-            Self::Io { .. } => error_type::IO_FAILED,
-            Self::SendError { .. } => error_type::WRITER_FAILED,
-            Self::Json { .. } | Self::Decode { .. } => error_type::PARSER_FAILED,
-            Self::BlockingTask { .. } => error_type::REQUEST_FAILED,
-        }
-    }
-
-    pub(crate) const fn error_stage(&self) -> &'static str {
-        match self {
-            Self::SendError { .. } => error_stage::SENDING,
-            Self::Json { .. } | Self::Decode { .. } => error_stage::PROCESSING,
-            _ => error_stage::RECEIVING,
-        }
-    }
 }
 
 pub(crate) struct Context {
