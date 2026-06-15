@@ -384,7 +384,10 @@ pub fn execute_query(
     let mut row_set_cursor = cursor.bind_buffer(buffer).context(DbSnafu)?;
     let mut rows = Rows::with_capacity(batch_size);
 
-    while let Some(batch) = row_set_cursor.fetch().context(DbSnafu)? {
+    while let Some(batch) = row_set_cursor
+        .fetch_with_truncation_check(true)
+        .context(DbSnafu)?
+    {
         let num_rows = batch.num_rows();
 
         for row_index in 0..num_rows {
