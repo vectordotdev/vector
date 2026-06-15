@@ -261,6 +261,10 @@ impl Context {
     }
 
     fn decode_rows(&self, rows: &Rows) -> Result<Vec<Event>, OdbcError> {
+        if rows.is_empty() {
+            return Ok(Vec::new());
+        }
+
         let payload = serde_json::to_vec(rows).context(JsonSnafu)?;
         let mut buf = BytesMut::from(payload.as_slice());
         let mut events = Vec::new();
