@@ -114,6 +114,13 @@ pub enum Mode {
     /// metrics with new tags after the limit has been hit.
     Exact,
 
+    /// This mode operates similarly to `exact` mode except it tracks cardinality using 64-bit hash fingerprints
+    /// of tag values instead of the original strings. This leads to lower memory requirements in most
+    /// scenarios (assuming average tag value size is greater than 8 bytes) at the cost of slightly
+    /// reduced throughput due to extra hashing operations and a very small chance of collisions at
+    /// very high cardinalities
+    ExactFingerprint,
+
     /// Tracks cardinality probabilistically.
     ///
     /// This mode has lower memory requirements than `exact`, but may occasionally allow metric
@@ -183,6 +190,9 @@ pub enum OverrideMode {
     /// Tracks cardinality exactly. See `Mode::Exact` for details.
     Exact,
 
+    /// Tracks cardinality using 64-bit hash fingerprints. See `Mode::ExactFingerprint` for details.
+    ExactFingerprint,
+
     /// Tracks cardinality probabilistically. See `Mode::Probabilistic` for details.
     Probabilistic(BloomFilterConfig),
 
@@ -196,6 +206,7 @@ impl OverrideMode {
     pub const fn as_mode(&self) -> Option<Mode> {
         match self {
             OverrideMode::Exact => Some(Mode::Exact),
+            OverrideMode::ExactFingerprint => Some(Mode::ExactFingerprint),
             OverrideMode::Probabilistic(b) => Some(Mode::Probabilistic(*b)),
             OverrideMode::Excluded => None,
         }

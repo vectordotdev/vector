@@ -66,6 +66,13 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 				This mode has higher memory requirements than `probabilistic`, but never falsely outputs
 				metrics with new tags after the limit has been hit.
 				"""
+			exact_fingerprint: """
+				This mode operates similarly to `exact` mode except it tracks cardinality using 64-bit hash fingerprints
+				of tag values instead of the original strings. This leads to lower memory requirements in most
+				scenarios (assuming average tag value size is greater than 8 bytes) at the cost of slightly
+				reduced throughput due to extra hashing operations and a very small chance of collisions at
+				very high cardinalities
+				"""
 			probabilistic: """
 				Tracks cardinality probabilistically.
 
@@ -126,7 +133,8 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 					description: "Controls the approach taken for tracking tag cardinality."
 					required:    true
 					type: string: enum: {
-						exact: "Tracks cardinality exactly. See `Mode::Exact` for details."
+						exact:             "Tracks cardinality exactly. See `Mode::Exact` for details."
+						exact_fingerprint: "Tracks cardinality using 64-bit hash fingerprints. See `Mode::ExactFingerprint` for details."
 						excluded: """
 																			Skip cardinality tracking for this metric. All tag values pass through and nothing is
 																			limited. Other fields in this per-metric configuration are ignored when this is selected.
