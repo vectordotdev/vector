@@ -217,7 +217,7 @@ fn sort_and_collapse_counters_by_series_and_timestamp(mut metrics: Vec<Metric>) 
             a.timestamp().map(|dt| dt.timestamp()).unwrap_or(now_ts),
         )
             .cmp(&(
-                a.value().as_name(),
+                b.value().as_name(),
                 b.series(),
                 b.timestamp().map(|dt| dt.timestamp()).unwrap_or(now_ts),
             ))
