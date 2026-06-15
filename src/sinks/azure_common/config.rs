@@ -96,6 +96,30 @@ pub enum UserAssignedManagedIdentityIdType {
     ResourceId,
 }
 
+/// The type of Azure Blob to create when writing to Azure Blob Storage.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[serde(deny_unknown_fields, rename_all = "snake_case")]
+pub enum AzureBlobType {
+    /// Stores data as block blobs.
+    ///
+    /// Each batch creates a new uniquely-named blob. Recommended for high-throughput
+    /// scenarios where blobs are written once and read many times.
+    #[default]
+    Block,
+
+    /// Stores data as append blobs.
+    ///
+    /// Batches are appended to an existing blob rather than creating a new one.
+    /// The blob name stays stable across flushes — suited for continuous log streaming
+    /// where you want a single growing file per time window.
+    ///
+    /// When combined with compression, each batch is compressed as an independent frame
+    /// and appended to the blob. The result is a series of concatenated compressed frames.
+    /// Use decompressors that support multi-stream decompression (e.g., `gunzip`, `zstd -d`).
+    Append,
+}
+
 /// Specific Azure credential types.
 #[configurable_component]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -411,6 +435,7 @@ pub struct AzureBlobRequest {
     pub content_type: &'static str,
     pub metadata: AzureBlobMetadata,
     pub request_metadata: RequestMetadata,
+    pub blob_type: AzureBlobType,
 }
 
 impl Finalizable for AzureBlobRequest {

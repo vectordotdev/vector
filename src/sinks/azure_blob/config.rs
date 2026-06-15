@@ -17,7 +17,8 @@ use crate::{
         Healthcheck, VectorSink,
         azure_common::{
             self, config::AzureAuthentication, config::AzureBlobRetryLogic,
-            config::AzureBlobTlsConfig, service::AzureBlobService, sink::AzureBlobSink,
+            config::AzureBlobTlsConfig, config::AzureBlobType, service::AzureBlobService,
+            sink::AzureBlobSink,
         },
         util::{
             BatchConfig, BulkSizeBasedDefaultBatchSettings, Compression, ServiceBuilderExt,
@@ -107,18 +108,22 @@ pub struct AzureBlobSinkConfig {
 
     /// The timestamp format for the time component of the blob key.
     ///
-    /// By default, blob keys are appended with a timestamp that reflects when the blob are sent to
-    /// Azure Blob Storage, such that the resulting blob key is functionally equivalent to joining
+    /// Blob keys are appended with a timestamp that reflects when the blob is sent to
+    /// Azure Blob Storage. The resulting blob key is functionally equivalent to joining
     /// the blob prefix with the formatted timestamp, such as `date=2022-07-18/1658176486`.
     ///
     /// This would represent a `blob_prefix` set to `date=%F/` and the timestamp of Mon Jul 18 2022
-    /// 20:34:44 GMT+0000, with the `filename_time_format` being set to `%s`, which renders
-    /// timestamps in seconds since the Unix epoch.
+    /// 20:34:44 GMT+0000, with the `blob_time_format` set to `%s`, which renders timestamps in
+    /// seconds since the Unix epoch.
     ///
     /// Supports the common [`strftime`][chrono_strftime_specifiers] specifiers found in most
     /// languages.
     ///
     /// When set to an empty string, no timestamp is appended to the blob prefix.
+    ///
+    /// The default value depends on `blob_type`:
+    /// - `block`: `%s` (Unix epoch seconds) — each batch gets a unique timestamp.
+    /// - `append`: `%Y-%m-%d` (ISO date) — batches within the same day share the same blob.
     ///
     /// [chrono_strftime_specifiers]: https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
     #[configurable(metadata(docs::syntax_override = "strftime"))]
@@ -128,12 +133,36 @@ pub struct AzureBlobSinkConfig {
     ///
     /// The UUID is appended to the timestamp portion of the object key, such that if the blob key
     /// generated is `date=2022-07-18/1658176486`, setting this field to `true` results
-    /// in an blob key that looks like
+    /// in a blob key that looks like
     /// `date=2022-07-18/1658176486-30f6652c-71da-4f9f-800d-a1189c47c547`.
     ///
-    /// This ensures there are no name collisions, and can be useful in high-volume workloads where
-    /// blob keys must be unique.
+    /// The default value depends on `blob_type`:
+    /// - `block`: `true` — guarantees unique blob names across concurrent writers.
+    /// - `append`: `false` — multiple batches must share the same blob name to append to it.
+    ///   Set to `true` only if you intentionally want each flush to target a distinct append blob.
     pub blob_append_uuid: Option<bool>,
+
+    /// The type of blob to use when writing to Azure Blob Storage.
+    ///
+    /// - `block` (default): a new uniquely-named blob per batch.
+    ///   `blob_append_uuid` defaults to `true`; `blob_time_format` defaults to `%s`.
+    /// - `append`: each batch appends to the same blob.
+    ///   `blob_append_uuid` defaults to `false`; `blob_time_format` defaults to `%Y-%m-%d`.
+    ///   Multiple batches within the same time window write to the same blob.
+    ///
+    /// **Batch size limit for `append` mode**: Azure limits each `append_block` call to 4 MiB
+    /// (4,194,304 bytes). `batch.max_bytes` automatically defaults to `4194304` when
+    /// `blob_type` is `append` and the setting is not explicitly configured.
+    /// Setting `batch.max_bytes` above `4194304` with `blob_type: append` is an error and
+    /// Vector will fail to start.
+    ///
+    /// When `blob_type` is `append` and compression is enabled, each batch is compressed as an
+    /// independent frame and appended to the blob. The result is a series of concatenated
+    /// compressed frames. Use decompressors that support multi-stream decompression
+    /// (e.g., `gunzip`, `zstd -d`).
+    #[configurable(derived)]
+    #[serde(default)]
+    pub blob_type: AzureBlobType,
 
     #[serde(flatten)]
     pub encoding: EncodingConfigWithFraming,
@@ -184,6 +213,7 @@ impl GenerateConfig for AzureBlobSinkConfig {
             blob_prefix: default_blob_prefix(),
             blob_time_format: Some(String::from("%s")),
             blob_append_uuid: Some(true),
+            blob_type: AzureBlobType::Block,
             encoding: (Some(NewlineDelimitedEncoderConfig::new()), JsonSerializerConfig::default()).into(),
             compression: Compression::gzip_default(),
             batch: BatchConfig::default(),
@@ -270,6 +300,9 @@ impl SinkConfig for AzureBlobSinkConfig {
 const DEFAULT_KEY_PREFIX: &str = "blob/%F/";
 const DEFAULT_FILENAME_TIME_FORMAT: &str = "%s";
 const DEFAULT_FILENAME_APPEND_UUID: bool = true;
+const DEFAULT_APPEND_BLOB_TIME_FORMAT: &str = "%Y-%m-%d";
+const DEFAULT_APPEND_BLOB_APPEND_UUID: bool = false;
+const APPEND_BLOB_MAX_BLOCK_BYTES: usize = 4 * 1024 * 1024;
 
 impl AzureBlobSinkConfig {
     pub fn build_processor(&self, client: Arc<BlobContainerClient>) -> crate::Result<VectorSink> {
@@ -279,16 +312,34 @@ impl AzureBlobSinkConfig {
             .service(AzureBlobService::new(client));
 
         // Configure our partitioning/batching.
-        let batcher_settings = self.batch.into_batcher_settings()?;
+        // For append blobs, if the user hasn't set max_bytes, default it to the 4 MiB
+        // Azure hard limit instead of inheriting the 10 MB BulkSizeBasedDefault.
+        // This prevents a startup failure when blob_type = append is used out of the box.
+        let mut batch = self.batch;
+        if self.blob_type == AzureBlobType::Append && batch.max_bytes.is_none() {
+            batch.max_bytes = Some(APPEND_BLOB_MAX_BLOCK_BYTES);
+        }
+        let validated_batch = batch.validate()?;
+        let validated_batch = if self.blob_type == AzureBlobType::Append {
+            validated_batch.limit_max_bytes(APPEND_BLOB_MAX_BLOCK_BYTES)?
+        } else {
+            validated_batch
+        };
+        let batcher_settings = validated_batch.into_batcher_settings()?;
 
+        let (default_append_uuid, default_time_format) = match self.blob_type {
+            AzureBlobType::Block => (DEFAULT_FILENAME_APPEND_UUID, DEFAULT_FILENAME_TIME_FORMAT),
+            AzureBlobType::Append => (
+                DEFAULT_APPEND_BLOB_APPEND_UUID,
+                DEFAULT_APPEND_BLOB_TIME_FORMAT,
+            ),
+        };
         let blob_time_format = self
             .blob_time_format
-            .as_ref()
-            .cloned()
-            .unwrap_or_else(|| DEFAULT_FILENAME_TIME_FORMAT.into());
-        let blob_append_uuid = self
-            .blob_append_uuid
-            .unwrap_or(DEFAULT_FILENAME_APPEND_UUID);
+            .as_deref()
+            .unwrap_or(default_time_format)
+            .to_string();
+        let blob_append_uuid = self.blob_append_uuid.unwrap_or(default_append_uuid);
 
         let transformer = self.encoding.transformer();
         let (framer, serializer) = self.encoding.build(SinkType::MessageBased)?;
@@ -298,6 +349,7 @@ impl AzureBlobSinkConfig {
             container_name: self.container_name.clone(),
             blob_time_format,
             blob_append_uuid,
+            blob_type: self.blob_type,
             encoder: (transformer, encoder),
             compression: self.compression,
         };

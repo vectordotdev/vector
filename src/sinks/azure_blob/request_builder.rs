@@ -9,7 +9,7 @@ use crate::{
     codecs::{Encoder, Transformer},
     event::{Event, Finalizable},
     sinks::{
-        azure_common::config::{AzureBlobMetadata, AzureBlobRequest},
+        azure_common::config::{AzureBlobMetadata, AzureBlobRequest, AzureBlobType},
         util::{
             Compression, RequestBuilder, metadata::RequestMetadataBuilder,
             request_builder::EncodeResult,
@@ -22,6 +22,7 @@ pub struct AzureBlobRequestOptions {
     pub container_name: String,
     pub blob_time_format: String,
     pub blob_append_uuid: bool,
+    pub blob_type: AzureBlobType,
     pub encoder: (Transformer, Encoder<Framer>),
     pub compression: Compression,
 }
@@ -95,6 +96,7 @@ impl RequestBuilder<(String, Vec<Event>)> for AzureBlobRequestOptions {
             content_type: self.encoder.1.content_type(),
             metadata: azure_metadata,
             request_metadata,
+            blob_type: self.blob_type,
         }
     }
 }
