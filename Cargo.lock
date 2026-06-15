@@ -456,7 +456,7 @@ dependencies = [
  "arrow-schema",
  "arrow-select",
  "flatbuffers 25.9.23",
- "lz4_flex 0.13.0",
+ "lz4_flex",
  "zstd 0.13.2",
 ]
 
@@ -6594,15 +6594,6 @@ dependencies = [
 
 [[package]]
 name = "lz4_flex"
-version = "0.11.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "373f5eceeeab7925e0c1098212f2fbc4d416adec9d35051a6ab251e824c1854a"
-dependencies = [
- "twox-hash",
-]
-
-[[package]]
-name = "lz4_flex"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "db9a0d582c2874f68138a16ce1867e0ffde6c0bb0a0df85e1f36d04146db488a"
@@ -7871,7 +7862,7 @@ dependencies = [
  "flate2",
  "half",
  "hashbrown 0.17.1",
- "lz4_flex 0.13.0",
+ "lz4_flex",
  "num-bigint",
  "num-integer",
  "num-traits",
@@ -10490,17 +10481,6 @@ dependencies = [
  "proc-macro2 1.0.106",
  "quote 1.0.45",
  "syn 2.0.117",
-]
-
-[[package]]
-name = "sha-1"
-version = "0.10.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f5058ada175748e33390e40e872bd0fe59a19f265d0158daa551c5a88a76009c"
-dependencies = [
- "cfg-if",
- "cpufeatures 0.2.11",
- "digest 0.10.7",
 ]
 
 [[package]]
@@ -13432,7 +13412,7 @@ checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 [[package]]
 name = "vrl"
 version = "0.33.1"
-source = "git+https://github.com/vectordotdev/vrl.git?branch=main#cd5f0dd1261d387aad2f12d81e693e3d37ff0a7d"
+source = "git+https://github.com/vectordotdev/vrl.git?branch=main#74e3e74582aa6b4445c1a94004bb3f14276d07df"
 dependencies = [
  "aes",
  "aes-siv",
@@ -13481,7 +13461,7 @@ dependencies = [
  "jsonschema",
  "lalrpop",
  "lalrpop-util",
- "lz4_flex 0.11.6",
+ "lz4_flex",
  "md-5 0.10.6",
  "mlua",
  "nom 8.0.0",
@@ -13518,9 +13498,8 @@ dependencies = [
  "seahash",
  "serde",
  "serde_json",
- "serde_yaml",
  "serde_yaml_ng",
- "sha-1",
+ "sha1",
  "sha2 0.10.9",
  "sha3",
  "simdutf8",
