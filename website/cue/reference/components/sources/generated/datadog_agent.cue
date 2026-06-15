@@ -345,6 +345,11 @@ generated: components: sources: datadog_agent: configuration: {
 			}
 		}
 	}
+	disable_llmobs: {
+		description: "If this is set to `true`, LLM Observability events are not accepted by the component."
+		required:    false
+		type: bool: default: false
+	}
 	disable_logs: {
 		description: "If this is set to `true`, logs are not accepted by the component."
 		required:    false
