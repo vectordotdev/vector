@@ -225,6 +225,15 @@ pub struct KafkaSourceConfig {
     ))]
     librdkafka_options: Option<HashMap<String, String>>,
 
+    /// Whether to ignore Kafka tombstone messages (messages with a `null` payload).
+    ///
+    /// When `true` (the default), messages with no payload are skipped. Set to `false`
+    /// to emit an event for each tombstone, which is useful when only the message
+    /// headers, key, or metadata are needed.
+    #[serde(default = "crate::serde::default_true")]
+    #[derivative(Default(value = "crate::serde::default_true()"))]
+    ignore_tombstones: bool,
+
     #[serde(flatten)]
     auth: kafka::KafkaAuthConfig,
 
@@ -591,6 +600,7 @@ impl ConsumerStateInner<Consuming> {
         let keys = self.config.keys();
         let decoder = self.decoder.clone();
         let log_namespace = self.log_namespace;
+        let ignore_tombstones = self.config.ignore_tombstones;
         let mut out = self.out.clone();
 
         let (end_tx, mut end_signal) = oneshot::channel::<()>();
@@ -651,7 +661,7 @@ impl ConsumerStateInner<Consuming> {
                                 topic: msg.topic(),
                                 partition: msg.partition(),
                             });
-                            parse_message(msg, decoder.clone(), &keys, &mut out, acknowledgements, &finalizer, log_namespace).await;
+                            parse_message(msg, decoder.clone(), &keys, &mut out, acknowledgements, &finalizer, log_namespace, ignore_tombstones).await;
                         }
                     },
                 )
@@ -948,6 +958,7 @@ fn drive_kafka_consumer(
     });
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn parse_message(
     msg: BorrowedMessage<'_>,
     decoder: Decoder,
@@ -956,8 +967,11 @@ async fn parse_message(
     acknowledgements: bool,
     finalizer: &Option<OrderedFinalizer<FinalizerEntry>>,
     log_namespace: LogNamespace,
+    ignore_tombstones: bool,
 ) {
-    if let Some((count, stream)) = parse_stream(&msg, decoder, keys, log_namespace) {
+    if let Some((count, stream)) =
+        parse_stream(&msg, decoder, keys, log_namespace, ignore_tombstones)
+    {
         let (batch, receiver) = BatchNotifier::new_with_receiver();
         let mut stream = stream.map(|event| {
             // All acknowledgements flow through the normal Finalizer stream so
@@ -991,8 +1005,14 @@ fn parse_stream<'a>(
     decoder: Decoder,
     keys: &'a Keys,
     log_namespace: LogNamespace,
+    ignore_tombstones: bool,
 ) -> Option<(usize, impl Stream<Item = Event> + 'a + use<'a>)> {
-    let payload = msg.payload()?; // skip messages with empty payload
+    let payload = match msg.payload() {
+        Some(payload) => payload,
+        // Tombstone (null-payload) message: either skip or process as empty body.
+        None if ignore_tombstones => return None,
+        None => &[],
+    };
 
     let rmsg = ReceivedMessage::from(msg);
 

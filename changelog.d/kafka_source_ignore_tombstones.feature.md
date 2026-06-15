@@ -1,0 +1,1 @@
+Added a new `ignore_tombstones` option to the `kafka` source. When set to `false`, Kafka tombstone messages (records with a `null` payload) are no longer skipped and instead produce an event, allowing pipelines to consume messages where only the key, headers, or other metadata are needed. Defaults to `true` to preserve the existing behavior.
