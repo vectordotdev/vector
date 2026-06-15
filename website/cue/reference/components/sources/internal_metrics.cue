@@ -1268,14 +1268,14 @@ components: sources: internal_metrics: {
 			description: "The semantic meaning."
 			required:    true
 			enum: {
-				service:  "The service typically represents the application that generated the event."
-				message:  "The main text message of the event."
+				service:   "The service typically represents the application that generated the event."
+				message:   "The main text message of the event."
 				timestamp: "The main timestamp of the event."
-				host: "The hostname of the machine where the event was generated."
-				tags: "The tags of an event, generally a key-value paired list."
-				source: "The source of the event."
-				severity: "The severity of the event."
-				trace_id: "The Id of the trace associated to the event."
+				host:      "The hostname of the machine where the event was generated."
+				tags:      "The tags of an event, generally a key-value paired list."
+				source:    "The source of the event."
+				severity:  "The severity of the event."
+				trace_id:  "The Id of the trace associated to the event."
 			}
 		}
 		_mode: {
