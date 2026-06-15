@@ -489,7 +489,7 @@ INSERT INTO number_columns (
     }
     assert_eq!(
         *row.get("decimal_col").unwrap(),
-        Value::Float(NotNan::new(-99999999.99).unwrap())
+        Value::Bytes(Bytes::from_static(b"-99999999.99"))
     );
 
     let Value::Object(row) = &rows[1] else {
@@ -534,7 +534,7 @@ INSERT INTO number_columns (
     }
     assert_eq!(
         *row.get("decimal_col").unwrap(),
-        Value::Float(NotNan::new(99999999.99).unwrap())
+        Value::Bytes(Bytes::from_static(b"99999999.99"))
     );
 
     debug!("{rows:#?}");

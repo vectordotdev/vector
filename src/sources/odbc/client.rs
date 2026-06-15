@@ -498,8 +498,6 @@ fn map_value(data_type: &odbc_api::DataType, value: Option<&[u8]>, tz: Tz) -> Va
         // Convert to float.
         odbc_api::DataType::Float { .. }
         | odbc_api::DataType::Real
-        | odbc_api::DataType::Decimal { .. }
-        | odbc_api::DataType::Numeric { .. }
         | odbc_api::DataType::Double => {
             let Some(value) = value else {
                 return Value::Null;
@@ -509,6 +507,15 @@ fn map_value(data_type: &odbc_api::DataType, value: Option<&[u8]>, tz: Tz) -> Va
                 .ok()
                 .and_then(|s| NotNan::from_str(s).ok())
                 .map_or(Value::Null, Value::Float)
+        }
+
+        // Preserve exact decimal values from the database.
+        odbc_api::DataType::Decimal { .. } | odbc_api::DataType::Numeric { .. } => {
+            let Some(value) = value else {
+                return Value::Null;
+            };
+
+            Value::Bytes(Bytes::copy_from_slice(value))
         }
 
         // Convert to timestamp.
