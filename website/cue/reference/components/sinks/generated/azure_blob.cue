@@ -301,6 +301,11 @@ generated: components: sinks: azure_blob: configuration: {
 			| Allowed services       | Blob               |
 			| Allowed resource types | Container & Object |
 			| Allowed permissions    | Read & Create      |
+
+			If you also configure the `tags` option, the SAS must additionally include the
+			`Tags` permission. Azure applies the *Set Blob Tags* authorization requirement to
+			the `Put Blob` request that carries the `x-ms-tags` header, so without it tagged
+			uploads fail with an authorization error even though the health check still passes.
 			"""
 		required: false
 		type: string: examples: ["DefaultEndpointsProtocol=https;AccountName=mylogstorage;AccountKey=storageaccountkeybase64encoded;EndpointSuffix=core.windows.net", "BlobEndpoint=https://mylogstorage.blob.core.windows.net/;SharedAccessSignature=generatedsastoken", "AccountName=mylogstorage"]
@@ -814,6 +819,24 @@ generated: components: sinks: azure_blob: configuration: {
 			}
 		}
 	}
+	metadata: {
+		description: """
+			The set of [custom metadata][blob_metadata] `key:value` pairs to apply to created blobs.
+
+			Each entry becomes an `x-ms-meta-{key}` header. Azure enforces its own limits on names
+			and combined size (currently 8 KiB total); invalid configurations are rejected by the
+			service. Names must be valid C# identifiers, and non-ASCII values must be
+			Base64-encoded by the user.
+
+			[blob_metadata]: https://learn.microsoft.com/rest/api/storageservices/set-blob-metadata
+			"""
+		required: false
+		type: object: options: "*": {
+			description: "A key/value pair."
+			required:    true
+			type: string: {}
+		}
+	}
 	request: {
 		description: """
 			Middleware settings for outbound requests.
@@ -997,6 +1020,34 @@ generated: components: sinks: azure_blob: configuration: {
 					default: 60
 					unit:    "seconds"
 				}
+			}
+		}
+	}
+	tags: {
+		description: """
+			The set of [blob index tags][blob_index_tags] to apply to created blobs.
+
+			Each entry becomes a tag in the `x-ms-tags` header. Azure enforces its own limits
+			(currently up to 10 tags per blob, with restricted character sets for keys and values);
+			invalid configurations are rejected by the service.
+
+			When authenticating with a shared access signature (SAS), the token must include the
+			`Tags` permission in addition to `Read` and `Create`. Azure applies the *Set Blob Tags*
+			authorization requirement to the `Put Blob` request that carries these tags.
+
+			[blob_index_tags]: https://learn.microsoft.com/azure/storage/blobs/storage-blob-index-how-to
+			"""
+		required: false
+		type: object: {
+			examples: [{
+				Classification: "confidential"
+				PHI:            "True"
+				Project:        "Blue"
+			}]
+			options: "*": {
+				description: "A single tag."
+				required:    true
+				type: string: {}
 			}
 		}
 	}

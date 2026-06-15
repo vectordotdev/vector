@@ -61,6 +61,11 @@ pub struct AzureBlobSinkConfig {
     /// | Allowed services       | Blob               |
     /// | Allowed resource types | Container & Object |
     /// | Allowed permissions    | Read & Create      |
+    ///
+    /// If you also configure the `tags` option, the SAS must additionally include the
+    /// `Tags` permission. Azure applies the *Set Blob Tags* authorization requirement to
+    /// the `Put Blob` request that carries the `x-ms-tags` header, so without it tagged
+    /// uploads fail with an authorization error even though the health check still passes.
     #[configurable(metadata(
         docs::warnings = "Access keys and SAS tokens can be used to gain unauthorized access to Azure Blob Storage \
         resources. Numerous security breaches have occurred due to leaked connection strings. It is important to keep \
@@ -154,6 +159,10 @@ pub struct AzureBlobSinkConfig {
     /// Each entry becomes a tag in the `x-ms-tags` header. Azure enforces its own limits
     /// (currently up to 10 tags per blob, with restricted character sets for keys and values);
     /// invalid configurations are rejected by the service.
+    ///
+    /// When authenticating with a shared access signature (SAS), the token must include the
+    /// `Tags` permission in addition to `Read` and `Create`. Azure applies the *Set Blob Tags*
+    /// authorization requirement to the `Put Blob` request that carries these tags.
     ///
     /// [blob_index_tags]: https://learn.microsoft.com/azure/storage/blobs/storage-blob-index-how-to
     #[configurable(metadata(docs::additional_props_description = "A single tag."))]
