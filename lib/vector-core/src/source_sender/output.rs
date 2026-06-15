@@ -24,7 +24,7 @@ use vector_common::{
 };
 use vrl::value::Value;
 
-use super::{CHUNK_SIZE, SendError, SourceSenderItem};
+use super::{SendError, SourceSenderItem, chunk_size};
 use crate::{
     EstimatedJsonEncodedSizeOf,
     config::{OutputId, log_schema},
@@ -246,7 +246,7 @@ impl Output {
         S: Stream<Item = E> + Unpin,
         E: Into<Event> + ByteSizeOf,
     {
-        let mut stream = events.ready_chunks(CHUNK_SIZE);
+        let mut stream = events.ready_chunks(chunk_size());
         while let Some(events) = stream.next().await {
             self.send_batch(events).await?;
         }
@@ -270,7 +270,7 @@ impl Output {
         let mut unsent_event_count = UnsentEventCount::new(events.len());
         let send_batch_start = Instant::now();
 
-        for events in array::events_into_arrays(events, Some(CHUNK_SIZE)) {
+        for events in array::events_into_arrays(events, Some(chunk_size())) {
             self.send_inner(events, &mut unsent_event_count, reference)
                 .await
                 .inspect_err(|error| {

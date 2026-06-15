@@ -1,6 +1,9 @@
 #![allow(missing_docs)]
 
-use std::{num::NonZeroU64, path::PathBuf};
+use std::{
+    num::{NonZeroU64, NonZeroUsize},
+    path::PathBuf,
+};
 
 use clap::{ArgAction, CommandFactory, FromArgMatches, Parser};
 
@@ -128,6 +131,11 @@ pub struct RootOpts {
     /// Number of threads to use for processing (default is number of available cores)
     #[arg(short, long, env = "VECTOR_THREADS")]
     pub threads: Option<usize>,
+
+    /// Number of events batched per source send and used as the base for source output buffer sizing
+    /// (source output buffer capacity is this value multiplied by the number of worker threads)
+    #[arg(long, env = "VECTOR_CHUNK_SIZE")]
+    pub chunk_size: Option<NonZeroUsize>,
 
     /// Enable more detailed internal logging. Repeat to increase level. Overridden by `--quiet`.
     #[arg(short, long, action = ArgAction::Count)]

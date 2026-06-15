@@ -229,7 +229,7 @@ impl Application {
             );
         }
 
-        let runtime = build_runtime(opts.root.threads, "vector-worker")?;
+        let runtime = build_runtime(opts.root.threads, opts.root.chunk_size, "vector-worker")?;
 
         // Signal handler for OS and provider messages.
         let mut signals = SignalPair::new(&runtime);
@@ -541,7 +541,11 @@ fn get_log_levels(default: &str) -> String {
         .unwrap_or_else(|_| default.into())
 }
 
-pub fn build_runtime(threads: Option<usize>, thread_name: &str) -> Result<Runtime, ExitCode> {
+pub fn build_runtime(
+    threads: Option<usize>,
+    chunk_size: Option<NonZeroUsize>,
+    thread_name: &str,
+) -> Result<Runtime, ExitCode> {
     let mut rt_builder = runtime::Builder::new_multi_thread();
     rt_builder.max_blocking_threads(20_000);
     rt_builder.enable_all().thread_name(thread_name);
@@ -556,7 +560,16 @@ pub fn build_runtime(threads: Option<usize>, thread_name: &str) -> Result<Runtim
         .unwrap_or_else(|_| panic!("double thread initialization"));
     rt_builder.worker_threads(threads);
 
-    debug!(message = "Building runtime.", worker_threads = threads);
+    let chunk_size = chunk_size
+        .map(NonZeroUsize::get)
+        .unwrap_or(vector_lib::source_sender::DEFAULT_CHUNK_SIZE);
+    vector_lib::source_sender::set_chunk_size(chunk_size);
+
+    debug!(
+        message = "Building runtime.",
+        worker_threads = threads,
+        chunk_size
+    );
     Ok(rt_builder.build().expect("Unable to create async runtime"))
 }
 
