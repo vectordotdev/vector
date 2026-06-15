@@ -13,6 +13,7 @@ use vrl::path::{OwnedSegment, OwnedTargetPath, PathPrefix};
 use super::{config::MAX_PAYLOAD_BYTES, service::LogApiRequest};
 use crate::{
     common::datadog::{DD_RESERVED_SEMANTIC_ATTRS, DDTAGS, MESSAGE, is_reserved_attribute},
+    internal_events::DatadogLogsReservedAttributeConflict,
     sinks::{
         prelude::*,
         util::{Compressor, http::HttpJsonBatchSizer},
@@ -196,13 +197,12 @@ pub fn position_reserved_attr_event_root(
         if log.contains(desired_path) {
             let rename_attr = format!("_RESERVED_{meaning}");
             let rename_path = event_path!(rename_attr.as_str());
-            warn!(
-                message = "Field with semantic meaning conflicts with an existing field at the expected destination. The existing one was renamed to not overwrite.",
-                meaning = meaning,
-                source_path = %current_path,
-                destination_path = expected_field_name,
-                renamed_existing_to = %rename_attr,
-            );
+            emit!(DatadogLogsReservedAttributeConflict {
+                meaning,
+                source_path: current_path,
+                destination_path: expected_field_name,
+                renamed_existing_to: &rename_attr,
+            });
             log.rename_key(desired_path, rename_path);
         }
 
