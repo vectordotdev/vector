@@ -6,6 +6,7 @@ mod tests;
 pub mod logs;
 pub mod metrics;
 pub mod traces;
+pub mod llmobs;
 
 #[allow(warnings, clippy::pedantic, clippy::nursery)]
 pub(crate) mod ddmetric_proto {
@@ -69,6 +70,7 @@ use crate::{
 pub const LOGS: &str = "logs";
 pub const METRICS: &str = "metrics";
 pub const TRACES: &str = "traces";
+pub const LLMOBS: &str = "llmobs";
 
 /// Configuration for the `datadog_agent` source.
 #[configurable_component(source(
@@ -105,6 +107,11 @@ pub struct DatadogAgentConfig {
     #[configurable(metadata(docs::advanced))]
     #[serde(default = "crate::serde::default_false")]
     disable_traces: bool,
+
+    /// If this is set to `true`, LLM Observability events are not accepted by the component.
+    #[configurable(metadata(docs::advanced))]
+    #[serde(default = "crate::serde::default_false")]
+    disable_llmobs: bool,
 
     /// If this is set to `true`, logs, metrics (beta), and traces (alpha) are sent to different outputs.
     ///
@@ -179,6 +186,7 @@ impl GenerateConfig for DatadogAgentConfig {
             disable_logs: false,
             disable_metrics: false,
             disable_traces: false,
+            disable_llmobs: false,
             multiple_outputs: false,
             parse_ddtags: false,
             split_metric_namespace: true,
@@ -322,6 +330,7 @@ impl SourceConfig for DatadogAgentConfig {
             .with_standard_vector_source_metadata();
 
         let mut output = Vec::with_capacity(1);
+        let llmobs_definition = definition.clone();
 
         if self.multiple_outputs {
             if !self.disable_logs {
@@ -332,6 +341,9 @@ impl SourceConfig for DatadogAgentConfig {
             }
             if !self.disable_traces {
                 output.push(SourceOutput::new_traces().with_port(TRACES))
+            }
+            if !self.disable_llmobs {
+                output.push(SourceOutput::new_maybe_logs(DataType::Log, llmobs_definition).with_port(LLMOBS))
             }
         } else {
             output.push(SourceOutput::new_maybe_logs(
@@ -459,10 +471,17 @@ impl DatadogAgentSource {
         }
 
         if !config.disable_metrics {
-            let metrics_filter = metrics::build_warp_filter(handler, self.clone());
+            let metrics_filter = metrics::build_warp_filter(handler.clone(), self.clone());
             filters = filters
                 .map(|f| f.or(metrics_filter.clone()).unify().boxed())
                 .or(Some(metrics_filter));
+        }
+
+        if !config.disable_llmobs {
+            let llmobs_filter = llmobs::build_warp_filter(handler.clone(), self.clone());
+            filters = filters
+                .map(|f| f.or(llmobs_filter.clone()).unify().boxed())
+                .or(Some(llmobs_filter));
         }
 
         filters.ok_or_else(|| "At least one of the supported data type shall be enabled".into())
