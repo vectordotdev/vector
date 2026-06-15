@@ -456,7 +456,19 @@ async fn post_processor_dispatches_by_event_type() {
         .expect("trace send should succeed");
     drop(sender);
 
-    assert_eq!(log_count.load(Ordering::SeqCst), 1, "process_log called once");
-    assert_eq!(metric_count.load(Ordering::SeqCst), 1, "process_metric called once");
-    assert_eq!(trace_count.load(Ordering::SeqCst), 1, "process_trace called once");
+    assert_eq!(
+        log_count.load(Ordering::SeqCst),
+        1,
+        "process_log called once"
+    );
+    assert_eq!(
+        metric_count.load(Ordering::SeqCst),
+        1,
+        "process_metric called once"
+    );
+    assert_eq!(
+        trace_count.load(Ordering::SeqCst),
+        1,
+        "process_trace called once"
+    );
 }

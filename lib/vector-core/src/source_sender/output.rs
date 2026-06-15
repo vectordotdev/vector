@@ -182,19 +182,38 @@ impl Output {
         reference: i64,
     ) -> Result<(), SendError> {
         let send_reference = Instant::now();
-        events
-            .iter_events()
-            .for_each(|event| self.emit_lag_time(event, reference));
 
         // Apply post-processor with typed dispatch. Each method receives a reference to the
         // concrete event type, making it impossible at the type level to change the variant.
+        // Finalizers are taken out before each call and restored after so that a processor
+        // that replaces the entire inner value (e.g. `*log = LogEvent::default()`) cannot
+        // accidentally drop the batch notifiers required for event acking.
         if let Some(ref pp) = self.post_processor {
             events.iter_events_mut().for_each(|event| match event {
-                EventMutRef::Log(log) => pp.process_log(log),
-                EventMutRef::Metric(metric) => pp.process_metric(metric),
-                EventMutRef::Trace(trace) => pp.process_trace(trace),
+                EventMutRef::Log(log) => {
+                    let finalizers = log.metadata_mut().take_finalizers();
+                    pp.process_log(log);
+                    log.metadata_mut().merge_finalizers(finalizers);
+                }
+                EventMutRef::Metric(metric) => {
+                    let finalizers = metric.metadata_mut().take_finalizers();
+                    pp.process_metric(metric);
+                    metric.metadata_mut().merge_finalizers(finalizers);
+                }
+                EventMutRef::Trace(trace) => {
+                    let finalizers = trace.metadata_mut().take_finalizers();
+                    pp.process_trace(trace);
+                    trace.metadata_mut().merge_finalizers(finalizers);
+                }
             });
         }
+
+        // Emit lag time after the post-processor so that any timestamp mutations made by the
+        // processor are reflected in the metric (the downstream channel receives the mutated
+        // event, so telemetry should match it).
+        events
+            .iter_events()
+            .for_each(|event| self.emit_lag_time(event, reference));
 
         // Attach runtime schema metadata after the post-processor so that processor mutations
         // are always preserved even if the processor replaces the inner event value.
