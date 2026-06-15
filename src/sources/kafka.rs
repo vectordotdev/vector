@@ -42,7 +42,7 @@ use vector_lib::{
         DecoderFramedRead, StreamDecodingError,
         decoding::{DeserializerConfig, FramingConfig},
     },
-    config::{LegacyKey, LogNamespace},
+    config::{DataType, LegacyKey, LogNamespace},
     configurable::configurable_component,
     finalizer::OrderedFinalizer,
     lookup::{OwnedValuePath, lookup_v2::OptionalValuePath, owned_value_path, path},
@@ -416,10 +416,14 @@ impl SourceConfig for KafkaSourceConfig {
                 None,
             );
 
-        vec![SourceOutput::new_maybe_logs(
-            self.decoding.output_type(),
-            schema_definition,
-        )]
+        // When tombstones are emitted, the source produces log events for them
+        // regardless of the configured decoder.
+        let mut output_type = self.decoding.output_type();
+        if !self.ignore_tombstones {
+            output_type |= DataType::Log;
+        }
+
+        vec![SourceOutput::new_maybe_logs(output_type, schema_definition)]
     }
 
     fn can_acknowledge(&self) -> bool {
