@@ -54,6 +54,7 @@ rand.workspace = true
 serde_json.workspace = true
 serde_yaml.workspace = true
 temp-dir = "0.1.16"
+tokio = { workspace = true, features = ["test-util"] }
 tokio-test.workspace = true
 tracing-fluent-assertions = { version = "0.3" }
 tracing-subscriber = { workspace = true, features = ["env-filter", "fmt", "registry", "std", "ansi"] }

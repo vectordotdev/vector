@@ -206,9 +206,10 @@ where
         .build()
         .expect("creating buffer should not fail");
     let usage_handle = BufferUsageHandle::noop();
-    Buffer::from_config_inner(config, usage_handle)
+    let (writer, reader, ledger, _) = Buffer::from_config_inner(config, usage_handle)
         .await
-        .expect("should not fail to create buffer")
+        .expect("should not fail to create buffer");
+    (writer, reader, ledger)
 }
 
 /// Creates a disk v2 buffer with all default values, but returns a handle to the buffer usage tracker.
@@ -228,7 +229,7 @@ where
         .build()
         .expect("creating buffer should not fail");
     let usage_handle = BufferUsageHandle::noop();
-    let (writer, reader, ledger) = Buffer::from_config_inner(config, usage_handle.clone())
+    let (writer, reader, ledger, _) = Buffer::from_config_inner(config, usage_handle.clone())
         .await
         .expect("should not fail to create buffer");
     (writer, reader, ledger, usage_handle)
@@ -278,9 +279,10 @@ where
         .expect("creating buffer should not fail");
     let usage_handle = BufferUsageHandle::noop();
 
-    Buffer::from_config_inner(config, usage_handle)
+    let (writer, reader, ledger, _) = Buffer::from_config_inner(config, usage_handle)
         .await
-        .expect("should not fail to create buffer")
+        .expect("should not fail to create buffer");
+    (writer, reader, ledger)
 }
 
 /// Creates a disk v2 buffer with the specified maximum record size.
@@ -302,9 +304,10 @@ where
         .expect("creating buffer should not fail");
     let usage_handle = BufferUsageHandle::noop();
 
-    Buffer::from_config_inner(config, usage_handle)
+    let (writer, reader, ledger, _) = Buffer::from_config_inner(config, usage_handle)
         .await
-        .expect("should not fail to create buffer")
+        .expect("should not fail to create buffer");
+    (writer, reader, ledger)
 }
 
 /// Creates a disk v2 buffer with the specified maximum data file size.
@@ -331,9 +334,10 @@ where
         .expect("creating buffer should not fail");
     let usage_handle = BufferUsageHandle::noop();
 
-    Buffer::from_config_inner(config, usage_handle)
+    let (writer, reader, ledger, _) = Buffer::from_config_inner(config, usage_handle)
         .await
-        .expect("should not fail to create buffer")
+        .expect("should not fail to create buffer");
+    (writer, reader, ledger)
 }
 
 /// Creates a disk v2 buffer with the specified write buffer size.
@@ -355,9 +359,10 @@ where
         .expect("creating buffer should not fail");
     let usage_handle = BufferUsageHandle::noop();
 
-    Buffer::from_config_inner(config, usage_handle)
+    let (writer, reader, ledger, _) = Buffer::from_config_inner(config, usage_handle)
         .await
-        .expect("should not fail to create buffer")
+        .expect("should not fail to create buffer");
+    (writer, reader, ledger)
 }
 
 pub(crate) fn get_corrected_max_record_size<T>(payload: &T) -> usize

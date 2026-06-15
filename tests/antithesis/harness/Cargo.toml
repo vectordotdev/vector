@@ -12,6 +12,7 @@ publish = false
 antithesis_sdk = { workspace = true, features = ["full"] }
 axum = { workspace = true, features = ["http1", "tokio"] }
 clap = { workspace = true, features = ["derive"] }
+hex = { version = "0.4.3" }
 reqwest = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true, features = ["rt", "macros", "net", "time"] }

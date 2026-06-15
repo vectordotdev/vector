@@ -5,7 +5,6 @@ use std::{
         Arc,
         atomic::{AtomicBool, AtomicU16, AtomicU64, Ordering},
     },
-    time::Instant,
 };
 
 use bytecheck::CheckBytes;
@@ -15,7 +14,7 @@ use fslock::LockFile;
 use futures::StreamExt;
 use rkyv::{Archive, Serialize, with::Atomic};
 use snafu::{ResultExt, Snafu};
-use tokio::{fs, io::AsyncWriteExt, sync::Notify};
+use tokio::{fs, io::AsyncWriteExt, sync::Notify, time::Instant};
 use vector_common::finalizer::OrderedFinalizer;
 
 use super::{
@@ -28,6 +27,9 @@ use super::{
 use crate::buffer_usage_data::BufferUsageHandle;
 
 pub const LEDGER_LEN: usize = align16(mem::size_of::<ArchivedLedgerState>());
+
+/// File name of the ledger within the buffer's data directory.
+const LEDGER_FILE_NAME: &str = "buffer.db";
 
 /// Error that occurred during calls to [`Ledger`].
 #[derive(Debug, Snafu)]
@@ -380,6 +382,12 @@ where
             .join(format!("buffer-data-{file_id}.dat"))
     }
 
+    /// Gets the path to the ledger file.
+    #[cfg(test)]
+    pub fn ledger_path(&self) -> PathBuf {
+        self.config.data_dir.join(LEDGER_FILE_NAME)
+    }
+
     /// Waits for a signal from the reader that progress has been made.
     ///
     /// This will only occur when a record is read, which may allow enough space (below the maximum
@@ -603,7 +611,7 @@ where
         }
 
         // Open the ledger file, which may involve creating it if it doesn't yet exist.
-        let ledger_path = config.data_dir.join("buffer.db");
+        let ledger_path = config.data_dir.join(LEDGER_FILE_NAME);
         let mut ledger_handle = config
             .filesystem
             .open_file_writable(&ledger_path)
@@ -737,16 +745,20 @@ where
         Ok(())
     }
 
+    /// Returns the finalizer together with the join handle of the task draining it. Callers that
+    /// do not need the handle let it drop, leaving the task to run until the finalizer is dropped.
     #[must_use]
-    pub(super) fn spawn_finalizer(self: Arc<Self>) -> OrderedFinalizer<u64> {
+    pub(super) fn spawn_finalizer(
+        self: Arc<Self>,
+    ) -> (OrderedFinalizer<u64>, tokio::task::JoinHandle<()>) {
         let (finalizer, mut stream) = OrderedFinalizer::new(None);
-        vector_common::spawn_in_current_span(async move {
+        let handle = vector_common::spawn_in_current_span(async move {
             while let Some((_status, amount)) = stream.next().await {
                 self.increment_pending_acks(amount);
                 self.notify_writer_waiters();
             }
         });
-        finalizer
+        (finalizer, handle)
     }
 }
 
