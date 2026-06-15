@@ -245,6 +245,10 @@ impl Default for OdbcConfig {
 #[typetag::serde(name = "odbc")]
 impl SourceConfig for OdbcConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
+        if self.statement.is_none() && self.statement_filepath.is_none() {
+            return Err("either `statement` or `statement_filepath` must be set".into());
+        }
+
         let log_namespace = cx.log_namespace(self.log_namespace);
         let decoder = self.get_decoding_config(log_namespace).build()?;
         let guard = Context::new(self.clone(), cx, decoder, log_namespace)?;
