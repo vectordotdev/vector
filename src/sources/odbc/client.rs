@@ -143,6 +143,11 @@ impl Context {
                     break;
                 }
                 next = schedule.next() => {
+                    if next.is_none() {
+                        debug!(message = "Schedule exhausted. Shutting down ODBC source.");
+                        break;
+                    }
+
                     let instant = Instant::now();
                     match self.process(prev_result.clone()).await {
                         Ok(result) => {
@@ -162,12 +167,6 @@ impl Context {
                                 error,
                             });
                         }
-                    }
-
-                    // When no further schedule is defined, run once and then stop.
-                    if next.is_none() {
-                        debug!(message = "No additional schedule configured. Shutting down ODBC source.");
-                        break
                     }
 
                     #[cfg(test)]
