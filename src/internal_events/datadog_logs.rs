@@ -6,7 +6,7 @@ use vrl::path::OwnedTargetPath;
 
 #[derive(Debug, NamedInternalEvent)]
 pub struct DatadogLogsReservedAttributeConflict<'a> {
-    pub meaning: &'a str,
+    pub meaning: &'static str,
     pub source_path: &'a OwnedTargetPath,
     pub destination_path: &'a str,
     pub renamed_existing_to: &'a str,

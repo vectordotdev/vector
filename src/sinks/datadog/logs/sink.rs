@@ -185,7 +185,7 @@ pub fn position_reserved_attr_event_root(
     log: &mut LogEvent,
     current_path: &OwnedTargetPath,
     expected_field_name: &str,
-    meaning: &str,
+    meaning: &'static str,
 ) {
     // the path that DD archives expects this reserved attribute to be in.
     let desired_path = event_path!(expected_field_name);
