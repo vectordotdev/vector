@@ -245,6 +245,12 @@ impl Default for OdbcConfig {
 #[typetag::serde(name = "odbc")]
 impl SourceConfig for OdbcConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
+        if self.connection_string_or_file().trim().is_empty() {
+            return Err(
+                "either a non-empty `connection_string` or a readable `connection_string_filepath` must be provided".into(),
+            );
+        }
+
         if self.statement.is_none() && self.statement_filepath.is_none() {
             return Err("either `statement` or `statement_filepath` must be set".into());
         }
