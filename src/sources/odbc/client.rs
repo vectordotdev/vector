@@ -23,6 +23,7 @@ use std::time::{Duration, Instant};
 use tokio::select;
 use tokio_util::codec::Decoder as _;
 use vector_common::internal_event::{BytesReceived, Protocol, error_stage, error_type};
+use vector_lib::EstimatedJsonEncodedSizeOf;
 use vector_lib::codecs::Decoder;
 use vector_lib::emit;
 use vector_lib::source_sender::SendError;
@@ -233,9 +234,13 @@ impl Context {
 
         let event_count = events.len();
         if event_count > 0 {
+            let byte_size = events.estimated_json_encoded_size_of();
             let mut out = out.clone();
             out.send_batch(events).await.context(SendSnafu)?;
-            emit!(OdbcEventsReceived { count: event_count });
+            emit!(OdbcEventsReceived {
+                count: event_count,
+                byte_size,
+            });
         }
 
         if let Some(last) = rows.last() {

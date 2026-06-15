@@ -1,11 +1,12 @@
 use vector_common::internal_event::{CounterName, InternalEvent};
-use vector_lib::{NamedInternalEvent, counter};
+use vector_lib::{NamedInternalEvent, counter, json_size::JsonSize};
 
 use crate::sources::odbc::OdbcError;
 
 #[derive(Debug, NamedInternalEvent)]
 pub struct OdbcEventsReceived {
     pub count: usize,
+    pub byte_size: JsonSize,
 }
 
 impl InternalEvent for OdbcEventsReceived {
@@ -13,6 +14,7 @@ impl InternalEvent for OdbcEventsReceived {
         trace!(
             message = "Events received.",
             count = %self.count,
+            byte_size = %self.byte_size,
         );
         counter!(
             CounterName::ComponentReceivedEventsTotal,
@@ -23,7 +25,7 @@ impl InternalEvent for OdbcEventsReceived {
             CounterName::ComponentReceivedEventBytesTotal,
             "protocol" => "odbc"
         )
-        .increment(0);
+        .increment(self.byte_size.get() as u64);
     }
 }
 
