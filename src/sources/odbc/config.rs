@@ -45,7 +45,7 @@ pub struct OdbcConfig {
     pub statement: Option<String>,
 
     /// The path to the file that contains the SQL statement.
-    /// If this is unset or the file cannot be read, the value from `statement` is used instead.
+    /// If this is set, the `statement` field is ignored and the file must exist and be readable.
     pub statement_filepath: Option<String>,
 
     /// Maximum time to allow the SQL statement to run.
@@ -182,11 +182,15 @@ impl OdbcConfig {
 
     /// Returns the SQL statement to execute.
     /// If the `statement_filepath` is set, read the file and return its content.
-    pub fn statement_or_file(&self) -> Option<String> {
-        self.statement_filepath
-            .as_ref()
-            .and_then(|path| fs::read_to_string(path).ok())
-            .or_else(|| self.statement.clone())
+    /// When a filepath is configured, read failures are returned instead of falling back to `statement`.
+    pub fn statement_or_file(&self) -> Result<String, std::io::Error> {
+        if let Some(path) = &self.statement_filepath {
+            fs::read_to_string(path)
+        } else if let Some(statement) = &self.statement {
+            Ok(statement.clone())
+        } else {
+            Ok(String::new())
+        }
     }
 
     pub fn get_decoding_config(&self, log_namespace: LogNamespace) -> DecodingConfig {
@@ -258,8 +262,11 @@ impl SourceConfig for OdbcConfig {
             );
         }
 
-        if self.statement.is_none() && self.statement_filepath.is_none() {
-            return Err("either `statement` or `statement_filepath` must be set".into());
+        if self.statement_or_file()?.trim().is_empty() {
+            return Err(
+                "either a non-empty `statement` or a readable `statement_filepath` must be provided"
+                    .into(),
+            );
         }
 
         let log_namespace = cx.log_namespace(self.log_namespace);

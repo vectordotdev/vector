@@ -14,7 +14,7 @@ use odbc_api::parameter::VarCharBox;
 use odbc_api::{
     ConnectionOptions, Cursor, Environment, IntoParameter, ResultSetMetadata, environment,
 };
-use snafu::{OptionExt, ResultExt, Snafu};
+use snafu::{ResultExt, Snafu};
 use std::fs;
 use std::fs::File;
 use std::io::BufReader;
@@ -64,9 +64,6 @@ pub enum OdbcError {
     #[snafu(display("JSON error: {source}"))]
     Json { source: serde_json::Error },
 
-    #[snafu(display("Configuration error: {cause}"))]
-    ConfigError { cause: &'static str },
-
     #[snafu(display("Decode error: {source}"))]
     Decode {
         source: vector_lib::codecs::decoding::Error,
@@ -83,7 +80,6 @@ impl OdbcError {
             Self::Io { .. } => error_type::IO_FAILED,
             Self::SendError { .. } => error_type::WRITER_FAILED,
             Self::Json { .. } | Self::Decode { .. } => error_type::PARSER_FAILED,
-            Self::ConfigError { .. } => error_type::CONFIGURATION_FAILED,
             Self::BlockingTask { .. } => error_type::REQUEST_FAILED,
         }
     }
@@ -188,9 +184,15 @@ impl Context {
     /// Executes the scheduled ODBC query, sends the result as an event, and updates tracking metadata.
     async fn process(&self, map: Option<ObjectMap>) -> Result<Option<ObjectMap>, OdbcError> {
         let conn_str = self.cfg.connection_string_or_file().context(IoSnafu)?;
-        let stmt_str = self.cfg.statement_or_file().context(ConfigSnafu {
-            cause: "No statement",
-        })?;
+        let stmt_str = self.cfg.statement_or_file().context(IoSnafu)?;
+        if stmt_str.trim().is_empty() {
+            return Err(OdbcError::Io {
+                source: std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "either a non-empty `statement` or a readable `statement_filepath` must be provided",
+                ),
+            });
+        }
         let out = self.cx.out.clone();
         let env = self.env;
 
