@@ -5,7 +5,6 @@ use azure_core::http::StatusCode;
 use azure_storage_blob::BlobContainerClient;
 
 use bytes::{Buf, BytesMut};
-use chrono::Utc;
 use flate2::read::MultiGzDecoder;
 use futures::{Stream, StreamExt, stream};
 use vector_lib::{
@@ -397,7 +396,7 @@ async fn assert_append_blob_multiple_forced_flushes(config: AzureBlobSinkConfig)
     // Rough per-line size: 100 bytes content + framing. Force a flush every ~3 lines.
     let flush_every_n_bytes = 350;
 
-    let mut batch = config.batch.clone();
+    let mut batch = config.batch;
     batch.max_bytes = Some(flush_every_n_bytes);
 
     let config = AzureBlobSinkConfig {

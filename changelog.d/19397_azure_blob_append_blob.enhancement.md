@@ -6,3 +6,5 @@ where you want a single growing file per time window.
 When `blob_type` is set to `append`, `blob_append_uuid` defaults to `false` and `blob_time_format`
 defaults to `%Y-%m-%d` (daily rotation). Both can still be overridden explicitly.
 The Azure hard limit of 4 MiB per `append_block` call is enforced at startup via `batch.max_bytes`.
+
+authors: danielku15

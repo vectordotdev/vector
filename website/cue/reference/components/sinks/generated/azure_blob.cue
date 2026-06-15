@@ -192,11 +192,13 @@ generated: components: sinks: azure_blob: configuration: {
 
 			The UUID is appended to the timestamp portion of the object key, such that if the blob key
 			generated is `date=2022-07-18/1658176486`, setting this field to `true` results
-			in an blob key that looks like
+			in a blob key that looks like
 			`date=2022-07-18/1658176486-30f6652c-71da-4f9f-800d-a1189c47c547`.
 
-			This ensures there are no name collisions, and can be useful in high-volume workloads where
-			blob keys must be unique.
+			The default value depends on `blob_type`:
+			- `block`: `true` — guarantees unique blob names across concurrent writers.
+			- `append`: `false` — multiple batches must share the same blob name to append to it.
+			  Set to `true` only if you intentionally want each flush to target a distinct append blob.
 			"""
 		required: false
 		type: bool: {}
@@ -230,23 +232,72 @@ generated: components: sinks: azure_blob: configuration: {
 		description: """
 			The timestamp format for the time component of the blob key.
 
-			By default, blob keys are appended with a timestamp that reflects when the blob are sent to
-			Azure Blob Storage, such that the resulting blob key is functionally equivalent to joining
+			Blob keys are appended with a timestamp that reflects when the blob is sent to
+			Azure Blob Storage. The resulting blob key is functionally equivalent to joining
 			the blob prefix with the formatted timestamp, such as `date=2022-07-18/1658176486`.
 
 			This would represent a `blob_prefix` set to `date=%F/` and the timestamp of Mon Jul 18 2022
-			20:34:44 GMT+0000, with the `filename_time_format` being set to `%s`, which renders
-			timestamps in seconds since the Unix epoch.
+			20:34:44 GMT+0000, with the `blob_time_format` set to `%s`, which renders timestamps in
+			seconds since the Unix epoch.
 
 			Supports the common [`strftime`][chrono_strftime_specifiers] specifiers found in most
 			languages.
 
 			When set to an empty string, no timestamp is appended to the blob prefix.
 
+			The default value depends on `blob_type`:
+			- `block`: `%s` (Unix epoch seconds) — each batch gets a unique timestamp.
+			- `append`: `%Y-%m-%d` (ISO date) — batches within the same day share the same blob.
+
 			[chrono_strftime_specifiers]: https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
 			"""
 		required: false
 		type: string: syntax: "strftime"
+	}
+	blob_type: {
+		description: """
+			The type of blob to use when writing to Azure Blob Storage.
+
+			- `block` (default): a new uniquely-named blob per batch.
+			  `blob_append_uuid` defaults to `true`; `blob_time_format` defaults to `%s`.
+			- `append`: each batch appends to the same blob.
+			  `blob_append_uuid` defaults to `false`; `blob_time_format` defaults to `%Y-%m-%d`.
+			  Multiple batches within the same time window write to the same blob.
+
+			**Batch size limit for `append` mode**: Azure limits each `append_block` call to 4 MiB
+			(4,194,304 bytes). `batch.max_bytes` automatically defaults to `4194304` when
+			`blob_type` is `append` and the setting is not explicitly configured.
+			Setting `batch.max_bytes` above `4194304` with `blob_type: append` is an error and
+			Vector will fail to start.
+
+			When `blob_type` is `append` and compression is enabled, each batch is compressed as an
+			independent frame and appended to the blob. The result is a series of concatenated
+			compressed frames. Use decompressors that support multi-stream decompression
+			(e.g., `gunzip`, `zstd -d`).
+			"""
+		required: false
+		type: string: {
+			default: "block"
+			enum: {
+				append: """
+					Stores data as append blobs.
+
+					Batches are appended to an existing blob rather than creating a new one.
+					The blob name stays stable across flushes — suited for continuous log streaming
+					where you want a single growing file per time window.
+
+					When combined with compression, each batch is compressed as an independent frame
+					and appended to the blob. The result is a series of concatenated compressed frames.
+					Use decompressors that support multi-stream decompression (e.g., `gunzip`, `zstd -d`).
+					"""
+				block: """
+					Stores data as block blobs.
+
+					Each batch creates a new uniquely-named blob. Recommended for high-throughput
+					scenarios where blobs are written once and read many times.
+					"""
+			}
+		}
 	}
 	compression: {
 		description: """
