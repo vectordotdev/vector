@@ -271,8 +271,30 @@ pub fn append_enacted(repo_root: &Path, entry: EnactedEntry) -> Result<()> {
     } else {
         data.deprecations_enacted.push(entry);
     }
-    data.deprecations_pending = pending_to_json(&pending);
+    data.deprecations_pending = pending_excluding_enacted(&pending, &data.deprecations_enacted);
     write_json(repo_root, &data)
+}
+
+/// Filter pending fragments so they exclude any `what` already in `enacted`.
+/// Keeps the JSON consistent if `enact` was interrupted between the JSON
+/// write and the fragment delete: the next `generate` / `check` will still
+/// produce a JSON without the enacted-and-still-on-disk fragment in
+/// `deprecations_pending`.
+fn pending_excluding_enacted(
+    pending: &[DeprecationEntry],
+    enacted: &[EnactedEntry],
+) -> Vec<PendingJsonEntry> {
+    let enacted_what: std::collections::HashSet<&str> =
+        enacted.iter().map(|e| e.what.as_str()).collect();
+    pending
+        .iter()
+        .filter(|e| !enacted_what.contains(e.what.as_str()))
+        .map(|e| PendingJsonEntry {
+            what: e.what.clone(),
+            deprecated_since: e.deprecated_since.to_string(),
+            description: e.description.clone(),
+        })
+        .collect()
 }
 
 /// Validate the enacted entries in `DEPRECATIONS_JSON`:
@@ -328,7 +350,7 @@ pub fn rendered_json(repo_root: &Path) -> Result<String> {
     let dir = repo_root.join(DEPRECATION_DIR);
     let pending = read_deprecation_fragments(&dir)?;
     let mut data = read_json(repo_root)?;
-    data.deprecations_pending = pending_to_json(&pending);
+    data.deprecations_pending = pending_excluding_enacted(&pending, &data.deprecations_enacted);
     Ok(serde_json::to_string_pretty(&data)? + "\n")
 }
 
@@ -338,19 +360,8 @@ pub fn sync_deprecations_cue(repo_root: &Path) -> Result<()> {
     let dir = repo_root.join(DEPRECATION_DIR);
     let pending = read_deprecation_fragments(&dir)?;
     let mut data = read_json(repo_root)?;
-    data.deprecations_pending = pending_to_json(&pending);
+    data.deprecations_pending = pending_excluding_enacted(&pending, &data.deprecations_enacted);
     write_json(repo_root, &data)
-}
-
-fn pending_to_json(entries: &[DeprecationEntry]) -> Vec<PendingJsonEntry> {
-    entries
-        .iter()
-        .map(|e| PendingJsonEntry {
-            what: e.what.clone(),
-            deprecated_since: e.deprecated_since.to_string(),
-            description: e.description.clone(),
-        })
-        .collect()
 }
 
 #[cfg(test)]
@@ -577,6 +588,34 @@ mod tests {
         .unwrap();
         let err = validate_enacted(tmp.path()).unwrap_err();
         assert!(format!("{err}").contains("later minor release"));
+    }
+
+    #[test]
+    fn rendered_json_drops_pending_already_enacted() {
+        // Simulate an interrupted enact: the fragment file is still on disk
+        // (delete failed) but the JSON already has the matching enacted entry.
+        // rendered_json must keep deprecations_pending consistent with
+        // deprecations_enacted so `check` doesn't accept the inconsistent
+        // intermediate state.
+        let tmp = tempdir().unwrap();
+        let dir = tmp.path().join("deprecation.d");
+        fs::create_dir_all(&dir).unwrap();
+        fs::create_dir_all(tmp.path().join("website/data")).unwrap();
+        fs::write(
+            dir.join("foo.md"),
+            "---\nwhat: foo\ndeprecated_since: \"0.55.0\"\n---\n",
+        )
+        .unwrap();
+        fs::write(
+            tmp.path().join("website/data/deprecations.json"),
+            r#"{"deprecations_pending":[],"deprecations_enacted":[
+                {"what":"foo","deprecated_since":"0.55.0","removed_in":"0.57.0"}
+            ]}"#,
+        )
+        .unwrap();
+        let out = rendered_json(tmp.path()).unwrap();
+        assert!(out.contains("\"deprecations_pending\": []"));
+        assert!(out.contains("\"what\": \"foo\""));
     }
 
     #[test]
