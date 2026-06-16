@@ -81,6 +81,7 @@ pub mod aws;
 pub mod common;
 pub mod completion;
 mod convert_config;
+pub mod cpu_time;
 pub mod encoding_transcode;
 pub mod enrichment_tables;
 pub mod extra_context;
@@ -240,6 +241,8 @@ pub fn get_hostname() -> std::io::Result<String> {
         hostname::get()?.to_string_lossy().into_owned()
     })
 }
+
+pub(crate) use vector_lib::spawn_in_current_span;
 
 /// Spawn a task with the given name. The name is only used if
 /// built with [`tokio_unstable`][tokio_unstable].

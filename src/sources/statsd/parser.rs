@@ -106,7 +106,9 @@ impl Parser {
                 {
                     parts[0].parse()?
                 } else {
-                    parts[0][1..].parse()?
+                    let mut chars = parts[0].chars();
+                    chars.next();
+                    chars.as_str().parse()?
                 };
 
                 match parse_direction(parts[0])? {
@@ -444,6 +446,15 @@ mod test {
                 MetricValue::Gauge { value: 10.0 },
             )),
         );
+    }
+
+    #[test]
+    fn gauge_multibyte_utf8_prefix_is_error_not_panic() {
+        // A multi-byte UTF-8 character as the value prefix must return a parse
+        // error, not panic with "byte index 1 is not a char boundary".
+        let input = std::str::from_utf8(b"m:\xc3\xa9|g").unwrap();
+        assert!(parse(input).is_err());
+        assert!(parse("m:é|g").is_err());
     }
 
     #[test]

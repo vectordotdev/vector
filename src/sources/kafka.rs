@@ -455,7 +455,7 @@ async fn kafka_source(
             .map_or(config.session_timeout_ms / 2, Duration::from_millis);
         let consumer_state =
             ConsumerStateInner::<Consuming>::new(config, decoder, out, log_namespace, span);
-        tokio::spawn(async move {
+        crate::spawn_in_current_span(async move {
             coordinate_kafka_callbacks(
                 consumer,
                 callback_rx,

@@ -381,10 +381,8 @@ impl EventMetadata {
 
         // Keep the earliest `last_transform_timestamp` for accurate latency measurement.
         match (self.last_transform_timestamp, other_timestamp) {
-            (Some(self_ts), Some(other_ts)) => {
-                if other_ts < self_ts {
-                    self.last_transform_timestamp = Some(other_ts);
-                }
+            (Some(self_ts), Some(other_ts)) if other_ts < self_ts => {
+                self.last_transform_timestamp = Some(other_ts);
             }
             (None, Some(other_ts)) => {
                 self.last_transform_timestamp = Some(other_ts);

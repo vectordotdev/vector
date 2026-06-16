@@ -19,7 +19,7 @@ use crate::{
     transforms::{FunctionTransform, OutputBuffer},
 };
 
-/// Exists only for backwards compatability purposes so that the value of sample_rate_key is
+/// Exists only for backwards compatibility purposes so that the value of sample_rate_key is
 /// consistent after the internal implementation of the Sample class was modified to work in terms
 /// of percentages
 #[derive(Clone, Debug)]
