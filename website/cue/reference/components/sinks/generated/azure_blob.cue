@@ -270,6 +270,20 @@ generated: components: sinks: azure_blob: configuration: {
 			Setting `batch.max_bytes` above `4194304` with `blob_type: append` is an error and
 			Vector will fail to start.
 
+			`batch.max_bytes` is measured on the uncompressed, pre-encoding event size, while Azure
+			enforces the 4 MiB limit on the encoded (and, if enabled, compressed) request body. With
+			the default `gzip` compression the encoded body is smaller than the batched events, so the
+			4 MiB batch limit leaves headroom. If you disable compression, encoding overhead (for
+			example JSON escaping) can push a near-limit batch over 4 MiB and Azure rejects it; lower
+			`batch.max_bytes` to leave headroom in that case.
+
+			**Ordering and delivery for `append` mode**: appended blocks are persisted in the order
+			Azure receives the requests, so append mode pins request concurrency to 1 (unless you set a
+			fixed `request.concurrency`) to keep flushes to the same blob in order. As with all Vector
+			sinks, delivery is at-least-once: if a flush is retried after Azure already committed the
+			block (a rare server-side error after a successful write), the batch can be appended twice.
+			Set `request.retry_attempts` to `0` if you prefer at-most-once over possible duplication.
+
 			When `blob_type` is `append` and compression is enabled, each batch is compressed as an
 			independent frame and appended to the blob. The result is a series of concatenated
 			compressed frames. Use decompressors that support multi-stream decompression
@@ -352,6 +366,10 @@ generated: components: sinks: azure_blob: configuration: {
 			| Allowed services       | Blob               |
 			| Allowed resource types | Container & Object |
 			| Allowed permissions    | Read & Create      |
+
+			When `blob_type` is `append`, the SAS token additionally needs the `Add` (or `Write`)
+			permission. `Read & Create` is sufficient to pass the health check and create the blob,
+			but every `Append Block` call fails with `403 Forbidden` without `Add`/`Write`.
 			"""
 		required: false
 		type: string: examples: ["DefaultEndpointsProtocol=https;AccountName=mylogstorage;AccountKey=storageaccountkeybase64encoded;EndpointSuffix=core.windows.net", "BlobEndpoint=https://mylogstorage.blob.core.windows.net/;SharedAccessSignature=generatedsastoken", "AccountName=mylogstorage"]

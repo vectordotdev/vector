@@ -599,12 +599,18 @@ fn azure_blob_build_request_append_blob_defaults() {
 
     let payload = EncodeResult::uncompressed(Bytes::new(), byte_size);
     let request_metadata = request_metadata_builder.build(&payload);
-    let request = request_options.build_request(metadata, request_metadata, payload);
 
-    let expected_date = Utc::now().format("%Y-%m-%d").to_string();
-    assert_eq!(
-        request.metadata.partition_key,
-        format!("blob/{expected_date}.log")
+    // Capture the date window around `build_request`, which formats the key with its own
+    // `Utc::now()`. Comparing against a single later `Utc::now()` would flake if the test
+    // crossed a UTC midnight between the two calls, so accept either side of the boundary.
+    let before = Utc::now().format("%Y-%m-%d").to_string();
+    let request = request_options.build_request(metadata, request_metadata, payload);
+    let after = Utc::now().format("%Y-%m-%d").to_string();
+
+    let key = &request.metadata.partition_key;
+    assert!(
+        *key == format!("blob/{before}.log") || *key == format!("blob/{after}.log"),
+        "partition_key {key:?} did not match the expected daily key for {before} or {after}"
     );
     assert_eq!(request.blob_type, AzureBlobType::Append);
 }
@@ -980,4 +986,30 @@ async fn azure_blob_append_blob_explicit_oversized_batch_fails_at_startup() {
         msg.contains("max_bytes") && msg.contains("exceeds"),
         "expected a max_bytes batch limit error, got: {msg}"
     );
+}
+
+#[tokio::test]
+async fn azure_blob_append_blob_partial_batch_without_max_bytes_succeeds() {
+    // A `[batch]` table that sets another field but omits `max_bytes` still triggers the
+    // per-field serde default (the 10 MB bulk default). Append mode must treat that inherited
+    // default as "unset" and fall back to the 4 MiB append limit, rather than failing at startup.
+    let config: AzureBlobSinkConfig = toml::from_str(
+        r#"
+            connection_string = "AccountName=mylogstorage"
+            container_name = "my-logs"
+            blob_type = "append"
+
+            [encoding]
+            codec = "json"
+
+            [batch]
+            timeout_secs = 5
+        "#,
+    )
+    .unwrap_or_else(|e| panic!("Config parsing failed: {e:?}"));
+
+    let cx = SinkContext::default();
+    let _ = config.build(cx).await.unwrap_or_else(|e| {
+        panic!("build should succeed when [batch] omits max_bytes (only timeout_secs set): {e:?}")
+    });
 }

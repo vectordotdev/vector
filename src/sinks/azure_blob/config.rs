@@ -22,7 +22,8 @@ use crate::{
         },
         util::{
             BatchConfig, BulkSizeBasedDefaultBatchSettings, Compression, ServiceBuilderExt,
-            TowerRequestConfig, partitioner::KeyPartitioner, service::TowerRequestConfigDefaults,
+            SinkBatchSettings, TowerRequestConfig, partitioner::KeyPartitioner,
+            service::TowerRequestConfigDefaults,
         },
     },
     template::Template,
@@ -61,6 +62,10 @@ pub struct AzureBlobSinkConfig {
     /// | Allowed services       | Blob               |
     /// | Allowed resource types | Container & Object |
     /// | Allowed permissions    | Read & Create      |
+    ///
+    /// When `blob_type` is `append`, the SAS token additionally needs the `Add` (or `Write`)
+    /// permission. `Read & Create` is sufficient to pass the health check and create the blob,
+    /// but every `Append Block` call fails with `403 Forbidden` without `Add`/`Write`.
     #[configurable(metadata(
         docs::warnings = "Access keys and SAS tokens can be used to gain unauthorized access to Azure Blob Storage \
         resources. Numerous security breaches have occurred due to leaked connection strings. It is important to keep \
@@ -155,6 +160,20 @@ pub struct AzureBlobSinkConfig {
     /// `blob_type` is `append` and the setting is not explicitly configured.
     /// Setting `batch.max_bytes` above `4194304` with `blob_type: append` is an error and
     /// Vector will fail to start.
+    ///
+    /// `batch.max_bytes` is measured on the uncompressed, pre-encoding event size, while Azure
+    /// enforces the 4 MiB limit on the encoded (and, if enabled, compressed) request body. With
+    /// the default `gzip` compression the encoded body is smaller than the batched events, so the
+    /// 4 MiB batch limit leaves headroom. If you disable compression, encoding overhead (for
+    /// example JSON escaping) can push a near-limit batch over 4 MiB and Azure rejects it; lower
+    /// `batch.max_bytes` to leave headroom in that case.
+    ///
+    /// **Ordering and delivery for `append` mode**: appended blocks are persisted in the order
+    /// Azure receives the requests, so append mode pins request concurrency to 1 (unless you set a
+    /// fixed `request.concurrency`) to keep flushes to the same blob in order. As with all Vector
+    /// sinks, delivery is at-least-once: if a flush is retried after Azure already committed the
+    /// block (a rare server-side error after a successful write), the batch can be appended twice.
+    /// Set `request.retry_attempts` to `0` if you prefer at-most-once over possible duplication.
     ///
     /// When `blob_type` is `append` and compression is enabled, each batch is compressed as an
     /// independent frame and appended to the blob. The result is a series of concatenated
@@ -306,24 +325,39 @@ const APPEND_BLOB_MAX_BLOCK_BYTES: usize = 4 * 1024 * 1024;
 
 impl AzureBlobSinkConfig {
     pub fn build_processor(&self, client: Arc<BlobContainerClient>) -> crate::Result<VectorSink> {
-        let request_limits = self.request.into_settings();
+        let mut request_limits = self.request.into_settings();
+        // Append blobs must be written in order: Azure orders appended blocks by the order the
+        // service receives them, not by event order. With the default adaptive concurrency, two
+        // flushes targeting the same blob can be in flight at once and land out of order. Pin
+        // concurrency to 1 for append mode unless the user explicitly chose a fixed value.
+        // (Same approach the loki sink uses for its order-sensitive modes.)
+        if self.blob_type == AzureBlobType::Append && request_limits.concurrency.is_none() {
+            request_limits.concurrency = Some(1);
+        }
         let service = ServiceBuilder::new()
             .settings(request_limits, AzureBlobRetryLogic)
             .service(AzureBlobService::new(client));
 
         // Configure our partitioning/batching.
-        // For append blobs, if the user hasn't set max_bytes, default it to the 4 MiB
-        // Azure hard limit instead of inheriting the 10 MB BulkSizeBasedDefault.
-        // This prevents a startup failure when blob_type = append is used out of the box.
+        // Sinks that enforce a hard per-request byte limit give their `BatchConfig` a type-level
+        // default `MAX_BYTES` equal to that limit (see `gcp_pubsub`, `aws_kinesis`), so
+        // `validate()?.limit_max_bytes()?` only ever rejects *explicit* over-configuration. Block
+        // and append share one `batch` field here, so append inherits block's 10 MB bulk default,
+        // which exceeds Azure's 4 MiB per-append limit. Restore the "default == limit" property for
+        // append before validating, so an omitted (or partially-specified) `[batch]` table uses the
+        // append limit while an explicit larger value is still rejected at startup.
         let mut batch = self.batch;
-        if self.blob_type == AzureBlobType::Append && batch.max_bytes.is_none() {
-            batch.max_bytes = Some(APPEND_BLOB_MAX_BLOCK_BYTES);
-        }
-        let validated_batch = batch.validate()?;
         let validated_batch = if self.blob_type == AzureBlobType::Append {
-            validated_batch.limit_max_bytes(APPEND_BLOB_MAX_BLOCK_BYTES)?
+            if batch.max_bytes.is_none()
+                || batch.max_bytes == BulkSizeBasedDefaultBatchSettings::MAX_BYTES
+            {
+                batch.max_bytes = Some(APPEND_BLOB_MAX_BLOCK_BYTES);
+            }
+            batch
+                .validate()?
+                .limit_max_bytes(APPEND_BLOB_MAX_BLOCK_BYTES)?
         } else {
-            validated_batch
+            batch.validate()?
         };
         let batcher_settings = validated_batch.into_batcher_settings()?;
 
