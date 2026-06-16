@@ -23,12 +23,15 @@ impl Cli {
         let repo_root = paths::find_repo_root()?;
         let dir = repo_root.join(deprecation::DEPRECATION_DIR);
 
-        // Accept "slug", "slug.md", or a path like "deprecation.d/slug.md"
-        let slug_path = std::path::Path::new(&self.slug);
-        let stem = slug_path
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .unwrap_or(&self.slug);
+        // Accept "slug" or "slug.md"; reject path-like inputs to keep the
+        // identifier unambiguous (and the file lookup safe).
+        if self.slug.contains('/') || self.slug.contains('\\') {
+            bail!(
+                "expected a deprecation slug (e.g. \"azure-monitor-logs-sink\"), not a path: {}",
+                self.slug
+            );
+        }
+        let stem = self.slug.strip_suffix(".md").unwrap_or(&self.slug);
         let filename = format!("{stem}.md");
 
         let path = dir.join(&filename);
