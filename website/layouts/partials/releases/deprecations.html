@@ -1,0 +1,88 @@
+{{/* Renders deprecations for a specific release version (major.minor match).
+     Enacted removals (removed_in == version) appear first, then newly announced entries (deprecated_since == version).
+     Enacted entries whose deprecated_since matches are included in announcements for historical context.
+     Params: version (string, e.g. "0.56" or "0.56.0") */}}
+{{- $pending := site.Data.deprecations.deprecations_pending -}}
+{{- $enacted := site.Data.deprecations.deprecations_enacted -}}
+{{- $version := .version -}}
+
+{{- $parts  := split $version "." -}}
+{{- $prefix := printf "%s.%s." (index $parts 0) (index $parts 1) -}}
+{{- $exact  := printf "%s.%s"  (index $parts 0) (index $parts 1) -}}
+
+{{- $announced := slice -}}
+{{- range $pending -}}
+  {{- if or (strings.HasPrefix .deprecated_since $prefix) (eq .deprecated_since $exact) -}}
+    {{- $announced = $announced | append . -}}
+  {{- end -}}
+{{- end -}}
+{{- /* Also include enacted entries first announced in this release for historical context. */ -}}
+{{- range $enacted -}}
+  {{- if or (strings.HasPrefix .deprecated_since $prefix) (eq .deprecated_since $exact) -}}
+    {{- $announced = $announced | append . -}}
+  {{- end -}}
+{{- end -}}
+
+{{- $announced = sort $announced "deprecated_since" "desc" -}}
+
+{{- $removed := slice -}}
+{{- range $enacted -}}
+  {{- /* Exact match, or prefix match only when page version is two-part (no patch). */ -}}
+  {{- if or (eq .removed_in $version)
+            (and (eq $version $exact) (strings.HasPrefix .removed_in $prefix)) -}}
+    {{- $removed = $removed | append . -}}
+  {{- end -}}
+{{- end -}}
+{{- $removed = sort $removed "deprecated_since" "desc" -}}
+
+{{ if gt (len $removed) 0 }}
+<div class="mt-8">
+  <div class="prose dark:prose-dark max-w-none">
+    {{ partial "heading.html" (dict "text" "Enacted Deprecations" "level" 2) }}
+  </div>
+  <div class="mt-6 flex flex-col space-y-6">
+    {{ range $removed }}
+    <div>
+      <span class="text-xl font-semibold text-dark dark:text-gray-300">
+        {{ .what | markdownify }}
+      </span>
+      {{ with .description }}
+      <div class="mt-2.5 prose dark:prose-dark max-w-none">
+        {{ . | markdownify }}
+      </div>
+      {{ end }}
+    </div>
+    {{ end }}
+  </div>
+</div>
+{{ end }}
+
+{{ if gt (len $announced) 0 }}
+<div class="mt-8">
+  <div class="prose dark:prose-dark max-w-none">
+    {{ partial "heading.html" (dict "text" "Deprecation Announcements" "level" 2) }}
+    <p class="text-sm text-gray-500 dark:text-gray-400">
+      See the <a href="/releases/deprecations/">deprecations page</a> for all active and historical deprecations.
+    </p>
+  </div>
+  <div class="mt-6 flex flex-col space-y-6">
+    {{ range $announced }}
+    <div>
+      <span class="text-xl font-semibold text-dark dark:text-gray-300">
+        {{ .what | markdownify }}
+      </span>
+      {{ with .removed_in }}
+      <div class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+        Removed in {{ . }}
+      </div>
+      {{ end }}
+      {{ with .description }}
+      <div class="mt-2.5 prose dark:prose-dark max-w-none">
+        {{ . | markdownify }}
+      </div>
+      {{ end }}
+    </div>
+    {{ end }}
+  </div>
+</div>
+{{ end }}
