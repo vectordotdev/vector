@@ -181,8 +181,6 @@ impl Output {
         unsent_event_count: &mut UnsentEventCount,
         reference: i64,
     ) -> Result<(), SendError> {
-        let send_reference = Instant::now();
-
         // Apply post-processor with typed dispatch. Each method receives a reference to the
         // concrete event type, making it impossible at the type level to change the variant.
         // Finalizers are taken out before each call and restored after so that a processor
@@ -216,6 +214,11 @@ impl Output {
             });
         }
 
+        // Capture send_reference after post-processing so that buffer_send_duration_seconds
+        // excludes processor CPU time and reflects only lag-time emission, schema attachment,
+        // and buffer enqueue latency.
+        let send_reference = Instant::now();
+
         // Emit lag time after the post-processor so that any timestamp mutations made by the
         // processor are reflected in the metric (the downstream channel receives the mutated
         // event, so telemetry should match it).
@@ -235,7 +238,6 @@ impl Output {
         let count = events.len();
 
         let send_start = Instant::now();
-
         let send_result = self.send_with_timeout(events, send_reference).await;
 
         if let Some(send_latency) = &self.metrics.send_latency {
