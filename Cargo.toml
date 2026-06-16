@@ -361,7 +361,6 @@ hex = { version = "0.4.3", default-features = false, optional = true }
 greptimedb-ingester = { version = "0.17.0", default-features = false, optional = true }
 
 # External libs
-antithesis-instrumentation = { workspace = true, optional = true }
 arc-swap = { workspace = true, default-features = false, optional = true }
 async-compression = { version = "0.4.27", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
 arrow = { version = "58.2.0", default-features = false, features = ["ipc"], optional = true }
@@ -485,6 +484,8 @@ tikv-jemallocator = { version = "0.7.0", default-features = false, features = ["
 
 [target.'cfg(target_os = "linux")'.dependencies]
 procfs = { version = "0.18.0", default-features = false }
+# antithesis-instrumentation links a native .a via ELF .init_array -- Linux only.
+antithesis-instrumentation = { workspace = true, optional = true }
 
 [build-dependencies]
 prost-build = { workspace = true, optional = true }

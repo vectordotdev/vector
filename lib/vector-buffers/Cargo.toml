@@ -39,7 +39,7 @@ serde_json = { workspace = true, optional = true }
 
 [features]
 antithesis-disk-asserts = ["dep:antithesis_sdk", "dep:serde_json"]
-test-util = []
+test = []
 
 [dev-dependencies]
 clap.workspace = true

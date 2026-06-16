@@ -17,7 +17,7 @@ serde_json = { workspace = true }
 tokio = { workspace = true, features = ["rt", "macros", "net", "time"] }
 # `WRITE_BUFFER_SIZE_V2` is exported only under this feature, so payload sizing
 # tracks the real disk_v2 write-buffer constant instead of a hardcoded copy.
-vector-buffers = { workspace = true, features = ["test-util"] }
+vector-buffers = { workspace = true, features = ["test"] }
 
 # antithesis-instrumentation links a native .a via ELF .init_array -- Linux only.
 [target.'cfg(target_os = "linux")'.dependencies]
