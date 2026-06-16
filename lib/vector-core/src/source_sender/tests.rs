@@ -470,3 +470,62 @@ async fn post_processor_dispatches_by_event_type() {
         "process_trace called once"
     );
 }
+
+/// Processor that replaces the entire inner log event with a default, simulating the worst-case
+/// whole-event replacement that would previously drop all EventMetadata fields.
+struct ReplaceWithDefaultProcessor;
+
+impl PostProcessor for ReplaceWithDefaultProcessor {
+    fn process_log(&self, event: &mut LogEvent) {
+        *event = LogEvent::default();
+    }
+
+    fn process_metric(&self, _event: &mut Metric) {}
+
+    fn process_trace(&self, _event: &mut TraceEvent) {}
+}
+
+#[tokio::test]
+async fn post_processor_whole_event_replacement_preserves_metadata() {
+    // A processor that replaces the entire inner event (e.g. `*log = LogEvent::default()`) must
+    // not drop secret metadata fields such as `datadog_api_key` and `splunk_hec_token`.
+    // Regression test for: https://github.com/vectordotdev/vector/pull/25563#discussion_r3414407843
+    metrics::init_test();
+
+    let pp: Arc<dyn PostProcessor> = Arc::new(ReplaceWithDefaultProcessor);
+    let (mut sender, mut stream) = make_sender_with_post_processor(&pp);
+
+    let mut log = LogEvent::default();
+    log.metadata_mut()
+        .set_datadog_api_key(Arc::from("test-api-key"));
+    log.metadata_mut()
+        .set_splunk_hec_token(Arc::from("test-hec-token"));
+    log.insert(event_path!("original_field"), "should_be_gone_after_replace");
+
+    sender
+        .send_event(Event::Log(log))
+        .await
+        .expect("send should succeed");
+    drop(sender);
+
+    let event = stream.next().await.expect("expected one event");
+    let log = event.as_log();
+
+    // The processor replaced the inner event, so the original field is gone — that is expected.
+    assert!(
+        log.get(event_path!("original_field")).is_none(),
+        "field added before replacement should not be present"
+    );
+
+    // But the metadata fields that live outside the event payload must survive.
+    assert_eq!(
+        log.metadata().datadog_api_key().as_deref(),
+        Some("test-api-key"),
+        "datadog_api_key must be preserved across whole-event replacement"
+    );
+    assert_eq!(
+        log.metadata().splunk_hec_token().as_deref(),
+        Some("test-hec-token"),
+        "splunk_hec_token must be preserved across whole-event replacement"
+    );
+}

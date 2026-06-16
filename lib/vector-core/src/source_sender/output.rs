@@ -189,19 +189,27 @@ impl Output {
         if let Some(ref pp) = self.post_processor {
             events.iter_events_mut().for_each(|event| match event {
                 EventMutRef::Log(log) => {
-                    let finalizers = log.metadata_mut().take_finalizers();
+                    let saved = log.metadata().clone();
                     pp.process_log(log);
-                    log.metadata_mut().merge_finalizers(finalizers);
+                    // Collect any finalizers the processor added to the (possibly replaced)
+                    // event so they are not lost when we restore the full saved metadata.
+                    let new_finalizers = log.metadata_mut().take_finalizers();
+                    *log.metadata_mut() = saved;
+                    log.metadata_mut().merge_finalizers(new_finalizers);
                 }
                 EventMutRef::Metric(metric) => {
-                    let finalizers = metric.metadata_mut().take_finalizers();
+                    let saved = metric.metadata().clone();
                     pp.process_metric(metric);
-                    metric.metadata_mut().merge_finalizers(finalizers);
+                    let new_finalizers = metric.metadata_mut().take_finalizers();
+                    *metric.metadata_mut() = saved;
+                    metric.metadata_mut().merge_finalizers(new_finalizers);
                 }
                 EventMutRef::Trace(trace) => {
-                    let finalizers = trace.metadata_mut().take_finalizers();
+                    let saved = trace.metadata().clone();
                     pp.process_trace(trace);
-                    trace.metadata_mut().merge_finalizers(finalizers);
+                    let new_finalizers = trace.metadata_mut().take_finalizers();
+                    *trace.metadata_mut() = saved;
+                    trace.metadata_mut().merge_finalizers(new_finalizers);
                 }
             });
         }
