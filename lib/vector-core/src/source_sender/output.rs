@@ -227,9 +227,8 @@ impl Output {
             .iter_events()
             .for_each(|event| self.emit_lag_time(event, reference));
 
-        // Attach runtime schema metadata after the post-processor so that processor mutations
-        // are always preserved even if the processor replaces the inner event value.
-        events.iter_events_mut().for_each(|mut event| {
+                events.iter_events_mut().for_each(|mut event| {
+            // attach runtime schema definitions from the source
             if let Some(log_definition) = &self.log_definition {
                 event.metadata_mut().set_schema_definition(log_definition);
             }
@@ -240,10 +239,13 @@ impl Output {
         let count = events.len();
 
         let send_start = Instant::now();
+
         let send_result = self.send_with_timeout(events, send_reference).await;
+
         if let Some(send_latency) = &self.metrics.send_latency {
             send_latency.record(send_start.elapsed().as_secs_f64());
         }
+
         send_result?;
 
         self.events_sent.emit(CountByteSize(count, byte_size));
