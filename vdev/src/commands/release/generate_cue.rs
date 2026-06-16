@@ -35,7 +35,7 @@ pub(super) fn run(new_version: &Version) -> Result<PathBuf> {
 
     info!("Creating release meta file...");
 
-    let last_version = find_latest_release_tag()?;
+    let last_version = git::latest_release_version()?;
     let commits = fetch_commits_since(&last_version)?;
 
     validate_single_bump(&last_version, new_version)?;
@@ -136,23 +136,6 @@ fn collect_released_identifiers(releases_dir: &Path) -> Result<ReleasedIdentifie
         }
     }
     Ok(out)
-}
-
-/// Find the latest semver release tag of the form `vX.Y.Z`, ignoring `vdev-v...` tags.
-pub(super) fn find_latest_release_tag() -> Result<Version> {
-    let tag_re = Regex::new(r"^v[0-9]+\.[0-9]+\.[0-9]+$").unwrap();
-    let output = git::run_and_check_output(&["tag", "--list", "--sort=-v:refname"])?;
-    for tag in output.lines() {
-        if tag.starts_with("vdev-v") {
-            continue;
-        }
-        if tag_re.is_match(tag) {
-            let v = Version::parse(tag.trim_start_matches('v'))
-                .with_context(|| format!("Failed to parse version from tag {tag}"))?;
-            return Ok(v);
-        }
-    }
-    bail!("No valid semantic version tag found (e.g. v1.2.3)")
 }
 
 fn validate_single_bump(last: &Version, new: &Version) -> Result<()> {
