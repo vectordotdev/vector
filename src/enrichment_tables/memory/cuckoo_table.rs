@@ -213,33 +213,25 @@ impl CuckooMemoryTable {
     fn export(&self) {
         if let Some(path) = &self.cuckoo_config.persistence_path {
             let mut parent = path.clone();
-            if parent.pop()
-                && let Ok(temp) = NamedTempFile::new_in(parent)
-            {
-                {
-                    let mut writer = BufWriter::new(temp.as_file());
-                    if self.export_to(&mut writer).is_err() {
-                        return;
+            if parent.pop() {
+                match NamedTempFile::new_in(parent) {
+                    Ok(temp) => {
+                        {
+                            let mut writer = BufWriter::new(temp.as_file());
+                            if self.export_to(&mut writer).is_err() {
+                                return;
+                            }
+                        }
+                        if let Err(error) = temp.persist(path) {
+                            warn!("Cuckoo filter export failed: {}", error);
+                        }
                     }
+                    Err(err) => warn!(
+                        "Couldn't open temporary file for export. Aborting export. Error: {}",
+                        err
+                    ),
                 }
-                if let Err(error) = temp.persist(path) {
-                    warn!("Cuckoo filter export failed: {}", error);
-                }
-            } else {
-                warn!(
-                    "Couldn't open temporary file for export. Trying to write directly to \"{}\"",
-                    path.to_str().unwrap_or("")
-                );
-                let Ok(file) = File::create(path) else {
-                    warn!(
-                        "Couldn't open \"{}\" for cuckoo filter state export.",
-                        path.to_str().unwrap_or("")
-                    );
-                    return;
-                };
-                let mut writer = BufWriter::new(file);
-                let _ = self.export_to(&mut writer);
-            };
+            }
         }
     }
 
