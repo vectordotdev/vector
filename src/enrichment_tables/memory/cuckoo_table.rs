@@ -477,6 +477,10 @@ impl StreamSink<Event> for CuckooMemoryTable {
                     emit!(MemoryEnrichmentTableTtlExpiredCount {
                         count: expired as u64
                     });
+                    emit!(MemoryEnrichmentTableFlushed {
+                        new_objects_count: self.filter.get_item_count(),
+                        new_byte_size: self.filter.get_memory_usage()
+                    });
                 }
             }
         }
