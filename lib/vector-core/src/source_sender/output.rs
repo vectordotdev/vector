@@ -181,6 +181,12 @@ impl Output {
         unsent_event_count: &mut UnsentEventCount,
         reference: i64,
     ) -> Result<(), SendError> {
+        // Capture send_reference at the very top of send_inner so that
+        // `buffer_send_duration_seconds` (measured via `send_reference.elapsed()` downstream)
+        // reflects the full end-to-end time from entering send_inner through buffer acceptance,
+        // including post-processor CPU time, lag-time emission, and schema attachment.
+        let send_reference = Instant::now();
+
         // Apply post-processor with typed dispatch. Each method receives a reference to the
         // concrete event type, making it impossible at the type level to change the variant.
         // Finalizers are taken out before each call and restored after so that a processor
@@ -233,13 +239,10 @@ impl Output {
         let byte_size = events.estimated_json_encoded_size_of();
         let count = events.len();
 
-        // Capture send_reference immediately before the channel send so that
-        // `buffer_send_duration_seconds` (measured via `send_reference.elapsed()` downstream)
-        // reflects only the actual enqueue latency, not post-processor CPU time.
-        let send_reference = Instant::now();
+        let send_start = Instant::now();
         let send_result = self.send_with_timeout(events, send_reference).await;
         if let Some(send_latency) = &self.metrics.send_latency {
-            send_latency.record(send_reference.elapsed().as_secs_f64());
+            send_latency.record(send_start.elapsed().as_secs_f64());
         }
         send_result?;
 
