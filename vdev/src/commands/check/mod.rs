@@ -1,6 +1,5 @@
 mod component_features;
 mod deny;
-mod deprecations;
 mod events;
 mod examples;
 mod fmt;
@@ -15,7 +14,6 @@ crate::cli_subcommands! {
     generated_docs,
     component_features,
     deny,
-    deprecations,
     docs,
     events,
     examples,

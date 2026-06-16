@@ -26,12 +26,11 @@ impl Cli {
             );
             Vec::new()
         } else {
-            println!(
-                "Neither {} nor {} found; nothing to validate.",
+            bail!(
+                "Neither {} nor {} found; the deprecation fragment system is not installed in this repo.",
                 dir.display(),
                 json_path.display()
             );
-            return Ok(());
         };
 
         if entries.is_empty() {
