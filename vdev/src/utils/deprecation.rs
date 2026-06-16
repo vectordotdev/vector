@@ -274,11 +274,12 @@ fn write_json(repo_root: &Path, data: &DeprecationsJson) -> Result<()> {
 
 /// Append an enacted entry and regenerate the pending section from deprecation.d/.
 ///
-/// Idempotent on an exact duplicate `(what, removed_in)`: silently skips the
-/// append so that re-running `enact` after a partial failure (e.g. the
-/// fragment delete failed) can complete cleanly. A conflicting record with
-/// the same `what` but a different `removed_in` is still rejected because
-/// the same feature cannot be removed twice.
+/// Idempotent only on a byte-for-byte duplicate: silently skips the append
+/// so that re-running `enact` after a partial failure (e.g. the fragment
+/// delete failed) can complete cleanly. Any mismatch in `removed_in`,
+/// `deprecated_since`, or `description` is rejected — those signal a stale
+/// or edited fragment versus the recorded entry, and silently keeping the
+/// older record would lose the new data.
 pub fn append_enacted(repo_root: &Path, entry: EnactedEntry) -> Result<()> {
     let dir = repo_root.join(DEPRECATION_DIR);
     let pending = read_deprecation_fragments(&dir)?;
@@ -296,8 +297,19 @@ pub fn append_enacted(repo_root: &Path, entry: EnactedEntry) -> Result<()> {
                 entry.removed_in
             );
         }
-        // Exact duplicate; rewrite pending so a partial failure can recover,
-        // but don't push the entry again.
+        if existing.deprecated_since != entry.deprecated_since
+            || existing.description != entry.description
+        {
+            bail!(
+                "Mismatched enacted entry for '{}': the existing record in {} differs from the fragment data \
+                 (deprecated_since or description). \
+                 Either revert the fragment edit or update the enacted JSON by hand.",
+                entry.what,
+                existing.removed_in,
+            );
+        }
+        // Byte-for-byte duplicate; rewrite pending so a partial failure can
+        // recover, but don't push the entry again.
     } else {
         data.deprecations_enacted.push(entry);
     }
@@ -584,6 +596,37 @@ mod tests {
         };
         let err = append_enacted(tmp.path(), conflict).unwrap_err();
         assert!(format!("{err}").contains("Conflicting"));
+    }
+
+    #[test]
+    fn append_enacted_rejects_mismatched_deprecated_since_or_description() {
+        let tmp = tempdir().unwrap();
+        fs::create_dir_all(tmp.path().join("deprecation.d")).unwrap();
+        fs::create_dir_all(tmp.path().join("website/data")).unwrap();
+        let entry = EnactedEntry {
+            what: "foo".into(),
+            deprecated_since: "0.55.0".into(),
+            removed_in: "0.56.0".into(),
+            description: "old".into(),
+        };
+        append_enacted(tmp.path(), entry.clone()).unwrap();
+
+        // Same `what` + `removed_in` but updated description must not silently
+        // keep the older record.
+        let edited = EnactedEntry {
+            description: "new".into(),
+            ..entry.clone()
+        };
+        let err = append_enacted(tmp.path(), edited).unwrap_err();
+        assert!(format!("{err}").contains("Mismatched"));
+
+        // Same with a different deprecated_since.
+        let edited = EnactedEntry {
+            deprecated_since: "0.54.0".into(),
+            ..entry
+        };
+        let err = append_enacted(tmp.path(), edited).unwrap_err();
+        assert!(format!("{err}").contains("Mismatched"));
     }
 
     #[test]
