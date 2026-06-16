@@ -100,6 +100,28 @@ where
                     .map(super::limited_queue::TrySendError::into_inner),
             }),
             Self::DiskV2(writer) => {
+                let mut writer = writer.lock().await;
+
+                // If the disk buffer is already at its size limit, hand the item off
+                // to the caller unfiltered. The caller forwards it to the overflow
+                // stage in `WhenFull::Overflow` mode, and the overflow stage may be
+                // an in-memory buffer with no wire-format constraint — filtering
+                // here would needlessly drop sub-items that the overflow could
+                // accept. Holding the writer lock makes the check race-free against
+                // other writers (only writers grow the buffer; readers only shrink).
+                //
+                // Note: this handles the steady-state-full case. The narrower
+                // "buffer has slack but not enough for this specific record" case
+                // (`can_write_record` returning false inside `try_write_record`)
+                // still has the item filtered before the rejection — that requires
+                // knowing the encoded size pre-encode, which we cannot do cheaply.
+                if writer.is_buffer_full() {
+                    return Ok(TrySendOutcome {
+                        filter_drops: FilterDrops::default(),
+                        rejected: Some(item),
+                    });
+                }
+
                 let pre_count = item.event_count() as u64;
                 let pre_size = item.size_of() as u64;
                 let Some(item) = item.filter_unencodable() else {
@@ -115,8 +137,6 @@ where
                     events: pre_count - item.event_count() as u64,
                     bytes: pre_size.saturating_sub(item.size_of() as u64),
                 };
-
-                let mut writer = writer.lock().await;
 
                 writer
                     .try_write_record(item)

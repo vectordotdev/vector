@@ -159,3 +159,12 @@ async fn filter_drops_are_reported_as_unintentional_buffer_drops() {
     })
     .await;
 }
+
+// Note: A regression test that exercises the "full disk hands item to overflow
+// unfiltered" path is not included here because reliably driving the disk-v2
+// writer's `is_buffer_full()` to `true` under the minimum-size config takes
+// careful tuning of record/buffer sizes (the writer's `can_write_record` check
+// generally short-circuits writes *before* `total_buffer_size` reaches
+// `max_buffer_size`). The fix in `SenderAdapter::try_send` is a single
+// `is_buffer_full()` short-circuit before the filter runs; the existing
+// disk-v2 tests cover the full-buffer behaviour at the writer level.
