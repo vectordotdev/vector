@@ -100,6 +100,7 @@ pub enum CounterName {
     MemoryEnrichmentTableReadsTotal,
     MemoryEnrichmentTableRemovedTotal,
     MemoryEnrichmentTableTtlExpirations,
+    ComponentCpuUsageNsTotal,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Display, AsRefStr, EnumIter)]
@@ -366,6 +367,7 @@ impl CounterName {
             Self::MemoryEnrichmentTableReadsTotal => "memory_enrichment_table_reads_total",
             Self::MemoryEnrichmentTableRemovedTotal => "memory_enrichment_table_removed_total",
             Self::MemoryEnrichmentTableTtlExpirations => "memory_enrichment_table_ttl_expirations",
+            Self::ComponentCpuUsageNsTotal => "component_cpu_usage_ns_total",
         }
     }
 }

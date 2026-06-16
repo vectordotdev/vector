@@ -1,8 +1,7 @@
 package metadata
 
-releases: "0.7.0": {
-	date:     "2020-01-22"
-	codename: "The Great Omelet"
+releases: "0.7.0": {// The Great Omelet
+	date: "2020-01-22"
 
 	whats_next: []
 
@@ -46,7 +45,7 @@ releases: "0.7.0": {
 		{sha: "c03853ea1ed1e1bc438ea1acc6c516d182190fb0", date: "2019-12-16 15:56:11 +0000", description: "remove accidentally committed vector.toml", pr_number: null, scopes: [], type: "chore", breaking_change: false, author: "Luke Steensen", files_count: 1, insertions_count: 0, deletions_count: 17},
 		{sha: "34ae27fd6600cc62f65786284ade21f3aa3f47c7", date: "2019-12-16 19:08:19 +0000", description: "Fix builds by updating website dependencies", pr_number: 1379, scopes: ["website"], type: "chore", breaking_change: false, author: "Binary Logic", files_count: 10, insertions_count: 287, deletions_count: 477},
 		{sha: "7626e8c1a50e11c2c78b10a015c541c1a817a144", date: "2019-12-16 20:46:24 +0000", description: "Fix broken links", pr_number: null, scopes: ["website"], type: "chore", breaking_change: false, author: "binarylogic", files_count: 58, insertions_count: 52, deletions_count: 77},
-		{sha: "f6d97e46cc01ad558e2da2d56d73f1fe4627e04e", date: "2019-12-16 20:50:35 +0000", description: "Remove uncessary #! link in sidebar", pr_number: null, scopes: ["website"], type: "chore", breaking_change: false, author: "binarylogic", files_count: 1, insertions_count: 1, deletions_count: 5},
+		{sha: "f6d97e46cc01ad558e2da2d56d73f1fe4627e04e", date: "2019-12-16 20:50:35 +0000", description: "Remove unnecessary #! link in sidebar", pr_number: null, scopes: ["website"], type: "chore", breaking_change: false, author: "binarylogic", files_count: 1, insertions_count: 1, deletions_count: 5},
 		{sha: "b78cd10f8627cb4cd51d8691e7f76de41c542a27", date: "2019-12-16 23:47:18 +0000", description: "Fix website redirect and meta descriptions", pr_number: null, scopes: ["website"], type: "chore", breaking_change: false, author: "binarylogic", files_count: 94, insertions_count: 307, deletions_count: 368},
 		{sha: "0d1ca551b058f38c21ef44793dc252dd95a4f8a0", date: "2019-12-16 23:52:30 +0000", description: "Add more meta descriptions to pages that were missing it", pr_number: null, scopes: ["website"], type: "chore", breaking_change: false, author: "binarylogic", files_count: 8, insertions_count: 7, deletions_count: 11},
 		{sha: "981b41cd1a324045aecdbc2f20b288a14f78599e", date: "2019-12-17 12:30:10 +0000", description: "Fix config path for MSI package", pr_number: 1378, scopes: [], type: "docs", breaking_change: false, author: "Alexander Rodin", files_count: 2, insertions_count: 6, deletions_count: 6},
