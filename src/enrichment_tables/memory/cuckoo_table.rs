@@ -176,8 +176,9 @@ impl CuckooMemoryTable {
                 let filter = match CuckooFilter::import_random_exportable(&mut reader) {
                     Ok(filter) => filter,
                     Err(error) => {
-                        warn!("Cuckoo filter state import failed: {}", error);
-                        break 'import CuckooFilter::new_random_exportable(built_config);
+                        return Err(
+                            format!("Cuckoo filter state import failed: {}. Delete the persited state file ({}) to proceed.", error, path.to_str().unwrap_or("")).into(),
+                        );
                     }
                 };
 
