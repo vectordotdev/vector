@@ -45,6 +45,9 @@ pub struct MemoryConfig {
     /// Since every TTL scan makes its changes visible, only use this value
     /// if it is shorter than the `scan_interval`.
     ///
+    /// NOTE: For cuckoo filter, all writes are visible immediately. Flush interval still defines
+    /// when metrics for cuckoo filter are made visible.
+    ///
     /// By default, all writes are made visible immediately.
     #[serde(skip_serializing_if = "vector_lib::serde::is_default")]
     pub flush_interval: Option<u64>,

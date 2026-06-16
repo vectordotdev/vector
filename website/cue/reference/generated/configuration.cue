@@ -295,12 +295,12 @@ generated: configuration: {
 								type: string: enum: cuckoo: """
 																					Cuckoo filter
 
-																					Supports removal too, as well as TTL and LRU
+																					Supports removal by accepting null values for keys, as well as TTL and LRU.
 																					"""
 								description: """
 																		Cuckoo filter
 
-																		Supports removal too, as well as TTL and LRU
+																		Supports removal by accepting null values for keys, as well as TTL and LRU.
 																		"""
 								required: true
 							}
@@ -320,6 +320,9 @@ generated: configuration: {
 														but there is a longer delay before the data is visible in the table.
 														Since every TTL scan makes its changes visible, only use this value
 														if it is shorter than the `scan_interval`.
+
+														NOTE: For cuckoo filter, all writes are visible immediately. Flush interval still defines
+														when metrics for cuckoo filter are made visible.
 
 														By default, all writes are made visible immediately.
 														"""
