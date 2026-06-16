@@ -30,16 +30,9 @@ impl Cli {
         }
 
         let mut entries = deprecation::read_deprecation_fragments(&dir)?;
-
-        if entries.is_empty() {
-            println!("No deprecation notices found.");
-            return Ok(());
-        }
-
         entries.sort_by(|a, b| a.deprecated_since.cmp(&b.deprecated_since));
 
-        // Determine the next minor release version (best-effort).
-        let explicit_version = self.version.is_some();
+        // Determine the target release version (best-effort).
         let next_minor: Option<Version> = if let Some(v) = self.version {
             Some(v)
         } else {
@@ -59,25 +52,33 @@ impl Cli {
             None => "next".to_string(),
         };
 
+        let mut removing: Vec<deprecation::EnactedEntry> = Vec::new();
         if let Some(ref v) = next_minor {
             let enacted = deprecation::read_enacted(&repo_root)?;
-            let removing: Vec<&deprecation::EnactedEntry> = enacted
-                .iter()
+            removing = enacted
+                .into_iter()
                 .filter(|e| {
                     Version::parse(&e.removed_in)
                         .ok()
                         .is_some_and(|rv| rv.major == v.major && rv.minor == v.minor)
                 })
                 .collect();
-            print_enacted_section(&next_label, &removing);
+        }
+
+        if announcing.is_empty() && planned.is_empty() && future.is_empty() && removing.is_empty() {
+            println!("No deprecation notices found.");
+            return Ok(());
+        }
+
+        if next_minor.is_some() {
+            let removing_refs: Vec<&deprecation::EnactedEntry> = removing.iter().collect();
+            print_enacted_section(&next_label, &removing_refs);
         }
 
         print_announcing_section(&next_label, &announcing);
-        if !explicit_version {
-            print_section("Previously announced", &planned);
-            if !future.is_empty() {
-                print_section("Announced for a future release", &future);
-            }
+        print_section("Previously announced", &planned);
+        if !future.is_empty() {
+            print_section("Announced for a future release", &future);
         }
 
         Ok(())

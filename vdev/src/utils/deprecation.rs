@@ -243,23 +243,34 @@ fn write_json(repo_root: &Path, data: &DeprecationsJson) -> Result<()> {
 }
 
 /// Append an enacted entry and regenerate the pending section from deprecation.d/.
-/// Refuses to add a duplicate (same `what` + `removed_in`).
+///
+/// Idempotent on an exact duplicate `(what, removed_in)`: silently skips the
+/// append so that re-running `enact` after a partial failure (e.g. the
+/// fragment delete failed) can complete cleanly. A conflicting record with
+/// the same `what` but a different `removed_in` is still rejected because
+/// the same feature cannot be removed twice.
 pub fn append_enacted(repo_root: &Path, entry: EnactedEntry) -> Result<()> {
     let dir = repo_root.join(DEPRECATION_DIR);
     let pending = read_deprecation_fragments(&dir)?;
     let mut data = read_json(repo_root)?;
-    if data
+    if let Some(existing) = data
         .deprecations_enacted
         .iter()
-        .any(|e| e.what == entry.what && e.removed_in == entry.removed_in)
+        .find(|e| e.what == entry.what)
     {
-        bail!(
-            "Enacted entry already exists for '{}' removed in {}",
-            entry.what,
-            entry.removed_in
-        );
+        if existing.removed_in != entry.removed_in {
+            bail!(
+                "Conflicting enacted entry for '{}': already recorded as removed in {}, refusing to record as removed in {}",
+                entry.what,
+                existing.removed_in,
+                entry.removed_in
+            );
+        }
+        // Exact duplicate; rewrite pending so a partial failure can recover,
+        // but don't push the entry again.
+    } else {
+        data.deprecations_enacted.push(entry);
     }
-    data.deprecations_enacted.push(entry);
     data.deprecations_pending = pending_to_json(&pending);
     write_json(repo_root, &data)
 }
@@ -457,7 +468,9 @@ mod tests {
     }
 
     #[test]
-    fn append_enacted_refuses_duplicates() {
+    fn append_enacted_is_idempotent_on_exact_duplicate() {
+        // Re-running `enact` after a partial failure should succeed without
+        // duplicating the enacted entry.
         let tmp = tempdir().unwrap();
         fs::create_dir_all(tmp.path().join("deprecation.d")).unwrap();
         fs::create_dir_all(tmp.path().join("website/data")).unwrap();
@@ -468,8 +481,29 @@ mod tests {
             description: String::new(),
         };
         append_enacted(tmp.path(), entry.clone()).unwrap();
-        let err = append_enacted(tmp.path(), entry).unwrap_err();
-        assert!(format!("{err}").contains("already exists"));
+        append_enacted(tmp.path(), entry).unwrap();
+        let enacted = read_enacted(tmp.path()).unwrap();
+        assert_eq!(enacted.len(), 1);
+    }
+
+    #[test]
+    fn append_enacted_rejects_conflicting_removed_in() {
+        let tmp = tempdir().unwrap();
+        fs::create_dir_all(tmp.path().join("deprecation.d")).unwrap();
+        fs::create_dir_all(tmp.path().join("website/data")).unwrap();
+        let entry = EnactedEntry {
+            what: "foo".into(),
+            deprecated_since: "0.55.0".into(),
+            removed_in: "0.56.0".into(),
+            description: String::new(),
+        };
+        append_enacted(tmp.path(), entry.clone()).unwrap();
+        let conflict = EnactedEntry {
+            removed_in: "0.57.0".into(),
+            ..entry
+        };
+        let err = append_enacted(tmp.path(), conflict).unwrap_err();
+        assert!(format!("{err}").contains("Conflicting"));
     }
 
     #[test]
