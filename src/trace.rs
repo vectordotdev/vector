@@ -77,8 +77,8 @@ pub fn init(
     //
     // Two separate `Option<Layer>` values are used rather than a single branch because
     // `RateLimitedLayer<BroadcastLayer<S>>` and `BroadcastLayer<S>` are distinct types.
-    // `tracing_subscriber` implements `Layer` for `Option<L>`, so exactly one of these will be
-    // `Some` and contribute an active layer while the other is a no-op `None`.
+    // `tracing_subscriber` implements `Layer` for `Option<L>`, which allows the unused layer to be
+    // represented as a no-op `None`.
     let rate_limited_broadcast = broadcast_rate_limit.map(|rate| {
         RateLimitedLayer::new(BroadcastLayer::new())
             .with_default_limit(rate.get())
@@ -87,6 +87,10 @@ pub fn init(
     let unlimited_broadcast = broadcast_rate_limit
         .is_none()
         .then(|| BroadcastLayer::new().with_filter(fmt_filter.clone()));
+    debug_assert_ne!(
+        rate_limited_broadcast.is_some(),
+        unlimited_broadcast.is_some()
+    );
 
     let subscriber = tracing_subscriber::registry()
         .with(metrics_layer)

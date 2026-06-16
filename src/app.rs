@@ -663,8 +663,8 @@ pub fn init_logging(
     color: bool,
     format: LogFormat,
     log_level: &str,
-    rate: u64,
-    broadcast_rate_limit: Option<NonZeroU64>,
+    internal_log_rate_limit_secs: u64,
+    internal_logs_source_rate_limit_secs: Option<NonZeroU64>,
 ) {
     let level = get_log_levels(log_level);
     let json = match format {
@@ -672,12 +672,20 @@ pub fn init_logging(
         LogFormat::Json => true,
     };
 
-    trace::init(color, json, &level, rate, broadcast_rate_limit);
+    trace::init(
+        color,
+        json,
+        &level,
+        internal_log_rate_limit_secs,
+        internal_logs_source_rate_limit_secs,
+    );
     debug!(
         message = "Internal log rate limit configured.",
-        internal_log_rate_secs = rate,
+        internal_log_rate_limit_secs,
+        internal_logs_source_rate_limit_secs =
+            internal_logs_source_rate_limit_secs.map(NonZeroU64::get),
     );
-    info!(message = "Log level is enabled.", level = ?level);
+    info!(message = "Log level is enabled.", ?level);
 }
 
 pub fn watcher_config(
