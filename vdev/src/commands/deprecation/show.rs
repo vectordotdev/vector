@@ -24,12 +24,14 @@ impl Cli {
         let repo_root = paths::find_repo_root()?;
         let dir = repo_root.join(deprecation::DEPRECATION_DIR);
 
-        if !dir.is_dir() {
-            println!("No {} directory found.", dir.display());
-            return Ok(());
-        }
-
-        let mut entries = deprecation::read_deprecation_fragments(&dir)?;
+        let mut entries = if dir.is_dir() {
+            deprecation::read_deprecation_fragments(&dir)?
+        } else {
+            // The dir disappears from a fresh checkout once all fragments
+            // have been enacted (git doesn't track empty directories), but
+            // the JSON's enacted entries are still worth surfacing.
+            Vec::new()
+        };
         entries.sort_by(|a, b| a.deprecated_since.cmp(&b.deprecated_since));
 
         // Determine the target release version (best-effort).

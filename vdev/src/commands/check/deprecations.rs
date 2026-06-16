@@ -78,12 +78,9 @@ impl Cli {
             }
         }
 
-        let before = std::fs::read_to_string(&json_path).unwrap_or_default();
-
-        deprecation::sync_deprecations_cue(&repo_root)?;
-
-        let after = std::fs::read_to_string(&json_path)?;
-        if before != after {
+        let on_disk = std::fs::read_to_string(&json_path).unwrap_or_default();
+        let expected = deprecation::rendered_json(&repo_root)?;
+        if on_disk != expected {
             bail!(
                 "{} is out of date. Run `cargo vdev deprecation generate` and commit the result.",
                 json_path.display()

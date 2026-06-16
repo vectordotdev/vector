@@ -275,33 +275,61 @@ pub fn append_enacted(repo_root: &Path, entry: EnactedEntry) -> Result<()> {
     write_json(repo_root, &data)
 }
 
-/// Validate the enacted entries in `DEPRECATIONS_JSON`: both versions must be
-/// valid semver, and no duplicate `(what, removed_in)` pairs.
+/// Validate the enacted entries in `DEPRECATIONS_JSON`:
+///   * both versions must be valid semver
+///   * `removed_in` must be in a later major.minor than `deprecated_since`
+///     (matching the deprecation policy and the `enact` command's rule)
+///   * no duplicate `what` values (a feature can't be removed twice, even
+///     in different releases)
 pub fn validate_enacted(repo_root: &Path) -> Result<usize> {
     let enacted = read_enacted(repo_root)?;
-    let mut seen: std::collections::HashSet<(String, String)> = std::collections::HashSet::new();
+    let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
     for e in &enacted {
-        Version::parse(&e.deprecated_since).with_context(|| {
+        let dep = Version::parse(&e.deprecated_since).with_context(|| {
             format!(
                 "Enacted entry '{}' has invalid deprecated_since '{}'",
                 e.what, e.deprecated_since
             )
         })?;
-        Version::parse(&e.removed_in).with_context(|| {
+        let rem = Version::parse(&e.removed_in).with_context(|| {
             format!(
                 "Enacted entry '{}' has invalid removed_in '{}'",
                 e.what, e.removed_in
             )
         })?;
-        if !seen.insert((e.what.clone(), e.removed_in.clone())) {
+        if !later_minor(&rem, &dep) {
             bail!(
-                "Duplicate enacted entry: '{}' removed in {}",
+                "Enacted entry '{}' has removed_in ({}) that is not in a later minor release than deprecated_since ({}); the deprecation policy requires at least one minor release between announcement and removal.",
                 e.what,
-                e.removed_in
+                e.removed_in,
+                e.deprecated_since
+            );
+        }
+        if !seen.insert(e.what.clone()) {
+            bail!(
+                "Duplicate enacted entry for '{}'; the same feature cannot be recorded as removed more than once.",
+                e.what
             );
         }
     }
     Ok(enacted.len())
+}
+
+/// True when `a` is in a later major.minor release than `b`. Equal or smaller
+/// major.minor (regardless of patch) returns false.
+pub fn later_minor(a: &Version, b: &Version) -> bool {
+    (a.major, a.minor) > (b.major, b.minor)
+}
+
+/// Render the JSON that `sync_deprecations_cue` would write, without
+/// touching disk. Returns the serialized string (with trailing newline) so
+/// callers can compare against the on-disk file.
+pub fn rendered_json(repo_root: &Path) -> Result<String> {
+    let dir = repo_root.join(DEPRECATION_DIR);
+    let pending = read_deprecation_fragments(&dir)?;
+    let mut data = read_json(repo_root)?;
+    data.deprecations_pending = pending_to_json(&pending);
+    Ok(serde_json::to_string_pretty(&data)? + "\n")
 }
 
 /// Regenerate `DEPRECATIONS_JSON` from `deprecation.d/` (pending) plus the
@@ -520,16 +548,54 @@ mod tests {
         .unwrap();
         assert!(validate_enacted(tmp.path()).is_err());
 
-        // Duplicate (what, removed_in).
+        // Duplicate `what` (different removed_in) — still rejected.
         fs::write(
             tmp.path().join("website/data/deprecations.json"),
             r#"{"deprecations_pending":[],"deprecations_enacted":[
                 {"what":"x","deprecated_since":"0.55.0","removed_in":"0.56.0"},
-                {"what":"x","deprecated_since":"0.55.0","removed_in":"0.56.0"}
+                {"what":"x","deprecated_since":"0.55.0","removed_in":"0.57.0"}
             ]}"#,
         )
         .unwrap();
         let err = validate_enacted(tmp.path()).unwrap_err();
         assert!(format!("{err}").contains("Duplicate"));
+    }
+
+    #[test]
+    fn validate_enacted_rejects_same_minor() {
+        let tmp = tempdir().unwrap();
+        fs::create_dir_all(tmp.path().join("website/data")).unwrap();
+        // removed_in is later semver (patch bump) but same minor as
+        // deprecated_since — policy violation that `enact` rejects, so a
+        // hand-edited JSON should also fail validation.
+        fs::write(
+            tmp.path().join("website/data/deprecations.json"),
+            r#"{"deprecations_pending":[],"deprecations_enacted":[
+                {"what":"x","deprecated_since":"0.57.0","removed_in":"0.57.1"}
+            ]}"#,
+        )
+        .unwrap();
+        let err = validate_enacted(tmp.path()).unwrap_err();
+        assert!(format!("{err}").contains("later minor release"));
+    }
+
+    #[test]
+    fn later_minor_semantics() {
+        assert!(later_minor(
+            &Version::new(0, 58, 0),
+            &Version::new(0, 57, 0)
+        ));
+        assert!(!later_minor(
+            &Version::new(0, 57, 1),
+            &Version::new(0, 57, 0)
+        ));
+        assert!(!later_minor(
+            &Version::new(0, 57, 0),
+            &Version::new(0, 57, 0)
+        ));
+        assert!(!later_minor(
+            &Version::new(0, 56, 5),
+            &Version::new(0, 57, 0)
+        ));
     }
 }

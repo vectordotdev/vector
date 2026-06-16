@@ -13,17 +13,19 @@ impl Cli {
     pub fn exec(self) -> Result<()> {
         let repo_root = paths::find_repo_root()?;
         let dir = repo_root.join(deprecation::DEPRECATION_DIR);
-        if !dir.is_dir() {
+        let json_path = repo_root.join(deprecation::DEPRECATIONS_JSON);
+        // If neither input exists, the fragment system isn't installed. With
+        // either present, we can still produce or refresh the JSON (an empty
+        // pending list is valid once all fragments have been enacted).
+        if !dir.is_dir() && !json_path.is_file() {
             bail!(
-                "{} not found; the deprecation fragment system is not installed in this repo.",
-                dir.display()
+                "Neither {} nor {} found; the deprecation fragment system is not installed in this repo.",
+                dir.display(),
+                json_path.display()
             );
         }
         deprecation::sync_deprecations_cue(&repo_root)?;
-        println!(
-            "Updated {}",
-            repo_root.join(deprecation::DEPRECATIONS_JSON).display()
-        );
+        println!("Updated {}", json_path.display());
         Ok(())
     }
 }
