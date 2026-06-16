@@ -40,14 +40,13 @@ impl<T> SenderAdapter<T>
 where
     T: Bufferable,
 {
-    pub(crate) async fn send(&mut self, mut item: T) -> crate::Result<()> {
+    pub(crate) async fn send(&mut self, item: T) -> crate::Result<()> {
         match self {
             Self::InMemory(tx) => tx.send(item).await.map_err(Into::into),
             Self::DiskV2(writer) => {
-                item.pre_encode_drop_unencodable();
-                if item.event_count() == 0 {
+                let Some(item) = item.filter_unencodable() else {
                     return Ok(());
-                }
+                };
 
                 let mut writer = writer.lock().await;
 
@@ -60,17 +59,16 @@ where
         }
     }
 
-    pub(crate) async fn try_send(&mut self, mut item: T) -> crate::Result<Option<T>> {
+    pub(crate) async fn try_send(&mut self, item: T) -> crate::Result<Option<T>> {
         match self {
             Self::InMemory(tx) => tx
                 .try_send(item)
                 .map(|()| None)
                 .or_else(|e| Ok(Some(e.into_inner()))),
             Self::DiskV2(writer) => {
-                item.pre_encode_drop_unencodable();
-                if item.event_count() == 0 {
+                let Some(item) = item.filter_unencodable() else {
                     return Ok(None);
-                }
+                };
 
                 let mut writer = writer.lock().await;
 

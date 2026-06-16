@@ -101,17 +101,6 @@ pub trait Encodable: Sized {
     /// guaranteed.
     fn encode<B: BufMut>(self, buffer: &mut B) -> Result<(), Self::EncodeError>;
 
-    /// Removes any sub-items from `self` that cannot be encoded (e.g. due to format-imposed
-    /// nesting depth limits), recording them as dropped via the appropriate telemetry, and
-    /// returns the number removed.
-    ///
-    /// Called by buffer senders prior to `encode` so that unencodable items can be reported
-    /// as `ComponentEventsDropped` rather than poisoning the buffer with an encode error.
-    /// The default implementation removes nothing.
-    fn pre_encode_drop_unencodable(&mut self) -> usize {
-        0
-    }
-
     /// Gets the encoded size, in bytes, of this value, if available.
     ///
     /// Not all types can know ahead of time how many bytes they will occupy when encoded, hence the

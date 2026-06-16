@@ -2,7 +2,10 @@ use bytes::{Buf, BufMut};
 use enumflags2::{BitFlags, FromBitsError, bitflags};
 use prost::Message;
 use snafu::Snafu;
-use vector_buffers::encoding::{AsMetadata, Encodable};
+use vector_buffers::{
+    Bufferable, EventCount,
+    encoding::{AsMetadata, Encodable},
+};
 use vector_common::internal_event::{self, ComponentEventsDropped, UNINTENTIONAL};
 use vrl::value::Value;
 
@@ -259,61 +262,32 @@ impl Encodable for EventArray {
         metadata.contains(EventEncodableMetadataFlags::DiskBufferV1CompatibilityMode)
     }
 
+    /// # Errors
+    ///
+    /// Returns `EncodeError::NestingTooDeep` if any contained event's value or metadata
+    /// exceeds the per-path frame budget ([`MAX_VALUE_NESTING_FRAMES`] /
+    /// [`MAX_METADATA_VALUE_NESTING_FRAMES`]). This is **all-or-nothing**: a single
+    /// over-budget event fails the entire batch, because a partially-encoded
+    /// `EventArray` reaching disk would trip prost's recursion limit on decode and
+    /// corrupt the buffer.
+    ///
+    /// Callers that want graceful per-item drop with telemetry and
+    /// `EventStatus::Rejected` must run [`Bufferable::filter_unencodable`] first.
+    /// `SenderAdapter::send`/`try_send` already does this on the disk-v2 path, so the
+    /// `NestingTooDeep` arm is unreachable from any current production call site — it
+    /// is defense-in-depth for a future caller that bypasses `SenderAdapter`.
+    ///
+    /// Returns `EncodeError::BufferTooSmall` if the buffer cannot hold the encoded
+    /// output.
     fn encode<B>(self, buffer: &mut B) -> Result<(), Self::EncodeError>
     where
         B: BufMut,
     {
-        // Defense-in-depth: well-behaved callers run `pre_encode_drop_unencodable`
-        // first, but if any deeply-nested event reaches encode it would corrupt the
-        // disk buffer by encoding successfully and then failing prost's recursion
-        // limit on decode.
         check_event_array_nesting_cost(&self)?;
 
         proto::EventArray::from(self)
             .encode(buffer)
             .map_err(|_| EncodeError::BufferTooSmall)
-    }
-
-    fn pre_encode_drop_unencodable(&mut self) -> usize {
-        let exceeds =
-            |value: &Value, budget: usize| check_value_nesting_cost(value, 0, budget).is_err();
-        let mut dropped = 0;
-        match self {
-            EventArray::Logs(logs) => logs.retain(|log| {
-                let too_deep = exceeds(log.value(), MAX_VALUE_NESTING_FRAMES)
-                    || exceeds(log.metadata().value(), MAX_METADATA_VALUE_NESTING_FRAMES);
-                if too_deep {
-                    log.metadata().update_status(EventStatus::Rejected);
-                    dropped += 1;
-                }
-                !too_deep
-            }),
-            EventArray::Traces(traces) => traces.retain(|trace| {
-                let too_deep = exceeds(trace.value(), MAX_VALUE_NESTING_FRAMES)
-                    || exceeds(trace.metadata().value(), MAX_METADATA_VALUE_NESTING_FRAMES);
-                if too_deep {
-                    trace.metadata().update_status(EventStatus::Rejected);
-                    dropped += 1;
-                }
-                !too_deep
-            }),
-            EventArray::Metrics(metrics) => metrics.retain(|metric| {
-                let too_deep =
-                    exceeds(metric.metadata().value(), MAX_METADATA_VALUE_NESTING_FRAMES);
-                if too_deep {
-                    metric.metadata().update_status(EventStatus::Rejected);
-                    dropped += 1;
-                }
-                !too_deep
-            }),
-        }
-        if dropped > 0 {
-            internal_event::emit(ComponentEventsDropped::<UNINTENTIONAL> {
-                count: dropped,
-                reason: "Event nesting cost exceeds maximum for protobuf encoding.",
-            });
-        }
-        dropped
     }
 
     fn decode<B>(metadata: Self::Metadata, buffer: B) -> Result<Self, Self::DecodeError>
@@ -331,5 +305,58 @@ impl Encodable for EventArray {
         } else {
             Err(DecodeError::UnsupportedEncodingMetadata)
         }
+    }
+}
+
+impl Bufferable for EventArray {
+    fn filter_unencodable(self) -> Option<Self> {
+        let exceeds =
+            |value: &Value, budget: usize| check_value_nesting_cost(value, 0, budget).is_err();
+        let mut dropped = 0;
+        let filtered = match self {
+            EventArray::Logs(mut logs) => {
+                logs.retain(|log| {
+                    let too_deep = exceeds(log.value(), MAX_VALUE_NESTING_FRAMES)
+                        || exceeds(log.metadata().value(), MAX_METADATA_VALUE_NESTING_FRAMES);
+                    if too_deep {
+                        log.metadata().update_status(EventStatus::Rejected);
+                        dropped += 1;
+                    }
+                    !too_deep
+                });
+                EventArray::Logs(logs)
+            }
+            EventArray::Traces(mut traces) => {
+                traces.retain(|trace| {
+                    let too_deep = exceeds(trace.value(), MAX_VALUE_NESTING_FRAMES)
+                        || exceeds(trace.metadata().value(), MAX_METADATA_VALUE_NESTING_FRAMES);
+                    if too_deep {
+                        trace.metadata().update_status(EventStatus::Rejected);
+                        dropped += 1;
+                    }
+                    !too_deep
+                });
+                EventArray::Traces(traces)
+            }
+            EventArray::Metrics(mut metrics) => {
+                metrics.retain(|metric| {
+                    let too_deep =
+                        exceeds(metric.metadata().value(), MAX_METADATA_VALUE_NESTING_FRAMES);
+                    if too_deep {
+                        metric.metadata().update_status(EventStatus::Rejected);
+                        dropped += 1;
+                    }
+                    !too_deep
+                });
+                EventArray::Metrics(metrics)
+            }
+        };
+        if dropped > 0 {
+            internal_event::emit(ComponentEventsDropped::<UNINTENTIONAL> {
+                count: dropped,
+                reason: "Event nesting cost exceeds maximum for protobuf encoding.",
+            });
+        }
+        (filtered.event_count() > 0).then_some(filtered)
     }
 }

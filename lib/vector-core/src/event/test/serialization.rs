@@ -8,10 +8,12 @@ use regex::Regex;
 use similar_asserts::assert_eq;
 use vector_buffers::encoding::Encodable;
 
+use crate::event::event_exceeds_max_nesting_cost;
 use crate::event::ser::{
     ARRAY_FRAME_COST, MAX_METADATA_VALUE_NESTING_FRAMES, MAX_VALUE_NESTING_FRAMES,
     OBJECT_FRAME_COST, TIMESTAMP_FRAME_COST, check_value_nesting_cost,
 };
+use vector_buffers::Bufferable;
 
 fn encode_value<T: Encodable, B: BufMut>(value: T, buffer: &mut B) {
     value.encode(buffer).expect("encoding should not fail");
@@ -611,6 +613,104 @@ fn nesting_gate_accepts_timestamp_leaf_below_max_object_depth() {
         proto::EventArray::decode(buf.freeze()).is_ok(),
         "prost should decode metadata Timestamp leaf at object depth {}",
         MAX_OBJECT_DEPTH_METADATA - 1,
+    );
+}
+
+/// Verify `filter_unencodable` keeps the valid events and drops only the over-budget
+/// ones, returning a smaller `EventArray` rather than failing the whole batch.
+#[test]
+fn filter_unencodable_drops_only_over_budget_events() {
+    let good = || {
+        let mut event = LogEvent::default();
+        event.insert("data", "ok");
+        event
+    };
+    let bad = || {
+        let mut event = LogEvent::default();
+        event.insert("data", create_nested_value(MAX_OBJECT_DEPTH_VALUE));
+        event
+    };
+
+    let logs = vec![good(), bad(), good(), bad(), good()];
+    let array = EventArray::Logs(LogArray::from(logs));
+
+    let filtered = array
+        .filter_unencodable()
+        .expect("3 good events should survive filtering");
+    assert_eq!(filtered.event_count(), 3, "only good events should remain");
+
+    let EventArray::Logs(surviving) = filtered else {
+        panic!("variant should be preserved");
+    };
+    for log in &surviving {
+        assert_eq!(
+            log.value().get("data").and_then(|v| v.as_bytes()),
+            Some(&bytes::Bytes::from_static(b"ok")),
+            "only good events should remain",
+        );
+    }
+}
+
+/// Verify that the public per-event entry point used by both the native codec and the
+/// vector sink charges `Value::Timestamp` for one frame, just like the buffer gate.
+/// Without this, a depth-33 object chain ending in a timestamp would pass the codec
+/// check and fail prost decode on the receiving end.
+#[test]
+fn event_exceeds_max_nesting_cost_charges_timestamp_leaf() {
+    let log_at_max_with_ts = {
+        let mut event = LogEvent::default();
+        event.insert(
+            "data",
+            create_nested_value_with_leaf(MAX_OBJECT_DEPTH_VALUE - 1, ts_leaf()),
+        );
+        Event::Log(event)
+    };
+    assert!(
+        event_exceeds_max_nesting_cost(&log_at_max_with_ts).is_some(),
+        "depth {MAX_OBJECT_DEPTH_VALUE} log with Timestamp leaf must be rejected",
+    );
+
+    let trace_at_max_with_ts = {
+        let mut trace = TraceEvent::default();
+        trace.insert(
+            "data",
+            create_nested_value_with_leaf(MAX_OBJECT_DEPTH_VALUE - 1, ts_leaf()),
+        );
+        Event::Trace(trace)
+    };
+    assert!(
+        event_exceeds_max_nesting_cost(&trace_at_max_with_ts).is_some(),
+        "depth {MAX_OBJECT_DEPTH_VALUE} trace with Timestamp leaf must be rejected",
+    );
+
+    let metric_at_max_with_ts = {
+        let mut metric = Metric::new(
+            "test",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 1.0 },
+        );
+        *metric.metadata_mut().value_mut() =
+            create_nested_value_with_leaf(MAX_OBJECT_DEPTH_METADATA, ts_leaf());
+        Event::Metric(metric)
+    };
+    assert!(
+        event_exceeds_max_nesting_cost(&metric_at_max_with_ts).is_some(),
+        "metric with metadata-Timestamp leaf at depth {MAX_OBJECT_DEPTH_METADATA} must be rejected",
+    );
+
+    // And one shallower stays under the budget.
+    let log_below_max_with_ts = {
+        let mut event = LogEvent::default();
+        event.insert(
+            "data",
+            create_nested_value_with_leaf(MAX_OBJECT_DEPTH_VALUE - 2, ts_leaf()),
+        );
+        Event::Log(event)
+    };
+    assert!(
+        event_exceeds_max_nesting_cost(&log_below_max_with_ts).is_none(),
+        "depth {} log with Timestamp leaf must be accepted",
+        MAX_OBJECT_DEPTH_VALUE - 1,
     );
 }
 

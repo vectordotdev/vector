@@ -103,10 +103,43 @@ impl<T> InMemoryBufferable for T where
 /// An item that can be buffered.
 ///
 /// This supertrait serves as the base trait for any item that can be pushed into a buffer.
-pub trait Bufferable: InMemoryBufferable + Encodable {}
-
-// Blanket implementation for anything that is already bufferable.
-impl<T> Bufferable for T where T: InMemoryBufferable + Encodable {}
+pub trait Bufferable: InMemoryBufferable + Encodable {
+    /// Drops any sub-items that cannot be persisted by the calling backend (e.g. due to
+    /// format-imposed nesting depth limits), reporting them as dropped via the appropriate
+    /// telemetry. Returns `None` if nothing remains worth writing.
+    ///
+    /// # Who calls this
+    ///
+    /// Only persistent backends with wire-format constraints invoke this — today that's
+    /// the disk-v2 sender (`SenderAdapter::send`/`try_send`). In-memory channels skip it
+    /// entirely (they hold the in-memory representation and have no nesting-limit risk).
+    /// A new backend with similar constraints should call this in the same place.
+    ///
+    /// # Default behaviour
+    ///
+    /// The default returns `Some(self)` if the item carries any events, and `None` if
+    /// it is already empty. This means an item that arrives empty (`event_count() == 0`)
+    /// is silently *not* persisted — preserving the pre-existing
+    /// "don't write empty records to disk" behaviour the call site used to enforce.
+    /// Types whose owners want empty items to be persisted must override this.
+    ///
+    /// # Skipping this call
+    ///
+    /// If a persistent backend writes an item without first calling `filter_unencodable`,
+    /// any sub-item that exceeds the format's limits will surface as a hard
+    /// [`Encodable::encode`] error and the *entire* item is rejected — including any
+    /// sibling sub-items that would otherwise have encoded fine. The filter is the only
+    /// path that produces graceful per-item drop with telemetry and a `Rejected` event
+    /// status; the encode-level check exists purely as defense-in-depth to ensure a
+    /// corrupt record cannot reach disk if a future caller forgets to filter.
+    fn filter_unencodable(self) -> Option<Self> {
+        if self.event_count() > 0 {
+            Some(self)
+        } else {
+            None
+        }
+    }
+}
 
 /// Hook for observing items as they are sent into a `BufferSender`.
 pub trait BufferInstrumentation<T: Bufferable>: Send + Sync + 'static {

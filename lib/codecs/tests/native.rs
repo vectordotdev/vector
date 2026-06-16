@@ -412,6 +412,88 @@ fn native_codec_rejects_overly_nested_metadata() {
     );
 }
 
+fn create_nested_value_with_leaf(wrapping_levels: usize, leaf: Value) -> Value {
+    let mut value = leaf;
+    for _ in 0..wrapping_levels {
+        let mut map = ObjectMap::new();
+        map.insert("nested".into(), value);
+        value = Value::Object(map);
+    }
+    value
+}
+
+fn ts_leaf() -> Value {
+    use chrono::TimeZone;
+    Value::Timestamp(
+        chrono::Utc
+            .timestamp_opt(1_700_000_000, 0)
+            .single()
+            .unwrap(),
+    )
+}
+
+#[test]
+fn native_codec_rejects_timestamp_leaf_at_max_object_depth() {
+    // 32 wrapping objects + outer fields object + Timestamp leaf = cost 99 + 1 = 100,
+    // one frame over MAX_VALUE_NESTING_FRAMES.
+    let mut event = LogEvent::default();
+    event.insert("data", create_nested_value_with_leaf(32, ts_leaf()));
+    let event = Event::Log(event);
+
+    let mut serializer = NativeSerializerConfig.build();
+    let mut buffer = BytesMut::with_capacity(8192);
+
+    let result = serializer.encode(event, &mut buffer);
+    assert!(
+        result.is_err(),
+        "native codec should reject Timestamp leaf at object depth 33"
+    );
+}
+
+#[test]
+fn native_codec_roundtrip_timestamp_leaf_below_max_object_depth() {
+    // 31 wrapping objects + outer fields object + Timestamp leaf = cost 96 + 1 = 97,
+    // comfortably under MAX_VALUE_NESTING_FRAMES.
+    let mut event = LogEvent::default();
+    let value = create_nested_value_with_leaf(31, ts_leaf());
+    event.insert("data", value.clone());
+    let event = Event::Log(event);
+
+    let mut serializer = NativeSerializerConfig.build();
+    let mut buffer = BytesMut::with_capacity(8192);
+
+    serializer
+        .encode(event, &mut buffer)
+        .expect("native codec should accept Timestamp leaf at object depth 32");
+
+    let deserializer = NativeDeserializerConfig.build();
+    let decoded_events = deserializer
+        .parse(buffer.freeze(), LogNamespace::Legacy)
+        .expect("native codec should decode Timestamp leaf at object depth 32");
+
+    assert_eq!(decoded_events.len(), 1);
+    let decoded_log = decoded_events.into_iter().next().unwrap().into_log();
+    assert_eq!(decoded_log.value().get("data"), Some(&value));
+}
+
+#[test]
+fn native_codec_rejects_timestamp_leaf_in_max_depth_metadata() {
+    // Metadata at 32 object levels + Timestamp leaf = cost 96 + 1 = 97, one frame
+    // over MAX_METADATA_VALUE_NESTING_FRAMES.
+    let mut event = LogEvent::from("flat data");
+    *event.metadata_mut().value_mut() = create_nested_value_with_leaf(32, ts_leaf());
+    let event = Event::Log(event);
+
+    let mut serializer = NativeSerializerConfig.build();
+    let mut buffer = BytesMut::with_capacity(8192);
+
+    let result = serializer.encode(event, &mut buffer);
+    assert!(
+        result.is_err(),
+        "native codec should reject metadata Timestamp leaf at object depth 32"
+    );
+}
+
 #[test]
 fn native_codec_roundtrip_max_metadata_depth_event() {
     // Metadata at 32 object levels = 96 frame cost = MAX_METADATA_VALUE_NESTING_FRAMES.
