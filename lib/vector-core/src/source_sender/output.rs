@@ -181,10 +181,6 @@ impl Output {
         unsent_event_count: &mut UnsentEventCount,
         reference: i64,
     ) -> Result<(), SendError> {
-        // Capture send_reference at the very top of send_inner so that
-        // `buffer_send_duration_seconds` (measured via `send_reference.elapsed()` downstream)
-        // reflects the full end-to-end time from entering send_inner through buffer acceptance,
-        // including post-processor CPU time, lag-time emission, and schema attachment.
         let send_reference = Instant::now();
 
         // Apply post-processor with typed dispatch. Each method receives a reference to the
@@ -227,7 +223,7 @@ impl Output {
             .iter_events()
             .for_each(|event| self.emit_lag_time(event, reference));
 
-                events.iter_events_mut().for_each(|mut event| {
+        events.iter_events_mut().for_each(|mut event| {
             // attach runtime schema definitions from the source
             if let Some(log_definition) = &self.log_definition {
                 event.metadata_mut().set_schema_definition(log_definition);

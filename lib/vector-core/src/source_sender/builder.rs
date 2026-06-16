@@ -64,9 +64,6 @@ impl Builder {
     /// before the event is placed on the output channel. See [`PostProcessor`] for the trait
     /// definition and its contract.
     ///
-    /// This method can be called before or after [`add_source_output`][Self::add_source_output];
-    /// outputs already added will be updated retroactively so that all outputs share the same
-    /// post-processor regardless of call order.
     #[must_use]
     pub fn with_post_processor(mut self, post_processor: Arc<dyn PostProcessor>) -> Self {
         // Retroactively apply to any outputs already created so that call order does not matter.

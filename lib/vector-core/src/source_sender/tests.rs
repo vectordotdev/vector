@@ -500,7 +500,10 @@ async fn post_processor_whole_event_replacement_preserves_metadata() {
         .set_datadog_api_key(Arc::from("test-api-key"));
     log.metadata_mut()
         .set_splunk_hec_token(Arc::from("test-hec-token"));
-    log.insert(event_path!("original_field"), "should_be_gone_after_replace");
+    log.insert(
+        event_path!("original_field"),
+        "should_be_gone_after_replace",
+    );
 
     sender
         .send_event(Event::Log(log))
