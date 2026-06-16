@@ -38,9 +38,14 @@ impl<'de> serde::Deserialize<'de> for DeprecationVersion {
         } else {
             std::borrow::Cow::Borrowed(s)
         };
-        Version::parse(&normalized)
-            .map(DeprecationVersion)
-            .map_err(|e| serde::de::Error::custom(format!("invalid version '{s}': {e}")))
+        let v = Version::parse(&normalized)
+            .map_err(|e| serde::de::Error::custom(format!("invalid version '{s}': {e}")))?;
+        if !v.pre.is_empty() || !v.build.is_empty() {
+            return Err(serde::de::Error::custom(format!(
+                "invalid version '{s}': prerelease and build metadata are not allowed; use plain X.Y or X.Y.Z"
+            )));
+        }
+        Ok(DeprecationVersion(v))
     }
 }
 
@@ -616,6 +621,27 @@ mod tests {
         let out = rendered_json(tmp.path()).unwrap();
         assert!(out.contains("\"deprecations_pending\": []"));
         assert!(out.contains("\"what\": \"foo\""));
+    }
+
+    #[test]
+    fn rejects_prerelease_and_build_metadata() {
+        let tmp = tempdir().unwrap();
+        fs::write(
+            tmp.path().join("pre.md"),
+            "---\nwhat: foo\ndeprecated_since: \"0.58.0-alpha\"\n---\n",
+        )
+        .unwrap();
+        let err = read_deprecation_fragments(tmp.path()).unwrap_err();
+        assert!(format!("{err:?}").contains("prerelease and build metadata"));
+
+        let tmp2 = tempdir().unwrap();
+        fs::write(
+            tmp2.path().join("build.md"),
+            "---\nwhat: foo\ndeprecated_since: \"0.58.0+ci\"\n---\n",
+        )
+        .unwrap();
+        let err = read_deprecation_fragments(tmp2.path()).unwrap_err();
+        assert!(format!("{err:?}").contains("prerelease and build metadata"));
     }
 
     #[test]
