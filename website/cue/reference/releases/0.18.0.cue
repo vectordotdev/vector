@@ -1,8 +1,7 @@
 package metadata
 
 releases: "0.18.0": {
-	date:     "2021-11-18"
-	codename: ""
+	date: "2021-11-18"
 
 	description: """
 		The Vector team is pleased to announce version 0.18.0!
@@ -21,7 +20,7 @@ releases: "0.18.0": {
 		"A change to internal telemetry causes aggregated histograms emitted by the `prometheus_exporter` and `prometheus_remote_write` sinks to be incorrectly tallied. Fixed in v0.18.1.",
 		"The new automatic namespacing feature broke running Vector from the published RPM due to it trying to load directories from `/etc/vector` that are not valid. Fixed in v0.18.1.",
 		"The new `reroute_dropped` feature of `remap` always creates the `dropped` output even if `reroute_dropped = false`. Fixed in v0.18.1.",
-		"The `headers_key` option for the `kafka` sink was inadvertantly changed to `headers_field`. Fixed in v0.19.0.",
+		"The `headers_key` option for the `kafka` sink was inadvertently changed to `headers_field`. Fixed in v0.19.0.",
 		"If `--config-dir` is used, Vector incorrectly tries to load files with unknown extensions. Fixed in v0.19.0.",
 		"""
 			`encoding.only_fields` failed to deserialize correctly for sinks that used fixed encodings (i.e. those that don't have `encoding.codec`). Fixed in v0.19.2. As a workaround, you can split the paths up in your configuration like:
