@@ -47,6 +47,13 @@ impl Cli {
             .ok_or_else(|| anyhow::anyhow!("Could not parse {filename}"))?;
 
         let version = if let Some(v) = self.version {
+            // Reject `--version 0.58.0-alpha` and friends: only release-shaped
+            // semver is valid here.
+            if !v.pre.is_empty() || !v.build.is_empty() {
+                bail!(
+                    "--version {v} has prerelease or build metadata; only plain X.Y.Z is allowed"
+                );
+            }
             v
         } else {
             let latest = git::latest_release_version()?;

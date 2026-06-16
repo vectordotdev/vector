@@ -104,8 +104,17 @@ pub fn partition_by_release(
 
 /// Read and parse all deprecation fragments from the given directory.
 /// Returns entries sorted by filename.
+///
+/// Rejects:
+///   * the directory itself being a symlink (treated as missing)
+///   * duplicate `what` values across fragments
 pub fn read_deprecation_fragments(dir: &Path) -> Result<Vec<DeprecationEntry>> {
-    if !dir.is_dir() {
+    // Use symlink_metadata so a symlinked `deprecation.d` doesn't pull in
+    // out-of-tree content.
+    let Ok(meta) = fs::symlink_metadata(dir) else {
+        return Ok(Vec::new());
+    };
+    if !meta.file_type().is_dir() {
         return Ok(Vec::new());
     }
     let mut paths: Vec<PathBuf> = fs::read_dir(dir)?
@@ -113,10 +122,26 @@ pub fn read_deprecation_fragments(dir: &Path) -> Result<Vec<DeprecationEntry>> {
         .filter(|p| is_deprecation_fragment(p))
         .collect();
     paths.sort();
-    paths
+    let entries: Vec<DeprecationEntry> = paths
         .into_iter()
         .map(|p| parse_deprecation_fragment(&p))
-        .collect()
+        .collect::<Result<_>>()?;
+
+    // Reject duplicate `what` across pending fragments. A feature has one
+    // identity; two fragments with the same `what` would publish the same
+    // deprecation twice.
+    let mut seen: std::collections::HashMap<&str, &str> = std::collections::HashMap::new();
+    for e in &entries {
+        if let Some(prev) = seen.insert(e.what.as_str(), e.filename.as_str()) {
+            bail!(
+                "Duplicate deprecation fragments for `what`: '{}' (in {} and {})",
+                e.what,
+                prev,
+                e.filename
+            );
+        }
+    }
+    Ok(entries)
 }
 
 fn is_deprecation_fragment(path: &Path) -> bool {
@@ -312,13 +337,13 @@ pub fn validate_enacted(repo_root: &Path) -> Result<usize> {
     let enacted = read_enacted(repo_root)?;
     let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
     for e in &enacted {
-        let dep = Version::parse(&e.deprecated_since).with_context(|| {
+        let dep = parse_strict_release(&e.deprecated_since).with_context(|| {
             format!(
                 "Enacted entry '{}' has invalid deprecated_since '{}'",
                 e.what, e.deprecated_since
             )
         })?;
-        let rem = Version::parse(&e.removed_in).with_context(|| {
+        let rem = parse_strict_release(&e.removed_in).with_context(|| {
             format!(
                 "Enacted entry '{}' has invalid removed_in '{}'",
                 e.what, e.removed_in
@@ -346,6 +371,17 @@ pub fn validate_enacted(repo_root: &Path) -> Result<usize> {
 /// major.minor (regardless of patch) returns false.
 pub fn later_minor(a: &Version, b: &Version) -> bool {
     (a.major, a.minor) > (b.major, b.minor)
+}
+
+/// Parse a release version string strictly: only plain `X.Y.Z` is allowed
+/// (no prerelease or build metadata). Mirrors the rule that release tags
+/// follow `vX.Y.Z`.
+pub fn parse_strict_release(s: &str) -> Result<Version> {
+    let v = Version::parse(s)?;
+    if !v.pre.is_empty() || !v.build.is_empty() {
+        bail!("version '{s}' has prerelease or build metadata; only plain X.Y.Z is allowed");
+    }
+    Ok(v)
 }
 
 /// Render the JSON that `sync_deprecations_cue` would write, without
@@ -621,6 +657,60 @@ mod tests {
         let out = rendered_json(tmp.path()).unwrap();
         assert!(out.contains("\"deprecations_pending\": []"));
         assert!(out.contains("\"what\": \"foo\""));
+    }
+
+    #[test]
+    fn rejects_duplicate_what_across_fragments() {
+        let tmp = tempdir().unwrap();
+        fs::write(
+            tmp.path().join("a.md"),
+            "---\nwhat: \"the foo option\"\ndeprecated_since: \"0.55.0\"\n---\n",
+        )
+        .unwrap();
+        fs::write(
+            tmp.path().join("b.md"),
+            "---\nwhat: \"the foo option\"\ndeprecated_since: \"0.56.0\"\n---\n",
+        )
+        .unwrap();
+        let err = read_deprecation_fragments(tmp.path()).unwrap_err();
+        assert!(format!("{err}").contains("Duplicate"));
+    }
+
+    #[test]
+    fn rejects_symlinked_dir() {
+        use tempfile::tempdir;
+        let outside = tempdir().unwrap();
+        fs::write(
+            outside.path().join("evil.md"),
+            "---\nwhat: \"evil\"\ndeprecated_since: \"0.99.0\"\n---\n",
+        )
+        .unwrap();
+
+        let host = tempdir().unwrap();
+        let link = host.path().join("deprecation.d");
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(outside.path(), &link).unwrap();
+        #[cfg(windows)]
+        std::os::windows::fs::symlink_dir(outside.path(), &link).unwrap();
+
+        // The symlinked dir must be treated as missing, not read through.
+        let entries = read_deprecation_fragments(&link).unwrap();
+        assert!(entries.is_empty());
+    }
+
+    #[test]
+    fn validate_enacted_rejects_prerelease_versions() {
+        let tmp = tempdir().unwrap();
+        fs::create_dir_all(tmp.path().join("website/data")).unwrap();
+        fs::write(
+            tmp.path().join("website/data/deprecations.json"),
+            r#"{"deprecations_pending":[],"deprecations_enacted":[
+                {"what":"x","deprecated_since":"0.55.0","removed_in":"0.56.0-alpha"}
+            ]}"#,
+        )
+        .unwrap();
+        let err = validate_enacted(tmp.path()).unwrap_err();
+        assert!(format!("{err:?}").contains("prerelease or build metadata"));
     }
 
     #[test]
