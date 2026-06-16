@@ -119,7 +119,7 @@ pub struct MemorySourceConfig {
 pub enum TableFilter {
     /// Cuckoo filter
     ///
-    /// Supports removal too, as well as TTL and LRU
+    /// Supports removal by accepting null values for keys, as well as TTL and LRU.
     Cuckoo(CuckooMemoryConfig),
 }
 
