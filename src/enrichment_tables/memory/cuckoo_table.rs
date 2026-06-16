@@ -281,7 +281,7 @@ impl CuckooMemoryTable {
                             "`ttl_bits` ({}) must be set to at least {} to support the provided `ttl` value ({}) at the configured scan interval ({}).",
                             self.cuckoo_config.ttl_bits.get(),
                             needed_bits,
-                            ttl,
+                            self.config.ttl,
                             self.config.scan_interval.get()
                         );
                     }
@@ -294,17 +294,6 @@ impl CuckooMemoryTable {
                     .and_then(|p| value.get(p))
                     .and_then(|v| v.as_integer())
                     .and_then(|v| i32::try_from(v).ok());
-                if let Some(counter) = counter {
-                    let needed_bits = counter.ilog2() + 2;
-                    if needed_bits as usize > self.cuckoo_config.counter_bits.get() {
-                        warn!(
-                            "`counter_bits` ({}) must be set to at least {} to support the provided `counter` value ({}).",
-                            self.cuckoo_config.counter_bits.get(),
-                            needed_bits,
-                            counter
-                        );
-                    }
-                }
                 let _ = self.filter.insert_if_not_present_with_update(
                     k,
                     InsertValues { ttl, counter },
