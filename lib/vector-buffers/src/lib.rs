@@ -112,8 +112,10 @@ pub trait Bufferable: InMemoryBufferable + Encodable {
     ///
     /// Only persistent backends with wire-format constraints invoke this — today that's
     /// the disk-v2 sender (`SenderAdapter::send`/`try_send`). In-memory channels skip it
-    /// entirely (they hold the in-memory representation and have no nesting-limit risk).
-    /// A new backend with similar constraints should call this in the same place.
+    /// entirely because they hold the in-memory representation and have no nesting-limit
+    /// risk. A new backend with similar constraints should call this in the same place
+    /// and surface the resulting `FilterDrops` to `BufferSender` so that buffer-usage
+    /// instrumentation stays consistent with what actually lands in the buffer.
     ///
     /// # Default behaviour
     ///
