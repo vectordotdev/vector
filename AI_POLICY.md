@@ -22,7 +22,7 @@ For discussions under issues, PR descriptions, and review threads, it works best
 
 AI tools can generate a lot of code quickly. Please keep PRs well-scoped and focused: one clear problem, one clear solution. Our reviewers are humans with limited time, and a focused, well-tested PR that solves a real problem will get reviewed and merged faster.
 
-Before opening a PR, it helps to make sure it addresses a real need (ideally tied to an open issue), that your changes are tested, and that you've followed the standard checks described in [CONTRIBUTING.md](CONTRIBUTING.md#running-other-checks).
+Before opening a PR, it helps to make sure it addresses a real need (ideally tied to an open issue), that your changes are tested, and that you've followed the instructions in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## AI review comments
 

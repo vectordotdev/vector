@@ -56,6 +56,7 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
 pub async fn top(opts: &super::Opts, uri: Uri, dashboard_title: &str) -> exitcode::ExitCode {
     // Channel for updating state via event messages
     let (tx, rx) = tokio::sync::mpsc::channel(20);
+    let (ui_tx, ui_rx) = tokio::sync::mpsc::channel(20);
     let mut starting_state = State::new(BTreeMap::new());
     starting_state.sort_state.column = opts.sort_field;
     starting_state.sort_state.reverse = opts.sort_desc;
@@ -65,7 +66,7 @@ pub async fn top(opts: &super::Opts, uri: Uri, dashboard_title: &str) -> exitcod
         .as_deref()
         .map(Regex::new)
         .and_then(Result::ok);
-    let state_rx = state::updater(rx, starting_state).await;
+    let state_rx = state::updater(rx, ui_rx, starting_state).await;
     // Channel for shutdown signal
     let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
 
@@ -77,7 +78,7 @@ pub async fn top(opts: &super::Opts, uri: Uri, dashboard_title: &str) -> exitcod
         opts.url().as_str(),
         opts.interval,
         opts.human_metrics,
-        tx,
+        ui_tx,
         state_rx,
         shutdown_rx,
     )
