@@ -264,7 +264,8 @@ to detect common problems.
 
 ### Disabling internal log rate limiting
 
-Vector rate limits its own internal logs by default (10-second windows). During development, you may want to see all log occurrences.
+Vector rate limits the console output of internal logs by default (10-second windows). During
+development, you may want to see all log occurrences.
 
 **Globally** (CLI flag or environment variable):
 
@@ -283,6 +284,10 @@ warn!(message = "Error occurred.", %error, internal_log_rate_limit = false);
 // Override rate limit window to 1 second
 info!(message = "Processing batch.", batch_size, internal_log_rate_secs = 1);
 ```
+
+Note: The `internal_logs` source is _not_ rate limited by default. To enable rate limiting on all
+such sources, set the `--internal-logs-source-rate-limit` CLI flag or
+`VECTOR_INTERNAL_LOGS_SOURCE_RATE_LIMIT` environment variable to an integer number of seconds.
 
 ## Testing
 
