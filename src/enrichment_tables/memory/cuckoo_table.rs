@@ -272,8 +272,20 @@ impl CuckooMemoryTable {
                     .and_then(|v| v.as_integer())
                     .and_then(|v| u64::try_from(v).ok())
                     .or(Some(self.config.ttl))
-                    .map(|v| (v / self.config.scan_interval.get()).max(1))
+                    .map(|v| (v.div_ceil(self.config.scan_interval.get())).max(1))
                     .and_then(|v| u32::try_from(v).ok());
+                if let Some(ttl) = ttl {
+                    let needed_bits = ttl.ilog2() + 1;
+                    if needed_bits as usize > self.cuckoo_config.ttl_bits.get() {
+                        warn!(
+                            "`ttl_bits` ({}) must be set to at least {} to support the provided `ttl` value ({}) at the configured scan interval ({}).",
+                            self.cuckoo_config.ttl_bits.get(),
+                            needed_bits,
+                            self.config.ttl,
+                            self.config.scan_interval.get()
+                        );
+                    }
+                }
                 let counter = self
                     .cuckoo_config
                     .counter_field
