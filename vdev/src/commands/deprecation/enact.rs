@@ -50,10 +50,11 @@ impl Cli {
             Version::new(latest.major, latest.minor + 1, 0)
         };
 
-        if version < entry.deprecated_since.0 {
+        if version <= entry.deprecated_since.0 {
             bail!(
-                "removed_in ({version}) is earlier than deprecated_since ({}); \
-                 a feature can't be removed before it was deprecated. \
+                "removed_in ({version}) must be later than deprecated_since ({}); \
+                 the deprecation policy requires at least one minor release between \
+                 the announcement and removal. \
                  Check --version or the fragment's `deprecated_since` field.",
                 entry.deprecated_since
             );

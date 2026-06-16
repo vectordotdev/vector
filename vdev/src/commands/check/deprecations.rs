@@ -16,18 +16,26 @@ impl Cli {
         let repo_root = paths::find_repo_root()?;
         let dir = repo_root.join(deprecation::DEPRECATION_DIR);
 
-        if !dir.is_dir() {
+        let json_path = repo_root.join(deprecation::DEPRECATIONS_JSON);
+        let entries = if dir.is_dir() {
+            deprecation::read_deprecation_fragments(&dir)?
+        } else if json_path.is_file() {
             println!(
-                "No {dir} directory found; nothing to validate.",
-                dir = dir.display()
+                "{} not found; validating generated JSON only.",
+                dir.display()
+            );
+            Vec::new()
+        } else {
+            println!(
+                "Neither {} nor {} found; nothing to validate.",
+                dir.display(),
+                json_path.display()
             );
             return Ok(());
-        }
-
-        let entries = deprecation::read_deprecation_fragments(&dir)?;
+        };
 
         if entries.is_empty() {
-            println!("No deprecation fragments found in {}.", dir.display());
+            println!("No deprecation fragments found.");
         } else {
             for entry in &entries {
                 println!("  ok  {}", entry.filename);
@@ -35,7 +43,10 @@ impl Cli {
             println!("{} deprecation fragment(s) are valid.", entries.len());
         }
 
-        // Reject any fragment with a deprecated_since newer than the next minor release.
+        // Reject any fragment with a deprecated_since newer than the next
+        // minor release. Skipped (with a warning) when the checkout has no
+        // release tags so shallow CI/source checkouts can still validate
+        // fragment frontmatter + generated JSON.
         match git::latest_release_version() {
             Ok(latest) => {
                 let next_minor = Version::new(latest.major, latest.minor + 1, 0);
@@ -61,11 +72,12 @@ impl Cli {
                 }
             }
             Err(e) => {
-                bail!("could not determine latest release version: {e}");
+                eprintln!(
+                    "Warning: skipping future-version validation; could not determine latest release version: {e}"
+                );
             }
         }
 
-        let json_path = repo_root.join(deprecation::DEPRECATIONS_JSON);
         let before = std::fs::read_to_string(&json_path).unwrap_or_default();
 
         deprecation::sync_deprecations_cue(&repo_root)?;
