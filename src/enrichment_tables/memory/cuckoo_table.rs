@@ -182,22 +182,30 @@ impl CuckooMemoryTable {
                     },
                 };
                 let mut reader = BufReader::new(file);
-                let filter = match CuckooFilter::import_random_exportable(&mut reader) {
-                    Ok(filter) => filter,
-                    Err(error) => {
-                        return Err(
-                            format!("Cuckoo filter state import failed: {}. Delete the persited state file ({}) to proceed.", error, path.to_str().unwrap_or("")).into(),
+                let (hasher, persisted_config) =
+                    match CuckooFilter::<ExportableRandomState>::import_config(&mut reader) {
+                        Ok(imported) => imported,
+                        Err(error) => {
+                            return Err(
+                            format!("Cuckoo filter state import failed: {}. Delete the persisted state file ({}) to proceed.", error, path.to_str().unwrap_or("")).into(),
                         );
-                    }
-                };
+                        }
+                    };
 
-                if filter.get_configuration() != built_config {
+                if persisted_config != built_config {
                     return Err(
                         format!("Stored cuckoo filter configuration doesn't match with new configuration. If this is intended, remove the persisted state file ({}).", path.to_str().unwrap_or("")).into(),
                     );
                 }
 
-                filter
+                match CuckooFilter::import_state(hasher, persisted_config, &mut reader) {
+                    Ok(filter) => filter,
+                    Err(error) => {
+                        return Err(
+                            format!("Cuckoo filter state import failed: {}. Delete the persisted state file ({}) to proceed.", error, path.to_str().unwrap_or("")).into(),
+                        );
+                    }
+                }
             } else {
                 CuckooFilter::new_random_exportable(built_config)
             }
