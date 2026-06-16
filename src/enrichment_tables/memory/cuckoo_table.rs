@@ -165,12 +165,21 @@ impl CuckooMemoryTable {
 
         let filter = 'import: {
             if let Some(path) = &cuckoo_config.persistence_path {
-                let Ok(file) = File::open(path) else {
-                    warn!(
-                        "Couldn't open \"{}\" for cuckoo filter state import.",
-                        path.to_str().unwrap_or("")
-                    );
-                    break 'import CuckooFilter::new_random_exportable(built_config);
+                let file = match File::open(path) {
+                    Ok(file) => file,
+                    Err(err) => match err.kind() {
+                        std::io::ErrorKind::NotFound => {
+                            break 'import CuckooFilter::new_random_exportable(built_config);
+                        }
+                        _ => {
+                            return Err(format!(
+                                "Couldn't open \"{}\" for cuckoo filter state import. {}",
+                                path.to_str().unwrap_or(""),
+                                err
+                            )
+                            .into());
+                        }
+                    },
                 };
                 let mut reader = BufReader::new(file);
                 let filter = match CuckooFilter::import_random_exportable(&mut reader) {
