@@ -394,6 +394,19 @@ mod tests {
     }
 
     #[test]
+    fn sort_metric_type_is_primary_sort_key() {
+        // The sort key is (type_name, series, timestamp). "counter" < "gauge" alphabetically,
+        // so a counter must always precede a gauge regardless of series name.
+        let input = vec![create_gauge("zzz", 1.0), create_counter("aaa", 1.0)];
+        let expected = vec![
+            create_counter("aaa", 1.0), // "counter" < "gauge" → counter sorts first
+            create_gauge("zzz", 1.0),
+        ];
+        let actual = sort_and_collapse_counters_by_series_and_timestamp(input);
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
     fn collapse_identical_metrics_multiple_timestamps() {
         let ts_1 = Utc::now() - Duration::from_secs(5);
         let ts_2 = ts_1 - Duration::from_secs(5);
