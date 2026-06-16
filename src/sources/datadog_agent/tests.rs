@@ -70,6 +70,22 @@ const DD_API_SKETCHES_PATH: &str = "/api/beta/sketches";
 const DD_API_TRACES_PATH: &str = "/api/v0.2/traces";
 const HTTP_REQUEST_TIMEOUT: Duration = Duration::from_secs(5);
 
+fn make_llmobs_source() -> DatadogAgentSource {
+    let decoder = vector_lib::codecs::Decoder::new(
+        Framer::Bytes(BytesDecoder::new()),
+        Deserializer::Bytes(BytesDeserializer),
+    );
+    DatadogAgentSource::new(
+        true,
+        decoder,
+        "http",
+        None,
+        LogNamespace::Legacy,
+        false,
+        true,
+    )
+}
+
 fn test_logs_schema_definition() -> schema::Definition {
     schema::Definition::empty_legacy_namespace().with_event_field(
         &owned_value_path!("a log field"),
@@ -2874,7 +2890,8 @@ fn test_decode_llmobs_body() {
     ]"#,
     );
 
-    let events = decode_llmobs_body(body, None).unwrap();
+    let source = make_llmobs_source();
+    let events = decode_llmobs_body(body, None, &source).unwrap();
     assert_eq!(events.len(), 1);
 
     let log = events[0].as_log();
@@ -2883,31 +2900,40 @@ fn test_decode_llmobs_body() {
     assert_eq!(log["name"], "my.workflow".into());
     assert_eq!(log["status"], "ok".into());
     assert_eq!(log["ml_app"], "my-llm-app".into());
-    assert_eq!(log["_dd.tracer_version"], "2.17.0".into());
+    assert_eq!(
+        log["_dd"].as_object().unwrap()["tracer_version"],
+        "2.17.0".into()
+    );
 }
 
 #[test]
 fn test_decode_llmobs_body_empty_spans() {
     let body = Bytes::from(r#"[{"event_type": "span", "spans": []}]"#);
-    let events = decode_llmobs_body(body, None).unwrap();
+    let source = make_llmobs_source();
+    let events = decode_llmobs_body(body, None, &source).unwrap();
     assert_eq!(events.len(), 0);
 }
 
 #[test]
 fn test_decode_llmobs_body_invalid_json() {
     let body = Bytes::from("not json");
-    assert!(decode_llmobs_body(body, None).is_err());
+    let source = make_llmobs_source();
+    assert!(decode_llmobs_body(body, None, &source).is_err());
 }
 
 #[test]
 fn test_decode_llmobs_body_api_key() {
     let body = Bytes::from(r#"[{"event_type":"span","spans":[{"span_id":"a","trace_id":"b"}]}]"#);
     let api_key: Option<Arc<str>> = Some(Arc::from("test1234test1234test1234test1234"));
+    let source = make_llmobs_source();
 
-    let events = decode_llmobs_body(body, api_key).unwrap();
+    let events = decode_llmobs_body(body, api_key, &source).unwrap();
     assert_eq!(events.len(), 1);
     assert_eq!(
-        events[0].metadata().datadog_api_key().map(|k| k.as_ref().to_owned()),
+        events[0]
+            .metadata()
+            .datadog_api_key()
+            .map(|k| k.as_ref().to_owned()),
         Some("test1234test1234test1234test1234".to_owned())
     );
 }

@@ -3,10 +3,10 @@ mod integration_tests;
 #[cfg(test)]
 mod tests;
 
+pub mod llmobs;
 pub mod logs;
 pub mod metrics;
 pub mod traces;
-pub mod llmobs;
 
 #[allow(warnings, clippy::pedantic, clippy::nursery)]
 pub(crate) mod ddmetric_proto {
@@ -329,8 +329,43 @@ impl SourceConfig for DatadogAgentConfig {
             )
             .with_standard_vector_source_metadata();
 
+        let log_namespace = global_log_namespace.merge(self.log_namespace);
+        let llmobs_definition = schema::Definition::new_with_default_metadata(
+            Kind::object(
+                Collection::empty()
+                    .with_known("span_id", Kind::bytes())
+                    .with_known("trace_id", Kind::bytes())
+                    .with_known("parent_id", Kind::bytes().or_undefined())
+                    .with_known("name", Kind::bytes().or_undefined())
+                    .with_known("session_id", Kind::bytes().or_undefined())
+                    .with_known("service", Kind::bytes().or_undefined())
+                    .with_known("start_ns", Kind::integer().or_undefined())
+                    .with_known("duration", Kind::integer().or_undefined())
+                    .with_known("status", Kind::bytes().or_undefined())
+                    .with_known("status_message", Kind::bytes().or_undefined())
+                    .with_known("ml_app", Kind::bytes().or_undefined())
+                    .with_known("meta", Kind::object(Collection::any()).or_undefined())
+                    .with_known("metrics", Kind::object(Collection::any()).or_undefined())
+                    .with_known(
+                        "tags",
+                        Kind::array(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                    )
+                    .with_known("span_links", Kind::any().or_undefined())
+                    .with_known("config", Kind::any().or_undefined())
+                    .with_known("collection_errors", Kind::any().or_undefined()),
+            ),
+            [log_namespace],
+        )
+        .with_source_metadata(
+            Self::NAME,
+            Some(LegacyKey::InsertIfEmpty(owned_value_path!("timestamp"))),
+            &owned_value_path!("timestamp"),
+            Kind::timestamp(),
+            Some(meaning::TIMESTAMP),
+        )
+        .with_standard_vector_source_metadata();
+
         let mut output = Vec::with_capacity(1);
-        let llmobs_definition = definition.clone();
 
         if self.multiple_outputs {
             if !self.disable_logs {
@@ -343,7 +378,10 @@ impl SourceConfig for DatadogAgentConfig {
                 output.push(SourceOutput::new_traces().with_port(TRACES))
             }
             if !self.disable_llmobs {
-                output.push(SourceOutput::new_maybe_logs(DataType::Log, llmobs_definition).with_port(LLMOBS))
+                output.push(
+                    SourceOutput::new_maybe_logs(DataType::Log, llmobs_definition)
+                        .with_port(LLMOBS),
+                )
             }
         } else {
             output.push(SourceOutput::new_maybe_logs(
