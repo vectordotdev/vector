@@ -56,7 +56,6 @@ pub(super) struct CuckooMemoryTable {
 /// Configuration of cuckoo filter for memory table.
 #[configurable_component]
 #[derive(Clone, Debug, PartialEq, Eq)]
-#[serde(deny_unknown_fields, rename_all = "snake_case", tag = "type")]
 pub struct CuckooMemoryConfig {
     /// Number of bits used for fingerprint.
     #[serde(default = "default_cuckoo_fingerprint_bits")]
