@@ -4,7 +4,7 @@ use crate::internal_events::{OdbcEventsReceived, OdbcFailedError, OdbcQueryExecu
 use crate::sinks::prelude::*;
 use crate::sources::odbc::config::OdbcConfig;
 use bytes::BytesMut;
-use chrono::{NaiveDate, NaiveDateTime, NaiveTime, Utc};
+use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, Timelike, Utc};
 use chrono_tz::Tz;
 use futures::pin_mut;
 use futures_util::StreamExt;
@@ -179,20 +179,28 @@ impl Context {
         // Load the last-run metadata from disk when available.
         // If the file is missing, fall back to the initial parameters or the latest query result.
         // Unreadable or corrupt metadata is treated as an error to avoid replaying old rows.
+        let tz = self.cfg.odbc_default_timezone;
         let stmt_params = if let Some(path) = &self.cfg.last_run_metadata_path {
-            match load_params(path, self.cfg.tracking_columns.as_ref())? {
+            match load_params(path, self.cfg.tracking_columns.as_ref(), tz)? {
                 Some(params) => params,
-                None => order_params(map.unwrap_or_default(), self.cfg.tracking_columns.as_ref())
-                    .unwrap_or_default(),
+                None => order_params(
+                    map.unwrap_or_default(),
+                    self.cfg.tracking_columns.as_ref(),
+                    tz,
+                )
+                .unwrap_or_default(),
             }
         } else {
-            order_params(map.unwrap_or_default(), self.cfg.tracking_columns.as_ref())
-                .unwrap_or_default()
+            order_params(
+                map.unwrap_or_default(),
+                self.cfg.tracking_columns.as_ref(),
+                tz,
+            )
+            .unwrap_or_default()
         };
         let cfg = self.cfg.clone();
         let login_timeout = cfg.login_timeout;
         let statement_timeout = cfg.statement_timeout;
-        let tz = cfg.odbc_default_timezone;
         let batch_size = cfg.odbc_batch_size;
         let max_str_limit = (cfg.odbc_max_str_limit > 0).then_some(cfg.odbc_max_str_limit);
 
@@ -402,6 +410,7 @@ pub fn execute_query(
 fn load_params(
     path: &str,
     columns_order: Option<&Vec<String>>,
+    tz: Tz,
 ) -> Result<Option<Vec<VarCharBox>>, OdbcError> {
     let file = match File::open(path) {
         Ok(file) => file,
@@ -411,16 +420,20 @@ fn load_params(
     let reader = BufReader::new(file);
     let map: ObjectMap = serde_json::from_reader(reader).context(JsonSnafu)?;
 
-    Ok(order_params(map, columns_order))
+    Ok(order_params(map, columns_order, tz))
 }
 
 /// Orders the parameters of a given `ObjectMap` based on an optional column order.
-fn order_params(map: ObjectMap, columns_order: Option<&Vec<String>>) -> Option<Vec<VarCharBox>> {
+fn order_params(
+    map: ObjectMap,
+    columns_order: Option<&Vec<String>>,
+    tz: Tz,
+) -> Option<Vec<VarCharBox>> {
     if columns_order.is_none() || columns_order.iter().len() == 0 {
         let params = map
-            .iter()
-            .filter_map(|(_, value)| {
-                value_to_sql_parameter(value).map(|param| param.into_parameter())
+            .values()
+            .filter_map(|value| {
+                value_to_sql_parameter(value, tz).map(|param| param.into_parameter())
             })
             .collect_vec();
         return Some(params);
@@ -438,7 +451,7 @@ fn order_params(map: ObjectMap, columns_order: Option<&Vec<String>>) -> Option<V
         .into_iter()
         .filter_map(|col| {
             let value = map.get(col)?;
-            value_to_sql_parameter(value).map(|param| param.into_parameter())
+            value_to_sql_parameter(value, tz).map(|param| param.into_parameter())
         })
         .collect_vec();
 
@@ -598,17 +611,30 @@ fn map_value(data_type: &odbc_api::DataType, value: Option<&[u8]>, tz: Tz) -> Va
     }
 }
 
+/// Formats a UTC timestamp as a naive local datetime string for ODBC parameter binding.
+fn format_timestamp_for_sql_parameter(timestamp: DateTime<Utc>, tz: Tz) -> String {
+    let local = timestamp.with_timezone(&tz);
+    if local.nanosecond() != 0 {
+        local.format("%Y-%m-%d %H:%M:%S%.f").to_string()
+    } else {
+        local.format("%Y-%m-%d %H:%M:%S").to_string()
+    }
+}
+
 /// Converts a scalar VRL value to raw text for ODBC parameter binding.
 ///
 /// Unlike `Value::to_string()`, this does not use VRL literal syntax (e.g. quoted
 /// strings or `t'…'` timestamps).
-fn value_to_sql_parameter(value: &Value) -> Option<String> {
+///
+/// Timestamps are formatted in `tz` as naive local datetimes so they compare
+/// consistently with timezone-less database date/time columns.
+fn value_to_sql_parameter(value: &Value, tz: Tz) -> Option<String> {
     match value {
         Value::Integer(i) => Some(i.to_string()),
         Value::Float(f) => Some(f.to_string()),
         Value::Boolean(b) => Some(b.to_string()),
         Value::Bytes(b) => std::str::from_utf8(b).ok().map(str::to_owned),
-        Value::Timestamp(t) => Some(t.to_rfc3339()),
+        Value::Timestamp(t) => Some(format_timestamp_for_sql_parameter(*t, tz)),
         Value::Null => None,
         other => serde_json::to_value(other).ok().and_then(|v| match v {
             serde_json::Value::String(s) => Some(s),
@@ -623,6 +649,7 @@ fn value_to_sql_parameter(value: &Value) -> Option<String> {
 mod tests {
     use super::*;
     use bytes::Bytes;
+    use chrono::TimeZone as _;
 
     #[test]
     fn map_value_integer_in_range() {
@@ -640,7 +667,7 @@ mod tests {
         let value = map_value(&odbc_api::DataType::BigInt, Some(raw), chrono_tz::UTC);
         assert_eq!(value, Value::Bytes(Bytes::from_static(raw)));
         assert_eq!(
-            value_to_sql_parameter(&value),
+            value_to_sql_parameter(&value, chrono_tz::UTC),
             Some("18446744073709551615".to_owned())
         );
     }
