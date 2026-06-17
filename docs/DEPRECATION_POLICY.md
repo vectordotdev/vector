@@ -79,9 +79,8 @@ When introducing a deprecation into Vector, the pull request introducing the dep
 - Add a deprecation changelog fragment in [`changelog.d`](../changelog.d/README.md). A short
   one-line summary is sufficient as the deprecation fragment is the canonical migration guide and is rendered on the
   release page automatically.
-- Add a deprecation note to the component docs. Typically, this means adding `deprecation: "description of the deprecation"`
-  to the `cue` data for the option or feature. If the `cue` schema does not support `deprecation` for whatever you
-  are deprecating yet, add it to the schema and open an issue to have it rendered on the website.
+- Add a deprecation note to the component docs if applicable. Typically, this means adding `deprecation: "description of the deprecation"`
+  to the cue file or `#[configurable(deprecated = "use <alternative> instead")]` to the parameter.
 - For a component that is being renamed, remove the documentation page for the old name and add a new one for the new
   name. Add an alias so the old name redirects. The title of the new name should be appended with the text
   `(formerly OldName)`.
