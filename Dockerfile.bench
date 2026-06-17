@@ -1,0 +1,36 @@
+#
+# VECTOR BUILDER (local bench builds with VRL override)
+#
+# Build with:
+#   docker buildx build --build-context vrl=../vrl -f Dockerfile.bench -t vector:<tag> .
+#
+FROM rust:1.92-bookworm AS builder
+RUN apt-get update && apt-get -y --no-install-recommends install \
+    cmake \
+    libclang-dev \
+    libsasl2-dev \
+    libssl-dev \
+    pkg-config \
+    protobuf-compiler \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /vector
+COPY --from=vrl . /vrl
+COPY . .
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git \
+    --mount=type=cache,target=/vector/target \
+    cargo build --bin vector --release && \
+    cp target/release/vector .
+
+#
+# TARGET
+#
+FROM debian:trixie-slim
+RUN apt-get update && apt-get dist-upgrade -y && apt-get -y --no-install-recommends install zlib1g ca-certificates libsasl2-2 && rm -rf /var/lib/apt/lists/*
+COPY --from=builder /vector/vector /usr/bin/vector
+RUN mkdir --parents --mode=0777 /var/lib/vector
+
+# Smoke test
+RUN ["/usr/bin/vector", "--version"]
+
+ENTRYPOINT ["/usr/bin/vector"]
