@@ -436,7 +436,7 @@ INSERT INTO number_columns (
         Duration::from_secs(3),
         Tz::UTC,
         10,
-        1000,
+        Some(1000),
     )
     .unwrap();
     debug!("Rows Count: {}", rows.len());
@@ -621,7 +621,7 @@ INSERT INTO string_columns (
         Duration::from_secs(3),
         Tz::UTC,
         10,
-        1000,
+        Some(1000),
     )
     .unwrap();
 
@@ -728,7 +728,7 @@ VALUES (
         Duration::from_secs(3),
         Tz::UTC,
         10,
-        1000,
+        Some(1000),
     )
     .unwrap();
 

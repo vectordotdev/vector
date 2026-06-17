@@ -194,7 +194,7 @@ impl Context {
         let statement_timeout = cfg.statement_timeout;
         let tz = cfg.odbc_default_timezone;
         let batch_size = cfg.odbc_batch_size;
-        let max_str_limit = cfg.odbc_max_str_limit;
+        let max_str_limit = (cfg.odbc_max_str_limit > 0).then_some(cfg.odbc_max_str_limit);
 
         let rows = tokio::task::spawn_blocking(move || {
             execute_query(
@@ -324,7 +324,7 @@ pub fn execute_query(
     statement_timeout: Duration,
     tz: Tz,
     batch_size: usize,
-    max_str_limit: usize,
+    max_str_limit: Option<usize>,
 ) -> Result<Rows, OdbcError> {
     let conn_options = ConnectionOptions {
         login_timeout_sec: Some(login_timeout.as_secs() as u32),
@@ -366,8 +366,7 @@ pub fn execute_query(
         })
         .collect::<Columns>();
 
-    let buffer =
-        TextRowSet::for_cursor(batch_size, &mut cursor, Some(max_str_limit)).context(DbSnafu)?;
+    let buffer = TextRowSet::for_cursor(batch_size, &mut cursor, max_str_limit).context(DbSnafu)?;
     let mut row_set_cursor = cursor.bind_buffer(buffer).context(DbSnafu)?;
     let mut rows = Rows::with_capacity(batch_size);
 

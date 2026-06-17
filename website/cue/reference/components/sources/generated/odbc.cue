@@ -397,6 +397,7 @@ generated: components: sources: odbc: configuration: {
 	odbc_max_str_limit: {
 		description: """
 			Maximum string length for ODBC driver operations.
+			Set to `0` to omit the upper bound and use driver-reported sizes instead.
 			The default is 4096.
 			"""
 		required: false

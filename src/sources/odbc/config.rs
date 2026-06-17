@@ -119,6 +119,7 @@ pub struct OdbcConfig {
     pub odbc_batch_size: usize,
 
     /// Maximum string length for ODBC driver operations.
+    /// Set to `0` to omit the upper bound and use driver-reported sizes instead.
     /// The default is 4096.
     #[configurable(metadata(docs::examples = 4096))]
     #[serde(default = "default_odbc_max_str_limit")]
