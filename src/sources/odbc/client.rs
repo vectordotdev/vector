@@ -501,10 +501,11 @@ fn map_value(data_type: &odbc_api::DataType, value: Option<&[u8]>, tz: Tz) -> Va
                 return Value::Null;
             };
 
-            std::str::from_utf8(value)
-                .ok()
-                .and_then(|s| s.parse::<i64>().ok())
-                .map_or(Value::Null, Value::Integer)
+            // Preserve unrepresentable integers as bytes so tracking metadata is not lost.
+            match std::str::from_utf8(value).map(|s| s.parse::<i64>()) {
+                Ok(Ok(i)) => Value::Integer(i),
+                _ => Value::Bytes(Bytes::copy_from_slice(value)),
+            }
         }
 
         // Convert to float.
@@ -616,5 +617,32 @@ fn value_to_sql_parameter(value: &Value) -> Option<String> {
             serde_json::Value::Bool(b) => Some(b.to_string()),
             _ => None,
         }),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bytes::Bytes;
+
+    #[test]
+    fn map_value_integer_in_range() {
+        let value = map_value(
+            &odbc_api::DataType::BigInt,
+            Some(b"9223372036854775807"),
+            chrono_tz::UTC,
+        );
+        assert_eq!(value, Value::Integer(9223372036854775807));
+    }
+
+    #[test]
+    fn map_value_integer_out_of_range_preserved_as_bytes() {
+        let raw = b"18446744073709551615";
+        let value = map_value(&odbc_api::DataType::BigInt, Some(raw), chrono_tz::UTC);
+        assert_eq!(value, Value::Bytes(Bytes::from_static(raw)));
+        assert_eq!(
+            value_to_sql_parameter(&value),
+            Some("18446744073709551615".to_owned())
+        );
     }
 }
