@@ -31,4 +31,7 @@ RUN --mount=type=cache,target=/vector/target \
     --no-default-features --features $FEATURES && \
     cp target/debug/vector /usr/bin/vector
 
+# BuildKit conditional stage selection: selects build-false (lean, no source) or
+# build-true (full source + compiled binary) based on the BUILD arg.
+# https://www.docker.com/blog/advanced-dockerfiles-faster-builds-and-smaller-images-using-buildkit-and-multistage-builds/
 FROM build-${BUILD}
