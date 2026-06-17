@@ -68,30 +68,28 @@ When possible, Vector will error at start-up when a removed configuration option
 
 When introducing a deprecation into Vector, the pull request introducing the deprecation should:
 
-- Add a note to the Deprecations section of the upgrade guide in `website/content/en/highlights` for
-  the next release with a description and directions for transitioning if applicable.
-- Copy the same note from the previous step, to a changelog fragment, with type="deprecation". See the changelog
-  fragment [README.md](../changelog.d/README.md) for details.
-- Add a deprecation note to the docs. Typically, this means adding `deprecation: "description of the deprecation"`
+- **Add a deprecation fragment** to [`deprecation.d/`](../deprecation.d/) following the format in
+  [`deprecation.d/README.md`](../deprecation.d/README.md). Set `deprecated_since` to the current release version.
+  Use the fragment body for the full migration guide (rationale, before/after examples, links). Then run
+  `cargo vdev deprecation generate` to regenerate `website/data/deprecations.json` and commit both files.
+  Run `cargo vdev deprecation show` to preview, and `cargo vdev deprecation check` to validate.
+- Add a changelog fragment with `type="deprecation"` ([`changelog.d/README.md`](../changelog.d/README.md)). A short
+  one-line summary is sufficient — the deprecation fragment is the canonical migration guide and is rendered on the
+  release page automatically.
+- Add a deprecation note to the component docs. Typically, this means adding `deprecation: "description of the deprecation"`
   to the `cue` data for the option or feature. If the `cue` schema does not support `deprecation` for whatever you
   are deprecating yet, add it to the schema and open an issue to have it rendered on the website.
-- For a component that is being renamed, the documentation page for the old name of the component is removed and a
-  new page is added for the new name. An alias is added so the old name will redirect to the new name. The title of
-  the new name will be appended with the text `(formerly OldName)`.
-- Add a log message to Vector that is logged at the `WARN` level starting with the word `DEPRECATION` if Vector detects
-  the deprecated configuration or feature being used (when possible).
-- Add a deprecation notice file to [`deprecation.d/`](../deprecation.d/) following the format described in
-  [`deprecation.d/README.md`](../deprecation.d/README.md). Set `deprecated_since` to the current release version.
-  Then run `cargo vdev deprecation generate` to regenerate `website/data/deprecations.json` and
-  commit both files. Run `cargo vdev deprecation show` to preview all current notices and
-  `cargo vdev check deprecations` to validate.
+- For a component that is being renamed, remove the documentation page for the old name and add a new one for the new
+  name. Add an alias so the old name redirects. The title of the new name should be appended with the text
+  `(formerly OldName)`.
+- Add a `WARN`-level log message starting with the word `DEPRECATION` if Vector detects the deprecated configuration
+  or feature being used (when possible).
 
 When removing a deprecation in a subsequent release, the pull request should:
 
-- Indicate that it is a breaking change by including `!` in the title after the type/scope
-- Remove the deprecation from the documentation
-- Add a note to the Breaking Changes section of the upgrade guide for the next release with a description and directions
-  for transitioning if applicable.
-- Copy the same note from the previous step, to a changelog fragment, with type="breaking". See the changelog
-  fragment [README.md](../changelog.d/README.md) for details.
-- Run `cargo vdev deprecation enact <slug> --version <removed-in-version>` and commit the result.
+- Mark the change as breaking by including `!` in the title after the type/scope.
+- Remove the deprecation from the component documentation.
+- Add a changelog fragment with `type="breaking"` ([`changelog.d/README.md`](../changelog.d/README.md)). A short
+  one-line summary is sufficient — the enacted deprecation entry is the canonical record of what was removed.
+- Run `cargo vdev deprecation enact <slug> --version <removed-in-version>` and commit the result. This records the
+  removal in `website/data/deprecations.json` and deletes the original fragment in one step.
