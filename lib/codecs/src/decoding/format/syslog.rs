@@ -480,14 +480,12 @@ fn insert_fields_from_syslog(
 
 #[cfg(test)]
 mod tests {
-    use vector_core::config::{LogSchema, init_log_schema, log_schema};
+    use vector_core::config::log_schema;
 
     use super::*;
 
     #[test]
     fn deserialize_syslog_legacy_namespace() {
-        init();
-
         let input =
             Bytes::from("<34>1 2003-10-11T22:14:15.003Z mymachine.example.com su - ID47 - MSG");
         let deserializer = SyslogDeserializer::default();
@@ -505,8 +503,6 @@ mod tests {
 
     #[test]
     fn deserialize_syslog_vector_namespace() {
-        init();
-
         let input =
             Bytes::from("<34>1 2003-10-11T22:14:15.003Z mymachine.example.com su - ID47 - MSG");
         let deserializer = SyslogDeserializer::default();
@@ -515,16 +511,5 @@ mod tests {
         assert_eq!(events.len(), 1);
         assert_eq!(events[0].as_log()["message"], "MSG".into());
         assert!(events[0].as_log()["timestamp"].is_timestamp());
-    }
-
-    fn init() {
-        let mut schema = LogSchema::default();
-        schema.set_message_key(Some(OwnedTargetPath::event(owned_value_path!(
-            "legacy_message"
-        ))));
-        schema.set_message_key(Some(OwnedTargetPath::event(owned_value_path!(
-            "legacy_timestamp"
-        ))));
-        init_log_schema(schema, false);
     }
 }
