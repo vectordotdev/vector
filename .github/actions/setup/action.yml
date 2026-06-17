@@ -134,9 +134,24 @@ runs:
       run: echo "::add-matcher::.github/matchers/rust.json"
       shell: bash
 
+    # Two steps so that the actions/cache post-step (which saves the cache) runs
+    # directly from this composite, not a nested one — nested composites break
+    # post-step input resolution (actions/runner#3514, #2030).
     - name: Cache Cargo registry, index, and git DB
-      if: ${{ inputs.cargo-cache == 'true' || env.NEEDS_RUST == 'true' }}
+      if: ${{ (inputs.cargo-cache == 'true' || env.NEEDS_RUST == 'true') && github.ref == 'refs/heads/master' }}
       uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+      with:
+        path: |
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-
+
+    - name: Restore Cargo registry, index, and git DB
+      if: ${{ (inputs.cargo-cache == 'true' || env.NEEDS_RUST == 'true') && github.ref != 'refs/heads/master' }}
+      uses: actions/cache/restore@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
       with:
         path: |
           ~/.cargo/registry/index/
