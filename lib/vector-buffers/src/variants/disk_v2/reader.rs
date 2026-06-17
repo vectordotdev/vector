@@ -800,6 +800,17 @@ where
                             );
                             self.ledger.wait_for_writer().await;
                         } else {
+                            // The ledger names a data file that is gone while
+                            // the writer has moved on past it. A data file is
+                            // only unlinked after every record in it is acked,
+                            // so a missing file below the writer was fully
+                            // delivered. Advancing past it loses nothing.
+                            warn!(
+                                skipped_file_id = reader_file_id,
+                                writer_file_id,
+                                data_file_path = data_file_path.to_string_lossy().as_ref(),
+                                "Reader resume data file is missing; it was fully acknowledged before deletion. Advancing past it."
+                            );
                             self.ledger.increment_acked_reader_file_id();
                         }
                         continue;
@@ -817,6 +828,53 @@ where
             self.reader = Some(RecordReader::new(data_file));
             return Ok(());
         }
+    }
+
+    /// Reconciles the reader's resume position on reopen.
+    ///
+    /// A crash between unlinking a fully-acked data file and the durable ledger flush can leave
+    /// the ledger naming a file that is already gone. Walk the reader file id forward to the
+    /// lowest file that still exists so `seek_to_next_record` opens a real file instead of failing
+    /// on a missing one. A missing file strictly below the writer was fully delivered, so skipping
+    /// it loses nothing. `total_buffer_size` is reseeded on reopen from files that exist, so an
+    /// absent file already contributes zero and is deliberately not adjusted here.
+    pub(super) async fn reconcile_reader_position(&mut self) -> Result<(), ReaderError<T>> {
+        let mut advanced = false;
+        loop {
+            let (reader_file_id, writer_file_id) = self.ledger.get_current_reader_writer_file_id();
+            // Equality guards, not a numeric `<`, so ring wraparound never skips the live writer file.
+            if reader_file_id == writer_file_id
+                || reader_file_id == self.ledger.get_next_writer_file_id()
+            {
+                break;
+            }
+            let data_file_path = self.ledger.get_data_file_path(reader_file_id);
+            match self
+                .ledger
+                .filesystem()
+                .open_file_readable(&data_file_path)
+                .await
+            {
+                Ok(_) => break,
+                Err(e) if e.kind() == ErrorKind::NotFound => {
+                    warn!(
+                        skipped_file_id = reader_file_id,
+                        writer_file_id,
+                        data_file_path = data_file_path.to_string_lossy().as_ref(),
+                        "Reader resume data file missing on reopen; fully acknowledged before deletion. Advancing past it."
+                    );
+                    self.ledger.increment_acked_reader_file_id();
+                    advanced = true;
+                }
+                Err(source) => return Err(ReaderError::Io { source }),
+            }
+        }
+        if advanced {
+            self.ledger
+                .flush()
+                .map_err(|source| ReaderError::Io { source })?;
+        }
+        Ok(())
     }
 
     /// Seeks to where this reader previously left off.
@@ -864,8 +922,14 @@ where
         //
         // Once the reader/writer file IDs are identical, we fall back to the slow path.
         while self.ledger.get_current_reader_file_id() != self.ledger.get_current_writer_file_id() {
-            let data_file_path = self.ledger.get_current_reader_data_file_path();
             self.ensure_ready_for_read().await.context(IoSnafu)?;
+            // NOTE we intentionally read the resume path after
+            // `ensure_ready_for_read` to avoid crash-looping the buffer. If the
+            // ledger is out of date -- a hard-crash will cause its sync to be
+            // missed after dat files are unlinked -- we may be pointed to a
+            // missing dat file. Skipping is harmless as, by construction, the
+            // file was previously read entirely.
+            let data_file_path = self.ledger.get_current_reader_data_file_path();
             let data_file_mmap = self
                 .ledger
                 .filesystem()

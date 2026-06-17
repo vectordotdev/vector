@@ -1157,8 +1157,14 @@ where
                     "Opened data file for writing."
                 );
 
-                // Make sure the file is flushed to disk, especially if we just created it.
+                // Make sure the file is flushed to disk as well as the
+                // directory it sits in, especially if we just created said
+                // file.
                 data_file.sync_all().await?;
+                self.ledger
+                    .filesystem()
+                    .sync_directory(&self.ledger.config().data_dir)
+                    .await?;
 
                 self.writer = Some(RecordWriter::new(
                     data_file,
