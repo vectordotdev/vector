@@ -342,6 +342,7 @@ impl SourceConfig for OdbcConfig {
         )]
     }
 
+    // At-most-once when `last_run_metadata_path` is set; for use cases where occasional row loss is acceptable.
     fn can_acknowledge(&self) -> bool {
         false
     }
