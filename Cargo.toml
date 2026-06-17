@@ -141,6 +141,7 @@ antithesis-instrumentation = { version = "0.1", default-features = false, featur
 antithesis_sdk = { version = "0.2", default-features = false, features = [] }
 anyhow = { version = "1.0.102", default-features = false, features = ["std"] }
 arc-swap = { version = "1.8.2", default-features = false }
+async-compression = { version = "0.4.42", default-features = false, features = ["tokio", "gzip"] }
 async-stream = { version = "0.3.6", default-features = false }
 async-trait = { version = "0.1.89", default-features = false }
 axum = { version = "0.6.20", default-features = false }
@@ -362,7 +363,7 @@ greptimedb-ingester = { version = "0.17.0", default-features = false, optional =
 
 # External libs
 arc-swap = { workspace = true, default-features = false, optional = true }
-async-compression = { version = "0.4.27", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
+async-compression = { workspace = true, features = ["zstd"], optional = true }
 arrow = { version = "58.2.0", default-features = false, features = ["ipc"], optional = true }
 arrow-schema = { version = "58.2.0", default-features = false, optional = true }
 parquet = { version = "58.2.0", default-features = false, features = [
