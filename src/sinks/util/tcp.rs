@@ -24,7 +24,7 @@ use crate::{
     codecs::Transformer,
     common::backoff::ExponentialBackoff,
     dns,
-    event::Event,
+    event::{Event, EventStatus},
     internal_events::{
         ConnectionOpen, OpenGauge, SocketMode, SocketSendError, TcpSocketConnectionEstablished,
         TcpSocketConnectionShutdown, TcpSocketOutgoingConnectionError,
@@ -287,17 +287,32 @@ where
                 self.transformer.transform(&mut event);
                 let mut bytes = BytesMut::new();
 
-                // Errors are handled by `Encoder`.
-                if encoder.encode(event, &mut bytes).is_ok() {
-                    let item = bytes.freeze();
-                    EncodedEvent {
-                        item,
+                match encoder.encode(event, &mut bytes) {
+                    Err(_) => {
+                        // Error already counted/logged by the `Encoder` framework.
+                        // Mark the dropped event's finalizers `Errored` so the
+                        // source acks reflect the drop rather than letting them
+                        // fall to the default delivered status when they go out
+                        // of scope.
+                        finalizers.update_status(EventStatus::Errored);
+                        EncodedEvent::new(Bytes::new(), 0, JsonSize::zero())
+                    }
+                    Ok(()) if bytes.is_empty() => {
+                        // The encoder accepted ownership of the event but produced
+                        // no output, meaning it dropped the event internally (e.g.
+                        // the native codec rejecting an over-budget event). The
+                        // encoder has already emitted `ComponentEventsDropped`;
+                        // finalize as `Rejected` so end-to-end acknowledgements
+                        // do not record the drop as a successful delivery.
+                        finalizers.update_status(EventStatus::Rejected);
+                        EncodedEvent::new(Bytes::new(), 0, JsonSize::zero())
+                    }
+                    Ok(()) => EncodedEvent {
+                        item: bytes.freeze(),
                         finalizers,
                         byte_size,
                         json_byte_size,
-                    }
-                } else {
-                    EncodedEvent::new(Bytes::new(), 0, JsonSize::zero())
+                    },
                 }
             })
             .peekable();
