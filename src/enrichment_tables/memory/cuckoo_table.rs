@@ -39,9 +39,9 @@ use vrl::value::{KeyString, ObjectMap, Value};
 use crate::enrichment_tables::memory::{
     MemoryConfig,
     internal_events::{
-        MemoryEnrichmentTableFlushed, MemoryEnrichmentTableInserted, MemoryEnrichmentTableRead,
-        MemoryEnrichmentTableReadFailed, MemoryEnrichmentTableRemoved,
-        MemoryEnrichmentTableTtlExpiredCount,
+        MemoryEnrichmentTableFlushed, MemoryEnrichmentTableInsertFailed,
+        MemoryEnrichmentTableInserted, MemoryEnrichmentTableRead, MemoryEnrichmentTableReadFailed,
+        MemoryEnrichmentTableRemoved, MemoryEnrichmentTableTtlExpiredCount,
     },
 };
 
@@ -285,7 +285,7 @@ impl CuckooMemoryTable {
                 continue;
             };
 
-            if self.cuckoo_config.ttl_enabled || self.cuckoo_config.counter_enabled {
+            let res = if self.cuckoo_config.ttl_enabled || self.cuckoo_config.counter_enabled {
                 let ttl = self
                     .config
                     .ttl_field
@@ -317,21 +317,29 @@ impl CuckooMemoryTable {
                     .and_then(|p| value.get(p))
                     .and_then(|v| v.as_integer())
                     .and_then(|v| i32::try_from(v).ok());
-                let _ = self.filter.insert_if_not_present_with_update(
+                self.filter.insert_if_not_present_with_update(
                     k,
                     InsertValues { ttl, counter },
                     LookupValues {
                         ttl,
                         counter_diff: counter,
                     },
-                );
+                )
             } else {
-                let _ = self.filter.insert_if_not_present(k);
+                self.filter.insert_if_not_present(k)
+            };
+
+            if res.is_some_and(|r| r.matches_key(k, &self.filter)) {
+                emit!(MemoryEnrichmentTableInsertFailed {
+                    key: k,
+                    include_key_metric_tag: self.config.internal_metrics.include_key_tag
+                });
+            } else {
+                emit!(MemoryEnrichmentTableInserted {
+                    key: k,
+                    include_key_metric_tag: self.config.internal_metrics.include_key_tag
+                });
             }
-            emit!(MemoryEnrichmentTableInserted {
-                key: k,
-                include_key_metric_tag: self.config.internal_metrics.include_key_tag
-            });
         }
     }
 }
