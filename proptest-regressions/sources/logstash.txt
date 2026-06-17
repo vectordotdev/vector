@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc b3e438be44a9b6d3ad27dd1c5cf54f143e698ff1f01b178661869dffb67c7710 # shrinks to windows = [GenWindow { declared: 2, actual: 1, compressed: false }, GenWindow { declared: 2, actual: 2, compressed: false }], batch_sizes = [3]

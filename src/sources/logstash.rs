@@ -1209,6 +1209,112 @@ mod test {
         );
     }
 
+    // Property test: an ACK must never advance past the window the sender is
+    // waiting on (go-lumber rejects ackSeq > count). Generate writer windows,
+    // decode them, regroup the frames into arbitrary batches (modeling
+    // ReadyFrames coalescing), and replay the emitted ACKs FIFO against the
+    // window sizes. A violation is the customer's `invalid sequence number`.
+
+    use proptest::prelude::*;
+
+    /// A writer window: advertises `WindowSize = declared` but sends `actual`
+    /// frames (`actual <= declared`). `actual < declared` is a legal under-fill,
+    /// after which the sender expects ACKs no greater than `actual`.
+    #[derive(Debug, Clone)]
+    struct GenWindow {
+        declared: u32,
+        actual: u32,
+        compressed: bool,
+    }
+
+    fn encode_windows(windows: &[GenWindow]) -> BytesMut {
+        let mut buf = BytesMut::new();
+        for w in windows {
+            push_window_size(&mut buf, w.declared);
+            if w.compressed {
+                let mut inner = BytesMut::new();
+                for seq in 1..=w.actual {
+                    push_req(&mut inner, seq, &[("message", "x")]);
+                }
+                push_compressed(&mut buf, &inner);
+            } else {
+                for seq in 1..=w.actual {
+                    push_req(&mut buf, seq, &[("message", "x")]);
+                }
+            }
+        }
+        buf
+    }
+
+    /// Replays `acks` FIFO against the window sizes; returns the first ACK that
+    /// advances past its window, if any.
+    fn first_out_of_window_ack(window_sizes: &[u32], acks: &[u32]) -> Option<(u32, u32)> {
+        let mut head = 0usize;
+        for &ack in acks {
+            // 0 once we're past the last window: any ACK there is a violation.
+            let size = window_sizes.get(head).copied().unwrap_or(0);
+            if ack > size {
+                return Some((ack, size));
+            }
+            if ack == size {
+                head += 1;
+            }
+        }
+        None
+    }
+
+    proptest::proptest! {
+        #![proptest_config(proptest::prelude::ProptestConfig::with_cases(2048))]
+
+        #[test]
+        fn acks_never_advance_past_a_window(
+            windows in proptest::collection::vec(
+                // declared >= actual >= 1; `extra` makes the window under-filled.
+                (1u32..=20, 0u32..=8, proptest::prelude::any::<bool>())
+                    .prop_map(|(actual, extra, compressed)| GenWindow {
+                        declared: actual + extra,
+                        actual,
+                        compressed,
+                    }),
+                1..20,
+            ),
+            batch_sizes in proptest::collection::vec(1usize..=8, 1..40),
+        ) {
+            // each window's sender expects ACKs <= the frames it actually sent
+            let window_sizes: Vec<u32> = windows.iter().map(|w| w.actual).collect();
+
+            let decoded: Vec<LogstashEventFrame> = decode_frames(encode_windows(&windows))
+                .into_iter()
+                .map(|(frame, _)| frame)
+                .collect();
+
+            // regroup into arbitrary contiguous batches; one ACK per batch, in order
+            let mut acks = Vec::new();
+            let mut offset = 0usize;
+            let mut sizes = batch_sizes.iter().copied().cycle();
+            while offset < decoded.len() {
+                let take = sizes.next().unwrap().min(decoded.len() - offset);
+                let batch = &decoded[offset..offset + take];
+                offset += take;
+                if let Some(ack_bytes) =
+                    LogstashAcker::new(batch).build_ack(TcpSourceAck::Ack)
+                {
+                    acks.extend(decode_acknowledgements(ack_bytes));
+                }
+            }
+
+            if let Some((ack, size)) = first_out_of_window_ack(&window_sizes, &acks) {
+                proptest::prop_assert!(
+                    false,
+                    "ACK seq {} advanced past window of size {} \
+                     (== `invalid sequence number received (seq={}, expected={})`)\n\
+                     windows={:?}\nbatch_sizes={:?}\nacks={:?}",
+                    ack, size, ack, size, window_sizes, batch_sizes, acks,
+                );
+            }
+        }
+    }
+
     async fn send_req(address: SocketAddr, pairs: &[(&str, &str)], sends_ack: bool) {
         let seq = rng().random_range(1..u32::MAX);
         let mut socket = tokio::net::TcpStream::connect(address).await.unwrap();
