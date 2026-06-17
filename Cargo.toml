@@ -140,7 +140,7 @@ members = [
 antithesis-instrumentation = { version = "0.1", default-features = false, features = [] }
 antithesis_sdk = { version = "0.2", default-features = false, features = [] }
 anyhow = { version = "1.0.102", default-features = false, features = ["std"] }
-arc-swap = { version = "1.8.2", default-features = false }
+arc-swap = { version = "1.9.1", default-features = false }
 async-stream = { version = "0.3.6", default-features = false }
 async-trait = { version = "0.1.89", default-features = false }
 axum = { version = "0.6.20", default-features = false }
