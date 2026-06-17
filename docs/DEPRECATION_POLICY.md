@@ -38,8 +38,9 @@ A configuration option or feature in Vector is marked as deprecated.
 
 When this happens, we will notify by:
 
-- Listing the deprecation in the Deprecations section of the upgrade guide for the release the deprecation was
-  introduced in. This will include instructions on how to transition if applicable.
+- Adding a [`deprecation.d/`](../deprecation.d/) fragment that lists the deprecation on the release page and on the
+  always-current [deprecations index](https://vector.dev/deprecations/), including migration guidance. The release's
+  upgrade guide may also call out the deprecation when it warrants a richer treatment than the fragment provides.
 - Adding a deprecation note to the [documentation site][configuration] alongside the configuration or feature being
   deprecated.
 - When possible, output a log at the `WARN` level if Vector detects deprecated configuration or features being used
@@ -57,8 +58,10 @@ A deprecated configuration option or feature in Vector is removed.
 
 When this happens, we will notify by:
 
-- Listing the removal in the Breaking Changes section of upgrade guide for that release. This will include directions on
-  how to transition if applicable.
+- Recording the removal as an enacted entry in the deprecations data (via `cargo vdev deprecation enact`), which moves
+  the entry from the active list to the past-deprecations section on the [deprecations index](https://vector.dev/deprecations/)
+  and surfaces it on the release page. The release's upgrade guide may also call out the removal under Breaking Changes
+  when it warrants a richer treatment.
 
 When possible, Vector will error at start-up when a removed configuration option or feature is used.
 
