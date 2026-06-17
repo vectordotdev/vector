@@ -1,0 +1,51 @@
+name: vector-e2e
+
+x-vector-build: &vector-build
+  context: ../../../..
+  dockerfile: tests/antithesis/scenarios/vector_e2e/Dockerfile
+  target: vector
+
+x-node-health: &node-health
+  test: ["CMD", "curl", "-fsS", "http://localhost:9598/metrics"]
+  interval: 5s
+  timeout: 3s
+  retries: 30
+  start_period: 10s
+
+services:
+  vector:
+    container_name: vector
+    hostname: vector
+    platform: linux/amd64
+    init: true
+    build: *vector-build
+    image: ve2e-vector:${ANTITHESIS_IMAGE_TAG:-dev}
+    entrypoint: ["/usr/bin/vector", "--config", "/etc/vector/vector.yaml"]
+    # vector runs the reload fault: VECTOR_CONFIG_ALT lets anytime_reload swap
+    # configs and SIGHUP, forcing the sink to rebuild. No disk buffer, so no volume.
+    environment:
+      NO_COLOR: "1"
+      VECTOR_CONFIG: "/etc/vector/vector.yaml"
+      VECTOR_CONFIG_ALT: "/etc/vector/vector.b.yaml"
+    healthcheck: *node-health
+
+  oracle:
+    container_name: oracle
+    hostname: oracle
+    platform: linux/amd64
+    init: true
+    build:
+      context: ../../../..
+      dockerfile: tests/antithesis/scenarios/vector_e2e/Dockerfile
+      target: workload
+    image: ve2e-oracle:${ANTITHESIS_IMAGE_TAG:-dev}
+    environment:
+      NO_COLOR: "1"
+      SCENARIO_NAME: "vector_e2e"
+      VECTOR_SOURCE_URL: "http://vector:8080/"
+      VECTOR_METRICS_URL: "http://vector:9598/metrics"
+      VECTOR_METRICS_URLS: "http://vector:9598/metrics"
+      # Test commands run in this container, so they reach the oracle locally.
+      ORACLE_URL: "http://127.0.0.1:8686"
+    depends_on:
+      vector: { condition: service_healthy }
