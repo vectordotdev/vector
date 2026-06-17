@@ -183,22 +183,19 @@ impl Output {
     ) -> Result<(), SendError> {
         // Apply post-processor with typed dispatch. Each method receives a reference to the
         // concrete event type, making it impossible at the type level to change the variant.
-        // Original finalizers are stripped before saving metadata so the clone contains no
-        // finalizers; this prevents them from being doubled when we restore. Any finalizers
-        // added by the processor are collected separately and merged back alongside the
-        // originals after the restore, ensuring all batch notifiers survive even if the
-        // processor replaces the entire inner value (e.g. `*log = LogEvent::default()`).
+        // Original finalizers are stripped before calling the processor so they cannot be
+        // accidentally dropped if the processor replaces the entire inner value
+        // (e.g. `*log = LogEvent::default()`). Any finalizers added by the processor are
+        // collected after and merged back alongside the originals.
         if let Some(ref pp) = self.post_processor {
             events.iter_events_mut().for_each(|mut event| {
                 let original_finalizers = event.metadata_mut().take_finalizers();
-                let saved = event.metadata().clone();
                 match event {
                     EventMutRef::Log(ref mut log) => pp.process_log(log),
                     EventMutRef::Metric(ref mut metric) => pp.process_metric(metric),
                     EventMutRef::Trace(ref mut trace) => pp.process_trace(trace),
                 }
                 let new_finalizers = event.metadata_mut().take_finalizers();
-                *event.metadata_mut() = saved;
                 event.metadata_mut().merge_finalizers(original_finalizers);
                 event.metadata_mut().merge_finalizers(new_finalizers);
             });
