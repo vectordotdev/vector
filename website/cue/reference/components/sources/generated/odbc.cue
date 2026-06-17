@@ -381,6 +381,7 @@ generated: components: sources: odbc: configuration: {
 	odbc_default_timezone: {
 		description: """
 			Timezone applied to database date/time columns that lack timezone information.
+			Ambiguous DST times use the latest matching instant; nonexistent times are kept as text.
 			The default is UTC.
 			"""
 		required: false

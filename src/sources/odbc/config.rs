@@ -122,6 +122,7 @@ pub struct OdbcConfig {
     pub odbc_max_str_limit: usize,
 
     /// Timezone applied to database date/time columns that lack timezone information.
+    /// Ambiguous DST times use the latest matching instant; nonexistent times are kept as text.
     /// The default is UTC.
     #[configurable(metadata(docs::examples = "UTC"))]
     #[configurable(metadata(

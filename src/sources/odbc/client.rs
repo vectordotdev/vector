@@ -452,6 +452,16 @@ fn save_params(path: &str, obj: &ObjectMap) -> Result<(), OdbcError> {
     fs::write(path, json).context(IoSnafu)
 }
 
+/// Localizes a naive datetime with `tz`, using `.latest()` for DST ambiguity and
+/// preserving `fallback_text` when the local time does not exist.
+fn naive_local_to_timestamp_value(ndt: NaiveDateTime, tz: Tz, fallback_text: &str) -> Value {
+    if let Some(dt) = ndt.and_local_timezone(tz).latest() {
+        Value::Timestamp(dt.with_timezone(&Utc))
+    } else {
+        Value::Bytes(Bytes::copy_from_slice(fallback_text.as_bytes()))
+    }
+}
+
 /// Converts ODBC data types to Vector values.
 ///
 /// # Arguments
@@ -538,10 +548,9 @@ fn map_value(data_type: &odbc_api::DataType, value: Option<&[u8]>, tz: Tz) -> Va
             let datetime = TIMESTAMP_FORMATS
                 .iter()
                 .find_map(|fmt| NaiveDateTime::parse_from_str(str, fmt).ok())
-                .and_then(|ndt| ndt.and_local_timezone(tz).single())
-                .map(|dt| dt.with_timezone(&Utc));
+                .map(|ndt| naive_local_to_timestamp_value(ndt, tz, str));
 
-            datetime.map(Value::Timestamp).unwrap_or(Value::Null)
+            datetime.unwrap_or(Value::Null)
         }
 
         // Convert to timestamp.
@@ -550,16 +559,15 @@ fn map_value(data_type: &odbc_api::DataType, value: Option<&[u8]>, tz: Tz) -> Va
                 return Value::Null;
             };
 
-            std::str::from_utf8(value)
-                .ok()
-                .and_then(|s| NaiveTime::from_str(s).ok())
-                .and_then(|time| {
-                    NaiveDateTime::new(NaiveDate::default(), time)
-                        .and_local_timezone(tz)
-                        .single()
-                        .map(|dt| Value::Timestamp(dt.with_timezone(&Utc)))
-                })
-                .unwrap_or(Value::Null)
+            let Ok(s) = std::str::from_utf8(value) else {
+                return Value::Null;
+            };
+
+            let Ok(time) = NaiveTime::from_str(s) else {
+                return Value::Null;
+            };
+
+            naive_local_to_timestamp_value(NaiveDateTime::new(NaiveDate::default(), time), tz, s)
         }
 
         // Convert to timestamp.
@@ -568,16 +576,15 @@ fn map_value(data_type: &odbc_api::DataType, value: Option<&[u8]>, tz: Tz) -> Va
                 return Value::Null;
             };
 
-            std::str::from_utf8(value)
-                .ok()
-                .and_then(|s| chrono::NaiveDate::from_str(s).ok())
-                .and_then(|date| {
-                    NaiveDateTime::new(date, NaiveTime::default())
-                        .and_local_timezone(tz)
-                        .single()
-                        .map(|dt| Value::Timestamp(dt.with_timezone(&Utc)))
-                })
-                .unwrap_or(Value::Null)
+            let Ok(s) = std::str::from_utf8(value) else {
+                return Value::Null;
+            };
+
+            let Ok(date) = chrono::NaiveDate::from_str(s) else {
+                return Value::Null;
+            };
+
+            naive_local_to_timestamp_value(NaiveDateTime::new(date, NaiveTime::default()), tz, s)
         }
 
         // Convert to boolean.
