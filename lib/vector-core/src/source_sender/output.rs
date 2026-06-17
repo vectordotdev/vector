@@ -187,6 +187,11 @@ impl Output {
         // accidentally dropped if the processor replaces the entire inner value
         // (e.g. `*log = LogEvent::default()`). Any finalizers added by the processor are
         // collected after and merged back alongside the originals.
+        //
+        // Note: post-processing runs before the send_with_timeout call. Because PostProcessor
+        // methods are synchronous, they cannot be cancelled by tokio::time::timeout (which
+        // only fires at .await points). Implementations are expected to be fast; heavy
+        // processing should be done in a transform, not here.
         if let Some(ref pp) = self.post_processor {
             events.iter_events_mut().for_each(|mut event| {
                 let original_finalizers = event.metadata_mut().take_finalizers();
@@ -207,8 +212,7 @@ impl Output {
         let send_reference = Instant::now();
 
         // Emit lag time after the post-processor so that any timestamp mutations made by the
-        // processor are reflected in the metric (the downstream channel receives the mutated
-        // event, so telemetry should match it).
+        // processor are reflected in the metric.
         events
             .iter_events()
             .for_each(|event| self.emit_lag_time(event, reference));
