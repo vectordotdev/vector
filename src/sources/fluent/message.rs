@@ -54,7 +54,7 @@ pub(super) struct FluentMessageOptions {
 pub(super) struct FluentEntry(pub(super) FluentTimestamp, pub(super) FluentRecord);
 
 /// Fluent record is just key/value pairs.
-pub(super) type FluentRecord = BTreeMap<String, FluentValue>;
+pub(super) type FluentRecord = BTreeMap<KeyString, FluentValue>;
 
 /// Fluent message tag.
 pub(super) type FluentTag = String;
