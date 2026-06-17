@@ -76,8 +76,8 @@ When introducing a deprecation into Vector, the pull request introducing the dep
   Use the fragment body for the full migration guide (rationale, before/after examples, links). Then run
   `cargo vdev deprecation generate` to regenerate `website/data/deprecations.json` and commit both files.
   Run `cargo vdev deprecation show` to preview, and `cargo vdev deprecation check` to validate.
-- Add a changelog fragment with `type="deprecation"` ([`changelog.d/README.md`](../changelog.d/README.md)). A short
-  one-line summary is sufficient — the deprecation fragment is the canonical migration guide and is rendered on the
+- Add a deprecation changelog fragment in [`changelog.d`](../changelog.d/README.md). A short
+  one-line summary is sufficient as the deprecation fragment is the canonical migration guide and is rendered on the
   release page automatically.
 - Add a deprecation note to the component docs. Typically, this means adding `deprecation: "description of the deprecation"`
   to the `cue` data for the option or feature. If the `cue` schema does not support `deprecation` for whatever you
