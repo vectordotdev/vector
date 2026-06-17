@@ -341,7 +341,7 @@ mod tests {
 
     #[test]
     fn serialize_fields() {
-        let event = Event::Log(LogEvent::from(btreemap! {
+        let event = Event::Log(LogEvent::from(ObjectMap::from(btreemap! {
             "foo" => Value::from("bar"),
             "int" => Value::from(123),
             "comma" => Value::from("abc,bcd"),
@@ -351,7 +351,7 @@ mod tests {
             "quote" => Value::from("the \"quote\" should be escaped"),
             "bool" => Value::from(true),
             "other" => Value::from("data"),
-        }));
+        })));
         let fields = vec![
             "foo".into(),
             "int".into(),
@@ -382,13 +382,13 @@ mod tests {
 
     #[test]
     fn serialize_order() {
-        let event = Event::Log(LogEvent::from(btreemap! {
+        let event = Event::Log(LogEvent::from(ObjectMap::from(btreemap! {
             "field1" => Value::from("value1"),
             "field2" => Value::from("value2"),
             "field3" => Value::from("value3"),
             "field4" => Value::from("value4"),
             "field5" => Value::from("value5"),
-        }));
+        })));
         let fields = vec![
             "field1".into(),
             "field5".into(),
@@ -414,12 +414,12 @@ mod tests {
 
     #[test]
     fn correct_quoting() {
-        let event = Event::Log(LogEvent::from(btreemap! {
+        let event = Event::Log(LogEvent::from(ObjectMap::from(btreemap! {
             "field1" => Value::from("hello world"),
             "field2" => Value::from(1),
             "field3" => Value::from("foo\"bar"),
             "field4" => Value::from("baz,bas"),
-        }));
+        })));
         let fields = vec![
             "field1".into(),
             "field2".into(),

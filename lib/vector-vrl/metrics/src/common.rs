@@ -202,7 +202,7 @@ pub(crate) fn resolve_tags(
 mod tests {
     use vector_core::{
         compile_vrl,
-        event::{Event, LogEvent, MetricKind, MetricTags, VrlTarget},
+        event::{Event, LogEvent, MetricKind, MetricTags, ObjectMap, VrlTarget},
     };
     use vrl::{
         compiler::{
@@ -245,7 +245,7 @@ mod tests {
     }
 
     fn assert_metric_matches(
-        metric: &BTreeMap<KeyString, Value>,
+        metric: &ObjectMap,
         name: &str,
         value: f64,
         tags: Option<Vec<(&str, &str)>>,

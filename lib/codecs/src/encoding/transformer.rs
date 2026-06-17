@@ -126,7 +126,8 @@ impl Transformer {
 
     fn apply_only_fields(&self, log: &mut LogEvent) {
         if let Some(only_fields) = self.only_fields.as_ref() {
-            let mut old_value = std::mem::replace(log.value_mut(), Value::Object(BTreeMap::new()));
+            let mut old_value =
+                std::mem::replace(log.value_mut(), Value::Object(BTreeMap::new().into()));
 
             for field in only_fields {
                 if let Some(value) = old_value.remove(field, true) {

@@ -83,15 +83,15 @@ mod tests {
     use bytes::BytesMut;
     use indoc::indoc;
     use vector_core::event::{LogEvent, Value};
-    use vrl::btreemap;
+    use vrl::{btreemap, value::ObjectMap};
 
     use super::*;
 
     #[test]
     fn serialize_avro() {
-        let event = Event::Log(LogEvent::from(btreemap! {
+        let event = Event::Log(LogEvent::from(ObjectMap::from(btreemap! {
             "foo" => Value::from("bar")
-        }));
+        })));
         let schema = indoc! {r#"
             {
                 "type": "record",

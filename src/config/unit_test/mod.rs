@@ -662,7 +662,7 @@ fn build_input_event(input: &TestInput) -> Result<Event, String> {
 
                 let mut target = TargetValue {
                     value: value!({}),
-                    metadata: value::Value::Object(BTreeMap::new()),
+                    metadata: value::Value::Object(BTreeMap::new().into()),
                     secrets: value::Secrets::default(),
                 };
 

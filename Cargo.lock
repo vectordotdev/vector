@@ -3789,6 +3789,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "ecow"
+version = "0.2.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "78e4f79b296fbaab6ce2e22d52cb4c7f010fe0ebe7a32e34fa25885fd797bd02"
+
+[[package]]
 name = "ed25519"
 version = "2.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -13475,7 +13481,6 @@ checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 [[package]]
 name = "vrl"
 version = "0.33.1"
-source = "git+https://github.com/vectordotdev/vrl.git?branch=main#74e3e74582aa6b4445c1a94004bb3f14276d07df"
 dependencies = [
  "aes",
  "aes-siv",
@@ -13505,6 +13510,7 @@ dependencies = [
  "dns-lookup",
  "domain",
  "dyn-clone",
+ "ecow",
  "encoding_rs",
  "exitcode",
  "fancy-regex",

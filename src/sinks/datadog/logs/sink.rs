@@ -170,8 +170,8 @@ pub fn normalize_as_agent_event(event: &mut Event) {
         .cloned()
         .collect::<Vec<_>>();
     for key in keys_to_move {
-        if let Some((entry_k, entry_v)) = object_map.remove_entry(key.as_str()) {
-            local_root.insert(entry_k, entry_v);
+        if let Some(entry_v) = object_map.remove(key.as_str()) {
+            local_root.insert(key, entry_v);
         }
     }
     // .. nest this object at the root under the reserved key named 'message'

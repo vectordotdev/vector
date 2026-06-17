@@ -12,6 +12,7 @@ use vector_lib::{
     byte_size_of::ByteSizeOf,
     codecs::{JsonSerializerConfig, NewlineDelimitedEncoder, encoding::Framer},
 };
+use vrl::value::ObjectMap;
 
 #[derive(Debug, Clone)]
 pub struct JsonLogSerializer;
@@ -45,11 +46,11 @@ fn encoder(c: &mut Criterion) {
     let mut group: BenchmarkGroup<WallTime> = c.benchmark_group("encoder");
     group.sampling_mode(SamplingMode::Auto);
 
-    let input: Event = Event::Log(LogEvent::from(btreemap! {
+    let input: Event = Event::Log(LogEvent::from(ObjectMap::from(btreemap! {
         "key1" => "value1",
         "key2" => "value2",
         "key3" => "value3"
-    }));
+    })));
 
     group.throughput(Throughput::Bytes(input.size_of() as u64));
     group.bench_with_input("JsonLogVecSerializer::encode", &(), |b, ()| {

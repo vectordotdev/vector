@@ -104,7 +104,7 @@ fn compile(
 
     let mut target_value = TargetValue {
         value: event.clone(),
-        metadata: Value::Object(BTreeMap::new()),
+        metadata: Value::Object(BTreeMap::new().into()),
         secrets: Secrets::new(),
     };
 
