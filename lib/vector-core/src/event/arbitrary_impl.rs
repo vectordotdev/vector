@@ -243,7 +243,9 @@ impl Arbitrary for MetricValue {
                 let mut sketch = AgentDDSketch::with_agent_defaults();
                 sketch.insert_many(&samples);
                 #[cfg(feature = "generate-fixtures")]
-                sketch.set_sum_avg(f64_for_arbitrary(g), f64_for_arbitrary(g));
+                if !sketch.is_empty() {
+                    sketch.set_sum_avg(f64_for_arbitrary(g), f64_for_arbitrary(g));
+                }
 
                 MetricValue::Sketch {
                     sketch: MetricSketch::AgentDDSketch(sketch),
