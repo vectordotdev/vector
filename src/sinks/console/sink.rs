@@ -42,10 +42,19 @@ where
                 // by the `Encoder` framework. Mark this event's finalizers Errored so
                 // source-side acks reflect the drop, then continue with the next
                 // event. Surfacing the error here as fatal would terminate the sink
-                // on the first data-dependent encoder failure (e.g., a single event
-                // exceeding the native codec's nesting budget) and silently drop
+                // on the first data-dependent encoder failure and silently drop
                 // every subsequent valid event.
                 finalizers.update_status(EventStatus::Errored);
+                continue;
+            }
+            if bytes.is_empty() {
+                // The encoder accepted ownership of the event but produced no
+                // output, meaning it dropped the event internally (e.g., the
+                // native codec rejecting an event whose nesting exceeds the
+                // protobuf recursion budget). The encoder has already emitted
+                // `ComponentEventsDropped` and set `EventStatus::Rejected` on
+                // the event's metadata; finalize accordingly and continue.
+                finalizers.update_status(EventStatus::Rejected);
                 continue;
             }
 
@@ -109,9 +118,10 @@ mod test {
         .await;
     }
 
-    /// A per-event encoder failure (e.g., a single event exceeding the native codec's
+    /// A per-event encoder drop (e.g., a single event exceeding the native codec's
     /// nesting budget) must not terminate the sink. The offending event is finalized
-    /// as `Errored`, the next event still goes through and is `Delivered`.
+    /// as `Rejected` (the encoder dropped it internally), the next event still goes
+    /// through and is `Delivered`.
     #[tokio::test]
     async fn per_event_encoder_failure_does_not_terminate_sink() {
         // Build a log whose value is an Object chain too deep for the native codec
@@ -150,8 +160,8 @@ mod test {
 
         assert_eq!(
             bad_rx.try_recv(),
-            Ok(BatchStatus::Errored),
-            "the over-budget event must be finalized as Errored",
+            Ok(BatchStatus::Rejected),
+            "the over-budget event must be finalized as Rejected (encoder dropped it)",
         );
         assert_eq!(
             good_rx.try_recv(),

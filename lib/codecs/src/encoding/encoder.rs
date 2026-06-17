@@ -283,6 +283,17 @@ impl tokio_util::codec::Encoder<Event> for Encoder<Framer> {
 
         self.serialize_at_start(event, &mut payload)?;
 
+        // If the inner serializer produced no output, the event was dropped
+        // internally (e.g., the native serializer rejecting an over-budget
+        // event with `EventStatus::Rejected` + `ComponentEventsDropped`). Skip
+        // framing so the caller observes an empty buffer and can finalize the
+        // dropped event accordingly, rather than seeing a stray delimiter for
+        // an event that produced no payload.
+        if payload.is_empty() {
+            buffer.unsplit(payload);
+            return Ok(());
+        }
+
         // Frame the serialized event.
         self.framer.encode((), &mut payload).map_err(|error| {
             emit(EncoderFramingError { error: &error });

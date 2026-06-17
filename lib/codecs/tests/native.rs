@@ -353,10 +353,12 @@ fn native_codec_rejects_overly_nested_event() {
     let mut serializer = NativeSerializerConfig.build();
     let mut buffer = BytesMut::with_capacity(8192);
 
-    let result = serializer.encode(event, &mut buffer);
+    serializer
+        .encode(event, &mut buffer)
+        .expect("native codec must return Ok for over-budget events so batched encoders do not abort the whole batch");
     assert!(
-        result.is_err(),
-        "native codec should reject events exceeding MAX_VALUE_NESTING_FRAMES"
+        buffer.is_empty(),
+        "native codec must write zero bytes for an over-budget event",
     );
 }
 
@@ -405,10 +407,12 @@ fn native_codec_rejects_overly_nested_metadata() {
     let mut serializer = NativeSerializerConfig.build();
     let mut buffer = BytesMut::with_capacity(8192);
 
-    let result = serializer.encode(event, &mut buffer);
+    serializer
+        .encode(event, &mut buffer)
+        .expect("native codec must return Ok for over-budget metadata");
     assert!(
-        result.is_err(),
-        "native codec should reject events with metadata exceeding MAX_METADATA_VALUE_NESTING_FRAMES"
+        buffer.is_empty(),
+        "native codec must write zero bytes for metadata exceeding MAX_METADATA_VALUE_NESTING_FRAMES",
     );
 }
 
@@ -443,10 +447,12 @@ fn native_codec_rejects_timestamp_leaf_at_max_object_depth() {
     let mut serializer = NativeSerializerConfig.build();
     let mut buffer = BytesMut::with_capacity(8192);
 
-    let result = serializer.encode(event, &mut buffer);
+    serializer
+        .encode(event, &mut buffer)
+        .expect("native codec must return Ok for over-budget events");
     assert!(
-        result.is_err(),
-        "native codec should reject Timestamp leaf at object depth 33"
+        buffer.is_empty(),
+        "native codec must write zero bytes for Timestamp leaf at object depth 33",
     );
 }
 
@@ -487,10 +493,12 @@ fn native_codec_rejects_timestamp_leaf_in_max_depth_metadata() {
     let mut serializer = NativeSerializerConfig.build();
     let mut buffer = BytesMut::with_capacity(8192);
 
-    let result = serializer.encode(event, &mut buffer);
+    serializer
+        .encode(event, &mut buffer)
+        .expect("native codec must return Ok for over-budget metadata");
     assert!(
-        result.is_err(),
-        "native codec should reject metadata Timestamp leaf at object depth 32"
+        buffer.is_empty(),
+        "native codec must write zero bytes for metadata Timestamp leaf at object depth 32",
     );
 }
 
