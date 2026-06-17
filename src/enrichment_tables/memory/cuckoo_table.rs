@@ -502,7 +502,7 @@ impl StreamSink<Event> for CuckooMemoryTable {
                     let count = self.cuckoo_config.scanning_threads.unwrap_or(NonZeroUsize::new(1).unwrap());
                     for i in 0..count.get() {
                         let filter = filter.clone();
-                        handles.spawn(async move {
+                        let task = async move {
                             let expired = filter.scan_and_update_full_partition(count, i);
                             emit!(MemoryEnrichmentTableTtlExpiredCount {
                                 count: expired as u64
@@ -511,7 +511,12 @@ impl StreamSink<Event> for CuckooMemoryTable {
                                 new_objects_count: filter.get_item_count(),
                                 new_byte_size: filter.get_memory_usage()
                             });
-                        });
+                        };
+                        if !self.cuckoo_config.concurrent_scanning {
+                            handles.spawn(task);
+                        } else {
+                            tokio::spawn(task);
+                        }
                     }
                     if !self.cuckoo_config.concurrent_scanning {
                         let _ = handles.join_all().await;
