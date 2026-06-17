@@ -171,7 +171,11 @@ async fn tag_cardinality_limit_drop_event_bloom() {
 
 #[tokio::test]
 async fn tag_cardinality_limit_drop_event_fingerprint() {
-    drop_event(make_transform_fingerprint(2, LimitExceededAction::DropEvent)).await;
+    drop_event(make_transform_fingerprint(
+        2,
+        LimitExceededAction::DropEvent,
+    ))
+    .await;
 }
 
 async fn drop_event(config: Config) {
@@ -1505,10 +1509,13 @@ per_tag_limits:
 #[test]
 fn fingerprint_accepted_value_passes_through_after_limit() {
     for action in [LimitExceededAction::DropTag, LimitExceededAction::DropEvent] {
-        let mut transform =
-            TagCardinalityLimit::new(make_transform_fingerprint(2, action));
-        transform.transform_one(make_metric(metric_tags!("env" => "prod"))).unwrap();
-        transform.transform_one(make_metric(metric_tags!("env" => "staging"))).unwrap();
+        let mut transform = TagCardinalityLimit::new(make_transform_fingerprint(2, action));
+        transform
+            .transform_one(make_metric(metric_tags!("env" => "prod")))
+            .unwrap();
+        transform
+            .transform_one(make_metric(metric_tags!("env" => "staging")))
+            .unwrap();
         // Limit now hit; re-send of an already-accepted value must still pass through.
         let e = transform
             .transform_one(make_metric(metric_tags!("env" => "prod")))

@@ -72,7 +72,6 @@ struct FingerprintStorage {
 }
 
 impl FingerprintStorage {
-
     /// Compute a 64-bit fingerprint of a tag value
     fn fingerprint(value: &TagValueSet) -> u64 {
         BuildHasherDefault::<SeaHasher>::default().hash_one(value)
@@ -106,7 +105,9 @@ impl AcceptedTagValueSet {
     pub fn new(mode: &Mode) -> Self {
         let storage = match &mode {
             Mode::Exact => TagValueSetStorage::Set(HashSet::new()),
-            Mode::ExactFingerprint => TagValueSetStorage::Fingerprint(FingerprintStorage::default()),
+            Mode::ExactFingerprint => {
+                TagValueSetStorage::Fingerprint(FingerprintStorage::default())
+            }
             Mode::Probabilistic(config) => {
                 TagValueSetStorage::Bloom(BloomFilterStorage::new(config.cache_size_per_key))
             }
