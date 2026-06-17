@@ -66,16 +66,12 @@ impl BloomFilterStorage {
     }
 }
 
+#[derive(Default)]
 struct FingerprintStorage {
-    fps: HashedSet<u64>,
+    fingerprints: HashedSet<u64>,
 }
 
 impl FingerprintStorage {
-    fn new() -> Self {
-        Self {
-            fps: HashedSet::default(),
-        }
-    }
 
     /// Compute a 64-bit fingerprint of a tag value
     fn fingerprint(value: &TagValueSet) -> u64 {
@@ -83,15 +79,15 @@ impl FingerprintStorage {
     }
 
     fn insert(&mut self, value: &TagValueSet) {
-        self.fps.insert(Self::fingerprint(value));
+        self.fingerprints.insert(Self::fingerprint(value));
     }
 
     fn contains(&self, value: &TagValueSet) -> bool {
-        self.fps.contains(&Self::fingerprint(value))
+        self.fingerprints.contains(&Self::fingerprint(value))
     }
 
     fn len(&self) -> usize {
-        self.fps.len()
+        self.fingerprints.len()
     }
 }
 
@@ -110,7 +106,7 @@ impl AcceptedTagValueSet {
     pub fn new(mode: &Mode) -> Self {
         let storage = match &mode {
             Mode::Exact => TagValueSetStorage::Set(HashSet::new()),
-            Mode::ExactFingerprint => TagValueSetStorage::Fingerprint(FingerprintStorage::new()),
+            Mode::ExactFingerprint => TagValueSetStorage::Fingerprint(FingerprintStorage::default()),
             Mode::Probabilistic(config) => {
                 TagValueSetStorage::Bloom(BloomFilterStorage::new(config.cache_size_per_key))
             }

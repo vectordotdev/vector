@@ -169,6 +169,11 @@ async fn tag_cardinality_limit_drop_event_bloom() {
     drop_event(make_transform_bloom(2, LimitExceededAction::DropEvent)).await;
 }
 
+#[tokio::test]
+async fn tag_cardinality_limit_drop_event_fingerprint() {
+    drop_event(make_transform_fingerprint(2, LimitExceededAction::DropEvent)).await;
+}
+
 async fn drop_event(config: Config) {
     assert_transform_compliance(async move {
         let mut event1 = make_metric(metric_tags!("tag1" => "val1"));
@@ -219,6 +224,11 @@ async fn tag_cardinality_limit_drop_tag_hashset() {
 #[tokio::test]
 async fn tag_cardinality_limit_drop_tag_bloom() {
     drop_tag(make_transform_bloom(2, LimitExceededAction::DropTag)).await;
+}
+
+#[tokio::test]
+async fn tag_cardinality_limit_drop_tag_fingerprint() {
+    drop_tag(make_transform_fingerprint(2, LimitExceededAction::DropTag)).await;
 }
 
 async fn drop_tag(config: Config) {
@@ -1490,70 +1500,21 @@ per_tag_limits:
     assert_eq!(excluded.mode, PerTagMode::Excluded);
 }
 
-/// Under `DropTag`, fingerprint mode accepts exactly `value_limit` distinct values per
-/// tag key and drops subsequent new values.
+/// A re-sent already-accepted tag value must pass through even after the limit is hit,
+/// for both DropTag and DropEvent actions.
 #[test]
-fn fingerprint_drop_tag_respects_value_limit() {
-    let mut transform =
-        TagCardinalityLimit::new(make_transform_fingerprint(2, LimitExceededAction::DropTag));
-
-    // First two distinct values for "env" are accepted.
-    let e1 = transform
-        .transform_one(make_metric(metric_tags!("env" => "prod")))
-        .unwrap();
-    assert_eq!("prod", e1.as_metric().tags().unwrap().get("env").unwrap());
-
-    let e2 = transform
-        .transform_one(make_metric(metric_tags!("env" => "staging")))
-        .unwrap();
-    assert_eq!(
-        "staging",
-        e2.as_metric().tags().unwrap().get("env").unwrap()
-    );
-
-    // Third distinct value — limit reached, tag must be dropped.
-    let e3 = transform
-        .transform_one(make_metric(metric_tags!("env" => "dev")))
-        .unwrap();
-    assert!(
-        !e3.as_metric().tags().unwrap().contains_key("env"),
-        "fingerprint mode should drop the tag after value_limit is reached"
-    );
-
-    // A previously-accepted value still passes through after the limit is hit.
-    let e4 = transform
-        .transform_one(make_metric(metric_tags!("env" => "prod")))
-        .unwrap();
-    assert_eq!("prod", e4.as_metric().tags().unwrap().get("env").unwrap());
-}
-
-/// Under `DropEvent`, fingerprint mode drops the entire event when any tag would exceed
-/// its `value_limit`.
-#[test]
-fn fingerprint_drop_event_respects_value_limit() {
-    let mut transform = TagCardinalityLimit::new(make_transform_fingerprint(
-        2,
-        LimitExceededAction::DropEvent,
-    ));
-
-    let e1 = make_metric(metric_tags!("env" => "prod"));
-    let e2 = make_metric(metric_tags!("env" => "staging"));
-    let e3 = make_metric(metric_tags!("env" => "dev"));
-    // Re-send of an already-accepted value must NOT drop the event.
-    let e4 = make_metric(metric_tags!("env" => "prod"));
-
-    assert_eq!(transform.transform_one(e1.clone()), Some(e1));
-    assert_eq!(transform.transform_one(e2.clone()), Some(e2));
-    assert_eq!(
-        transform.transform_one(e3),
-        None,
-        "3rd distinct value should drop the event"
-    );
-    assert_eq!(
-        transform.transform_one(e4.clone()),
-        Some(e4),
-        "re-send of accepted value must not drop the event"
-    );
+fn fingerprint_accepted_value_passes_through_after_limit() {
+    for action in [LimitExceededAction::DropTag, LimitExceededAction::DropEvent] {
+        let mut transform =
+            TagCardinalityLimit::new(make_transform_fingerprint(2, action));
+        transform.transform_one(make_metric(metric_tags!("env" => "prod"))).unwrap();
+        transform.transform_one(make_metric(metric_tags!("env" => "staging"))).unwrap();
+        // Limit now hit; re-send of an already-accepted value must still pass through.
+        let e = transform
+            .transform_one(make_metric(metric_tags!("env" => "prod")))
+            .unwrap();
+        assert_eq!("prod", e.as_metric().tags().unwrap().get("env").unwrap());
+    }
 }
 
 /// Fingerprint mode must never allocate a tracking entry for a tag that is globally
