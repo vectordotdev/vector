@@ -13483,7 +13483,7 @@ checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 [[package]]
 name = "vrl"
 version = "0.33.1"
-source = "git+https://github.com/vectordotdev/vrl.git?branch=perf%2Fsmol-str-keystring#d9b72fee50f19abab556b3aa4f08c0c6f3776adf"
+source = "git+https://github.com/vectordotdev/vrl.git?branch=perf%2Fsmol-str-keystring#0b5556b7993c064dcd0da3e510b5f8f3dde0ff82"
 dependencies = [
  "aes",
  "aes-siv",
