@@ -216,6 +216,20 @@ impl OdbcConfig {
             log_namespace,
         )
     }
+
+    fn validate_tracking_columns(&self) -> Result<(), String> {
+        let uses_init_params_or_metadata =
+            self.statement_init_params.is_some() || self.last_run_metadata_path.is_some();
+
+        if uses_init_params_or_metadata && self.tracking_columns.as_ref().is_none_or(Vec::is_empty) {
+            return Err(
+                "`tracking_columns` must be set when using `statement_init_params` or `last_run_metadata_path`"
+                    .to_owned(),
+            );
+        }
+
+        Ok(())
+    }
 }
 
 impl_generate_config_from_default!(OdbcConfig);
@@ -292,6 +306,10 @@ impl SourceConfig for OdbcConfig {
 
         if self.odbc_batch_size == 0 {
             return Err("`odbc_batch_size` must be greater than 0".into());
+        }
+
+        if let Err(error) = self.validate_tracking_columns() {
+            return Err(error.into());
         }
 
         let log_namespace = cx.log_namespace(self.log_namespace);
