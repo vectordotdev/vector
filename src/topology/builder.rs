@@ -199,7 +199,9 @@ impl<'a> Builder<'a> {
                 };
 
                 let mut prev_state = None;
-                if !self.diff.enrichment_tables.is_added(name) {
+                if !self.diff.enrichment_tables.is_added(name)
+                    && table_outer.inner.wants_previous_state()
+                {
                     prev_state = ENRICHMENT_TABLES.extract_state(&table_name);
                 }
 

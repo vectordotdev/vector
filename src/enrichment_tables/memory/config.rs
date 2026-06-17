@@ -68,9 +68,25 @@ pub struct MemoryConfig {
     #[configurable(derived)]
     #[serde(default)]
     pub ttl_field: OptionalValuePath,
+    /// Behavior for memory table state on configuration reload.
+    #[configurable(derived)]
+    #[serde(default)]
+    pub reload_behavior: ReloadBehavior,
 
     #[serde(skip)]
     memory: Arc<Mutex<Option<Box<Memory>>>>,
+}
+
+/// Behavior for memory enrichment table state on configuration reload.
+#[configurable_component]
+#[derive(Clone, Default)]
+#[serde(rename_all = "kebab-case")]
+pub enum ReloadBehavior {
+    /// Always clear state on configuration reload.
+    #[default]
+    ClearState,
+    /// Try to preserve state when possible.
+    PreserveState,
 }
 
 /// Configuration for memory enrichment table source functionality.
@@ -123,6 +139,7 @@ impl Default for MemoryConfig {
             source_config: None,
             internal_metrics: InternalMetricsConfig::default(),
             ttl_field: OptionalValuePath::none(),
+            reload_behavior: Default::default(),
         }
     }
 }
@@ -160,6 +177,10 @@ impl EnrichmentTableConfig for MemoryConfig {
         prev_state: Option<Box<dyn std::any::Any + Send + Sync>>,
     ) -> crate::Result<Box<dyn Table + Send + Sync>> {
         Ok(Box::new(self.get_or_build_memory(prev_state).await))
+    }
+
+    fn wants_previous_state(&self) -> bool {
+        matches!(self.reload_behavior, ReloadBehavior::PreserveState)
     }
 
     fn sink_config(

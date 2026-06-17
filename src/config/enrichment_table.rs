@@ -127,6 +127,11 @@ pub trait EnrichmentTableConfig: NamedComponent + core::fmt::Debug + Send + Sync
         prev_state: Option<Box<dyn std::any::Any + Send + Sync>>,
     ) -> crate::Result<Box<dyn vector_lib::enrichment::Table + Send + Sync>>;
 
+    /// Checks whether this table wants previous state, to try and restore it.
+    fn wants_previous_state(&self) -> bool {
+        false
+    }
+
     fn sink_config(
         &self,
         _default_key: &ComponentKey,

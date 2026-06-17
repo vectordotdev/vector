@@ -18,7 +18,7 @@ use crate::{
     config::{Config, unit_test::UnitTestSourceConfig},
     enrichment_tables::{
         EnrichmentTables,
-        memory::{MemoryConfig, MemorySourceConfig},
+        memory::{MemoryConfig, MemorySourceConfig, ReloadBehavior},
     },
     sinks::prometheus::exporter::PrometheusExporterConfig,
     sources::{
@@ -496,6 +496,7 @@ async fn topology_reload_preserves_enrichment_table_state() {
     let (new_tx, new_rx) = channel();
     let mut new_config = Config::builder();
     let mut new_memory_config = MemoryConfig::default();
+    new_memory_config.reload_behavior = ReloadBehavior::PreserveState;
     new_memory_config.source_config = Some(MemorySourceConfig {
         export_interval: Some(NonZeroU64::new(1).unwrap()),
         source_key: "memory_test_source".to_string(),
@@ -519,21 +520,6 @@ async fn topology_reload_preserves_enrichment_table_state() {
     // Make sure the topology is fully running: other components, etc.
     sleep(Duration::from_secs(2)).await;
 
-    // let message = result
-    //     .lines()
-    //     .filter_map(|l| serde_json::from_str::<ObjectMap>(l).ok())
-    //     .find(|entry| {
-    //         entry
-    //             .get("key")
-    //             .is_some_and(|k| k.as_str().is_some_and(|k| k == "message"))
-    //     })
-    //     .and_then(|entry| {
-    //         entry
-    //             .get("value")
-    //             .cloned()
-    //             .map(|m| m.to_string_lossy().into_owned())
-    //     });
-    // assert_eq!(message.unwrap(), log_msg);
     tokio::select! {
         events = old_rx => {
             let events = events.expect("must get event to output");
