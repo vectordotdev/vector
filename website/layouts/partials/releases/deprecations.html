@@ -6,19 +6,22 @@
 {{- $enacted := site.Data.deprecations.deprecations_enacted -}}
 {{- $version := .version -}}
 
-{{- $parts  := split $version "." -}}
-{{- $prefix := printf "%s.%s." (index $parts 0) (index $parts 1) -}}
-{{- $exact  := printf "%s.%s"  (index $parts 0) (index $parts 1) -}}
+{{- $parts := split $version "." -}}
+{{- /* `deprecated_since` can be the shorthand "0.56" (normalized at write
+       time) or the full "0.56.0". Match exactly on either; never a loose
+       major.minor prefix that would put `0.56.1` fragments on the 0.56.0
+       page. */ -}}
+{{- $exact := printf "%s.%s" (index $parts 0) (index $parts 1) -}}
 
 {{- $announced := slice -}}
 {{- range $pending -}}
-  {{- if or (strings.HasPrefix .deprecated_since $prefix) (eq .deprecated_since $exact) -}}
+  {{- if or (eq .deprecated_since $version) (eq .deprecated_since $exact) -}}
     {{- $announced = $announced | append . -}}
   {{- end -}}
 {{- end -}}
 {{- /* Also include enacted entries first announced in this release for historical context. */ -}}
 {{- range $enacted -}}
-  {{- if or (strings.HasPrefix .deprecated_since $prefix) (eq .deprecated_since $exact) -}}
+  {{- if or (eq .deprecated_since $version) (eq .deprecated_since $exact) -}}
     {{- $announced = $announced | append . -}}
   {{- end -}}
 {{- end -}}
@@ -27,9 +30,7 @@
 
 {{- $removed := slice -}}
 {{- range $enacted -}}
-  {{- /* Exact match, or prefix match only when page version is two-part (no patch). */ -}}
-  {{- if or (eq .removed_in $version)
-            (and (eq $version $exact) (strings.HasPrefix .removed_in $prefix)) -}}
+  {{- if or (eq .removed_in $version) (eq .removed_in $exact) -}}
     {{- $removed = $removed | append . -}}
   {{- end -}}
 {{- end -}}
