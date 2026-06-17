@@ -170,7 +170,10 @@ maybe_install_cargo_tool() {
         cargo install -f --path vdev --locked
       fi
     else
-      cargo "${installer[@]}" vdev --force --locked
+      # binstall unavailable. `cargo install vdev` (no version) would resolve
+      # against crates.io and could pick an older version than the checkout
+      # declares; install from the working tree to match vdev/Cargo.toml.
+      cargo install -f --path vdev --locked
     fi
     return 0
   fi
