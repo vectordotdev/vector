@@ -51,10 +51,13 @@ or links to further documentation. It is rendered verbatim in the release notes.
 
 1. **Announce** – a PR adds a file to this directory when the deprecation is first introduced.
 2. **Planned** – every subsequent release lists the entry under `planned_deprecations`.
-3. **Removed** – when a deprecated feature is finally removed, the PR deletes the file from this directory.
+3. **Removed** – when a deprecated feature is finally removed, the PR runs
+   `cargo vdev deprecation enact <slug> --version <removed-in-version>`. The command
+   records the removal in `website/data/deprecations.json` and deletes the fragment in
+   one step; deleting the fragment manually would drop it from `past_deprecations`.
 
 ## Validation
 
-Run `cargo vdev check deprecations` to validate all files in this directory.
+Run `cargo vdev deprecation check` to validate all files in this directory.
 
 To preview the current deprecation state, run `cargo vdev deprecation show`.
