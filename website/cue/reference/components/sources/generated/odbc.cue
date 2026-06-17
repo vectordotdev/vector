@@ -354,6 +354,7 @@ generated: components: sources: odbc: configuration: {
 			Maximum time to wait for the ODBC connection/login to complete.
 			If the connection does not succeed within this window, the attempt fails
 			and is retried at the next scheduled run.
+			Set to 0 to disable the timeout and wait indefinitely.
 			The default is 3 seconds.
 			"""
 		required: false
@@ -475,6 +476,7 @@ generated: components: sources: odbc: configuration: {
 		description: """
 			Maximum time to allow the SQL statement to run.
 			If the query does not finish within this window, it is canceled and retried at the next scheduled run.
+			Set to 0 to disable the timeout and wait indefinitely.
 			The default is 3 seconds.
 			"""
 		required: false

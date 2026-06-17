@@ -50,6 +50,7 @@ pub struct OdbcConfig {
 
     /// Maximum time to allow the SQL statement to run.
     /// If the query does not finish within this window, it is canceled and retried at the next scheduled run.
+    /// Set to 0 to disable the timeout and wait indefinitely.
     /// The default is 3 seconds.
     #[configurable(metadata(docs::examples = 3))]
     #[configurable(metadata(
@@ -62,6 +63,7 @@ pub struct OdbcConfig {
     /// Maximum time to wait for the ODBC connection/login to complete.
     /// If the connection does not succeed within this window, the attempt fails
     /// and is retried at the next scheduled run.
+    /// Set to 0 to disable the timeout and wait indefinitely.
     /// The default is 3 seconds.
     #[configurable(metadata(docs::examples = 3))]
     #[configurable(metadata(
@@ -285,10 +287,6 @@ impl SourceConfig for OdbcConfig {
                 "either a non-empty `statement` or a readable `statement_filepath` must be provided"
                     .into(),
             );
-        }
-
-        if self.login_timeout.is_zero() {
-            return Err("`login_timeout` must be greater than 0".into());
         }
 
         let log_namespace = cx.log_namespace(self.log_namespace);
