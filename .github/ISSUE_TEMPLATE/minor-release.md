@@ -66,7 +66,6 @@ Automated steps include:
   - [ ] Review generated changelog entries to ensure they are understandable to end-users.
   - [ ] Ensure the date matches the scheduled release date.
   - [ ] Run `cargo vdev deprecation show --version "${NEW_VECTOR_VERSION}"` to review new deprecation announcements in this release.
-  - [ ] Run `cargo vdev deprecation enact <slug> --version "${NEW_VECTOR_VERSION}"` for any deprecations being removed in this release, then commit all resulting changes (deleted fragment and updated `website/data/deprecations.json`).
 - [ ] PR review & approval.
 
 # On the day of release
