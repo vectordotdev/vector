@@ -161,6 +161,36 @@ runs:
         restore-keys: |
           ${{ runner.os }}-cargo-
 
+    - name: Cache C build artifacts (openssl, rdkafka)
+      if: ${{ (inputs.cargo-cache == 'true' || env.NEEDS_RUST == 'true') && github.ref == 'refs/heads/master' }}
+      uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+      with:
+        path: |
+          target/debug/build/openssl-sys-*/
+          target/debug/build/openssl-src-*/
+          target/debug/build/rdkafka-sys-*/
+          target/debug/.fingerprint/openssl-sys-*/
+          target/debug/.fingerprint/openssl-src-*/
+          target/debug/.fingerprint/rdkafka-sys-*/
+        key: ${{ runner.os }}-cbuild-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cbuild-
+
+    - name: Restore C build artifacts (openssl, rdkafka)
+      if: ${{ (inputs.cargo-cache == 'true' || env.NEEDS_RUST == 'true') && github.ref != 'refs/heads/master' }}
+      uses: actions/cache/restore@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+      with:
+        path: |
+          target/debug/build/openssl-sys-*/
+          target/debug/build/openssl-src-*/
+          target/debug/build/rdkafka-sys-*/
+          target/debug/.fingerprint/openssl-sys-*/
+          target/debug/.fingerprint/openssl-src-*/
+          target/debug/.fingerprint/rdkafka-sys-*/
+        key: ${{ runner.os }}-cbuild-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cbuild-
+
     - name: Install mold
       if: ${{ runner.os == 'Linux' && env.DISABLE_MOLD != 'true' && inputs.mold == 'true' }}
       shell: bash
