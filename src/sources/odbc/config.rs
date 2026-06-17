@@ -112,6 +112,7 @@ pub struct OdbcConfig {
     pub schedule_timezone: Tz,
 
     /// Number of rows to fetch per batch from the ODBC driver.
+    /// Must be greater than 0.
     /// The default is 100.
     #[configurable(metadata(docs::examples = 100))]
     #[serde(default = "default_odbc_batch_size")]
@@ -287,6 +288,10 @@ impl SourceConfig for OdbcConfig {
                 "either a non-empty `statement` or a readable `statement_filepath` must be provided"
                     .into(),
             );
+        }
+
+        if self.odbc_batch_size == 0 {
+            return Err("`odbc_batch_size` must be greater than 0".into());
         }
 
         let log_namespace = cx.log_namespace(self.log_namespace);

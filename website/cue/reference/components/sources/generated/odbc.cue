@@ -369,6 +369,7 @@ generated: components: sources: odbc: configuration: {
 	odbc_batch_size: {
 		description: """
 			Number of rows to fetch per batch from the ODBC driver.
+			Must be greater than 0.
 			The default is 100.
 			"""
 		required: false
