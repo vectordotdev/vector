@@ -55,9 +55,21 @@ pub struct OdbcConfig {
     #[configurable(metadata(
         docs::additional_props_description = "Maximum time to wait for the SQL statement to execute"
     ))]
-    #[serde(default = "default_query_timeout_sec")]
+    #[serde(default = "default_statement_timeout_sec")]
     #[serde_as(as = "DurationSeconds<u64>")]
     pub statement_timeout: Duration,
+
+    /// Maximum time to wait for the ODBC connection/login to complete.
+    /// If the connection does not succeed within this window, the attempt fails
+    /// and is retried at the next scheduled run.
+    /// The default is 3 seconds.
+    #[configurable(metadata(docs::examples = 3))]
+    #[configurable(metadata(
+        docs::additional_props_description = "Maximum time to wait for the ODBC connection/login to complete"
+    ))]
+    #[serde(default = "default_login_timeout_sec")]
+    #[serde_as(as = "DurationSeconds<u64>")]
+    pub login_timeout: Duration,
 
     /// Initial parameters for the first execution of the statement.
     /// Used if `last_run_metadata_path` does not exist.
@@ -204,7 +216,11 @@ impl OdbcConfig {
 
 impl_generate_config_from_default!(OdbcConfig);
 
-const fn default_query_timeout_sec() -> Duration {
+const fn default_statement_timeout_sec() -> Duration {
+    Duration::from_secs(3)
+}
+
+const fn default_login_timeout_sec() -> Duration {
     Duration::from_secs(3)
 }
 
@@ -236,7 +252,8 @@ impl Default for OdbcConfig {
             schedule: default_schedule(),
             schedule_timezone: Tz::UTC,
             statement: None,
-            statement_timeout: Duration::from_secs(3),
+            statement_timeout: default_statement_timeout_sec(),
+            login_timeout: default_login_timeout_sec(),
             statement_init_params: None,
             odbc_batch_size: default_odbc_batch_size(),
             odbc_max_str_limit: default_odbc_max_str_limit(),
@@ -267,6 +284,10 @@ impl SourceConfig for OdbcConfig {
                 "either a non-empty `statement` or a readable `statement_filepath` must be provided"
                     .into(),
             );
+        }
+
+        if self.login_timeout.is_zero() {
+            return Err("`login_timeout` must be greater than 0".into());
         }
 
         let log_namespace = cx.log_namespace(self.log_namespace);

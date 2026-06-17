@@ -190,7 +190,8 @@ impl Context {
                 .unwrap_or_default()
         };
         let cfg = self.cfg.clone();
-        let timeout = cfg.statement_timeout;
+        let login_timeout = cfg.login_timeout;
+        let statement_timeout = cfg.statement_timeout;
         let tz = cfg.odbc_default_timezone;
         let batch_size = cfg.odbc_batch_size;
         let max_str_limit = cfg.odbc_max_str_limit;
@@ -201,7 +202,8 @@ impl Context {
                 &conn_str,
                 &stmt_str,
                 stmt_params,
-                timeout,
+                login_timeout,
+                statement_timeout,
                 tz,
                 batch_size,
                 max_str_limit,
@@ -318,17 +320,22 @@ pub fn execute_query(
     conn_str: &str,
     stmt_str: &str,
     stmt_params: Vec<VarCharBox>,
-    timeout: Duration,
+    login_timeout: Duration,
+    statement_timeout: Duration,
     tz: Tz,
     batch_size: usize,
     max_str_limit: usize,
 ) -> Result<Rows, OdbcError> {
+    let conn_options = ConnectionOptions {
+        login_timeout_sec: Some(login_timeout.as_secs() as u32),
+        packet_size: None,
+    };
     let conn = env
-        .connect_with_connection_string(conn_str, ConnectionOptions::default())
+        .connect_with_connection_string(conn_str, conn_options)
         .context(DbSnafu)?;
     let mut statement = conn.preallocate().context(DbSnafu)?;
     statement
-        .set_query_timeout_sec(timeout.as_secs() as usize)
+        .set_query_timeout_sec(statement_timeout.as_secs() as usize)
         .context(DbSnafu)?;
 
     let result = if stmt_params.is_empty() {

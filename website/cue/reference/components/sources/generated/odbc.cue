@@ -349,6 +349,22 @@ generated: components: sources: odbc: configuration: {
 		required: false
 		type: string: examples: ["/path/to/tracking.json"]
 	}
+	login_timeout: {
+		description: """
+			Maximum time to wait for the ODBC connection/login to complete.
+			If the connection does not succeed within this window, the attempt fails
+			and is retried at the next scheduled run.
+			The default is 3 seconds.
+			"""
+		required: false
+		type: uint: {
+			default: 3
+			examples: [
+				3,
+			]
+			unit: "seconds"
+		}
+	}
 	odbc_batch_size: {
 		description: """
 			Number of rows to fetch per batch from the ODBC driver.
@@ -422,7 +438,7 @@ generated: components: sources: odbc: configuration: {
 	statement_filepath: {
 		description: """
 			The path to the file that contains the SQL statement.
-			If this is unset or the file cannot be read, the value from `statement` is used instead.
+			If this is set, the `statement` field is ignored and the file must exist and be readable.
 			"""
 		required: false
 		type: string: {}
