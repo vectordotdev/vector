@@ -1,0 +1,74 @@
+name: vector-to-vector-e2e-disk
+
+x-vector-build: &vector-build
+  context: ../../../..
+  dockerfile: tests/antithesis/scenarios/vector_to_vector_e2e_disk/Dockerfile
+  target: vector
+
+x-node-health: &node-health
+  test: ["CMD", "curl", "-fsS", "http://localhost:9598/metrics"]
+  interval: 5s
+  timeout: 3s
+  retries: 30
+  start_period: 10s
+
+services:
+  head:
+    container_name: head
+    hostname: head
+    platform: linux/amd64
+    init: true
+    build: *vector-build
+    image: v2v-vector:${ANTITHESIS_IMAGE_TAG:-dev}
+    entrypoint: ["/usr/bin/vector", "--config", "/etc/vector/head.yaml"]
+    environment:
+      NO_COLOR: "1"
+      # Shrink head's disk-buffer data file from the 128MiB default so files fill
+      # and rotate constantly, but floor it to hold the largest payload class:
+      # 768KiB raw is ~1.5MiB once hex-encoded, and a record cannot span data
+      # files. 2MiB leaves headroom for record framing.
+      VECTOR_DISK_V2_MAX_DATA_FILE_SIZE: "2097152"
+    volumes: ["v2v-buffer-head:/var/lib/vector"]
+    healthcheck: *node-health
+
+  tail:
+    container_name: tail
+    hostname: tail
+    platform: linux/amd64
+    init: true
+    build: *vector-build
+    image: v2v-vector:${ANTITHESIS_IMAGE_TAG:-dev}
+    entrypoint: ["/usr/bin/vector", "--config", "/etc/vector/tail.yaml"]
+    environment:
+      NO_COLOR: "1"
+      # Same as head: shrunk for constant rotation, floored at 2MiB to hold the
+      # largest payload class (768KiB raw, ~1.5MiB hex-encoded).
+      VECTOR_DISK_V2_MAX_DATA_FILE_SIZE: "2097152"
+    volumes: ["v2v-buffer-tail:/var/lib/vector"]
+    healthcheck: *node-health
+
+  oracle:
+    container_name: oracle
+    hostname: oracle
+    platform: linux/amd64
+    init: true
+    build:
+      context: ../../../..
+      dockerfile: tests/antithesis/scenarios/vector_to_vector_e2e_disk/Dockerfile
+      target: workload
+    image: v2v-oracle:${ANTITHESIS_IMAGE_TAG:-dev}
+    environment:
+      NO_COLOR: "1"
+      SCENARIO_NAME: "vector_to_vector_e2e_disk"
+      VECTOR_SOURCE_URL: "http://head:8080/"
+      VECTOR_METRICS_URL: "http://head:9598/metrics"
+      VECTOR_METRICS_URLS: "http://head:9598/metrics,http://tail:9598/metrics"
+      # Test commands run in this container, so they reach the oracle locally.
+      ORACLE_URL: "http://127.0.0.1:8686"
+    depends_on:
+      head: { condition: service_healthy }
+      tail: { condition: service_healthy }
+
+volumes:
+  v2v-buffer-head:
+  v2v-buffer-tail:

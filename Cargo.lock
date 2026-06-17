@@ -224,6 +224,45 @@ dependencies = [
 ]
 
 [[package]]
+name = "antithesis-harness"
+version = "0.1.0"
+dependencies = [
+ "antithesis-instrumentation",
+ "antithesis_sdk",
+ "axum 0.6.20",
+ "clap",
+ "reqwest 0.11.26",
+ "serde_json",
+ "tokio",
+ "vector-buffers",
+]
+
+[[package]]
+name = "antithesis-instrumentation"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eb6b548668212c6d3a942a4ac7be13bc4fc25715bf661328438f30e3fd342cf0"
+dependencies = [
+ "cc",
+]
+
+[[package]]
+name = "antithesis_sdk"
+version = "0.2.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "18dbd97a5b6c21cc9176891cf715f7f0c273caf3959897f43b9bd1231939e675"
+dependencies = [
+ "libc",
+ "libloading",
+ "linkme",
+ "once_cell",
+ "rand 0.8.6",
+ "rustc_version_runtime",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "anyhow"
 version = "1.0.102"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -456,7 +495,7 @@ dependencies = [
  "arrow-schema",
  "arrow-select",
  "flatbuffers 25.9.23",
- "lz4_flex 0.13.0",
+ "lz4_flex",
  "zstd 0.13.2",
 ]
 
@@ -6474,6 +6513,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "linkme"
+version = "0.3.36"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e83272d46373fb8decca684579ac3e7c8f3d71d4cc3aa693df8759e260ae41cf"
+dependencies = [
+ "linkme-impl",
+]
+
+[[package]]
+name = "linkme-impl"
+version = "0.3.36"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "32d59e20403c7d08fe62b4376edfe5c7fb2ef1e6b1465379686d0f21c8df444b"
+dependencies = [
+ "proc-macro2 1.0.106",
+ "quote 1.0.45",
+ "syn 2.0.117",
+]
+
+[[package]]
 name = "linux-raw-sys"
 version = "0.4.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6590,15 +6649,6 @@ checksum = "6bd8c0d6c6ed0cd30b3652886bb8711dc4bb01d637a68105a3d5158039b418e6"
 dependencies = [
  "cc",
  "libc",
-]
-
-[[package]]
-name = "lz4_flex"
-version = "0.11.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "373f5eceeeab7925e0c1098212f2fbc4d416adec9d35051a6ab251e824c1854a"
-dependencies = [
- "twox-hash",
 ]
 
 [[package]]
@@ -7871,7 +7921,7 @@ dependencies = [
  "flate2",
  "half",
  "hashbrown 0.17.1",
- "lz4_flex 0.13.0",
+ "lz4_flex",
  "num-bigint",
  "num-integer",
  "num-traits",
@@ -10493,17 +10543,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "sha-1"
-version = "0.10.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f5058ada175748e33390e40e872bd0fe59a19f265d0158daa551c5a88a76009c"
-dependencies = [
- "cfg-if",
- "cpufeatures 0.2.11",
- "digest 0.10.7",
-]
-
-[[package]]
 name = "sha1"
 version = "0.10.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12752,7 +12791,7 @@ checksum = "accd4ea62f7bb7a82fe23066fb0957d48ef677f6eeb8215f372f52e48bb32426"
 
 [[package]]
 name = "vdev"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "anyhow",
  "cfg-if",
@@ -12792,6 +12831,7 @@ dependencies = [
 name = "vector"
 version = "0.57.0"
 dependencies = [
+ "antithesis-instrumentation",
  "approx",
  "arc-swap",
  "arr_macro",
@@ -13023,6 +13063,7 @@ dependencies = [
 name = "vector-buffers"
 version = "0.1.0"
 dependencies = [
+ "antithesis_sdk",
  "async-recursion",
  "async-stream",
  "async-trait",
@@ -13050,6 +13091,7 @@ dependencies = [
  "rand 0.9.4",
  "rkyv",
  "serde",
+ "serde_json",
  "serde_yaml",
  "snafu 0.9.0",
  "temp-dir",
@@ -13433,7 +13475,7 @@ checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 [[package]]
 name = "vrl"
 version = "0.33.1"
-source = "git+https://github.com/vectordotdev/vrl.git?branch=main#cd5f0dd1261d387aad2f12d81e693e3d37ff0a7d"
+source = "git+https://github.com/vectordotdev/vrl.git?branch=main#74e3e74582aa6b4445c1a94004bb3f14276d07df"
 dependencies = [
  "aes",
  "aes-siv",
@@ -13482,7 +13524,7 @@ dependencies = [
  "jsonschema",
  "lalrpop",
  "lalrpop-util",
- "lz4_flex 0.11.6",
+ "lz4_flex",
  "md-5 0.10.6",
  "mlua",
  "nom 8.0.0",
@@ -13519,9 +13561,8 @@ dependencies = [
  "seahash",
  "serde",
  "serde_json",
- "serde_yaml",
  "serde_yaml_ng",
- "sha-1",
+ "sha1",
  "sha2 0.10.9",
  "sha3",
  "simdutf8",

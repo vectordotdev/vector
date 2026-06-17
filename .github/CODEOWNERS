@@ -3,6 +3,8 @@
 .github/workflows/regression.yml @vectordotdev/vector @vectordotdev/single-machine-performance
 regression/config.yaml @vectordotdev/vector @vectordotdev/single-machine-performance
 
+tests/antithesis/ @vectordotdev/vector @vectordotdev/single-machine-performance
+
 website/ @vectordotdev/vector
 website/js @vectordotdev/vector @vectordotdev/vector-website
 website/layouts @vectordotdev/vector @vectordotdev/vector-website
