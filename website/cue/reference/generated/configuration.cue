@@ -223,6 +223,16 @@ generated: configuration: {
 								description: "Number of slots in each bucket"
 								required:    false
 							}
+							concurrent_scanning: {
+								type: bool: default: false
+								description: """
+																		If set to true scanning will not block insertions.
+																		This may affect behavior since blocking scans would free up space before insertions.
+
+																		By default, scanning is blocking.
+																		"""
+								required: false
+							}
 							counter_bits: {
 								type: uint: default: 8
 								description: "Number of bits to use to track counter. This will limit the max value."
@@ -275,6 +285,15 @@ generated: configuration: {
 								description: """
 																		Path to the file to export data to periodically and on exit.
 																		Data will be imported from this file on startup.
+																		"""
+								required: false
+							}
+							scanning_threads: {
+								type: uint: {}
+								description: """
+																		Number of threads to use for scanning and updating LRU/TTL.
+
+																		By default, scanning is single threaded.
 																		"""
 								required: false
 							}

@@ -18,7 +18,10 @@ use futures::{
     stream::{self, BoxStream},
 };
 use tempfile::NamedTempFile;
-use tokio::time::{Instant, interval, interval_at};
+use tokio::{
+    task::JoinSet,
+    time::{Instant, interval, interval_at},
+};
 use tokio_stream::wrappers::IntervalStream;
 use vector_config::configurable_component;
 use vector_lib::{
@@ -97,6 +100,17 @@ pub struct CuckooMemoryConfig {
     /// By default, export is only done on exit.
     #[serde(skip_serializing_if = "vector_lib::serde::is_default")]
     pub export_interval: Option<u64>,
+    /// Number of threads to use for scanning and updating LRU/TTL.
+    ///
+    /// By default, scanning is single threaded.
+    #[serde(default)]
+    pub scanning_threads: Option<NonZeroUsize>,
+    /// If set to true scanning will not block insertions.
+    /// This may affect behavior since blocking scans would free up space before insertions.
+    ///
+    /// By default, scanning is blocking.
+    #[serde(default = "crate::serde::default_false")]
+    pub concurrent_scanning: bool,
 }
 
 const fn default_cuckoo_fingerprint_bits() -> NonZeroUsize {
@@ -483,14 +497,25 @@ impl StreamSink<Event> for CuckooMemoryTable {
                 }
 
                 Some(_) = scan_interval.next() => {
-                    let expired = self.filter.scan_and_update_full();
-                    emit!(MemoryEnrichmentTableTtlExpiredCount {
-                        count: expired as u64
-                    });
-                    emit!(MemoryEnrichmentTableFlushed {
-                        new_objects_count: self.filter.get_item_count(),
-                        new_byte_size: self.filter.get_memory_usage()
-                    });
+                    let mut handles = JoinSet::new();
+                    let filter = self.filter.clone();
+                    let count = self.cuckoo_config.scanning_threads.unwrap_or(NonZeroUsize::new(1).unwrap());
+                    for i in 0..count.get() {
+                        let filter = filter.clone();
+                        handles.spawn(async move {
+                            let expired = filter.scan_and_update_full_partition(count, i);
+                            emit!(MemoryEnrichmentTableTtlExpiredCount {
+                                count: expired as u64
+                            });
+                            emit!(MemoryEnrichmentTableFlushed {
+                                new_objects_count: filter.get_item_count(),
+                                new_byte_size: filter.get_memory_usage()
+                            });
+                        });
+                    }
+                    if !self.cuckoo_config.concurrent_scanning {
+                        let _ = handles.join_all().await;
+                    }
                 }
             }
         }
@@ -520,6 +545,8 @@ mod tests {
             counter_field: OptionalValuePath::none(),
             persistence_path: None,
             export_interval: None,
+            scanning_threads: None,
+            concurrent_scanning: false,
         };
         modfn(&mut config);
         config
