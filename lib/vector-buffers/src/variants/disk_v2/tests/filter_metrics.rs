@@ -94,6 +94,13 @@ impl Bufferable for FilterableBatch {
 
 /// A partial-filter drop on a disk-v2 send must show up as an unintentional buffer
 /// drop, so `buffer_size_*` stays consistent with what actually landed on disk.
+///
+/// Note: we deliberately do NOT attach `with_usage_instrumentation` to the
+/// `BufferSender`. In production, `TopologyBuilder::build` skips that call for
+/// disk-v2 because the stage `provides_instrumentation()` itself via the ledger.
+/// This test reflects that production wiring: filter-drop accounting goes
+/// through `Ledger::track_dropped`, and `usage` (returned by the helper) IS the
+/// ledger's handle.
 #[tokio::test]
 async fn filter_drops_are_reported_as_unintentional_buffer_drops() {
     let _a = install_tracing_helpers();
@@ -105,9 +112,10 @@ async fn filter_drops_are_reported_as_unintentional_buffer_drops() {
             let (writer, _reader, _ledger, usage) =
                 create_default_buffer_v2_with_usage::<_, FilterableBatch>(data_dir).await;
             let mut sender = BufferSender::new(SenderAdapter::from(writer), WhenFull::Block);
-            sender.with_usage_instrumentation(usage.clone());
 
-            // 10 events arrive, filter keeps 3.
+            // 10 events arrive, filter keeps 3. Flush after each send so the
+            // ledger's `track_write` actually reaches the usage handle (it only
+            // fires when buffered writes are flushed to disk).
             sender
                 .send(
                     FilterableBatch {
@@ -118,23 +126,25 @@ async fn filter_drops_are_reported_as_unintentional_buffer_drops() {
                 )
                 .await
                 .expect("send should succeed");
+            sender.flush().await.expect("flush should succeed");
 
             let snapshot = usage.snapshot();
             assert_eq!(
                 snapshot.received_event_count, 10,
-                "received reflects pre-filter sizing (the item arrived at the buffer boundary)",
+                "received counts both the 7 filter-dropped events (via track_dropped) \
+                 and the 3 events flushed to disk (via track_write)",
             );
             assert_eq!(
                 snapshot.dropped_event_count, 7,
-                "filter drops are reported as an unintentional buffer drop \
-                 so buffer_size stays consistent (received - dropped = 3 queued)",
+                "filter drops show up under the disk-v2 stage's unintentional dropped count \
+                 so buffer_size stays consistent (received - sent - dropped = 3 queued)",
             );
             assert_eq!(
                 snapshot.dropped_event_count_intentional, 0,
                 "no buffer-fullness drops here",
             );
 
-            // 5 events arrive, filter drops them all.
+            // 5 events arrive, filter drops them all (nothing reaches disk).
             sender
                 .send(
                     FilterableBatch {
@@ -149,7 +159,7 @@ async fn filter_drops_are_reported_as_unintentional_buffer_drops() {
             let snapshot = usage.snapshot();
             assert_eq!(
                 snapshot.received_event_count, 15,
-                "fully-filtered item still bumps received (it arrived at the boundary)",
+                "fully-filtered item still bumps received via track_dropped",
             );
             assert_eq!(
                 snapshot.dropped_event_count, 12,

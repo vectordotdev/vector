@@ -24,24 +24,6 @@ pub enum SenderAdapter<T: Bufferable> {
     DiskV2(Arc<Mutex<disk_v2::BufferWriter<T, ProductionFilesystem>>>),
 }
 
-/// Events/bytes dropped by `Bufferable::filter_unencodable` inside the backend
-/// dispatch. Only the disk-v2 backend invokes the filter (it is the only one with
-/// wire-format constraints); in-memory backends always return the default zero
-/// value.
-#[derive(Clone, Copy, Debug, Default)]
-pub(crate) struct FilterDrops {
-    pub events: u64,
-    pub bytes: u64,
-}
-
-/// Outcome of [`SenderAdapter::try_send`]. Carries both whatever the filter dropped
-/// (which the caller still needs to account for in buffer instrumentation) and the
-/// item that did not fit, if any (which the caller may forward to an overflow stage).
-pub(crate) struct TrySendOutcome<T: Bufferable> {
-    pub filter_drops: FilterDrops,
-    pub rejected: Option<T>,
-}
-
 impl<T: Bufferable> From<LimitedSender<T>> for SenderAdapter<T> {
     fn from(v: LimitedSender<T>) -> Self {
         Self::InMemory(v)
@@ -58,30 +40,30 @@ impl<T> SenderAdapter<T>
 where
     T: Bufferable,
 {
-    pub(crate) async fn send(&mut self, item: T) -> crate::Result<FilterDrops> {
+    pub(crate) async fn send(&mut self, item: T) -> crate::Result<()> {
         match self {
-            Self::InMemory(tx) => tx
-                .send(item)
-                .await
-                .map(|()| FilterDrops::default())
-                .map_err(Into::into),
+            Self::InMemory(tx) => tx.send(item).await.map_err(Into::into),
             Self::DiskV2(writer) => {
                 let pre_count = item.event_count() as u64;
                 let pre_size = item.size_of() as u64;
-                let Some(item) = item.filter_unencodable() else {
-                    return Ok(FilterDrops {
-                        events: pre_count,
-                        bytes: pre_size,
-                    });
-                };
-                let drops = FilterDrops {
-                    events: pre_count - item.event_count() as u64,
-                    bytes: pre_size.saturating_sub(item.size_of() as u64),
-                };
-
                 let mut writer = writer.lock().await;
 
-                writer.write_record(item).await.map(|_| drops).map_err(|e| {
+                let Some(item) = item.filter_unencodable() else {
+                    // The whole item was filtered out (e.g. every sub-item over the
+                    // protobuf nesting budget). Report the drop directly via the
+                    // ledger's usage handle so it shows up in the disk-v2 stage's
+                    // `received` / `dropped` metrics — `BufferSender` does not carry
+                    // its own handle for backends that `provides_instrumentation()`.
+                    writer.track_dropped(pre_count, pre_size);
+                    return Ok(());
+                };
+                if item.event_count() as u64 != pre_count {
+                    let dropped_events = pre_count - item.event_count() as u64;
+                    let dropped_bytes = pre_size.saturating_sub(item.size_of() as u64);
+                    writer.track_dropped(dropped_events, dropped_bytes);
+                }
+
+                writer.write_record(item).await.map(|_| ()).map_err(|e| {
                     error!("Disk buffer writer has encountered an unrecoverable error.");
 
                     e.into()
@@ -90,15 +72,12 @@ where
         }
     }
 
-    pub(crate) async fn try_send(&mut self, item: T) -> crate::Result<TrySendOutcome<T>> {
+    pub(crate) async fn try_send(&mut self, item: T) -> crate::Result<Option<T>> {
         match self {
-            Self::InMemory(tx) => Ok(TrySendOutcome {
-                filter_drops: FilterDrops::default(),
-                rejected: tx
-                    .try_send(item)
-                    .err()
-                    .map(super::limited_queue::TrySendError::into_inner),
-            }),
+            Self::InMemory(tx) => Ok(tx
+                .try_send(item)
+                .err()
+                .map(super::limited_queue::TrySendError::into_inner)),
             Self::DiskV2(writer) => {
                 let mut writer = writer.lock().await;
 
@@ -116,40 +95,26 @@ where
                 // still has the item filtered before the rejection — that requires
                 // knowing the encoded size pre-encode, which we cannot do cheaply.
                 if writer.is_buffer_full() {
-                    return Ok(TrySendOutcome {
-                        filter_drops: FilterDrops::default(),
-                        rejected: Some(item),
-                    });
+                    return Ok(Some(item));
                 }
 
                 let pre_count = item.event_count() as u64;
                 let pre_size = item.size_of() as u64;
                 let Some(item) = item.filter_unencodable() else {
-                    return Ok(TrySendOutcome {
-                        filter_drops: FilterDrops {
-                            events: pre_count,
-                            bytes: pre_size,
-                        },
-                        rejected: None,
-                    });
+                    writer.track_dropped(pre_count, pre_size);
+                    return Ok(None);
                 };
-                let filter_drops = FilterDrops {
-                    events: pre_count - item.event_count() as u64,
-                    bytes: pre_size.saturating_sub(item.size_of() as u64),
-                };
+                if item.event_count() as u64 != pre_count {
+                    let dropped_events = pre_count - item.event_count() as u64;
+                    let dropped_bytes = pre_size.saturating_sub(item.size_of() as u64);
+                    writer.track_dropped(dropped_events, dropped_bytes);
+                }
 
-                writer
-                    .try_write_record(item)
-                    .await
-                    .map(|rejected| TrySendOutcome {
-                        filter_drops,
-                        rejected,
-                    })
-                    .map_err(|e| {
-                        error!("Disk buffer writer has encountered an unrecoverable error.");
+                writer.try_write_record(item).await.map_err(|e| {
+                    error!("Disk buffer writer has encountered an unrecoverable error.");
 
-                        e.into()
-                    })
+                    e.into()
+                })
             }
         }
     }
@@ -289,8 +254,7 @@ impl<T: Bufferable> BufferSender<T> {
             .as_ref()
             .map(|_| (item.event_count(), item.size_of()));
 
-        let mut rejected_sizing: Option<(usize, usize)> = None;
-        let filter_drops;
+        let mut was_dropped = false;
 
         if let Some(instrumentation) = self.usage_instrumentation.as_ref()
             && let Some((item_count, item_size)) = item_sizing
@@ -299,50 +263,38 @@ impl<T: Bufferable> BufferSender<T> {
                 .increment_received_event_count_and_byte_size(item_count as u64, item_size as u64);
         }
         match self.when_full {
-            WhenFull::Block => filter_drops = self.base.send(item).await?,
+            WhenFull::Block => self.base.send(item).await?,
             WhenFull::DropNewest => {
-                let outcome = self.base.try_send(item).await?;
-                filter_drops = outcome.filter_drops;
-                if let Some(rejected) = outcome.rejected {
-                    rejected_sizing = Some((rejected.event_count(), rejected.size_of()));
+                if self.base.try_send(item).await?.is_some() {
+                    was_dropped = true;
                 }
             }
             WhenFull::Overflow => {
-                let outcome = self.base.try_send(item).await?;
-                filter_drops = outcome.filter_drops;
-                if let Some(rejected) = outcome.rejected {
-                    rejected_sizing = Some((rejected.event_count(), rejected.size_of()));
+                if let Some(item) = self.base.try_send(item).await? {
+                    was_dropped = true;
                     self.overflow
                         .as_mut()
                         .unwrap_or_else(|| unreachable!("overflow must exist"))
-                        .send(rejected, send_reference)
+                        .send(item, send_reference)
                         .await?;
                 }
             }
         }
 
-        if let Some(instrumentation) = self.usage_instrumentation.as_ref() {
-            // Backend-filtered sub-items never reach the buffer; report them as an
-            // unintentional buffer drop so `buffer_size_*` (received - left) stays
-            // consistent with what is actually queued, rather than staying inflated
-            // by the filtered count forever.
-            if filter_drops.events > 0 || filter_drops.bytes > 0 {
-                instrumentation.increment_dropped_event_count_and_byte_size(
-                    filter_drops.events,
-                    filter_drops.bytes,
-                    false,
-                );
-            }
-            // Fullness-driven drops use the post-filter sizing of the rejected item,
-            // not the pre-filter sizing captured above — the filter portion has
-            // already been accounted for as an unintentional drop.
-            if let Some((rejected_count, rejected_size)) = rejected_sizing {
-                instrumentation.increment_dropped_event_count_and_byte_size(
-                    rejected_count as u64,
-                    rejected_size as u64,
-                    true,
-                );
-            }
+        // Backend filter drops are accounted directly through the backend's own
+        // usage handle (e.g. disk-v2's ledger), so they show up in the buffer
+        // stage's `received` / `dropped` metrics even when the `BufferSender`
+        // does not carry instrumentation. This block only reports fullness-driven
+        // drops captured via `was_dropped`.
+        if let Some(instrumentation) = self.usage_instrumentation.as_ref()
+            && let Some((item_count, item_size)) = item_sizing
+            && was_dropped
+        {
+            instrumentation.increment_dropped_event_count_and_byte_size(
+                item_count as u64,
+                item_size as u64,
+                true,
+            );
         }
         if let Some(send_duration) = self.send_duration.as_ref()
             && let Some(send_reference) = send_reference
