@@ -38,9 +38,9 @@ const SEND_BATCH_LATENCY_NAME: HistogramName = HistogramName::SourceSendBatchLat
 /// [`Builder`].
 pub trait PostProcessor: Send + Sync {
     /// Called once for every [`crate::event::LogEvent`] in a batch.
-    fn process_log(&self, event: &mut crate::event::LogEvent);
+    fn process_log(&self, _event: &mut crate::event::LogEvent) {}
     /// Called once for every [`crate::event::Metric`] in a batch.
-    fn process_metric(&self, event: &mut crate::event::Metric);
+    fn process_metric(&self, _event: &mut crate::event::Metric) {}
     /// Called once for every [`crate::event::TraceEvent`] in a batch.
-    fn process_trace(&self, event: &mut crate::event::TraceEvent);
+    fn process_trace(&self, _event: &mut crate::event::TraceEvent) {}
 }

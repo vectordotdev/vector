@@ -183,34 +183,24 @@ impl Output {
     ) -> Result<(), SendError> {
         // Apply post-processor with typed dispatch. Each method receives a reference to the
         // concrete event type, making it impossible at the type level to change the variant.
-        // Finalizers are taken out before each call and restored after so that a processor
-        // that replaces the entire inner value (e.g. `*log = LogEvent::default()`) cannot
-        // accidentally drop the batch notifiers required for event acking.
+        // Original finalizers are stripped before saving metadata so the clone contains no
+        // finalizers; this prevents them from being doubled when we restore. Any finalizers
+        // added by the processor are collected separately and merged back alongside the
+        // originals after the restore, ensuring all batch notifiers survive even if the
+        // processor replaces the entire inner value (e.g. `*log = LogEvent::default()`).
         if let Some(ref pp) = self.post_processor {
-            events.iter_events_mut().for_each(|event| match event {
-                EventMutRef::Log(log) => {
-                    let saved = log.metadata().clone();
-                    pp.process_log(log);
-                    // Collect any finalizers the processor added to the (possibly replaced)
-                    // event so they are not lost when we restore the full saved metadata.
-                    let new_finalizers = log.metadata_mut().take_finalizers();
-                    *log.metadata_mut() = saved;
-                    log.metadata_mut().merge_finalizers(new_finalizers);
+            events.iter_events_mut().for_each(|mut event| {
+                let original_finalizers = event.metadata_mut().take_finalizers();
+                let saved = event.metadata().clone();
+                match event {
+                    EventMutRef::Log(ref mut log) => pp.process_log(log),
+                    EventMutRef::Metric(ref mut metric) => pp.process_metric(metric),
+                    EventMutRef::Trace(ref mut trace) => pp.process_trace(trace),
                 }
-                EventMutRef::Metric(metric) => {
-                    let saved = metric.metadata().clone();
-                    pp.process_metric(metric);
-                    let new_finalizers = metric.metadata_mut().take_finalizers();
-                    *metric.metadata_mut() = saved;
-                    metric.metadata_mut().merge_finalizers(new_finalizers);
-                }
-                EventMutRef::Trace(trace) => {
-                    let saved = trace.metadata().clone();
-                    pp.process_trace(trace);
-                    let new_finalizers = trace.metadata_mut().take_finalizers();
-                    *trace.metadata_mut() = saved;
-                    trace.metadata_mut().merge_finalizers(new_finalizers);
-                }
+                let new_finalizers = event.metadata_mut().take_finalizers();
+                *event.metadata_mut() = saved;
+                event.metadata_mut().merge_finalizers(original_finalizers);
+                event.metadata_mut().merge_finalizers(new_finalizers);
             });
         }
 
