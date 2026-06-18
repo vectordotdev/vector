@@ -401,9 +401,9 @@ impl Table for Memory {
         Vec::new()
     }
 
-    /// Has to be reloaded always, because a new component is created to insert data into it
+    /// Doesn't need reload, data is written directly
     fn needs_reload(&self) -> bool {
-        true
+        false
     }
 
     fn extract_state(&self) -> Option<Box<dyn std::any::Any + Send + Sync>> {

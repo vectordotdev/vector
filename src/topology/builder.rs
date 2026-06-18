@@ -189,7 +189,10 @@ impl<'a> Builder<'a> {
         // Build enrichment tables
         'tables: for (name, table_outer) in self.config.enrichment_tables.iter() {
             let table_name = name.to_string();
-            if ENRICHMENT_TABLES.needs_reload(&table_name) {
+            if ENRICHMENT_TABLES.needs_reload(&table_name)
+                || self.diff.enrichment_tables.is_changed(name)
+                || self.diff.enrichment_tables.is_added(name)
+            {
                 let indexes = if !self.diff.enrichment_tables.is_added(name) {
                     // If this is an existing enrichment table, we need to store the indexes to reapply
                     // them again post load.
