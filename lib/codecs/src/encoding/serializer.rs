@@ -432,6 +432,37 @@ pub enum Serializer {
 }
 
 impl Serializer {
+    /// Whether an empty serialized payload from this serializer indicates that
+    /// the event was dropped internally (rather than legitimately encoded to
+    /// zero bytes).
+    ///
+    /// Only the native protobuf serializer treats zero-byte output as a drop
+    /// signal: a valid event always produces at least the protobuf wrapper
+    /// bytes, so an empty payload there can only mean the encoder refused the
+    /// event (currently: over-budget protobuf nesting). Text-based serializers
+    /// (`Text`, `RawMessage`, etc.) legitimately emit zero bytes for events
+    /// with no message field, so callers must not treat empty output from
+    /// those as a drop.
+    pub fn empty_output_means_dropped(&self) -> bool {
+        match self {
+            Serializer::Native(_) => true,
+            Serializer::Avro(_)
+            | Serializer::Cef(_)
+            | Serializer::Csv(_)
+            | Serializer::Gelf(_)
+            | Serializer::Json(_)
+            | Serializer::Logfmt(_)
+            | Serializer::NativeJson(_)
+            | Serializer::Protobuf(_)
+            | Serializer::RawMessage(_)
+            | Serializer::Text(_) => false,
+            #[cfg(feature = "syslog")]
+            Serializer::Syslog(_) => false,
+            #[cfg(feature = "opentelemetry")]
+            Serializer::Otlp(_) => false,
+        }
+    }
+
     /// Check if the serializer supports encoding an event to JSON via `Serializer::to_json_value`.
     pub fn supports_json(&self) -> bool {
         match self {

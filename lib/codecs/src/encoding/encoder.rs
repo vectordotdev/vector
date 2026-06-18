@@ -283,13 +283,18 @@ impl tokio_util::codec::Encoder<Event> for Encoder<Framer> {
 
         self.serialize_at_start(event, &mut payload)?;
 
-        // If the inner serializer produced no output, the event was dropped
-        // internally (e.g., the native serializer rejecting an over-budget
-        // event with `EventStatus::Rejected` + `ComponentEventsDropped`). Skip
-        // framing so the caller observes an empty buffer and can finalize the
-        // dropped event accordingly, rather than seeing a stray delimiter for
-        // an event that produced no payload.
-        if payload.is_empty() {
+        // If the inner serializer produced no output AND treats empty output as
+        // a drop signal (currently only the native protobuf serializer), the
+        // event was dropped internally. Skip framing so the caller observes an
+        // empty buffer and can finalize the dropped event accordingly, rather
+        // than seeing a stray delimiter or length prefix for an event that
+        // produced no payload.
+        //
+        // Text-based serializers (`Text`, `RawMessage`) legitimately emit zero
+        // bytes for events with no message field, and those events still need
+        // their framing (e.g. a newline) so downstream stream parsers see the
+        // expected delimiter.
+        if payload.is_empty() && self.serializer.empty_output_means_dropped() {
             buffer.unsplit(payload);
             return Ok(());
         }
