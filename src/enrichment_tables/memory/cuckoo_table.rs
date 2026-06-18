@@ -27,6 +27,7 @@ use tokio::{
     time::{Instant, interval, interval_at},
 };
 use tokio_stream::wrappers::IntervalStream;
+use tracing::Instrument;
 use vector_config::configurable_component;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
@@ -540,7 +541,7 @@ impl StreamSink<Event> for CuckooMemoryTable {
                                 new_byte_size: filter.get_memory_usage()
                             });
                             scans_in_progress.fetch_sub(1, Ordering::AcqRel);
-                        };
+                        }.in_current_span();
                         if !self.cuckoo_config.concurrent_scanning {
                             handles.spawn(task);
                         } else {
