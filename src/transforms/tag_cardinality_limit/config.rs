@@ -223,6 +223,10 @@ impl OverrideMode {
 ///   environment:
 ///     mode: limit_override  # track with a per-tag cap
 ///     value_limit: 3
+///   high_cardinality_tag:
+///     mode: limit_override
+///     value_limit: 1000
+///     cache_size_per_key: 102400  # larger bloom filter for this tag
 ///   trace_id:
 ///     mode: excluded        # opt out of tracking entirely
 /// ```
@@ -236,19 +240,24 @@ pub struct PerTagConfig {
 
 /// Mode applied to a specific tag key within a per-metric override.
 ///
-/// The tracking algorithm (`exact`/`probabilistic`), `cache_size_per_key`,
-/// `limit_exceeded_action`, and `internal_metrics` are always inherited from the
-/// enclosing per-metric configuration.
+/// The tracking algorithm (`exact`/`probabilistic`), `limit_exceeded_action`, and
+/// `internal_metrics` are inherited from the enclosing per-metric (or global) configuration.
+/// `cache_size_per_key` may optionally be overridden per tag when probabilistic mode is in use.
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[serde(tag = "mode", rename_all = "snake_case", deny_unknown_fields)]
 #[configurable(metadata(docs::enum_tag_description = "Controls how this tag key is handled."))]
 pub enum PerTagMode {
-    /// Track this tag with a per-tag value limit. The enclosing per-metric tracking
-    /// algorithm and all other settings still apply.
+    /// Track this tag with a per-tag value limit. All other settings are inherited from
+    /// the enclosing config.
     LimitOverride {
         /// Maximum number of distinct values to accept for this tag key.
         value_limit: usize,
+
+        /// Override the bloom filter cache size for this specific tag key.
+        /// Only effective in `probabilistic` mode. Inherits from the enclosing config when unset.
+        #[serde(default)]
+        cache_size_per_key: Option<usize>,
     },
     /// Opt this tag out of cardinality tracking entirely. All values pass through
     /// without being recorded or checked against any `value_limit`.

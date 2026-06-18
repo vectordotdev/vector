@@ -162,6 +162,15 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 						description: "An individual tag configuration."
 						required:    true
 						type: object: options: {
+							cache_size_per_key: {
+								description: """
+																								Override the bloom filter cache size for this specific tag key.
+																								Only effective in `probabilistic` mode. Inherits from the enclosing config when unset.
+																								"""
+								relevant_when: "mode = \"limit_override\""
+								required:      false
+								type: uint: {}
+							}
 							mode: {
 								description: "Controls how this tag key is handled."
 								required:    true
@@ -171,8 +180,8 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 																											without being recorded or checked against any `value_limit`.
 																											"""
 									limit_override: """
-																											Track this tag with a per-tag value limit. The enclosing per-metric tracking
-																											algorithm and all other settings still apply.
+																											Track this tag with a per-tag value limit. All other settings are inherited from
+																											the enclosing config.
 																											"""
 								}
 							}
@@ -207,6 +216,15 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 			description: "An individual tag configuration."
 			required:    true
 			type: object: options: {
+				cache_size_per_key: {
+					description: """
+						Override the bloom filter cache size for this specific tag key.
+						Only effective in `probabilistic` mode. Inherits from the enclosing config when unset.
+						"""
+					relevant_when: "mode = \"limit_override\""
+					required:      false
+					type: uint: {}
+				}
 				mode: {
 					description: "Controls how this tag key is handled."
 					required:    true
@@ -216,8 +234,8 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 																			without being recorded or checked against any `value_limit`.
 																			"""
 						limit_override: """
-																			Track this tag with a per-tag value limit. The enclosing per-metric tracking
-																			algorithm and all other settings still apply.
+																			Track this tag with a per-tag value limit. All other settings are inherited from
+																			the enclosing config.
 																			"""
 					}
 				}

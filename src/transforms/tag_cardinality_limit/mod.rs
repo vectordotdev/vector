@@ -26,6 +26,17 @@ use crate::event::metric::TagValueSet;
 
 type MetricId = (Option<String>, String);
 
+/// Applies a per-tag `cache_size_per_key` override to a `Mode`. No-op in exact mode or when
+/// `override_size` is `None`.
+const fn apply_cache_size_override(mode: Mode, override_size: Option<usize>) -> Mode {
+    match (mode, override_size) {
+        (Mode::Probabilistic(_), Some(size)) => Mode::Probabilistic(BloomFilterConfig {
+            cache_size_per_key: size,
+        }),
+        _ => mode,
+    }
+}
+
 /// Outcome of applying tag cardinality tracking to a tag value.
 #[derive(Debug, Eq, PartialEq)]
 enum AcceptResult {
@@ -126,13 +137,14 @@ impl TagCardinalityLimit {
         if let Some(per_tag) = per_metric.per_tag_limits.get(tag_key) {
             match per_tag.mode {
                 PerTagMode::Excluded => return TagSettings::Excluded,
-                PerTagMode::LimitOverride { value_limit } => {
-                    // Tracking algorithm and all other settings are always inherited
-                    // from the per-metric config.
+                PerTagMode::LimitOverride {
+                    value_limit,
+                    cache_size_per_key,
+                } => {
                     return TagSettings::Tracked(Inner {
                         value_limit,
                         limit_exceeded_action,
-                        mode: metric_mode,
+                        mode: apply_cache_size_override(metric_mode, cache_size_per_key),
                         internal_metrics,
                     });
                 }
@@ -152,8 +164,12 @@ impl TagCardinalityLimit {
         let global = self.config.global;
         match self.config.per_tag_limits.get(tag_key).map(|c| c.mode) {
             Some(PerTagMode::Excluded) => TagSettings::Excluded,
-            Some(PerTagMode::LimitOverride { value_limit }) => TagSettings::Tracked(Inner {
+            Some(PerTagMode::LimitOverride {
                 value_limit,
+                cache_size_per_key,
+            }) => TagSettings::Tracked(Inner {
+                value_limit,
+                mode: apply_cache_size_override(global.mode, cache_size_per_key),
                 ..global
             }),
             None => TagSettings::Tracked(global),
