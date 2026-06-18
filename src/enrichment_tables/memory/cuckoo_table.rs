@@ -181,6 +181,13 @@ impl CuckooMemoryTable {
 
         let built_config = builder.build()?;
 
+        let filter_size = built_config.get_configured_memory_usage();
+        if let Some(max_byte_size) = config.max_byte_size
+            && filter_size as u64 > max_byte_size
+        {
+            return Err(format!("Configured cuckoo filter is larger ({}) than defined `max_byte_size` ({}). Reduce the size of cuckoo filter or increase or remove `max_byte_size`.", filter_size, max_byte_size).into());
+        }
+
         let filter = 'import: {
             if let Some(path) = &cuckoo_config.persistence_path {
                 let file = match File::open(path) {
@@ -228,13 +235,6 @@ impl CuckooMemoryTable {
                 CuckooFilter::new_random_exportable(built_config)
             }
         };
-
-        let filter_size = filter.get_memory_usage();
-        if let Some(max_byte_size) = config.max_byte_size
-            && filter.get_memory_usage() as u64 > max_byte_size
-        {
-            return Err(format!("Configured cuckoo filter is larger ({}) than defined `max_byte_size` ({}). Reduce the size of cuckoo filter or increase or remove `max_byte_size`.", filter_size, max_byte_size).into());
-        }
 
         Ok(Self {
             config,
