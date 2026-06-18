@@ -514,6 +514,32 @@ mod test {
     }
 
     #[test]
+    fn syslog_source_parses_network_device_multiline_message() {
+        let event = event_from_bytes(
+            "host",
+            Some(Bytes::from("192.0.2.10")),
+            Bytes::from(
+                "<130>2026 Jun 18 04:24:32 device-redacted command-log:An alarm 35125 level minor occurred at 04:24:32 06/18/2026 UTC sent by MCP GPON alarm link: shelf 1 slot 8 olt 11 onu 83 level 2 \n on  \n",
+            ),
+            LogNamespace::Legacy,
+        )
+        .unwrap();
+        let log = event.as_log();
+
+        assert_eq!(
+            log["message"],
+            "An alarm 35125 level minor occurred at 04:24:32 06/18/2026 UTC sent by MCP GPON alarm link: shelf 1 slot 8 olt 11 onu 83 level 2   on".into()
+        );
+        assert_eq!(log["hostname"], "device-redacted".into());
+        assert_eq!(log["host"], "device-redacted".into());
+        assert_eq!(log["source_ip"], "192.0.2.10".into());
+        assert_eq!(log["source_type"], "syslog".into());
+        assert_eq!(log["appname"], "command-log".into());
+        assert_eq!(log["facility"], "local0".into());
+        assert_eq!(log["severity"], "crit".into());
+    }
+
+    #[test]
     fn output_schema_definition_vector_namespace() {
         let config = SyslogConfig {
             log_namespace: Some(true),

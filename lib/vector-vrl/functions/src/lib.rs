@@ -12,6 +12,7 @@
 use vrl::{compiler::Function, path::OwnedTargetPath};
 
 pub mod get_secret;
+mod parse_syslog;
 pub mod remove_secret;
 pub mod set_secret;
 pub mod set_semantic_meaning;
@@ -38,7 +39,15 @@ pub fn secret_functions() -> Vec<Box<dyn Function>> {
 /// Returns all VRL functions available in Vector.
 #[allow(clippy::disallowed_methods)]
 pub fn all() -> Vec<Box<dyn Function>> {
-    let functions = iter_all_without_vrl_stdlib().chain(vrl::stdlib::all());
+    let functions = iter_all_without_vrl_stdlib()
+        .chain(std::iter::once(
+            Box::new(parse_syslog::ParseSyslog) as Box<dyn Function>
+        ))
+        .chain(
+            vrl::stdlib::all()
+                .into_iter()
+                .filter(|function| function.identifier() != "parse_syslog"),
+        );
     functions.collect()
 }
 
