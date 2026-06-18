@@ -31,14 +31,12 @@ releases: {
 	#DeprecationEntry: {
 		what:             string
 		deprecated_since: string
-		description?:     string
+		description:      string
 	}
 
 	#EnactedDeprecationEntry: {
-		what:             string
-		deprecated_since: string
-		removed_in:       string
-		description?:     string
+		#DeprecationEntry
+		removed_in: string
 	}
 
 	#Release: {
