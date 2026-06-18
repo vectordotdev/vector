@@ -222,7 +222,7 @@ impl TransformConfig for SampleConfig {
         Input::new(DataType::Log | DataType::Trace)
     }
 
-    fn validate(&self, _: &schema::Definition) -> Result<(), Vec<String>> {
+    fn validate(&self, _: &TransformContext) -> Result<(), Vec<String>> {
         self.sample_rate()
             .map(|_| ())
             .map_err(|e| vec![e.to_string()])
@@ -317,7 +317,7 @@ mod tests {
             exclude: None,
         };
 
-        assert!(config.validate(&crate::schema::Definition::any()).is_ok());
+        assert!(config.validate(&crate::config::TransformContext::default()).is_ok());
     }
 
     #[test]

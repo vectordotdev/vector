@@ -9,7 +9,7 @@ use super::{
     ComponentKey, Config, OutputId, Resource, builder::ConfigBuilder,
     transform::get_transform_output_ids,
 };
-use crate::config::schema;
+use crate::config::TransformContext;
 
 /// Minimum value (exclusive) for EWMA alpha options.
 /// The alpha value must be strictly greater than this value.
@@ -234,10 +234,7 @@ pub fn check_outputs(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     }
 
     for (key, transform) in config.transforms.iter() {
-        // use the most general definition possible, since the real value isn't known yet.
-        let definition = schema::Definition::any();
-
-        if let Err(errs) = transform.inner.validate(&definition) {
+        if let Err(errs) = transform.inner.validate(&TransformContext::default()) {
             errors.extend(errs.into_iter().map(|msg| format!("Transform {key} {msg}")));
         }
 

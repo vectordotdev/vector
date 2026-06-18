@@ -210,6 +210,14 @@ impl AnyCondition {
             AnyCondition::Map(m) => m.build(enrichment_tables, metrics_storage),
         }
     }
+
+    pub fn validate(
+        &self,
+        enrichment_tables: &vector_lib::enrichment::TableRegistry,
+        metrics_storage: &MetricsStorage,
+    ) -> crate::Result<()> {
+        self.build(enrichment_tables, metrics_storage).map(|_| ())
+    }
 }
 
 impl From<ConditionConfig> for AnyCondition {

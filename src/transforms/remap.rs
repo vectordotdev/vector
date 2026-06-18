@@ -277,6 +277,16 @@ impl TransformConfig for RemapConfig {
         Ok(transform)
     }
 
+    fn validate(&self, context: &TransformContext) -> std::result::Result<(), Vec<String>> {
+        self.compile_vrl_program(
+            context.enrichment_tables.clone(),
+            context.metrics_storage.clone(),
+            context.merged_schema_definition.clone(),
+        )
+        .map(|_| ())
+        .map_err(|e| vec![e.to_string()])
+    }
+
     fn input(&self) -> Input {
         Input::all()
     }

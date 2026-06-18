@@ -101,7 +101,7 @@ impl TransformConfig for ExclusiveRouteConfig {
         Input::all()
     }
 
-    fn validate(&self, _: &schema::Definition) -> Result<(), Vec<String>> {
+    fn validate(&self, _: &TransformContext) -> Result<(), Vec<String>> {
         let mut errors = Vec::new();
 
         let mut counts = std::collections::HashMap::new();

@@ -162,6 +162,7 @@ pub struct TransformContext {
     /// (e.g. `aws_ec2_metadata`, `throttle`) clone this and pass it to [`crate::cpu_time::spawn_timed`] so
     /// their CPU is attributed to the component alongside the main transform task.
     pub cpu_ns: Option<Counter>,
+
 }
 
 impl Default for TransformContext {
@@ -250,7 +251,7 @@ pub trait TransformConfig: DynClone + NamedComponent + core::fmt::Debug + Send +
     ///
     /// If validation does not succeed, an error variant containing a list of all validation errors
     /// is returned.
-    fn validate(&self, _merged_definition: &schema::Definition) -> Result<(), Vec<String>> {
+    fn validate(&self, _context: &TransformContext) -> Result<(), Vec<String>> {
         Ok(())
     }
 

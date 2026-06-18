@@ -1,13 +1,15 @@
 #![allow(missing_docs)]
 
-use std::{fmt, fs::remove_dir_all, path::PathBuf};
+use std::{collections::HashMap, fmt, fs::remove_dir_all, path::PathBuf};
 
 use clap::Parser;
 use colored::*;
 use exitcode::ExitCode;
+use vector_vrl_metrics::MetricsStorage;
 
 use crate::{
-    config::{self, Config, ConfigDiff, loading::ConfigBuilderLoader},
+    config::{self, Config, ConfigDiff, TransformContext, loading::ConfigBuilderLoader},
+    schema::Definition,
     topology::{
         self,
         builder::{TopologyPieces, TopologyPiecesBuilder},
@@ -117,13 +119,13 @@ pub async fn validate(opts: &Opts, color: bool) -> ExitCode {
         None => return exitcode::CONFIG,
     };
 
-    if !opts.no_environment {
-        if let Some(tmp_directory) = create_tmp_directory(&mut config, &mut fmt) {
-            validated &= validate_environment(opts, &config, &mut fmt).await;
-            remove_tmp_directory(tmp_directory);
-        } else {
-            validated = false;
-        }
+    if opts.no_environment {
+        validated &= validate_transforms_no_environment(&config, &mut fmt).await;
+    } else if let Some(tmp_directory) = create_tmp_directory(&mut config, &mut fmt) {
+        validated &= validate_environment(opts, &config, &mut fmt).await;
+        remove_tmp_directory(tmp_directory);
+    } else {
+        validated = false;
     }
 
     if validated {
@@ -178,6 +180,54 @@ pub fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
     }
 
     Some(config)
+}
+
+async fn validate_transforms_no_environment(config: &Config, fmt: &mut Formatter) -> bool {
+    let enrichment_tables = vector_lib::enrichment::TableRegistry::default();
+    let metrics_storage = MetricsStorage::default();
+    let mut definition_cache = HashMap::new();
+    let mut errors = Vec::new();
+
+    for (key, transform) in config.transforms() {
+        let input_definitions = topology::schema::input_definitions(
+            &transform.inputs,
+            config,
+            enrichment_tables.clone(),
+            &mut definition_cache,
+        )
+        .unwrap_or_default();
+
+        let merged_schema_definition = input_definitions
+            .iter()
+            .map(|(_, definition)| definition.clone())
+            .reduce(Definition::merge)
+            .unwrap_or_else(Definition::any);
+
+        let context = TransformContext {
+            key: Some(key.clone()),
+            globals: config.global.clone(),
+            enrichment_tables: enrichment_tables.clone(),
+            metrics_storage: metrics_storage.clone(),
+            merged_schema_definition,
+            schema: config.schema,
+            ..Default::default()
+        };
+
+        if let Err(errs) = transform.inner.validate(&context) {
+            for err in errs {
+                errors.push(format!("Transform \"{key}\": {err}"));
+            }
+        }
+    }
+
+    if errors.is_empty() {
+        fmt.success("Transform configuration");
+        true
+    } else {
+        fmt.title("Transform errors");
+        fmt.sub_error(errors);
+        false
+    }
 }
 
 async fn validate_environment(opts: &Opts, config: &Config, fmt: &mut Formatter) -> bool {
