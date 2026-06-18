@@ -1105,7 +1105,7 @@ impl RunningTopology {
             .transforms()
             .filter(|(key, _)| !diff.transforms.contains(key));
         for (transform_key, transform) in unchanged_transforms {
-            let changed_outputs = get_changed_outputs(diff, transform.inputs.clone());
+            let changed_outputs = get_changed_outputs(&self.config, diff, transform.inputs.clone());
             for output_id in changed_outputs {
                 debug!(component_id = %transform_key, fanout_id = %output_id.component, "Reattaching component input to fanout.");
 
@@ -1115,12 +1115,20 @@ impl RunningTopology {
             }
         }
 
+        let unchanged_table_sinks = self
+            .config
+            .enrichment_tables()
+            .filter(|(key, _)| !diff.enrichment_tables.contains(key))
+            .filter_map(|(key, table)| table.as_sink(key))
+            .collect::<Vec<_>>();
         let unchanged_sinks = self
             .config
             .sinks()
             .filter(|(key, _)| !diff.sinks.contains(key));
-        for (sink_key, sink) in unchanged_sinks {
-            let changed_outputs = get_changed_outputs(diff, sink.inputs.clone());
+        for (sink_key, sink) in
+            unchanged_sinks.chain(unchanged_table_sinks.iter().map(|(k, v)| (k, v)))
+        {
+            let changed_outputs = get_changed_outputs(&self.config, diff, sink.inputs.clone());
             for output_id in changed_outputs {
                 debug!(component_id = %sink_key, fanout_id = %output_id.component, "Reattaching component input to fanout.");
 
@@ -1475,10 +1483,30 @@ impl RunningTopology {
     }
 }
 
-fn get_changed_outputs(diff: &ConfigDiff, output_ids: Inputs<OutputId>) -> Vec<OutputId> {
+fn get_changed_outputs(
+    config: &Config,
+    diff: &ConfigDiff,
+    output_ids: Inputs<OutputId>,
+) -> Vec<OutputId> {
     let mut changed_outputs = Vec::new();
 
-    for source_key in &diff.sources.to_change {
+    let to_change_table_sources = diff
+        .enrichment_tables
+        .to_change
+        .iter()
+        .filter_map(|key| {
+            config
+                .enrichment_table(key)
+                .and_then(|t| t.as_source(key))
+                .map(|(key, _)| key.clone())
+        })
+        .collect::<Vec<_>>();
+    for source_key in diff
+        .sources
+        .to_change
+        .iter()
+        .chain(to_change_table_sources.iter())
+    {
         changed_outputs.extend(
             output_ids
                 .iter()
