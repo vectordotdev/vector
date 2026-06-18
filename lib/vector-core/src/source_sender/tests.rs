@@ -310,45 +310,6 @@ fn assert_buffer_metrics(buffer_size: usize, level: usize) {
     assert_eq!(*value, buffer_size as f64);
 }
 
-// ── PostProcessor tests ──────────────────────────────────────────────────────
-
-/// Processor that inserts a boolean field into every log event, counting calls.
-struct InsertFieldProcessor {
-    call_count: Arc<AtomicUsize>,
-}
-
-impl PostProcessor for InsertFieldProcessor {
-    fn process_log(&self, event: &mut LogEvent) {
-        self.call_count.fetch_add(1, Ordering::SeqCst);
-        event.insert(event_path!("post_processed"), true);
-    }
-
-    fn process_metric(&self, _event: &mut Metric) {}
-
-    fn process_trace(&self, _event: &mut TraceEvent) {}
-}
-
-/// Processor that counts calls per event type to verify typed dispatch.
-struct DispatchCountProcessor {
-    logs: Arc<AtomicUsize>,
-    metrics: Arc<AtomicUsize>,
-    traces: Arc<AtomicUsize>,
-}
-
-impl PostProcessor for DispatchCountProcessor {
-    fn process_log(&self, _event: &mut LogEvent) {
-        self.logs.fetch_add(1, Ordering::SeqCst);
-    }
-
-    fn process_metric(&self, _event: &mut Metric) {
-        self.metrics.fetch_add(1, Ordering::SeqCst);
-    }
-
-    fn process_trace(&self, _event: &mut TraceEvent) {
-        self.traces.fetch_add(1, Ordering::SeqCst);
-    }
-}
-
 /// Build a sender with the given post-processor using the `set_post_processor` modifier.
 fn make_sender_with_post_processor(
     pp: &Arc<dyn PostProcessor>,
@@ -379,6 +340,22 @@ async fn post_processor_none_is_noop() {
         Some(&vrl::value::Value::from("world"))
     );
     assert!(log.get(event_path!("post_processed")).is_none());
+}
+
+/// Processor that inserts a boolean field into every log event, counting calls.
+struct InsertFieldProcessor {
+    call_count: Arc<AtomicUsize>,
+}
+
+impl PostProcessor for InsertFieldProcessor {
+    fn process_log(&self, event: &mut LogEvent) {
+        self.call_count.fetch_add(1, Ordering::SeqCst);
+        event.insert(event_path!("post_processed"), true);
+    }
+
+    fn process_metric(&self, _event: &mut Metric) {}
+
+    fn process_trace(&self, _event: &mut TraceEvent) {}
 }
 
 #[tokio::test]
@@ -420,6 +397,27 @@ async fn post_processor_mutates_log_events() {
         1,
         "processor must be called exactly once"
     );
+}
+
+/// Processor that counts calls per event type to verify typed dispatch.
+struct DispatchCountProcessor {
+    logs: Arc<AtomicUsize>,
+    metrics: Arc<AtomicUsize>,
+    traces: Arc<AtomicUsize>,
+}
+
+impl PostProcessor for DispatchCountProcessor {
+    fn process_log(&self, _event: &mut LogEvent) {
+        self.logs.fetch_add(1, Ordering::SeqCst);
+    }
+
+    fn process_metric(&self, _event: &mut Metric) {
+        self.metrics.fetch_add(1, Ordering::SeqCst);
+    }
+
+    fn process_trace(&self, _event: &mut TraceEvent) {
+        self.traces.fetch_add(1, Ordering::SeqCst);
+    }
 }
 
 #[tokio::test]

@@ -28,7 +28,7 @@ use super::{CHUNK_SIZE, PostProcessor, SendError, SourceSenderItem};
 use crate::{
     EstimatedJsonEncodedSizeOf,
     config::{OutputId, log_schema},
-    event::{Event, EventArray, EventContainer as _, EventMutRef, EventRef},
+    event::{Event, EventArray, EventContainer as _, EventRef, array},
     schema::Definition,
 };
 
@@ -195,11 +195,7 @@ impl Output {
         if let Some(ref pp) = self.post_processor {
             events.iter_events_mut().for_each(|mut event| {
                 let original_finalizers = event.metadata_mut().take_finalizers();
-                match event {
-                    EventMutRef::Log(ref mut log) => pp.process_log(log),
-                    EventMutRef::Metric(ref mut metric) => pp.process_metric(metric),
-                    EventMutRef::Trace(ref mut trace) => pp.process_trace(trace),
-                }
+                pp.process(&mut event);
                 let new_finalizers = event.metadata_mut().take_finalizers();
                 event.metadata_mut().merge_finalizers(original_finalizers);
                 event.metadata_mut().merge_finalizers(new_finalizers);
@@ -309,7 +305,7 @@ impl Output {
         let mut unsent_event_count = UnsentEventCount::new(events.len());
         let send_batch_start = Instant::now();
 
-        for events in crate::event::array::events_into_arrays(events, Some(CHUNK_SIZE)) {
+        for events in array::events_into_arrays(events, Some(CHUNK_SIZE)) {
             self.send_inner(events, &mut unsent_event_count, reference)
                 .await
                 .inspect_err(|error| {

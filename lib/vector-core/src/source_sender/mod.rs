@@ -43,4 +43,17 @@ pub trait PostProcessor: Send + Sync {
     fn process_metric(&self, _event: &mut crate::event::Metric) {}
     /// Called once for every [`crate::event::TraceEvent`] in a batch.
     fn process_trace(&self, _event: &mut crate::event::TraceEvent) {}
+
+    /// Dispatches a single event to the appropriate typed method.
+    ///
+    /// Override [`process_log`](Self::process_log), [`process_metric`](Self::process_metric), or
+    /// [`process_trace`](Self::process_trace) rather than this method unless you need to handle
+    /// all variants uniformly.
+    fn process(&self, event: &mut crate::event::EventMutRef<'_>) {
+        match event {
+            crate::event::EventMutRef::Log(log) => self.process_log(log),
+            crate::event::EventMutRef::Metric(metric) => self.process_metric(metric),
+            crate::event::EventMutRef::Trace(trace) => self.process_trace(trace),
+        }
+    }
 }
