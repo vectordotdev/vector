@@ -1,7 +1,7 @@
 use std::{
     fs::File,
     io::{BufReader, BufWriter, Write},
-    num::NonZeroUsize,
+    num::{NonZeroU64, NonZeroUsize},
     path::PathBuf,
     pin::Pin,
     sync::{
@@ -103,7 +103,7 @@ pub struct CuckooMemoryConfig {
     ///
     /// By default, export is only done on exit.
     #[serde(skip_serializing_if = "vector_lib::serde::is_default")]
-    pub export_interval: Option<u64>,
+    pub export_interval: Option<NonZeroU64>,
     /// Number of threads to use for scanning and updating LRU/TTL.
     ///
     /// By default, scanning is single threaded.
@@ -467,6 +467,7 @@ impl StreamSink<Event> for CuckooMemoryTable {
         let mut export_interval: Pin<Box<dyn Stream<Item = Instant> + Send>> = self
             .cuckoo_config
             .export_interval
+            .map(NonZeroU64::get)
             .map(Duration::from_secs)
             .map::<Pin<Box<dyn Stream<Item = Instant> + Send>>, _>(|d| {
                 Box::pin(IntervalStream::new(interval(d)))
