@@ -293,6 +293,7 @@ impl TcpSourceAcker for LogstashAcker {
     fn build_ack(self, ack: TcpSourceAck) -> Option<Bytes> {
         match ack {
             TcpSourceAck::Ack if !self.acknowledgements.is_empty() => {
+                debug!(message = "Sending Lumberjack ACK(s).", acks = ?self.acknowledgements);
                 let mut bytes: Vec<u8> = Vec::with_capacity(self.acknowledgements.len() * 6);
                 for (protocol_version, sequence_number) in self.acknowledgements {
                     bytes.push(protocol_version.into());
@@ -539,12 +540,21 @@ impl Decoder for LogstashDecoder {
 
                     use LogstashFrameType::*;
 
-                    match LogstashFrameType::try_from(src.get_u8())? {
-                        WindowSize => LogstashDecoderReadState::ReadFrame(protocol, WindowSize),
-                        Data => LogstashDecoderReadState::ReadFrame(protocol, Data),
-                        Json => LogstashDecoderReadState::ReadFrame(protocol, Json),
-                        Compressed => LogstashDecoderReadState::ReadFrame(protocol, Compressed),
-                        Ack => LogstashDecoderReadState::ReadFrame(protocol, Ack),
+                    let frame_type = src.get_u8();
+                    match LogstashFrameType::try_from(frame_type) {
+                        Ok(WindowSize) => LogstashDecoderReadState::ReadFrame(protocol, WindowSize),
+                        Ok(Data) => LogstashDecoderReadState::ReadFrame(protocol, Data),
+                        Ok(Json) => LogstashDecoderReadState::ReadFrame(protocol, Json),
+                        Ok(Compressed) => LogstashDecoderReadState::ReadFrame(protocol, Compressed),
+                        Ok(Ack) => LogstashDecoderReadState::ReadFrame(protocol, Ack),
+                        Err(error) => {
+                            debug!(
+                                message = "Unexpected frame type byte; stream may be misframed.",
+                                frame_type_byte = frame_type,
+                                buffer_head = ?&src[..src.len().min(16)],
+                            );
+                            return Err(error);
+                        }
                     }
                 }
                 // A `WindowSize` frame opens a new ack domain; its value is unused
@@ -556,8 +566,13 @@ impl Decoder for LogstashDecoder {
                         return Ok(None);
                     }
 
-                    let _window_size = src.get_u32();
+                    let window_size = src.get_u32();
                     self.window.open();
+                    debug!(
+                        message = "Opened Lumberjack writer window.",
+                        window_id = self.window.current,
+                        advertised_size = window_size,
+                    );
 
                     LogstashDecoderReadState::ReadProtocol
                 }
