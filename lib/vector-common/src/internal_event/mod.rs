@@ -6,6 +6,7 @@ pub mod component_events_timed_out;
 mod events_received;
 mod events_sent;
 pub mod metric_name;
+pub mod metric_tags;
 mod optional_tag;
 mod prelude;
 pub mod service;
