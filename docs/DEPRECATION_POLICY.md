@@ -87,6 +87,17 @@ When introducing a deprecation into Vector, the pull request introducing the dep
 - Add a `WARN`-level log message starting with the word `DEPRECATION` if Vector detects the deprecated configuration
   or feature being used (when possible).
 
+### Breaking changes require a prior announcement
+
+A breaking change (any PR with a `type="breaking"` changelog fragment, or a removal of a deprecated feature) should
+normally have been announced in an earlier release via a `deprecation.d/` fragment. Reviewers should ask the contributor
+to land the announcement first, then come back to ship the removal after the migration window has passed (see the
+[Policy](#policy) section for the minimum window).
+
+The exception is the one already listed in [Policy](#policy): a security issue or critical bug may justify shipping a
+breaking change without a prior announcement. Call that out explicitly in the PR description so reviewers can apply
+the exception consciously rather than by oversight.
+
 When removing a deprecation in a subsequent release, the pull request should:
 
 - Mark the change as breaking by including `!` in the title after the type/scope.
