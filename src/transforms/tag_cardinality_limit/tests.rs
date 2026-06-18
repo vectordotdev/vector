@@ -1590,10 +1590,6 @@ fn fingerprint_mode_deserializes() {
     );
 }
 
-// ============================================================================
-// cache_size_per_key override tests
-// ============================================================================
-
 /// `apply_cache_size_override` replaces the bloom size when mode is probabilistic and an
 /// override is given; leaves the mode unchanged in all other cases.
 #[test]

@@ -2,6 +2,32 @@ package metadata
 
 generated: configuration: {
 	configuration: {
+		api: {
+			type: object: options: {
+				address: {
+					type: string: {
+						default: "127.0.0.1:8686"
+						examples: ["0.0.0.0:8686", "127.0.0.1:1234"]
+					}
+					description: """
+						The network address to which the API should bind. If you're running
+						Vector in a Docker container, bind to `0.0.0.0`. Otherwise
+						the API will not be exposed outside the container.
+						"""
+					common:   true
+					required: false
+				}
+				enabled: {
+					type: bool: default: false
+					description: "Whether the API is enabled for this Vector instance."
+					common:      true
+					required:    false
+				}
+			}
+			description: "API options."
+			warnings: ["The API currently does not support authentication. Only enable it in isolated environments or for debugging. It must not be exposed to untrusted clients."]
+			group: "api"
+		}
 		enrichment_tables: {
 			type: object: options: "*": {
 				type: object: options: {
@@ -132,8 +158,9 @@ generated: configuration: {
 								required: true
 							}
 						}
-						description: "File-specific settings."
-						required:    true
+						description:   "File-specific settings."
+						required:      true
+						relevant_when: "type = \"file\""
 					}
 					schema: {
 						type: object: options: "*": {
@@ -186,11 +213,175 @@ generated: configuration: {
 														[rfc3339]: https://tools.ietf.org/html/rfc3339
 														[chrono_fmt]: https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
 														"""
-						required: false
+						required:      false
+						relevant_when: "type = \"file\""
+					}
+					flush_interval: {
+						type: uint: {}
+						description: """
+														The interval used for making writes visible in the table.
+														Longer intervals might get better performance,
+														but there is a longer delay before the data is visible in the table.
+														Since every TTL scan makes its changes visible, only use this value
+														if it is shorter than the `scan_interval`.
+
+														By default, all writes are made visible immediately.
+														"""
+						required:      false
+						relevant_when: "type = \"memory\""
+					}
+					internal_metrics: {
+						type: object: options: include_key_tag: {
+							type: bool: default: false
+							description: """
+																		Determines whether to include the key tag on internal metrics.
+
+																		This is useful for distinguishing between different keys while monitoring. However, the tag's
+																		cardinality is unbounded.
+																		"""
+							required: false
+						}
+						description:   "Configuration of internal metrics"
+						required:      false
+						relevant_when: "type = \"memory\""
+					}
+					max_byte_size: {
+						type: uint: {}
+						description: """
+														Maximum size of the table in bytes. All insertions that make
+														this table bigger than the maximum size are rejected.
+
+														By default, there is no size limit.
+														"""
+						required:      false
+						relevant_when: "type = \"memory\""
+					}
+					scan_interval: {
+						type: uint: default: 30
+						description: """
+														The scan interval used to look for expired records. This is provided
+														as an optimization to ensure that TTL is updated, but without doing
+														too many cache scans.
+														"""
+						required:      false
+						relevant_when: "type = \"memory\""
+					}
+					source_config: {
+						type: object: options: {
+							export_batch_size: {
+								type: uint: {}
+								description: """
+																		Batch size for data exporting. Used to prevent exporting entire table at
+																		once and blocking the system.
+
+																		By default, batches are not used and entire table is exported.
+																		"""
+								required: false
+							}
+							export_expired_items: {
+								type: bool: default: false
+								description: """
+																		Set to true to export expired items via the `expired` output port.
+																		Expired items ignore other settings and are exported as they are flushed from the table.
+																		"""
+								required: false
+							}
+							export_interval: {
+								type: uint: {}
+								description: "Interval for exporting all data from the table when used as a source."
+								required:    false
+							}
+							remove_after_export: {
+								type: bool: default: false
+								description: """
+																		If set to true, all data will be removed from cache after exporting.
+																		Only valid if used as a source and export_interval > 0
+
+																		By default, export will not remove data from cache
+																		"""
+								required: false
+							}
+							source_key: {
+								type: string: {}
+								description: """
+																		Key to use for this component when used as a source. This must be different from the
+																		component key.
+																		"""
+								required: true
+							}
+						}
+						description:   "Configuration for source functionality."
+						required:      false
+						relevant_when: "type = \"memory\""
+					}
+					ttl: {
+						type: uint: default: 600
+						description: """
+														TTL (time-to-live in seconds) is used to limit the lifetime of data stored in the cache.
+														When TTL expires, data behind a specific key in the cache is removed.
+														TTL is reset when the key is replaced.
+														"""
+						required:      false
+						relevant_when: "type = \"memory\""
+					}
+					ttl_field: {
+						type: string: default: ""
+						description:   "Field in the incoming value used as the TTL override."
+						required:      false
+						relevant_when: "type = \"memory\""
+					}
+					locale: {
+						type: string: default: "en"
+						description: """
+														The locale to use when querying the database.
+
+														MaxMind includes localized versions of some of the fields within their database, such as
+														country name. This setting can control which of those localized versions are returned by the
+														transform.
+
+														More information on which portions of the geolocation data are localized, and what languages
+														are available, can be found [here][locale_docs].
+
+														[locale_docs]: https://support.maxmind.com/hc/en-us/articles/4414877149467-IP-Geolocation-Data#h_01FRRGRYTGZB29ERDBZCX3MR8Q
+														"""
+						required:      false
+						relevant_when: "type = \"geoip\""
+					}
+					path: {
+						type: string: {}
+						description: """
+														Path to the [MaxMind GeoIP2][geoip2] or [GeoLite2 binary city database file][geolite2]
+														(**GeoLite2-City.mmdb**).
+
+														Other databases, such as the country database, are not supported.
+														`mmdb` enrichment table can be used for other databases.
+
+														[geoip2]: https://dev.maxmind.com/geoip/geoip2/downloadable
+														[geolite2]: https://dev.maxmind.com/geoip/geoip2/geolite2/#Download_Access
+														"""
+						required:      true
+						relevant_when: "type = \"geoip\" or type = \"mmdb\""
 					}
 					type: {
 						required: true
-						type: string: enum: file: "Exposes data from a static file as an enrichment table."
+						type: string: enum: {
+							file: "Exposes data from a static file as an enrichment table."
+							memory: """
+																	Exposes data from a memory cache as an enrichment table. The cache can be written to using
+																	a sink.
+																	"""
+							geoip: """
+																	Exposes data from a [MaxMind][maxmind] [GeoIP2][geoip2] database as an enrichment table.
+
+																	[maxmind]: https://www.maxmind.com/
+																	[geoip2]: https://www.maxmind.com/en/geoip2-databases
+																	"""
+							mmdb: """
+																	Exposes data from a [MaxMind][maxmind] database as an enrichment table.
+
+																	[maxmind]: https://www.maxmind.com/
+																	"""
+						}
 						description: "enrichment table type"
 					}
 				}
@@ -345,12 +536,253 @@ generated: configuration: {
 						required:      false
 						relevant_when: "type = \"exec\""
 					}
+					auth: {
+						type: object: options: {
+							access_key_id: {
+								type: string: examples: ["AKIAIOSFODNN7EXAMPLE"]
+								description: "The AWS access key ID."
+								required:    true
+							}
+							assume_role: {
+								type: string: examples: ["arn:aws:iam::123456789098:role/my_role"]
+								description: """
+																		The ARN of an [IAM role][iam_role] to assume.
+
+																		[iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
+																		"""
+								required: true
+							}
+							external_id: {
+								type: string: examples: ["randomEXAMPLEidString"]
+								description: """
+																		The optional unique external ID in conjunction with role to assume.
+
+																		[external_id]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create_for-user_externalid.html
+																		"""
+								required: false
+							}
+							region: {
+								type: string: examples: ["us-west-2"]
+								description: """
+																		The [AWS region][aws_region] to send STS requests to.
+
+																		If not set, this defaults to the configured region
+																		for the service itself.
+
+																		[aws_region]: https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints
+																		"""
+								required: false
+							}
+							secret_access_key: {
+								type: string: examples: ["wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"]
+								description: "The AWS secret access key."
+								required:    true
+							}
+							session_name: {
+								type: string: examples: ["vector-indexer-role"]
+								description: """
+																		The optional [RoleSessionName][role_session_name] is a unique session identifier for your assumed role.
+
+																		Should be unique per principal or reason.
+																		If not set, the session name is autogenerated like assume-role-provider-1736428351340
+
+																		[role_session_name]: https://docs.aws.amazon.com/STS/latest/APIReference/API_AssumeRole.html
+																		"""
+								required: false
+							}
+							session_token: {
+								type: string: examples: ["AQoDYXdz...AQoDYXdz..."]
+								description: """
+																		The AWS session token.
+																		See [AWS temporary credentials](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp_use-resources.html)
+																		"""
+								required: false
+							}
+							credentials_file: {
+								type: string: examples: ["/my/aws/credentials"]
+								description: "Path to the credentials file."
+								required:    true
+							}
+							profile: {
+								type: string: {
+									default: "default"
+									examples: ["develop"]
+								}
+								description: """
+																		The credentials profile to use.
+
+																		Used to select AWS credentials from a provided credentials file.
+																		"""
+								required: false
+							}
+							imds: {
+								type: object: options: {
+									connect_timeout_seconds: {
+										type: uint: {
+											default: 1
+											unit:    "seconds"
+										}
+										description: "Connect timeout for IMDS."
+										required:    false
+									}
+									max_attempts: {
+										type: uint: default: 4
+										description: "Number of IMDS retries for fetching tokens and metadata."
+										required:    false
+									}
+									read_timeout_seconds: {
+										type: uint: {
+											default: 1
+											unit:    "seconds"
+										}
+										description: "Read timeout for IMDS."
+										required:    false
+									}
+								}
+								description: "Configuration for authenticating with AWS through IMDS."
+								required:    false
+							}
+							load_timeout_secs: {
+								type: uint: {
+									examples: [30]
+									unit: "seconds"
+								}
+								description: """
+																		Timeout for successfully loading any credentials, in seconds.
+
+																		Relevant when the default credentials chain or `assume_role` is used.
+																		"""
+								required: false
+							}
+						}
+						description:   "Configuration of the authentication strategy for interacting with AWS services."
+						required:      false
+						relevant_when: "type = \"aws_secrets_manager\""
+					}
+					secret_id: {
+						type: string: {}
+						description:   "ID of the secret to resolve."
+						required:      true
+						relevant_when: "type = \"aws_secrets_manager\""
+					}
+					tls: {
+						type: object: options: {
+							alpn_protocols: {
+								type: array: items: type: string: examples: ["h2"]
+								description: """
+																		Sets the list of supported ALPN protocols.
+
+																		Declare the supported ALPN protocols, which are used during negotiation with a peer. They are prioritized in the order
+																		that they are defined.
+																		"""
+								required: false
+							}
+							ca_file: {
+								type: string: examples: ["/path/to/certificate_authority.crt"]
+								description: """
+																		Absolute path to an additional CA certificate file.
+
+																		The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
+																		"""
+								required: false
+							}
+							crt_file: {
+								type: string: examples: ["/path/to/host_certificate.crt"]
+								description: """
+																		Absolute path to a certificate file used to identify this server.
+
+																		The certificate must be in DER, PEM (X.509), or PKCS#12 format. Additionally, the certificate can be provided as
+																		an inline string in PEM format.
+
+																		If this is set _and_ is not a PKCS#12 archive, `key_file` must also be set.
+																		"""
+								required: false
+							}
+							key_file: {
+								type: string: examples: ["/path/to/host_certificate.key"]
+								description: """
+																		Absolute path to a private key file used to identify this server.
+
+																		The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
+																		"""
+								required: false
+							}
+							key_pass: {
+								type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
+								description: """
+																		Passphrase used to unlock the encrypted key file.
+
+																		This has no effect unless `key_file` is set.
+																		"""
+								required: false
+							}
+							server_name: {
+								type: string: examples: ["www.example.com"]
+								description: """
+																		Server name to use when using Server Name Indication (SNI).
+
+																		Only relevant for outgoing connections.
+																		"""
+								required: false
+							}
+							verify_certificate: {
+								type: bool: {}
+								description: """
+																		Enables certificate verification. For components that create a server, this requires that the
+																		client connections have a valid client certificate. For components that initiate requests,
+																		this validates that the upstream has a valid certificate.
+
+																		If enabled, certificates must not be expired and must be issued by a trusted
+																		issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
+																		certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
+																		so on, until the verification process reaches a root certificate.
+
+																		Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
+																		"""
+								required: false
+							}
+							verify_hostname: {
+								type: bool: {}
+								description: """
+																		Enables hostname verification.
+
+																		If enabled, the hostname used to connect to the remote host must be present in the TLS certificate presented by
+																		the remote host, either as the Common Name or as an entry in the Subject Alternative Name extension.
+
+																		Only relevant for outgoing connections.
+
+																		Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
+																		"""
+								required: false
+							}
+						}
+						description:   "TLS configuration."
+						required:      false
+						relevant_when: "type = \"aws_secrets_manager\""
+					}
+					endpoint: {
+						type: string: examples: ["http://127.0.0.0:5000/path/to/service"]
+						description:   "Custom endpoint for use with AWS-compatible services."
+						required:      false
+						relevant_when: "type = \"aws_secrets_manager\""
+					}
+					region: {
+						type: string: examples: ["us-east-1"]
+						description: """
+														The [AWS region][aws_region] of the target service.
+
+														[aws_region]: https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints
+														"""
+						required:      false
+						relevant_when: "type = \"aws_secrets_manager\""
+					}
 					type: {
 						required: true
 						type: string: enum: {
-							file:      "File."
-							directory: "Directory."
-							exec:      "Exec."
+							file:                "File."
+							directory:           "Directory."
+							exec:                "Exec."
+							aws_secrets_manager: "AWS Secrets Manager."
 						}
 						description: "secret type"
 					}
