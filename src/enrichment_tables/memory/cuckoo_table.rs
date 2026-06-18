@@ -4,6 +4,10 @@ use std::{
     num::NonZeroUsize,
     path::PathBuf,
     pin::Pin,
+    sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    },
     time::Duration,
 };
 
@@ -469,6 +473,8 @@ impl StreamSink<Event> for CuckooMemoryTable {
             })
             .unwrap_or(Box::pin(stream::empty()));
 
+        let scans_in_progress = Arc::new(AtomicUsize::new(0));
+
         loop {
             tokio::select! {
                 event = input.next() => {
@@ -505,11 +511,17 @@ impl StreamSink<Event> for CuckooMemoryTable {
                 }
 
                 Some(_) = scan_interval.next() => {
+                    if scans_in_progress.load(Ordering::Acquire) > 0 {
+                        warn!("Previous scan still in progress for cuckoo enrichment table. New scan will be skipped until previous one is complete. Consider increasing scan interval.");
+                        continue;
+                    }
                     let mut handles = JoinSet::new();
                     let filter = self.filter.clone();
                     let count = self.cuckoo_config.scanning_threads.unwrap_or(NonZeroUsize::new(1).unwrap());
+                    scans_in_progress.fetch_add(count.get(), Ordering::AcqRel);
                     for i in 0..count.get() {
                         let filter = filter.clone();
+                        let scans_in_progress = Arc::clone(&scans_in_progress);
                         let task = async move {
                             let expired = filter.scan_and_update_full_partition(count, i);
                             emit!(MemoryEnrichmentTableTtlExpiredCount {
@@ -519,6 +531,7 @@ impl StreamSink<Event> for CuckooMemoryTable {
                                 new_objects_count: filter.get_item_count(),
                                 new_byte_size: filter.get_memory_usage()
                             });
+                            scans_in_progress.fetch_sub(1, Ordering::AcqRel);
                         };
                         if !self.cuckoo_config.concurrent_scanning {
                             handles.spawn(task);
