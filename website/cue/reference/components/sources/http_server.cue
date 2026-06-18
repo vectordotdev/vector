@@ -4,7 +4,6 @@ components: sources: http_server: {
 	_port: 80
 
 	title: "HTTP Server"
-	alias: "http"
 
 	classes: {
 		delivery: "at_least_once"
