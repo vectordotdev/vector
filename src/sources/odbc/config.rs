@@ -222,7 +222,8 @@ impl OdbcConfig {
         let uses_init_params_or_metadata =
             self.statement_init_params.is_some() || self.last_run_metadata_path.is_some();
 
-        if uses_init_params_or_metadata && self.tracking_columns.as_ref().is_none_or(Vec::is_empty) {
+        if uses_init_params_or_metadata && self.tracking_columns.as_ref().is_none_or(Vec::is_empty)
+        {
             return Err(
                 "`tracking_columns` must be set when using `statement_init_params` or `last_run_metadata_path`"
                     .to_owned(),
