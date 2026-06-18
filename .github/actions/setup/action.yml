@@ -145,15 +145,18 @@ runs:
     # won the save lock, persisting an almost-empty target/ and locking out
     # heavier jobs (check-clippy, build) from saving their actual artifacts.
     #
-    # Swatinem appends rustc + Cargo.lock hashes to the prefix-key, so a new
-    # entry is created per Cargo.lock change. With master-only saves and LRU
-    # eviction, this keeps the 10 GB GHA cache budget under control. If it
-    # saturates, consider `add-rust-environment-hash-key: false` to drop those.
+    # `add-rust-environment-hash-key: false` suppresses Swatinem's rustc +
+    # Cargo.lock hash suffixes, giving one fixed entry per job that is
+    # overwritten on every master save. Without this, each Cargo.lock bump
+    # creates a new ~1-3 GB entry per job, quickly saturating the 10 GB GHA
+    # cache budget. Cargo's internal fingerprint system handles invalidation
+    # inside the cached target/ — changed crates recompile, unchanged ones hit.
     - name: Cache Cargo + target/
       if: ${{ inputs.cargo-cache == 'true' || env.NEEDS_RUST == 'true' }}
       uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
       with:
         prefix-key: "v1-vector"
+        add-rust-environment-hash-key: "false"
         save-if: ${{ github.ref == 'refs/heads/master' }}
 
     - name: Install mold
