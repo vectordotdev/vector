@@ -143,11 +143,11 @@ impl<'a> Builder<'a> {
         self.build_transforms(enrichment_tables).await;
         self.build_sinks(enrichment_tables).await;
 
-        // We should have all the data for the enrichment tables loaded now, so switch them over to
-        // readonly.
-        enrichment_tables.finish_load();
-
         if self.errors.is_empty() {
+            // We should have all the data for the enrichment tables loaded now, so switch them over to
+            // readonly.
+            enrichment_tables.finish_load();
+
             Ok(TopologyPieces {
                 inputs: self.inputs,
                 outputs: Self::finalize_outputs(self.outputs),
