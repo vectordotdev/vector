@@ -317,7 +317,11 @@ mod tests {
             exclude: None,
         };
 
-        assert!(config.validate(&crate::config::TransformContext::default()).is_ok());
+        assert!(
+            config
+                .validate(&crate::config::TransformContext::default())
+                .is_ok()
+        );
     }
 
     #[test]
