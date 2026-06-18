@@ -1,0 +1,34 @@
+name: Auto-tag vdev on version bump
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - "vdev/Cargo.toml"
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 2
+
+      - name: Create tag if version changed
+        run: |
+          current=$(grep '^version = ' vdev/Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+          previous=$(git show HEAD~1:vdev/Cargo.toml | grep '^version = ' | head -1 | sed 's/version = "\(.*\)"/\1/')
+
+          if [ "$current" = "$previous" ]; then
+            echo "vdev version unchanged ($current), skipping tag"
+            exit 0
+          fi
+
+          tag="vdev-v${current}"
+          echo "Version changed $previous -> $current, creating tag $tag"
+          git tag "$tag"
+          git push origin "$tag"
