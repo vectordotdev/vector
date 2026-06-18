@@ -88,16 +88,30 @@ where
                 // here would needlessly drop sub-items that the overflow could
                 // accept. Holding the writer lock makes the check race-free against
                 // other writers (only writers grow the buffer; readers only shrink).
-                //
-                // Note: this handles the steady-state-full case. The narrower
-                // "buffer has slack but not enough for this specific record" case
-                // (`can_write_record` returning false inside `try_write_record`)
-                // still has the item filtered before the rejection — that requires
-                // knowing the encoded size pre-encode, which we cannot do cheaply.
                 if writer.is_buffer_full() {
                     return Ok(Some(item));
                 }
 
+                // KNOWN LIMITATION (accepted; tracked as a follow-up): past the
+                // steady-state-full check above, over-budget sub-items are filtered
+                // and dropped here even in `WhenFull::Overflow`, so a non-protobuf
+                // overflow stage (e.g. in-memory) never gets the chance to accept
+                // them. This surfaces two ways:
+                //   1. the item is partially over-budget and `try_write_record`
+                //      below then rejects the *remainder* for fullness — the
+                //      overflow receives the item minus the already-dropped events;
+                //   2. the item is fully over-budget — `filter_unencodable` returns
+                //      `None` and the whole item is dropped before any capacity
+                //      check, so nothing overflows.
+                // Routing unencodable items by `WhenFull` (drop in Block/DropNewest,
+                // overflow otherwise) is a `BufferSender`-level policy decision,
+                // whereas filtering lives here in the backend; reconciling the two
+                // is deferred. The window is narrow and atypical: it requires a
+                // disk-v2 stage in `Overflow` mode (disk is normally the terminal
+                // Block stage), a non-protobuf overflow target, an over-budget
+                // event (>32 nesting levels), and a downstream egress that could
+                // actually deliver it. In other topologies these events are dropped
+                // a stage later regardless.
                 let pre_count = item.event_count() as u64;
                 let pre_size = item.size_of() as u64;
                 let Some(item) = item.filter_unencodable() else {
