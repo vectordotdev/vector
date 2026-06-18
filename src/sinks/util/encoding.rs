@@ -222,14 +222,14 @@ mod tests {
     use vector_lib::{
         codecs::{
             CharacterDelimitedEncoder, JsonSerializerConfig, LengthDelimitedEncoder,
-            NativeSerializerConfig, NewlineDelimitedEncoder, TextSerializerConfig,
+            NewlineDelimitedEncoder, TextSerializerConfig,
             encoding::{ProtobufSerializerConfig, ProtobufSerializerOptions},
         },
         event::LogEvent,
         internal_event::CountByteSize,
         json_size::JsonSize,
     };
-    use vrl::value::{KeyString, ObjectMap, Value};
+    use vrl::value::{KeyString, Value};
 
     cfg_if! {
         if #[cfg(feature = "codecs-arrow")] {
@@ -616,93 +616,5 @@ mod tests {
             .expect("EncoderRecordBatchError should be emitted on ArrowJsonDecode failure");
         contains_name_once("ComponentEventsDropped")
             .expect("ComponentEventsDropped should be emitted by the wrapper");
-    }
-
-    /// Legitimately empty payloads (text serializer with a log carrying no
-    /// `message` field) must keep their framing: the dropped-event shortcut
-    /// added for the native serializer must not swallow real empty records,
-    /// otherwise NDJSON consumers would lose the per-event newline.
-    #[test]
-    fn test_encode_batch_text_empty_message_keeps_newline_framing() {
-        let encoding = (
-            Transformer::default(),
-            vector_lib::codecs::Encoder::<Framer>::new(
-                NewlineDelimitedEncoder::default().into(),
-                TextSerializerConfig::default().build().into(),
-            ),
-        );
-
-        // Three logs: empty/middle/last. The middle log has no `message` so
-        // text serialization produces zero bytes; the framer still has to add
-        // a newline so the stream remains parseable.
-        let with_message = || {
-            Event::Log(LogEvent::from(BTreeMap::from([(
-                KeyString::from("message"),
-                Value::from("ok"),
-            )])))
-        };
-        let empty_message = || Event::Log(LogEvent::default());
-
-        let mut writer = Vec::new();
-        encoding
-            .encode_input(
-                vec![with_message(), empty_message(), with_message()],
-                &mut writer,
-            )
-            .expect("encode should succeed");
-
-        // Expected: "ok\n\nok\n" — first event framed with newline, middle
-        // (empty) event still framed with a bare newline, last event written
-        // without per-event framing but followed by the batch-suffix newline.
-        assert_eq!(String::from_utf8(writer).unwrap(), "ok\n\nok\n");
-    }
-
-    /// An over-budget event in the middle of a batched native-codec request must
-    /// be silently dropped by the encoder without aborting the whole batch.
-    /// Surrounding valid events must still encode and reach the writer.
-    #[test]
-    fn test_encode_batch_native_drops_over_budget_event_without_aborting() {
-        let encoding = (
-            Transformer::default(),
-            vector_lib::codecs::Encoder::<Framer>::new(
-                NewlineDelimitedEncoder::default().into(),
-                NativeSerializerConfig.build().into(),
-            ),
-        );
-
-        let valid = || {
-            Event::Log(LogEvent::from(BTreeMap::from([(
-                KeyString::from("k"),
-                Value::from("ok"),
-            )])))
-        };
-
-        // Build an over-budget value: 34 object levels (cost 102) > 99-frame budget.
-        let mut deep = Value::from("x");
-        for _ in 0..34 {
-            let mut m = ObjectMap::new();
-            m.insert("nested".into(), deep);
-            deep = Value::Object(m);
-        }
-        let mut over_budget = LogEvent::default();
-        over_budget.insert("data", deep);
-
-        let mut writer = Vec::new();
-        let (bytes_written, _) = encoding
-            .encode_input(vec![valid(), Event::Log(over_budget), valid()], &mut writer)
-            .expect(
-                "batched native encoding must not abort the request \
-                 when a single event exceeds the nesting budget",
-            );
-
-        assert!(
-            bytes_written > 0,
-            "the two valid events must still produce output bytes",
-        );
-        assert_eq!(
-            bytes_written,
-            writer.len(),
-            "bytes_written must match the writer's actual length",
-        );
     }
 }

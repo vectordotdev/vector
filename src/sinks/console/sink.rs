@@ -37,26 +37,10 @@ where
 
             let finalizers = event.take_finalizers();
             let mut bytes = BytesMut::new();
-            if self.encoder.encode(event, &mut bytes).is_err() {
-                // Error is already logged + counted + emits `ComponentEventsDropped`
-                // by the `Encoder` framework. Mark this event's finalizers Errored so
-                // source-side acks reflect the drop, then continue with the next
-                // event. Surfacing the error here as fatal would terminate the sink
-                // on the first data-dependent encoder failure and silently drop
-                // every subsequent valid event.
+            self.encoder.encode(event, &mut bytes).map_err(|_| {
+                // Error is handled by `Encoder`.
                 finalizers.update_status(EventStatus::Errored);
-                continue;
-            }
-            if bytes.is_empty() {
-                // The encoder accepted ownership of the event but produced no
-                // output, meaning it dropped the event internally (e.g., the
-                // native codec rejecting an event whose nesting exceeds the
-                // protobuf recursion budget). The encoder has already emitted
-                // `ComponentEventsDropped` and set `EventStatus::Rejected` on
-                // the event's metadata; finalize accordingly and continue.
-                finalizers.update_status(EventStatus::Rejected);
-                continue;
-            }
+            })?;
 
             match self.output.write_all(&bytes).await {
                 Err(error) => {
@@ -82,10 +66,9 @@ where
 #[cfg(test)]
 mod test {
     use futures::future::ready;
-    use futures_util::stream::{self, StreamExt};
+    use futures_util::stream;
     use vector_lib::{
-        codecs::{JsonSerializerConfig, NativeSerializerConfig, NewlineDelimitedEncoder},
-        event::{BatchNotifier, BatchStatus, ObjectMap, Value},
+        codecs::{JsonSerializerConfig, NewlineDelimitedEncoder},
         sink::VectorSink,
     };
 
@@ -116,58 +99,5 @@ mod test {
             &SINK_TAGS,
         )
         .await;
-    }
-
-    /// A per-event encoder drop (e.g., a single event exceeding the native codec's
-    /// nesting budget) must not terminate the sink. The offending event is finalized
-    /// as `Rejected` (the encoder dropped it internally), the next event still goes
-    /// through and is `Delivered`.
-    #[tokio::test]
-    async fn per_event_encoder_failure_does_not_terminate_sink() {
-        // Build a log whose value is an Object chain too deep for the native codec
-        // (object cost 34 * 3 = 102 frames, over the 99-frame value budget).
-        let mut deep_value = Value::from("x");
-        for _ in 0..34 {
-            let mut m = ObjectMap::new();
-            m.insert("nested".into(), deep_value);
-            deep_value = Value::Object(m);
-        }
-
-        let (bad_batch, mut bad_rx) = BatchNotifier::new_with_receiver();
-        let mut bad_event = LogEvent::default().with_batch_notifier(&bad_batch);
-        bad_event.insert("data", deep_value);
-        drop(bad_batch);
-
-        let (good_batch, mut good_rx) = BatchNotifier::new_with_receiver();
-        let good_event = LogEvent::from("ok").with_batch_notifier(&good_batch);
-        drop(good_batch);
-
-        let encoder = Encoder::<Framer>::new(
-            NewlineDelimitedEncoder::default().into(),
-            NativeSerializerConfig.build().into(),
-        );
-
-        let sink = Box::new(WriterSink {
-            output: Vec::new(),
-            transformer: Default::default(),
-            encoder,
-        });
-
-        let events = stream::iter(vec![Event::Log(bad_event), Event::Log(good_event)]).boxed();
-        sink.run(events)
-            .await
-            .expect("sink should not return Err for a per-event encode failure");
-
-        assert_eq!(
-            bad_rx.try_recv(),
-            Ok(BatchStatus::Rejected),
-            "the over-budget event must be finalized as Rejected (encoder dropped it)",
-        );
-        assert_eq!(
-            good_rx.try_recv(),
-            Ok(BatchStatus::Delivered),
-            "the subsequent valid event must still be Delivered \
-             (the sink must keep processing past a per-event encoder failure)",
-        );
     }
 }
