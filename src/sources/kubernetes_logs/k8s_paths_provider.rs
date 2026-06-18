@@ -9,12 +9,12 @@ use kube::runtime::reflector::{ObjectRef, store::Store};
 use vector_lib::file_source::paths_provider::PathsProvider;
 
 use super::path_helpers::build_pod_logs_directory;
-use crate::kubernetes::pod_manager_logic::extract_static_pod_config_hashsum;
+use crate::kubernetes::pod_store::{PodStore, pod_uid_for_path};
 
 /// A paths provider implementation that uses the state obtained from the
 /// the k8s API.
 pub struct K8sPathsProvider {
-    pod_state: Store<Pod>,
+    pod_state: PodStore,
     namespace_state: Store<Namespace>,
     include_paths: Vec<glob::Pattern>,
     exclude_paths: Vec<glob::Pattern>,
@@ -24,7 +24,7 @@ pub struct K8sPathsProvider {
 impl K8sPathsProvider {
     /// Create a new [`K8sPathsProvider`].
     pub const fn new(
-        pod_state: Store<Pod>,
+        pod_state: PodStore,
         namespace_state: Store<Namespace>,
         include_paths: Vec<glob::Pattern>,
         exclude_paths: Vec<glob::Pattern>,
@@ -44,7 +44,7 @@ impl PathsProvider for K8sPathsProvider {
     type IntoIter = Vec<PathBuf>;
 
     fn paths(&self) -> Vec<PathBuf> {
-        let state = self.pod_state.state();
+        let state = self.pod_state.list();
 
         state
             .into_iter()
@@ -103,15 +103,12 @@ fn extract_pod_logs_directory(pod: &Pod) -> Option<PathBuf> {
     let namespace = metadata.namespace.as_ref()?;
     let name = metadata.name.as_ref()?;
 
-    let uid = if let Some(static_pod_config_hashsum) = extract_static_pod_config_hashsum(metadata) {
-        // If there's a static pod config hashsum - use it instead of uid.
-        static_pod_config_hashsum
-    } else {
-        // In the common case - just fallback to the real pod uid.
-        metadata.uid.as_ref()?
-    };
+    // The static pod config hashsum is preferred over the real UID for mirror
+    // pods; `pod_uid_for_path` encapsulates that choice so the directory and the
+    // `PodStore` key always agree.
+    let uid = pod_uid_for_path(metadata)?;
 
-    Some(build_pod_logs_directory(namespace, name, uid))
+    Some(build_pod_logs_directory(namespace, name, &uid))
 }
 
 const CONTAINER_EXCLUSION_ANNOTATION_KEY: &str = "vector.dev/exclude-containers";

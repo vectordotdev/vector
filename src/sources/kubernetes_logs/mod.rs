@@ -51,7 +51,7 @@ use crate::{
         KubernetesLogsEventNodeAnnotationError, KubernetesLogsEventsReceived,
         KubernetesLogsPodInfo, StreamClosedError,
     },
-    kubernetes::{custom_reflector, meta_cache::MetaCache},
+    kubernetes::{PodStore, custom_reflector, meta_cache::MetaCache, pod_reflector},
     shutdown::ShutdownSignal,
     sources,
     sources::kubernetes_logs::partial_events_merger::merge_partial_events,
@@ -734,13 +734,15 @@ impl Source {
         )
         .backoff(watcher::DefaultBackoff::default());
 
-        let pod_store_w = reflector::store::Writer::default();
-        let pod_state = pod_store_w.as_reader();
-        let pod_cacher = MetaCache::new();
+        // Pods are tracked in a UID-keyed store (rather than kube's
+        // name+namespace-keyed reflector store) so that a pod recreated under a
+        // reused name cannot evict the metadata of a different incarnation whose
+        // log files are still being read. See
+        // https://github.com/vectordotdev/vector/issues/13467.
+        let pod_store = PodStore::new();
 
-        reflectors.push(tokio::spawn(custom_reflector(
-            pod_store_w,
-            pod_cacher,
+        reflectors.push(tokio::spawn(pod_reflector(
+            pod_store.clone(),
             pod_watcher,
             delay_deletion,
         )));
@@ -795,13 +797,13 @@ impl Source {
         )));
 
         let paths_provider = K8sPathsProvider::new(
-            pod_state.clone(),
+            pod_store.clone(),
             ns_state.clone(),
             include_paths,
             exclude_paths,
             insert_namespace_fields,
         );
-        let annotator = PodMetadataAnnotator::new(pod_state, pod_fields_spec, log_namespace);
+        let annotator = PodMetadataAnnotator::new(pod_store, pod_fields_spec, log_namespace);
         let ns_annotator =
             NamespaceMetadataAnnotator::new(ns_state, namespace_fields_spec, log_namespace);
         let node_annotator = NodeMetadataAnnotator::new(node_state, node_field_spec, log_namespace);

@@ -9,6 +9,8 @@
 
 pub mod meta_cache;
 pub mod pod_manager_logic;
+pub mod pod_store;
 pub mod reflector;
 
+pub use pod_store::{PodStore, pod_reflector};
 pub use reflector::custom_reflector;

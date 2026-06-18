@@ -6,7 +6,6 @@ use k8s_openapi::{
     api::core::v1::{Container, ContainerStatus, Pod, PodSpec, PodStatus},
     apimachinery::pkg::apis::meta::v1::ObjectMeta,
 };
-use kube::runtime::reflector::{ObjectRef, store::Store};
 use vector_lib::{
     config::{LegacyKey, LogNamespace},
     configurable::configurable_component,
@@ -21,7 +20,10 @@ use super::{
     Config,
     path_helpers::{LogFileInfo, parse_log_file_path},
 };
-use crate::event::{Event, LogEvent};
+use crate::{
+    event::{Event, LogEvent},
+    kubernetes::pod_store::PodStore,
+};
 
 /// Configuration for how the events are enriched with Pod metadata.
 #[configurable_component]
@@ -175,7 +177,7 @@ impl Default for FieldsSpec {
 
 /// Annotate the event with pod metadata.
 pub struct PodMetadataAnnotator {
-    pods_state_reader: Store<Pod>,
+    pods_state_reader: PodStore,
     fields_spec: FieldsSpec,
     log_namespace: LogNamespace,
 }
@@ -183,7 +185,7 @@ pub struct PodMetadataAnnotator {
 impl PodMetadataAnnotator {
     /// Create a new [`PodMetadataAnnotator`].
     pub const fn new(
-        pods_state_reader: Store<Pod>,
+        pods_state_reader: PodStore,
         fields_spec: FieldsSpec,
         log_namespace: LogNamespace,
     ) -> Self {
@@ -200,8 +202,11 @@ impl PodMetadataAnnotator {
     pub fn annotate<'a>(&self, event: &mut Event, file: &'a str) -> Option<LogFileInfo<'a>> {
         let log = event.as_mut_log();
         let file_info = parse_log_file_path(file)?;
-        let obj = ObjectRef::<Pod>::new(file_info.pod_name).within(file_info.pod_namespace);
-        let resource = self.pods_state_reader.get(&obj)?;
+        // Look up by the pod's path identifier (UID) so logs from a deleted pod
+        // are annotated with the metadata of the exact incarnation that wrote
+        // them, even if a pod with the same name and namespace has since been
+        // created. See https://github.com/vectordotdev/vector/issues/13467.
+        let resource = self.pods_state_reader.get(file_info.pod_uid)?;
         let pod: &Pod = resource.as_ref();
 
         annotate_from_file_info(log, &self.fields_spec, &file_info, self.log_namespace);

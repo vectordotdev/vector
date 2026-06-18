@@ -1,0 +1,3 @@
+The `kubernetes_logs` source now tracks pod metadata by pod UID rather than by name and namespace. Previously, when a pod was deleted and another was created reusing the same name and namespace (for example during a `StatefulSet` rollout or a same-node restart), the recreated pod could be evicted from Vector's internal metadata, causing Vector to stop collecting that pod's logs entirely and emit `Failed to annotate event with pod metadata` errors.
+
+Both incarnations are now tracked independently while their log files are still being read, so logs from the old pod are annotated with the correct metadata and the new pod is never evicted.
