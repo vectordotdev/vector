@@ -8,15 +8,23 @@ on:
       - "vdev/Cargo.toml"
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   tag:
     runs-on: ubuntu-24.04
     steps:
+      - name: Generate token via GitHub App
+        id: generate_token
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
+        with:
+          app-id: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_ID }}
+          private-key: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_PRIVATE_KEY }}
+
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 2
+          token: ${{ steps.generate_token.outputs.token }}
 
       - name: Create tag if version changed
         run: |
