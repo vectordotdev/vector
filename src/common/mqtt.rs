@@ -104,6 +104,11 @@ pub enum ConfigurationError {
     /// Credentials provided were incomplete
     #[snafu(display("Username and password must be either both or neither provided."))]
     IncompleteCredentials,
+    /// Acknowledgements enabled without a stable client ID
+    #[snafu(display(
+        "A stable `client_id` must be set when `acknowledgements` are enabled, so the MQTT session and its unacknowledged messages can be resumed after a restart."
+    ))]
+    AcknowledgementsRequireClientId,
 }
 
 #[derive(Clone)]
