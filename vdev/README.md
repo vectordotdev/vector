@@ -39,7 +39,7 @@ CI installs vdev from a published binary release via [cargo-binstall](https://gi
 ./scripts/environment/prepare.sh --modules=vdev
 ```
 
-This pins the vdev version defined in `prepare.sh` and fetches the matching pre-compiled binary.
+This installs the vdev version declared in `vdev/Cargo.toml` by fetching the matching pre-compiled binary from the GitHub release. If no matching release exists yet — e.g. you're on a branch that bumped the version but hasn't been tagged — `prepare.sh` falls back to building vdev from your working tree (`cargo install --path vdev`), which is slower but ensures the installed binary reflects your branch's vdev source.
 
 For a quick install of the latest published vdev (not pinned):
 
