@@ -855,12 +855,7 @@ mod test {
     async fn test_protocol(status: EventStatus, sends_ack: bool) {
         let events = assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
             let (address, recv) = start_logstash(status).await;
-            spawn_collect_n(
-                send_req(address, &[("message", "Hello, world!")], sends_ack),
-                recv,
-                1,
-            )
-            .await
+            spawn_collect_n(send_req(address, "Hello, world!", sends_ack), recv, 1).await
         })
         .await;
 
@@ -878,22 +873,20 @@ mod test {
         assert!(log.get("timestamp").is_some());
     }
 
-    fn push_req(req: &mut BytesMut, seq: u32, pairs: &[(&str, &str)]) {
+    fn push_req(req: &mut BytesMut, seq: u32, message: &str) {
         req.put_u8(b'2');
         req.put_u8(b'D');
         req.put_u32(seq);
-        req.put_u32(pairs.len() as u32);
-        for (key, value) in pairs {
-            req.put_u32(key.len() as u32);
-            req.put(key.as_bytes());
-            req.put_u32(value.len() as u32);
-            req.put(value.as_bytes());
-        }
+        req.put_u32(1u32);
+        req.put_u32("message".len() as u32);
+        req.put("message".as_bytes());
+        req.put_u32(message.len() as u32);
+        req.put(message.as_bytes());
     }
 
-    fn encode_req(seq: u32, pairs: &[(&str, &str)]) -> Bytes {
+    fn encode_req(seq: u32, message: &str) -> Bytes {
         let mut req = BytesMut::new();
-        push_req(&mut req, seq, pairs);
+        push_req(&mut req, seq, message);
         req.into()
     }
 
@@ -1013,7 +1006,7 @@ mod test {
     #[test]
     fn v1_decoder_does_not_panic() {
         let seq = rng().random_range(1..u32::MAX);
-        let req = encode_req(seq, &[("message", "Hello, World!")]);
+        let req = encode_req(seq, "Hello, World!");
         for i in 0..req.len() - 1 {
             assert!(
                 decode_data_frame(LogstashProtocolVersion::V1, &mut BytesMut::from(&req[..i]))
@@ -1096,10 +1089,10 @@ mod test {
     async fn distinct_windows_do_not_share_an_ack_domain() {
         let mut req = BytesMut::new();
         push_window_size(&mut req, 1);
-        push_req(&mut req, 1, &[("message", "first window")]);
+        push_req(&mut req, 1, "first window");
         push_window_size(&mut req, 2);
-        push_req(&mut req, 1, &[("message", "second window first")]);
-        push_req(&mut req, 2, &[("message", "second window second")]);
+        push_req(&mut req, 1, "second window first");
+        push_req(&mut req, 2, "second window second");
 
         let decoded = decode_frames_and_assert_sequences(req, &[1, 1, 2]);
         assert_acknowledgements_for_ready_frames(decoded, &[1, 1, 2], &[1, 2]).await;
@@ -1109,11 +1102,11 @@ mod test {
     async fn distinct_windows_with_monotonic_sequences_ack_the_first_window() {
         let mut req = BytesMut::new();
         push_window_size(&mut req, 2);
-        push_req(&mut req, 1, &[("message", "first window first")]);
-        push_req(&mut req, 2, &[("message", "first window second")]);
+        push_req(&mut req, 1, "first window first");
+        push_req(&mut req, 2, "first window second");
         push_window_size(&mut req, 2);
-        push_req(&mut req, 3, &[("message", "second window first")]);
-        push_req(&mut req, 4, &[("message", "second window second")]);
+        push_req(&mut req, 3, "second window first");
+        push_req(&mut req, 4, "second window second");
 
         let decoded = decode_frames_and_assert_sequences(req, &[1, 2, 3, 4]);
         assert_acknowledgements_for_ready_frames(decoded, &[1, 2, 3, 4], &[2, 4]).await;
@@ -1123,7 +1116,7 @@ mod test {
     async fn incomplete_final_window_is_acked_to_the_last_received_event() {
         let mut req = BytesMut::new();
         push_window_size(&mut req, 4);
-        push_req(&mut req, 1, &[("message", "only event in partial window")]);
+        push_req(&mut req, 1, "only event in partial window");
 
         let decoded = decode_frames_and_assert_sequences(req, &[1]);
         assert_acknowledgements_for_ready_frames(decoded, &[1], &[1]).await;
@@ -1133,8 +1126,8 @@ mod test {
     async fn compressed_frames_preserve_inner_window_boundaries() {
         let mut inner = BytesMut::new();
         push_window_size(&mut inner, 2);
-        push_req(&mut inner, 1, &[("message", "compressed first")]);
-        push_req(&mut inner, 2, &[("message", "compressed second")]);
+        push_req(&mut inner, 1, "compressed first");
+        push_req(&mut inner, 2, "compressed second");
 
         let mut req = BytesMut::new();
         push_compressed(&mut req, &inner);
@@ -1147,10 +1140,10 @@ mod test {
     async fn single_window_split_across_ready_frames_keeps_progressive_acks() {
         let mut req = BytesMut::new();
         push_window_size(&mut req, 4);
-        push_req(&mut req, 1, &[("message", "first")]);
-        push_req(&mut req, 2, &[("message", "second")]);
-        push_req(&mut req, 3, &[("message", "third")]);
-        push_req(&mut req, 4, &[("message", "fourth")]);
+        push_req(&mut req, 1, "first");
+        push_req(&mut req, 2, "second");
+        push_req(&mut req, 3, "third");
+        push_req(&mut req, 4, "fourth");
 
         let decoded = decode_frames_and_assert_sequences(req, &[1, 2, 3, 4]);
 
@@ -1175,18 +1168,14 @@ mod test {
 
         let mut first_batch = BytesMut::new();
         push_window_size(&mut first_batch, 2);
-        push_req(&mut first_batch, 1, &[("message", "first partial tail")]);
+        push_req(&mut first_batch, 1, "first partial tail");
         let decoded =
             decode_frames_with_decoder_and_assert_sequences(&mut decoder, first_batch, &[1]);
         assert_acknowledgements_for_ready_frames(decoded, &[1], &[1]).await;
 
         let mut second_batch = BytesMut::new();
         push_window_size(&mut second_batch, 1);
-        push_req(
-            &mut second_batch,
-            1,
-            &[("message", "fresh window after ack")],
-        );
+        push_req(&mut second_batch, 1, "fresh window after ack");
         let decoded =
             decode_frames_with_decoder_and_assert_sequences(&mut decoder, second_batch, &[1]);
         assert_acknowledgements_for_ready_frames(decoded, &[1], &[1]).await;
@@ -1206,14 +1195,10 @@ mod test {
         // ACK 10 for window 2. It must never emit seq=10 for window 1.
         let mut req = BytesMut::new();
         push_window_size(&mut req, 2);
-        push_req(
-            &mut req,
-            1,
-            &[("message", "under-filled window, only event")],
-        );
+        push_req(&mut req, 1, "under-filled window, only event");
         push_window_size(&mut req, 10);
         for seq in 1..=10 {
-            push_req(&mut req, seq, &[("message", "second window")]);
+            push_req(&mut req, seq, "second window");
         }
 
         // Decoded sequence numbers: window 1 -> [1], window 2 -> [1..=10].
@@ -1234,14 +1219,10 @@ mod test {
         // delivers seq 2..=11. Correct ACKs: [1, 11].
         let mut req = BytesMut::new();
         push_window_size(&mut req, 2);
-        push_req(
-            &mut req,
-            1,
-            &[("message", "under-filled window, only event")],
-        );
+        push_req(&mut req, 1, "under-filled window, only event");
         push_window_size(&mut req, 10);
         for seq in 2..=11 {
-            push_req(&mut req, seq, &[("message", "second window")]);
+            push_req(&mut req, seq, "second window");
         }
 
         let expected_sequences: Vec<u32> = (1..=11).collect();
@@ -1259,14 +1240,10 @@ mod test {
 
         let mut req = BytesMut::new();
         push_window_size(&mut req, first_window_size);
-        push_req(
-            &mut req,
-            1,
-            &[("message", "under-filled window, only event")],
-        );
+        push_req(&mut req, 1, "under-filled window, only event");
         push_window_size(&mut req, 10);
         for seq in 1..=10 {
-            push_req(&mut req, seq, &[("message", "second window")]);
+            push_req(&mut req, seq, "second window");
         }
 
         let decoded = decode_frames(req);
@@ -1316,12 +1293,12 @@ mod test {
             if w.compressed {
                 let mut inner = BytesMut::new();
                 for seq in 1..=w.actual {
-                    push_req(&mut inner, seq, &[("message", "x")]);
+                    push_req(&mut inner, seq, "x");
                 }
                 push_compressed(&mut buf, &inner);
             } else {
                 for seq in 1..=w.actual {
-                    push_req(&mut buf, seq, &[("message", "x")]);
+                    push_req(&mut buf, seq, "x");
                 }
             }
         }
@@ -1397,11 +1374,11 @@ mod test {
         }
     }
 
-    async fn send_req(address: SocketAddr, pairs: &[(&str, &str)], sends_ack: bool) {
+    async fn send_req(address: SocketAddr, message: &str, sends_ack: bool) {
         let seq = rng().random_range(1..u32::MAX);
         let mut socket = tokio::net::TcpStream::connect(address).await.unwrap();
 
-        let req = encode_req(seq, pairs);
+        let req = encode_req(seq, message);
         socket.write_all(&req).await.unwrap();
 
         let mut output = BytesMut::new();
