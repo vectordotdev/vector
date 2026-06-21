@@ -35,7 +35,7 @@ pub(super) fn run(new_version: &Version) -> Result<PathBuf> {
 
     info!("Creating release meta file...");
 
-    let last_version = find_latest_release_tag()?;
+    let last_version = git::latest_release_version()?;
     let commits = fetch_commits_since(&last_version)?;
 
     validate_single_bump(&last_version, new_version)?;
@@ -138,23 +138,6 @@ fn collect_released_identifiers(releases_dir: &Path) -> Result<ReleasedIdentifie
     Ok(out)
 }
 
-/// Find the latest semver release tag of the form `vX.Y.Z`, ignoring `vdev-v...` tags.
-pub(super) fn find_latest_release_tag() -> Result<Version> {
-    let tag_re = Regex::new(r"^v[0-9]+\.[0-9]+\.[0-9]+$").unwrap();
-    let output = git::run_and_check_output(&["tag", "--list", "--sort=-v:refname"])?;
-    for tag in output.lines() {
-        if tag.starts_with("vdev-v") {
-            continue;
-        }
-        if tag_re.is_match(tag) {
-            let v = Version::parse(tag.trim_start_matches('v'))
-                .with_context(|| format!("Failed to parse version from tag {tag}"))?;
-            return Ok(v);
-        }
-    }
-    bail!("No valid semantic version tag found (e.g. v1.2.3)")
-}
-
 fn validate_single_bump(last: &Version, new: &Version) -> Result<()> {
     if bump_type(last, new).is_none() {
         bail!(
@@ -196,7 +179,6 @@ struct Commit {
     date: String,
     description: String,
     r#type: Option<String>,
-    scopes: Vec<String>,
     breaking_change: bool,
     pr_number: Option<u64>,
     files_count: u64,
@@ -232,7 +214,6 @@ impl Commit {
     }
 
     fn render_cue(&self) -> String {
-        let scopes_json = serde_json::to_string(&self.scopes).expect("scopes serialise");
         let pr_number = match self.pr_number {
             Some(n) => n.to_string(),
             None => "null".to_string(),
@@ -242,11 +223,10 @@ impl Commit {
             None => "null".to_string(),
         };
         format!(
-            "{{sha: {sha}, date: {date}, description: {description}, pr_number: {pr_number}, scopes: {scopes}, type: {type_field}, breaking_change: {breaking}, author: {author}, files_count: {files}, insertions_count: {ins}, deletions_count: {del}}}",
+            "{{sha: {sha}, date: {date}, description: {description}, pr_number: {pr_number}, type: {type_field}, breaking_change: {breaking}, author: {author}, files_count: {files}, insertions_count: {ins}, deletions_count: {del}}}",
             sha = json!(self.sha),
             date = json!(self.date),
             description = json!(self.description),
-            scopes = scopes_json,
             type_field = type_json,
             breaking = self.breaking_change,
             author = json!(self.author),
@@ -291,7 +271,6 @@ fn fetch_commits_since(last_version: &Version) -> Result<Vec<Commit>> {
             date,
             description: conv.description,
             r#type: conv.r#type,
-            scopes: conv.scopes,
             breaking_change: conv.breaking_change,
             pr_number: conv.pr_number,
             files_count: files,
@@ -346,7 +325,6 @@ fn commit_stats(sha: &str) -> Result<(u64, u64, u64)> {
 #[derive(Debug)]
 struct ConventionalParts {
     r#type: Option<String>,
-    scopes: Vec<String>,
     breaking_change: bool,
     description: String,
     pr_number: Option<u64>,
@@ -355,7 +333,7 @@ struct ConventionalParts {
 impl ConventionalParts {
     fn parse(message: &str) -> Self {
         let re = Regex::new(
-            r"^(?P<type>[a-z]*)(\((?P<scope>[a-zA-Z0-9_, -]*)\))?(?P<breaking>!)?: (?P<desc>.*?)( \(#(?P<pr>[0-9]+)\))?$",
+            r"^(?P<type>[a-z]*)(\([a-zA-Z0-9_, -]*\))?(?P<breaking>!)?: (?P<desc>.*?)( \(#(?P<pr>[0-9]+)\))?$",
         )
         .unwrap();
 
@@ -364,16 +342,6 @@ impl ConventionalParts {
                 .name("type")
                 .map(|m| m.as_str().to_string())
                 .filter(|s| !s.is_empty());
-            let scopes: Vec<String> = caps
-                .name("scope")
-                .map(|m| {
-                    m.as_str()
-                        .split(',')
-                        .map(|s| s.trim().to_string())
-                        .filter(|s| !s.is_empty())
-                        .collect()
-                })
-                .unwrap_or_default();
             let breaking_change = caps.name("breaking").is_some();
             let description = caps
                 .name("desc")
@@ -382,7 +350,6 @@ impl ConventionalParts {
             let pr_number = caps.name("pr").and_then(|m| m.as_str().parse::<u64>().ok());
             ConventionalParts {
                 r#type,
-                scopes,
                 breaking_change,
                 description,
                 pr_number,
@@ -390,7 +357,6 @@ impl ConventionalParts {
         } else {
             ConventionalParts {
                 r#type: None,
-                scopes: Vec::new(),
                 breaking_change: false,
                 description: message.to_string(),
                 pr_number: None,
@@ -514,7 +480,6 @@ fn render_release_cue(
          \n\
          releases: \"{version}\": {{\n\
          \tdate:     \"{date}\"\n\
-         \tcodename: \"\"\n\
          \n\
          \twhats_next: []\n\
          \n\
@@ -569,7 +534,6 @@ mod tests {
     fn parse_conventional_basic() {
         let p = ConventionalParts::parse("feat(kafka source): add new metric (#123)");
         assert_eq!(p.r#type.as_deref(), Some("feat"));
-        assert_eq!(p.scopes, vec!["kafka source".to_string()]);
         assert!(!p.breaking_change);
         assert_eq!(p.description, "add new metric");
         assert_eq!(p.pr_number, Some(123));
@@ -585,21 +549,42 @@ mod tests {
     }
 
     #[test]
-    fn parse_conventional_multi_scope() {
-        let p = ConventionalParts::parse("fix(a, b): wip");
-        assert_eq!(p.scopes, vec!["a".to_string(), "b".to_string()]);
-        assert_eq!(p.pr_number, None);
+    fn parse_conventional_with_scope() {
+        // Scopes are accepted in the commit subject but no longer stored.
+        let p = ConventionalParts::parse("fix(ARC): tweak retry policy (#456)");
+        assert_eq!(p.r#type.as_deref(), Some("fix"));
+        assert_eq!(p.description, "tweak retry policy");
+        assert_eq!(p.pr_number, Some(456));
     }
 
     #[test]
-    fn parse_conventional_uppercase_scope() {
-        // The semantic-PR workflow allows uppercase scopes like `ARC`, so the
-        // release-generation parser must accept them too.
-        let p = ConventionalParts::parse("fix(ARC): tweak retry policy (#456)");
-        assert_eq!(p.r#type.as_deref(), Some("fix"));
-        assert_eq!(p.scopes, vec!["ARC".to_string()]);
-        assert_eq!(p.description, "tweak retry policy");
-        assert_eq!(p.pr_number, Some(456));
+    fn scoped_subject_parses_and_validates() {
+        // End-to-end: a scoped conventional subject must flow through both
+        // parsing and Commit::validate without error after the scope drop.
+        let subjects = [
+            "feat(kafka source): add new metric (#123)",
+            "fix(loki sink): handle empty labels (#9)",
+            "chore(deps): bump tokio (#1)",
+            "enhancement(api, config): tweak schema (#42)",
+        ];
+        for subject in subjects {
+            let p = ConventionalParts::parse(subject);
+            assert!(p.r#type.is_some(), "parse failed for: {subject}");
+            let c = Commit {
+                sha: "x".into(),
+                author: "a".into(),
+                date: "d".into(),
+                description: p.description,
+                r#type: p.r#type,
+                breaking_change: p.breaking_change,
+                pr_number: p.pr_number,
+                files_count: 0,
+                insertions_count: 0,
+                deletions_count: 0,
+            };
+            c.validate()
+                .unwrap_or_else(|e| panic!("validate failed for {subject}: {e}"));
+        }
     }
 
     #[test]
@@ -695,7 +680,6 @@ mod tests {
             date: "2026-05-06 12:00:00 UTC".into(),
             description: "do stuff".into(),
             r#type: Some("feat".into()),
-            scopes: vec!["kafka source".into()],
             breaking_change: false,
             pr_number: Some(42),
             files_count: 1,
@@ -712,11 +696,9 @@ mod tests {
         assert!(out.contains("\t\t\t\tAdds a thing.\n"));
         assert!(out.contains("\t\t\t\tMulti-line.\n"));
         assert!(out.contains("contributors: [\"alice\"]"));
-        // contributors line must NOT appear for the fix entry
         assert!(out.contains("\t\t\ttype: \"fix\"\n"));
-        // Commit struct rendered inline.
         assert!(out.contains("sha: \"abc123\""));
-        assert!(out.contains("scopes: [\"kafka source\"]"));
+        assert!(!out.contains("scopes:"));
         assert!(out.contains("pr_number: 42"));
         assert!(out.contains("files_count: 1"));
     }
@@ -730,7 +712,6 @@ mod tests {
                 date: "d".into(),
                 description: "no scope".into(),
                 r#type: Some((*t).into()),
-                scopes: vec![],
                 breaking_change: false,
                 pr_number: None,
                 files_count: 0,
@@ -752,7 +733,6 @@ mod tests {
             date: "d".into(),
             description: "x".into(),
             r#type: Some("nope".into()),
-            scopes: vec!["a".into()],
             breaking_change: false,
             pr_number: None,
             files_count: 0,
@@ -772,7 +752,6 @@ mod tests {
             date: "d".into(),
             description: "Merge branch 'foo'".into(),
             r#type: None,
-            scopes: Vec::new(),
             breaking_change: false,
             pr_number: None,
             files_count: 0,

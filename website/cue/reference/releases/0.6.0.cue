@@ -1,8 +1,7 @@
 package metadata
 
-releases: "0.6.0": {
-	date:     "2019-12-12"
-	codename: "The Long Stretch"
+releases: "0.6.0": {// The Long Stretch
+	date: "2019-12-12"
 
 	whats_next: []
 

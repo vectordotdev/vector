@@ -164,6 +164,7 @@ jobs:
         if: steps.run_condition.outputs.should_run == 'true'
 
       - uses: ./.github/actions/setup
+        if: steps.run_condition.outputs.should_run == 'true'
         with:
           vdev: true
           datadog-ci: true
@@ -222,6 +223,7 @@ jobs:
         if: steps.run_condition.outputs.should_run == 'true'
 
       - uses: ./.github/actions/setup
+        if: steps.run_condition.outputs.should_run == 'true'
         with:
           vdev: true
           datadog-ci: true
