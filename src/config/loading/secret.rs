@@ -151,7 +151,7 @@ pub fn interpolate(input: &str, secrets: &HashMap<String, String>) -> Result<Str
     let output = COLLECTOR
         .replace_all(input, |caps: &Captures<'_>| {
             caps.get(1)
-                .and_then(|b| caps.get(2).map(|k| (b, k)))
+                .zip(caps.get(2))
                 .and_then(|(b, k)| secrets.get(&format!("{}.{}", b.as_str(), k.as_str())))
                 .cloned()
                 .unwrap_or_else(|| {

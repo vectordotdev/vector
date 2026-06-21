@@ -31,8 +31,7 @@ use tower_http::{
 };
 use tracing::{Instrument, Span};
 use vector_lib::{
-    configurable::configurable_component,
-    sensitive_string::SensitiveString,
+    configurable::configurable_component, sensitive_string::SensitiveString,
     tcp::TcpKeepaliveConfig,
 };
 

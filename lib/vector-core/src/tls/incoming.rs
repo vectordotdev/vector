@@ -97,8 +97,8 @@ impl MaybeTlsListener {
         if let Some(keepalive) = self.keepalive
             && let Some(time_secs) = keepalive.time_secs
         {
-            let config = socket2::TcpKeepalive::new()
-                .with_time(std::time::Duration::from_secs(time_secs));
+            let config =
+                socket2::TcpKeepalive::new().with_time(std::time::Duration::from_secs(time_secs));
             if let Err(error) = tcp::set_keepalive(&stream, &config) {
                 warn!(message = "Failed to set TCP keepalive on accepted connection.", %error);
             }
