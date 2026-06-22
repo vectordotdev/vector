@@ -62,10 +62,10 @@ pub struct AzureBlobSinkConfig {
     /// | Allowed resource types | Container & Object |
     /// | Allowed permissions    | Read & Create      |
     ///
-    /// If you also configure the `tags` option, the SAS must additionally include the
+    /// If you also configure the `tags` option, the SAS must include the
     /// `Tags` permission. Azure applies the *Set Blob Tags* authorization requirement to
     /// the `Put Blob` request that carries the `x-ms-tags` header, so without it tagged
-    /// uploads fail with an authorization error even though the health check still passes.
+    /// uploads fail with an authorization error even when the health check still passes.
     #[configurable(metadata(
         docs::warnings = "Access keys and SAS tokens can be used to gain unauthorized access to Azure Blob Storage \
         resources. Numerous security breaches have occurred due to leaked connection strings. It is important to keep \
@@ -156,13 +156,20 @@ pub struct AzureBlobSinkConfig {
 
     /// The set of [blob index tags][blob_index_tags] to apply to created blobs.
     ///
-    /// Each entry becomes a tag in the `x-ms-tags` header. Azure enforces its own limits
-    /// (currently up to 10 tags per blob, with restricted character sets for keys and values);
-    /// invalid configurations are rejected by the service.
+    /// Each entry becomes a tag in the `x-ms-tags` header. Azure limits blobs to 10 tags,
+    /// with restricted character sets for keys and values; the service rejects invalid
+    /// configurations.
     ///
     /// When authenticating with a shared access signature (SAS), the token must include the
     /// `Tags` permission in addition to `Read` and `Create`. Azure applies the *Set Blob Tags*
-    /// authorization requirement to the `Put Blob` request that carries these tags.
+    /// authorization requirement to the `Put Blob` request that carries these tags, so without
+    /// it tagged uploads fail with an authorization error even when the health check still passes.
+    ///
+    /// When authenticating with an Azure credential (managed identity, workload identity, and so
+    /// on), the identity needs the
+    /// `Microsoft.Storage/storageAccounts/blobServices/containers/blobs/tags/write` RBAC action.
+    /// The least-privileged built-in role that grants it is *Storage Blob Data Owner*; the
+    /// *Storage Blob Data Contributor* role commonly sufficient for uploads does not include it.
     ///
     /// [blob_index_tags]: https://learn.microsoft.com/azure/storage/blobs/storage-blob-index-how-to
     #[configurable(metadata(docs::additional_props_description = "A single tag."))]
@@ -172,10 +179,11 @@ pub struct AzureBlobSinkConfig {
 
     /// The set of [custom metadata][blob_metadata] `key:value` pairs to apply to created blobs.
     ///
-    /// Each entry becomes an `x-ms-meta-{key}` header. Azure enforces its own limits on names
-    /// and combined size (currently 8 KiB total); invalid configurations are rejected by the
-    /// service. Names must be valid C# identifiers, and non-ASCII values must be
-    /// Base64-encoded by the user.
+    /// Each entry becomes an `x-ms-meta-{key}` header. Azure limits the total size of all
+    /// metadata and restricts key names to ASCII alphanumeric characters and underscores,
+    /// starting with a letter. Non-ASCII values must be Base64-encoded before being set.
+    /// The service rejects invalid configurations. See the [Azure documentation][blob_metadata]
+    /// for current limits.
     ///
     /// [blob_metadata]: https://learn.microsoft.com/rest/api/storageservices/set-blob-metadata
     #[configurable(metadata(docs::additional_props_description = "A key/value pair."))]

@@ -1037,6 +1037,12 @@ generated: components: sinks: azure_blob: configuration: {
 			authorization requirement to the `Put Blob` request that carries these tags, so without
 			it tagged uploads fail with an authorization error even when the health check still passes.
 
+			When authenticating with an Azure credential (managed identity, workload identity, and so
+			on), the identity needs the
+			`Microsoft.Storage/storageAccounts/blobServices/containers/blobs/tags/write` RBAC action.
+			The least-privileged built-in role that grants it is *Storage Blob Data Owner*; the
+			*Storage Blob Data Contributor* role commonly sufficient for uploads does not include it.
+
 			[blob_index_tags]: https://learn.microsoft.com/azure/storage/blobs/storage-blob-index-how-to
 			"""
 		required: false
