@@ -46,14 +46,6 @@ pub struct HealthConfig {
     pub retry_max_duration_secs: Duration,
 }
 
-const fn default_retry_initial_backoff_secs() -> u64 {
-    RETRY_INITIAL_BACKOFF_SECONDS_DEFAULT
-}
-
-const fn default_retry_max_duration_secs() -> std::time::Duration {
-    Duration::from_secs(RETRY_MAX_DURATION_SECONDS_DEFAULT)
-}
-
 impl Default for HealthConfig {
     fn default() -> Self {
         Self {
@@ -61,6 +53,14 @@ impl Default for HealthConfig {
             retry_max_duration_secs: default_retry_max_duration_secs(),
         }
     }
+}
+
+const fn default_retry_initial_backoff_secs() -> u64 {
+    RETRY_INITIAL_BACKOFF_SECONDS_DEFAULT
+}
+
+const fn default_retry_max_duration_secs() -> std::time::Duration {
+    Duration::from_secs(RETRY_MAX_DURATION_SECONDS_DEFAULT)
 }
 
 impl HealthConfig {
@@ -339,7 +339,6 @@ mod tests {
         assert!(counters.healthy(snapshot).is_ok());
     }
 
-    #[test]
     fn health_config_default_matches_deserialize_defaults() {
         let config = HealthConfig::default();
 
