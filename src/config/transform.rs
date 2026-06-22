@@ -250,7 +250,7 @@ pub trait TransformConfig: DynClone + NamedComponent + core::fmt::Debug + Send +
     ///
     /// If validation does not succeed, an error variant containing a list of all validation errors
     /// is returned.
-    fn validate(&self, _merged_definition: &schema::Definition) -> Result<(), Vec<String>> {
+    fn validate(&self, _context: &TransformContext) -> Result<(), Vec<String>> {
         Ok(())
     }
 

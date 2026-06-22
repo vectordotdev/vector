@@ -131,13 +131,26 @@ impl TransformConfig for RouteConfig {
         Input::all()
     }
 
-    fn validate(&self, _: &schema::Definition) -> Result<(), Vec<String>> {
+    fn validate(&self, context: &TransformContext) -> Result<(), Vec<String>> {
+        let mut errors = Vec::new();
+
         if self.route.contains_key(UNMATCHED_ROUTE) {
-            Err(vec![format!(
+            errors.push(format!(
                 "cannot have a named output with reserved name: `{UNMATCHED_ROUTE}`"
-            )])
-        } else {
+            ));
+        }
+
+        for (name, condition) in &self.route {
+            if let Err(e) = condition.validate(&context.enrichment_tables, &context.metrics_storage)
+            {
+                errors.push(format!("route \"{name}\": {e}"));
+            }
+        }
+
+        if errors.is_empty() {
             Ok(())
+        } else {
+            Err(errors)
         }
     }
 

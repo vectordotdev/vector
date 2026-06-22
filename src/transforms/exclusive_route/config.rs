@@ -101,7 +101,7 @@ impl TransformConfig for ExclusiveRouteConfig {
         Input::all()
     }
 
-    fn validate(&self, _: &schema::Definition) -> Result<(), Vec<String>> {
+    fn validate(&self, context: &TransformContext) -> Result<(), Vec<String>> {
         let mut errors = Vec::new();
 
         let mut counts = std::collections::HashMap::new();
@@ -125,6 +125,15 @@ impl TransformConfig for ExclusiveRouteConfig {
             .any(|route| route.name == UNMATCHED_ROUTE)
         {
             errors.push(format!("Using reserved '{UNMATCHED_ROUTE}' name."));
+        }
+
+        for route in &self.routes {
+            if let Err(e) = route
+                .condition
+                .validate(&context.enrichment_tables, &context.metrics_storage)
+            {
+                errors.push(format!("route \"{}\": {e}", route.name));
+            }
         }
 
         if errors.is_empty() {

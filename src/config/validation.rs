@@ -1,5 +1,6 @@
 use std::{collections::HashMap, path::PathBuf};
 
+use crate::transforms::route::UNMATCHED_ROUTE;
 use futures_util::{FutureExt, StreamExt, TryFutureExt, TryStreamExt, stream};
 use heim::{disk::Partition, units::information::byte};
 use indexmap::IndexMap;
@@ -9,7 +10,6 @@ use super::{
     ComponentKey, Config, OutputId, Resource, builder::ConfigBuilder,
     transform::get_transform_output_ids,
 };
-use crate::config::schema;
 
 /// Minimum value (exclusive) for EWMA alpha options.
 /// The alpha value must be strictly greater than this value.
@@ -234,23 +234,22 @@ pub fn check_outputs(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     }
 
     for (key, transform) in config.transforms.iter() {
-        // use the most general definition possible, since the real value isn't known yet.
-        let definition = schema::Definition::any();
-
-        if let Err(errs) = transform.inner.validate(&definition) {
-            errors.extend(errs.into_iter().map(|msg| format!("Transform {key} {msg}")));
-        }
-
-        if get_transform_output_ids(
+        let output_ids = get_transform_output_ids(
             transform.inner.as_ref(),
             key.clone(),
             config.schema.log_namespace(),
         )
-        .any(|output| matches!(output.port, Some(output) if output == DEFAULT_OUTPUT))
-        {
-            errors.push(format!(
-                "Transform {key} cannot have a named output with reserved name: `{DEFAULT_OUTPUT}`"
-            ));
+        .collect::<Vec<_>>();
+
+        for reserved in [DEFAULT_OUTPUT, UNMATCHED_ROUTE] {
+            if output_ids
+                .iter()
+                .any(|output| matches!(&output.port, Some(port) if port == reserved))
+            {
+                errors.push(format!(
+                    "Transform {key} cannot have a named output with reserved name: `{reserved}`"
+                ));
+            }
         }
     }
 
