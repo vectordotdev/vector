@@ -295,6 +295,12 @@ impl TcpSourceAcker for LogstashAcker {
             TcpSourceAck::Ack if !self.acknowledgements.is_empty() => {
                 let mut bytes: Vec<u8> = Vec::with_capacity(self.acknowledgements.len() * 6);
                 for (protocol_version, sequence_number) in self.acknowledgements {
+                    trace!(
+                        protocol = ?protocol_version,
+                        sequence_number,
+                        internal_log_rate_limit = false,
+                        "Sending Ack frame."
+                    );
                     bytes.push(protocol_version.into());
                     bytes.push(LogstashFrameType::Ack.into());
                     bytes.extend(sequence_number.to_be_bytes().iter());
@@ -556,8 +562,13 @@ impl Decoder for LogstashDecoder {
                         return Ok(None);
                     }
 
-                    let _window_size = src.get_u32();
+                    let window_size = src.get_u32();
                     self.window.open();
+                    trace!(
+                        window_size,
+                        internal_log_rate_limit = false,
+                        "Decoded WindowSize frame."
+                    );
 
                     LogstashDecoderReadState::ReadProtocol
                 }
@@ -569,7 +580,12 @@ impl Decoder for LogstashDecoder {
                         return Ok(None);
                     }
 
-                    let _sequence_number = src.get_u32();
+                    let sequence_number = src.get_u32();
+                    trace!(
+                        sequence_number,
+                        internal_log_rate_limit = false,
+                        "Received Ack frame from sender (skipping)."
+                    );
 
                     LogstashDecoderReadState::ReadProtocol
                 }
@@ -579,6 +595,14 @@ impl Decoder for LogstashDecoder {
                         return Ok(None);
                     };
                     self.stamp_frame(&mut frame);
+                    trace!(
+                        protocol = ?frame.protocol,
+                        sequence_number = frame.sequence_number,
+                        byte_size,
+                        window_id = frame.window_id,
+                        internal_log_rate_limit = false,
+                        "Decoded Data frame."
+                    );
 
                     LogstashDecoderReadState::PendingFrames([(frame, byte_size)].into())
                 }
@@ -588,6 +612,14 @@ impl Decoder for LogstashDecoder {
                         return Ok(None);
                     };
                     self.stamp_frame(&mut frame);
+                    trace!(
+                        protocol = ?frame.protocol,
+                        sequence_number = frame.sequence_number,
+                        byte_size,
+                        window_id = frame.window_id,
+                        internal_log_rate_limit = false,
+                        "Decoded JSON frame."
+                    );
 
                     LogstashDecoderReadState::PendingFrames([(frame, byte_size)].into())
                 }
@@ -600,7 +632,11 @@ impl Decoder for LogstashDecoder {
                         return Ok(None);
                     };
                     self.window = decoded.window;
-
+                    trace!(
+                        inner_frame_count = decoded.frames.len(),
+                        internal_log_rate_limit = false,
+                        "Decoded Compressed frame."
+                    );
                     LogstashDecoderReadState::PendingFrames(decoded.frames)
                 }
             };
