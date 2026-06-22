@@ -193,7 +193,8 @@ pub struct RootOpts {
     /// This controls the time window for rate limiting Vector's own internal logs.
     /// Within each time window, the first occurrence of a log is emitted, the second
     /// shows a suppression warning, and subsequent occurrences are silent until the
-    /// window expires.
+    /// window expires. When the window expires and the log fires again, a summary of
+    /// the suppressed count is emitted followed by the log itself.
     ///
     /// Logs are grouped by their location in the code and the `component_id` field, so logs
     /// from different components are rate limited independently.
@@ -209,6 +210,16 @@ pub struct RootOpts {
         default_value = "10"
     )]
     pub internal_log_rate_limit: u64,
+
+    /// Apply a rate limit (in seconds) to the broadcast channel that feeds all `internal_logs`
+    /// sources. When set, the first occurrence of a repeated log is emitted, the second shows a
+    /// suppression warning, and subsequent occurrences are silent until the window expires. When
+    /// the window expires and the log fires again, a summary of the suppressed count is emitted
+    /// followed by the log itself. Unset by default so that `internal_logs` consumers receive
+    /// every log event. This limit is independent of `--internal-log-rate-limit`, which only
+    /// applies to stdout/stderr output.
+    #[arg(long, env = "VECTOR_INTERNAL_LOGS_SOURCE_RATE_LIMIT")]
+    pub internal_logs_source_rate_limit: Option<NonZeroU64>,
 
     /// Set the duration in seconds to wait for graceful shutdown after SIGINT or SIGTERM are
     /// received. After the duration has passed, Vector will force shutdown. To never force
@@ -260,6 +271,15 @@ pub struct RootOpts {
     /// `--watch-config`.
     #[arg(long, env = "VECTOR_ALLOW_EMPTY_CONFIG", default_value = "false")]
     pub allow_empty_config: bool,
+
+    /// Raise the file descriptor soft limit (RLIMIT_NOFILE) to the hard limit at startup.
+    ///
+    /// Many systems default the soft limit to 1024 (Linux) or 256 (macOS), which is too low
+    /// when Vector monitors large numbers of log files. This flag raises the soft limit to
+    /// prevent "Too many open files" errors without requiring manual sysadmin intervention.
+    #[cfg(unix)]
+    #[arg(long, env = "VECTOR_RAISE_FD_LIMIT", default_value = "false")]
+    pub raise_fd_limit: bool,
 }
 
 impl RootOpts {
@@ -291,6 +311,89 @@ impl RootOpts {
     }
 }
 
+/// Raise the soft file descriptor limit (RLIMIT_NOFILE) as high as the OS allows.
+///
+/// Many systems default the soft limit to 1024 (Linux) or 256 (macOS), which is too low
+/// for Vector when it monitors large numbers of log files. Raising it prevents
+/// "Too many open files (os error 24)" errors without requiring manual sysadmin intervention.
+///
+/// On Linux, the soft limit is raised to the hard limit (typically 65536+).
+/// On macOS, the hard limit can be RLIM_INFINITY, so we first try the hard limit,
+/// then fall back to the kernel-enforced `kern.maxfilesperproc` (typically 10240).
+#[cfg(unix)]
+pub(crate) fn raise_file_descriptor_limit() {
+    use nix::sys::resource::{Resource, getrlimit, setrlimit};
+    use tracing::{info, warn};
+
+    let (soft, hard) = match getrlimit(Resource::RLIMIT_NOFILE) {
+        Ok(limits) => limits,
+        Err(err) => {
+            warn!(message = "Failed to get file descriptor limit.", %err);
+            return;
+        }
+    };
+
+    if soft >= hard {
+        return; // Already at maximum
+    }
+
+    // Try setting soft limit to hard limit (works on Linux, may fail on macOS)
+    if setrlimit(Resource::RLIMIT_NOFILE, hard, hard).is_ok() {
+        info!(
+            message = "Raised file descriptor limit.",
+            from = soft,
+            to = hard,
+        );
+        return;
+    }
+
+    // On macOS, the hard limit can be RLIM_INFINITY which setrlimit rejects.
+    // Fall back to the kernel-enforced kern.maxfilesperproc.
+    #[cfg(target_os = "macos")]
+    {
+        if let Some(maxfiles) = macos_maxfilesperproc()
+            && maxfiles > soft
+            && setrlimit(Resource::RLIMIT_NOFILE, maxfiles, hard).is_ok()
+        {
+            info!(
+                message = "Raised file descriptor limit.",
+                from = soft,
+                to = maxfiles,
+            );
+            return;
+        }
+    }
+
+    warn!(
+        message = "Failed to raise file descriptor limit.",
+        current = soft,
+        attempted = hard,
+    );
+}
+
+/// Query the macOS kernel limit on per-process open files.
+#[cfg(target_os = "macos")]
+fn macos_maxfilesperproc() -> Option<libc::rlim_t> {
+    let mut maxfiles: libc::c_int = 0;
+    let mut len = std::mem::size_of::<libc::c_int>() as libc::size_t;
+    // Safety: sysctlbyname with a valid null-terminated name and correctly sized output buffer.
+    // No safe wrapper exists for this macOS-specific call.
+    let ret = unsafe {
+        libc::sysctlbyname(
+            c"kern.maxfilesperproc".as_ptr(),
+            &mut maxfiles as *mut libc::c_int as *mut libc::c_void,
+            &mut len,
+            std::ptr::null_mut(),
+            0,
+        )
+    };
+    if ret == 0 && maxfiles > 0 {
+        Some(maxfiles as libc::rlim_t)
+    } else {
+        None
+    }
+}
+
 #[derive(Parser, Debug)]
 #[command(rename_all = "kebab-case")]
 pub enum SubCommand {
@@ -315,7 +418,7 @@ pub enum SubCommand {
     /// where a configuration is split into multiple files, the schema would apply to those files
     /// only when concatenated together.
     ///
-    /// By default all output is writen to stdout. The `output_path` option can be used to redirect to a file.
+    /// By default all output is written to stdout. The `output_path` option can be used to redirect to a file.
     GenerateSchema(generate_schema::Opts),
 
     /// Generate shell completion, then exit.
@@ -423,4 +526,92 @@ pub fn handle_config_errors(errors: Vec<String>) -> exitcode::ExitCode {
     }
 
     exitcode::CONFIG
+}
+
+#[cfg(test)]
+mod tests {
+    #[cfg(unix)]
+    fn run_in_subprocess(test_name: &str) {
+        let exe = std::env::current_exe().unwrap();
+        let output = std::process::Command::new(exe)
+            .env("__VECTOR_SUBPROCESS_TEST", "1")
+            .args(["--exact", test_name, "--nocapture"])
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "subprocess test failed:\nstdout: {}\nstderr: {}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr),
+        );
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn test_raise_file_descriptor_limit() {
+        if std::env::var("__VECTOR_SUBPROCESS_TEST").is_err() {
+            run_in_subprocess("cli::tests::test_raise_file_descriptor_limit");
+            return;
+        }
+
+        use nix::sys::resource::{Resource, getrlimit, setrlimit};
+
+        let (original_soft, hard) = getrlimit(Resource::RLIMIT_NOFILE).unwrap();
+        let lowered = std::cmp::min(original_soft, 256);
+        if lowered < hard {
+            setrlimit(Resource::RLIMIT_NOFILE, lowered, hard).unwrap();
+
+            let (soft_before, _) = getrlimit(Resource::RLIMIT_NOFILE).unwrap();
+            assert_eq!(soft_before, lowered);
+
+            super::raise_file_descriptor_limit();
+
+            let (soft_after, _) = getrlimit(Resource::RLIMIT_NOFILE).unwrap();
+            assert!(
+                soft_after > lowered,
+                "Expected soft limit to be raised above {lowered}, got {soft_after}"
+            );
+        }
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn test_raise_file_descriptor_limit_already_at_max() {
+        if std::env::var("__VECTOR_SUBPROCESS_TEST").is_err() {
+            run_in_subprocess("cli::tests::test_raise_file_descriptor_limit_already_at_max");
+            return;
+        }
+
+        use nix::sys::resource::{Resource, getrlimit, setrlimit};
+
+        let (_, hard) = getrlimit(Resource::RLIMIT_NOFILE).unwrap();
+
+        if setrlimit(Resource::RLIMIT_NOFILE, hard, hard).is_err() {
+            #[cfg(target_os = "macos")]
+            if let Some(maxfiles) = super::macos_maxfilesperproc() {
+                let _ = setrlimit(Resource::RLIMIT_NOFILE, maxfiles, hard);
+            }
+        }
+
+        let (soft_before, _) = getrlimit(Resource::RLIMIT_NOFILE).unwrap();
+
+        super::raise_file_descriptor_limit();
+
+        let (soft_after, _) = getrlimit(Resource::RLIMIT_NOFILE).unwrap();
+        assert_eq!(soft_before, soft_after);
+    }
+
+    #[test]
+    #[cfg(target_os = "macos")]
+    fn test_macos_maxfilesperproc_returns_positive() {
+        let result = super::macos_maxfilesperproc();
+        assert!(
+            result.is_some(),
+            "macos_maxfilesperproc() should return Some on macOS"
+        );
+        assert!(
+            result.unwrap() > 0,
+            "kern.maxfilesperproc should be positive"
+        );
+    }
 }

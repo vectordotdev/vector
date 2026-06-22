@@ -132,14 +132,19 @@ members = [
   "lib/vector-vrl/metrics",
   "lib/vector-vrl/tests",
   "lib/vector-vrl/web-playground",
+  "tests/antithesis/harness",
   "vdev",
 ]
 
 [workspace.dependencies]
+antithesis-instrumentation = { version = "0.1", default-features = false, features = [] }
+antithesis_sdk = { version = "0.2", default-features = false, features = [] }
 anyhow = { version = "1.0.102", default-features = false, features = ["std"] }
 arc-swap = { version = "1.8.2", default-features = false }
+async-compression = { version = "0.4.42", default-features = false, features = ["tokio", "gzip"] }
 async-stream = { version = "0.3.6", default-features = false }
 async-trait = { version = "0.1.89", default-features = false }
+axum = { version = "0.6.20", default-features = false }
 base64 = { version = "0.22.1", default-features = false }
 bytes = { version = "1.11.1", default-features = false, features = ["serde"] }
 cfg-if = { version = "1.0.4", default-features = false }
@@ -190,8 +195,8 @@ reqwest = { version = "0.11", features = ["json"] }
 rust_decimal = { version = "1.40.0", default-features = false, features = ["std"] }
 semver = { version = "1.0.28", default-features = false, features = ["serde", "std"] }
 serde = { version = "1.0.219", default-features = false, features = ["alloc", "derive", "rc"] }
-serde_json = { version = "1.0.149", default-features = false, features = ["preserve_order", "raw_value", "std"] }
-serde_with = { version = "3.20.0", default-features = false, features = ["std", "macros", "chrono_0_4"] }
+serde_json = { version = "1.0.150", default-features = false, features = ["preserve_order", "raw_value", "std"] }
+serde_with = { version = "3.21.0", default-features = false, features = ["std", "macros", "chrono_0_4"] }
 serde_yaml = { version = "0.9.34", default-features = false }
 snafu = { version = "0.9.0", default-features = false, features = ["futures", "std"] }
 socket2 = { version = "0.5.10", default-features = false }
@@ -212,6 +217,7 @@ tracing = { version = "0.1.44", default-features = false }
 tracing-subscriber = { version = "0.3.22", default-features = false, features = ["fmt"] }
 url = { version = "2.5.4", default-features = false, features = ["serde"] }
 uuid = { version = "1.22.0", features = ["v4", "v7", "serde", "fast-rng"] }
+vector-buffers = { path = "lib/vector-buffers" }
 vector-config = { path = "lib/vector-config" }
 vector-config-common = { path = "lib/vector-config-common" }
 vector-config-macros = { path = "lib/vector-config-macros" }
@@ -357,7 +363,7 @@ greptimedb-ingester = { version = "0.17.0", default-features = false, optional =
 
 # External libs
 arc-swap = { workspace = true, default-features = false, optional = true }
-async-compression = { version = "0.4.27", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
+async-compression = { workspace = true, features = ["zstd"], optional = true }
 arrow = { version = "58.2.0", default-features = false, features = ["ipc"], optional = true }
 arrow-schema = { version = "58.2.0", default-features = false, optional = true }
 parquet = { version = "58.2.0", default-features = false, features = [
@@ -410,6 +416,7 @@ itertools.workspace = true
 k8s-openapi = { version = "0.27.0", default-features = false, features = ["v1_31"], optional = true }
 kube = { version = "3.0.1", default-features = false, features = ["client", "openssl-tls", "runtime"], optional = true }
 listenfd = { version = "1.0.2", default-features = false, optional = true }
+libc.workspace = true
 lru = { version = "0.16.3", default-features = false }
 maxminddb = { version = "0.27.0", default-features = false, optional = true, features = ["simdutf8"] }
 md-5 = { version = "0.10", default-features = false, optional = true }
@@ -441,7 +448,7 @@ sqlx = { version = "0.8.6", default-features = false, features = ["derive", "pos
 stream-cancel = { version = "0.8.2", default-features = false }
 strip-ansi-escapes = { version = "0.2.1", default-features = false }
 syslog = { version = "6.1.1", default-features = false, optional = true }
-tokio-postgres = { version = "0.7.13", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
+tokio-postgres = { version = "0.7.18", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
 tokio-tungstenite = { workspace = true, features = ["connect"], optional = true }
 toml.workspace = true
 hickory-proto = { workspace = true, optional = true }
@@ -465,17 +472,21 @@ sysinfo = "0.37.2"
 byteorder = "1.5.0"
 
 [target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.52", features = ["Win32_Foundation", "Win32_System_Threading"] }
 windows-service = "0.8.0"
 windows = { version = "0.58", features = ["Win32_System_EventLog", "Win32_Foundation", "Win32_System_Com", "Win32_Security", "Win32_Security_Authorization", "Win32_System_Threading", "Win32_Storage_FileSystem"], optional = true }
 quick-xml = { version = "0.31", default-features = false, features = ["serialize"], optional = true }
 rdkafka = { workspace = true, features = ["cmake_build"], optional = true }
 
 [target.'cfg(unix)'.dependencies]
-nix = { version = "0.31", default-features = false, features = ["socket", "signal", "fs"] }
+libc.workspace = true
+nix = { version = "0.31", default-features = false, features = ["socket", "signal", "fs", "resource"] }
 tikv-jemallocator = { version = "0.7.0", default-features = false, features = ["unprefixed_malloc_on_supported_platforms"], optional = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 procfs = { version = "0.18.0", default-features = false }
+# antithesis-instrumentation links a native .a via ELF .init_array -- Linux only.
+antithesis-instrumentation = { workspace = true, optional = true }
 
 [build-dependencies]
 prost-build = { workspace = true, optional = true }
@@ -524,6 +535,8 @@ ntapi = { git = "https://github.com/MSxDOS/ntapi.git", rev = "24fc1e47677fc9f6e3
 # table below). Local dev builds skip it so they don't need `libsasl2-dev` / cyrus-sasl
 # installed, and so rdkafka's build script doesn't link GSSAPI.
 default = ["enable-unix"]
+antithesis-scenario-memory = ["dep:antithesis-instrumentation"]
+antithesis-scenario-disk = ["dep:antithesis-instrumentation", "vector-lib/antithesis-disk-asserts"]
 # Default features for `cargo docs`. We're not using `gssapi` which would require installing libsasl2 in our doc environment.
 docs = ["enable-unix"]
 # Default features for *-unknown-linux-* which make use of `cmake` for dependencies
@@ -931,7 +944,7 @@ sinks-chronicle = []
 sinks-clickhouse = ["dep:nom", "dep:rust_decimal", "codecs-arrow"]
 sinks-console = []
 sinks-databend = ["dep:databend-client"]
-sinks-databricks-zerobus = ["dep:databricks-zerobus-ingest-sdk", "codecs-arrow"]
+sinks-databricks-zerobus = ["dep:databricks-zerobus-ingest-sdk", "codecs-arrow", "arrow/ipc_compression"]
 sinks-datadog_events = []
 sinks-datadog_logs = []
 sinks-datadog_metrics = ["protobuf-build", "dep:prost", "dep:prost-reflect"]

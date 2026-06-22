@@ -31,6 +31,15 @@ extern crate tracing;
 #[macro_use]
 extern crate vector_lib;
 
+#[cfg(all(
+    target_os = "linux",
+    any(
+        feature = "antithesis-scenario-memory",
+        feature = "antithesis-scenario-disk"
+    )
+))]
+extern crate antithesis_instrumentation as _;
+
 pub use indoc::indoc;
 // re-export codecs for convenience
 pub use vector_lib::codecs;
@@ -81,6 +90,7 @@ pub mod aws;
 pub mod common;
 pub mod completion;
 mod convert_config;
+pub mod cpu_time;
 pub mod encoding_transcode;
 pub mod enrichment_tables;
 pub mod extra_context;

@@ -5,6 +5,7 @@ use aws_smithy_types::byte_stream::ByteStream;
 use futures::{TryStreamExt, stream, stream::StreamExt};
 use snafu::Snafu;
 use tokio_util::io::StreamReader;
+use vector_common::compression::gzip_multiple_decoder;
 use vector_lib::{
     codecs::{
         NewlineDelimitedDecoderConfig,
@@ -330,11 +331,7 @@ async fn s3_object_decoder(
     match compression {
         Auto => unreachable!(), // is mapped above
         None => Box::new(r),
-        Gzip => Box::new({
-            let mut decoder = bufread::GzipDecoder::new(r);
-            decoder.multiple_members(true);
-            decoder
-        }),
+        Gzip => Box::new(gzip_multiple_decoder(r)),
         Zstd => Box::new({
             let mut decoder = bufread::ZstdDecoder::new(r);
             decoder.multiple_members(true);
