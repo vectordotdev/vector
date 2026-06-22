@@ -1,6 +1,5 @@
 use std::{collections::HashMap, path::PathBuf};
 
-use crate::transforms::route::UNMATCHED_ROUTE;
 use futures_util::{FutureExt, StreamExt, TryFutureExt, TryStreamExt, stream};
 use heim::{disk::Partition, units::information::byte};
 use indexmap::IndexMap;
@@ -234,22 +233,16 @@ pub fn check_outputs(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     }
 
     for (key, transform) in config.transforms.iter() {
-        let output_ids = get_transform_output_ids(
+        if get_transform_output_ids(
             transform.inner.as_ref(),
             key.clone(),
             config.schema.log_namespace(),
         )
-        .collect::<Vec<_>>();
-
-        for reserved in [DEFAULT_OUTPUT, UNMATCHED_ROUTE] {
-            if output_ids
-                .iter()
-                .any(|output| matches!(&output.port, Some(port) if port == reserved))
-            {
-                errors.push(format!(
-                    "Transform {key} cannot have a named output with reserved name: `{reserved}`"
-                ));
-            }
+        .any(|output| matches!(output.port, Some(output) if output == DEFAULT_OUTPUT))
+        {
+            errors.push(format!(
+                "Transform {key} cannot have a named output with reserved name: `{DEFAULT_OUTPUT}`"
+            ));
         }
     }
 
