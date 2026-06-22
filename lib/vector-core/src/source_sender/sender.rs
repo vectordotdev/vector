@@ -20,7 +20,9 @@ use vector_common::{
     json_size::JsonSize,
 };
 
-use super::{Builder, Output, SendError};
+use std::sync::Arc;
+
+use super::{Builder, Output, PostProcessor, SendError};
 #[cfg(any(test, feature = "test"))]
 use super::{
     LAG_TIME_NAME, OutputMetrics, SEND_BATCH_LATENCY_NAME, SEND_LATENCY_NAME, TEST_BUFFER_SIZE,
@@ -102,6 +104,17 @@ pub struct SourceSender {
 impl SourceSender {
     pub fn builder() -> Builder {
         Builder::default()
+    }
+
+    /// Attach a post-processing step to every output on this sender, replacing any previously set
+    /// one.
+    pub fn set_post_processor(&mut self, pp: &Arc<dyn PostProcessor>) {
+        if let Some(output) = &mut self.default_output {
+            output.set_post_processor(Arc::clone(pp));
+        }
+        for output in self.named_outputs.values_mut() {
+            output.set_post_processor(Arc::clone(pp));
+        }
     }
 
     #[cfg(any(test, feature = "test"))]
