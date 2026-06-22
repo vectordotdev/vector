@@ -4,8 +4,11 @@ use std::{
     io::{self, Read},
     net::SocketAddr,
     num::NonZeroUsize,
+    sync::atomic::{AtomicUsize, Ordering},
     time::Duration,
 };
+
+static NEXT_CONNECTION_NUM: AtomicUsize = AtomicUsize::new(0);
 
 use bytes::{Buf, Bytes, BytesMut};
 use flate2::read::ZlibDecoder;
@@ -265,6 +268,7 @@ impl TcpSource for LogstashSource {
 }
 
 struct LogstashAcker {
+    connection_num: usize,
     // Batched reads can contain multiple writer windows. Preserve a separate
     // ACK point for each completed window so Filebeat never sees an ACK that
     // advances past the current window it is waiting on. If the batch ends in
@@ -282,6 +286,7 @@ struct LogstashAcker {
 
 impl LogstashAcker {
     fn new(frames: &[LogstashEventFrame]) -> Self {
+        let connection_num = frames.first().map(|f| f.connection_num).unwrap_or_default();
         let acknowledgements = frames
             .iter()
             .enumerate()
@@ -291,7 +296,10 @@ impl LogstashAcker {
             .map(|(_, frame)| (frame.protocol, frame.sequence_number))
             .collect();
 
-        Self { acknowledgements }
+        Self {
+            connection_num,
+            acknowledgements,
+        }
     }
 }
 
@@ -302,6 +310,13 @@ impl TcpSourceAcker for LogstashAcker {
             TcpSourceAck::Ack if !self.acknowledgements.is_empty() => {
                 let mut bytes: Vec<u8> = Vec::with_capacity(self.acknowledgements.len() * 6);
                 for (protocol_version, sequence_number) in self.acknowledgements {
+                    trace!(
+                        connection_num = self.connection_num,
+                        protocol = ?protocol_version,
+                        sequence_number,
+                        internal_log_rate_limit = false,
+                        "Sending Ack frame."
+                    );
                     bytes.push(protocol_version.into());
                     bytes.push(LogstashFrameType::Ack.into());
                     bytes.extend(sequence_number.to_be_bytes().iter());
@@ -324,6 +339,8 @@ enum LogstashDecoderReadState {
 #[derive(Debug)]
 struct LogstashDecoder {
     state: LogstashDecoderReadState,
+    connection_num: usize,
+    nested: bool,
     // Tracks how many events remain in the current writer window. This lets us
     // preserve sender window boundaries even if ReadyFrames later batches
     // multiple decoded windows together before ACKing.
@@ -331,15 +348,29 @@ struct LogstashDecoder {
 }
 
 impl LogstashDecoder {
-    const fn new() -> Self {
-        Self::new_with_window_events_remaining(None)
+    fn new() -> Self {
+        let connection_num = NEXT_CONNECTION_NUM.fetch_add(1, Ordering::Relaxed);
+        trace!(
+            connection_num,
+            internal_log_rate_limit = false,
+            "Starting new Logstash connection decoder."
+        );
+        Self {
+            state: LogstashDecoderReadState::ReadProtocol,
+            connection_num,
+            nested: false,
+            window_events_remaining: None,
+        }
     }
 
-    const fn new_with_window_events_remaining(
+    const fn new_nested(
+        connection_num: usize,
         window_events_remaining: Option<NonZeroUsize>,
     ) -> Self {
         Self {
             state: LogstashDecoderReadState::ReadProtocol,
+            connection_num,
+            nested: true,
             window_events_remaining,
         }
     }
@@ -369,6 +400,18 @@ impl LogstashDecoder {
                 // without an explicit WindowSize frame.
                 frame.window_end = true;
             }
+        }
+    }
+}
+
+impl Drop for LogstashDecoder {
+    fn drop(&mut self) {
+        if !self.nested {
+            trace!(
+                connection_num = self.connection_num,
+                internal_log_rate_limit = false,
+                "Dropping Logstash connection decoder."
+            );
         }
     }
 }
@@ -487,6 +530,7 @@ impl TryFrom<u8> for LogstashFrameType {
 struct LogstashEventFrame {
     protocol: LogstashProtocolVersion,
     sequence_number: u32,
+    connection_num: usize,
     fields: BTreeMap<KeyString, serde_json::Value>,
     window_end: bool,
 }
@@ -564,6 +608,12 @@ impl Decoder for LogstashDecoder {
 
                     let window_size = src.get_u32() as usize;
                     self.window_events_remaining = NonZeroUsize::new(window_size);
+                    trace!(
+                        connection_num = self.connection_num,
+                        window_size,
+                        internal_log_rate_limit = false,
+                        "Decoded WindowSize frame."
+                    );
 
                     LogstashDecoderReadState::ReadProtocol
                 }
@@ -575,25 +625,57 @@ impl Decoder for LogstashDecoder {
                         return Ok(None);
                     }
 
-                    let _sequence_number = src.get_u32();
+                    let sequence_number = src.get_u32();
+                    trace!(
+                        connection_num = self.connection_num,
+                        sequence_number,
+                        internal_log_rate_limit = false,
+                        "Received Ack frame from sender (skipping)."
+                    );
 
                     LogstashDecoderReadState::ReadProtocol
                 }
                 // https://github.com/logstash-plugins/logstash-input-beats/blob/master/PROTOCOL.md#data-frame-type
                 LogstashDecoderReadState::ReadFrame(protocol, LogstashFrameType::Data) => {
-                    let Some((mut frame, byte_size)) = decode_data_frame(protocol, src) else {
+                    let Some((mut frame, byte_size)) =
+                        decode_data_frame(protocol, self.connection_num, src)
+                    else {
                         return Ok(None);
                     };
                     self.annotate_frame(&mut frame);
+                    if !self.nested {
+                        trace!(
+                            connection_num = self.connection_num,
+                            protocol = ?frame.protocol,
+                            sequence_number = frame.sequence_number,
+                            byte_size,
+                            window_end = frame.window_end,
+                            internal_log_rate_limit = false,
+                            "Decoded Data frame."
+                        );
+                    }
 
                     LogstashDecoderReadState::PendingFrames([(frame, byte_size)].into())
                 }
                 // https://github.com/logstash-plugins/logstash-input-beats/blob/master/PROTOCOL.md#json-frame-type
                 LogstashDecoderReadState::ReadFrame(protocol, LogstashFrameType::Json) => {
-                    let Some((mut frame, byte_size)) = decode_json_frame(protocol, src)? else {
+                    let Some((mut frame, byte_size)) =
+                        decode_json_frame(protocol, self.connection_num, src)?
+                    else {
                         return Ok(None);
                     };
                     self.annotate_frame(&mut frame);
+                    if !self.nested {
+                        trace!(
+                            connection_num = self.connection_num,
+                            protocol = ?frame.protocol,
+                            sequence_number = frame.sequence_number,
+                            byte_size,
+                            window_end = frame.window_end,
+                            internal_log_rate_limit = false,
+                            "Decoded JSON frame."
+                        );
+                    }
 
                     LogstashDecoderReadState::PendingFrames([(frame, byte_size)].into())
                 }
@@ -605,12 +687,33 @@ impl Decoder for LogstashDecoder {
                 // overwrite any WindowSize boundaries that were established inside the compressed
                 // payload and can also lose progress from a partially consumed outer window.
                 LogstashDecoderReadState::ReadFrame(_protocol, LogstashFrameType::Compressed) => {
-                    let Some(decoded) = decode_compressed_frame(src, self.window_events_remaining)?
+                    let Some(decoded) = decode_compressed_frame(
+                        src,
+                        self.connection_num,
+                        self.window_events_remaining,
+                    )?
                     else {
                         return Ok(None);
                     };
                     self.window_events_remaining = decoded.window_events_remaining;
-
+                    let frame_count = decoded.frames.len();
+                    let first_seq = decoded.frames.front().map(|(f, _)| f.sequence_number);
+                    let last_seq = decoded.frames.back().map(|(f, _)| f.sequence_number);
+                    let window_boundaries: Vec<u32> = decoded
+                        .frames
+                        .iter()
+                        .filter(|(f, _)| f.window_end)
+                        .map(|(f, _)| f.sequence_number)
+                        .collect();
+                    trace!(
+                        connection_num = self.connection_num,
+                        frame_count,
+                        first_seq,
+                        last_seq,
+                        ?window_boundaries,
+                        internal_log_rate_limit = false,
+                        "Decoded Compressed frame."
+                    );
                     LogstashDecoderReadState::PendingFrames(decoded.frames)
                 }
             };
@@ -621,6 +724,7 @@ impl Decoder for LogstashDecoder {
 /// Decode the Lumberjack version 1 protocol, which use the Key:Value format.
 fn decode_data_frame(
     protocol: LogstashProtocolVersion,
+    connection_num: usize,
     src: &mut BytesMut,
 ) -> Option<(LogstashEventFrame, usize)> {
     let mut rest = src.as_ref();
@@ -652,6 +756,7 @@ fn decode_data_frame(
         LogstashEventFrame {
             protocol,
             sequence_number,
+            connection_num,
             fields,
             window_end: false,
         },
@@ -684,6 +789,7 @@ fn decode_pair(mut rest: &[u8]) -> Option<(&[u8], &[u8], &[u8])> {
 
 fn decode_json_frame(
     protocol: LogstashProtocolVersion,
+    connection_num: usize,
     src: &mut BytesMut,
 ) -> Result<Option<(LogstashEventFrame, usize)>, DecodeError> {
     let mut rest = src.as_ref();
@@ -711,6 +817,7 @@ fn decode_json_frame(
         LogstashEventFrame {
             protocol,
             sequence_number,
+            connection_num,
             fields,
             window_end: false,
         },
@@ -720,6 +827,7 @@ fn decode_json_frame(
 
 fn decode_compressed_frame(
     src: &mut BytesMut,
+    connection_num: usize,
     window_events_remaining: Option<NonZeroUsize>,
 ) -> Result<Option<DecodedCompressedFrames>, DecodeError> {
     let mut rest = src.as_ref();
@@ -749,7 +857,7 @@ fn decode_compressed_frame(
 
     let mut buf = res?;
 
-    let mut decoder = LogstashDecoder::new_with_window_events_remaining(window_events_remaining);
+    let mut decoder = LogstashDecoder::new_nested(connection_num, window_events_remaining);
 
     let mut frames = VecDeque::new();
 
@@ -1011,8 +1119,12 @@ mod test {
         let req = encode_req(seq, &[("message", "Hello, World!")]);
         for i in 0..req.len() - 1 {
             assert!(
-                decode_data_frame(LogstashProtocolVersion::V1, &mut BytesMut::from(&req[..i]))
-                    .is_none()
+                decode_data_frame(
+                    LogstashProtocolVersion::V1,
+                    0,
+                    &mut BytesMut::from(&req[..i])
+                )
+                .is_none()
             );
         }
     }
