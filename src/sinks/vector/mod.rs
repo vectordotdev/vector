@@ -43,8 +43,15 @@ mod tests {
     use bytes::{BufMut, Bytes, BytesMut};
     use futures::{StreamExt, channel::mpsc};
     use http::request::Parts;
-    use hyper::Method;
+    use hyper::{
+        Method, Response, Server,
+        service::{make_service_fn, service_fn},
+    };
     use prost::Message;
+    use std::sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    };
     use vector_lib::{
         config::{Tags, Telemetry, init_telemetry},
         event::{BatchNotifier, BatchStatus},
@@ -72,6 +79,79 @@ mod tests {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<VectorConfig>();
+    }
+
+    #[tokio::test]
+    async fn build_rejects_missing_address() {
+        let config: VectorConfig = toml::from_str("").unwrap();
+
+        let err = match config.build(SinkContext::default()).await {
+            Ok(_) => panic!("missing address should fail"),
+            Err(err) => err,
+        };
+
+        assert!(
+            err.to_string()
+                .contains("No Vector endpoint configured. Please set `address` or `addresses`."),
+            "{err}"
+        );
+    }
+
+    #[tokio::test]
+    async fn build_rejects_address_and_addresses() {
+        let config: VectorConfig = toml::from_str(
+            r#"
+                address = "http://127.0.0.1:6000"
+                addresses = ["http://127.0.0.1:6001"]
+            "#,
+        )
+        .unwrap();
+
+        let err = match config.build(SinkContext::default()).await {
+            Ok(_) => panic!("address and addresses should be mutually exclusive"),
+            Err(err) => err,
+        };
+
+        assert!(
+            err.to_string()
+                .contains("`address` and `addresses` options are mutually exclusive"),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn parse_addresses_config() {
+        let config: Result<VectorConfig, _> = toml::from_str(
+            r#"
+                addresses = ["http://127.0.0.1:6000", "http://127.0.0.1:6001"]
+            "#,
+        );
+
+        assert!(config.is_ok());
+    }
+
+    #[test]
+    fn parse_failover_endpoint_strategy() {
+        let config: Result<VectorConfig, _> = toml::from_str(
+            r#"
+                addresses = ["http://127.0.0.1:6000", "http://127.0.0.1:6001"]
+                endpoint_strategy = "failover"
+            "#,
+        );
+
+        assert!(config.is_ok());
+    }
+
+    #[test]
+    fn parse_failover_primary_endpoint_strategy() {
+        let config: Result<VectorConfig, _> = toml::from_str(
+            r#"
+                addresses = ["http://127.0.0.1:6000", "http://127.0.0.1:6001"]
+                endpoint_strategy = "failover_primary"
+            "#,
+        );
+
+        assert!(config.is_ok());
     }
 
     enum TestType {
@@ -161,6 +241,562 @@ mod tests {
     #[tokio::test]
     async fn deliver_message() {
         run_sink_test(TestType::Normal).await;
+    }
+
+    #[tokio::test]
+    async fn deliver_message_to_multiple_addresses() {
+        let num_lines = 10;
+
+        let (_guard1, addr1) = next_addr();
+        let (_guard2, addr2) = next_addr();
+
+        let config = format!(
+            r#"
+                addresses = ["http://{addr1}/", "http://{addr2}/"]
+            "#
+        );
+        let config: VectorConfig = toml::from_str(&config).unwrap();
+
+        let cx = SinkContext::default();
+
+        let (sink, _) = config.build(cx).await.unwrap();
+        let (rx1, trigger1, server1) = build_test_server_generic(addr1, move || {
+            hyper::Response::builder()
+                .header("grpc-status", "0") // OK
+                .header("content-type", "application/grpc")
+                .body(hyper::Body::from(encode_body(proto::PushEventsResponse {})))
+                .unwrap()
+        });
+        let (rx2, trigger2, server2) = build_test_server_generic(addr2, move || {
+            hyper::Response::builder()
+                .header("grpc-status", "0") // OK
+                .header("content-type", "application/grpc")
+                .body(hyper::Body::from(encode_body(proto::PushEventsResponse {})))
+                .unwrap()
+        });
+
+        tokio::spawn(server1);
+        tokio::spawn(server2);
+
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let (mut input_lines, events) = random_lines_with_stream(8, num_lines, Some(batch));
+
+        run_and_assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
+
+        drop(trigger1);
+        drop(trigger2);
+
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+        let (mut output_lines, mut output_lines2) =
+            futures::future::join(get_received(rx1, |_| {}), get_received(rx2, |_| {})).await;
+
+        output_lines.append(&mut output_lines2);
+
+        input_lines.sort();
+        output_lines.sort();
+
+        assert_eq!(num_lines, output_lines.len());
+        assert_eq!(input_lines, output_lines);
+    }
+
+    #[tokio::test]
+    async fn failover_strategy_prefers_first_address() {
+        let num_lines = 10;
+
+        let (_guard1, addr1) = next_addr();
+        let (_guard2, addr2) = next_addr();
+
+        let config = format!(
+            r#"
+                addresses = ["http://{addr1}/", "http://{addr2}/"]
+                endpoint_strategy = "failover"
+            "#
+        );
+        let config: VectorConfig = toml::from_str(&config).unwrap();
+
+        let (sink, _) = config.build(SinkContext::default()).await.unwrap();
+        let (rx1, trigger1, server1) = build_test_server_generic(addr1, move || {
+            hyper::Response::builder()
+                .header("grpc-status", "0") // OK
+                .header("content-type", "application/grpc")
+                .body(hyper::Body::from(encode_body(proto::PushEventsResponse {})))
+                .unwrap()
+        });
+        let (rx2, trigger2, server2) = build_test_server_generic(addr2, move || {
+            hyper::Response::builder()
+                .header("grpc-status", "0") // OK
+                .header("content-type", "application/grpc")
+                .body(hyper::Body::from(encode_body(proto::PushEventsResponse {})))
+                .unwrap()
+        });
+
+        tokio::spawn(server1);
+        tokio::spawn(server2);
+
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let (input_lines, events) = random_lines_with_stream(8, num_lines, Some(batch));
+
+        run_and_assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
+
+        drop(trigger1);
+        drop(trigger2);
+
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+        let (output_lines, output_lines2) =
+            futures::future::join(get_received(rx1, |_| {}), get_received(rx2, |_| {})).await;
+
+        assert_eq!(num_lines, output_lines.len());
+        assert_eq!(input_lines, output_lines);
+        assert!(output_lines2.is_empty());
+    }
+
+    #[tokio::test]
+    async fn failover_strategy_uses_next_address_when_first_fails() {
+        let num_lines = 10;
+
+        let (_guard1, addr1) = next_addr();
+        let (_guard2, addr2) = next_addr();
+
+        let config = format!(
+            r#"
+                addresses = ["http://{addr1}/", "http://{addr2}/"]
+                endpoint_strategy = "failover"
+            "#
+        );
+        let config: VectorConfig = toml::from_str(&config).unwrap();
+
+        let (sink, _) = config.build(SinkContext::default()).await.unwrap();
+        let (rx2, trigger2, server2) = build_test_server_generic(addr2, move || {
+            hyper::Response::builder()
+                .header("grpc-status", "0") // OK
+                .header("content-type", "application/grpc")
+                .body(hyper::Body::from(encode_body(proto::PushEventsResponse {})))
+                .unwrap()
+        });
+
+        tokio::spawn(server2);
+
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let (input_lines, events) = random_lines_with_stream(8, num_lines, Some(batch));
+
+        run_and_assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
+
+        drop(trigger2);
+
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+        let output_lines = get_received(rx2, |_| {}).await;
+
+        assert_eq!(num_lines, output_lines.len());
+        assert_eq!(input_lines, output_lines);
+    }
+
+    #[tokio::test]
+    async fn failover_primary_strategy_retries_primary_before_secondary() {
+        let num_lines = 10;
+
+        let (_guard1, addr1) = next_addr();
+        let (_guard2, addr2) = next_addr();
+
+        let config = format!(
+            r#"
+                addresses = ["http://{addr1}/", "http://{addr2}/"]
+                endpoint_strategy = "failover_primary"
+            "#
+        );
+        let config: VectorConfig = toml::from_str(&config).unwrap();
+
+        let primary_attempts = Arc::new(AtomicUsize::new(0));
+        let primary_service_attempts = Arc::clone(&primary_attempts);
+        let (rx1, trigger1, server1) = build_test_server_generic(addr1, move || {
+            if primary_service_attempts.fetch_add(1, Ordering::AcqRel) == 0 {
+                hyper::Response::builder()
+                    .header("grpc-status", "14") // unavailable
+                    .header("content-type", "application/grpc")
+                    .body(hyper::Body::empty())
+                    .unwrap()
+            } else {
+                hyper::Response::builder()
+                    .header("grpc-status", "0") // OK
+                    .header("content-type", "application/grpc")
+                    .body(hyper::Body::from(encode_body(proto::PushEventsResponse {})))
+                    .unwrap()
+            }
+        });
+        let (rx2, trigger2, server2) = build_test_server_generic(addr2, move || {
+            hyper::Response::builder()
+                .header("grpc-status", "0") // OK
+                .header("content-type", "application/grpc")
+                .body(hyper::Body::from(encode_body(proto::PushEventsResponse {})))
+                .unwrap()
+        });
+
+        tokio::spawn(server1);
+        tokio::spawn(server2);
+
+        let (sink, _) = config.build(SinkContext::default()).await.unwrap();
+
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let (input_lines, events) = random_lines_with_stream(8, num_lines, Some(batch));
+
+        run_and_assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
+
+        drop(trigger1);
+        drop(trigger2);
+
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+        assert_eq!(
+            primary_attempts.load(Ordering::Acquire),
+            2,
+            "retriable primary failure should retry configured primary before secondary"
+        );
+
+        let output_lines = get_received(rx1, |_| {}).await;
+        let secondary_output_lines = get_received(rx2, |_| {}).await;
+
+        assert_eq!(num_lines * 2, output_lines.len());
+        assert!(
+            output_lines
+                .chunks(num_lines)
+                .all(|lines| lines == input_lines)
+        );
+        assert!(
+            secondary_output_lines.is_empty(),
+            "secondary must not receive traffic when configured primary succeeds on retry"
+        );
+    }
+
+    #[tokio::test]
+    async fn failover_strategy_continues_in_ring_order_after_active_failure() {
+        let num_lines = 2;
+
+        let (_guard1, addr1) = next_addr();
+        let (_guard2, addr2) = next_addr();
+        let (_guard3, addr3) = next_addr();
+
+        let config = format!(
+            r#"
+                addresses = ["http://{addr1}/", "http://{addr2}/", "http://{addr3}/"]
+                endpoint_strategy = "failover"
+                batch.max_events = 1
+                request.concurrency = 1
+            "#
+        );
+        let config: VectorConfig = toml::from_str(&config).unwrap();
+
+        let primary_attempts = Arc::new(AtomicUsize::new(0));
+        let primary_service_attempts = Arc::clone(&primary_attempts);
+        let (_rx1, trigger1, server1) = build_test_server_generic(addr1, move || {
+            primary_service_attempts.fetch_add(1, Ordering::AcqRel);
+            hyper::Response::builder()
+                .header("grpc-status", "14") // unavailable
+                .header("content-type", "application/grpc")
+                .body(hyper::Body::empty())
+                .unwrap()
+        });
+
+        let active_attempts = Arc::new(AtomicUsize::new(0));
+        let active_service_attempts = Arc::clone(&active_attempts);
+        let (_rx2, trigger2, server2) = build_test_server_generic(addr2, move || {
+            if active_service_attempts.fetch_add(1, Ordering::AcqRel) == 0 {
+                hyper::Response::builder()
+                    .header("grpc-status", "0") // OK
+                    .header("content-type", "application/grpc")
+                    .body(hyper::Body::from(encode_body(proto::PushEventsResponse {})))
+                    .unwrap()
+            } else {
+                hyper::Response::builder()
+                    .header("grpc-status", "14") // unavailable
+                    .header("content-type", "application/grpc")
+                    .body(hyper::Body::empty())
+                    .unwrap()
+            }
+        });
+
+        let next_attempts = Arc::new(AtomicUsize::new(0));
+        let next_service_attempts = Arc::clone(&next_attempts);
+        let (_rx3, trigger3, server3) = build_test_server_generic(addr3, move || {
+            next_service_attempts.fetch_add(1, Ordering::AcqRel);
+            hyper::Response::builder()
+                .header("grpc-status", "0") // OK
+                .header("content-type", "application/grpc")
+                .body(hyper::Body::from(encode_body(proto::PushEventsResponse {})))
+                .unwrap()
+        });
+
+        tokio::spawn(server1);
+        tokio::spawn(server2);
+        tokio::spawn(server3);
+
+        let (sink, _) = config.build(SinkContext::default()).await.unwrap();
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let (_input_lines, events) = random_lines_with_stream(8, num_lines, Some(batch));
+
+        run_and_assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
+
+        drop(trigger1);
+        drop(trigger2);
+        drop(trigger3);
+
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+        assert_eq!(primary_attempts.load(Ordering::Acquire), 1);
+        assert_eq!(active_attempts.load(Ordering::Acquire), 2);
+        assert_eq!(next_attempts.load(Ordering::Acquire), 1);
+    }
+
+    #[tokio::test]
+    async fn failover_primary_strategy_retries_configured_primary_after_active_failure() {
+        let num_lines = 2;
+
+        let (_guard1, addr1) = next_addr();
+        let (_guard2, addr2) = next_addr();
+        let (_guard3, addr3) = next_addr();
+
+        let config = format!(
+            r#"
+                addresses = ["http://{addr1}/", "http://{addr2}/", "http://{addr3}/"]
+                endpoint_strategy = "failover_primary"
+                batch.max_events = 1
+                request.concurrency = 1
+            "#
+        );
+        let config: VectorConfig = toml::from_str(&config).unwrap();
+
+        let primary_attempts = Arc::new(AtomicUsize::new(0));
+        let primary_service_attempts = Arc::clone(&primary_attempts);
+        let (_rx1, trigger1, server1) = build_test_server_generic(addr1, move || {
+            if primary_service_attempts.fetch_add(1, Ordering::AcqRel) < 2 {
+                hyper::Response::builder()
+                    .header("grpc-status", "14") // unavailable
+                    .header("content-type", "application/grpc")
+                    .body(hyper::Body::empty())
+                    .unwrap()
+            } else {
+                hyper::Response::builder()
+                    .header("grpc-status", "0") // OK
+                    .header("content-type", "application/grpc")
+                    .body(hyper::Body::from(encode_body(proto::PushEventsResponse {})))
+                    .unwrap()
+            }
+        });
+
+        let active_attempts = Arc::new(AtomicUsize::new(0));
+        let active_service_attempts = Arc::clone(&active_attempts);
+        let (_rx2, trigger2, server2) = build_test_server_generic(addr2, move || {
+            if active_service_attempts.fetch_add(1, Ordering::AcqRel) == 0 {
+                hyper::Response::builder()
+                    .header("grpc-status", "0") // OK
+                    .header("content-type", "application/grpc")
+                    .body(hyper::Body::from(encode_body(proto::PushEventsResponse {})))
+                    .unwrap()
+            } else {
+                hyper::Response::builder()
+                    .header("grpc-status", "14") // unavailable
+                    .header("content-type", "application/grpc")
+                    .body(hyper::Body::empty())
+                    .unwrap()
+            }
+        });
+
+        let next_attempts = Arc::new(AtomicUsize::new(0));
+        let next_service_attempts = Arc::clone(&next_attempts);
+        let (_rx3, trigger3, server3) = build_test_server_generic(addr3, move || {
+            next_service_attempts.fetch_add(1, Ordering::AcqRel);
+            hyper::Response::builder()
+                .header("grpc-status", "0") // OK
+                .header("content-type", "application/grpc")
+                .body(hyper::Body::from(encode_body(proto::PushEventsResponse {})))
+                .unwrap()
+        });
+
+        tokio::spawn(server1);
+        tokio::spawn(server2);
+        tokio::spawn(server3);
+
+        let (sink, _) = config.build(SinkContext::default()).await.unwrap();
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let (_input_lines, events) = random_lines_with_stream(8, num_lines, Some(batch));
+
+        run_and_assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
+
+        drop(trigger1);
+        drop(trigger2);
+        drop(trigger3);
+
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+        assert_eq!(primary_attempts.load(Ordering::Acquire), 3);
+        assert_eq!(active_attempts.load(Ordering::Acquire), 2);
+        assert_eq!(next_attempts.load(Ordering::Acquire), 0);
+    }
+
+    #[tokio::test]
+    async fn failover_strategy_does_not_resend_non_retriable_errors() {
+        let num_lines = 10;
+
+        let (_guard1, addr1) = next_addr();
+        let (_guard2, addr2) = next_addr();
+
+        let config = format!(
+            r#"
+                addresses = ["http://{addr1}/", "http://{addr2}/"]
+                endpoint_strategy = "failover"
+            "#
+        );
+        let config: VectorConfig = toml::from_str(&config).unwrap();
+
+        let (sink, _) = config.build(SinkContext::default()).await.unwrap();
+        let (_rx1, trigger1, server1) = build_test_server_generic(addr1, move || {
+            hyper::Response::builder()
+                .header("grpc-status", "15") // data loss
+                .header("content-type", "application/grpc")
+                .body(tonic::body::empty_body())
+                .unwrap()
+        });
+        let (rx2, trigger2, server2) = build_test_server_generic(addr2, move || {
+            hyper::Response::builder()
+                .header("grpc-status", "0") // OK
+                .header("content-type", "application/grpc")
+                .body(hyper::Body::from(encode_body(proto::PushEventsResponse {})))
+                .unwrap()
+        });
+
+        tokio::spawn(server1);
+        tokio::spawn(server2);
+
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let (_, events) = random_lines_with_stream(8, num_lines, Some(batch));
+
+        sink.run(events).await.expect("Running sink failed");
+
+        drop(trigger1);
+        drop(trigger2);
+
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
+        assert!(
+            get_received(rx2, |_| {}).await.is_empty(),
+            "non-retriable primary rejection must not be resent to secondary endpoint"
+        );
+    }
+
+    #[tokio::test]
+    async fn failover_strategy_uses_next_address_when_first_times_out() {
+        let num_lines = 10;
+
+        let (_guard1, addr1) = next_addr();
+        let (_guard2, addr2) = next_addr();
+
+        let config = format!(
+            r#"
+                addresses = ["http://{addr1}/", "http://{addr2}/"]
+                endpoint_strategy = "failover"
+
+                [request]
+                timeout_secs = 1
+            "#
+        );
+        let config: VectorConfig = toml::from_str(&config).unwrap();
+
+        let hanging_service = make_service_fn(|_| async {
+            Ok::<_, crate::Error>(service_fn(|_req| async {
+                tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+                Ok::<_, crate::Error>(
+                    Response::builder()
+                        .header("grpc-status", "0") // OK
+                        .header("content-type", "application/grpc")
+                        .body(hyper::Body::from(encode_body(proto::PushEventsResponse {})))
+                        .unwrap(),
+                )
+            }))
+        });
+        let hanging_server = tokio::spawn(Server::bind(&addr1).serve(hanging_service));
+
+        let (sink, _) = config.build(SinkContext::default()).await.unwrap();
+        let (rx2, trigger2, server2) = build_test_server_generic(addr2, move || {
+            hyper::Response::builder()
+                .header("grpc-status", "0") // OK
+                .header("content-type", "application/grpc")
+                .body(hyper::Body::from(encode_body(proto::PushEventsResponse {})))
+                .unwrap()
+        });
+
+        tokio::spawn(server2);
+
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let (input_lines, events) = random_lines_with_stream(8, num_lines, Some(batch));
+
+        run_and_assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
+
+        hanging_server.abort();
+        drop(trigger2);
+
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+        let output_lines = get_received(rx2, |_| {}).await;
+
+        assert_eq!(num_lines, output_lines.len());
+        assert_eq!(input_lines, output_lines);
+    }
+
+    #[tokio::test]
+    async fn failover_strategy_retries_after_all_endpoints_time_out() {
+        let num_lines = 10;
+
+        let (_guard, addr) = next_addr();
+
+        let config = format!(
+            r#"
+                addresses = ["http://{addr}/"]
+                endpoint_strategy = "failover"
+
+                [request]
+                timeout_secs = 1
+                retry_initial_backoff_secs = 1
+                retry_max_duration_secs = 5
+            "#
+        );
+        let config: VectorConfig = toml::from_str(&config).unwrap();
+
+        let attempts = Arc::new(AtomicUsize::new(0));
+        let service_attempts = Arc::clone(&attempts);
+        let service = make_service_fn(move |_| {
+            let service_attempts = Arc::clone(&service_attempts);
+            async move {
+                Ok::<_, crate::Error>(service_fn(move |_req| {
+                    let attempt = service_attempts.fetch_add(1, Ordering::AcqRel);
+                    async move {
+                        if attempt == 0 {
+                            tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+                        }
+
+                        Ok::<_, crate::Error>(
+                            Response::builder()
+                                .header("grpc-status", "0") // OK
+                                .header("content-type", "application/grpc")
+                                .body(hyper::Body::from(encode_body(proto::PushEventsResponse {})))
+                                .unwrap(),
+                        )
+                    }
+                }))
+            }
+        });
+        let server = tokio::spawn(Server::bind(&addr).serve(service));
+
+        let (sink, _) = config.build(SinkContext::default()).await.unwrap();
+
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let (_input_lines, events) = random_lines_with_stream(8, num_lines, Some(batch));
+
+        run_and_assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
+
+        server.abort();
+
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+        assert!(
+            attempts.load(Ordering::Acquire) > 1,
+            "sink should retry after endpoint timeout"
+        );
     }
 
     #[tokio::test]
