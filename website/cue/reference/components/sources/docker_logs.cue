@@ -2,7 +2,6 @@ package metadata
 
 components: sources: docker_logs: {
 	title: "Docker"
-	alias: "docker"
 
 	classes: {
 		delivery: "best_effort"

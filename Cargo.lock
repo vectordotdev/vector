@@ -224,6 +224,45 @@ dependencies = [
 ]
 
 [[package]]
+name = "antithesis-harness"
+version = "0.1.0"
+dependencies = [
+ "antithesis-instrumentation",
+ "antithesis_sdk",
+ "axum 0.6.20",
+ "clap",
+ "reqwest 0.11.26",
+ "serde_json",
+ "tokio",
+ "vector-buffers",
+]
+
+[[package]]
+name = "antithesis-instrumentation"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eb6b548668212c6d3a942a4ac7be13bc4fc25715bf661328438f30e3fd342cf0"
+dependencies = [
+ "cc",
+]
+
+[[package]]
+name = "antithesis_sdk"
+version = "0.2.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "18dbd97a5b6c21cc9176891cf715f7f0c273caf3959897f43b9bd1231939e675"
+dependencies = [
+ "libc",
+ "libloading",
+ "linkme",
+ "once_cell",
+ "rand 0.8.6",
+ "rustc_version_runtime",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "anyhow"
 version = "1.0.102"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2500,9 +2539,9 @@ dependencies = [
 
 [[package]]
 name = "cmake"
-version = "0.1.54"
+version = "0.1.58"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e7caa3f9de89ddbe2c607f4101924c5abec803763ae9534e4f4d7d8f84aa81f0"
+checksum = "c0f78a02292a74a88ac736019ab962ece0bc380e3f977bf72e376c5d78ff0678"
 dependencies = [
  "cc",
 ]
@@ -6471,6 +6510,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "47186c6da4d81ca383c7c47c1bfc80f4b95f4720514d860a5407aaf4233f9588"
 dependencies = [
  "linked-hash-map",
+]
+
+[[package]]
+name = "linkme"
+version = "0.3.36"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e83272d46373fb8decca684579ac3e7c8f3d71d4cc3aa693df8759e260ae41cf"
+dependencies = [
+ "linkme-impl",
+]
+
+[[package]]
+name = "linkme-impl"
+version = "0.3.36"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "32d59e20403c7d08fe62b4376edfe5c7fb2ef1e6b1465379686d0f21c8df444b"
+dependencies = [
+ "proc-macro2 1.0.106",
+ "quote 1.0.45",
+ "syn 2.0.117",
 ]
 
 [[package]]
@@ -12732,7 +12791,7 @@ checksum = "accd4ea62f7bb7a82fe23066fb0957d48ef677f6eeb8215f372f52e48bb32426"
 
 [[package]]
 name = "vdev"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "anyhow",
  "cfg-if",
@@ -12772,6 +12831,7 @@ dependencies = [
 name = "vector"
 version = "0.57.0"
 dependencies = [
+ "antithesis-instrumentation",
  "approx",
  "arc-swap",
  "arr_macro",
@@ -13003,6 +13063,7 @@ dependencies = [
 name = "vector-buffers"
 version = "0.1.0"
 dependencies = [
+ "antithesis_sdk",
  "async-recursion",
  "async-stream",
  "async-trait",
@@ -13030,6 +13091,7 @@ dependencies = [
  "rand 0.9.4",
  "rkyv",
  "serde",
+ "serde_json",
  "serde_yaml",
  "snafu 0.9.0",
  "temp-dir",
@@ -13047,6 +13109,7 @@ dependencies = [
 name = "vector-common"
 version = "0.1.0"
 dependencies = [
+ "async-compression",
  "async-stream",
  "bytes",
  "chrono",

@@ -4,7 +4,6 @@ components: sinks: prometheus_exporter: {
 	_port: 9598
 
 	title: "Prometheus Exporter"
-	alias: "prometheus"
 
 	classes: {
 		delivery:      "best_effort"
