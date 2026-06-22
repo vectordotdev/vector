@@ -412,7 +412,9 @@ mod tests {
     };
 
     use futures::{FutureExt, SinkExt, StreamExt, future, stream};
+    use tokio::sync::{mpsc, oneshot};
     use tokio::time::Duration;
+    use tower::{Service, ServiceExt, service_fn};
     use vector_lib::json_size::JsonSize;
 
     use super::*;
@@ -593,5 +595,81 @@ mod tests {
             // Treat the default as the request is successful
             RetryAction::Successful
         }
+    }
+
+    #[derive(Clone, Copy, Debug)]
+    struct RetryNever;
+
+    impl RetryLogic for RetryNever {
+        type Error = std::io::Error;
+        type Request = usize;
+        type Response = ();
+
+        fn is_retriable_error(&self, _: &Self::Error) -> bool {
+            false
+        }
+    }
+
+    #[derive(Clone, Copy, Debug)]
+    struct AlwaysHealthy;
+
+    impl HealthLogic for AlwaysHealthy {
+        type Error = crate::Error;
+        type Response = ();
+
+        fn is_healthy(&self, response: &Result<Self::Response, Self::Error>) -> Option<bool> {
+            Some(response.is_ok())
+        }
+    }
+
+    #[tokio::test]
+    async fn distributed_service_prefers_less_loaded_endpoint() {
+        let settings = TowerRequestConfig::<GlobalTowerRequestConfigDefaults> {
+            concurrency: Concurrency::Fixed(1),
+            ..TowerRequestConfig::default()
+        }
+        .into_settings();
+
+        let (requests_tx, mut requests_rx) =
+            mpsc::unbounded_channel::<(&'static str, usize, oneshot::Sender<()>)>();
+
+        let make_service = |id| {
+            let requests_tx = requests_tx.clone();
+            service_fn(move |request: usize| {
+                let requests_tx = requests_tx.clone();
+                async move {
+                    let (done_tx, done_rx) = oneshot::channel();
+                    requests_tx.send((id, request, done_tx)).unwrap();
+                    let _ = done_rx.await;
+                    Ok::<(), std::io::Error>(())
+                }
+            })
+        };
+
+        let mut service = settings.distributed_service(
+            RetryNever,
+            vec![
+                ("endpoint-a".to_owned(), make_service("a")),
+                ("endpoint-b".to_owned(), make_service("b")),
+            ],
+            HealthConfig::default(),
+            AlwaysHealthy,
+            1,
+        );
+
+        let first = tokio::spawn(service.ready().await.unwrap().call(1));
+        let (first_id, first_request, first_done) = requests_rx.recv().await.unwrap();
+        assert_eq!(first_request, 1);
+
+        let second = tokio::spawn(service.ready().await.unwrap().call(2));
+        let (second_id, second_request, second_done) = requests_rx.recv().await.unwrap();
+        assert_eq!(second_request, 2);
+        assert_ne!(first_id, second_id);
+
+        first_done.send(()).unwrap();
+        second_done.send(()).unwrap();
+
+        first.await.unwrap().unwrap();
+        second.await.unwrap().unwrap();
     }
 }
