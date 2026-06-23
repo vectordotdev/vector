@@ -1077,55 +1077,106 @@ mod test {
         );
     }
 
-    #[tokio::test]
-    async fn distinct_windows_do_not_share_an_ack_domain() {
-        let mut req = BytesMut::new();
-        push_window_size(&mut req, 1);
-        push_req(&mut req, 1, "first window");
-        push_window_size(&mut req, 2);
-        push_req(&mut req, 1, "second window first");
-        push_req(&mut req, 2, "second window second");
+    #[derive(Clone, Copy)]
+    struct Window(u32, &'static [u32]);
 
-        let decoded = decode_frames_and_assert_sequences(req, &[1, 1, 2]);
-        assert_acknowledgements_for_ready_frames(decoded, &[1, 1, 2], &[1, 2]).await;
+    impl Window {
+        fn encode(&self, req: &mut BytesMut) {
+            push_window_size(req, self.0);
+            self.encode_data(req);
+        }
+
+        fn encode_data(&self, req: &mut BytesMut) {
+            for &seq in self.1 {
+                push_req(req, seq, &format!("msg-{seq}"));
+            }
+        }
     }
 
-    #[tokio::test]
-    async fn distinct_windows_with_monotonic_sequences_ack_the_first_window() {
-        let mut req = BytesMut::new();
-        push_window_size(&mut req, 2);
-        push_req(&mut req, 1, "first window first");
-        push_req(&mut req, 2, "first window second");
-        push_window_size(&mut req, 2);
-        push_req(&mut req, 3, "second window first");
-        push_req(&mut req, 4, "second window second");
-
-        let decoded = decode_frames_and_assert_sequences(req, &[1, 2, 3, 4]);
-        assert_acknowledgements_for_ready_frames(decoded, &[1, 2, 3, 4], &[2, 4]).await;
+    #[derive(Clone, Copy)]
+    enum CompressionMode {
+        None,
+        PerWindow,
+        CompressedData,
+        WholeSequence,
     }
 
-    #[tokio::test]
-    async fn incomplete_final_window_is_acked_to_the_last_received_event() {
-        let mut req = BytesMut::new();
-        push_window_size(&mut req, 4);
-        push_req(&mut req, 1, "only event in partial window");
-
-        let decoded = decode_frames_and_assert_sequences(req, &[1]);
-        assert_acknowledgements_for_ready_frames(decoded, &[1], &[1]).await;
+    struct AckProtocolCase {
+        windows: &'static [Window],
+        expected_sequences: &'static [u32],
+        expected_acknowledgements: &'static [u32],
     }
 
+    #[rstest::rstest]
+    #[case::distinct_windows(AckProtocolCase {
+        windows: &[Window(1, &[1]), Window(2, &[1, 2])],
+        expected_sequences: &[1, 1, 2],
+        expected_acknowledgements: &[1, 2],
+    })]
+    #[case::monotonic_sequences(AckProtocolCase {
+        windows: &[Window(2, &[1, 2]), Window(2, &[3, 4])],
+        expected_sequences: &[1, 2, 3, 4],
+        expected_acknowledgements: &[2, 4],
+    })]
+    #[case::incomplete_final_window(AckProtocolCase {
+        windows: &[Window(4, &[1])],
+        expected_sequences: &[1],
+        expected_acknowledgements: &[1],
+    })]
+    #[case::incomplete_windows(AckProtocolCase {
+        windows: &[Window(8, &[1, 2, 3]), Window(8, &[1, 2, 3, 4])],
+        expected_sequences: &[1, 2, 3, 1, 2, 3, 4],
+        expected_acknowledgements: &[3, 4],
+    })]
     #[tokio::test]
-    async fn compressed_frames_preserve_inner_window_boundaries() {
-        let mut inner = BytesMut::new();
-        push_window_size(&mut inner, 2);
-        push_req(&mut inner, 1, "compressed first");
-        push_req(&mut inner, 2, "compressed second");
-
+    async fn ack_protocol(
+        #[case] case: AckProtocolCase,
+        #[values(
+            CompressionMode::None,
+            CompressionMode::PerWindow,
+            CompressionMode::CompressedData,
+            CompressionMode::WholeSequence
+        )]
+        compression: CompressionMode,
+    ) {
         let mut req = BytesMut::new();
-        push_compressed(&mut req, &inner);
+        match compression {
+            CompressionMode::None => {
+                for window in case.windows {
+                    window.encode(&mut req);
+                }
+            }
+            CompressionMode::PerWindow => {
+                for window in case.windows {
+                    let mut inner = BytesMut::new();
+                    window.encode(&mut inner);
+                    push_compressed(&mut req, &inner);
+                }
+            }
+            CompressionMode::CompressedData => {
+                for window in case.windows {
+                    push_window_size(&mut req, window.0);
+                    let mut inner = BytesMut::new();
+                    window.encode_data(&mut inner);
+                    push_compressed(&mut req, &inner);
+                }
+            }
+            CompressionMode::WholeSequence => {
+                let mut inner = BytesMut::new();
+                for window in case.windows {
+                    window.encode(&mut inner);
+                }
+                push_compressed(&mut req, &inner);
+            }
+        }
 
-        let decoded = decode_frames_and_assert_sequences(req, &[1, 2]);
-        assert_acknowledgements_for_ready_frames(decoded, &[1, 2], &[2]).await;
+        let decoded = decode_frames_and_assert_sequences(req, case.expected_sequences);
+        assert_acknowledgements_for_ready_frames(
+            decoded,
+            case.expected_sequences,
+            case.expected_acknowledgements,
+        )
+        .await;
     }
 
     #[tokio::test]
