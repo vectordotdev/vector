@@ -106,6 +106,16 @@ impl TransformConfig for DelayConfig {
             clone_input_definitions(input_definitions),
         )]
     }
+
+    fn validate_env(&self, context: &TransformContext) -> Result<(), Vec<String>> {
+        self.condition
+            .as_ref()
+            .map(|c| {
+                c.validate(&context.enrichment_tables, &context.metrics_storage)
+                    .map_err(|e| vec![format!("condition: {e}")])
+            })
+            .unwrap_or(Ok(()))
+    }
 }
 
 pub struct Delay {

@@ -231,6 +231,29 @@ impl TransformConfig for ReduceConfig {
 
         vec![TransformOutput::new(DataType::Log, output_definitions)]
     }
+
+    fn validate_env(&self, context: &TransformContext) -> Result<(), Vec<String>> {
+        let mut errors = Vec::new();
+        if let Some(Err(e)) = self
+            .ends_when
+            .as_ref()
+            .map(|c| c.validate(&context.enrichment_tables, &context.metrics_storage))
+        {
+            errors.push(format!("ends_when: {e}"));
+        }
+        if let Some(Err(e)) = self
+            .starts_when
+            .as_ref()
+            .map(|c| c.validate(&context.enrichment_tables, &context.metrics_storage))
+        {
+            errors.push(format!("starts_when: {e}"));
+        }
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
 }
 
 #[cfg(test)]

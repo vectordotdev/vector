@@ -86,6 +86,18 @@ impl TransformConfig for ThrottleConfig {
             clone_input_definitions(input_definitions),
         )]
     }
+
+    fn validate_env(&self, context: &TransformContext) -> Result<(), Vec<String>> {
+        if let Some(Err(e)) = self
+            .exclude
+            .as_ref()
+            .map(|c| c.validate(&context.enrichment_tables, &context.metrics_storage))
+        {
+            Err(vec![format!("exclude: {e}")])
+        } else {
+            Ok(())
+        }
+    }
 }
 
 #[cfg(test)]
