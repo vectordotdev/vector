@@ -329,7 +329,8 @@ impl RunningTopology {
                 .run_healthchecks(&diff, &mut new_pieces, new_config.healthchecks)
                 .await
             {
-                self.connect_diff(&diff, &mut new_pieces).await;
+                self.connect_diff(&diff, &mut new_pieces, Some(&new_config))
+                    .await;
                 self.spawn_diff(&diff, new_pieces);
                 self.config = new_config;
 
@@ -355,7 +356,7 @@ impl RunningTopology {
                 .run_healthchecks(&diff, &mut new_pieces, self.config.healthchecks)
                 .await
         {
-            self.connect_diff(&diff, &mut new_pieces).await;
+            self.connect_diff(&diff, &mut new_pieces, None).await;
             self.spawn_diff(&diff, new_pieces);
 
             info!("Old configuration restored successfully.");
@@ -762,6 +763,7 @@ impl RunningTopology {
         &mut self,
         diff: &ConfigDiff,
         new_pieces: &mut TopologyPieces,
+        new_config: Option<&Config>,
     ) {
         debug!("Connecting changed/added component(s).");
 
@@ -822,7 +824,8 @@ impl RunningTopology {
                 .enrichment_tables
                 .changed_and_added()
                 .filter_map(|key| {
-                    self.config
+                    new_config
+                        .unwrap_or(&self.config)
                         .enrichment_table(key)
                         .and_then(|t| t.as_source(key).map(|(key, _)| key))
                 })
@@ -855,7 +858,8 @@ impl RunningTopology {
                 .enrichment_tables
                 .changed_and_added()
                 .filter_map(|key| {
-                    self.config
+                    new_config
+                        .unwrap_or(&self.config)
                         .enrichment_table(key)
                         .and_then(|t| t.as_sink(key).map(|(key, _)| key))
                 })
@@ -879,12 +883,17 @@ impl RunningTopology {
             self.setup_outputs(key, new_pieces).await;
         }
 
-        let added_changed_table_sources: Vec<&ComponentKey> = diff
+        let added_changed_table_sources: Vec<ComponentKey> = diff
             .enrichment_tables
             .changed_and_added()
-            .filter(|k| new_pieces.source_tasks.contains_key(k))
+            .filter_map(|key| {
+                new_config
+                    .unwrap_or(&self.config)
+                    .enrichment_table(key)
+                    .and_then(|t| t.as_source(key).map(|(key, _)| key))
+            })
             .collect();
-        for key in added_changed_table_sources.iter() {
+        for key in &added_changed_table_sources {
             debug!(component_id = %key, "Connecting outputs for enrichment table source.");
             self.setup_outputs(key, new_pieces).await;
         }
@@ -908,12 +917,17 @@ impl RunningTopology {
             debug!(component_id = %key, "Connecting inputs for sink.");
             self.setup_inputs(key, diff, new_pieces).await;
         }
-        let added_changed_tables: Vec<&ComponentKey> = diff
+        let added_changed_tables: Vec<ComponentKey> = diff
             .enrichment_tables
             .changed_and_added()
-            .filter(|k| new_pieces.inputs.contains_key(k))
+            .filter_map(|key| {
+                new_config
+                    .unwrap_or(&self.config)
+                    .enrichment_table(key)
+                    .and_then(|t| t.as_sink(key).map(|(key, _)| key))
+            })
             .collect();
-        for key in added_changed_tables.iter() {
+        for key in &added_changed_tables {
             debug!(component_id = %key, "Connecting inputs for enrichment table sink.");
             self.setup_inputs(key, diff, new_pieces).await;
         }
@@ -1445,7 +1459,9 @@ impl RunningTopology {
         {
             return None;
         }
-        running_topology.connect_diff(&diff, &mut pieces).await;
+        running_topology
+            .connect_diff(&diff, &mut pieces, None)
+            .await;
         running_topology.spawn_diff(&diff, pieces);
 
         let (utilization_task_shutdown_trigger, utilization_shutdown_signal, _) =
