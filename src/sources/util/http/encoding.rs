@@ -1,4 +1,4 @@
-use std::{io::Read, sync::OnceLock};
+use std::io::Read;
 
 use bytes::{Buf, Bytes};
 #[cfg(any(
@@ -22,28 +22,11 @@ use warp::http::StatusCode;
 ))]
 use warp::{Filter, filters::BoxedFilter};
 
+#[cfg(test)]
+use crate::sources::util::decompression::DEFAULT_MAX_DECOMPRESSED_SIZE_BYTES;
+use crate::sources::util::decompression::max_decompressed_size_bytes;
+pub use crate::sources::util::decompression::set_max_decompressed_size_bytes;
 use crate::{common::http::ErrorMessage, internal_events::HttpDecompressError};
-
-/// Default cap on the decompressed body size produced by [`decompress_body`].
-///
-/// Prevents a compressed "bomb" payload from causing unbounded memory growth.
-pub(crate) const DEFAULT_MAX_DECOMPRESSED_BODY_SIZE: usize = 100 * 1024 * 1024;
-
-static MAX_DECOMPRESSED_BODY_SIZE: OnceLock<usize> = OnceLock::new();
-
-/// Override the global decompressed body size cap. Must be called before any sources start.
-pub fn set_max_decompressed_size_bytes(size: usize) {
-    MAX_DECOMPRESSED_BODY_SIZE
-        .set(size)
-        .expect("max_decompressed_size_bytes already set");
-}
-
-/// Returns the currently configured decompressed body size cap.
-pub(crate) fn max_decompressed_size_bytes() -> usize {
-    *MAX_DECOMPRESSED_BODY_SIZE
-        .get()
-        .unwrap_or(&DEFAULT_MAX_DECOMPRESSED_BODY_SIZE)
-}
 
 /// Collects a request body into [`Bytes`] while enforcing an in-memory size cap.
 #[cfg(any(
@@ -393,7 +376,7 @@ mod tests {
         assert_eq!(zstd_window_log_max(1024), Some(10));
         assert_eq!(zstd_window_log_max(1025), Some(11));
         assert_eq!(
-            zstd_window_log_max(DEFAULT_MAX_DECOMPRESSED_BODY_SIZE),
+            zstd_window_log_max(DEFAULT_MAX_DECOMPRESSED_SIZE_BYTES),
             Some(27)
         );
     }

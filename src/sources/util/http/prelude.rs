@@ -22,7 +22,8 @@ use warp::{
     reject::Rejection,
 };
 
-use super::encoding::{decompress_body, limited_body, max_decompressed_size_bytes};
+use super::encoding::{decompress_body, limited_body};
+use crate::sources::util::decompression::max_decompressed_size_bytes;
 use crate::{
     SourceSender,
     common::http::{ErrorMessage, server_auth::HttpServerAuthConfig},

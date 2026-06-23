@@ -22,6 +22,9 @@ use vector_lib::{
 };
 use vrl::value::{KeyString, Kind, kind::Collection};
 
+use super::util::decompression::{
+    max_decompressed_size_bytes, max_zlib_compressed_frame_size_bytes,
+};
 use super::util::net::{SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{
     config::{
@@ -760,9 +763,22 @@ fn decode_compressed_frame(
         return Ok(None);
     }
     let payload_size = rest.get_u32() as usize;
+    let limit = max_decompressed_size_bytes();
+
+    // Reject an oversized declared payload before buffering it, so a peer cannot force multi-GB
+    // buffering by advertising a huge length and slow-streaming its bytes. The bound includes
+    // zlib's worst-case expansion so a valid frame whose decompressed content is within `limit`
+    // is never rejected here; the decompressed cap itself is still enforced below.
+    let compressed_limit = max_zlib_compressed_frame_size_bytes();
+    if payload_size > compressed_limit {
+        return Err(DecodeError::DecompressionFailed {
+            source: io::Error::other(format!(
+                "compressed frame payload size {payload_size} exceeds limit of {compressed_limit} bytes"
+            )),
+        });
+    }
 
     if rest.remaining() < payload_size {
-        src.reserve(payload_size);
         return Ok(None);
     }
 
@@ -771,10 +787,22 @@ fn decode_compressed_frame(
 
     let mut buf = Vec::new();
 
+    // Read one byte beyond the cap to detect overflow without ambiguity.
     let res = ZlibDecoder::new(io::Cursor::new(slice))
+        .take((limit as u64).saturating_add(1))
         .read_to_end(&mut buf)
         .context(DecompressionFailedSnafu)
-        .map(|_| BytesMut::from(&buf[..]));
+        .and_then(|_| {
+            if buf.len() > limit {
+                Err(DecodeError::DecompressionFailed {
+                    source: io::Error::other(format!(
+                        "decompressed size exceeds limit of {limit} bytes"
+                    )),
+                })
+            } else {
+                Ok(BytesMut::from(&buf[..]))
+            }
+        });
 
     let byte_size = bytes_remaining(src, rest);
     src.advance(byte_size);
