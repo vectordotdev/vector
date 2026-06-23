@@ -168,7 +168,7 @@ pub async fn validate(opts: &Opts, color: bool) -> ExitCode {
 
     validated &= validate_transforms(&config, &mut fmt).await;
 
-    if validated && !opts.no_environment {
+    if !opts.no_environment {
         if let Some(tmp_directory) = create_tmp_directory(&mut config, &mut fmt) {
             validated &= validate_environment(opts, &config, &mut fmt).await;
             remove_tmp_directory(tmp_directory);
