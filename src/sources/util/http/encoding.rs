@@ -1,4 +1,4 @@
-use std::io::Read;
+use std::{io::Read, sync::OnceLock};
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use flate2::read::{MultiGzDecoder, ZlibDecoder};
@@ -12,6 +12,21 @@ use crate::{common::http::ErrorMessage, internal_events::HttpDecompressError};
 ///
 /// Prevents a compressed "bomb" payload from causing unbounded memory growth.
 pub(crate) const DEFAULT_MAX_DECOMPRESSED_BODY_SIZE: usize = 100 * 1024 * 1024;
+
+static MAX_DECOMPRESSED_BODY_SIZE: OnceLock<usize> = OnceLock::new();
+
+/// Override the global decompressed body size cap. Must be called before any sources start.
+pub fn set_max_decompressed_size_bytes(size: usize) {
+    // Ignore the error: if already set (e.g. in tests), the first write wins.
+    let _ = MAX_DECOMPRESSED_BODY_SIZE.set(size);
+}
+
+/// Returns the currently configured decompressed body size cap.
+pub(crate) fn max_decompressed_size_bytes() -> usize {
+    *MAX_DECOMPRESSED_BODY_SIZE
+        .get()
+        .unwrap_or(&DEFAULT_MAX_DECOMPRESSED_BODY_SIZE)
+}
 
 /// Collects a request body into [`Bytes`] while enforcing an in-memory size cap.
 pub(crate) fn limited_body(max_body_size: usize) -> BoxedFilter<(Bytes,)> {
@@ -43,7 +58,7 @@ pub(crate) fn limited_body(max_body_size: usize) -> BoxedFilter<(Bytes,)> {
 ///
 /// Caps the decompressed output at 100 MiB to mitigate decompression-bomb DoS attacks.
 pub fn decompress_body(header: Option<&str>, body: Bytes) -> Result<Bytes, ErrorMessage> {
-    decompress_body_with_limit(header, body, Some(DEFAULT_MAX_DECOMPRESSED_BODY_SIZE))
+    decompress_body_with_limit(header, body, Some(max_decompressed_size_bytes()))
 }
 
 /// Like [`decompress_body`], but allows the caller to control the decompressed size cap.

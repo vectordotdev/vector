@@ -199,6 +199,12 @@ cli: {
 			type:        "integer"
 			env_var:     "VECTOR_INTERNAL_LOG_RATE_LIMIT"
 		}
+		"max-decompressed-size-bytes": {
+			description: env_vars.VECTOR_MAX_DECOMPRESSED_SIZE_BYTES.description
+			default:     env_vars.VECTOR_MAX_DECOMPRESSED_SIZE_BYTES.type.uint.default
+			type:        "integer"
+			env_var:     "VECTOR_MAX_DECOMPRESSED_SIZE_BYTES"
+		}
 	}
 
 	options: _core_options
@@ -708,6 +714,13 @@ cli: {
 				Allow the configuration to run without any components. This is useful for loading in an empty stub config that will later be replaced with actual components. Note that this is likely not useful without also watching for config file changes as described in `--watch-config`.
 				"""
 			type: bool: default: false
+		}
+		VECTOR_MAX_DECOMPRESSED_SIZE_BYTES: {
+			description: "Maximum number of bytes allowed after decompressing a payload. Sources that decompress incoming payloads enforce this cap to prevent a compressed \"bomb\" from exhausting memory. Defaults to 104857600 (100 MiB)."
+			type: uint: {
+				default: 104857600
+				unit:    "bytes"
+			}
 		}
 		VECTOR_STRICT_ENV_VARS: {
 			description: """

@@ -41,7 +41,7 @@ use crate::{
         opentelemetry::config::{LOGS, METRICS, OpentelemetryConfig, TRACES},
         util::{
             add_headers, decompress_body,
-            http::{DEFAULT_MAX_DECOMPRESSED_BODY_SIZE, limited_body},
+            http::{limited_body, max_decompressed_size_bytes},
         },
     },
     tls::MaybeTlsSettings,
@@ -194,7 +194,7 @@ where
         + 'static
         + Fn(Option<String>, HeaderMap, Bytes) -> Result<Vec<Event>, ErrorMessage>,
 {
-    let body_filter = limited_body(DEFAULT_MAX_DECOMPRESSED_BODY_SIZE);
+    let body_filter = limited_body(max_decompressed_size_bytes());
 
     warp::post()
         .and(warp::path("v1"))
