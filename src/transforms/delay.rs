@@ -107,6 +107,14 @@ impl TransformConfig for DelayConfig {
         )]
     }
 
+    fn validate(&self, _: &TransformContext) -> Result<(), Vec<String>> {
+        if self.delay_ms.as_millis() == 0 {
+            Err(vec!["delay must not be zero".to_string()])
+        } else {
+            Ok(())
+        }
+    }
+
     fn validate_env(&self, context: &TransformContext) -> Result<(), Vec<String>> {
         self.condition
             .as_ref()

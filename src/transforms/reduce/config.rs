@@ -232,6 +232,16 @@ impl TransformConfig for ReduceConfig {
         vec![TransformOutput::new(DataType::Log, output_definitions)]
     }
 
+    fn validate(&self, _: &TransformContext) -> Result<(), Vec<String>> {
+        if self.ends_when.is_some() && self.starts_when.is_some() {
+            Err(vec![
+                "only one of `ends_when` and `starts_when` can be provided".to_string(),
+            ])
+        } else {
+            Ok(())
+        }
+    }
+
     fn validate_env(&self, context: &TransformContext) -> Result<(), Vec<String>> {
         let mut errors = Vec::new();
         if let Some(Err(e)) = self

@@ -87,6 +87,16 @@ impl TransformConfig for ThrottleConfig {
         )]
     }
 
+    fn validate(&self, _: &TransformContext) -> Result<(), Vec<String>> {
+        if self.threshold == 0 || self.window_secs.as_secs_f64() == 0.0 {
+            Err(vec![
+                "`threshold` and `window_secs` must be non-zero".to_string(),
+            ])
+        } else {
+            Ok(())
+        }
+    }
+
     fn validate_env(&self, context: &TransformContext) -> Result<(), Vec<String>> {
         if let Some(Err(e)) = self
             .exclude
