@@ -670,136 +670,58 @@ impl Service<ChronicleRequest> for ChronicleService {
     }
 }
 
-#[cfg(all(test, feature = "chronicle-integration-tests"))]
-mod integration_tests {
-    use reqwest::{Client, Method, Response};
-    use serde::{Deserialize, Serialize};
-    use vector_lib::event::{BatchNotifier, BatchStatus};
+#[cfg(test)]
+mod unit_tests {
+    use std::io::Write;
+
+    use tempfile::NamedTempFile;
+    use wiremock::{Mock, MockServer, ResponseTemplate, matchers::method};
 
     use super::*;
-    use crate::test_util::{
-        components::{
-            COMPONENT_ERROR_TAGS, SINK_TAGS, run_and_assert_sink_compliance,
-            run_and_assert_sink_error,
-        },
-        random_events_with_stream, random_string, trace_init,
-    };
+    use crate::test_util::{random_string, trace_init};
 
-    const ADDRESS_ENV_VAR: &str = "CHRONICLE_ADDRESS";
+    #[tokio::test]
+    async fn invalid_credentials_rejected_by_oauth_server() {
+        trace_init();
 
-    fn config(log_type: &str, auth_path: &str) -> ChronicleUnstructuredConfig {
-        let address = std::env::var(ADDRESS_ENV_VAR).unwrap();
-        let config = format!(
-            indoc! { r#"
-             endpoint: "{}"
-             customer_id: "customer id"
-             namespace: namespace
-             credentials_path: "{}"
-             log_type: "{}"
-             encoding:
-               codec: text
-        "# },
-            address, auth_path, log_type
-        );
+        let mock_server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .respond_with(ResponseTemplate::new(401))
+            .mount(&mock_server)
+            .await;
 
-        let config: ChronicleUnstructuredConfig = serde_yaml::from_str(&config).unwrap();
-        config
-    }
+        let base_url = mock_server.uri();
+        let creds = serde_json::json!({
+            "type": "service_account",
+            "project_id": "test",
+            "private_key_id": "1",
+            "private_key": "-----BEGIN RSA PRIVATE KEY-----\nMIICXgIBAAKBgQDouHdVDVz0/M6PGe60Kf/g0nyOxCvbZgiUAZNzFimXDU+RpZ54\n6/oETl6VpRkbp8a4Xb8avll2lsamdHvGcsgnjJXdpp7LfWYLqHEpn0/XFM+womXg\nvglWCDwAsXmrmwpZKEC82mmyFigheyPA/sfuN6z+wa7P5B65xzIdDQX7nQIDAQAB\nAoGBANID/rUDrTrtll8v8Oon6OH0MjIIuOdzKhSfY3h9rKTDf2YaB2xq0KLoMpVr\ne8AoZb5l45t34naR1M3M2xKY7SSDAVJFfg/3Vxeot86DQ23IGLXj7LnNxXnvklXa\nEXaD8LNz/MXxS7/Lu0R+lEtjEkf23+BRb11fL6Q/EDToNHnhAkEA/FnwHhKMc/Bm\nXsS8bENuZP3SV2v7TU6MFTtXJFmsoZBxHnsM8UUi0gq9gBnApmdhy7v2N/Mv9gFI\nviSdr7vm1QJBAOwV3cHAciRHVK71TweOWIJKZBM9ZVut0VDs5GrBYZxGMBiOr3BI\ns7+0ugTKxVimuei6c0KNXw1kg3Vtc5+utakCQQDklAbXBpAomJHxt5zBKBc/7VXx\nEANyk/p5ZOXbLEsdkXuVU3p2tNwEi+v4s9r4H97Kr3goV+SSnbkpWntm6fn9AkBn\nFnE7rlXpA4C12QYGTaDWW7dxM0j0DGUvChH/j6uYuok73+o5hHWAy2DCwOwFduAN\nAIVd1S9hQLeqaf2oB3jpAkEAnRT+bAlMjtUOBO6XPNO4IbYwWJvGMcIEO7zu6AdB\nPJy3/U+bLimxFuYdrs6SnIHIUVdl35AlckHqzT54a5YKqQ==\n-----END RSA PRIVATE KEY-----",
+            "client_email": "test@test.com",
+            "client_id": "1",
+            "auth_uri": format!("{base_url}/o/oauth2/auth"),
+            "token_uri": format!("{base_url}/token"),
+            "auth_provider_x509_cert_url": format!("{base_url}/oauth2/v1/certs"),
+            "client_x509_cert_url": "https://example.com"
+        });
 
-    async fn config_build(
-        log_type: &str,
-        auth_path: &str,
-    ) -> crate::Result<(VectorSink, crate::sinks::Healthcheck)> {
+        let mut tmp = NamedTempFile::new().unwrap();
+        write!(tmp, "{creds}").unwrap();
+
+        let log_type = random_string(10);
         let cx = SinkContext::default();
-        config(log_type, auth_path).build(cx).await
-    }
-
-    #[ignore = "https://github.com/vectordotdev/vector/issues/24133"]
-    #[tokio::test]
-    async fn publish_events() {
-        trace_init();
-
-        let log_type = random_string(10);
-        let (sink, healthcheck) = config_build(&log_type, "tests/integration/gcp/config/auth.json")
-            .await
-            .expect("Building sink failed");
-
-        healthcheck.await.expect("Health check failed");
-
-        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
-        let (input, events) = random_events_with_stream(100, 100, Some(batch));
-        run_and_assert_sink_compliance(sink, events, &SINK_TAGS).await;
-        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
-
-        let response = pull_messages(&log_type).await;
-        let messages = response
-            .into_iter()
-            .map(|message| message.log_text)
-            .collect::<Vec<_>>();
-        assert_eq!(input.len(), messages.len());
-        for i in 0..input.len() {
-            let data = serde_json::to_value(&messages[i]).unwrap();
-            let expected = serde_json::to_value(input[i].as_log().get("message").unwrap()).unwrap();
-            assert_eq!(data, expected);
-        }
-    }
-
-    #[tokio::test]
-    async fn invalid_credentials() {
-        trace_init();
-
-        let log_type = random_string(10);
-        // Test with an auth file that doesnt match the public key sent to the dummy chronicle server.
-        let sink = config_build(&log_type, "tests/integration/gcp/config/invalidauth.json").await;
-
-        assert!(sink.is_err())
-    }
-
-    #[ignore = "https://github.com/vectordotdev/vector/issues/24133"]
-    #[tokio::test]
-    async fn publish_invalid_events() {
-        trace_init();
-
-        // The chronicle-emulator we are testing against is setup so a `log_type` of "INVALID"
-        // will return a `400 BAD_REQUEST`.
-        let log_type = "INVALID";
-        let (sink, healthcheck) = config_build(log_type, "tests/integration/gcp/config/auth.json")
-            .await
-            .expect("Building sink failed");
-
-        healthcheck.await.expect("Health check failed");
-
-        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
-        let (_input, events) = random_events_with_stream(100, 100, Some(batch));
-        run_and_assert_sink_error(sink, events, &COMPONENT_ERROR_TAGS).await;
-        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
-    }
-
-    #[derive(Clone, Debug, Deserialize, Serialize)]
-    pub struct Log {
-        customer_id: String,
-        namespace: String,
-        log_type: String,
-        log_text: String,
-        ts_rfc3339: String,
-    }
-
-    async fn request(method: Method, path: &str, log_type: &str) -> Response {
-        let address = std::env::var(ADDRESS_ENV_VAR).unwrap();
-        let url = format!("{address}/{path}");
-        Client::new()
-            .request(method.clone(), &url)
-            .query(&[("log_type", log_type)])
-            .send()
-            .await
-            .unwrap_or_else(|_| panic!("Sending {method} request to {url} failed"))
-    }
-
-    async fn pull_messages(log_type: &str) -> Vec<Log> {
-        request(Method::GET, "logs", log_type)
-            .await
-            .json::<Vec<Log>>()
-            .await
-            .expect("Extracting pull data failed")
+        let config: ChronicleUnstructuredConfig = serde_yaml::from_str(&format!(
+            indoc! { r#"
+                endpoint: "http://127.0.0.1:1"
+                customer_id: test-customer
+                credentials_path: "{}"
+                log_type: "{}"
+                encoding:
+                  codec: text
+            "# },
+            tmp.path().display(),
+            log_type
+        ))
+        .unwrap();
+        assert!(config.build(cx).await.is_err());
     }
 }
