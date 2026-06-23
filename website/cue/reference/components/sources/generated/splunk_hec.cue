@@ -128,7 +128,7 @@ generated: components: sources: splunk_hec: configuration: {
 						required:    true
 						type: string: enum: {
 							avro: """
-																			Decodes the raw bytes as as an [Apache Avro][apache_avro] message.
+																			Decodes the raw bytes as an [Apache Avro][apache_avro] message.
 
 																			[apache_avro]: https://avro.apache.org/
 																			"""
@@ -672,7 +672,7 @@ generated: components: sources: splunk_hec: configuration: {
 						required:    true
 						type: string: enum: {
 							avro: """
-																			Decodes the raw bytes as as an [Apache Avro][apache_avro] message.
+																			Decodes the raw bytes as an [Apache Avro][apache_avro] message.
 
 																			[apache_avro]: https://avro.apache.org/
 																			"""

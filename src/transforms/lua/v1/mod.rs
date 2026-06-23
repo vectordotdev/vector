@@ -388,7 +388,7 @@ mod tests {
     fn lua_read_empty_field() {
         let event = transform_one(
             r#"
-              if event["non-existant"] == nil then
+              if event["non-existent"] == nil then
                 event["result"] = "empty"
               else
                 event["result"] = "found"

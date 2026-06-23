@@ -13,7 +13,8 @@ pub use vector_common::{
     Error, NamedInternalEvent, Result, TimeZone, assert_event_data_eq, atomic, btreemap,
     byte_size_of, byte_size_of::ByteSizeOf, conversion, counter, encode_logfmt, finalization,
     finalizer, gauge, histogram, id, impl_event_data_eq, internal_event, json_size,
-    registered_event, request_metadata, sensitive_string, shutdown, stats, trigger,
+    registered_event, request_metadata, sensitive_string, shutdown, spawn_in_current_span, stats,
+    trigger,
 };
 pub use vector_config as configurable;
 pub use vector_config::impl_generate_config_from_default;

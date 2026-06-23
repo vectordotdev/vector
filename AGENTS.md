@@ -264,6 +264,11 @@ cargo install dd-rust-license-tool --locked
 make build-licenses
 ```
 
+## Git Conventions
+
+- **Commit messages:** Do NOT include co-authoring information from coding agents (i.e. avoid "Co-Authored-By: Claude" attribution)
+- **Pull requests:** Do NOT add "Generated with Claude Code" or similar footers — keep PR descriptions focused on the technical changes
+
 ## Creating Pull Requests
 
 Before opening a PR, read [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md) and use it as the reference for the PR body structure and title.

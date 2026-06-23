@@ -1,12 +1,12 @@
-use std::{collections::HashMap, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use vector_buffers::topology::channel::LimitedReceiver;
 use vector_common::histogram;
 use vector_common::internal_event::DEFAULT_OUTPUT;
 
 use super::{
-    CHUNK_SIZE, LAG_TIME_NAME, Output, OutputMetrics, SEND_BATCH_LATENCY_NAME, SEND_LATENCY_NAME,
-    SourceSender, SourceSenderItem,
+    CHUNK_SIZE, LAG_TIME_NAME, Output, OutputMetrics, PostProcessor, SEND_BATCH_LATENCY_NAME,
+    SEND_LATENCY_NAME, SourceSender, SourceSenderItem,
 };
 use crate::config::{ComponentKey, OutputId, SourceOutput};
 
@@ -17,6 +17,7 @@ pub struct Builder {
     output_metrics: OutputMetrics,
     timeout: Option<Duration>,
     ewma_half_life_seconds: Option<f64>,
+    post_processor: Option<Arc<dyn PostProcessor>>,
 }
 
 impl Default for Builder {
@@ -32,6 +33,7 @@ impl Default for Builder {
             ),
             timeout: None,
             ewma_half_life_seconds: None,
+            post_processor: None,
         }
     }
 }
@@ -52,6 +54,26 @@ impl Builder {
     #[must_use]
     pub fn with_ewma_half_life_seconds(mut self, half_life_seconds: Option<f64>) -> Self {
         self.ewma_half_life_seconds = half_life_seconds;
+        self
+    }
+
+    /// Attach a post-processing step that will be applied to every event on **all** outputs
+    /// (default and named ports) produced by this builder.
+    ///
+    /// The processor runs before schema metadata is attached to each event, immediately
+    /// before the event is placed on the output channel. See [`PostProcessor`] for the trait
+    /// definition and its contract.
+    ///
+    #[must_use]
+    pub fn with_post_processor(mut self, post_processor: Arc<dyn PostProcessor>) -> Self {
+        // Retroactively apply to any outputs already created so that call order does not matter.
+        if let Some(output) = &mut self.default_output {
+            output.set_post_processor(Arc::clone(&post_processor));
+        }
+        for output in self.named_outputs.values_mut() {
+            output.set_post_processor(Arc::clone(&post_processor));
+        }
+        self.post_processor = Some(post_processor);
         self
     }
 
@@ -76,6 +98,10 @@ impl Builder {
                     self.timeout,
                     self.ewma_half_life_seconds,
                 );
+                let output = match &self.post_processor {
+                    Some(pp) => output.with_post_processor(Arc::clone(pp)),
+                    None => output,
+                };
                 self.default_output = Some(output);
                 rx
             }
@@ -89,6 +115,10 @@ impl Builder {
                     self.timeout,
                     self.ewma_half_life_seconds,
                 );
+                let output = match &self.post_processor {
+                    Some(pp) => output.with_post_processor(Arc::clone(pp)),
+                    None => output,
+                };
                 self.named_outputs.insert(name, output);
                 rx
             }

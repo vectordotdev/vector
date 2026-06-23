@@ -199,6 +199,11 @@ cli: {
 			type:        "integer"
 			env_var:     "VECTOR_INTERNAL_LOG_RATE_LIMIT"
 		}
+		"internal-logs-source-rate-limit": {
+			description: env_vars.VECTOR_INTERNAL_LOGS_SOURCE_RATE_LIMIT.description
+			type:        "integer"
+			env_var:     "VECTOR_INTERNAL_LOGS_SOURCE_RATE_LIMIT"
+		}
 		"max-decompressed-size-bytes": {
 			description: env_vars.VECTOR_MAX_DECOMPRESSED_SIZE_BYTES.description
 			default:     env_vars.VECTOR_MAX_DECOMPRESSED_SIZE_BYTES.type.uint.default
@@ -684,10 +689,29 @@ cli: {
 			}
 		}
 		VECTOR_INTERNAL_LOG_RATE_LIMIT: {
-			description: "Set the internal log rate limit. This limits Vector from emitting identical logs more than once over the given number of seconds."
+			description: """
+				Set the internal log rate limit in seconds. Within each time window, the first occurrence of a
+				log is emitted, the second shows a suppression warning, and subsequent occurrences are silent
+				until the window expires. When the window expires and the log fires again, a summary of the
+				suppressed count is emitted followed by the log itself.
+				"""
 			type: uint: {
 				default: 10
 				unit:    null
+			}
+		}
+		VECTOR_INTERNAL_LOGS_SOURCE_RATE_LIMIT: {
+			description: """
+				Apply a rate limit (in seconds) to the broadcast channel that feeds all `internal_logs` sources.
+				When set, the first occurrence of a repeated log is emitted, the second shows a suppression
+				warning, and subsequent occurrences are silent until the window expires. When the window expires
+				and the log fires again, a summary of the suppressed count is emitted followed by the log itself.
+				Unset by default so that `internal_logs` consumers receive every log event. This limit is
+				independent of `VECTOR_INTERNAL_LOG_RATE_LIMIT`, which only applies to stdout/stderr output.
+				"""
+			type: uint: {
+				default: null
+				unit:    "seconds"
 			}
 		}
 		VECTOR_GRACEFUL_SHUTDOWN_LIMIT_SECS: {

@@ -118,7 +118,7 @@ fn test_decode_log_body() {
 
         let events = decode_log_body(body, api_key, &source).unwrap();
         assert_eq!(events.len(), msgs.len());
-        for (msg, event) in msgs.into_iter().zip(events.into_iter()) {
+        for (msg, event) in msgs.into_iter().zip(events) {
             let log = event.as_log();
             assert_eq!(log["message"], msg.message.into());
             assert_eq!(log["status"], msg.status.into());

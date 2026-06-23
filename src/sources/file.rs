@@ -580,7 +580,7 @@ pub fn file_source(
         // checkpoints until all the acks have come in.
         let (send_shutdown, shutdown2) = oneshot::channel::<()>();
         let checkpoints = checkpointer.view();
-        tokio::spawn(async move {
+        crate::spawn_in_current_span(async move {
             while let Some((status, entry)) = ack_stream.next().await {
                 if status == BatchStatus::Delivered {
                     checkpoints.update(entry.file_id, entry.offset);
