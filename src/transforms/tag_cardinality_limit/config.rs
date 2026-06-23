@@ -118,7 +118,7 @@ pub enum Mode {
     /// of tag values instead of the original strings. This leads to lower memory requirements in most
     /// scenarios (assuming average tag value size is greater than 8 bytes) at the cost of slightly
     /// reduced throughput due to extra hashing operations and a very small chance of collisions at
-    /// very high cardinalities
+    /// very high cardinalities.
     ExactFingerprint,
 
     /// Tracks cardinality probabilistically.
