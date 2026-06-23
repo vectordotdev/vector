@@ -207,14 +207,15 @@ fn format_command_error(
     }
 
     if let Some(description) = command_description {
-        let _ = writeln!(error_msg, "{description}");
+        writeln!(error_msg, "{description}").ok();
     }
 
-    let _ = write!(
+    write!(
         error_msg,
         "failed with exit code: {}",
         output.status.code().unwrap()
-    );
+    )
+    .ok();
 
     error_msg
 }

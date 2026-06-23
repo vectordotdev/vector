@@ -235,8 +235,9 @@ where
         None => Cow::Borrowed(s), // All valid, zero allocation
         Some((first_invalid_idx, _)) => {
             let mut result = String::with_capacity(s.len());
-            result.push_str(&s[..first_invalid_idx]); // Copy valid prefix
-            for c in s[first_invalid_idx..].chars() {
+            let (valid_prefix, remainder) = s.split_at(first_invalid_idx);
+            result.push_str(valid_prefix);
+            for c in remainder.chars() {
                 result.push(if is_valid(c) { c } else { '_' });
             }
 
@@ -320,7 +321,7 @@ impl SyslogMessage {
     fn encode(&self, rfc: &SyslogRFC) -> String {
         let mut result = String::with_capacity(256);
 
-        let _ = write!(result, "{}", self.pri.encode());
+        write!(result, "{}", self.pri.encode()).ok();
 
         if *rfc == SyslogRFC::Rfc5424 {
             result.push_str(SYSLOG_V1);
@@ -329,7 +330,7 @@ impl SyslogMessage {
 
         match rfc {
             SyslogRFC::Rfc3164 => {
-                let _ = write!(result, "{} ", self.timestamp.format("%b %e %H:%M:%S"));
+                write!(result, "{} ", self.timestamp.format("%b %e %H:%M:%S")).ok();
             }
             SyslogRFC::Rfc5424 => {
                 result.push_str(
@@ -435,12 +436,12 @@ impl StructuredData {
             self.elements
                 .iter()
                 .fold(String::new(), |mut acc, (sd_id, sd_params)| {
-                    let _ = write!(acc, "[{sd_id}");
+                    write!(acc, "[{sd_id}").ok();
                     for (key, value) in sd_params {
                         let esc_val = escape_sd_value(value);
-                        let _ = write!(acc, " {key}=\"{esc_val}\"");
+                        write!(acc, " {key}=\"{esc_val}\"").ok();
                     }
-                    let _ = write!(acc, "]");
+                    write!(acc, "]").ok();
                     acc
                 })
         }

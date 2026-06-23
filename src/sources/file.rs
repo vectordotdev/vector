@@ -2571,7 +2571,7 @@ mod tests {
                     let mut rx = rx;
                     while let Some(event) = rx.next().await {
                         counter.fetch_add(1, Ordering::SeqCst);
-                        let _ = relay_tx.send(event);
+                        relay_tx.send(event).ok();
                     }
                 });
 

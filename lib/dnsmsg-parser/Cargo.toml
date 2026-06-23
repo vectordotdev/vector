@@ -8,6 +8,9 @@ license = "MIT"
 
 [lints.clippy]
 unwrap-used = "forbid"
+string_slice = "warn"
+await_holding_lock = "warn"
+let_underscore_must_use = "warn"
 
 [dependencies]
 data-encoding = "2.10"

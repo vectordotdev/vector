@@ -7,6 +7,9 @@ publish = false
 
 [lints.clippy]
 unwrap-used = "deny"
+string_slice = "warn"
+await_holding_lock = "warn"
+let_underscore_must_use = "warn"
 
 [[bin]]
 name = "generate-avro-fixtures"

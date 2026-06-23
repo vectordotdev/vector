@@ -192,7 +192,7 @@ impl SharedKeyAuthorizationPolicy {
             vals.sort();
             vals.dedup();
             let joined = vals.join(",");
-            let _ = writeln!(s, "{}:{}", k, joined);
+            writeln!(s, "{}:{}", k, joined).ok();
         }
 
         // CanonicalizedResource
@@ -280,7 +280,7 @@ fn append_canonicalized_resource(s: &mut String, account: &str, url: &Url) -> Az
         for (k, mut vals) in qp_map {
             vals.sort();
             let mut line = String::new();
-            let _ = write!(&mut line, "\n{}:", k);
+            write!(&mut line, "\n{}:", k).ok();
             let joined = vals.join(",");
             line.push_str(&joined);
             s.push_str(&line);

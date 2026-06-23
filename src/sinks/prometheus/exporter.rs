@@ -811,7 +811,7 @@ mod tests {
 
         let mut gz = GzDecoder::new(&body_raw[..]);
         let mut body_decoded = String::new();
-        let _ = gz.read_to_string(&mut body_decoded);
+        gz.read_to_string(&mut body_decoded).ok();
 
         assert!(body_raw.len() < expected.len());
         assert_eq!(body_decoded, expected);

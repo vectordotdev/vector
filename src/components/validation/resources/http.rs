@@ -427,7 +427,7 @@ impl HttpResourceOutputContext<'_> {
             resource_shutdown_rx.wait().await;
 
             // signal the server to shutdown
-            let _ = http_server_shutdown_tx.send(());
+            http_server_shutdown_tx.send(()).ok();
 
             // mark ourselves as done
             resource_completed.mark_as_done();

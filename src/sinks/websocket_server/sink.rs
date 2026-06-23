@@ -888,7 +888,7 @@ mod tests {
                 }
             }
 
-            let _ = tx.close().await;
+            tx.close().await.ok();
         })
     }
 

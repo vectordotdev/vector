@@ -288,7 +288,9 @@ impl TryFrom<String> for SocketListenAddr {
             Err(_) => {
                 let fd: usize = match input.as_str() {
                     "systemd" => Ok(0),
-                    s if s.starts_with("systemd#") => s[8..]
+                    s if s.starts_with("systemd#") => s
+                        .strip_prefix("systemd#")
+                        .unwrap()
                         .parse::<usize>()
                         .map_err(|_| "failed to parse usize".to_string())?
                         .checked_sub(1)

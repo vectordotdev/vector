@@ -145,7 +145,7 @@ fn parse_sampling(input: &str) -> Result<f64, ParseError> {
         ));
     }
 
-    let num: f64 = input[1..].parse()?;
+    let num: f64 = input.strip_prefix('@').unwrap().parse()?;
     if num.is_sign_positive() {
         Ok(num)
     } else {
@@ -161,7 +161,9 @@ fn parse_tags(input: &&str) -> Result<MetricTags, ParseError> {
         ));
     }
 
-    Ok(input[1..]
+    Ok(input
+        .strip_prefix('#')
+        .unwrap()
         .split(',')
         .map(extract_tag_key_and_value)
         .collect())
