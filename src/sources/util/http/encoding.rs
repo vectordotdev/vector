@@ -17,8 +17,9 @@ static MAX_DECOMPRESSED_BODY_SIZE: OnceLock<usize> = OnceLock::new();
 
 /// Override the global decompressed body size cap. Must be called before any sources start.
 pub fn set_max_decompressed_size_bytes(size: usize) {
-    // Ignore the error: if already set (e.g. in tests), the first write wins.
-    let _ = MAX_DECOMPRESSED_BODY_SIZE.set(size);
+    MAX_DECOMPRESSED_BODY_SIZE
+        .set(size)
+        .expect("max_decompressed_size_bytes already set");
 }
 
 /// Returns the currently configured decompressed body size cap.
