@@ -6,7 +6,7 @@ use indexmap::IndexMap;
 use vector_lib::{buffers::config::DiskUsage, internal_event::DEFAULT_OUTPUT};
 
 use super::{
-    ComponentKey, Config, OutputId, Resource, builder::ConfigBuilder,
+    ComponentKey, Config, OutputId, Resource, TransformContext, builder::ConfigBuilder,
     transform::get_transform_output_ids,
 };
 
@@ -233,6 +233,14 @@ pub fn check_outputs(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     }
 
     for (key, transform) in config.transforms.iter() {
+        // Structural validation: reserved names, duplicate routes, invalid sample rates.
+        // Uses a default context so transforms that require environment resources (VRL
+        // compilation, condition building) must guard on context.key being None and skip
+        // those checks — they run later in validate_transforms() with a real context.
+        if let Err(errs) = transform.inner.validate(&TransformContext::default()) {
+            errors.extend(errs.into_iter().map(|msg| format!("Transform {key} {msg}")));
+        }
+
         if get_transform_output_ids(
             transform.inner.as_ref(),
             key.clone(),

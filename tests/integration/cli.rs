@@ -199,6 +199,36 @@ fn validate_no_environment_validates_condition_transforms() {
 }
 
 #[test]
+fn validate_no_environment_reports_condition_errors() {
+    assert_eq!(
+        validate_with_args(
+            indoc! {r#"
+                data_dir: "${VECTOR_DATA_DIR}"
+
+                sources:
+                  in:
+                    type: demo_logs
+                    format: shuffle
+                    lines: ["log"]
+
+                transforms:
+                  broken:
+                    inputs: ["in"]
+                    type: filter
+                    condition: ".foo = \"not a condition\""
+
+                sinks:
+                  out:
+                    inputs: ["broken"]
+                    type: blackhole
+            "#},
+            &["--no-environment"],
+        ),
+        exitcode::CONFIG
+    );
+}
+
+#[test]
 fn validate_no_environment_skips_aws_ec2_metadata_environment_check() {
     assert_eq!(
         validate_with_args(

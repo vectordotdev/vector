@@ -168,7 +168,7 @@ pub async fn validate(opts: &Opts, color: bool) -> ExitCode {
 
     validated &= validate_transforms(&config, &mut fmt).await;
 
-    if !opts.no_environment {
+    if validated && !opts.no_environment {
         if let Some(tmp_directory) = create_tmp_directory(&mut config, &mut fmt) {
             validated &= validate_environment(opts, &config, &mut fmt).await;
             remove_tmp_directory(tmp_directory);
@@ -281,10 +281,15 @@ async fn validate_transforms(config: &Config, fmt: &mut Formatter) -> bool {
             ..Default::default()
         };
 
-        if let Err(errs) = transform.inner.validate(&context) {
-            for err in errs {
-                errors.push(format!("Transform \"{key}\": {err}"));
-            }
+        for err in transform
+            .inner
+            .validate(&context)
+            .err()
+            .into_iter()
+            .chain(transform.inner.validate_env(&context).err())
+            .flatten()
+        {
+            errors.push(format!("Transform \"{key}\": {err}"));
         }
     }
 

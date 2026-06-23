@@ -277,7 +277,7 @@ impl TransformConfig for RemapConfig {
         Ok(transform)
     }
 
-    fn validate(&self, context: &TransformContext) -> std::result::Result<(), Vec<String>> {
+    fn validate_env(&self, context: &TransformContext) -> std::result::Result<(), Vec<String>> {
         self.compile_vrl_program(
             context.enrichment_tables.clone(),
             context.metrics_storage.clone(),

@@ -222,25 +222,21 @@ impl TransformConfig for SampleConfig {
         Input::new(DataType::Log | DataType::Trace)
     }
 
-    fn validate(&self, context: &TransformContext) -> Result<(), Vec<String>> {
-        let mut errors = self
-            .sample_rate()
-            .err()
-            .map(|e| vec![e.to_string()])
-            .unwrap_or_default();
+    fn validate(&self, _: &TransformContext) -> Result<(), Vec<String>> {
+        self.sample_rate()
+            .map(|_| ())
+            .map_err(|e| vec![e.to_string()])
+    }
 
+    fn validate_env(&self, context: &TransformContext) -> Result<(), Vec<String>> {
         if let Some(Err(e)) = self
             .exclude
             .as_ref()
             .map(|c| c.validate(&context.enrichment_tables, &context.metrics_storage))
         {
-            errors.push(format!("exclude: {e}"));
-        }
-
-        if errors.is_empty() {
-            Ok(())
+            Err(vec![format!("exclude: {e}")])
         } else {
-            Err(errors)
+            Ok(())
         }
     }
 
