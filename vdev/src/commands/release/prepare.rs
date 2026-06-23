@@ -68,7 +68,7 @@ impl Cli {
             alpine_version: self.alpine_version,
             debian_version: self.debian_version,
             repo_root,
-            latest_vector_version: generate_cue::find_latest_release_tag()?,
+            latest_vector_version: git::latest_release_version()?,
             release_branch: format!("v{}.{}", self.version.major, self.version.minor),
             // Websites containing `website` will also generate website previews.
             // Caveat is these branches can only contain alphanumeric chars and dashes.
