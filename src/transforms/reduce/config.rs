@@ -233,12 +233,28 @@ impl TransformConfig for ReduceConfig {
     }
 
     fn validate(&self, _: &TransformContext) -> Result<(), Vec<String>> {
+        let mut errors = Vec::new();
+
         if self.ends_when.is_some() && self.starts_when.is_some() {
-            Err(vec![
-                "only one of `ends_when` and `starts_when` can be provided".to_string(),
-            ])
-        } else {
+            errors.push("only one of `ends_when` and `starts_when` can be provided".to_string());
+        }
+
+        for (path, _) in &self.merge_strategies {
+            match parse_target_path(path) {
+                Err(_) => errors.push(format!("Could not parse path: `{path}`")),
+                Ok(parsed) if parsed.path.segments.iter().any(|s| s.is_index()) => {
+                    errors.push(format!(
+                        "Merge strategies with indexes are currently not supported. Path: `{path}`"
+                    ));
+                }
+                Ok(_) => {}
+            }
+        }
+
+        if errors.is_empty() {
             Ok(())
+        } else {
+            Err(errors)
         }
     }
 
