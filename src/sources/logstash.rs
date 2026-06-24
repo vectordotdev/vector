@@ -1128,6 +1128,20 @@ mod test {
         expected_sequences: &[1, 2, 3, 1, 2, 3, 4],
         expected_acknowledgements: &[3, 4],
     })]
+    // Regression: a sender may legally under-fill a window (WindowSize is a
+    // maximum). When such a window is coalesced with a later one in a single
+    // read, the later window's sequence must not leak onto the earlier one.
+    #[case::under_filled_window_must_not_leak_later_window_sequence(AckProtocolCase {
+        windows: &[Window(2, &[1]), Window(10, &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10])],
+        expected_sequences: &[1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+        expected_acknowledgements: &[1, 10],
+    })]
+    // Same scenario with monotonic sequences across windows.
+    #[case::under_filled_window_with_monotonic_sequences_must_not_leak(AckProtocolCase {
+        windows: &[Window(2, &[1]), Window(10, &[2, 3, 4, 5, 6, 7, 8, 9, 10, 11])],
+        expected_sequences: &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+        expected_acknowledgements: &[1, 11],
+    })]
     #[tokio::test]
     async fn ack_protocol(
         #[case] case: AckProtocolCase,
