@@ -756,8 +756,16 @@ generated: components: sources: http_server: configuration: {
 			sink reports a failure (`Errored` or `Rejected`), the configured response is discarded and
 			the client receives a `500 Internal Server Error` or `400 Bad Request` instead.
 
-			Responses returned via `abort` are not subject to this — they are sent immediately before
+			Responses returned via `abort` are not subject to this. They are sent immediately before
 			any events reach the sink, so acknowledgement results can never override them.
+
+			## Log namespace
+
+			When [`log_namespace`][Self::log_namespace] is set to `vector`, request metadata such as
+			the request path, headers, query parameters, and source IP are stored in event metadata
+			rather than in the event fields that the program can access via `.`. Programs that rely
+			on inspecting this context should use the default `legacy` log namespace, where all
+			metadata is written directly into the event fields before the program runs.
 
 			[acknowledgements]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
 			[VRL]: https://vector.dev/docs/reference/vrl

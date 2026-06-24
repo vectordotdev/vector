@@ -15,6 +15,7 @@ use vector_lib::{
     config::SourceAcknowledgementsConfig,
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, EventMetadata, VrlTarget},
 };
+use vrl::value::ObjectMap;
 use vrl::{
     compiler::{
         Program,
@@ -22,7 +23,6 @@ use vrl::{
     },
     value::Value,
 };
-use vrl::value::ObjectMap;
 use warp::{
     Filter,
     filters::{
@@ -49,9 +49,9 @@ use crate::{
 
 /// The decision returned by `build_vrl_response` after running the VRL `response_source` program.
 ///
-/// - `Forward(response)` — the program returned normally. Send events to the sink and, once the
+/// - `Forward(response)`: the program returned normally. Send events to the sink and, once the
 ///   sink acknowledges them, send `response` back to the HTTP client.
-/// - `Reject(response)` — the program called `abort`. Drop the decoded events without forwarding
+/// - `Reject(response)`: the program called `abort`. Drop the decoded events without forwarding
 ///   them to the sink and send `response` back to the HTTP client immediately. Acknowledgements
 ///   are never involved, so the response can never be overridden by a sink failure.
 enum VrlResponseDecision {
@@ -338,11 +338,11 @@ async fn handle_request(
             };
 
             match decision {
-                // The VRL program called `abort` — drop events, respond immediately.
+                // The VRL program called `abort`, so drop events and respond immediately.
                 // Acknowledgements are not involved, so the response is never overridden.
                 VrlResponseDecision::Reject(response) => Ok(response),
 
-                // The VRL program returned normally — forward events to the sink and wait
+                // The VRL program returned normally, so forward events to the sink and wait
                 // for the acknowledgement before responding to the HTTP client.
                 VrlResponseDecision::Forward(response) => {
                     let receiver = BatchNotifier::maybe_apply_to(acknowledgements, &mut events);
@@ -405,7 +405,7 @@ fn build_vrl_response(
         // The program called `abort`. Suppress event forwarding and respond immediately.
         //
         // The abort message can be either:
-        // - A plain string — used directly as the response body with `reject_code` as the status.
+        // - A plain string, used directly as the response body with `reject_code` as the status.
         // - A JSON-encoded object with the same shape as the normal return path:
         //   `{ "status": <integer>, "body": <string>, "headers": <object> }`.
         //   When a JSON object is provided, `status`, `body`, and `headers` are each optional;
@@ -428,7 +428,7 @@ fn build_vrl_response(
                         build_response_from_json_obj(&obj, reject_code)?
                     }
                     // Not a JSON object, or a JSON object with no recognised control keys
-                    // (e.g. `abort encode_json({"error": "bad"})`) — treat the whole message
+                    // (e.g. `abort encode_json({"error": "bad"})`), treat the whole message
                     // string as the response body so the content is not silently dropped.
                     _ => build_plain_reject_response(reject_code, msg)?,
                 },
@@ -485,9 +485,9 @@ fn build_vrl_response(
 /// Used by both the normal return path and the JSON-encoded abort path.
 ///
 /// The object may contain:
-/// - `status`  — integer HTTP status code; falls back to `default_status` if absent or invalid.
-/// - `body`    — string response body; empty if absent.
-/// - `headers` — object of string header name → string value pairs; ignored if absent.
+/// - `status`: integer HTTP status code; falls back to `default_status` if absent or invalid.
+/// - `body`: string response body; empty if absent.
+/// - `headers`: object of string header name to string value pairs; ignored if absent.
 fn build_response_from_vrl_obj(
     obj: &vrl::value::ObjectMap,
     default_status: StatusCode,
@@ -528,9 +528,9 @@ fn build_response_from_vrl_obj(
 /// Builds an HTTP response from a JSON object encoded in an `abort` message string.
 ///
 /// The object may contain:
-/// - `status`  — integer HTTP status code; falls back to `default_status` if absent or invalid.
-/// - `body`    — string response body; empty if absent.
-/// - `headers` — object of string header name → string value pairs; ignored if absent.
+/// - `status`: integer HTTP status code; falls back to `default_status` if absent or invalid.
+/// - `body`: string response body; empty if absent.
+/// - `headers`: object of string header name to string value pairs; ignored if absent.
 fn build_response_from_json_obj(
     obj: &serde_json::Map<String, JsonValue>,
     default_status: StatusCode,

@@ -213,7 +213,7 @@ pub struct SimpleHttpConfig {
     /// sink reports a failure (`Errored` or `Rejected`), the configured response is discarded and
     /// the client receives a `500 Internal Server Error` or `400 Bad Request` instead.
     ///
-    /// Responses returned via `abort` are not subject to this — they are sent immediately before
+    /// Responses returned via `abort` are not subject to this. They are sent immediately before
     /// any events reach the sink, so acknowledgement results can never override them.
     ///
     /// ## Log namespace
@@ -1070,7 +1070,7 @@ mod tests {
     }
 
     /// When `response_source` calls `abort` with a JSON-encoded object containing both `status`
-    /// and `body`, the client receives that exact status and body — not `reject_code`.
+    /// and `body`, the client receives that exact status and body, not `reject_code`.
     #[tokio::test]
     async fn response_source_abort_json_object_overrides_status_and_body() {
         let program = r#"abort encode_json({ "status": 403, "body": "forbidden" })"#;
@@ -1099,7 +1099,7 @@ mod tests {
 
         let resp = post_raw(addr, "hello\n").await;
 
-        // No status in the object — reject_code (422) is used.
+        // No status in the object, so reject_code (422) is used.
         assert_eq!(resp.status().as_u16(), 422);
         assert_eq!(resp.text().await.unwrap(), "rejected");
 
@@ -1129,10 +1129,10 @@ mod tests {
     }
 
     /// When `abort` is called with a JSON object whose `status` value is out of the valid u16
-    /// range, the cast must not wrap — `reject_code` is used as the fallback instead.
+    /// range, the cast must not wrap, so `reject_code` is used as the fallback instead.
     #[tokio::test]
     async fn response_source_abort_json_out_of_range_status_falls_back_to_reject_code() {
-        // 65736 wraps to 200 with `as u16` — with `u16::try_from` it is rejected and
+        // 65736 wraps to 200 with `as u16`. With `u16::try_from` it is rejected and
         // `reject_code` (422) must be used instead.
         let program = r#"abort encode_json({ "status": 65736, "body": "wrapped" })"#;
 
@@ -1144,7 +1144,7 @@ mod tests {
         assert_eq!(
             resp.status().as_u16(),
             422,
-            "out-of-range status must not wrap via as u16 — reject_code should be used"
+            "out-of-range status must not wrap via as u16, reject_code should be used"
         );
         assert_eq!(resp.text().await.unwrap(), "wrapped");
 
@@ -1158,7 +1158,7 @@ mod tests {
     /// rather than silently dropping its content.
     #[tokio::test]
     async fn response_source_abort_json_without_control_keys_used_as_plain_body() {
-        // This object has no control keys — it should be treated as a plain string body,
+        // This object has no control keys, so it should be treated as a plain string body,
         // not as a (empty) control object that discards the content.
         let program = r#"abort encode_json({ "error": "bad request" })"#;
 
@@ -1168,7 +1168,7 @@ mod tests {
         let resp = post_raw(addr, "hello\n").await;
 
         assert_eq!(resp.status().as_u16(), 400);
-        // The full JSON string must be the body — content must not be silently dropped.
+        // The full JSON string must be the body, content must not be silently dropped.
         assert_eq!(resp.text().await.unwrap(), r#"{"error":"bad request"}"#);
 
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
@@ -1177,7 +1177,7 @@ mod tests {
     }
 
     /// When `response_source` calls `abort` and acknowledgements are enabled, the response is
-    /// returned immediately without ever touching the sink — so ack results cannot override it.
+    /// returned immediately without ever touching the sink, so ack results cannot override it.
     #[tokio::test]
     async fn response_source_abort_not_overridden_by_ack_failure() {
         // Program that always aborts.
@@ -1215,7 +1215,7 @@ mod tests {
         );
         assert_eq!(resp.text().await.unwrap(), "request rejected");
 
-        // No events were forwarded — the stream should be empty.
+        // No events were forwarded, so the stream should be empty.
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         let events = collect_ready(recv).await;
         assert!(events.is_empty(), "abort must not forward events to sink");
@@ -1229,7 +1229,7 @@ mod tests {
     /// silently discarded whenever the downstream sink fails and acknowledgements are enabled.
     ///
     /// The `BatchNotifier` attached to each event only resolves (and thus unblocks
-    /// `handle_batch_status`) once every cloned notifier is dropped — which happens when
+    /// `handle_batch_status`) once every cloned notifier is dropped, which happens when
     /// `new_test_finalize` finalizes the event on the consumer side. That means the HTTP response
     /// cannot complete until the event is actually pulled off the stream, so we must drive the
     /// stream concurrently with the HTTP request using `spawn_collect_n`.
@@ -2326,6 +2326,8 @@ mod tests {
             host_key: OptionalValuePath::none(),
             decoder,
             log_namespace: LogNamespace::Vector,
+            response_source: None,
+            reject_code: StatusCode::BAD_REQUEST,
         };
 
         let mut log = LogEvent::default();
@@ -2389,6 +2391,8 @@ mod tests {
             host_key: OptionalValuePath::none(),
             decoder,
             log_namespace: LogNamespace::Vector,
+            response_source: None,
+            reject_code: StatusCode::BAD_REQUEST,
         };
 
         let mut log = LogEvent::default();
@@ -2445,6 +2449,8 @@ mod tests {
             host_key: OptionalValuePath::none(),
             decoder,
             log_namespace: LogNamespace::Vector,
+            response_source: None,
+            reject_code: StatusCode::BAD_REQUEST,
         };
 
         let metric = Metric::new(
