@@ -1112,6 +1112,40 @@ mod test {
         .await;
     }
 
+    #[cfg(target_os = "linux")]
+    #[tokio::test]
+    async fn udp_burst_packets() {
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
+            let (tx, rx) = SourceSender::new_test();
+            let address = init_udp(tx, false).await;
+
+            let sender = tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap();
+            for index in 0..64 {
+                let message = format!("burst-{index}");
+                sender.send_to(message.as_bytes(), address).await.unwrap();
+            }
+
+            let mut actual = collect_n(rx, 64)
+                .await
+                .into_iter()
+                .map(|event| {
+                    event.as_log()[log_schema().message_key().unwrap().to_string()]
+                        .to_string_lossy()
+                        .into_owned()
+                })
+                .collect::<Vec<_>>();
+            actual.sort();
+
+            let mut expected = (0..64)
+                .map(|index| format!("burst-{index}"))
+                .collect::<Vec<_>>();
+            expected.sort();
+
+            assert_eq!(actual, expected);
+        })
+        .await;
+    }
+
     #[tokio::test]
     async fn udp_max_length() {
         assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
