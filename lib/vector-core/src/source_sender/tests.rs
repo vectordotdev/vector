@@ -1,12 +1,17 @@
 use chrono::{DateTime, Duration, Utc};
+use futures::StreamExt as _;
 use rand::{Rng, rng};
+use std::sync::{
+    Arc,
+    atomic::{AtomicUsize, Ordering},
+};
 use std::time::{Duration as StdDuration, Instant};
 use tokio::time::timeout;
 use vrl::event_path;
 
 use super::*;
 use crate::{
-    event::{Event, LogEvent, Metric, MetricKind, MetricValue, TraceEvent},
+    event::{Event, LogEvent, Metric, MetricKind, MetricValue, TraceEvent, into_event_stream},
     metrics::{self, Controller},
 };
 
@@ -303,4 +308,219 @@ fn assert_buffer_metrics(buffer_size: usize, level: usize) {
         panic!("source_buffer_max_size_events should be a gauge");
     };
     assert_eq!(*value, buffer_size as f64);
+}
+
+/// Build a sender with the given post-processor using the `set_post_processor` modifier.
+fn make_sender_with_post_processor(
+    pp: &Arc<dyn PostProcessor>,
+) -> (SourceSender, impl futures::Stream<Item = Event> + Unpin) {
+    let (mut sender, rx) = SourceSender::new_test_sender_with_options(TEST_BUFFER_SIZE, None);
+    sender.set_post_processor(pp);
+    let stream = rx.into_stream().flat_map(into_event_stream);
+    (sender, stream)
+}
+
+#[tokio::test]
+async fn post_processor_none_is_noop() {
+    // With no post-processor events should pass through unchanged.
+    let (mut sender, mut stream) = SourceSender::new_test();
+
+    let mut log = LogEvent::default();
+    log.insert(event_path!("hello"), "world");
+    sender
+        .send_event(Event::Log(log))
+        .await
+        .expect("send should succeed");
+    drop(sender);
+
+    let event = stream.next().await.expect("expected one event");
+    let log = event.as_log();
+    assert_eq!(
+        log.get(event_path!("hello")),
+        Some(&vrl::value::Value::from("world"))
+    );
+    assert!(log.get(event_path!("post_processed")).is_none());
+}
+
+/// Processor that inserts a boolean field into every log event, counting calls.
+struct InsertFieldProcessor {
+    call_count: Arc<AtomicUsize>,
+}
+
+impl PostProcessor for InsertFieldProcessor {
+    fn process_log(&self, event: &mut LogEvent) {
+        self.call_count.fetch_add(1, Ordering::SeqCst);
+        event.insert(event_path!("post_processed"), true);
+    }
+
+    fn process_metric(&self, _event: &mut Metric) {}
+
+    fn process_trace(&self, _event: &mut TraceEvent) {}
+}
+
+#[tokio::test]
+async fn post_processor_mutates_log_events() {
+    // A processor should mutate every log event that flows through.
+    metrics::init_test();
+
+    let call_count = Arc::new(AtomicUsize::new(0));
+    let pp = InsertFieldProcessor {
+        call_count: Arc::clone(&call_count),
+    };
+
+    let pp: Arc<dyn PostProcessor> = Arc::new(pp);
+    let (mut sender, mut stream) = make_sender_with_post_processor(&pp);
+
+    let mut log = LogEvent::default();
+    log.insert(event_path!("original"), "yes");
+    sender
+        .send_event(Event::Log(log))
+        .await
+        .expect("send should succeed");
+    drop(sender);
+
+    let event = stream.next().await.expect("expected one event");
+    let log = event.as_log();
+
+    assert_eq!(
+        log.get(event_path!("original")),
+        Some(&vrl::value::Value::from("yes")),
+        "original field must be preserved"
+    );
+    assert_eq!(
+        log.get(event_path!("post_processed")),
+        Some(&vrl::value::Value::Boolean(true)),
+        "post_processed field must be set by the processor"
+    );
+    assert_eq!(
+        call_count.load(Ordering::SeqCst),
+        1,
+        "processor must be called exactly once"
+    );
+}
+
+/// Processor that counts calls per event type to verify typed dispatch.
+struct DispatchCountProcessor {
+    logs: Arc<AtomicUsize>,
+    metrics: Arc<AtomicUsize>,
+    traces: Arc<AtomicUsize>,
+}
+
+impl PostProcessor for DispatchCountProcessor {
+    fn process_log(&self, _event: &mut LogEvent) {
+        self.logs.fetch_add(1, Ordering::SeqCst);
+    }
+
+    fn process_metric(&self, _event: &mut Metric) {
+        self.metrics.fetch_add(1, Ordering::SeqCst);
+    }
+
+    fn process_trace(&self, _event: &mut TraceEvent) {
+        self.traces.fetch_add(1, Ordering::SeqCst);
+    }
+}
+
+#[tokio::test]
+async fn post_processor_dispatches_by_event_type() {
+    // Verify that each event type is routed to the correct trait method.
+    metrics::init_test();
+
+    let logs = Arc::new(AtomicUsize::new(0));
+    let metrics = Arc::new(AtomicUsize::new(0));
+    let traces = Arc::new(AtomicUsize::new(0));
+
+    let pp = DispatchCountProcessor {
+        logs: Arc::clone(&logs),
+        metrics: Arc::clone(&metrics),
+        traces: Arc::clone(&traces),
+    };
+
+    let pp: Arc<dyn PostProcessor> = Arc::new(pp);
+    let (mut sender, _stream) = make_sender_with_post_processor(&pp);
+
+    sender
+        .send_event(Event::Log(LogEvent::default()))
+        .await
+        .expect("log send should succeed");
+    sender
+        .send_event(Event::Metric(Metric::new(
+            "m",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 1.0 },
+        )))
+        .await
+        .expect("metric send should succeed");
+    sender
+        .send_event(Event::Trace(TraceEvent::default()))
+        .await
+        .expect("trace send should succeed");
+    drop(sender);
+
+    assert_eq!(logs.load(Ordering::SeqCst), 1, "process_log called once");
+    assert_eq!(
+        metrics.load(Ordering::SeqCst),
+        1,
+        "process_metric called once"
+    );
+    assert_eq!(
+        traces.load(Ordering::SeqCst),
+        1,
+        "process_trace called once"
+    );
+}
+
+/// Processor that replaces the entire inner log event with a default, simulating the worst-case
+/// whole-event replacement that would previously drop all EventMetadata fields.
+struct ReplaceWithDefaultProcessor;
+
+impl PostProcessor for ReplaceWithDefaultProcessor {
+    fn process_log(&self, event: &mut LogEvent) {
+        *event = LogEvent::default();
+    }
+
+    fn process_metric(&self, _event: &mut Metric) {}
+
+    fn process_trace(&self, _event: &mut TraceEvent) {}
+}
+
+#[tokio::test]
+async fn post_processor_whole_event_replacement_preserves_finalizers() {
+    // A processor that replaces the entire inner event (e.g. `*log = LogEvent::default()`) must
+    // not drop the event's finalizers (batch-ack notifiers). Metadata fields outside the inner
+    // value (e.g. `datadog_api_key`) are NOT preserved — the processor takes full ownership of
+    // the event when it replaces the inner value.
+    metrics::init_test();
+
+    let pp: Arc<dyn PostProcessor> = Arc::new(ReplaceWithDefaultProcessor);
+    let (mut sender, mut stream) = make_sender_with_post_processor(&pp);
+
+    let mut log = LogEvent::default();
+    log.metadata_mut()
+        .set_datadog_api_key(Arc::from("test-api-key"));
+    log.insert(
+        event_path!("original_field"),
+        "should_be_gone_after_replace",
+    );
+
+    sender
+        .send_event(Event::Log(log))
+        .await
+        .expect("send should succeed");
+    drop(sender);
+
+    let event = stream.next().await.expect("expected one event");
+    let log = event.as_log();
+
+    // The processor replaced the inner event, so the original field is gone — expected.
+    assert!(
+        log.get(event_path!("original_field")).is_none(),
+        "field added before replacement should not be present"
+    );
+
+    // Metadata set before the replacement is also gone — the processor owns the new event.
+    assert_eq!(
+        log.metadata().datadog_api_key().as_deref(),
+        None,
+        "datadog_api_key is not preserved when the processor replaces the entire inner value"
+    );
 }

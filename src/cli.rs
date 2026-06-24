@@ -201,7 +201,8 @@ pub struct RootOpts {
     /// This controls the time window for rate limiting Vector's own internal logs.
     /// Within each time window, the first occurrence of a log is emitted, the second
     /// shows a suppression warning, and subsequent occurrences are silent until the
-    /// window expires.
+    /// window expires. When the window expires and the log fires again, a summary of
+    /// the suppressed count is emitted followed by the log itself.
     ///
     /// Logs are grouped by their location in the code and the `component_id` field, so logs
     /// from different components are rate limited independently.
@@ -217,6 +218,16 @@ pub struct RootOpts {
         default_value = "10"
     )]
     pub internal_log_rate_limit: u64,
+
+    /// Apply a rate limit (in seconds) to the broadcast channel that feeds all `internal_logs`
+    /// sources. When set, the first occurrence of a repeated log is emitted, the second shows a
+    /// suppression warning, and subsequent occurrences are silent until the window expires. When
+    /// the window expires and the log fires again, a summary of the suppressed count is emitted
+    /// followed by the log itself. Unset by default so that `internal_logs` consumers receive
+    /// every log event. This limit is independent of `--internal-log-rate-limit`, which only
+    /// applies to stdout/stderr output.
+    #[arg(long, env = "VECTOR_INTERNAL_LOGS_SOURCE_RATE_LIMIT")]
+    pub internal_logs_source_rate_limit: Option<NonZeroU64>,
 
     /// Set the duration in seconds to wait for graceful shutdown after SIGINT or SIGTERM are
     /// received. After the duration has passed, Vector will force shutdown. To never force

@@ -1,0 +1,47 @@
+{{/* Renders the "Deprecation Announcements" section for a specific release.
+     Each entry whose `deprecated_since` matches the page version is listed.
+     Enactments (removals) are not duplicated here — they are surfaced via
+     the changelog's Breaking changes section and on /deprecations/.
+     Params: version (string, e.g. "0.56" or "0.56.0") */}}
+{{- $pending := site.Data.deprecations.deprecations_pending -}}
+{{- $version := .version -}}
+
+{{- $parts := split $version "." -}}
+{{- /* `deprecated_since` can be the shorthand "0.56" (normalized at write
+       time) or the full "0.56.0". Match exactly on either; never a loose
+       major.minor prefix that would put `0.56.1` fragments on the 0.56.0
+       page. */ -}}
+{{- $exact := printf "%s.%s" (index $parts 0) (index $parts 1) -}}
+
+{{- $announced := slice -}}
+{{- range $pending -}}
+  {{- if or (eq .deprecated_since $version) (eq .deprecated_since $exact) -}}
+    {{- $announced = $announced | append . -}}
+  {{- end -}}
+{{- end -}}
+{{- $announced = sort $announced "deprecated_since" "desc" -}}
+
+{{ if gt (len $announced) 0 }}
+<div class="mt-8">
+  <div class="prose dark:prose-dark max-w-none">
+    {{ partial "heading.html" (dict "text" "Deprecation Announcements" "level" 2) }}
+    <p class="text-sm text-gray-500 dark:text-gray-400">
+      See the <a href="/deprecations/">deprecations page</a> for all active and historical deprecations.
+    </p>
+  </div>
+  <div class="mt-6 flex flex-col space-y-6">
+    {{ range $announced }}
+    <div>
+      <span class="text-xl font-semibold text-dark dark:text-gray-300">
+        {{ .what | markdownify }}
+      </span>
+      {{ with .description }}
+      <div class="mt-2.5 prose dark:prose-dark max-w-none">
+        {{ . | markdownify }}
+      </div>
+      {{ end }}
+    </div>
+    {{ end }}
+  </div>
+</div>
+{{ end }}
