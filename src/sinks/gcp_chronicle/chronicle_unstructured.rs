@@ -720,8 +720,7 @@ mod unit_tests {
                 encoding:
                   codec: text
             "# },
-            creds_path,
-            log_type
+            creds_path, log_type
         ))
         .unwrap();
         assert!(config.build(cx).await.is_err());
