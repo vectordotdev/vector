@@ -21,7 +21,7 @@ const EVENT_COUNT: usize = 100;
 const TRANSFORM_TYPE: &str = "test_noop";
 const TRANSFORM_KIND: &str = "transform";
 
-fn has_transform_tags<'a>(metric: &'a Metric, transform_id: &str) -> bool {
+fn has_transform_tags(metric: &Metric, transform_id: &str) -> bool {
     metric.tags().is_some_and(|tags| {
         tags.get("component_id") == Some(transform_id)
             && tags.get("component_type") == Some(TRANSFORM_TYPE)
@@ -140,8 +140,7 @@ async fn component_cpu_usage_emitted_function_transform() {
 #[tokio::test]
 async fn component_cpu_usage_emitted_task_transform() {
     let id = "cpu_transform_task";
-    let metrics =
-        run_cpu_topology(id, |_| NoopTransformConfig::from(TransformType::Task)).await;
+    let metrics = run_cpu_topology(id, |_| NoopTransformConfig::from(TransformType::Task)).await;
     assert_cpu_counter_positive(&metrics, id);
 }
 
