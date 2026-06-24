@@ -532,9 +532,19 @@ mod tests {
     async fn lua_runs_init_hook() {
         let line1 = random_string(9);
         run_transform(
-            &format!(
-                "version: \"2\"\nhooks:\n  init: |\n    function (emit)\n      event = {{log={{message=\"{line1}\"}}}}\n      emit(event)\n    end\n  process: |\n    function (event, emit)\n      emit(event)\n    end\n"
-            ),
+            &indoc::formatdoc! {r#"
+                version: "2"
+                hooks:
+                  init: |
+                    function (emit)
+                      event = {{log={{message="{line1}"}}}}
+                      emit(event)
+                    end
+                  process: |
+                    function (event, emit)
+                      emit(event)
+                    end
+            "#},
             |tx, out| async move {
                 let line2 = random_string(9);
                 tx.send(Event::Log(LogEvent::from(line2.as_str())))
@@ -901,10 +911,20 @@ mod tests {
         .unwrap();
 
         run_transform(
-            &format!(
-                "version: \"2\"\nhooks:\n  process: |\n    function (event, emit)\n      local script2 = require(\"script2\")\n      script2.modify(event)\n      emit(event)\n    end\nsearch_dirs:\n  - {:?}\n",
-                dir.path().as_os_str() // This seems a bit weird, but recall we also support windows.
-            ),
+            &indoc::formatdoc! {r#"
+                version: "2"
+                hooks:
+                  process: |
+                    function (event, emit)
+                      local script2 = require("script2")
+                      script2.modify(event)
+                      emit(event)
+                    end
+                search_dirs:
+                  - {dir}
+            "#,
+                dir = dir.path().as_os_str().to_string_lossy(), // recall we also support windows
+            },
             |tx, out| async move {
                 let event = LogEvent::default();
                 tx.send(event.into()).await.unwrap();
