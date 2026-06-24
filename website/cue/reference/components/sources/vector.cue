@@ -54,6 +54,29 @@ components: sources: vector: {
 
 	configuration: generated.components.sources.vector.configuration
 
+	how_it_works: {
+		authentication: {
+			title: "Authentication"
+			body: """
+				You can require authentication on incoming requests by setting the `auth`
+				option, which supports the `bearer`, `basic`, and `custom` strategies.
+
+				Requests that do not present the matching credentials are rejected with an
+				`Unauthenticated` status. The upstream `vector` sink must be configured with the
+				same credentials. The standard gRPC health service stays open so liveness probes
+				do not need credentials.
+
+				Because the token is a normal configuration value, you can pull it from a secrets
+				backend, for example `token: "SECRET[backend.vector_token]"`. The value is read
+				when the configuration loads and again on reload, so rotate it by reloading
+				Vector.
+
+				Enable TLS when using authentication so the credentials are not received in
+				plaintext.
+				"""
+		}
+	}
+
 	output: {
 		logs: event: {
 			description: "A Vector event"
