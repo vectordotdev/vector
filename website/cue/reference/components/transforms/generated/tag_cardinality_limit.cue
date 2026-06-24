@@ -165,7 +165,8 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 							cache_size_per_key: {
 								description: """
 																								Override the bloom filter cache size for this specific tag key.
-																								Only effective in `probabilistic` mode. Inherits from the enclosing config when unset.
+																								Only valid in `probabilistic` mode; setting this in `exact` mode is a configuration error.
+																								Inherits from the enclosing config when unset.
 																								"""
 								relevant_when: "mode = \"limit_override\""
 								required:      false
@@ -219,7 +220,8 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 				cache_size_per_key: {
 					description: """
 						Override the bloom filter cache size for this specific tag key.
-						Only effective in `probabilistic` mode. Inherits from the enclosing config when unset.
+						Only valid in `probabilistic` mode; setting this in `exact` mode is a configuration error.
+						Inherits from the enclosing config when unset.
 						"""
 					relevant_when: "mode = \"limit_override\""
 					required:      false

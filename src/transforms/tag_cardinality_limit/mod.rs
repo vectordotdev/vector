@@ -26,7 +26,7 @@ use crate::event::metric::TagValueSet;
 
 type MetricId = (Option<String>, String);
 
-/// Applies a per-tag `cache_size_per_key` override to a `Mode`. No-op in exact mode or when
+/// Replaces the bloom filter size in a `Probabilistic` mode with the override. No-op when
 /// `override_size` is `None`.
 const fn apply_cache_size_override(mode: Mode, override_size: Option<usize>) -> Mode {
     match (mode, override_size) {

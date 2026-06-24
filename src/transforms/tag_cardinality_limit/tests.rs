@@ -12,7 +12,7 @@ use vrl::compiler::prelude::Kind;
 
 use super::*;
 use crate::{
-    config::{LogNamespace, schema::Definition},
+    config::{LogNamespace, TransformConfig, TransformContext, schema::Definition},
     event::{Event, Metric, MetricTags, metric, metric::TagValue},
     test_util::components::assert_transform_compliance,
     transforms::{
@@ -1704,4 +1704,96 @@ per_tag_limits:
             cache_size_per_key: None,
         }
     );
+}
+
+// ============================================================================
+// Config validation tests
+// ============================================================================
+
+/// cache_size_per_key on a global per-tag entry in exact mode is a build error.
+#[tokio::test]
+async fn validation_rejects_cache_size_in_global_exact_mode() {
+    let config = make_transform_with_global_per_tag_limits(
+        500,
+        LimitExceededAction::DropTag,
+        Mode::Exact,
+        HashMap::from([(
+            "tag1".to_string(),
+            PerTagConfig {
+                mode: PerTagMode::LimitOverride {
+                    value_limit: 10,
+                    cache_size_per_key: Some(1024),
+                },
+            },
+        )]),
+    );
+    assert!(config.build(&TransformContext::default()).await.is_err());
+}
+
+/// cache_size_per_key on a per-metric per-tag entry in exact mode is a build error.
+#[tokio::test]
+async fn validation_rejects_cache_size_in_per_metric_exact_mode() {
+    let config = make_transform_hashset_with_per_metric_limits(
+        500,
+        LimitExceededAction::DropTag,
+        HashMap::from([(
+            "metricA".to_string(),
+            make_per_metric(
+                10,
+                LimitExceededAction::DropTag,
+                HashMap::from([(
+                    "tag1".to_string(),
+                    PerTagConfig {
+                        mode: PerTagMode::LimitOverride {
+                            value_limit: 5,
+                            cache_size_per_key: Some(1024),
+                        },
+                    },
+                )]),
+            ),
+        )]),
+    );
+    assert!(config.build(&TransformContext::default()).await.is_err());
+}
+
+/// cache_size_per_key in probabilistic mode is valid.
+#[tokio::test]
+async fn validation_allows_cache_size_in_probabilistic_mode() {
+    let config = make_transform_with_global_per_tag_limits(
+        500,
+        LimitExceededAction::DropTag,
+        Mode::Probabilistic(BloomFilterConfig {
+            cache_size_per_key: default_cache_size(),
+        }),
+        HashMap::from([(
+            "tag1".to_string(),
+            PerTagConfig {
+                mode: PerTagMode::LimitOverride {
+                    value_limit: 10,
+                    cache_size_per_key: Some(1024),
+                },
+            },
+        )]),
+    );
+    assert!(config.build(&TransformContext::default()).await.is_ok());
+}
+
+/// cache_size_per_key: None in exact mode is fine (no regression).
+#[tokio::test]
+async fn validation_allows_no_cache_size_override_in_exact_mode() {
+    let config = make_transform_with_global_per_tag_limits(
+        500,
+        LimitExceededAction::DropTag,
+        Mode::Exact,
+        HashMap::from([(
+            "tag1".to_string(),
+            PerTagConfig {
+                mode: PerTagMode::LimitOverride {
+                    value_limit: 10,
+                    cache_size_per_key: None,
+                },
+            },
+        )]),
+    );
+    assert!(config.build(&TransformContext::default()).await.is_ok());
 }

@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use snafu::Snafu;
 use vector_lib::configurable::configurable_component;
 
 use crate::{
@@ -255,7 +256,8 @@ pub enum PerTagMode {
         value_limit: usize,
 
         /// Override the bloom filter cache size for this specific tag key.
-        /// Only effective in `probabilistic` mode. Inherits from the enclosing config when unset.
+        /// Only valid in `probabilistic` mode; setting this in `exact` mode is a configuration error.
+        /// Inherits from the enclosing config when unset.
         #[serde(default)]
         cache_size_per_key: Option<usize>,
     },
@@ -350,10 +352,58 @@ impl GenerateConfig for Config {
     }
 }
 
+#[derive(Debug, Snafu)]
+pub enum BuildError {
+    #[snafu(display(
+        "cache_size_per_key set on per-tag entry `{tag_key}` but the inherited mode is \
+         `exact`, where it has no effect. Remove the field or switch to `probabilistic` mode."
+    ))]
+    CacheSizeInExactMode { tag_key: String },
+}
+
+impl Config {
+    fn validate(&self) -> crate::Result<()> {
+        // Global per_tag_limits: validate against the global mode.
+        if self.global.mode == Mode::Exact {
+            for (tag_key, tag_cfg) in &self.per_tag_limits {
+                if let PerTagMode::LimitOverride {
+                    cache_size_per_key: Some(_),
+                    ..
+                } = tag_cfg.mode
+                {
+                    return Err(Box::new(BuildError::CacheSizeInExactMode {
+                        tag_key: tag_key.clone(),
+                    }));
+                }
+            }
+        }
+
+        // Per-metric per_tag_limits: validate against each per-metric mode.
+        for per_metric in self.per_metric_limits.values() {
+            if per_metric.config.mode == OverrideMode::Exact {
+                for (tag_key, tag_cfg) in &per_metric.per_tag_limits {
+                    if let PerTagMode::LimitOverride {
+                        cache_size_per_key: Some(_),
+                        ..
+                    } = tag_cfg.mode
+                    {
+                        return Err(Box::new(BuildError::CacheSizeInExactMode {
+                            tag_key: tag_key.clone(),
+                        }));
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+}
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "tag_cardinality_limit")]
 impl TransformConfig for Config {
     async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
+        self.validate()?;
         Ok(Transform::event_task(TagCardinalityLimit::new(
             self.clone(),
         )))
