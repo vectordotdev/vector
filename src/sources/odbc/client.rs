@@ -632,24 +632,32 @@ fn value_to_sql_parameter(value: &Value, tz: Tz) -> Option<String> {
     match value {
         Value::Integer(i) => Some(i.to_string()),
         Value::Float(f) => Some(f.to_string()),
-        Value::Boolean(b) => Some(b.to_string()),
+        Value::Boolean(b) => Some(boolean_to_sql_parameter(*b)),
         Value::Bytes(b) => std::str::from_utf8(b).ok().map(str::to_owned),
         Value::Timestamp(t) => Some(format_timestamp_for_sql_parameter(*t, tz)),
         Value::Null => None,
         other => serde_json::to_value(other).ok().and_then(|v| match v {
             serde_json::Value::String(s) => Some(s),
             serde_json::Value::Number(n) => Some(n.to_string()),
-            serde_json::Value::Bool(b) => Some(b.to_string()),
+            serde_json::Value::Bool(b) => Some(boolean_to_sql_parameter(b)),
             _ => None,
         }),
     }
 }
 
+/// Formats a boolean as `1`/`0` for ODBC parameter binding.
+///
+/// Numeric/bit columns (for example MariaDB `BIT`) coerce string parameters to
+/// numbers; `"true"` and `"false"` both become `0`, so use bit literals instead.
+fn boolean_to_sql_parameter(value: bool) -> String {
+    if value { "1" } else { "0" }.to_owned()
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use bytes::Bytes;
-    use chrono::TimeZone as _;
 
     #[test]
     fn map_value_integer_in_range() {
