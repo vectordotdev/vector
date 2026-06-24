@@ -34,6 +34,7 @@ use crate::{
 
 mod backpressure;
 mod compliance;
+mod cpu_metrics;
 #[cfg(all(feature = "sinks-socket", feature = "sources-socket"))]
 mod crash;
 mod doesnt_reload;
