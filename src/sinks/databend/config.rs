@@ -225,12 +225,10 @@ mod tests {
 
     #[test]
     fn parse_config() {
-        let cfg = toml::from_str::<DatabendConfig>(
-            r#"
-            endpoint = "databend://localhost:8000/mydatabase?sslmode=disable"
-            table = "mytable"
-        "#,
-        )
+        let cfg = serde_yaml::from_str::<DatabendConfig>(indoc::indoc! {r#"
+            endpoint: "databend://localhost:8000/mydatabase?sslmode=disable"
+            table: "mytable"
+        "#})
         .unwrap();
         assert_eq!(
             cfg.endpoint.uri,
@@ -246,15 +244,18 @@ mod tests {
 
     #[test]
     fn parse_config_with_encoding_compression() {
-        let cfg = toml::from_str::<DatabendConfig>(
-            r#"
-            endpoint = "databend://localhost:8000/mydatabase?sslmode=disable"
-            table = "mytable"
-            encoding.codec = "csv"
-            encoding.csv.fields = ["host", "timestamp", "message"]
-            compression = "gzip"
-        "#,
-        )
+        let cfg = serde_yaml::from_str::<DatabendConfig>(indoc::indoc! {r#"
+            endpoint: "databend://localhost:8000/mydatabase?sslmode=disable"
+            table: "mytable"
+            encoding:
+              codec: "csv"
+              csv:
+                fields:
+                  - "host"
+                  - "timestamp"
+                  - "message"
+            compression: "gzip"
+        "#})
         .unwrap();
         assert_eq!(
             cfg.endpoint.uri,

@@ -423,24 +423,24 @@ mod tests {
     #[test]
     fn test_config_without_tags() {
         let config = indoc! {r#"
-            namespace = "vector-logs"
-            endpoint = "http://localhost:9999"
-            bucket = "my-bucket"
-            org = "my-org"
-            token = "my-token"
+            namespace: "vector-logs"
+            endpoint: "http://localhost:9999"
+            bucket: "my-bucket"
+            org: "my-org"
+            token: "my-token"
         "#};
 
-        toml::from_str::<InfluxDbLogsConfig>(config).unwrap();
+        serde_yaml::from_str::<InfluxDbLogsConfig>(config).unwrap();
     }
 
     #[test]
     fn test_config_measurement_from_namespace() {
         let config = indoc! {r#"
-            namespace = "ns"
-            endpoint = "http://localhost:9999"
+            namespace: "ns"
+            endpoint: "http://localhost:9999"
         "#};
 
-        let sink_config = toml::from_str::<InfluxDbLogsConfig>(config).unwrap();
+        let sink_config = serde_yaml::from_str::<InfluxDbLogsConfig>(config).unwrap();
         assert_eq!("ns.vector", sink_config.get_measurement().unwrap());
     }
 
