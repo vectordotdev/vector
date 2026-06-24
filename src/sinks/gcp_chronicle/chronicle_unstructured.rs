@@ -709,6 +709,8 @@ mod unit_tests {
 
         let log_type = random_string(10);
         let cx = SinkContext::default();
+        // Normalize to forward slashes so YAML doesn't interpret Windows path separators as escapes.
+        let creds_path = tmp.path().to_str().unwrap().replace('\\', "/");
         let config: ChronicleUnstructuredConfig = serde_yaml::from_str(&format!(
             indoc! { r#"
                 endpoint: "http://127.0.0.1:1"
@@ -718,7 +720,7 @@ mod unit_tests {
                 encoding:
                   codec: text
             "# },
-            tmp.path().display(),
+            creds_path,
             log_type
         ))
         .unwrap();
