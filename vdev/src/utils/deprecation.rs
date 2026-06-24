@@ -196,19 +196,17 @@ fn parse_deprecation_fragment(path: &Path) -> Result<DeprecationEntry> {
 /// The file must begin with `---`, and have a closing `---` on its own line.
 fn split_frontmatter<'a>(content: &'a str, path: &Path) -> Result<(&'a str, &'a str)> {
     let content = content.trim_start();
-    if !content.starts_with("---") {
-        bail!(
-            "Deprecation fragment {} must begin with YAML frontmatter (---)",
-            path.display()
-        );
-    }
-
     // Advance past the opening `---` (and optional trailing whitespace on that line)
     let after_open = content
         .strip_prefix("---")
-        .unwrap()
-        .trim_start_matches([' ', '\t']);
-    let after_open = after_open.trim_start_matches('\n');
+        .ok_or_else(|| {
+            anyhow!(
+                "Deprecation fragment {} must begin with YAML frontmatter (---)",
+                path.display()
+            )
+        })?
+        .trim_start_matches([' ', '\t'])
+        .trim_start_matches('\n');
 
     let (frontmatter, rest) = after_open.split_once("\n---").ok_or_else(|| {
         anyhow!(

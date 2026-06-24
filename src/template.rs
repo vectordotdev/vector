@@ -584,9 +584,9 @@ fn render_metric_field<'a>(key: &str, metric: &'a Metric) -> Option<&'a str> {
     match key {
         "name" => Some(metric.name()),
         "namespace" => metric.namespace(),
-        _ if key.starts_with("tags.") => metric
+        _ if let Some(tag_key) = key.strip_prefix("tags.") => metric
             .tags()
-            .and_then(|tags| tags.get(key.strip_prefix("tags.").unwrap())),
+            .and_then(|tags| tags.get(tag_key)),
         _ => None,
     }
 }

@@ -288,16 +288,13 @@ impl TryFrom<String> for SocketListenAddr {
             Err(_) => {
                 let fd: usize = match input.as_str() {
                     "systemd" => Ok(0),
-                    s if s.starts_with("systemd#") => s
+                    s => s
                         .strip_prefix("systemd#")
-                        .unwrap()
+                        .ok_or_else(|| "unable to parse".to_string())?
                         .parse::<usize>()
                         .map_err(|_| "failed to parse usize".to_string())?
                         .checked_sub(1)
                         .ok_or_else(|| "systemd indices start at 1".to_string()),
-
-                    // otherwise fail
-                    _ => Err("unable to parse".to_string()),
                 }?;
 
                 Ok(fd.into())
