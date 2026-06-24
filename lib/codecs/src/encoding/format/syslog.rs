@@ -4,7 +4,6 @@ use lookup::lookup_v2::ConfigTargetPath;
 use serde_json;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
-use std::fmt::Write;
 use std::str::FromStr;
 use strum::{EnumString, FromRepr, VariantNames};
 use tokio_util::codec::Encoder;
@@ -321,7 +320,7 @@ impl SyslogMessage {
     fn encode(&self, rfc: &SyslogRFC) -> String {
         let mut result = String::with_capacity(256);
 
-        write!(result, "{}", self.pri.encode()).ok();
+        result.push_str(&self.pri.encode().to_string());
 
         if *rfc == SyslogRFC::Rfc5424 {
             result.push_str(SYSLOG_V1);
@@ -330,7 +329,7 @@ impl SyslogMessage {
 
         match rfc {
             SyslogRFC::Rfc3164 => {
-                write!(result, "{} ", self.timestamp.format("%b %e %H:%M:%S")).ok();
+                result.push_str(&format!("{} ", self.timestamp.format("%b %e %H:%M:%S")));
             }
             SyslogRFC::Rfc5424 => {
                 result.push_str(
