@@ -38,71 +38,79 @@ async fn handle_top_input<B: Backend>(
             return true;
         }
         KeyCode::Up | KeyCode::Char('k') => {
-            let _ = event_tx
+            event_tx
                 .send(UiEventType::Scroll(-1, terminal.size().unwrap_or_default()))
-                .await;
+                .await
+                .ok();
         }
         KeyCode::Down | KeyCode::Char('j') => {
-            let _ = event_tx
+            event_tx
                 .send(UiEventType::Scroll(1, terminal.size().unwrap_or_default()))
-                .await;
+                .await
+                .ok();
         }
         KeyCode::End | KeyCode::Char('G') => {
-            let _ = event_tx
+            event_tx
                 .send(UiEventType::Scroll(
                     isize::MAX,
                     terminal.size().unwrap_or_default(),
                 ))
-                .await;
+                .await
+                .ok();
         }
         KeyCode::Home | KeyCode::Char('g') => {
-            let _ = event_tx
+            event_tx
                 .send(UiEventType::Scroll(
                     isize::MIN,
                     terminal.size().unwrap_or_default(),
                 ))
-                .await;
+                .await
+                .ok();
         }
         KeyCode::Left | KeyCode::PageUp => {
-            let _ = event_tx
+            event_tx
                 .send(UiEventType::ScrollPage(
                     -1,
                     terminal.size().unwrap_or_default(),
                 ))
-                .await;
+                .await
+                .ok();
         }
         KeyCode::Char('b') if key_event.modifiers.intersects(KeyModifiers::CONTROL) => {
-            let _ = event_tx
+            event_tx
                 .send(UiEventType::ScrollPage(
                     -1,
                     terminal.size().unwrap_or_default(),
                 ))
-                .await;
+                .await
+                .ok();
         }
         KeyCode::Right | KeyCode::PageDown => {
-            let _ = event_tx
+            event_tx
                 .send(UiEventType::ScrollPage(
                     1,
                     terminal.size().unwrap_or_default(),
                 ))
-                .await;
+                .await
+                .ok();
         }
         KeyCode::Char('f') if key_event.modifiers.intersects(KeyModifiers::CONTROL) => {
-            let _ = event_tx
+            event_tx
                 .send(UiEventType::ScrollPage(
                     1,
                     terminal.size().unwrap_or_default(),
                 ))
-                .await;
+                .await
+                .ok();
         }
         KeyCode::Char('?') | KeyCode::F(1) => {
-            let _ = event_tx.send(UiEventType::ToggleHelp).await;
+            event_tx.send(UiEventType::ToggleHelp).await.ok();
         }
         KeyCode::Char('s') | KeyCode::F(6) => {
-            let _ = event_tx.send(UiEventType::ToggleSortMenu).await;
+            event_tx.send(UiEventType::ToggleSortMenu).await.ok();
         }
         KeyCode::Char('r') | KeyCode::F(7) => {
-            let _ = event_tx.send(UiEventType::ToggleSortDirection).await;
+            event_tx.send(UiEventType::ToggleSortDirection).await.ok();
         }
         KeyCode::Char(d) if d.is_ascii_digit() => {
             let col = match d {
@@ -118,10 +126,10 @@ async fn handle_top_input<B: Backend>(
                 '0' => SortColumn::MemoryUsed,
                 _ => return false,
             };
-            let _ = event_tx.send(UiEventType::SortByColumn(col)).await;
+            event_tx.send(UiEventType::SortByColumn(col)).await.ok();
         }
         KeyCode::F(4) | KeyCode::Char('f') | KeyCode::Char('/') => {
-            let _ = event_tx.send(UiEventType::ToggleFilterMenu).await;
+            event_tx.send(UiEventType::ToggleFilterMenu).await.ok();
         }
         _ => (),
     }
@@ -135,7 +143,7 @@ async fn handle_help_input<B: Backend>(
 ) -> bool {
     match key_event.code {
         KeyCode::Esc => {
-            let _ = event_tx.send(UiEventType::ToggleHelp).await;
+            event_tx.send(UiEventType::ToggleHelp).await.ok();
         }
         _ => return handle_top_input(key_event, event_tx, terminal).await,
     }
@@ -149,16 +157,16 @@ async fn handle_sort_input<B: Backend>(
 ) -> bool {
     match key_event.code {
         KeyCode::Esc => {
-            let _ = event_tx.send(UiEventType::ToggleSortMenu).await;
+            event_tx.send(UiEventType::ToggleSortMenu).await.ok();
         }
         KeyCode::Up | KeyCode::BackTab | KeyCode::Char('k') => {
-            let _ = event_tx.send(UiEventType::SortSelection(-1)).await;
+            event_tx.send(UiEventType::SortSelection(-1)).await.ok();
         }
         KeyCode::Down | KeyCode::Tab | KeyCode::Char('j') => {
-            let _ = event_tx.send(UiEventType::SortSelection(1)).await;
+            event_tx.send(UiEventType::SortSelection(1)).await.ok();
         }
         KeyCode::Enter => {
-            let _ = event_tx.send(UiEventType::SortConfirmation).await;
+            event_tx.send(UiEventType::SortConfirmation).await.ok();
         }
         _ => return handle_top_input(key_event, event_tx, terminal).await,
     }
@@ -172,22 +180,28 @@ async fn handle_filter_input<B: Backend>(
 ) -> bool {
     match key_event.code {
         KeyCode::Esc => {
-            let _ = event_tx.send(UiEventType::ToggleFilterMenu).await;
+            event_tx.send(UiEventType::ToggleFilterMenu).await.ok();
         }
         KeyCode::BackTab | KeyCode::Up => {
-            let _ = event_tx.send(UiEventType::FilterColumnSelection(-1)).await;
+            event_tx
+                .send(UiEventType::FilterColumnSelection(-1))
+                .await
+                .ok();
         }
         KeyCode::Tab | KeyCode::Down => {
-            let _ = event_tx.send(UiEventType::FilterColumnSelection(1)).await;
+            event_tx
+                .send(UiEventType::FilterColumnSelection(1))
+                .await
+                .ok();
         }
         KeyCode::Backspace => {
-            let _ = event_tx.send(UiEventType::FilterBackspace).await;
+            event_tx.send(UiEventType::FilterBackspace).await.ok();
         }
         KeyCode::Enter => {
-            let _ = event_tx.send(UiEventType::FilterConfirmation).await;
+            event_tx.send(UiEventType::FilterConfirmation).await.ok();
         }
         KeyCode::Char(any) => {
-            let _ = event_tx.send(UiEventType::FilterInput(any)).await;
+            event_tx.send(UiEventType::FilterInput(any)).await.ok();
         }
         _ => return handle_top_input(key_event, event_tx, terminal).await,
     }

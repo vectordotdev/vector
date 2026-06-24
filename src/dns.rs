@@ -34,9 +34,10 @@ impl Resolver {
             spawn_blocking(move || {
                 let name_ref = match name.as_str() {
                     // strip IPv6 prefix and suffix
-                    name if name.starts_with('[') && name.ends_with(']') => {
-                        &name[1..name.len() - 1]
-                    }
+                    name if name.starts_with('[') && name.ends_with(']') => name
+                        .strip_prefix('[')
+                        .and_then(|s| s.strip_suffix(']'))
+                        .unwrap(),
                     name => name,
                 };
                 (name_ref, dummy_port).to_socket_addrs()

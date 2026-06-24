@@ -204,18 +204,19 @@ fn split_frontmatter<'a>(content: &'a str, path: &Path) -> Result<(&'a str, &'a 
     }
 
     // Advance past the opening `---` (and optional trailing whitespace on that line)
-    let after_open = content[3..].trim_start_matches([' ', '\t']);
+    let after_open = content
+        .strip_prefix("---")
+        .unwrap()
+        .trim_start_matches([' ', '\t']);
     let after_open = after_open.trim_start_matches('\n');
 
-    let close_pos = after_open.find("\n---").ok_or_else(|| {
+    let (frontmatter, rest) = after_open.split_once("\n---").ok_or_else(|| {
         anyhow!(
             "Deprecation fragment {} has unclosed frontmatter",
             path.display()
         )
     })?;
-
-    let frontmatter = &after_open[..close_pos];
-    let rest = &after_open[close_pos + 4..]; // skip `\n---`
+    let rest = rest.trim_start_matches(['\r', '\n']);
     let body = rest.trim_start_matches(['\r', '\n']);
 
     Ok((frontmatter, body))

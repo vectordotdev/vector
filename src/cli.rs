@@ -589,7 +589,7 @@ mod tests {
         if setrlimit(Resource::RLIMIT_NOFILE, hard, hard).is_err() {
             #[cfg(target_os = "macos")]
             if let Some(maxfiles) = super::macos_maxfilesperproc() {
-                let _ = setrlimit(Resource::RLIMIT_NOFILE, maxfiles, hard);
+                setrlimit(Resource::RLIMIT_NOFILE, maxfiles, hard).ok();
             }
         }
 
