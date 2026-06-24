@@ -189,6 +189,7 @@ fn remove_sensitive(mut headers: HeaderMap<HeaderValue>) -> HeaderMap<HeaderValu
         HeaderName::from_static("x-honeycomb-team"),
         HeaderName::from_static("x-api-key"),
         HeaderName::from_static("api-key"),
+        HeaderName::from_static("x-amz-security-token"),
     ];
     for (name, value) in headers.iter_mut() {
         if sensitive.contains(name) {
@@ -279,6 +280,21 @@ mod tests {
         // Lookup with the mixed-case form resolves to the same normalized name.
         let mixed_case = HeaderName::from_bytes(b"X-Api-Key").unwrap();
         assert!(is_sensitive(&result, &mixed_case).iter().all(|&s| s));
+    }
+
+    #[test]
+    fn marks_aws_session_token_as_sensitive() {
+        let token_header = HeaderName::from_static("x-amz-security-token");
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            token_header.clone(),
+            HeaderValue::from_static("AQoXnyc4lcK4w=="),
+        );
+        let result = remove_sensitive(headers);
+        assert!(
+            is_sensitive(&result, &token_header).iter().all(|&s| s),
+            "x-amz-security-token must be marked sensitive to avoid leaking AWS STS credentials"
+        );
     }
 
     #[test]
