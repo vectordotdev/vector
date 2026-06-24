@@ -1,10 +1,24 @@
 use std::{io::Read, sync::OnceLock};
 
-use bytes::{Buf, BufMut, Bytes, BytesMut};
+use bytes::{Buf, Bytes};
+#[cfg(any(
+    feature = "sources-utils-http-prelude",
+    feature = "sources-opentelemetry"
+))]
+use bytes::{BufMut, BytesMut};
 use flate2::read::{MultiGzDecoder, ZlibDecoder};
+#[cfg(any(
+    feature = "sources-utils-http-prelude",
+    feature = "sources-opentelemetry"
+))]
 use futures_util::StreamExt;
 use snap::raw::Decoder as SnappyDecoder;
-use warp::{Filter, filters::BoxedFilter, http::StatusCode};
+use warp::http::StatusCode;
+#[cfg(any(
+    feature = "sources-utils-http-prelude",
+    feature = "sources-opentelemetry"
+))]
+use warp::{Filter, filters::BoxedFilter};
 
 use crate::{common::http::ErrorMessage, internal_events::HttpDecompressError};
 
@@ -30,6 +44,10 @@ pub(crate) fn max_decompressed_size_bytes() -> usize {
 }
 
 /// Collects a request body into [`Bytes`] while enforcing an in-memory size cap.
+#[cfg(any(
+    feature = "sources-utils-http-prelude",
+    feature = "sources-opentelemetry"
+))]
 pub(crate) fn limited_body(max_body_size: usize) -> BoxedFilter<(Bytes,)> {
     let max_body_size_header = u64::try_from(max_body_size).unwrap_or(u64::MAX);
 
@@ -158,6 +176,10 @@ fn decompress_snappy(
     Ok(decoded.into())
 }
 
+#[cfg(any(
+    feature = "sources-utils-http-prelude",
+    feature = "sources-opentelemetry"
+))]
 async fn collect_body_with_limit<S, B>(body: S, max_body_size: usize) -> Result<Bytes, ErrorMessage>
 where
     S: futures_util::Stream<Item = Result<B, warp::Error>>,
@@ -206,6 +228,10 @@ fn zstd_window_log_max(max_decompressed_size: usize) -> Option<u32> {
     })
 }
 
+#[cfg(any(
+    feature = "sources-utils-http-prelude",
+    feature = "sources-opentelemetry"
+))]
 fn request_body_too_large_error(max: usize) -> ErrorMessage {
     ErrorMessage::new(
         StatusCode::PAYLOAD_TOO_LARGE,
