@@ -11,7 +11,9 @@ on:
     types: [opened, reopened, synchronize]
     # Keep these paths in sync with the documentation team entries in .github/CODEOWNERS
     paths:
+      - "*.md"
       - "docs/**"
+      - "deprecation.d/**"
       - "website/content/**"
       - "website/cue/reference/**"
 

@@ -14,12 +14,13 @@ use vector_lib::{
     compile_vrl,
     config::{DataType, LegacyKey, LogNamespace},
     configurable::configurable_component,
-    lookup::{lookup_v2::OptionalValuePath, owned_value_path, path},
+    lookup::{PathPrefix, lookup_v2::OptionalValuePath, owned_value_path, path},
     schema::Definition,
 };
 use vrl::{
     compiler::{CompilationResult, CompileConfig, Program, TypeState},
-    value::{Kind, kind::Collection},
+    path::ValuePath as _,
+    value::{Kind, ObjectMap, kind::Collection},
 };
 use warp::http::HeaderMap;
 
@@ -119,6 +120,14 @@ pub struct SimpleHttpConfig {
     #[configurable(metadata(docs::examples = "*"))]
     query_parameters: Vec<String>,
 
+    /// HTTP authentication configuration.
+    ///
+    /// Use HTTP authentication with HTTPS only. The authentication credentials are passed as an
+    /// HTTP header without any additional encryption beyond what is provided by the transport itself.
+    ///
+    /// When using the `custom` strategy, the VRL program may write `%field = value` to enrich
+    /// authenticated events. These metadata fields are injected into the event body (legacy
+    /// namespace) or under `http_server.<field>` in event metadata (Vector namespace).
     #[configurable(derived)]
     auth: Option<HttpServerAuthConfig>,
 
@@ -289,9 +298,16 @@ impl SimpleHttpConfig {
             )
             .with_standard_vector_source_metadata();
 
-        // for metadata that is added to the events dynamically from config options
+        // For metadata that is added to the events dynamically from config options.
         if log_namespace == LogNamespace::Legacy {
-            schema_definition = schema_definition.unknown_fields(Kind::bytes());
+            // Custom auth programs can inject any VRL value, not just bytes; widen the unknown
+            // field kind accordingly so schema-aware downstream components don't reject events.
+            let unknown_kind = if matches!(self.auth, Some(HttpServerAuthConfig::Custom { .. })) {
+                Kind::any()
+            } else {
+                Kind::bytes()
+            };
+            schema_definition = schema_definition.unknown_fields(unknown_kind);
         }
 
         schema_definition
@@ -641,6 +657,42 @@ impl HttpSource for SimpleHttpSource {
     fn enable_source_ip(&self) -> bool {
         self.host_key.path.is_some()
     }
+
+    /// Injects `%field` enrichment from a `custom` auth VRL program into events.
+    /// Both namespaces use insert-if-empty semantics so auth enrichment never
+    /// overwrites built-in source metadata (`path`, `host`, `headers`, …) that
+    /// `enrich_events` already populated.
+    /// Vector namespace: inserted into event metadata under `http_server.<field>` for
+    ///   all event types (Log, Metric, Trace).
+    /// Legacy namespace: inserted into the Log event body only (Metric/Trace are skipped).
+    fn inject_auth_enrichment(&self, events: &mut [Event], enrichment: ObjectMap) {
+        for event in events.iter_mut() {
+            match self.log_namespace {
+                LogNamespace::Vector => {
+                    // metadata_mut() dispatches to Log, Metric, and Trace so every
+                    // decoded event type receives the auth enrichment fields.
+                    let meta = event.metadata_mut().value_mut();
+                    for (key, value) in &enrichment {
+                        let key_str = key.as_str();
+                        let name_part = path!(SimpleHttpConfig::NAME);
+                        let key_part = path!(key_str);
+                        let full_path = name_part.concat(key_part);
+                        if meta.get(full_path.clone()).is_none() {
+                            meta.insert(full_path, value.clone());
+                        }
+                    }
+                }
+                LogNamespace::Legacy => {
+                    // Legacy enrichment targets the event body; only Log events have one.
+                    if let Event::Log(log) = event {
+                        for (key, value) in &enrichment {
+                            log.try_insert((PathPrefix::Event, path!(key.as_str())), value.clone());
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -663,11 +715,15 @@ mod tests {
         config::LogNamespace,
         event::LogEvent,
         lookup::{
-            OwnedTargetPath, PathPrefix, event_path, lookup_v2::OptionalValuePath, owned_value_path,
+            OwnedTargetPath, PathPrefix, event_path, lookup_v2::OptionalValuePath,
+            owned_value_path, path,
         },
         schema::Definition,
     };
-    use vrl::value::{Kind, ObjectMap, kind::Collection};
+    use vrl::{
+        path::ValuePath as _,
+        value::{Kind, ObjectMap, kind::Collection},
+    };
 
     use super::{SimpleHttpConfig, remove_duplicates};
     use crate::{
@@ -2246,6 +2302,174 @@ mod tests {
                 list_dedup
             );
         }
+    }
+
+    #[test]
+    fn inject_auth_enrichment_does_not_clobber_vector_namespace_builtin_fields() {
+        use crate::{codecs::DecodingConfig, sources::util::HttpSource as _};
+        use vector_lib::codecs::BytesDeserializerConfig;
+        use vrl::value::KeyString;
+
+        let decoder = DecodingConfig::new(
+            BytesDecoderConfig::new().into(),
+            BytesDeserializerConfig::new().into(),
+            LogNamespace::Vector,
+        )
+        .build()
+        .unwrap()
+        .with_log_namespace(LogNamespace::Vector);
+
+        let source = super::SimpleHttpSource {
+            headers: vec![],
+            query_parameters: vec![],
+            path_key: OptionalValuePath::none(),
+            host_key: OptionalValuePath::none(),
+            decoder,
+            log_namespace: LogNamespace::Vector,
+        };
+
+        let mut log = LogEvent::default();
+        // Pre-populate %http_server.path as enrich_events would.
+        log.insert(
+            (
+                PathPrefix::Metadata,
+                path!(SimpleHttpConfig::NAME).concat(path!("path")),
+            ),
+            "/real/path",
+        );
+
+        let mut events = vec![Event::Log(log)];
+        let mut enrichment = ObjectMap::new();
+        // Attempt to clobber the built-in `path` field and inject a new field.
+        enrichment.insert(KeyString::from("path"), Value::from("/clobbered"));
+        enrichment.insert(KeyString::from("tenant_id"), Value::from("t-123"));
+
+        source.inject_auth_enrichment(&mut events, enrichment);
+
+        let Event::Log(log) = &events[0] else {
+            panic!("expected log event");
+        };
+        assert_eq!(
+            log.get((
+                PathPrefix::Metadata,
+                path!(SimpleHttpConfig::NAME).concat(path!("path")),
+            )),
+            Some(&Value::from("/real/path")),
+            "auth enrichment must not overwrite built-in source metadata"
+        );
+        assert_eq!(
+            log.get((
+                PathPrefix::Metadata,
+                path!(SimpleHttpConfig::NAME).concat(path!("tenant_id")),
+            )),
+            Some(&Value::from("t-123")),
+            "new auth enrichment field must be injected"
+        );
+    }
+
+    #[test]
+    fn inject_auth_enrichment_does_not_overwrite_existing_metadata_in_vector_namespace() {
+        use crate::{codecs::DecodingConfig, sources::util::HttpSource as _};
+        use vector_lib::codecs::BytesDeserializerConfig;
+        use vrl::value::KeyString;
+
+        let decoder = DecodingConfig::new(
+            BytesDecoderConfig::new().into(),
+            BytesDeserializerConfig::new().into(),
+            LogNamespace::Vector,
+        )
+        .build()
+        .unwrap()
+        .with_log_namespace(LogNamespace::Vector);
+
+        let source = super::SimpleHttpSource {
+            headers: vec![],
+            query_parameters: vec![],
+            path_key: OptionalValuePath::none(),
+            host_key: OptionalValuePath::none(),
+            decoder,
+            log_namespace: LogNamespace::Vector,
+        };
+
+        let mut log = LogEvent::default();
+        // Pre-populate a key (e.g. already written by enrich_events or the decoded event).
+        log.insert(
+            (
+                PathPrefix::Metadata,
+                path!(SimpleHttpConfig::NAME).concat(path!("tenant_id")),
+            ),
+            "existing",
+        );
+
+        let mut events = vec![Event::Log(log)];
+        let mut enrichment = ObjectMap::new();
+        enrichment.insert(KeyString::from("tenant_id"), Value::from("auth-value"));
+
+        source.inject_auth_enrichment(&mut events, enrichment);
+
+        let Event::Log(log) = &events[0] else {
+            panic!("expected log event");
+        };
+        assert_eq!(
+            log.get((
+                PathPrefix::Metadata,
+                path!(SimpleHttpConfig::NAME).concat(path!("tenant_id")),
+            )),
+            Some(&Value::from("existing")),
+            "auth enrichment must not overwrite already-present metadata keys"
+        );
+    }
+
+    #[test]
+    fn inject_auth_enrichment_applies_to_non_log_events_in_vector_namespace() {
+        use crate::{codecs::DecodingConfig, sources::util::HttpSource as _};
+        use vector_lib::{
+            codecs::BytesDeserializerConfig,
+            event::{Metric, MetricKind, MetricValue},
+        };
+        use vrl::value::KeyString;
+
+        let decoder = DecodingConfig::new(
+            BytesDecoderConfig::new().into(),
+            BytesDeserializerConfig::new().into(),
+            LogNamespace::Vector,
+        )
+        .build()
+        .unwrap()
+        .with_log_namespace(LogNamespace::Vector);
+
+        let source = super::SimpleHttpSource {
+            headers: vec![],
+            query_parameters: vec![],
+            path_key: OptionalValuePath::none(),
+            host_key: OptionalValuePath::none(),
+            decoder,
+            log_namespace: LogNamespace::Vector,
+        };
+
+        let metric = Metric::new(
+            "requests",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 1.0 },
+        );
+        let mut events = vec![Event::Metric(metric)];
+
+        let mut enrichment = ObjectMap::new();
+        enrichment.insert(KeyString::from("tenant_id"), Value::from("t-456"));
+
+        source.inject_auth_enrichment(&mut events, enrichment);
+
+        let Event::Metric(metric) = &events[0] else {
+            panic!("expected metric event");
+        };
+        assert_eq!(
+            metric
+                .metadata()
+                .value()
+                .get(path!(SimpleHttpConfig::NAME).concat(path!("tenant_id")),),
+            Some(&Value::from("t-456")),
+            "auth enrichment must be written to non-log event metadata"
+        );
     }
 
     impl ValidatableComponent for SimpleHttpConfig {

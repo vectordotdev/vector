@@ -433,6 +433,8 @@ generated: configuration: {
 					description: """
 						Controls how metadata is stored in log events.
 
+						This feature is in beta and behavior may change.
+
 						When set to `false` (legacy mode), metadata fields like `host`, `timestamp`, and `source_type`
 						are stored as top-level fields alongside your log data.
 
@@ -442,6 +444,7 @@ generated: configuration: {
 						See the [Log Namespacing guide](/guides/level-up/log_namespace/) for detailed information
 						about when to use Vector namespace mode and how to migrate from legacy mode.
 						"""
+					warnings: ["Enabling log namespacing currently does not work when disk buffers are used. Avoid combining `schema.log_namespace = true` with disk buffers until [#18574](https://github.com/vectordotdev/vector/issues/18574) is resolved."]
 					required: false
 				}
 				validation: {
@@ -1254,6 +1257,20 @@ generated: configuration: {
 														"""
 						required: true
 					}
+					measure_cpu_usage: {
+						type: bool: default: false
+						description: """
+														Enable CPU usage metrics for this transform.
+
+														When set to `true`, each poll of the transform task is timed using the OS thread CPU clock
+														and the accumulated nanoseconds are reported as the `component_cpu_usage_ns_total` counter,
+														tagged with `component_id`, `component_kind`, and `component_type`.
+
+														Defaults to `false`. Enable only for transforms where CPU attribution is needed, as it
+														adds a `clock_gettime` call on every future poll.
+														"""
+						required: false
+					}
 				}
 				description: "A transform."
 				required:    true
@@ -1497,7 +1514,8 @@ generated: configuration: {
 				"""
 			common:   false
 			required: false
-			group:    "schema"
+			warnings: ["These settings are ignored when `schema.log_namespace` is set to `true`."]
+			group: "schema"
 		}
 		metrics_storage_refresh_period: {
 			type: float: {}

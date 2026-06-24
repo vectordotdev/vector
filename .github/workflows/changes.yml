@@ -34,6 +34,8 @@ on:
         value: ${{ jobs.source.outputs.dependencies }}
       deny:
         value: ${{ jobs.source.outputs.deny }}
+      deprecations:
+        value: ${{ jobs.source.outputs.deprecations }}
       internal_events:
         value: ${{ jobs.source.outputs.internal_events }}
       cue:
@@ -170,6 +172,7 @@ jobs:
       source: ${{ steps.filter.outputs.source }}
       dependencies: ${{ steps.filter.outputs.dependencies }}
       deny: ${{ steps.filter.outputs.deny }}
+      deprecations: ${{ steps.filter.outputs.deprecations }}
       internal_events: ${{ steps.filter.outputs.internal_events }}
       cue: ${{ steps.filter.outputs.cue }}
       component_docs: ${{ steps.filter.outputs.component_docs }}
@@ -223,12 +226,17 @@ jobs:
               - '**/Cargo.toml'
               - 'Cargo.lock'
               - ".github/workflows/deny.yml"
+            deprecations:
+              - 'deprecation.d/**'
+              - 'website/data/deprecations.json'
+              - "vdev/**"
+              - ".github/workflows/deprecation.yaml"
+              - ".github/workflows/changes.yml"
             cue:
               - 'website/cue/**'
               - "vdev/**"
               - ".github/workflows/changes.yml"
             component_docs:
-              - 'scripts/generate-component-docs.rb'
               - "vdev/**"
               - 'website/cue/**/*.cue'
               - 'docs/generated/**'

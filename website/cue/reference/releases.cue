@@ -28,9 +28,19 @@ releases: {
 		contributors: [string, ...string] | *[]
 	}
 
+	#DeprecationEntry: {
+		what:             string
+		deprecated_since: string
+		description:      string
+	}
+
+	#EnactedDeprecationEntry: {
+		#DeprecationEntry
+		removed_in: string
+	}
+
 	#Release: {
 		version:      string
-		codename?:    string
 		date:         string
 		description?: string
 		known_issues: [string, ...string] | *[]
