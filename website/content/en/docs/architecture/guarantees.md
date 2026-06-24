@@ -129,7 +129,7 @@ by themselves guarantee end-to-end delivery.
 
 ### Does Vector support exactly-once delivery?
 
-No, Vector does not support exactly once delivery. There are future plans to partially support this for sources and sinks that support it, for example Kafka, but it remains unclear if Vector will ever be able to achieve this. We recommend [subscribing to our mailing list](/community), which will keep you in the loop if this ever changes.
+No, Vector does not support exactly once delivery. There are future plans to partially support this for sources and sinks that support it, for example Kafka, but it remains unclear if Vector will ever be able to achieve this.
 
 ### How can I find components that meet these guarantees?
 
