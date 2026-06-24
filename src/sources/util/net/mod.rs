@@ -112,9 +112,7 @@ impl TryFrom<String> for SocketListenAddr {
             Err(_) => {
                 let fd: usize = match input.as_str() {
                     "systemd" => Ok(0),
-                    s if s.starts_with("systemd#") => s
-                        .strip_prefix("systemd#")
-                        .unwrap()
+                    s if let Some(rest) = s.strip_prefix("systemd#") => rest
                         .parse::<usize>()
                         .map_err(|_| Self::Error::UsizeParse)?
                         .checked_sub(1)
