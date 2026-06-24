@@ -1,10 +1,26 @@
 use std::{io::Read, sync::OnceLock};
 
-use bytes::{Buf, BufMut, Bytes, BytesMut};
+use bytes::{Buf, Bytes};
+#[cfg(any(
+    feature = "sources-utils-http-prelude",
+    feature = "sources-opentelemetry",
+    test
+))]
+use bytes::{BufMut, BytesMut};
 use flate2::read::{MultiGzDecoder, ZlibDecoder};
+#[cfg(any(
+    feature = "sources-utils-http-prelude",
+    feature = "sources-opentelemetry",
+    test
+))]
 use futures_util::StreamExt;
 use snap::raw::Decoder as SnappyDecoder;
-use warp::{Filter, filters::BoxedFilter, http::StatusCode};
+use warp::http::StatusCode;
+#[cfg(any(
+    feature = "sources-utils-http-prelude",
+    feature = "sources-opentelemetry"
+))]
+use warp::{Filter, filters::BoxedFilter};
 
 use crate::{common::http::ErrorMessage, internal_events::HttpDecompressError};
 
@@ -30,6 +46,10 @@ pub(crate) fn max_decompressed_size_bytes() -> usize {
 }
 
 /// Collects a request body into [`Bytes`] while enforcing an in-memory size cap.
+#[cfg(any(
+    feature = "sources-utils-http-prelude",
+    feature = "sources-opentelemetry"
+))]
 pub(crate) fn limited_body(max_body_size: usize) -> BoxedFilter<(Bytes,)> {
     let max_body_size_header = u64::try_from(max_body_size).unwrap_or(u64::MAX);
 
@@ -158,6 +178,11 @@ fn decompress_snappy(
     Ok(decoded.into())
 }
 
+#[cfg(any(
+    feature = "sources-utils-http-prelude",
+    feature = "sources-opentelemetry",
+    test
+))]
 async fn collect_body_with_limit<S, B>(body: S, max_body_size: usize) -> Result<Bytes, ErrorMessage>
 where
     S: futures_util::Stream<Item = Result<B, warp::Error>>,
@@ -167,7 +192,12 @@ where
 
     let mut bytes = BytesMut::new();
     while let Some(chunk) = body.next().await {
-        let chunk = chunk.map_err(body_read_error)?;
+        let chunk = chunk.map_err(|error| {
+            ErrorMessage::new(
+                StatusCode::BAD_REQUEST,
+                format!("Failed reading request body: {error}"),
+            )
+        })?;
         if chunk.remaining() > max_body_size.saturating_sub(bytes.len()) {
             return Err(request_body_too_large_error(max_body_size));
         }
@@ -201,6 +231,11 @@ fn zstd_window_log_max(max_decompressed_size: usize) -> Option<u32> {
     })
 }
 
+#[cfg(any(
+    feature = "sources-utils-http-prelude",
+    feature = "sources-opentelemetry",
+    test
+))]
 fn request_body_too_large_error(max: usize) -> ErrorMessage {
     ErrorMessage::new(
         StatusCode::PAYLOAD_TOO_LARGE,
@@ -212,13 +247,6 @@ fn decompressed_too_large_error(encoding: &str, max: usize) -> ErrorMessage {
     ErrorMessage::new(
         StatusCode::PAYLOAD_TOO_LARGE,
         format!("Decompressed {encoding} body exceeds limit of {max} bytes."),
-    )
-}
-
-fn body_read_error(error: warp::Error) -> ErrorMessage {
-    ErrorMessage::new(
-        StatusCode::BAD_REQUEST,
-        format!("Failed reading request body: {error}"),
     )
 }
 
