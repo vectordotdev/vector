@@ -528,10 +528,13 @@ fn map_value(data_type: &odbc_api::DataType, value: Option<&[u8]>, tz: Tz) -> Va
                 return Value::Null;
             };
 
-            std::str::from_utf8(value)
-                .ok()
-                .and_then(|s| NotNan::from_str(s).ok())
-                .map_or(Value::Null, Value::Float)
+            // Preserve unrepresentable floats (for example NaN) as bytes so tracking metadata is not lost.
+            // Downstream consumers may see `Value::Bytes` instead of `Value::Float` for NaN and other
+            // values that `NotNan` cannot represent.
+            match std::str::from_utf8(value).map(NotNan::from_str) {
+                Ok(Ok(f)) => Value::Float(f),
+                _ => Value::Bytes(Bytes::copy_from_slice(value)),
+            }
         }
 
         // Preserve exact decimal values from the database.
@@ -652,7 +655,6 @@ fn value_to_sql_parameter(value: &Value, tz: Tz) -> Option<String> {
 fn boolean_to_sql_parameter(value: bool) -> String {
     if value { "1" } else { "0" }.to_owned()
 }
-
 
 #[cfg(test)]
 mod tests {
