@@ -27,13 +27,14 @@ jobs:
     steps:
       - name: Check member review state
         id: check
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const { data: reviews } = await github.rest.pulls.listReviews({
               owner: context.repo.owner,
               repo: context.repo.repo,
               pull_number: context.payload.pull_request.number,
+              per_page: 100,
             });
 
             const allowed = ['MEMBER', 'OWNER'];
