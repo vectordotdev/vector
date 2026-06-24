@@ -1,3 +1,4 @@
+// Event sends only fail when the receiver is dropped (UI shutting down), so errors are ignored.
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{Terminal, prelude::Backend};
 

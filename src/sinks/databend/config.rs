@@ -125,6 +125,7 @@ impl SinkConfig for DatabendConfig {
         let mut endpoint = url::Url::parse(&endpoint)?;
         match auth {
             Some(Auth::Basic { user, password }) => {
+                // Only fails for host-less URLs, which cannot happen given the scheme validation above.
                 endpoint.set_username(&user).ok();
                 endpoint.set_password(Some(password.inner())).ok();
             }

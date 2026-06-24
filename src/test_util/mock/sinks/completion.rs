@@ -81,13 +81,13 @@ impl StreamSink<Event> for CompletionSink {
                 if self.remaining == 0
                     && let Some(tx) = self.completion_tx.take()
                 {
-                    tx.send(true).ok();
+                    tx.send(true).ok(); // receiver may be gone if the test already completed
                 }
             }
         }
 
         if let Some(tx) = self.completion_tx.take() {
-            tx.send(self.remaining == 0).ok();
+            tx.send(self.remaining == 0).ok(); // receiver may be gone if the test already completed
         }
 
         Ok(())

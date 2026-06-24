@@ -2571,7 +2571,7 @@ mod tests {
                     let mut rx = rx;
                     while let Some(event) = rx.next().await {
                         counter.fetch_add(1, Ordering::SeqCst);
-                        relay_tx.send(event).ok();
+                        relay_tx.send(event).ok(); // receiver gone means pipeline is shutting down
                     }
                 });
 
