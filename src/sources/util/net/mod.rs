@@ -158,7 +158,7 @@ mod test {
 
     #[test]
     fn parse_socket_listen_addr_success() {
-        let test: Config = toml::from_str(r#"addr="127.1.2.3:1234""#).unwrap();
+        let test: Config = serde_yaml::from_str(r#"addr: "127.1.2.3:1234""#).unwrap();
         assert_eq!(
             test.addr,
             SocketListenAddr::SocketAddr(SocketAddr::V4(SocketAddrV4::new(
@@ -166,25 +166,25 @@ mod test {
                 1234,
             )))
         );
-        let test: Config = toml::from_str(r#"addr="systemd""#).unwrap();
+        let test: Config = serde_yaml::from_str(r#"addr: "systemd""#).unwrap();
         assert_eq!(test.addr, SocketListenAddr::SystemdFd(0));
-        let test: Config = toml::from_str(r#"addr="systemd#3""#).unwrap();
+        let test: Config = serde_yaml::from_str(r#"addr: "systemd#3""#).unwrap();
         assert_eq!(test.addr, SocketListenAddr::SystemdFd(2));
     }
 
     #[test]
     fn parse_socket_listen_addr_fail() {
         // no port specified
-        let test: Result<Config, toml::de::Error> = toml::from_str(r#"addr="127.1.2.3""#);
+        let test: Result<Config, serde_yaml::Error> = serde_yaml::from_str(r#"addr: "127.1.2.3""#);
         assert!(test.is_err());
 
         // systemd fd indexing should be one based not zero.
         // the user should leave off the {#N} to get the fd 0.
-        let test: Result<Config, toml::de::Error> = toml::from_str(r#"addr="systemd#0""#);
+        let test: Result<Config, serde_yaml::Error> = serde_yaml::from_str(r#"addr: "systemd#0""#);
         assert!(test.is_err());
 
         // typo
-        let test: Result<Config, toml::de::Error> = toml::from_str(r#"addr="system""#);
+        let test: Result<Config, serde_yaml::Error> = serde_yaml::from_str(r#"addr: "system""#);
         assert!(test.is_err());
     }
 }

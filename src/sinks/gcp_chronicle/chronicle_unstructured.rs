@@ -691,17 +691,18 @@ mod integration_tests {
         let address = std::env::var(ADDRESS_ENV_VAR).unwrap();
         let config = format!(
             indoc! { r#"
-             endpoint = "{}"
-             customer_id = "customer id"
-             namespace = "namespace"
-             credentials_path = "{}"
-             log_type = "{}"
-             encoding.codec = "text"
+             endpoint: "{}"
+             customer_id: "customer id"
+             namespace: namespace
+             credentials_path: "{}"
+             log_type: "{}"
+             encoding:
+               codec: text
         "# },
             address, auth_path, log_type
         );
 
-        let config: ChronicleUnstructuredConfig = toml::from_str(&config).unwrap();
+        let config: ChronicleUnstructuredConfig = serde_yaml::from_str(&config).unwrap();
         config
     }
 

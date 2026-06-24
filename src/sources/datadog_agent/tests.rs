@@ -300,15 +300,15 @@ async fn source_with_sender(
         );
     }
     let (guard, address) = next_addr();
-    let config = toml::from_str::<DatadogAgentConfig>(&format!(
+    let config = serde_yaml::from_str::<DatadogAgentConfig>(&format!(
         indoc! { r#"
-            address = "{}"
-            compression = "none"
-            store_api_key = {}
-            acknowledgements = {}
-            multiple_outputs = {}
-            split_metric_namespace = {}
-            trace_proto = "v1v2"
+            address: "{}"
+            compression: none
+            store_api_key: {}
+            acknowledgements: {}
+            multiple_outputs: {}
+            split_metric_namespace: {}
+            trace_proto: v1v2
         "#},
         address, store_api_key, acknowledgements, multiple_outputs, split_metric_namespace
     ))
@@ -779,9 +779,9 @@ async fn send_timeout_returns_service_unavailable() {
 
 #[test]
 fn parse_config_with_send_timeout_secs() {
-    let config = toml::from_str::<DatadogAgentConfig>(indoc! { r#"
-            address = "0.0.0.0:8012"
-            send_timeout_secs = 1.5
+    let config = serde_yaml::from_str::<DatadogAgentConfig>(indoc! { r#"
+            address: "0.0.0.0:8012"
+            send_timeout_secs: 1.5
         "#})
     .unwrap();
 
@@ -791,8 +791,8 @@ fn parse_config_with_send_timeout_secs() {
 
 #[test]
 fn parse_config_without_send_timeout_secs() {
-    let config = toml::from_str::<DatadogAgentConfig>(indoc! { r#"
-            address = "0.0.0.0:8012"
+    let config = serde_yaml::from_str::<DatadogAgentConfig>(indoc! { r#"
+            address: "0.0.0.0:8012"
         "#})
     .unwrap();
 
@@ -2334,9 +2334,10 @@ async fn decode_series_endpoint_v2() {
 
 #[test]
 fn test_output_schema_definition_json_vector_namespace() {
-    let definition = toml::from_str::<DatadogAgentConfig>(indoc! { r#"
-            address = "0.0.0.0:8012"
-            decoding.codec = "json"
+    let definition = serde_yaml::from_str::<DatadogAgentConfig>(indoc! { r#"
+            address: "0.0.0.0:8012"
+            decoding:
+              codec: json
         "#})
     .unwrap()
     .outputs(LogNamespace::Vector)
@@ -2393,9 +2394,10 @@ fn test_output_schema_definition_json_vector_namespace() {
 
 #[test]
 fn test_output_schema_definition_bytes_vector_namespace() {
-    let definition = toml::from_str::<DatadogAgentConfig>(indoc! { r#"
-            address = "0.0.0.0:8012"
-            decoding.codec = "bytes"
+    let definition = serde_yaml::from_str::<DatadogAgentConfig>(indoc! { r#"
+            address: "0.0.0.0:8012"
+            decoding:
+              codec: bytes
         "#})
     .unwrap()
     .outputs(LogNamespace::Vector)
@@ -2453,9 +2455,10 @@ fn test_output_schema_definition_bytes_vector_namespace() {
 
 #[test]
 fn test_output_schema_definition_json_legacy_namespace() {
-    let definition = toml::from_str::<DatadogAgentConfig>(indoc! { r#"
-            address = "0.0.0.0:8012"
-            decoding.codec = "json"
+    let definition = serde_yaml::from_str::<DatadogAgentConfig>(indoc! { r#"
+            address: "0.0.0.0:8012"
+            decoding:
+              codec: json
         "#})
     .unwrap()
     .outputs(LogNamespace::Legacy)
@@ -2483,9 +2486,10 @@ fn test_output_schema_definition_json_legacy_namespace() {
 
 #[test]
 fn test_output_schema_definition_bytes_legacy_namespace() {
-    let definition = toml::from_str::<DatadogAgentConfig>(indoc! { r#"
-            address = "0.0.0.0:8012"
-            decoding.codec = "bytes"
+    let definition = serde_yaml::from_str::<DatadogAgentConfig>(indoc! { r#"
+            address: "0.0.0.0:8012"
+            decoding:
+              codec: bytes
         "#})
     .unwrap()
     .outputs(LogNamespace::Legacy)
