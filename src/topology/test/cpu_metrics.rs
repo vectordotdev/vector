@@ -121,7 +121,6 @@ fn assert_cpu_counter_positive(metrics: &[Metric]) {
 /// Function transform (non-concurrent, inline runner): `component_cpu_usage_ns_total`
 /// must be present with the correct component tags and a positive value when
 /// `measure_cpu_usage = true`.
-#[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
 #[tokio::test]
 async fn component_cpu_usage_emitted_function_transform() {
     let metrics = run_cpu_topology(|c| c).await;
@@ -131,7 +130,6 @@ async fn component_cpu_usage_emitted_function_transform() {
 /// Task transform (non-concurrent): the same `cpu_timed` wrapper is applied to
 /// the task future in `build_task_transform`, so the counter must also be
 /// emitted when `measure_cpu_usage = true`.
-#[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
 #[tokio::test]
 async fn component_cpu_usage_emitted_task_transform() {
     let metrics = run_cpu_topology(|_| NoopTransformConfig::from(TransformType::Task)).await;
@@ -141,7 +139,6 @@ async fn component_cpu_usage_emitted_task_transform() {
 /// Concurrent sync transform: the driver future goes through `run_concurrently()`
 /// in `build_sync_transform`, and each spawned batch task is wrapped via
 /// `spawn_timed`. The counter must still be emitted when `measure_cpu_usage = true`.
-#[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
 #[tokio::test]
 async fn component_cpu_usage_emitted_concurrent_transform() {
     let metrics = run_cpu_topology(|c| c.with_concurrency()).await;
