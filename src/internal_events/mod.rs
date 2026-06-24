@@ -119,6 +119,7 @@ mod process;
 #[cfg(any(
     feature = "sources-prometheus-scrape",
     feature = "sources-prometheus-remote-write",
+    feature = "sources-prometheus-kubernetes-sd",
     feature = "sinks-prometheus"
 ))]
 mod prometheus;
@@ -269,6 +270,7 @@ pub(crate) use self::postgresql_metrics::*;
 #[cfg(any(
     feature = "sources-prometheus-scrape",
     feature = "sources-prometheus-remote-write",
+    feature = "sources-prometheus-kubernetes-sd",
     feature = "sinks-prometheus"
 ))]
 pub(crate) use self::prometheus::*;

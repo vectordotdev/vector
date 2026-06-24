@@ -250,16 +250,7 @@ impl HttpClientContext for PrometheusScrapeContext {
                 honor_label,
             }) = &self.instance_info
             {
-                match (honor_label, metric.tag_value(tag)) {
-                    (false, Some(old_instance)) => {
-                        metric.replace_tag(format!("exported_{tag}"), old_instance);
-                        metric.replace_tag(tag.clone(), instance.clone());
-                    }
-                    (true, Some(_)) => {}
-                    (_, None) => {
-                        metric.replace_tag(tag.clone(), instance.clone());
-                    }
-                }
+                super::merge_honor_label_tag(metric, tag, instance, *honor_label);
             }
             if let Some(EndpointInfo {
                 tag,
@@ -267,16 +258,7 @@ impl HttpClientContext for PrometheusScrapeContext {
                 honor_label,
             }) = &self.endpoint_info
             {
-                match (honor_label, metric.tag_value(tag)) {
-                    (false, Some(old_endpoint)) => {
-                        metric.replace_tag(format!("exported_{tag}"), old_endpoint);
-                        metric.replace_tag(tag.clone(), endpoint.clone());
-                    }
-                    (true, Some(_)) => {}
-                    (_, None) => {
-                        metric.replace_tag(tag.clone(), endpoint.clone());
-                    }
-                }
+                super::merge_honor_label_tag(metric, tag, endpoint, *honor_label);
             }
         }
     }
