@@ -3,6 +3,10 @@
 # this into a reusable workflow (`workflow_call`) with the label as an input.
 name: Add Docs Review Label
 
+concurrency:
+  group: pr-labels-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
 permissions:
   pull-requests: write
 
