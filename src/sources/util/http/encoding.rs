@@ -167,7 +167,12 @@ where
 
     let mut bytes = BytesMut::new();
     while let Some(chunk) = body.next().await {
-        let chunk = chunk.map_err(body_read_error)?;
+        let chunk = chunk.map_err(|error| {
+            ErrorMessage::new(
+                StatusCode::BAD_REQUEST,
+                format!("Failed reading request body: {error}"),
+            )
+        })?;
         if chunk.remaining() > max_body_size.saturating_sub(bytes.len()) {
             return Err(request_body_too_large_error(max_body_size));
         }
@@ -212,13 +217,6 @@ fn decompressed_too_large_error(encoding: &str, max: usize) -> ErrorMessage {
     ErrorMessage::new(
         StatusCode::PAYLOAD_TOO_LARGE,
         format!("Decompressed {encoding} body exceeds limit of {max} bytes."),
-    )
-}
-
-fn body_read_error(error: warp::Error) -> ErrorMessage {
-    ErrorMessage::new(
-        StatusCode::BAD_REQUEST,
-        format!("Failed reading request body: {error}"),
     )
 }
 
