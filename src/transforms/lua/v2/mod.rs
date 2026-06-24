@@ -460,6 +460,7 @@ impl RuntimeTransform for Lua {
 mod tests {
     use std::{future::Future, sync::Arc};
 
+    use indoc::indoc;
     use similar_asserts::assert_eq;
     use tokio::sync::{
         Mutex,
@@ -488,7 +489,7 @@ mod tests {
     }
 
     fn from_config(config: &str) -> crate::Result<Box<Lua>> {
-        Lua::new(&toml::from_str(config).unwrap(), "transform".into()).map(Box::new)
+        Lua::new(&serde_yaml::from_str(config).unwrap(), "transform".into()).map(Box::new)
     }
 
     async fn run_transform<T: Future>(
@@ -497,7 +498,7 @@ mod tests {
     ) -> T::Output {
         test_util::trace_init();
         assert_transform_compliance(async move {
-            let config = super::super::LuaConfig::V2(toml::from_str(config).unwrap());
+            let config = super::super::LuaConfig::V2(serde_yaml::from_str(config).unwrap());
             let (tx, rx) = mpsc::channel(1);
             let (topology, out) = create_topology(ReceiverStream::new(rx), config).await;
 
@@ -532,18 +533,7 @@ mod tests {
         let line1 = random_string(9);
         run_transform(
             &format!(
-                r#"
-            version = "2"
-            hooks.init = """function (emit)
-                event = {{log={{message="{line1}"}}}}
-                emit(event)
-            end
-            """
-            hooks.process = """function (event, emit)
-                emit(event)
-            end
-            """
-            "#
+                "version: \"2\"\nhooks:\n  init: |\n    function (emit)\n      event = {{log={{message=\"{line1}\"}}}}\n      emit(event)\n    end\n  process: |\n    function (event, emit)\n      emit(event)\n    end\n"
             ),
             |tx, out| async move {
                 let line2 = random_string(9);
@@ -567,14 +557,15 @@ mod tests {
     #[tokio::test]
     async fn lua_add_field() {
         run_transform(
-            r#"
-            version = "2"
-            hooks.process = """function (event, emit)
-                event["log"]["hello"] = "goodbye"
-                emit(event)
-            end
-            """
-            "#,
+            indoc! {r#"
+            version: "2"
+            hooks:
+              process: |
+                function (event, emit)
+                  event["log"]["hello"] = "goodbye"
+                  emit(event)
+                end
+            "#},
             |tx, out| async move {
                 let event = Event::Log(LogEvent::from("program me"));
                 tx.send(event).await.unwrap();
@@ -591,15 +582,16 @@ mod tests {
     #[tokio::test]
     async fn lua_read_field() {
         run_transform(
-            r#"
-            version = "2"
-            hooks.process = """function (event, emit)
-                _, _, name = string.find(event.log.message, "Hello, my name is (%a+).")
-                event.log.name = name
-                emit(event)
-            end
-            """
-            "#,
+            indoc! {r#"
+            version: "2"
+            hooks:
+              process: |
+                function (event, emit)
+                  _, _, name = string.find(event.log.message, "Hello, my name is (%a+).")
+                  event.log.name = name
+                  emit(event)
+                end
+            "#},
             |tx, out| async move {
                 let event = Event::Log(LogEvent::from("Hello, my name is Bob."));
                 tx.send(event).await.unwrap();
@@ -613,14 +605,15 @@ mod tests {
     #[tokio::test]
     async fn lua_remove_field() {
         run_transform(
-            r#"
-            version = "2"
-            hooks.process = """function (event, emit)
-                event.log.name = nil
-                emit(event)
-            end
-            """
-            "#,
+            indoc! {r#"
+            version: "2"
+            hooks:
+              process: |
+                function (event, emit)
+                  event.log.name = nil
+                  emit(event)
+                end
+            "#},
             |tx, out| async move {
                 let mut event = LogEvent::default();
                 event.insert("name", "Bob");
@@ -636,13 +629,14 @@ mod tests {
     #[tokio::test]
     async fn lua_drop_event() {
         run_transform(
-            r#"
-            version = "2"
-            hooks.process = """function (event, emit)
-                -- emit nothing
-            end
-            """
-            "#,
+            indoc! {r#"
+            version: "2"
+            hooks:
+              process: |
+                function (event, emit)
+                  -- emit nothing
+                end
+            "#},
             |tx, _out| async move {
                 let event = LogEvent::default().into();
                 tx.send(event).await.unwrap();
@@ -656,14 +650,15 @@ mod tests {
     #[tokio::test]
     async fn lua_duplicate_event() {
         run_transform(
-            r#"
-            version = "2"
-            hooks.process = """function (event, emit)
-                emit(event)
-                emit(event)
-            end
-            """
-            "#,
+            indoc! {r#"
+            version: "2"
+            hooks:
+              process: |
+                function (event, emit)
+                  emit(event)
+                  emit(event)
+                end
+            "#},
             |tx, out| async move {
                 let mut event = LogEvent::default();
                 event.insert("host", "127.0.0.1");
@@ -679,18 +674,19 @@ mod tests {
     #[tokio::test]
     async fn lua_read_empty_field() {
         run_transform(
-            r#"
-            version = "2"
-            hooks.process = """function (event, emit)
-                if event["log"]["non-existent"] == nil then
-                  event["log"]["result"] = "empty"
-                else
-                  event["log"]["result"] = "found"
+            indoc! {r#"
+            version: "2"
+            hooks:
+              process: |
+                function (event, emit)
+                  if event["log"]["non-existent"] == nil then
+                    event["log"]["result"] = "empty"
+                  else
+                    event["log"]["result"] = "found"
+                  end
+                  emit(event)
                 end
-                emit(event)
-            end
-            """
-            "#,
+            "#},
             |tx, out| async move {
                 let event = LogEvent::default();
                 tx.send(event.into()).await.unwrap();
@@ -707,14 +703,15 @@ mod tests {
     #[tokio::test]
     async fn lua_integer_value() {
         run_transform(
-            r#"
-            version = "2"
-            hooks.process = """function (event, emit)
-                event["log"]["number"] = 3
-                emit(event)
-            end
-            """
-            "#,
+            indoc! {r#"
+            version: "2"
+            hooks:
+              process: |
+                function (event, emit)
+                  event["log"]["number"] = 3
+                  emit(event)
+                end
+            "#},
             |tx, out| async move {
                 let event = LogEvent::default();
                 tx.send(event.into()).await.unwrap();
@@ -731,14 +728,15 @@ mod tests {
     #[tokio::test]
     async fn lua_numeric_value() {
         run_transform(
-            r#"
-            version = "2"
-            hooks.process = """function (event, emit)
-                event["log"]["number"] = 3.14159
-                emit(event)
-            end
-            """
-            "#,
+            indoc! {r#"
+            version: "2"
+            hooks:
+              process: |
+                function (event, emit)
+                  event["log"]["number"] = 3.14159
+                  emit(event)
+                end
+            "#},
             |tx, out| async move {
                 let event = LogEvent::default();
                 tx.send(event.into()).await.unwrap();
@@ -755,14 +753,15 @@ mod tests {
     #[tokio::test]
     async fn lua_boolean_value() {
         run_transform(
-            r#"
-            version = "2"
-            hooks.process = """function (event, emit)
-                event["log"]["bool"] = true
-                emit(event)
-            end
-            """
-            "#,
+            indoc! {r#"
+            version: "2"
+            hooks:
+              process: |
+                function (event, emit)
+                  event["log"]["bool"] = true
+                  emit(event)
+                end
+            "#},
             |tx, out| async move {
                 let event = LogEvent::default();
                 tx.send(event.into()).await.unwrap();
@@ -779,14 +778,15 @@ mod tests {
     #[tokio::test]
     async fn lua_non_coercible_value() {
         run_transform(
-            r#"
-            version = "2"
-            hooks.process = """function (event, emit)
-                event["log"]["junk"] = nil
-                emit(event)
-            end
-            """
-            "#,
+            indoc! {r#"
+            version: "2"
+            hooks:
+              process: |
+                function (event, emit)
+                  event["log"]["junk"] = nil
+                  emit(event)
+                end
+            "#},
             |tx, out| async move {
                 let event = LogEvent::default();
                 tx.send(event.into()).await.unwrap();
@@ -799,15 +799,14 @@ mod tests {
 
     #[tokio::test]
     async fn lua_non_string_key_write() -> crate::Result<()> {
-        let mut transform = from_config(
-            r#"
-            hooks.process = """function (event, emit)
-                event["log"][false] = "hello"
-                emit(event)
-            end
-            """
-            "#,
-        )
+        let mut transform = from_config(indoc! {r#"
+            hooks:
+              process: |
+                function (event, emit)
+                  event["log"][false] = "hello"
+                  emit(event)
+                end
+            "#})
         .unwrap();
 
         let err = transform
@@ -825,14 +824,15 @@ mod tests {
     #[tokio::test]
     async fn lua_non_string_key_read() {
         run_transform(
-            r#"
-            version = "2"
-            hooks.process = """function (event, emit)
-                event.log.result = event.log[false]
-                emit(event)
-            end
-            """
-            "#,
+            indoc! {r#"
+            version: "2"
+            hooks:
+              process: |
+                function (event, emit)
+                  event.log.result = event.log[false]
+                  emit(event)
+                end
+            "#},
             |tx, out| async move {
                 let event = LogEvent::default();
                 tx.send(event.into()).await.unwrap();
@@ -845,14 +845,13 @@ mod tests {
 
     #[tokio::test]
     async fn lua_script_error() -> crate::Result<()> {
-        let mut transform = from_config(
-            r#"
-            hooks.process = """function (event, emit)
-                error("this is an error")
-            end
-            """
-            "#,
-        )
+        let mut transform = from_config(indoc! {r#"
+            hooks:
+              process: |
+                function (event, emit)
+                  error("this is an error")
+                end
+            "#})
         .unwrap();
 
         let err = transform
@@ -865,14 +864,13 @@ mod tests {
 
     #[tokio::test]
     async fn lua_syntax_error() -> crate::Result<()> {
-        let err = from_config(
-            r#"
-            hooks.process = """function (event, emit)
-                1234 = sadf <>&*!#@
-            end
-            """
-            "#,
-        )
+        let err = from_config(indoc! {r#"
+            hooks:
+              process: |
+                function (event, emit)
+                  1234 = sadf <>&*!#@
+                end
+            "#})
         .map(|_| ())
         .unwrap_err()
         .to_string();
@@ -904,16 +902,7 @@ mod tests {
 
         run_transform(
             &format!(
-                r#"
-            version = "2"
-            hooks.process = """function (event, emit)
-                local script2 = require("script2")
-                script2.modify(event)
-                emit(event)
-            end
-            """
-            search_dirs = [{:?}]
-            "#,
+                "version: \"2\"\nhooks:\n  process: |\n    function (event, emit)\n      local script2 = require(\"script2\")\n      script2.modify(event)\n      emit(event)\n    end\nsearch_dirs:\n  - {:?}\n",
                 dir.path().as_os_str() // This seems a bit weird, but recall we also support windows.
             ),
             |tx, out| async move {
@@ -932,16 +921,17 @@ mod tests {
     #[tokio::test]
     async fn lua_pairs() {
         run_transform(
-            r#"
-            version = "2"
-            hooks.process = """function (event, emit)
-                for k,v in pairs(event.log) do
-                  event.log[k] = k .. v
+            indoc! {r#"
+            version: "2"
+            hooks:
+              process: |
+                function (event, emit)
+                  for k,v in pairs(event.log) do
+                    event.log[k] = k .. v
+                  end
+                  emit(event)
                 end
-                emit(event)
-            end
-            """
-            "#,
+            "#},
             |tx, out| async move {
                 let mut event = LogEvent::default();
                 event.insert("name", "Bob");
@@ -960,14 +950,15 @@ mod tests {
     #[tokio::test]
     async fn lua_metric() {
         run_transform(
-            r#"
-            version = "2"
-                hooks.process = """function (event, emit)
-                event.metric.counter.value = event.metric.counter.value + 1
-                emit(event)
-            end
-            """
-            "#,
+            indoc! {r#"
+            version: "2"
+            hooks:
+              process: |
+                function (event, emit)
+                  event.metric.counter.value = event.metric.counter.value + 1
+                  emit(event)
+                end
+            "#},
             |tx, out| async move {
                 let metric = Metric::new(
                     "example counter",
@@ -993,14 +984,15 @@ mod tests {
     #[tokio::test]
     async fn lua_multiple_events() {
         run_transform(
-            r#"
-            version = "2"
-            hooks.process = """function (event, emit)
-                event["log"]["hello"] = "goodbye"
-                emit(event)
-            end
-            """
-            "#,
+            indoc! {r#"
+            version: "2"
+            hooks:
+              process: |
+                function (event, emit)
+                  event["log"]["hello"] = "goodbye"
+                  emit(event)
+                end
+            "#},
             |tx, out| async move {
                 let n: usize = 10;
                 let events = (0..n).map(|i| Event::Log(LogEvent::from(format!("program me {i}"))));
