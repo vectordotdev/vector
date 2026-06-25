@@ -7,7 +7,9 @@ publish = false
 license = "MPL-2.0"
 
 [dependencies]
+chrono.workspace = true
 indoc.workspace = true
+syslog_loose = { version = "0.23", default-features = false }
 vrl.workspace = true
 enrichment = { path = "../enrichment" }
 dnstap-parser = { path = "../dnstap-parser", optional = true }
