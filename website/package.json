@@ -53,7 +53,7 @@
     "tailwindcss": "^2.2.4",
     "tocbot": "^4.12.2",
     "topojson-client": "^3.1.0",
-    "tsx": "^4.21.0",
+    "tsx": "^4.22.4",
     "typescript": "^5.9.3",
     "typesense": "^1.8.2",
     "typesense-sync": "https://s3.amazonaws.com/origin-static-assets/corp-node-packages/master/typesense-sync-v2.0.0.tgz"

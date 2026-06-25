@@ -121,6 +121,24 @@ fn make_transform_bloom_with_per_metric_limits(
     }
 }
 
+fn make_transform_fingerprint(
+    value_limit: usize,
+    limit_exceeded_action: LimitExceededAction,
+) -> Config {
+    Config {
+        global: Inner {
+            value_limit,
+            limit_exceeded_action,
+            mode: Mode::ExactFingerprint,
+            internal_metrics: InternalMetricsConfig::default(),
+        },
+        tracking_scope: TrackingScope::default(),
+        max_tracked_keys: None,
+        per_metric_limits: HashMap::new(),
+        per_tag_limits: HashMap::new(),
+    }
+}
+
 fn make_transform_with_global_per_tag_limits(
     value_limit: usize,
     limit_exceeded_action: LimitExceededAction,
@@ -149,6 +167,15 @@ async fn tag_cardinality_limit_drop_event_hashset() {
 #[tokio::test]
 async fn tag_cardinality_limit_drop_event_bloom() {
     drop_event(make_transform_bloom(2, LimitExceededAction::DropEvent)).await;
+}
+
+#[tokio::test]
+async fn tag_cardinality_limit_drop_event_fingerprint() {
+    drop_event(make_transform_fingerprint(
+        2,
+        LimitExceededAction::DropEvent,
+    ))
+    .await;
 }
 
 async fn drop_event(config: Config) {
@@ -201,6 +228,11 @@ async fn tag_cardinality_limit_drop_tag_hashset() {
 #[tokio::test]
 async fn tag_cardinality_limit_drop_tag_bloom() {
     drop_tag(make_transform_bloom(2, LimitExceededAction::DropTag)).await;
+}
+
+#[tokio::test]
+async fn tag_cardinality_limit_drop_tag_fingerprint() {
+    drop_tag(make_transform_fingerprint(2, LimitExceededAction::DropTag)).await;
 }
 
 async fn drop_tag(config: Config) {
@@ -1235,6 +1267,11 @@ fn global_per_tag_excluded_drop_tag_passthrough_bloom() {
     }));
 }
 
+#[test]
+fn global_per_tag_excluded_drop_tag_passthrough_fingerprint() {
+    global_per_tag_excluded_drop_tag_passthrough(Mode::ExactFingerprint);
+}
+
 /// A globally-excluded tag passes through unchanged on every metric, even when its values
 /// would have exceeded `value_limit`. Sibling non-excluded tags still respect the limit.
 fn global_per_tag_excluded_drop_tag_passthrough(mode: Mode) {
@@ -1285,6 +1322,11 @@ fn global_per_tag_excluded_drop_event_passthrough_bloom() {
     global_per_tag_excluded_drop_event_passthrough(Mode::Probabilistic(BloomFilterConfig {
         cache_size_per_key: default_cache_size(),
     }));
+}
+
+#[test]
+fn global_per_tag_excluded_drop_event_passthrough_fingerprint() {
+    global_per_tag_excluded_drop_event_passthrough(Mode::ExactFingerprint);
 }
 
 /// Under `DropEvent`, a globally-excluded tag never triggers a drop, but a non-excluded
@@ -1460,4 +1502,72 @@ per_tag_limits:
 
     let excluded = parsed.per_tag_limits.get("excluded_tag").unwrap();
     assert_eq!(excluded.mode, PerTagMode::Excluded);
+}
+
+/// A re-sent already-accepted tag value must pass through even after the limit is hit,
+/// for both DropTag and DropEvent actions.
+#[test]
+fn fingerprint_accepted_value_passes_through_after_limit() {
+    for action in [LimitExceededAction::DropTag, LimitExceededAction::DropEvent] {
+        let mut transform = TagCardinalityLimit::new(make_transform_fingerprint(2, action));
+        transform
+            .transform_one(make_metric(metric_tags!("env" => "prod")))
+            .unwrap();
+        transform
+            .transform_one(make_metric(metric_tags!("env" => "staging")))
+            .unwrap();
+        // Limit now hit; re-send of an already-accepted value must still pass through.
+        let e = transform
+            .transform_one(make_metric(metric_tags!("env" => "prod")))
+            .unwrap();
+        assert_eq!("prod", e.as_metric().tags().unwrap().get("env").unwrap());
+    }
+}
+
+/// Fingerprint mode must never allocate a tracking entry for a tag that is globally
+/// excluded, matching the `Mode::Exact` "never allocate" contract.
+#[test]
+fn fingerprint_excluded_tag_never_populates_cache() {
+    let config = make_transform_with_global_per_tag_limits(
+        2,
+        LimitExceededAction::DropTag,
+        Mode::ExactFingerprint,
+        HashMap::from([("kube_pod_name".to_string(), make_per_tag_excluded())]),
+    );
+    let mut transform = TagCardinalityLimit::new(config);
+
+    for i in 0..10 {
+        let event = make_metric(metric_tags!(
+            "kube_pod_name" => format!("pod-{i}").as_str(),
+            "tag1" => "val1"
+        ));
+        transform.transform_one(event).unwrap();
+    }
+
+    let bucket = transform
+        .accepted_tags
+        .get(&None)
+        .expect("non-excluded tag1 should still allocate a global bucket");
+    assert!(
+        bucket.contains_key("tag1"),
+        "non-excluded tag must still be tracked"
+    );
+    assert!(
+        !bucket.contains_key("kube_pod_name"),
+        "excluded tag key must never enter the fingerprint cache"
+    );
+}
+
+/// Fingerprint mode YAML round-trips: `mode: exact_fingerprint` deserializes cleanly.
+#[test]
+fn fingerprint_mode_deserializes() {
+    let yaml = "mode: exact_fingerprint";
+    let mode: Mode = serde_yaml::from_str(yaml).expect("exact_fingerprint should deserialize");
+    assert_eq!(mode, Mode::ExactFingerprint);
+
+    let serialized = serde_yaml::to_string(&mode).expect("should serialize");
+    assert!(
+        serialized.contains("exact_fingerprint"),
+        "serialized form should contain 'exact_fingerprint'"
+    );
 }

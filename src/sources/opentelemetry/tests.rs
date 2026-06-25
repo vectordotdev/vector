@@ -1695,6 +1695,8 @@ async fn http_logs_use_otlp_decoding_emits_metric() {
 
 #[cfg(test)]
 mod otlp_decoding_config_tests {
+    use indoc::indoc;
+
     use crate::config::{DataType, LogNamespace, SourceConfig};
     use crate::sources::opentelemetry::config::{
         GrpcConfig, HttpConfig, OpentelemetryConfig, OtlpDecodingConfig,
@@ -1751,34 +1753,30 @@ mod otlp_decoding_config_tests {
         assert!(!config_false.any_enabled());
         assert!(!config_false.is_mixed());
 
-        // Test TOML deserialization (which uses From<bool> under the hood)
-        let config: OpentelemetryConfig = toml::from_str(
+        // Test YAML deserialization (which uses From<bool> under the hood)
+        let config: OpentelemetryConfig = serde_yaml::from_str(indoc! {
             r#"
-            use_otlp_decoding = true
-
-            [grpc]
-            address = "0.0.0.0:4317"
-
-            [http]
-            address = "0.0.0.0:4318"
+            use_otlp_decoding: true
+            grpc:
+              address: "0.0.0.0:4317"
+            http:
+              address: "0.0.0.0:4318"
             "#,
-        )
+        })
         .unwrap();
         assert!(config.use_otlp_decoding.logs);
         assert!(config.use_otlp_decoding.metrics);
         assert!(config.use_otlp_decoding.traces);
 
-        let config: OpentelemetryConfig = toml::from_str(
+        let config: OpentelemetryConfig = serde_yaml::from_str(indoc! {
             r#"
-            use_otlp_decoding = false
-
-            [grpc]
-            address = "0.0.0.0:4317"
-
-            [http]
-            address = "0.0.0.0:4318"
+            use_otlp_decoding: false
+            grpc:
+              address: "0.0.0.0:4317"
+            http:
+              address: "0.0.0.0:4318"
             "#,
-        )
+        })
         .unwrap();
         assert!(!config.use_otlp_decoding.logs);
         assert!(!config.use_otlp_decoding.metrics);
@@ -1788,38 +1786,34 @@ mod otlp_decoding_config_tests {
     #[test]
     fn test_otlp_decoding_deserialization_from_struct() {
         // Test deserializing from a struct with all fields
-        let config: OpentelemetryConfig = toml::from_str(
+        let config: OpentelemetryConfig = serde_yaml::from_str(indoc! {
             r#"
-            [grpc]
-            address = "0.0.0.0:4317"
-
-            [http]
-            address = "0.0.0.0:4318"
-
-            [use_otlp_decoding]
-            logs = false
-            metrics = false
-            traces = true
+            grpc:
+              address: "0.0.0.0:4317"
+            http:
+              address: "0.0.0.0:4318"
+            use_otlp_decoding:
+              logs: false
+              metrics: false
+              traces: true
             "#,
-        )
+        })
         .unwrap();
         assert!(!config.use_otlp_decoding.logs);
         assert!(!config.use_otlp_decoding.metrics);
         assert!(config.use_otlp_decoding.traces);
 
         // Test deserializing from a struct with partial fields (using defaults)
-        let config: OpentelemetryConfig = toml::from_str(
+        let config: OpentelemetryConfig = serde_yaml::from_str(indoc! {
             r#"
-            [grpc]
-            address = "0.0.0.0:4317"
-
-            [http]
-            address = "0.0.0.0:4318"
-
-            [use_otlp_decoding]
-            traces = true
+            grpc:
+              address: "0.0.0.0:4317"
+            http:
+              address: "0.0.0.0:4318"
+            use_otlp_decoding:
+              traces: true
             "#,
-        )
+        })
         .unwrap();
         assert!(!config.use_otlp_decoding.logs); // default false
         assert!(!config.use_otlp_decoding.metrics); // default false
@@ -1829,15 +1823,14 @@ mod otlp_decoding_config_tests {
     #[test]
     fn test_otlp_decoding_default_when_not_specified() {
         // Test that when use_otlp_decoding is not specified, it uses defaults (all false)
-        let config: OpentelemetryConfig = toml::from_str(
+        let config: OpentelemetryConfig = serde_yaml::from_str(indoc! {
             r#"
-            [grpc]
-            address = "0.0.0.0:4317"
-
-            [http]
-            address = "0.0.0.0:4318"
+            grpc:
+              address: "0.0.0.0:4317"
+            http:
+              address: "0.0.0.0:4318"
             "#,
-        )
+        })
         .unwrap();
         assert!(!config.use_otlp_decoding.logs);
         assert!(!config.use_otlp_decoding.metrics);

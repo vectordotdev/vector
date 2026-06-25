@@ -1246,10 +1246,9 @@ fn test_s3_sns_testevent() {
 
 #[test]
 fn parse_sqs_config() {
-    let config: Config = toml::from_str(
-        r#"
-            queue_url = "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
-        "#,
+    let config: Config = serde_yaml::from_str(
+        r#"queue_url: "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
+"#,
     )
     .unwrap();
     assert_eq!(
@@ -1258,14 +1257,12 @@ fn parse_sqs_config() {
     );
     assert!(config.deferred.is_none());
 
-    let config: Config = toml::from_str(
-        r#"
-            queue_url = "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
-            [deferred]
-            queue_url = "https://sqs.us-east-1.amazonaws.com/123456789012/MyDeferredQueue"
-            max_age_secs = 3600
-        "#,
-    )
+    let config: Config = serde_yaml::from_str(indoc::indoc! {r#"
+        queue_url: "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
+        deferred:
+          queue_url: "https://sqs.us-east-1.amazonaws.com/123456789012/MyDeferredQueue"
+          max_age_secs: 3600
+    "#})
     .unwrap();
     assert_eq!(
         config.queue_url,
@@ -1280,21 +1277,17 @@ fn parse_sqs_config() {
     );
     assert_eq!(deferred.max_age_secs, 3600);
 
-    let test: Result<Config, toml::de::Error> = toml::from_str(
-        r#"
-            queue_url = "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
-            [deferred]
-            max_age_secs = 3600
-        "#,
-    );
+    let test: Result<Config, serde_yaml::Error> = serde_yaml::from_str(indoc::indoc! {r#"
+        queue_url: "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
+        deferred:
+          max_age_secs: 3600
+    "#});
     assert!(test.is_err());
 
-    let test: Result<Config, toml::de::Error> = toml::from_str(
-        r#"
-            queue_url = "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
-            [deferred]
-            queue_url = "https://sqs.us-east-1.amazonaws.com/123456789012/MyDeferredQueue"
-        "#,
-    );
+    let test: Result<Config, serde_yaml::Error> = serde_yaml::from_str(indoc::indoc! {r#"
+        queue_url: "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
+        deferred:
+          queue_url: "https://sqs.us-east-1.amazonaws.com/123456789012/MyDeferredQueue"
+    "#});
     assert!(test.is_err());
 }

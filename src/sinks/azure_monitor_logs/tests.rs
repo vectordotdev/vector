@@ -47,14 +47,12 @@ async fn component_spec_compliance() {
 
 #[tokio::test]
 async fn fails_missing_creds() {
-    let config: AzureMonitorLogsConfig = toml::from_str(
-        r#"
-            customer_id = "97ce69d9-b4be-4241-8dbd-d265edcf06c4"
-            shared_key = ""
-            log_type = "Vector"
-            azure_resource_id = "97ce69d9-b4be-4241-8dbd-d265edcf06c4"
-        "#,
-    )
+    let config: AzureMonitorLogsConfig = serde_yaml::from_str(indoc::indoc! {r#"
+            customer_id: 97ce69d9-b4be-4241-8dbd-d265edcf06c4
+            shared_key: ""
+            log_type: Vector
+            azure_resource_id: 97ce69d9-b4be-4241-8dbd-d265edcf06c4
+        "#})
     .unwrap();
     if config.build(SinkContext::default()).await.is_ok() {
         panic!("config.build failed to error");
@@ -63,23 +61,23 @@ async fn fails_missing_creds() {
 
 #[test]
 fn correct_host() {
-    let config_default = toml::from_str::<AzureMonitorLogsConfig>(
-            r#"
-            customer_id = "97ce69d9-b4be-4241-8dbd-d265edcf06c4"
-            shared_key = "SERsIYhgMVlJB6uPsq49gCxNiruf6v0vhMYE+lfzbSGcXjdViZdV/e5pEMTYtw9f8SkVLf4LFlLCc2KxtRZfCA=="
-            log_type = "Vector"
-        "#,
+    let config_default = serde_yaml::from_str::<AzureMonitorLogsConfig>(
+            indoc::indoc! {r#"
+            customer_id: 97ce69d9-b4be-4241-8dbd-d265edcf06c4
+            shared_key: "SERsIYhgMVlJB6uPsq49gCxNiruf6v0vhMYE+lfzbSGcXjdViZdV/e5pEMTYtw9f8SkVLf4LFlLCc2KxtRZfCA=="
+            log_type: Vector
+        "#},
         )
         .expect("Config parsing failed without custom host");
     assert_eq!(config_default.host, default_host());
 
-    let config_cn = toml::from_str::<AzureMonitorLogsConfig>(
-            r#"
-            customer_id = "97ce69d9-b4be-4241-8dbd-d265edcf06c4"
-            shared_key = "SERsIYhgMVlJB6uPsq49gCxNiruf6v0vhMYE+lfzbSGcXjdViZdV/e5pEMTYtw9f8SkVLf4LFlLCc2KxtRZfCA=="
-            log_type = "Vector"
-            host = "ods.opinsights.azure.cn"
-        "#,
+    let config_cn = serde_yaml::from_str::<AzureMonitorLogsConfig>(
+            indoc::indoc! {r#"
+            customer_id: 97ce69d9-b4be-4241-8dbd-d265edcf06c4
+            shared_key: "SERsIYhgMVlJB6uPsq49gCxNiruf6v0vhMYE+lfzbSGcXjdViZdV/e5pEMTYtw9f8SkVLf4LFlLCc2KxtRZfCA=="
+            log_type: Vector
+            host: ods.opinsights.azure.cn
+        "#},
         )
         .expect("Config parsing failed with .cn custom host");
     assert_eq!(config_cn.host, "ods.opinsights.azure.cn");
@@ -87,14 +85,12 @@ fn correct_host() {
 
 #[tokio::test]
 async fn fails_invalid_base64() {
-    let config: AzureMonitorLogsConfig = toml::from_str(
-        r#"
-            customer_id = "97ce69d9-b4be-4241-8dbd-d265edcf06c4"
-            shared_key = "1Qs77Vz40+iDMBBTRmROKJwnEX"
-            log_type = "Vector"
-            azure_resource_id = "97ce69d9-b4be-4241-8dbd-d265edcf06c4"
-        "#,
-    )
+    let config: AzureMonitorLogsConfig = serde_yaml::from_str(indoc::indoc! {r#"
+            customer_id: 97ce69d9-b4be-4241-8dbd-d265edcf06c4
+            shared_key: 1Qs77Vz40+iDMBBTRmROKJwnEX
+            log_type: Vector
+            azure_resource_id: 97ce69d9-b4be-4241-8dbd-d265edcf06c4
+        "#})
     .unwrap();
     if config.build(SinkContext::default()).await.is_ok() {
         panic!("config.build failed to error");
@@ -103,29 +99,27 @@ async fn fails_invalid_base64() {
 
 #[test]
 fn fails_config_missing_fields() {
-    toml::from_str::<AzureMonitorLogsConfig>(
-            r#"
-            customer_id = "97ce69d9-b4be-4241-8dbd-d265edcf06c4"
-            shared_key = "SERsIYhgMVlJB6uPsq49gCxNiruf6v0vhMYE+lfzbSGcXjdViZdV/e5pEMTYtw9f8SkVLf4LFlLCc2KxtRZfCA=="
-            azure_resource_id = "97ce69d9-b4be-4241-8dbd-d265edcf06c4"
-        "#,
+    serde_yaml::from_str::<AzureMonitorLogsConfig>(
+            indoc::indoc! {r#"
+            customer_id: 97ce69d9-b4be-4241-8dbd-d265edcf06c4
+            shared_key: "SERsIYhgMVlJB6uPsq49gCxNiruf6v0vhMYE+lfzbSGcXjdViZdV/e5pEMTYtw9f8SkVLf4LFlLCc2KxtRZfCA=="
+            azure_resource_id: 97ce69d9-b4be-4241-8dbd-d265edcf06c4
+        "#},
         )
         .expect_err("Config parsing failed to error with missing log_type");
 
-    toml::from_str::<AzureMonitorLogsConfig>(
-        r#"
-            customer_id = "97ce69d9-b4be-4241-8dbd-d265edcf06c4"
-            log_type = "Vector"
-            azure_resource_id = "97ce69d9-b4be-4241-8dbd-d265edcf06c4"
-        "#,
-    )
+    serde_yaml::from_str::<AzureMonitorLogsConfig>(indoc::indoc! {r#"
+            customer_id: 97ce69d9-b4be-4241-8dbd-d265edcf06c4
+            log_type: Vector
+            azure_resource_id: 97ce69d9-b4be-4241-8dbd-d265edcf06c4
+        "#})
     .expect_err("Config parsing failed to error with missing shared_key");
 
-    toml::from_str::<AzureMonitorLogsConfig>(
-            r#"
-            shared_key = "SERsIYhgMVlJB6uPsq49gCxNiruf6v0vhMYE+lfzbSGcXjdViZdV/e5pEMTYtw9f8SkVLf4LFlLCc2KxtRZfCA=="
-            log_type = "Vector"
-        "#,
+    serde_yaml::from_str::<AzureMonitorLogsConfig>(
+            indoc::indoc! {r#"
+            shared_key: "SERsIYhgMVlJB6uPsq49gCxNiruf6v0vhMYE+lfzbSGcXjdViZdV/e5pEMTYtw9f8SkVLf4LFlLCc2KxtRZfCA=="
+            log_type: Vector
+        "#},
         )
         .expect_err("Config parsing failed to error with missing customer_id");
 }
@@ -161,14 +155,14 @@ fn build_authorization_header_value(
 
 #[tokio::test]
 async fn correct_request() {
-    let config: AzureMonitorLogsConfig = toml::from_str(
-            r#"
+    let config: AzureMonitorLogsConfig = serde_yaml::from_str(
+            indoc::indoc! {r#"
             # random GUID and random 64 Base-64 encoded bytes
-            customer_id = "97ce69d9-b4be-4241-8dbd-d265edcf06c4"
-            shared_key = "SERsIYhgMVlJB6uPsq49gCxNiruf6v0vhMYE+lfzbSGcXjdViZdV/e5pEMTYtw9f8SkVLf4LFlLCc2KxtRZfCA=="
-            log_type = "Vector"
-            azure_resource_id = "97ce69d9-b4be-4241-8dbd-d265edcf06c4"
-        "#,
+            customer_id: 97ce69d9-b4be-4241-8dbd-d265edcf06c4
+            shared_key: "SERsIYhgMVlJB6uPsq49gCxNiruf6v0vhMYE+lfzbSGcXjdViZdV/e5pEMTYtw9f8SkVLf4LFlLCc2KxtRZfCA=="
+            log_type: Vector
+            azure_resource_id: 97ce69d9-b4be-4241-8dbd-d265edcf06c4
+        "#},
         )
         .unwrap();
 

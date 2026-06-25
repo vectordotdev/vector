@@ -449,12 +449,13 @@ mod tests {
     #[test]
     fn test_config_with_tags() {
         let config = indoc! {r#"
-            namespace = "vector"
-            endpoint = "http://localhost:9999"
-            tags = {region="us-west-1"}
+            namespace: "vector"
+            endpoint: "http://localhost:9999"
+            tags:
+              region: "us-west-1"
         "#};
 
-        toml::from_str::<InfluxDbConfig>(config).unwrap();
+        serde_yaml::from_str::<InfluxDbConfig>(config).unwrap();
     }
 
     #[test]
