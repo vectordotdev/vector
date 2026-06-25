@@ -229,6 +229,32 @@ impl Template {
         (!parts.is_empty()).then_some(parts)
     }
 
+    /// Longest leading substring of the template source that is rendered
+    /// verbatim — no `{{ field }}` reference and no strftime specifier.
+    ///
+    /// Sinks use this to derive a confinement boundary from the
+    /// operator-authored portion of the template.
+    pub fn literal_prefix(&self) -> &str {
+        let bytes = self.src.as_bytes();
+        let mut i = 0;
+        while i < bytes.len() {
+            // `{{` starts a field reference.
+            if bytes[i] == b'{' && bytes.get(i + 1) == Some(&b'{') {
+                break;
+            }
+            // Any `%` may start a strftime sequence. `%%` is an escaped `%`,
+            // but in a mixed literal like `/tmp/100%%/%Y/` the whole segment
+            // is processed by chrono, which decodes `%%` to `%` and expands
+            // `%Y` to the year. We cannot know what chrono will emit without
+            // an actual timestamp, so stop at the first `%` unconditionally.
+            if bytes[i] == b'%' {
+                break;
+            }
+            i += 1;
+        }
+        &self.src[..i]
+    }
+
     #[allow(clippy::missing_const_for_fn)] // Adding `const` results in https://doc.rust-lang.org/error_codes/E0015.html
     /// Returns a reference to the template string.
     pub fn get_ref(&self) -> &str {
@@ -664,6 +690,30 @@ mod tests {
         assert_eq!(f5, vec!["foo", "bar"]);
         assert_eq!(f6, None);
         assert_eq!(f7, None);
+    }
+
+    #[test]
+    fn literal_prefix() {
+        let cases = [
+            ("/var/log/app.log", "/var/log/app.log"),
+            ("/var/log/{{ host }}/app.log", "/var/log/"),
+            ("/var/log/%Y/{{ host }}.log", "/var/log/"),
+            ("/srv-{{ id }}.log", "/srv-"),
+            ("{{ full_path }}", ""),
+            ("/{{ tenant }}/app.log", "/"),
+            // `%%` stops the prefix scan — in mixed segments like
+            // `100%%/%Y/{{ x }}` chrono decodes `%%` while expanding `%Y`,
+            // so we cannot determine the rendered prefix without a timestamp.
+            ("100%%-literal/{{ x }}", "100"),
+            ("no-template-at-all", "no-template-at-all"),
+            ("only-strftime-%F.log", "only-strftime-"),
+            // single `{` is not a field opener
+            ("a{b/{{ c }}", "a{b/"),
+        ];
+        for (src, expected) in cases {
+            let tpl = Template::try_from(src).unwrap();
+            assert_eq!(tpl.literal_prefix(), expected, "src = {src:?}");
+        }
     }
 
     #[test]
